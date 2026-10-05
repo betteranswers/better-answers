@@ -17,7 +17,7 @@ C4Context
   System_Ext(claude, "Claude and Claude Code", "The MCP client: find, ask, open and give_feedback as the signed-in person, by OAuth; personal tokens are P1's")
   System_Ext(m365, "Microsoft 365", "Entra sign-in on an exact invited-email match; SharePoint libraries read through Graph")
   System_Ext(website, "The client's public website", "Bound per URL prefix, enumerated and indexed on a cadence, no JavaScript rendering")
-  System_Ext(models, "Model providers", "Per-workspace routes by purpose: extraction, enrichment, answering, judging; embedding held in reserve")
+  System_Ext(models, "Model providers", "Per-workspace model choices by purpose: extraction, enrichment, answering, judging; embedding held in reserve")
   System_Ext(email, "Email over SMTP", "Sign-in codes today; invitations from P1, the alert email from O1")
   System_Ext(backups, "Off-host buckets and the dead-man switch", "Encrypted dumps and git bundles under governance lock, the object-store mirror, healthchecks.io's checks")
 

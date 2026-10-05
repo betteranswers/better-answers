@@ -7,7 +7,7 @@ description: Clears Renovate's dependency pull requests, one or a batch — list
 
 Renovate opens its pull requests at weekends (lock maintenance on Monday morning), labelled `deps`, on `renovate/<group>` branches. `renovate.json` holds the groups, the age rule and every rule that turns an update off; read it rather than trusting a summary. `automerge` is off, so nothing lands until a session arms it.
 
-The unit of work is the **cause**, not the package. Five red pull requests are often two causes, and each cause is fixed once, by one of four routes. No ticket is needed for any of this unless the fix outgrows a pull request.
+The unit of work is the **cause**, not the package. Five red pull requests are often two causes, and each cause is fixed once, by one of four paths. No ticket is needed for any of this unless the fix outgrows a pull request.
 
 ## 1. List the batch
 
@@ -75,7 +75,7 @@ What a fix owes, whichever path:
 - **Review**: `impact` before an edit and `detect_changes` before each commit, then the two reviews in `docs/agents/code-review.md`: `/ce-code-review` before the pull request, Cubic on it. GitNexus leaves test files out, so `impact` on a test answers *not found*, and the blast radius is the assertion itself. One commit per fix, in the commit's form; a branch fix has no `Refs:` footer.
 - **An issue**, when the path says so: filed in Linear (`docs/agents/issue-tracker.md`), with the pull request's number and the log line in its Notes. When the fix cannot land ahead of the new version, the issue carries the bump too, and the Renovate pull request closes as redundant once it lands (T-356 carried #211's).
 
-**Done when** every pull request on the first three routes has a head whose red leg's failing line is gone from a local run of that suite.
+**Done when** every pull request on the first three paths has a head whose red leg's failing line is gone from a local run of that suite.
 
 ## 5. Arm and watch
 

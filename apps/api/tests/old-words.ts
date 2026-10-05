@@ -253,20 +253,19 @@ const ROUTE_SENSES: readonly Sense[] = [
     sense: "Compound Engineering's route to a review peer",
     written: /\b(?:opencode|claude) route\b/gi,
   },
-  {
-    sense: "a TanStack route, in the SPA's composition or a test of it",
-    within: "apps/web/src/app/",
+  ...["apps/web/src/app/router.tsx", "apps/web/src/app/visible-tree.ts"].map((within) => ({
+    sense: "a TanStack route, in the router the SPA composes or its live reading",
+    within,
     written: /\broutes?\b/gi,
-  },
+  })),
   {
-    sense: "a TanStack route named outside the composition",
+    sense: "a TanStack route named outside the router",
     written:
-      /\b(?:index|shell|console['’]s) route\b|\ba route['’]s static data\b|\ba route (?:nothing declared|written beside)\b/gi,
+      /\b(?:index|shell|console['’]s) route\b|\ba route['’]s static data\b|\ba route (?:nothing declared|written beside)\b|\bits route carries\b/gi,
   },
   {
     sense: "a network's route",
-    written:
-      /\bdefault route\b|\bno route to\b|\bdo not route\b|\broutes through\b|\broute out\b/gi,
+    written: /\bdefault route\b|\bno route to\b|\bdo not route\b|\broute out\b/gi,
   },
   {
     sense: "the stored rebuild reason the model choice's migration replaced, named as stored",

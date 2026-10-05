@@ -9,7 +9,7 @@ C4Container
   Person(person, "Admin, Editor or Viewer", "Signed in on app., a session cookie host-only")
   Person(operator, "Operator", "Runs pnpm ops inside the api container; rolls back, and releases in drill mode, by dispatching release.yml")
   System_Ext(claude, "Claude and Claude Code", "MCP client with a bearer token from OAuth consent")
-  System_Ext(models, "Model providers", "Answering, judging, extraction routes; embedding in reserve")
+  System_Ext(models, "Model providers", "Answering, judging, extraction model choices; embedding in reserve")
   System_Ext(external, "Microsoft 365, the client's website, SMTP", "Sign-in and SharePoint from P1 and S4; sign-in codes by email today")
   System_Ext(offhost, "Off-host buckets and healthchecks.io", "Encrypted dumps and bundles, the object-store mirror, the dead-man checks")
 
@@ -34,7 +34,7 @@ C4Container
   Rel(api, postgres, "Reads and writes under SET LOCAL app.workspace_id as", "app_rt, pg")
   Rel(api, git, "Commits the governed write to, under a per-repository lock", "git binary")
   Rel(api, objects, "Streams uploaded originals to; sweeps orphaned ones; writes erasure replay copies", "S3")
-  Rel(api, models, "Calls answering and judging routes of; planned S2", "fetch-shaped seam")
+  Rel(api, models, "Calls through the answering and judging model choices; planned S2", "fetch-shaped seam")
   Rel(api, external, "Sends sign-in codes; signs in with Microsoft from P1", "SMTP, OIDC")
   Rel(api, offhost, "Pings the scheduler and sweeps checks", "HTTPS")
   Rel(api, web, "Serves the static build of", "HTTP on app.")

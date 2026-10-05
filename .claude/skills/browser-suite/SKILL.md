@@ -249,7 +249,7 @@ three things, of which automated rules are only one:
   `apps/web/e2e/frame.spec.ts` two.
 
 Ask for the `passesTheAccessibilityGate` fixture — called with no arguments — where the test does
-not end on the page it is about. The routes and failed-page specs walk on to other pages
+not end on the page it is about. The models-and-spend and failed-page specs walk on to other pages
 afterwards; every test in `apps/web/e2e/consent.spec.ts` ends at the client's own redirect, which
 is another origin and no page of ours. A test that ends somewhere this product did not serve and
 audited nothing is refused by name, so an absence is a failure rather than a silence.

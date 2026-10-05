@@ -35,7 +35,7 @@ C4Component
   Rel(api, erasure, "Calls")
   Rel(api, runs, "Calls")
   Rel(api, workspaces, "Calls")
-  Rel(api, llm, "Lists routes through")
+  Rel(api, llm, "Lists model choices through")
   Rel(api, sweeps, "Runs the pass through")
 
   Rel(erasure, concepts, "Moves bundle commits and checks through")
@@ -60,7 +60,7 @@ C4Component
   Rel(concepts, pgdoor, "Writes the index and identity through")
   Rel(runs, pgdoor, "Calls the queue functions through")
   Rel(graphdoor, access, "Renders the predicate from")
-  Rel(llm, pgdoor, "Reads routes through")
+  Rel(llm, pgdoor, "Reads model choices through")
   Rel(audit, pgdoor, "Inserts through")
 
   UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")
@@ -93,7 +93,7 @@ Enforced by one plugin rule, `better-answers/import-direction` (`packages/devtoo
 | `store/postgres` | `ingress_counter`, `mcp_call_counter`, `invitation_email_counter` |
 | `workspaces` | `workspace_config` |
 | `members` | `group`, `group_member`, `access_request` |
-| `llm` | `llm_route`; `llm_call` at S2 |
+| `llm` | `model_choice`; `llm_call` at S2 |
 | `audit` | `audit_event` |
 | `sources` | `source_binding`, `source_document`, `finding`, `index.chunk` |
 | `concepts` | `concept_identity`, `concept_index`, `bundle_commit`, `evidence`, `concept_evidence`, `concept_verification`, `concept_class_override`, `suggestion`, `concept_write_request`, `graph_generation`, `graph_node`, `graph_edge`; `concept_owner` at S3 |

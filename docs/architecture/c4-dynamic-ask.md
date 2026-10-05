@@ -27,7 +27,7 @@ C4Dynamic
   Rel(graphdoor, postgres, "5. One set-seeded walk; the reached set and the depth the cap fell at, recorded not chased", "recursive CTE")
   Rel(plan, postgres, "6. conceptsByIris hydrates the reached concepts under the predicate; the Answers among them are the reuse candidates")
   Rel(transport, draft, "7. The transaction has committed; the iterable is returned and iterated")
-  Rel(draft, llm, "8. Resolves the answering and judging routes; the client at the wire seam")
+  Rel(draft, llm, "8. Resolves the answering and judging model choices; the client at the wire seam")
   Rel(llm, models, "9. The judge over the candidate Answers, then the draft over the walk, or the reuse as it stands", "HTTPS, streamed")
   Rel(draft, transport, "10. Streams the contract: the verdict first, then the cited claims; depth 0 and the map phrase when the map is unavailable")
   Rel(transport, record, "11. On stream close, in a second transaction")
