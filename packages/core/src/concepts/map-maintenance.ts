@@ -13,23 +13,23 @@ import { enqueueJob, type EnqueueJobRefusal, type RebuildReason } from "../runs/
 import {
   countMap,
   sweepNonLiveGenerations,
-  type GraphCounts,
+  type MapCounts,
   type SweptGeneration,
-} from "../store/graph/index.ts";
+} from "../store/map/index.ts";
 import { withScope, type PostgresDoor } from "../store/postgres/index.ts";
 
-const GRAPH_ACTOR = "process:better-answers-graph";
+const MAP_ACTOR = "process:better-answers-graph";
 
-export type GraphMaintenancePrincipal = PlatformPrincipal & {
-  readonly actorId: typeof GRAPH_ACTOR;
+export type MapMaintenancePrincipal = PlatformPrincipal & {
+  readonly actorId: typeof MAP_ACTOR;
 };
 
-export const GRAPH_MAINTENANCE: GraphMaintenancePrincipal = {
+export const MAP_MAINTENANCE: MapMaintenancePrincipal = {
   kind: "platform",
-  actorId: GRAPH_ACTOR,
+  actorId: MAP_ACTOR,
 };
 
-const GRAPH_ACTS = declareActs("platform", {
+const MAP_ACTS = declareActs("platform", {
   swept: act("platform.graph.swept", {
     generation: "count",
     nodes: "count",
@@ -37,13 +37,13 @@ const GRAPH_ACTS = declareActs("platform", {
   }),
 });
 
-export type GraphMaintenanceRefusal = "malformed";
+export type MapMaintenanceRefusal = "malformed";
 
-export const graphCounts = async (
-  platform: GraphMaintenancePrincipal,
+export const mapCounts = async (
+  platform: MapMaintenancePrincipal,
   door: PostgresDoor,
   input: { readonly workspaceId: string },
-): Promise<Result<GraphCounts, GraphMaintenanceRefusal | Error>> => {
+): Promise<Result<MapCounts, MapMaintenanceRefusal | Error>> => {
   const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
   if (!workspace.success) return err("malformed");
   const counted = await attempt(() =>
@@ -53,14 +53,14 @@ export const graphCounts = async (
 };
 
 /**
- * Deletes every graph generation but the live one, with an audit event for each, under one batch
+ * Deletes every map generation but the live one, with an audit event for each, under one batch
  * id when there are several.
  */
-export const sweepGraph = async (
-  platform: GraphMaintenancePrincipal,
+export const sweepMap = async (
+  platform: MapMaintenancePrincipal,
   door: PostgresDoor,
   input: { readonly workspaceId: string },
-): Promise<Result<readonly SweptGeneration[], GraphMaintenanceRefusal | Error>> => {
+): Promise<Result<readonly SweptGeneration[], MapMaintenanceRefusal | Error>> => {
   const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
   if (!workspace.success) return err("malformed");
   const swept = await attempt(() =>
@@ -69,7 +69,7 @@ export const sweepGraph = async (
       await recordEach(
         platform,
         tx,
-        GRAPH_ACTS.swept,
+        MAP_ACTS.swept,
         generations.map(({ gen, nodes, edges }) => ({
           subjectId: String(gen),
           detail: { generation: gen, nodes, edges },
@@ -82,14 +82,14 @@ export const sweepGraph = async (
 };
 
 /** Queues a full rebuild for the worker and returns its job id; nothing is rebuilt here. */
-export const rebuildGraph = async (
-  platform: GraphMaintenancePrincipal,
+export const rebuildMap = async (
+  platform: MapMaintenancePrincipal,
   door: PostgresDoor,
   input: { readonly workspaceId: string; readonly reason: RebuildReason },
 ): Promise<
   Result<
     { readonly jobId: string },
-    GraphMaintenanceRefusal | EnqueueJobRefusal | PrincipalRefusal | Error
+    MapMaintenanceRefusal | EnqueueJobRefusal | PrincipalRefusal | Error
   >
 > => {
   const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);

@@ -1,18 +1,18 @@
 ---
-title: "The graph is plain Postgres tables, and row-level security is the tenancy guarantee"
+title: "The map is plain Postgres tables, and row-level security is the tenancy guarantee"
 date: 2026-09-23
 module: packages/schema
 problem_type: architecture_pattern
-component: graph
+component: map
 severity: high
 applies_when:
   - "Adding a tenant table, a grant, a policy or a definer function"
-  - "Writing a graph traversal, or proposing a graph engine or database"
+  - "Writing a map traversal, or proposing a graph engine or database"
   - "Writing a migration, or changing what worker_rt may reach"
   - "Changing how find matches full text on index.chunk"
 tags:
   - adr-0032
-  - graph
+  - map
   - rls
   - tenancy
   - migrations
@@ -20,11 +20,11 @@ tags:
   - definer-function
 ---
 
-# The graph is plain Postgres tables, and row-level security is the tenancy guarantee
+# The map is plain Postgres tables, and row-level security is the tenancy guarantee
 
 ## The decision
 
-The graph is two ordinary tenant tables in the platform Postgres, `graph_node` and `graph_edge`. They carry `workspace_id` and the three visibility terms as columns, under the same row-level security as every tenant table. Traversal is a prepared recursive-CTE template in the one graph query module per tier, with depth capped at 4 by the template. There is no Apache AGE, no per-workspace role and no custom database image. There is no `neo4j` ecosystem either: no driver, no Bolt, no APOC and no `neo4j_graphrag` import, with no exception.
+The map is two ordinary tenant tables in the platform Postgres, `map_node` and `map_edge`. They carry `workspace_id` and the three visibility terms as columns, under the same row-level security as every tenant table. Traversal is a prepared recursive-CTE template in the one map query module per tier, with depth capped at 4 by the template. There is no Apache AGE, no per-workspace role and no custom database image. There is no `neo4j` ecosystem either: no driver, no Bolt, no APOC and no `neo4j_graphrag` import, with no exception.
 
 The tenancy rule lives here:
 
@@ -35,7 +35,7 @@ The tenancy rule lives here:
 
 The substrate:
 
-- One migration journal, Drizzle's, in `packages/schema`. It generates migrations for `public` and carries hand-written SQL for the `index` schema, extensions, policies, SQL functions and the graph tables.
+- One migration journal, Drizzle's, in `packages/schema`. It generates migrations for `public` and carries hand-written SQL for the `index` schema, extensions, policies, SQL functions and the map tables.
 - One policy seam: every tenant policy calls `current_workspace_id()`, written `(SELECT current_workspace_id())`.
 - `index.chunk`'s vector column is `vector(N)`, fixed, with `embedding_route_id` on every row and list partitioning by workspace.
 - A `SECURITY DEFINER` function, `create_workspace_partition`, makes each workspace's `index.chunk` partition with a GIN index over its full-text column, `search`. The HNSW index returns with the route's S8 block, when the embedding column is first written, in the same per-partition shape.
@@ -45,8 +45,8 @@ The substrate:
 
 ## Why
 
-- AGE stored each workspace's graph as its own schema. Row-level security guards rows, not schemas, so fifty graphs needed fifty roles. The roles were AGE's cost, not a decision of their own.
-- The design had already removed what a graph engine is for: entry by key only, five named edge types, prepared templates, depth 4 at most, graphs of tens of megabytes. Hand-written SQL is cheap there.
+- AGE stored each workspace's map as its own schema. Row-level security guards rows, not schemas, so fifty maps needed fifty roles. The roles were AGE's cost, not a decision of their own.
+- The design had already removed what a graph engine is for: entry by key only, five named edge types, prepared templates, depth 4 at most, maps of tens of megabytes. Hand-written SQL is cheap there.
 - drizzle-orm has no query lifecycle hook, so there is no interception layer to trust. A default-deny policy is the stronger guarantee.
 - A second journal would blind the worker's schema stamp to the schema the worker writes.
 - pgvector's HNSW refuses a column with no dimension. The HNSW index was over a column nothing writes until S8, so every workspace paid to build it for no query.

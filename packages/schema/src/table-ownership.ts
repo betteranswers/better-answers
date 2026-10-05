@@ -1,6 +1,6 @@
 export const IDENTITY_PROVIDER = "apps/api/src/auth";
 export const POSTGRES_DOOR = "packages/core/src/store/postgres";
-export const GRAPH_DOOR = "packages/core/src/store/graph";
+export const MAP_DOOR = "packages/core/src/store/map";
 
 /**
  * Not `MIGRATOR`: the roles' surface spells the owning database role that way, and this names
@@ -11,7 +11,7 @@ export const JOURNAL_MIGRATOR = "apps/api/src";
 export const OWNERS_OUTSIDE_CORE = [
   IDENTITY_PROVIDER,
   POSTGRES_DOOR,
-  GRAPH_DOOR,
+  MAP_DOOR,
   JOURNAL_MIGRATOR,
 ] as const;
 
@@ -65,9 +65,9 @@ export const TABLE_OWNERS = {
 
   "public.job": "runs",
 
-  "public.graph_generation": "concepts",
-  "public.graph_node": "concepts",
-  "public.graph_edge": "concepts",
+  "public.map_generation": "concepts",
+  "public.map_node": "concepts",
+  "public.map_edge": "concepts",
 
   "public.suggestion": "concepts",
   "public.concept_write_request": "concepts",
@@ -314,29 +314,29 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "Approving an access request mints the invitation row directly, in the same transaction as the decision — a direct row write through the identity-write seam, never Better Auth's endpoint path, so the two invitation fences stand until the accept page ships.",
   },
   {
-    table: "public.graph_generation",
-    by: GRAPH_DOOR,
+    table: "public.map_generation",
+    by: MAP_DOOR,
     access: "read and write",
     reason:
       "The delta builder creates the live-generation row on a workspace's first delta and binds it on every write; the traversal templates bind it on every walk, so a rebuild's flip is one row update every read sees at once.",
   },
   {
-    table: "public.graph_node",
-    by: GRAPH_DOOR,
+    table: "public.map_node",
+    by: MAP_DOOR,
     access: "read and write",
     reason:
       "The delta builder upserts the bundle-and-record nodes inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path.",
   },
   {
-    table: "public.graph_edge",
-    by: GRAPH_DOOR,
+    table: "public.map_edge",
+    by: MAP_DOOR,
     access: "read and write",
     reason:
       "The delta builder replaces a concept's outgoing edges inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path.",
   },
   {
     table: "public.concept_index",
-    by: GRAPH_DOOR,
+    by: MAP_DOOR,
     access: "read",
     reason:
       "The delta builder resolves a link's target to a concept and reads its kind off the index inside the act's own transaction, and a newly landed concept's linkers are found there — the map is derived from the rows the same transaction just wrote.",

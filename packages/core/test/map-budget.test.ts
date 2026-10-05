@@ -2,7 +2,7 @@ import { appendFile } from "node:fs/promises";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { GRAPH_WALK_ROW_LIMIT, walkFrom } from "@better-answers/core/store/graph";
+import { MAP_WALK_ROW_LIMIT, walkFrom } from "@better-answers/core/store/map";
 
 import { writeConcept, type WriteConceptInput } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
@@ -109,7 +109,7 @@ const inMs = (value: number): string => `${Math.round(value)} ms`;
 type Figure = readonly [name: string, value: string];
 
 const recordFigures = async (figures: readonly Figure[]): Promise<void> => {
-  const heading = "The graph walk under concurrent read load";
+  const heading = "The map walk under concurrent read load";
   process.stdout.write(
     `\n${heading}: ${figures.map(([name, value]) => `${name} ${value}`).join("; ")}\n`,
   );
@@ -122,7 +122,7 @@ const recordFigures = async (figures: readonly Figure[]): Promise<void> => {
   );
 };
 
-describe("the graph under concurrent read load", () => {
+describe("the map under concurrent read load", () => {
   let map: DenseMap;
 
   beforeAll(async () => {
@@ -156,7 +156,7 @@ describe("the graph under concurrent read load", () => {
     ]);
 
     expect(walks.map((walked) => [walked.oneRowSteps, walked.walkSteps])).toEqual(
-      Array.from({ length: IN_FLIGHT * ROUNDS }, () => [1, GRAPH_WALK_ROW_LIMIT]),
+      Array.from({ length: IN_FLIGHT * ROUNDS }, () => [1, MAP_WALK_ROW_LIMIT]),
     );
     expect(
       inOneRowWalks,
@@ -166,8 +166,8 @@ describe("the graph under concurrent read load", () => {
 
   it("lands every concept and edge of the dense map", async () => {
     const rows = await db().pool.query<{ nodes: string; edges: string }>(
-      `SELECT (SELECT count(*) FROM graph_node WHERE workspace_id = $1) AS nodes,
-              (SELECT count(*) FROM graph_edge WHERE workspace_id = $1) AS edges`,
+      `SELECT (SELECT count(*) FROM map_node WHERE workspace_id = $1) AS nodes,
+              (SELECT count(*) FROM map_edge WHERE workspace_id = $1) AS edges`,
       [map.scenario.workspaceId],
     );
     expect(rows.rows[0]).toEqual({ nodes: String(CONCEPTS), edges: String(EDGES) });
@@ -188,7 +188,7 @@ describe("the graph under concurrent read load", () => {
      * promise.
      */
     const started = performance.now();
-    await runWorkerOnce(db().connectionUri, bundles().root, "graph-budget");
+    await runWorkerOnce(db().connectionUri, bundles().root, "map-budget");
     const wallClockMs = performance.now() - started;
 
     const job = await db().pool.query<{ status: string }>(
@@ -200,11 +200,11 @@ describe("the graph under concurrent read load", () => {
 
     const rebuilt = await db().pool.query<{ live_gen: number; nodes: string; edges: string }>(
       `SELECT g.live_gen,
-              (SELECT count(*) FROM graph_node n
+              (SELECT count(*) FROM map_node n
                 WHERE n.workspace_id = $1 AND n.gen = g.live_gen) AS nodes,
-              (SELECT count(*) FROM graph_edge e
+              (SELECT count(*) FROM map_edge e
                 WHERE e.workspace_id = $1 AND e.gen = g.live_gen) AS edges
-         FROM graph_generation g WHERE g.workspace_id = $1`,
+         FROM map_generation g WHERE g.workspace_id = $1`,
       [workspaceId],
     );
     expect(rebuilt.rows[0]).toEqual({

@@ -38,17 +38,17 @@ const workspaceWithLeftovers = async (name: string) => {
   );
   if (!put.ok) throw new Error(`the orphan was refused: ${put.error}`);
   await seedingWith(db().pool, async (seed) => {
-    const live = await seed.graphNode({ workspaceId: workspace.workspaceId });
-    await seed.graphEdge({ workspaceId: workspace.workspaceId, fromUid: live.uid });
-    const left = await seed.graphNode({ workspaceId: workspace.workspaceId, gen: 2 });
-    await seed.graphEdge({ workspaceId: workspace.workspaceId, gen: 2, fromUid: left.uid });
+    const live = await seed.mapNode({ workspaceId: workspace.workspaceId });
+    await seed.mapEdge({ workspaceId: workspace.workspaceId, fromUid: live.uid });
+    const left = await seed.mapNode({ workspaceId: workspace.workspaceId, gen: 2 });
+    await seed.mapEdge({ workspaceId: workspace.workspaceId, gen: 2, fromUid: left.uid });
   });
   return { ...workspace, admin, orphan };
 };
 
 const generationsOf = async (workspaceId: string): Promise<readonly number[]> => {
   const found = await db().pool.query<{ gen: number }>(
-    "SELECT DISTINCT gen FROM graph_node WHERE workspace_id = $1 AND gen IS NOT NULL ORDER BY gen",
+    "SELECT DISTINCT gen FROM map_node WHERE workspace_id = $1 AND gen IS NOT NULL ORDER BY gen",
     [workspaceId],
   );
   return found.rows.map((row) => row.gen);
@@ -129,7 +129,7 @@ describe("a sweep pass over every workspace", () => {
     const admin = principalOf(orphaned.workspaceId, orphaned.adminUserId, "Admin");
     await putObject(admin, store().door, orphan, new Blob(["Left by a failed bind."]).stream());
 
-    const pass = await whileWritesAreRefused(db().pool, "graph_node", () =>
+    const pass = await whileWritesAreRefused(db().pool, "map_node", () =>
       sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "remove" }),
     );
 
@@ -144,7 +144,7 @@ describe("a sweep pass over every workspace", () => {
       removed: 2,
       generations: 0,
     });
-    const refused = pass.value.swept.filter((swept) => !swept.graph.ok);
+    const refused = pass.value.swept.filter((swept) => !swept.map.ok);
     expect(refused.map((swept) => swept.workspaceId)).toEqual([stuck.workspaceId]);
     expect(await passesRecorded()).toEqual([
       {
@@ -198,7 +198,7 @@ describe("a sweep pass over every workspace", () => {
           {
             workspaceId: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
             uploads: { ok: true, value: { found: 0, removed: 0 } },
-            graph: { ok: true, value: [] },
+            map: { ok: true, value: [] },
           },
         ],
       },

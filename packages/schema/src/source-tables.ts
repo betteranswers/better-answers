@@ -18,7 +18,7 @@ export const CONNECTORS = ["upload"] as const;
 
 export const CONNECTOR_UPLOAD = "upload" satisfies (typeof CONNECTORS)[number];
 
-export const DESTINATIONS = ["chunk-index", "bundle", "graph"] as const;
+export const DESTINATIONS = ["chunk-index", "bundle", "map"] as const;
 
 export const UPLOAD_DESTINATIONS = ["chunk-index", "bundle"] as const;
 

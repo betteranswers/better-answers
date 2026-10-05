@@ -105,13 +105,11 @@ export type TestData = {
     overrides?: Partial<InsertInput<"conceptVerification">>,
   ): Promise<Row<"conceptVerification">>;
 
-  graphGeneration(
-    overrides?: Partial<InsertInput<"graphGeneration">>,
-  ): Promise<Row<"graphGeneration">>;
+  mapGeneration(overrides?: Partial<InsertInput<"mapGeneration">>): Promise<Row<"mapGeneration">>;
 
-  graphNode(overrides?: Partial<InsertInput<"graphNode">>): Promise<Row<"graphNode">>;
+  mapNode(overrides?: Partial<InsertInput<"mapNode">>): Promise<Row<"mapNode">>;
 
-  graphEdge(overrides?: Partial<InsertInput<"graphEdge">>): Promise<Row<"graphEdge">>;
+  mapEdge(overrides?: Partial<InsertInput<"mapEdge">>): Promise<Row<"mapEdge">>;
 
   suggestion(overrides?: Partial<InsertInput<"suggestion">>): Promise<Row<"suggestion">>;
 
@@ -549,18 +547,18 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  const graphGeneration: TestData["graphGeneration"] = async (overrides = {}) => {
+  const mapGeneration: TestData["mapGeneration"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "graphGeneration", { liveGen: 1, ...overrides, workspaceId });
+    return insertRow(client, "mapGeneration", { liveGen: 1, ...overrides, workspaceId });
   };
 
   const liveGenFor = async (workspaceId: string): Promise<number> => {
     const found = await client.query<{ live_gen: number }>(
-      "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+      "SELECT live_gen FROM map_generation WHERE workspace_id = $1",
       [workspaceId],
     );
     const live = found.rows[0]?.live_gen;
-    return live ?? (await graphGeneration({ workspaceId })).liveGen;
+    return live ?? (await mapGeneration({ workspaceId })).liveGen;
   };
 
   const genFor = async (
@@ -569,10 +567,10 @@ export const testData = (client: pg.PoolClient): TestData => {
   ): Promise<number | null> =>
     Object.hasOwn(overrides, "gen") ? (overrides.gen ?? null) : liveGenFor(workspaceId);
 
-  const graphNode: TestData["graphNode"] = async (overrides = {}) => {
+  const mapNode: TestData["mapNode"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const gen = await genFor(overrides, workspaceId);
-    return insertRow(client, "graphNode", {
+    return insertRow(client, "mapNode", {
       uid: conceptIriOf(ulid()),
       label: "Concept",
       kind: "Policy",
@@ -586,11 +584,11 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  const graphEdge: TestData["graphEdge"] = async (overrides = {}) => {
+  const mapEdge: TestData["mapEdge"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const gen = await genFor(overrides, workspaceId);
-    const fromUid = overrides.fromUid ?? (await graphNode({ workspaceId, gen })).uid;
-    const toUid = overrides.toUid ?? (await graphNode({ workspaceId, gen })).uid;
+    const fromUid = overrides.fromUid ?? (await mapNode({ workspaceId, gen })).uid;
+    const toUid = overrides.toUid ?? (await mapNode({ workspaceId, gen })).uid;
     const label = overrides.label ?? "LINKS_TO";
 
     const link =
@@ -602,7 +600,7 @@ export const testData = (client: pg.PoolClient): TestData => {
             sentence: "One policy rests on another.",
           }
         : { fromKind: null, toKind: null, section: null, sentence: null };
-    return insertRow(client, "graphEdge", {
+    return insertRow(client, "mapEdge", {
       uid: `links_to:${ulid()}`,
       publishedAt: new Date(),
       sensitivity: "Internal",
@@ -928,9 +926,9 @@ export const testData = (client: pg.PoolClient): TestData => {
     bundleCommit,
     evidence,
     conceptVerification,
-    graphGeneration,
-    graphNode,
-    graphEdge,
+    mapGeneration,
+    mapNode,
+    mapEdge,
     job,
     suggestion,
     conceptWriteRequest,

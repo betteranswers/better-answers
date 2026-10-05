@@ -8,7 +8,7 @@ import { folded, withMembership, withScope, type Tx } from "../src/store/postgre
 import { abortTheTransaction, countWaitingOnLocks, until } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
-const graphMaintenance: PlatformPrincipal = {
+const mapMaintenance: PlatformPrincipal = {
   kind: "platform",
   actorId: "process:better-answers-graph",
 };
@@ -18,7 +18,7 @@ const { db, arrange } = suiteWithBundles();
 const auditQueuedByCron = async (
   scenario: Awaited<ReturnType<typeof arrange>>,
 ): Promise<string> => {
-  const cron = await enqueueJob(graphMaintenance, scenario.postgres, {
+  const cron = await enqueueJob(mapMaintenance, scenario.postgres, {
     workspaceId: scenario.workspaceId,
     kind: "nightly-audit",
   });
@@ -120,7 +120,7 @@ describe("what the api puts on the worker's queue", () => {
   it("queues for the platform in the workspace it names", async () => {
     const scenario = await arrange();
 
-    const queued = await enqueueJob(graphMaintenance, scenario.postgres, {
+    const queued = await enqueueJob(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "full-rebuild",
       reason: "reconciler",
@@ -154,11 +154,11 @@ describe("what the api puts on the worker's queue", () => {
     const scenario = await arrange();
 
     // @ts-expect-error a rebuild without its reason is outside the input, on purpose
-    const noReason = await enqueueJob(graphMaintenance, scenario.postgres, {
+    const noReason = await enqueueJob(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "full-rebuild",
     });
-    const spuriousReason = await enqueueJob(graphMaintenance, scenario.postgres, {
+    const spuriousReason = await enqueueJob(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "nightly-audit",
       // @ts-expect-error an audit carries no reason, on purpose
@@ -197,7 +197,7 @@ const boundJob = (workspaceId: WorkspaceId) =>
   ({ workspaceId, kind: "index", subjectId: BINDING, reason: "bound" }) as const;
 
 const actOf = <T>(scenario: Scenario, work: (tx: Tx) => Promise<T>): Promise<T> =>
-  withScope(graphMaintenance, scenario.postgres, scenario.workspaceId, (tx) => work(tx));
+  withScope(mapMaintenance, scenario.postgres, scenario.workspaceId, (tx) => work(tx));
 
 const jobsIn = async (workspaceId: string) =>
   (
@@ -209,7 +209,7 @@ const jobsIn = async (workspaceId: string) =>
 
 const queuedBound = async (scenario: Scenario): Promise<string> => {
   const first = await actOf(scenario, (tx) =>
-    enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId)),
+    enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId)),
   );
   if (!first.ok) throw new Error(`the job was not queued: ${String(first.error)}`);
   return first.value.jobId;
@@ -223,7 +223,7 @@ describe("an act landing its rows and job in one transaction", () => {
     const scenario = await arrange();
 
     const act = actOf(scenario, async (tx) => {
-      const enqueued = await enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId));
+      const enqueued = await enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId));
 
       await abortTheTransaction(tx);
       return enqueued;
@@ -238,7 +238,7 @@ describe("an act landing its rows and job in one transaction", () => {
     const firstJobId = await queuedBound(scenario);
 
     const second = await actOf(scenario, async (tx) => {
-      const answered = await enqueueJobIn(graphMaintenance, tx, {
+      const answered = await enqueueJobIn(mapMaintenance, tx, {
         ...boundJob(scenario.workspaceId),
         reason: "restored",
       });
@@ -269,14 +269,14 @@ describe("an act landing its rows and job in one transaction", () => {
       const firstJobId = await queuedBound(scenario);
 
       const taken = await actOf(scenario, (tx) =>
-        enqueueJobIn(graphMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: emptying }),
+        enqueueJobIn(mapMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: emptying }),
       );
       expect(taken).toEqual({ ok: true, value: { jobId: firstJobId } });
       expect(await reasonsIn(scenario.workspaceId)).toEqual([emptying]);
 
       for (const reason of ["restored", alsoEmptying] as const) {
         const later = await actOf(scenario, (tx) =>
-          enqueueJobIn(graphMaintenance, tx, { ...boundJob(scenario.workspaceId), reason }),
+          enqueueJobIn(mapMaintenance, tx, { ...boundJob(scenario.workspaceId), reason }),
         );
         expect(later).toEqual({ ok: true, value: { jobId: firstJobId } });
         expect(await reasonsIn(scenario.workspaceId)).toEqual([emptying]);
@@ -289,7 +289,7 @@ describe("an act landing its rows and job in one transaction", () => {
     const firstLanded = Promise.withResolvers<undefined>();
     const held = Promise.withResolvers<undefined>();
     const first = actOf(scenario, async (tx) => {
-      const queued = await enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId));
+      const queued = await enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId));
       firstLanded.resolve(undefined);
       await held.promise;
       return queued;
@@ -297,7 +297,7 @@ describe("an act landing its rows and job in one transaction", () => {
     await firstLanded.promise;
 
     const second = actOf(scenario, (tx) =>
-      enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId)),
+      enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId)),
     ).then(
       () => "committed",
       (error: unknown) => error,
@@ -320,7 +320,7 @@ describe("an act landing its rows and job in one transaction", () => {
 
     const firstJobId = await queuedBound(scenario);
     const other = await actOf(scenario, (tx) =>
-      enqueueJobIn(graphMaintenance, tx, {
+      enqueueJobIn(mapMaintenance, tx, {
         ...boundJob(scenario.workspaceId),
         subjectId: ANOTHER_BINDING,
       }),
@@ -357,7 +357,7 @@ describe("an act landing its rows and job in one transaction", () => {
 
     const refused = await actOf(scenario, (tx) =>
       // @ts-expect-error each row is outside the queue's input, on purpose
-      enqueueJobIn(graphMaintenance, tx, {
+      enqueueJobIn(mapMaintenance, tx, {
         workspaceId: scenario.workspaceId,
         ...asked,
       }),
@@ -414,14 +414,14 @@ describe("an act landing its rows and job in one transaction", () => {
 describe("waiting on a job somebody queued", () => {
   it("answers the job's status and outcome to a polling caller", async () => {
     const scenario = await arrange();
-    const queued = await enqueueJob(graphMaintenance, scenario.postgres, {
+    const queued = await enqueueJob(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "full-rebuild",
       reason: "drill",
     });
     if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
 
-    const waiting = await jobById(graphMaintenance, scenario.postgres, {
+    const waiting = await jobById(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       jobId: queued.value.jobId,
     });
@@ -446,7 +446,7 @@ describe("waiting on a job somebody queued", () => {
       new Date("2026-09-07T02:00:00Z"),
       queued.value.jobId,
     );
-    const over = await jobById(graphMaintenance, scenario.postgres, {
+    const over = await jobById(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       jobId: queued.value.jobId,
     });
@@ -468,7 +468,7 @@ describe("waiting on a job somebody queued", () => {
       mismatched: [{ path: "knowledge/expenses.md", body: { text: "…" } }],
     });
 
-    const read = await jobById(graphMaintenance, scenario.postgres, {
+    const read = await jobById(mapMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       jobId,
     });
@@ -509,20 +509,20 @@ describe("waiting on a job somebody queued", () => {
     }
 
     expect((await jobById(scenario.admin, scenario.postgres, asking)).ok).toBe(true);
-    expect((await jobById(graphMaintenance, scenario.postgres, asking)).ok).toBe(true);
+    expect((await jobById(mapMaintenance, scenario.postgres, asking)).ok).toBe(true);
   });
 
   it("says no-such-job for an id this workspace never held", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
-    const queued = await enqueueJob(graphMaintenance, elsewhere.postgres, {
+    const queued = await enqueueJob(mapMaintenance, elsewhere.postgres, {
       workspaceId: elsewhere.workspaceId,
       kind: "nightly-audit",
     });
     if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
 
     expect(
-      await jobById(graphMaintenance, scenario.postgres, {
+      await jobById(mapMaintenance, scenario.postgres, {
         workspaceId: scenario.workspaceId,
         jobId: queued.value.jobId,
       }),

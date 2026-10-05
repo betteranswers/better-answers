@@ -123,10 +123,10 @@ const withMapLeftovers = async () => {
   const client = await db().pool.connect();
   try {
     const seed = testData(client);
-    const live = await seed.graphNode({ workspaceId: workspace.workspaceId });
-    await seed.graphEdge({ workspaceId: workspace.workspaceId, fromUid: live.uid });
-    const left = await seed.graphNode({ workspaceId: workspace.workspaceId, gen: 2 });
-    await seed.graphEdge({ workspaceId: workspace.workspaceId, gen: 2, fromUid: left.uid });
+    const live = await seed.mapNode({ workspaceId: workspace.workspaceId });
+    await seed.mapEdge({ workspaceId: workspace.workspaceId, fromUid: live.uid });
+    const left = await seed.mapNode({ workspaceId: workspace.workspaceId, gen: 2 });
+    await seed.mapEdge({ workspaceId: workspace.workspaceId, gen: 2, fromUid: left.uid });
   } finally {
     client.release();
   }
@@ -325,7 +325,7 @@ describe("the sweeps' daily pass", () => {
     const stuck = await withMapLeftovers();
     await provisioned();
 
-    const sweeps = await whileWritesAreRefused(db().pool, "graph_node", () =>
+    const sweeps = await whileWritesAreRefused(db().pool, "map_node", () =>
       onePass({ uploadSweep: "list", pingUrl: PING_URL }),
     );
 
@@ -335,7 +335,7 @@ describe("the sweeps' daily pass", () => {
         workspaces: 2,
         generations: 0,
         refused: 1,
-        refusals: [{ workspace_id: stuck.workspaceId, sweep: "graph", reason: expect.any(String) }],
+        refusals: [{ workspace_id: stuck.workspaceId, sweep: "map", reason: expect.any(String) }],
       }),
     ]);
     expect(sweeps.pinged).toEqual([

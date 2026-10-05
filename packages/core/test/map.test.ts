@@ -2,14 +2,14 @@ import type { QueryResultRow } from "pg";
 import { describe, expect, it } from "vitest";
 
 import {
-  GRAPH_WALK_DEPTH,
-  GRAPH_WALK_ROW_LIMIT,
+  MAP_WALK_DEPTH,
+  MAP_WALK_ROW_LIMIT,
   walkFrom,
   walkTo,
   writeConceptDelta,
   type ConceptDelta,
   type WalkStep,
-} from "@better-answers/core/store/graph";
+} from "@better-answers/core/store/map";
 import { citedSourcesOf, conceptIriOf, ulid } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 
@@ -50,16 +50,16 @@ const walked = async (
 const uidsByDepth = (steps: readonly WalkStep[]): readonly (readonly [string, number])[] =>
   steps.map((step) => [step.uid, step.depth]);
 
-describe("a graph walk", () => {
+describe("a map walk", () => {
   it("reaches everything within four hops of the entry, no further", async () => {
     const scenario = await arrange();
     const uids = await seeded(async (seed) => {
       const chain: string[] = [];
-      for (let at = 0; at <= GRAPH_WALK_DEPTH + 1; at += 1) {
-        const node = await seed.graphNode({ workspaceId: scenario.workspaceId });
+      for (let at = 0; at <= MAP_WALK_DEPTH + 1; at += 1) {
+        const node = await seed.mapNode({ workspaceId: scenario.workspaceId });
         const previous = chain.at(-1);
         if (previous !== undefined) {
-          await seed.graphEdge({
+          await seed.mapEdge({
             workspaceId: scenario.workspaceId,
             fromUid: previous,
             toUid: node.uid,
@@ -73,7 +73,7 @@ describe("a graph walk", () => {
     const steps = await walked(scenario.viewer, uids[0] ?? "");
 
     expect(uidsByDepth(steps)).toEqual(
-      uids.slice(0, GRAPH_WALK_DEPTH + 1).map((uid, depth) => [uid, depth]),
+      uids.slice(0, MAP_WALK_DEPTH + 1).map((uid, depth) => [uid, depth]),
     );
   });
 
@@ -90,16 +90,16 @@ describe("a graph walk", () => {
   it.each(WITHHELD)("excludes every path through %s", async (_what, shape) => {
     const scenario = await arrange();
     const { entry, middle, far } = await seeded(async (seed) => {
-      const a = await seed.graphNode({ workspaceId: scenario.workspaceId });
-      const b = await seed.graphNode({ workspaceId: scenario.workspaceId, ...shape.node });
-      const c = await seed.graphNode({ workspaceId: scenario.workspaceId });
-      await seed.graphEdge({
+      const a = await seed.mapNode({ workspaceId: scenario.workspaceId });
+      const b = await seed.mapNode({ workspaceId: scenario.workspaceId, ...shape.node });
+      const c = await seed.mapNode({ workspaceId: scenario.workspaceId });
+      await seed.mapEdge({
         workspaceId: scenario.workspaceId,
         fromUid: a.uid,
         toUid: b.uid,
         ...shape.edge,
       });
-      await seed.graphEdge({ workspaceId: scenario.workspaceId, fromUid: b.uid, toUid: c.uid });
+      await seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid: b.uid, toUid: c.uid });
       return { entry: a.uid, middle: b.uid, far: c.uid };
     });
 
@@ -114,7 +114,7 @@ describe("a graph walk", () => {
   it("answers a withheld entry exactly as one nobody mapped", async () => {
     const scenario = await arrange();
     const restricted = await seeded((seed) =>
-      seed.graphNode({ workspaceId: scenario.workspaceId, sensitivity: "Restricted" }),
+      seed.mapNode({ workspaceId: scenario.workspaceId, sensitivity: "Restricted" }),
     );
 
     const withheld = await walked(scenario.viewer, restricted.uid);
@@ -131,16 +131,16 @@ describe("a graph walk", () => {
     const ours = await arrange();
     const theirs = await arrange();
     const { home, theirEntry, theirFar } = await seeded(async (seed) => {
-      const mine = await seed.graphNode({ workspaceId: ours.workspaceId });
-      const from = await seed.graphNode({ workspaceId: theirs.workspaceId });
-      const to = await seed.graphNode({ workspaceId: theirs.workspaceId });
-      await seed.graphEdge({
+      const mine = await seed.mapNode({ workspaceId: ours.workspaceId });
+      const from = await seed.mapNode({ workspaceId: theirs.workspaceId });
+      const to = await seed.mapNode({ workspaceId: theirs.workspaceId });
+      await seed.mapEdge({
         workspaceId: theirs.workspaceId,
         fromUid: from.uid,
         toUid: to.uid,
       });
 
-      await seed.graphEdge({
+      await seed.mapEdge({
         workspaceId: ours.workspaceId,
         fromUid: mine.uid,
         toUid: to.uid,
@@ -159,16 +159,16 @@ describe("a graph walk", () => {
   it("walks only the live generation, with source entities beside it", async () => {
     const scenario = await arrange();
     const { entry, liveFar, nextFar, entity } = await seeded(async (seed) => {
-      const a = await seed.graphNode({ workspaceId: scenario.workspaceId });
-      const b = await seed.graphNode({ workspaceId: scenario.workspaceId });
-      await seed.graphEdge({ workspaceId: scenario.workspaceId, fromUid: a.uid, toUid: b.uid });
-      const person = await seed.graphNode({
+      const a = await seed.mapNode({ workspaceId: scenario.workspaceId });
+      const b = await seed.mapNode({ workspaceId: scenario.workspaceId });
+      await seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid: a.uid, toUid: b.uid });
+      const person = await seed.mapNode({
         workspaceId: scenario.workspaceId,
         gen: null,
         label: "source-entity:Person",
         kind: null,
       });
-      await seed.graphEdge({
+      await seed.mapEdge({
         workspaceId: scenario.workspaceId,
         gen: null,
         label: "IS_CONCEPT",
@@ -177,13 +177,13 @@ describe("a graph walk", () => {
         uid: `is_concept:${person.uid}`,
       });
 
-      const rebuiltEntry = await seed.graphNode({
+      const rebuiltEntry = await seed.mapNode({
         workspaceId: scenario.workspaceId,
         gen: 2,
         uid: a.uid,
       });
-      const c = await seed.graphNode({ workspaceId: scenario.workspaceId, gen: 2 });
-      await seed.graphEdge({
+      const c = await seed.mapNode({ workspaceId: scenario.workspaceId, gen: 2 });
+      await seed.mapEdge({
         workspaceId: scenario.workspaceId,
         gen: 2,
         fromUid: rebuiltEntry.uid,
@@ -198,7 +198,7 @@ describe("a graph walk", () => {
     const inbound = await walked(scenario.viewer, entry, walkTo);
     expect(inbound.map((step) => step.uid).toSorted()).toEqual([entry, entity].toSorted());
 
-    await db().pool.query("UPDATE graph_generation SET live_gen = 2 WHERE workspace_id = $1", [
+    await db().pool.query("UPDATE map_generation SET live_gen = 2 WHERE workspace_id = $1", [
       scenario.workspaceId,
     ]);
 
@@ -212,12 +212,12 @@ describe("a graph walk", () => {
     const uids = await seeded(async (seed) => {
       const nodes: string[] = [];
       for (let at = 0; at < 8; at += 1) {
-        nodes.push((await seed.graphNode({ workspaceId: scenario.workspaceId })).uid);
+        nodes.push((await seed.mapNode({ workspaceId: scenario.workspaceId })).uid);
       }
       for (const from of nodes) {
         for (const to of nodes) {
           if (from === to) continue;
-          await seed.graphEdge({ workspaceId: scenario.workspaceId, fromUid: from, toUid: to });
+          await seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid: from, toUid: to });
         }
       }
       return nodes;
@@ -225,14 +225,14 @@ describe("a graph walk", () => {
 
     const steps = await walked(scenario.admin, uids[0] ?? "");
 
-    expect(steps.length).toBe(GRAPH_WALK_ROW_LIMIT);
+    expect(steps.length).toBe(MAP_WALK_ROW_LIMIT);
   });
 
   it("answers the path's node fields alone, nothing off an edge", async () => {
     const scenario = await arrange();
     const entry = await seeded(async (seed) => {
-      const a = await seed.graphNode({ workspaceId: scenario.workspaceId });
-      await seed.graphEdge({ workspaceId: scenario.workspaceId, fromUid: a.uid });
+      const a = await seed.mapNode({ workspaceId: scenario.workspaceId });
+      await seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid: a.uid });
       return a.uid;
     });
 
@@ -299,7 +299,7 @@ const edgeRowsFrom = async <Row extends QueryResultRow>(
   columns: string,
 ): Promise<readonly Row[]> => {
   const rows = await db().pool.query<Row>(
-    `SELECT ${columns} FROM graph_edge WHERE workspace_id = $1 AND from_uid = $2 ORDER BY uid`,
+    `SELECT ${columns} FROM map_edge WHERE workspace_id = $1 AND from_uid = $2 ORDER BY uid`,
     [scenario.workspaceId, fromUid],
   );
   return rows.rows;

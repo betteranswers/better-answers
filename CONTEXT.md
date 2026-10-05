@@ -53,7 +53,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
 - **bundle** — OKF's own noun for a knowledge base: a directory tree of concept documents with its
   own manifest, whose links join its concepts (the directory is only its storage shape). Code,
   concept files and the MCP wire keep the word; a page says *knowledge base*.
-- **map** — _Code rename pending._ the platform's derived, queryable map over the knowledge base and
+- **map** — the platform's derived, queryable map over the knowledge base and
   the records: concepts, their links and relations, sources, actors and citations; held inside the
   platform Postgres as ordinary workspace-scoped rows (ADR 0032). Derived again from the knowledge
   base on every commit and from the records as they change; never a source of truth. **Two** fixed
@@ -141,7 +141,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   sharing one batch id. The *signal* ADR 0012 names, in ADR 0025's sense — a query over those rows,
   never a metric. One is a crash window that was recovered, so a series of them is a fact worth
   reading.
-- **sweep pass** — _Internal._ the platform's daily pass of the *upload sweep* and the *graph
+- **sweep pass** — _Internal._ the platform's daily pass of the *upload sweep* and the *map
   sweep* over every workspace, one pass at a time, a sweep by hand included, then the deletion of
   expired sign-in rows: *sessions* past their end or their pending hour, the identity set's
   short-lived tokens a day past their expiry (sign-in codes and links, and Better Auth's others),
@@ -152,7 +152,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   first connect. **List-only** until the operator switches removal on, seven days after the first
   upload is connected in a client's workspace on production: it counts what it would remove and
   removes nothing.
-- **graph sweep** — _Internal._ the removal of every generation of a workspace's map but the live
+- **map sweep** — _Internal._ the removal of every generation of a workspace's map but the live
   one.
 - **concept index** — _Internal._ the platform's derived row for every concept, written when the
   concept's commit is made, never edited. The only "both" of the minting rule. Carries the text
@@ -1184,7 +1184,7 @@ to it by IRI and never restates it (ADR 0014).
   binds it. Generations exist **for full rebuilds only** — an ordinary edit's delta lands in the
   api's own commit transaction and writes no new generation (ADR 0023). Source entities carry none:
   they are reconciled per document.
-- **map rebuild** — _Code rename pending._ the job that **rebuilds** one workspace's map in full as
+- **map rebuild** — the job that **rebuilds** one workspace's map in full as
   a new generation, for one of six reasons — first build · model choice change · reconciler ·
   erasure · upgrade · drill — and flips it live in one row update. It is not how an ordinary edit
   reaches the map: that delta is written by the api in the same transaction as the concept index

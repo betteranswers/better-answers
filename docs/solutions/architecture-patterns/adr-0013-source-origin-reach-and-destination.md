@@ -23,7 +23,7 @@ tags:
 
 ## The decision
 
-A source binding is bound by **origin** (company or external; platform origin is an evidence kind with no binding), **reach** (connected or referenced) and **destination** (the chunk index, the bundle, the graph; at least one).
+A source binding is bound by **origin** (company or external; platform origin is an evidence kind with no binding), **reach** (connected or referenced) and **destination** (the chunk index, the bundle, the map; at least one).
 
 It is gated by three permission fields:
 
@@ -72,7 +72,7 @@ An Admin's recorded widen act (`widenBinding`, in the `sources` slice) is the on
 - Extracting only under a plan each time, or a standing plan off by default: for a targeted binding the switch is the plan.
 - Sensitivity as the only gate, or no gate: neither can say "indexed, not yet released".
 - URL-only citations, caching the referenced page, or an evidence snapshot record: a stored copy is a copy the company chose not to make.
-- Mirror retention only, or several numeric retention classes: uploads have nothing to mirror, and graph-only bindings need transient.
+- Mirror retention only, or several numeric retention classes: uploads have nothing to mirror, and map-only bindings need transient.
 - A customer-hosted worker now, a worker-local folder watch, or a platform drop area: the share agent reaches an on-site folder with nothing of the platform on the client's network.
 - Every lifted connector switched on, an OKF-bundle upload binding, or source ACL synchronisation: no first-client case.
 - Docling as the converter for layout: on CPU it wants more than twice the worker's 1.5 GB.

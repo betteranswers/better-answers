@@ -51,14 +51,6 @@ import {
   FINDING_REVIEW_STATES,
   REDACTION_TIERS,
 } from "./finding-tables.ts";
-import {
-  GRAPH_EDGE_LABELS,
-  GRAPH_NODE_LABELS,
-  graphEdge,
-  graphGeneration,
-  graphNode,
-  SOURCE_ENTITY_LABEL_PREFIX,
-} from "./graph-tables.ts";
 import { group, GROUP_ORIGINS, groupMember } from "./group-tables.ts";
 import {
   account,
@@ -85,6 +77,14 @@ import {
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
 import { workspaceLastActive } from "./last-active-tables.ts";
+import {
+  MAP_EDGE_LABELS,
+  MAP_NODE_LABELS,
+  mapEdge,
+  mapGeneration,
+  mapNode,
+  SOURCE_ENTITY_LABEL_PREFIX,
+} from "./map-tables.ts";
 import { contractStamp, sweepPass, UPLOAD_SWEEP_MODES } from "./platform-tables.ts";
 import { AUDIENCES, SENSITIVITIES } from "./readable-columns.ts";
 import { ROLES } from "./roles.ts";
@@ -735,58 +735,49 @@ export const compositionIncludeUpdate = createUpdateSchema(
   compositionIncludeRefinements,
 );
 
-const graphLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
+const mapLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
   schema.refine(
     (label) =>
       labels.some((known) => known === label) || label.startsWith(SOURCE_ENTITY_LABEL_PREFIX),
-    { message: "a graph label is one of the closed set, or wears the source-entity prefix" },
+    { message: "a map label is one of the closed set, or wears the source-entity prefix" },
   );
 
-type GraphRowInput = { readonly label: string; readonly gen?: number | null };
+type MapRowInput = { readonly label: string; readonly gen?: number | null };
 
-const sourceEntityCarriesNoGen = (row: GraphRowInput): boolean =>
+const sourceEntityCarriesNoGen = (row: MapRowInput): boolean =>
   !row.label.startsWith(SOURCE_ENTITY_LABEL_PREFIX) || row.gen === null || row.gen === undefined;
 
-const closedNodeLabelCarriesGen = (row: GraphRowInput): boolean =>
+const closedNodeLabelCarriesGen = (row: MapRowInput): boolean =>
   row.label.startsWith(SOURCE_ENTITY_LABEL_PREFIX) || (row.gen !== null && row.gen !== undefined);
 
 const generation = (schema: z.ZodNumber) => schema.int().positive();
 
-const graphGenerationRefinements = {
+const mapGenerationRefinements = {
   workspaceId,
   liveGen: generation,
 };
 
-export const graphGenerationSelect = createSelectSchema(
-  graphGeneration,
-  graphGenerationRefinements,
-);
-export const graphGenerationInsert = createInsertSchema(
-  graphGeneration,
-  graphGenerationRefinements,
-);
-export const graphGenerationUpdate = createUpdateSchema(
-  graphGeneration,
-  graphGenerationRefinements,
-);
+export const mapGenerationSelect = createSelectSchema(mapGeneration, mapGenerationRefinements);
+export const mapGenerationInsert = createInsertSchema(mapGeneration, mapGenerationRefinements);
+export const mapGenerationUpdate = createUpdateSchema(mapGeneration, mapGenerationRefinements);
 
-const graphKey = (schema: z.ZodString) => schema.trim().min(1);
+const mapKey = (schema: z.ZodString) => schema.trim().min(1);
 
-const graphRow = {
+const mapRow = {
   workspaceId,
   gen: generation,
-  uid: graphKey,
+  uid: mapKey,
   ...readableUnit,
 };
 
-const graphNodeRefinements = {
-  ...graphRow,
-  label: graphLabel(GRAPH_NODE_LABELS),
-  kind: graphKey,
+const mapNodeRefinements = {
+  ...mapRow,
+  label: mapLabel(MAP_NODE_LABELS),
+  kind: mapKey,
 };
 
-export const graphNodeSelect = createSelectSchema(graphNode, graphNodeRefinements);
-export const graphNodeInsert = createInsertSchema(graphNode, graphNodeRefinements)
+export const mapNodeSelect = createSelectSchema(mapNode, mapNodeRefinements);
+export const mapNodeInsert = createInsertSchema(mapNode, mapNodeRefinements)
   .refine(sourceEntityCarriesNoGen, {
     message: "a source-entity label carries no generation",
     path: ["gen"],
@@ -795,23 +786,23 @@ export const graphNodeInsert = createInsertSchema(graphNode, graphNodeRefinement
     message: "a closed node label is a bundle-and-record row and carries its generation",
     path: ["gen"],
   });
-export const graphNodeUpdate = createUpdateSchema(graphNode, graphNodeRefinements);
+export const mapNodeUpdate = createUpdateSchema(mapNode, mapNodeRefinements);
 
-const graphEdgeRefinements = {
-  ...graphRow,
-  label: graphLabel(GRAPH_EDGE_LABELS),
-  fromUid: graphKey,
-  toUid: graphKey,
-  fromKind: graphKey,
-  toKind: graphKey,
+const mapEdgeRefinements = {
+  ...mapRow,
+  label: mapLabel(MAP_EDGE_LABELS),
+  fromUid: mapKey,
+  toUid: mapKey,
+  fromKind: mapKey,
+  toKind: mapKey,
 };
 
-export const graphEdgeSelect = createSelectSchema(graphEdge, graphEdgeRefinements);
-export const graphEdgeInsert = createInsertSchema(graphEdge, graphEdgeRefinements).refine(
+export const mapEdgeSelect = createSelectSchema(mapEdge, mapEdgeRefinements);
+export const mapEdgeInsert = createInsertSchema(mapEdge, mapEdgeRefinements).refine(
   sourceEntityCarriesNoGen,
   { message: "a source-entity label carries no generation", path: ["gen"] },
 );
-export const graphEdgeUpdate = createUpdateSchema(graphEdge, graphEdgeRefinements);
+export const mapEdgeUpdate = createUpdateSchema(mapEdge, mapEdgeRefinements);
 
 const outcomeScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const outcome = z.union([
@@ -1022,23 +1013,23 @@ export const boundarySchemas = {
     insert: conceptVerificationInsert,
     update: conceptVerificationUpdate,
   },
-  graphGeneration: {
-    table: graphGeneration,
-    select: graphGenerationSelect,
-    insert: graphGenerationInsert,
-    update: graphGenerationUpdate,
+  mapGeneration: {
+    table: mapGeneration,
+    select: mapGenerationSelect,
+    insert: mapGenerationInsert,
+    update: mapGenerationUpdate,
   },
-  graphNode: {
-    table: graphNode,
-    select: graphNodeSelect,
-    insert: graphNodeInsert,
-    update: graphNodeUpdate,
+  mapNode: {
+    table: mapNode,
+    select: mapNodeSelect,
+    insert: mapNodeInsert,
+    update: mapNodeUpdate,
   },
-  graphEdge: {
-    table: graphEdge,
-    select: graphEdgeSelect,
-    insert: graphEdgeInsert,
-    update: graphEdgeUpdate,
+  mapEdge: {
+    table: mapEdge,
+    select: mapEdgeSelect,
+    insert: mapEdgeInsert,
+    update: mapEdgeUpdate,
   },
   job: { table: job, select: jobSelect, insert: jobInsert, update: jobUpdate },
   suggestion: {

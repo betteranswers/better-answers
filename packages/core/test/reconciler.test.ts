@@ -164,9 +164,9 @@ const rowsOf = async (workspaceId: string) => {
      SELECT 'event', id, concat_ws(' ', act, actor, subject_id, detail::text)
        FROM audit_event WHERE workspace_id = $1
      UNION ALL
-     SELECT 'node', uid, concat_ws(' ', kind, gen::text) FROM graph_node WHERE workspace_id = $1
+     SELECT 'node', uid, concat_ws(' ', kind, gen::text) FROM map_node WHERE workspace_id = $1
      UNION ALL
-     SELECT 'edge', uid, concat_ws(' ', from_uid, to_uid) FROM graph_edge WHERE workspace_id = $1
+     SELECT 'edge', uid, concat_ws(' ', from_uid, to_uid) FROM map_edge WHERE workspace_id = $1
      UNION ALL
      SELECT 'suggestion', id, concat_ws(' ', status, decider, target_iri)
        FROM suggestion WHERE workspace_id = $1
@@ -271,7 +271,7 @@ describe("a commit whose rows were lost", () => {
       { parent_sha: null, audit_event_id: facts.trailers["Audit"], actor: facts.trailers["Actor"] },
     ]);
     const nodes = await db().pool.query<{ uid: string }>(
-      "SELECT uid FROM graph_node WHERE workspace_id = $1",
+      "SELECT uid FROM map_node WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(nodes.rows).toEqual([{ uid: iri }]);

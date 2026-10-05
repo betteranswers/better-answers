@@ -9,7 +9,7 @@ applies_when:
   - "Adding a slice, a store door or a directory under packages/core/src"
   - "Importing from one slice into another, or from a transport into packages/core"
   - "Writing a query against a table another slice owns"
-  - "Writing a test that reaches Postgres, the object store, a git repository or the graph"
+  - "Writing a test that reaches Postgres, the object store, a git repository or the map"
   - "Adding a deployable under apps/"
 tags:
   - adr-0029
@@ -31,14 +31,14 @@ The tree is `apps/` over `packages/`: `apps/` is what deploys and `packages/` is
 
 - `kernel/` holds the Principal, branded ids, the error vocabulary and `Result`: types and pure functions.
 - `access/` holds the read predicate, defined once with one SQL renderer.
-- `store/` holds the four doors, one per shared store, and is the only place a connection is made: `store/postgres`, `store/git`, `store/graph` and `store/objects`. Each door is exported under its own name, such as `@better-answers/core/store/postgres`. There is no `store` barrel and no `./store` entry.
+- `store/` holds the four doors, one per shared store, and is the only place a connection is made: `store/postgres`, `store/git`, `store/map` and `store/objects`. Each door is exported under its own name, such as `@better-answers/core/store/postgres`. There is no `store` barrel and no `./store` entry.
 - `llm/` and `audit/` are layers every slice may use.
 - A slice is the capability that owns a set of tables and the invariants over them. The slices today are `sources`, `concepts`, `answering`, `guides`, `erasure`, `runs`, `workspaces`, `members` and `sweeps`. `erasure` sits on top, and nothing imports it.
 
 The import direction has five rules:
 
 1. `kernel` imports nothing else in core.
-2. `access` imports only `kernel`. `store` imports only `kernel`, except that `store/graph` also imports `access`, so a traversal template cannot exist without the predicate.
+2. `access` imports only `kernel`. `store` imports only `kernel`, except that `store/map` also imports `access`, so a traversal template cannot exist without the predicate.
 3. `llm` and `audit` import `kernel`, `access` and `store`, never a slice and never each other.
 4. A slice reaches another slice only through its face, never its internals. The slice graph is acyclic.
 5. Nothing in core imports a transport or a transport's dependency, such as `hono`, `@trpc`, `@modelcontextprotocol` or `better-auth`.
@@ -68,7 +68,7 @@ Every one of the four doors is real in a test, and none may be faked: `CODING_ST
 - `resources/` for the persistence modules: *resource* is MCP's word.
 - Flat top-level directories: what deploys against what is imported should be structural.
 - A checked-in `layers.json` read by a lint rule: zones are read off position instead.
-- The graph door taking the rendered predicate as a parameter: a place a caller forgets.
+- The map door taking the rendered predicate as a parameter: a place a caller forgets.
 
 ## History
 

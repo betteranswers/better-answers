@@ -155,13 +155,13 @@ export type {
 /** @public S2 */
 export type { EvidencePane } from "./visibility.ts";
 export {
-  GRAPH_MAINTENANCE,
-  graphCounts,
-  rebuildGraph,
-  sweepGraph,
-  type GraphMaintenanceRefusal,
-} from "./graph-maintenance.ts";
-export type { SweptGeneration } from "../store/graph/index.ts";
+  MAP_MAINTENANCE,
+  mapCounts,
+  rebuildMap,
+  sweepMap,
+  type MapMaintenanceRefusal,
+} from "./map-maintenance.ts";
+export type { SweptGeneration } from "../store/map/index.ts";
 
 const CONCEPT_ACTS = declareActs("knowledge", {
   committed: act("knowledge.concept.committed", {

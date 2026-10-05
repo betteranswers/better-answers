@@ -1,9 +1,9 @@
 import type { UPLOAD_SWEEP_MODES } from "@better-answers/schema";
 
 import {
-  GRAPH_MAINTENANCE,
-  sweepGraph,
-  type GraphMaintenanceRefusal,
+  MAP_MAINTENANCE,
+  sweepMap,
+  type MapMaintenanceRefusal,
   type SweptGeneration,
 } from "../concepts/index.ts";
 import {
@@ -61,7 +61,7 @@ export type SweepDoors = {
 type WorkspaceSwept = {
   readonly workspaceId: WorkspaceId;
   readonly uploads: Result<SweptUploads, SweepUploadsRefusal>;
-  readonly graph: Result<readonly SweptGeneration[], GraphMaintenanceRefusal | Error>;
+  readonly map: Result<readonly SweptGeneration[], MapMaintenanceRefusal | Error>;
 };
 
 type SweepTotals = {
@@ -86,13 +86,13 @@ const totalsOf = (swept: readonly WorkspaceSwept[]): SweepTotals => {
   let found = 0;
   let removed = 0;
   let generations = 0;
-  for (const { uploads, graph } of swept) {
-    if (!uploads.ok || !graph.ok) refused += 1;
+  for (const { uploads, map } of swept) {
+    if (!uploads.ok || !map.ok) refused += 1;
     if (uploads.ok) {
       found += uploads.value.found;
       removed += uploads.value.removed;
     }
-    if (graph.ok) generations += graph.value.length;
+    if (map.ok) generations += map.value.length;
   }
   return { workspaces: swept.length, refused, found, removed, generations };
 };
@@ -138,7 +138,7 @@ const sweepOne = async (
     { postgres: doors.postgres, objects: doors.objects },
     { workspaceId, now: doors.clock.now(), dryRun: uploadSweep === "list" },
   ),
-  graph: await sweepGraph(GRAPH_MAINTENANCE, doors.postgres, { workspaceId }),
+  map: await sweepMap(MAP_MAINTENANCE, doors.postgres, { workspaceId }),
 });
 
 /**

@@ -33,7 +33,7 @@ A guide definition and every composition are platform records in Postgres, with 
 - A guide's readers are roles, and roles are levels: Admin, Editor, Viewer. Per role, the guide definition sets the default layer and the action threshold.
 - A guide has no publish state. It is visible to its readers from the moment it exists, every section wearing its trust badge. A hidden section is a definition setting that Admins see marked, and coverage still counts it.
 - A composition's shown trust is the weaker of its own and its cited concepts'. When a cited concept changes, the composition is marked *needs review* synchronously in Postgres.
-- Status, trust, freshness and *changed since checked* are carried on the Postgres row, so the graph is never a hard dependency of a cited answer.
+- Status, trust, freshness and *changed since checked* are carried on the Postgres row, so the map is never a hard dependency of a cited answer.
 - The map degrades visibly in fixed words, carried in an answer's context header line and never its verdict. The glossary's two are *map as of <time>* and *map unavailable since <time>*.
 
 ## Why

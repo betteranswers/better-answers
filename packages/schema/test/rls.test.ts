@@ -39,10 +39,10 @@ import {
   A_FINDING,
   A_FINDING_BORN_RESTORED,
   A_FINDING_BORN_REVIEWED,
-  A_GRAPH_GENERATION,
-  A_GRAPH_NODE,
-  A_GRAPH_NODE_CLASSED,
-  A_GRAPH_NODE_OF_KIND,
+  A_MAP_GENERATION,
+  A_MAP_NODE,
+  A_MAP_NODE_CLASSED,
+  A_MAP_NODE_OF_KIND,
   A_GROUP,
   A_GROUP_MEMBERSHIP,
   AN_AUDIT_EVENT_ROW,
@@ -1091,28 +1091,28 @@ describe("the concept write path under app_rt", () => {
   });
 });
 
-describe("the graph tables under app_rt", () => {
-  const GRAPH_TABLES = ["graph_generation", "graph_node", "graph_edge"] as const;
+describe("the map tables under app_rt", () => {
+  const MAP_TABLES = ["map_generation", "map_node", "map_edge"] as const;
 
   it("returns none unscoped and only the tenant's, on all three", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) {
-        const from = await seed.graphNode({ workspaceId });
-        await seed.graphEdge({ workspaceId, fromUid: from.uid });
+        const from = await seed.mapNode({ workspaceId });
+        await seed.mapEdge({ workspaceId, fromUid: from.uid });
       }
       await client.query("SET LOCAL ROLE app_rt");
 
-      expect(await countedRows(client, GRAPH_TABLES)).toEqual(
-        GRAPH_TABLES.map((table) => ({ table, rows: 0 })),
+      expect(await countedRows(client, MAP_TABLES)).toEqual(
+        MAP_TABLES.map((table) => ({ table, rows: 0 })),
       );
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      expect(await countedRows(client, GRAPH_TABLES)).toEqual([
-        { table: "graph_generation", rows: 1 },
-        { table: "graph_node", rows: 2 },
-        { table: "graph_edge", rows: 1 },
+      expect(await countedRows(client, MAP_TABLES)).toEqual([
+        { table: "map_generation", rows: 1 },
+        { table: "map_node", rows: 2 },
+        { table: "map_edge", rows: 1 },
       ]);
     });
   });
@@ -1120,16 +1120,16 @@ describe("the graph tables under app_rt", () => {
   it("lets the worker build and flip generations, never rewrite them", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      const live = await seed.graphNode({ workspaceId: WS_A });
+      const live = await seed.mapNode({ workspaceId: WS_A });
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const generation = await client.query<{ live_gen: number }>(
-        "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+        "SELECT live_gen FROM map_generation WHERE workspace_id = $1",
         [WS_A],
       );
       const next = (generation.rows[0]?.live_gen ?? 0) + 1;
-      await client.query(A_GRAPH_NODE_OF_KIND, [WS_A, next, live.uid, "Concept", "Policy"]);
+      await client.query(A_MAP_NODE_OF_KIND, [WS_A, next, live.uid, "Concept", "Policy"]);
       await client.query(AN_EDGE, [
         WS_A,
         next,
@@ -1138,29 +1138,29 @@ describe("the graph tables under app_rt", () => {
         live.uid,
         live.uid,
       ]);
-      await client.query("UPDATE graph_generation SET live_gen = $2 WHERE workspace_id = $1", [
+      await client.query("UPDATE map_generation SET live_gen = $2 WHERE workspace_id = $1", [
         WS_A,
         next,
       ]);
       const flipped = await client.query<{ live_gen: number }>(
-        "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+        "SELECT live_gen FROM map_generation WHERE workspace_id = $1",
         [WS_A],
       );
       expect(flipped.rows).toEqual([{ live_gen: next }]);
 
       await refusesEach(client, [
         [
-          "UPDATE graph_node SET kind = 'Product'",
+          "UPDATE map_node SET kind = 'Product'",
           "a rebuild that could edit a node could edit the live generation's",
         ],
-        ["DELETE FROM graph_node", "sweeping a retired generation is the api's, not this"],
+        ["DELETE FROM map_node", "sweeping a retired generation is the api's, not this"],
         [
-          "UPDATE graph_edge SET section = 'elsewhere'",
+          "UPDATE map_edge SET section = 'elsewhere'",
           "the same for an edge, whose section and sentence are a concept's own content",
         ],
-        ["DELETE FROM graph_edge", "and the same for the sweep"],
+        ["DELETE FROM map_edge", "and the same for the sweep"],
         [
-          "DELETE FROM graph_generation",
+          "DELETE FROM map_generation",
           "the row that says which generation is live is flipped, never removed",
         ],
       ]);
@@ -1170,18 +1170,18 @@ describe("the graph tables under app_rt", () => {
   it("refuses an out-of-turn generation for a flip or a row", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      await seed.graphNode({ workspaceId: WS_A });
+      await seed.mapNode({ workspaceId: WS_A });
       await seed.workspace({ id: "01J6CCCCCCCCCCCCCCCCCCCCCC", name: "C" });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const served: readonly (readonly [string, readonly unknown[]])[] = [
-        [A_GRAPH_NODE, [WS_A, 1, "live", "Concept"]],
-        [A_GRAPH_NODE, [WS_A, 2, "next", "Concept"]],
+        [A_MAP_NODE, [WS_A, 1, "live", "Concept"]],
+        [A_MAP_NODE, [WS_A, 2, "next", "Concept"]],
         [AN_EDGE, [WS_A, 2, "e-next", "LINKS_TO", "next", "live"]],
-        [A_GRAPH_NODE, [WS_A, null, "entity", "source-entity:Person"]],
-        ["UPDATE graph_generation SET live_gen = $2 WHERE workspace_id = $1", [WS_A, 2]],
-        [`${A_GRAPH_GENERATION} ${THE_GENERATION_ROW_HELD}`, [WS_A, 1]],
+        [A_MAP_NODE, [WS_A, null, "entity", "source-entity:Person"]],
+        ["UPDATE map_generation SET live_gen = $2 WHERE workspace_id = $1", [WS_A, 2]],
+        [`${A_MAP_GENERATION} ${THE_GENERATION_ROW_HELD}`, [WS_A, 1]],
       ];
       for (const [statement, parameters] of served) {
         await client.query(statement, [...parameters]);
@@ -1189,25 +1189,25 @@ describe("the graph tables under app_rt", () => {
 
       await refusesEach(client, [
         [
-          "UPDATE graph_generation SET live_gen = 4 WHERE workspace_id = $1",
+          "UPDATE map_generation SET live_gen = 4 WHERE workspace_id = $1",
           "a flip past the generation being built exposes a map nobody wrote",
           [WS_A],
           /flips only to the next/,
         ],
         [
-          "UPDATE graph_generation SET live_gen = 1 WHERE workspace_id = $1",
+          "UPDATE map_generation SET live_gen = 1 WHERE workspace_id = $1",
           "a flip back is a swept generation served as the map",
           [WS_A],
           /flips only to the next/,
         ],
         [
-          A_GRAPH_NODE,
+          A_MAP_NODE,
           "a node into the retired generation, now that 2 is live",
           [WS_A, 1, "retired", "Concept"],
           /lands in the live generation or the next/,
         ],
         [
-          A_GRAPH_NODE,
+          A_MAP_NODE,
           "a node into a generation nobody is building",
           [WS_A, 4, "far", "Concept"],
           /lands in the live generation or the next/,
@@ -1225,7 +1225,7 @@ describe("the graph tables under app_rt", () => {
       ]);
       await client.query("SAVEPOINT guard_probe");
       await expect(
-        client.query(A_GRAPH_NODE, ["01J6CCCCCCCCCCCCCCCCCCCCCC", 1, "first", "Concept"]),
+        client.query(A_MAP_NODE, ["01J6CCCCCCCCCCCCCCCCCCCCCC", 1, "first", "Concept"]),
       ).rejects.toThrow(/lands in the live generation or the next/);
       await client.query("ROLLBACK TO SAVEPOINT guard_probe");
     });
@@ -1234,26 +1234,26 @@ describe("the graph tables under app_rt", () => {
   it("refuses a node written into another tenant from this scope", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      await seed.graphGeneration({ workspaceId: WS_B });
+      await seed.mapGeneration({ workspaceId: WS_B });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       await client.query("SAVEPOINT other_tenant");
       await expect(
-        client.query(A_GRAPH_NODE, [WS_B, null, "uid-b", "source-entity:Person"]),
+        client.query(A_MAP_NODE, [WS_B, null, "uid-b", "source-entity:Person"]),
       ).rejects.toThrow(/row-level security/);
       await client.query("ROLLBACK TO SAVEPOINT other_tenant");
-      await expect(client.query(A_GRAPH_NODE, [WS_B, 1, "uid-b", "Concept"])).rejects.toThrow(
+      await expect(client.query(A_MAP_NODE, [WS_B, 1, "uid-b", "Concept"])).rejects.toThrow(
         /lands in the live generation or the next: live is <NULL>/,
       );
     });
   });
 
-  it("refuses each forbidden graph row at its own constraint", async () => {
+  it("refuses each forbidden map row at its own constraint", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      const node = await seed.graphNode({ workspaceId: WS_A });
-      const entity = await seed.graphNode({
+      const node = await seed.mapNode({ workspaceId: WS_A });
+      const entity = await seed.mapNode({
         workspaceId: WS_A,
         gen: null,
         label: "source-entity:Person",
@@ -1263,49 +1263,41 @@ describe("the graph tables under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const rows: readonly [string, readonly unknown[], string][] = [
-        [A_GRAPH_NODE, [WS_A, 1, "uid-1", "Widget"], "graph_node_label_check"],
-        [A_GRAPH_NODE, [WS_A, 1, "uid-2", "source-entity:Person"], "graph_node_label_check"],
-        [A_GRAPH_NODE, [WS_A, null, "uid-6", "Concept"], "graph_node_label_check"],
-        [
-          AN_EDGE,
-          [WS_A, 1, "edge-2", "source-entity:mentions", "a", "b"],
-          "graph_edge_label_check",
-        ],
+        [A_MAP_NODE, [WS_A, 1, "uid-1", "Widget"], "map_node_label_check"],
+        [A_MAP_NODE, [WS_A, 1, "uid-2", "source-entity:Person"], "map_node_label_check"],
+        [A_MAP_NODE, [WS_A, null, "uid-6", "Concept"], "map_node_label_check"],
+        [AN_EDGE, [WS_A, 1, "edge-2", "source-entity:mentions", "a", "b"], "map_edge_label_check"],
 
-        [A_GRAPH_NODE, [WS_A, 0, "uid-7", "Concept"], "graph_node_gen_check"],
-        [AN_EDGE, [WS_A, 0, "edge-3", "LINKS_TO", "a", "b"], "graph_edge_gen_check"],
+        [A_MAP_NODE, [WS_A, 0, "uid-7", "Concept"], "map_node_gen_check"],
+        [AN_EDGE, [WS_A, 0, "edge-3", "LINKS_TO", "a", "b"], "map_edge_gen_check"],
 
-        [
-          A_GRAPH_NODE_CLASSED,
-          [WS_A, 1, "uid-3", "Concept", "Secret"],
-          "graph_node_sensitivity_check",
-        ],
+        [A_MAP_NODE_CLASSED, [WS_A, 1, "uid-3", "Concept", "Secret"], "map_node_sensitivity_check"],
 
-        [A_GRAPH_NODE, [WS_A, node.gen, node.uid, "Concept"], "graph_node_bundle_uidx"],
+        [A_MAP_NODE, [WS_A, node.gen, node.uid, "Concept"], "map_node_bundle_uidx"],
         [
-          A_GRAPH_NODE,
+          A_MAP_NODE,
           [WS_A, null, entity.uid, "source-entity:Person"],
-          "graph_node_source_entity_uidx",
+          "map_node_source_entity_uidx",
         ],
 
         [
           AN_EDGE_CARRYING_A_SENTENCE,
           [WS_A, 1, "edge-1", "SUPERSEDES", "a", "b", "smuggled"],
-          "graph_edge_links_to_check",
+          "map_edge_links_to_check",
         ],
 
-        [A_GRAPH_GENERATION, [WS_A, 2], "graph_generation_pkey"],
-        [A_GRAPH_GENERATION, [WS_A, 0], "graph_generation_live_gen_check"],
+        [A_MAP_GENERATION, [WS_A, 2], "map_generation_pkey"],
+        [A_MAP_GENERATION, [WS_A, 0], "map_generation_live_gen_check"],
       ];
       for (const [statement, parameters, constraint] of rows) {
-        await client.query("SAVEPOINT graph_row");
+        await client.query("SAVEPOINT map_row");
         await expect(client.query(statement, [...parameters])).rejects.toThrow(
           new RegExp(constraint),
         );
-        await client.query("ROLLBACK TO SAVEPOINT graph_row");
+        await client.query("ROLLBACK TO SAVEPOINT map_row");
       }
 
-      await client.query(A_GRAPH_NODE, [WS_A, (node.gen ?? 0) + 1, node.uid, "Concept"]);
+      await client.query(A_MAP_NODE, [WS_A, (node.gen ?? 0) + 1, node.uid, "Concept"]);
     });
   });
 });
@@ -2098,8 +2090,8 @@ describe("the audience pair on every readable unit", () => {
       "concept_index_audience_check",
       (seed) => seed.conceptIndex({ workspaceId: WS_A }),
     ],
-    ["graph_node", "graph_node_audience_check", (seed) => seed.graphNode({ workspaceId: WS_A })],
-    ["graph_edge", "graph_edge_audience_check", (seed) => seed.graphEdge({ workspaceId: WS_A })],
+    ["map_node", "map_node_audience_check", (seed) => seed.mapNode({ workspaceId: WS_A })],
+    ["map_edge", "map_edge_audience_check", (seed) => seed.mapEdge({ workspaceId: WS_A })],
     [
       "source_binding",
       "source_binding_audience_check",

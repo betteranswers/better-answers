@@ -9,7 +9,7 @@ set -euo pipefail
 : "${STAGING_OBJECTSTORE_ROOT_KEY:?}" "${STAGING_OBJECTSTORE_ROOT_SECRET:?}"
 : "${STAGING_S3_BUCKET:=better-answers}"
 : "${PROD_PSQL:?a command that runs psql against production over SSH — see the drill.env template host-setup.sh writes}"
-: "${DRILL_WORKSPACE:?the workspace whose graph is rebuilt and diffed}"
+: "${DRILL_WORKSPACE:?the workspace whose map is rebuilt and diffed}"
 : "${HEALTHCHECKS_PING_URL_DRILL:?}" "${HEALTHCHECKS_PING_URL_STAGING_WIPED:?}"
 : "${RCLONE_CONFIG_DRILLSINK_ACCESS_KEY_ID:?the WRITE-AND-LIST credential — the report upload alone}"
 
@@ -143,17 +143,17 @@ STAGING_DATABASE_URL="${STAGING_DATABASE_URL}" "${DEPLOY_DIR}/seed-synthetic.sh"
 platform up -d --wait api worker
 say "api up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
 
-say "## 6 recovery order 2–5: watermark, graph rebuild, pipeline state (LMDBs empty → reprocess), orphans"
+say "## 6 recovery order 2–5: watermark, map rebuild, pipeline state (LMDBs empty → reprocess), orphans"
 ops reconcile-watermark --workspace "${DRILL_WORKSPACE}"
-t0=$(date +%s); ops graph-rebuild --workspace "${DRILL_WORKSPACE}" --wait
-say "graph rebuilt in $(( $(date +%s) - t0 )) s (promise: ≤ 120 s)"
-ops graph-sweep --workspace "${DRILL_WORKSPACE}"
+t0=$(date +%s); ops map-rebuild --workspace "${DRILL_WORKSPACE}" --wait
+say "map rebuilt in $(( $(date +%s) - t0 )) s (promise: ≤ 120 s)"
+ops map-sweep --workspace "${DRILL_WORKSPACE}"
 ops object-store-orphans --workspace "${DRILL_WORKSPACE}" >> "${REPORT}"
 
 say "## 7 counts of the rebuilt map for this workspace"
 # >>> the counts
-ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts"
-if [ ! -s "${WORK}/staging.counts" ]; then say "DRILL FAILED: graph-counts printed no counts for ${DRILL_WORKSPACE}"; exit 1; fi
+ops map-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts"
+if [ ! -s "${WORK}/staging.counts" ]; then say "DRILL FAILED: map-counts printed no counts for ${DRILL_WORKSPACE}"; exit 1; fi
 cat "${WORK}/staging.counts" >> "${REPORT}"
 # A live map moves on after the dump, so only a recorded run is a fair comparison, and production records none yet.
 say "production records no run of the map's counts: staging counts recorded, not compared"

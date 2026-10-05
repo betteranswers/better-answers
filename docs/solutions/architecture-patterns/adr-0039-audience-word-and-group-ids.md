@@ -24,7 +24,7 @@ tags:
 
 ## The decision
 
-**The representation.** Every readable unit and the binding carry a pair: `concept_index`, `composition`, `source_binding`, `concept_class_override`, `graph_node` and `graph_edge`.
+**The representation.** Every readable unit and the binding carry a pair: `concept_index`, `composition`, `source_binding`, `concept_class_override`, `map_node` and `map_edge`.
 
 - `audience` is *everyone* or *groups*, narrowed at the boundary.
 - `audience_groups text[]` holds ADR 0038's group ids.

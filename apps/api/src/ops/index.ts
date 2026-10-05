@@ -3,14 +3,14 @@ import type { Logger } from "pino";
 
 import type { Sensitivity } from "@better-answers/core/access";
 import {
-  GRAPH_MAINTENANCE,
-  graphCounts,
+  MAP_MAINTENANCE,
+  mapCounts,
   IMPORT_SENSITIVITY_DEFAULT,
   importBundle,
   RECONCILER,
-  rebuildGraph,
+  rebuildMap,
   reconcile,
-  sweepGraph,
+  sweepMap,
   type BundleImported,
   type BundleTree,
   type ConceptRewritten,
@@ -76,9 +76,9 @@ import {
   conceptIndex,
   conceptVerification,
   erasureRequest,
-  graphEdge,
-  graphGeneration,
-  graphNode,
+  mapEdge,
+  mapGeneration,
+  mapNode,
   job,
   REBUILD_REASONS,
   ROLES,
@@ -165,13 +165,13 @@ const flagValue = (flags: Flags, name: string): string | undefined => {
   return typeof value === "string" ? value : undefined;
 };
 
-const MAP_TABLES = [graphGeneration, graphNode, graphEdge];
+const MAP_TABLES = [mapGeneration, mapNode, mapEdge];
 
 /** Table objects, never names, so a renamed table renames what each command must find. */
 const NEEDS = {
-  "graph-rebuild": [...MAP_TABLES, job],
-  "graph-sweep": MAP_TABLES,
-  "graph-counts": MAP_TABLES,
+  "map-rebuild": [...MAP_TABLES, job],
+  "map-sweep": MAP_TABLES,
+  "map-counts": MAP_TABLES,
   "reconcile-watermark": [conceptIndex, bundleCommit],
   "object-store-orphans": [sourceDocument],
   "erasure-rehearsal": [erasureRequest, suppression],
@@ -191,12 +191,12 @@ const WAIT_POLL_MS = 2_000;
 
 const USAGE_TEXT = `usage: pnpm ops <command> [options]
   replay-erasures --since <dump stamp | ISO instant>      re-apply every erasure completed after a dump (mandatory in every restore)
-  graph-rebuild --workspace <id> [--reason <word>] [--wait | --wait-seconds <n>]   the map made again by the worker
+  map-rebuild --workspace <id> [--reason <word>] [--wait | --wait-seconds <n>]   the map made again by the worker
     --reason  one of ${REBUILD_REASONS.join(" · ")} (default ${REBUILD_DEFAULT_REASON})
     --wait    poll the job until it is over, ${WAIT_SECONDS} seconds — the rebuild's own budget
     --wait-seconds <n>  the same, for a whole number of seconds an operator names instead
-  graph-sweep --workspace <id>                              delete every generation of the map but the live one
-  graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff
+  map-sweep --workspace <id>                                delete every generation of the map but the live one
+  map-counts --workspace <id>                               nodes per label and edges, as JSON, for the drill's diff
   reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed
   object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed bind or a lost race left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
     --list         say how many there are, removing none
@@ -476,13 +476,9 @@ const refused = (
 const exitOf = (refusal: RefusalWord | Error): number =>
   refusal instanceof Error ? REFUSED : EXIT_OF_CLASS[refusalOf(refusal).class];
 
-const graphCountsCommand = async (
-  doors: Doors,
-  workspaceId: string,
-  io: OpsIo,
-): Promise<number> => {
-  const counted = await graphCounts(GRAPH_MAINTENANCE, doors.postgres, { workspaceId });
-  if (!counted.ok) return refused("graph-counts", workspaceId, counted.error, io);
+const mapCountsCommand = async (doors: Doors, workspaceId: string, io: OpsIo): Promise<number> => {
+  const counted = await mapCounts(MAP_MAINTENANCE, doors.postgres, { workspaceId });
+  if (!counted.ok) return refused("map-counts", workspaceId, counted.error, io);
   const { liveGen, nodes, edges } = counted.value;
   io.say(JSON.stringify({ live_gen: liveGen, nodes, edges }));
   return DONE;
@@ -544,21 +540,21 @@ const waitForJob = async (
   seconds: number,
   io: OpsIo,
 ): Promise<number> => {
-  const job = await jobAfterWaiting(GRAPH_MAINTENANCE, doors, { workspaceId, jobId }, seconds);
-  if (!job.ok) return refused("graph-rebuild", workspaceId, job.error, io);
+  const job = await jobAfterWaiting(MAP_MAINTENANCE, doors, { workspaceId, jobId }, seconds);
+  if (!job.ok) return refused("map-rebuild", workspaceId, job.error, io);
   if (job.value.status === "done") {
     io.say(
-      `graph-rebuild: done — job ${jobId} rebuilt the map on ${counted(job.value.attempts, "attempt")}`,
+      `map-rebuild: done — job ${jobId} rebuilt the map on ${counted(job.value.attempts, "attempt")}`,
     );
     return DONE;
   }
   io.say(
-    `graph-rebuild: REFUSED — job ${jobId} is ${unfinished(job.value, seconds, "nothing has rebuilt this map")}`,
+    `map-rebuild: REFUSED — job ${jobId} is ${unfinished(job.value, seconds, "nothing has rebuilt this map")}`,
   );
   return REFUSED;
 };
 
-const graphRebuildCommand = async (
+const mapRebuildCommand = async (
   doors: Doors,
   workspaceId: string,
   flags: Flags,
@@ -566,19 +562,19 @@ const graphRebuildCommand = async (
 ): Promise<number> => {
   const reason = rebuildReasonOf(flags);
   if (reason === undefined) {
-    io.say(`graph-rebuild: --reason must be one of ${REBUILD_REASONS.join(", ")}`);
+    io.say(`map-rebuild: --reason must be one of ${REBUILD_REASONS.join(", ")}`);
     return USAGE;
   }
   const wait = waitSecondsOf(flags);
   if (wait === "malformed") {
-    io.say("graph-rebuild: --wait takes no value; --wait-seconds takes a whole number of seconds");
+    io.say("map-rebuild: --wait takes no value; --wait-seconds takes a whole number of seconds");
     return USAGE;
   }
-  const enqueued = await rebuildGraph(GRAPH_MAINTENANCE, doors.postgres, { workspaceId, reason });
-  if (!enqueued.ok) return refused("graph-rebuild", workspaceId, enqueued.error, io);
+  const enqueued = await rebuildMap(MAP_MAINTENANCE, doors.postgres, { workspaceId, reason });
+  if (!enqueued.ok) return refused("map-rebuild", workspaceId, enqueued.error, io);
   const { jobId } = enqueued.value;
   if (wait === undefined) {
-    io.say(`graph-rebuild: done — enqueued ${jobId}`);
+    io.say(`map-rebuild: done — enqueued ${jobId}`);
     return DONE;
   }
   return waitForJob(doors, workspaceId, jobId, wait, io);
@@ -587,20 +583,20 @@ const graphRebuildCommand = async (
 const plural = (many: number, noun: string): string => `${noun}${many === 1 ? "" : "s"}`;
 const counted = (many: number, noun: string): string => `${many} ${plural(many, noun)}`;
 
-const graphSweepCommand = async (doors: Doors, workspaceId: string, io: OpsIo): Promise<number> => {
+const mapSweepCommand = async (doors: Doors, workspaceId: string, io: OpsIo): Promise<number> => {
   const swept = await withSweepLock(SWEEPS, doors.postgres, () =>
-    sweepGraph(GRAPH_MAINTENANCE, doors.postgres, { workspaceId }),
+    sweepMap(MAP_MAINTENANCE, doors.postgres, { workspaceId }),
   );
-  if (!swept.ok) return refused("graph-sweep", workspaceId, swept.error, io);
+  if (!swept.ok) return refused("map-sweep", workspaceId, swept.error, io);
   if (swept.value.length === 0) {
-    io.say("graph-sweep: done — nothing to sweep");
+    io.say("map-sweep: done — nothing to sweep");
     return DONE;
   }
   const generations = swept.value.map((generation) => generation.gen).join(", ");
   const nodes = swept.value.reduce((total, generation) => total + generation.nodes, 0);
   const edges = swept.value.reduce((total, generation) => total + generation.edges, 0);
   io.say(
-    `graph-sweep: done — swept ${plural(swept.value.length, "generation")} ${generations} (${counted(nodes, "node")}, ${counted(edges, "edge")})`,
+    `map-sweep: done — swept ${plural(swept.value.length, "generation")} ${generations} (${counted(nodes, "node")}, ${counted(edges, "edge")})`,
   );
   return DONE;
 };
@@ -1355,9 +1351,9 @@ const restoreSignInCommand = async (doors: Doors, flags: Flags, io: OpsIo): Prom
 };
 
 const SLICE_RUNNERS = {
-  "graph-rebuild": graphRebuildCommand,
-  "graph-sweep": (doors, workspaceId, _flags, io) => graphSweepCommand(doors, workspaceId, io),
-  "graph-counts": (doors, workspaceId, _flags, io) => graphCountsCommand(doors, workspaceId, io),
+  "map-rebuild": mapRebuildCommand,
+  "map-sweep": (doors, workspaceId, _flags, io) => mapSweepCommand(doors, workspaceId, io),
+  "map-counts": (doors, workspaceId, _flags, io) => mapCountsCommand(doors, workspaceId, io),
   "reconcile-watermark": (doors, workspaceId, _flags, io) =>
     reconcileWatermark(doors, workspaceId, io),
   "object-store-orphans": objectStoreOrphans,

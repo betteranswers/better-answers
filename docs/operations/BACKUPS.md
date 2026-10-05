@@ -17,7 +17,8 @@ Everything in `dumps/` is **client-side encrypted with `age`** before upload; th
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Postgres (Coolify resource) | `pg_dump -Fc` + `pg_dumpall -g`: `public`, `index`, Better Auth | the `backup` service (`backup.sh hourly`), age-encrypted | `dumps/pg/<tier>/` | every hour; 02:05 files as daily / weekly (Sun) / monthly (1st) | hourly 48 h · daily 30 d · weekly 8 w · monthly **6 m** | yes — incl. `suppression`, `erasure_request`, findings | `pg_restore` — `restore-drill.sh` step 1 |
 | Postgres (second writer) | Coolify's own scheduled dump of the resource | Coolify → its S3 storage | `dumps/coolify-pg/` | daily | 30 d (Coolify's one number; the bucket lifecycle is the truth) | yes | Coolify's restore |
-| Object store (uploads, normalised text) | every bucket — originals under *mirror*/*keep*, and the *transient* bindings' redacted normalised text the graph rebuild needs (53 Q8) | `rclone sync` from the `backup` service — deletions propagate | `mirror/objectstore/` | nightly 02:00 | live + 30 d of non-current versions | yes | `rclone sync` back — step 3 |
+| The map (plain tables inside Postgres, ADR 0032) | `map_generation`, `map_node`, `map_edge` | rides the Postgres dump above — no separate job | `dumps/pg/` | with every dump | as Postgres | yes — source entities from redacted text | `pg_restore`; the rebuild is a repair path, drilled monthly on one workspace |
+| Object store (uploads, normalised text) | every bucket — originals under *mirror*/*keep*, and the *transient* bindings' redacted normalised text the map rebuild needs (53 Q8) | `rclone sync` from the `backup` service — deletions propagate | `mirror/objectstore/` | nightly 02:00 | live + 30 d of non-current versions | yes | `rclone sync` back — step 3 |
 | Git store (`/data/git`, bare repositories) | one verified `git bundle --all` per workspace repository holding a ref, age-encrypted | `backup.sh nightly` reading `/data/git` read-only | `dumps/git/<workspace>/` | nightly 02:00 | 30 d of nightlies + first-of-month for 6 m | yes (history before a rewrite) | `git clone <bundle>` as the api's uid, from a directory of its own, and an empty repository for each workspace the restored database names with no bundle — step 4 |
 | Git store (second copy) | `git push --mirror` per repository holding a ref | the `backup` service over SSH to VPC 2's public IP under a deploy key (`GIT_MIRROR_SSH_TARGET`; the two VPCs do not route privately) | VPC 2 `/data/mirror/<workspace>.git` | nightly 02:00, after the bundles | live; `reflog expire` and `git gc --prune=now` on the mirror by the nightly job, after any push that replaced refs | yes | `git clone` from VPC 2 — never pulled *from* by production |
 | Coolify itself | its database and the `APP_KEY`-encrypted env — **not** `/data/coolify/ssh/keys/` (escrowed) | Coolify's instance backup | `dumps/coolify/` | daily | 30 d | no client data (env only) | `RUNBOOK.md` page 5 |
@@ -27,7 +28,6 @@ Everything in `dumps/` is **client-side encrypted with `age`** before upload; th
 
 | Store | Kind | Why not | Rebuilt by | Budget |
 | --- | --- | --- | --- | --- |
-| The graph (plain tables inside Postgres, ADR 0032) | copied | rides the Postgres dump above — no separate job | `dumps/pg/` | with every dump | as Postgres | yes — source entities from redacted text | `pg_restore`; the rebuild is a repair path, drilled monthly on one workspace |
 | Worker LMDBs (`/data/worker/lmdb/<binding>`) | **personal data on disk** | memoised extraction output; disposable by design (ADR 0005); capped at 4 GB per binding, wiped and reprocessed over it | reprocessing the binding | priced by the extraction plan |
 | Worker trees (`/data/worker/trees`) | personal data on disk | checkouts of the bare repositories at a commit | `git clone` from `/data/git` (mounted read-only) | minutes |
 | `/data/backup/staging` | personal data on disk | the local copy before upload — deleted on verified upload; anything older than 24 h is deleted by the next job | — | — |
@@ -43,7 +43,7 @@ The three dates are computed **from the timestamp of the last dump before the re
 0. The stores, in this order and all of them before the api is started: Postgres from the latest dump (or the one the incident names), then the object store from the mirror bucket, then the git store from the nightly bundles.
 1. **Replay every erasure completed after the dump** — after the three stores are back and before `api` is up.
 2. Reconcile the bundle commit watermark against the git store's heads — the head-check reconciler.
-3. Resync the graph from git and records (the estate rebuild).
+3. Resync the map from git and records (the estate rebuild).
 4. Reconcile pipeline state: every LMDB is wiped; bindings reprocess from the object store.
 5. Object-store orphans: blobs with no catalogue row are listed, then swept after the grace.
 

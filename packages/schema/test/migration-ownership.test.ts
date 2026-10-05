@@ -27,9 +27,9 @@ const firstLineOf = (sql: string): string => sql.split("\n", 1)[0] ?? "";
 
 const FORBIDDEN_IN_GENERATED = [
   /"index"/u,
-  /\bgraph_node\b/u,
-  /\bgraph_edge\b/u,
-  /\bgraph_generation\b/u,
+  /\bmap_node\b/u,
+  /\bmap_edge\b/u,
+  /\bmap_generation\b/u,
 ];
 
 describe("the migration journal", () => {
@@ -72,7 +72,7 @@ describe("the migration journal", () => {
     }
   });
 
-  it("never touches `index` or graph tables in a generated migration", () => {
+  it("never touches `index` or map tables in a generated migration", () => {
     for (const [position, file] of journalMigrationFiles().entries()) {
       const sql = readFileSync(file, "utf8");
       if (firstLineOf(sql) === CUSTOM_MARKER) continue;
@@ -286,11 +286,12 @@ describe("what the inbox substrate copies from the schema package", () => {
 });
 
 describe("what the audience substrate copies from the schema package", () => {
-  it("uses the declared audience CHECK on both graph tables", () => {
+  it("uses the declared audience CHECK on both map tables", () => {
     const file = journalMigrationFiles().find((name) => name.endsWith("audience-substrate.sql"));
     if (file === undefined) throw new Error("the audience substrate is not in the journal");
     const sql = readFileSync(file, "utf8");
 
+    // The substrate migration predates the map's, so it writes the tables' names before 0067.
     for (const table of ["graph_node", "graph_edge"]) {
       expect(sql).toContain(`"${table}_audience_check" CHECK (${AUDIENCE_CHECK})`);
     }

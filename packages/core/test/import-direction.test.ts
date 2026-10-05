@@ -28,7 +28,7 @@ const MANIFEST = JSON.stringify({
     "./access": "./src/access/index.ts",
     "./store": "./src/store/index.ts",
     "./store/postgres": "./src/store/postgres/index.ts",
-    "./store/graph": "./src/store/graph/index.ts",
+    "./store/map": "./src/store/map/index.ts",
     "./llm": "./src/llm/index.ts",
     "./audit": "./src/audit/index.ts",
     "./concepts": "./src/concepts/index.ts",
@@ -50,7 +50,7 @@ const SLICE = `${CORE}/src/concepts/landing.ts`;
 const NESTED = `${CORE}/src/answering/plan/step.ts`;
 const KERNEL = `${CORE}/src/kernel/actor.ts`;
 const ACCESS = `${CORE}/src/access/predicate.ts`;
-const GRAPH_DOOR = `${CORE}/src/store/graph/index.ts`;
+const MAP_DOOR = `${CORE}/src/store/map/index.ts`;
 const POSTGRES_DOOR = `${CORE}/src/store/postgres/handle.ts`;
 const STORE_BARREL = `${CORE}/src/store/index.ts`;
 const LLM = `${CORE}/src/llm/model-choices.ts`;
@@ -88,8 +88,8 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["a slice reaching a door's internal file", SLICE, "../store/postgres/handle.ts"],
     ["a slice detouring to a sibling's internal", SLICE, "../concepts/../guides/renderer.ts"],
     ["a slice subdirectory reaching a sibling's internal", NESTED, "../../concepts/inbox.ts"],
-    ["a door reaching kernel's internal", GRAPH_DOOR, "../../kernel/actor.ts"],
-    ["the graph door reaching access's internal", GRAPH_DOOR, "../../access/predicate.ts"],
+    ["a door reaching kernel's internal", MAP_DOOR, "../../kernel/actor.ts"],
+    ["the map door reaching access's internal", MAP_DOOR, "../../access/predicate.ts"],
     ["a test reaching a slice's internal", TEST, "../src/concepts/file.ts"],
     [
       "a self-reference to a sibling's internal file",
@@ -122,11 +122,11 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["access importing a door's face", ACCESS, "../store/postgres/index.ts"],
     ["access importing a slice's face", ACCESS, "../concepts/index.ts"],
   ],
-  "a store door imports only kernel, and store/graph alone also imports access": [
+  "a store door imports only kernel, and store/map alone also imports access": [
     ["the postgres door importing access", POSTGRES_DOOR, "../../access/index.ts"],
-    ["the graph door importing a slice's face", GRAPH_DOOR, "../../concepts/index.ts"],
-    ["the graph door importing a layer's face", GRAPH_DOOR, "../../audit/index.ts"],
-    ["a door importing another door", GRAPH_DOOR, "../postgres/index.ts"],
+    ["the map door importing a slice's face", MAP_DOOR, "../../concepts/index.ts"],
+    ["the map door importing a layer's face", MAP_DOOR, "../../audit/index.ts"],
+    ["a door importing another door", MAP_DOOR, "../postgres/index.ts"],
     ["a door importing the store barrel", POSTGRES_DOOR, "../index.ts"],
     ["the store barrel importing a door", STORE_BARREL, "./postgres/index.ts"],
   ],
@@ -197,10 +197,10 @@ describe("the rule stays silent where the ADR allows the import", () => {
       SLICE,
       "@better-answers/core/store/postgres",
     ],
-    ["the graph door importing access", GRAPH_DOOR, "../../access/index.ts"],
-    ["the graph door importing kernel", GRAPH_DOOR, "../../kernel/index.ts"],
+    ["the map door importing access", MAP_DOOR, "../../access/index.ts"],
+    ["the map door importing kernel", MAP_DOOR, "../../kernel/index.ts"],
     ["the postgres door importing kernel", POSTGRES_DOOR, "../../kernel/index.ts"],
-    ["a door importing its own internal", GRAPH_DOOR, "./walk.ts"],
+    ["a door importing its own internal", MAP_DOOR, "./walk.ts"],
     ["access importing kernel", ACCESS, "../kernel/index.ts"],
     ["audit importing a door", AUDIT, "../store/postgres/index.ts"],
     ["audit importing kernel", AUDIT, "../kernel/index.ts"],
@@ -208,7 +208,7 @@ describe("the rule stays silent where the ADR allows the import", () => {
     ["llm importing a door by self-reference", LLM, "@better-answers/core/store/postgres"],
     ["a test importing a slice's face", TEST, "../src/concepts/index.ts"],
     ["a test importing kernel's face", TEST, "../src/kernel/index.ts"],
-    ["a test importing a door's face by self-reference", TEST, "@better-answers/core/store/graph"],
+    ["a test importing a door's face by self-reference", TEST, "@better-answers/core/store/map"],
     ["a test importing erasure — the one importer allowed to", TEST, "../src/erasure/index.ts"],
     ["a test importing its own sibling", TEST, "./suite-postgres.ts"],
     ["a test importing the devtools runner", TEST, "@better-answers/devtools/throwaway-tree"],

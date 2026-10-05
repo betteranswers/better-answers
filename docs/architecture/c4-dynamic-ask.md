@@ -13,18 +13,18 @@ C4Dynamic
     Component(plan, "planAnswer", "answering slice, in the resolving transaction", "The full-text hits, the walk from the set, the reuse decision; returns a plan holding no Tx")
     Component(draft, "draftAnswer", "answering slice, async generator", "Calls the model over the plan; holds no transaction")
     Component(record, "recordAnswer", "answering slice, a second short transaction", "answer_audit, llm_call, the reached set and the cut depth")
-    Component(graphdoor, "store/graph", "walkFrom over a set", "Seeded ANY of the entry uids, one shared cap, statement_timeout per statement, the predicate on every element")
+    Component(mapdoor, "store/map", "walkFrom over a set", "Seeded ANY of the entry uids, one shared cap, statement_timeout per statement, the predicate on every element")
     Component(llm, "llm", "model choice and client", "The model choice for answering and judging; the fetch-shaped model client; a row per call")
   }
 
-  ContainerDb(postgres, "Postgres", "RLS", "concept_index with its tsvector, the graph tables, answer_audit, llm_call")
+  ContainerDb(postgres, "Postgres", "RLS", "concept_index with its tsvector, the map tables, answer_audit, llm_call")
   System_Ext(models, "Model provider", "Messages-API-shaped", "Local or hosted, one code path")
 
   Rel(claude, transport, "1. ask with the question", "MCP or tRPC")
   Rel(transport, plan, "2. In the resolver body, with the Principal and the resolving Tx")
   Rel(plan, postgres, "3. Full-text over concept_index's stored tsvector under the predicate, ranked by kind; the same expression find uses", "GIN")
-  Rel(plan, graphdoor, "4. walkFrom the set of hits, depth 4 at most")
-  Rel(graphdoor, postgres, "5. One set-seeded walk; the reached set and the depth the cap fell at, recorded not chased", "recursive CTE")
+  Rel(plan, mapdoor, "4. walkFrom the set of hits, depth 4 at most")
+  Rel(mapdoor, postgres, "5. One set-seeded walk; the reached set and the depth the cap fell at, recorded not chased", "recursive CTE")
   Rel(plan, postgres, "6. conceptsByIris hydrates the reached concepts under the predicate; the Answers among them are the reuse candidates")
   Rel(transport, draft, "7. The transaction has committed; the iterable is returned and iterated")
   Rel(draft, llm, "8. Resolves the answering and judging model choices; the client at the wire seam")

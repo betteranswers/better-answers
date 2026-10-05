@@ -441,7 +441,7 @@ describe("the deploy tree", () => {
     );
   });
 
-  it("wipes staging with no special case for the graph", () => {
+  it("wipes staging with no special case for the map", () => {
     const drill = read("deploy/restore-drill.sh");
     expect(drill).not.toMatch(/ag_catalog|drop_graph|\bAGE\b/);
     expect(drill).toContain('-f "${DEPLOY_DIR}/empty-database.sql"');
@@ -515,44 +515,44 @@ describe("the deploy tree", () => {
         ...ASIDE,
         `platform() { printf '%s\\n' "ran: $*"; return ${String(status)}; }`,
         commands ?? "",
-        "ops graph-sweep --workspace a-workspace",
+        "ops map-sweep --workspace a-workspace",
         'say "the next step ran"',
       ]);
 
     expect(ran(0)).toEqual({
       code: 0,
       output:
-        "ran: exec -T api pnpm --silent ops graph-sweep --workspace a-workspace\nthe next step ran\n",
+        "ran: exec -T api pnpm --silent ops map-sweep --workspace a-workspace\nthe next step ran\n",
     });
     expect(ran(NOT_BUILT_EXIT)).toEqual({
       code: NOT_BUILT_EXIT,
       output:
-        "ran: exec -T api pnpm --silent ops graph-sweep --workspace a-workspace\n" +
-        "DRILL FAILED: 'pnpm ops graph-sweep' answered not built, so a table its slice needs is absent from the restored copy\n",
+        "ran: exec -T api pnpm --silent ops map-sweep --workspace a-workspace\n" +
+        "DRILL FAILED: 'pnpm ops map-sweep' answered not built, so a table its slice needs is absent from the restored copy\n",
     });
     expect(ran(1)).toEqual({
       code: 1,
-      output: "ran: exec -T api pnpm --silent ops graph-sweep --workspace a-workspace\n",
+      output: "ran: exec -T api pnpm --silent ops map-sweep --workspace a-workspace\n",
     });
   });
 
-  it("fails the counts when graph-counts finds its tables absent", () => {
+  it("fails the counts when map-counts finds its tables absent", () => {
     const ran = countsRan(
-      "graph-counts: not built — graph_generation, graph_node, graph_edge absent from this schema",
+      "map-counts: not built — map_generation, map_node, map_edge absent from this schema",
       NOT_BUILT_EXIT,
     );
 
     expect(ran).toEqual({
       code: NOT_BUILT_EXIT,
       output:
-        "DRILL FAILED: 'pnpm ops graph-counts' answered not built, so a table its slice needs is absent from the restored copy\n",
+        "DRILL FAILED: 'pnpm ops map-counts' answered not built, so a table its slice needs is absent from the restored copy\n",
     });
   });
 
-  it("fails the counts when graph-counts prints none", () => {
+  it("fails the counts when map-counts prints none", () => {
     expect(countsRan("", 0)).toEqual({
       code: 1,
-      output: `DRILL FAILED: graph-counts printed no counts for ${SYNTHETIC_WORKSPACE}\n`,
+      output: `DRILL FAILED: map-counts printed no counts for ${SYNTHETIC_WORKSPACE}\n`,
     });
   });
 

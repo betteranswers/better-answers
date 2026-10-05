@@ -1,5 +1,9 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import type pg from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   INDEX_REASONS,
@@ -8,8 +12,10 @@ import {
   JOB_KINDS,
   REASONS_EMPTYING_THE_BINDING,
 } from "../src/index.ts";
+import { journalMetaFolder } from "../src/journal.ts";
 import {
   type JobProbeRow,
+  seedBindingTo,
   seedClaimedJob,
   seedFinishedJob,
   seedQueuedJob,
@@ -137,7 +143,14 @@ describe("the job kind descriptors", () => {
         kind: "full-rebuild",
         claimingTier: "worker",
         namesASubject: false,
-        reasons: ["first-sync", "model-choice-change", "reconciler", "erasure", "upgrade", "drill"],
+        reasons: [
+          "first-build",
+          "model-choice-change",
+          "reconciler",
+          "erasure",
+          "upgrade",
+          "drill",
+        ],
         enqueuedBy: "Admin",
       },
       {
@@ -171,7 +184,7 @@ describe("the kind CHECK", () => {
       for (const descriptor of DESCRIBED) landed.push(await admitted(client, rowFor(descriptor)));
       expect(landed).toEqual([
         "nightly-audit · no reason · no subject",
-        "full-rebuild · first-sync · no subject",
+        "full-rebuild · first-build · no subject",
         `index · bound · ${BINDING}`,
       ]);
     });
@@ -220,7 +233,7 @@ describe("the reason CHECK", () => {
       }
 
       expect(landed).toEqual([
-        "full-rebuild · first-sync · no subject",
+        "full-rebuild · first-build · no subject",
         "full-rebuild · model-choice-change · no subject",
         "full-rebuild · reconciler · no subject",
         "full-rebuild · erasure · no subject",
@@ -322,7 +335,7 @@ describe("the run key", () => {
       }
       expect(landed).toEqual([
         "nightly-audit · no reason · no subject",
-        "full-rebuild · first-sync · no subject",
+        "full-rebuild · first-build · no subject",
       ]);
     });
   });
@@ -478,18 +491,23 @@ const itsStatementsOnTheJobTable = (): readonly string[] =>
     (statement) => statement.includes('"job"') || statement.includes("public.job"),
   );
 
-const withTheOldReasonAdmitted = async (
+/** Under the reason CHECK `tag` added, with `before` run ahead of the second workspace's making. */
+const withTheReasonCheckOf = async (
+  tag: string,
   fn: (client: pg.PoolClient) => Promise<void>,
+  before: (client: pg.PoolClient) => Promise<unknown> = async () => undefined,
 ): Promise<void> => {
   await withWorkspace(async (client) => {
     await client.query('ALTER TABLE "job" DROP CONSTRAINT "job_reason_check"');
-    await client.query(
-      migrationStatementSaying(THE_CHECK_BEFORE_THE_RENAME, ADDS_THE_REASON_CHECK),
-    );
+    await client.query(migrationStatementSaying(tag, ADDS_THE_REASON_CHECK));
+    await before(client);
     await testData(client).workspace({ id: ANOTHER_WS, name: "The queue's other workspace" });
     await fn(client);
   });
 };
+
+const withTheOldReasonAdmitted = (fn: (client: pg.PoolClient) => Promise<void>): Promise<void> =>
+  withTheReasonCheckOf(THE_CHECK_BEFORE_THE_RENAME, fn);
 
 const reasonsStandingIn = async (
   client: pg.PoolClient,
@@ -516,6 +534,103 @@ describe("the migration that named the model choice", () => {
       expect(await reasonsStandingIn(client, ANOTHER_WS)).toEqual([NEW_REASON]);
       expect(await claimed(client, ["full-rebuild"])).toEqual([queued]);
       expect(await refusedBy(client, OLD_REBUILD)).toBe("job_reason_check");
+    });
+  });
+});
+
+const THE_MAP_MIGRATION = "0067_the-map.sql";
+
+const OLD_FIRST_REASON = "first-sync";
+
+const NEW_FIRST_REASON = "first-build";
+
+const OLD_FIRST_REBUILD = {
+  kind: "full-rebuild",
+  reason: OLD_FIRST_REASON,
+  subjectId: null,
+} as const;
+
+const THE_OLD_DESTINATION = ["chunk-index", "graph"] as const;
+
+/** The migration's statements on `job` and `source_binding`; its table renames ran when the database did. */
+const itsStatementsOnTheValuesItRewrites = (): readonly string[] =>
+  migrationStatements(THE_MAP_MIGRATION).filter((statement) =>
+    ['"job"', "public.job", '"source_binding"', "public.source_binding"].some((table) =>
+      statement.includes(table),
+    ),
+  );
+
+/** 0036 declared the CHECK inside its CREATE TABLE, so the snapshot before the map holds it alone. */
+const theDestinationCheckBeforeTheMap = (): string => {
+  const snapshot = z
+    .object({
+      tables: z.object({
+        "public.source_binding": z.object({
+          checkConstraints: z.object({
+            source_binding_destination_check: z.object({ value: z.string() }),
+          }),
+        }),
+      }),
+    })
+    .parse(JSON.parse(readFileSync(path.join(journalMetaFolder, "0066_snapshot.json"), "utf8")));
+  const { value } =
+    snapshot.tables["public.source_binding"].checkConstraints.source_binding_destination_check;
+  return `ALTER TABLE "source_binding" ADD CONSTRAINT "source_binding_destination_check" CHECK (${value})`;
+};
+
+const withTheOldMapValuesAdmitted = (fn: (client: pg.PoolClient) => Promise<void>): Promise<void> =>
+  withTheReasonCheckOf(THE_RENAMING_MIGRATION, fn, async (client) => {
+    await client.query(
+      'ALTER TABLE "source_binding" DROP CONSTRAINT "source_binding_destination_check"',
+    );
+    await client.query(theDestinationCheckBeforeTheMap());
+  });
+
+const replayingItsRewrites = (client: pg.PoolClient): Promise<void> =>
+  asTheMigrationOwnerOf(client, ["TABLE public.job", "TABLE public.source_binding"], async () => {
+    for (const statement of itsStatementsOnTheValuesItRewrites()) await client.query(statement);
+  });
+
+const destinationsStandingIn = async (
+  client: pg.PoolClient,
+  workspaceId: string,
+): Promise<readonly (readonly string[])[]> =>
+  (
+    await client.query<{ destination: string[] }>(
+      "SELECT destination FROM source_binding WHERE workspace_id = $1",
+      [workspaceId],
+    )
+  ).rows.map((row) => row.destination);
+
+describe("the migration that named the map", () => {
+  it("moves every workspace's queued first-sync to first-build", async () => {
+    await withTheOldMapValuesAdmitted(async (client) => {
+      const queued = await seedQueuedJob(client, WS, OLD_FIRST_REBUILD);
+      await seedQueuedJob(client, ANOTHER_WS, OLD_FIRST_REBUILD);
+
+      await replayingItsRewrites(client);
+
+      expect(await reasonsStandingIn(client, WS)).toEqual([NEW_FIRST_REASON]);
+      expect(await reasonsStandingIn(client, ANOTHER_WS)).toEqual([NEW_FIRST_REASON]);
+      expect(await claimed(client, ["full-rebuild"])).toEqual([queued]);
+      expect(await refusedBy(client, OLD_FIRST_REBUILD)).toBe("job_reason_check");
+    });
+  });
+
+  it("moves every workspace's 'graph' destination to 'map'", async () => {
+    await withTheOldMapValuesAdmitted(async (client) => {
+      await seedBindingTo(client, WS, BINDING, THE_OLD_DESTINATION);
+      await seedBindingTo(client, ANOTHER_WS, BINDING, THE_OLD_DESTINATION);
+
+      await replayingItsRewrites(client);
+
+      expect(await destinationsStandingIn(client, WS)).toEqual([["chunk-index", "map"]]);
+      expect(await destinationsStandingIn(client, ANOTHER_WS)).toEqual([["chunk-index", "map"]]);
+      expect(
+        await refusalOf(client, () =>
+          seedBindingTo(client, WS, ANOTHER_BINDING, THE_OLD_DESTINATION),
+        ),
+      ).toBe("source_binding_destination_check");
     });
   });
 });

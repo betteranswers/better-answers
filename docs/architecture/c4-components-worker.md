@@ -6,7 +6,7 @@ Level 3. The Python tier is **a host** (T-113, verdict 2): one loop, a registry 
 C4Component
   title Component diagram — apps/worker, the loop and the host
 
-  ContainerDb(postgres, "Postgres", "workspace-scoped role", "The queue, the stamps, finding, source_document, index.chunk, the graph tables")
+  ContainerDb(postgres, "Postgres", "workspace-scoped role", "The queue, the stamps, finding, source_document, index.chunk, the map tables")
   ContainerDb(git, "Git store", "read-only mount", "The bundle at the commit on the run row")
   ContainerDb(objects, "Object store", "Garage, S3", "Originals and normalised redacted copies")
   ContainerDb(lmdb, "Per-binding LMDB", "cocoindex Environment", "binding/ and findings/, sibling stores")
@@ -16,7 +16,7 @@ C4Component
     Component(loop, "loop.py", "the image's command", "One pass over every workspace per tick: claim and run one job, or enqueue the nightly audit when due; claims nothing while the schema stamp or the contract digest differs")
     Component(queue, "queue.py", "the queue agreement", "claim_job with the kinds, heartbeat, finish, fail; the lease kept alive beside the run")
     Component(kinds, "kinds.py — KINDS", "the registry", "nightly-audit, full-rebuild, index: each a handler taking the bootstrap and the claimed job, answering an outcome row")
-    Component(rebuild, "rebuild.py", "full-rebuild", "One workspace's graph made again as a new generation, flipped live by one row update")
+    Component(rebuild, "rebuild.py", "full-rebuild", "One workspace's map made again as a new generation, flipped live by one row update")
     Component(audit, "audit.py", "nightly-audit", "The parser audit over every concept file")
     Component(bundle, "bundle.py, concept_file.py, links.py, chunker.py", "dulwich", "Reads the bundle at a commit; the canonical text and hash the concept-file agreement pins; links; the concept chunker")
     Component(host, "pipeline/host.py, run.py, rows.py", "cocoindex host", "index_binding: a per-workspace asyncpg pool, Environments in a bounded LRU, each binding's two stores, the chunk rows; empties binding/ on wiped or rule-change")

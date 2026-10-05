@@ -104,7 +104,7 @@ const acceptedOne = async (scenario: Scenario, setId: string): Promise<ConceptWr
 };
 
 const countOf = async (
-  table: "concept_index" | "graph_node",
+  table: "concept_index" | "map_node",
   workspaceId: string,
 ): Promise<string | undefined> => {
   const counted = await db().pool.query<{ count: string }>(
@@ -388,7 +388,7 @@ describe("accepting a suggestion", () => {
     expect(concept.rows).toEqual([{ iri: accepted.iri, body: request.body }]);
   });
 
-  it("lands the graph delta in the acceptance's own transaction", async () => {
+  it("lands the map delta in the acceptance's own transaction", async () => {
     const scenario = await arrange();
 
     const { input: cited, written } = await editorWrote(scenario);
@@ -400,7 +400,7 @@ describe("accepting a suggestion", () => {
     const accepted = await acceptedOne(scenario, set.setId);
 
     const nodes = await db().pool.query<{ uid: string; gen: number }>(
-      "SELECT uid, gen FROM graph_node WHERE workspace_id = $1",
+      "SELECT uid, gen FROM map_node WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(nodes.rows.map((row) => row.uid).toSorted()).toEqual(
@@ -408,7 +408,7 @@ describe("accepting a suggestion", () => {
     );
     expect(nodes.rows.map((row) => row.gen)).toEqual([1, 1]);
     const edges = await db().pool.query(
-      "SELECT from_uid, to_uid FROM graph_edge WHERE workspace_id = $1",
+      "SELECT from_uid, to_uid FROM map_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(edges.rows).toEqual([{ from_uid: accepted.iri, to_uid: written.iri }]);
@@ -760,7 +760,7 @@ describe("an acceptance at a path another concept holds", () => {
 
     expect(await countOf("concept_index", scenario.workspaceId)).toBe("1");
 
-    expect(await countOf("graph_node", scenario.workspaceId)).toBe("1");
+    expect(await countOf("map_node", scenario.workspaceId)).toBe("1");
     expect(
       await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.accepted"),
     ).toHaveLength(1);

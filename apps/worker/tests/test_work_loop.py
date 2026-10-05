@@ -25,10 +25,10 @@ from better_answers_worker.rebuild import run_rebuild
 from better_answers_worker.schema_view import MIGRATION_WHEN
 from bundles import write_bundle
 from factories import (
-    hold_graph_generation,
+    hold_map_generation,
     seed_concept,
-    seed_graph_generation,
     seed_job,
+    seed_map_generation,
     seed_workspace,
 )
 from pg_harness import migrated_postgres_at, stamp_contract, stamp_migration
@@ -269,7 +269,7 @@ def test_a_running_jobs_claim_is_visible_and_its_lease_moves(
 
     passes: list[bool] = []
     with psycopg.connect(dsn) as blocker, queue.connected(dsn) as worker:
-        blocker.execute("LOCK TABLE graph_generation IN EXCLUSIVE MODE")
+        blocker.execute("LOCK TABLE map_generation IN EXCLUSIVE MODE")
         pass_ = threading.Thread(
             target=lambda: passes.append(
                 loop.tick(worker, bootstrap, heartbeat_every_seconds=0.05)
@@ -343,7 +343,7 @@ def test_a_rebuild_holds_the_generation_row_first_so_writes_land(
     with database.cursor() as cursor:
         expenses = seed_expenses(cursor, workspace)
 
-        seed_graph_generation(cursor, workspace_id=workspace)
+        seed_map_generation(cursor, workspace_id=workspace)
     database.commit()
     dsn = _WHERE[database]
 
@@ -359,7 +359,7 @@ def test_a_rebuild_holds_the_generation_row_first_so_writes_land(
                 body="Receipts are kept for six years.",
                 kind="Evidence",
             )
-            hold_graph_generation(cursor, workspace_id=workspace)
+            hold_map_generation(cursor, workspace_id=workspace)
         write_bundle(
             tmp_path,
             workspace,
@@ -396,8 +396,7 @@ def test_a_rebuild_holds_the_generation_row_first_so_writes_land(
     assert (outcome.generation, outcome.nodes, outcome.missing_row) == (2, 2, [])
     with database.cursor() as cursor:
         cursor.execute(
-            "SELECT uid FROM graph_node WHERE workspace_id = %s AND gen = 2"
-            " ORDER BY uid",
+            "SELECT uid FROM map_node WHERE workspace_id = %s AND gen = 2 ORDER BY uid",
             (workspace,),
         )
         assert cursor.fetchall() == [(IRI,), (OTHER_IRI,)]
@@ -473,7 +472,7 @@ def test_a_rebuild_writes_the_next_generation_aside_then_flips_it(
             kind="Evidence",
         )
 
-        seed_graph_generation(cursor, workspace_id=workspace)
+        seed_map_generation(cursor, workspace_id=workspace)
     database.commit()
     write_bundle(
         tmp_path,
@@ -487,13 +486,13 @@ def test_a_rebuild_writes_the_next_generation_aside_then_flips_it(
     assert (outcome.generation, outcome.nodes, outcome.edges) == (2, 2, 1)
     with database.cursor() as cursor:
         cursor.execute(
-            "SELECT live_gen FROM graph_generation WHERE workspace_id = %s",
+            "SELECT live_gen FROM map_generation WHERE workspace_id = %s",
             (workspace,),
         )
         assert cursor.fetchone() == (2,)
         cursor.execute(
             "SELECT gen, label, from_uid, to_uid, from_kind, to_kind, section, sentence"
-            " FROM graph_edge WHERE workspace_id = %s",
+            " FROM map_edge WHERE workspace_id = %s",
             (workspace,),
         )
         assert cursor.fetchall() == [

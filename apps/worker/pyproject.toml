@@ -156,9 +156,9 @@ build-backend = "uv_build"
 # The one pin for `cryptography`, and the only place in this tier carrying its version.
 # `presidio-anonymizer==2.2.364`, the newest on PyPI, asks for `cryptography>=48.0.1,<49`, and
 # 48.0.1 is exposed to GHSA-g6cj-pr64-35w5, fixed in 50.0.0, and to GHSA-m2h6-j472-rp4c and
-# GHSA-jwv3-5hgf-82ww, fixed in 49.0.0. While that cap holds, no resolution of this graph
-# reaches a release any of the three is fixed in, which is what the security pull request
-# raised against it ran into. The cap is overridden rather than waited out because presidio
+# GHSA-jwv3-5hgf-82ww, fixed in 49.0.0. While that cap holds, no resolution of this
+# dependency graph reaches a release any of the three is fixed in, which is what the security
+# pull request raised against it ran into. The cap is overridden rather than waited out because presidio
 # touches this package at `Cipher(AES, CBC)` and `padding` alone, in
 # `presidio_anonymizer/operators/aes_cipher.py`, and this tier's own use is `AESGCM` in
 # `envelope.py` — none of the three is in code either reaches, and neither major moved

@@ -29,6 +29,20 @@ export const seedBindingOfAConnectorAlone = async (
   return id;
 };
 
+const BINDING_TO = `INSERT INTO source_binding (workspace_id, id, name, connector, destination)
+  VALUES ($1, $2, 'The handbook', 'upload', $3::text[])`;
+
+/** Raw, so a destination word a CHECK of the day admits can be seeded beneath a later one. */
+export const seedBindingTo = async (
+  client: pg.PoolClient,
+  workspaceId: string,
+  id: string,
+  destination: readonly string[],
+): Promise<string> => {
+  await client.query(BINDING_TO, [workspaceId, id, destination]);
+  return id;
+};
+
 export const seedCataloguedDocument = async (
   client: pg.PoolClient,
   item: CataloguedItem,
