@@ -59,7 +59,7 @@ export type IconName =
   | "backups"
   | "caret-down"
   | "caret-right"
-  | "ceiling"
+  | "spending-limit"
   | "checks"
   | "columns"
   | "conflicts"
@@ -91,7 +91,7 @@ export type IconName =
   | "question"
   | "queue"
   | "remove"
-  | "routes"
+  | "models"
   | "search"
   | "menu"
   | "signals"
@@ -114,7 +114,7 @@ const GLYPHS = {
   backups: CloudArrowUp,
   "caret-down": CaretDown,
   "caret-right": CaretRight,
-  ceiling: Gauge,
+  "spending-limit": Gauge,
   checks: CalendarCheck,
   columns: Columns,
   conflicts: Warning,
@@ -146,7 +146,7 @@ const GLYPHS = {
   question: Question,
   queue: ListChecks,
   remove: X,
-  routes: Path,
+  models: Path,
   search: MagnifyingGlass,
   menu: SidebarSimple,
   signals: Broadcast,

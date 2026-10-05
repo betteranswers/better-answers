@@ -84,6 +84,7 @@ describe("what a procedure may answer the wire", () => {
       "members.requests",
       "members.resendInvitation",
       "members.revokeCredentials",
+      "modelChoices.list",
       "person.acceptInvitation",
       "person.acknowledgeRecoveryCodes",
       "person.dismissPasskeyOffer",
@@ -96,7 +97,6 @@ describe("what a procedure may answer the wire", () => {
       "person.requestAccess",
       "person.secondFactor",
       "person.setDisplayName",
-      "routes.list",
       "runs.ofSubject",
       "session.membership",
       "session.operator",
@@ -159,7 +159,7 @@ describe("what a procedure may answer the wire", () => {
       | "members.requests"
       | "members.approveRequest"
       | "members.declineRequest"
-      | "routes.list"
+      | "modelChoices.list"
       | "sources.list"
       | "sources.bind"
       | "sources.findings"

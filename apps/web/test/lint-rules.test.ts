@@ -18,8 +18,8 @@ if (webOverrides().length !== 6) {
 const { flagged } = oxlintOver(
   JSON.stringify({ plugins: ["typescript", "unicorn", "import"], overrides: webOverrides() }),
   {
-    tree: { "apps/web/src/shared/routeTable.ts": "export const keep = 1;\n" },
-    flagged: ["apps/web/src/shared/routeTable.ts"],
+    tree: { "apps/web/src/shared/sortOrder.ts": "export const keep = 1;\n" },
+    flagged: ["apps/web/src/shared/sortOrder.ts"],
   },
 );
 
@@ -35,16 +35,18 @@ const namedProbe = (name: string, specifier: string): string =>
 describe("no feature imports another feature", () => {
   it("refuses a sibling feature, allows its own files and shared", () => {
     const refused = flagged({
-      "apps/web/src/features/routes/reaches-sideways.ts": probe("@/features/people/api.ts"),
-      "apps/web/src/features/routes/reaches-sideways-relatively.ts": probe("../people/api.ts"),
-      "apps/web/src/features/routes/reaches-itself.ts": probe("./api.ts"),
-      "apps/web/src/features/routes/components/reaches-its-own-feature.ts": probe("../api.ts"),
-      "apps/web/src/features/routes/reaches-shared.ts": probe("@/shared/api/trpc.ts"),
+      "apps/web/src/features/model-choices/reaches-sideways.ts": probe("@/features/people/api.ts"),
+      "apps/web/src/features/model-choices/reaches-sideways-relatively.ts":
+        probe("../people/api.ts"),
+      "apps/web/src/features/model-choices/reaches-itself.ts": probe("./api.ts"),
+      "apps/web/src/features/model-choices/components/reaches-its-own-feature.ts":
+        probe("../api.ts"),
+      "apps/web/src/features/model-choices/reaches-shared.ts": probe("@/shared/api/trpc.ts"),
     });
 
     expect(refused).toEqual([
-      "apps/web/src/features/routes/reaches-sideways-relatively.ts",
-      "apps/web/src/features/routes/reaches-sideways.ts",
+      "apps/web/src/features/model-choices/reaches-sideways-relatively.ts",
+      "apps/web/src/features/model-choices/reaches-sideways.ts",
     ]);
   });
 });
@@ -52,14 +54,14 @@ describe("no feature imports another feature", () => {
 describe("imports run app \u2192 features \u2192 shared, never back", () => {
   it("refuses a feature importing the app layer, allows shared", () => {
     const refused = flagged({
-      "apps/web/src/features/routes/reaches-up.ts": probe("@/app/router.tsx"),
-      "apps/web/src/features/routes/reaches-up-relatively.ts": probe("../../app/router.tsx"),
-      "apps/web/src/features/routes/reaches-down.ts": probe("@/shared/navigation.ts"),
+      "apps/web/src/features/model-choices/reaches-up.ts": probe("@/app/router.tsx"),
+      "apps/web/src/features/model-choices/reaches-up-relatively.ts": probe("../../app/router.tsx"),
+      "apps/web/src/features/model-choices/reaches-down.ts": probe("@/shared/navigation.ts"),
     });
 
     expect(refused).toEqual([
-      "apps/web/src/features/routes/reaches-up-relatively.ts",
-      "apps/web/src/features/routes/reaches-up.ts",
+      "apps/web/src/features/model-choices/reaches-up-relatively.ts",
+      "apps/web/src/features/model-choices/reaches-up.ts",
     ]);
   });
 
@@ -74,13 +76,13 @@ describe("imports run app \u2192 features \u2192 shared, never back", () => {
 
   it("refuses shared importing upwards, allows app importing features and shared", () => {
     const refused = flagged({
-      "apps/web/src/shared/reaches-a-feature.ts": probe("@/features/routes/api.ts"),
+      "apps/web/src/shared/reaches-a-feature.ts": probe("@/features/model-choices/api.ts"),
       "apps/web/src/shared/reaches-the-app.ts": probe("@/app/router.tsx"),
       "apps/web/src/shared/api/reaches-a-feature-relatively.ts": probe(
-        "../../features/routes/api.ts",
+        "../../features/model-choices/api.ts",
       ),
       "apps/web/src/shared/stays-put.ts": probe("./navigation.ts"),
-      "apps/web/src/app/composes-a-feature.ts": probe("@/features/routes/api.ts"),
+      "apps/web/src/app/composes-a-feature.ts": probe("@/features/model-choices/api.ts"),
       "apps/web/src/app/composes-shared.ts": probe("@/shared/navigation.ts"),
     });
 
@@ -99,14 +101,14 @@ describe("better-auth is named in the identity feature and nowhere else", () => 
       "apps/web/src/features/auth/deep.ts": probe("better-auth/client/plugins"),
       "apps/web/src/features/auth/scoped.ts": probe("@better-auth/oauth-provider/client"),
       "apps/web/src/shared/ui/reaches-the-library.tsx": probe("better-auth/react"),
-      "apps/web/src/features/routes/reaches-the-library.ts": probe("better-auth/client"),
+      "apps/web/src/features/model-choices/reaches-the-library.ts": probe("better-auth/client"),
       "apps/web/src/shared/api/reaches-the-library.ts": probe("better-auth/client"),
       "apps/web/src/app/reaches-the-library.ts": probe("@better-auth/oauth-provider/client"),
     });
 
     expect(refused).toEqual([
       "apps/web/src/app/reaches-the-library.ts",
-      "apps/web/src/features/routes/reaches-the-library.ts",
+      "apps/web/src/features/model-choices/reaches-the-library.ts",
       "apps/web/src/shared/api/reaches-the-library.ts",
       "apps/web/src/shared/ui/reaches-the-library.tsx",
     ]);
@@ -114,7 +116,7 @@ describe("better-auth is named in the identity feature and nowhere else", () => 
 
   it("holds the identity feature to every other import rule", () => {
     const refused = flagged({
-      "apps/web/src/features/auth/reaches-sideways.ts": probe("@/features/routes/api.ts"),
+      "apps/web/src/features/auth/reaches-sideways.ts": probe("@/features/model-choices/api.ts"),
       "apps/web/src/features/auth/reaches-up.ts": probe("@/app/router.tsx"),
       "apps/web/src/features/auth/reaches-the-api.ts": typeProbe("@better-answers/api/trpc"),
       "apps/web/src/features/auth/reaches-down.ts": probe("@/shared/ui/button.tsx"),
@@ -161,11 +163,11 @@ describe("the journeys take no act from the harness", () => {
 describe("filenames in the SPA are kebab-case", () => {
   it("refuses a camel-case filename and allows a kebab-case one", () => {
     const refused = flagged({
-      "apps/web/src/shared/routeTable.ts": "export const keep = 1;\n",
-      "apps/web/src/shared/route-table.ts": "export const keep = 1;\n",
+      "apps/web/src/shared/sortOrder.ts": "export const keep = 1;\n",
+      "apps/web/src/shared/sort-order.ts": "export const keep = 1;\n",
     });
 
-    expect(refused).toEqual(["apps/web/src/shared/routeTable.ts"]);
+    expect(refused).toEqual(["apps/web/src/shared/sortOrder.ts"]);
   });
 });
 
@@ -174,11 +176,11 @@ describe("AppRouter as a type, in one file only", () => {
     const refused = flagged({
       "apps/web/src/shared/api/trpc.ts": typeProbe("@better-answers/api/trpc"),
       "apps/web/src/shared/api/second-client.ts": typeProbe("@better-answers/api/trpc"),
-      "apps/web/src/features/routes/api.ts": typeProbe("@better-answers/api/trpc"),
+      "apps/web/src/features/model-choices/api.ts": typeProbe("@better-answers/api/trpc"),
     });
 
     expect(refused).toEqual([
-      "apps/web/src/features/routes/api.ts",
+      "apps/web/src/features/model-choices/api.ts",
       "apps/web/src/shared/api/second-client.ts",
     ]);
   });
@@ -187,12 +189,12 @@ describe("AppRouter as a type, in one file only", () => {
     const refused = flagged({
       "apps/web/src/shared/api/trpc.ts": probe("@better-answers/api/trpc"),
       "apps/web/src/app/pages/system-page.ts": probe("@better-answers/api/trpc"),
-      "apps/web/src/features/routes/api.ts": probe("@better-answers/api/trpc"),
+      "apps/web/src/features/model-choices/api.ts": probe("@better-answers/api/trpc"),
     });
 
     expect(refused).toEqual([
       "apps/web/src/app/pages/system-page.ts",
-      "apps/web/src/features/routes/api.ts",
+      "apps/web/src/features/model-choices/api.ts",
       "apps/web/src/shared/api/trpc.ts",
     ]);
   });

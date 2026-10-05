@@ -147,24 +147,24 @@ describe("the chunk's columns, on the parent and on a partition", () => {
   });
 });
 
-describe("the embedding and the route it came from", () => {
-  it("refuses a vector or route alone, admitting neither or both", async () => {
+describe("the embedding and the model choice it came from", () => {
+  it("refuses a vector or model choice without the other", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });
       const binding = `binding-${ulid()}`;
 
-      const probe = (embedding: string | null, route: string | null) =>
-        attemptChunkEmbeddedBy(client, WS_A, binding, embedding, route);
+      const probe = (embedding: string | null, modelChoice: string | null) =>
+        attemptChunkEmbeddedBy(client, WS_A, binding, embedding, modelChoice);
 
       expect({
-        vectorWithoutItsRoute: await probe(VECTOR, null),
-        routeWithoutItsVector: await probe(null, "route-embed"),
+        vectorWithoutItsModelChoice: await probe(VECTOR, null),
+        modelChoiceWithoutItsVector: await probe(null, "model-choice-embed"),
         neither: await probe(null, null),
-        both: await probe(VECTOR, "route-embed"),
+        both: await probe(VECTOR, "model-choice-embed"),
       }).toEqual({
-        vectorWithoutItsRoute: "chunk_embedding_pair_check",
-        routeWithoutItsVector: "chunk_embedding_pair_check",
+        vectorWithoutItsModelChoice: "chunk_embedding_pair_check",
+        modelChoiceWithoutItsVector: "chunk_embedding_pair_check",
         neither: ADMITTED,
         both: ADMITTED,
       });

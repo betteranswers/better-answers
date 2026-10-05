@@ -49,7 +49,7 @@ export const TABLE_OWNERS = {
   "public.workspace_config": "workspaces",
   "public.group": "members",
   "public.group_member": "members",
-  "public.llm_route": "llm",
+  "public.model_choice": "llm",
   "public.audit_event": "audit",
   "public.identity_audit_event": "audit",
   "public.access_request": "members",

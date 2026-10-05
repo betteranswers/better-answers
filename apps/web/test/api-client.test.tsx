@@ -12,30 +12,30 @@ import { TRPC_ENDPOINT, useTRPC } from "@/shared/api/trpc.ts";
 
 afterEach(cleanup);
 
-type ListProcedure = ReturnType<typeof useTRPC>["routes"]["list"];
+type ListProcedure = ReturnType<typeof useTRPC>["modelChoices"]["list"];
 
-function RoutesProbe() {
+function ModelChoicesProbe() {
   const api = useTRPC();
-  const options = api.routes.list.queryOptions();
+  const options = api.modelChoices.list.queryOptions();
   return <p data-testid="probe">{JSON.stringify(options.queryKey)}</p>;
 }
 
 describe("the SPA's tRPC client", () => {
-  it("hands a component routes' query options, keyed by the procedure", () => {
+  it("hands a component its query options, keyed by the procedure", () => {
     render(
       <Providers clients={createAppClients()}>
-        <RoutesProbe />
+        <ModelChoicesProbe />
       </Providers>,
     );
 
     expect(JSON.parse(screen.getByTestId("probe").textContent)).toEqual([
-      ["routes", "list"],
+      ["modelChoices", "list"],
       { type: "query" },
     ]);
   });
 
   it("throws for a component rendered outside the provider", () => {
-    expect(() => render(<RoutesProbe />)).toThrow(/TRPCProvider/);
+    expect(() => render(<ModelChoicesProbe />)).toThrow(/TRPCProvider/);
   });
 });
 
@@ -44,19 +44,19 @@ describe("the query provider above the router", () => {
     const clients = createAppClients();
     const router = createAppRouter(
       clients,
-      createMemoryHistory({ initialEntries: ["/agent-operations/routes-and-spend"] }),
+      createMemoryHistory({ initialEntries: ["/models/models-and-spend"] }),
     );
     await router.load();
 
     render(
       <Providers clients={clients}>
         <RouterProvider router={router} />
-        <RoutesProbe />
+        <ModelChoicesProbe />
       </Providers>,
     );
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Agent Operations");
-    expect(screen.getByTestId("probe").textContent).toContain("routes");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models");
+    expect(screen.getByTestId("probe").textContent).toContain("modelChoices");
   });
 });
 
@@ -73,7 +73,7 @@ describe("the path the client and the api agree on", () => {
   });
 });
 
-describe("routes.list's types crossing from apps/api", () => {
+describe("modelChoices.list's types crossing from apps/api", () => {
   it("takes no input, since the session carries the workspace", () => {
     /**
      * `toEqualTypeOf` constrains its argument, so absence is asserted through a conditional,
@@ -87,10 +87,10 @@ describe("routes.list's types crossing from apps/api", () => {
     expectTypeOf<NoInput>().toEqualTypeOf<true>();
   });
 
-  it("answers one route per purpose, in a page's words", () => {
-    type Route = inferOutput<ListProcedure>[number];
+  it("answers one model choice per purpose, in a page's words", () => {
+    type ModelChoice = inferOutput<ListProcedure>[number];
 
-    type ExpectedRoute = {
+    type ExpectedModelChoice = {
       readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
       readonly provider: string | null;
       readonly model: string | null;
@@ -99,6 +99,6 @@ describe("routes.list's types crossing from apps/api", () => {
       readonly retentionTail: string | null;
     };
 
-    expectTypeOf<Route>().toEqualTypeOf<ExpectedRoute>();
+    expectTypeOf<ModelChoice>().toEqualTypeOf<ExpectedModelChoice>();
   });
 });

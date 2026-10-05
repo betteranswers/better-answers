@@ -13,8 +13,8 @@ import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
 const oxlint: Tool["executable"] = { package: "oxlint", path: ["bin", "oxlint"] };
 
-const CAMEL_CASE_FILE = "routeTable.ts";
-const KEBAB_CASE_FILE = "route-table.ts";
+const CAMEL_CASE_FILE = "sortOrder.ts";
+const KEBAB_CASE_FILE = "sort-order.ts";
 const SOURCE = "export const keep = 1;\n";
 
 const kebabCaseConfig = JSON.stringify({

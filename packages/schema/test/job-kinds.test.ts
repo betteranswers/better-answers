@@ -137,7 +137,7 @@ describe("the job kind descriptors", () => {
         kind: "full-rebuild",
         claimingTier: "worker",
         namesASubject: false,
-        reasons: ["first-sync", "route-change", "reconciler", "erasure", "upgrade", "drill"],
+        reasons: ["first-sync", "model-choice-change", "reconciler", "erasure", "upgrade", "drill"],
         enqueuedBy: "Admin",
       },
       {
@@ -221,7 +221,7 @@ describe("the reason CHECK", () => {
 
       expect(landed).toEqual([
         "full-rebuild · first-sync · no subject",
-        "full-rebuild · route-change · no subject",
+        "full-rebuild · model-choice-change · no subject",
         "full-rebuild · reconciler · no subject",
         "full-rebuild · erasure · no subject",
         "full-rebuild · upgrade · no subject",
@@ -458,6 +458,64 @@ describe("the migration that retired a run reason", () => {
       expect(deleted).toBe(0);
       expect(await jobsStandingIn(client, WS)).toEqual([inOne]);
       expect(await jobsStandingIn(client, ANOTHER_WS)).toEqual([inTheOther]);
+    });
+  });
+});
+
+const THE_RENAMING_MIGRATION = "0066_the-model-choice.sql";
+
+const THE_CHECK_BEFORE_THE_RENAME = "0051_the-dismissal.sql";
+
+const OLD_REASON = "route-change";
+
+const NEW_REASON = "model-choice-change";
+
+const OLD_REBUILD = { kind: "full-rebuild", reason: OLD_REASON, subjectId: null } as const;
+
+/** The migration's statements on `job`; the table renames before them ran when the database did. */
+const itsStatementsOnTheJobTable = (): readonly string[] =>
+  migrationStatements(THE_RENAMING_MIGRATION).filter(
+    (statement) => statement.includes('"job"') || statement.includes("public.job"),
+  );
+
+const withTheOldReasonAdmitted = async (
+  fn: (client: pg.PoolClient) => Promise<void>,
+): Promise<void> => {
+  await withWorkspace(async (client) => {
+    await client.query('ALTER TABLE "job" DROP CONSTRAINT "job_reason_check"');
+    await client.query(
+      migrationStatementSaying(THE_CHECK_BEFORE_THE_RENAME, ADDS_THE_REASON_CHECK),
+    );
+    await testData(client).workspace({ id: ANOTHER_WS, name: "The queue's other workspace" });
+    await fn(client);
+  });
+};
+
+const reasonsStandingIn = async (
+  client: pg.PoolClient,
+  workspaceId: string,
+): Promise<readonly string[]> =>
+  (
+    await client.query<{ reason: string }>(
+      "SELECT reason FROM job WHERE workspace_id = $1 ORDER BY enqueued_at",
+      [workspaceId],
+    )
+  ).rows.map((row) => row.reason);
+
+describe("the migration that named the model choice", () => {
+  it("moves every workspace's queued old reason to the new one", async () => {
+    await withTheOldReasonAdmitted(async (client) => {
+      const queued = await seedQueuedJob(client, WS, OLD_REBUILD);
+      await seedQueuedJob(client, ANOTHER_WS, OLD_REBUILD);
+
+      await asTheMigrationOwner(client, async () => {
+        for (const statement of itsStatementsOnTheJobTable()) await client.query(statement);
+      });
+
+      expect(await reasonsStandingIn(client, WS)).toEqual([NEW_REASON]);
+      expect(await reasonsStandingIn(client, ANOTHER_WS)).toEqual([NEW_REASON]);
+      expect(await claimed(client, ["full-rebuild"])).toEqual([queued]);
+      expect(await refusedBy(client, OLD_REBUILD)).toBe("job_reason_check");
     });
   });
 });

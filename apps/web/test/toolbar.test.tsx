@@ -9,11 +9,11 @@ import { openApp } from "./open-app.tsx";
 
 afterEach(cleanup);
 
-const ROUTES_AND_SPEND = "/agent-operations/routes-and-spend";
+const MODELS_AND_SPEND = "/models/models-and-spend";
 
 const shellAt = async (path: string) => (await openApp(path)).router;
 
-const tabs = () => screen.getByRole("tablist", { name: "Routes and spend" });
+const tabs = () => screen.getByRole("tablist", { name: "Models and spend" });
 
 const openTab = () => within(tabs()).getByRole("tab", { selected: true }).textContent;
 
@@ -118,26 +118,26 @@ const reviewTab = (name: string) =>
 
 describe("the toolbar the open page fills", () => {
   it("carries the page's tabs in order, the open one selected", async () => {
-    await shellAt(ROUTES_AND_SPEND);
+    await shellAt(MODELS_AND_SPEND);
 
     expect(
       within(tabs())
         .getAllByRole("tab")
         .map((tab) => tab.textContent),
-    ).toEqual(["Routes", "Spend"]);
-    expect(openTab()).toBe("Routes");
+    ).toEqual(["Model choices", "Spend"]);
+    expect(openTab()).toBe("Model choices");
   });
 
   it("opens the picked tab, and says when it is unbuilt", async () => {
-    await shellAt(ROUTES_AND_SPEND);
+    await shellAt(MODELS_AND_SPEND);
 
     pick("Spend");
 
     expect(openTab()).toBe("Spend");
     expect(screen.getByText("Spend is not built yet.")).toBeDefined();
-    expect(screen.queryByRole("region", { name: "Routes" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Model choices" })).toBeNull();
     // A tab divides a page, so the page's own words stand either way.
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Agent Operations");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models");
   });
 
   it("opens another page on its own first tab", () => {
@@ -156,13 +156,13 @@ describe("the toolbar the open page fills", () => {
   });
 
   it("gives the open tab its own panel, holding the page", async () => {
-    await shellAt(ROUTES_AND_SPEND);
+    await shellAt(MODELS_AND_SPEND);
 
     const panel = screen.getByRole("tabpanel");
     expect(panel.getAttribute("aria-labelledby")).toBe(
-      within(tabs()).getByRole("tab", { name: "Routes" }).id,
+      within(tabs()).getByRole("tab", { name: "Model choices" }).id,
     );
-    expect(within(panel).getByRole("region", { name: "Routes" })).toBeDefined();
+    expect(within(panel).getByRole("region", { name: "Model choices" })).toBeDefined();
   });
 
   it("draws no toolbar or panel without tabs or acts", async () => {

@@ -29,9 +29,9 @@ const bindingIn = async (scenario: Scenario, rulesInForce: Rules = SAFE_SET): Pr
       (await seed.sourceBinding({ workspaceId: scenario.workspaceId, rulesInForce })).id,
   );
 
-const routeIn = async (
+const modelChoiceIn = async (
   scenario: Scenario,
-  route: {
+  modelChoice: {
     readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
     readonly provider: string;
     readonly model: string;
@@ -39,21 +39,21 @@ const routeIn = async (
   },
 ): Promise<void> => {
   await seedingWith(db().pool, async (seed) => {
-    await seed.llmRoute({
+    await seed.modelChoice({
       workspaceId: scenario.workspaceId,
-      purpose: route.purpose,
-      provider: route.provider,
-      model: route.model,
-      retentionTail: route.retentionTail ?? null,
+      purpose: modelChoice.purpose,
+      provider: modelChoice.provider,
+      model: modelChoice.model,
+      retentionTail: modelChoice.retentionTail ?? null,
     });
   });
 };
 
-const answeringRouteAndBinding = async (
+const answeringModelChoiceAndBinding = async (
   scenario: Scenario,
   retentionTail: string | null,
 ): Promise<string> => {
-  await routeIn(scenario, {
+  await modelChoiceIn(scenario, {
     purpose: "answering",
     provider: "anthropic",
     model: "claude-sonnet-5",
@@ -164,13 +164,13 @@ describe("what the platform holds whatever the binding", () => {
   });
 });
 
-describe("the routes a DPIA input lists", () => {
-  it("prints the provider's retention sentence a route carries", async () => {
+describe("the model choices a DPIA input lists", () => {
+  it("prints the provider's retention sentence a model choice carries", async () => {
     const scenario = await arrange();
     const tail = "Prompts and outputs are deleted within 30 days; no training on customer data.";
-    const binding = await answeringRouteAndBinding(scenario, tail);
+    const binding = await answeringModelChoiceAndBinding(scenario, tail);
 
-    expect((await documentFor(scenario, binding)).routes).toEqual([
+    expect((await documentFor(scenario, binding)).modelChoices).toEqual([
       {
         purpose: "answering",
         provider: "anthropic",
@@ -182,11 +182,11 @@ describe("the routes a DPIA input lists", () => {
     ]);
   });
 
-  it("says not recorded for a route without a retention sentence", async () => {
+  it("says not recorded without a model choice's retention sentence", async () => {
     const scenario = await arrange();
-    const binding = await answeringRouteAndBinding(scenario, null);
+    const binding = await answeringModelChoiceAndBinding(scenario, null);
 
-    expect((await documentFor(scenario, binding)).routes).toEqual([
+    expect((await documentFor(scenario, binding)).modelChoices).toEqual([
       {
         purpose: "answering",
         provider: "anthropic",
@@ -200,12 +200,16 @@ describe("the routes a DPIA input lists", () => {
 
   it("names each provider's sub-processor, and not recorded for others", async () => {
     const scenario = await arrange();
-    await routeIn(scenario, { purpose: "extraction", provider: "mistral", model: "mistral-large" });
-    await routeIn(scenario, { purpose: "enrichment", provider: "local", model: "llama-4" });
-    await routeIn(scenario, { purpose: "judging", provider: "openai", model: "gpt-6" });
+    await modelChoiceIn(scenario, {
+      purpose: "extraction",
+      provider: "mistral",
+      model: "mistral-large",
+    });
+    await modelChoiceIn(scenario, { purpose: "enrichment", provider: "local", model: "llama-4" });
+    await modelChoiceIn(scenario, { purpose: "judging", provider: "openai", model: "gpt-6" });
     const binding = await bindingIn(scenario);
 
-    expect((await documentFor(scenario, binding)).routes).toEqual([
+    expect((await documentFor(scenario, binding)).modelChoices).toEqual([
       {
         purpose: "extraction",
         provider: "mistral",
@@ -237,18 +241,18 @@ describe("the routes a DPIA input lists", () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario);
 
-    expect((await documentFor(scenario, binding)).routes).toEqual([]);
+    expect((await documentFor(scenario, binding)).modelChoices).toEqual([]);
   });
 
-  it("lists no embedding route and never names Mistral", async () => {
+  it("lists no embedding model choice and never names Mistral", async () => {
     const scenario = await arrange();
-    await routeIn(scenario, {
+    await modelChoiceIn(scenario, {
       purpose: "embedding",
       provider: "mistral",
       model: "mistral-embed",
       retentionTail: "Zero data retention on /v1/embeddings.",
     });
-    await routeIn(scenario, {
+    await modelChoiceIn(scenario, {
       purpose: "answering",
       provider: "anthropic",
       model: "claude-sonnet-5",
@@ -257,7 +261,7 @@ describe("the routes a DPIA input lists", () => {
 
     const document = await documentFor(scenario, binding);
 
-    expect(document.routes.map((route) => route.purpose)).toEqual(["answering"]);
+    expect(document.modelChoices.map((modelChoice) => modelChoice.purpose)).toEqual(["answering"]);
     expect(JSON.stringify(document)).not.toContain("mistral");
   });
 });

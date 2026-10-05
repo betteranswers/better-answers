@@ -13,17 +13,19 @@ const run = promisify(execFile);
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const warmPostgresModule = fileURLToPath(new URL("./warm-postgres.ts", import.meta.url));
 
-const writeRoute = async (db: MigratedPostgres): Promise<void> => {
+const writeModelChoice = async (db: MigratedPostgres): Promise<void> => {
   const client = await db.pool.connect();
   try {
-    await testData(client).llmRoute();
+    await testData(client).modelChoice();
   } finally {
     client.release();
   }
 };
 
-const routesIn = async (db: MigratedPostgres): Promise<number> => {
-  const counted = await db.pool.query<{ n: number }>('SELECT count(*)::int AS n FROM "llm_route"');
+const modelChoicesIn = async (db: MigratedPostgres): Promise<number> => {
+  const counted = await db.pool.query<{ n: number }>(
+    'SELECT count(*)::int AS n FROM "model_choice"',
+  );
   return counted.rows[0]?.n ?? -1;
 };
 
@@ -79,9 +81,9 @@ describe("the warm harness", () => {
     const one = await openMigratedPostgres("one-file");
     const another = await openMigratedPostgres("another-file");
     try {
-      await writeRoute(one);
+      await writeModelChoice(one);
 
-      expect({ one: await routesIn(one), another: await routesIn(another) }).toEqual({
+      expect({ one: await modelChoicesIn(one), another: await modelChoicesIn(another) }).toEqual({
         one: 1,
         another: 0,
       });
@@ -93,14 +95,14 @@ describe("the warm harness", () => {
   it("hands the copy back as app_rt, the unscoped read refused", async () => {
     const db = await openMigratedPostgres();
     try {
-      await writeRoute(db);
+      await writeModelChoice(db);
 
-      const asRuntime = await db.runtimePool.query<{ role: string; routes: number }>(
-        'SELECT current_user AS role, (SELECT count(*)::int FROM "llm_route") AS routes',
+      const asRuntime = await db.runtimePool.query<{ role: string; modelChoices: number }>(
+        'SELECT current_user AS role, (SELECT count(*)::int FROM "model_choice") AS "modelChoices"',
       );
-      expect({ ...asRuntime.rows[0], asSuperuser: await routesIn(db) }).toEqual({
+      expect({ ...asRuntime.rows[0], asSuperuser: await modelChoicesIn(db) }).toEqual({
         role: "app_rt",
-        routes: 0,
+        modelChoices: 0,
         asSuperuser: 1,
       });
     } finally {
@@ -112,13 +114,13 @@ describe("the warm harness", () => {
     const db = await openMigratedPostgres("grants");
     try {
       const catalogue = await db.pool.query(
-        `SELECT (SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'llm_route') AS "isolationPolicy",
+        `SELECT (SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'model_choice') AS "isolationPolicy",
                 EXISTS (SELECT 1 FROM pg_default_acl) AS "defaultPrivileges",
                 has_schema_privilege('app_rt', 'public', 'USAGE') AS "schemaUsage",
-                has_table_privilege('app_rt', 'public.llm_route', 'SELECT') AS "tableSelect"`,
+                has_table_privilege('app_rt', 'public.model_choice', 'SELECT') AS "tableSelect"`,
       );
       expect(catalogue.rows[0]).toEqual({
-        isolationPolicy: "llm_route_workspace_isolation",
+        isolationPolicy: "model_choice_workspace_isolation",
         defaultPrivileges: true,
         schemaUsage: true,
         tableSelect: true,
@@ -135,7 +137,10 @@ describe("the warm harness", () => {
 
     const next = await openMigratedPostgres("after-the-stop");
     try {
-      expect({ leftBehind: await isLeftBehind(next, name), served: await routesIn(next) }).toEqual({
+      expect({
+        leftBehind: await isLeftBehind(next, name),
+        served: await modelChoicesIn(next),
+      }).toEqual({
         leftBehind: false,
         served: 0,
       });
@@ -172,7 +177,7 @@ describe("the warm harness", () => {
 
   it("re-opens a key onto a fresh database", async () => {
     const bailed = await openMigratedPostgres("re-run");
-    await writeRoute(bailed);
+    await writeModelChoice(bailed);
     const name = await databaseNameOf(bailed);
 
     await bailed.pool.end();
@@ -182,8 +187,8 @@ describe("the warm harness", () => {
     try {
       expect({
         database: await databaseNameOf(reopened),
-        routes: await routesIn(reopened),
-      }).toEqual({ database: name, routes: 0 });
+        modelChoices: await modelChoicesIn(reopened),
+      }).toEqual({ database: name, modelChoices: 0 });
     } finally {
       await reopened.stop();
     }
@@ -194,7 +199,7 @@ describe("the warm harness", () => {
       `import { openMigratedPostgres } from ${JSON.stringify(warmPostgresModule)};`,
       "const db = await openMigratedPostgres();",
       "const footing = await db.runtimePool.query('SELECT current_user AS role');",
-      "const policies = await db.pool.query('SELECT policyname FROM pg_policies WHERE tablename = $1', ['llm_route']);",
+      "const policies = await db.pool.query('SELECT policyname FROM pg_policies WHERE tablename = $1', ['model_choice']);",
       "const fsync = await db.pool.query('SHOW fsync');",
       "const synchronousCommit = await db.pool.query('SHOW synchronous_commit');",
       "const fullPageWrites = await db.pool.query('SHOW full_page_writes');",
@@ -209,7 +214,7 @@ describe("the warm harness", () => {
 
     expect(JSON.parse(cold.stdout)).toEqual({
       role: "app_rt",
-      isolationPolicy: "llm_route_workspace_isolation",
+      isolationPolicy: "model_choice_workspace_isolation",
       durability: DURABILITY_OFF,
     });
   }, 300_000);

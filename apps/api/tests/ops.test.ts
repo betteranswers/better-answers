@@ -2675,7 +2675,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const A_DAY_MS = 24 * 60 * 60_000;
     const sessionRead = z.object({ session: z.object({ id: z.string() }) });
     const CHECK_LINE =
-      "restore-sign-in: run this only once you have checked who they are by a route other than their email, and hand them the code by that same route, never by email";
+      "restore-sign-in: run this only once you have checked who they are by a channel other than their email, and hand them the code by that same channel, never by email";
 
     const capturingMail = (send?: Mail["send"]) => {
       const sent: EmailMessage[] = [];
@@ -2812,7 +2812,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(sent[0]?.html).not.toContain("operator");
     });
 
-    it("says it must follow an identity check by another route", async () => {
+    it("says it must follow an identity check by another channel", async () => {
       const person = await app().person();
 
       const run = await restoring(person.email, {}, { clock: { now: () => RESTORED_AT } });

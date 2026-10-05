@@ -15,7 +15,7 @@ C4Component
     Component(gitdoor, "store/git", "git binary", "The governed write: per-repository lock, hash precondition, one commit per act, the Audit trailer; checks GIT_STORE_DIR once at open")
     Component(graphdoor, "store/graph", "recursive CTEs", "The delta builder and the walk templates; the one door that imports access, so no traversal exists without the predicate")
     Component(objdoor, "store/objects", "S3", "put, get, list and remove under the per-workspace prefix; the platform prefix for erasure replay copies")
-    Component(llm, "llm", "route rows", "listRoutes over llm_route; the llm_call ledger and the fetch-shaped model client planned S2")
+    Component(llm, "llm", "model choice rows", "listModelChoices over model_choice; the llm_call ledger and the fetch-shaped model client planned S2")
     Component(audit, "audit", "insert-only audit log", "The one append-only audit log: the typed event vocabulary, two doors, four families")
 
     Component(sources, "sources", "slice", "Bind, publish, narrow, widen; the review acts; reprocess; the DPIA input; passages; the upload sweep")
@@ -35,7 +35,7 @@ C4Component
   Rel(api, erasure, "Calls")
   Rel(api, runs, "Calls")
   Rel(api, workspaces, "Calls")
-  Rel(api, llm, "Lists routes through")
+  Rel(api, llm, "Lists model choices through")
   Rel(api, sweeps, "Runs the pass through")
 
   Rel(erasure, concepts, "Moves bundle commits and checks through")
@@ -53,14 +53,14 @@ C4Component
   Rel(answering, concepts, "Finds and opens concepts through")
   Rel(answering, sources, "Finds and opens passages through")
   Rel(answering, graphdoor, "Walks through; planned S2")
-  Rel(answering, llm, "Resolves a route and records a call through; planned S2")
+  Rel(answering, llm, "Resolves a model choice and records a call through; planned S2")
 
   Rel(concepts, gitdoor, "Commits through")
   Rel(concepts, graphdoor, "Writes the delta through")
   Rel(concepts, pgdoor, "Writes the index and identity through")
   Rel(runs, pgdoor, "Calls the queue functions through")
   Rel(graphdoor, access, "Renders the predicate from")
-  Rel(llm, pgdoor, "Reads routes through")
+  Rel(llm, pgdoor, "Reads model choices through")
   Rel(audit, pgdoor, "Inserts through")
 
   UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")
@@ -93,7 +93,7 @@ Enforced by one plugin rule, `better-answers/import-direction` (`packages/devtoo
 | `store/postgres` | `ingress_counter`, `mcp_call_counter`, `invitation_email_counter` |
 | `workspaces` | `workspace_config` |
 | `members` | `group`, `group_member`, `access_request` |
-| `llm` | `llm_route`; `llm_call` at S2 |
+| `llm` | `model_choice`; `llm_call` at S2 |
 | `audit` | `audit_event` |
 | `sources` | `source_binding`, `source_document`, `finding`, `index.chunk` |
 | `concepts` | `concept_identity`, `concept_index`, `bundle_commit`, `evidence`, `concept_evidence`, `concept_verification`, `concept_class_override`, `suggestion`, `concept_write_request`, `graph_generation`, `graph_node`, `graph_edge`; `concept_owner` at S3 |

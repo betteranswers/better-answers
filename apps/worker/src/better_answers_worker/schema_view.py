@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0065_the-promotion-mark"
+MIGRATION_ID = "0066_the-model-choice"
 
-MIGRATION_WHEN = 1791053966545
+MIGRATION_WHEN = 1791156833419
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -300,15 +300,6 @@ TABLES: dict[str, dict[str, str]] = {
         "alg": "text",
         "crv": "text",
     },
-    "public.llm_route": {
-        "id": "text NOT NULL",
-        "workspace_id": "text NOT NULL",
-        "purpose": "llm_purpose NOT NULL",
-        "provider": "text NOT NULL",
-        "model": "text NOT NULL",
-        "dimensions": "integer",
-        "retention_tail": "text",
-    },
     "public.mcp_call_counter": {
         "workspace_id": "text NOT NULL",
         "token_id": "text NOT NULL",
@@ -322,6 +313,15 @@ TABLES: dict[str, dict[str, str]] = {
         "role": "text NOT NULL",
         "created_at": "timestamp with time zone NOT NULL",
         "credentials_revoked_at": "timestamp with time zone",
+    },
+    "public.model_choice": {
+        "id": "text NOT NULL",
+        "workspace_id": "text NOT NULL",
+        "purpose": "llm_purpose NOT NULL",
+        "provider": "text NOT NULL",
+        "model": "text NOT NULL",
+        "dimensions": "integer",
+        "retention_tail": "text",
     },
     "public.oauth_access_token": {
         "id": "text NOT NULL",

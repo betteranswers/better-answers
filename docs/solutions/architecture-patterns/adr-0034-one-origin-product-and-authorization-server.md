@@ -6,7 +6,7 @@ problem_type: architecture_pattern
 component: transports
 severity: high
 applies_when:
-  - "Adding a route, a path or a hostname to the ingress"
+  - "Adding an HTTP route, a path or a hostname to the ingress"
   - "Changing the session cookie, the trusted origins or the consent page"
   - "Adding or changing a sign-in method"
   - "Changing Cloudflare's rate-limit rules or plan"

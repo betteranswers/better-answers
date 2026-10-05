@@ -1830,17 +1830,17 @@ describe("a tenant table under app_rt", () => {
     });
   });
 
-  it("returns zero llm_route rows on a missing or empty scope", async () => {
+  it("returns zero model_choice rows on a missing or empty scope", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      await seed.llmRoute({ workspaceId: WS_A });
+      await seed.modelChoice({ workspaceId: WS_A });
       await client.query("SET LOCAL ROLE app_rt");
 
-      const unscoped = await client.query("SELECT id FROM llm_route");
+      const unscoped = await client.query("SELECT id FROM model_choice");
       expect(unscoped.rows).toEqual([]);
 
       await client.query("SELECT set_config('app.workspace_id', '', true)");
-      const emptyScope = await client.query("SELECT id FROM llm_route");
+      const emptyScope = await client.query("SELECT id FROM model_choice");
       expect(emptyScope.rows).toEqual([]);
     });
   });
@@ -1851,7 +1851,7 @@ describe("a tenant table under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      await expect(seed.llmRoute({ workspaceId: WS_B })).rejects.toThrow(/row-level security/);
+      await expect(seed.modelChoice({ workspaceId: WS_B })).rejects.toThrow(/row-level security/);
     });
   });
 

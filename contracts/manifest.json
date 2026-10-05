@@ -3,7 +3,7 @@
     "queue": { "form": "sql-function" },
     "concept-inbox": { "form": "sql-function" },
     "credential-envelope": { "form": "fixtured" },
-    "llm-routing": { "form": "sql-function" },
+    "model-choice": { "form": "sql-function" },
     "cost-ledger": { "form": "generated" },
     "id-shape": { "form": "fixtured" },
     "concept-file": { "form": "fixtured" },
@@ -15,7 +15,7 @@
     "erasure-match": { "form": "fixtured" }
   },
   "fixtures": [
-    { "agreement": "llm-routing", "path": "llm-routing/cases.json" },
+    { "agreement": "model-choice", "path": "model-choice/cases.json" },
     { "agreement": "id-shape", "path": "id-shape/cases.json" },
     { "agreement": "concept-inbox", "path": "concept-inbox/cases.json" },
     { "agreement": "queue", "path": "queue/cases.json" },

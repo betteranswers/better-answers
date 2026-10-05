@@ -6,7 +6,7 @@ import type { Tx } from "../store/postgres/index.ts";
 export const LLM_PURPOSES = llmPurpose.enumValues;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 
-export type WorkspaceRoute = {
+export type WorkspaceModelChoice = {
   readonly purpose: LlmPurpose;
   readonly provider: string | null;
   readonly model: string | null;
@@ -20,7 +20,7 @@ export type WorkspaceRoute = {
 
 const FIXED_PURPOSE: LlmPurpose = "embedding";
 
-type RouteRow = {
+type ModelChoiceRow = {
   readonly purpose: string;
   readonly provider: string;
   readonly model: string;
@@ -28,7 +28,10 @@ type RouteRow = {
   readonly retentionTail: string | null;
 };
 
-const routeOf = (purpose: LlmPurpose, row: RouteRow | undefined): WorkspaceRoute =>
+const modelChoiceOf = (
+  purpose: LlmPurpose,
+  row: ModelChoiceRow | undefined,
+): WorkspaceModelChoice =>
   row === undefined
     ? { purpose, provider: null, model: null, dimensions: null, fixed: false, retentionTail: null }
     : {
@@ -40,19 +43,19 @@ const routeOf = (purpose: LlmPurpose, row: RouteRow | undefined): WorkspaceRoute
         retentionTail: row.retentionTail,
       };
 
-/** One route per purpose, in `LLM_PURPOSES` order; a purpose with no route configured has nulls. */
-export const listRoutes = async (
+/** One model choice per purpose, in `LLM_PURPOSES` order; a purpose with none configured has nulls. */
+export const listModelChoices = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<readonly WorkspaceRoute[], Error>> => {
+): Promise<Result<readonly WorkspaceModelChoice[], Error>> => {
   const configured = await attempt(() =>
-    tx.query<RouteRow>(
+    tx.query<ModelChoiceRow>(
       `SELECT purpose, provider, model, dimensions, retention_tail AS "retentionTail"
-         FROM llm_route WHERE workspace_id = $1`,
+         FROM model_choice WHERE workspace_id = $1`,
       [principal.workspaceId],
     ),
   );
   if (!configured.ok) return err(configured.error);
   const byPurpose = new Map(configured.value.rows.map((row) => [row.purpose, row]));
-  return ok(LLM_PURPOSES.map((purpose) => routeOf(purpose, byPurpose.get(purpose))));
+  return ok(LLM_PURPOSES.map((purpose) => modelChoiceOf(purpose, byPurpose.get(purpose))));
 };

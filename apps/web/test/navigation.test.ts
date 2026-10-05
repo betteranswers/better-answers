@@ -89,7 +89,7 @@ describe("the one navigation list", () => {
               "Agent tokens",
             ],
           ],
-          ["Agent Operations", ["Routes and spend", "Ceiling"]],
+          ["Models", ["Models and spend", "Spending limit"]],
           ["Questions", ["Answer audit", "Answer tests"]],
           ["People", ["Members", "Groups", "Tokens"]],
           ["Personal data", ["Erasure and suppression"]],
@@ -124,7 +124,7 @@ describe("the one navigation list", () => {
         .map((each) => each.path),
     ).toEqual([
       "/sources/bindings",
-      "/agent-operations/routes-and-spend",
+      "/models/models-and-spend",
       "/people/members",
       "/people/groups",
       "/system/audit-log",
@@ -179,7 +179,7 @@ describe("what each person is shown", () => {
         "Control Centre",
         [
           ["Sources", ["Bindings"]],
-          ["Agent Operations", ["Routes and spend"]],
+          ["Models", ["Models and spend"]],
           ["People", ["Members", "Groups"]],
           ["System", ["Audit log"]],
         ],
@@ -254,7 +254,7 @@ describe("what each person is shown", () => {
       "Overview",
       "Suggestions",
       "Sources",
-      "Agent Operations",
+      "Models",
       "Questions",
       "People",
       "Personal data",
@@ -331,7 +331,8 @@ const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
 
 const MOVED = [
   ["/people/audit-log", "/system/audit-log"],
-  ["/system/routes-and-spend", "/agent-operations/routes-and-spend"],
+  ["/system/routes-and-spend", "/models/models-and-spend"],
+  ["/agent-operations/routes-and-spend", "/models/models-and-spend"],
   ["/people", "/people/members"],
   ["/sources", "/sources/bindings"],
   ["/system", "/system/audit-log"],

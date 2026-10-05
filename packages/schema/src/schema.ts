@@ -31,8 +31,8 @@ export const llmPurpose = pgEnum("llm_purpose", [
   "embedding",
 ]);
 
-export const llmRoute = withRLS(
-  "llm_route",
+export const modelChoice = withRLS(
+  "model_choice",
   {
     id: text("id").primaryKey(),
     workspaceId: text("workspace_id")
@@ -48,10 +48,10 @@ export const llmRoute = withRLS(
   },
   "workspaceId",
   (table) => [
-    uniqueIndex("llm_route_workspace_purpose_unique").on(table.workspaceId, table.purpose),
+    uniqueIndex("model_choice_workspace_purpose_unique").on(table.workspaceId, table.purpose),
 
     check(
-      "llm_route_dimensions_check",
+      "model_choice_dimensions_check",
       sql`(purpose = 'embedding') = (dimensions IS NOT NULL) AND (dimensions IS NULL OR dimensions > 0)`,
     ),
   ],

@@ -27,9 +27,9 @@ const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
 
 const MEMBERS = pageNamed(PEOPLE, "Members");
 
-const AGENT_OPERATIONS = menuGroupIn(CONTROL_CENTRE, "agent-operations");
+const MODELS = menuGroupIn(CONTROL_CENTRE, "models");
 
-const ROUTES_AND_SPEND = pageNamed(AGENT_OPERATIONS, "Routes and spend");
+const MODELS_AND_SPEND = pageNamed(MODELS, "Models and spend");
 
 /** Declared and never built, so no reader may find it. */
 const SIGNALS = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Signals");
@@ -92,9 +92,9 @@ const anAdminWithATeam = async (page: Page, api: APIRequestContext, name: string
   const team: Team = { priya, tom };
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await page.goto(ROUTES_AND_SPEND.path);
+  await page.goto(MODELS_AND_SPEND.path);
   await expect(
-    page.getByRole("heading", { level: 1, name: headingOf(ROUTES_AND_SPEND) }),
+    page.getByRole("heading", { level: 1, name: headingOf(MODELS_AND_SPEND) }),
   ).toBeVisible();
   return team;
 };
@@ -231,7 +231,7 @@ test("draws the list within its second, timed in the page", async ({ page, reque
   // A fresh document, so no members read is cached to answer it.
   await page.reload();
   await expect(
-    page.getByRole("heading", { level: 1, name: headingOf(ROUTES_AND_SPEND) }),
+    page.getByRole("heading", { level: 1, name: headingOf(MODELS_AND_SPEND) }),
   ).toBeVisible();
 
   await clockTheNextKey(page, { at: "//*[@role='dialog']", reads: TOM });

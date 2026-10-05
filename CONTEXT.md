@@ -398,7 +398,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   estimates. Once accepted, every sync extracts as it indexes; a sync that would reprocess more than
   a set share of the connected source, or pass the workspace's spending limit, waits for
   re-acceptance.
-- **spending limit** — _Code rename pending._ the workspace's cap on what extraction may spend, held
+- **spending limit** — the workspace's cap on what extraction may spend, held
   as a config row and read before a sync and before an ad-hoc draft, and shown on Models › Models
   and spend. At the limit the platform refuses in one sentence naming who can raise it, and never
   silently narrows the work. Distinct from a cost estimate's price, which is one connected source's
@@ -464,7 +464,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   sends changed documents out to the platform; a caller of the public API, never the worker.
 - **run key** — _Internal._ the key that makes two requests to sync the same connected source for the
   same period one sync.
-- **model choice** — _Code rename pending._ a workspace's choice of model and provider for one
+- **model choice** — a workspace's choice of model and provider for one
   purpose (extraction, enrichment, answering, judging, embedding), local or hosted; one model choice
   per purpose, listed on Control Centre › Models › Models and spend. Its `model` names the model it
   calls. The embedding model choice is **fixed** — the word a reader sees on it — from the start,

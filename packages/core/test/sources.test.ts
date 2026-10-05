@@ -816,6 +816,7 @@ const dpiaHashOfTheHandbook = (bindingId: string): string =>
         audience: "everyone",
         bindingId,
         class: "Internal",
+        modelChoices: [],
         personalDataCategories: [
           "special-category",
           "bank-details",
@@ -831,7 +832,6 @@ const dpiaHashOfTheHandbook = (bindingId: string): string =>
           "authored concept bodies",
         ],
         retentionClass: "not recorded",
-        routes: [],
         rulesInForce: { default_off: false, default_on: true },
         scope: "not recorded",
         specialCategory: {

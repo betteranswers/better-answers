@@ -52,7 +52,7 @@ One navigation list in `apps/web/src/shared/` declares every area, group and pag
 - **Knowledge**: the curated map. Its Browse group is every role's. Its Curation group is for Admins and owners.
 - **The work area**: work produced from the knowledge for someone outside, question sets first. Its name waits for S6, which builds its first page.
 - **Inbox**: what waits on the person. It is for Admins, and for the owner of any domain.
-- **Control Centre**: the Admin's one area, in eight groups: Overview, Suggestions, Sources, Agent Operations, Questions, People, Personal data and System.
+- **Control Centre**: the Admin's one area, in eight groups: Overview, Suggestions, Sources, Models, Questions, People, Personal data and System.
 - **Briefings** joins at Then: what the platform tells a person unasked, such as sector and account signals, each cited.
 
 The utilities sit at the rail's foot: Keyboard shortcuts today, and help and settings once they exist. The top band, not the rail, reaches the console from the workspace switcher and any visible page by jump-to (⌘K). The avatar menu reaches the Account page. Like the sign-in pages, it stands outside the shell, so a person with no workspace and the operator reach it too, and the no-workspace and choose-workspace pages link to it. The pending pages, confirm, recovery and setup, stand outside it too: a session that must confirm its second factor reaches them from the shell, the console and every page outside the shell, and from any read or change refused while it waits, and comes back to the address it left (ADR 0048).
@@ -67,7 +67,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | Control Centre | Overview | Overview | Admin |
 | | Suggestions | Queue | Admin |
 | | Sources | **Bindings** · Publish and accept gates · Priced plan · Backlogs · Gone-at-source impact · Agent tokens | Admin |
-| | Agent Operations | **Routes and spend** · Ceiling | Admin |
+| | Models | **Models and spend** · Spending limit | Admin |
 | | Questions | Answer audit · Answer tests | Admin |
 | | People | **Members** · **Groups** · Tokens | Admin |
 | | Personal data | Erasure and suppression | Admin |
@@ -108,8 +108,8 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 - **Flags**: no counterpart. A *flag* is a reader's feedback on an answer (ADR 0017).
 - **Memory**: no counterpart. The agents' only memory is the map, read and curated in Knowledge (ADR 0016).
 - **Tools**: a later Connected clients page in Agent Operations: the MCP surface's four entries and each client's scopes.
-- **Providers**: Agent Operations › Routes and spend, a route per purpose.
-- **Costs**: Agent Operations › Routes and spend, and Ceiling.
+- **Providers**: Models › Models and spend, a model choice per purpose.
+- **Costs**: Models › Models and spend, and Spending limit.
 - **Settings**: a later Settings page in System, an index in which each setting stays with its object.
 
 **The whole structure, beyond v0.1's list.** A block is named where the route names the page. The later stages are VISION's.
@@ -121,7 +121,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of acts an agent takes as the person |
-| Control Centre | Bindings. Routes and spend. Members, Groups. Audit log | Overview, which no block names. Queue (S5). Priced plan (S4). Publish and accept gates, Backlogs, Gone-at-source impact. Ceiling (S7). Answer audit, Answer tests (S2). Tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Agent tokens, with the share agent. Runs, Connected clients, Settings. Then: feeds and referenced systems in Sources, Approvals in Agent Operations |
+| Control Centre | Bindings. Models and spend. Members, Groups. Audit log | Overview, which no block names. Queue (S5). Priced plan (S4). Publish and accept gates, Backlogs, Gone-at-source impact. Spending limit (S7). Answer audit, Answer tests (S2). Tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Agent tokens, with the share agent. Runs, Connected clients, Settings. Then: feeds and referenced systems in Sources, Approvals in Agent Operations |
 | Console | Everyone, Names waiting, Every workspace | none | The identity-set audit log |
 
 Two things stay open:
@@ -162,3 +162,5 @@ Amended 02/10/2026 by the people layout rework plan (`docs/plans/2026-10-01-1807
 Amended 02/10/2026 by the sign-in and security plan (`docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`, KTD11). The Account page now exists, outside the shell beside the display-name page, with its Sign-in section. Every frame, a workspace's and the console's, offers a person holding no passkey one above its toolbar, once, until they dismiss it; the offer links to the Account page's add. The four levels and every rule above stand.
 
 Amended 03/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, KTD1 and KTD5). The glossary rewrite settled the trust words, the third thing this record left open, and ADR 0019 now lists them. It also set the direction for every name. One word holds everywhere: the reader's word heads the glossary entry, and code, types, database tables and columns, contracts and live docs are renamed to it, one noun at a time. Names the platform does not own keep theirs: OKF's vocabulary and the keys the platform writes into concept files (`iri`, `sources[].locator`); names on the wire, which are MCP entry names, MCP tool schema keys and values, token scopes and refusal words; names a library or protocol owns, such as OAuth's and Better Auth's; and stored history, which is audit action names and detail keys, migrations, old page addresses, `docs/archive/` and completed plans in `docs/plans/`. An old word leaves the glossary for `apps/api/tests/old-words.ts`, which only the words test reads. The navigation's levels have reader words now, *area* for an entry in the rail and *page* for a place with an address of its own, and this record takes them when the pages sweep renames the code. The four levels and every rule above stand.
+
+Amended 05/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, U9 and KTD11). Control Centre's Agent Operations group is now **Models**: Routes and spend is *Models and spend* at `/models/models-and-spend`, and Ceiling is *Spending limit*. Both older addresses of the page lead to it. The Flux AgentOps comparison above keeps the group's old name, because where its later pages (Runs, Approvals, Connected clients) land is open until one is built. The four levels and every rule above stand.

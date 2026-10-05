@@ -1,6 +1,6 @@
 import { EMBEDDING_DIMENSIONS } from "../src/index.ts";
 
-export const CONFIGURED_LLM_ROUTES = [
+export const CONFIGURED_MODEL_CHOICES = [
   { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
   { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
 ] as const satisfies readonly {
@@ -9,7 +9,7 @@ export const CONFIGURED_LLM_ROUTES = [
   readonly model: string;
 }[];
 
-export const LISTED_LLM_ROUTES = [
+export const LISTED_MODEL_CHOICES = [
   {
     purpose: "extraction",
     provider: null,

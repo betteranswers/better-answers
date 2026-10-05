@@ -70,9 +70,9 @@ const BEYOND_USE = {
 const acceptedRows = {
   workspace: [{ id: WS_ID, name: "Workspace A", slug: "workspace-a" }],
   user: [{ id: USER_ID, name: "A person", email: "person@example.invalid" }],
-  llmRoute: [
+  modelChoice: [
     {
-      id: "route-embed",
+      id: "model-choice-embed",
       workspaceId: WS_ID,
       purpose: "embedding",
       provider: "mistral",
@@ -288,7 +288,7 @@ const acceptedRows = {
       workspaceId: WS_ID,
       content: "hello",
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.5),
-      embeddingRouteId: "route-embed",
+      embeddingRouteId: "model-choice-embed",
       bindingId: "binding-1",
     },
   ],
@@ -794,7 +794,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
       const insertOrder = [
         "workspace",
         "user",
-        "llmRoute",
+        "modelChoice",
         "workspaceConfig",
         "member",
 
@@ -884,9 +884,9 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { id: WS_ID, name: "   ", slug: "a" },
     ],
 
-    llmRoute: [
-      { ...acceptedRows.llmRoute[0], dimensions: 0 },
-      { ...acceptedRows.llmRoute[0], retentionTail: "   " },
+    modelChoice: [
+      { ...acceptedRows.modelChoice[0], dimensions: 0 },
+      { ...acceptedRows.modelChoice[0], retentionTail: "   " },
     ],
 
     user: [{ ...acceptedRows.user[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
@@ -1219,7 +1219,7 @@ describe("the frontmatter bound's unit", () => {
 describe("the customType exception, per shape", () => {
   const tooShort = Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0);
 
-  it("chunk.select requires an embedding of the route's width", () => {
+  it("chunk.select requires an embedding of the model choice's width", () => {
     const row = {
       ...acceptedRows.chunk[0],
       publishedAt: null,
@@ -1236,7 +1236,7 @@ describe("the customType exception, per shape", () => {
     expect(select.safeParse({ ...row, embedding: tooShort }).success).toBe(false);
   });
 
-  it("chunk.insert requires an embedding of the route's width", () => {
+  it("chunk.insert requires an embedding of the model choice's width", () => {
     const row = acceptedRows.chunk[0];
     const insert = boundarySchemas.chunk.insert;
     expect(insert.safeParse(row).success).toBe(true);
@@ -1272,9 +1272,9 @@ describe("5 — the inferred type is pinned", () => {
       }
     >
   >;
-  type _llmRouteSelect = Expect<
+  type _modelChoiceSelect = Expect<
     Equal<
-      z.infer<typeof boundarySchemas.llmRoute.select>,
+      z.infer<typeof boundarySchemas.modelChoice.select>,
       {
         id: string;
         workspaceId: WorkspaceId;

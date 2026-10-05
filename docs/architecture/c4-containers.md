@@ -9,7 +9,7 @@ C4Container
   Person(person, "Admin, Editor or Viewer", "Signed in on app., a session cookie host-only")
   Person(operator, "Operator", "Runs pnpm ops inside the api container; rolls back, and releases in drill mode, by dispatching release.yml")
   System_Ext(claude, "Claude and Claude Code", "MCP client with a bearer token from OAuth consent")
-  System_Ext(models, "Model providers", "Answering, judging, extraction routes; embedding in reserve")
+  System_Ext(models, "Model providers", "Answering, judging, extraction model choices; embedding in reserve")
   System_Ext(external, "Microsoft 365, the client's website, SMTP", "Sign-in and SharePoint from P1 and S4; sign-in codes by email today")
   System_Ext(offhost, "Off-host buckets and healthchecks.io", "Encrypted dumps and bundles, the object-store mirror, the dead-man checks")
 
@@ -34,7 +34,7 @@ C4Container
   Rel(api, postgres, "Reads and writes under SET LOCAL app.workspace_id as", "app_rt, pg")
   Rel(api, git, "Commits the governed write to, under a per-repository lock", "git binary")
   Rel(api, objects, "Streams uploaded originals to; sweeps orphaned ones; writes erasure replay copies", "S3")
-  Rel(api, models, "Calls answering and judging routes of; planned S2", "fetch-shaped seam")
+  Rel(api, models, "Calls through the answering and judging model choices; planned S2", "fetch-shaped seam")
   Rel(api, external, "Sends sign-in codes; signs in with Microsoft from P1", "SMTP, OIDC")
   Rel(api, offhost, "Pings the scheduler and sweeps checks", "HTTPS")
   Rel(api, web, "Serves the static build of", "HTTP on app.")
@@ -44,7 +44,7 @@ C4Container
   Rel(worker, git, "Reads the bundle at a commit from", "dulwich, read-only mount")
   Rel(worker, objects, "Reads originals from; writes the normalised redacted copy to", "S3, boto3")
   Rel(worker, lmdb, "Memoises the detector in; tracks chunk targets in", "cocoindex")
-  Rel(worker, models, "Calls the extraction route of; planned S7", "fetch-shaped seam")
+  Rel(worker, models, "Calls through the extraction model choice; planned S7", "fetch-shaped seam")
   Rel(worker, external, "Fetches the website and SharePoint libraries; planned S4", "HTTPS, Graph")
 
   Rel(backup, postgres, "Dumps", "pg_dump, age")
@@ -70,7 +70,7 @@ C4Container
 | --- | --- | --- |
 | queue | SQL function | claim, lease, heartbeat, finish, fail; the kinds a claimant runs, the job's subject and the run key; a lapsed lease revokes its claimant |
 | concept-inbox | SQL function | the `concept_write_request` handshake |
-| llm-routing | SQL function | the route per workspace and purpose |
+| model-choice | SQL function | the model choice per workspace and purpose |
 | credential-envelope | fixtured | the encryption envelope both tiers decrypt |
 | id-shape | fixtured | the one ULID shape either tier mints |
 | concept-file | fixtured | the canonical text and content hash of a concept file |

@@ -27,7 +27,7 @@ const aProvisionedWorkspace = z.object({
 
 const memberAdded = z.object({ added: z.boolean() });
 const credentialsRevoked = z.object({ revoked: z.boolean() });
-const routesSeeded = z.object({ seeded: z.number() });
+const modelChoicesSeeded = z.object({ seeded: z.number() });
 const codeSent = z.object({ code: z.string() });
 const linkSent = z.object({ token: z.string() });
 
@@ -213,17 +213,17 @@ export const claudeDisconnects = async (
   expect(revoked.ok(), `the revocation answered ${revoked.status()}`).toBe(true);
 };
 
-export type SeedRoute = {
+export type SeedModelChoice = {
   readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
   readonly provider: string;
   readonly model: string;
 };
 
-/** A purpose `routes` leaves out has no route. */
-export const seedRoutes = (
+/** A purpose `modelChoices` leaves out has no model choice. */
+export const seedModelChoices = (
   api: APIRequestContext,
-  input: { workspaceId: string; routes: readonly SeedRoute[] },
-) => ask(api, "/routes", input, routesSeeded);
+  input: { workspaceId: string; modelChoices: readonly SeedModelChoice[] },
+) => ask(api, "/model-choices", input, modelChoicesSeeded);
 
 type Sensitivity = (typeof SENSITIVITIES)[number];
 

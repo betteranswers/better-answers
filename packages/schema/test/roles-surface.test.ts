@@ -208,7 +208,7 @@ describe("a table created after the flip", () => {
           "a connector's new table gives the worker nothing until a migration says otherwise",
         ],
         [
-          "SELECT id FROM llm_route",
+          "SELECT id FROM model_choice",
           "the worker could DELETE this table by the default alone, and never read it",
         ],
         [
@@ -220,9 +220,9 @@ describe("a table created after the flip", () => {
       await client.query("SET LOCAL ROLE app_rt");
       expect({
         flipped: (await client.query("SELECT id FROM public.after_the_flip")).rows,
-        route: (await client.query("SELECT id FROM llm_route")).rows,
+        modelChoice: (await client.query("SELECT id FROM model_choice")).rows,
         config: (await client.query("SELECT workspace_id FROM workspace_config")).rows,
-      }).toEqual({ flipped: [], route: [], config: [] });
+      }).toEqual({ flipped: [], modelChoice: [], config: [] });
     });
   });
 });
@@ -234,13 +234,13 @@ describe("what worker_rt reaches after the flip", () => {
         job: await privilegesHeld(client, "worker_rt", "public.job"),
         workspace: await privilegesHeld(client, "worker_rt", "public.workspace"),
         chunk: await privilegesHeld(client, "worker_rt", '"index".chunk'),
-        llmRoute: await privilegesHeld(client, "worker_rt", "public.llm_route"),
+        modelChoice: await privilegesHeld(client, "worker_rt", "public.model_choice"),
         workspaceConfig: await privilegesHeld(client, "worker_rt", "public.workspace_config"),
       }).toEqual({
         job: held("SELECT", "INSERT", "UPDATE"),
         workspace: held("SELECT"),
         chunk: THE_FOUR_VERBS,
-        llmRoute: NOTHING_OF_THE_EIGHT,
+        modelChoice: NOTHING_OF_THE_EIGHT,
         workspaceConfig: NOTHING_OF_THE_EIGHT,
       });
     });
@@ -314,8 +314,8 @@ describe("the functions the journal installs", () => {
       await client.query("SET LOCAL ROLE worker_rt");
       await refusesEach(client, [
         [
-          "SELECT id FROM llm_route_for('embedding'::llm_purpose)",
-          "the route resolver goes to the roles its callers run as, and the worker is not one",
+          "SELECT id FROM model_choice_for('embedding'::llm_purpose)",
+          "the model choice resolver goes to the roles its callers run as, and the worker is not one",
         ],
       ]);
 
@@ -329,7 +329,9 @@ describe("the functions the journal installs", () => {
         ["SELECT graph_row_generation_guard()", "and for the guard on a map row's generation"],
       ]);
 
-      const resolved = await client.query("SELECT id FROM llm_route_for('embedding'::llm_purpose)");
+      const resolved = await client.query(
+        "SELECT id FROM model_choice_for('embedding'::llm_purpose)",
+      );
       expect(resolved.rows).toEqual([]);
     });
   });

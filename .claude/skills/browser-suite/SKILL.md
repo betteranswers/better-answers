@@ -7,7 +7,7 @@ description: How this repository drives a browser — the served-build seam, the
 
 `apps/web`'s interface is the **served build driven by a browser**, so a fact about a
 page is read here and a page is never asserted against its source. Everything below is what
-the suite already is; `apps/web/e2e/routes.spec.ts` is the fullest worked example.
+the suite already is; `apps/web/e2e/models-and-spend.spec.ts` is the fullest worked example.
 
 ## The seam
 
@@ -113,7 +113,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `ageTheCode` | Moves the expiry of the code sent to an address into the past — how a spec meets an expired code without waiting out its lifetime |
 | `withAnAuthenticator` | Writes an authenticator for an address straight to the store, sealed as the library seals one, spending no emailed code and sending no notice, and answers the key a spec makes codes from with `authenticatorCodeAt`. A second ask answers the same key. It also issues ten recovery codes, marked saved, as a first setup leaves an Admin. `enrolledWith` is the same act answering those codes too, or issuing none with `"none"`, as someone just made an Admin holds |
 | `restored` | The platform operator's restore, through the ops command's own act and principal: the person's factors, recovery codes and sessions end, and a restore code that expires in 24 hours is answered. No notice is sent, so a code read back afterwards is still the sign-in's |
-| `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the page must show rather than omit |
+| `seedModelChoices` | The model choices a workspace has made; a purpose left out of the list has no model choice, which the page must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
 | `makeGroups` | Groups made by a named member through the members slice's own acts, one transaction each, every group holding the members `memberIds` names — the member's own acts on the audit log, and the groups the `Groups` page and a member's page start from |
@@ -203,7 +203,7 @@ Five more play Claude's part in its OAuth flow on the suite's own origin — `ap
   `${path} answered ${status}` is the pattern, and so are the axe assertion and the gate's refusal
   in `apps/web/e2e/browser.ts`.
 - **Read the SPA's own constants, words as well as pages, rather than copying them.**
-  `apps/web/e2e/routes.spec.ts` imports `@/shared/navigation.ts`, so the list of areas, groups
+  `apps/web/e2e/models-and-spend.spec.ts` imports `@/shared/navigation.ts`, so the list of areas, groups
   and pages is written once. Read a sentence the same way: import it from a feature's word table
   (`apps/web/src/features/sources/words.ts`), the navigation list or the role meanings
   (`apps/web/src/shared/role-words.ts`). Then assert the state it belongs to: the
@@ -241,20 +241,20 @@ three things, of which automated rules are only one:
 - **A keyboard traversal** reaching the page and each of its acts without a pointer:
   `apps/web/e2e/sign-in.spec.ts` for the three pages outside the shell,
   `apps/web/e2e/frame.spec.ts` for the band, the rail and the menu, and
-  `apps/web/e2e/routes.spec.ts` and `apps/web/e2e/failed-page.spec.ts` for theirs. It is the
+  `apps/web/e2e/models-and-spend.spec.ts` and `apps/web/e2e/failed-page.spec.ts` for theirs. It is the
   floor, not the extra.
 - **An aria snapshot**, written inline with `toMatchAriaSnapshot`, where what a page *sounds
   like* is the thing under test — a row that lost its heading or a list that stopped being a list
-  fails it though the pixels are unchanged. `apps/web/e2e/routes.spec.ts` holds one and
+  fails it though the pixels are unchanged. `apps/web/e2e/models-and-spend.spec.ts` holds one and
   `apps/web/e2e/frame.spec.ts` two.
 
 Ask for the `passesTheAccessibilityGate` fixture — called with no arguments — where the test does
-not end on the page it is about. The routes and failed-page specs walk on to other pages
+not end on the page it is about. The models-and-spend and failed-page specs walk on to other pages
 afterwards; every test in `apps/web/e2e/consent.spec.ts` ends at the client's own redirect, which
 is another origin and no page of ours. A test that ends somewhere this product did not serve and
 audited nothing is refused by name, so an absence is a failure rather than a silence.
 
-`apps/web/e2e/routes.spec.ts` carries all three and is the model to copy.
+`apps/web/e2e/models-and-spend.spec.ts` carries all three and is the model to copy.
 `apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: two of its six tests are
 `test.fail()`, so the run prints them with a ✘ and counts them passed — that is the gate firing
 where it should, and an `Expected to fail, but passed` there means the gate has stopped running.
@@ -270,10 +270,10 @@ pnpm --filter @better-answers/web run e2e
 
 # one spec, one project
 pnpm --filter @better-answers/web run build && \
-  pnpm --filter @better-answers/web exec playwright test e2e/routes.spec.ts --project chromium
+  pnpm --filter @better-answers/web exec playwright test e2e/models-and-spend.spec.ts --project chromium
 
 # one test in it, by title
-pnpm --filter @better-answers/web exec playwright test e2e/routes.spec.ts -g "latency budget"
+pnpm --filter @better-answers/web exec playwright test e2e/models-and-spend.spec.ts -g "latency budget"
 
 # what would run, starting no server
 pnpm --filter @better-answers/web exec playwright test --list
