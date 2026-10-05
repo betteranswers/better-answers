@@ -44,7 +44,7 @@ C4Container
   Rel(worker, git, "Reads the bundle at a commit from", "dulwich, read-only mount")
   Rel(worker, objects, "Reads originals from; writes the normalised redacted copy to", "S3, boto3")
   Rel(worker, lmdb, "Memoises the detector in; tracks chunk targets in", "cocoindex")
-  Rel(worker, models, "Calls the extraction route of; planned S7", "fetch-shaped seam")
+  Rel(worker, models, "Calls through the extraction model choice; planned S7", "fetch-shaped seam")
   Rel(worker, external, "Fetches the website and SharePoint libraries; planned S4", "HTTPS, Graph")
 
   Rel(backup, postgres, "Dumps", "pg_dump, age")
@@ -70,7 +70,7 @@ C4Container
 | --- | --- | --- |
 | queue | SQL function | claim, lease, heartbeat, finish, fail; the kinds a claimant runs, the job's subject and the run key; a lapsed lease revokes its claimant |
 | concept-inbox | SQL function | the `concept_write_request` handshake |
-| llm-routing | SQL function | the route per workspace and purpose |
+| model-choice | SQL function | the model choice per workspace and purpose |
 | credential-envelope | fixtured | the encryption envelope both tiers decrypt |
 | id-shape | fixtured | the one ULID shape either tier mints |
 | concept-file | fixtured | the canonical text and content hash of a concept file |

@@ -463,6 +463,13 @@
       "when": 1791053966545,
       "tag": "0065_the-promotion-mark",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1791156833419,
+      "tag": "0066_the-model-choice",
+      "breakpoints": true
     }
   ]
 }

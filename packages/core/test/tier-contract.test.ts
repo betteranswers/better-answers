@@ -40,7 +40,7 @@ const SPOKEN_AGREEMENTS = {
   "erasure-match": "fixtured",
   "id-shape": "fixtured",
   "credential-envelope": "fixtured",
-  "llm-routing": "sql-function",
+  "model-choice": "sql-function",
   queue: "sql-function",
   redaction: "fixtured",
   "upload-media-types": "fixtured",

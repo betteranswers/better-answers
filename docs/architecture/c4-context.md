@@ -33,7 +33,7 @@ C4Context
 
   Rel(platform, m365, "Signs people in with; enumerates libraries of", "OIDC, Microsoft Graph")
   Rel(platform, website, "Fetches pages of", "HTTPS")
-  Rel(platform, models, "Calls per route, every call a row", "Messages-API-shaped HTTPS")
+  Rel(platform, models, "Calls per model choice, every call a row", "Messages-API-shaped HTTPS")
   Rel(platform, email, "Sends through", "SMTP")
   Rel(platform, backups, "Copies dumps, bundles and mirrors to; pings each scheduled job's check", "S3, HTTPS")
 
@@ -44,7 +44,7 @@ C4Context
 
 - **One system, one origin.** The product, sign-in, consent, the authorization server, discovery and the MCP surface all sit on `app.<apex>` (ADR 0034). There is no second server for agents; the MCP client is the same person under the same predicate and the same audit (stories 38 and 39). The bearer comes from OAuth consent; the *personal token* minted on the Account page is P1's and not built.
 - **The person named in a document never signs in.** Their relation to the platform is through the company — a document that names them, an Admin who records their request — which is why they are drawn outside.
-- **Three of the six outside systems are not reached until a route block lands them.** Microsoft sign-in is P1's, SharePoint and the website are S4's, the model providers are S2's for answering and judging and S7's for extraction. The embedding route is fixed and unread until S8's trigger; no v0.1 block embeds (ADRs 0016 and 0020 as amended 2026-09-09).
+- **Three of the six outside systems are not reached until a route block lands them.** Microsoft sign-in is P1's, SharePoint and the website are S4's, the model providers are S2's for answering and judging and S7's for extraction. The embedding model choice is fixed and unread until S8's trigger; no v0.1 block embeds (ADRs 0016 and 0020 as amended 2026-09-09).
 - **Email and the backups exist today.** Sign-in by email code, the hourly to monthly dumps, the nightly mirror and git bundles are built and drilled; an invitation email is P1's and the alert email O1's; every restore replays the erasures completed after its dump — `restore-drill.sh` and `restore-production.sh` run `pnpm ops replay-erasures` before `api` answers. The dead-man switch hears from every scheduled job, the api's head check and daily sweeps among them (`c4-dynamic-scheduled-work.md`).
 - **The operator works through the api container and a workflow.** Provisioning, adding a member, importing a bundle, making the test workspace and the drill's steps are `pnpm ops` commands; a *release* is a `release.yml` run that sets the platform stack's digests in Coolify and deploys, per merge, nightly or on the operator's dispatch, as `RELEASE_MODE` says (`c4-deployment.md`). Each night the run also signs in to production as the test workspace's test people and walks their pages, as `JOURNEYS_MODE` says.
 

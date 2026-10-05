@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { CONFIGURED_LLM_ROUTES, LISTED_LLM_ROUTES, testData } from "@better-answers/schema/testing";
+import {
+  CONFIGURED_MODEL_CHOICES,
+  LISTED_MODEL_CHOICES,
+  testData,
+} from "@better-answers/schema/testing";
 
 import { attempt, type Claims } from "../src/kernel/index.ts";
-import { listRoutes, LLM_PURPOSES } from "../src/llm/index.ts";
+import { listModelChoices, LLM_PURPOSES } from "../src/llm/index.ts";
 import { folded, openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
@@ -11,7 +15,7 @@ const db = postgresForSuite();
 
 type Seeded = { readonly workspaceId: string; readonly userId: string };
 
-type SeededRoute = {
+type SeededModelChoice = {
   readonly purpose: "answering" | "embedding";
   readonly provider: string;
   readonly model: string;
@@ -19,20 +23,20 @@ type SeededRoute = {
   readonly retentionTail?: string;
 };
 
-const seedWorkspace = async (routes: readonly SeededRoute[]): Promise<Seeded> => {
+const seedWorkspace = async (modelChoices: readonly SeededModelChoice[]): Promise<Seeded> => {
   const client = await db().pool.connect();
   try {
     const seed = testData(client);
     const workspace = await seed.workspace();
     const user = await seed.user();
     await seed.member({ workspaceId: workspace.id, userId: user.id, role: "Viewer" });
-    for (const route of routes) {
-      await seed.llmRoute({
+    for (const modelChoice of modelChoices) {
+      await seed.modelChoice({
         workspaceId: workspace.id,
-        purpose: route.purpose,
-        provider: route.provider,
-        model: route.model,
-        retentionTail: route.retentionTail ?? null,
+        purpose: modelChoice.purpose,
+        provider: modelChoice.provider,
+        model: modelChoice.model,
+        retentionTail: modelChoice.retentionTail ?? null,
       });
     }
     return { workspaceId: workspace.id, userId: user.id };
@@ -49,24 +53,24 @@ const claimsFor = (seeded: Seeded): Claims => ({
 
 const listAs = async (seeded: Seeded) => {
   const listed = folded(
-    await withPrincipal(openPostgres(db().runtimePool), claimsFor(seeded), listRoutes),
+    await withPrincipal(openPostgres(db().runtimePool), claimsFor(seeded), listModelChoices),
   );
   if (!listed.ok) {
-    throw new Error(`the routes were not listed: ${String(listed.error)}`, {
+    throw new Error(`the model choices were not listed: ${String(listed.error)}`, {
       cause: listed.error,
     });
   }
   return listed.value;
 };
 
-describe("a workspace's model routes", () => {
+describe("a workspace's model choices", () => {
   it("answers one row per purpose, in purpose order", async () => {
-    const seeded = await seedWorkspace(CONFIGURED_LLM_ROUTES);
+    const seeded = await seedWorkspace(CONFIGURED_MODEL_CHOICES);
 
-    expect(await listAs(seeded)).toEqual(LISTED_LLM_ROUTES);
+    expect(await listAs(seeded)).toEqual(LISTED_MODEL_CHOICES);
   });
 
-  it("shows every route empty for a workspace that chose nothing", async () => {
+  it("shows every model choice empty where the workspace chose nothing", async () => {
     const seeded = await seedWorkspace([]);
 
     const listed = await listAs(seeded);
@@ -74,17 +78,17 @@ describe("a workspace's model routes", () => {
     expect(listed).toHaveLength(LLM_PURPOSES.length);
     expect(
       listed.every(
-        (route) =>
-          route.provider === null &&
-          route.model === null &&
-          route.dimensions === null &&
-          route.retentionTail === null &&
-          !route.fixed,
+        (modelChoice) =>
+          modelChoice.provider === null &&
+          modelChoice.model === null &&
+          modelChoice.dimensions === null &&
+          modelChoice.retentionTail === null &&
+          !modelChoice.fixed,
       ),
     ).toBe(true);
   });
 
-  it("reads back a route's retention tail in the provider's words", async () => {
+  it("reads a model choice's retention tail in the provider's words", async () => {
     const tail = "Prompts and outputs are deleted within 30 days; no training on customer data.";
     const seeded = await seedWorkspace([
       {
@@ -95,23 +99,27 @@ describe("a workspace's model routes", () => {
       },
     ]);
 
-    expect((await listAs(seeded)).find((route) => route.purpose === "answering")).toMatchObject({
+    expect(
+      (await listAs(seeded)).find((modelChoice) => modelChoice.purpose === "answering"),
+    ).toMatchObject({
       retentionTail: tail,
     });
   });
 
-  it("answers no tail for a route whose terms nobody read", async () => {
+  it("answers no tail where nobody read a model choice's terms", async () => {
     const seeded = await seedWorkspace([
       { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
     ]);
 
-    expect((await listAs(seeded)).find((route) => route.purpose === "answering")).toMatchObject({
+    expect(
+      (await listAs(seeded)).find((modelChoice) => modelChoice.purpose === "answering"),
+    ).toMatchObject({
       provider: "anthropic",
       retentionTail: null,
     });
   });
 
-  it("shows a member their own workspace's routes, never another's", async () => {
+  it("shows a member their own workspace's model choices, never another's", async () => {
     const first = await seedWorkspace([
       { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
     ]);
@@ -122,11 +130,11 @@ describe("a workspace's model routes", () => {
     const asFirst = await listAs(first);
     const asSecond = await listAs(second);
 
-    expect(asFirst.find((route) => route.purpose === "answering")).toMatchObject({
+    expect(asFirst.find((modelChoice) => modelChoice.purpose === "answering")).toMatchObject({
       provider: "anthropic",
       model: "claude-sonnet-5",
     });
-    expect(asSecond.find((route) => route.purpose === "answering")).toMatchObject({
+    expect(asSecond.find((modelChoice) => modelChoice.purpose === "answering")).toMatchObject({
       provider: "mistral",
       model: "mistral-large",
     });
@@ -142,7 +150,9 @@ describe("a workspace's model routes", () => {
       openPostgres(db().runtimePool),
       claimsFor(mine),
       async (_principal, tx) => {
-        const all = await tx.query<{ workspace_id: string }>("SELECT workspace_id FROM llm_route");
+        const all = await tx.query<{ workspace_id: string }>(
+          "SELECT workspace_id FROM model_choice",
+        );
         return all.rows.map((row) => row.workspace_id);
       },
     );
@@ -152,12 +162,12 @@ describe("a workspace's model routes", () => {
 
   it("hands back a store failure, and the transaction never commits", async () => {
     const seeded = await seedWorkspace([]);
-    let read: Awaited<ReturnType<typeof listRoutes>> | undefined;
+    let read: Awaited<ReturnType<typeof listModelChoices>> | undefined;
 
     await expect(
       withPrincipal(openPostgres(db().runtimePool), claimsFor(seeded), async (principal, tx) => {
         await attempt(() => tx.query("SELECT no_such_function()"));
-        read = await listRoutes(principal, tx);
+        read = await listModelChoices(principal, tx);
       }),
     ).rejects.toThrow(/did not commit/);
 

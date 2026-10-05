@@ -25,7 +25,7 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 | `packages/` | The rest of the shared TypeScript: `schema`, `design-system` |
 | `contracts/` | The tier contract's language-neutral fixtures. Both tiers' suites read it, and so does the gate tooling. Nothing imports it and nothing deploys it |
 | `docs/architecture/` | The C4 diagrams: context, containers, three component views, deployment and six flows. They are a reading of the tree, which `/c4-architecture` redraws after any review that moves the shape. The README maps each route block to the containers and components it touches |
-| `docs/specs/` | `v01-route.md`, the route |
+| `docs/specs/` | `v01-route.md`, the route spec |
 | `docs/archive/` | Frozen history from before Compound Engineering: the ADRs with their amendments, and the block and ticket specs the route was built through. Read, never edited |
 | `docs/plans/` | Compound Engineering's plans, one per piece of work. A plan has no status: git says what shipped |
 | `docs/solutions/` | Documented solutions to past problems (bugs, best practices, workflow patterns), by category, with YAML frontmatter (`module`, `tags`, `problem_type`). `/ce-plan` searches it before every plan |

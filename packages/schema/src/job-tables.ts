@@ -14,7 +14,7 @@ export const INDEX_KIND = "index";
 
 export const REBUILD_REASONS = [
   "first-sync",
-  "route-change",
+  "model-choice-change",
   "reconciler",
   "erasure",
   "upgrade",

@@ -14,7 +14,7 @@ C4Dynamic
     Component(draft, "draftAnswer", "answering slice, async generator", "Calls the model over the plan; holds no transaction")
     Component(record, "recordAnswer", "answering slice, a second short transaction", "answer_audit, llm_call, the reached set and the cut depth")
     Component(graphdoor, "store/graph", "walkFrom over a set", "Seeded ANY of the entry uids, one shared cap, statement_timeout per statement, the predicate on every element")
-    Component(llm, "llm", "route and client", "The route for answering and judging; the fetch-shaped model client; a row per call")
+    Component(llm, "llm", "model choice and client", "The model choice for answering and judging; the fetch-shaped model client; a row per call")
   }
 
   ContainerDb(postgres, "Postgres", "RLS", "concept_index with its tsvector, the graph tables, answer_audit, llm_call")
@@ -41,7 +41,7 @@ C4Dynamic
 - **Entry points are the concept index's own.** A stored, GIN-indexed `tsvector` over title, tags, *Also known as* and body, written in the governed write's transaction and read under the predicate — no vector, no model call to find an entry (ADR 0016, amended 2026-09-09; probe 1). The expression replaces `findConcepts`' ILIKE predicate, so `find` and `ask` match by one rule.
 - **The walk takes a set.** One set-seeded walk from forty entries answers in 15 ms against 423 ms for forty walks; the shared cap of 1,000 is about 25 rows per entry, so the walk barely leaves its seeds and the recorded cut is what keeps the answer honest (probe 3; ADR 0023, amended 2026-09-10). The recall measure asserts the master `Answer` was reached, never set equality.
 - **No totals, one *not found*.** Absent and withheld are indistinguishable wherever a caller reads (stories 35 and 36); the `map` field carries the phrase, never a count; before anything projects an edge's columns, the target's own predicate is applied — `open`'s relations projection is the first such projection.
-- **Every model call is a row and never the prompt.** `llm_call` records route, purpose, tokens and price, as ADR 0025's amendment fixes the columns; a retried `ask` is a second audit row and its stale reservation is swept (gate §2, A21).
+- **Every model call is a row and never the prompt.** `llm_call` records model choice, purpose, tokens and price, as ADR 0025's amendment fixes the columns; a retried `ask` is a second audit row and its stale reservation is swept (gate §2, A21).
 - **The recall measure decides S8.** Recall at ten of the master `Answer` on a paraphrase, threshold 90 % over a synthetic set in CI; the real reading is the client's own answer tests in its workspace at C1, and that reading alone — or the unmapped-passage hit rate on answers flagged *incomplete* — picks the reserve block.
 
 ## Left to S2's spec

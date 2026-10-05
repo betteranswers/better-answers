@@ -15,7 +15,7 @@ C4Component
     Component(gitdoor, "store/git", "git binary", "The governed write: per-repository lock, hash precondition, one commit per act, the Audit trailer; checks GIT_STORE_DIR once at open")
     Component(graphdoor, "store/graph", "recursive CTEs", "The delta builder and the walk templates; the one door that imports access, so no traversal exists without the predicate")
     Component(objdoor, "store/objects", "S3", "put, get, list and remove under the per-workspace prefix; the platform prefix for erasure replay copies")
-    Component(llm, "llm", "route rows", "listRoutes over llm_route; the llm_call ledger and the fetch-shaped model client planned S2")
+    Component(llm, "llm", "model choice rows", "listModelChoices over model_choice; the llm_call ledger and the fetch-shaped model client planned S2")
     Component(audit, "audit", "insert-only audit log", "The one append-only audit log: the typed event vocabulary, two doors, four families")
 
     Component(sources, "sources", "slice", "Bind, publish, narrow, widen; the review acts; reprocess; the DPIA input; passages; the upload sweep")
@@ -53,7 +53,7 @@ C4Component
   Rel(answering, concepts, "Finds and opens concepts through")
   Rel(answering, sources, "Finds and opens passages through")
   Rel(answering, graphdoor, "Walks through; planned S2")
-  Rel(answering, llm, "Resolves a route and records a call through; planned S2")
+  Rel(answering, llm, "Resolves a model choice and records a call through; planned S2")
 
   Rel(concepts, gitdoor, "Commits through")
   Rel(concepts, graphdoor, "Writes the delta through")

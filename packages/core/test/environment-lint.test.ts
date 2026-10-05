@@ -52,7 +52,7 @@ const EXCUSED: readonly (readonly [string, string])[] = [
   ["a test that renders", "apps/web/test/frame.test.tsx"],
   ["a test helper beside it", "packages/core/test/bundle.ts"],
   ["a suite under a plural directory", "apps/api/tests/image-probe.ts"],
-  ["a browser spec", "apps/web/e2e/routes.spec.ts"],
+  ["a browser spec", "apps/web/e2e/models-and-spend.spec.ts"],
   ["a journey's fixture", "apps/web/journeys/fixtures.ts"],
 ];
 

@@ -22,7 +22,7 @@ const A_MEMBERSHIP = {
   role: "Admin",
 };
 
-const NOT_A_LIST = { why: "the api answered a shape the routes card cannot render" };
+const NOT_A_LIST = { why: "the api answered a shape the model choices card cannot render" };
 
 const answerTrpc = (input: string | URL | Request): Promise<Response> => {
   const url = new URL(
@@ -33,7 +33,7 @@ const answerTrpc = (input: string | URL | Request): Promise<Response> => {
     .replace("/trpc/", "")
     .split(",")
     .map((procedure) => ({
-      result: { data: procedure === "routes.list" ? NOT_A_LIST : A_MEMBERSHIP },
+      result: { data: procedure === "modelChoices.list" ? NOT_A_LIST : A_MEMBERSHIP },
     }));
   return Promise.resolve(
     new Response(JSON.stringify(answers), {
@@ -43,18 +43,18 @@ const answerTrpc = (input: string | URL | Request): Promise<Response> => {
   );
 };
 
-const ROUTES_AND_SPEND = "/agent-operations/routes-and-spend";
+const MODELS_AND_SPEND = "/models/models-and-spend";
 
-const openRoutesWithABrokenRead = async () => {
+const openModelChoicesWithABrokenRead = async () => {
   vi.stubGlobal("fetch", answerTrpc);
-  const { rendered } = await openApp(ROUTES_AND_SPEND);
+  const { rendered } = await openApp(MODELS_AND_SPEND);
   await screen.findByRole("alert");
   return rendered;
 };
 
 describe("a page that throws", () => {
   it("leaves the rail, menu, band and content standing", async () => {
-    await openRoutesWithABrokenRead();
+    await openModelChoicesWithABrokenRead();
 
     const band = screen.getByRole("banner");
     expect(within(band).getByRole("link", { name: PRODUCT_NAME })).toBeDefined();
@@ -64,13 +64,13 @@ describe("a page that throws", () => {
     const rail = screen.getByRole("navigation", { name: "Areas" });
     expect(within(rail).getByRole("link", { name: "Control Centre" })).toBeDefined();
     const nav = screen.getByRole("navigation", { name: "Control Centre" });
-    expect(within(nav).getByRole("link", { name: "Routes and spend" })).toBeDefined();
+    expect(within(nav).getByRole("link", { name: "Models and spend" })).toBeDefined();
 
     expect(screen.getByRole("main").contains(screen.getByRole("alert"))).toBe(true);
   });
 
   it("says the page did not load, as an alert", async () => {
-    await openRoutesWithABrokenRead();
+    await openModelChoicesWithABrokenRead();
 
     const alert = screen.getByRole("alert");
     expect(within(alert).getByRole("heading", { level: 1 }).textContent).toBe(
@@ -80,7 +80,7 @@ describe("a page that throws", () => {
   });
 
   it("shows no message, name or stack from what threw", async () => {
-    const { container } = await openRoutesWithABrokenRead();
+    const { container } = await openModelChoicesWithABrokenRead();
 
     const shown = container.textContent;
     expect(shown).not.toContain("map is not a function");
@@ -92,7 +92,7 @@ describe("a page that throws", () => {
   });
 
   it("offers the two ways out as controls a keyboard reaches", async () => {
-    await openRoutesWithABrokenRead();
+    await openModelChoicesWithABrokenRead();
 
     const again = screen.getByRole("button", { name: FAILED_PAGE.retry });
 
@@ -124,7 +124,7 @@ describe("a page that throws", () => {
     const clients = createAppClients();
     const router = createAppRouter(
       clients,
-      createMemoryHistory({ initialEntries: [ROUTES_AND_SPEND] }),
+      createMemoryHistory({ initialEntries: [MODELS_AND_SPEND] }),
     );
     render(
       <Providers clients={clients}>

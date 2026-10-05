@@ -26,7 +26,7 @@ tags:
 An answer asserts only what a concept states. It is found by traversal before it is drafted.
 
 - Entry points are found first. The graph is then walked from them, reading status, supersession, conflicts and trust.
-- An `Answer` concept on the walk that answers the question as asked is reused as it stands. One call on the judging route decides that, over the walk's shortlist.
+- An `Answer` concept on the walk that answers the question as asked is reused as it stands. One call on the judging model choice decides that, over the walk's shortlist.
 - Otherwise prose is drafted over the concepts the walk collected, with a citation marker per claim (ADR 0015).
 - No prose is ever generated from a document. Where no concept answers, the page says "Not answered from the company's knowledge" and shows unmapped passages.
 - Nothing withheld is counted, hinted at or explained anywhere.

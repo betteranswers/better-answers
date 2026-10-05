@@ -52,21 +52,22 @@ def seed_workspace(
     return _returning_row(cursor)
 
 
-def seed_llm_route(
+def seed_model_choice(
     cursor: Cursor[Any],
     *,
     workspace_id: str,
-    route_id: str | None = None,
+    model_choice_id: str | None = None,
     purpose: str = "embedding",
     provider: str = "mistral",
     model: str = "mistral-embed",
     dimensions: int | None = EMBEDDING_DIMENSIONS,
 ) -> dict[str, Any]:
     cursor.execute(
-        "INSERT INTO llm_route (id, workspace_id, purpose, provider, model, dimensions)"
+        "INSERT INTO model_choice"
+        " (id, workspace_id, purpose, provider, model, dimensions)"
         " VALUES (%s, %s, %s, %s, %s, %s) RETURNING *",
         (
-            route_id or f"route-{ulid()}",
+            model_choice_id or f"model-choice-{ulid()}",
             workspace_id,
             purpose,
             provider,

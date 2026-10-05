@@ -80,7 +80,7 @@ describe("the api serves the shell on app.", () => {
   it("leaves the product's transport answering on app., not the shell", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
-      .fetch(`${TRPC_ENDPOINT}/routes.list`, asABrowserNavigates);
+      .fetch(`${TRPC_ENDPOINT}/modelChoices.list`, asABrowserNavigates);
 
     expect(response.headers.get("content-type")).not.toContain("text/html");
     await expect(response.text()).resolves.not.toContain(`<div id="root">`);

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { boundarySchemas, RULES_IN_FORCE_KEYS, type REDACTION_TIERS } from "@better-answers/schema";
 
 import { err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
-import { listRoutes, type LlmPurpose } from "../llm/index.ts";
+import { listModelChoices, type LlmPurpose } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnBinding, bindingNamed, BINDING_ID } from "./admin-binding.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
@@ -53,7 +53,7 @@ const UNNAMED_PROCESSOR = { processor: NOT_RECORDED, country: NOT_RECORDED };
 
 const EXCLUDED_PURPOSE: LlmPurpose = "embedding";
 
-type DpiaRoute = {
+type DpiaModelChoice = {
   readonly purpose: string;
   readonly provider: string;
   readonly model: string;
@@ -75,7 +75,7 @@ export type DpiaInput = {
 
   readonly class: string;
   readonly rulesInForce: Readonly<Record<string, boolean>>;
-  readonly routes: readonly DpiaRoute[];
+  readonly modelChoices: readonly DpiaModelChoice[];
 
   readonly retentionClass: string;
 
@@ -153,7 +153,7 @@ export const dpiaInputFor = async (
   }
   const rulesInForce: Readonly<Record<string, boolean>> = parsed.data;
 
-  const listed = await listRoutes(admin, tx);
+  const listed = await listModelChoices(admin, tx);
   if (!listed.ok) return err(listed.error);
 
   const document: DpiaInput = {
@@ -166,18 +166,18 @@ export const dpiaInputFor = async (
     scope: NOT_RECORDED,
     class: binding.sensitivity,
     rulesInForce,
-    routes: listed.value.flatMap((route) => {
-      if (route.purpose === EXCLUDED_PURPOSE) return [];
-      if (route.provider === null || route.model === null) return [];
-      const named = SUB_PROCESSORS.get(route.provider) ?? UNNAMED_PROCESSOR;
+    modelChoices: listed.value.flatMap((modelChoice) => {
+      if (modelChoice.purpose === EXCLUDED_PURPOSE) return [];
+      if (modelChoice.provider === null || modelChoice.model === null) return [];
+      const named = SUB_PROCESSORS.get(modelChoice.provider) ?? UNNAMED_PROCESSOR;
       return [
         {
-          purpose: route.purpose,
-          provider: route.provider,
-          model: route.model,
+          purpose: modelChoice.purpose,
+          provider: modelChoice.provider,
+          model: modelChoice.model,
           processor: named.processor,
           country: named.country,
-          retentionTail: route.retentionTail ?? NOT_RECORDED,
+          retentionTail: modelChoice.retentionTail ?? NOT_RECORDED,
         },
       ];
     }),

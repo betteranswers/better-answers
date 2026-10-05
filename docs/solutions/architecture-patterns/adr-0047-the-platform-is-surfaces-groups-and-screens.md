@@ -108,7 +108,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 - **Flags**: no counterpart. A *flag* is a reader's feedback on an answer (ADR 0017).
 - **Memory**: no counterpart. The agents' only memory is the map, read and curated in Knowledge (ADR 0016).
 - **Tools**: a later Connected clients page in Agent Operations: the MCP surface's four entries and each client's scopes.
-- **Providers**: Agent Operations › Routes and spend, a route per purpose.
+- **Providers**: Models › Models and spend, a model choice per purpose.
 - **Costs**: Agent Operations › Routes and spend, and Ceiling.
 - **Settings**: a later Settings page in System, an index in which each setting stays with its object.
 

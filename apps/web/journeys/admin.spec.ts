@@ -1,9 +1,9 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { AUDIT_LOG_WORDS } from "@/features/people/audit-log-words.ts";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { BULK_WORDS, SELECTED_MEMBERS } from "@/features/people/member-act-words.ts";
-import { ROUTES_WORDS } from "@/features/routes/words.ts";
 import { NOTHING_BOUND } from "@/features/sources/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
 
@@ -17,10 +17,7 @@ const MEMBERS = pageNamed(people, "Members").path;
 const GROUPS = pageNamed(people, "Groups").path;
 const AUDIT_LOG = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit log").path;
 const BINDINGS = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Bindings").path;
-const ROUTES_AND_SPEND = pageNamed(
-  menuGroupIn(CONTROL_CENTRE, "agent-operations"),
-  "Routes and spend",
-).path;
+const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Models and spend").path;
 
 /** Every group the journeys make starts so, and the opening repair deletes any left behind. */
 const JOURNEYS_GROUPS = "Journeys run";
@@ -185,9 +182,11 @@ const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
     await expect(page.getByText(NOTHING_BOUND, { exact: true })).toBeVisible();
     await gate();
   });
-  await test.step("Routes and spend", async () => {
-    await page.goto(ROUTES_AND_SPEND);
-    await expect(page.getByRole("region", { name: "Routes" })).toContainText(ROUTES_WORDS.lead);
+  await test.step("Models and spend", async () => {
+    await page.goto(MODELS_AND_SPEND);
+    await expect(page.getByRole("region", { name: "Model choices" })).toContainText(
+      MODEL_CHOICES_WORDS.lead,
+    );
   });
 };
 

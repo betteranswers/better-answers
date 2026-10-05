@@ -21,7 +21,7 @@ The shape of Better Answers as `origin/main` holds it on 24 September 2026, with
 | `c4-dynamic-scheduled-work.md` | Dynamic | Scheduled work and its watchers: the head check, the sweep pass, the nightly audit, the backup cron, the drill, the uptime probe, the nightly journeys, the dead-man checks | Adding a schedule, a ping or an alert |
 | `c4-dynamic-ask.md` | Dynamic | S2's answering act as T-113 re-seamed it: plan · draft · record | Working S2, S6 or S8 |
 
-Context and Container are the two every reader needs. The component diagrams exist because the route lands almost all of its code inside three containers and a block spec has to say *where*. The dynamic diagrams draw the flows the route's seam sketches name most: the governed write every records block goes through; S1's document-shaped cross-tier seam, split in three because one diagram could not carry the bind, the worker's run and the review under twenty elements; the plan · draft · record split S2 is built to; and the scheduled work whose silence is an alert.
+Context and Container are the two every reader needs. The component diagrams exist because the route lands almost all of its code inside three containers and a block spec has to say *where*. The dynamic diagrams draw the flows the route spec's seam sketches name most: the governed write every records block goes through; S1's document-shaped cross-tier seam, split in three because one diagram could not carry the bind, the worker's run and the review under twenty elements; the plan · draft · record split S2 is built to; and the scheduled work whose silence is an alert.
 
 ## Where each block lands
 
@@ -39,7 +39,7 @@ The route's status table says what a block is and what blocks it. This table say
 | S5 | api · web · Postgres · git store | `concepts` slice — the promotion gate, the by-run revert; the Suggestions page (no stuck-ref act: T-108 closed 19/09/2026 with ADR 0012 saying why) |
 | S6 | api · web · Postgres | `answering` slice — question sets, the api-claimed job, the response-set document; the deferred principal in `kernel`; the question-set page |
 | S7 | worker · api · Postgres · a model provider | *extraction* in the worker over S2's model client; `concept_write_request` sets; the Kinds rename on `concepts` |
-| S8 | worker · api · Postgres · an embedding provider | *reserve* — `index.chunk` gains a concept unit and its vector; the `concept-catch-up` job; the embedding route first read |
+| S8 | worker · api · Postgres · an embedding provider | *reserve* — `index.chunk` gains a concept unit and its vector; the `concept-catch-up` job; the embedding model choice first read |
 | P1 | api · web · Postgres · Microsoft Entra · SMTP | `members` slice — the People acts; Better Auth's Microsoft provider; the Account page and *personal tokens*; `rls-exemptions.ts` |
 | P2 | api · Postgres | `workspaces` slice — provisioning at the `runOps` seam landed as T-329 (`provision-workspace`, `add-member`, 22/09/2026); the console's remainder — *the operator principal kind*, the admin plugin reduced, the identity-set audit log — stays P2's |
 | O1 | api · web · Postgres · backup | *the signal module* (a query per line, thresholds as rows); *`backup_run`*, *`platform_event`*; the System page's cards |

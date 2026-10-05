@@ -5,8 +5,8 @@ const config: KnipConfig = {
   // `uv` and `openssl` are installed on the machine and never by npm, so no manifest names them.
   ignoreBinaries: ["uv", "openssl"],
 
-  // Nothing here is published, so an unimported entry export is dead; one kept for a later route
-  // block carries `/** @public <block> */`.
+  // Nothing here is published, so an unimported entry export is dead; one kept
+  // for a later route block carries `/** @public <block> */`.
   includeEntryExports: true,
 
   workspaces: {

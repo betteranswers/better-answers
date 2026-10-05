@@ -43,8 +43,8 @@ def test_records_no_column_a_prompt_or_completion_sits_under() -> None:
             assert word not in column, column
 
 
-def test_resolves_a_route_for_every_purpose_and_no_other() -> None:
-    from factories import EMBEDDING_DIMENSIONS, seed_llm_route, seed_workspace
+def test_resolves_a_model_choice_for_every_purpose_and_no_other() -> None:
+    from factories import EMBEDDING_DIMENSIONS, seed_model_choice, seed_workspace
     from pg_harness import migrated_postgres
 
     purposes = purposes_the_rows_use()
@@ -55,7 +55,7 @@ def test_resolves_a_route_for_every_purpose_and_no_other() -> None:
 
         workspace = seed_workspace(cursor)
         seeded = {
-            purpose: seed_llm_route(
+            purpose: seed_model_choice(
                 cursor,
                 workspace_id=workspace["id"],
                 purpose=purpose,
@@ -74,7 +74,9 @@ def test_resolves_a_route_for_every_purpose_and_no_other() -> None:
         )
         resolved = {}
         for purpose in purposes:
-            cursor.execute("SELECT id FROM llm_route_for(%s::llm_purpose)", (purpose,))
+            cursor.execute(
+                "SELECT id FROM model_choice_for(%s::llm_purpose)", (purpose,)
+            )
             found = cursor.fetchone()
             resolved[purpose] = found[0] if found else None
 

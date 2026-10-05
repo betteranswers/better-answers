@@ -70,7 +70,7 @@ const invitation = z.object({
 const seeding = z.object({
   workspaceId: z.string().min(1),
 
-  routes: z.array(
+  modelChoices: z.array(
     z.object({
       purpose: z.enum(llmPurpose.enumValues),
       provider: z.string().min(1),
@@ -205,18 +205,18 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json({ removed: true });
   });
 
-  control.post(`${HARNESS_PREFIX}/routes`, async (context) => {
+  control.post(`${HARNESS_PREFIX}/model-choices`, async (context) => {
     const asked = await readBody(context.req.raw, seeding);
     const client = await app.database.superuser.connect();
     try {
       const seed = testData(client);
-      for (const route of asked.routes) {
-        await seed.llmRoute({ workspaceId: asked.workspaceId, ...route });
+      for (const modelChoice of asked.modelChoices) {
+        await seed.modelChoice({ workspaceId: asked.workspaceId, ...modelChoice });
       }
     } finally {
       client.release();
     }
-    return context.json({ seeded: asked.routes.length });
+    return context.json({ seeded: asked.modelChoices.length });
   });
 
   control.post(`${HARNESS_PREFIX}/bindings`, async (context) => {

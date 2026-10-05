@@ -265,14 +265,14 @@ export const attemptChunkEmbeddedBy = (
   workspaceId: string,
   bindingId: string,
   embedding: string | null,
-  route: string | null,
+  modelChoice: string | null,
 ): Promise<string> =>
   refusalOf(client, () =>
     client.query(CHUNK_AND_ITS_EMBEDDING, [
       workspaceId,
       `chunk-${ulid()}`,
       embedding,
-      route,
+      modelChoice,
       bindingId,
     ]),
   );

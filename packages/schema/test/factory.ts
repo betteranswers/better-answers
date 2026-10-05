@@ -54,7 +54,7 @@ export type TestData = {
     overrides?: Partial<InsertInput<"workspaceConfig">>,
   ): Promise<Row<"workspaceConfig">>;
 
-  llmRoute(overrides?: Partial<InsertInput<"llmRoute">>): Promise<Row<"llmRoute">>;
+  modelChoice(overrides?: Partial<InsertInput<"modelChoice">>): Promise<Row<"modelChoice">>;
 
   chunk(overrides?: Partial<InsertInput<"chunk">>): Promise<Row<"chunk">>;
 
@@ -301,11 +301,11 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  const llmRoute: TestData["llmRoute"] = async (overrides = {}) => {
+  const modelChoice: TestData["modelChoice"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const purpose = overrides.purpose ?? "embedding";
-    return insertRow(client, "llmRoute", {
-      id: `route-${ulid()}`,
+    return insertRow(client, "modelChoice", {
+      id: `model-choice-${ulid()}`,
       provider: "mistral",
       model: "mistral-embed",
 
@@ -333,7 +333,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       id: `chunk-${ulid()}`,
       content: "test content",
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0),
-      embeddingRouteId: `route-${ulid()}`,
+      embeddingRouteId: `model-choice-${ulid()}`,
       bindingId: `binding-${ulid()}`,
 
       sourceDocumentId: null,
@@ -911,7 +911,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     group,
     groupMember,
     workspaceConfig,
-    llmRoute,
+    modelChoice,
     chunk,
     oauthClient,
     oauthRefreshToken,

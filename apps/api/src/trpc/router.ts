@@ -1,7 +1,7 @@
 import { octetInputParser } from "@trpc/server/http";
 
 import { err } from "@better-answers/core/kernel";
-import { listRoutes } from "@better-answers/core/llm";
+import { listModelChoices } from "@better-answers/core/llm";
 import { runsOfSubject, runsOfSubjectInput } from "@better-answers/core/runs";
 import {
   bindUpload,
@@ -57,9 +57,9 @@ export const appRouter = router({
   person: personRouter,
   console: consoleRouter,
   members: membersRouter,
-  routes: router({
+  modelChoices: router({
     list: queryProcedure.query(({ ctx }) =>
-      crossing(ctx, listRoutes.name, listRoutes(ctx.principal, ctx.tx)),
+      crossing(ctx, listModelChoices.name, listModelChoices(ctx.principal, ctx.tx)),
     ),
   }),
   sources: router({

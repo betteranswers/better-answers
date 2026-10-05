@@ -10,7 +10,7 @@ C4Component
   ContainerDb(git, "Git store", "read-only mount", "The bundle at the commit on the run row")
   ContainerDb(objects, "Object store", "Garage, S3", "Originals and normalised redacted copies")
   ContainerDb(lmdb, "Per-binding LMDB", "cocoindex Environment", "binding/ and findings/, sibling stores")
-  System_Ext(models, "Model provider", "The extraction route; planned S7")
+  System_Ext(models, "Model provider", "The extraction model choice; planned S7")
 
   Container_Boundary(worker, "apps/worker") {
     Component(loop, "loop.py", "the image's command", "One pass over every workspace per tick: claim and run one job, or enqueue the nightly audit when due; claims nothing while the schema stamp or the contract digest differs")
@@ -74,4 +74,4 @@ C4Component
 | T-366 | The suppression is the workspace's since T-375, read for every document; since T-376 the seam withholds every exact, case-folded occurrence of its identifiers, detected or not, as an erasure match with no finding. Core's documents finder has each document naming the subject re-indexed now (T-377) |
 | S4 | A connector per provider beside the converter, the estate-size probe, `MAX_CONCURRENT_RUNS=1` measured, citation repair on a gone document, what becomes of findings when a `content_hash` moves |
 | S7 | Extraction over the accepted plan and the ceiling, the template per document kind, conflicts raised never resolved |
-| S8 | *reserve* — the concept unit: the `concept-catch-up` kind, embedding on the fixed route with an `llm_call` per call |
+| S8 | *reserve* — the concept unit: the `concept-catch-up` kind, embedding on the fixed model choice with an `llm_call` per call |

@@ -107,6 +107,12 @@ const APP_SENSES: readonly Sense[] = [
   },
 ];
 
+const MIGRATION_TAG: Sense = {
+  sense: "a migration's tag, naming the dated file it was generated as",
+  within: "packages/schema/migrations/meta/",
+  written: /"tag": "\d{4}_[\w-]+"/g,
+};
+
 const LEDGER_SENSES: readonly Sense[] = [
   {
     sense: "spend's cost ledger, by its name or the llm_call row it holds",
@@ -117,11 +123,7 @@ const LEDGER_SENSES: readonly Sense[] = [
     within: "contracts/cost-ledger/",
     written: /\bledger\b/gi,
   },
-  {
-    sense: "a migration's tag, naming the dated file it was generated as",
-    within: "packages/schema/migrations/meta/",
-    written: /"tag": "\d{4}_[\w-]+"/g,
-  },
+  MIGRATION_TAG,
   {
     sense: "a company's own books, in the source documents the worker's fixtures stand in for",
     within: "apps/worker/tests/fixtures/",
@@ -198,6 +200,102 @@ const PAGE_AREA_MENU_CARVED_OUT: readonly CarveOut[] = [
       file ===
       "docs/solutions/best-practices/what-a-rename-sweeps-runner-and-prose-pass-get-wrong-and-the-checks-that-catch-it.md",
     why: "the sweep's learning names the words it renamed, as its map does",
+  },
+];
+
+const MODEL_CHOICE = "model choice";
+
+const MODEL_CHOICE_LANDED = "2026-10-05";
+
+/** Trees where every route is one the api, the SPA's sign-in or a fake server answers over HTTP. */
+const HTTP_ROUTE_TREES = [
+  "apps/api/src/auth/",
+  "apps/api/src/ingress/",
+  "apps/api/tests/pending-set.test.ts",
+  "apps/test-inbox/",
+  "apps/web/src/features/auth/",
+  "apps/web/test/second-factor-api.ts",
+  "apps/web/test/pending-gate.test.tsx",
+  "packages/devtools/test/ci/ghcr-cleanup.test.ts",
+  "docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md",
+  "docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md",
+  "docs/solutions/logic-errors/better-auth-lookup-deleted-another-persons-expired-sign-in-code.md",
+];
+
+const ROUTE_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  MIGRATION_TAG,
+  {
+    sense: "the route spec and its blocks: the v0.1 route, on it or off it",
+    written:
+      /\broute spec\b|\bv01-route\b|\broute blocks?\b|\bthe v0\.1 route\b|\b(?:on|off|of|holds) (?:the|this|any) route\b|\bthe route(?:['’]s (?:[A-Z]\d|status|one new)|(?=:| (?:holds|lands|has|was|changes|planned|names|fixes)\b))|^#+ The route$/gi,
+  },
+  {
+    sense: "a Hono or Playwright route() call, and the request a Playwright route holds",
+    written:
+      /\b\w+\.route\(|\(route\)|\broute\.(?:fetch|fulfill|abort|continue|request)\(|\["route"\]/g,
+  },
+  ...HTTP_ROUTE_TREES.map((within) => ({
+    sense: "an HTTP route the api, the SPA's sign-in or a fake server answers",
+    within,
+    written: /\broutes?\b/gi,
+  })),
+  {
+    sense: "an HTTP route elsewhere: the api's, a machine's, one beside tRPC",
+    written:
+      /\b(?:api|HTTP|Hono|machine|core|restore|accept-invitation) routes?\b|\b(?:a|our|own) route (?:beside|of our own|in apps|calling)\b|\bapi['’]s own routes?\b|\broute (?:makes|calls|is the only guard)\b|\bthe route['’]s (?:own )?(?:checks?|ceiling)\b|\bevery other route\b|\bbreaking a route\b/gi,
+  },
+  {
+    sense: "jCodeMunch's route tool, by its name",
+    written: /`route \{/g,
+  },
+  {
+    sense: "Compound Engineering's route to a review peer",
+    written: /\b(?:opencode|claude) route\b/gi,
+  },
+  {
+    sense: "a TanStack route, in the SPA's composition or a test of it",
+    within: "apps/web/src/app/",
+    written: /\broutes?\b/gi,
+  },
+  {
+    sense: "a TanStack route named outside the composition",
+    written:
+      /\b(?:index|shell|console['’]s) route\b|\ba route['’]s static data\b|\ba route (?:nothing declared|written beside)\b/gi,
+  },
+  {
+    sense: "a network's route",
+    written:
+      /\bdefault route\b|\bno route to\b|\bdo not route\b|\broutes through\b|\broute out\b/gi,
+  },
+  {
+    sense: "the stored rebuild reason the model choice's migration replaced, named as stored",
+    written: /[`"]route-change[`"]/g,
+  },
+  {
+    sense: "the rename runner's examples, which name the first map's words",
+    within: "packages/devtools/src/rename/words.ts",
+    written: /`(?:llm route|route|SELECT route_id|no route set)`/g,
+  },
+  {
+    sense: "the embedding_route_id column on index.chunk",
+    written: /\bembedding_route_id\b|\bembeddingRouteId\b/g,
+    until: "passage",
+  },
+];
+
+/** Copied from upstream, so their words are upstream's. */
+const VENDORED: readonly CarveOut[] = [
+  {
+    holds: (file) =>
+      ["complexity-gate", "mutation-testing"].some((skill) =>
+        file.startsWith(`.claude/skills/${skill}/`),
+      ),
+    why: "a skill copied from jspiro/skills, kept as upstream wrote it",
+  },
+  {
+    holds: (file) => file === ".compound-engineering/config.example.yaml",
+    why: "Compound Engineering's own example config, where a route is its engine's",
   },
 ];
 
@@ -341,7 +439,15 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("exemption", "sensitivity override"),
   avoided("expired", "shelf life", "of a concept; an invitation's status keeps it"),
   avoided("expiry", "shelf life"),
-  pending("extraction ceiling", "spending limit", "spending limit", "model choice", "everywhere"),
+  {
+    word: "extraction ceiling",
+    use: "spending limit",
+    entry: "spending limit",
+    sweep: MODEL_CHOICE,
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: [writtenBefore(MODEL_CHOICE_LANDED)],
+  },
   pending("extraction plan", "cost estimate", "cost estimate", "cost estimate", "everywhere"),
   avoided("FIDO", "passkey"),
   avoided("field error", "issue word"),
@@ -531,7 +637,16 @@ export const OLD_WORDS: readonly OldWord[] = [
     "everywhere",
   ),
   avoided("roadmap", "route spec"),
-  pending("route", "model choice", "model choice", "model choice", "one sense"),
+  {
+    word: "route",
+    use: "model choice",
+    entry: "model choice",
+    sweep: MODEL_CHOICE,
+    state: "landed",
+    reach: "one sense",
+    permitted: ROUTE_SENSES,
+    carvedOut: [writtenBefore(MODEL_CHOICE_LANDED), ...VENDORED],
+  },
   pending("run", "sync", "sync", "sync", "one sense"),
   avoided("Sales", "role (of a person)", "a job title", "Admin, Editor or Viewer"),
   {

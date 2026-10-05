@@ -42,7 +42,7 @@ reviews:
     - Tests go through the module's interface against real infrastructure.
       Module mocking is banned and lint-enforced.
     - Fabricated work must be avoided. Placeholder, mock, demo or filler content on a
-      production path; a reference to a file, command, route, function,
+      production path; a reference to a file, command, endpoint, function,
       environment variable or config key that does not exist.
       Report these with the evidence from the diff, and leave alone generated
       files, fixtures, snapshots, migrations and mechanical renames. A finding

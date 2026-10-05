@@ -1319,7 +1319,7 @@ const restoredSaid = (restored: SignInRestored, noticed: boolean): readonly stri
     ? `restore-sign-in: a notice of the restore went to ${restored.email}`
     : `restore-sign-in: the notice to ${restored.email} did not go; tell them of the restore yourself`,
   `restore-sign-in: their restore code, good once until ${restored.expiresAt.toISOString()}: ${restored.code}`,
-  "restore-sign-in: run this only once you have checked who they are by a route other than their email, and hand them the code by that same route, never by email",
+  "restore-sign-in: run this only once you have checked who they are by a channel other than their email, and hand them the code by that same channel, never by email",
 ];
 
 /** The code goes to stdout alone: never to the logger, and never in the notice. */

@@ -513,18 +513,18 @@ describe("the pre-push hook over a throwaway repository", () => {
 
   it.each([
     {
-      route: "LEFTHOOK_EXCLUDE",
+      bypass: "LEFTHOOK_EXCLUDE",
       directory: "exclude",
       options: { env: { PNPM_STUB_FAILS: "check:docs:api", LEFTHOOK_EXCLUDE: "check:docs:api" } },
       ran: pushedSteps().length - 1,
     },
     {
-      route: "--no-verify",
+      bypass: "--no-verify",
       directory: "no-verify",
       options: { env: { PNPM_STUB_FAILS: "check:docs:api" }, flags: ["--no-verify"] },
       ran: 0,
     },
-  ])("lets a failing gate's push through when $route skips it", ({ directory, options, ran }) => {
+  ])("lets a failing gate's push through when $bypass skips it", ({ directory, options, ran }) => {
     const pushing = hookedRepository(directory);
 
     const pushed = pushFrom(pushing, pushing.root, "main", options);

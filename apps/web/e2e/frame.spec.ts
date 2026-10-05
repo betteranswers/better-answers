@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { BREADCRUMB, JUMP_TO, NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
 import { ACCOUNT_HEADING, PASSKEY_WORDS } from "@/features/auth/account-words.ts";
-import { ROUTES_WORDS } from "@/features/routes/words.ts";
+import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { keystrokesOn } from "@/shared/keystroke-words.ts";
 import {
   ASK,
@@ -38,9 +38,9 @@ import {
 
 const SOURCES = menuGroupIn(CONTROL_CENTRE, "sources");
 
-const AGENT_OPERATIONS = menuGroupIn(CONTROL_CENTRE, "agent-operations");
+const MODELS = menuGroupIn(CONTROL_CENTRE, "models");
 
-const ROUTES_AND_SPEND = pageNamed(AGENT_OPERATIONS, "Routes and spend");
+const MODELS_AND_SPEND = pageNamed(MODELS, "Models and spend");
 
 const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
 
@@ -51,7 +51,7 @@ const SYSTEM = menuGroupIn(CONTROL_CENTRE, "system");
 /** What an Admin is shown today, spelled out rather than read through the filter that draws it. */
 const AN_ADMINS_PAGES = [
   [SOURCES, pageNamed(SOURCES, "Bindings")],
-  [AGENT_OPERATIONS, ROUTES_AND_SPEND],
+  [MODELS, MODELS_AND_SPEND],
   [PEOPLE, MEMBERS],
   [PEOPLE, pageNamed(PEOPLE, "Groups")],
   [SYSTEM, pageNamed(SYSTEM, "Audit log")],
@@ -61,8 +61,8 @@ const AREA_NAMES = ["Control Centre"];
 
 const PAGE_NAMES = AN_ADMINS_PAGES.map(([, page]) => page.name);
 
-/** The first heading Routes and spend draws: its group's name. */
-const ITS_HEADING = headingOf(ROUTES_AND_SPEND);
+/** The first heading Models and spend draws: its group's name. */
+const ITS_HEADING = headingOf(MODELS_AND_SPEND);
 
 const SWAP_BUDGET_MS = 1000;
 
@@ -102,18 +102,20 @@ const partOf = (page: Page, name: string) => bandOf(page).getByText(name, { exac
 
 const crumbsOf = (page: Page) => bandOf(page).getByRole("navigation", { name: BREADCRUMB });
 
-const TOOLBAR_TABS = ["Routes", "Spend"];
+const TOOLBAR_TABS = ["Model choices", "Spend"];
 
-const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Routes and spend" });
+const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Models and spend" });
 
-const routesCardOf = (page: Page) => page.getByRole("region", { name: "Routes" });
+const modelChoicesCardOf = (page: Page) => page.getByRole("region", { name: "Model choices" });
 
 /**
- * The page reads the routes after the nav paints, so a page here has started only once its
+ * The page reads its model choices after the nav paints, so a page here has started once its
  * card says a new workspace has none.
  */
-const theRoutesHaveLanded = (page: Page) =>
-  expect(routesCardOf(page).getByText(ROUTES_WORDS.noneSet, { exact: true })).toBeVisible();
+const theModelChoicesHaveLanded = (page: Page) =>
+  expect(
+    modelChoicesCardOf(page).getByText(MODEL_CHOICES_WORDS.noneSet, { exact: true }),
+  ).toBeVisible();
 
 const boxOf = async (region: Locator) => {
   const box = await region.boundingBox();
@@ -263,20 +265,20 @@ const signedIn = async (page: Page, api: Parameters<typeof provision>[0], name: 
 };
 
 /** Drawn before anything is measured or pressed, so the narrow shell is what answers. */
-const narrowAtRoutesAndSpend = async (
+const narrowAtModelsAndSpend = async (
   page: Page,
   api: Parameters<typeof provision>[0],
   name: string,
 ) => {
   await signedIn(page, api, name);
   await page.setViewportSize(NARROW);
-  await page.goto(ROUTES_AND_SPEND.path);
+  await page.goto(MODELS_AND_SPEND.path);
   await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 };
 
 test("names the icon rail's areas to eye, pointer and keyboard", async ({ page, request }) => {
   await signedIn(page, request, "Wharfedale Castings");
-  await page.goto(ROUTES_AND_SPEND.path);
+  await page.goto(MODELS_AND_SPEND.path);
 
   const rail = railOf(page);
   await expect(rail.getByRole("link")).toHaveText(AREA_NAMES);
@@ -340,10 +342,10 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
       - list:
         - listitem:
           - link "Bindings"
-      - heading "Agent Operations" [level=3]
+      - heading "Models" [level=3]
       - list:
         - listitem:
-          - link "Routes and spend"
+          - link "Models and spend"
       - heading "People" [level=3]
       - list:
         - listitem:
@@ -419,10 +421,10 @@ test("lists a Viewer's home as the nav's one entry", async ({ page, request }) =
 
 test("names workspace and place, the logo leading home", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Halifax Fabrication");
-  await page.goto(ROUTES_AND_SPEND.path);
+  await page.goto(MODELS_AND_SPEND.path);
 
   await expect(switcherOf(page, workspace.name)).toBeVisible();
-  for (const name of [CONTROL_CENTRE.name, AGENT_OPERATIONS.name, ROUTES_AND_SPEND.name]) {
+  for (const name of [CONTROL_CENTRE.name, MODELS.name, MODELS_AND_SPEND.name]) {
     await expect(partOf(page, name)).toBeVisible();
   }
   await expect(bandOf(page).getByRole("button", { name: "Sign out" })).toHaveCount(0);
@@ -553,13 +555,13 @@ test("sizes the band's cells to the rail and nav below", async ({ page, request 
 
 test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Dales Engineering");
-  await page.goto(ROUTES_AND_SPEND.path);
+  await page.goto(MODELS_AND_SPEND.path);
   const rail = railOf(page);
   await expect(rail.getByRole("link", { name: CONTROL_CENTRE.name })).toHaveAttribute(
     "aria-current",
     "page",
   );
-  await theRoutesHaveLanded(page);
+  await theModelChoicesHaveLanded(page);
 
   // Every part but the open tab leads somewhere, so each is a stop between toggle and jump-to.
   const band = [
@@ -567,8 +569,8 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
     switcherOf(page, workspace.name),
     closerOf(page),
     crumbOf(page, CONTROL_CENTRE.name),
-    crumbOf(page, AGENT_OPERATIONS.name),
-    crumbOf(page, ROUTES_AND_SPEND.name),
+    crumbOf(page, MODELS.name),
+    crumbOf(page, MODELS_AND_SPEND.name),
     jumpToOf(page),
     avatarOf(page, workspace.admin.name),
   ];
@@ -604,13 +606,13 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
   await expect(offer.getByRole("button", { name: PASSKEY_WORDS.dismissOffer })).toBeFocused();
 
   await page.keyboard.press("Tab");
-  await expect(tabsOf(page).getByRole("tab", { name: "Routes" })).toBeFocused();
+  await expect(tabsOf(page).getByRole("tab", { name: "Model choices" })).toBeFocused();
 
   // The open tab's panel holds the page, so the content is reached through the toolbar.
   const panel = page.getByRole("tabpanel");
   await page.keyboard.press("Tab");
   await expect(panel).toBeFocused();
-  await expect(panel.getByRole("region", { name: "Routes" })).toBeVisible();
+  await expect(panel.getByRole("region", { name: "Model choices" })).toBeVisible();
 
   /**
    * Nothing carries a positive tabindex, so the document's own order is the tab order. Zero
@@ -633,7 +635,7 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
 // a page with nothing focused.
 test("moves focus from the skip link into the content", async ({ page, request }) => {
   await signedIn(page, request, "Ribble Toolmaking");
-  await page.goto(ROUTES_AND_SPEND.path);
+  await page.goto(MODELS_AND_SPEND.path);
   // A keypress before the shell has drawn is spent on nothing, so wait for the page first.
   await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 
@@ -644,7 +646,7 @@ test("scrolls nothing sideways at 320 pixels, navigation open or closed", async 
   page,
   request,
 }) => {
-  await narrowAtRoutesAndSpend(page, request, "Acme Joinery");
+  await narrowAtModelsAndSpend(page, request, "Acme Joinery");
 
   await scrollsNothingSideways(page, "with the sheet closed");
 
@@ -793,7 +795,7 @@ test("keeps a focused control clear of the fixed band", async ({ page, request }
 
 test("paints the shell in the page's own surface token", async ({ page, request }) => {
   await signedIn(page, request, "Southern Castings");
-  await page.goto(ROUTES_AND_SPEND.path);
+  await page.goto(MODELS_AND_SPEND.path);
 
   const painted = await page.locator("main").evaluate((main) => {
     const nothing = "rgba(0, 0, 0, 0)";
@@ -819,13 +821,13 @@ test("paints the shell in the page's own surface token", async ({ page, request 
 
 test("fills the toolbar with tabs the arrow keys move between", async ({ page, request }) => {
   await signedIn(page, request, "Calder Ironworks");
-  await page.goto(ROUTES_AND_SPEND.path);
+  await page.goto(MODELS_AND_SPEND.path);
 
   const tabs = tabsOf(page);
   await expect(tabs.getByRole("tab")).toHaveText(TOOLBAR_TABS);
   await expect(tabs).toMatchAriaSnapshot(`
-    - tablist "Routes and spend":
-      - tab "Routes" [selected]
+    - tablist "Models and spend":
+      - tab "Model choices" [selected]
       - tab "Spend"
   `);
 
@@ -837,14 +839,14 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
   expect(toolbar).toBeLessThan(content);
 
   // The arrows and the selection are the registry's, so the shell rolls no keyboard of its own.
-  await tabs.getByRole("tab", { name: "Routes" }).click();
+  await tabs.getByRole("tab", { name: "Model choices" }).click();
   await page.keyboard.press("ArrowRight");
   await expect(tabs.getByRole("tab", { name: "Spend" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText("Spend is not built yet.")).toBeVisible();
-  await expect(routesCardOf(page)).toHaveCount(0);
+  await expect(modelChoicesCardOf(page)).toHaveCount(0);
 
   await page.keyboard.press("ArrowLeft");
-  await expect(routesCardOf(page)).toBeVisible();
+  await expect(modelChoicesCardOf(page)).toBeVisible();
 });
 
 test("draws no toolbar over a page without tabs or acts", async ({ page, request }) => {
@@ -1057,9 +1059,9 @@ test("measures a page's prose, but not a table's or dialog's", async ({ page, re
 
 test("remembers a closed menu on this browser only", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Ribble Toolmaking");
-  await page.goto(ROUTES_AND_SPEND.path);
+  await page.goto(MODELS_AND_SPEND.path);
   await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
-  await theRoutesHaveLanded(page);
+  await theModelChoicesHaveLanded(page);
 
   // Listening only across the act, so neither the start above nor the reload below is mistaken
   // for it.
@@ -1095,7 +1097,7 @@ test("opens the navigation over narrow content, holding and returning focus", as
   request,
   passesTheAccessibilityGate,
 }) => {
-  await narrowAtRoutesAndSpend(page, request, "Wharfedale Castings");
+  await narrowAtModelsAndSpend(page, request, "Wharfedale Castings");
 
   await expect(railOf(page)).toHaveCount(0);
   await expect(navOf(page, CONTROL_CENTRE)).toHaveCount(0);
@@ -1130,7 +1132,7 @@ test("opens the navigation over narrow content, holding and returning focus", as
 });
 
 test("closes the sheet on a chosen page, focus returned", async ({ page, request }) => {
-  await narrowAtRoutesAndSpend(page, request, "Northern Tooling");
+  await narrowAtModelsAndSpend(page, request, "Northern Tooling");
   await scrollsNothingSideways(page, "before the sheet opens");
 
   const menu = sheetButtonOf(page);
@@ -1153,7 +1155,7 @@ test("closes the sheet on a chosen page, focus returned", async ({ page, request
 });
 
 test("closes the sheet on widening, focusing the navigation control", async ({ page, request }) => {
-  await narrowAtRoutesAndSpend(page, request, "Calder Pressings");
+  await narrowAtModelsAndSpend(page, request, "Calder Pressings");
 
   await sheetButtonOf(page).click();
   await expect(sheetOf(page)).toBeVisible();

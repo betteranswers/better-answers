@@ -12,7 +12,7 @@ By hand, the same loop is three skills:
 - `/ce-plan` writes the plan to `docs/plans/`, after searching `docs/solutions/` for what past work learned. A plan has no status field: git says what shipped.
 - `/ce-work` builds a plan, unit by unit, and ends in a pull request.
 
-A route block (`docs/specs/v01-route.md`) is one `/ce-brainstorm`, then `/ce-plan`, then one `/lfg` or `/ce-work` per plan. `/ce-dogfood` walks a branch's pages as the personas in `docs/personas/` and fixes the small breakages it finds. It is the route for judging a signed-in page's UX against its spec: it walks the change as the personas on its own build, beside the browser suite's behaviour and accessibility checks.
+A route block (`docs/specs/v01-route.md`) is one `/ce-brainstorm`, then `/ce-plan`, then one `/lfg` or `/ce-work` per plan. `/ce-dogfood` walks a branch's pages as the personas in `docs/personas/` and fixes the small breakages it finds. It is the way to judge a signed-in page's UX against its spec: it walks the change as the personas on its own build, beside the browser suite's behaviour and accessibility checks.
 
 ## What CE does not know about this repository
 

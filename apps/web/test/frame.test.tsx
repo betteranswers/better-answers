@@ -70,7 +70,7 @@ describe("the shell's regions", () => {
   });
 
   it("carries four landmark regions and a skip link first", async () => {
-    const { container } = await openAs("Admin", "/agent-operations/routes-and-spend");
+    const { container } = await openAs("Admin", "/models/models-and-spend");
 
     expect(rail()).toBeDefined();
     expect(menu()).toBeDefined();
@@ -85,10 +85,10 @@ describe("the shell's regions", () => {
   it("lists the open area's groups over their pages", async () => {
     await openAs("Admin", "/system/audit-log");
 
-    expect(namesIn(menu(), "heading")).toEqual(["Sources", "Agent Operations", "People", "System"]);
+    expect(namesIn(menu(), "heading")).toEqual(["Sources", "Models", "People", "System"]);
     expect(namesIn(menu())).toEqual([
       "Bindings",
-      "Routes and spend",
+      "Models and spend",
       "Members",
       "Groups",
       "Audit log",
@@ -109,10 +109,10 @@ describe("the shell's regions", () => {
   });
 
   it("names area, group and page in the band", async () => {
-    await openAs("Admin", "/agent-operations/routes-and-spend");
+    await openAs("Admin", "/models/models-and-spend");
 
     const bar = screen.getByRole("banner");
-    for (const name of ["Control Centre", "Agent Operations", "Routes and spend"]) {
+    for (const name of ["Control Centre", "Models", "Models and spend"]) {
       expect(within(bar).getByText(name, { exact: true })).toBeDefined();
     }
   });
@@ -163,10 +163,10 @@ describe("the shell's regions", () => {
     expect(container.textContent).not.toMatch(/sign out/i);
   });
 
-  it("gives Agent Operations the routes card", async () => {
-    await openAs("Admin", "/agent-operations/routes-and-spend");
+  it("gives Models the model choices card", async () => {
+    await openAs("Admin", "/models/models-and-spend");
 
-    expect(screen.getByRole("heading", { level: 2, name: "Routes" })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 2, name: "Model choices" })).toBeDefined();
   });
 
   it("says an unknown address names no page", async () => {

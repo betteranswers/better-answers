@@ -28,7 +28,7 @@ A **signal** is a named query over rows the platform already keeps, with a thres
 
 - Thresholds are config rows an Admin changes on System, never code.
 - An **alert** is recorded once as a `platform_event(kind=alert)` and closed by a *cleared* event, so no condition fires twice.
-- Every model call writes one `llm_call` row: `workspace_id`, purpose, route, model, tokens in and out, seconds, priced cost, outcome, and the run or answer it served. Never the prompt or the completion.
+- Every model call writes one `llm_call` row: `workspace_id`, purpose, model choice, model, tokens in and out, seconds, priced cost, outcome, and the run or answer it served. Never the prompt or the completion.
 - The answer audit is its own table, with a workspace id and a retention period (ADR 0017).
 - The worker's heartbeat row carries the box's figures once a minute: memory, `pswpin`, disk under `/data`, the git store's size per workspace and each LMDB volume's. That row is the whole host-metrics agent. Swap-in above 4 MB/s for five minutes during a first index is ADR 0024's step-A signal.
 - Three channels, each for the case only it can see: healthchecks.io for silence, Coolify through Resend for deploy and container failures, and the api's own email through `SMTP_URL` for the thresholds, immediately for a short list and in a daily digest for the rest.

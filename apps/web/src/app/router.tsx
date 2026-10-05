@@ -80,7 +80,7 @@ import type { PageToolbar } from "@/shared/page-toolbar.tsx";
 import { ConsoleFrame } from "./console-frame.tsx";
 import { FailedPage } from "./failed-page.tsx";
 import { WorkspaceFrame } from "./frame.tsx";
-import { ROUTES_AND_SPEND_TOOLBAR, RoutesAndSpendPage } from "./pages/routes-and-spend-page.tsx";
+import { MODELS_AND_SPEND_TOOLBAR, ModelsAndSpendPage } from "./pages/models-and-spend-page.tsx";
 import { UnbuiltPage } from "./pages/unbuilt-page.tsx";
 import type { AppClients } from "./providers.tsx";
 import { UnknownPage } from "./unknown-page.tsx";
@@ -92,10 +92,7 @@ type BuiltPage = { readonly draw: () => ReactElement; readonly toolbar?: PageToo
 /** The list decides which pages are built; this map only says by what, and with what in hand. */
 const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>([
   ["/sources/bindings", { draw: BindingsPage, toolbar: BINDINGS_TOOLBAR }],
-  [
-    "/agent-operations/routes-and-spend",
-    { draw: RoutesAndSpendPage, toolbar: ROUTES_AND_SPEND_TOOLBAR },
-  ],
+  ["/models/models-and-spend", { draw: ModelsAndSpendPage, toolbar: MODELS_AND_SPEND_TOOLBAR }],
   ["/people/members", { draw: MembersPage, toolbar: MEMBERS_TOOLBAR }],
   ["/people/groups", { draw: GroupsPage }],
   ["/system/audit-log", { draw: AuditLogPage }],

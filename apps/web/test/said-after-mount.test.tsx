@@ -5,8 +5,8 @@ import { z } from "zod";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
+import { ModelChoicesCard } from "@/features/model-choices/model-choices-card.tsx";
 import { GroupsPage } from "@/features/people/groups-page.tsx";
-import { RoutesCard } from "@/features/routes/routes-card.tsx";
 import { Review } from "@/features/sources/review.tsx";
 import type { ListedBinding } from "@/features/sources/sources-api.ts";
 
@@ -60,10 +60,10 @@ describe("a page's read, said after its region mounts (BA-31)", () => {
   });
 
   it("fills a region of lines a render after it mounts", () => {
-    const seen = mounted(REGION, <RoutesCard />);
+    const seen = mounted(REGION, <ModelChoicesCard />);
 
     expect(seen[0]).toBe("");
-    expect(seen.at(-1)).toBe("The routes are still loading.");
+    expect(seen.at(-1)).toBe("The model choices are still loading.");
   });
 
   it("fills a region drawing one state after mount", () => {

@@ -6,14 +6,14 @@ import {
   anAddress,
   landedAtHome,
   provision,
-  seedRoutes,
+  seedModelChoices,
   signIn,
   skipLinkReachesThePage,
 } from "./harness.ts";
 
-const NOT_A_LIST = { why: "the api answered a shape the routes card cannot render" };
+const NOT_A_LIST = { why: "the api answered a shape the model choices card cannot render" };
 
-const ROUTES_LIST = "routes.list";
+const MODEL_CHOICES_LIST = "modelChoices.list";
 
 test("offers a way out, shell intact, when a page throws", async ({
   page,
@@ -22,9 +22,9 @@ test("offers a way out, shell intact, when a page throws", async ({
 }) => {
   const email = anAddress("failed-page");
   const workspace = await provision(request, { name: "Wharfedale Castings", adminEmail: email });
-  await seedRoutes(request, {
+  await seedModelChoices(request, {
     workspaceId: workspace.workspaceId,
-    routes: [{ purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" }],
+    modelChoices: [{ purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" }],
   });
 
   await page.route("**/trpc/**", async (route) => {
@@ -32,7 +32,7 @@ test("offers a way out, shell intact, when a page throws", async ({
     const procedures = decodeURIComponent(new URL(route.request().url()).pathname)
       .replace("/trpc/", "")
       .split(",");
-    if (!procedures.includes(ROUTES_LIST)) {
+    if (!procedures.includes(MODEL_CHOICES_LIST)) {
       await route.fulfill({ response: answered });
       return;
     }
@@ -40,7 +40,7 @@ test("offers a way out, shell intact, when a page throws", async ({
 
     const broken = Array.isArray(answers)
       ? answers.map((answer, index) =>
-          procedures[index] === ROUTES_LIST ? { result: { data: NOT_A_LIST } } : answer,
+          procedures[index] === MODEL_CHOICES_LIST ? { result: { data: NOT_A_LIST } } : answer,
         )
       : { result: { data: NOT_A_LIST } };
     await route.fulfill({ json: broken });
@@ -48,7 +48,7 @@ test("offers a way out, shell intact, when a page throws", async ({
 
   await page.goto("/sign-in");
   await signIn(page, request, email);
-  await page.goto("/agent-operations/routes-and-spend");
+  await page.goto("/models/models-and-spend");
 
   await expect(page.getByRole("heading", { level: 1, name: FAILED_PAGE.heading })).toBeVisible();
   await expect(page.getByRole("alert")).toContainText(FAILED_PAGE.said);
@@ -75,7 +75,10 @@ test("offers a way out, shell intact, when a page throws", async ({
   await passesTheAccessibilityGate();
 
   // The toolbar stands too, and its other tab is a way back in: the page is asked again.
-  await expect(page.getByRole("tab", { name: "Routes" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Model choices" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await page.getByRole("tab", { name: "Spend" }).click();
   await expect(page.getByText("Spend is not built yet.")).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);

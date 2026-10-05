@@ -35,9 +35,6 @@
     "domain": 4,
     "landed": 4
   },
-  "apps/web/src/features/routes/words.ts": {
-    "route": 2
-  },
   "apps/web/src/features/sources/refusal-words.ts": {
     "bind": 1,
     "binding": 10,
@@ -70,7 +67,6 @@
     "priced plan": 1,
     "Publish and accept gates": 1,
     "Queue": 1,
-    "route": 1,
     "run": 1,
     "slug": 1
   },

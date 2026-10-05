@@ -88,7 +88,7 @@ import { workspaceLastActive } from "./last-active-tables.ts";
 import { contractStamp, sweepPass, UPLOAD_SWEEP_MODES } from "./platform-tables.ts";
 import { AUDIENCES, SENSITIVITIES } from "./readable-columns.ts";
 import { ROLES } from "./roles.ts";
-import { llmRoute, workspaceConfig } from "./schema.ts";
+import { modelChoice, workspaceConfig } from "./schema.ts";
 import {
   BINDING_STATES,
   CONNECTORS,
@@ -141,7 +141,7 @@ export const workspaceSelect = createSelectSchema(workspace, workspaceRefinement
 export const workspaceInsert = createInsertSchema(workspace, workspaceRefinements);
 export const workspaceUpdate = createUpdateSchema(workspace, workspaceRefinements);
 
-const llmRouteRefinements = {
+const modelChoiceRefinements = {
   id: (schema: z.ZodString) => schema.trim().min(1),
   workspaceId,
   provider: (schema: z.ZodString) => schema.trim().min(1),
@@ -151,9 +151,9 @@ const llmRouteRefinements = {
   retentionTail: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const llmRouteSelect = createSelectSchema(llmRoute, llmRouteRefinements);
-export const llmRouteInsert = createInsertSchema(llmRoute, llmRouteRefinements);
-export const llmRouteUpdate = createUpdateSchema(llmRoute, llmRouteRefinements);
+export const modelChoiceSelect = createSelectSchema(modelChoice, modelChoiceRefinements);
+export const modelChoiceInsert = createInsertSchema(modelChoice, modelChoiceRefinements);
+export const modelChoiceUpdate = createUpdateSchema(modelChoice, modelChoiceRefinements);
 
 const workspaceConfigRefinements = {
   workspaceId,
@@ -887,11 +887,11 @@ export const boundarySchemas = {
     insert: workspaceInsert,
     update: workspaceUpdate,
   },
-  llmRoute: {
-    table: llmRoute,
-    select: llmRouteSelect,
-    insert: llmRouteInsert,
-    update: llmRouteUpdate,
+  modelChoice: {
+    table: modelChoice,
+    select: modelChoiceSelect,
+    insert: modelChoiceInsert,
+    update: modelChoiceUpdate,
   },
   workspaceConfig: {
     table: workspaceConfig,

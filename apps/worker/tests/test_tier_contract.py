@@ -19,7 +19,7 @@ SPOKEN_AGREEMENTS = {
     "erasure-match": "fixtured",
     "id-shape": "fixtured",
     "credential-envelope": "fixtured",
-    "llm-routing": "sql-function",
+    "model-choice": "sql-function",
     "queue": "sql-function",
     "redaction": "fixtured",
     "upload-media-types": "fixtured",
@@ -370,26 +370,26 @@ def test_a_minted_id_matches_the_shape_the_other_tier_parses() -> None:
     )
 
 
-def test_llm_routing_resolves_every_fixtured_call() -> None:
-    from factories import seed_llm_route, seed_workspace
+def test_model_choice_resolves_every_fixtured_call() -> None:
+    from factories import seed_model_choice, seed_workspace
     from pg_harness import migrated_postgres
 
     fixture = json.loads(
-        (CONTRACTS_DIR / "llm-routing" / "cases.json").read_text("utf-8")
+        (CONTRACTS_DIR / "model-choice" / "cases.json").read_text("utf-8")
     )
 
     with migrated_postgres() as connection, connection.cursor() as cursor:
         for workspace in fixture["workspaces"]:
             seed_workspace(cursor, workspace_id=workspace["id"], name=workspace["name"])
-        for route in fixture["routes"]:
-            seed_llm_route(
+        for model_choice in fixture["model_choices"]:
+            seed_model_choice(
                 cursor,
-                route_id=route["id"],
-                workspace_id=route["workspace_id"],
-                purpose=route["purpose"],
-                provider=route["provider"],
-                model=route["model"],
-                dimensions=route["dimensions"],
+                model_choice_id=model_choice["id"],
+                workspace_id=model_choice["workspace_id"],
+                purpose=model_choice["purpose"],
+                provider=model_choice["provider"],
+                model=model_choice["model"],
+                dimensions=model_choice["dimensions"],
             )
 
         cursor.execute("SET LOCAL ROLE app_rt")
@@ -399,11 +399,11 @@ def test_llm_routing_resolves_every_fixtured_call() -> None:
                 (call["workspace_id"],),
             )
             cursor.execute(
-                "SELECT id FROM llm_route_for(%s::llm_purpose)", (call["purpose"],)
+                "SELECT id FROM model_choice_for(%s::llm_purpose)", (call["purpose"],)
             )
             rows = cursor.fetchall()
             resolved = rows[0][0] if rows else None
-            assert resolved == call["expect_route_id"], call
+            assert resolved == call["expect_model_choice_id"], call
         connection.rollback()
 
 

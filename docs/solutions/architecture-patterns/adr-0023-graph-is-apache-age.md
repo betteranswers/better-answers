@@ -59,7 +59,7 @@ The walk's timeout is set per statement, never on a role. Entry is by key, never
 ## Rejected
 
 - Clearing and rebuilding in one transaction per workspace: write locks held for the run's length.
-- Deltas only, with no generations: a route change, an erasure re-derive and the reconciler need a safe "rewrite everything".
+- Deltas only, with no generations: a model choice change, an erasure re-derive and the reconciler need a safe "rewrite everything".
 - The canonical entity as the target contribution's node: it wears one binding's predicate and gates the whole person.
 - Rewriting merged entities into one node: it loses the per-contribution predicate and cannot be undone.
 
