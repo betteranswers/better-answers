@@ -15,8 +15,8 @@ A company's knowledge lives scattered across systems, documents and people's hea
 Three knowledge layers, and the platform's records over them:
 
 1. **Sources** — the company's systems and documents, connected (or referenced without connection), reviewed for sensitivity, indexed for search. Sources stay where they are and keep evolving.
-2. **Bundles** — the OKF concepts: the curated map of what the company knows, one trust-bearing unit per file, written to the spec and readable without the platform. OKF's structure is explicit, graph-shaped by default, providing rich queryable, traversable context, able to be reasoned over even before any extraction has taken place. Each concept file holds its own trust and credibility signals; portable; the company's asset.
-3. **Map** — derived from the bundles and the records: It keeps the map's shape standing as knowledge grows, and grows itself — from what each bundle already holds (people, teams, products, datasets, systems, policies) to the edges between them. 
+2. **Bundles** — the OKF concepts: the curated body of what the company knows, one trust-bearing unit per file, written to the spec and readable without the platform. OKF's structure is explicit, graph-shaped by default, providing rich queryable, traversable context, able to be reasoned over even before any extraction has taken place. Each concept file holds its own trust and credibility signals; portable; the company's asset.
+3. **Map** — derived from the bundles and the records: It keeps the shape of what the company knows standing as knowledge grows, and grows itself — from what each bundle already holds (people, teams, products, datasets, systems, policies) to the edges between them. 
 
 **Records** are what the platform keeps because it runs use cases: guides and their compositions, usage and outcomes, opportunities and responses, bindings, audit, review. They cite concepts by IRI and never restate them. Where a unit lives is decided by the minting rule: a concept when a company with no platform would keep it as knowledge — the client's Q&A pairs are concepts — a record when it exists only because the platform runs a use case.
 
