@@ -63,3 +63,5 @@ WORKTREES="$(unlocked_worktrees)"
 while IFS= read -r wt; do
   [ -z "$wt" ] || sweep_one "$wt" </dev/null
 done <<<"$WORKTREES"
+
+drop_orphan_doc_indexes "$UNDER"

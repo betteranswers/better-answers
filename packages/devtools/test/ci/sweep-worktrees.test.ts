@@ -52,10 +52,20 @@ const stubTools = (
   const registry = JSON.stringify(
     NAMES.map((name) => ({ repo_id: `local/${name}`, source_root: realpathSync(worktrees[name]) })),
   );
+  const under = path.dirname(realpathSync(worktrees.fresh));
+  const docIndexes = JSON.stringify({
+    repos: [
+      { repo: "local/fresh-worktree", source_root: realpathSync(worktrees.fresh) },
+      { repo: "local/orphan", source_root: path.join(under, "orphan") },
+      { repo: "local/gone-elsewhere", source_root: path.join(scratch, "gone-elsewhere") },
+    ],
+  });
   const merged = JSON.stringify([{ headRefOid: squashedHead, mergedAt: LONG_AGO }]);
   return stubsOnPath(path.join(scratch, "bin"), {
     "jcodemunch-mcp": recordsItsArgv(log, [`[ "$1" = list-repos ] && printf '%s' '${registry}'`]),
-    "jdocmunch-mcp": recordsItsArgv(`${log}-doc`, []),
+    "jdocmunch-mcp": recordsItsArgv(`${log}-doc`, [
+      `[ "$1" = watch-status ] && printf '%s' '${docIndexes}'`,
+    ]),
     gh: `case "$*" in *"--head t-squashed"*) printf '%s' '${merged}' ;; *) printf '[]' ;; esac\n`,
   });
 };
@@ -103,7 +113,7 @@ describe("the sweep over worktrees left beside running agents", () => {
   let estate: Estate;
   beforeAll(() => {
     estate = arrangeAndSweep();
-  });
+  }, 60_000);
 
   it("exits 0 over an estate it partly keeps", () => {
     expect(estate.run.status).toBe(0);
@@ -130,6 +140,18 @@ describe("the sweep over worktrees left beside running agents", () => {
       .split("\n")
       .filter((line) => line.startsWith("delete-index"));
     expect(dropped).toEqual(["delete-index local/merged", "delete-index local/squashed"]);
+  });
+
+  it("drops each doc index whose worktree folder is gone", () => {
+    const dropped = readFileSync(`${estate.log}-doc`, "utf8")
+      .split("\n")
+      .filter((line) => line.startsWith("delete-index"));
+    expect(dropped).toEqual([
+      "delete-index --repo local/merged-worktree",
+      "delete-index --repo local/squashed-worktree",
+      "delete-index --repo local/orphan",
+    ]);
+    expect(estate.run.stderr).toContain("jdocmunch: dropped the index local/orphan");
   });
 
   it.each([

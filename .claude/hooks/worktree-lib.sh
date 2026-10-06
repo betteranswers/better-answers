@@ -3,8 +3,13 @@ say() {
   echo "$SAY_AS: $*" >&2
 }
 
-# $1: a worktree's physical path, the only name jCodeMunch keeps it under.
 drop_index() {
+  drop_code_index "$1"
+  drop_doc_index "$1"
+}
+
+# $1: a worktree's physical path, the only name jCodeMunch keeps it under.
+drop_code_index() {
   command -v jcodemunch-mcp >/dev/null 2>&1 || return 0
   local repo
   repo="$(jcodemunch-mcp list-repos --json 2>/dev/null \
@@ -17,19 +22,33 @@ drop_index() {
   else
     say "jcodemunch: could not drop the index $repo — run jcodemunch-mcp delete-index $repo by hand"
   fi
-  drop_doc_index "$1"
 }
 
 # $1: a worktree's physical path. provision-worktree.sh names its doc index after the folder.
 drop_doc_index() {
   command -v jdocmunch-mcp >/dev/null 2>&1 || return 0
-  local repo
-  repo="local/$(basename "$1")"
-  if jdocmunch-mcp delete-index --repo "$repo" >/dev/null 2>&1; then
-    say "jdocmunch: dropped the index $repo"
+  drop_doc_repo "local/$(basename "$1")"
+}
+
+drop_doc_repo() {
+  if jdocmunch-mcp delete-index --repo "$1" >/dev/null 2>&1; then
+    say "jdocmunch: dropped the index $1"
   else
-    say "jdocmunch: no index $repo to drop"
+    say "jdocmunch: no index $1 to drop"
   fi
+}
+
+# $1: a folder path ending in `/`. A worktree removed without the remove hook leaves its doc index.
+drop_orphan_doc_indexes() {
+  command -v jdocmunch-mcp >/dev/null 2>&1 || return 0
+  local repo root
+  while IFS=$'\t' read -r repo root; do
+    case "$root" in
+      "$1"?*) [ -d "$root" ] || drop_doc_repo "$repo" ;;
+    esac
+  done < <(jdocmunch-mcp watch-status 2>/dev/null \
+    | jq -r '.repos[]? | select(.repo and .source_root) | [.repo, .source_root] | @tsv' \
+      2>/dev/null || true)
 }
 
 is_clean() {
