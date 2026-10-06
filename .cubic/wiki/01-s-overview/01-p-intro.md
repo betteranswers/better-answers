@@ -90,7 +90,7 @@ Sources: [CODING_RULES.md:144-162](CODING_RULES.md#L144-L162), [apps/docs-site/s
 
 The design system provides a "Blueprint" register rather than a traditional dashboard. It emphasizes square corners, hairline borders, and a modular 32px grid.
 
-*  **Glossary-Driven UI**: Interface labels must match the `CONTEXT.md` glossary exactly (e.g., "Workspace" instead of "Organization").
+*  **Glossary-Driven UI**: Interface labels must match the `CONCEPTS.md` glossary exactly (e.g., "Workspace" instead of "Organization").
 *  **Trust Words**: Accuracy is signaled via a closed set of specific trust words (e.g., "Checked by <person>", "Out of date").
 *  **Accessibility**: The system targets WCAG 2.2 AA compliance, using native controls and proper ARIA roles.
 

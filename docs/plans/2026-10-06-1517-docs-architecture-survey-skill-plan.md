@@ -18,7 +18,7 @@ execution: code
 - **Stop conditions:** stop and ask the owner in any of these cases:
   - The trial run (U5) shows the survey reporting mostly what a gate or `ce-code-review` already catches, so the skill adds nothing BA-35 needs.
   - A required word for the skill's text fails the avoid-words test in a way no rewording fixes.
-  - BA-59's rename of `CONTEXT.md` lands first, and the paths the skill names must follow it.
+  - BA-59's rename of the glossary lands first, and the paths the skill names must follow it.
 - **Execution profile:** one pull request carries U1 to U5. U6 is a Linear write made when that pull request opens.
 - **Who finishes:** `ce-work` builds the pull request and `ce-code-review` reviews it. The merge queue lands it, with CI's `check` as the arbiter.
 - **Open blockers:** none.
@@ -40,7 +40,7 @@ The route spec puts an architecture review before S2 (`docs/specs/v01-route.md`,
 ### Key Decisions
 
 - **Build a local survey skill.** Governs R1. (session-settled: user-directed — chosen over relying on CE's reviewers: the workflow evaluation of 06/10/2026 found they judge only a diff, and no CE skill surveys a whole codebase)
-- **The skill stops at the report.** Upstream's grilling loop and its `CONTEXT.md` and ADR edits are dropped, because BA-35 runs the review through `/ce-brainstorm`, which owns the questioning and the edit to a decision's doc. Governs R10, R11. (session-settled: user-approved — chosen over keeping upstream's grilling loop: two places would edit the same decision docs)
+- **The skill stops at the report.** Upstream's grilling loop and its glossary and ADR edits are dropped, because BA-35 runs the review through `/ce-brainstorm`, which owns the questioning and the edit to a decision's doc. Governs R10, R11. (session-settled: user-approved — chosen over keeping upstream's grilling loop: two places would edit the same decision docs)
 - **Every invocation rebuilds proposals from first principles.** A proposal may go past "deepen this module" when a better shape exists, including reopening a decision doc. Governs R5. (session-settled: user-directed — chosen over a survey bounded to upstream's deepening frame: the reviewer's output must not be limited when a better solution exists)
 - **Diagrams come from the `diagram-design` plugin where a picture helps a decision.** Governs R8. (session-settled: user-directed — chosen over Mermaid-only diagrams in the report: the owner wants a diagram wherever it helps architectural understanding and decisions, with Mermaid kept as the fallback)
 - **`DEEPENING.md` comes in as an adapted reference.** Its dependency categories are rewritten to the rule *Run every store the platform runs, for real*. `codebase-design` and `DESIGN-IT-TWICE.md` stay out. Governs R6. (session-settled: user-approved — chosen over leaving `DEEPENING.md` out: its testing guidance and its rule to replace old tests rather than add more are in no repository rule)
@@ -129,7 +129,7 @@ The route spec puts an architecture review before S2 (`docs/specs/v01-route.md`,
 - KTD6. **`first-principles` is read as a method, never invoked as a skill.** Invoking it would hand the turn to the owner, because it asks one question at a time, and a skill invoked by another runs in the caller's context. The walk reads its `SKILL.md` when present and fills every bucket from the tree. Each unknown becomes an open question on the card for BA-35. When the file is absent, which happens under OpenCode or before the skills CLI has run, a short in-skill frame does the same job and the header says so. Governs R5. (Conflict call-out: the owner asked for the skill to be used. This honours that intent through its method, because its interactive protocol cannot run inside a survey.)
 - KTD7. **The vocabulary comes from `CODING_STANDARDS.md` and ADR 0029, cited by heading. The skill avoids the landed old words.** Three of upstream's phrasings use words this repository has replaced, so they fail `apps/api/tests/avoid-words.test.ts`, and the carve-out for vendored skills covers only unedited copies. The unit of the report is an **opportunity**. "Candidate" is a pending row meaning *suggested concept*, and "suggestion" is a glossary term. Governs R4, R7.
 - KTD8. **The report is styled from the `better-answers-design` skill's colours and type, as plain CSS in one file.** `AGENTS.md` sends anything a person looks at to that skill, and `lavish-axi`'s own order prefers the project's design system. No React components. The HTML template lives inside a markdown reference, because `oxfmt` checks non-markdown files under `.claude/skills/`. Governs R9.
-- KTD9. **A path test keeps the skill's pointers true.** `packages/devtools/test/ci/survey-architecture-skill.test.ts` checks that every repository path in backticks in the skill and its references exists. It follows `apps/web/test/browser-suite-skill.test.ts`. A path git ignores, such as `.lavish/` or a skill installed per checkout like `first-principles`, is skipped, because CI's checkout never has it. A `references/` path resolves against the skill's own directory. BA-59 plans to rename `CONTEXT.md`, so a rename that missed the skill would otherwise leave it reading nothing, with no error. Governs R12.
+- KTD9. **A path test keeps the skill's pointers true.** `packages/devtools/test/ci/survey-architecture-skill.test.ts` checks that every repository path in backticks in the skill and its references exists. It follows `apps/web/test/browser-suite-skill.test.ts`. A path git ignores, such as `.lavish/` or a skill installed per checkout like `first-principles`, is skipped, because CI's checkout never has it. A `references/` path resolves against the skill's own directory. BA-59 plans to rename the glossary, so a rename that missed the skill would otherwise leave it reading nothing, with no error. Governs R12.
 - KTD10. **The trial runs the two reviewer personas directly.** Each gets the slice as a diff against git's empty tree, scoped to `packages/core/src/concepts` and `packages/core/src/answering`, and the project-standards reviewer is told to read `CODING_STANDARDS.md` as its standards file. A deletion-and-revert worktree reviewed with `base:` was the alternative. It reaches the same diff with more machinery. The rubric is fixed before either run (U5). Governs R15.
 
 Phase notes: no external research ran, because the upstream skill and the authoring standard are local. No bake-off was needed, because every fork here closed on the repository's evidence.
@@ -173,7 +173,7 @@ When no opportunity survives the walk, the report still gets written. It lists w
 - `candidate` and the other pending avoid-words rows may land while the skill is in use. KTD7's word choice avoids the one most central to it.
 - GitNexus lags `main`, and it reads the main checkout's index from any tree. KTD5 makes the lag visible per area.
 - `disable-model-invocation` is untested in a tracked skill here, and OpenCode's handling of it is unknown. U4's activation cells cover Claude Code. The OpenCode run records what it saw.
-- BA-59 renames `CONTEXT.md`. KTD9's test fails that rename's pull request if it misses the skill.
+- BA-59 renames the glossary. KTD9's test fails that rename's pull request if it misses the skill.
 
 ### Deferred to Implementation
 
@@ -239,7 +239,7 @@ When no opportunity survives the walk, the report still gets written. It lists w
   - Happy path: the provision test passes with `survey-architecture` in both lists, and fails if the `.gitignore` line is removed.
   - The path test passes when every backticked repository path in the skill exists.
   - The path test passes on a clean checkout where no git-ignored path exists, though the skill names `.lavish/`.
-  - Error path: the path test fails, naming the path, when a reference cites `CONTEXT.md` and that file is renamed.
+  - Error path: the path test fails, naming the path, when a reference cites the glossary and that file is renamed.
   - The path test asserts the skill names `CODING_STANDARDS.md` and `docs/solutions/architecture-patterns/`, so the check holds something.
   - The docs-lane test passes with the new row, and fails if the script runs the test without the row.
 - **Verification:** `pnpm run check:docs` passes, including the avoid-words test over the new files.

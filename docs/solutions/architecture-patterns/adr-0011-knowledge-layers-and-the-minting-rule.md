@@ -40,7 +40,7 @@ A relation is a `LINKS_TO` edge between two concepts, carrying its two endpoint 
 
 What follows from the rule:
 
-- Every new kind of unit is classified by the rule in the ticket that introduces it, and `CONTEXT.md` names the layer it lives in. Nothing is registered anywhere else.
+- Every new kind of unit is classified by the rule in the ticket that introduces it, and `CONCEPTS.md` names the layer it lives in. Nothing is registered anywhere else.
 - Q&A pairs are `Answer` concepts. A composition has two homes, a guide section and a response.
 - The type vocabulary is derived from the concept index, never a file in the bundle.
 

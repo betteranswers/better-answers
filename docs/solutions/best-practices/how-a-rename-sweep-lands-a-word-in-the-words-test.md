@@ -9,9 +9,9 @@ severity: medium
 applies_when:
   - "A BA-29 sweep (U8 to U17) reaches KTD5 step 5 and marks its rows landed in apps/api/tests/old-words.ts"
   - "Adding or changing a permitted sense, a carve-out or a reach on a row of the old-words list"
-  - "Removing a _Code rename pending._ mark from CONTEXT.md"
+  - "Removing a _Code rename pending._ mark from CONCEPTS.md"
   - "Refreshing apps/api/tests/old-words-ratchet.json"
-  - "Reviewing a sweep pull request's diff of old-words.ts, CONTEXT.md or the ratchet baseline"
+  - "Reviewing a sweep pull request's diff of old-words.ts, CONCEPTS.md or the ratchet baseline"
 symptoms:
   - "KTD5 step 5 says only that a sweep marks its rows landed, but landing a row also needs senses, a plans carve-out, a glossary edit and a baseline refresh"
   - "Several mistakes in a landed row pass the words test without a finding: a sense regex without the g flag, a carve-out on a reader-text row, a row flipped back to pending, a plural under a one-sense row"
@@ -99,7 +99,7 @@ The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull re
 2. **Flipping a landed row back to pending switches it off without a finding.** No scan reads a pending row (`landed`, `words-scan.ts:226`; "reads a pending word nowhere", `avoid-words.test.ts:375-381`), and `listFaults` does not object. A reviewer sees it only in the diff. The one side effect is that the ratchet counts the word again from no baseline, so a page using it fails as a rise once the baseline has been refreshed past it.
 3. **A one-sense row matches the whole word alone.** `findsIn` without `anyForm` is `(?<!\w)word(?!\w)` (`words-scan.ts:124`), so a plural or a compound passes once the row lands ("reads a word held to senses whole, never in compounds", `avoid-words.test.ts:450-452`). While the row was pending the ratchet counted every form (`countIn`, 131-132), but only in page words (`PAGE_WORDS`, 249-252, read at 473), and it stops counting at the flip (471).
 4. **A lone lowercase word is read only in a words module.** `isRead` reads it only when the file matches `WORDS_MODULE` (`words-scan.ts:310-312`, 245; planted at `avoid-words.test.ts:861-869`). A string such as `"binding"` in `navigation.ts`, an MCP entry, the answer renderer or an email is invisible to the reader-text, internal-word and ratchet checks. The line scan still sees it for an everywhere or one-sense row, but for a reader-text row nothing does. A sweep that renames a words module out of the `*words.ts` pattern drops it from those checks too, and passes. The test fails loudly only when a whole source of reader text yields no string (`readerStringsPerSource`, `words-scan.ts:386-393`; the test at `avoid-words.test.ts:112-119`) or a reader-text file does not parse (the throw at `words-scan.ts:360`; planted at `avoid-words.test.ts:871-875`). Losing one words module among several trips neither.
-5. **Landing a row can wake the internal-word check.** `watchedInternals` leaves an `_Internal._` head unwatched while a pending row names its word (`words-scan.ts:422-436`; planted at `avoid-words.test.ts:763-778`). U8's `actor id` and `person id` are pending reader-text rows (`old-words.ts:143`, `397`) and internal heads (`CONTEXT.md:606`, `613`), so landing them sets both `readerFindings` and `internalFindings` reading the same strings. If such a head is ordinary English, add it to `NOT_WATCHED_ON_PAGES` (`old-words.ts:527-554`). `unwatchedStrays` refuses an unwatched head that heads no internal entry (`words-scan.ts:86-91`).
+5. **Landing a row can wake the internal-word check.** `watchedInternals` leaves an `_Internal._` head unwatched while a pending row names its word (`words-scan.ts:422-436`; planted at `avoid-words.test.ts:763-778`). U8's `actor id` and `person id` are pending reader-text rows (`old-words.ts:143`, `397`) and internal heads (`CONCEPTS.md:606`, `613`), so landing them sets both `readerFindings` and `internalFindings` reading the same strings. If such a head is ordinary English, add it to `NOT_WATCHED_ON_PAGES` (`old-words.ts:527-554`). `unwatchedStrays` refuses an unwatched head that heads no internal entry (`words-scan.ts:86-91`).
 
 ## Why This Matters
 
@@ -108,7 +108,7 @@ The words test is the one gate on R12, which refuses an old word once it has lan
 ## When to Apply
 
 - At KTD5 step 5 of every sweep still to come, U8 to U17.
-- On any change to `old-words.ts`, the `_Code rename pending._` marks in `CONTEXT.md`, or `old-words-ratchet.json`.
+- On any change to `old-words.ts`, the `_Code rename pending._` marks in `CONCEPTS.md`, or `old-words-ratchet.json`.
 - When reviewing a sweep's pull request. Check the diff for `state` flips both ways, `g` on every new sense, `within` where one tree writes a sense, a `writtenBefore` carve-out on each newly landed line-scanned row, and a baseline that only fell.
 
 ## Examples
@@ -143,4 +143,4 @@ KTD1 also gives this row a deferred sense for `binding_id` on `index.chunk`, the
 
 - `docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`: KTD1 (178), KTD5 (201-208), KTD6 (209-215), KTD7 (216), KTD8 (217), KTD15 (233), R12 (93), R21 and R22 (102-103), U7 (543-571), Appendix G (1001-1023).
 - `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`, amended by the same plan.
-- `CONTEXT.md:5-7`, the preamble that defines `_Internal._` and `_Code rename pending._`.
+- `CONCEPTS.md:5-7`, the preamble that defines `_Internal._` and `_Code rename pending._`.

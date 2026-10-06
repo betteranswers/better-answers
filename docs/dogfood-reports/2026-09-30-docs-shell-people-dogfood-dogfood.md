@@ -130,7 +130,7 @@ Ours, capped at 68ch, beside Arena's Members block at page width:
 ![Arena's Members block](2026-09-30-shell-people-assets/a01-block.png)
 
 ### How much of the Arena blocks is layout, and how much is product
-- **What's broken:** #13, #14, #16 and #18 carry concepts `CONTEXT.md` does not have: several roles per member and custom roles (Bid writer, Finance), teams alongside groups, member status (Suspended, Deactivated), SSO, passkeys and second factors, time-boxed scoped access requests, and severity on audit events.
+- **What's broken:** #13, #14, #16 and #18 carry concepts `CONCEPTS.md` does not have: several roles per member and custom roles (Bid writer, Finance), teams alongside groups, member status (Suspended, Deactivated), SSO, passkeys and second factors, time-boxed scoped access requests, and severity on audit events.
 - **Why escalated:** adopting any of them is a product-scope decision, not a UI one.
 - **Options:** take the blocks' layout and controls only (filters, row menus, page detail, one-sentence audit), keeping today's concepts. Or adopt named concepts too, each as its own decision.
 - **Recommendation:** layout only for this rework, and list the concepts in Linear for later.

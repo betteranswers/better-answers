@@ -2,11 +2,11 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-This repo is **single-context**: one root `CONTEXT.md` and one set of decisions in `docs/solutions/architecture-patterns/`. The pnpm and uv workspaces (`apps/*`, `packages/*`) are runtime tiers, not separate domains — they share one vocabulary by design.
+This repo is **single-context**: one root `CONCEPTS.md` and one set of decisions in `docs/solutions/architecture-patterns/`. The pnpm and uv workspaces (`apps/*`, `packages/*`) are runtime tiers, not separate domains — they share one vocabulary by design.
 
 ## Before exploring, read these
 
-- **`CONTEXT.md`** at the repo root — the glossary.
+- **`CONCEPTS.md`** at the repo root — the glossary.
 - **`docs/solutions/architecture-patterns/`** — the live architecture decisions. Read the ones that touch the area you're about to work in.
 - **`AGENTS.md`** — the map: layout, how a task is worked, which skill to reach for.
 - **`CODING_STANDARDS.md`** — the constitution. A workspace's own rules live in `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md` and `apps/worker/CODING_STANDARDS.md`; read a workspace's file too when changing it.
@@ -17,7 +17,7 @@ This repo is **single-context**: one root `CONTEXT.md` and one set of decisions 
 ```
 /
 ├── AGENTS.md          ← the map (CLAUDE.md is a one-line pointer to it)
-├── CONTEXT.md         ← the glossary
+├── CONCEPTS.md        ← the glossary
 ├── CODING_STANDARDS.md    ← the constitution
 ├── VISION.md          ← the destination
 ├── docs/
@@ -34,9 +34,9 @@ This repo is **single-context**: one root `CONTEXT.md` and one set of decisions 
 
 ## Use the glossary's vocabulary
 
-When your output names a domain concept (in a task title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
+When your output names a domain concept (in a task title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONCEPTS.md`. Don't drift to synonyms the glossary explicitly avoids.
 
-`CONTEXT.md` states the stronger rule this repo actually runs on: **a new domain word is settled in the glossary before it appears in code**, and a term moves into the glossary only once it has been settled in a wayfinder ticket. So if the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for the next `/ce-brainstorm`).
+The rule this repo runs on: **a domain word code uses is defined in `CONCEPTS.md` in the same change, or before it**. Compound Engineering's skills keep the file: `ce-brainstorm` and `ce-plan` add the terms a dialogue or a plan settles, and `ce-compound` and `ce-compound-refresh` add, refine, fold and retire entries as CE's rules for the file define. Each edit shows in its pull request's diff. The exceptions that hold here are in the glossary's own opening paragraph. So if the concept you need isn't in the glossary yet, either you're inventing language the project doesn't use (reconsider) or there's a real gap (define it in the same change).
 
 ## Flag decision conflicts
 

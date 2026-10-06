@@ -101,7 +101,7 @@ describe("the list of old words", () => {
   it("agrees with the glossary it serves", () => {
     expect(
       listFaults(OLD_WORDS, glossary, NOT_WATCHED_ON_PAGES),
-      "apps/api/tests/old-words.ts and CONTEXT.md disagree. Keep the list sorted, one row per word, each under an entry the glossary heads, and a pending row for every entry marked pending.",
+      "apps/api/tests/old-words.ts and CONCEPTS.md disagree. Keep the list sorted, one row per word, each under an entry the glossary heads, and a pending row for every entry marked pending.",
     ).toEqual([]);
   });
 
@@ -139,7 +139,7 @@ describe("the tree, against the list", () => {
   it("uses no landed word outside the senses it keeps", () => {
     expect(
       said(lineFindings(repositoryRoot, SCAN)),
-      "a line writes a word the glossary has replaced. Write the word each line names, as CONTEXT.md and apps/web/CODING_STANDARDS.md say; where the use is a sense the word keeps, add that sense to its row in apps/api/tests/old-words.ts.",
+      "a line writes a word the glossary has replaced. Write the word each line names, as CONCEPTS.md and apps/web/CODING_STANDARDS.md say; where the use is a sense the word keeps, add that sense to its row in apps/api/tests/old-words.ts.",
     ).toEqual([]);
   });
 
@@ -153,7 +153,7 @@ describe("the tree, against the list", () => {
   it("writes no internal word where a person reads it", () => {
     expect(
       saidOfInternals(internalFindings(repositoryRoot, glossary, SCAN, NOT_WATCHED_ON_PAGES)),
-      "a person would read a word CONTEXT.md marks internal. Write what each line names; where the head is ordinary English, add it to NOT_WATCHED_ON_PAGES in apps/api/tests/old-words.ts.",
+      "a person would read a word CONCEPTS.md marks internal. Write what each line names; where the head is ordinary English, add it to NOT_WATCHED_ON_PAGES in apps/api/tests/old-words.ts.",
     ).toEqual([]);
   });
 

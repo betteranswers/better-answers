@@ -39,7 +39,7 @@ C4Dynamic
 ## What the flow guarantees
 
 - **Authorization is judged at time of act**, against the instant the acting credential was issued at, under a shared lock on the member and person rows — so rows after a revocation are impossible by construction, and a bare commit inside the window is the replay case (ADR 0012, T-052).
-- **The map is never behind for an edit.** The delta joins the commit transaction; a full rebuild writes beside the live generation and flips in one row update. The reader's two phrases are *map as of* and *map unavailable since*; the third is retired (ADR 0023, `CONTEXT.md` *map*).
+- **The map is never behind for an edit.** The delta joins the commit transaction; a full rebuild writes beside the live generation and flips in one row update. The reader's two phrases are *map as of* and *map unavailable since*; the third is retired (ADR 0023, `CONCEPTS.md` *map*).
 - **A replay is fail-closed on what a commit does not carry.** The merge key, class and evidence are recovered; a file whose `sources[]` are not the standing citations lands Restricted with an audit event saying so; the replay's audit event is the reconciler's under the commit's `Audit:` id (ADR 0012, amendments of 2026-09-07 and 2026-09-08).
 - **Unwanted content is undone by a forward revert, never a history rewrite.** The one rewrite the platform performs is the erasure routine's, on author lines, to the erasure pseudonym (ADRs 0012, 0035).
 

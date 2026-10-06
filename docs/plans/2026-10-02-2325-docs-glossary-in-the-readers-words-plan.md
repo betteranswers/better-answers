@@ -78,8 +78,8 @@ The trust words show the same split. The owner agreed on 28/09/2026 to move from
 
 **The glossary**
 
-- R6. `CONTEXT.md` heads every entry a person meets with the reader's word, defined in plain words.
-- R7. Old and avoided words leave `CONTEXT.md` for a list that only the words test reads.
+- R6. `CONCEPTS.md` heads every entry a person meets with the reader's word, defined in plain words.
+- R7. Old and avoided words leave `CONCEPTS.md` for a list that only the words test reads.
 - R8. An internal entry carries a mark the words test can read.
 
 **Rules agents read**
@@ -153,7 +153,7 @@ This plan covers the glossary rewrite and the renames that follow from it. The b
 
 ### Dependencies / Assumptions
 
-- The words test (`apps/api/tests/avoid-words.test.ts`) reads `_Avoid_` clauses from `CONTEXT.md` today. A word marked retired is refused everywhere; an avoided word only in its wrong sense, through a pattern table.
+- The words test (`apps/api/tests/avoid-words.test.ts`) reads `_Avoid_` clauses from `CONCEPTS.md` today. A word marked retired is refused everywhere; an avoided word only in its wrong sense, through a pattern table.
 - The audit log is append-only, and core reads act names to decide retries and the scope of an ended sign-in.
 - The rename of `checkedBy` and `checkedAt` to `verifiedBy` and `verifiedAt` inside core lines code up with OKF's `verified` key. OKF's own tier words stay as they are (R15).
 - The first client's bundle is on production, and `RELEASE_MODE` has been `nightly` since 27/09/2026, releasing at 02:35. The platform goes live, and the mode becomes `drill`, on a later day (`docs/operations/RUNBOOK.md`).
@@ -206,7 +206,7 @@ This plan covers the glossary rewrite and the renames that follow from it. The b
   5. marks its rows landed in the words test's list.
 
   The map stays in `packages/devtools/renames/` so an older branch can replay it. Governs R12, R14.
-- KTD6. **The reader-text check parses text, not files.** It reads `_Internal._` heads from `CONTEXT.md` and extracts string and JSX text from the reader-text files only:
+- KTD6. **The reader-text check parses text, not files.** It reads `_Internal._` heads from `CONCEPTS.md` and extracts string and JSX text from the reader-text files only:
   - the words modules and `apps/web/src/shared/navigation.ts`;
   - the MCP entry descriptions;
   - the answer renderer;
@@ -294,7 +294,7 @@ sequenceDiagram
 | ts-morph's bundled compiler disagrees with TypeScript 7 | TypeScript 7's `tsc` and the suites are the proof. ast-grep takes any symbol ts-morph mishandles |
 | New words collide with existing names (*action* props, Playwright's `page`, `.map`, the `model` column) | Each sweep's map lists the permitted senses (Appendix G) and the codemod skips them |
 | A branch opened before a sweep reintroduces old names | Each map is committed and replayable. The words test's message names the reader word and the sweep (AE12) |
-| The sessions in flight edit `CONTEXT.md` while the first pull request is open | The first pull request lands fast, and the sessions are told to rebase onto the new entry form (U5) |
+| The sessions in flight edit `CONCEPTS.md` while the first pull request is open | The first pull request lands fast, and the sessions are told to rebase onto the new entry form (U5) |
 | The reader-text check flags ordinary English | It parses text only, and the list flags ordinary-English heads as not watched (KTD6) |
 | Old store directories keep text redacted under a superseded rule, and an erasure report claims completion | The release removes every old-named store directory, beyond what the `wiped` reason deletes (KTD3, AE9) |
 | A rename migration's value update reaches no row under row-level security | Updates run inside each workspace's scope, and re-adding the CHECK proves every row (KTD12) |
@@ -338,7 +338,7 @@ sequenceDiagram
 
 | U-ID | Title | Key files | Depends on |
 |---|---|---|---|
-| U1 | Rewrite the glossary | `CONTEXT.md` | none |
+| U1 | Rewrite the glossary | `CONCEPTS.md` | none |
 | U2 | Rebuild the words test | `apps/api/tests/avoid-words.test.ts`, `apps/api/tests/old-words.ts` | U1 |
 | U3 | Rules, readme and ADR docs agents read | `apps/web/CODING_STANDARDS.md`, `packages/design-system/readme.md`, ADR 0019 and 0047 docs | U1 |
 | U4 | MCP trust words in reader text | `packages/core/src/answering/index.ts`, `apps/api/src/mcp/entries/index.ts` | U1 |
@@ -358,14 +358,14 @@ sequenceDiagram
 
 ### U1. Rewrite the glossary
 
-**Goal:** `CONTEXT.md` heads every entry a person meets with its reader's word, marks internal entries, and holds no old word.
+**Goal:** `CONCEPTS.md` heads every entry a person meets with its reader's word, marks internal entries, and holds no old word.
 
 **Requirements:** R1 to R8, R15, R21, R22.
 
 **Dependencies:** none.
 
 **Files:**
-- Modify: `CONTEXT.md`
+- Modify: `CONCEPTS.md`
 
 **Approach:**
 1. Rename entry heads per Appendix A and B, and rewrite each definition in plain words.
@@ -549,7 +549,7 @@ sequenceDiagram
 **Dependencies:** U6, and BA-28, BA-31 and BA-34 merged in the web app's shell.
 
 **Files:**
-- Modify: `apps/web/src/shared/navigation.ts`, `apps/web/src/app/words.ts`, `apps/web/src/shared/keystroke-words.ts`, the shell's components, `apps/web/test/`, `apps/web/e2e/`, ADR 0046 and 0047 docs, `docs/specs/v01-route.md`, the design and browser-suite skills, `CONTEXT.md` (pending marks removed), `apps/api/tests/old-words.ts` (rows landed)
+- Modify: `apps/web/src/shared/navigation.ts`, `apps/web/src/app/words.ts`, `apps/web/src/shared/keystroke-words.ts`, the shell's components, `apps/web/test/`, `apps/web/e2e/`, ADR 0046 and 0047 docs, `docs/specs/v01-route.md`, the design and browser-suite skills, `CONCEPTS.md` (pending marks removed), `apps/api/tests/old-words.ts` (rows landed)
 - Create: `packages/devtools/renames/page-area-menu.json`
 
 **Approach:**
@@ -875,7 +875,7 @@ sequenceDiagram
 - An append-only audit table keeps its family check and subject index, and no row is rewritten.
 - The generated `audit-acts.ts` is in step.
 
-**Verification:** `check` and `check:gates` pass. The words test holds every Appendix A and B row landed, and `CONTEXT.md` has no pending mark left.
+**Verification:** `check` and `check:gates` pass. The words test holds every Appendix A and B row landed, and `CONCEPTS.md` has no pending mark left.
 
 ---
 
@@ -901,7 +901,7 @@ sequenceDiagram
 
 - Every requirement holds, and BA-29's acceptance criteria are ticked.
 - The words test's list holds every Appendix A and B old word as landed, and old words appear only where R15, R21, R22 or Appendix G keep them.
-- `CONTEXT.md` has no pending mark.
+- `CONCEPTS.md` has no pending mark.
 - Each table-renaming release has its release note and RUNBOOK entry, and the restore drill has passed after the passage sweep.
 - No codemod output, spike code or abandoned attempt remains in the tree.
 - Per unit: its verification is met, its rename map is committed, and its pull request has merged through the queue.

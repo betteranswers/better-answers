@@ -124,7 +124,7 @@ BA-34 asked for the approach to be chosen from first principles, and for the rec
 
 **Records**
 
-- R20. ADR 0022's doc records that a release holds only once the journeys pass, and when automatic rollback applies. `CONTEXT.md` names the test workspace and its people.
+- R20. ADR 0022's doc records that a release holds only once the journeys pass, and when automatic rollback applies. `CONCEPTS.md` names the test workspace and its people.
 - R21. BA-34's acceptance criteria in Linear are rewritten to match this contract.
 
 ### Key Flows
@@ -213,7 +213,7 @@ flowchart TD
 - `docs/operations/CI.md` (`release.yml`): release modes, the gate, the record, the nightly backup.
 - `docs/operations/RUNBOOK.md:65-74`, `:74`, `:90`, `:160`, `:260`, `:270`: rollback by tag, forward-only migrations, staging between drills, `ops add-person`, staging without mail.
 - `docs/operations/coolify.md` (*Boxes*, *Ingress (Cloudflare)*, *Memory*): two 4 GB boxes, the tunnel and three hostnames, the per-IP edge rule (its threshold is estate configuration).
-- `CONTEXT.md:715-718` (release phases), `:774-777` (operator).
+- `CONCEPTS.md:715-718` (release phases), `:774-777` (operator).
 - `deploy/seed-synthetic.sh:15-38`: the fixture holds no person.
 - `apps/api/tests/local.ts:9`, `:54`: the local loop and its Dogfood workspace.
 - `apps/api/src/auth/constants.ts:24`, `:62-75`: five codes per address in ten minutes; Better Auth's per-IP rules, keyed on `cf-connecting-ip` (`apps/api/src/auth/auth.ts:428-436`).
@@ -840,7 +840,7 @@ flowchart LR
 
 **Files:**
 - `docs/solutions/architecture-patterns/adr-0022-two-stacks-deployed-by-digest.md` (a release holds only once the journeys pass under gate; the journeys-only night; the build-commit checkout; R16's condition)
-- `CONTEXT.md` (entries for the test people and the test inbox, named in full because *inbox* already means the suggestions queue; the Audit log as their permanent record; the release entry's "held")
+- `CONCEPTS.md` (entries for the test people and the test inbox, named in full because *inbox* already means the suggestions queue; the Audit log as their permanent record; the release entry's "held")
 - `docs/architecture/` (the test inbox as a system outside the estate, redrawn through `/c4-architecture`)
 - `docs/operations/CI.md` (`release.yml`: the five jobs (gate, promote, journeys, record and report), the journeys-only night and dispatch, `JOURNEYS_MODE`, the outcome words)
 - `docs/operations/RUNBOOK.md` page 6 (the rollback target must account for migrations in live releases that have no tag)
@@ -915,7 +915,7 @@ flowchart LR
 - `docs/operations/RUNBOOK.md` (page 13; *Restore a person's sign-in*)
 - `docs/operations/SECRETS.md`
 - `apps/web/.claude/skills/browser-suite/SKILL.md` (*The journeys*)
-- `CONTEXT.md` (*journeys*)
+- `CONCEPTS.md` (*journeys*)
 
 **Approach:**
 1. The two secrets join the journeys' others where KTD1 and KTD15 keep them, and no other step reads them.

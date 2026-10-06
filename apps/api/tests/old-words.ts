@@ -1,5 +1,5 @@
 /**
- * Only the words test reads this, so `CONTEXT.md` shows an agent the word to write and never the
+ * Only the words test reads this, so `CONCEPTS.md` shows an agent the word to write and never the
  * word it replaced.
  */
 

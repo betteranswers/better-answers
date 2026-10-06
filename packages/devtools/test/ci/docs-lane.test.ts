@@ -193,7 +193,7 @@ const LANES: readonly LaneCase[] = [
     because: "a directory is matched by its whole name, never by a prefix of it",
   },
   {
-    changed: ["docs/vision.md", "CONTEXT.md"],
+    changed: ["docs/vision.md", "CONCEPTS.md"],
     lane: "docs",
     images: "no",
     diff: "a prose-only change",
@@ -228,7 +228,7 @@ describe("which paths reach which lane", () => {
 describe("which lane a change runs in", () => {
   it("takes the docs lane when every changed path is markdown", () => {
     expect(laneOf(["docs/adr/0043-what-an-act-is.md"])).toEqual("docs");
-    expect(laneOf(["docs/specs/T-121.md", "CONTEXT.md", "apps/web/CODING_STANDARDS.md"])).toEqual(
+    expect(laneOf(["docs/specs/T-121.md", "CONCEPTS.md", "apps/web/CODING_STANDARDS.md"])).toEqual(
       "docs",
     );
     expect(laneOf(["docs/specs/old-name.md", "docs/specs/new-name.md"])).toEqual("docs");
@@ -403,7 +403,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   {
     file: "apps/api/tests/avoid-words.test.ts",
     reads:
-      "apps/api/tests/old-words.ts and CONTEXT.md's heads and marks, then every tracked text file outside its carve-outs",
+      "apps/api/tests/old-words.ts and CONCEPTS.md's heads and marks, then every tracked text file outside its carve-outs",
     inTheLane: "check:docs:api",
   },
   {

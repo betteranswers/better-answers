@@ -23,7 +23,7 @@ reviews:
     and a finding that contradicts one of them is wrong.
 
     - `AGENTS.md` — the map: layout, how a task is worked, which skill applies.
-    - `CONTEXT.md` — the glossary. Every domain word has one settled meaning.
+    - `CONCEPTS.md` — the glossary. Every domain word has one settled meaning.
       A new domain word is settled here BEFORE it appears in code; a diff that
       introduces a domain term absent from the glossary is a finding.
     - `CODING_STANDARDS.md` — the constitution.

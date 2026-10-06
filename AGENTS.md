@@ -7,7 +7,7 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 ## Read first
 
 - `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block. A block becomes a plan through `/ce-brainstorm` and `/ce-plan` (*Workflow*, below).
-- `CONTEXT.md` — the glossary. Name things in code, tests, docs and commits with its words.
+- `CONCEPTS.md` — the glossary. Name things in code, tests, docs and commits with its words.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature that relates to the knowledge layer.
 - `CODING_STANDARDS.md` — the constitution: every rule that binds work in this repo. A directory's own rules live beside it, in `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md`, `apps/worker/CODING_STANDARDS.md` and `deploy/CODING_STANDARDS.md`.
 - `docs/solutions/architecture-patterns/` — why the architecture is the way it is: one doc per live decision. `/ce-plan` finds the ones a plan touches. Code cites a decision as `ADR NNNN`, and its doc is `adr-NNNN-<slug>.md`. A change that moves a decision edits its doc in the same commit, and says so in the pull request. The ADRs these came from, with their amendments, are frozen in `docs/archive/adr/`.
@@ -114,7 +114,7 @@ A new issue lands in Linear's **Triage** state. The owner moves it to Todo when 
 
 ### Domain docs
 
-Single-context: one root `CONTEXT.md` and one set of decisions in `docs/solutions/architecture-patterns/`. See `docs/agents/domain.md`.
+Single-context: one root `CONCEPTS.md` and one set of decisions in `docs/solutions/architecture-patterns/`. See `docs/agents/domain.md`.
 
 ### Mutation triage
 

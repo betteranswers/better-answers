@@ -82,7 +82,7 @@ export const dropExpiredVerifications = async (door: PostgresDoor, now: Date): P
 };
 ```
 
-`apps/api/src/sweeps.ts:48-54` wraps it, and the pass runs it after the workspace sweeps, whether or not they succeeded; a pass skipped for a held lock skips it too (`sweeps.ts:77-82`). A refused delete becomes a refusal whose sweep is `verifications` and which names no workspace, and the pass's log line carries `verifications_deleted` (`sweeps.ts:92-98`), as does `the sweep pass failed` (`sweeps.ts:83-90`). The delete covers every verification row more than a day past expiry, not only sign-in codes: links, OAuth state, trusted devices and the library's locks too. The runbook's "The daily sweeps" and §11 say so (`docs/operations/RUNBOOK.md`), and so does CONTEXT.md's **sweep pass** entry.
+`apps/api/src/sweeps.ts:48-54` wraps it, and the pass runs it after the workspace sweeps, whether or not they succeeded; a pass skipped for a held lock skips it too (`sweeps.ts:77-82`). A refused delete becomes a refusal whose sweep is `verifications` and which names no workspace, and the pass's log line carries `verifications_deleted` (`sweeps.ts:92-98`), as does `the sweep pass failed` (`sweeps.ts:83-90`). The delete covers every verification row more than a day past expiry, not only sign-in codes: links, OAuth state, trusted devices and the library's locks too. The runbook's "The daily sweeps" and §11 say so (`docs/operations/RUNBOOK.md`), and so does CONCEPTS.md's **sweep pass** entry.
 
 The delete and its day's grace have since moved to core, as one of the three deletes in `sweepIdentitySet` (`packages/core/src/sweeps/index.ts`), beside expired sessions and rate-limit windows. The grace and the refusal word `verifications` are unchanged.
 
@@ -173,4 +173,4 @@ If a release stops deleting expired rows at lookup (read `findVerificationValue`
 - `docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md`: another Better Auth 1.7.5 behaviour that differs from what the config suggests, and the record of the closed factor paths that keep two-factor's no-session branch latent.
 - `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md`: Better Auth runs in-process as the api's identity provider, which is why its `verification` table sits in the api's Postgres and the api's sweep pass can delete from it.
 - `docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`, U16 (identity-set housekeeping): must keep the day's grace.
-- `CONTEXT.md`, **sweep pass**; `docs/operations/RUNBOOK.md`, "The daily sweeps" and §11.
+- `CONCEPTS.md`, **sweep pass**; `docs/operations/RUNBOOK.md`, "The daily sweeps" and §11.

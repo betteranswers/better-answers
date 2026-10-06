@@ -57,7 +57,7 @@ describe("the survey-architecture skill", () => {
     expect(named).toEqual(
       expect.arrayContaining([
         "CODING_STANDARDS.md",
-        "CONTEXT.md",
+        "CONCEPTS.md",
         "docs/solutions/architecture-patterns/",
         `${skillDirectory}/references/deepening.md`,
         `${skillDirectory}/scripts/churn.sh`,
