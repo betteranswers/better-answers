@@ -85,7 +85,7 @@ def current_session():
         fail(
             "not a Claude Code session: CLAUDE_CODE_SESSION_ID is unset, so name a session"
         )
-    return resolve(session), True
+    return resolve(session)
 
 
 def records(path):
@@ -126,6 +126,10 @@ def seconds(stamp):
     )
 
 
+def total_tokens(requests):
+    return tuple(sum(t) for t in zip(*(v for _, v in requests))) or (0, 0, 0)
+
+
 def tokens(usage):
     fresh = usage.get("input_tokens", 0) + usage.get("cache_creation_input_tokens", 0)
     return fresh, usage.get("cache_read_input_tokens", 0), usage.get("output_tokens", 0)
@@ -162,7 +166,7 @@ class Digest:
         elif kind == "assistant":
             self.take_assistant(number, record)
         elif kind == "user":
-            self.take_user(number, record)
+            self.take_user(record)
 
     def take_assistant(self, number, record):
         request = record.get("requestId") or record.get("uuid")
@@ -182,32 +186,36 @@ class Digest:
             "name": name,
             "request": request,
             "start": seconds(record.get("timestamp")),
-            "input": mask(json.dumps(given, sort_keys=True)),
+            "input": json.dumps(given, sort_keys=True),
             "background": bool(given.get("run_in_background")),
         }
 
-    def take_user(self, _number, record):
+    def take_user(self, record):
         self.skills += [
             m.strip().split(":")[-1] for m in COMMAND.findall(text_of(record))
         ]
         for block in blocks(record):
             if block.get("type") == "tool_result":
-                content = block.get("content")
-                text = content if isinstance(content, str) else json.dumps(content)
+                failed = bool(block.get("is_error"))
                 self.results[block.get("tool_use_id")] = {
                     "end": seconds(record.get("timestamp")),
-                    "error": bool(block.get("is_error")),
-                    "text": mask(" ".join(text.split()))[:120],
+                    "error": failed,
+                    "text": error_text(block.get("content")) if failed else "",
                 }
 
 
+def error_text(content):
+    text = content if isinstance(content, str) else json.dumps(content)
+    return mask(" ".join(text[:2000].split()))[:120]
+
+
 def cut_for_current(path):
-    lines = [
-        n
-        for n, r in records(path)
-        if r.get("type") == "user" and INVOCATION in text_of(r)
-    ]
-    return lines[-1] if lines else None
+    stop = None
+    with open(path, errors="replace") as handle:
+        for number, line in enumerate(handle, start=1):
+            if INVOCATION in line and json.loads(line).get("type") == "user":
+                stop = number
+    return stop
 
 
 def build(path, current):
@@ -260,11 +268,7 @@ def subagents(path):
         sub = Digest()
         for number, record in records(log):
             sub.take(number, record)
-        spent = [sum(t) for t in zip(*(v for _, v in sub.requests.values()))] or [
-            0,
-            0,
-            0,
-        ]
+        spent = total_tokens(sub.requests.values())
         rows.append((agent, meta, spent, len(sub.calls)))
     return sorted(rows, key=lambda r: -sum(r[2]))
 
@@ -274,9 +278,7 @@ def report(path, digest, top):
     out.append(
         f"from {digest.first} to {digest.last}; finished: {'yes' if digest.finished else 'no'}"
     )
-    main_in, main_cache, main_out = [
-        sum(t) for t in zip(*(v for _, v in digest.requests.values()))
-    ] or [0, 0, 0]
+    main_in, main_cache, main_out = total_tokens(digest.requests.values())
     pending = [k for k in digest.calls if k not in digest.results]
     errors = [k for k in digest.calls if digest.results.get(k, {}).get("error")]
     out.append(
@@ -308,7 +310,7 @@ def report(path, digest, top):
     out.append("")
     out.append("repeated:")
     out += [
-        f"  lines {lines}  {name} {given[:120]}"
+        f"  lines {lines}  {name} {mask(given[:600])[:120]}"
         for (name, given), lines in repeated(digest)[:top]
     ]
     out.append("")
@@ -316,9 +318,7 @@ def report(path, digest, top):
     out += [f"  {skill}" for skill in dict.fromkeys(digest.skills)]
     out.append("")
     rows = subagents(path)
-    sub_in = sum(r[2][0] for r in rows)
-    sub_cache = sum(r[2][1] for r in rows)
-    sub_out = sum(r[2][2] for r in rows)
+    sub_in, sub_cache, sub_out = (sum(r[2][i] for r in rows) for i in range(3))
     out.append(f"subagent tokens: input {sub_in}, cache {sub_cache}, output {sub_out}")
     out.append("")
     out.append("subagents:")
@@ -347,10 +347,11 @@ def show(path, agent, line):
         path = path.parent / path.stem / "subagents" / f"agent-{agent}.jsonl"
         if not path.exists():
             fail(f"no subagent {agent} in this session")
-    for number, record in records(path):
-        if number == line:
-            print(json.dumps(cut(record), indent=1))
-            return
+    with open(path, errors="replace") as handle:
+        for number, text in enumerate(handle, start=1):
+            if number == line:
+                print(json.dumps(cut(json.loads(text)), indent=1))
+                return
     fail(f"no record on line {line}")
 
 
@@ -390,7 +391,7 @@ def main():
         listing(args.limit)
     elif args.mode == "digest":
         if args.session is None:
-            path, current = current_session()
+            path, current = current_session(), True
         else:
             path = resolve(args.session)
             current = path.stem == os.environ.get("CLAUDE_CODE_SESSION_ID")

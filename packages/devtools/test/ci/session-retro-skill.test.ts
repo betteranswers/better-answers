@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 
@@ -15,6 +15,7 @@ const PAST = "5e55a0e1-0000-4000-8000-000000000001";
 const CURRENT = "5e55a0e1-0000-4000-8000-000000000002";
 
 const home = mkdtempSync(path.join(tmpdir(), "session-retro-"));
+afterAll(() => rmSync(home, { recursive: true, force: true }));
 const projectFolder = path.join(home, ".claude/projects", repositoryRoot.replaceAll(/[/.]/g, "-"));
 mkdirSync(path.join(projectFolder, PAST, "subagents"), { recursive: true });
 cpSync(path.join(fixtures, `${PAST}.jsonl`), path.join(projectFolder, `${PAST}.jsonl`));
