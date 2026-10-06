@@ -1,7 +1,9 @@
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 
 import { beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { gitIn, writeUnder } from "@better-answers/devtools/throwaway-tree";
 import {
@@ -45,6 +47,7 @@ type Estate = {
 
 /** jCodeMunch names each worktree `local/<name>`; gh says `t-squashed`'s head merged by squash. */
 const stubTools = (
+  primary: string,
   worktrees: Readonly<Record<Name, string>>,
   squashedHead: string,
   log: string,
@@ -55,6 +58,7 @@ const stubTools = (
   const under = path.dirname(realpathSync(worktrees.fresh));
   const docIndexes = JSON.stringify({
     repos: [
+      { repo: "local/estate-primary", source_root: realpathSync(primary) },
       { repo: "local/fresh-worktree", source_root: realpathSync(worktrees.fresh) },
       { repo: "local/orphan", source_root: path.join(under, "orphan") },
       { repo: "local/gone-elsewhere", source_root: path.join(scratch, "gone-elsewhere") },
@@ -98,10 +102,13 @@ const arrangeAndSweep = (): Estate => {
   gitIn(primary, "worktree", "lock", worktrees.locked);
 
   const log = path.join(scratch, "jcodemunch-argv");
-  const bin = stubTools(worktrees, squashedHead, log);
+  const bin = stubTools(primary, worktrees, squashedHead, log);
   const run = runHook(sweep, {
     argv: [primary],
-    env: { PATH: `${bin}${path.delimiter}${process.env["PATH"] ?? ""}` },
+    env: {
+      PATH: `${bin}${path.delimiter}${process.env["PATH"] ?? ""}`,
+      DOC_INDEX_PATH: path.join(scratch, "doc-store"),
+    },
   });
   return { primary, worktrees, log, run };
 };
@@ -154,6 +161,15 @@ describe("the sweep over worktrees left beside running agents", () => {
     expect(estate.run.stderr).toContain("jdocmunch: dropped the index local/orphan");
   });
 
+  it("refreshes the main checkout's doc index in place", () => {
+    const refreshed = readFileSync(`${estate.log}-doc`, "utf8")
+      .split("\n")
+      .filter((line) => line.startsWith("index-local"));
+    expect(refreshed).toEqual([
+      `index-local --path ${realpathSync(estate.primary)} --no-ai-summaries --no-embeddings`,
+    ]);
+  });
+
   it.each([
     ["a fresh worktree, holding no commit of its own", "fresh"],
     ["a worktree merged under an hour ago", "recent"],
@@ -163,5 +179,70 @@ describe("the sweep over worktrees left beside running agents", () => {
     ["a merged worktree outside .claude/worktrees", "elsewhere"],
   ] as const)("keeps %s", (_, name) => {
     expect(existsSync(estate.worktrees[name])).toBe(true);
+  });
+});
+
+/** A hook the desktop client starts inherits launchd's PATH, which holds no user tool folder. */
+describe("the sweep under a PATH without the user's tool folders", () => {
+  let docLog: string;
+  let run: HookRun;
+  beforeAll(() => {
+    const { primary } = originAndClone(scratch, "bare", { "README.md": "# bare\n" });
+    const home = path.join(scratch, "bare-home");
+    docLog = path.join(scratch, "bare-doc-argv");
+    mkdirSync(path.join(home, ".local"), { recursive: true });
+    stubsOnPath(path.join(home, ".local/bin"), {
+      "jdocmunch-mcp": recordsItsArgv(docLog, [`[ "$1" = watch-status ] && printf '{"repos":[]}'`]),
+    });
+    run = runHook(sweep, {
+      argv: [primary],
+      env: { HOME: home, PATH: "/usr/bin:/bin", DOC_INDEX_PATH: path.join(scratch, "bare-store") },
+    });
+  }, 60_000);
+
+  it("finds jdocmunch-mcp in the user's ~/.local/bin", () => {
+    expect(run.status).toBe(0);
+    expect(readFileSync(docLog, "utf8")).toContain("watch-status");
+  });
+
+  it("creates no doc index where the main checkout had none", () => {
+    expect(readFileSync(docLog, "utf8")).not.toContain("index-local");
+  });
+});
+
+const jdocmunchInstalled = spawnSync("jdocmunch-mcp", ["--version"]).status === 0;
+
+/** Real jdocmunch-mcp over a private store, which no watcher watches: an outage by construction. */
+describe.skipIf(!jdocmunchInstalled)("the sweep after docs change through git unwatched", () => {
+  const indexSchema = z.object({ sections: z.array(z.object({ title: z.string() })) });
+  const titles = (store: string, name: string): string[] =>
+    indexSchema
+      .parse(JSON.parse(readFileSync(path.join(store, "local", `${name}.json`), "utf8")))
+      .sections.map((section) => section.title);
+  let store: string;
+  let name: string;
+  let before: string[];
+  beforeAll(() => {
+    const { primary } = originAndClone(scratch, "docs", {
+      "guide.md": "# Guide\n\n## Old heading\n\ntext\n",
+    });
+    store = path.join(scratch, "docs-store");
+    name = path.basename(primary);
+    const env = { ...process.env, DOC_INDEX_PATH: store };
+    const flags = ["--no-ai-summaries", "--no-embeddings"];
+    spawnSync("jdocmunch-mcp", ["index-local", "--path", primary, ...flags], { env });
+    gitIn(primary, "switch", "-q", "-c", "side");
+    writeUnder(primary, "guide.md", "# Guide\n\n## New heading\n\ntext\n");
+    gitIn(primary, "commit", "-q", "-am", "rename the heading");
+    gitIn(primary, "switch", "-q", "-");
+    gitIn(primary, "merge", "-q", "--ff-only", "side");
+    before = titles(store, name);
+    runHook(sweep, { argv: [primary], env: { DOC_INDEX_PATH: store } });
+  }, 120_000);
+
+  it("leaves the main checkout's outline matching the files on disk", () => {
+    expect(before).toContain("Old heading");
+    expect(titles(store, name)).toContain("New heading");
+    expect(titles(store, name)).not.toContain("Old heading");
   });
 });

@@ -59,9 +59,24 @@ unlocked_worktrees() {
   done < <(git -C "$ROOT" worktree list --porcelain; echo)
 }
 
+# Only the watcher sees a doc change git brings in. index-local diffs, so an index in step costs a walk.
+refresh_doc_index() {
+  command -v jdocmunch-mcp >/dev/null 2>&1 || return 0
+  local repo root
+  while IFS=$'\t' read -r repo root; do
+    [ "$root" = "$ROOT" ] || continue
+    if jdocmunch-mcp index-local --path "$ROOT" --no-ai-summaries --no-embeddings >/dev/null 2>&1; then
+      say "jdocmunch: refreshed the index $repo"
+    else
+      say "jdocmunch: could not refresh $repo — run jdocmunch-mcp index-local --path $ROOT --no-ai-summaries --no-embeddings"
+    fi
+  done < <(doc_indexes)
+}
+
 WORKTREES="$(unlocked_worktrees)"
 while IFS= read -r wt; do
   [ -z "$wt" ] || sweep_one "$wt" </dev/null
 done <<<"$WORKTREES"
 
 drop_orphan_doc_indexes "$UNDER"
+refresh_doc_index
