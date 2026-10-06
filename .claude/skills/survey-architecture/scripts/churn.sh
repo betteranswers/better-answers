@@ -20,5 +20,5 @@ function flush(  k, c) {
 }
 /^@/ { flush(); next }
 NF { x = area($0); if (x != "") seen[x] = 1 }
-END { flush(); for (k in churn) printf "%d\t%s\n", churn[k], k; printf "%d\t(commits touching more than %d areas, left out)\n", wide, max }
+END { flush(); for (k in churn) printf "%d\t%s\n", churn[k], k; printf "# %d commits touching more than %d areas left out\n", wide, max }
 ' | sort -rn

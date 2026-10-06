@@ -14,11 +14,15 @@ const skillFiles = ["SKILL.md", "references/deepening.md", "references/report.md
 
 const QUOTED = /`(?<token>[^`]+)`/g;
 
-const withoutFences = (text: string): string =>
-  text
-    .split("\n")
-    .filter((line) => !line.startsWith("```"))
-    .join("\n");
+const withoutFences = (text: string): string => {
+  const kept: string[] = [];
+  let inFence = false;
+  for (const line of text.split("\n")) {
+    if (line.startsWith("```")) inFence = !inFence;
+    else if (!inFence) kept.push(line);
+  }
+  return kept.join("\n");
+};
 
 const looksLikePath = (token: string): boolean =>
   !/[\s<>$*]/.test(token) &&
@@ -49,13 +53,14 @@ describe("the survey-architecture skill", () => {
     expect(missing, `${skillDirectory} names paths that do not exist`).toEqual([]);
   });
 
-  it("names the rules and decisions it judges against", () => {
+  it("names the rules, decisions and script it relies on", () => {
     expect(named).toEqual(
       expect.arrayContaining([
         "CODING_STANDARDS.md",
         "CONTEXT.md",
         "docs/solutions/architecture-patterns/",
         `${skillDirectory}/references/deepening.md`,
+        `${skillDirectory}/scripts/churn.sh`,
       ]),
     );
   });

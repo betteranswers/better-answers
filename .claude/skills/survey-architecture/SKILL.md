@@ -21,12 +21,14 @@ An area is one of these:
 - a directory under `apps/api/src/`, `apps/web/src/` or `apps/worker/src/`, one level deeper under `apps/worker/src/better_answers_worker/` and `apps/web/src/features/`;
 - the source folder of any other package, such as `packages/schema/src/`.
 
+The files that sit directly in one of these folders, such as `apps/api/src/server.ts`, form an area of their own, named by the folder.
+
 **When the owner named an area,** resolve it to areas.
 - If each path or slice name the owner gave matches exactly one area, survey those areas alone.
 - If one matches several areas, or if the owner described a pain point rather than a place, list the areas it points to and ask which to survey. Wait for the answer.
 - If one matches none, stop and list the areas the history recipe below finds.
 
-**When no area was named,** pick the areas from the history recipe and GitNexus. Run this from the repository root. It counts commits per area over the last 30 days and leaves out commits that touch more than 4 areas, because mechanical sweeps dominate raw churn here:
+**When no area was named,** pick the areas from the history recipe and GitNexus. The recipe is `scripts/churn.sh` in this skill's directory; run it from the repository root. It counts commits per area over the last 30 days and leaves out commits that touch more than 4 areas, because mechanical sweeps dominate raw churn here. Its last line counts the commits it left out:
 
 ```bash
 bash .claude/skills/survey-architecture/scripts/churn.sh 30 4 HEAD
