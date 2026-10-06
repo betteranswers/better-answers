@@ -5,7 +5,7 @@ description: Clears Renovate's dependency pull requests, one or a batch — list
 
 # Renovate's pull requests
 
-Renovate opens its pull requests at weekends (lock maintenance on Monday morning), labelled `deps`, on `renovate/<group>` branches. `renovate.json` holds the groups, the age rule and every rule that turns an update off; read it rather than trusting a summary. `automerge` is off, so nothing lands until a session arms it.
+Renovate's pull requests are labelled `deps`, on `renovate/<group>` branches. `renovate.json` holds the schedule, the groups, the limits, the age rule, every hold and every rule that turns an update off; read it rather than trusting a summary. The schedule and limits bound only what Renovate opens by itself: the owner can create pending updates from the Mend dependency dashboard, and its "Select All" opens every one at once. A batch made there is cleared like any other. `automerge` is off, and `arm-merge.yml` arms only a person's pull request, so nothing of Renovate's lands until a session arms it.
 
 The unit of work is the **cause**, not the package. Five red pull requests are often two causes, and each cause is fixed once, by one of four paths. No ticket is needed for any of this unless the fix outgrows a pull request.
 
@@ -13,20 +13,20 @@ The unit of work is the **cause**, not the package. Five red pull requests are o
 
 ```bash
 gh pr list --author app/renovate --state open \
-  --json number,title,headRefName,autoMergeRequest,statusCheckRollup
+  --json number,title,headRefName,statusCheckRollup
 ```
 
-For each, note what it moves (the body's table), the `check` verdict and whether it is armed. Then:
+For each, note what it moves (the body's table), the `check` verdict and whether it is armed. Armed means `isInMergeQueue` or `autoMergeRequest` is set in step 5's query; `gh pr list` has no queue field, and GitHub clears the auto-merge flag when a pull request enters the queue. A queue entry whose state is `UNMERGEABLE` is red, whatever its own checks say. Then:
 
 - **Waiting, not failing**: a check still running, or `renovate/stability-days` pending (the release is under a day old; `renovate.json`'s age rule).
-- **Superseded**: a minor and a major of the same package (#26 and #215, pnpm). Merge the higher; Renovate closes the lower itself.
+- **One package in two pull requests**: at two versions (a major on its own beside a minor inside a group), merge the higher; Renovate drops the lower on its next run. At one version split across workspaces, neither passes alone, and the cause is how the pull requests were cut: that is a rule (step 3).
 - **Renovate's own comment**: `gh pr view <n> --comments`. An *Artifact update problem* means the lockfile was not regenerated, and the cause is usually a constraint this repository holds.
 
 **Done when** every open Renovate pull request has a line: what it moves, green, red or waiting, armed or not.
 
 ## 2. Read each red job's log
 
-`check` is the fan-in; the red leg beside it (`full-worker`, `full-api`, …) is the one to read. A pull request's own run holds no leg, so the red one is in its merge group's run, on the branch `gh-readonly-queue/main/pr-<n>-<sha>`.
+`check` is the fan-in; the red leg beside it (`full-worker`, `full-api`, …) is the one to read, in whichever run holds it. The pull request's own run can show a lockfile or type error early. The merge group's run, on the branch `gh-readonly-queue/main/pr-<n>-<sha>`, runs the suites and is the arbiter for everything else.
 
 ```bash
 gh run list --workflow check.yml --event merge_group --json databaseId,headBranch,conclusion \
@@ -34,7 +34,9 @@ gh run list --workflow check.yml --event merge_group --json databaseId,headBranc
 gh run view <run> --log-failed > /tmp/pr<n>.log
 ```
 
-Find the first failing assertion or error line. A merge-group failure whose only red is a browser spec the pull request did not touch is a flake to re-arm. A red that the latest queue run also shows (`gh run list --workflow check.yml --event merge_group --limit 3`) is not this pull request's.
+Find the first failing assertion or error line. A merge-group failure whose only red is a browser spec the pull request did not touch is a flake to re-arm.
+
+A merge group holds `main` and every queue entry ahead of the pull request it is named for, so its red is that pull request's only when neither `main` nor an entry ahead carries the cause. Before attributing it, read which entries the group holds: each is a merge commit on the group head's first-parent line, so `git fetch origin <headSha>` and `git log --first-parent <headSha>` name them, the run's `headSha` from `gh run list --json headSha`. An entry ahead whose state is `UNMERGEABLE` fails every group behind it until it leaves the queue (step 5).
 
 **Done when** every red pull request has a cause quoted from a log line, never inferred from a check's name.
 
@@ -44,7 +46,7 @@ Find the first failing assertion or error line. A merge-group failure whose only
 | --- | --- | --- |
 | **Main first** | The fix passes on `main`'s current version too. Land it in a pull request of its own; the Renovate pull request goes green untouched | #238: pnpm 11.27 left Playwright's test server running, fixed by starting it with `node`. #245: pnpm 12's native binary baked into the api image. Both unblocked #215 |
 | **On the branch** | The fix holds only with the new version: a test that asserts the old version, a re-dated reading | #187 and #248: `test_image.py` pins `pdf-inspector` |
-| **A rule** | Renovate proposes something this repository refuses. A `packageRules` entry in `renovate.json`, its `description` saying why and naming the pull request that showed it | #240: `requires-python` and the `python` image held below 3.14 |
+| **A rule** | Renovate proposes something this repository refuses, or cuts its pull requests so that none can pass alone. A `packageRules` entry in `renovate.json`, its `description` saying why and naming the pull requests that showed it. A hold that follows what another package requires also gets a test in `packages/devtools/test/ci/dependency-versions.test.ts` that reads the requirement, so the hold cannot outlive it | #240: `requires-python` and the `python` image held below 3.14. #562 and #571: `pg` moved per workspace, fixed by the grouping in #582 |
 | **A ticket** | The fix needs a migration, a production check or a person's review. Leave the pull request open and unarmed | #211 → T-356: better-auth 1.7.5 refuses a column 1.7.3 dropped, so a migration rides with the bump |
 
 The test between the first two: check the fix out on `main` and run the suite. Green there means main first.
@@ -55,7 +57,7 @@ The test between the first two: check the fix out on `main` and run the suite. G
 
 Order matters because Renovate **regenerates** a branch when its rebase box is ticked, force-pushing its own commit and dropping everyone else's.
 
-1. **Main first and rules land.** A branch off `origin/main`, one commit in the commit's form (`docs/agents/workflow.md`, *The commit's form*), and a pull request through `ce-commit-push-pr`. `arm-merge.yml` arms it once Cubic has read it. Wait for each to merge.
+1. **Main first and rules land.** A branch off `origin/main`, one commit in the commit's form (`docs/agents/workflow.md`, *The commit's form*), and a pull request through `ce-commit-push-pr`. `arm-merge.yml` arms it once Cubic's check on its head succeeds; when that check ends any other way (neutral when Cubic hits its line limit), nothing arms it, and you arm it as in step 5. Wait for each to merge.
 2. **Tick the rebase box** on every pull request they touch, so Renovate regenerates it over the new `main`:
 
    ```bash
@@ -85,13 +87,16 @@ gh api graphql -F owner='{owner}' -F name='{repo}' -F number=<n> -f query='
   query($owner: String!, $name: String!, $number: Int!) {
     repository(owner: $owner, name: $name) {
       pullRequest(number: $number) {
-        state isInMergeQueue autoMergeRequest { enabledAt } mergeQueueEntry { position state }
+        id state isInMergeQueue autoMergeRequest { enabledAt } mergeQueueEntry { position state }
+        timelineItems(itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT], last: 1) {
+          nodes { ... on RemovedFromMergeQueueEvent { createdAt reason } }
+        }
       }
     }
   }'
 ```
 
-`gh pr merge` warns that the queue sets the merge method; that is expected. One of `isInMergeQueue` and `autoMergeRequest` is set when the pull request is armed or queued. A failed queue run disarms it, and so does any new head, Renovate's force-push included: re-arm after each and read it back. Watch every armed pull request with one background loop that ends on `MERGED`, `CLOSED`, disarmed or a red leg, and read the log of any red leg as in step 2. From a worktree, write the loop to a script with a name of its own under `/tmp`, since other sessions keep theirs there, and run that.
+`gh pr merge` warns that the queue sets the merge method; that is expected. One of `isInMergeQueue` and `autoMergeRequest` is set when the pull request is armed or queued. Any new head disarms it, Renovate's force-push included: re-arm after each and read it back. A failed queue run does not always take the entry out: one can stay queued in state `UNMERGEABLE` with auto-merge off (#571, which failed every group behind it, #580 to #583). Take such an entry out with the GraphQL mutation `dequeuePullRequest`, given the `id` above, before reading anything behind it. When the queue has removed a pull request, the latest removal's `reason` says why: `failed_checks` is read as in step 2, and `merge_conflict` means a pull request that rewrote the lockfile merged ahead of it, so tick its rebase box (step 4), wait for the head to change and re-arm. Watch every armed pull request with one background loop that ends on `MERGED`, `CLOSED`, disarmed, an `UNMERGEABLE` entry or a red leg. From a worktree, write the loop to a script with a name of its own under `/tmp`, since other sessions keep theirs there, and run that.
 
 **Done when** every pull request is merged, closed by Renovate, or handed over in step 6.
 
