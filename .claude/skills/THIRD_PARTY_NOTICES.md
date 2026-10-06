@@ -108,3 +108,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## `session-retro`
+
+`session-retro` is adapted from https://github.com/mattpocock/skills, Matt Pocock's skills, which are under the MIT licence. It was written by hand from `skills/engineering/retro/SKILL.md` at commit `a7d038f6bf7f01b516408e95e2fb56e0b338fa6f`, so `skills-lock.json` does not name it. That skill is not in the 1.2.3 release the section above cites.
+
+It carries the owner's edits throughout:
+- Upstream's call to its `writing-for-agents` skill gave way to this repository's authoring standard.
+- The seven categories keep upstream's questions and name this repository's steering files, checks and reviewer as their targets.
+- The bundled script that reads a session's log, the ranking rule and the filing of kept findings as Linear issues were added.
+
+The upstream `LICENSE` is the same text as in the section above, read on 06/10/2026 at that commit.

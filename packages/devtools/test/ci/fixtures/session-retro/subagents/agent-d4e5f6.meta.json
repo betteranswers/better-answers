@@ -1,0 +1,7 @@
+{
+  "agentType": "workflow",
+  "description": "Unlinked worker",
+  "toolUseId": null,
+  "spawnDepth": 0,
+  "requestShape": "background"
+}

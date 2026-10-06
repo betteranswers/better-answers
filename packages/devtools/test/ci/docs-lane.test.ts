@@ -418,6 +418,12 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:devtools",
   },
   {
+    file: "packages/devtools/test/ci/session-retro-skill.test.ts",
+    reads:
+      ".claude/skills/session-retro/SKILL.md and its reference, every path they name, and the made-up session logs under fixtures/session-retro/",
+    inTheLane: "check:docs:devtools",
+  },
+  {
     file: "packages/devtools/test/ci/survey-architecture-skill.test.ts",
     reads:
       ".claude/skills/survey-architecture/SKILL.md and its two references, and every path they name",
