@@ -64,6 +64,10 @@ const CARVED_OUT: readonly CarveOut[] = [
     why: "third-party skills, kept as upstream wrote them so their skills-lock hashes hold",
   },
   {
+    holds: under(".claude/skills/pixel-perfect/"),
+    why: "a third-party plugin, kept as upstream wrote it so it still matches its source commit",
+  },
+  {
     holds: (file) =>
       [
         "apps/api/tests/avoid-words.test.ts",

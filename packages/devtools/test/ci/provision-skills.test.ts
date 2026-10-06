@@ -375,6 +375,18 @@ describe("the skills this repository tracks", () => {
     expect(skills).toContain(".claude/skills/repo-quality-sweep/SKILL.md");
   });
 
+  it("tracks the pixel-perfect plugin with its licence and notice", () => {
+    const files = tracked(".claude/skills/pixel-perfect");
+
+    expect(files).toContain(".claude/skills/pixel-perfect/.claude-plugin/plugin.json");
+    expect(files).toContain(".claude/skills/pixel-perfect/LICENSE");
+    expect(files).toContain(".claude/skills/pixel-perfect/NOTICE.md");
+    for (const skill of ["audit", "critique", "screenshot-diff", "visual-qa"]) {
+      expect(files).toContain(`.claude/skills/pixel-perfect/skills/${skill}/SKILL.md`);
+    }
+    expect(files.filter((file) => file.endsWith("/SKILL.md"))).toHaveLength(15);
+  });
+
   it("tracks nothing else, since every other skill installs per checkout", () => {
     const ours = tracked(".claude/skills").map((file) => file.split("/")[2] ?? "");
 
@@ -386,6 +398,7 @@ describe("the skills this repository tracks", () => {
       "code-comments",
       "complexity-gate",
       "mutation-testing",
+      "pixel-perfect",
       "renovate-prs",
       "repo-quality-sweep",
     ]);

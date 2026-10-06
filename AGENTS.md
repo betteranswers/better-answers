@@ -62,6 +62,7 @@ Three rules that hold regardless of whether the skill was invoked:
 - `/ce-code-review` before a pull request, `/ce-compound` after a solved problem (*Compounding*, below).
 - `/ce-dogfood` for a page, walked as the personas in `docs/personas/`.
 - `/browser-suite` for any Playwright spec under `apps/web/e2e/`.
+- The `pixel-perfect:` skills (`.claude/skills/pixel-perfect/`) to review a rendered page's design: `visual-qa` for contrast, touch targets and overflow, `audit` and `critique` for a scored review, `screenshot-diff` for a pixel diff. They load only in a session started at the repository root.
 - `/renovate-prs` for Renovate's dependency pull requests, red or waiting.
 - `/better-answers-design` for anything a person will look at.
 - The api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/`.
