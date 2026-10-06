@@ -66,6 +66,7 @@ Three rules that hold regardless of whether the skill was invoked:
 - `/better-answers-design` for anything a person will look at.
 - The api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/`.
 - `resend` and `email-best-practices`, vendored from Resend, for its sending limits, deliverability and webhooks. The api sends through Resend's SMTP relay with nodemailer (`apps/api/src/smtp.ts`), not its SDK, so check any of their samples against the code before copying it.
+- `/survey-architecture` before a route block that the route spec holds behind an architecture review, starting with S2. It gives that review its report of opportunities to start from.
 - `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so.
 
 Other skills live beside the code that uses them most, such as `apps/worker/.claude/skills/` and `apps/web/.claude/skills/`. If a task has a skill, use it for best practice: for example, hono for the api's routes and middleware, cocoindex for the worker and its pipeline, and better-auth for authentication. Production deploys only through `release.yml`, and the procedure, rollback included, is in `docs/operations/RUNBOOK.md` and `docs/operations/CI.md`; the coolify skills describe Coolify itself, not this release path.

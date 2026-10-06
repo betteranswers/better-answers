@@ -74,6 +74,7 @@ AGENTS.md.bak
 !.claude/skills/complexity-gate/
 !.claude/skills/mutation-testing/
 !.claude/skills/repo-quality-sweep/
+!.claude/skills/survey-architecture/
 !.claude/skills/THIRD_PARTY_NOTICES.md
 .agents/
 tasks/AGENTS.md
