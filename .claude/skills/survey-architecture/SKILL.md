@@ -22,9 +22,9 @@ An area is one of these:
 - the source folder of any other package, such as `packages/schema/src/`.
 
 **When the owner named an area,** resolve it to areas.
-- If a path or slice name matches exactly one area, survey that area alone.
-- If it matches several, or if the owner described a pain point rather than a place, list the areas it points to and ask which to survey. Wait for the answer.
-- If it matches none, stop and list the areas the history recipe below finds.
+- If each path or slice name the owner gave matches exactly one area, survey those areas alone.
+- If one matches several areas, or if the owner described a pain point rather than a place, list the areas it points to and ask which to survey. Wait for the answer.
+- If one matches none, stop and list the areas the history recipe below finds.
 
 **When no area was named,** pick the areas from the history recipe and GitNexus. Run this from the repository root. It counts commits per area over the last 30 days and leaves out commits that touch more than 4 areas, because mechanical sweeps dominate raw churn here:
 

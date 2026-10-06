@@ -8,7 +8,7 @@ Write both files to the `.lavish/` folder of the **main checkout**, which is the
 
 Name them `survey-architecture-<area>-<YYYY-MM-DD-HHMM>.html` and `.md`, using the local time.
 - `<area>` is `all` when no area was named.
-- Otherwise it is the named area's path with `/` replaced by `-`, for example `packages-core-src-concepts`.
+- Otherwise it is the first named area's path with `/` replaced by `-`, for example `packages-core-src-concepts`. When more areas were named, add `-plus-` and how many, for example `packages-core-src-concepts-plus-1`.
 - If either name is taken, add `-2`, `-3` and so on before the extension.
 
 Never overwrite an earlier report. `lavish-axi` resumes a session by file, so a reused name would attach the old annotations to new findings.
