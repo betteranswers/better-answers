@@ -44,6 +44,59 @@ jobs:
           echo "already checked by the merge queue: ${verdict} (${COMMIT})"
           echo "verdict=${verdict}" >> "$GITHUB_OUTPUT"
 
+  # A merge group's cache entries sit under its `gh-readonly-queue` ref, which no later run
+  # reads, and `already-checked` skips `check` here; so this job writes on main what
+  # `check.yml`'s legs restore. It holds no token that publishes, and nothing here ships.
+  # A failure here leaves the run green, which the nightly release reads; the next push retries.
+  caches:
+    continue-on-error: true
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # `check.yml` restores this path and key; the pins hashed name the models.
+      - name: whether main already holds the detector's weights
+        id: weights
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/huggingface
+          key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
+          lookup-only: true
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      # Saves the store only when main holds no entry for this lockfile.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        id: node
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - if: steps.node.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+      # setup-uv saves nothing in a merge group, so without this main's entry is the nightly
+      # mutation run's, a lockfile behind until then.
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        id: uv
+        with:
+          version-file: apps/worker/.tool-versions
+          enable-cache: true
+      - if: steps.uv.outputs.cache-hit != 'true' || steps.weights.outputs.cache-hit != 'true'
+        run: uv sync --frozen
+        working-directory: apps/worker
+      - if: steps.weights.outputs.cache-hit != 'true'
+        name: HF_HOME on the runner's own temp directory, not the checkout
+        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
+      # The image's own fetch: loading each pinned model also fetches the encoder it names.
+      - if: steps.weights.outputs.cache-hit != 'true'
+        name: the detector's weights, fetched as the worker image fetches them
+        run: uv run --frozen python -c 'from better_answers_worker.redaction.weights import fetch; fetch()'
+        working-directory: apps/worker
+      - if: steps.weights.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/huggingface
+          key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
+
   check:
     needs: already-checked
     # `!cancelled()` and not `success()`: a broken gate has no verdict, so `check` runs.

@@ -171,9 +171,10 @@ jobs:
       - name: HF_HOME on the runner's own temp directory, not the checkout
         run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
       # The cross-tier suite runs the worker over an index job, which loads the detector's
-      # models; without this the shard holding it fetches them afresh every run.
+      # models; without this the shard holding it fetches them afresh every run. Restore
+      # only: `build.yml`'s `caches` job writes the entry on main, where every ref reads it.
       - name: the redaction detector's weights, keyed on the pins that name them
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/huggingface
           key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
@@ -210,9 +211,9 @@ jobs:
       - name: HF_HOME on the runner's own temp directory, not the checkout
         run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
       # This leg runs the worker over an index job, which loads the detector's models;
-      # without this it fetches them afresh every run.
+      # without this it fetches them afresh every run. Restore only, as in `full-core`.
       - name: the redaction detector's weights, keyed on the pins that name them
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/huggingface
           key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
@@ -288,8 +289,9 @@ jobs:
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
+      # Restore only, as in `full-core`.
       - name: the redaction detector's weights, keyed on the pins that name them
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/huggingface
           key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
