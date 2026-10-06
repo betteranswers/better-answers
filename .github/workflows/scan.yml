@@ -86,12 +86,12 @@ jobs:
           output: ${{ matrix.tier }}.sarif
           exit-code: "0"
           # Named, because the action's own default trails the scanner's security releases; Renovate moves this input.
-          version: v0.74.0
+          version: v0.75.0
           # Any run on main can write an Actions cache entry, and a database planted there would hide what this scan reports.
           cache: "false"
           # The worker's layers are 1.47 GB compressed, and the five-minute default spans the pull as well as the scan.
           timeout: 15m
-      - uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: ${{ matrix.tier }}.sarif
           category: image-${{ matrix.tier }}
