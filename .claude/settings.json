@@ -15,6 +15,18 @@
         ]
       }
     ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/watch-cap-hook.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "WorktreeCreate": [
       {
         "hooks": [

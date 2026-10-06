@@ -122,6 +122,22 @@ A worktree the hook or the sweep removes also gives up the jCodeMunch index prov
 
 A worktree removed any other way, by the harness, by hand or by `rm -rf`, runs neither, and its jDocMunch index outlived it: 28 of 33 doc indexes named a gone folder on 06/10/2026. So each sweep run also drops every doc index whose root lies under `.claude/worktrees/` and is no longer a directory, read from what `jdocmunch-mcp watch-status` prints. An index whose folder exists, or that lies anywhere else, is left alone.
 
+Each sweep run then refreshes the main checkout's doc index, if it has one: `jdocmunch-mcp index-local --path <the main checkout> --no-ai-summaries --no-embeddings`. A doc change that arrives through git (a pull, a merge, a checkout) reaches that index only through the jDocMunch watcher. While the watcher is down, the index keeps the old headings, and each partial refresh still moves `indexed_at`, so it looks fresh. On 06/10/2026 it still listed headings that had left their files a day earlier. The sweep refreshes on every run rather than judging whether the index is behind, because `index-local` already makes that judgement: it compares each file with the index and rewrites only what differs, so an index in step costs one walk of the tree, a few seconds that no creation waits for. A main checkout with no doc index is not given one.
+
+The hooks append `~/Library/pnpm`, `~/.local/bin` and `/opt/homebrew/bin` to `PATH` when they load `worktree-lib.sh`. A hook that the desktop client starts inherits launchd's bare `PATH`, where the sweep and the remove hook would find no `jdocmunch-mcp`, `jcodemunch-mcp` or `gh` and skip each step without a word.
+
+### The doc watcher's log cap
+
+The jDocMunch watcher runs as the launchd service `us.gravelle.jdocmunch-watch`. On 06/10/2026 a loop in it wrote a 159 GB `~/.doc-index/logs/watch.err`. Its plist now carries `SoftResourceLimits` → `FileSize` of 1 GB, so no file the watcher writes can grow past that. The limit binds the index files too, and the largest is 64 MB, so the cap stays far above it.
+
+`jdocmunch-mcp watch-install` writes the plist afresh and drops the cap. Put it back with:
+
+```
+bash scripts/jdocmunch-watch-cap.sh
+```
+
+It adds the cap and reloads the service with `launchctl bootout` and `bootstrap`. When the cap is already there it changes nothing and reloads nothing. A `SessionStart` hook, `.claude/hooks/watch-cap-hook.sh`, runs it with `--check` at each session's start. When the cap is missing, the session opens with a message naming the command. The hook only reads the plist: nothing but a person running the script changes it. Set `JDOCMUNCH_WATCH_PLIST` to point the script at another plist.
+
 ### Provisioning a worktree
 
 `provision-worktree.sh <worktree-path>` installs a fresh checkout's dependencies and the agent tooling a checkout cannot carry, so an agent's first act in a worktree is its task and not `pnpm install`. The create hook runs it; run it by hand after a `git worktree add`, which fires no hook. Six stages, each reporting on its own line and none stopping the next:
