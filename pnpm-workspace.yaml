@@ -13,13 +13,8 @@ allowBuilds:
   protobufjs: false
   ssh2: false
 
-minimumReleaseAgeExclude:
-  - zod@4.5.4
-  - '@aws-sdk/client-s3@3.1130.0'
-  - '@aws-sdk/lib-storage@3.1130.0'
-
 patchedDependencies:
-  '@stryker-mutator/vitest-runner@10.0.0': patches/@stryker-mutator__vitest-runner@10.0.0.patch
+  '@stryker-mutator/vitest-runner': patches/@stryker-mutator__vitest-runner.patch
   testcontainers: patches/testcontainers.patch
 
 # `@trpc/server` needs TypeScript for its types alone, yet names it a required peer, which pnpm

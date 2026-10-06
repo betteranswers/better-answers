@@ -166,7 +166,7 @@ overrides:
   '@trpc/server>typescript': '-'
 
 patchedDependencies:
-  '@stryker-mutator/vitest-runner@10.0.0': 78a167c23faa243dbe5c68a4b5d70f166aa93c221aafca5233799a3cb63aacb1
+  '@stryker-mutator/vitest-runner': 78a167c23faa243dbe5c68a4b5d70f166aa93c221aafca5233799a3cb63aacb1
   testcontainers: 6796c7b967c1e04405fe36f9a69a6c43796d0d7f2303e7819e507c1aadbd5a0c
 
 importers:
