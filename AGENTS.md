@@ -82,10 +82,10 @@ The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), proje
 
 Work runs on the Compound Engineering plugin (CE), pinned by release tag in `.claude/settings.json`. Renovate opens a pull request for each new release. A change goes through `/lfg`, or `/ce-plan` then `/ce-work`. `ce-commit-push-pr` opens the pull request. `arm-merge.yml` arms its merge once Cubic has read the head, and the merge queue merges it when `check` is green. CI's `check` is the arbiter.
 
-A pull request's body becomes its merge commit's body on `main`, so every body an agent writes has one form. It opens with what is now different, and `ce-commit-push-pr` sizes and arranges the rest. Two lines are required and close the body, after every section and before any attribution a tool appends:
+A pull request's body becomes its merge commit's body on `main`, so every body an agent writes has one form. It opens with what is now different, and `ce-commit-push-pr` sizes and arranges the rest. The body closes with these lines, after every section and before any attribution a tool appends:
 
-- `Merge risk:` says whether reverting the merge commit undoes the change, `reversible` or `not reversible`, then what a failure would reach. A migration that has run, data written to a store, an email sent, or a `contracts/` change the other tier has read is not reversible.
-- The issue line is `Fixes BA-N` when the pull request completes the issue, or `Related to BA-N` when it does not. A pull request with no issue has no issue line.
+- `Merge risk:` is required on every body. It says whether reverting the merge commit undoes the change, `reversible` or `not reversible`, then what a failure would reach. A migration that has run, data written to a store, an email sent, or a `contracts/` change the other tier has read is not reversible.
+- The issue line follows it whenever the pull request has an issue: `Fixes BA-N` when the pull request completes the issue, or `Related to BA-N` when it does not.
 
 ```text
 Merge risk: reversible, docs only
