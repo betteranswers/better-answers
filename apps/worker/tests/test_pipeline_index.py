@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from typing import Any, TypedDict
 
+import anydoc
 import asyncpg
 import psycopg
 import pytest
@@ -13,6 +14,7 @@ from better_answers_worker import loop, queue
 from better_answers_worker.kinds import index_run
 from better_answers_worker.pipeline import (
     BINDING_STORE,
+    DOCX_MEDIA_TYPE,
     FINDINGS_STORE,
     IndexRun,
     ReadDocument,
@@ -172,6 +174,7 @@ def normalised_key_of(document_id: str) -> str:
 CONVERSION_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "conversion"
 A_SCANNED_PDF = (CONVERSION_FIXTURES / "scanned-invoice.pdf").read_bytes()
 A_RATE_CARD_PDF = (CONVERSION_FIXTURES / "rate-card.pdf").read_bytes()
+AN_EXPENSES_POLICY_DOCX = (CONVERSION_FIXTURES / "expenses-policy.docx").read_bytes()
 A_RATE_CARD_CONVERTED = (
     "# Rate card\n\n"
     "## Rates hold for the quarter.\n\n"
@@ -735,6 +738,45 @@ def test_a_quarantined_document_read_next_run_loses_its_error(
     assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
         A_RATE_CARD_CONVERTED
     ]
+
+
+class ConverterOutOfMemoryError(Exception):
+    pass
+
+
+def test_an_unexpected_document_failure_fails_the_run_and_keeps_chunks(
+    database: tuple[psycopg.Connection, str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection, dsn = database
+    workspace_id = seed_the_binding(
+        connection,
+        documents=(AN_INVOICE_ID, A_SICK_NOTE_ID),
+        media_types={A_SICK_NOTE_ID: DOCX_MEDIA_TYPE},
+    )
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    bucket = a_bucket_holding_the_three()
+    bucket.objects[original_key_of(A_SICK_NOTE_ID)] = AN_EXPENSES_POLICY_DOCX
+    index_binding(bootstrap, run_for(workspace_id), copies=bucket)
+    chunks = chunk_rows_of(connection, workspace_id)
+    catalogue = catalogue_rows_of(connection, workspace_id)
+    writes = list(bucket.writes)
+
+    def out_of_memory(*_: object, **__: object) -> str:
+        raise ConverterOutOfMemoryError
+
+    monkeypatch.setattr(anydoc, "to_markdown_bytes", out_of_memory)
+
+    with pytest.raises(ConverterOutOfMemoryError):
+        index_binding(bootstrap, run_for(workspace_id), copies=bucket)
+    assert {row["source_document_id"] for row in chunks} == {
+        AN_INVOICE_ID,
+        A_SICK_NOTE_ID,
+    }
+    assert chunk_rows_of(connection, workspace_id) == chunks
+    assert catalogue_rows_of(connection, workspace_id) == catalogue
+    assert bucket.writes == writes
 
 
 def test_reads_a_suppression_off_the_table_and_keeps_it_out(
