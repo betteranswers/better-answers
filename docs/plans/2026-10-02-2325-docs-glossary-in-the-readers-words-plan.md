@@ -26,7 +26,7 @@ deepened: 2026-10-03
 - **Execution profile:**
   - The first pull request carries U1 to U4 together. U5 follows its merge.
   - U6 lands before any sweep.
-  - The sweeps run in KTD10's order, one pull request and one release per noun. A sweep waits until BA-28, BA-31 and BA-34 have merged in the areas it touches (R20).
+  - The sweeps run in KTD10's order, one pull request and one release per noun. From U12 on they run in three lanes, and U17 follows all three (KTD10, item 7). A sweep waits until BA-28, BA-31 and BA-34 have merged in the areas it touches (R20).
   - A sweep that renames a table, column or stored value is released by hand while the owner watches (KTD4, Operational Notes).
 - **Who finishes:** `ce-work` builds each pull request and `ce-code-review` reviews it. Cubic's monthly allowance is spent until 1 November 2026, so the owner arms each merge by hand. The merge queue lands it, with CI's `check` as the arbiter.
 - **Open blockers:** none.
@@ -173,6 +173,8 @@ This plan covers the glossary rewrite and the renames that follow from it. The b
 
 ## Planning Contract
 
+Planning Contract preservation: changed on 06/10/2026, after U11 released. The single chain from U12 to U17 became three lanes (KTD10, item 7). U16's inbox noun moved to U15, U15 gained the worker files its nouns live in, and the column questions of U14 and U16 were added to Deferred to Implementation. No requirement changed.
+
 ### Key Technical Decisions
 
 - KTD1. **The words test owns the old words, in a list beside it.** `apps/api/tests/old-words.ts` holds one row per old word: its reader word, its sweep, a state of pending or landed, whether it is retired everywhere or held to one sense, and its permitted senses. Governs R7, R12. Precedent: `better-auth-endpoints.txt` beside its test.
@@ -223,6 +225,15 @@ This plan covers the glossary rewrite and the renames that follow from it. The b
   4. Map precedes sync, freeing *sync* from the map's rebuild.
   5. Connected source precedes passage. Every column on `index.chunk`, the table cocoindex writes, waits for the passage sweep, so that table changes in one release followed by one wipe.
   6. Action goes last, at 366 files.
+  7. **From U12 on, three lanes, then action.** A lane is a run of sweeps that share a slice. Sweeps in different lanes share only files that a replayed map or a regenerated file resolves:
+     - **Sources:** U12, then U13. Both work in `packages/core/src/sources/`, `apps/web/src/features/sources/` and the worker, sharing 17 code files.
+     - **Knowledge:** U14, then U15. They share `packages/core/src/concepts/` and `packages/core/src/answering/`, 13 code files. U15's nouns *quarantined*, *finding group*, *composition* and *class* live in the sources slice and the worker, so they also wait for U13.
+     - **People:** U16, without the inbox noun. The inbox store is `packages/core/src/concepts/inbox.ts` and `contracts/concept-inbox/`, which U15's suggestion kinds also change, so it moved to U15.
+     - **Then U17**, which touches every slice that declares an act.
+
+     U14 can start now. It shares 6 code files with U12 and 3 with U13, and no deferred sense names it: every `until` in `apps/api/tests/old-words.ts` names `passage`, which is U12, the first sweep in its own lane.
+
+     The evidence is the remaining sweeps' old words searched over the tree on 06/10/2026, after U11 merged. It is a search, not the dry-run maps the BA-29 comment of 06/10/2026 suggested. The search leaves out the senses Appendix G keeps: bare *client* (tRPC, pg, S3) and *domain* as an email domain. The remaining shared code files between lanes are 6 to 44 per pair: test harnesses, fixtures, `navigation.ts`, `boundary-schemas.ts`, `table-ownership.ts` and `rls.test.ts`. A rebase pays for those (Operational Notes). Lanes shorten the building, and the releases stay one at a time.
 
   Governs R14, R20.
 - KTD11. **Every renamed page address redirects.** `movedFrom` on a page or group becomes a list. Every old address stays in it, including the earlier `/system/routes-and-spend`. Governs R14, R22.
@@ -248,12 +259,22 @@ flowchart TB
   A --> M[U9 model choice: first table rename]
   M --> G[U10 map]
   G --> C[U11 connected source]
-  C --> PS[U12 passage, cocoindex spike, one forced re-index]
-  PS --> Y[U13 sync]
-  Y --> V[U14 verification]
-  V --> K[U15 knowledge words]
-  K --> PE[U16 people words]
-  PE --> X[U17 action, last]
+  subgraph Sources lane
+    PS[U12 passage, cocoindex spike, one forced re-index] --> Y[U13 sync]
+  end
+  subgraph Knowledge lane
+    V[U14 verification] --> K[U15 knowledge words, inbox included]
+  end
+  subgraph People lane
+    PE[U16 people words]
+  end
+  C --> PS
+  C --> V
+  C --> PE
+  Y -->|quarantined, finding group, composition, class| K
+  Y --> X[U17 action, last]
+  K --> X
+  PE --> X
 ```
 
 An old word's life in the words test's list:
@@ -323,6 +344,18 @@ sequenceDiagram
   8. Set `RELEASE_MODE` back to `nightly`.
 - Cubic reviews nothing until 1 November 2026. `ce-code-review` still runs on every pull request, and the owner arms each merge by hand.
 - After the passage sweep, run the restore drill once to prove AE13.
+- **Running the lanes (KTD10, item 7).** Each lane runs in its own session and worktree, one unit per `ce-work` run. What lanes do not change:
+  - **One watched release at a time.** While one lane's sweep is in its watched release, with `RELEASE_MODE` at `drill`, every other lane holds its merge. "Nothing else waiting" in step 2 above includes the other lanes.
+  - **Migration numbers.** U12, U15 and U17 each add a migration. U14 (Deferred to Implementation) and U16's *slug* add one if they rename a column. The branch that merges second renumbers its migration's file name and its journal `idx` and `tag`. It also sets the journal's `when` later than the landed migration's, because drizzle's migrator applies by `when`, not by number, and skips a migration whose `when` is earlier than the last one applied. Then it rewrites its snapshot against the new predecessor and regenerates the worker's schema view, whose `MIGRATION_WHEN` follows the last entry. A second `generate` must find no diff.
+  - **Contract stamps.** U12 and U15 both move the contract digest. The second to merge regenerates both stamps after its rebase.
+  - **Shared files.** `apps/web/src/shared/navigation.ts`, `apps/api/tests/old-words.ts` with its ratchet, `CONCEPTS.md` and `contracts/manifest.json` conflict on every rebase. Resolve them by hand, then regenerate the ratchet; it may only lose entries.
+- **Rebasing a lane onto a landed sweep:**
+  1. Replay each map that landed since the branch was cut, in apply mode. Then run the branch's own map again in apply mode, because the rebase brought in the other lane's files.
+  2. Correct every literal path that a map in `packages/devtools/renames/` names and the other lane moved. Nothing else catches a stale path (step 11 of the rename-sweep learning named in step 5).
+  3. Dry-run every landed map and the branch's own map. None may list a `rename` (the same learning, step 13).
+  4. Run the words test. AE12 names any old word the replay missed.
+  5. Re-read by hand the prose the rebase brought in. A prose pass is not a safe replay: it rewrites code and data in files the runner's senses shield (`docs/solutions/best-practices/what-a-rename-sweeps-runner-and-prose-pass-get-wrong-and-the-checks-that-catch-it.md`).
+- **A new deferred sense** (`until`) must name a sweep that has not landed and that follows the sweep landing the row, in the same lane or U17.
 
 ### Deferred to Implementation
 
@@ -331,6 +364,8 @@ sequenceDiagram
 - Which parser extracts string and JSX text for the reader-text check: `oxc-parser` is already present as a transitive dependency.
 - The code word for each collision, recorded in that sweep's rename map.
 - Whether a unit's nouns split into more than one pull request. One noun per pull request is the rule (KTD5).
+- Whether U14 renames the column `concept_verification.checked_at` and its index with core's name. If it does, U14 carries a hand-written migration and releases under watch (KTD4). The wire keys stay either way (R21).
+- Whether U16 renames the column `workspace.slug`, with its `workspace_slug_unique` constraint, or keeps it and maps the new field name onto it through Better Auth's field option. A rename makes U16's *slug* pull request a KTD4 migration with a watched release, and adds it to the Verification Contract's `generate` rows.
 
 ---
 
@@ -350,11 +385,11 @@ sequenceDiagram
 | U10 | Map | `packages/schema/src/graph-tables.ts`, `apps/worker/src/better_answers_worker/rebuild.py` | U9 |
 | U11 | Connected source | `packages/schema/src/source-tables.ts`, `packages/core/src/sources/` | U10 |
 | U12 | Passage, with the worker's stored names | `apps/worker/src/better_answers_worker/pipeline/`, `index.chunk` migrations | U11 |
-| U13 | Sync | `apps/web/src/features/sources/`, `packages/core/src/sources/` | U12 |
-| U14 | Verification | `packages/core/src/answering/index.ts`, `packages/core/src/concepts/` | U13 |
-| U15 | Knowledge words | `packages/core/src/concepts/`, `packages/schema/src/suggestion-tables.ts` | U14 |
-| U16 | People words | `packages/core/src/members/`, `packages/core/src/workspaces/` | U15 |
-| U17 | Action, last | `packages/core/src/kernel/`, `packages/core/src/audit/`, `packages/devtools/lint-rules/` | U16 |
+| U13 | Sync | `apps/web/src/features/sources/`, `packages/core/src/sources/` | U12 (Sources lane) |
+| U14 | Verification | `packages/core/src/answering/index.ts`, `packages/core/src/concepts/` | U11 (Knowledge lane) |
+| U15 | Knowledge words | `packages/core/src/concepts/`, `packages/schema/src/suggestion-tables.ts` | U14; U13 for its sources nouns (Knowledge lane) |
+| U16 | People words | `packages/core/src/members/`, `packages/core/src/workspaces/` | U11 (People lane) |
+| U17 | Action, last | `packages/core/src/kernel/`, `packages/core/src/audit/`, `packages/devtools/lint-rules/` | U13, U15, U16 |
 
 ### U1. Rewrite the glossary
 
@@ -733,7 +768,7 @@ sequenceDiagram
 
 **Requirements:** R1, R14.
 
-**Dependencies:** U12.
+**Dependencies:** U12, in the Sources lane (KTD10, item 7).
 
 **Files:**
 - Modify: `packages/core/src/sources/listing.ts`, `apps/web/src/features/sources/words.ts`, `apps/worker/src/better_answers_worker/`
@@ -755,7 +790,7 @@ sequenceDiagram
 
 **Requirements:** R1, R4, R14, R21. KTD13.
 
-**Dependencies:** U13.
+**Dependencies:** U11. It opens the Knowledge lane and can start now (KTD10, item 7).
 
 **Files:**
 - Modify: `packages/core/src/answering/index.ts`, `packages/core/src/concepts/`, `apps/web/src/shared/navigation.ts`, `packages/design-system/tokens/semantic.css`, `packages/design-system/guidelines/colors-trust.card.html`
@@ -780,10 +815,10 @@ sequenceDiagram
 
 **Requirements:** R1, R14, R15, R21, R22. KTD8, KTD12.
 
-**Dependencies:** U14.
+**Dependencies:** U14, in the Knowledge lane. The nouns *quarantined*, *finding group*, *composition* and *class* also wait for U13, because they live in the sources slice and the worker (KTD10, item 7).
 
 **Files:**
-- Modify: `packages/core/src/concepts/`, `packages/core/src/sources/`, `packages/core/src/answering/index.ts`, `packages/schema/src/suggestion-tables.ts`, `packages/schema/src/concept-tables.ts`, `packages/schema/src/source-tables.ts`, `apps/web/src/features/`, `apps/web/src/shared/navigation.ts`
+- Modify: `packages/core/src/concepts/`, `packages/core/src/sources/`, `packages/core/src/answering/index.ts`, `packages/schema/src/suggestion-tables.ts`, `packages/schema/src/concept-tables.ts`, `packages/schema/src/source-tables.ts`, `apps/web/src/features/`, `apps/web/src/shared/navigation.ts`, `apps/worker/src/better_answers_worker/` (*quarantined*, *composition* and *class*)
 - Create: one map per noun in `packages/devtools/renames/`
 
 **Approach:**
@@ -799,7 +834,8 @@ sequenceDiagram
    - *finding group* to *group of findings*;
    - *quarantined* to *unreadable*;
    - *extraction plan* to *cost estimate*;
-   - *answer audit* to *Questions asked*.
+   - *answer audit* to *Questions asked*;
+   - the inbox store's code word to *suggestions*, moved from U16 because it lives in `packages/core/src/concepts/inbox.ts` and `contracts/concept-inbox/`, beside the suggestion kinds this unit renames.
 2. Stored values change by migration (KTD12): *candidate* and *repair* as suggestion kinds, *repair* as a verification origin, and *quarantined*. `contracts/concept-inbox/cases.json` holds *candidate*, so that sweep moves the contract digest. The kind rename also replaces `submit_suggestion_set`, whose definer body lists the kinds each role may raise, and `suggestion_repair_proposer_check` (KTD4). The map's *Composition* label is rebuilt.
 3. *Link* and *knowledge base* are page words only. `iri`, `locator` and OKF's *bundle* stay in code (R15). The wire key `hits` stays (R21).
 
@@ -820,7 +856,7 @@ sequenceDiagram
 
 **Requirements:** R1, R14, R21, R22.
 
-**Dependencies:** U15.
+**Dependencies:** U11. It is the People lane (KTD10, item 7).
 
 **Files:**
 - Modify: `packages/core/src/members/`, `packages/core/src/workspaces/`, `apps/api/src/auth/auth.ts`, `apps/web/src/features/people/`, `apps/web/src/features/console/`, `apps/web/src/shared/navigation.ts`, `packages/schema/src/workspace-table.ts`
@@ -836,7 +872,7 @@ sequenceDiagram
    - *agent token* to *share agent token*;
    - People's "Tokens" to "Personal tokens";
    - *backup run* to *backup*.
-2. Rename these pages, with redirects: Suggestions' "Queue" to "To decide", "Publish and accept gates" to "Publishing rules", and "Gone-at-source impact" to "Removed at source". The inbox store's code word becomes *suggestions*.
+2. Rename these pages, with redirects: Suggestions' "Queue" to "To decide", "Publish and accept gates" to "Publishing rules", and "Gone-at-source impact" to "Removed at source". The inbox store's code word moved to U15.
 3. Keep OAuth's and Better Auth's API names, the refusal words and the stored act names (R21, R22).
 4. `packages/core/src/workspaces/index.ts` turns the constraint name `workspace_slug_unique` into the refusal `slug-taken`. A renamed constraint updates that map in the same commit.
 
@@ -856,7 +892,7 @@ sequenceDiagram
 
 **Requirements:** R1, R11, R14, R22. KTD8, KTD14.
 
-**Dependencies:** U16.
+**Dependencies:** U13, U15 and U16: the end of all three lanes.
 
 **Files:**
 - Modify: `packages/core/src/kernel/`, `packages/core/src/audit/`, every slice declaring acts, `packages/schema/src/audit-tables.ts` with a new migration, `packages/devtools/lint-rules/rules/act-admits-before-await.ts` and its test, `.oxlintrc.json`, `apps/web/src/` files named for *act*, the five `CODING_STANDARDS.md` files, ADR 0043 doc, `docs/agents/`
@@ -887,7 +923,7 @@ sequenceDiagram
 | `pnpm --filter @better-answers/core run check` | Core's types and suites | U4, U8 onward |
 | `pnpm run check:api` | The api's suites, the words test and MCP output | U2, U4, every sweep |
 | `pnpm run check:web` | The web app's types, tests and browser suite | U7, U8, every sweep touching pages |
-| `pnpm run check:worker` | The worker's suites and the prepare test | U6, U9 to U13 |
+| `pnpm run check:worker` | The worker's suites and the prepare test | U6, U9 to U13, U15 |
 | `pnpm --filter @better-answers/schema run generate`, then again with no diff | A rename migration keeps the snapshot in step | U9 to U12, U15, U17 |
 | `generate:worker-view`, `generate:roles-surface`, `generate:contract-stamp` (schema) and `generate:audit-acts` (core) | Generated files in step, drift-checked | Every schema sweep, U17 |
 | `pnpm run check:gates` | Lint, comment and format gates, including the renamed lint rule | U6, U17 |
