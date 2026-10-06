@@ -365,12 +365,11 @@ describe("the skills this repository tracks", () => {
     expect(skills).toContain(".claude/skills/renovate-prs/SKILL.md");
   });
 
-  it("tracks five third-party skills, so every agent loads one copy", () => {
+  it("tracks four third-party skills, so every agent loads one copy", () => {
     const skills = tracked(".claude/skills");
 
     expect(skills).toContain(".claude/skills/code-comments/SKILL.md");
     expect(skills).toContain(".claude/skills/complexity-gate/SKILL.md");
-    expect(skills).toContain(".claude/skills/human-writing/SKILL.md");
     expect(skills).toContain(".claude/skills/mutation-testing/SKILL.md");
     expect(skills).toContain(".claude/skills/repo-quality-sweep/SKILL.md");
   });
@@ -384,7 +383,6 @@ describe("the skills this repository tracks", () => {
       "browser-suite",
       "code-comments",
       "complexity-gate",
-      "human-writing",
       "mutation-testing",
       "renovate-prs",
       "repo-quality-sweep",

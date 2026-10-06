@@ -1,5 +1,7 @@
 # AGENTS.md
 
+`AGENTS.md` is the canonical repo instruction file. Root `CLAUDE.md` is a file of its own that imports it: its first line is `@AGENTS.md`, and below that sits only the block GitNexus keeps.
+
 A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts, curated) → the **map** (derived). Over them the platform keeps **records** (guides, compositions, usage, bindings, audit), which cite concepts. The destination this repo builds towards is `VISION.md`. Two runtime tiers share four stores: Postgres, an object store, a git repository per workspace, and the map as Postgres tables under RLS. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`. The map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
 
 ## Read first
@@ -10,7 +12,16 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 - `CODING_STANDARDS.md` — the constitution: every rule that binds work in this repo. A directory's own rules live beside it, in `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md`, `apps/worker/CODING_STANDARDS.md` and `deploy/CODING_STANDARDS.md`.
 - `docs/solutions/architecture-patterns/` — why the architecture is the way it is: one doc per live decision. `/ce-plan` finds the ones a plan touches. Code cites a decision as `ADR NNNN`, and its doc is `adr-NNNN-<slug>.md`. A change that moves a decision edits its doc in the same commit, and says so in the pull request. The ADRs these came from, with their amendments, are frozen in `docs/archive/adr/`.
 
-## Layout
+
+## Repository Docs Convention
+
+- **plans**  live in `docs/plans/` — unified plan artifacts.  `ce-plan` adds implementation planning in place. Consumers assess contents and unresolved blockers rather than a readiness field.
+- **Solutions** live in `docs/solutions/` — documented solutions to past problems (bugs, best practices, workflow patterns), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`). Relevant when implementing or debugging in documented areas.
+- **Specs** live in `docs/specs/` — target platform format specifications. `v01-route.md` is the route spec.
+- **C4 architecture diagrams** live in `docs/architecture/` - context, containers, three component views, deployment and flows. They are a reading of the tree, which `/c4-architecture` redraws after any review that moves the shape. The README maps each route block to the containers and components it touches.
+
+
+## Directory Layout
 
 `apps/` is what deploys; `packages/` is what is imported.
 
@@ -24,11 +35,7 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 | `packages/devtools/` | The repository's own gate tooling: the throwaway-tree runner that every gate's test runs its tool through, the lint rules, the anti-slop lift, and the mutation probe and summary. Its README lists them |
 | `packages/` | The rest of the shared TypeScript: `schema`, `design-system` |
 | `contracts/` | The tier contract's language-neutral fixtures. Both tiers' suites read it, and so does the gate tooling. Nothing imports it and nothing deploys it |
-| `docs/architecture/` | The C4 diagrams: context, containers, three component views, deployment and six flows. They are a reading of the tree, which `/c4-architecture` redraws after any review that moves the shape. The README maps each route block to the containers and components it touches |
-| `docs/specs/` | `v01-route.md`, the route spec |
 | `docs/archive/` | Frozen history from before Compound Engineering: the ADRs with their amendments, and the block and ticket specs the route was built through. Read, never edited |
-| `docs/plans/` | Compound Engineering's plans, one per piece of work. A plan has no status: git says what shipped |
-| `docs/solutions/` | Documented solutions to past problems (bugs, best practices, workflow patterns), by category, with YAML frontmatter (`module`, `tags`, `problem_type`). `/ce-plan` searches it before every plan |
 | `docs/personas/` | The personas `/ce-dogfood` walks a page as: a git-ignored link to `.planning/personas/`, which the worktree hook makes |
 | `.compound-engineering/` | Compound Engineering's settings for this repository |
 | `docs/operations/` | Public-facing ops documents. Documents that are not public-facing are under `.planning/estate/` |
@@ -38,6 +45,16 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 Read commands, versions and scripts from each workspace's `package.json` or `pyproject.toml`. Every workspace exposes `check` (types, tests), unless a test names it as having nothing to run. One `check` runs every step it has and names all that failed, and the root `check` runs them all. The TypeScript lint is a root gate: `oxlint` walks the whole tree once, under `check:gates`, so no workspace's `check` repeats it. Each workspace keeps its own `lint` script for running by hand. `packages/devtools` also keeps its Python lint and format checks in `check`, because the tree walk does not reach them.
 
 ## Skills
+
+This repository authors each skill once and distributes it across multiple agent models and harnesses. A skill is a set of goals, not a state machine: it hands the agent the goal, the done condition, the safe failure direction, and the facts it cannot derive from the repo in front of it, then gets out of the way. `docs/solutions/skill-design/portable-agent-skill-authoring.md` is the standard; the rules in this file supplement it and take precedence where more specific.
+
+**Before creating, editing, reviewing, or acting on review feedback for a skill this repository tracks, invoke the repo-local `ce-skill-work` skill** (`.claude/skills/ce-skill-work/`). The tracked skills are the folders `.gitignore` names under `.claude/skills/` and `apps/api/.claude/skills/`, plus `packages/design-system/`, which `.claude/skills/better-answers-design` links to. Every other entry in `.claude/skills/` or an `apps/*/.claude/skills/` is git-ignored and installed per checkout, most by the skills CLI from `skills-lock.json`, as a folder or as a link into `.agents/skills/` (git-ignored too); `.claude/hooks/provision-skills.sh` copies them into each worktree. An edit to one of those is lost at the next install. `ce-skill-work` carries the procedures for each of those four activities, the audit questions, the provenance rule for removals, and the validation contract. The same routing applies when a skill-authoring best practice itself changes or is newly learned — a prompt-guide lesson, a tuning that demonstrably worked, a standard-level correction: invoke `ce-skill-work` and record the practice in `docs/solutions/skill-design/portable-agent-skill-authoring.md` (and here when it must be always-loaded), never only in one skill's prose. This file states only what must be always-loaded; when the two disagree, fix the disagreement rather than following the shorter one.
+
+Three rules that hold regardless of whether the skill was invoked:
+
+- **State conditions, not procedures or cases.** When a block keeps absorbing "add the case we just found" — in authoring, in a review round, or in your own fix to a finding — the representation is wrong. Delete the additions and restate the goal, then re-verify against every path the additions served; a restatement that no longer names a path is a new defect, not a simplification.
+- **Prescribe a mechanism only where it is owned.** A delegating skill states the condition, the safe failure direction, and the non-derivable callee facts, never a re-derivation of the callee's commands (`docs/solutions/skill-design/skill-gates-state-conditions-not-prescribed-git-commands.md`).
+- **Bring the block you touch up to the standard**; leave untouched blocks alone and name them as follow-up. Skills predate the standard and evolve toward it.
 
 - `/lfg` for a change end to end: plan, build, review, compound, browser test and pull request, with no pause for approval.
 - `/ce-brainstorm` when what to build is still open, `/ce-plan` to write the plan, `/ce-work` to build one.
@@ -51,7 +68,7 @@ Read commands, versions and scripts from each workspace's `package.json` or `pyp
 - `resend` and `email-best-practices`, vendored from Resend, for its sending limits, deliverability and webhooks. The api sends through Resend's SMTP relay with nodemailer (`apps/api/src/smtp.ts`), not its SDK, so check any of their samples against the code before copying it.
 - `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so.
 
-Other skills live beside the code that uses them most, such as `apps/worker/.claude/skills/` and `apps/web/.claude/skills/`. If a task has a skill, use it for best practice: for example, hono for the api's routes and middleware, cocoindex for the worker and its pipeline, and better-auth for authentication. Production deploys only through `release.yml` (ADR 0022), and the procedure, rollback included, is in `docs/operations/RUNBOOK.md` and `docs/operations/CI.md`; the coolify skills describe Coolify itself, not this release path.
+Other skills live beside the code that uses them most, such as `apps/worker/.claude/skills/` and `apps/web/.claude/skills/`. If a task has a skill, use it for best practice: for example, hono for the api's routes and middleware, cocoindex for the worker and its pipeline, and better-auth for authentication. Production deploys only through `release.yml`, and the procedure, rollback included, is in `docs/operations/RUNBOOK.md` and `docs/operations/CI.md`; the coolify skills describe Coolify itself, not this release path.
 
 ## Agent skills
 
