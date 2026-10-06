@@ -304,7 +304,7 @@ This plan covers P1's People layout rework. The breakdown below is the current u
   This KTD makes the how-level choice for the "Ready-made parts first" decision. (session-settled: user-approved — chosen over building parts from scratch, or taking Kibo's data-table code: the registries are already the rule under ADR 0033.) Implements R1, R2, R4.
 - KTD8. **Members pages in the browser; the Audit log and Activity page on the server.** The members list read already returns the whole workspace, so Members pages over it at 25 rows. The Audit log and Activity keep the existing keyset cursor with Load more. Implements R7, R16, R24.
 - KTD9. **Every new read's query key carries the workspace, or is listed for dropping on a workspace switch.** Anything a mounted screen draws is reset, not removed. Implements R13, R16, R19, R25.
-- KTD10. **One sentence per audit act, written in the web, with subjects named by the server.** The audit read resolves each subject's name as it stands now, beside the actor names it resolves today. A subject is a person, a group, or an invitation's address. A deleted group reads "a deleted group", and an erased person reads as a former member. A web unit test fails for any registered act with no sentence, and an unknown act falls back to today's label. The words are checked against `CONTEXT.md`. Implements R16, R24.
+- KTD10. **One sentence per audit act, written in the web, with subjects named by the server.** The audit read resolves each subject's name as it stands now, beside the actor names it resolves today. A subject is a person, a group, or an invitation's address. A deleted group reads "a deleted group", and an erased person reads as a former member. A web unit test fails for any registered act with no sentence, and an unknown act falls back to today's label. The words are checked against `CONCEPTS.md`. Implements R16, R24.
 - KTD11. **A multi-address invite mints every invitation in one transaction, then emails each.**
   - Core lowercases addresses and folds duplicates (R31).
   - It refuses, with a per-address word (KTD1), an address that belongs to a member (R32).
@@ -439,7 +439,7 @@ flowchart TB
 ### Documentation / Operational Notes
 
 - ADR 0043's doc gains the per-item refusal (U1). ADR 0047's doc gains detail addresses (U8).
-- `CONTEXT.md` gains *member page*, *selection bar* and *bulk act*, and its *Activity* sense, each checked against existing entries. U7, U8 and U15 add the words they introduce.
+- `CONCEPTS.md` gains *member page*, *selection bar* and *bulk act*, and its *Activity* sense, each checked against existing entries. U7, U8 and U15 add the words they introduce.
 - U9's migration ships with the release's migrate step. The release notes name the new index, say that a lock-timeout failure stops the migrate step and the release is re-run by hand, and say that rolling the images back after this release leaves the worker idle until it rolls forward.
 - The owner, or an agent on request, files the Arena concepts under Scope Boundaries in Linear.
 
@@ -704,7 +704,7 @@ flowchart TB
 - `apps/web/src/features/people/people-state.ts`
 - `apps/web/src/features/people/refusal-words.ts`
 - New: `apps/web/src/features/people/member-bulk-acts.tsx`
-- `CONTEXT.md`
+- `CONCEPTS.md`
 - Tests: `apps/web/e2e/people.spec.ts`, `apps/web/e2e/workspace-switcher.spec.ts` (run)
 
 **Approach:**
@@ -756,7 +756,7 @@ flowchart TB
 - `apps/web/src/features/people/member-removal.tsx`
 - `apps/web/src/features/people/members-screen.tsx`
 - `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`
-- `CONTEXT.md`
+- `CONCEPTS.md`
 - Tests: `apps/web/test/navigation.test.ts`, `apps/web/test/breadcrumb.test.ts`, `apps/web/test/jump-to.test.tsx`, `apps/web/e2e/people.spec.ts`, `apps/web/e2e/jump-to.spec.ts`, `apps/web/e2e/frame.spec.ts`
 
 **Approach:**
@@ -1045,7 +1045,7 @@ flowchart TB
 - `apps/web/src/features/people/audit-log-screen.tsx`
 - `apps/web/src/features/people/audit-log-api.ts`
 - `apps/web/src/features/people/audit-log-state.ts`
-- `CONTEXT.md`
+- `CONCEPTS.md`
 - Tests: `apps/web/e2e/audit-log.spec.ts`
 
 **Approach:**
@@ -1088,7 +1088,7 @@ flowchart TB
 - Every requirement R1 to R37 is met, and each Acceptance Example AE1 to AE12 has a passing test that names it.
 - `pnpm check` is green on each pull request, and the merge queue has landed every stream.
 - The console's Everyone and Names-waiting specs pass with no change to their files.
-- ADR 0043's doc and ADR 0047's doc carry this plan's amendments, and `CONTEXT.md` carries the new words.
+- ADR 0043's doc and ADR 0047's doc carry this plan's amendments, and `CONCEPTS.md` carries the new words.
 - No import of the retired member sheet remains, and no code from an abandoned approach is left in the diff.
 - The `/ce-dogfood` walk finds no list behaving differently from the others.
 - Per unit: its Verification line holds, and its test scenarios exist as tests.

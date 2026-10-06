@@ -79,7 +79,7 @@ Typography is driven by the **Geist** and **Geist Mono** families.
 Sources: [packages/design-system/readme.md:128-135](packages/design-system/readme.md#L128-L135), [apps/web/src/index.css:26-44](apps/web/src/index.css#L26-L44)
 
 ### Content Rules
-All interface text follows strict semantic and tonal rules defined in the project glossary (`CONTEXT.md`).
+All interface text follows strict semantic and tonal rules defined in the project glossary (`CONCEPTS.md`).
 
 *  **Verbatim Trust Words**: A closed set including "Checked by the platform", "Unchecked", "Out of date", and "Restricted".
 *  **Tone**: Precise and grounded. Use counts ("Three passages") rather than hedging ("A few").

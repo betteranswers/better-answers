@@ -83,7 +83,7 @@ A first-principles review on 02/10 tested every reader of a rule: agents, gates,
 
 ### Scope Boundaries
 
-- BA-29 owns `CONTEXT.md`, `apps/api/tests/avoid-words.test.ts` and its word list, and the docs for ADR 0019 and ADR 0047.
+- BA-29 owns `CONCEPTS.md`, `apps/api/tests/avoid-words.test.ts` and its word list, and the docs for ADR 0019 and ADR 0047.
 - Plan ids in solution docs that sit beside the plan's path stay. A reader can follow them.
 - `docs/archive/` is frozen. `.scratch/` and `.planning/` are git-ignored.
 - The comment gate's reaction to a tag in a comment stays: it quotes the tag back as "cites a rule tag". The contract fixes that wording.
@@ -217,7 +217,7 @@ A first-principles review on 02/10 tested every reader of a rule: agents, gates,
   4. Rewrite *Land a gate with the test that runs it* so a gate's message names the file that holds its rule.
   5. Rewrite ADR 0045's lines 37 and 51.
   6. Update each test's expected text. Retitle the tests whose titles say "naming its rule" so they say what is now named.
-- **Patterns to follow:** `apps/api/tests/avoid-words.test.ts:305`, which already names a document (`CONTEXT.md`) in a gate message.
+- **Patterns to follow:** `apps/api/tests/avoid-words.test.ts:305`, which already names a document (`CONCEPTS.md`) in a gate message.
 - **Test scenarios:**
   - **Restricted syntax:** each pattern (an `in` over an upper-case table, `for…in`, a label, a list inside `z.enum`) is refused with its fix and "the root `CODING_STANDARDS.md`".
   - **Admission before await:** an act that awaits before it admits is refused with a message naming the root rules file.

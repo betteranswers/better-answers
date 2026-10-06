@@ -114,7 +114,7 @@ When the secondary nav hides, only the nav leaves the row below the band. The ba
 - R16. The logo exists as an SVG in the design system's assets. It is used in the band, on the sign-in screens and as the browser's tab icon.
 - R17. `better-answers` replaces "Better Answers" on every surface a person reads: web screens, the browser tab title, the api's auth pages, and the sign-in code and invitation emails, including their sender name.
 - R18. The design system's readme and guideline cards describe this shell: the band and its cells, the width rule of R14, the logo and the name. The line that says there is no logo is removed, and the shell guidance matches R1 to R15.
-- R19. A new ADR records the platform's structure of surfaces, groups and screens, including what is not built. ADR 0017 and ADR 0046 are edited to match, in the same change that ships it. `CONTEXT.md`'s entries for the product's name, the surfaces and the shell's regions and levels are updated. BA-12's role filter is delivered by this work. Its Editor half (deciding through Inbox and ownership) stays open until Inbox and ownership are built.
+- R19. A new ADR records the platform's structure of surfaces, groups and screens, including what is not built. ADR 0017 and ADR 0046 are edited to match, in the same change that ships it. `CONCEPTS.md`'s entries for the product's name, the surfaces and the shell's regions and levels are updated. BA-12's role filter is delivered by this work. Its Editor half (deciding through Inbox and ownership) stays open until Inbox and ownership are built.
 
 ### Acceptance Examples
 
@@ -140,7 +140,7 @@ This plan covers the shell and layout foundations. The breakdown below is the cu
   - Can proceed independently of this plan.
   - Shares the People screens with the layout rework.
 - **Glossary rewrite (pre-S2 architecture review):** the reader's words throughout, including the Guru-aligned trust words and the names of screens.
-  - Shares `CONTEXT.md` with R19, which edits only the name, the surfaces and the shell entries.
+  - Shares `CONCEPTS.md` with R19, which edits only the name, the surfaces and the shell entries.
   - Enables later wording changes on these screens, with no layout change.
 - **Each later block that builds a screen:** Overview, Inbox, Knowledge, the work surface (S6), Briefings (Then).
   - Depends on this plan's navigation list: marking a declared screen built makes it appear.
@@ -164,7 +164,7 @@ This plan covers the shell and layout foundations. The breakdown below is the cu
 ### Dependencies / Assumptions
 
 - The logo's final form is the owner's description: two square brackets with a square between them. The SVG drawn here is the logo, unless the owner replaces it.
-- Screen wording follows `CONTEXT.md` as edited by U1. The glossary rewrite may rename words on these screens later without changing their layout.
+- Screen wording follows `CONCEPTS.md` as edited by U1. The glossary rewrite may rename words on these screens later without changing their layout.
 - ADR 0046's remaining open question stays open: an Editor's home once question sets land.
 
 ### Sources / Research
@@ -283,7 +283,7 @@ U1 settles the words before code names them. U3 (design system) and U8 (name) ca
 
 | U-ID | Title | Key files | Depends on |
 |---|---|---|---|
-| U1 | Record the structure: ADR, ADR edits, glossary | `docs/solutions/architecture-patterns/`, `CONTEXT.md` | — |
+| U1 | Record the structure: ADR, ADR edits, glossary | `docs/solutions/architecture-patterns/`, `CONCEPTS.md` | — |
 | U2 | The navigation list, visibility and router | `apps/web/src/shared/screens.ts`, `apps/web/src/app/router.tsx` | U1 |
 | U3 | Design system: logo, width rule, shell guidance | `packages/design-system/` | — |
 | U4 | The frame: band, rail, secondary nav, width, narrow sheet | `apps/web/src/app/frame.tsx` and siblings | U2, U3 |
@@ -302,12 +302,12 @@ U1 settles the words before code names them. U3 (design system) and U8 (name) ca
   - `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md` (new)
   - `docs/solutions/architecture-patterns/adr-0017-answers-are-retained-correctable-records.md`
   - `docs/solutions/architecture-patterns/adr-0046-a-reader-surface-beside-control-centre.md`
-  - `CONTEXT.md`
+  - `CONCEPTS.md`
 - **Approach:**
   1. Write ADR 0047 from `.scratch/ia-2026-09-30/`. It records the rail of surfaces and each surface's groups and screens, marking what is built, v0.1 and later. It also records the decisions of 30/09/2026 (suggestion queue in Control Centre, ownership grants acts, visibility per screen, hidden addresses look absent), the Flux AgentOps mapping, and what stays open: the work surface's name, Search's surface, and the Guru trust words.
   2. Edit ADR 0017: Control Centre is one surface of eight groups, not six screens. Remove the verb-name refusal that Ask now contradicts, and say why.
   3. Edit ADR 0046: the reader surface becomes the Ask surface in one rail. Its "filtered Control Centre" line becomes the decision. Its answer-audit question is answered: Admin-only, with each person's own questions in Ask.
-  4. Edit `CONTEXT.md`:
+  4. Edit `CONCEPTS.md`:
      - the name: `better-answers`;
      - *Control Centre* (eight groups), and *reader surface* (retired to *surface*);
      - the levels *surface*, *group*, *screen*, *tab*, replacing *screen (of Control Centre)* and *view*;
@@ -316,8 +316,8 @@ U1 settles the words before code names them. U3 (design system) and U8 (name) ca
 
      The existing *mark* entry is untouched.
 - **Patterns to follow:** the ADR frontmatter and "The decision / Why / Rejected / History" shape of `adr-0046-a-reader-surface-beside-control-centre.md`. AGENTS.md's rule that a change moving a decision edits its doc in the same commit.
-- **Test scenarios:** `Test expectation: none -- decision records and glossary; the docs gate (`pnpm check:docs`) checks their format and the api's avoid-words test reads `CONTEXT.md`.`
-- **Verification:** ADR 0047's structure table matches the navigation list U2 declares. `CONTEXT.md` defines every shell word the plan's requirements use. `pnpm check:docs` passes.
+- **Test scenarios:** `Test expectation: none -- decision records and glossary; the docs gate (`pnpm check:docs`) checks their format and the api's avoid-words test reads `CONCEPTS.md`.`
+- **Verification:** ADR 0047's structure table matches the navigation list U2 declares. `CONCEPTS.md` defines every shell word the plan's requirements use. `pnpm check:docs` passes.
 
 ### U2. The navigation list, visibility and router
 
@@ -545,6 +545,6 @@ Each browser spec that proves a screen's behaviour asserts its ADR 0037 budget.
 - Every requirement R1 to R23 is met, and each acceptance example AE1 to AE9 has a passing test that names it.
 - `pnpm check` passes locally and in CI.
 - The dogfood report's shell scenarios 1 to 9 pass on a re-walk against the reference shell. Scenario 6 is judged against the band Key Decision, which has no primary-action slot. Scenario 15 passes for the address wrapping alone (AE6), and its status tabs, search and row menu are left to the People layout rework.
-- ADR 0047 exists, ADR 0017 and ADR 0046 are edited, and `CONTEXT.md` defines every shell word used on screen, all in the same pull request as the code.
+- ADR 0047 exists, ADR 0017 and ADR 0046 are edited, and `CONCEPTS.md` defines every shell word used on screen, all in the same pull request as the code.
 - The pull request references BA-12 (`Refs: BA-12`), not `Fixes`. BA-12 is updated to record that the role filter shipped and that its Editor half waits on Inbox and ownership.
 - No code from abandoned approaches remains: no unused two-surface helpers, no registry Sidebar files, no leftover `max-w-prose`.

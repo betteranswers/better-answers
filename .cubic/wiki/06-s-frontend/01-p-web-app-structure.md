@@ -119,7 +119,7 @@ The platform skins these components using a Tailwind v4 bridge to ensure they ad
 Sources: [packages/design-system/readme.md:104-108](packages/design-system/readme.md#L104-L108), [packages/design-system/guidelines/kits-adoption.card.html:150-165](packages/design-system/guidelines/kits-adoption.card.html#L150-L165)
 
 ### Platform-Specific Components
-Certain components are custom-built to encode specific domain rules from the glossary (`CONTEXT.md`):
+Certain components are custom-built to encode specific domain rules from the glossary (`CONCEPTS.md`):
 *  **TrustTag**: Displays a closed set of trust words.
 *  **Citation**: Renders concept, source, locator, and passage information.
 *  **Frame**: A blueprint object with registration marks (`+` signs) on corners.

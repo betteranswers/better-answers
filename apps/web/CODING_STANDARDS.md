@@ -32,4 +32,4 @@ Every UI ticket carries that acceptance line. Every interactive element is a nat
 
 ## Write the text on a page in the glossary's reader words
 
-Each thing a person meets has one word: the head of its entry in `CONTEXT.md`. Write that word in every heading, label, message and empty state, and call a place with its own address a *page*. An entry marked `_Internal._` names something only the code meets, so its word stays in the code. `packages/design-system/readme.md` holds the voice, the trust words and the casing.
+Each thing a person meets has one word: the head of its entry in `CONCEPTS.md`. Write that word in every heading, label, message and empty state, and call a place with its own address a *page*. An entry marked `_Internal._` names something only the code meets, so its word stays in the code. `packages/design-system/readme.md` holds the voice, the trust words and the casing.

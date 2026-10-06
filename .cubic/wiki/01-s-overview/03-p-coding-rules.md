@@ -132,7 +132,7 @@ Sources: [CODING\_RULES.md:88-92](CODING\_RULES.md#L88-L92)
 
 ## Documentation & Auditing
 
-Documentation follows a "glossary first" approach. A new domain word must be settled in `CONTEXT.md` before it appears in code.
+Documentation follows a "glossary first" approach. A new domain word is defined in `CONCEPTS.md` in the same change as its first code use, or earlier.
 
 *  **Why, not What:** Comments explain constraints and trade-offs that cannot be inferred from the code.
 *  **Transactional Audit:** Every governed act must write an audit event within the same database transaction.

@@ -49,7 +49,7 @@ Paths below that start `internal/`, `cmd/`, `docs/configuration/`, `docs/example
   ```
 
 - No commit was made. The staged index was intact.
-- 79 of the 86 files still had unstaged changes. The 7 missing were exactly the files with unstaged changes and nothing staged: `CONTEXT.md`, `apps/api/tests/old-words.ts`, `apps/api/tests/old-words-ratchet.json`, `apps/api/tests/kept-names.ts`, `apps/api/tests/avoid-words.test.ts`, `packages/design-system/guidelines/colors-neutral.card.html` and `packages/design-system/tokens/typography.css`. Each was back at HEAD content.
+- 79 of the 86 files still had unstaged changes. The 7 missing were exactly the files with unstaged changes and nothing staged: `CONCEPTS.md`, `apps/api/tests/old-words.ts`, `apps/api/tests/old-words-ratchet.json`, `apps/api/tests/kept-names.ts`, `apps/api/tests/avoid-words.test.ts`, `packages/design-system/guidelines/colors-neutral.card.html` and `packages/design-system/tokens/typography.css`. Each was back at HEAD content.
 - `git stash list` showed no new entry. There was no `lefthook-unstaged.patch` in the common `.git/info` or in the worktree's git dir (`.git/worktrees/<name>/`).
 
 ## What Didn't Work

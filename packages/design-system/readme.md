@@ -12,7 +12,7 @@ the hosted product at `better-answers.com`.
 | --- | --- | --- |
 | The better-answers repository (mounted, read-only) | `better-answers/` | Product definition, glossary, UX and accessibility rules, the reader-facing word set, Control Centre's pages |
 | `VISION.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
-| `CONTEXT.md` | in that repo | The **domain glossary**: each entry a person meets is headed by the word a page uses, and an entry only the code meets is marked internal |
+| `CONCEPTS.md` | in that repo | The **domain glossary**: each entry a person meets is headed by the word a page uses, and an entry only the code meets is marked internal |
 | `CODING_STANDARDS.md` | in that repo | disclosure model, latency and keyboard budget, WCAG 2.2 AA + GOV.UK semantics |
 | `docs/archive/adr/0001–0027` | in that repo | Answer contract (0016), citation markers (0015), the write path (0012), trust derivation (0019), open-core (0027) |
 | Styling brief (from the user) | — | "better-auth, Vercel, Linear" — the visual register |
@@ -50,7 +50,7 @@ The avatar menu in the band holds the person's name, their role and "Sign out".
 
 ## 3. Content fundamentals
 
-A page is written in its reader's words. `CONTEXT.md` heads every entry a person meets with
+A page is written in its reader's words. `CONCEPTS.md` heads every entry a person meets with
 the word a page uses. An entry only the code meets is marked `_Internal._`.
 
 **Write the glossary's word.** A page names each thing by the word that heads its glossary
@@ -332,7 +332,7 @@ not swept.
 
 The seven product-specific components the set used to hold are the ones to rebuild first on
 top of a registry primitive, because nothing off the shelf carries their meaning:
-**`TrustTag`** (the closed set of trust words, `CONTEXT.md` and ADR 0019),
+**`TrustTag`** (the closed set of trust words, `CONCEPTS.md` and ADR 0019),
 **`Citation`** (concept, source, locator, passage on one disclosure, ADR 0015),
 **`CoverageBar`**, **`SummaryList`** and **`Details`** (GOV.UK *semantics* without the
 GOV.UK brand), **`Icon`** (the Phosphor substitution in one file) and
@@ -351,4 +351,4 @@ GOV.UK brand), **`Icon`** (the Phosphor substitution in one file) and
 4. **Accent colour.** Ink blue `#2e4bd4` was chosen, not found. The source specifies no palette — only that colour never carries a signal alone.
 7. **Textures.** `GridPattern`, `DotPattern` and `NoiseTexture` are ports of the corresponding Magic UI components, retuned to these tokens rather than pulled from npm — the design system ships no build step. In an application, install `@magicui/grid-pattern`, `@magicui/dot-pattern` and `@magicui/noise-texture` and pass the same tokens.
 5. **Dark theme.** Authored on the reference styling's convention, not on evidence from the source.
-6. **Page layouts.** Grounded in `CONTEXT.md` and the ADRs (which name every page and its content) but not in any interface code, because none exists yet.
+6. **Page layouts.** Grounded in `CONCEPTS.md` and the ADRs (which name every page and its content) but not in any interface code, because none exists yet.

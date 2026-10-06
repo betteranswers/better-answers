@@ -222,7 +222,7 @@ flowchart TB
 ### Sources / Research
 
 - Current sign-in: `apps/api/src/auth/auth.ts` (emailOTP only; no passkey, two-factor or Microsoft provider), `apps/api/src/auth/constants.ts` (6 digits, 5 minutes, 3 attempts), `apps/web/src/features/auth/sign-in-screen.tsx`, and `packages/core/src/workspaces/sign-in-and-consent.ts` (sign-in recorded with no method).
-- Decisions in force: ADR 0009, 0034, 0035, 0038 and 0047 under `docs/solutions/architecture-patterns/`, and `CONTEXT.md`'s *sign-in*, *invitation* and *Account page*.
+- Decisions in force: ADR 0009, 0034, 0035, 0038 and 0047 under `docs/solutions/architecture-patterns/`, and `CONCEPTS.md`'s *sign-in*, *invitation* and *Account page*.
 - NIST SP 800-63B-4: email is not an authenticator (§3.1.3.1), and its reauthentication ceilings. https://pages.nist.gov/800-63-4/sp800-63b.html
 - Microsoft: Safe Links scans and opens links before delivery (https://learn.microsoft.com/en-us/defender-office-365/safe-links-about); `amr`, `xms_edov` and the mutable `email` claim (https://learn.microsoft.com/en-us/entra/identity-platform/optional-claims-reference).
 - Passkey prompts: offer them in account settings, not during sign-in (https://www.passkeycentral.org/design-guidelines/principles).
@@ -437,7 +437,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 - **Audit:** the rule *Keep a read, a run and a health check out of the audit log* is amended to name the library-owned factor writes (KTD2). Audit details name passkey ids, never passkey names, because the log is append-only.
 - **Operators:** console writes and reads both pass the gate, and writes move from "signed in within the hour" to "confirmed a factor within the hour".
 - **MCP and personal tokens:** unaffected at use time. A pending Admin cannot complete a new "connect Claude" authorisation until confirmed.
-- **Glossary and decisions:** `CONTEXT.md` gains the new words first. ADR 0009, 0034, 0035, 0038 and 0047 are amended by the units that move them, and a new decision doc records the second-factor policy.
+- **Glossary and decisions:** `CONCEPTS.md` gains the new words first. ADR 0009, 0034, 0035, 0038 and 0047 are amended by the units that move them, and a new decision doc records the second-factor policy.
 
 ---
 
@@ -445,7 +445,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 
 | U-ID | Title | Files touched (key) | Depends on |
 | --- | --- | --- | --- |
-| U1 | Glossary words for sign-in and the second factor | `CONTEXT.md` | — |
+| U1 | Glossary words for sign-in and the second factor | `CONCEPTS.md` | — |
 | U2 | Email builder with an HTML part | `apps/api/src/email.ts`, `apps/api/src/main.ts`, `apps/api/src/auth/sign-in-email.ts` | U1 |
 | U3 | The sign-in link | `apps/api/src/auth/`, `apps/web/src/features/auth/link-*`, `packages/core/src/erasure/identity.ts` | U2 |
 | U4 | Sign-in screen: paste, auto-submit, tab sync | `apps/web/src/features/auth/sign-in-screen.tsx` | U3 |
@@ -467,7 +467,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 **Goal:** settle the words before code names them.
 **Requirements:** R7 to R25, R36, R37 (the vocabulary they use).
 **Dependencies:** none.
-**Files:** `CONTEXT.md`.
+**Files:** `CONCEPTS.md`.
 **Approach:**
 1. Add entries for *passkey*, *authenticator*, *second factor*, *recovery code*, *re-confirm*, *session* and *sign-in link*, each with one definition and its *Avoid* line.
 2. Extend the *sign-in* entry to name passkeys and the link, and the *Account page* entry to name its Sign-in and Sessions sections.
@@ -817,7 +817,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 - schema: the account table's `tid` in `packages/schema/src/identity-tables.ts`, one new migration, and `generate:worker-view`
 - endpoint snapshot: `apps/api/tests/better-auth-endpoints.txt`
 - web: `apps/web/src/features/account/` (linked-account row and add)
-- docs: `docs/solutions/architecture-patterns/adr-0034-*.md`, `CONTEXT.md` (*sign-in*), `docs/operations/SECRETS.md`
+- docs: `docs/solutions/architecture-patterns/adr-0034-*.md`, `CONCEPTS.md` (*sign-in*), `docs/operations/SECRETS.md`
 - tests: new `apps/api/tests/microsoft.test.ts`, `apps/web/e2e/harness.ts` (fake OpenID issuer), new `apps/web/e2e/microsoft.spec.ts`
 **Approach:**
 1. Read the client id and secret as a credential class in config.
@@ -946,7 +946,7 @@ Run local suites with `IMAGE_PROBE_DEFERRED=true` (`docs/agents/workflow.md`). C
 - Every R1 to R37 is met and traced to a unit and a test, and every AE has a test that names it.
 - U10 flips U5's pinned email-code bypass test, so an Admin's email sign-in is pending. The passkey and Microsoft equivalents are written against the gate in U10 and U14.
 - Every endpoint added by Better Auth is reviewed in the snapshot, and every one that changes, verifies or reveals a factor is proven closed or gated.
-- `CONTEXT.md`, the amended ADR docs (0009, 0034, 0035, 0038, 0047) and the amended rule *Keep a read, a run and a health check out of the audit log* in `CODING_STANDARDS.md` land in the commits that move them, and the new second-factor decision doc exists.
+- `CONCEPTS.md`, the amended ADR docs (0009, 0034, 0035, 0038, 0047) and the amended rule *Keep a read, a run and a health check out of the audit log* in `CODING_STANDARDS.md` land in the commits that move them, and the new second-factor decision doc exists.
 - Erasure removes every new identity-set row and the sign-in code and link rows, proven both on a last membership and with another membership remaining.
 - The browser suite passes the accessibility gate on every new screen.
 - No abandoned-attempt code, flags or dead routes remain in the diff.
