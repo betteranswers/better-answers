@@ -141,7 +141,7 @@ Sources: [packages/design-system/readme.md:59-64](packages/design-system/readme.
 ## Summary of Usage Rules
 
 The glossary is binding on all development activities. Developers must follow these guidelines:
-1.  **Name First:** Settle new domain words in `CONCEPTS.md` before they appear in code.
+1.  **Name First:** Define a new domain word in `CONCEPTS.md` in the same change as its first code use, or earlier.
 2.  **No Synonyms:** Use the exact term defined (e.g., always "Workspace", never "Team").
 3.  **Banned Terms:** Never use terms marked as "Avoid".
 4.  **Audit Consistency:** Acts must be named using the `family.subject.verb` template (e.g., `knowledge.suggestion.accepted`).
