@@ -12,7 +12,7 @@ C4Dynamic
     Component(run, "run.py — index_binding", "the host", "Opens the binding's two stores and the workspace's pool")
     Component(catalogue, "catalogue.py", "psycopg", "read_binding, record_findings, reconcile_catalogue, quarantine_catalogue")
     Component(landed, "landed.py — landed", "coco.fn, unmemoised, one component per document", "Converts, asks for spans, redacts, splits into chunks")
-    Component(converter, "converter.py", "anydoc 0.2.4, pdf-inspector 1.24.0", "docx and PDF to normalised text, text passed through; UnreadableError otherwise")
+    Component(converter, "converter.py", "anydoc 0.2.4, pdf-inspector 1.25.2", "docx and PDF to normalised text, text passed through; UnreadableError otherwise")
     Component(detected, "detected.py — detected", "coco.fn, memo=True, version 1", "Spans for one normalised text under one detection key")
     Component(redaction, "redaction/", "Presidio, GLiNER, spaCy", "spans_detected; redact — the block rule, erasure matches, pseudonyms, withholdings, written spans")
     Component(rows, "rows.py and host.land_rows", "cocoindex chunks app, managed_by user", "index.chunk rows keyed by document and ordinal")
