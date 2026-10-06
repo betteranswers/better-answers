@@ -110,25 +110,25 @@ export const useRevokeEverywhere = (personId: string) => {
   const onEveryPage = useOnEveryPage();
   const operator = useTheOperator();
   const inspectedKey = api.console.people.inspect.queryKey({ personId });
-  return useMutation(
-    api.console.people.revokeCredentials.mutationOptions({
-      onMutate: () => {
-        const at = new Date().toISOString();
-        return Promise.all([
-          optimistic(inspectedKey, (held) => endedEverywhere(held, at, operator)),
-          onEveryPage((page) => revokedIn(page, personId, at)),
-        ]);
-      },
-      onError: (_refusal, _asked, undos) => {
-        undoEach(undos);
-      },
-      onSettled: () =>
-        Promise.all([
-          queryClient.invalidateQueries({ queryKey: inspectedKey }),
-          queryClient.invalidateQueries({ queryKey: api.console.people.list.queryKey() }),
-        ]),
-    }),
-  );
+  // The callbacks go to the hook itself: the React lint takes one passed through `mutationOptions` as run during render.
+  return useMutation({
+    ...api.console.people.revokeCredentials.mutationOptions<readonly Undo[]>(),
+    onMutate: () => {
+      const at = new Date().toISOString();
+      return Promise.all([
+        optimistic(inspectedKey, (held) => endedEverywhere(held, at, operator)),
+        onEveryPage((page) => revokedIn(page, personId, at)),
+      ]);
+    },
+    onError: (_refusal, _asked, undos) => {
+      undoEach(undos);
+    },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: inspectedKey }),
+        queryClient.invalidateQueries({ queryKey: api.console.people.list.queryKey() }),
+      ]),
+  });
 };
 
 type NamesWaiting = inferOutput<Api["console"]["people"]["namesWaiting"]>;
