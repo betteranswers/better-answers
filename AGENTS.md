@@ -126,7 +126,7 @@ Two reviews, one in the session and one on the pull request. `/ce-code-review` r
 
 ## Code and doc exploration
 
-The jCodeMunch policy, its front-door tools and how to read their results are in the owner's global `~/.claude/CLAUDE.md`, which every session here loads. A hook refuses raw reads of code. This section adds only what is particular to this repository.
+The jCodeMunch policy, its front-door tools and how to read their results are in the owner's global `~/.claude/CLAUDE.md`, which sessions on the owner's machine load, and a global hook there refuses raw reads of code. A session that did not load that file runs `jcodemunch_guide` for the policy. This section adds only what is particular to this repository.
 
 **After editing files:**
 - A login service per server (`jcodemunch-mcp watch-install`, `jdocmunch-mcp watch-install --no-ai-summaries`) reindexes the main checkout and each worktree on any change on disk, merges included. Check it with `watch-status`.
@@ -143,12 +143,12 @@ So from a worktree:
 - An `impact` that answers *ambiguous* is re-run by `target_uid` before its risk counts.
 - `rename` stays a dry run (`dry_run: true`, its default). It has no `worktree:` parameter: it reads **and writes** the main checkout's files, and its answer names no tree. Its edit list names the sites, by the main checkout's line numbers. Apply each one in the worktree with `Edit`. The rename counts as done only when a jCodeMunch `search_text` for the old name comes back empty. That search sees what this branch added since the last `analyze`.
 
-**Docs.** Use jDocMunch to find and read this repository's documentation, the Markdown under `docs/` and at the root:
+**Docs.** Use jDocMunch to find and read this repository's own Markdown, the files git tracks:
 - Start with `doc_resolve_repo` on `.`. From a worktree it names the worktree's own index (above).
 - Find a passage with `search_sections`, and read it with `get_section` or `get_sections`.
 - Open a long file's structure with `get_document_outline` before reading any of it.
 
-No hook holds this rule, so it applies whether you would read with `Read` or through Bash. Read a doc directly when you will work through all of it (a plan you are carrying out), when you are about to edit it, or when a command needs it raw, such as a grep that also covers code. Files jDocMunch does not index, such as skill references and run output under `/tmp`, are always read directly.
+No hook holds this rule, so it applies whether you would read with `Read` or through Bash. Read a doc directly when you will work through all of it (a plan you are carrying out), when you are about to edit it, or when a command needs it raw, such as a grep that also covers code. Files outside the repository, such as the references of an installed plugin's skills and run output under `/tmp`, are always read directly.
 
 <!-- gitnexus:start -->
 <!-- gitnexus:keep -->
