@@ -57,7 +57,7 @@ export const connectedSourcesSeeding = z.object({
   connectedSources: z.array(aConnectedSource).min(1),
 });
 
-/** By workspace alone: a connected source the browser bound carries an id only the page minted. */
+/** By workspace alone: a connected source the browser connected carries an id only the page minted. */
 export const indexRunMoving = z.object({
   workspaceId: z.string().min(1),
   to: z.enum(MOVED_RUNS),

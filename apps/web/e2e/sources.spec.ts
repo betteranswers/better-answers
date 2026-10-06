@@ -230,8 +230,8 @@ test.describe("the Sources page's list of connected sources", () => {
   });
 });
 
-test.describe("connected source a document on the Sources page", () => {
-  test("an Admin connects by keyboard and sees landed, indexing, indexed", async ({
+test.describe("connecting a document on the Sources page", () => {
+  test("an Admin connects by keyboard and sees received, indexing, indexed", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -298,7 +298,9 @@ test.describe("connected source a document on the Sources page", () => {
       uploadThroughput: -1,
     });
 
-    await expect(page.getByText("Bound “The staff handbook”: handbook.md landed")).toBeVisible();
+    await expect(
+      page.getByText("Connected “The staff handbook”: handbook.md was received"),
+    ).toBeVisible();
     await expect(stateOf(page, "The staff handbook")).toHaveText("received");
     await expect(lastRunOf(page, "The staff handbook")).toContainText("Index run queued");
     await expect(classOf(page, "The staff handbook")).toHaveText("Restricted");

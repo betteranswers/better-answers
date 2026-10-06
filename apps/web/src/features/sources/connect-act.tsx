@@ -152,7 +152,7 @@ export function ConnectAct() {
         consequence="The connected source starts unpublished: nobody but an Admin reads a word of it until you publish it. Its index run starts once the file lands."
         commit={
           <Button type="submit" form={ids.form} disabled={connect.isPending}>
-            {connect.isPending ? "Connected source the document" : "Connect the document"}
+            {connect.isPending ? "Connecting the document" : "Connect the document"}
           </Button>
         }
       >
