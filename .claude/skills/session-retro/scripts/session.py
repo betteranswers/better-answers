@@ -23,6 +23,22 @@ INVOCATION = "<command-name>/session-retro</command-name>"
 COMMAND = re.compile(r"<command-name>/?([^<]+)</command-name>")
 FIELD_LIMIT = 300
 OWNER_WAITS = {"AskUserQuestion"}
+SECRETS = [
+    re.compile(r"(?i)(bearer\s+)[\w.~+/=-]{8,}"),
+    re.compile(
+        r"(?i)((?:api[_-]?key|token|secret|password|passwd)[\"']?\s*[=:]\s*[\"']?)[^\s\"',]{6,}"
+    ),
+    re.compile(r"()\b(?:sk|pk|rk)[-_](?:live|test|proj)[-_][\w-]{8,}"),
+    re.compile(r"()\b(?:ghp|gho|ghs|github_pat|xox[abp]|re)_[\w]{16,}"),
+    re.compile(r"()\bAKIA[0-9A-Z]{16}\b"),
+    re.compile(r"()\b(?=\w*[g-zG-Z])(?=\w*\d)\w{40,}\b"),
+]
+
+
+def mask(text):
+    for pattern in SECRETS:
+        text = pattern.sub(lambda m: m.group(1) + "[redacted]", text)
+    return text
 
 
 def fail(message):
@@ -166,7 +182,7 @@ class Digest:
             "name": name,
             "request": request,
             "start": seconds(record.get("timestamp")),
-            "input": json.dumps(given, sort_keys=True),
+            "input": mask(json.dumps(given, sort_keys=True)),
             "background": bool(given.get("run_in_background")),
         }
 
@@ -181,7 +197,7 @@ class Digest:
                 self.results[block.get("tool_use_id")] = {
                     "end": seconds(record.get("timestamp")),
                     "error": bool(block.get("is_error")),
-                    "text": " ".join(text.split())[:120],
+                    "text": mask(" ".join(text.split()))[:120],
                 }
 
 
@@ -315,6 +331,7 @@ def report(path, digest, top):
 
 def cut(value, depth=0):
     if isinstance(value, str):
+        value = mask(value)
         return value if len(value) <= FIELD_LIMIT else value[:FIELD_LIMIT] + " [cut]"
     if isinstance(value, list):
         return [cut(v, depth + 1) for v in value[:20]]

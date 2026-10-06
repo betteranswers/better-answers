@@ -82,6 +82,11 @@ describe("the session-retro script's digest", () => {
     expect(section("repeated")).toContain("pnpm test");
   });
 
+  it("masks a secret in repeated calls and errors", () => {
+    expect(digest).not.toContain("FAKE0fixture0token");
+    expect(section("repeated")).toContain("[redacted]");
+  });
+
   it("skips and counts a line it cannot parse", () => {
     expect(digest).toMatch(/skipped lines: 1/);
   });
@@ -129,6 +134,12 @@ describe("the session-retro script's other modes", () => {
     expect(shown).toContain("A long note.");
     expect(shown).toContain("[cut]");
     expect(shown.length).toBeLessThan(1500);
+  });
+
+  it("masks a secret in a record it shows", () => {
+    const shown = session(["show", PAST, "19"]).stdout;
+    expect(shown).toContain("Bearer [redacted]");
+    expect(shown).not.toContain("FAKE0fixture0token");
   });
 
   it("shows a subagent's record by its agent id", () => {
