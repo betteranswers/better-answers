@@ -1,11 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
+
+import { missingPaths, namedPaths } from "./skill-pointers.ts";
 
 const skillDirectory = ".claude/skills/session-retro";
 const script = path.join(repositoryRoot, skillDirectory, "scripts/session.py");
@@ -163,46 +165,11 @@ describe("the session-retro script's other modes", () => {
   });
 });
 
-const QUOTED = /`(?<token>[^`]+)`/g;
-
-const withoutFences = (text: string): string => {
-  const kept: string[] = [];
-  let inFence = false;
-  for (const line of text.split("\n")) {
-    if (line.startsWith("```")) inFence = !inFence;
-    else if (!inFence) kept.push(line);
-  }
-  return kept.join("\n");
-};
-
-const looksLikePath = (token: string): boolean =>
-  !/[\s<>$*~]/.test(token) &&
-  !token.startsWith("/") &&
-  !token.startsWith("-") &&
-  (token.includes("/") || /.\.[a-z]+$/.test(token));
-
-const fromRoot = (token: string): string =>
-  token.startsWith("references/") || token.startsWith("scripts/")
-    ? path.join(skillDirectory, token)
-    : token;
-
-const named = ["SKILL.md", "references/categories.md"].flatMap((file) =>
-  [
-    ...withoutFences(
-      readFileSync(path.join(repositoryRoot, skillDirectory, file), "utf8"),
-    ).matchAll(QUOTED),
-  ]
-    .map((match) => match.groups?.["token"] ?? "")
-    .filter(looksLikePath)
-    .map(fromRoot),
-);
+const named = namedPaths(skillDirectory, ["SKILL.md", "references/categories.md"]);
 
 describe("the session-retro skill's pointers", () => {
   it("points at files that are in the tree", () => {
-    const missing = [...new Set(named)].filter(
-      (file) => !existsSync(path.join(repositoryRoot, file)),
-    );
-    expect(missing, `${skillDirectory} names paths that do not exist`).toEqual([]);
+    expect(missingPaths(named), `${skillDirectory} names paths that do not exist`).toEqual([]);
   });
 
   it("names its script and the files a finding targets", () => {
