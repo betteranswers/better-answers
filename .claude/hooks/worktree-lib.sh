@@ -1,4 +1,7 @@
 # shellcheck shell=bash # sourced by the worktree hooks, so it carries no shebang of its own
+# Appended, so a tool already on PATH wins. A hook the desktop client starts has launchd's bare PATH.
+PATH="$PATH:$HOME/Library/pnpm:$HOME/.local/bin:/opt/homebrew/bin"
+
 say() {
   echo "$SAY_AS: $*" >&2
 }
@@ -38,6 +41,12 @@ drop_doc_repo() {
   fi
 }
 
+doc_indexes() {
+  jdocmunch-mcp watch-status 2>/dev/null \
+    | jq -r '.repos[]? | select(.repo and .source_root) | [.repo, .source_root] | @tsv' \
+      2>/dev/null || true
+}
+
 # $1: a folder path ending in `/`. A worktree removed without the remove hook leaves its doc index.
 drop_orphan_doc_indexes() {
   command -v jdocmunch-mcp >/dev/null 2>&1 || return 0
@@ -46,9 +55,7 @@ drop_orphan_doc_indexes() {
     case "$root" in
       "$1"?*) [ -d "$root" ] || drop_doc_repo "$repo" ;;
     esac
-  done < <(jdocmunch-mcp watch-status 2>/dev/null \
-    | jq -r '.repos[]? | select(.repo and .source_root) | [.repo, .source_root] | @tsv' \
-      2>/dev/null || true)
+  done < <(doc_indexes)
 }
 
 is_clean() {
