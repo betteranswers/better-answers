@@ -19,6 +19,7 @@ import {
 } from "./old-words.ts";
 import { readUnder } from "./tree-walk.ts";
 import {
+  AVOID_LIST,
   type Counts,
   entriesOf,
   type Finding,
@@ -123,7 +124,7 @@ describe("the list of old words", () => {
   });
 
   it("leaves the glossary no list of words to avoid", () => {
-    expect(glossary).not.toMatch(/_Avoid_/);
+    expect(glossary).not.toMatch(AVOID_LIST);
   });
 });
 
@@ -698,12 +699,69 @@ describe("the glossary's entries", () => {
     ].join("\n");
 
     expect(entriesOf(glossary)).toEqual([
-      {
-        term: "watermark",
-        text: "- **watermark** — the last commit a workspace's rows know about.",
-      },
-      { term: "job", text: "- **job** — one unit of work." },
+      { term: "watermark", definition: "the last commit a workspace's rows know about." },
+      { term: "job", definition: "one unit of work." },
     ]);
+  });
+
+  it("reads a headed entry up to the next heading", () => {
+    const glossary = [
+      "## Work",
+      "",
+      "### job",
+      "_Internal._ one unit of background work.",
+      "",
+      "It runs once per claim.",
+      "",
+      "### connected source",
+      "_Code rename pending._ an Admin's connection of one source.",
+      "## Flagged ambiguities",
+      "- **cursor** — _Internal._ a bullet entry beside the headed ones.",
+    ].join("\n");
+
+    expect(entriesOf(glossary)).toEqual([
+      {
+        term: "job",
+        definition: "_Internal._ one unit of background work. It runs once per claim.",
+      },
+      {
+        term: "connected source",
+        definition: "_Code rename pending._ an Admin's connection of one source.",
+      },
+      { term: "cursor", definition: "_Internal._ a bullet entry beside the headed ones." },
+    ]);
+  });
+
+  it("reads the mark that opens a headed entry's definition", () => {
+    const glossary = [
+      "### job",
+      "_Internal._ one unit of background work. A page says *Task*.",
+      "",
+      "### connected source",
+      "_Code rename pending._ an Admin's connection of one source.",
+      "",
+      "### Unverified",
+      "nobody has confirmed it.",
+    ].join("\n");
+
+    expect(
+      internalFindings(
+        plantedTree({ [WORDS]: 'export const A = "One job left.";' }),
+        glossary,
+        scanOf([]),
+        [],
+      ).map((finding) => `${finding.internal.head} → ${finding.internal.pagesSay ?? "-"}`),
+    ).toEqual(["job → Task"]);
+    expect(listFaults([], glossary, [])).toContain(
+      `"connected source" is marked pending, but no pending row names its code's word`,
+    );
+  });
+
+  it("refuses a list of words to avoid, in any emphasis", () => {
+    const lists = ["*Avoid:* booking", "_Avoid_: booking", "**Avoid:** booking", "Avoid: booking"];
+
+    expect(lists.filter((line) => !AVOID_LIST.test(line))).toEqual([]);
+    expect(AVOID_LIST.test("a word to avoid on a page")).toBe(false);
   });
 });
 

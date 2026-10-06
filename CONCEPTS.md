@@ -1,4 +1,4 @@
-# CONTEXT.md — glossary
+# Concepts
 
 Root glossary for the platform. Each entry a person meets is headed by the word they read on a
 page, in an MCP tool's text or answer, or in an email, and the code, the database and the docs use
@@ -8,6 +8,11 @@ an older name until that noun's sweep lands, and `apps/api/tests/old-words.ts` g
 Names the platform does not own keep theirs: OKF's keys and nouns and the keys written into concept
 files, the MCP wire, a library's or a protocol's own names, and stored history. Terms not listed
 here are still draft.
+
+Compound Engineering's skills edit this file under their own rules for `CONCEPTS.md`, with three
+exceptions that hold here. The two marks above stay where they open a definition. The file carries
+no list of words to avoid: the old words live in the words test, so an agent reads only the word to
+write. A new entry follows the shape of the entries around it.
 
 ## Knowledge model
 
