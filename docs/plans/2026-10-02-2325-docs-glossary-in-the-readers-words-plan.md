@@ -346,13 +346,15 @@ sequenceDiagram
 - After the passage sweep, run the restore drill once to prove AE13.
 - **Running the lanes (KTD10, item 7).** Each lane runs in its own session and worktree, one unit per `ce-work` run. What lanes do not change:
   - **One watched release at a time.** While one lane's sweep is in its watched release, with `RELEASE_MODE` at `drill`, every other lane holds its merge. "Nothing else waiting" in step 2 above includes the other lanes.
-  - **Migration numbers.** U12, U15, U17, U16's *slug* and possibly U14 (Deferred to Implementation) each add a migration. The branch that merges second renumbers its migration in the journal as well as the file name, rewrites its snapshot against the new predecessor, and shows that a second `generate` finds no diff.
+  - **Migration numbers.** U12, U15 and U17 each add a migration. U14 (Deferred to Implementation) and U16's *slug* add one if they rename a column. The branch that merges second renumbers its migration's file name and its journal `idx` and `tag`. It also sets the journal's `when` later than the landed migration's, because drizzle's migrator applies by `when`, not by number, and skips a migration whose `when` is earlier than the last one applied. Then it rewrites its snapshot against the new predecessor and regenerates the worker's schema view, whose `MIGRATION_WHEN` follows the last entry. A second `generate` must find no diff.
   - **Contract stamps.** U12 and U15 both move the contract digest. The second to merge regenerates both stamps after its rebase.
   - **Shared files.** `apps/web/src/shared/navigation.ts`, `apps/api/tests/old-words.ts` with its ratchet, `CONCEPTS.md` and `contracts/manifest.json` conflict on every rebase. Resolve them by hand, then regenerate the ratchet; it may only lose entries.
 - **Rebasing a lane onto a landed sweep:**
-  1. Replay each map that landed since the branch was cut, in apply mode.
-  2. Run the words test. AE12 names any old word the replay missed.
-  3. Re-read by hand the prose the rebase brought in. A prose pass is not a safe replay: it rewrites code and data in files the runner's senses shield (`docs/solutions/best-practices/what-a-rename-sweeps-runner-and-prose-pass-get-wrong-and-the-checks-that-catch-it.md`).
+  1. Replay each map that landed since the branch was cut, in apply mode. Then run the branch's own map again in apply mode, because the rebase brought in the other lane's files.
+  2. Correct every literal path that a map in `packages/devtools/renames/` names and the other lane moved. Nothing else catches a stale path (step 11 of the rename-sweep learning named in step 5).
+  3. Dry-run every landed map and the branch's own map. None may list a `rename` (the same learning, step 13).
+  4. Run the words test. AE12 names any old word the replay missed.
+  5. Re-read by hand the prose the rebase brought in. A prose pass is not a safe replay: it rewrites code and data in files the runner's senses shield (`docs/solutions/best-practices/what-a-rename-sweeps-runner-and-prose-pass-get-wrong-and-the-checks-that-catch-it.md`).
 - **A new deferred sense** (`until`) must name a sweep that has not landed and that follows the sweep landing the row, in the same lane or U17.
 
 ### Deferred to Implementation
