@@ -173,7 +173,7 @@ This plan covers the glossary rewrite and the renames that follow from it. The b
 
 ## Planning Contract
 
-Planning Contract preservation: changed on 06/10/2026, after U11 released. The single chain from U12 to U17 became three lanes (KTD10, item 7). U16's inbox noun moved to U15, and U14's column question was added to Deferred to Implementation. No requirement changed.
+Planning Contract preservation: changed on 06/10/2026, after U11 released. The single chain from U12 to U17 became three lanes (KTD10, item 7). U16's inbox noun moved to U15, U15 gained the worker files its nouns live in, and the column questions of U14 and U16 were added to Deferred to Implementation. No requirement changed.
 
 ### Key Technical Decisions
 
@@ -365,6 +365,7 @@ sequenceDiagram
 - The code word for each collision, recorded in that sweep's rename map.
 - Whether a unit's nouns split into more than one pull request. One noun per pull request is the rule (KTD5).
 - Whether U14 renames the column `concept_verification.checked_at` and its index with core's name. If it does, U14 carries a hand-written migration and releases under watch (KTD4). The wire keys stay either way (R21).
+- Whether U16 renames the column `workspace.slug`, with its `workspace_slug_unique` constraint, or keeps it and maps the new field name onto it through Better Auth's field option. A rename makes U16's *slug* pull request a KTD4 migration with a watched release, and adds it to the Verification Contract's `generate` rows.
 
 ---
 
@@ -817,7 +818,7 @@ sequenceDiagram
 **Dependencies:** U14, in the Knowledge lane. The nouns *quarantined*, *finding group*, *composition* and *class* also wait for U13, because they live in the sources slice and the worker (KTD10, item 7).
 
 **Files:**
-- Modify: `packages/core/src/concepts/`, `packages/core/src/sources/`, `packages/core/src/answering/index.ts`, `packages/schema/src/suggestion-tables.ts`, `packages/schema/src/concept-tables.ts`, `packages/schema/src/source-tables.ts`, `apps/web/src/features/`, `apps/web/src/shared/navigation.ts`
+- Modify: `packages/core/src/concepts/`, `packages/core/src/sources/`, `packages/core/src/answering/index.ts`, `packages/schema/src/suggestion-tables.ts`, `packages/schema/src/concept-tables.ts`, `packages/schema/src/source-tables.ts`, `apps/web/src/features/`, `apps/web/src/shared/navigation.ts`, `apps/worker/src/better_answers_worker/` (*quarantined*, *composition* and *class*)
 - Create: one map per noun in `packages/devtools/renames/`
 
 **Approach:**
@@ -922,7 +923,7 @@ sequenceDiagram
 | `pnpm --filter @better-answers/core run check` | Core's types and suites | U4, U8 onward |
 | `pnpm run check:api` | The api's suites, the words test and MCP output | U2, U4, every sweep |
 | `pnpm run check:web` | The web app's types, tests and browser suite | U7, U8, every sweep touching pages |
-| `pnpm run check:worker` | The worker's suites and the prepare test | U6, U9 to U13 |
+| `pnpm run check:worker` | The worker's suites and the prepare test | U6, U9 to U13, U15 |
 | `pnpm --filter @better-answers/schema run generate`, then again with no diff | A rename migration keeps the snapshot in step | U9 to U12, U15, U17 |
 | `generate:worker-view`, `generate:roles-surface`, `generate:contract-stamp` (schema) and `generate:audit-acts` (core) | Generated files in step, drift-checked | Every schema sweep, U17 |
 | `pnpm run check:gates` | Lint, comment and format gates, including the renamed lint rule | U6, U17 |
