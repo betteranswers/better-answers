@@ -135,7 +135,7 @@ reviews:
         - apps/web/**
         - packages/core/**
 pr_descriptions:
-  generate: true
+  generate: false
   cubic_review_link: true
   skip_if_author_description: false
 issues:
