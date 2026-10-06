@@ -418,6 +418,12 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:devtools",
   },
   {
+    file: "packages/devtools/test/ci/survey-architecture-skill.test.ts",
+    reads:
+      ".claude/skills/survey-architecture/SKILL.md and its two references, and every path they name",
+    inTheLane: "check:docs:devtools",
+  },
+  {
     file: "packages/devtools/test/ci/docs-lane.test.ts",
     reads: "no markdown — it holds this table against the script the lane runs",
     inTheLane: "check:docs:devtools",

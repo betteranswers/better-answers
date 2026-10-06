@@ -365,7 +365,7 @@ describe("the skills this repository tracks", () => {
     expect(skills).toContain(".claude/skills/renovate-prs/SKILL.md");
   });
 
-  it("tracks five third-party skills, so every agent loads one copy", () => {
+  it("tracks six third-party skills, so every agent loads one copy", () => {
     const skills = tracked(".claude/skills");
 
     expect(skills).toContain(".claude/skills/ce-skill-work/SKILL.md");
@@ -373,6 +373,19 @@ describe("the skills this repository tracks", () => {
     expect(skills).toContain(".claude/skills/complexity-gate/SKILL.md");
     expect(skills).toContain(".claude/skills/mutation-testing/SKILL.md");
     expect(skills).toContain(".claude/skills/repo-quality-sweep/SKILL.md");
+    expect(skills).toContain(".claude/skills/survey-architecture/SKILL.md");
+  });
+
+  it("tracks the pixel-perfect plugin with its licence and notice", () => {
+    const files = tracked(".claude/skills/pixel-perfect");
+
+    expect(files).toContain(".claude/skills/pixel-perfect/.claude-plugin/plugin.json");
+    expect(files).toContain(".claude/skills/pixel-perfect/LICENSE");
+    expect(files).toContain(".claude/skills/pixel-perfect/NOTICE.md");
+    for (const skill of ["audit", "critique", "screenshot-diff", "visual-qa"]) {
+      expect(files).toContain(`.claude/skills/pixel-perfect/skills/${skill}/SKILL.md`);
+    }
+    expect(files.filter((file) => file.endsWith("/SKILL.md"))).toHaveLength(15);
   });
 
   it("tracks nothing else, since every other skill installs per checkout", () => {
@@ -386,8 +399,10 @@ describe("the skills this repository tracks", () => {
       "code-comments",
       "complexity-gate",
       "mutation-testing",
+      "pixel-perfect",
       "renovate-prs",
       "repo-quality-sweep",
+      "survey-architecture",
     ]);
   });
 

@@ -136,8 +136,8 @@ reviews:
         - packages/core/**
 pr_descriptions:
   generate: false
-  cubic_review_link: true
-  skip_if_author_description: false
+  cubic_review_link: false
+  skip_if_author_description: true
 issues:
   fix_with_cubic_buttons: true
   pr_comment_fixes: true

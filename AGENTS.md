@@ -62,10 +62,12 @@ Three rules that hold regardless of whether the skill was invoked:
 - `/ce-code-review` before a pull request, `/ce-compound` after a solved problem (*Compounding*, below).
 - `/ce-dogfood` for a page, walked as the personas in `docs/personas/`.
 - `/browser-suite` for any Playwright spec under `apps/web/e2e/`.
+- The `pixel-perfect:` skills (`.claude/skills/pixel-perfect/`) to review a rendered page's design: `visual-qa` for contrast, touch targets and overflow, `audit` and `critique` for a scored review, `screenshot-diff` for a pixel diff. They load only in a session started at the repository root.
 - `/renovate-prs` for Renovate's dependency pull requests, red or waiting.
 - `/better-answers-design` for anything a person will look at.
 - The api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/`.
 - `resend` and `email-best-practices`, vendored from Resend, for its sending limits, deliverability and webhooks. The api sends through Resend's SMTP relay with nodemailer (`apps/api/src/smtp.ts`), not its SDK, so check any of their samples against the code before copying it.
+- `/survey-architecture` before a route block that the route spec holds behind an architecture review, starting with S2. It gives that review its report of opportunities to start from.
 - `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so.
 
 Other skills live beside the code that uses them most, such as `apps/worker/.claude/skills/` and `apps/web/.claude/skills/`. If a task has a skill, use it for best practice: for example, hono for the api's routes and middleware, cocoindex for the worker and its pipeline, and better-auth for authentication. Production deploys only through `release.yml`, and the procedure, rollback included, is in `docs/operations/RUNBOOK.md` and `docs/operations/CI.md`; the coolify skills describe Coolify itself, not this release path.
