@@ -20,7 +20,7 @@
     "check:docs": "node scripts/check.mjs format:check check:docs:api check:docs:core check:docs:devtools check:docs:web",
     "check:docs:api": "pnpm --filter @better-answers/api run test tests/avoid-words.test.ts",
     "check:docs:core": "pnpm --filter @better-answers/core run test test/tier-contract.test.ts",
-    "check:docs:devtools": "pnpm --filter @better-answers/devtools run test test/ci/deploy-tree.test.ts test/ci/docs-lane.test.ts test/ci/provision-skills.test.ts test/ci/survey-architecture-skill.test.ts",
+    "check:docs:devtools": "pnpm --filter @better-answers/devtools run test test/ci/deploy-tree.test.ts test/ci/docs-lane.test.ts test/ci/provision-skills.test.ts test/ci/survey-architecture-skill.test.ts test/ci/session-retro-skill.test.ts",
     "check:docs:web": "pnpm --filter @better-answers/web run test test/browser-suite-skill.test.ts",
     "jscpd": "node scripts/jscpd.mjs",
     "comment-gate:python": "python3 packages/devtools/python/comment_gate.py apps packages .github deploy .claude/hooks scripts cubic.yaml lefthook.yml pnpm-workspace.yaml",

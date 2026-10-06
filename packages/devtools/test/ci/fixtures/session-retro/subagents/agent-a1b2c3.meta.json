@@ -1,0 +1,7 @@
+{
+  "agentType": "general-purpose",
+  "description": "Fixture worker",
+  "toolUseId": "t5",
+  "spawnDepth": 1,
+  "requestShape": "background"
+}
