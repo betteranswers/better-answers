@@ -1220,6 +1220,6 @@ How the work from the foundation to a finished v0.1 is cut and ordered.
   producer) and the *records strand* (guides, suggestions). A block belongs to one strand; a
   cross-strand edge is stated on the block.
 - **land (the verb)** — _Internal._ to take a change to `main` through the merge queue: a branch, a
-  commit, a push, a pull request and an armed auto-merge, the queue doing the merge
-  (`docs/agents/workflow.md`, *Merging*). The adjective is the other sense — a *landed copy* is a
-  state of the knowledge layer, and nothing here lands one.
+  commit, a push, a pull request and an armed auto-merge, the queue doing the merge. The adjective
+  is the other sense — a *landed copy* is a state of the knowledge layer, and nothing here lands
+  one.
