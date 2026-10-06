@@ -88,6 +88,20 @@ describe("the session-retro script's digest", () => {
     expect(section("repeated")).toContain("[redacted]");
   });
 
+  it("masks every secret shape it is given", () => {
+    for (const value of [
+      "FAKEquotedvalue01",
+      "FAKEurlpassword02",
+      "RkFLRWJhc2ljMDM=",
+      "FAKEawssecret04",
+      "FAKEanthropickey05xyz",
+      "FAKElinearkey06abcdefgh",
+      "FAKElisterror07",
+    ]) {
+      expect(digest).not.toContain(value);
+    }
+  });
+
   it("skips and counts a line it cannot parse", () => {
     expect(digest).toMatch(/skipped lines: 1/);
   });

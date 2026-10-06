@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""Read a Claude Code session log for the session-retro skill.
-
-  session.py list [--limit N]
-  session.py digest [SESSION] [--top N]
-  session.py show SESSION [--agent AGENT] LINE
-
-Run from the repository root. SESSION is an id or an id prefix; digest
-without one reads the current session from CLAUDE_CODE_SESSION_ID.
-"""
+"""Digest Claude Code session logs for the session-retro skill, which cannot read them whole."""
 
 import argparse
 import json
@@ -24,12 +16,14 @@ COMMAND = re.compile(r"<command-name>/?([^<]+)</command-name>")
 FIELD_LIMIT = 300
 OWNER_WAITS = {"AskUserQuestion"}
 SECRETS = [
-    re.compile(r"(?i)(bearer\s+)[\w.~+/=-]{8,}"),
+    re.compile(r"(?i)((?:bearer|basic)\s+)[\w.~+/=-]{8,}"),
     re.compile(
-        r"(?i)((?:api[_-]?key|token|secret|password|passwd)[\"']?\s*[=:]\s*[\"']?)[^\s\"',]{6,}"
+        r"(?i)([\w-]*(?:api[_-]?key|access[_-]?key|token|secret|password|passwd|pwd)"
+        r"[\"']?\s*[=:]\s*[\"']?)[^\s\"',]{6,}"
     ),
-    re.compile(r"()\b(?:sk|pk|rk)[-_](?:live|test|proj)[-_][\w-]{8,}"),
-    re.compile(r"()\b(?:ghp|gho|ghs|github_pat|xox[abp]|re)_[\w]{16,}"),
+    re.compile(r"(\w+://[^:/\s@]+:)[^@\s]+(?=@)"),
+    re.compile(r"()\b(?:sk|pk|rk)[-_][\w-]{16,}"),
+    re.compile(r"()\b(?:ghp|gho|ghs|github_pat|xox[abp]|re|lin_api)_[\w]{16,}"),
     re.compile(r"()\bAKIA[0-9A-Z]{16}\b"),
     re.compile(r"()\b(?=\w*[g-zG-Z])(?=\w*\d)\w{40,}\b"),
 ]
@@ -41,27 +35,40 @@ def mask(text):
     return text
 
 
+def mask_tree(value):
+    if isinstance(value, str):
+        return mask(value)
+    if isinstance(value, list):
+        return [mask_tree(v) for v in value]
+    if isinstance(value, dict):
+        return {k: mask_tree(v) for k, v in value.items()}
+    return value
+
+
 def fail(message):
     print(message, file=sys.stderr)
     sys.exit(1)
 
 
+def main_checkout():
+    common = subprocess.run(
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    return str(Path(common).parent) if common else os.getcwd()
+
+
 def repository_folders():
-    root = (
-        subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            check=False,
-        ).stdout.strip()
-        or os.getcwd()
-    )
-    slug = re.sub(r"[/.]", "-", root)
+    slug = re.sub(r"[/.]", "-", main_checkout())
     projects = Path.home() / ".claude" / "projects"
     if not projects.is_dir():
         return []
     return sorted(
-        p for p in projects.iterdir() if p.is_dir() and p.name.startswith(slug)
+        p
+        for p in projects.iterdir()
+        if p.is_dir() and (p.name == slug or p.name.startswith(slug + "--"))
     )
 
 
@@ -205,15 +212,24 @@ class Digest:
 
 
 def error_text(content):
-    text = content if isinstance(content, str) else json.dumps(content)
-    return mask(" ".join(text[:2000].split()))[:120]
+    masked = mask_tree(content)
+    text = masked if isinstance(masked, str) else json.dumps(masked)
+    return " ".join(text.split())[:120]
+
+
+def parsed(text):
+    try:
+        value = json.loads(text)
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def cut_for_current(path):
     stop = None
     with open(path, errors="replace") as handle:
         for number, line in enumerate(handle, start=1):
-            if INVOCATION in line and json.loads(line).get("type") == "user":
+            if INVOCATION in line and parsed(line).get("type") == "user":
                 stop = number
     return stop
 
@@ -264,7 +280,7 @@ def subagents(path):
     for log in sorted(folder.glob("agent-*.jsonl")):
         agent = log.stem.removeprefix("agent-")
         meta_file = log.with_suffix(".meta.json")
-        meta = json.loads(meta_file.read_text()) if meta_file.exists() else {}
+        meta = parsed(meta_file.read_text()) if meta_file.exists() else {}
         sub = Digest()
         for number, record in records(log):
             sub.take(number, record)
@@ -310,7 +326,7 @@ def report(path, digest, top):
     out.append("")
     out.append("repeated:")
     out += [
-        f"  lines {lines}  {name} {mask(given[:600])[:120]}"
+        f"  lines {lines}  {name} {json.dumps(mask_tree(json.loads(given)), sort_keys=True)[:120]}"
         for (name, given), lines in repeated(digest)[:top]
     ]
     out.append("")
