@@ -39,7 +39,7 @@ export const scopeParameter = (principal: Principal | OperatorPrincipal): string
 
 type Bindable = string | number | Date | null | readonly string[];
 
-/** A placeholder is the number its own value's connected source answers, so the two cannot drift apart. */
+/** A placeholder is the number `bind` answers for its own value, so the two cannot drift apart. */
 export const boundValues = () => {
   const values: Bindable[] = [];
   return { values, bind: (value: Bindable): number => values.push(value) };

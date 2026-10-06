@@ -147,7 +147,7 @@ describe("the code request", () => {
     expect(await linkRowsOf(person.email)).toBe(1);
   });
 
-  it("connects the browser that asked with a host-only cookie", async () => {
+  it("binds the browser that asked with a host-only cookie", async () => {
     const person = await app().person();
 
     const { asked } = await askedFor(app().client(), person.email);

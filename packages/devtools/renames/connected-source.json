@@ -184,6 +184,11 @@
     {
       "sense": "a stored act name inside a statement (R22)",
       "matches": ["sources\\.binding\\."]
+    },
+    {
+      "sense": "the sign-in link's cookie, which binds a link to the browser that asked",
+      "paths": ["apps/api/tests/sign-in-link.test.ts"],
+      "matches": ["binds the browser"]
     }
   ]
 }

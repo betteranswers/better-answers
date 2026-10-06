@@ -318,7 +318,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: MAP_DOOR,
     access: "read and write",
     reason:
-      "The delta builder creates the live-generation row on a workspace's first delta and connects it on every write; the traversal templates connect it on every walk, so a rebuild's flip is one row update every read sees at once.",
+      "The delta builder creates the live-generation row on a workspace's first delta and passes it as a parameter on every write; the traversal templates pass it on every walk, so a rebuild's flip is one row update every read sees at once.",
   },
   {
     table: "public.map_node",
