@@ -7,8 +7,7 @@ awk -v max="$max" '
 function area(p,  a, n) {
   n = split(p, a, "/")
   if (a[3] != "src") return ""
-  if (a[1] == "apps" && a[2] == "worker" && n > 5) return a[1] "/" a[2] "/" a[3] "/" a[4] "/" a[5]
-  if (a[1] == "apps" && a[2] == "web" && a[4] == "features" && n > 5) return a[1] "/" a[2] "/" a[3] "/" a[4] "/" a[5]
+  if (a[1] == "apps" && (a[2] == "worker" || (a[2] == "web" && a[4] == "features")) && n > 5) return a[1] "/" a[2] "/" a[3] "/" a[4] "/" a[5]
   if (n > 4) return a[1] "/" a[2] "/" a[3] "/" a[4]
   return a[1] "/" a[2] "/" a[3]
 }

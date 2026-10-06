@@ -44,7 +44,7 @@ const named = skillFiles.flatMap((file) =>
 describe("the survey-architecture skill", () => {
   it("points at files that are in the tree", () => {
     const missing = [...new Set(named)].filter(
-      (file) => !ignored(file) && !existsSync(path.join(repositoryRoot, file)),
+      (file) => !existsSync(path.join(repositoryRoot, file)) && !ignored(file),
     );
     expect(missing, `${skillDirectory} names paths that do not exist`).toEqual([]);
   });
