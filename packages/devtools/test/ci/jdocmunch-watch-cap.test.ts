@@ -31,16 +31,17 @@ const INSTALLED = `<?xml version="1.0" encoding="UTF-8"?>
 
 let made = 0;
 
-/** A plist at its own path, or none, and a `launchctl` stub that logs its argv. */
+/** A plist at its own path, or none, and a `launchctl` stub that logs its argv and finds the job `loaded`. */
 const machine = (
   plist: string | undefined,
+  loaded = true,
 ): { readonly plistPath: string; readonly log: string; readonly env: Record<string, string> } => {
   made += 1;
   const plistPath = path.join(scratch, `watch-${String(made)}.plist`);
   if (plist !== undefined) writeFileSync(plistPath, plist);
   const log = path.join(scratch, `launchctl-${String(made)}`);
   const bin = stubsOnPath(path.join(scratch, `bin-${String(made)}`), {
-    launchctl: recordsItsArgv(log),
+    launchctl: recordsItsArgv(log, loaded ? [] : [`[ "$1" = print ] && exit 113`]),
   });
   return {
     plistPath,
@@ -56,7 +57,12 @@ const run = (file: string, env: Record<string, string>, argv: string[] = []): Ho
   runHook(file, { argv, env });
 
 const reloads = (log: string): string[] =>
-  existsSync(log) ? readFileSync(log, "utf8").trim().split("\n") : [];
+  existsSync(log)
+    ? readFileSync(log, "utf8")
+        .trim()
+        .split("\n")
+        .filter((line) => line.startsWith("boot"))
+    : [];
 
 describe("putting the cap back on the watcher's log", () => {
   it("adds the 1 GB cap and reloads the watcher", () => {
@@ -82,6 +88,18 @@ describe("putting the cap back on the watcher's log", () => {
     expect(again.stdout).toContain("Nothing changed");
     expect(readFileSync(plistPath, "utf8")).toBe(once);
     expect(reloads(log)).toHaveLength(2);
+  });
+
+  it("loads a capped watcher that a failed reload left down", () => {
+    const { plistPath, log, env } = machine(INSTALLED, false);
+    run(script, env);
+    const again = run(script, env);
+    expect(again.status).toBe(0);
+    expect(reloads(log)).toEqual([
+      expect.stringMatching(/^bootout /),
+      expect.stringMatching(/^bootstrap /),
+      expect.stringMatching(new RegExp(`^bootstrap gui/\\d+ ${plistPath}$`)),
+    ]);
   });
 
   it("refuses when the watcher was never installed", () => {

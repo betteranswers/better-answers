@@ -69,6 +69,7 @@ const stubTools = (
     "jcodemunch-mcp": recordsItsArgv(log, [`[ "$1" = list-repos ] && printf '%s' '${registry}'`]),
     "jdocmunch-mcp": recordsItsArgv(`${log}-doc`, [
       `[ "$1" = watch-status ] && printf '%s' '${docIndexes}'`,
+      `[ "$1" = index-local ] && printf '{"success": true}'`,
     ]),
     gh: `case "$*" in *"--head t-squashed"*) printf '%s' '${merged}' ;; *) printf '[]' ;; esac\n`,
   });
@@ -168,6 +169,7 @@ describe("the sweep over worktrees left beside running agents", () => {
     expect(refreshed).toEqual([
       `index-local --path ${realpathSync(estate.primary)} --no-ai-summaries --no-embeddings`,
     ]);
+    expect(estate.run.stderr).toContain("jdocmunch: refreshed the index local/estate-primary");
   });
 
   it.each([
@@ -210,6 +212,29 @@ describe("the sweep under a PATH without the user's tool folders", () => {
   });
 });
 
+describe("the sweep when jdocmunch-mcp refuses the refresh", () => {
+  it("says the refresh failed, though the tool exited 0", () => {
+    const { primary } = originAndClone(scratch, "refused", { "README.md": "# refused\n" });
+    const indexes = JSON.stringify({
+      repos: [{ repo: "local/refused-primary", source_root: realpathSync(primary) }],
+    });
+    const bin = stubsOnPath(path.join(scratch, "refused-bin"), {
+      "jdocmunch-mcp": [
+        `[ "$1" = watch-status ] && printf '%s' '${indexes}'`,
+        `[ "$1" = index-local ] && printf '{"success": false}'`,
+        "exit 0",
+        "",
+      ].join("\n"),
+    });
+    const run = runHook(sweep, {
+      argv: [primary],
+      env: { PATH: `${bin}${path.delimiter}${process.env["PATH"] ?? ""}` },
+    });
+    expect(run.status).toBe(0);
+    expect(run.stderr).toContain("jdocmunch: could not refresh local/refused-primary");
+  }, 60_000);
+});
+
 const jdocmunchInstalled = spawnSync("jdocmunch-mcp", ["--version"]).status === 0;
 
 /** Real jdocmunch-mcp over a private store, which no watcher watches: an outage by construction. */
@@ -222,6 +247,7 @@ describe.skipIf(!jdocmunchInstalled)("the sweep after docs change through git un
   let store: string;
   let name: string;
   let before: string[];
+  let swept: HookRun;
   beforeAll(() => {
     const { primary } = originAndClone(scratch, "docs", {
       "guide.md": "# Guide\n\n## Old heading\n\ntext\n",
@@ -237,12 +263,13 @@ describe.skipIf(!jdocmunchInstalled)("the sweep after docs change through git un
     gitIn(primary, "switch", "-q", "-");
     gitIn(primary, "merge", "-q", "--ff-only", "side");
     before = titles(store, name);
-    runHook(sweep, { argv: [primary], env: { DOC_INDEX_PATH: store } });
+    swept = runHook(sweep, { argv: [primary], env: { DOC_INDEX_PATH: store } });
   }, 120_000);
 
   it("leaves the main checkout's outline matching the files on disk", () => {
     expect(before).toContain("Old heading");
     expect(titles(store, name)).toContain("New heading");
     expect(titles(store, name)).not.toContain("Old heading");
+    expect(swept.stderr).toContain(`jdocmunch: refreshed the index local/${name}`);
   });
 });

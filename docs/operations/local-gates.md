@@ -136,7 +136,7 @@ The jDocMunch watcher runs as the launchd service `us.gravelle.jdocmunch-watch`.
 bash scripts/jdocmunch-watch-cap.sh
 ```
 
-It adds the cap and reloads the service with `launchctl bootout` and `bootstrap`. When the cap is already there it changes nothing and reloads nothing. A `SessionStart` hook, `.claude/hooks/watch-cap-hook.sh`, runs it with `--check` at each session's start. When the cap is missing, the session opens with a message naming the command. The hook only reads the plist: nothing but a person running the script changes it. Set `JDOCMUNCH_WATCH_PLIST` to point the script at another plist.
+It adds the cap and reloads the service with `launchctl bootout` and `bootstrap`. When the cap is already there it changes nothing, unless an earlier run left the service unloaded, and then it loads it. A `SessionStart` hook, `.claude/hooks/watch-cap-hook.sh`, runs it with `--check` when a session starts fresh, not on a resume. When the cap is missing, the session opens with a message naming the command. The hook only reads the plist: nothing but a person running the script changes it. Set `JDOCMUNCH_WATCH_PLIST` to point the script at another plist.
 
 ### Provisioning a worktree
 
