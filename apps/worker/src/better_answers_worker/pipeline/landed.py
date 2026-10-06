@@ -233,6 +233,12 @@ async def _one_document(
     )
 
 
+def _fail_the_run(error: BaseException, _: coco.ExceptionContext) -> None:
+    # The engine's default logs and carries on, so the run would finish with the
+    # document neither read nor quarantined and land_rows would delete its chunks.
+    raise error
+
+
 @coco.fn
 async def _every_document(
     landings: tuple[tuple[LandedDocument, bytes], ...],
@@ -240,17 +246,20 @@ async def _every_document(
     refused: dict[str, str],
     wave: _Wave,
 ) -> int:
-    await coco.mount_each(
-        coco.component_subpath(A_DOCUMENTS_COMPONENT),
-        _one_document,
-        [
-            (document.source_document_id, (document, body))
-            for document, body in landings
-        ],
-        read,
-        refused,
-        wave,
-    )
+    async with coco.exception_handler(_fail_the_run):
+        mounted = await coco.mount_each(
+            coco.component_subpath(A_DOCUMENTS_COMPONENT),
+            _one_document,
+            [
+                (document.source_document_id, (document, body))
+                for document, body in landings
+            ],
+            read,
+            refused,
+            wave,
+        )
+        # The handler's raise surfaces only here: unawaited, the run still finishes.
+        await mounted.ready()
     return len(landings)
 
 

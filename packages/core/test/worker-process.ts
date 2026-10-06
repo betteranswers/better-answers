@@ -90,4 +90,18 @@ export const runWorkerOnce = async (
   });
 
   expect(outcome.stderr).not.toMatch(/Traceback/);
+  const errors = errorsLoggedIn(outcome.stdout);
+  if (errors.length > 0) {
+    throw new Error(`the worker logged an error: ${errors.join("; ")}\n${outcome.stdout}`);
+  }
 };
+
+/** The engine logs a component's exception on stdout and carries on, so the pass exits 0. */
+const errorLine = z.object({ level: z.literal("error"), event: z.string() });
+
+const errorsLoggedIn = (stdout: string): readonly string[] =>
+  stdout.split("\n").flatMap((line) => {
+    if (!line.startsWith("{")) return [];
+    const read = errorLine.safeParse(JSON.parse(line));
+    return read.success ? [read.data.event] : [];
+  });
