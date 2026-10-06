@@ -125,34 +125,13 @@ A mutation survivor is a hypothesis until a probe answers it. Triage uses contro
 
 Two reviews, one in the session and one on the pull request. `/ce-code-review` runs before the pull request, with a second model family read through OpenCode (`.compound-engineering/config.yaml`). Cubic reviews every head on the pull request. `ce-babysit-pr` fixes or answers its threads, three rounds at most, and the ruleset holds the merge until every thread is resolved. The loop is in `docs/agents/code-review.md`.
 
-## Code Exploration Policy
+## Code and doc exploration
 
-Always use jCodeMunch-MCP for code navigation. Never fall back to Read, Grep, Glob, or Bash for code exploration.
-**Exception:** use `Read` when you are about to edit a file — the harness requires a `Read` before `Edit`/`Write`. Use jCodeMunch to *find and understand* code, then `Read` only the file you are changing.
-
-This server runs the **front door** tool set. Three tools reach every jCodeMunch capability, so the tool list stays small and the catalogue is fetched only when you need it.
-
-**Start any session:**
-1. `order { "action": "resolve_repo", "args": { "path": "." } }` — confirm the project is indexed. If it is not: `order { "action": "index_folder", "args": { "path": "." } }`
-
-**Then, for any task:**
-- Know what you want → `order { "action": "<name>", "args": { ... } }`
-- Know the goal, not the tool → `route { "query": "your task in a sentence" }` picks the action and shapes the arguments
-- Want to see what exists → `menu { "query": "what you are trying to do" }` returns matching actions with example arguments
-- Want the whole catalogue and the usage rules → `jcodemunch_guide`
-
-`menu` and `jcodemunch_guide` list every action this server can run, including ones absent from your tool list. That is expected: the front door is the way to call them.
-
-**Interpreting results:**
-- A `verdict` of `no_implementation_found` is evidence of absence. Report the gap; do not re-search with different wording.
-- A `verdict` of `degraded` means a channel was unavailable, so absence is NOT proven. Read the note before relying on the result.
-- `source: ""` alongside `source_status` means the body could not be read, not that the symbol is empty.
+The jCodeMunch policy, its front-door tools and how to read their results are in the owner's global `~/.claude/CLAUDE.md`, which sessions on the owner's machine load, and a global hook there refuses raw reads of code. A session that did not load that file runs `jcodemunch_guide` for the policy. This section adds only what is particular to this repository.
 
 **After editing files:**
 - A login service per server (`jcodemunch-mcp watch-install`, `jdocmunch-mcp watch-install --no-ai-summaries`) reindexes the main checkout and each worktree on any change on disk, merges included. Check it with `watch-status`.
 - Without the watchers, only the Edit and Write tools reindex, and jCodeMunch's hook skips non-code files. After a change made another way (a Bash edit, a delete, a rename), call `order { "action": "register_edit", "args": { "paths": [...] } }`.
-
-**Announce your model once per session** so the server can size its answers: `announce_model { "model": "<your-model-id>" }`.
 
 **From a worktree, two indexes.**
 
@@ -165,27 +144,12 @@ So from a worktree:
 - An `impact` that answers *ambiguous* is re-run by `target_uid` before its risk counts.
 - `rename` stays a dry run (`dry_run: true`, its default). It has no `worktree:` parameter: it reads **and writes** the main checkout's files, and its answer names no tree. Its edit list names the sites, by the main checkout's line numbers. Apply each one in the worktree with `Edit`. The rename counts as done only when a jCodeMunch `search_text` for the old name comes back empty. That search sees what this branch added since the last `analyze`.
 
-## Doc Exploration Policy
+**Docs.** Use jDocMunch to find and read this repository's own Markdown, the files git tracks:
+- Start with `doc_resolve_repo` on `.`. From a worktree it names the worktree's own index (above).
+- Find a passage with `search_sections`, and read it with `get_section` or `get_sections`.
+- Open a long file's structure with `get_document_outline` before reading any of it.
 
-Always use jDocMunch-MCP tools for documentation navigation. Never fall back to Read for doc exploration.
-**Exception:** Use `Read` when you need exact line numbers for `Edit`.
-
-**Start any session:**
-1. `doc_resolve_repo` on `.` — check these docs are indexed; from a worktree it finds the worktree's own index (*From a worktree, two indexes*, above). If they aren't: `index_local { "path": "." }`
-
-**Finding content:**
-- keyword/topic search -> `search_sections` (returns summaries only)
-- browse structure -> `get_toc` (flat) or `get_toc_tree` (nested)
-- single document -> `get_document_outline`
-
-**Reading content:**
-- one section -> `get_section` (full content via byte-range)
-- multiple sections -> `get_sections` (batch)
-- section + context -> `get_section_context` (ancestors + children)
-
-**Maintenance:**
-- broken internal links -> `get_broken_links`
-- code/doc coverage gap -> `get_doc_coverage`
+No hook holds this rule, so it applies whether you would read with `Read` or through Bash. Read a doc directly when you will work through all of it (a plan you are carrying out), when you are about to edit it, or when a command needs it raw, such as a grep that also covers code. Files outside the repository, such as the references of an installed plugin's skills and run output under `/tmp`, are always read directly.
 
 <!-- gitnexus:start -->
 <!-- gitnexus:keep -->
