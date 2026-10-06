@@ -44,6 +44,7 @@ WORKER_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = WORKER_ROOT.parents[1]
 AGREEMENT = REPO_ROOT / "contracts" / "redaction" / "cases.json"
 CHECK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "check.yml"
+BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yml"
 
 
 HF_HOME_IN_CI = "${{ runner.temp }}/huggingface"
@@ -305,5 +306,23 @@ def test_the_check_workflow_caches_weights_where_the_detector_reads() -> None:
 
     assert f"HF_HOME={HF_HOME_IN_CI}" in workflow
     assert f"path: {HF_HOME_IN_CI}" in workflow
-    assert "uses: actions/cache@" in workflow
+    assert "uses: actions/cache/restore@" in workflow
     assert PINS_FILE in workflow
+
+
+def _weights_keys(workflow: str) -> set[str]:
+    return set(re.findall(r"^\s+key: (hugging-face-.*)$", workflow, re.MULTILINE))
+
+
+def test_main_saves_the_weights_under_the_key_check_restores() -> None:
+    # A merge group's entry sits under its own queue ref, which no later run reads.
+    check = CHECK_WORKFLOW.read_text(encoding="utf-8")
+    build = BUILD_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "uses: actions/cache@" not in check
+    assert "uses: actions/cache/save@" not in check
+    assert "uses: actions/cache/save@" in build
+    assert f"HF_HOME={HF_HOME_IN_CI}" in build
+    assert f"path: {HF_HOME_IN_CI}" in build
+    assert len(_weights_keys(check)) == 1
+    assert _weights_keys(build) == _weights_keys(check)
