@@ -337,6 +337,145 @@ const GRAPH_SENSES: readonly Sense[] = [
   },
 ];
 
+const CONNECTED_SOURCE = "connected source";
+
+const CONNECTED_SOURCE_LANDED = "2026-10-07";
+
+/** The sweeps' learnings quote the words they teach later sweeps to remove. */
+const CONNECTED_SOURCE_CARVED_OUT: readonly CarveOut[] = [
+  writtenBefore(CONNECTED_SOURCE_LANDED),
+  {
+    holds: (file) =>
+      [
+        "docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md",
+        "docs/solutions/best-practices/what-a-rename-sweeps-runner-and-prose-pass-get-wrong-and-the-checks-that-catch-it.md",
+        "docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md",
+      ].includes(file),
+    why: "a sweep's learning names the words a sweep renames, as its map does",
+  },
+  {
+    holds: (file) => file === "pnpm-lock.yaml" || file === "LICENSE",
+    why: "a package's name is its publisher's, and the licence is the Apache Foundation's text",
+  },
+  {
+    holds: (file) => file.startsWith("packages/devtools/lifts/"),
+    why: "lifted code keeps the words of the source it was lifted from",
+  },
+];
+
+/** Where `bind` sets a SQL statement's parameter, as the store door's helper names it. */
+const SQL_PARAMETER_TREES = [
+  "packages/core/src/store/postgres/",
+  "packages/core/src/audit/",
+  "packages/core/src/members/audit-log.ts",
+  "packages/core/src/members/invitation-statuses.ts",
+  "packages/core/src/access/index.ts",
+];
+
+const BIND_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  MIGRATION_TAG,
+  ...SQL_PARAMETER_TREES.map((within) => ({
+    sense: "setting a SQL statement's parameter",
+    within,
+    written: /\bbind\b/gi,
+  })),
+  { sense: "JavaScript's and D1's bind()", written: /\.bind\(|\bbind: \(/g },
+  { sense: "a Docker bind mount", written: /\bbind[- ]mount(?:s|ed)?\b/gi },
+  {
+    sense: "a socket taking a port",
+    within: "apps/api/tests/loopback-port.ts",
+    written: /\bbind it\b/g,
+  },
+  {
+    sense: "D1's statement API, as the test inbox types it",
+    within: "apps/test-inbox/",
+    written: /\bbind\b/g,
+  },
+  {
+    sense: "a rule or a setting holding something to it",
+    written:
+      /\bbind (?:you|every|before CI|a change|the page|the migrations|from this page)\b|\b(?:escapes|that) bind it\b/gi,
+  },
+  {
+    sense: "a kind the route spec struck, kept as written",
+    within: "docs/specs/v01-route.md",
+    written: /~~`bind · index · reindex · prune`~~/g,
+  },
+  {
+    sense: "the passage agreement's fixture, whose every edit moves the contract's digest",
+    within: "contracts/document-chunk/",
+    written: /\bbind act\b/g,
+    until: "passage",
+  },
+];
+
+const BINDING_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  MIGRATION_TAG,
+  {
+    sense: "the stored detail key, which the web reads as audit rows keep it (R22)",
+    within: "apps/web/",
+    written: /\bbindingId\b/g,
+  },
+  {
+    sense: "the stored subject kind, which audit rows keep (R22)",
+    within: "packages/core/src/members/audit-log.ts",
+    written: /"binding"/g,
+  },
+  {
+    sense: "the refusal word, in a test of its declaration (R21)",
+    within: "packages/core/test/refusal-words.test.ts",
+    written: /\bno-such-binding\b/g,
+  },
+  {
+    sense: "an erasure report's action key, which erasure requests store (R22)",
+    written: /\bbindingsReindexed\b/g,
+  },
+  {
+    sense: "the binding_id column on index.chunk and its view, and the passage agreement's key",
+    written: /\b(?:chunk_)?binding_id(?:_not_null)?\b|\bchunk_workspace_id_binding_id\w*/g,
+    until: "passage",
+  },
+  {
+    sense: "the worker's store directory and its size key, which the passage sweep renames",
+    written:
+      /\bBINDING_STORE\b|\bLMDB_MAX_BYTES_PER_BINDING\b|\bbinding:\{|`binding\/`|\bbinding\/(?=[\s`,)])|(["'])binding\1/g,
+    until: "passage",
+  },
+  {
+    sense: "the sign-in link's binding cookie, which ties a link to one browser",
+    written: /\bbinding cookie\b|\bbindingCookieName\b|\bbindTheLink\b/g,
+  },
+  { sense: "a component's own prop for its vim key bindings", written: /\bvimBindings\b/g },
+  { sense: "a form label bound to its control", written: /\blabel binding\b/g },
+  { sense: "OAuth's audience binding", written: /\baudience binding\b/g },
+  {
+    sense: "a Cloudflare Worker's binding to its D1 database",
+    written: /"binding": "DB"/g,
+  },
+  {
+    sense: "the error an api before migration 0068 answers, quoted as it reads",
+    within: "docs/operations/RUNBOOK.md",
+    written: /relation "source_binding" does not exist/g,
+  },
+  {
+    sense: "the old table name a test reads from an older migration or snapshot",
+    within: "packages/schema/test/job-kinds.test.ts",
+    written: /"source_binding"/g,
+  },
+  {
+    sense: "the old table prefix and column word the catalogue test refuses",
+    within: "packages/schema/test/renamed-names.test.ts",
+    written: /"source_binding"|"binding"|\bbinding_id\b/g,
+  },
+];
+
+const REFERENCED_SENSES: readonly Sense[] = [
+  { sense: "the DPIA an Admin confirms is referenced", written: /\bDPIA (?:is )?referenced\b/gi },
+  { sense: "a file another names", written: /\breferenced scripts\b/g },
+];
+
 /** Copied from upstream, so their words are upstream's. */
 const VENDORED: readonly CarveOut[] = [
   {
@@ -350,6 +489,11 @@ const VENDORED: readonly CarveOut[] = [
     holds: (file) => file === ".compound-engineering/config.example.yaml",
     why: "Compound Engineering's own example config, where a route is its engine's",
   },
+];
+
+const CONNECTED_SOURCE_ROWS_CARVED_OUT: readonly CarveOut[] = [
+  ...CONNECTED_SOURCE_CARVED_OUT,
+  ...VENDORED,
 ];
 
 export const OLD_WORDS: readonly OldWord[] = [
@@ -409,8 +553,26 @@ export const OLD_WORDS: readonly OldWord[] = [
     reads: isCodeAPersonReads,
   },
   avoided("Bid writer", "role (of a person)", "a job title", "Admin, Editor or Viewer"),
-  pending("bind", "connect", "connected source", "connected source", "one sense"),
-  pending("binding", "connected source", "connected source", "connected source", "everywhere"),
+  {
+    word: "bind",
+    use: "connect",
+    entry: "connected source",
+    sweep: CONNECTED_SOURCE,
+    state: "landed",
+    reach: "one sense",
+    permitted: BIND_SENSES,
+    carvedOut: CONNECTED_SOURCE_ROWS_CARVED_OUT,
+  },
+  {
+    word: "binding",
+    use: "connected source",
+    entry: "connected source",
+    sweep: CONNECTED_SOURCE,
+    state: "landed",
+    reach: "everywhere",
+    permitted: BINDING_SENSES,
+    carvedOut: CONNECTED_SOURCE_ROWS_CARVED_OUT,
+  },
   avoided("budget cap", "spending limit"),
   pending("bulk act", "bulk action", "bulk action", "action", "everywhere"),
   pending("bundle", "knowledge base", "knowledge base", "knowledge base", "reader text"),
@@ -457,7 +619,7 @@ export const OLD_WORDS: readonly OldWord[] = [
     "everywhere",
   ),
   avoided("cleanup", "sweep pass"),
-  avoided("clear", "emptying a binding"),
+  avoided("clear", "emptying a connected source"),
   pending("client", "assistant", "assistant", "assistant", "one sense"),
   avoided("client data on the box", "go-live", "for this day"),
   pending("client grant", "access", "access (of an assistant)", "access", "everywhere"),
@@ -563,7 +725,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("join link", "invitation"),
   avoided("kebab menu", "row menu"),
   avoided("KPI", "signal"),
-  pending("landed", "Received", "connected source", "connected source", "reader text"),
+  {
+    word: "landed",
+    use: "Received",
+    entry: "connected source",
+    sweep: CONNECTED_SOURCE,
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("landing page", "home (of a role)"),
   avoided("lane", "strand"),
   avoided("last login", "last active"),
@@ -619,7 +788,14 @@ export const OLD_WORDS: readonly OldWord[] = [
     state: "landed",
     reach: "reader text",
   },
-  pending("object store", "Received", "landed copy", "connected source", "reader text"),
+  {
+    word: "object store",
+    use: "Received",
+    entry: "landed copy",
+    sweep: CONNECTED_SOURCE,
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("offered change", "suggestion"),
   avoided("one-time password", "authenticator"),
   avoided("operation", "action"),
@@ -660,7 +836,7 @@ export const OLD_WORDS: readonly OldWord[] = [
     "Publishing rules",
     "reader text",
   ),
-  avoided("purge", "emptying a binding"),
+  avoided("purge", "emptying a connected source"),
   pending("quarantine", "unreadable", "unreadable", "unreadable", "everywhere"),
   pending("quarantined", "unreadable", "unreadable", "unreadable", "everywhere"),
   pending("Queue", "To decide", "To decide", "To decide", "reader text"),
@@ -672,7 +848,16 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("reclassify", "widen (a connected source)"),
   avoided("recompute", "cascade", "one level's work, not the whole"),
   avoided("reconciliation event", "reconciler hit"),
-  pending("referenced", "read live", "reach (of a source)", "connected source", "one sense"),
+  {
+    word: "referenced",
+    use: "read live",
+    entry: "reach (of a source)",
+    sweep: CONNECTED_SOURCE,
+    state: "landed",
+    reach: "one sense",
+    permitted: REFERENCED_SENSES,
+    carvedOut: CONNECTED_SOURCE_ROWS_CARVED_OUT,
+  },
   avoided("registered client", "assistant"),
   avoided("rejection", "refusal"),
   avoided("relink", "citation fix"),
@@ -687,7 +872,7 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("replay count", "reconciler hit"),
   avoided("report", "feedback"),
   avoided("repository server", "git store"),
-  avoided("reset", "emptying a binding"),
+  avoided("reset", "emptying a connected source"),
   avoided("reset code", "restore code"),
   avoided("result", "match", "the Result type every action returns"),
   pending(

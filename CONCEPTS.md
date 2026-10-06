@@ -288,7 +288,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   rest. How a finding was **written** is read off the spans: under its own placeholder where one
   names it, under another finding's where others cover every character of it, not at all
   otherwise.
-- **emptying a binding** — _Internal._ deleting a connected source's derived rows in the api's
+- **emptying a connected source** — _Internal._ deleting a connected source's derived rows in the api's
   transaction and removing its store in the job the same action enqueues. The two go together,
   whatever asked for them: the store is the engine's target-state tracking, so rows deleted beside a
   store left standing are re-upserted by nothing (ADR 0036). A *wipe* empties a connected source,
@@ -304,7 +304,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   buying framework (G-Cloud), a regulation, a sector, a source. A named section of the concept's
   body, chosen by an include — never a key in the file, never a record (ADR 0014). Named by its
   context, never by an audience; a wording that states a different claim is a separate concept.
-- **connected source** — _Code rename pending._ an Admin's connection of one source to the
+- **connected source** — an Admin's connection of one source to the
   workspace: its connector, credential, scope, collection, sensitivity, audience, cadence,
   destination and retention class; the unit the scheduler syncs and the unit that is published.
   Every source an Admin adds is one, listed on Control Centre › Sources › Connected sources and
@@ -321,7 +321,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
 - **origin (of a source)** — whose knowledge a source carries: the **company**'s own, a third
   party's (**external** — Companies House, a sector feed) or the **platform**'s (what the platform
   itself generated, cited as evidence; never a connected source).
-- **reach (of a source)** — _Code rename pending._ whether the platform holds a copy. A **copied**
+- **reach (of a source)** — whether the platform holds a copy. A **copied**
   source is connected, enumerated and indexed by syncs; a source **read live** is connected with a
   credential and read by a tool when a producer or a reader asks — never enumerated, never indexed,
   never cached. A source type is its origin and its reach.

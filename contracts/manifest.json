@@ -11,7 +11,7 @@
     "document-chunk": { "form": "fixtured" },
     "upload-media-types": { "form": "fixtured" },
     "citation": { "form": "fixtured" },
-    "emptying-a-binding": { "form": "fixtured" },
+    "emptying-a-connected-source": { "form": "fixtured" },
     "erasure-match": { "form": "fixtured" }
   },
   "fixtures": [
@@ -25,7 +25,10 @@
     { "agreement": "document-chunk", "path": "document-chunk/cases.json" },
     { "agreement": "upload-media-types", "path": "upload-media-types/cases.json" },
     { "agreement": "citation", "path": "citation/cases.json" },
-    { "agreement": "emptying-a-binding", "path": "emptying-a-binding/cases.json" },
+    {
+      "agreement": "emptying-a-connected-source",
+      "path": "emptying-a-connected-source/cases.json"
+    },
     { "agreement": "erasure-match", "path": "erasure-match/cases.json" },
     { "agreement": "cost-ledger", "path": "cost-ledger/rows.json" }
   ]

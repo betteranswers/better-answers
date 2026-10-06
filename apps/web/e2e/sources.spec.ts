@@ -1,8 +1,8 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { JUMP_TO, RAIL } from "@/app/words.ts";
-import { SAID_OF_A_BINDING } from "@/features/sources/refusal-words.ts";
-import { NOTHING_BOUND } from "@/features/sources/words.ts";
+import { SAID_OF_A_CONNECTED_SOURCE } from "@/features/sources/refusal-words.ts";
+import { NOTHING_CONNECTED } from "@/features/sources/words.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
@@ -18,11 +18,11 @@ import {
   person,
   provision,
   saysItsSentenceNotItsWord,
-  seedBindings,
+  seedConnectedSources,
   signIn,
   skipLinkReachesThePage,
   theActLandedWithinItsBudget,
-  type SeedBinding,
+  type SeedConnectedSource,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -30,20 +30,21 @@ const LIST_BUDGET_MS = 1000;
 /** Any id the platform mints: the page shows none, a finding's least of all. */
 const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
 
-const BINDINGS = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Bindings");
+const CONNECTED_SOURCES = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Connected sources");
 
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
-const bindingsRegion = (page: Page) => page.getByRole("region", { name: "Bindings" });
+const connectedSourcesRegion = (page: Page) =>
+  page.getByRole("region", { name: "Connected sources" });
 
-const bindingNamed = (page: Page, name: string): Locator =>
-  bindingsRegion(page)
+const connectedSourceNamed = (page: Page, name: string): Locator =>
+  connectedSourcesRegion(page)
     .getByRole("listitem")
     .filter({ has: page.getByRole("heading", { level: 3, name, exact: true }) });
 
 /** The lead's one definition a term names, read the way a screen reader pairs them. */
 const leadOf = (page: Page, name: string, term: string): Locator =>
-  bindingNamed(page, name)
+  connectedSourceNamed(page, name)
     .getByRole("term")
     .filter({ hasText: new RegExp(`^${term}$`) })
     .first()
@@ -59,17 +60,20 @@ const classOf = (page: Page, name: string) => leadOf(page, name, "Class");
 const anAdminAtSources = async (
   page: Page,
   api: APIRequestContext,
-  input: { readonly workspace: string; readonly bindings?: readonly SeedBinding[] },
+  input: { readonly workspace: string; readonly connectedSources?: readonly SeedConnectedSource[] },
 ) => {
   const email = anAddress("admin");
   const workspace = await provision(api, { name: input.workspace, adminEmail: email });
   const seeded =
-    input.bindings === undefined
-      ? { bindings: [] }
-      : await seedBindings(api, { workspaceId: workspace.workspaceId, bindings: input.bindings });
+    input.connectedSources === undefined
+      ? { connectedSources: [] }
+      : await seedConnectedSources(api, {
+          workspaceId: workspace.workspaceId,
+          connectedSources: input.connectedSources,
+        });
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await nav(page).getByRole("link", { name: BINDINGS.name }).click();
+  await nav(page).getByRole("link", { name: CONNECTED_SOURCES.name }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
   return { workspace, seeded };
 };
@@ -87,7 +91,10 @@ const twoFramesDrawn = (page: Page) =>
       }),
   );
 
-const indexed = (name: string, overrides: Partial<SeedBinding> = {}): SeedBinding => ({
+const indexed = (
+  name: string,
+  overrides: Partial<SeedConnectedSource> = {},
+): SeedConnectedSource => ({
   name,
   sensitivity: "Internal",
   run: "done",
@@ -95,9 +102,9 @@ const indexed = (name: string, overrides: Partial<SeedBinding> = {}): SeedBindin
   ...overrides,
 });
 
-test.describe("the Sources page's list of bindings", () => {
-  test("lists an Admin ten bindings in a second, details folded", async ({ page, request }) => {
-    const ten: SeedBinding[] = [
+test.describe("the Sources page's list of connected sources", () => {
+  test("lists an Admin ten sources in a second, details folded", async ({ page, request }) => {
+    const ten: SeedConnectedSource[] = [
       indexed("Bid library"),
       indexed("Case studies", { published: true }),
       indexed("Contracts", { run: "queued" }),
@@ -109,28 +116,28 @@ test.describe("the Sources page's list of bindings", () => {
       indexed("Staff handbook"),
       indexed("Tender archive", { published: true }),
     ];
-    await anAdminAtSources(page, request, { workspace: "Calder Joinery", bindings: ten });
+    await anAdminAtSources(page, request, { workspace: "Calder Joinery", connectedSources: ten });
 
     // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
-    await page.goto("/sources/bindings");
-    await expect(bindingsRegion(page).getByRole("heading", { level: 3 })).toHaveCount(10);
+    await page.goto("/sources/connected-sources");
+    await expect(connectedSourcesRegion(page).getByRole("heading", { level: 3 })).toHaveCount(10);
     const elapsed = Date.now() - started;
-    test.info().annotations.push({ type: "bindings list", description: `${elapsed} ms` });
-    expect(elapsed, "the list of ten bindings rendered past its budget").toBeLessThan(
+    test.info().annotations.push({ type: "connected sources list", description: `${elapsed} ms` });
+    expect(elapsed, "the list of ten connected sources rendered past its budget").toBeLessThan(
       LIST_BUDGET_MS,
     );
 
-    await expect(bindingsRegion(page).getByRole("heading", { level: 3 })).toHaveText(
-      ten.map((binding) => binding.name),
+    await expect(connectedSourcesRegion(page).getByRole("heading", { level: 3 })).toHaveText(
+      ten.map((connectedSource) => connectedSource.name),
     );
     await expect(stateOf(page, "Case studies")).toHaveText("published");
-    await expect(stateOf(page, "Contracts")).toHaveText("landed");
+    await expect(stateOf(page, "Contracts")).toHaveText("received");
     await expect(stateOf(page, "Framework returns")).toHaveText("indexing");
     await expect(stateOf(page, "Staff handbook")).toHaveText("indexed");
     await expect(lastRunOf(page, "Safety records")).toHaveText("No run yet");
 
-    const handbook = bindingNamed(page, "Staff handbook");
+    const handbook = connectedSourceNamed(page, "Staff handbook");
     await expect(handbook).toMatchAriaSnapshot(`
       - listitem:
         - heading "Staff handbook" [level=3]
@@ -168,7 +175,7 @@ test.describe("the Sources page's list of bindings", () => {
   }) => {
     await anAdminAtSources(page, request, {
       workspace: "Holme Surveys",
-      bindings: [
+      connectedSources: [
         indexed("Site archive", {
           documents: [
             { title: "Floor plan", quarantineError: "NeedsOcrError" },
@@ -181,7 +188,7 @@ test.describe("the Sources page's list of bindings", () => {
       ],
     });
 
-    const archive = bindingNamed(page, "Site archive");
+    const archive = connectedSourceNamed(page, "Site archive");
     await archive.getByRole("button", { name: "More about Site archive" }).click();
 
     await expect(archive).toContainText("4 documents quarantined, 2 want OCR.");
@@ -193,11 +200,14 @@ test.describe("the Sources page's list of bindings", () => {
     ]);
   });
 
-  test("shows an Editor Bindings as not found, binding nothing", async ({ page, request }) => {
+  test("shows an Editor Connected sources as not found, connecting nothing", async ({
+    page,
+    request,
+  }) => {
     const workspace = await provision(request, { name: "Pennine Fabrication" });
-    await seedBindings(request, {
+    await seedConnectedSources(request, {
       workspaceId: workspace.workspaceId,
-      bindings: [indexed("Staff handbook")],
+      connectedSources: [indexed("Staff handbook")],
     });
     const email = anAddress("editor");
     const editor = await person(request, email);
@@ -208,35 +218,35 @@ test.describe("the Sources page's list of bindings", () => {
     });
     await page.goto("/sign-in");
     await signIn(page, request, email);
-    // Control Centre is the Admin's alone, so an Editor reaches Bindings by address only.
-    await page.goto(BINDINGS.path);
+    // Control Centre is the Admin's alone, so an Editor reaches Connected sources by address only.
+    await page.goto(CONNECTED_SOURCES.path);
 
     await notFoundOfferingHome(page, "Editor");
-    await expect(bindingsRegion(page)).toHaveCount(0);
+    await expect(connectedSourcesRegion(page)).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("Staff handbook");
 
     await page.keyboard.press("b");
-    await expect(page.getByRole("dialog", { name: "Bind a document" })).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Connect a document" })).toHaveCount(0);
   });
 });
 
-test.describe("binding a document on the Sources page", () => {
-  test("an Admin binds by keyboard and sees landed, indexing, indexed", async ({
+test.describe("connecting a document on the Sources page", () => {
+  test("an Admin connects by keyboard and sees received, indexing, indexed", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     const { workspace } = await anAdminAtSources(page, request, { workspace: "Airedale Tooling" });
-    await page.goto("/sources/bindings");
-    await expect(bindingsRegion(page)).toMatchAriaSnapshot(`
-      - region "Bindings":
+    await page.goto("/sources/connected-sources");
+    await expect(connectedSourcesRegion(page)).toMatchAriaSnapshot(`
+      - region "Connected sources":
         - /children: equal
-        - heading "Bindings" [level=2]
-        - paragraph: ${NOTHING_BOUND}
+        - heading "Connected sources" [level=2]
+        - paragraph: ${NOTHING_CONNECTED}
     `);
     await expect(
-      page.getByRole("button", { name: /^bind/i }),
-      "the toolbar's act is the one way to bind",
+      page.getByRole("button", { name: /^connect/i }),
+      "the toolbar's act is the one way to connect",
     ).toHaveCount(1);
     await passesTheAccessibilityGate();
     await skipLinkReachesThePage(page);
@@ -245,7 +255,7 @@ test.describe("binding a document on the Sources page", () => {
     // key press, leaving the chooser uncaught and cancelled.
     const choosing = page.waitForEvent("filechooser");
     await page.keyboard.press("b");
-    const dialog = page.getByRole("dialog", { name: "Bind a document" });
+    const dialog = page.getByRole("dialog", { name: "Connect a document" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByLabel("Name")).toBeFocused();
     await page.keyboard.type("The staff handbook");
@@ -276,7 +286,7 @@ test.describe("binding a document on the Sources page", () => {
 
     await page.keyboard.press("Tab");
     await page.keyboard.press("Tab");
-    await expect(dialog.getByRole("button", { name: "Bind the document" })).toBeFocused();
+    await expect(dialog.getByRole("button", { name: "Connect the document" })).toBeFocused();
     await page.keyboard.press("Enter");
 
     await expect(dialog.getByRole("progressbar", { name: "Upload of handbook.md" })).toBeVisible();
@@ -288,8 +298,10 @@ test.describe("binding a document on the Sources page", () => {
       uploadThroughput: -1,
     });
 
-    await expect(page.getByText("Bound “The staff handbook”: handbook.md landed")).toBeVisible();
-    await expect(stateOf(page, "The staff handbook")).toHaveText("landed");
+    await expect(
+      page.getByText("Connected “The staff handbook”: handbook.md was received"),
+    ).toBeVisible();
+    await expect(stateOf(page, "The staff handbook")).toHaveText("received");
     await expect(lastRunOf(page, "The staff handbook")).toContainText("Index run queued");
     await expect(classOf(page, "The staff handbook")).toHaveText("Restricted");
 
@@ -309,24 +321,24 @@ test.describe("binding a document on the Sources page", () => {
     await anAdminAtSources(page, request, { workspace: "Ryburn Signs" });
 
     await page.keyboard.press("b");
-    const dialog = page.getByRole("dialog", { name: "Bind a document" });
+    const dialog = page.getByRole("dialog", { name: "Connect a document" });
     await dialog.getByLabel("Name").fill("Shop photographs");
     await dialog.getByLabel("File").setInputFiles({
       name: "shopfront.png",
       mimeType: "image/png",
       buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
     });
-    await dialog.getByRole("button", { name: "Bind the document" }).click();
+    await dialog.getByRole("button", { name: "Connect the document" }).click();
 
     await saysItsSentenceNotItsWord(dialog.getByRole("alert"), {
-      table: SAID_OF_A_BINDING,
+      table: SAID_OF_A_CONNECTED_SOURCE,
       word: "media-type-refused",
     });
     await expect(dialog).toBeVisible();
   });
 });
 
-const SUPPLIER_FORMS: SeedBinding = indexed("Supplier forms", {
+const SUPPLIER_FORMS: SeedConnectedSource = indexed("Supplier forms", {
   documents: [
     {
       title: "Supplier form",
@@ -349,10 +361,10 @@ const A_DISMISSED_SPAN =
   "Dismissed 1 span as not special category. The seam's verdict passes over a dismissed span, which stays withheld unless kept in text.";
 
 /**
- * Two documents as a run leaves them after a dismissal: one lifted to its binding's class, one
+ * Two documents as a run leaves them after a dismissal: one lifted to its connected source's class, one
  * still holding a span nobody dismissed.
  */
-const SERVICE_RECORDS: SeedBinding = indexed("Service records", {
+const SERVICE_RECORDS: SeedConnectedSource = indexed("Service records", {
   documents: [
     {
       title: "Pump service notes",
@@ -388,14 +400,14 @@ const reviewOf = (page: Page, name: string) =>
 const findingRow = (page: Page, name: string, document: string, rule: string) =>
   reviewOf(page, name).getByRole("row").filter({ hasText: document }).filter({ hasText: rule });
 
-test.describe("reviewing a binding's findings", () => {
+test.describe("reviewing a connected source's findings", () => {
   test("shows an Admin findings by category and rule, counts only", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Colne Valley Metals",
-      bindings: [SUPPLIER_FORMS],
+      connectedSources: [SUPPLIER_FORMS],
     });
 
-    await bindingNamed(page, "Supplier forms")
+    await connectedSourceNamed(page, "Supplier forms")
       .getByRole("button", { name: "Review Supplier forms" })
       .focus();
     await page.keyboard.press("r");
@@ -448,9 +460,9 @@ test.describe("reviewing a binding's findings", () => {
   test("lets an Admin keep groups in text and narrow documents", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Hebden Plastics",
-      bindings: [SUPPLIER_FORMS],
+      connectedSources: [SUPPLIER_FORMS],
     });
-    await bindingNamed(page, "Supplier forms")
+    await connectedSourceNamed(page, "Supplier forms")
       .getByRole("button", { name: "Review Supplier forms" })
       .click();
 
@@ -523,9 +535,9 @@ test.describe("reviewing a binding's findings", () => {
   test("dismisses a special category group, row and run saying so", async ({ page, request }) => {
     const { workspace } = await anAdminAtSources(page, request, {
       workspace: "Ripponden Pumps",
-      bindings: [SUPPLIER_FORMS],
+      connectedSources: [SUPPLIER_FORMS],
     });
-    await bindingNamed(page, "Supplier forms")
+    await connectedSourceNamed(page, "Supplier forms")
       .getByRole("button", { name: "Review Supplier forms" })
       .click();
     const review = reviewOf(page, "Supplier forms");
@@ -540,7 +552,9 @@ test.describe("reviewing a binding's findings", () => {
       }),
     ).toBeChecked();
     await expect(dismissal).toBeDisabled();
-    await expect(review).toContainText(sentenceOf(SAID_OF_A_BINDING["not-special-category"]));
+    await expect(review).toContainText(
+      sentenceOf(SAID_OF_A_CONNECTED_SOURCE["not-special-category"]),
+    );
     await page.keyboard.press("x");
 
     await page.keyboard.press("Tab");
@@ -583,7 +597,7 @@ test.describe("reviewing a binding's findings", () => {
     await expect(page.locator("body")).not.toContainText(AN_ID);
 
     await page.reload();
-    await bindingNamed(page, "Supplier forms")
+    await connectedSourceNamed(page, "Supplier forms")
       .getByRole("button", { name: "Review Supplier forms" })
       .click();
     await expect(
@@ -595,9 +609,9 @@ test.describe("reviewing a binding's findings", () => {
   test("shows an Admin which dismissed documents are still narrowed", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Sowerby Hydraulics",
-      bindings: [SERVICE_RECORDS],
+      connectedSources: [SERVICE_RECORDS],
     });
-    await bindingNamed(page, "Service records")
+    await connectedSourceNamed(page, "Service records")
       .getByRole("button", { name: "Review Service records" })
       .click();
 
@@ -631,7 +645,7 @@ test.describe("reviewing a binding's findings", () => {
   test("shows an Admin a kept group an erasure still withholds", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Wharfe Catering",
-      bindings: [
+      connectedSources: [
         indexed("Payroll exports", {
           documents: [
             {
@@ -650,7 +664,7 @@ test.describe("reviewing a binding's findings", () => {
         }),
       ],
     });
-    await bindingNamed(page, "Payroll exports")
+    await connectedSourceNamed(page, "Payroll exports")
       .getByRole("button", { name: "Review Payroll exports" })
       .click();
 
@@ -661,13 +675,13 @@ test.describe("reviewing a binding's findings", () => {
     );
   });
 
-  test("previews an unpublished binding's chunks to the Admin reviewing it", async ({
+  test("previews an unpublished source's chunks to the Admin reviewing it", async ({
     page,
     request,
   }) => {
     await anAdminAtSources(page, request, {
       workspace: "Kirklees Print",
-      bindings: [
+      connectedSources: [
         indexed("Staff handbook", {
           documents: [
             {
@@ -678,7 +692,7 @@ test.describe("reviewing a binding's findings", () => {
         }),
       ],
     });
-    await bindingNamed(page, "Staff handbook")
+    await connectedSourceNamed(page, "Staff handbook")
       .getByRole("button", { name: "Review Staff handbook" })
       .click();
     await page
@@ -694,10 +708,10 @@ test.describe("reviewing a binding's findings", () => {
   test("scrolls nothing sideways at 320 pixels with the review open", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Marsden Mills",
-      bindings: [SUPPLIER_FORMS],
+      connectedSources: [SUPPLIER_FORMS],
     });
     await page.setViewportSize({ width: 320, height: 720 });
-    await bindingNamed(page, "Supplier forms")
+    await connectedSourceNamed(page, "Supplier forms")
       .getByRole("button", { name: "Review Supplier forms" })
       .click();
     await expect(reviewOf(page, "Supplier forms").getByRole("checkbox")).toHaveCount(3);
@@ -716,14 +730,14 @@ test.describe("reviewing a binding's findings", () => {
   });
 });
 
-test.describe("publishing, narrowing and widening a binding", () => {
+test.describe("publishing, narrowing and widening a connected source", () => {
   test("publishes within 100 ms after stating confirmations and audit row", async ({
     page,
     request,
   }) => {
     await anAdminAtSources(page, request, {
       workspace: "Spen Valley Bakery",
-      bindings: [
+      connectedSources: [
         indexed("Staff handbook", {
           documents: [
             {
@@ -743,7 +757,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
       ],
     });
 
-    await bindingNamed(page, "Staff handbook")
+    await connectedSourceNamed(page, "Staff handbook")
       .getByRole("button", { name: "Review Staff handbook" })
       .focus();
     await page.keyboard.press("p");
@@ -787,7 +801,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
         - term: Findings, job title
         - definition: "0"
         - term: DPIA input
-        - definition: The hash of this binding's DPIA input, taken at the click
+        - definition: The hash of this connected source's DPIA input, taken at the click
     `);
 
     await expect(dialog.getByRole("checkbox", { name: "Lawful basis recorded" })).toBeFocused();
@@ -815,28 +829,30 @@ test.describe("publishing, narrowing and widening a binding", () => {
     ).toBeVisible();
     await expect(stateOf(page, "Staff handbook")).toHaveText("published");
     await expect(
-      bindingNamed(page, "Staff handbook").getByRole("button", { name: "Publish Staff handbook" }),
+      connectedSourceNamed(page, "Staff handbook").getByRole("button", {
+        name: "Publish Staff handbook",
+      }),
     ).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 3, name: "Staff handbook" })).toBeFocused();
   });
 
-  test("narrows a published binding with its citing concepts and compositions", async ({
+  test("narrows a published source with its citing concepts and compositions", async ({
     page,
     request,
   }) => {
     const { seeded } = await anAdminAtSources(page, request, {
       workspace: "Todmorden Engineering",
-      bindings: [
+      connectedSources: [
         indexed("Supplier payments", {
           published: true,
           documents: [{ title: "Payment terms", cited: true }],
         }),
       ],
     });
-    const citedBy = seeded.bindings[0]?.documents[0]?.citedBy;
+    const citedBy = seeded.connectedSources[0]?.documents[0]?.citedBy;
     expect(citedBy, "the harness seeded no citing concept").toBeDefined();
 
-    await bindingNamed(page, "Supplier payments")
+    await connectedSourceNamed(page, "Supplier payments")
       .getByRole("button", { name: "Narrow Supplier payments" })
       .focus();
     await page.keyboard.press("n");
@@ -861,7 +877,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
   }) => {
     const { seeded } = await anAdminAtSources(page, request, {
       workspace: "Hebden Bridge Joinery",
-      bindings: [
+      connectedSources: [
         indexed("Tender answers", {
           sensitivity: "Restricted",
           published: true,
@@ -869,10 +885,10 @@ test.describe("publishing, narrowing and widening a binding", () => {
         }),
       ],
     });
-    const citedBy = seeded.bindings[0]?.documents[0]?.citedBy;
+    const citedBy = seeded.connectedSources[0]?.documents[0]?.citedBy;
     expect(citedBy, "the harness seeded no citing concept").toBeDefined();
 
-    await bindingNamed(page, "Tender answers")
+    await connectedSourceNamed(page, "Tender answers")
       .getByRole("button", { name: "Widen Tender answers" })
       .focus();
     await page.keyboard.press("w");
@@ -910,7 +926,9 @@ test.describe("publishing, narrowing and widening a binding", () => {
     await expect(classPicked, "the list of classes did not hand focus back").toBeFocused();
     const commit = dialog.getByRole("button", { name: /^Widen Tender answers to / });
     await expect(commit).toBeDisabled();
-    await expect(commit).toHaveAccessibleDescription(sentenceOf(SAID_OF_A_BINDING["not-wider"]));
+    await expect(commit).toHaveAccessibleDescription(
+      sentenceOf(SAID_OF_A_CONNECTED_SOURCE["not-wider"]),
+    );
 
     await classPicked.press("Enter");
     await page.getByRole("option", { name: "Internal" }).press("Enter");
@@ -931,7 +949,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
     await page.keyboard.press("Enter");
     await theActLandedWithinItsBudget(page, "widen");
 
-    await expect(bindingsRegion(page).getByRole("status")).toContainText(
+    await expect(connectedSourcesRegion(page).getByRole("status")).toContainText(
       "Widened “Tender answers” to Internal for everyone in the workspace. 1 concept and 1 composition moved with it.",
     );
     await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
@@ -939,21 +957,21 @@ test.describe("publishing, narrowing and widening a binding", () => {
     await expect(page.getByRole("heading", { level: 3, name: "Tender answers" })).toBeFocused();
   });
 
-  test("widens a Public binding's audience, then says nothing is wider", async ({
+  test("widens a Public source's audience, then says nothing is wider", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     await anAdminAtSources(page, request, {
       workspace: "Ripponden Glass",
-      bindings: [
+      connectedSources: [
         indexed("Price book", { sensitivity: "Public", audience: "groups", published: true }),
       ],
     });
     const audienceOf = leadOf(page, "Price book", "Audience");
     await expect(audienceOf).toHaveText("Named groups (1 group)");
 
-    await bindingNamed(page, "Price book")
+    await connectedSourceNamed(page, "Price book")
       .getByRole("button", { name: "Widen Price book" })
       .focus();
     await page.keyboard.press("w");
@@ -988,18 +1006,18 @@ test.describe("publishing, narrowing and widening a binding", () => {
 
     // The row reads widened before the api answers, and a late answer overwrites the next
     // `w`'s sentence.
-    await expect(bindingsRegion(page).getByRole("status")).toHaveText(
+    await expect(connectedSourcesRegion(page).getByRole("status")).toHaveText(
       "Widened “Price book” to Public for everyone in the workspace. 0 concepts and 0 compositions moved with it.",
     );
     await expect(audienceOf).toHaveText("Everyone in the workspace");
     await expect(
-      bindingNamed(page, "Price book").getByRole("button", { name: "Widen Price book" }),
+      connectedSourceNamed(page, "Price book").getByRole("button", { name: "Widen Price book" }),
     ).toHaveCount(0);
-    await bindingNamed(page, "Price book")
+    await connectedSourceNamed(page, "Price book")
       .getByRole("button", { name: "Review Price book" })
       .focus();
     await page.keyboard.press("w");
-    await expect(bindingsRegion(page).getByRole("status")).toHaveText(
+    await expect(connectedSourcesRegion(page).getByRole("status")).toHaveText(
       "“Price book” is Public for everyone in the workspace, and no class or audience is wider.",
     );
   });
@@ -1007,10 +1025,10 @@ test.describe("publishing, narrowing and widening a binding", () => {
   test("refuses widening with a special category finding unreviewed", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Mytholmroyd Pumps",
-      bindings: [{ ...SERVICE_RECORDS, sensitivity: "Restricted", published: true }],
+      connectedSources: [{ ...SERVICE_RECORDS, sensitivity: "Restricted", published: true }],
     });
 
-    await bindingNamed(page, "Service records")
+    await connectedSourceNamed(page, "Service records")
       .getByRole("button", { name: "Widen Service records" })
       .click();
     await page
@@ -1020,8 +1038,8 @@ test.describe("publishing, narrowing and widening a binding", () => {
       })
       .click();
 
-    await expect(bindingsRegion(page).getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_A_BINDING["special-category-unreviewed"]),
+    await expect(connectedSourcesRegion(page).getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_A_CONNECTED_SOURCE["special-category-unreviewed"]),
     );
     await expect(classOf(page, "Service records")).toHaveText("Restricted");
   });
@@ -1032,7 +1050,7 @@ test.describe("the Sources page's keystrokes", () => {
     await anAdminAtSources(page, request, { workspace: "Luddenden Weaving" });
 
     await page.keyboard.press("?");
-    const heading = keystrokesOn(BINDINGS.name);
+    const heading = keystrokesOn(CONNECTED_SOURCES.name);
     const listed = page.getByRole("dialog", { name: heading });
     await expect(listed).toMatchAriaSnapshot(`
       - dialog ${JSON.stringify(heading)}:
@@ -1041,15 +1059,15 @@ test.describe("the Sources page's keystrokes", () => {
         - checkbox ${JSON.stringify(KEYSTROKE_WORDS.turnedOn)} [checked]
         - text: ${JSON.stringify(KEYSTROKE_WORDS.turnedOn)}
         - term: b
-        - definition: Bind a document
+        - definition: Connect a document
         - term: r
-        - definition: Review the binding in focus
+        - definition: Review the connected source in focus
         - term: p
-        - definition: Publish the binding in focus
+        - definition: Publish the connected source in focus
         - term: "n"
-        - definition: Narrow the binding in focus
+        - definition: Narrow the connected source in focus
         - term: w
-        - definition: Widen the binding in focus
+        - definition: Widen the connected source in focus
         - term: x
         - definition: Select or clear the finding group in focus
         - term: k
@@ -1073,10 +1091,10 @@ test.describe("the Sources page's keystrokes", () => {
     await expect(keystrokes).toBeFocused();
 
     await page.keyboard.press("b");
-    const binding = page.getByRole("dialog", { name: "Bind a document" });
-    await expect(binding).toBeVisible();
+    const connectedSource = page.getByRole("dialog", { name: "Connect a document" });
+    await expect(connectedSource).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(binding).toHaveCount(0);
+    await expect(connectedSource).toHaveCount(0);
 
     await keystrokes.click();
     await listed.getByRole("checkbox", { name: KEYSTROKE_WORDS.turnedOn }).press("Space");
@@ -1085,13 +1103,13 @@ test.describe("the Sources page's keystrokes", () => {
     await page.keyboard.press("b");
     await page.keyboard.press("?");
     await twoFramesDrawn(page);
-    await expect(binding, "a keystroke turned off still bound").toHaveCount(0);
+    await expect(connectedSource, "a keystroke turned off still bound").toHaveCount(0);
     await expect(listed, "a keystroke turned off still listed").toHaveCount(0);
 
     await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
     await page.keyboard.press("b");
     await twoFramesDrawn(page);
-    await expect(binding, "the choice did not survive a reload").toHaveCount(0);
+    await expect(connectedSource, "the choice did not survive a reload").toHaveCount(0);
   });
 });

@@ -9,7 +9,7 @@ import {
   JOB_KIND_DESCRIPTORS,
   JOB_QUEUED_STATUS,
   NIGHTLY_AUDIT_KIND,
-  REASONS_EMPTYING_THE_BINDING,
+  REASONS_EMPTYING_THE_CONNECTED_SOURCE,
   REBUILD_REASONS,
   ROLES,
   type JOB_KINDS,
@@ -202,7 +202,7 @@ const landJob = async (tx: Tx, workspaceId: string, job: JobInsert): Promise<str
     job.kind,
     job.subjectId ?? null,
     job.reason ?? null,
-    REASONS_EMPTYING_THE_BINDING,
+    REASONS_EMPTYING_THE_CONNECTED_SOURCE,
   ]);
   const answered = landed.rows[0]?.id;
   if (answered === undefined) {
@@ -213,7 +213,7 @@ const landJob = async (tx: Tx, workspaceId: string, job: JobInsert): Promise<str
 
 /**
  * Reuses a job already queued for the subject and answers its id; a reason that empties the
- * binding replaces a queued reason that does not. Refuses `malformed` for input its kind does not
+ * connected source replaces a queued reason that does not. Refuses `malformed` for input its kind does not
  * take, or another workspace's. Rejects when another act queues the subject meanwhile.
  */
 export const enqueueJobIn = async (
@@ -279,11 +279,11 @@ export const jobById = async (
 
 type OutcomeRow = { readonly outcome: OutcomeColumn };
 
-/** The outcome of the binding's newest `done` index run; null when there is none or it has none. */
+/** The outcome of the connected source's newest `done` index run; null when there is none or it has none. */
 export const latestIndexOutcomeIn = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: { readonly bindingId: string },
+  input: { readonly connectedSourceId: string },
 ): Promise<Result<JobOutcome | null, RoleRefusal | Error>> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
@@ -293,7 +293,7 @@ export const latestIndexOutcomeIn = async (
       `SELECT outcome FROM job
         WHERE workspace_id = $1 AND kind = $2 AND subject_id = $3 AND status = $4
         ORDER BY finished_at DESC, id DESC LIMIT 1`,
-      [admin.value.workspaceId, INDEX_KIND, input.bindingId, JOB_DONE_STATUS],
+      [admin.value.workspaceId, INDEX_KIND, input.connectedSourceId, JOB_DONE_STATUS],
     ),
   );
   if (!read.ok) return err(read.error);

@@ -228,7 +228,7 @@ Reviewer: this catches a diff that logs a bootstrap value.
 
 ### Take a `Principal` as the first parameter
 
-Every `packages/core` function that reads or writes tenant data takes a `Principal` first: workspace, user, role. A transport builds it. Business logic checks the role, the role's action threshold and the read predicate beside the data access. Test the predicate against columns on the readable unit, never against a source binding's fields. Work that outlives a session runs under a deferred or a platform principal, never a live user session.
+Every `packages/core` function that reads or writes tenant data takes a `Principal` first: workspace, user, role. A transport builds it. Business logic checks the role, the role's action threshold and the read predicate beside the data access. Test the predicate against columns on the readable unit, never against a connected source's fields. Work that outlives a session runs under a deferred or a platform principal, never a live user session.
 
 ### Ship a tenant table, a grant or a definer function with the test of what it refuses
 

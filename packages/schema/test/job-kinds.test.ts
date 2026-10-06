@@ -10,12 +10,14 @@ import {
   JOB_KIND_DESCRIPTORS,
   type JobKindDescriptor,
   JOB_KINDS,
-  REASONS_EMPTYING_THE_BINDING,
+  REASONS_EMPTYING_THE_CONNECTED_SOURCE,
 } from "../src/index.ts";
 import { journalMetaFolder } from "../src/journal.ts";
 import {
   type JobProbeRow,
-  seedBindingTo,
+  seedConnectedSourceIn,
+  seedConnectedSourceOfAConnectorAlone,
+  seedConnectedSourceTo,
   seedClaimedJob,
   seedFinishedJob,
   seedQueuedJob,
@@ -41,9 +43,9 @@ beforeAll(async () => {
 
 const WS = "01J6JJJJJJJJJJJJJJJJJJJJJJ";
 const ANOTHER_WS = "01J6JKKKKKKKKKKKKKKKKKKKKK";
-const BINDING = "01J6BNNNNNNNNNNNNNNNNNNNNN";
-const ANOTHER_BINDING = "01J6BMMMMMMMMMMMMMMMMMMMMM";
-const A_THIRD_BINDING = "01J6BLLLLLLLLLLLLLLLLLLLLL";
+const CONNECTED_SOURCE = "01J6BNNNNNNNNNNNNNNNNNNNNN";
+const ANOTHER_CONNECTED_SOURCE = "01J6BMMMMMMMMMMMMMMMMMMMMM";
+const A_THIRD_CONNECTED_SOURCE = "01J6BLLLLLLLLLLLLLLLLLLLLL";
 
 const RETIRED_REASON = "narrowed";
 
@@ -119,7 +121,7 @@ const admitted = async (client: pg.PoolClient, row: JobProbeRow): Promise<string
 const rowFor = (descriptor: JobKindDescriptor): JobProbeRow => ({
   kind: descriptor.kind,
   reason: descriptor.reasons[0] ?? null,
-  subjectId: descriptor.namesASubject ? BINDING : null,
+  subjectId: descriptor.namesASubject ? CONNECTED_SOURCE : null,
 });
 
 const withWorkspace = async (fn: (client: pg.PoolClient) => Promise<void>): Promise<void> => {
@@ -157,7 +159,7 @@ describe("the job kind descriptors", () => {
         kind: "index",
         claimingTier: "worker",
         namesASubject: true,
-        reasons: ["bound", "restored", "dismissed", "rule-change", "wiped"],
+        reasons: ["connected", "restored", "dismissed", "rule-change", "wiped"],
         enqueuedBy: "Admin",
       },
     ]);
@@ -167,9 +169,9 @@ describe("the job kind descriptors", () => {
     expect([...JOB_KINDS]).toEqual(["nightly-audit", "full-rebuild", "index"]);
   });
 
-  it("names the binding-emptying reasons, each an index reason", () => {
-    expect([...REASONS_EMPTYING_THE_BINDING]).toEqual(["rule-change", "wiped"]);
-    const emptying: readonly string[] = REASONS_EMPTYING_THE_BINDING;
+  it("names the connected-source-emptying reasons, each an index reason", () => {
+    expect([...REASONS_EMPTYING_THE_CONNECTED_SOURCE]).toEqual(["rule-change", "wiped"]);
+    const emptying: readonly string[] = REASONS_EMPTYING_THE_CONNECTED_SOURCE;
     expect(INDEX_REASONS.filter((reason) => emptying.includes(reason))).toEqual([
       "rule-change",
       "wiped",
@@ -185,7 +187,7 @@ describe("the kind CHECK", () => {
       expect(landed).toEqual([
         "nightly-audit · no reason · no subject",
         "full-rebuild · first-build · no subject",
-        `index · bound · ${BINDING}`,
+        `index · connected · ${CONNECTED_SOURCE}`,
       ]);
     });
   });
@@ -202,13 +204,13 @@ describe("the subject CHECK", () => {
     await withWorkspace(async (client) => {
       for (const descriptor of DESCRIBED) {
         expect(await admitted(client, rowFor(descriptor))).toContain(
-          descriptor.namesASubject ? BINDING : "no subject",
+          descriptor.namesASubject ? CONNECTED_SOURCE : "no subject",
         );
         expect(
           await refusedBy(client, {
             kind: descriptor.kind,
             reason: descriptor.reasons[0] ?? null,
-            subjectId: descriptor.namesASubject ? null : BINDING,
+            subjectId: descriptor.namesASubject ? null : CONNECTED_SOURCE,
           }),
         ).toBe("job_subject_check");
       }
@@ -226,7 +228,7 @@ describe("the reason CHECK", () => {
             await admitted(client, {
               kind: descriptor.kind,
               reason,
-              subjectId: descriptor.namesASubject ? BINDING : null,
+              subjectId: descriptor.namesASubject ? CONNECTED_SOURCE : null,
             }),
           );
         }
@@ -239,11 +241,11 @@ describe("the reason CHECK", () => {
         "full-rebuild · erasure · no subject",
         "full-rebuild · upgrade · no subject",
         "full-rebuild · drill · no subject",
-        `index · bound · ${BINDING}`,
-        `index · restored · ${BINDING}`,
-        `index · dismissed · ${BINDING}`,
-        `index · rule-change · ${BINDING}`,
-        `index · wiped · ${BINDING}`,
+        `index · connected · ${CONNECTED_SOURCE}`,
+        `index · restored · ${CONNECTED_SOURCE}`,
+        `index · dismissed · ${CONNECTED_SOURCE}`,
+        `index · rule-change · ${CONNECTED_SOURCE}`,
+        `index · wiped · ${CONNECTED_SOURCE}`,
       ]);
     });
   });
@@ -257,7 +259,7 @@ describe("the reason CHECK", () => {
             await refusedBy(client, {
               kind: descriptor.kind,
               reason,
-              subjectId: descriptor.namesASubject ? BINDING : null,
+              subjectId: descriptor.namesASubject ? CONNECTED_SOURCE : null,
             }),
           ).toBe("job_reason_check");
         }
@@ -268,7 +270,11 @@ describe("the reason CHECK", () => {
   it("refuses the retired word, which no descriptor declares", async () => {
     await withWorkspace(async (client) => {
       expect(
-        await refusedBy(client, { kind: "index", reason: RETIRED_REASON, subjectId: BINDING }),
+        await refusedBy(client, {
+          kind: "index",
+          reason: RETIRED_REASON,
+          subjectId: CONNECTED_SOURCE,
+        }),
       ).toBe("job_reason_check");
     });
   });
@@ -280,7 +286,7 @@ describe("the reason CHECK", () => {
         const row = {
           kind: descriptor.kind,
           reason: null,
-          subjectId: descriptor.namesASubject ? BINDING : null,
+          subjectId: descriptor.namesASubject ? CONNECTED_SOURCE : null,
         };
         outcomes.push(
           descriptor.reasons.length > 0
@@ -300,9 +306,17 @@ describe("the reason CHECK", () => {
 describe("the run key", () => {
   it("refuses a second queued job for the same subject", async () => {
     await withWorkspace(async (client) => {
-      await seedQueuedJob(client, WS, { kind: "index", reason: "bound", subjectId: BINDING });
+      await seedQueuedJob(client, WS, {
+        kind: "index",
+        reason: "connected",
+        subjectId: CONNECTED_SOURCE,
+      });
       expect(
-        await refusedBy(client, { kind: "index", reason: "rule-change", subjectId: BINDING }),
+        await refusedBy(client, {
+          kind: "index",
+          reason: "rule-change",
+          subjectId: CONNECTED_SOURCE,
+        }),
       ).toBe("job_queued_subject_key");
     });
   });
@@ -311,8 +325,8 @@ describe("the run key", () => {
     await withWorkspace(async (client) => {
       const first = await seedQueuedJob(client, WS, {
         kind: "index",
-        reason: "bound",
-        subjectId: BINDING,
+        reason: "connected",
+        subjectId: CONNECTED_SOURCE,
       });
       await client.query(
         `UPDATE job SET status = 'done', finished_at = now(), outcome = '{"chunks": 0}'::jsonb
@@ -320,8 +334,12 @@ describe("the run key", () => {
         [WS, first],
       );
       expect(
-        await admitted(client, { kind: "index", reason: "rule-change", subjectId: BINDING }),
-      ).toBe(`index · rule-change · ${BINDING}`);
+        await admitted(client, {
+          kind: "index",
+          reason: "rule-change",
+          subjectId: CONNECTED_SOURCE,
+        }),
+      ).toBe(`index · rule-change · ${CONNECTED_SOURCE}`);
     });
   });
 
@@ -347,20 +365,20 @@ describe("the claim's sibling check", () => {
       await seedClaimedJob(
         client,
         WS,
-        { kind: "index", reason: "bound", subjectId: BINDING, enqueuedAgoSeconds: 60 },
+        { kind: "index", reason: "connected", subjectId: CONNECTED_SOURCE, enqueuedAgoSeconds: 60 },
         120,
       );
 
       await seedQueuedJob(client, WS, {
         kind: "index",
         reason: "restored",
-        subjectId: BINDING,
+        subjectId: CONNECTED_SOURCE,
         enqueuedAgoSeconds: 45,
       });
       const free = await seedQueuedJob(client, WS, {
         kind: "index",
-        reason: "bound",
-        subjectId: ANOTHER_BINDING,
+        reason: "connected",
+        subjectId: ANOTHER_CONNECTED_SOURCE,
         enqueuedAgoSeconds: 10,
       });
 
@@ -375,13 +393,13 @@ describe("the claim's sibling check", () => {
       const running = await seedClaimedJob(
         client,
         WS,
-        { kind: "index", reason: "bound", subjectId: BINDING, enqueuedAgoSeconds: 60 },
+        { kind: "index", reason: "connected", subjectId: CONNECTED_SOURCE, enqueuedAgoSeconds: 60 },
         120,
       );
       await seedQueuedJob(client, WS, {
         kind: "index",
         reason: "rule-change",
-        subjectId: BINDING,
+        subjectId: CONNECTED_SOURCE,
         enqueuedAgoSeconds: 45,
       });
 
@@ -426,14 +444,14 @@ const withTheRetiredWordAdmitted = async (
 describe("the migration that retired a run reason", () => {
   it("deletes every row with the word, any status, any workspace", async () => {
     await withTheRetiredWordAdmitted(async (client) => {
-      await seedQueuedJob(client, WS, { ...RETIRED, subjectId: BINDING });
-      await seedClaimedJob(client, WS, { ...RETIRED, subjectId: ANOTHER_BINDING }, 120);
-      await seedFinishedJob(client, WS, { ...RETIRED, subjectId: A_THIRD_BINDING });
-      await seedQueuedJob(client, ANOTHER_WS, { ...RETIRED, subjectId: BINDING });
+      await seedQueuedJob(client, WS, { ...RETIRED, subjectId: CONNECTED_SOURCE });
+      await seedClaimedJob(client, WS, { ...RETIRED, subjectId: ANOTHER_CONNECTED_SOURCE }, 120);
+      await seedFinishedJob(client, WS, { ...RETIRED, subjectId: A_THIRD_CONNECTED_SOURCE });
+      await seedQueuedJob(client, ANOTHER_WS, { ...RETIRED, subjectId: CONNECTED_SOURCE });
       const standing = await seedQueuedJob(client, WS, {
         kind: "index",
         reason: "rule-change",
-        subjectId: A_THIRD_BINDING,
+        subjectId: A_THIRD_CONNECTED_SOURCE,
       });
 
       await asTheMigrationOwner(client, async () => {
@@ -445,17 +463,21 @@ describe("the migration that retired a run reason", () => {
       expect(await jobsStandingIn(client, ANOTHER_WS)).toEqual([]);
       expect(await jobsStandingIn(client, WS)).toEqual([standing]);
       expect(
-        await refusedBy(client, { kind: "index", reason: RETIRED_REASON, subjectId: BINDING }),
+        await refusedBy(client, {
+          kind: "index",
+          reason: RETIRED_REASON,
+          subjectId: CONNECTED_SOURCE,
+        }),
       ).toBe("job_reason_check");
     });
   });
 
   it("needs its workspace loop: a bare DELETE reaches no row", async () => {
     await withTheRetiredWordAdmitted(async (client) => {
-      const inOne = await seedQueuedJob(client, WS, { ...RETIRED, subjectId: BINDING });
+      const inOne = await seedQueuedJob(client, WS, { ...RETIRED, subjectId: CONNECTED_SOURCE });
       const inTheOther = await seedQueuedJob(client, ANOTHER_WS, {
         ...RETIRED,
-        subjectId: BINDING,
+        subjectId: CONNECTED_SOURCE,
       });
 
       const deleted = await asTheMigrationOwner(
@@ -552,44 +574,61 @@ const OLD_FIRST_REBUILD = {
 
 const THE_OLD_DESTINATION = ["chunk-index", "graph"] as const;
 
-/** The migration's statements on `job` and `source_binding`; its table renames ran when the database did. */
-const itsStatementsOnTheValuesItRewrites = (): readonly string[] =>
-  migrationStatements(THE_MAP_MIGRATION).filter((statement) =>
-    ['"job"', "public.job", '"source_binding"', "public.source_binding"].some((table) =>
-      statement.includes(table),
-    ),
-  );
+/** The map's table for connected sources, as migration 0067 and the snapshots before 0068 name it. */
+const THE_TABLE_THE_MAP_NAMED = "source_binding";
 
-/** 0036 declared the CHECK inside its CREATE TABLE, so the snapshot before the map holds it alone. */
-const theDestinationCheckBeforeTheMap = (): string => {
-  const snapshot = z
-    .object({
-      tables: z.object({
-        "public.source_binding": z.object({
-          checkConstraints: z.object({
-            source_binding_destination_check: z.object({ value: z.string() }),
-          }),
-        }),
-      }),
-    })
-    .parse(JSON.parse(readFileSync(path.join(journalMetaFolder, "0066_snapshot.json"), "utf8")));
-  const { value } =
-    snapshot.tables["public.source_binding"].checkConstraints.source_binding_destination_check;
-  return `ALTER TABLE "source_binding" ADD CONSTRAINT "source_binding_destination_check" CHECK (${value})`;
+/**
+ * The migration's statements on `job` and the connected sources' table, under that table's name
+ * today; its table renames ran when the database did.
+ */
+const itsStatementsOnTheValuesItRewrites = (): readonly string[] =>
+  migrationStatements(THE_MAP_MIGRATION)
+    .filter((statement) =>
+      [
+        '"job"',
+        "public.job",
+        `"${THE_TABLE_THE_MAP_NAMED}"`,
+        `public.${THE_TABLE_THE_MAP_NAMED}`,
+      ].some((table) => statement.includes(table)),
+    )
+    .map((statement) => statement.replaceAll(THE_TABLE_THE_MAP_NAMED, "connected_source"));
+
+const SNAPSHOT_CHECKS = z.object({
+  tables: z.record(
+    z.string(),
+    z.object({ checkConstraints: z.record(z.string(), z.object({ value: z.string() })) }),
+  ),
+});
+
+/** A CHECK declared inside its CREATE TABLE has no statement to replay, so a snapshot holds it. */
+const aCheckFrom = (snapshot: string, suffix: string, addedAs: string): string => {
+  const check = `${THE_TABLE_THE_MAP_NAMED}_${suffix}`;
+  const value = SNAPSHOT_CHECKS.parse(
+    JSON.parse(readFileSync(path.join(journalMetaFolder, snapshot), "utf8")),
+  ).tables[`public.${THE_TABLE_THE_MAP_NAMED}`]?.checkConstraints[check]?.value;
+  if (value === undefined) throw new Error(`${snapshot} holds no ${check}`);
+  return `ALTER TABLE "connected_source" ADD CONSTRAINT "${addedAs}" CHECK (${value})`;
 };
+
+/** 0036 declared the CHECK, so the snapshot before the map holds it alone. */
+const theDestinationCheckBeforeTheMap = (): string =>
+  aCheckFrom("0066_snapshot.json", "destination_check", "connected_source_destination_check");
 
 const withTheOldMapValuesAdmitted = (fn: (client: pg.PoolClient) => Promise<void>): Promise<void> =>
   withTheReasonCheckOf(THE_RENAMING_MIGRATION, fn, async (client) => {
     await client.query(
-      'ALTER TABLE "source_binding" DROP CONSTRAINT "source_binding_destination_check"',
+      'ALTER TABLE "connected_source" DROP CONSTRAINT "connected_source_destination_check"',
     );
     await client.query(theDestinationCheckBeforeTheMap());
   });
 
-const replayingItsRewrites = (client: pg.PoolClient): Promise<void> =>
-  asTheMigrationOwnerOf(client, ["TABLE public.job", "TABLE public.source_binding"], async () => {
-    for (const statement of itsStatementsOnTheValuesItRewrites()) await client.query(statement);
+const replaying = (client: pg.PoolClient, statements: readonly string[]): Promise<void> =>
+  asTheMigrationOwnerOf(client, ["TABLE public.job", "TABLE public.connected_source"], async () => {
+    for (const statement of statements) await client.query(statement);
   });
+
+const replayingItsRewrites = (client: pg.PoolClient): Promise<void> =>
+  replaying(client, itsStatementsOnTheValuesItRewrites());
 
 const destinationsStandingIn = async (
   client: pg.PoolClient,
@@ -597,7 +636,7 @@ const destinationsStandingIn = async (
 ): Promise<readonly (readonly string[])[]> =>
   (
     await client.query<{ destination: string[] }>(
-      "SELECT destination FROM source_binding WHERE workspace_id = $1",
+      "SELECT destination FROM connected_source WHERE workspace_id = $1",
       [workspaceId],
     )
   ).rows.map((row) => row.destination);
@@ -619,8 +658,8 @@ describe("the migration that named the map", () => {
 
   it("moves every workspace's 'graph' destination to 'map'", async () => {
     await withTheOldMapValuesAdmitted(async (client) => {
-      await seedBindingTo(client, WS, BINDING, THE_OLD_DESTINATION);
-      await seedBindingTo(client, ANOTHER_WS, BINDING, THE_OLD_DESTINATION);
+      await seedConnectedSourceTo(client, WS, CONNECTED_SOURCE, THE_OLD_DESTINATION);
+      await seedConnectedSourceTo(client, ANOTHER_WS, CONNECTED_SOURCE, THE_OLD_DESTINATION);
 
       await replayingItsRewrites(client);
 
@@ -628,9 +667,99 @@ describe("the migration that named the map", () => {
       expect(await destinationsStandingIn(client, ANOTHER_WS)).toEqual([["chunk-index", "map"]]);
       expect(
         await refusalOf(client, () =>
-          seedBindingTo(client, WS, ANOTHER_BINDING, THE_OLD_DESTINATION),
+          seedConnectedSourceTo(client, WS, ANOTHER_CONNECTED_SOURCE, THE_OLD_DESTINATION),
         ),
-      ).toBe("source_binding_destination_check");
+      ).toBe("connected_source_destination_check");
+    });
+  });
+});
+
+const THE_CONNECTED_SOURCE_MIGRATION = "0068_the-connected-source.sql";
+
+const OLD_INDEX_REASON = "bound";
+
+const NEW_INDEX_REASON = "connected";
+
+const OLD_STATE = "landed";
+
+const NEW_STATE = "received";
+
+const AN_OLD_RUN = { kind: "index", reason: OLD_INDEX_REASON } as const;
+
+/** Its statements that rewrite a value; the renames before them ran when the database did. */
+const itsValueRewrites = (): readonly string[] =>
+  migrationStatements(THE_CONNECTED_SOURCE_MIGRATION).filter(
+    (statement) =>
+      !statement.includes("RENAME") &&
+      ['"job"', "public.job", '"connected_source"', "public.connected_source"].some((table) =>
+        statement.includes(table),
+      ),
+  );
+
+/** Added by its old name, which 0068's DROP names: the table's other renames ran with the database. */
+const theStateCheckBeforeTheRename = (): string =>
+  aCheckFrom("0067_snapshot.json", "state_check", `${THE_TABLE_THE_MAP_NAMED}_state_check`);
+
+const withTheOldConnectedSourceValuesAdmitted = (
+  fn: (client: pg.PoolClient) => Promise<void>,
+): Promise<void> =>
+  withTheReasonCheckOf(THE_MAP_MIGRATION, fn, async (client) => {
+    await client.query(
+      'ALTER TABLE "connected_source" DROP CONSTRAINT "connected_source_state_check"',
+    );
+    await client.query(theStateCheckBeforeTheRename());
+  });
+
+const replayingItsValueRewrites = (client: pg.PoolClient): Promise<void> =>
+  replaying(client, itsValueRewrites());
+
+const statesStandingIn = async (
+  client: pg.PoolClient,
+  workspaceId: string,
+): Promise<readonly string[]> =>
+  (
+    await client.query<{ state: string }>(
+      "SELECT state FROM connected_source WHERE workspace_id = $1 ORDER BY id",
+      [workspaceId],
+    )
+  ).rows.map((row) => row.state);
+
+describe("the migration that named the connected source", () => {
+  it("moves every workspace's bound runs to connected, finished ones too", async () => {
+    await withTheOldConnectedSourceValuesAdmitted(async (client) => {
+      const queued = await seedQueuedJob(client, WS, {
+        ...AN_OLD_RUN,
+        subjectId: CONNECTED_SOURCE,
+      });
+      await seedFinishedJob(client, WS, { ...AN_OLD_RUN, subjectId: ANOTHER_CONNECTED_SOURCE });
+      await seedQueuedJob(client, ANOTHER_WS, { ...AN_OLD_RUN, subjectId: CONNECTED_SOURCE });
+
+      await replayingItsValueRewrites(client);
+
+      expect(await reasonsStandingIn(client, WS)).toEqual([NEW_INDEX_REASON, NEW_INDEX_REASON]);
+      expect(await reasonsStandingIn(client, ANOTHER_WS)).toEqual([NEW_INDEX_REASON]);
+      expect(await claimed(client, ["index"])).toEqual([queued]);
+      expect(await refusedBy(client, { ...AN_OLD_RUN, subjectId: A_THIRD_CONNECTED_SOURCE })).toBe(
+        "job_reason_check",
+      );
+    });
+  });
+
+  it("moves every workspace's landed connected source to received", async () => {
+    await withTheOldConnectedSourceValuesAdmitted(async (client) => {
+      await seedConnectedSourceIn(client, WS, CONNECTED_SOURCE, OLD_STATE);
+      await seedConnectedSourceIn(client, ANOTHER_WS, CONNECTED_SOURCE, OLD_STATE);
+
+      await replayingItsValueRewrites(client);
+      await seedConnectedSourceOfAConnectorAlone(client, WS, ANOTHER_CONNECTED_SOURCE);
+
+      expect(await statesStandingIn(client, WS)).toEqual([NEW_STATE, NEW_STATE]);
+      expect(await statesStandingIn(client, ANOTHER_WS)).toEqual([NEW_STATE]);
+      expect(
+        await refusalOf(client, () =>
+          seedConnectedSourceIn(client, WS, A_THIRD_CONNECTED_SOURCE, OLD_STATE),
+        ),
+      ).toBe("connected_source_state_check");
     });
   });
 });

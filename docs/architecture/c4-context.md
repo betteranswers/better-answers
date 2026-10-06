@@ -6,7 +6,7 @@ Level 1. The platform as one system: who uses it, which systems it talks to, and
 C4Context
   title System context — Better Answers, a living company knowledge map
 
-  Person(admin, "Admin", "Binds sources, reviews findings, publishes, decides every suggestion, manages people and thresholds")
+  Person(admin, "Admin", "Connects sources, reviews findings, publishes, decides every suggestion, manages people and thresholds")
   Person(editor, "Editor", "A bid writer: types and edits concepts, writes guide Briefs, asks, saves Answers, answers a question set")
   Person(viewer, "Viewer", "Reads, searches, opens a concept and its evidence, flags an answer")
   Person(operator, "Operator", "Provisions a workspace and its first member, releases by digest, runs the drill and the ops commands")

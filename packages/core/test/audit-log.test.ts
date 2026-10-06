@@ -3,6 +3,7 @@ import type { z } from "zod";
 
 import { testData } from "@better-answers/schema/testing";
 
+import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import { parse, type Result, type Role, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   addToGroup,
@@ -682,10 +683,10 @@ describe("the audit log's subjects", () => {
     const { workspaceId } = workspace;
     const actor = `human:${workspace.adminUserId}`;
     await seedingWith(db().pool, async (seed) => {
-      const binding = await seed.sourceBinding({ workspaceId, name: "Staff handbook" });
+      const connectedSource = await seed.connectedSource({ workspaceId, name: "Staff handbook" });
       const document = await seed.sourceDocument({
         workspaceId,
-        bindingId: binding.id,
+        connectedSourceId: connectedSource.id,
         title: "Leave policy.pdf",
       });
       const concept = await seed.conceptIndex({ workspaceId, title: "Annual leave" });
@@ -693,15 +694,19 @@ describe("the audit log's subjects", () => {
         workspaceId,
         act: "sources.binding.published",
         actor,
-        subjectId: binding.id,
-        detail: { bindingId: binding.id },
+        subjectId: connectedSource.id,
+        detail: { [STORED_DETAIL_KEYS.connectedSourceId]: connectedSource.id },
       });
       await seed.auditEvent({
         workspaceId,
         act: "sources.document.narrowed",
         actor,
         subjectId: document.id,
-        detail: { documentId: document.id, bindingId: binding.id, sensitivity: "Restricted" },
+        detail: {
+          documentId: document.id,
+          [STORED_DETAIL_KEYS.connectedSourceId]: connectedSource.id,
+          sensitivity: "Restricted",
+        },
       });
       await seed.auditEvent({
         workspaceId,
@@ -722,9 +727,12 @@ describe("the audit log's subjects", () => {
       ],
       [
         { kind: "document", name: "Leave policy.pdf" },
-        { documentId: { kind: "document", name: "Leave policy.pdf" }, bindingId: handbook },
+        {
+          documentId: { kind: "document", name: "Leave policy.pdf" },
+          [STORED_DETAIL_KEYS.connectedSourceId]: handbook,
+        },
       ],
-      [handbook, { bindingId: handbook }],
+      [handbook, { [STORED_DETAIL_KEYS.connectedSourceId]: handbook }],
     ]);
   });
 
@@ -737,14 +745,17 @@ describe("the audit log's subjects", () => {
         act: "sources.binding.published",
         actor: `human:${workspace.adminUserId}`,
         subjectId: gone,
-        detail: { bindingId: gone },
+        detail: { [STORED_DETAIL_KEYS.connectedSourceId]: gone },
       }),
     );
 
     const [published] = pageOf(await readAs(workspace, workspace.adminUserId)).events;
 
     const removed = { kind: "removed", of: "connected-source" };
-    expect([published?.subject, published?.named]).toEqual([removed, { bindingId: removed }]);
+    expect([published?.subject, published?.named]).toEqual([
+      removed,
+      { [STORED_DETAIL_KEYS.connectedSourceId]: removed },
+    ]);
   });
 
   it("names the person a detail id holds", async () => {

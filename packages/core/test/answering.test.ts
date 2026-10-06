@@ -658,7 +658,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
       text: INVOICE_TEXT,
     });
     const unpublished = await documentHolding(reader.workspaceId, {
-      title: "The binding still under review",
+      title: "The connected source still under review",
       text: HANDBOOK_TEXT,
       publishedAt: null,
     });

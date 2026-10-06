@@ -9,7 +9,7 @@ import {
   type Malformed,
   type Result,
 } from "@better-answers/core/kernel";
-import { bindUploadFields, type BindUploadFields } from "@better-answers/core/sources";
+import { connectUploadFields, type ConnectUploadFields } from "@better-answers/core/sources";
 import type { ObjectDoor } from "@better-answers/core/store/objects";
 import type { PostgresDoor } from "@better-answers/core/store/postgres";
 
@@ -20,7 +20,7 @@ import { doorTold, type Doors } from "../doors.ts";
  * holds the pair.
  */
 export const UPLOAD_DESCRIPTOR_HEADERS = {
-  bindingId: "x-upload-binding-id",
+  connectedSourceId: "x-upload-connected-source-id",
   name: "x-upload-name",
   fileName: "x-upload-file-name",
   mediaType: "x-upload-media-type",
@@ -28,7 +28,7 @@ export const UPLOAD_DESCRIPTOR_HEADERS = {
   sensitivity: "x-upload-sensitivity",
   audience: "x-upload-audience",
   audienceGroups: "x-upload-audience-groups",
-} as const satisfies Record<keyof z.input<typeof bindUploadFields>, string>;
+} as const satisfies Record<keyof z.input<typeof connectUploadFields>, string>;
 
 /** A header carries bytes and a name may not be one, so each value is its JSON, percent-encoded. */
 const decoded = (sent: string): Result<z.JSONType, IssueWord> => {
@@ -42,7 +42,7 @@ const decoded = (sent: string): Result<z.JSONType, IssueWord> => {
 };
 
 /** An absent header is an absent field; one never encoded joins the schema's own refusals. */
-export const descriptorOf = (headers: Headers): Result<BindUploadFields, Malformed> => {
+export const descriptorOf = (headers: Headers): Result<ConnectUploadFields, Malformed> => {
   const gathered: Record<string, z.JSONType> = {};
   const unreadable: Record<string, IssueWord> = {};
   for (const [field, header] of Object.entries(UPLOAD_DESCRIPTOR_HEADERS)) {
@@ -52,7 +52,7 @@ export const descriptorOf = (headers: Headers): Result<BindUploadFields, Malform
     if (read.ok) gathered[field] = read.value;
     else unreadable[field] = read.error;
   }
-  const parsed = parse(bindUploadFields, gathered);
+  const parsed = parse(connectUploadFields, gathered);
   if (Object.keys(unreadable).length === 0) return parsed;
   const refused = parsed.ok ? {} : parsed.error.fields;
   return err({ word: MALFORMED, fields: { ...refused, ...unreadable } });

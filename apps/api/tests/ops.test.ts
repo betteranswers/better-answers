@@ -19,7 +19,7 @@ import {
   type SubjectIdentifiers,
 } from "@better-answers/core/erasure";
 import { ok, type UserPrincipal } from "@better-answers/core/kernel";
-import { bindUpload, bindUploadFields } from "@better-answers/core/sources";
+import { connectUpload, connectUploadFields } from "@better-answers/core/sources";
 import { fileAtHead, head, initRepository } from "@better-answers/core/store/git";
 import { getObject, listObjects } from "@better-answers/core/store/objects";
 import {
@@ -350,7 +350,7 @@ const theIndexRunLanded = async (
   const run = await queuedIndexJob(app, workspaceId);
   const reader = await principalOf(app, workspaceId, readerId);
   const documents = await app.database.superuser.query<{ id: string; original_key: string }>(
-    "SELECT id, original_key FROM source_document WHERE workspace_id = $1 AND binding_id = $2",
+    "SELECT id, original_key FROM source_document WHERE workspace_id = $1 AND connected_source_id = $2",
     [workspaceId, run.subject_id],
   );
   const client = await app.database.superuser.connect();
@@ -361,7 +361,7 @@ const theIndexRunLanded = async (
       const content = await textOf(original.value);
       await testData(client).chunk({
         workspaceId,
-        bindingId: run.subject_id,
+        connectedSourceId: run.subject_id,
         sourceDocumentId: document.id,
         content,
         locator: `${document.id}/chars:0-${content.length}`,
@@ -389,12 +389,12 @@ const boundAndIndexed = async (
 ): Promise<void> => {
   const admin = await principalOf(app, workspaceId, adminId);
   const bytes = new TextEncoder().encode(text);
-  const bound = await bindUpload(
+  const bound = await connectUpload(
     admin,
     { postgres: app.doors.postgres, objects: objects().door },
     {
-      ...inputOf(bindUploadFields, {
-        bindingId: ulid(),
+      ...inputOf(connectUploadFields, {
+        connectedSourceId: ulid(),
         name: "The claims handbook",
         fileName: "claims-handbook.md",
         mediaType: "text/markdown",
@@ -403,11 +403,11 @@ const boundAndIndexed = async (
       body: new Blob([bytes]).stream(),
     },
   );
-  if (!bound.ok) throw new Error(`the bind was refused: ${String(bound.error)}`);
+  if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
   await theIndexRunLanded(app, workspaceId, adminId);
 };
 
-/** Completed while the documents finder answered nothing, so its run wiped no binding. */
+/** Completed while the documents finder answered nothing, so its run wiped no connected source. */
 const completedBeforeTheFinder = async (
   app: TestApp,
   workspaceId: string,
@@ -680,7 +680,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("wipes and requeues the subject's binding; a rerun only logs", async () => {
+    it("wipes and requeues the subject's source; a rerun only logs", async () => {
       const { workspaceId, admin } = await app().provision();
       await initRepository(openTestGit(app()), workspaceId);
       const identifiers: SubjectIdentifiers = {
@@ -724,7 +724,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(afterTheFirst).toEqual({
         chunks: [],
         jobs: [
-          { kind: "index", reason: "bound", status: "done" },
+          { kind: "index", reason: "connected", status: "done" },
           { kind: "index", reason: "wiped", status: "queued" },
         ],
         erasures: [
@@ -903,7 +903,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("object-store-orphans — the bytes a failed bind left", () => {
+  describe("object-store-orphans — the bytes a failed connect left", () => {
     /**
      * The store stamps an object with its own clock, so the instant the grace is judged from is
      * the suite's own, moved on.
@@ -911,8 +911,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const aDayOn = (): Date => new Date(Date.now() + 25 * 60 * 60 * 1000);
 
     const handbook = () => ({
-      ...inputOf(bindUploadFields, {
-        bindingId: ulid(),
+      ...inputOf(connectUploadFields, {
+        connectedSourceId: ulid(),
         name: "The staff handbook",
         fileName: "handbook.md",
         mediaType: "text/markdown",
@@ -921,27 +921,27 @@ describe("pnpm ops — the restore scripts' commands", () => {
       body: new Blob(["The handbook says what the company decided."]).stream(),
     });
 
-    const bindingsOf = async (workspaceId: string, userId: string) => {
+    const connectedSourcesOf = async (workspaceId: string, userId: string) => {
       const admin = await principalOf(app(), workspaceId, userId);
       const doors = { postgres: openPostgres(app().database.pool), objects: objects().door };
 
-      const bound = await bindUpload(admin, doors, handbook());
-      if (!bound.ok) throw new Error(`the bind was refused: ${String(bound.error)}`);
+      const bound = await connectUpload(admin, doors, handbook());
+      if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
 
       /**
        * The job is the transaction's last statement, so refusing it leaves the object the act put
        * before it and no row that names the object.
        */
       const failed = await whileWritesAreRefused(app().database.superuser, "job", () =>
-        bindUpload(admin, doors, handbook()),
+        connectUpload(admin, doors, handbook()),
       );
-      if (failed.ok) throw new Error("the bind landed where the queue was refused");
+      if (failed.ok) throw new Error("the connect landed where the queue was refused");
       return { admin, named: bound.value.originalKey };
     };
 
     it("removes only the original no document names, once past grace", async () => {
       const { workspaceId, admin: person } = await app().provision();
-      const { admin, named } = await bindingsOf(workspaceId, person.id);
+      const { admin, named } = await connectedSourcesOf(workspaceId, person.id);
 
       const looked = await opsWith(
         app(),
@@ -966,7 +966,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("removes nothing while the grace still holds over both", async () => {
       const { workspaceId, admin: person } = await app().provision();
-      await bindingsOf(workspaceId, person.id);
+      await connectedSourcesOf(workspaceId, person.id);
 
       const run = await ops(app(), ["object-store-orphans", "--workspace", workspaceId]);
 
@@ -1044,7 +1044,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(seededRow.rowCount).toBe(1);
     });
 
-    it("wipes the subject's chunks in phase two, requeueing the binding", async () => {
+    it("wipes the subject's chunks in phase two, requeueing the source", async () => {
       const { workspaceId, admin } = await aWorkspaceToDrillIn();
       const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
       const name = `Rehearsal subject ${workspaceId}`;
@@ -1070,7 +1070,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.exitCode).toBe(0);
       expect(await tokensTheChunksHold(app(), workspaceId, tokens)).toEqual([]);
       expect(await indexJobsIn(app(), workspaceId)).toEqual([
-        { reason: "bound", status: "done" },
+        { reason: "connected", status: "done" },
         { reason: "wiped", status: "queued" },
       ]);
     });
@@ -1083,7 +1083,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const [indexRun] = await indexJobsIn(app(), workspaceId);
       const jobs = await jobsOf(app(), workspaceId);
       expect(run.exitCode).toBe(1);
-      expect(indexRun).toEqual({ reason: "bound", status: "failed" });
+      expect(indexRun).toEqual({ reason: "connected", status: "failed" });
       expect(run.lines).toEqual([
         `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${jobs[0]?.id ?? ""} is failed after 1 attempt; the job's own row says what it found`,
       ]);

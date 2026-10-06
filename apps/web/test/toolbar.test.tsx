@@ -22,12 +22,12 @@ const pick = (name: string) => fireEvent.mouseDown(within(tabs()).getByRole("tab
 
 const A_TABBED_PAGE: PageToolbar = {
   tabs: [
-    { id: "bindings-all", name: "All" },
-    { id: "bindings-gone", name: "Gone at source" },
+    { id: "connected-sources-all", name: "All" },
+    { id: "connected-sources-gone", name: "Gone at source" },
   ],
   acts: (
     <button type="button" className="border border-border px-3">
-      Add a binding
+      Add a connected source
     </button>
   ),
 };
@@ -43,9 +43,9 @@ const ANOTHER_TABBED_PAGE: PageToolbar = {
  * One helper of the feature's own, called by its content and by its acts: the shared slot
  * never learns the type.
  */
-const useTickedGroups = viewStateOf<number>("/bindings/review");
+const useTickedGroups = viewStateOf<number>("/connected-sources/review");
 
-const useAnotherPagesTickedGroups = viewStateOf<number>("/bindings/all");
+const useAnotherPagesTickedGroups = viewStateOf<number>("/connected-sources/all");
 
 function NarrowAct() {
   const [ticked] = useTickedGroups();
@@ -146,7 +146,7 @@ describe("the toolbar the open page fills", () => {
         <Toolbar name={name} toolbar={toolbar} />
       </PageTabsRoot>
     );
-    const { rerender } = render(shell(A_TABBED_PAGE, "Bindings"));
+    const { rerender } = render(shell(A_TABBED_PAGE, "Connected sources"));
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Gone at source" }));
     expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Gone at source");
 
@@ -175,23 +175,23 @@ describe("the toolbar the open page fills", () => {
   it("draws a page's tabs before its acts in the toolbar", () => {
     render(
       <PageTabsRoot tabs={A_TABBED_PAGE.tabs}>
-        <Toolbar name="Bindings" toolbar={A_TABBED_PAGE} />
+        <Toolbar name="Connected sources" toolbar={A_TABBED_PAGE} />
         <PagePanel>
-          <p>The bindings.</p>
+          <p>The connected sources.</p>
         </PagePanel>
       </PageTabsRoot>,
     );
 
-    const list = screen.getByRole("tablist", { name: "Bindings" });
-    const act = screen.getByRole("button", { name: "Add a binding" });
+    const list = screen.getByRole("tablist", { name: "Connected sources" });
+    const act = screen.getByRole("button", { name: "Add a connected source" });
 
     expect(list.compareDocumentPosition(act) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
   it("draws only the acts for a page without tabs", () => {
-    render(<Toolbar name="Bindings" toolbar={{ acts: A_TABBED_PAGE.acts }} />);
+    render(<Toolbar name="Connected sources" toolbar={{ acts: A_TABBED_PAGE.acts }} />);
 
-    expect(screen.getByRole("button", { name: "Add a binding" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Add a connected source" })).toBeDefined();
     expect(screen.queryByRole("tablist")).toBeNull();
   });
 });

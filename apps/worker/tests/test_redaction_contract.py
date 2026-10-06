@@ -27,7 +27,11 @@ def test_the_always_tier_alone_is_unswitchable_and_keyless() -> None:
     fixture = read_redaction()
 
     unswitchable = [tier["tier"] for tier in fixture["tiers"] if not tier["switchable"]]
-    keyless = [tier["tier"] for tier in fixture["tiers"] if tier["binding_key"] is None]
+    keyless = [
+        tier["tier"]
+        for tier in fixture["tiers"]
+        if tier["connected_source_key"] is None
+    ]
     assert unswitchable == [SPOKEN_ALWAYS_TIER]
     assert keyless == [SPOKEN_ALWAYS_TIER]
 
@@ -36,9 +40,9 @@ def test_a_switchable_tiers_key_fits_the_column_this_tier_reads() -> None:
 
     fixture = read_redaction()
 
-    assert TABLES["public.source_binding"]["rules_in_force"] == "jsonb NOT NULL"
+    assert TABLES["public.connected_source"]["rules_in_force"] == "jsonb NOT NULL"
     for tier in fixture["tiers"]:
-        key = tier["binding_key"]
+        key = tier["connected_source_key"]
         assert key is None or (key and " " not in key), tier["tier"]
 
 

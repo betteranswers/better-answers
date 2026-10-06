@@ -16,7 +16,7 @@ export type TestPeople = Readonly<Record<Role, string>>;
 export type Standing = {
   readonly members: readonly Pick<Member, "address" | "role">[];
   readonly waitingInvitations: number;
-  readonly bindings: number;
+  readonly connectedSources: number;
 };
 
 /** The part after the last `@`, as the fixture command reads it: a subdomain is another domain. */
@@ -63,7 +63,7 @@ export const findingsIn = (standing: Standing, people: TestPeople): readonly str
       "members in roles its fixture does not give",
     ],
     [standing.waitingInvitations, "waiting invitation", "waiting invitations"],
-    [standing.bindings, "binding", "bindings"],
+    [standing.connectedSources, "connected source", "connected sources"],
   ];
   return found
     .filter(([count]) => count > 0)

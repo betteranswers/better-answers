@@ -7,20 +7,20 @@
     {
       "tier": "always",
       "switchable": false,
-      "binding_key": null,
-      "why": "Policy: no binding switches it off, so it carries no key on a binding's rules in force. A span it withheld is restorable one at a time by an Admin with a reason, which is the only way it is ever let back into the text."
+      "connected_source_key": null,
+      "why": "Policy: no connected source switches it off, so it carries no key on a connected source's rules in force. A span it withheld is restorable one at a time by an Admin with a reason, which is the only way it is ever let back into the text."
     },
     {
       "tier": "default-on",
       "switchable": true,
-      "binding_key": "default_on",
-      "why": "On unless a binding says otherwise. The safe set an unconfigured binding gets has this tier on, so a binding nobody thought about withholds more rather than less."
+      "connected_source_key": "default_on",
+      "why": "On unless a connected source says otherwise. The safe set an unconfigured connected source gets has this tier on, so a connected source nobody thought about withholds more rather than less."
     },
     {
       "tier": "default-off",
       "switchable": true,
-      "binding_key": "default_off",
-      "why": "Off unless a binding says otherwise, because a bid library is full of the names and titles of people whose work the company is describing. Seeded on for meeting-note, support-ticket and HR-shaped bindings, which is one flip of this key."
+      "connected_source_key": "default_off",
+      "why": "Off unless a connected source says otherwise, because a bid library is full of the names and titles of people whose work the company is describing. Seeded on for meeting-note, support-ticket and HR-shaped connected sources, which is one flip of this key."
     }
   ],
   "categories": [
@@ -78,7 +78,7 @@
       "placeholder": "[person A]",
       "special_category": false,
       "narrows_to": null,
-      "why": "A person's name, replaced by a stable pseudonym rather than a blank: the same name is the same letter everywhere in one binding and a different letter in another, so a document still reads as a document and two bindings cannot be joined on the letter. `[person A]` is the first letter, and the placeholder every later one is written in the shape of. This is the tier a name is ordinarily raised at; a name inside an officers block is raised at the always tier instead, whatever a binding says, and takes that tier's word."
+      "why": "A person's name, replaced by a stable pseudonym rather than a blank: the same name is the same letter everywhere in one connected source and a different letter in another, so a document still reads as a document and two connected sources cannot be joined on the letter. `[person A]` is the first letter, and the placeholder every later one is written in the shape of. This is the tier a name is ordinarily raised at; a name inside an officers block is raised at the always tier instead, whatever a connected source says, and takes that tier's word."
     },
     {
       "category": "job-title",

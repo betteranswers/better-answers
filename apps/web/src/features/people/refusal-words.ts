@@ -11,7 +11,7 @@ export const SAID_OF_A_MEMBER = {
     next: "Make someone else an Admin first.",
   },
   "changed-meanwhile": {
-    why: "Another change to these members landed at the same moment.",
+    why: "Another change to these members was made at the same moment.",
     next: "Read the list again and decide again.",
   },
   "no-such-member": {
@@ -46,7 +46,7 @@ export const SAID_OF_TICKED_MEMBERS = {
     next: "Choose another group.",
   },
   "changed-meanwhile": {
-    why: "Another change to these members landed at the same moment, so nothing changed.",
+    why: "Another change to these members was made at the same moment, so nothing changed.",
     next: "Try again.",
   },
 } satisfies SaidOfWord;
@@ -77,7 +77,7 @@ export const SAID_OF_AN_INVITATION = {
     next: "Check the address and send the invitation again.",
   },
   "changed-meanwhile": {
-    why: "Another invitation to one of these addresses landed at the same moment, so nothing was sent.",
+    why: "Another invitation to one of these addresses went out at the same moment, so nothing was sent.",
     next: "Send them again.",
   },
 } satisfies SaidOfWord;
@@ -94,7 +94,7 @@ export const SAID_OF_TICKED_INVITATIONS = {
     next: "Try again without it.",
   },
   "changed-meanwhile": {
-    why: "Another change to these invitations landed at the same moment, so nothing changed.",
+    why: "Another change to these invitations was made at the same moment, so nothing changed.",
     next: "Try again.",
   },
 } satisfies SaidOfWord;

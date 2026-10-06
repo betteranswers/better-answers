@@ -30,16 +30,16 @@ The engine is ADR 0032's: plain Postgres tables under RLS. This record holds the
 - The bundle-and-record delta lands in the api's commit transaction, beside the concept index row, the `bundle_commit` and the audit event. The map is never behind for an edit.
 - Generations survive only for full rebuilds. A rebuild writes the next generation beside the live one and swaps with one row update.
 - Keys are never text: concepts by IRI, sections by `(IRI, slug)`, source entities by `(document, type, normalised-text hash)`, actors by `(workspace, actor id)`, compositions by `(record id, version)`.
-- A confirmed alias merge makes a canonical entity, each contribution hanging off it by `SAME_AS` under its own binding, class and audience.
+- A confirmed alias merge makes a canonical entity, each contribution hanging off it by `SAME_AS` under its own connected source, class and audience.
 - The label set is closed and owned by the migrations. A concept's kind is a property, never a label.
 - A `Person` concept starts Restricted whatever its evidence says. Only a recorded Admin override widens it.
 
-The read predicate (published · sensitivity · audience) lives once, as `readableClause` in `packages/core/src/access/index.ts`. It is tested against columns: `published_at`, `sensitivity`, `audience` and `audience_groups` on `concept_index`, `composition`, `map_node` and `map_edge`. For a chunk it is tested against `index.readable_chunk`'s columns, because a chunk's visibility is read from its binding and document and not carried (ADR 0044). The map door, `packages/core/src/store/map/index.ts`, applies it to every node and edge of a walk, and the template caps depth at 4.
+The read predicate (published · sensitivity · audience) lives once, as `readableClause` in `packages/core/src/access/index.ts`. It is tested against columns: `published_at`, `sensitivity`, `audience` and `audience_groups` on `concept_index`, `composition`, `map_node` and `map_edge`. For a chunk it is tested against `index.readable_chunk`'s columns, because a chunk's visibility is read from its connected source and document and not carried (ADR 0044). The map door, `packages/core/src/store/map/index.ts`, applies it to every node and edge of a walk, and the template caps depth at 4.
 
 A class is derived:
 
-- Most restrictive among the bindings of the evidence a concept cites, and among a composition's includes.
-- Re-derived synchronously inside the narrowing act, two levels down: binding, then concept, then composition.
+- Most restrictive among the connected sources of the evidence a concept cites, and among a composition's includes.
+- Re-derived synchronously inside the narrowing act, two levels down: connected source, then concept, then composition.
 - Audiences combine by intersection, with *everyone* the identity. An empty intersection forces Restricted (ADR 0039).
 - A unit resting on nothing takes its fallback: the writer's word on a creation, what the row holds on anything else.
 
@@ -60,7 +60,7 @@ The walk's timeout is set per statement, never on a role. Entry is by key, never
 
 - Clearing and rebuilding in one transaction per workspace: write locks held for the run's length.
 - Deltas only, with no generations: a model choice change, an erasure re-derive and the reconciler need a safe "rewrite everything".
-- The canonical entity as the target contribution's node: it wears one binding's predicate and gates the whole person.
+- The canonical entity as the target contribution's node: it wears one connected source's predicate and gates the whole person.
 - Rewriting merged entities into one node: it loses the per-contribution predicate and cannot be undone.
 
 ## History

@@ -29,7 +29,7 @@ const FIXTURE: Standing["members"] = [
 const standing = (changed: Partial<Standing> = {}): Standing => ({
   members: FIXTURE,
   waitingInvitations: 0,
-  bindings: 0,
+  connectedSources: 0,
   ...changed,
 });
 
@@ -82,7 +82,7 @@ describe("the check of the test workspace", () => {
     expect(findingsIn(standing({ members }), PEOPLE)).toEqual(["3 members of its fixture missing"]);
   });
 
-  it("counts outsiders, invitations and bindings, naming no address", () => {
+  it("counts outsiders, invitations and connected sources, naming no address", () => {
     const members = [
       ...FIXTURE,
       { address: "stranger@elsewhere.example", role: "Viewer" },
@@ -90,9 +90,16 @@ describe("the check of the test workspace", () => {
       { address: "invented-member-01@elsewhere.example", role: "Viewer" },
     ];
 
-    const found = findingsIn(standing({ members, waitingInvitations: 1, bindings: 2 }), PEOPLE);
+    const found = findingsIn(
+      standing({ members, waitingInvitations: 1, connectedSources: 2 }),
+      PEOPLE,
+    );
 
-    expect(found).toEqual(["3 members outside its fixture", "1 waiting invitation", "2 bindings"]);
+    expect(found).toEqual([
+      "3 members outside its fixture",
+      "1 waiting invitation",
+      "2 connected sources",
+    ]);
     expect(found.join(" ")).not.toContain("@");
   });
 });

@@ -8,7 +8,7 @@ import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
 import { ModelChoicesCard } from "@/features/model-choices/model-choices-card.tsx";
 import { GroupsPage } from "@/features/people/groups-page.tsx";
 import { Review } from "@/features/sources/review.tsx";
-import type { ListedBinding } from "@/features/sources/sources-api.ts";
+import type { ListedConnectedSource } from "@/features/sources/sources-api.ts";
 
 import { regionsSeen } from "./regions-seen.tsx";
 
@@ -33,8 +33,8 @@ const mounted = (selector: string, children: ReactNode) => {
   return seen;
 };
 
-const A_BINDING: ListedBinding = {
-  bindingId: z.string().brand<"BindingId">().parse("01K5T000000000000000000001"),
+const A_CONNECTED_SOURCE: ListedConnectedSource = {
+  connectedSourceId: z.string().brand<"ConnectedSourceId">().parse("01K5T000000000000000000001"),
   name: "Scans",
   connector: "upload",
   sensitivity: "Internal",
@@ -42,7 +42,7 @@ const A_BINDING: ListedBinding = {
   audienceGroups: null,
   destination: ["chunk-index", "bundle"],
   retentionClass: "keep",
-  state: "landed",
+  state: "received",
   publishedAt: null,
   documentCount: 1,
   chunkCount: 0,
@@ -75,7 +75,7 @@ describe("a page's read, said after its region mounts (BA-31)", () => {
 
   it("fills a disclosure's region a render after opening mounts it", () => {
     const chunks = "[data-slot=collapsible-content] [aria-live=polite]";
-    const seen = mounted(chunks, <Review binding={A_BINDING} />);
+    const seen = mounted(chunks, <Review connectedSource={A_CONNECTED_SOURCE} />);
     const closed = seen.length;
 
     fireEvent.click(screen.getByRole("button", { name: /Preview the chunks/v }));

@@ -221,7 +221,7 @@ const writeAfterTheDump = async (pool: pg.Pool): Promise<void> => {
   const client = await pool.connect();
   try {
     const data = testData(client);
-    const later = await data.sourceBinding();
+    const later = await data.connectedSource();
     await client.query("BEGIN");
     await data.chunk({ workspaceId: later.workspaceId });
     await client.query("COMMIT");
@@ -385,7 +385,7 @@ describe("the production restore, over a database holding schema and rows", () =
     const restored = await securitySurface(production);
 
     expect(restored).toEqual(await securitySurface(fresh));
-    expect(restored).toContain("public.source_binding: row security true, forced true");
+    expect(restored).toContain("public.connected_source: row security true, forced true");
     expect(restored).toContain(
       "schema public, owned by pg_database_owner: USAGE to PUBLIC, granted by pg_database_owner",
     );
@@ -412,7 +412,7 @@ describe("the drill's restore, over staging left migrated and seeded", () => {
     const restored = await securitySurface(staging);
 
     expect(restored).toEqual(await securitySurface(fresh));
-    expect(restored).toContain("public.source_binding: row security true, forced true");
+    expect(restored).toContain("public.connected_source: row security true, forced true");
     expect(restored).toContain(
       "schema public, owned by pg_database_owner: USAGE to PUBLIC, granted by pg_database_owner",
     );

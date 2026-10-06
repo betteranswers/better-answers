@@ -100,8 +100,8 @@ const anAdmin = async () => {
   return { workspaceId: workspace.workspaceId, api };
 };
 
-const bindingIn = (workspaceId: string, publishedAt: Date | null): Promise<string> =>
-  seededIn(app, async (seed) => (await seed.sourceBinding({ workspaceId, publishedAt })).id);
+const connectedSourceIn = (workspaceId: string, publishedAt: Date | null): Promise<string> =>
+  seededIn(app, async (seed) => (await seed.connectedSource({ workspaceId, publishedAt })).id);
 
 const A_SORT_CODE = { category: "bank-details", ruleId: "sort-code-with-account-number" };
 
@@ -112,9 +112,12 @@ const A_SORT_CODE = { category: "bank-details", ruleId: "sort-code-with-account-
 const A_WORD_OF_EACH_CLASS = [
   [
     "malformed",
-    { word: "malformed", fields: { bindingId: "bad-format" } },
+    { word: "malformed", fields: { connectedSourceId: "bad-format" } },
     400,
-    async () => (await anAdmin()).api.sources.findings.query({ bindingId: "not-a-binding-id" }),
+    async () =>
+      (await anAdmin()).api.sources.findings.query({
+        connectedSourceId: "not-a-connected-source-id",
+      }),
   ],
   [
     "forbidden",
@@ -133,9 +136,9 @@ const A_WORD_OF_EACH_CLASS = [
     404,
     async () => {
       const { workspaceId, api } = await anAdmin();
-      const bindingId = await bindingIn(workspaceId, null);
+      const connectedSourceId = await connectedSourceIn(workspaceId, null);
       return api.sources.narrowDocuments.mutate({
-        bindingId,
+        connectedSourceId,
         findingGroups: [{ documentId: ulid(), tier: "always", ...A_SORT_CODE }],
       });
     },
@@ -146,7 +149,7 @@ const A_WORD_OF_EACH_CLASS = [
     422,
     async () =>
       (await anAdmin()).api.sources.keepInText.mutate({
-        bindingId: ulid(),
+        connectedSourceId: ulid(),
         findingGroups: [{ documentId: ulid(), tier: "default-on", ...A_SORT_CODE }],
         reason: "The sort code is the company's own.",
       }),
@@ -157,8 +160,14 @@ const A_WORD_OF_EACH_CLASS = [
     409,
     async () => {
       const { workspaceId, api } = await anAdmin();
-      const bindingId = await bindingIn(workspaceId, new Date("2026-09-22T09:00:00.000Z"));
-      return api.sources.publish.mutate({ bindingId, confirmations: THE_THREE_CONFIRMATIONS });
+      const connectedSourceId = await connectedSourceIn(
+        workspaceId,
+        new Date("2026-09-22T09:00:00.000Z"),
+      );
+      return api.sources.publish.mutate({
+        connectedSourceId,
+        confirmations: THE_THREE_CONFIRMATIONS,
+      });
     },
   ],
   [
@@ -167,8 +176,11 @@ const A_WORD_OF_EACH_CLASS = [
     412,
     async () => {
       const { workspaceId, api } = await anAdmin();
-      const bindingId = await bindingIn(workspaceId, null);
-      return api.sources.publish.mutate({ bindingId, confirmations: THE_THREE_CONFIRMATIONS });
+      const connectedSourceId = await connectedSourceIn(workspaceId, null);
+      return api.sources.publish.mutate({
+        connectedSourceId,
+        confirmations: THE_THREE_CONFIRMATIONS,
+      });
     },
   ],
 ] as const;

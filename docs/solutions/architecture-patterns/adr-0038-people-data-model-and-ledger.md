@@ -28,7 +28,7 @@ tags:
 
 - A person may sit in several groups. Membership changes what a person may see, through audiences, never what they may do. `group_member` carries no role and no permission column.
 - A member removed from the workspace cascades out of every group.
-- A group carries an origin, Admin-curated or audience-minted, so a Restricted binding's named people will be a row of this same table (ADR 0039).
+- A group carries an origin, Admin-curated or audience-minted, so a Restricted connected source's named people will be a row of this same table (ADR 0039).
 - Deleting a group is allowed and fail-closed. An audience holds group ids with no foreign key, and a dangling id matches no caller, so content narrows.
 - Teams, plural roles, dynamic roles and temporal access are not adopted. Nor are request expiry or a Suspended member state. A person holds one role in a workspace: Admin, Editor or Viewer.
 
@@ -69,7 +69,7 @@ The sign-in and the consent are written after Better Auth's own write, and a fai
 ## Rejected
 
 - Nested groups, or teams beside groups: a walk per check and a second concept for one set of people.
-- A second table for a binding's named people: two grouping shapes an audience could name.
+- A second table for a connected source's named people: two grouping shapes an audience could name.
 - A role or permission column on a group: a back door to a role.
 - Refusing to delete a group an audience still names: the predicate is fail-closed, and a warning is the page's.
 - The request under a user principal with a synthetic membership, or under no principal: the first invents a membership, the second a core function with no Principal.

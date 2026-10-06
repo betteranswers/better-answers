@@ -35,7 +35,7 @@ import {
   removeRepository,
 } from "./bundle.ts";
 import { gitStarts } from "./git-starts.ts";
-import { bindingHolding } from "./sourced-concept.ts";
+import { connectedSourceHolding } from "./sourced-concept.ts";
 import {
   abortTheTransaction,
   answered,
@@ -270,7 +270,7 @@ describe("a governed write", () => {
   it("records concept, identity, commit and evidence in one transaction", async () => {
     const scenario = await arrange();
 
-    const handbook = await bindingHolding(db(), scenario.workspaceId);
+    const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
     const input = writeFor({
       evidence: [
         {
@@ -317,7 +317,7 @@ describe("a governed write", () => {
   it("keeps the version its evidence was recorded against", async () => {
     const scenario = await arrange();
 
-    const handbook = await bindingHolding(db(), scenario.workspaceId);
+    const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
     await landed(
       scenario,
       writeFor({

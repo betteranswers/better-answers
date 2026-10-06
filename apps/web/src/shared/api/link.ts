@@ -6,7 +6,7 @@ import type { OperationContext } from "@trpc/client";
  * reach; the api harness holds the pair.
  */
 export type UploadDescriptor = {
-  readonly bindingId: string;
+  readonly connectedSourceId: string;
   readonly name: string;
   readonly fileName: string;
   readonly mediaType: string;
@@ -17,7 +17,7 @@ export type UploadDescriptor = {
 };
 
 export const UPLOAD_HEADER_OF_FIELD = {
-  bindingId: "x-upload-binding-id",
+  connectedSourceId: "x-upload-connected-source-id",
   name: "x-upload-name",
   fileName: "x-upload-file-name",
   mediaType: "x-upload-media-type",

@@ -30,7 +30,7 @@ const fixtureSchema = z.object({
     z.object({
       tier: z.string().min(1),
       switchable: z.boolean(),
-      binding_key: z.string().min(1).nullable(),
+      connected_source_key: z.string().min(1).nullable(),
       why: z.string().min(1),
     }),
   ),
@@ -59,25 +59,27 @@ describe("the redaction agreement's tiers", () => {
     }
   });
 
-  it("lets a binding switch every tier but the always set", () => {
+  it("lets a source switch every tier but the always set", () => {
     expect(fixture.tiers.filter((tier) => !tier.switchable).map((tier) => tier.tier)).toEqual([
       REDACTION_ALWAYS_TIER,
     ]);
 
     expect(
-      fixture.tiers.filter((tier) => tier.binding_key === null).map((tier) => tier.tier),
+      fixture.tiers.filter((tier) => tier.connected_source_key === null).map((tier) => tier.tier),
     ).toEqual([REDACTION_ALWAYS_TIER]);
     expect(
-      fixture.tiers.flatMap((tier) => (tier.binding_key === null ? [] : [tier.binding_key])),
+      fixture.tiers.flatMap((tier) =>
+        tier.connected_source_key === null ? [] : [tier.connected_source_key],
+      ),
     ).toEqual([...RULES_IN_FORCE_KEYS]);
   });
 
   it("writes rules in force the boundary takes; always is refused", () => {
     const switchable = fixture.tiers.flatMap((tier) =>
-      tier.binding_key === null ? [] : [tier.binding_key],
+      tier.connected_source_key === null ? [] : [tier.connected_source_key],
     );
 
-    const binding = {
+    const connectedSource = {
       workspaceId: "01J6AAAAAAAAAAAAAAAAAAAAAA",
       id: "01J6VVVVVVVVVVVVVVVVVVVVVV",
       name: "The handbook",
@@ -85,12 +87,12 @@ describe("the redaction agreement's tiers", () => {
       rulesInForce: Object.fromEntries(switchable.map((key) => [key, true])),
     };
 
-    expect(boundarySchemas.sourceBinding.insert.safeParse(binding).success).toBe(true);
+    expect(boundarySchemas.connectedSource.insert.safeParse(connectedSource).success).toBe(true);
 
     expect(
-      boundarySchemas.sourceBinding.insert.safeParse({
-        ...binding,
-        rulesInForce: { ...binding.rulesInForce, [REDACTION_ALWAYS_TIER]: false },
+      boundarySchemas.connectedSource.insert.safeParse({
+        ...connectedSource,
+        rulesInForce: { ...connectedSource.rulesInForce, [REDACTION_ALWAYS_TIER]: false },
       }).success,
     ).toBe(false);
   });
@@ -133,7 +135,8 @@ describe("the redaction agreement's categories", () => {
   it("narrows to Restricted for a special-category finding and no other", () => {
     expect(SENSITIVITIES).toContain(fixture.narrows_to);
     expect(
-      boundarySchemas.sourceBinding.select.shape.sensitivity.safeParse(fixture.narrows_to).success,
+      boundarySchemas.connectedSource.select.shape.sensitivity.safeParse(fixture.narrows_to)
+        .success,
     ).toBe(true);
 
     for (const { category: named, special_category, narrows_to } of fixture.categories) {

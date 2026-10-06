@@ -16,7 +16,7 @@ export const SELECT_FIRST = {
   group: "Select a group first.",
   invitation: "Select an invitation first.",
   request: "Select a request first.",
-  binding: "Select a binding first.",
+  connectedSource: "Select a connected source first.",
   person: "Select a person first.",
   name: "Select a name first.",
 } as const;

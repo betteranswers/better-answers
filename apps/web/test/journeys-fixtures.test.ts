@@ -595,13 +595,15 @@ describe("the Admin's check of the test workspace, through its reads", () => {
     );
   }, 120_000);
 
-  it("stops the run for a binding", async () => {
+  it("stops the run for a connected source", async () => {
     const run = await checkedAgainst(
-      aWorkspace({ "GET /trpc/sources.list": answered([{ id: "a-binding" }]) }),
+      aWorkspace({ "GET /trpc/sources.list": answered([{ id: "a-connected-source" }]) }),
     );
 
     expect(run.signIns).toBe(1);
-    expect(run.summary).toContain(stoppedFor("the test workspace's check found 1 binding"));
+    expect(run.summary).toContain(
+      stoppedFor("the test workspace's check found 1 connected source"),
+    );
   }, 120_000);
 
   it("stops the run for a missing invented member", async () => {

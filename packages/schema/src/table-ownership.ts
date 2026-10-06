@@ -72,7 +72,7 @@ export const TABLE_OWNERS = {
   "public.suggestion": "concepts",
   "public.concept_write_request": "concepts",
 
-  "public.source_binding": "sources",
+  "public.connected_source": "sources",
   "public.source_document": "sources",
 
   "public.finding": "sources",
@@ -318,7 +318,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: MAP_DOOR,
     access: "read and write",
     reason:
-      "The delta builder creates the live-generation row on a workspace's first delta and binds it on every write; the traversal templates bind it on every walk, so a rebuild's flip is one row update every read sees at once.",
+      "The delta builder creates the live-generation row on a workspace's first delta and passes it as a parameter on every write; the traversal templates pass it on every walk, so a rebuild's flip is one row update every read sees at once.",
   },
   {
     table: "public.map_node",
@@ -346,21 +346,21 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "concepts",
     access: "read",
     reason:
-      "The class derivation joins a concept's citations to the documents they locate, to reach the binding each was yielded by — the platform-held fact a producer's citation cannot supply.",
+      "The class derivation joins a concept's citations to the documents they locate, to reach the connected source each was yielded by — the platform-held fact a producer's citation cannot supply.",
   },
   {
-    table: "public.source_binding",
+    table: "public.connected_source",
     by: "concepts",
     access: "read",
     reason:
-      "A concept's class is the most restrictive among the bindings of the evidence it cites and its audience their intersection; the evidence pane applies the reader's predicate to the same rows to say which cited evidence they may reach.",
+      "A concept's class is the most restrictive among the connected sources of the evidence it cites and its audience their intersection; the evidence pane applies the reader's predicate to the same rows to say which cited evidence they may reach.",
   },
   {
     table: "public.job",
     by: "sources",
     access: "read",
     reason:
-      "The publish act reads the status of the binding's latest `index` run, by subject, inside its own transaction: the worker holds SELECT alone on `source_binding`, so the run's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through. One column of one row, by the statement in `packages/core/src/sources/binding.ts`. The review read's other question of the same table — what the latest finished run found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
+      "The publish act reads the status of the connected source's latest `index` run, by subject, inside its own transaction: the worker holds SELECT alone on `connected_source`, so the run's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through. One column of one row, by the statement in `packages/core/src/sources/connected-source.ts`. The review read's other question of the same table — what the latest finished run found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
   },
   {
     table: "public.concept_index",

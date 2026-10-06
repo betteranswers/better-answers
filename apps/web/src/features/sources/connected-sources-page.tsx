@@ -9,31 +9,31 @@ import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import type { PageToolbar } from "@/shared/page-toolbar.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
 
-import { BindAct } from "./bind-act.tsx";
+import { ConnectAct } from "./connect-act.tsx";
 import {
   classAndAudienceWords,
   movedWords,
   NarrowDialog,
   PublishDialog,
   WidenDialog,
-} from "./binding-dialogs.tsx";
-import { BindingList } from "./binding-list.tsx";
+} from "./connected-source-dialogs.tsx";
+import { ConnectedSourceList } from "./connected-source-list.tsx";
 import { outcomeOfFailure } from "./refusal.tsx";
 import { Review } from "./review.tsx";
 import {
   EVERYONE,
   NARROWEST,
-  useBindings,
-  useNarrowBinding,
+  useConnectedSources,
+  useNarrowConnectedSource,
   usePublish,
-  useWidenBinding,
+  useWidenConnectedSource,
   widestAlready,
-  type BindingNarrowed,
-  type BindingWidened,
-  type ListedBinding,
+  type ConnectedSourceNarrowed,
+  type ConnectedSourceWidened,
+  type ListedConnectedSource,
 } from "./sources-api.ts";
 import { REVIEW_HEADING, SOURCES_KEYSTROKES } from "./sources-state.ts";
-import { AUDIENCE_WORDS, NOTHING_BOUND } from "./words.ts";
+import { AUDIENCE_WORDS, NOTHING_CONNECTED } from "./words.ts";
 
 const sources = menuGroupIn(CONTROL_CENTRE, "sources");
 
@@ -41,47 +41,49 @@ const sources = menuGroupIn(CONTROL_CENTRE, "sources");
  * The three bulk acts sit beside the findings they command, in the review: five acts in the band
  * scroll a 320px page sideways.
  */
-export const BINDINGS_TOOLBAR: PageToolbar = {
-  acts: <BindAct />,
+export const CONNECTED_SOURCES_TOOLBAR: PageToolbar = {
+  acts: <ConnectAct />,
 };
 
 const LISTED = Object.values(SOURCES_KEYSTROKES);
 
-const NOTHING_IN_FOCUS = selectFirst("binding");
+const NOTHING_IN_FOCUS = selectFirst("connectedSource");
 
-const waitsForItsRun = (binding: ListedBinding): Outcome => ({
+const waitsForItsRun = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
   words:
-    binding.state === "published"
-      ? `“${binding.name}” is already published.`
-      : `“${binding.name}” is ${binding.state}: publishing waits for its index run to finish.`,
+    connectedSource.state === "published"
+      ? `“${connectedSource.name}” is already published.`
+      : `“${connectedSource.name}” is ${connectedSource.state}: publishing waits for its index run to finish.`,
 });
 
-const narrowestAlready = (binding: ListedBinding): Outcome => ({
+const narrowestAlready = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
-  words: `“${binding.name}” is ${binding.sensitivity}, and no class is narrower.`,
+  words: `“${connectedSource.name}” is ${connectedSource.sensitivity}, and no class is narrower.`,
 });
 
-const nothingWider = (binding: ListedBinding): Outcome => ({
+const nothingWider = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
-  words: `“${binding.name}” is ${classAndAudienceWords(binding)}, and no class or audience is wider.`,
+  words: `“${connectedSource.name}” is ${classAndAudienceWords(connectedSource)}, and no class or audience is wider.`,
 });
 
-function ListStatus(properties: { readonly bindings: ReturnType<typeof useBindings> }) {
-  const { bindings } = properties;
-  const said = useReadSaid(bindings);
+function ListStatus(properties: {
+  readonly connectedSources: ReturnType<typeof useConnectedSources>;
+}) {
+  const { connectedSources } = properties;
+  const said = useReadSaid(connectedSources);
   return (
     <div aria-live="polite" className="mt-2">
-      {said.isPending ? <p>The bindings are still loading.</p> : null}
+      {said.isPending ? <p>The connected sources are still loading.</p> : null}
       {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
-      {bindings.data?.length === 0 ? <EmptyState line={NOTHING_BOUND} /> : null}
+      {connectedSources.data?.length === 0 ? <EmptyState line={NOTHING_CONNECTED} /> : null}
     </div>
   );
 }
 
-export function BindingsPage() {
+export function ConnectedSourcesPage() {
   usePageKeystrokes(LISTED);
-  const bindings = useBindings();
+  const connectedSources = useConnectedSources();
   const listId = useId();
   const [inFocus, setInFocus] = useState<string>();
   const [reviewing, setReviewing] = useState<string>();
@@ -90,12 +92,12 @@ export function BindingsPage() {
   const [widening, setWidening] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
   const publishAct = usePublish();
-  const narrowAct = useNarrowBinding();
-  const widenAct = useWidenBinding();
+  const narrowAct = useNarrowConnectedSource();
+  const widenAct = useWidenConnectedSource();
 
-  const listed = bindings.data ?? [];
-  const bindingOf = (bindingId: string | undefined) =>
-    listed.find((binding) => binding.bindingId === bindingId);
+  const listed = connectedSources.data ?? [];
+  const connectedSourceOf = (connectedSourceId: string | undefined) =>
+    listed.find((connectedSource) => connectedSource.connectedSourceId === connectedSourceId);
 
   const settledSaying = <Answer,>(said: (answer: Answer) => ReactNode) => ({
     onSuccess: (answer: Answer) => {
@@ -107,58 +109,58 @@ export function BindingsPage() {
   });
 
   /** The review opens below the list, out of the reader's sight, so focus follows it there. */
-  const review = (bindingId: string) => {
+  const review = (connectedSourceId: string) => {
     flushSync(() => {
-      setReviewing(bindingId);
+      setReviewing(connectedSourceId);
     });
     document.getElementById(REVIEW_HEADING)?.focus();
   };
 
-  const publish = (binding: ListedBinding) => {
-    if (binding.state === "indexed") setPublishing(binding.bindingId);
-    else setOutcome(waitsForItsRun(binding));
+  const publish = (connectedSource: ListedConnectedSource) => {
+    if (connectedSource.state === "indexed") setPublishing(connectedSource.connectedSourceId);
+    else setOutcome(waitsForItsRun(connectedSource));
   };
 
-  const narrow = (binding: ListedBinding) => {
-    if (binding.sensitivity === NARROWEST) setOutcome(narrowestAlready(binding));
-    else setNarrowing(binding.bindingId);
+  const narrow = (connectedSource: ListedConnectedSource) => {
+    if (connectedSource.sensitivity === NARROWEST) setOutcome(narrowestAlready(connectedSource));
+    else setNarrowing(connectedSource.connectedSourceId);
   };
 
-  const widen = (binding: ListedBinding) => {
-    if (widestAlready(binding)) setOutcome(nothingWider(binding));
-    else setWidening(binding.bindingId);
+  const widen = (connectedSource: ListedConnectedSource) => {
+    if (widestAlready(connectedSource)) setOutcome(nothingWider(connectedSource));
+    else setWidening(connectedSource.connectedSourceId);
   };
 
   /**
-   * A letter pressed outside the list still needs a binding, so the one whose row last held
+   * A letter pressed outside the list still needs a connected source, so the one whose row last held
    * focus stands.
    */
-  const bindingInFocusOrTell = (): ListedBinding | undefined => {
-    const binding = bindingOf(inFocus);
-    if (binding === undefined) setOutcome(NOTHING_IN_FOCUS);
-    return binding;
+  const connectedSourceInFocusOrTell = (): ListedConnectedSource | undefined => {
+    const connectedSource = connectedSourceOf(inFocus);
+    if (connectedSource === undefined) setOutcome(NOTHING_IN_FOCUS);
+    return connectedSource;
   };
   useKeystroke(SOURCES_KEYSTROKES.review, () => {
-    const binding = bindingInFocusOrTell();
-    if (binding !== undefined) review(binding.bindingId);
+    const connectedSource = connectedSourceInFocusOrTell();
+    if (connectedSource !== undefined) review(connectedSource.connectedSourceId);
   });
   useKeystroke(SOURCES_KEYSTROKES.publish, () => {
-    const binding = bindingInFocusOrTell();
-    if (binding !== undefined) publish(binding);
+    const connectedSource = connectedSourceInFocusOrTell();
+    if (connectedSource !== undefined) publish(connectedSource);
   });
   useKeystroke(SOURCES_KEYSTROKES.narrow, () => {
-    const binding = bindingInFocusOrTell();
-    if (binding !== undefined) narrow(binding);
+    const connectedSource = connectedSourceInFocusOrTell();
+    if (connectedSource !== undefined) narrow(connectedSource);
   });
   useKeystroke(SOURCES_KEYSTROKES.widen, () => {
-    const binding = bindingInFocusOrTell();
-    if (binding !== undefined) widen(binding);
+    const connectedSource = connectedSourceInFocusOrTell();
+    if (connectedSource !== undefined) widen(connectedSource);
   });
 
-  const underReview = bindingOf(reviewing);
-  const toPublish = bindingOf(publishing);
-  const toNarrow = bindingOf(narrowing);
-  const toWiden = bindingOf(widening);
+  const underReview = connectedSourceOf(reviewing);
+  const toPublish = connectedSourceOf(publishing);
+  const toNarrow = connectedSourceOf(narrowing);
+  const toWiden = connectedSourceOf(widening);
 
   return (
     <>
@@ -166,16 +168,16 @@ export function BindingsPage() {
       <p className="mt-2 text-muted-foreground">{sources.summary}</p>
 
       <section aria-labelledby={listId} className="mt-6">
-        <h2 id={listId}>Bindings</h2>
+        <h2 id={listId}>Connected sources</h2>
         <OutcomeLine outcome={outcome} className="mt-2" />
 
-        <ListStatus bindings={bindings} />
+        <ListStatus connectedSources={connectedSources} />
 
         {listed.length === 0 ? null : (
-          <BindingList
-            bindings={listed}
+          <ConnectedSourceList
+            connectedSources={listed}
             acts={{
-              onFocusBinding: setInFocus,
+              onFocusConnectedSource: setInFocus,
               onReview: review,
               onPublish: publish,
               onNarrow: narrow,
@@ -186,20 +188,20 @@ export function BindingsPage() {
       </section>
 
       {underReview === undefined ? null : (
-        <Review key={underReview.bindingId} binding={underReview} />
+        <Review key={underReview.connectedSourceId} connectedSource={underReview} />
       )}
 
       {toPublish === undefined ? null : (
         <PublishDialog
-          key={toPublish.bindingId}
-          binding={toPublish}
+          key={toPublish.connectedSourceId}
+          connectedSource={toPublish}
           onClose={() => {
             setPublishing(undefined);
           }}
           onConfirm={(confirmations) => {
             setPublishing(undefined);
             publishAct.mutate(
-              { bindingId: toPublish.bindingId, confirmations },
+              { connectedSourceId: toPublish.connectedSourceId, confirmations },
               settledSaying(
                 () =>
                   `Published “${toPublish.name}”: its passages reach ${AUDIENCE_WORDS[toPublish.audience].toLowerCase()} now, and the audit row is written.`,
@@ -210,8 +212,8 @@ export function BindingsPage() {
       )}
       {toNarrow === undefined ? null : (
         <NarrowDialog
-          key={toNarrow.bindingId}
-          binding={toNarrow}
+          key={toNarrow.connectedSourceId}
+          connectedSource={toNarrow}
           onClose={() => {
             setNarrowing(undefined);
           }}
@@ -219,12 +221,12 @@ export function BindingsPage() {
             setNarrowing(undefined);
             narrowAct.mutate(
               {
-                bindingId: toNarrow.bindingId,
+                connectedSourceId: toNarrow.connectedSourceId,
                 sensitivity,
                 audience: toNarrow.audience,
                 audienceGroups: toNarrow.audienceGroups,
               },
-              settledSaying((narrowed: BindingNarrowed) => (
+              settledSaying((narrowed: ConnectedSourceNarrowed) => (
                 <>
                   Narrowed “{toNarrow.name}” to {narrowed.visibility.sensitivity}.{" "}
                   {movedWords(narrowed)}
@@ -236,8 +238,8 @@ export function BindingsPage() {
       )}
       {toWiden === undefined ? null : (
         <WidenDialog
-          key={toWiden.bindingId}
-          binding={toWiden}
+          key={toWiden.connectedSourceId}
+          connectedSource={toWiden}
           onClose={() => {
             setWidening(undefined);
           }}
@@ -245,11 +247,11 @@ export function BindingsPage() {
             setWidening(undefined);
             widenAct.mutate(
               {
-                bindingId: toWiden.bindingId,
+                connectedSourceId: toWiden.connectedSourceId,
                 ...asked,
                 audienceGroups: asked.audience === EVERYONE ? null : toWiden.audienceGroups,
               },
-              settledSaying((widened: BindingWidened) => (
+              settledSaying((widened: ConnectedSourceWidened) => (
                 <>
                   Widened “{toWiden.name}” to {classAndAudienceWords(widened.visibility)}.{" "}
                   {movedWords(widened)}

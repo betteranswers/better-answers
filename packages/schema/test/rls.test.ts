@@ -49,8 +49,8 @@ import {
   AN_AUDIT_EVENT_ROW_WITH_ITS_FAMILY,
   A_MEMBER,
   A_MIGRATION_STAMP,
-  A_SOURCE_BINDING,
-  A_SOURCE_BINDING_CLASSED,
+  A_CONNECTED_SOURCE,
+  A_CONNECTED_SOURCE_CLASSED,
   A_SOURCE_DOCUMENT,
   A_SUBJECT_REQUEST,
   A_SUGGESTION,
@@ -2093,9 +2093,9 @@ describe("the audience pair on every readable unit", () => {
     ["map_node", "map_node_audience_check", (seed) => seed.mapNode({ workspaceId: WS_A })],
     ["map_edge", "map_edge_audience_check", (seed) => seed.mapEdge({ workspaceId: WS_A })],
     [
-      "source_binding",
-      "source_binding_audience_check",
-      (seed) => seed.sourceBinding({ workspaceId: WS_A }),
+      "connected_source",
+      "connected_source_audience_check",
+      (seed) => seed.connectedSource({ workspaceId: WS_A }),
     ],
     [
       "composition",
@@ -2148,24 +2148,24 @@ describe("the audience pair on every readable unit", () => {
   );
 });
 
-describe("the rules in force on a source binding", () => {
-  it("starts bindings on the safe set, which one flip changes", async () => {
+describe("the rules in force on a connected source", () => {
+  it("starts sources on the safe set, which one flip changes", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const id = ulid();
-      await client.query(A_SOURCE_BINDING, [WS_A, id, "The handbook"]);
+      await client.query(A_CONNECTED_SOURCE, [WS_A, id, "The handbook"]);
 
       const born = await client.query<{ rules_in_force: Record<string, boolean> }>(
-        "SELECT rules_in_force FROM source_binding WHERE id = $1",
+        "SELECT rules_in_force FROM connected_source WHERE id = $1",
         [id],
       );
       expect(born.rows).toEqual([{ rules_in_force: { default_on: true, default_off: false } }]);
 
       const flipped = await client.query(
-        `UPDATE source_binding SET rules_in_force = '{"default_on": true, "default_off": true}'::jsonb
+        `UPDATE connected_source SET rules_in_force = '{"default_on": true, "default_off": true}'::jsonb
           WHERE id = $1`,
         [id],
       );
@@ -2176,7 +2176,7 @@ describe("the rules in force on a source binding", () => {
   it("refuses rules the seam could not read as tiers", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      const binding = await seed.sourceBinding({ workspaceId: WS_A });
+      const connectedSource = await seed.connectedSource({ workspaceId: WS_A });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
@@ -2193,10 +2193,10 @@ describe("the rules in force on a source binding", () => {
       for (const value of offShape) {
         await client.query("SAVEPOINT rules_in_force_row");
         await expect(
-          client.query(`UPDATE source_binding SET rules_in_force = ${value} WHERE id = $1`, [
-            binding.id,
+          client.query(`UPDATE connected_source SET rules_in_force = ${value} WHERE id = $1`, [
+            connectedSource.id,
           ]),
-        ).rejects.toThrow(/source_binding_rules_in_force_check/);
+        ).rejects.toThrow(/connected_source_rules_in_force_check/);
         await client.query("ROLLBACK TO SAVEPOINT rules_in_force_row");
       }
     });
@@ -2205,7 +2205,7 @@ describe("the rules in force on a source binding", () => {
 
 describe("the derivation's tables under app_rt", () => {
   const DERIVATION_TABLES = [
-    "source_binding",
+    "connected_source",
     "source_document",
     "concept_evidence",
     "concept_class_override",
@@ -2214,8 +2214,11 @@ describe("the derivation's tables under app_rt", () => {
   ] as const;
 
   const seedOneOfEach = async (seed: TestData, workspaceId: string) => {
-    const binding = await seed.sourceBinding({ workspaceId });
-    const document = await seed.sourceDocument({ workspaceId, bindingId: binding.id });
+    const connectedSource = await seed.connectedSource({ workspaceId });
+    const document = await seed.sourceDocument({
+      workspaceId,
+      connectedSourceId: connectedSource.id,
+    });
     const identity = await seed.conceptIdentity({ workspaceId });
     const cited = await seed.conceptEvidence({
       workspaceId,
@@ -2225,7 +2228,7 @@ describe("the derivation's tables under app_rt", () => {
     await seed.conceptClassOverride({ workspaceId, iri: identity.iri });
     const composed = await seed.composition({ workspaceId });
     await seed.compositionInclude({ workspaceId, compositionId: composed.id, iri: identity.iri });
-    return { binding, document, identity, cited, composed };
+    return { connectedSource, document, identity, cited, composed };
   };
 
   it("returns none unscoped and only the tenant's, on all six", async () => {
@@ -2252,7 +2255,7 @@ describe("the derivation's tables under app_rt", () => {
     "composition_include",
   ] as const;
 
-  it("limits the worker to reading and reconciling bindings and documents", async () => {
+  it("limits the worker to reading and reconciling sources and documents", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const seeded = await seedOneOfEach(seed, WS_A);
@@ -2266,7 +2269,7 @@ describe("the derivation's tables under app_rt", () => {
         ]);
       }
 
-      const binding = await client.query("SELECT id FROM source_binding");
+      const connectedSource = await client.query("SELECT id FROM connected_source");
       const document = await client.query("SELECT id FROM source_document");
       await client.query(
         "UPDATE source_document SET last_seen = now(), outcome = 'converted' WHERE id = $1",
@@ -2296,12 +2299,12 @@ describe("the derivation's tables under app_rt", () => {
         [seeded.document.id],
       );
       expect({
-        binding: binding.rows,
+        connectedSource: connectedSource.rows,
         document: document.rows,
         quarantined: quarantined.rows,
         reconciled: reconciled.rows,
       }).toEqual({
-        binding: [{ id: seeded.binding.id }],
+        connectedSource: [{ id: seeded.connectedSource.id }],
         document: [{ id: seeded.document.id }],
         quarantined: [{ outcome: "quarantined", quarantine_error: "NeedsOcrError" }],
         reconciled: [{ redaction_version: "5:d1", sensitivity: "Restricted" }],
@@ -2317,22 +2320,22 @@ describe("the derivation's tables under app_rt", () => {
           "what an upload catalogued is the upload's, and a run writes back only what it read",
         ],
         [
-          "UPDATE source_binding SET name = 'renamed by a run'",
-          "a binding is what an Admin made, and the tier that indexes it has no say in what it is",
+          "UPDATE connected_source SET name = 'renamed by a run'",
+          "a connected source is what an Admin made, and the tier that indexes it has no say in what it is",
         ],
         [
-          A_SOURCE_BINDING_CLASSED,
-          "a worker that could insert a binding could bind a source no Admin ever connected",
-          [WS_A, ulid(), "A binding nobody made"],
+          A_CONNECTED_SOURCE_CLASSED,
+          "a worker that could insert a connected source could connect a source no Admin ever connected",
+          [WS_A, ulid(), "A connected source nobody made"],
         ],
         [
-          "DELETE FROM source_binding",
-          "and one that could remove a binding could take a published source away without a record",
+          "DELETE FROM connected_source",
+          "and one that could remove a connected source could take a published source away without a record",
         ],
         [
           A_SOURCE_DOCUMENT,
           "a worker that could insert a document row could catalogue a document nobody uploaded",
-          [WS_A, ulid(), seeded.binding.id, "invented.md", "Invented", 1],
+          [WS_A, ulid(), seeded.connectedSource.id, "invented.md", "Invented", 1],
         ],
         [
           "DELETE FROM source_document",
@@ -2342,7 +2345,7 @@ describe("the derivation's tables under app_rt", () => {
     });
   });
 
-  it("refuses another tenant's binding or concept and unrecorded evidence", async () => {
+  it("refuses another tenant's connected source or concept and unrecorded evidence", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const ours = await seedOneOfEach(seed, WS_A);
@@ -2353,8 +2356,8 @@ describe("the derivation's tables under app_rt", () => {
       const rows: readonly [string, readonly unknown[], string][] = [
         [
           A_SOURCE_DOCUMENT,
-          [WS_A, ulid(), theirs.binding.id, "handbook.md", "The handbook", 1024],
-          "source_document_binding_fk",
+          [WS_A, ulid(), theirs.connectedSource.id, "handbook.md", "The handbook", 1024],
+          "source_document_connected_source_fk",
         ],
         [
           A_COMPOSITION_INCLUDE,
@@ -2537,7 +2540,7 @@ describe("the finding under both runtime roles", () => {
 
         [
           A_FINDING_BORN_REVIEWED,
-          "a finding is born unreviewed, and one inserted already reviewed is a special-category span a binding may widen over at nobody's word",
+          "a finding is born unreviewed, and one inserted already reviewed is a special-category span a connected source may widen over at nobody's word",
           [WS_A, ulid(), document.id],
         ],
         [
@@ -2735,7 +2738,7 @@ describe("the finding under both runtime roles", () => {
       await refusesEach(client, [
         [
           A_FINDING,
-          "the same span under the same rule is the same finding, and a bare insert of it is a run that would double the binding's rows",
+          "the same span under the same rule is the same finding, and a bare insert of it is a run that would double the connected source's rows",
           theSameSpanAgain(),
           /finding_span_key/,
         ],

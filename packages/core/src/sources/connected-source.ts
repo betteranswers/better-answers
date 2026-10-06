@@ -2,18 +2,18 @@ import { z } from "zod";
 
 import {
   AUDIENCE_EVERYONE,
-  BINDING_PUBLISHED_STATE,
+  CONNECTED_SOURCE_PUBLISHED_STATE,
   boundarySchemas,
   CONNECTOR_UPLOAD,
   FINDING_UNREVIEWED_STATE,
   INDEX_KIND,
   JOB_DONE_STATUS,
-  REASONS_EMPTYING_THE_BINDING,
+  REASONS_EMPTYING_THE_CONNECTED_SOURCE,
   SENSITIVITY_DEFAULT,
 } from "@better-answers/schema";
 
 import { visibilityAgreed } from "../access/index.ts";
-import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
+import { act, declareActs, record, STORED_DETAIL_KEYS, type DetailOf } from "../audit/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import {
   admit,
@@ -44,13 +44,13 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 import {
-  adminOnBinding,
-  bindingNamed,
-  BINDING_ID,
-  BINDING_VISIBILITY,
-  type ActingOnBinding,
-  type PlatformOnBinding,
-} from "./admin-binding.ts";
+  adminOnConnectedSource,
+  connectedSourceNamed,
+  CONNECTED_SOURCE_ID,
+  CONNECTED_SOURCE_VISIBILITY,
+  type ActingOnConnectedSource,
+  type PlatformOnConnectedSource,
+} from "./admin-connected-source.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import { dpiaInputFor, type REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun } from "./findings.ts";
@@ -59,8 +59,8 @@ import type { SourceRefusal } from "./vocabulary.ts";
 export const UPLOAD_ORIGINALS_PREFIX = "uploads/";
 
 /** One key per attempt: a concurrent repeat that loses writes beside the committed original. */
-const originalKeyOf = (bindingId: string, documentId: string): string =>
-  `${UPLOAD_ORIGINALS_PREFIX}${bindingId.toLowerCase()}/${documentId.toLowerCase()}/original`;
+const originalKeyOf = (connectedSourceId: string, documentId: string): string =>
+  `${UPLOAD_ORIGINALS_PREFIX}${connectedSourceId.toLowerCase()}/${documentId.toLowerCase()}/original`;
 
 export const UPLOAD_MEDIA_TYPES = [
   "text/markdown",
@@ -117,16 +117,16 @@ const countsOf = (found: ReadonlyMap<string, number>): FindingCounts => ({
   findingsJobTitle: countOf(found, "job-title"),
 });
 
-const BINDING_ACTS = declareActs("sources", {
+const CONNECTED_SOURCE_ACTS = declareActs("sources", {
   bound: act("sources.binding.bound", {
-    bindingId: "id",
+    [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     documentId: "id",
     sensitivity: "sensitivity",
     audience: "audience",
   }),
 
   published: act("sources.binding.published", {
-    bindingId: "id",
+    [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     lawfulBasisRecorded: "flag",
     privacyInformationUpdated: "flag",
     dpiaReferenced: "flag",
@@ -137,44 +137,44 @@ const BINDING_ACTS = declareActs("sources", {
   }),
 });
 
-const BINDING_COLUMNS = boundarySchemas.sourceBinding.insert.shape;
+const CONNECTED_SOURCE_COLUMNS = boundarySchemas.connectedSource.insert.shape;
 
 const DOCUMENT_COLUMNS = boundarySchemas.sourceDocument.insert.shape;
 
-const ASKED_VISIBILITY = BINDING_VISIBILITY.extend({
-  sensitivity: BINDING_VISIBILITY.shape.sensitivity.default(SENSITIVITY_DEFAULT),
-  audience: BINDING_VISIBILITY.shape.audience.default(AUDIENCE_EVERYONE),
-  audienceGroups: BINDING_VISIBILITY.shape.audienceGroups.default(null),
+const ASKED_VISIBILITY = CONNECTED_SOURCE_VISIBILITY.extend({
+  sensitivity: CONNECTED_SOURCE_VISIBILITY.shape.sensitivity.default(SENSITIVITY_DEFAULT),
+  audience: CONNECTED_SOURCE_VISIBILITY.shape.audience.default(AUDIENCE_EVERYONE),
+  audienceGroups: CONNECTED_SOURCE_VISIBILITY.shape.audienceGroups.default(null),
 });
 
-export const bindUploadFields = ASKED_VISIBILITY.extend({
-  bindingId: BINDING_ID,
-  name: BINDING_COLUMNS.name,
+export const connectUploadFields = ASKED_VISIBILITY.extend({
+  connectedSourceId: CONNECTED_SOURCE_ID,
+  name: CONNECTED_SOURCE_COLUMNS.name,
   fileName: DOCUMENT_COLUMNS.sourceSystemId,
   mediaType: DOCUMENT_COLUMNS.mediaType,
   byteSize: DOCUMENT_COLUMNS.byteSize,
-}).transform(({ bindingId, name, fileName, mediaType, byteSize, ...asked }, ctx) => {
+}).transform(({ connectedSourceId, name, fileName, mediaType, byteSize, ...asked }, ctx) => {
   const visibility = visibilityAgreed(asked, ctx);
   return visibility === undefined
     ? z.NEVER
-    : { bindingId, name, fileName, mediaType, byteSize, visibility };
+    : { connectedSourceId, name, fileName, mediaType, byteSize, visibility };
 });
 
-export type BindUploadFields = z.output<typeof bindUploadFields>;
+export type ConnectUploadFields = z.output<typeof connectUploadFields>;
 
-export type BindUploadInput = BindUploadFields & {
+export type ConnectUploadInput = ConnectUploadFields & {
   readonly body: ReadableStream<Uint8Array>;
 };
 
-export type BindUploadRefusal =
+export type ConnectUploadRefusal =
   | PrincipalRefusal
   | SourceRefusal<"role-forbids" | "no-such-group" | "media-type-refused" | "too-large">
   | Error;
 
-type BindUploadDoors = { readonly postgres: PostgresDoor; readonly objects: ObjectDoor };
+type ConnectUploadDoors = { readonly postgres: PostgresDoor; readonly objects: ObjectDoor };
 
 export type UploadBound = {
-  readonly bindingId: string;
+  readonly connectedSourceId: string;
   readonly documentId: string;
 
   readonly jobId: string;
@@ -183,9 +183,9 @@ export type UploadBound = {
   readonly originalKey: string;
 };
 
-const BOUND_REASON = "bound";
+const CONNECTED_REASON = "connected";
 
-const INSERT_BINDING = `INSERT INTO source_binding
+const INSERT_CONNECTED_SOURCE = `INSERT INTO connected_source
     (workspace_id, id, name, connector, sensitivity, audience, audience_groups)
   VALUES ($1, $2, $3, $4, $5, $6, $7)
   ON CONFLICT (workspace_id, id) DO NOTHING`;
@@ -194,14 +194,14 @@ const FIRST_OUTCOME = `SELECT d.id AS document_id, d.original_key AS original_ke
           e.id AS audit_event_id, j.id AS job_id
      FROM source_document d
      JOIN audit_event e
-       ON e.workspace_id = d.workspace_id AND e.subject_id = d.binding_id AND e.act = $3
+       ON e.workspace_id = d.workspace_id AND e.subject_id = d.connected_source_id AND e.act = $3
      JOIN job j
-       ON j.workspace_id = d.workspace_id AND j.subject_id = d.binding_id
+       ON j.workspace_id = d.workspace_id AND j.subject_id = d.connected_source_id
       AND j.kind = $4 AND j.reason = $5
-    WHERE d.workspace_id = $1 AND d.binding_id = $2`;
+    WHERE d.workspace_id = $1 AND d.connected_source_id = $2`;
 
 const INSERT_DOCUMENT = `INSERT INTO source_document
-    (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key)
+    (workspace_id, id, connected_source_id, source_system_id, title, media_type, byte_size, original_key)
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`;
 
 const inTransaction = async <T>(
@@ -243,18 +243,24 @@ const cappedAt = (body: ReadableStream<Uint8Array>): CappedBody => {
 const firstOutcomeOf = async (
   tx: Tx,
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
 ): Promise<UploadBound | undefined> => {
   const standing = await tx.query<{
     document_id: string;
     original_key: string;
     audit_event_id: string;
     job_id: string;
-  }>(FIRST_OUTCOME, [workspaceId, bindingId, BINDING_ACTS.bound.name, INDEX_KIND, BOUND_REASON]);
+  }>(FIRST_OUTCOME, [
+    workspaceId,
+    connectedSourceId,
+    CONNECTED_SOURCE_ACTS.bound.name,
+    INDEX_KIND,
+    CONNECTED_REASON,
+  ]);
   const first = standing.rows[0];
   if (first === undefined) return undefined;
   return {
-    bindingId,
+    connectedSourceId,
     documentId: first.document_id,
     jobId: first.job_id,
     auditEventId: first.audit_event_id,
@@ -263,7 +269,7 @@ const firstOutcomeOf = async (
 };
 
 const withinUploadLimits = (
-  input: BindUploadFields,
+  input: ConnectUploadFields,
 ): Result<undefined, SourceRefusal<"media-type-refused" | "too-large">> => {
   if (!UPLOAD_MEDIA_TYPES.some((allowed) => allowed === input.mediaType)) {
     return err("media-type-refused");
@@ -275,7 +281,7 @@ const withinUploadLimits = (
 const everyGroupHeld = async (
   principal: UserPrincipal,
   door: PostgresDoor,
-  visibility: BindUploadFields["visibility"],
+  visibility: ConnectUploadFields["visibility"],
 ): Promise<
   Result<undefined, PrincipalRefusal | SourceRefusal<"role-forbids" | "no-such-group"> | Error>
 > => {
@@ -307,45 +313,45 @@ const storeOriginal = async (
 };
 
 /**
- * Once the first bind commits, a repeat returns its outcome and reads no byte. A concurrent repeat
+ * Once the first connect commits, a repeat returns its outcome and reads no byte. A concurrent repeat
  * that loses the insert returns it too, its own object left to the upload sweep. `too-large`
  * answers a declared size or streamed body over the cap; the document records the size streamed.
  */
-export const bindUpload = async (
+export const connectUpload = async (
   principal: UserPrincipal,
-  doors: BindUploadDoors,
-  input: BindUploadInput,
-): Promise<Result<UploadBound, BindUploadRefusal>> => {
+  doors: ConnectUploadDoors,
+  input: ConnectUploadInput,
+): Promise<Result<UploadBound, ConnectUploadRefusal>> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
   const { workspaceId } = admin.value;
 
-  const { bindingId, visibility } = input;
+  const { connectedSourceId, visibility } = input;
 
   const limited = withinUploadLimits(input);
   if (!limited.ok) return err(limited.error);
   const held = await everyGroupHeld(principal, doors.postgres, visibility);
   if (!held.ok) return err(held.error);
 
-  // Before a byte is read: a repeat of a committed bind would otherwise stream a copy no row names.
+  // Before a byte is read: a repeat of a committed connect would otherwise stream a copy no row names.
   const standing = await inTransaction(principal, doors.postgres, (fresh, tx) =>
-    firstOutcomeOf(tx, workspaceId, bindingId),
+    firstOutcomeOf(tx, workspaceId, connectedSourceId),
   );
   if (!standing.ok) return err(standing.error);
   if (standing.value !== undefined) return ok(standing.value);
 
   const documentId = ulid();
   const auditEventId = ulid();
-  const originalKey = originalKeyOf(bindingId, documentId);
+  const originalKey = originalKeyOf(connectedSourceId, documentId);
 
   const stored = await storeOriginal(admin.value, doors.objects, originalKey, input.body);
   if (!stored.ok) return err(stored.error);
   const bytesStreamed = stored.value;
 
   return inTransaction(principal, doors.postgres, async (fresh, tx) => {
-    const landed = await tx.query(INSERT_BINDING, [
+    const landed = await tx.query(INSERT_CONNECTED_SOURCE, [
       workspaceId,
-      bindingId,
+      connectedSourceId,
       input.name,
       CONNECTOR_UPLOAD,
       visibility.sensitivity,
@@ -353,16 +359,18 @@ export const bindUpload = async (
       visibility.audienceGroups,
     ]);
     if (landed.rowCount === 0) {
-      const first = await firstOutcomeOf(tx, workspaceId, bindingId);
+      const first = await firstOutcomeOf(tx, workspaceId, connectedSourceId);
       if (first === undefined) {
-        throw new Error(`sources: ${bindingId} is taken by a binding no first bind accounts for`);
+        throw new Error(
+          `sources: ${connectedSourceId} is taken by a connected source no first connect accounts for`,
+        );
       }
       return first;
     }
     await tx.query(INSERT_DOCUMENT, [
       workspaceId,
       documentId,
-      bindingId,
+      connectedSourceId,
       input.fileName,
       input.fileName,
       input.mediaType,
@@ -371,10 +379,10 @@ export const bindUpload = async (
     ]);
     await record(fresh, tx, {
       id: auditEventId,
-      act: BINDING_ACTS.bound,
-      subjectId: bindingId,
+      act: CONNECTED_SOURCE_ACTS.bound,
+      subjectId: connectedSourceId,
       detail: {
-        bindingId,
+        [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId,
         documentId,
         sensitivity: visibility.sensitivity,
         audience: visibility.audience,
@@ -383,18 +391,18 @@ export const bindUpload = async (
     const queued = await enqueueJobIn(fresh, tx, {
       workspaceId,
       kind: INDEX_KIND,
-      subjectId: bindingId,
-      reason: "bound",
+      subjectId: connectedSourceId,
+      reason: CONNECTED_REASON,
     });
     if (!queued.ok) {
       throw indexRunRefused(queued.error);
     }
-    return { bindingId, documentId, jobId: queued.value.jobId, auditEventId, originalKey };
+    return { connectedSourceId, documentId, jobId: queued.value.jobId, auditEventId, originalKey };
   });
 };
 
-export const publishBindingInput = z.object({
-  bindingId: BINDING_ID,
+export const publishConnectedSourceInput = z.object({
+  connectedSourceId: CONNECTED_SOURCE_ID,
 
   confirmations: z.object({
     lawfulBasisRecorded: z.boolean(),
@@ -404,11 +412,11 @@ export const publishBindingInput = z.object({
 });
 
 /** The instant is the Clock's, never a caller's, so it travels beside the parsed fields. */
-export type PublishBindingInput = z.output<typeof publishBindingInput> & {
+export type PublishConnectedSourceInput = z.output<typeof publishConnectedSourceInput> & {
   readonly publishedAt: Date;
 };
 
-export type PublishBindingRefusal =
+export type PublishConnectedSourceRefusal =
   | SourceRefusal<
       | "role-forbids"
       | "no-such-binding"
@@ -418,15 +426,15 @@ export type PublishBindingRefusal =
     >
   | Error;
 
-export type BindingPublished = {
-  readonly bindingId: string;
+export type ConnectedSourcePublished = {
+  readonly connectedSourceId: string;
   readonly auditEventId: string;
 
   readonly dpiaHash: string;
 };
 
 /**
- * The job row, not source_binding.state: the worker holds only SELECT on that table and cannot
+ * The job row, not connected_source.state: the worker holds only SELECT on that table and cannot
  * write its progress there.
  */
 const LATEST_INDEX_RUN = `SELECT status FROM job
@@ -437,102 +445,105 @@ const LATEST_INDEX_RUN = `SELECT status FROM job
 const FINDINGS_BY_CATEGORY = `SELECT f.category, count(*)::int AS found
     FROM finding f
     JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
-   WHERE f.workspace_id = $1 AND d.binding_id = $2 AND ${raisedByTheLastRun("f", "d")}
+   WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND ${raisedByTheLastRun("f", "d")}
    GROUP BY f.category`;
 
-type BindingToPublish = {
+type ConnectedSourceToPublish = {
   readonly published_at: Date | null;
   readonly sensitivity: string;
   readonly audience: string;
 };
 
-const bindingToPublish = async (
-  acting: ActingOnBinding,
+const connectedSourceToPublish = async (
+  acting: ActingOnConnectedSource,
   tx: Tx,
 ): Promise<
   Result<
-    BindingToPublish,
+    ConnectedSourceToPublish,
     SourceRefusal<"no-such-binding" | "already-published" | "not-indexed"> | Error
   >
 > => {
-  const { workspaceId, bindingId } = acting;
-  const binding = await bindingNamed<BindingToPublish>(acting, tx, {
+  const { workspaceId, connectedSourceId } = acting;
+  const connectedSource = await connectedSourceNamed<ConnectedSourceToPublish>(acting, tx, {
     columns: "published_at, sensitivity, audience",
     lock: "for-update",
   });
-  if (!binding.ok) return err(binding.error);
-  if (binding.value.published_at !== null) return err("already-published");
+  if (!connectedSource.ok) return err(connectedSource.error);
+  if (connectedSource.value.published_at !== null) return err("already-published");
 
   const run = await attempt(() =>
-    tx.query<{ status: string }>(LATEST_INDEX_RUN, [workspaceId, INDEX_KIND, bindingId]),
+    tx.query<{ status: string }>(LATEST_INDEX_RUN, [workspaceId, INDEX_KIND, connectedSourceId]),
   );
   if (!run.ok) return err(run.error);
 
   if (run.value.rows[0]?.status !== JOB_DONE_STATUS) return err("not-indexed");
-  return ok(binding.value);
+  return ok(connectedSource.value);
 };
 
 type DpiaAndFindingCounts = { readonly dpiaHash: string; readonly counts: FindingCounts };
 
 const dpiaAndFindingCounts = async (
-  acting: ActingOnBinding,
+  acting: ActingOnConnectedSource,
   tx: Tx,
 ): Promise<
   Result<DpiaAndFindingCounts, SourceRefusal<"role-forbids" | "no-such-binding"> | Error>
 > => {
-  const { admin, workspaceId, bindingId } = acting;
-  const dpia = await dpiaInputFor(admin, tx, { bindingId: bindingId });
+  const { admin, workspaceId, connectedSourceId } = acting;
+  const dpia = await dpiaInputFor(admin, tx, { connectedSourceId: connectedSourceId });
   if (!dpia.ok) return err(dpia.error);
   const counted = await attempt(() =>
-    tx.query<{ category: string; found: number }>(FINDINGS_BY_CATEGORY, [workspaceId, bindingId]),
+    tx.query<{ category: string; found: number }>(FINDINGS_BY_CATEGORY, [
+      workspaceId,
+      connectedSourceId,
+    ]),
   );
   if (!counted.ok) return err(counted.error);
   const found = new Map(counted.value.rows.map((row) => [row.category, row.found]));
   return ok({ dpiaHash: dpia.value.hash, counts: countsOf(found) });
 };
 
-type PublishedDetail = DetailOf<(typeof BINDING_ACTS)["published"]["detail"]>;
+type PublishedDetail = DetailOf<(typeof CONNECTED_SOURCE_ACTS)["published"]["detail"]>;
 
 const publishAndCascade = async (
-  acting: ActingOnBinding,
+  acting: ActingOnConnectedSource,
   tx: Tx,
   publishedAt: Date,
   detail: PublishedDetail,
 ): Promise<Result<string, Error>> => {
-  const { admin, workspaceId, bindingId } = acting;
+  const { admin, workspaceId, connectedSourceId } = acting;
   const auditEventId = ulid();
   const published = await attempt(() =>
     tx.query(
-      "UPDATE source_binding SET published_at = $3, state = $4 WHERE workspace_id = $1 AND id = $2",
-      [workspaceId, bindingId, publishedAt, BINDING_PUBLISHED_STATE],
+      "UPDATE connected_source SET published_at = $3, state = $4 WHERE workspace_id = $1 AND id = $2",
+      [workspaceId, connectedSourceId, publishedAt, CONNECTED_SOURCE_PUBLISHED_STATE],
     ),
   );
   if (!published.ok) return err(published.error);
 
   await record(admin, tx, {
     id: auditEventId,
-    act: BINDING_ACTS.published,
-    subjectId: bindingId,
+    act: CONNECTED_SOURCE_ACTS.published,
+    subjectId: connectedSourceId,
     detail,
   });
-  const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId }));
+  const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { connectedSourceId }));
   if (!cascaded.ok) return err(cascaded.error);
   return ok(auditEventId);
 };
 
 /**
  * `confirmation-missing` unless all three confirmations are true, and `not-indexed` unless the
- * latest index run is done. Stamps the binding published, writes an audit event with the DPIA hash
+ * latest index run is done. Stamps the connected source published, writes an audit event with the DPIA hash
  * and the last run's finding count per category, and recomputes what cites its documents.
  */
-export const publishBinding = async (
+export const publishConnectedSource = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: PublishBindingInput,
-): Promise<Result<BindingPublished, PublishBindingRefusal>> => {
-  const acting = adminOnBinding(principal, input.bindingId);
+  input: PublishConnectedSourceInput,
+): Promise<Result<ConnectedSourcePublished, PublishConnectedSourceRefusal>> => {
+  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
-  const { admin, bindingId } = acting.value;
+  const { admin, connectedSourceId } = acting.value;
 
   if (!CONFIRMATIONS.every((named) => input.confirmations[named] === true)) {
     return err("confirmation-missing");
@@ -541,46 +552,48 @@ export const publishBinding = async (
   const opened = await openingACascadeOverHeldGroups(admin, tx, []);
   if (!opened.ok) return err(opened.error);
 
-  const binding = await bindingToPublish(acting.value, tx);
-  if (!binding.ok) return err(binding.error);
+  const connectedSource = await connectedSourceToPublish(acting.value, tx);
+  if (!connectedSource.ok) return err(connectedSource.error);
   const read = await dpiaAndFindingCounts(acting.value, tx);
   if (!read.ok) return err(read.error);
   const { dpiaHash, counts } = read.value;
 
   const published = await publishAndCascade(acting.value, tx, input.publishedAt, {
-    bindingId: bindingId,
+    [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId,
     lawfulBasisRecorded: input.confirmations.lawfulBasisRecorded,
     privacyInformationUpdated: input.confirmations.privacyInformationUpdated,
     dpiaReferenced: input.confirmations.dpiaReferenced,
     ...counts,
     dpiaHash,
-    sensitivity: binding.value.sensitivity,
-    audience: binding.value.audience,
+    sensitivity: connectedSource.value.sensitivity,
+    audience: connectedSource.value.audience,
   });
   if (!published.ok) return err(published.error);
-  return ok({ bindingId: bindingId, auditEventId: published.value, dpiaHash });
+  return ok({ connectedSourceId: connectedSourceId, auditEventId: published.value, dpiaHash });
 };
 
-export const reprocessBindingInput = z.object({
+export const reprocessConnectedSourceInput = z.object({
   workspaceId: boundarySchemas.workspace.select.shape.id,
-  bindingId: BINDING_ID,
+  connectedSourceId: CONNECTED_SOURCE_ID,
 
-  reason: z.enum(REASONS_EMPTYING_THE_BINDING),
+  reason: z.enum(REASONS_EMPTYING_THE_CONNECTED_SOURCE),
 });
 
-export const reprocessBindingAct = declareAct({
+export const reprocessConnectedSourceAct = declareAct({
   admits: { role: "Admin", purposes: ["erasure"] },
-  input: reprocessBindingInput,
+  input: reprocessConnectedSourceInput,
   refuses: ["role-forbids", "no-such-binding"],
   effect: "write",
 });
 
-export type ReprocessBindingInput = InputOf<typeof reprocessBindingAct>;
+export type ReprocessConnectedSourceInput = InputOf<typeof reprocessConnectedSourceAct>;
 
-export type ReprocessBindingRefusal = SourceRefusal<RefusalOf<typeof reprocessBindingAct>> | Error;
+export type ReprocessConnectedSourceRefusal =
+  | SourceRefusal<RefusalOf<typeof reprocessConnectedSourceAct>>
+  | Error;
 
-export type BindingReprocessed = {
-  readonly bindingId: string;
+export type ConnectedSourceReprocessed = {
+  readonly connectedSourceId: string;
 
   readonly jobId: string;
 
@@ -590,31 +603,34 @@ export type BindingReprocessed = {
 };
 
 const actingOn = (
-  admittedAs: AdmittedOf<typeof reprocessBindingAct>,
-  input: ReprocessBindingInput,
-): Result<ActingOnBinding | PlatformOnBinding, SourceRefusal<"no-such-binding">> => {
-  const { bindingId } = input;
-  const acting: ActingOnBinding | PlatformOnBinding =
+  admittedAs: AdmittedOf<typeof reprocessConnectedSourceAct>,
+  input: ReprocessConnectedSourceInput,
+): Result<
+  ActingOnConnectedSource | PlatformOnConnectedSource,
+  SourceRefusal<"no-such-binding">
+> => {
+  const { connectedSourceId } = input;
+  const acting: ActingOnConnectedSource | PlatformOnConnectedSource =
     admittedAs.kind === "user"
-      ? { admin: admittedAs, workspaceId: admittedAs.workspaceId, bindingId }
-      : { platform: admittedAs, workspaceId: input.workspaceId, bindingId };
+      ? { admin: admittedAs, workspaceId: admittedAs.workspaceId, connectedSourceId }
+      : { platform: admittedAs, workspaceId: input.workspaceId, connectedSourceId };
   // A person acts where its membership was proved, so a workspace it names otherwise holds none of
-  // its bindings.
+  // its connected sources.
   if (acting.workspaceId !== input.workspaceId) return err("no-such-binding");
   return ok(acting);
 };
 
-type Emptied = Pick<BindingReprocessed, "chunks" | "findings">;
+type Emptied = Pick<ConnectedSourceReprocessed, "chunks" | "findings">;
 
-const emptyTheBinding = async (
-  acting: ActingOnBinding | PlatformOnBinding,
+const emptyTheConnectedSource = async (
+  acting: ActingOnConnectedSource | PlatformOnConnectedSource,
   tx: Tx,
 ): Promise<Result<Emptied, Error>> => {
-  const { workspaceId, bindingId } = acting;
+  const { workspaceId, connectedSourceId } = acting;
   const wiped = await attempt(() =>
     tx.query(`DELETE FROM "index".chunk WHERE workspace_id = $1 AND binding_id = $2`, [
       workspaceId,
-      bindingId,
+      connectedSourceId,
     ]),
   );
   if (!wiped.ok) return err(wiped.error);
@@ -625,8 +641,8 @@ const emptyTheBinding = async (
         WHERE workspace_id = $1
           AND review_state = $3 AND restored_at IS NULL
           AND document_id IN (SELECT id FROM source_document
-                               WHERE workspace_id = $1 AND binding_id = $2)`,
-      [workspaceId, bindingId, FINDING_UNREVIEWED_STATE],
+                               WHERE workspace_id = $1 AND connected_source_id = $2)`,
+      [workspaceId, connectedSourceId, FINDING_UNREVIEWED_STATE],
     ),
   );
   if (!raised.ok) return err(raised.error);
@@ -634,34 +650,37 @@ const emptyTheBinding = async (
 };
 
 /**
- * Queues an index run, then deletes the binding's chunks and its unreviewed, unrestored findings;
+ * Queues an index run, then deletes the connected source's chunks and its unreviewed, unrestored findings;
  * `chunks` and `findings` count the rows deleted. A person acts only in its own workspace, and any
  * other is `no-such-binding`.
  */
-export const reprocessBinding = async (
+export const reprocessConnectedSource = async (
   principal: Principal,
   tx: Tx,
-  input: ReprocessBindingInput,
-): Promise<Result<BindingReprocessed, ReprocessBindingRefusal>> => {
-  const admitted = admit(reprocessBindingAct, principal, input);
+  input: ReprocessConnectedSourceInput,
+): Promise<Result<ConnectedSourceReprocessed, ReprocessConnectedSourceRefusal>> => {
+  const admitted = admit(reprocessConnectedSourceAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const acting = actingOn(admitted.value, input);
   if (!acting.ok) return err(acting.error);
-  const { workspaceId, bindingId } = acting.value;
+  const { workspaceId, connectedSourceId } = acting.value;
 
-  const standing = await bindingNamed(acting.value, tx, { columns: "1", lock: "for-update" });
+  const standing = await connectedSourceNamed(acting.value, tx, {
+    columns: "1",
+    lock: "for-update",
+  });
   if (!standing.ok) return err(standing.error);
 
   const queued = await enqueueJobIn(admitted.value, tx, {
     workspaceId,
     kind: INDEX_KIND,
-    subjectId: bindingId,
+    subjectId: connectedSourceId,
     reason: input.reason,
   });
   if (!queued.ok) {
     throw indexRunRefused(queued.error);
   }
-  const emptied = await emptyTheBinding(acting.value, tx);
+  const emptied = await emptyTheConnectedSource(acting.value, tx);
   if (!emptied.ok) return err(emptied.error);
-  return ok({ bindingId: bindingId, jobId: queued.value.jobId, ...emptied.value });
+  return ok({ connectedSourceId: connectedSourceId, jobId: queued.value.jobId, ...emptied.value });
 };

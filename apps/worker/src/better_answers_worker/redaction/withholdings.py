@@ -67,7 +67,7 @@ def withholdings_over(
     findings: Sequence[Finding], text: str, policy: Policy
 ) -> tuple[Withholding, ...]:
     """One per finding, in order. An erasure outranks an
-    Admin's restore, which outranks the binding's switches."""
+    Admin's restore, which outranks the connected source's switches."""
     erased = suppressed_among(findings, text, policy.suppressions)
     restored = restored_among(findings, policy.restores)
     return tuple(

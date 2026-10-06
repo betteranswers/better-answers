@@ -1,5 +1,5 @@
 import { ulid, type UserPrincipal } from "../src/kernel/index.ts";
-import { bindUpload, bindUploadFields } from "../src/sources/index.ts";
+import { connectUpload, connectUploadFields } from "../src/sources/index.ts";
 import type { ObjectDoor } from "../src/store/objects/index.ts";
 import type { PostgresDoor } from "../src/store/postgres/index.ts";
 import { inputOf } from "./suite-input.ts";
@@ -28,7 +28,7 @@ export const THE_QUERY = "overtime";
 
 export const THE_TITLE = "depot-handbook.md";
 
-const THE_BINDING = "The depot handbook";
+const THE_CONNECTED_SOURCE = "The depot handbook";
 
 export type Span = { readonly start: number; readonly end: number };
 
@@ -63,22 +63,22 @@ const bodyOf = (text: string) =>
     },
   });
 
-export type BindingDoors = {
+export type ConnectedSourceDoors = {
   readonly postgres: PostgresDoor;
   readonly objects: ObjectDoor;
 };
 
 /** Binds `text` as an Internal Markdown upload of a file named `called`; throws when refused. */
-export const bindTheHandbook = async (
+export const connectTheHandbook = async (
   admin: UserPrincipal,
-  doors: BindingDoors,
+  doors: ConnectedSourceDoors,
   called = THE_TITLE,
   text = THE_HANDBOOK,
 ) => {
-  const bound = await bindUpload(admin, doors, {
-    ...inputOf(bindUploadFields, {
-      bindingId: ulid(),
-      name: `${THE_BINDING} · ${called}`,
+  const bound = await connectUpload(admin, doors, {
+    ...inputOf(connectUploadFields, {
+      connectedSourceId: ulid(),
+      name: `${THE_CONNECTED_SOURCE} · ${called}`,
       fileName: called,
       mediaType: "text/markdown",
       byteSize: new TextEncoder().encode(text).length,
@@ -86,6 +86,6 @@ export const bindTheHandbook = async (
     }),
     body: bodyOf(text),
   });
-  if (!bound.ok) throw new Error(`the bind was refused: ${String(bound.error)}`);
+  if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
   return bound.value;
 };

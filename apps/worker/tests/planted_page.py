@@ -108,7 +108,7 @@ def _tiers_in_force(rules: Mapping[str, bool]) -> tuple[str, ...]:
     return tuple(
         str(tier["tier"])
         for tier in _AGREEMENT["tiers"]
-        if not tier["switchable"] or rules.get(str(tier["binding_key"]), False)
+        if not tier["switchable"] or rules.get(str(tier["connected_source_key"]), False)
     )
 
 

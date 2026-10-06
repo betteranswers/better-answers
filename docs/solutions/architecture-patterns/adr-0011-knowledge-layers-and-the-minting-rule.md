@@ -23,7 +23,7 @@ tags:
 
 ## The decision
 
-The platform has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts, curated) → the **map** (derived). Records are not a layer. They are what the platform keeps because it runs use cases: guides and their compositions, usage and outcomes, bindings, audit, review. A record cites concepts by IRI and never restates them.
+The platform has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts, curated) → the **map** (derived). Records are not a layer. They are what the platform keeps because it runs use cases: guides and their compositions, usage and outcomes, connected sources, audit, review. A record cites concepts by IRI and never restates them.
 
 Where a unit lives follows one minting rule:
 
@@ -33,7 +33,7 @@ Where a unit lives follows one minting rule:
 
 The map derives from sources too:
 
-- A binding whose destination is the map yields **source entities**: typed nodes and edges derived directly from a source document (a person, a meeting, a task), keyed to that document and carrying its sensitivity.
+- A connected source whose destination is the map yields **source entities**: typed nodes and edges derived directly from a source document (a person, a meeting, a task), keyed to that document and carrying its sensitivity.
 - A source entity is never a concept and never a record. A producer may later propose a concept from source entities through the ordinary suggestion path, and the document then becomes cited evidence.
 
 A relation is a `LINKS_TO` edge between two concepts, carrying its two endpoint kinds, its section and its sentence (ADR 0026). There is no typed-relation derivation, no relations list and no predicate matcher. The map derives supersession, conflicts and equivalence. A predicate label, if one is ever wanted, is derived from edge sentences by a later enrichment job and stays in the map.

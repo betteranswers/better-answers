@@ -190,7 +190,7 @@ describe("a second factor's audit sentence", () => {
 describe("an audit event in today's words", () => {
   const HANDBOOK = { kind: "connected-source", name: "Staff handbook" } as const;
 
-  it("says a connected source published, though stored as a binding", () => {
+  it("says a connected source published, whatever its stored act name", () => {
     const published = byHannah({
       act: "sources.binding.published",
       subject: HANDBOOK,

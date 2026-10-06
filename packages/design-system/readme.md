@@ -28,7 +28,7 @@ had no basis in the source, it is flagged in §7.
 
 Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts, curated) →
 the **map** (derived) — with **records** the platform keeps over them (guides, compositions,
-usage, bindings, audit), citing concepts by IRI and never restating them.
+usage, connected sources, audit), citing concepts by IRI and never restating them.
 
 Two kinds of user: **people** (Admin, Editor, Viewer) running business activities and
 curating knowledge, and **agents** arriving through the MCP surface. One deployment holds

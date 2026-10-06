@@ -1,15 +1,15 @@
 import { z } from "zod";
 
 import {
-  BINDING_INDEXED_STATE,
-  BINDING_INDEXING_STATE,
-  BINDING_LANDED_STATE,
-  BINDING_PUBLISHED_STATE,
+  CONNECTED_SOURCE_INDEXED_STATE,
+  CONNECTED_SOURCE_INDEXING_STATE,
+  CONNECTED_SOURCE_RECEIVED_STATE,
+  CONNECTED_SOURCE_PUBLISHED_STATE,
   boundarySchemas,
   DOCUMENT_QUARANTINED_OUTCOME,
   JOB_CLAIMED_STATUS,
   JOB_DONE_STATUS,
-  type BINDING_STATES,
+  type CONNECTED_SOURCE_STATES,
 } from "@better-answers/schema";
 
 import {
@@ -24,7 +24,7 @@ import {
 import { latestRunsOf, type SubjectRun } from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
-type BindingState = (typeof BINDING_STATES)[number];
+type ConnectedSourceState = (typeof CONNECTED_SOURCE_STATES)[number];
 
 type QuarantinedDocument = {
   readonly documentId: string;
@@ -33,7 +33,7 @@ type QuarantinedDocument = {
   readonly error: string;
 };
 
-const LISTED_ROW = boundarySchemas.sourceBinding.select
+const LISTED_ROW = boundarySchemas.connectedSource.select
   .pick({
     id: true,
     name: true,
@@ -49,9 +49,9 @@ const LISTED_ROW = boundarySchemas.sourceBinding.select
 
 type ListedRow = z.output<typeof LISTED_ROW>;
 
-export type ListedBinding = Omit<ListedRow, "id" | "publishedAt"> & {
-  readonly bindingId: ListedRow["id"];
-  readonly state: BindingState;
+export type ListedConnectedSource = Omit<ListedRow, "id" | "publishedAt"> & {
+  readonly connectedSourceId: ListedRow["id"];
+  readonly state: ConnectedSourceState;
   readonly publishedAt: string | null;
   readonly lastRun: SubjectRun | null;
   readonly quarantined: readonly QuarantinedDocument[];
@@ -59,44 +59,46 @@ export type ListedBinding = Omit<ListedRow, "id" | "publishedAt"> & {
   readonly quarantinedByError: Readonly<Record<string, number>>;
 };
 
-export type ListBindingsRefusal = RoleRefusal | Error;
+export type ListConnectedSourcesRefusal = RoleRefusal | Error;
 
 type QuarantineRow = {
-  readonly binding_id: string;
+  readonly connected_source_id: string;
   readonly id: string;
   readonly title: string;
   readonly quarantine_error: string;
 };
 
-const BINDINGS = `SELECT b.id, b.name, b.connector, b.sensitivity, b.audience,
+const CONNECTED_SOURCES = `SELECT b.id, b.name, b.connector, b.sensitivity, b.audience,
             b.audience_groups AS "audienceGroups", b.destination,
             b.retention_class AS "retentionClass", b.published_at AS "publishedAt",
             (SELECT count(*)::int FROM source_document d
-              WHERE d.workspace_id = b.workspace_id AND d.binding_id = b.id) AS "documentCount",
+              WHERE d.workspace_id = b.workspace_id AND d.connected_source_id = b.id) AS "documentCount",
             (SELECT count(*)::int FROM "index".chunk c
               WHERE c.workspace_id = b.workspace_id AND c.binding_id = b.id) AS "chunkCount"
-       FROM source_binding b
+       FROM connected_source b
       WHERE b.workspace_id = $1
       ORDER BY b.name, b.id`;
 
 /**
  * The error is the converter's own name for why, so an Admin is told without a log being read.
  */
-const QUARANTINED = `SELECT binding_id, id, title, quarantine_error FROM source_document
+const QUARANTINED = `SELECT connected_source_id, id, title, quarantine_error FROM source_document
       WHERE workspace_id = $1 AND outcome = $2 AND quarantine_error IS NOT NULL
-      ORDER BY binding_id, title, id`;
+      ORDER BY connected_source_id, title, id`;
 
-const UNREADABLE_BINDING = new Error("a source binding's row is not the shape its table admits");
+const UNREADABLE_CONNECTED_SOURCE = new Error(
+  "a connected source's row is not the shape its table admits",
+);
 
 /**
- * The worker cannot write the binding's state column, so everything short of a publish is read
- * off the binding's latest run.
+ * The worker cannot write the connected source's state column, so everything short of a publish is read
+ * off the connected source's latest run.
  */
-const stateOf = (publishedAt: Date | null, lastRun: SubjectRun | null): BindingState => {
-  if (publishedAt !== null) return BINDING_PUBLISHED_STATE;
-  if (lastRun?.status === JOB_DONE_STATUS) return BINDING_INDEXED_STATE;
-  if (lastRun?.status === JOB_CLAIMED_STATUS) return BINDING_INDEXING_STATE;
-  return BINDING_LANDED_STATE;
+const stateOf = (publishedAt: Date | null, lastRun: SubjectRun | null): ConnectedSourceState => {
+  if (publishedAt !== null) return CONNECTED_SOURCE_PUBLISHED_STATE;
+  if (lastRun?.status === JOB_DONE_STATUS) return CONNECTED_SOURCE_INDEXED_STATE;
+  if (lastRun?.status === JOB_CLAIMED_STATUS) return CONNECTED_SOURCE_INDEXING_STATE;
+  return CONNECTED_SOURCE_RECEIVED_STATE;
 };
 
 const countedByError = (quarantined: readonly QuarantinedDocument[]) => {
@@ -105,23 +107,23 @@ const countedByError = (quarantined: readonly QuarantinedDocument[]) => {
   return Object.fromEntries(counts);
 };
 
-export const listBindings = async (
+export const listConnectedSources = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<readonly ListedBinding[], ListBindingsRefusal>> => {
+): Promise<Result<readonly ListedConnectedSource[], ListConnectedSourcesRefusal>> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
   const { workspaceId } = admin.value;
 
   const read = await attempt(async () => ({
-    bindings: (await tx.query(BINDINGS, [workspaceId])).rows,
+    connectedSources: (await tx.query(CONNECTED_SOURCES, [workspaceId])).rows,
     quarantined: (
       await tx.query<QuarantineRow>(QUARANTINED, [workspaceId, DOCUMENT_QUARANTINED_OUTCOME])
     ).rows,
   }));
   if (!read.ok) return err(read.error);
-  const parsed = z.array(LISTED_ROW).safeParse(read.value.bindings);
-  if (!parsed.success) return err(UNREADABLE_BINDING);
+  const parsed = z.array(LISTED_ROW).safeParse(read.value.connectedSources);
+  if (!parsed.success) return err(UNREADABLE_CONNECTED_SOURCE);
   const rows = parsed.data;
 
   const lastRuns = await latestRunsOf(admin.value, tx, { subjectIds: rows.map((row) => row.id) });
@@ -131,14 +133,14 @@ export const listBindings = async (
     rows.map(({ id, publishedAt, ...row }) => {
       const lastRun = lastRuns.value.get(id) ?? null;
       const quarantined = read.value.quarantined
-        .filter((document) => document.binding_id === id)
+        .filter((document) => document.connected_source_id === id)
         .map((document) => ({
           documentId: document.id,
           title: document.title,
           error: document.quarantine_error,
         }));
       return {
-        bindingId: id,
+        connectedSourceId: id,
         ...row,
         state: stateOf(publishedAt, lastRun),
         publishedAt: publishedAt?.toISOString() ?? null,

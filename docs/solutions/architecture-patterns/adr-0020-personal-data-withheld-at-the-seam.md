@@ -24,10 +24,10 @@ tags:
 
 ## The decision
 
-The **redaction seam** withholds personal data in the worker's conversion step and on the referenced read tool's return. It runs before chunking, embedding, extraction and every model call, so no derived store and no model ever holds the value. The original bytes stay in the object store, opened only by an Admin, each view an audit event.
+The **redaction seam** withholds personal data in the worker's conversion step and on the read-live tool's return. It runs before chunking, embedding, extraction and every model call, so no derived store and no model ever holds the value. The original bytes stay in the object store, opened only by an Admin, each view an audit event.
 
-- **Sensitivity** has three classes: Restricted (the default for every binding and every `Person`), Internal and Public. Only *Restricted* is a reader word; the other two are Admin words.
-- **Redaction rules** have three tiers: *always* (special-category cues, financial account and government identifiers), *default on* and *default off* per binding. No binding switches the always set off. The officer-block rule always wins. Special-category data narrows its document to Restricted on landing.
+- **Sensitivity** has three classes: Restricted (the default for every connected source and every `Person`), Internal and Public. Only *Restricted* is a reader word; the other two are Admin words.
+- **Redaction rules** have three tiers: *always* (special-category cues, financial account and government identifiers), *default on* and *default off* per connected source. No connected source switches the always set off. The officer-block rule always wins. Special-category data narrows its document to Restricted on landing.
 - One declared descriptor per category, in `apps/worker/src/better_answers_worker/redaction/descriptors.py`, feeds the recognisers, the category list and `rule_version`. A window begins where the document begins something: a heading, then a paragraph.
 - A **finding** is its document, its rule and its two offsets into the normalised text. Its category, tier, score and version pair are the last run's reading of it.
 - An Admin's restore, *keep in text* or special-category dismissal reaches the next run as an argument, never a change key. An erasure outranks all three.
@@ -62,7 +62,7 @@ A **suppression** is the workspace's: one per erasure request, holding the reque
 - Quarantining flagged documents, or role-gating the chunks: the useful file is the flagged one, and the value reaches every store.
 - Pseudonymising every name, or nothing by default: a worse answer, or an unsafe default.
 - A publish block on special category: blocking widening is the control.
-- Reprocessing on a binding-wide rule version: about £750 and two days for one switch.
+- Reprocessing on a connected-source-wide rule version: about £750 and two days for one switch.
 - Rewriting on every leaver, or never rewriting: every clone diverges, or "we cannot" is not a basis.
 - Typed placeholders for the always set, or an "incomplete" hint: each tells the reader what exists.
 - A targeted text replacement over concept bodies: it rewrites what the company asserts.

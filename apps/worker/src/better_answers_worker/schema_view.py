@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0067_the-map"
+MIGRATION_ID = "0068_the-connected-source"
 
-MIGRATION_WHEN = 1791193377095
+MIGRATION_WHEN = 1791319467017
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -148,6 +148,21 @@ TABLES: dict[str, dict[str, str]] = {
         "frontmatter": "jsonb NOT NULL",
         "body": "text NOT NULL",
         "base_content_hash": "text",
+    },
+    "public.connected_source": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "published_at": "timestamp with time zone",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
+        "audience_groups": "text[]",
+        "created_at": "timestamp with time zone NOT NULL",
+        "rules_in_force": "jsonb NOT NULL",
+        "name": "text NOT NULL",
+        "connector": "text NOT NULL",
+        "destination": "text[] NOT NULL",
+        "retention_class": "text NOT NULL",
+        "state": "text NOT NULL",
     },
     "public.contract_stamp": {
         "only_row": "boolean NOT NULL",
@@ -487,25 +502,10 @@ TABLES: dict[str, dict[str, str]] = {
         "pending_since": "timestamp with time zone",
         "setup_granted_at": "timestamp with time zone",
     },
-    "public.source_binding": {
-        "workspace_id": "text NOT NULL",
-        "id": "text NOT NULL",
-        "published_at": "timestamp with time zone",
-        "sensitivity": "text NOT NULL",
-        "audience": "text NOT NULL",
-        "audience_groups": "text[]",
-        "created_at": "timestamp with time zone NOT NULL",
-        "rules_in_force": "jsonb NOT NULL",
-        "name": "text NOT NULL",
-        "connector": "text NOT NULL",
-        "destination": "text[] NOT NULL",
-        "retention_class": "text NOT NULL",
-        "state": "text NOT NULL",
-    },
     "public.source_document": {
         "workspace_id": "text NOT NULL",
         "id": "text NOT NULL",
-        "binding_id": "text NOT NULL",
+        "connected_source_id": "text NOT NULL",
         "source_system_id": "text NOT NULL",
         "title": "text NOT NULL",
         "media_type": "text NOT NULL",

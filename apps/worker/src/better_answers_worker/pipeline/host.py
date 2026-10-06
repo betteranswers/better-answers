@@ -17,7 +17,7 @@ from ..config import Bootstrap
 from ..log import logger
 from .tables import POOL, Table, declare_nothing, declare_rows
 
-# Sized for four bindings with both stores open; the bound counts handles.
+# Sized for four connected sources with both stores open; the bound counts handles.
 ENVIRONMENTS_HELD = 8
 
 
@@ -43,8 +43,8 @@ LANDED_APP = "landed"
 CHUNKS_APP = "chunks"
 
 
-# The binding's own store: the chunk rows and the target-state tracking that says which
-# of them have gone. A wipe removes it.
+# The connected source's own store: the chunk rows and the target-state tracking that
+# says which of them have gone. A wipe removes it.
 BINDING_STORE = "binding"
 
 
@@ -53,7 +53,7 @@ BINDING_STORE = "binding"
 FINDINGS_STORE = "findings"
 
 
-STORES_A_BINDING_HOLDS: tuple[str, ...] = (BINDING_STORE, FINDINGS_STORE)
+STORES_A_CONNECTED_SOURCE_HOLDS: tuple[str, ...] = (BINDING_STORE, FINDINGS_STORE)
 
 
 STORE_OF: Mapping[str, str] = MappingProxyType(
@@ -64,7 +64,7 @@ STORE_OF: Mapping[str, str] = MappingProxyType(
 @dataclass(frozen=True, slots=True)
 class IndexRun:
     workspace_id: str
-    binding_id: str
+    connected_source_id: str
 
     reason: str
 
@@ -122,7 +122,7 @@ def _opened_once_let_go(
         return opened
     logger.info(
         "the engine still holds the store, so its open waits for it to let go",
-        binding_id=run.binding_id,
+        connected_source_id=run.connected_source_id,
         store=store,
         wait_seconds=wait_seconds,
     )
@@ -162,8 +162,9 @@ class _Loop:
 
 
 class Host:
-    """One pool per workspace and each binding's two engine stores, closing the least
-    recently used binding's once more than `environments_held` handles are open."""
+    """One pool per workspace and each connected source's two engine stores, closing
+    the least recently used source's once more than `environments_held` handles are
+    open."""
 
     def __init__(
         self,
@@ -172,11 +173,11 @@ class Host:
         environments_held: int = ENVIRONMENTS_HELD,
         release_wait_seconds: float = RELEASE_WAIT_SECONDS,
     ) -> None:
-        # Under one binding's handles, the binding in use would be the one shed.
-        if environments_held < len(STORES_A_BINDING_HOLDS):
+        # Under one source's handles, the source in use would be the one shed.
+        if environments_held < len(STORES_A_CONNECTED_SOURCE_HOLDS):
             message = (
-                f"the Environment cache must hold a binding's"
-                f" {len(STORES_A_BINDING_HOLDS)} handles and was bounded at"
+                f"the Environment cache must hold a connected source's"
+                f" {len(STORES_A_CONNECTED_SOURCE_HOLDS)} handles and was bounded at"
                 f" {environments_held}"
             )
             raise ValueError(message)
@@ -201,28 +202,28 @@ class Host:
     ) -> None:
         self.close()
 
-    def binding_directory(self, run: IndexRun) -> Path:
-        return Path(self._engine.lmdb_dir) / run.workspace_id / run.binding_id
+    def connected_source_directory(self, run: IndexRun) -> Path:
+        return Path(self._engine.lmdb_dir) / run.workspace_id / run.connected_source_id
 
     def store_directory(self, run: IndexRun, store: str) -> Path:
-        return self.binding_directory(run) / store
+        return self.connected_source_directory(run) / store
 
     def store_map_bytes(self) -> int:
-        # Split across the binding's stores: a whole cap each would let a binding hold
+        # Split across the source's stores: a whole cap each would let a source hold
         # twice the operator's number.
-        return self._engine.lmdb_map_bytes // len(STORES_A_BINDING_HOLDS)
+        return self._engine.lmdb_map_bytes // len(STORES_A_CONNECTED_SOURCE_HOLDS)
 
     def lmdb_bytes(self, run: IndexRun) -> int:
         # The whole directory, both stores: the operator sizes a volume against what a
-        # binding holds and the split must not halve the number.
-        directory = self.binding_directory(run)
+        # connected source holds and the split must not halve the number.
+        directory = self.connected_source_directory(run)
         if not directory.is_dir():
             return 0
         return sum(
             item.stat().st_size for item in directory.rglob("*") if item.is_file()
         )
 
-    def remove_binding_store(self, run: IndexRun) -> None:
+    def remove_connected_source_store(self, run: IndexRun) -> None:
         # Evicted before the directory goes: removing it under an open handle would
         # leave the engine writing into a store nothing can read.
         self._evict(run, BINDING_STORE)
@@ -236,28 +237,28 @@ class Host:
         self._pools[workspace_id] = opened
         return opened
 
-    def open_binding(self, run: IndexRun) -> None:
-        for store in STORES_A_BINDING_HOLDS:
+    def open_connected_source(self, run: IndexRun) -> None:
+        for store in STORES_A_CONNECTED_SOURCE_HOLDS:
             self._environment(run, store)
 
-    def held_bindings(self) -> tuple[str, ...]:
-        """Binding ids with a store open, least recently used first."""
+    def held_connected_sources(self) -> tuple[str, ...]:
+        """Connected source ids with a store open, least recently used first."""
         return tuple(self._environments)
 
     def _evict(self, run: IndexRun, store: str) -> None:
-        stores = self._environments.get(run.binding_id, {})
+        stores = self._environments.get(run.connected_source_id, {})
         stores.pop(store, None)
         if not stores:
-            self._environments.pop(run.binding_id, None)
+            self._environments.pop(run.connected_source_id, None)
 
     def _handles(self) -> int:
         return sum(len(stores) for stores in self._environments.values())
 
     def _environment(self, run: IndexRun, store: str) -> coco.Environment:
-        stores = self._environments.get(run.binding_id, {})
+        stores = self._environments.get(run.connected_source_id, {})
         held = stores.get(store)
         if held is not None:
-            self._environments.move_to_end(run.binding_id)
+            self._environments.move_to_end(run.connected_source_id)
             return held
 
         directory = self.store_directory(run, store)
@@ -273,19 +274,19 @@ class Host:
             store,
             lambda: coco.Environment(
                 settings,
-                name=f"binding:{run.binding_id}:{store}",
+                name=f"binding:{run.connected_source_id}:{store}",
                 context_provider=provider,
                 event_loop=self._loop.loop,
             ),
             self._release_wait,
         )
-        self._environments.setdefault(run.binding_id, {})[store] = opened
-        self._environments.move_to_end(run.binding_id)
+        self._environments.setdefault(run.connected_source_id, {})[store] = opened
+        self._environments.move_to_end(run.connected_source_id)
         while self._handles() > self._held:
             oldest, closed = self._environments.popitem(last=False)
             logger.info(
-                "the binding's stores were closed to stay within the cache",
-                binding_id=oldest,
+                "the connected source's stores were closed to stay within the cache",
+                connected_source_id=oldest,
                 stores=list(closed),
                 held=self._held,
             )
@@ -310,8 +311,8 @@ class Host:
         landed = app.update_blocking()
         return int(landed) if isinstance(landed, int) else len(declared)
 
-    def drop_binding(self, run: IndexRun) -> None:
-        """Drops the engine's record of the binding's chunks,
+    def drop_connected_source(self, run: IndexRun) -> None:
+        """Drops the engine's record of the connected source's chunks,
         leaving the table, its indexes and every row it landed."""
         coco.App(self.app_config(run, CHUNKS_APP), declare_nothing).drop_blocking()
 

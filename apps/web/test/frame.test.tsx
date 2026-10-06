@@ -87,7 +87,7 @@ describe("the shell's regions", () => {
 
     expect(namesIn(menu(), "heading")).toEqual(["Sources", "Models", "People", "System"]);
     expect(namesIn(menu())).toEqual([
-      "Bindings",
+      "Connected sources",
       "Models and spend",
       "Members",
       "Groups",

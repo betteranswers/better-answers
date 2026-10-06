@@ -29,7 +29,7 @@ from .host import (
     ENVIRONMENTS_HELD,
     FINDINGS_STORE,
     LANDED_APP,
-    STORES_A_BINDING_HOLDS,
+    STORES_A_CONNECTED_SOURCE_HOLDS,
     Host,
     IndexRun,
     open_pool,
@@ -51,10 +51,10 @@ from .landed import (
 from .objects import Bucket, LandedCopies, object_key_of
 from .rows import CHUNK_TABLE, chunk_rows, rows_of
 from .run import (
-    REASONS_EMPTYING_THE_BINDING,
+    REASONS_EMPTYING_THE_CONNECTED_SOURCE,
     WIPED_REASON,
     IndexOutcome,
-    index_binding,
+    index_connected_source,
 )
 from .tables import Column, Table
 
@@ -72,9 +72,9 @@ __all__ = [
     "OCR_ANSWER",
     "PASSED_THROUGH",
     "PDF_MEDIA_TYPE",
-    "REASONS_EMPTYING_THE_BINDING",
+    "REASONS_EMPTYING_THE_CONNECTED_SOURCE",
     "SEAM_MS_PER_PAGE",
-    "STORES_A_BINDING_HOLDS",
+    "STORES_A_CONNECTED_SOURCE_HOLDS",
     "THE_MEMOS_IDENTITY",
     "TIMEOUT_MARGIN_MS",
     "WIPED_REASON",
@@ -98,7 +98,7 @@ __all__ = [
     "converted",
     "converter_pin_of",
     "detected",
-    "index_binding",
+    "index_connected_source",
     "locator_of",
     "object_key_of",
     "open_pool",

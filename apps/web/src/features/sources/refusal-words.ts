@@ -2,29 +2,29 @@ import type { SaidOfWord } from "@/shared/refusal-words.ts";
 
 import { UPLOAD_CAP_MB } from "./words.ts";
 
-export const SAID_OF_A_BINDING = {
+export const SAID_OF_A_CONNECTED_SOURCE = {
   "role-forbids": {
     why: "Only an Admin of this workspace may do this.",
     next: "An Admin can take it from here.",
   },
   "no-such-binding": {
-    why: "This workspace holds no such binding.",
+    why: "This workspace holds no such connected source.",
     next: "Read the list again.",
   },
   "no-such-document": {
-    why: "A document those finding groups sit in is not under this binding.",
-    next: "Review the binding again.",
+    why: "A document those finding groups sit in is not under this connected source.",
+    next: "Review the connected source again.",
   },
   "no-such-finding": {
-    why: "This binding holds no span of one of the ticked finding groups.",
-    next: "Review the binding again; its last run may have moved on.",
+    why: "This connected source holds no span of one of the ticked finding groups.",
+    next: "Review the connected source again; its last run may have moved on.",
   },
   "already-published": {
-    why: "This binding is already published.",
+    why: "This connected source is already published.",
     next: "Narrow it if it reaches too far.",
   },
   "not-indexed": {
-    why: "The binding's index run has not finished.",
+    why: "The connected source's index run has not finished.",
     next: "Publish once its state reads indexed.",
   },
   "confirmation-missing": {
@@ -32,8 +32,8 @@ export const SAID_OF_A_BINDING = {
     next: "Tick each one, then publish.",
   },
   "special-category-unreviewed": {
-    why: "A special category finding in this binding is still unreviewed, and a binding holding one cannot widen.",
-    next: "Review the binding, narrow or dismiss that finding group, then widen it.",
+    why: "A special category finding in this connected source is still unreviewed, and a connected source holding one cannot widen.",
+    next: "Review the connected source, narrow or dismiss that finding group, then widen it.",
   },
   "media-type-refused": {
     why: "The platform converts markdown, plain text, Word (.docx) and PDF, and this file is none of them.",
@@ -41,7 +41,7 @@ export const SAID_OF_A_BINDING = {
   },
   "too-large": {
     why: `The file is over the ${UPLOAD_CAP_MB} MB one upload may carry.`,
-    next: "Bind a smaller file, or split this one.",
+    next: "Connect a smaller file, or split this one.",
   },
   "not-the-always-set": {
     why: "Only a finding group of the always set can be kept in text.",

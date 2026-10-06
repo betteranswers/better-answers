@@ -40,7 +40,10 @@ THE_SAFE_SET: Mapping[str, bool] = {"default_on": True, "default_off": False}
 NOTHING_SWITCHABLE: Mapping[str, bool] = {"default_on": False, "default_off": False}
 
 
-AN_HR_SHAPED_BINDING: Mapping[str, bool] = {"default_on": True, "default_off": True}
+AN_HR_SHAPED_CONNECTED_SOURCE: Mapping[str, bool] = {
+    "default_on": True,
+    "default_off": True,
+}
 
 
 NO_SUPPRESSIONS: Sequence[Mapping[str, Sequence[str]]] = ()
@@ -145,7 +148,7 @@ def spans(page: str) -> tuple[Span, ...]:
 
 
 @pytest.fixture(scope="module")
-def on_a_plain_binding(page: str, spans: tuple[Span, ...]) -> Redaction:
+def on_a_plain_connected_source(page: str, spans: tuple[Span, ...]) -> Redaction:
     return redact(page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED)
 
 
@@ -155,18 +158,20 @@ def with_nothing_switchable_on(page: str, spans: tuple[Span, ...]) -> Redaction:
 
 
 @pytest.fixture(scope="module")
-def on_an_hr_shaped_binding(page: str, spans: tuple[Span, ...]) -> Redaction:
-    return redact(page, spans, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED)
+def on_an_hr_shaped_connected_source(page: str, spans: tuple[Span, ...]) -> Redaction:
+    return redact(page, spans, AN_HR_SHAPED_CONNECTED_SOURCE, NO_SUPPRESSIONS, SEED)
 
 
 @pytest.fixture(scope="module")
 def under_another_seed(page: str, spans: tuple[Span, ...]) -> Redaction:
-    return redact(page, spans, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, ANOTHER_SEED)
+    return redact(
+        page, spans, AN_HR_SHAPED_CONNECTED_SOURCE, NO_SUPPRESSIONS, ANOTHER_SEED
+    )
 
 
 @pytest.fixture(scope="module")
 def with_one_name_suppressed(page: str, spans: tuple[Span, ...]) -> Redaction:
-    return redact(page, spans, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED)
+    return redact(page, spans, AN_HR_SHAPED_CONNECTED_SOURCE, ONE_NAME_SUPPRESSED, SEED)
 
 
 @pytest.fixture(scope="module")
@@ -238,18 +243,20 @@ def how_written(found: Redaction, withholding: Withholding) -> str:
 
 
 def test_cuts_every_span_out_by_its_own_offsets(
-    on_a_plain_binding: Redaction, page: str
+    on_a_plain_connected_source: Redaction, page: str
 ) -> None:
 
     for category, planted in PLANTED_SPANS:
-        assert planted in spans_under(on_a_plain_binding, page, category), (
+        assert planted in spans_under(on_a_plain_connected_source, page, category), (
             f"{category}: {planted!r} was not cut back out of the page"
         )
 
 
-def test_the_recall_set_is_found_in_full(on_a_plain_binding: Redaction) -> None:
+def test_the_recall_set_is_found_in_full(
+    on_a_plain_connected_source: Redaction,
+) -> None:
 
-    counts = on_a_plain_binding.counts
+    counts = on_a_plain_connected_source.counts
 
     assert {
         category: counts.get(category, 0) for category in FINDINGS_BY_CATEGORY
@@ -257,10 +264,11 @@ def test_the_recall_set_is_found_in_full(on_a_plain_binding: Redaction) -> None:
 
 
 def test_every_finding_names_the_tier_its_category_is_raised_at(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
 ) -> None:
     raised = {
-        (finding.category, finding.tier) for finding in on_a_plain_binding.findings
+        (finding.category, finding.tier)
+        for finding in on_a_plain_connected_source.findings
     }
 
     assert ("special-category", "always") in raised
@@ -296,10 +304,10 @@ def test_a_switched_off_tier_leaves_its_spans_in_the_text(
 
 
 def test_the_default_on_tier_writes_its_word_over_each_span(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
 ) -> None:
 
-    redacted = on_a_plain_binding.text
+    redacted = on_a_plain_connected_source.text
     typed = typed_placeholders_under(THE_SAFE_SET)
 
     assert typed
@@ -309,38 +317,44 @@ def test_the_default_on_tier_writes_its_word_over_each_span(
 
 
 def test_a_job_title_stays_until_its_tier_is_switched_on(
-    on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction, page: str
+    on_a_plain_connected_source: Redaction,
+    on_an_hr_shaped_connected_source: Redaction,
+    page: str,
 ) -> None:
 
-    assert A_PLANTED_JOB_TITLE in spans_under(on_a_plain_binding, page, "job-title")
-    assert tiers_of(on_a_plain_binding, page, A_PLANTED_JOB_TITLE) == {"default-off"}
+    assert A_PLANTED_JOB_TITLE in spans_under(
+        on_a_plain_connected_source, page, "job-title"
+    )
+    assert tiers_of(on_a_plain_connected_source, page, A_PLANTED_JOB_TITLE) == {
+        "default-off"
+    }
 
-    assert A_PLANTED_JOB_TITLE in on_a_plain_binding.text
-    assert "[job title withheld]" not in on_a_plain_binding.text
-    assert on_a_plain_binding.counts["job-title"] == 5
+    assert A_PLANTED_JOB_TITLE in on_a_plain_connected_source.text
+    assert "[job title withheld]" not in on_a_plain_connected_source.text
+    assert on_a_plain_connected_source.counts["job-title"] == 5
 
-    assert A_PLANTED_JOB_TITLE not in on_an_hr_shaped_binding.text
-    assert "[job title withheld]" in on_an_hr_shaped_binding.text
-    assert on_an_hr_shaped_binding.counts["job-title"] == 5
+    assert A_PLANTED_JOB_TITLE not in on_an_hr_shaped_connected_source.text
+    assert "[job title withheld]" in on_an_hr_shaped_connected_source.text
+    assert on_an_hr_shaped_connected_source.counts["job-title"] == 5
 
 
 def test_only_a_date_beside_date_of_birth_is_a_finding(
-    on_a_plain_binding: Redaction, page: str
+    on_a_plain_connected_source: Redaction, page: str
 ) -> None:
 
-    dates = spans_under(on_a_plain_binding, page, "date-of-birth")
+    dates = spans_under(on_a_plain_connected_source, page, "date-of-birth")
 
     assert dates == [DATE_IN_CONTEXT]
     for bare in BARE_DATES:
         assert bare not in dates
-        assert bare in on_a_plain_binding.text
+        assert bare in on_a_plain_connected_source.text
 
 
 def test_only_a_consumer_domain_email_is_personal_contact(
-    on_a_plain_binding: Redaction, page: str
+    on_a_plain_connected_source: Redaction, page: str
 ) -> None:
 
-    contact = spans_under(on_a_plain_binding, page, "personal-contact")
+    contact = spans_under(on_a_plain_connected_source, page, "personal-contact")
 
     assert A_CONSUMER_ADDRESS in contact
 
@@ -349,19 +363,21 @@ def test_only_a_consumer_domain_email_is_personal_contact(
 
     assert [
         finding
-        for finding in on_a_plain_binding.findings
+        for finding in on_a_plain_connected_source.findings
         if finding.start < closed and opened < finding.end
     ] == []
 
-    assert A_COMPANY_ADDRESS in on_a_plain_binding.text
+    assert A_COMPANY_ADDRESS in on_a_plain_connected_source.text
 
 
 def test_the_telephone_number_is_personal_contact_regardless_of_domain(
-    on_a_plain_binding: Redaction, page: str
+    on_a_plain_connected_source: Redaction, page: str
 ) -> None:
 
-    assert "07700 900123" in spans_under(on_a_plain_binding, page, "personal-contact")
-    assert "07700 900123" not in on_a_plain_binding.text
+    assert "07700 900123" in spans_under(
+        on_a_plain_connected_source, page, "personal-contact"
+    )
+    assert "07700 900123" not in on_a_plain_connected_source.text
 
 
 def test_a_shouted_consumer_domain_is_still_the_same_domain() -> None:
@@ -381,20 +397,20 @@ def test_a_shouted_consumer_domain_is_still_the_same_domain() -> None:
 
 
 def test_a_health_cue_withholds_its_sentence_and_narrows_the_document(
-    on_a_plain_binding: Redaction, page: str
+    on_a_plain_connected_source: Redaction, page: str
 ) -> None:
 
-    sentences = spans_under(on_a_plain_binding, page, "special-category")
+    sentences = spans_under(on_a_plain_connected_source, page, "special-category")
 
     assert sentences == [A_HEALTH_SENTENCE]
-    assert on_a_plain_binding.verdict == "Restricted"
-    assert A_HEALTH_SENTENCE not in on_a_plain_binding.text
+    assert on_a_plain_connected_source.verdict == "Restricted"
+    assert A_HEALTH_SENTENCE not in on_a_plain_connected_source.text
 
 
 def test_an_ordinary_sentence_with_a_health_word_is_always_kept(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
     with_nothing_switchable_on: Redaction,
-    on_an_hr_shaped_binding: Redaction,
+    on_an_hr_shaped_connected_source: Redaction,
     page: str,
 ) -> None:
 
@@ -403,8 +419,8 @@ def test_an_ordinary_sentence_with_a_health_word_is_always_kept(
 
     for found in (
         with_nothing_switchable_on,
-        on_a_plain_binding,
-        on_an_hr_shaped_binding,
+        on_a_plain_connected_source,
+        on_an_hr_shaped_connected_source,
     ):
         assert [
             finding
@@ -442,39 +458,41 @@ def test_a_page_with_no_special_category_cue_narrows_nothing() -> None:
 
 
 def test_finds_a_sort_code_inside_a_code_fence_today(
-    on_a_plain_binding: Redaction, page: str
+    on_a_plain_connected_source: Redaction, page: str
 ) -> None:
 
-    assert FENCED_SORT_CODE in spans_under(on_a_plain_binding, page, "bank-details")
+    assert FENCED_SORT_CODE in spans_under(
+        on_a_plain_connected_source, page, "bank-details"
+    )
 
 
 def test_the_redaction_carries_the_version_string_every_finding_rides_on(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
 ) -> None:
-    assert on_a_plain_binding.version == VERSION_STRING
+    assert on_a_plain_connected_source.version == VERSION_STRING
 
 
-def test_a_name_is_a_pseudonym_only_on_an_hr_binding(
-    on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction
+def test_a_name_is_a_pseudonym_only_on_an_hr_source(
+    on_a_plain_connected_source: Redaction, on_an_hr_shaped_connected_source: Redaction
 ) -> None:
 
-    assert "Imogen Sarkar" in on_a_plain_binding.text
-    assert "[person " not in on_a_plain_binding.text
+    assert "Imogen Sarkar" in on_a_plain_connected_source.text
+    assert "[person " not in on_a_plain_connected_source.text
 
-    assert "Imogen Sarkar" not in on_an_hr_shaped_binding.text
-    assert "[person Y]" in on_an_hr_shaped_binding.text
+    assert "Imogen Sarkar" not in on_an_hr_shaped_connected_source.text
+    assert "[person Y]" in on_an_hr_shaped_connected_source.text
 
 
-def test_one_name_is_one_letter_throughout_a_binding(
-    on_an_hr_shaped_binding: Redaction, page: str
+def test_one_name_is_one_letter_throughout_a_connected_source(
+    on_an_hr_shaped_connected_source: Redaction, page: str
 ) -> None:
 
     assert page.count("Imogen Sarkar") == 3
-    assert on_an_hr_shaped_binding.text.count("[person Y]") == 3
+    assert on_an_hr_shaped_connected_source.text.count("[person Y]") == 3
 
 
 def test_a_different_seed_gives_the_same_name_a_different_letter(
-    on_an_hr_shaped_binding: Redaction, under_another_seed: Redaction
+    on_an_hr_shaped_connected_source: Redaction, under_another_seed: Redaction
 ) -> None:
 
     for name, letter in LETTERS_UNDER_SEED.items():
@@ -482,20 +500,20 @@ def test_a_different_seed_gives_the_same_name_a_different_letter(
         under_other = f"[person {LETTERS_UNDER_ANOTHER_SEED[name]}]"
 
         assert under_one != under_other
-        assert under_one in on_an_hr_shaped_binding.text
+        assert under_one in on_an_hr_shaped_connected_source.text
         assert under_one not in under_another_seed.text
         assert under_other in under_another_seed.text
 
 
 def test_withholds_a_name_with_its_officers_block_whatever_the_rules(
-    on_a_plain_binding: Redaction,
-    on_an_hr_shaped_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
+    on_an_hr_shaped_connected_source: Redaction,
     with_nothing_switchable_on: Redaction,
 ) -> None:
 
     for found in (
-        on_a_plain_binding,
-        on_an_hr_shaped_binding,
+        on_a_plain_connected_source,
+        on_an_hr_shaped_connected_source,
         with_nothing_switchable_on,
     ):
         block = officers_block(found.text)
@@ -507,44 +525,50 @@ def test_withholds_a_name_with_its_officers_block_whatever_the_rules(
 
 
 def test_the_same_name_outside_the_block_keeps_its_own_tier(
-    on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction, page: str
+    on_a_plain_connected_source: Redaction,
+    on_an_hr_shaped_connected_source: Redaction,
+    page: str,
 ) -> None:
 
-    assert "Rosalind Petheridge" in past_the_officers_block(on_a_plain_binding.text)
-    assert "[person U]" in past_the_officers_block(on_an_hr_shaped_binding.text)
-    assert tiers_of(on_a_plain_binding, page, "Rosalind Petheridge") == {
+    assert "Rosalind Petheridge" in past_the_officers_block(
+        on_a_plain_connected_source.text
+    )
+    assert "[person U]" in past_the_officers_block(
+        on_an_hr_shaped_connected_source.text
+    )
+    assert tiers_of(on_a_plain_connected_source, page, "Rosalind Petheridge") == {
         "always",
         "default-off",
     }
 
 
 def test_withholds_a_signatory_inside_a_home_address_with_the_address(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
     with_nothing_switchable_on: Redaction,
     page: str,
 ) -> None:
 
     assert AN_ADDRESS_AROUND_A_NAME in spans_under(
-        on_a_plain_binding, page, "home-address"
+        on_a_plain_connected_source, page, "home-address"
     )
-    assert tiers_of(on_a_plain_binding, page, A_FOURTH_OFFICER) == {"always"}
+    assert tiers_of(on_a_plain_connected_source, page, A_FOURTH_OFFICER) == {"always"}
 
-    assert A_FOURTH_OFFICER not in on_a_plain_binding.text
+    assert A_FOURTH_OFFICER not in on_a_plain_connected_source.text
     for end_of_the_address in A_STREET_AND_ITS_POSTCODE:
-        assert end_of_the_address not in on_a_plain_binding.text
+        assert end_of_the_address not in on_a_plain_connected_source.text
 
-    (his_name,) = withholdings_over(on_a_plain_binding, page, A_FOURTH_OFFICER)
+    (his_name,) = withholdings_over(on_a_plain_connected_source, page, A_FOURTH_OFFICER)
     (the_address,) = withholdings_over(
-        on_a_plain_binding, page, AN_ADDRESS_AROUND_A_NAME
+        on_a_plain_connected_source, page, AN_ADDRESS_AROUND_A_NAME
     )
 
-    assert (his_name.withheld, how_written(on_a_plain_binding, his_name)) == (
+    assert (his_name.withheld, how_written(on_a_plain_connected_source, his_name)) == (
         True,
         UNDER_ANOTHER_FINDINGS_PLACEHOLDER,
     )
     assert [
         (page[span.start : span.end], span.withholding)
-        for span in on_a_plain_binding.written_spans
+        for span in on_a_plain_connected_source.written_spans
         if span.start < the_address.finding.end and the_address.finding.start < span.end
     ] == [(AN_ADDRESS_AROUND_A_NAME, the_address)]
 
@@ -563,23 +587,25 @@ def test_withholds_a_signatory_inside_a_home_address_with_the_address(
 
 
 def test_withholds_a_suppressed_name_and_leaves_every_other_untouched(
-    on_an_hr_shaped_binding: Redaction, with_one_name_suppressed: Redaction
+    on_an_hr_shaped_connected_source: Redaction, with_one_name_suppressed: Redaction
 ) -> None:
 
-    assert "[person U]" in on_an_hr_shaped_binding.text
+    assert "[person U]" in on_an_hr_shaped_connected_source.text
     assert "[person U]" not in with_one_name_suppressed.text
 
     for letter in ("E", "Y"):
         assert with_one_name_suppressed.text.count(
             f"[person {letter}]"
-        ) == on_an_hr_shaped_binding.text.count(f"[person {letter}]")
+        ) == on_an_hr_shaped_connected_source.text.count(f"[person {letter}]")
 
 
 def test_a_suppression_withholds_at_always_and_rewrites_no_tier(
-    on_a_plain_binding: Redaction, with_one_name_suppressed: Redaction, page: str
+    on_a_plain_connected_source: Redaction,
+    with_one_name_suppressed: Redaction,
+    page: str,
 ) -> None:
 
-    assert tiers_of(on_a_plain_binding, page, "Rosalind Petheridge") == {
+    assert tiers_of(on_a_plain_connected_source, page, "Rosalind Petheridge") == {
         "always",
         "default-off",
     }
@@ -598,8 +624,8 @@ def test_a_suppression_withholds_at_always_and_rewrites_no_tier(
 
 @pytest.mark.parametrize(
     "rules_in_force",
-    [THE_SAFE_SET, NOTHING_SWITCHABLE, AN_HR_SHAPED_BINDING],
-    ids=["the safe set", "nothing switchable on", "an HR-shaped binding"],
+    [THE_SAFE_SET, NOTHING_SWITCHABLE, AN_HR_SHAPED_CONNECTED_SOURCE],
+    ids=["the safe set", "nothing switchable on", "an HR-shaped connected source"],
 )
 def test_withholds_an_erased_work_address_and_name_under_any_rules(
     page: str, spans: tuple[Span, ...], rules_in_force: Mapping[str, bool]
@@ -616,7 +642,7 @@ def test_withholds_an_erased_work_address_and_name_under_any_rules(
 
 
 def test_an_erasure_match_moves_no_finding_count_or_verdict(
-    on_a_plain_binding: Redaction, with_his_erasure: Redaction, page: str
+    on_a_plain_connected_source: Redaction, with_his_erasure: Redaction, page: str
 ) -> None:
 
     at = page.index(A_COMPANY_ADDRESS)
@@ -625,12 +651,12 @@ def test_an_erasure_match_moves_no_finding_count_or_verdict(
         ErasureMatch(at, at + len(A_COMPANY_ADDRESS))
         in with_his_erasure.erasure_matches
     )
-    assert with_his_erasure.findings == on_a_plain_binding.findings
+    assert with_his_erasure.findings == on_a_plain_connected_source.findings
     assert [one.finding for one in with_his_erasure.withholdings] == list(
         with_his_erasure.findings
     )
-    assert with_his_erasure.counts == on_a_plain_binding.counts
-    assert with_his_erasure.verdict == on_a_plain_binding.verdict
+    assert with_his_erasure.counts == on_a_plain_connected_source.counts
+    assert with_his_erasure.verdict == on_a_plain_connected_source.verdict
     assert A_COMPANY_ADDRESS not in spans_under(
         with_his_erasure, page, "personal-contact"
     )
@@ -728,20 +754,20 @@ def test_a_one_word_name_withholds_nothing_below_the_floor() -> None:
 
 
 def test_the_same_inputs_twice_give_identical_output(
-    on_an_hr_shaped_binding: Redaction,
+    on_an_hr_shaped_connected_source: Redaction,
     page: str,
     spans: tuple[Span, ...],
 ) -> None:
 
-    again = redact(page, spans, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED)
+    again = redact(page, spans, AN_HR_SHAPED_CONNECTED_SOURCE, NO_SUPPRESSIONS, SEED)
 
-    assert again.text == on_an_hr_shaped_binding.text
-    assert again.findings == on_an_hr_shaped_binding.findings
-    assert again.withholdings == on_an_hr_shaped_binding.withholdings
-    assert again.written_spans == on_an_hr_shaped_binding.written_spans
-    assert again.counts == on_an_hr_shaped_binding.counts
-    assert again.verdict == on_an_hr_shaped_binding.verdict
-    assert again.version == on_an_hr_shaped_binding.version
+    assert again.text == on_an_hr_shaped_connected_source.text
+    assert again.findings == on_an_hr_shaped_connected_source.findings
+    assert again.withholdings == on_an_hr_shaped_connected_source.withholdings
+    assert again.written_spans == on_an_hr_shaped_connected_source.written_spans
+    assert again.counts == on_an_hr_shaped_connected_source.counts
+    assert again.verdict == on_an_hr_shaped_connected_source.verdict
+    assert again.version == on_an_hr_shaped_connected_source.version
 
 
 THE_COMPANYS_OWN_ACCOUNT = "00-00-00, account number 12345678"
@@ -757,46 +783,46 @@ def restore_of(found: Redaction, page: str, span: str, tier: str = "always") -> 
 
 
 def test_leaves_a_restored_span_in_the_text_as_a_finding(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
     page: str,
     spans: tuple[Span, ...],
 ) -> None:
 
-    kept = restore_of(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT)
+    kept = restore_of(on_a_plain_connected_source, page, THE_COMPANYS_OWN_ACCOUNT)
 
     found = redact(page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
 
-    assert THE_COMPANYS_OWN_ACCOUNT not in on_a_plain_binding.text
+    assert THE_COMPANYS_OWN_ACCOUNT not in on_a_plain_connected_source.text
     assert THE_COMPANYS_OWN_ACCOUNT in found.text
-    assert found.findings == on_a_plain_binding.findings
-    assert found.counts == on_a_plain_binding.counts
+    assert found.findings == on_a_plain_connected_source.findings
+    assert found.counts == on_a_plain_connected_source.counts
 
     assert FENCED_SORT_CODE not in found.text
 
 
 def test_a_restore_under_another_rule_restores_nothing(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
     page: str,
     spans: tuple[Span, ...],
 ) -> None:
 
-    kept = restore_of(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT)
+    kept = restore_of(on_a_plain_connected_source, page, THE_COMPANYS_OWN_ACCOUNT)
     under_another_rule = Restore(rule_id="UK_NHS", start=kept.start, end=kept.end)
 
     found = redact(
         page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [under_another_rule]
     )
 
-    assert found.text == on_a_plain_binding.text
+    assert found.text == on_a_plain_connected_source.text
 
 
 def test_an_unrestored_finding_over_the_same_characters_still_withholds_them(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
     page: str,
     spans: tuple[Span, ...],
 ) -> None:
 
-    his_name = restore_of(on_a_plain_binding, page, A_FOURTH_OFFICER)
+    his_name = restore_of(on_a_plain_connected_source, page, A_FOURTH_OFFICER)
 
     under_the_address = redact(
         page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [his_name]
@@ -810,18 +836,30 @@ def test_an_unrestored_finding_over_the_same_characters_still_withholds_them(
 
 
 def test_an_erasure_outranks_a_restore(
-    on_an_hr_shaped_binding: Redaction,
+    on_an_hr_shaped_connected_source: Redaction,
     page: str,
     spans: tuple[Span, ...],
 ) -> None:
 
-    in_the_block = restore_of(on_an_hr_shaped_binding, page, "Rosalind Petheridge")
+    in_the_block = restore_of(
+        on_an_hr_shaped_connected_source, page, "Rosalind Petheridge"
+    )
 
     restored = redact(
-        page, spans, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED, [in_the_block]
+        page,
+        spans,
+        AN_HR_SHAPED_CONNECTED_SOURCE,
+        NO_SUPPRESSIONS,
+        SEED,
+        [in_the_block],
     )
     erased = redact(
-        page, spans, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED, [in_the_block]
+        page,
+        spans,
+        AN_HR_SHAPED_CONNECTED_SOURCE,
+        ONE_NAME_SUPPRESSED,
+        SEED,
+        [in_the_block],
     )
 
     assert "Rosalind Petheridge" in officers_block(restored.text)
@@ -835,24 +873,33 @@ def test_an_erasure_outranks_a_restore(
 
 
 def test_the_withholding_names_the_first_reason_that_holds(
-    on_a_plain_binding: Redaction,
-    on_an_hr_shaped_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
+    on_an_hr_shaped_connected_source: Redaction,
     page: str,
     spans: tuple[Span, ...],
 ) -> None:
 
-    kept = restore_of(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT)
-    in_the_block = restore_of(on_an_hr_shaped_binding, page, "Rosalind Petheridge")
+    kept = restore_of(on_a_plain_connected_source, page, THE_COMPANYS_OWN_ACCOUNT)
+    in_the_block = restore_of(
+        on_an_hr_shaped_connected_source, page, "Rosalind Petheridge"
+    )
 
     restored = redact(page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
     erased = redact(
-        page, spans, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED, [in_the_block]
+        page,
+        spans,
+        AN_HR_SHAPED_CONNECTED_SOURCE,
+        ONE_NAME_SUPPRESSED,
+        SEED,
+        [in_the_block],
     )
 
-    assert reasons_over(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT) == {
-        IN_FORCE
+    assert reasons_over(
+        on_a_plain_connected_source, page, THE_COMPANYS_OWN_ACCOUNT
+    ) == {IN_FORCE}
+    assert reasons_over(on_a_plain_connected_source, page, A_PLANTED_JOB_TITLE) == {
+        SWITCHED_OFF
     }
-    assert reasons_over(on_a_plain_binding, page, A_PLANTED_JOB_TITLE) == {SWITCHED_OFF}
     assert reasons_over(restored, page, THE_COMPANYS_OWN_ACCOUNT) == {RESTORED}
     assert reasons_over(erased, page, "Rosalind Petheridge") == {
         OVERRIDDEN_BY_THE_ERASURE,
@@ -861,19 +908,19 @@ def test_the_withholding_names_the_first_reason_that_holds(
 
     assert {
         withholding.reason
-        for found in (on_a_plain_binding, restored, erased)
+        for found in (on_a_plain_connected_source, restored, erased)
         for withholding in found.withholdings
     } == {OVERRIDDEN_BY_THE_ERASURE, AN_ERASURE, RESTORED, SWITCHED_OFF, IN_FORCE}
 
 
 def test_answers_one_withholding_per_finding_in_raised_order(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
     with_nothing_switchable_on: Redaction,
     with_one_name_suppressed: Redaction,
 ) -> None:
 
     for found in (
-        on_a_plain_binding,
+        on_a_plain_connected_source,
         with_nothing_switchable_on,
         with_one_name_suppressed,
     ):
@@ -882,20 +929,20 @@ def test_answers_one_withholding_per_finding_in_raised_order(
 
 
 def test_a_restore_moves_neither_the_counts_nor_the_verdict(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
     page: str,
     spans: tuple[Span, ...],
 ) -> None:
 
-    kept = restore_of(on_a_plain_binding, page, A_HEALTH_SENTENCE)
+    kept = restore_of(on_a_plain_connected_source, page, A_HEALTH_SENTENCE)
 
     found = redact(page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
 
-    assert A_HEALTH_SENTENCE not in on_a_plain_binding.text
+    assert A_HEALTH_SENTENCE not in on_a_plain_connected_source.text
     assert A_HEALTH_SENTENCE in found.text
     assert found.verdict == "Restricted"
     assert found.counts["special-category"] == 1
-    assert found.counts == on_a_plain_binding.counts
+    assert found.counts == on_a_plain_connected_source.counts
 
 
 @pytest.fixture(scope="module")
@@ -1089,9 +1136,9 @@ def test_a_page_without_special_category_findings_is_never_lifted() -> None:
 
 
 def test_each_withheld_character_lies_under_exactly_one_written_span(
-    on_a_plain_binding: Redaction,
+    on_a_plain_connected_source: Redaction,
     with_nothing_switchable_on: Redaction,
-    on_an_hr_shaped_binding: Redaction,
+    on_an_hr_shaped_connected_source: Redaction,
     under_another_seed: Redaction,
     with_one_name_suppressed: Redaction,
     with_his_erasure: Redaction,
@@ -1099,9 +1146,9 @@ def test_each_withheld_character_lies_under_exactly_one_written_span(
 ) -> None:
 
     for found in (
-        on_a_plain_binding,
+        on_a_plain_connected_source,
         with_nothing_switchable_on,
-        on_an_hr_shaped_binding,
+        on_an_hr_shaped_connected_source,
         under_another_seed,
         with_one_name_suppressed,
         with_his_erasure,
@@ -1256,7 +1303,7 @@ def test_a_finding_in_a_losing_container_takes_the_containers_placeholder(
         ("UK_BANK_ACCOUNT", "4AB 20-45-77 41234567"),
     )
 
-    found = redacted_over(text, claims, AN_HR_SHAPED_BINDING)
+    found = redacted_over(text, claims, AN_HR_SHAPED_CONNECTED_SOURCE)
 
     assert written_runs(found, text) == [
         ("Imogen Sarkar, 12 Acacia Avenue, Leeds LS1 ", "UK_HOME_ADDRESS"),
@@ -1286,7 +1333,7 @@ def test_a_partly_overlapped_name_keeps_the_whole_names_letter() -> None:
         span_over(text, "UK_HOME_ADDRESS", "Sarkar, 9 Kestrel Lane, Wetherby LS22 4TD"),
     )
 
-    found = redact(text, spans, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED)
+    found = redact(text, spans, AN_HR_SHAPED_CONNECTED_SOURCE, NO_SUPPRESSIONS, SEED)
 
     assert written_runs(found, text) == [
         ("Imogen Sarkar", "PERSON"),

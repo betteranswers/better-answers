@@ -1,5 +1,5 @@
 ---
-title: "A chunk's visibility is read from its binding and its document, never copied onto its row"
+title: "A chunk's visibility is read from its connected source and its document, never copied onto its row"
 date: 2026-09-23
 module: packages/schema
 problem_type: architecture_pattern
@@ -7,7 +7,7 @@ component: stores
 severity: high
 applies_when:
   - "Writing a query that reads chunks, or adding a column to index.chunk"
-  - "Publishing or narrowing a binding or its documents"
+  - "Publishing or narrowing a connected source or its documents"
   - "Changing the order of a run's catalogue writes and its chunk landing"
   - "Adding filter columns for a vector search over chunks"
 tags:
@@ -20,17 +20,17 @@ tags:
   - narrowing
 ---
 
-# A chunk's visibility is read from its binding and its document, never copied onto its row
+# A chunk's visibility is read from its connected source and its document, never copied onto its row
 
 ## The decision
 
-A chunk's visibility is read, not carried. `index.readable_chunk` is a `security_invoker` view that joins the chunk to its binding and its document (`packages/schema/migrations/0044_the-readable-chunk.sql`).
+A chunk's visibility is read, not carried. `index.readable_chunk` is a `security_invoker` view that joins the chunk to its connected source and its document (`packages/schema/migrations/0044_the-readable-chunk.sql`).
 
-- `published_at`, `audience` and `audience_groups` are the binding's.
-- `sensitivity` is the narrower of the binding's class and the document's, by `narrower_class`. That is the document's *effective class*.
+- `published_at`, `audience` and `audience_groups` are the connected source's.
+- `sensitivity` is the narrower of the connected source's class and the document's, by `narrower_class`. That is the document's *effective class*.
 - `narrower_class` is the class ranking's one SQL statement.
 - `passageAt`, `findPassages` and `previewChunks` (`packages/core/src/sources/passages.ts`) read the view.
-- A chunk whose binding row is gone is unreadable.
+- A chunk whose connected source row is gone is unreadable.
 
 What follows from it:
 
@@ -48,9 +48,9 @@ Only S8 measuring a need for the filter columns on the indexed table reopens thi
 
 ## Why
 
-- Five writers in two tiers copied the four columns, and the fold was written four ways. A run that read the binding before a narrowing committed landed its rows at the old, wider class. The re-copy at run end never ran if the run failed, and could itself write a pre-narrowing class over a narrowing that had just committed.
-- One SQL statement reads one snapshot. A read that joins the chunk to its binding and its document cannot see a narrowing half-applied, whatever the run believed. The safety is the database's own, and needs no lock order.
-- Committing the catalogue writes first puts a document's special-category class on its row before any chunk of it can be read. It is per run, because the landing converges the whole binding's rows in one update. A run that dies between the two leaves findings for chunks not yet landed, until the retry.
+- Five writers in two tiers copied the four columns, and the fold was written four ways. A run that read the connected source before a narrowing committed landed its rows at the old, wider class. The re-copy at run end never ran if the run failed, and could itself write a pre-narrowing class over a narrowing that had just committed.
+- One SQL statement reads one snapshot. A read that joins the chunk to its connected source and its document cannot see a narrowing half-applied, whatever the run believed. The safety is the database's own, and needs no lock order.
+- Committing the catalogue writes first puts a document's special-category class on its row before any chunk of it can be read. It is per run, because the landing converges the whole connected source's rows in one update. A run that dies between the two leaves findings for chunks not yet landed, until the retry.
 - Measured on 1,000,000 chunk rows under RLS, `find` through the view ran at p50 45 ms and p95 235 ms. That is inside ADR 0037's one second and no slower than the copies.
 - `security_invoker` makes the base tables' policies and the caller's privileges decide. A barrier would stop the planner reordering through the view.
 - The joins carry `workspace_id` beside the id, so the read prunes to one tenant's partition.

@@ -4,7 +4,7 @@ from typing import Any
 from . import queue
 from .audit import run_audit
 from .config import Bootstrap
-from .pipeline import IndexRun, index_binding
+from .pipeline import IndexRun, index_connected_source
 from .rebuild import run_rebuild
 
 type Handler = Callable[[Bootstrap, queue.ClaimedJob], dict[str, Any]]
@@ -30,13 +30,15 @@ def index_run(bootstrap: Bootstrap, job: queue.ClaimedJob) -> dict[str, Any]:
     if job.subject_id is None or job.reason is None:
         message = (
             "an index job naming no "
-            f"{'binding' if job.subject_id is None else 'reason'}: {job.id}"
+            f"{'connected_source' if job.subject_id is None else 'reason'}: {job.id}"
         )
         raise ValueError(message)
     run = IndexRun(
-        workspace_id=job.workspace_id, binding_id=job.subject_id, reason=job.reason
+        workspace_id=job.workspace_id,
+        connected_source_id=job.subject_id,
+        reason=job.reason,
     )
-    return index_binding(bootstrap, run).as_row()
+    return index_connected_source(bootstrap, run).as_row()
 
 
 KINDS: dict[str, Handler] = {

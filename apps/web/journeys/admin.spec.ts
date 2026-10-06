@@ -4,7 +4,7 @@ import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { AUDIT_LOG_WORDS } from "@/features/people/audit-log-words.ts";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { BULK_WORDS, SELECTED_MEMBERS } from "@/features/people/member-act-words.ts";
-import { NOTHING_BOUND } from "@/features/sources/words.ts";
+import { NOTHING_CONNECTED } from "@/features/sources/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
 
 import { theConsoleIsRefused, theSwitcherListsOneWorkspace, type Gate } from "./every-role.ts";
@@ -16,7 +16,10 @@ const people = menuGroupIn(CONTROL_CENTRE, "people");
 const MEMBERS = pageNamed(people, "Members").path;
 const GROUPS = pageNamed(people, "Groups").path;
 const AUDIT_LOG = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit log").path;
-const BINDINGS = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Bindings").path;
+const CONNECTED_SOURCES = pageNamed(
+  menuGroupIn(CONTROL_CENTRE, "sources"),
+  "Connected sources",
+).path;
 const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Models and spend").path;
 
 /** Every group the journeys make starts so, and the opening repair deletes any left behind. */
@@ -177,9 +180,9 @@ const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
     );
     await gate();
   });
-  await test.step("Bindings", async () => {
-    await page.goto(BINDINGS);
-    await expect(page.getByText(NOTHING_BOUND, { exact: true })).toBeVisible();
+  await test.step("Connected sources", async () => {
+    await page.goto(CONNECTED_SOURCES);
+    await expect(page.getByText(NOTHING_CONNECTED, { exact: true })).toBeVisible();
     await gate();
   });
   await test.step("Models and spend", async () => {

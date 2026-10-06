@@ -81,7 +81,7 @@ describe("the one navigation list", () => {
           [
             "Sources",
             [
-              "Bindings",
+              "Connected sources",
               "Publish and accept gates",
               "Priced plan",
               "Backlogs",
@@ -123,7 +123,7 @@ describe("the one navigation list", () => {
         .filter((each) => each.built)
         .map((each) => each.path),
     ).toEqual([
-      "/sources/bindings",
+      "/sources/connected-sources",
       "/models/models-and-spend",
       "/people/members",
       "/people/groups",
@@ -178,7 +178,7 @@ describe("what each person is shown", () => {
       [
         "Control Centre",
         [
-          ["Sources", ["Bindings"]],
+          ["Sources", ["Connected sources"]],
           ["Models", ["Models and spend"]],
           ["People", ["Members", "Groups"]],
           ["System", ["Audit log"]],
@@ -334,7 +334,8 @@ const MOVED = [
   ["/system/routes-and-spend", "/models/models-and-spend"],
   ["/agent-operations/routes-and-spend", "/models/models-and-spend"],
   ["/people", "/people/members"],
-  ["/sources", "/sources/bindings"],
+  ["/sources", "/sources/connected-sources"],
+  ["/sources/bindings", "/sources/connected-sources"],
   ["/system", "/system/audit-log"],
 ] as const;
 

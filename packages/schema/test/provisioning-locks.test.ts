@@ -68,7 +68,7 @@ const untilBlockedOrDone = async (pid: number): Promise<void> => {
 
 const aTenantAtWork = async (
   workspaceId: string,
-): Promise<{ bindingId: string; documentId: string }> => {
+): Promise<{ connectedSourceId: string; documentId: string }> => {
   const client = await opened();
   let landed = false;
   try {
@@ -76,10 +76,13 @@ const aTenantAtWork = async (
     await seed.workspace({ id: workspaceId, name: "At work" });
     await scopeTo(client, workspaceId);
     await client.query("SELECT create_workspace_partition($1)", [workspaceId]);
-    const binding = await seed.sourceBinding({ workspaceId });
-    const document = await seed.sourceDocument({ workspaceId, bindingId: binding.id });
+    const connectedSource = await seed.connectedSource({ workspaceId });
+    const document = await seed.sourceDocument({
+      workspaceId,
+      connectedSourceId: connectedSource.id,
+    });
     landed = true;
-    return { bindingId: binding.id, documentId: document.id };
+    return { connectedSourceId: connectedSource.id, documentId: document.id };
   } finally {
     await closed(client, { commit: landed });
   }
@@ -116,18 +119,21 @@ const inAShortWait = async (
 
 describe("provisioning beside a transaction writing documents and chunks", () => {
   it("lets a document's writer add its chunk, aborting neither side", async () => {
-    const { bindingId } = await aTenantAtWork(WS_WRITING);
+    const { connectedSourceId } = await aTenantAtWork(WS_WRITING);
 
     const writer = await opened();
     await scopeTo(writer, WS_WRITING);
-    const document = await testData(writer).sourceDocument({ workspaceId: WS_WRITING, bindingId });
+    const document = await testData(writer).sourceDocument({
+      workspaceId: WS_WRITING,
+      connectedSourceId,
+    });
 
     const signUp = await provisionStarted(WS_SIGNING_UP);
 
     const written = await outcomeOf(
       testData(writer).chunk({
         workspaceId: WS_WRITING,
-        bindingId,
+        connectedSourceId,
         sourceDocumentId: document.id,
         locator: "chars:0-12",
         ordinal: 0,
@@ -144,11 +150,11 @@ describe("provisioning beside a transaction writing documents and chunks", () =>
   });
 
   it("blocks no other tenant's chunk reads or writes while waiting", async () => {
-    const { bindingId, documentId } = await aTenantAtWork(WS_READ_BESIDE);
+    const { connectedSourceId, documentId } = await aTenantAtWork(WS_READ_BESIDE);
 
     const writer = await opened();
     await scopeTo(writer, WS_READ_BESIDE);
-    await testData(writer).sourceDocument({ workspaceId: WS_READ_BESIDE, bindingId });
+    await testData(writer).sourceDocument({ workspaceId: WS_READ_BESIDE, connectedSourceId });
 
     const signUp = await provisionStarted(WS_SIGNING_UP_TOO);
 
@@ -162,7 +168,7 @@ describe("provisioning beside a transaction writing documents and chunks", () =>
       (client) =>
         testData(client).chunk({
           workspaceId: WS_READ_BESIDE,
-          bindingId,
+          connectedSourceId,
           sourceDocumentId: documentId,
           locator: "chars:0-12",
           ordinal: 0,

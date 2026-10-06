@@ -31,7 +31,7 @@ import {
   usePreview,
   type FindingGroup,
   type FindingGroupKey,
-  type ListedBinding,
+  type ListedConnectedSource,
 } from "./sources-api.ts";
 import {
   groupsTickedIn,
@@ -42,11 +42,11 @@ import {
 import { spokenWord } from "./words.ts";
 
 const NOTHING_FOUND = {
-  landed: "No index run has finished yet, so nothing has been found.",
+  received: "No index run has finished yet, so nothing has been found.",
   indexing: "The index run has not finished, so nothing has been found yet.",
-  indexed: "The last run found nothing to withhold in this binding.",
-  published: "The last run found nothing to withhold in this binding.",
-} satisfies Record<ListedBinding["state"], string>;
+  indexed: "The last run found nothing to withhold in this connected source.",
+  published: "The last run found nothing to withhold in this connected source.",
+} satisfies Record<ListedConnectedSource["state"], string>;
 
 function Note(properties: { readonly tag: string; readonly children: ReactNode }) {
   return (
@@ -112,9 +112,9 @@ function PreviewChunks(properties: {
   );
 }
 
-function Preview(properties: { readonly binding: ListedBinding }) {
+function Preview(properties: { readonly connectedSource: ListedConnectedSource }) {
   const [open, setOpen] = useState(false);
-  const preview = usePreview(properties.binding.bindingId, open);
+  const preview = usePreview(properties.connectedSource.connectedSourceId, open);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
@@ -125,7 +125,7 @@ function Preview(properties: { readonly binding: ListedBinding }) {
       </CollapsibleTrigger>
       <CollapsibleContent>
         <p className="mt-2 text-muted-foreground">
-          Seen by Admins here and by nobody else anywhere until the binding is published.
+          Seen by Admins here and by nobody else anywhere until the connected source is published.
         </p>
         <PreviewChunks preview={preview} open={open} />
       </CollapsibleContent>
@@ -134,17 +134,17 @@ function Preview(properties: { readonly binding: ListedBinding }) {
 }
 
 function FindingsTable(properties: {
-  readonly binding: ListedBinding;
+  readonly connectedSource: ListedConnectedSource;
   readonly groups: readonly FindingGroup[];
 }) {
-  const { binding, groups } = properties;
+  const { connectedSource, groups } = properties;
   const [ticked, tick] = useTickedGroups();
   const [inFocus, setInFocus] = useState<FindingGroupKey>();
-  const selected = groupsTickedIn(ticked, binding.bindingId);
+  const selected = groupsTickedIn(ticked, connectedSource.connectedSourceId);
 
   const toggle = (group: FindingGroup) => {
     tick({
-      bindingId: binding.bindingId,
+      connectedSourceId: connectedSource.connectedSourceId,
       groups: groupIsIn(selected, group)
         ? selected.filter((each) => !groupIsIn([keyOf(group)], each))
         : [...selected, group],
@@ -218,15 +218,15 @@ function FindingsTable(properties: {
   );
 }
 
-export function Review(properties: { readonly binding: ListedBinding }) {
-  const { binding } = properties;
-  const findings = useFindings(binding.bindingId);
+export function Review(properties: { readonly connectedSource: ListedConnectedSource }) {
+  const { connectedSource } = properties;
+  const findings = useFindings(connectedSource.connectedSourceId);
   const said = useReadSaid(findings);
 
   return (
     <section aria-labelledby={REVIEW_HEADING} className="mt-8 border-t border-border pt-6">
       <h2 id={REVIEW_HEADING} tabIndex={-1}>
-        Review of {binding.name}
+        Review of {connectedSource.name}
       </h2>
       <p className="mt-2 text-muted-foreground">
         What the last run found, per category and rule, counted. No value is shown: the three acts
@@ -236,20 +236,20 @@ export function Review(properties: { readonly binding: ListedBinding }) {
       <div aria-live="polite" className="mt-4">
         {said.isPending ? <p>The findings are still loading.</p> : null}
         {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
-        {findings.data?.length === 0 ? <p>{NOTHING_FOUND[binding.state]}</p> : null}
+        {findings.data?.length === 0 ? <p>{NOTHING_FOUND[connectedSource.state]}</p> : null}
       </div>
       {findings.data === undefined || findings.data.length === 0 ? null : (
         <>
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-            <KeepInTextAct bindingId={binding.bindingId} />
-            <NarrowDocumentsAct bindingId={binding.bindingId} />
-            <DismissAsNotSpecialCategoryAct bindingId={binding.bindingId} />
+            <KeepInTextAct connectedSourceId={connectedSource.connectedSourceId} />
+            <NarrowDocumentsAct connectedSourceId={connectedSource.connectedSourceId} />
+            <DismissAsNotSpecialCategoryAct connectedSourceId={connectedSource.connectedSourceId} />
           </div>
-          <FindingsTable binding={binding} groups={findings.data} />
+          <FindingsTable connectedSource={connectedSource} groups={findings.data} />
         </>
       )}
 
-      {binding.state === "published" ? null : <Preview binding={binding} />}
+      {connectedSource.state === "published" ? null : <Preview connectedSource={connectedSource} />}
     </section>
   );
 }

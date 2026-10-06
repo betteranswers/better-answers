@@ -3,19 +3,19 @@ import { z } from "zod";
 
 import { ISSUE_WORDS, parse, ROOT_PATH, type IssueWord } from "../src/kernel/index.ts";
 import {
-  bindUploadFields,
+  connectUploadFields,
   dismissAsNotSpecialCategoryInput,
   findingsOfInput,
   keepInTextInput,
-  narrowBindingInput,
+  narrowConnectedSourceInput,
   narrowDocumentsInput,
   previewChunksInput,
-  publishBindingInput,
-  reprocessBindingInput,
+  publishConnectedSourceInput,
+  reprocessConnectedSourceInput,
 } from "../src/sources/index.ts";
 
 const A_WORKSPACE = "01JQ0000000000000000000WSP";
-const A_BINDING = "01J6NNNNNNNNNNNNNNNNNNNNN1";
+const A_CONNECTED_SOURCE = "01J6NNNNNNNNNNNNNNNNNNNNN1";
 const A_GROUP = "01J6NNNNNNNNNNNNNNNNNNNNN2";
 const A_FINDING = "01J6NNNNNNNNNNNNNNNNNNNNN3";
 const A_DOCUMENT = "01J6NNNNNNNNNNNNNNNNNNNNN4";
@@ -68,8 +68,8 @@ const EVERY_ISSUE: ReadonlyArray<readonly [IssueWord, string, z.ZodType, unknown
 
 describe("what a kernel parse answers", () => {
   it("hands back the branded value a schema admits", () => {
-    const read = parse(narrowBindingInput, {
-      bindingId: A_BINDING,
+    const read = parse(narrowConnectedSourceInput, {
+      connectedSourceId: A_CONNECTED_SOURCE,
       sensitivity: "Restricted",
       audience: "everyone",
     });
@@ -77,15 +77,15 @@ describe("what a kernel parse answers", () => {
     expect(read).toEqual({
       ok: true,
       value: {
-        bindingId: A_BINDING,
+        connectedSourceId: A_CONNECTED_SOURCE,
         visibility: { sensitivity: "Restricted", audience: "everyone", audienceGroups: null },
       },
     });
   });
 
   it("names the failing field with a word, never its value", () => {
-    const read = parse(bindUploadFields, {
-      bindingId: A_BINDING,
+    const read = parse(connectUploadFields, {
+      connectedSourceId: A_CONNECTED_SOURCE,
       name: SECRET,
       fileName: "handbook.md",
       mediaType: "text/markdown",
@@ -102,7 +102,7 @@ describe("what a kernel parse answers", () => {
 
   it("carries no offending value when every field is wrong", () => {
     const read = parse(keepInTextInput, {
-      bindingId: SECRET,
+      connectedSourceId: SECRET,
       findingGroups: [{ ...ALWAYS_GROUP, tier: SECRET }],
       reason: "",
     });
@@ -112,7 +112,7 @@ describe("what a kernel parse answers", () => {
       error: {
         word: "malformed",
         fields: {
-          bindingId: "bad-format",
+          connectedSourceId: "bad-format",
           "findingGroups.0.tier": "not-in-set",
           reason: "too-small",
         },
@@ -124,7 +124,12 @@ describe("what a kernel parse answers", () => {
   it("names a nested field by the path that reaches it", () => {
     const { dpiaReferenced: _dropped, ...part } = CONFIRMED;
 
-    expect(parse(publishBindingInput, { bindingId: A_BINDING, confirmations: part })).toEqual({
+    expect(
+      parse(publishConnectedSourceInput, {
+        connectedSourceId: A_CONNECTED_SOURCE,
+        confirmations: part,
+      }),
+    ).toEqual({
       ok: false,
       error: { word: "malformed", fields: { "confirmations.dpiaReferenced": "missing" } },
     });
@@ -132,8 +137,8 @@ describe("what a kernel parse answers", () => {
 
   it("reads a nested undefined key as a missing one", () => {
     expect(
-      parse(publishBindingInput, {
-        bindingId: A_BINDING,
+      parse(publishConnectedSourceInput, {
+        connectedSourceId: A_CONNECTED_SOURCE,
         confirmations: { ...CONFIRMED, dpiaReferenced: undefined },
       }),
     ).toEqual({
@@ -175,9 +180,9 @@ describe("what a kernel parse answers", () => {
 });
 
 describe("the shapes the Sources acts are handed", () => {
-  it("defaults a bind's class, audience and groups to the narrowest", () => {
-    const read = parse(bindUploadFields, {
-      bindingId: A_BINDING,
+  it("defaults a connect's class, audience and groups to the narrowest", () => {
+    const read = parse(connectUploadFields, {
+      connectedSourceId: A_CONNECTED_SOURCE,
       name: "The staff handbook",
       fileName: "handbook.md",
       mediaType: "text/markdown",
@@ -187,7 +192,7 @@ describe("the shapes the Sources acts are handed", () => {
     expect(read).toEqual({
       ok: true,
       value: {
-        bindingId: A_BINDING,
+        connectedSourceId: A_CONNECTED_SOURCE,
         name: "The staff handbook",
         fileName: "handbook.md",
         mediaType: "text/markdown",
@@ -198,14 +203,14 @@ describe("the shapes the Sources acts are handed", () => {
   });
 
   it("refuses an audience word and group list that disagree", () => {
-    const named = parse(narrowBindingInput, {
-      bindingId: A_BINDING,
+    const named = parse(narrowConnectedSourceInput, {
+      connectedSourceId: A_CONNECTED_SOURCE,
       sensitivity: "Internal",
       audience: "everyone",
       audienceGroups: [A_GROUP],
     });
-    const bare = parse(narrowBindingInput, {
-      bindingId: A_BINDING,
+    const bare = parse(narrowConnectedSourceInput, {
+      connectedSourceId: A_CONNECTED_SOURCE,
       sensitivity: "Internal",
       audience: "groups",
     });
@@ -219,8 +224,8 @@ describe("the shapes the Sources acts are handed", () => {
   it("refuses an empty group list", () => {
     expect(
       refusalOf(
-        parse(narrowBindingInput, {
-          bindingId: A_BINDING,
+        parse(narrowConnectedSourceInput, {
+          connectedSourceId: A_CONNECTED_SOURCE,
           sensitivity: "Internal",
           audience: "groups",
           audienceGroups: [],
@@ -230,23 +235,28 @@ describe("the shapes the Sources acts are handed", () => {
   });
 
   it("refuses a fractional preview limit and defaults an absent one", () => {
-    expect(refusalOf(parse(previewChunksInput, { bindingId: A_BINDING, limit: 2.5 }))).toEqual({
+    expect(
+      refusalOf(parse(previewChunksInput, { connectedSourceId: A_CONNECTED_SOURCE, limit: 2.5 })),
+    ).toEqual({
       word: "malformed",
       fields: { limit: "wrong-type" },
     });
-    expect(parse(previewChunksInput, { bindingId: A_BINDING })).toEqual({
+    expect(parse(previewChunksInput, { connectedSourceId: A_CONNECTED_SOURCE })).toEqual({
       ok: true,
-      value: { bindingId: A_BINDING, limit: 20 },
+      value: { connectedSourceId: A_CONNECTED_SOURCE, limit: 20 },
     });
   });
 
   it("defaults a narrowing to the narrowest class, keeping its groups", () => {
     expect(
-      parse(narrowDocumentsInput, { bindingId: A_BINDING, findingGroups: [ALWAYS_GROUP] }),
+      parse(narrowDocumentsInput, {
+        connectedSourceId: A_CONNECTED_SOURCE,
+        findingGroups: [ALWAYS_GROUP],
+      }),
     ).toEqual({
       ok: true,
       value: {
-        bindingId: A_BINDING,
+        connectedSourceId: A_CONNECTED_SOURCE,
         findingGroups: [ALWAYS_GROUP],
         sensitivity: "Restricted",
       },
@@ -257,9 +267,9 @@ describe("the shapes the Sources acts are handed", () => {
     for (const reason of ["spring-clean", "bound", "restored", "narrowed"]) {
       expect(
         refusalOf(
-          parse(reprocessBindingInput, {
+          parse(reprocessConnectedSourceInput, {
             workspaceId: A_WORKSPACE,
-            bindingId: A_BINDING,
+            connectedSourceId: A_CONNECTED_SOURCE,
             reason,
           }),
         ),
@@ -268,7 +278,7 @@ describe("the shapes the Sources acts are handed", () => {
     expect(
       refusalOf(
         parse(keepInTextInput, {
-          bindingId: A_BINDING,
+          connectedSourceId: A_CONNECTED_SOURCE,
           findingGroups: [{ ...ALWAYS_GROUP, tier: "sometimes" }],
           reason: REASON,
         }),
@@ -285,7 +295,7 @@ describe("the shapes the Sources acts are handed", () => {
       expect(
         refusalOf(
           parse(dismissAsNotSpecialCategoryInput, {
-            bindingId: A_BINDING,
+            connectedSourceId: A_CONNECTED_SOURCE,
             findingGroups: [ALWAYS_GROUP],
             reason,
           }),
@@ -296,18 +306,24 @@ describe("the shapes the Sources acts are handed", () => {
 
   it("brands the ids an act is handed", () => {
     const kept = parse(keepInTextInput, {
-      bindingId: A_BINDING,
+      connectedSourceId: A_CONNECTED_SOURCE,
       findingGroups: [ALWAYS_GROUP],
       reason: REASON,
     });
 
     expect(kept).toEqual({
       ok: true,
-      value: { bindingId: A_BINDING, findingGroups: [ALWAYS_GROUP], reason: REASON },
+      value: {
+        connectedSourceId: A_CONNECTED_SOURCE,
+        findingGroups: [ALWAYS_GROUP],
+        reason: REASON,
+      },
     });
-    expect(refusalOf(parse(findingsOfInput, { bindingId: A_FINDING.toLowerCase() }))).toEqual({
+    expect(
+      refusalOf(parse(findingsOfInput, { connectedSourceId: A_FINDING.toLowerCase() })),
+    ).toEqual({
       word: "malformed",
-      fields: { bindingId: "bad-format" },
+      fields: { connectedSourceId: "bad-format" },
     });
   });
 });

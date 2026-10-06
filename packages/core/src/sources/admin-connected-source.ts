@@ -17,64 +17,64 @@ import {
 import type { Tx, TxRow } from "../store/postgres/index.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
-export const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
+export const CONNECTED_SOURCE_ID = boundarySchemas.connectedSource.select.shape.id;
 
-export type BindingId = z.output<typeof BINDING_ID>;
+export type ConnectedSourceId = z.output<typeof CONNECTED_SOURCE_ID>;
 
-export const BINDING_VISIBILITY = boundarySchemas.sourceBinding.select.pick({
+export const CONNECTED_SOURCE_VISIBILITY = boundarySchemas.connectedSource.select.pick({
   sensitivity: true,
   audience: true,
   audienceGroups: true,
 });
 
-export type ActingOnBinding = {
+export type ActingOnConnectedSource = {
   readonly admin: AdminUserPrincipal;
   readonly workspaceId: WorkspaceId;
-  readonly bindingId: BindingId;
+  readonly connectedSourceId: ConnectedSourceId;
 };
 
 /** The platform carries no workspace, so its standing names the one its act was asked for. */
-export type PlatformOnBinding = {
+export type PlatformOnConnectedSource = {
   readonly platform: PlatformPrincipal;
   readonly workspaceId: WorkspaceId;
-  readonly bindingId: BindingId;
+  readonly connectedSourceId: ConnectedSourceId;
 };
 
-export const adminOnBinding = (
+export const adminOnConnectedSource = (
   principal: UserPrincipal,
-  bindingId: BindingId,
-): Result<ActingOnBinding, RoleRefusal> => {
+  connectedSourceId: ConnectedSourceId,
+): Result<ActingOnConnectedSource, RoleRefusal> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
-  return ok({ admin: admin.value, workspaceId: admin.value.workspaceId, bindingId });
+  return ok({ admin: admin.value, workspaceId: admin.value.workspaceId, connectedSourceId });
 };
 
-type BindingRead = {
+type ConnectedSourceRead = {
   readonly columns: string;
 
   readonly lock: "for-update" | "none";
 };
 
-type BindingNamedRefusal = SourceRefusal<"no-such-binding"> | Error;
+type ConnectedSourceNamedRefusal = SourceRefusal<"no-such-binding"> | Error;
 
 /**
  * `columns` is spliced into the SQL unescaped, so it takes a literal list, never input.
  * `for-update` holds the row until the transaction ends.
  */
-export const bindingNamed = async <Row extends TxRow>(
-  acting: ActingOnBinding | PlatformOnBinding,
+export const connectedSourceNamed = async <Row extends TxRow>(
+  acting: ActingOnConnectedSource | PlatformOnConnectedSource,
   tx: Tx,
-  read: BindingRead,
-): Promise<Result<Row, BindingNamedRefusal>> => {
+  read: ConnectedSourceRead,
+): Promise<Result<Row, ConnectedSourceNamedRefusal>> => {
   const locked = read.lock === "for-update" ? " FOR UPDATE" : "";
   const found = await attempt(() =>
     tx.query<Row>(
-      `SELECT ${read.columns} FROM source_binding WHERE workspace_id = $1 AND id = $2${locked}`,
-      [acting.workspaceId, acting.bindingId],
+      `SELECT ${read.columns} FROM connected_source WHERE workspace_id = $1 AND id = $2${locked}`,
+      [acting.workspaceId, acting.connectedSourceId],
     ),
   );
   if (!found.ok) return err(found.error);
-  const binding = found.value.rows[0];
-  if (binding === undefined) return err("no-such-binding");
-  return ok(binding);
+  const connectedSource = found.value.rows[0];
+  if (connectedSource === undefined) return err("no-such-binding");
+  return ok(connectedSource);
 };

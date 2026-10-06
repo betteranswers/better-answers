@@ -2,7 +2,7 @@ import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import {
-  BINDING_STATES,
+  CONNECTED_SOURCE_STATES,
   CONNECTORS,
   DESTINATIONS,
   DOCUMENT_OUTCOMES,
@@ -14,7 +14,7 @@ import {
   type CataloguedItem,
   type CataloguePlace,
   citeDocument,
-  seedBindingOfAConnectorAlone,
+  seedConnectedSourceOfAConnectorAlone,
   seedCataloguedDocument,
 } from "./catalogue-statements.ts";
 import { testData } from "./factory.ts";
@@ -22,7 +22,7 @@ import { withRollback } from "./harness.ts";
 import { asTheMigrationOwnerOf, migrationStatementSaying } from "./journal-statements.ts";
 import {
   ADMITTED,
-  attemptBindingOf,
+  attemptConnectedSourceOf,
   attemptCataloguedDocument,
   attemptDocumentClassed,
   attemptDocumentConcluded,
@@ -30,7 +30,7 @@ import {
   attemptAuditEventRowReusingAnId,
   attemptQuarantinePair,
   attemptRowKeyedToTheAuditLog,
-  type BindingWords,
+  type ConnectedSourceWords,
   postgresForSuite,
   refusalOf,
 } from "./probes.ts";
@@ -38,8 +38,8 @@ import {
 const db = postgresForSuite();
 
 const WORKSPACE = "01J6CAAAAAAAAAAAAAAAAAAAAA";
-const UPLOAD_BINDING = "01J6CBBBBBBBBBBBBBBBBBBBBB";
-const SECOND_BINDING = "01J6CCCCCCCCCCCCCCCCCCCCCC";
+const UPLOAD_CONNECTED_SOURCE = "01J6CBBBBBBBBBBBBBBBBBBBBB";
+const SECOND_CONNECTED_SOURCE = "01J6CCCCCCCCCCCCCCCCCCCCCC";
 const HANDBOOK = "01J6CDDDDDDDDDDDDDDDDDDDDD";
 
 const CONTENT_SHA256 = "d".repeat(64);
@@ -53,26 +53,29 @@ const wordsOf = (
   destination: readonly (string | null)[],
   retentionClass: string,
   state: string,
-): BindingWords => ({ connector, destination, retentionClass, state });
+): ConnectedSourceWords => ({ connector, destination, retentionClass, state });
 
-const UNDER_THE_UPLOAD: CataloguePlace = { workspaceId: WORKSPACE, bindingId: UPLOAD_BINDING };
+const UNDER_THE_UPLOAD: CataloguePlace = {
+  workspaceId: WORKSPACE,
+  connectedSourceId: UPLOAD_CONNECTED_SOURCE,
+};
 
 const THE_HANDBOOK: CataloguedItem = {
   workspaceId: WORKSPACE,
   id: HANDBOOK,
-  bindingId: UPLOAD_BINDING,
+  connectedSourceId: UPLOAD_CONNECTED_SOURCE,
   sourceSystemId: "handbook.md",
 };
 
-const withBindings = async (
+const withConnectedSources = async (
   fn: (client: pg.PoolClient) => Promise<void>,
-  bindings: readonly string[] = [UPLOAD_BINDING],
+  connectedSources: readonly string[] = [UPLOAD_CONNECTED_SOURCE],
 ): Promise<void> => {
   await withRollback(db().pool, async (client) => {
     const seed = testData(client);
     await seed.workspace({ id: WORKSPACE, name: "The catalogue's workspace" });
-    for (const id of bindings) {
-      await seed.sourceBinding({ workspaceId: WORKSPACE, id });
+    for (const id of connectedSources) {
+      await seed.connectedSource({ workspaceId: WORKSPACE, id });
     }
     await fn(client);
   });
@@ -85,34 +88,34 @@ const withWorkspace = async (fn: (client: pg.PoolClient) => Promise<void>): Prom
   });
 };
 
-describe("a binding nobody configured", () => {
-  it("feeds both upload destinations, is kept, and has only landed", async () => {
+describe("a connected source nobody configured", () => {
+  it("feeds both upload destinations, is kept, and is only received", async () => {
     await withWorkspace(async (client) => {
-      await seedBindingOfAConnectorAlone(client, WORKSPACE, UPLOAD_BINDING);
+      await seedConnectedSourceOfAConnectorAlone(client, WORKSPACE, UPLOAD_CONNECTED_SOURCE);
 
       const born = await client.query(
-        "SELECT destination, retention_class, state FROM source_binding WHERE workspace_id = $1 AND id = $2",
-        [WORKSPACE, UPLOAD_BINDING],
+        "SELECT destination, retention_class, state FROM connected_source WHERE workspace_id = $1 AND id = $2",
+        [WORKSPACE, UPLOAD_CONNECTED_SOURCE],
       );
 
       expect(born.rows).toEqual([
-        { destination: ["chunk-index", "bundle"], retention_class: "keep", state: "landed" },
+        { destination: ["chunk-index", "bundle"], retention_class: "keep", state: "received" },
       ]);
     });
   });
 });
 
-describe("the four closed word sets a binding carries", () => {
+describe("the four closed word sets a connected source carries", () => {
   it("admits every word each set declares", async () => {
     await withWorkspace(async (client) => {
       const landed: string[] = [];
       for (const connector of CONNECTORS) {
         landed.push(
           admitting(
-            await attemptBindingOf(
+            await attemptConnectedSourceOf(
               client,
               WORKSPACE,
-              wordsOf(connector, ["chunk-index"], "keep", "landed"),
+              wordsOf(connector, ["chunk-index"], "keep", "received"),
             ),
           ),
         );
@@ -120,10 +123,10 @@ describe("the four closed word sets a binding carries", () => {
       for (const destination of DESTINATIONS) {
         landed.push(
           admitting(
-            await attemptBindingOf(
+            await attemptConnectedSourceOf(
               client,
               WORKSPACE,
-              wordsOf("upload", [destination], "keep", "landed"),
+              wordsOf("upload", [destination], "keep", "received"),
             ),
           ),
         );
@@ -131,18 +134,18 @@ describe("the four closed word sets a binding carries", () => {
       for (const retentionClass of RETENTION_CLASSES) {
         landed.push(
           admitting(
-            await attemptBindingOf(
+            await attemptConnectedSourceOf(
               client,
               WORKSPACE,
-              wordsOf("upload", ["chunk-index"], retentionClass, "landed"),
+              wordsOf("upload", ["chunk-index"], retentionClass, "received"),
             ),
           ),
         );
       }
-      for (const state of BINDING_STATES) {
+      for (const state of CONNECTED_SOURCE_STATES) {
         landed.push(
           admitting(
-            await attemptBindingOf(
+            await attemptConnectedSourceOf(
               client,
               WORKSPACE,
               wordsOf("upload", ["chunk-index"], "keep", state),
@@ -158,42 +161,46 @@ describe("the four closed word sets a binding carries", () => {
   it("refuses stray words, empty destinations and a NULL destination", async () => {
     await withWorkspace(async (client) => {
       const refusals = [
-        await attemptBindingOf(
+        await attemptConnectedSourceOf(
           client,
           WORKSPACE,
-          wordsOf("sharepoint", ["chunk-index"], "keep", "landed"),
+          wordsOf("sharepoint", ["chunk-index"], "keep", "received"),
         ),
-        await attemptBindingOf(
+        await attemptConnectedSourceOf(
           client,
           WORKSPACE,
-          wordsOf("upload", ["warehouse"], "keep", "landed"),
+          wordsOf("upload", ["warehouse"], "keep", "received"),
         ),
 
-        await attemptBindingOf(client, WORKSPACE, wordsOf("upload", [], "keep", "landed")),
+        await attemptConnectedSourceOf(
+          client,
+          WORKSPACE,
+          wordsOf("upload", [], "keep", "received"),
+        ),
 
-        await attemptBindingOf(
+        await attemptConnectedSourceOf(
           client,
           WORKSPACE,
-          wordsOf("upload", ["bundle", null], "keep", "landed"),
+          wordsOf("upload", ["bundle", null], "keep", "received"),
         ),
-        await attemptBindingOf(
+        await attemptConnectedSourceOf(
           client,
           WORKSPACE,
-          wordsOf("upload", ["chunk-index"], "forever", "landed"),
+          wordsOf("upload", ["chunk-index"], "forever", "received"),
         ),
-        await attemptBindingOf(
+        await attemptConnectedSourceOf(
           client,
           WORKSPACE,
           wordsOf("upload", ["chunk-index"], "keep", "reviewing"),
         ),
       ];
       expect(refusals).toEqual([
-        "source_binding_connector_check",
-        "source_binding_destination_check",
-        "source_binding_destination_check",
-        "source_binding_destination_check",
-        "source_binding_retention_class_check",
-        "source_binding_state_check",
+        "connected_source_connector_check",
+        "connected_source_destination_check",
+        "connected_source_destination_check",
+        "connected_source_destination_check",
+        "connected_source_retention_class_check",
+        "connected_source_state_check",
       ]);
     });
   });
@@ -201,7 +208,7 @@ describe("the four closed word sets a binding carries", () => {
 
 describe("the catalogue a run reconciles", () => {
   it("keeps every column given and leaves run columns empty", async () => {
-    await withBindings(async (client) => {
+    await withConnectedSources(async (client) => {
       await seedCataloguedDocument(client, THE_HANDBOOK);
       const landed = await client.query(
         `SELECT source_system_id, title, media_type, byte_size, original_key,
@@ -254,8 +261,8 @@ describe("the catalogue a run reconciles", () => {
     });
   });
 
-  it("admits an item once per binding, and under another binding", async () => {
-    await withBindings(
+  it("admits an item once per source, and under another source", async () => {
+    await withConnectedSources(
       async (client) => {
         await seedCataloguedDocument(client, THE_HANDBOOK);
 
@@ -265,20 +272,20 @@ describe("the catalogue a run reconciles", () => {
           await attemptCataloguedDocument(client, {
             ...THE_HANDBOOK,
             id: ulid(),
-            bindingId: SECOND_BINDING,
+            connectedSourceId: SECOND_CONNECTED_SOURCE,
           }),
         );
         expect({ twice, elsewhere }).toEqual({
-          twice: "source_document_workspace_id_binding_id_source_system_id_uidx",
+          twice: "source_document_connected_source_id_source_system_id_uidx",
           elsewhere: ADMITTED,
         });
       },
-      [UPLOAD_BINDING, SECOND_BINDING],
+      [UPLOAD_CONNECTED_SOURCE, SECOND_CONNECTED_SOURCE],
     );
   });
 
   it("admits every declared class and outcome, and refuses others", async () => {
-    await withBindings(async (client) => {
+    await withConnectedSources(async (client) => {
       const landed: string[] = [];
       for (const sensitivity of SENSITIVITIES) {
         landed.push(admitting(await attemptDocumentClassed(client, UNDER_THE_UPLOAD, sensitivity)));
@@ -306,7 +313,7 @@ describe("the catalogue a run reconciles", () => {
   });
 
   it("carries a quarantine error only on a quarantined document", async () => {
-    await withBindings(async (client) => {
+    await withConnectedSources(async (client) => {
       const quarantined = admitting(
         await attemptQuarantinePair(client, UNDER_THE_UPLOAD, "quarantined", "NeedsOcrError"),
       );
@@ -333,7 +340,7 @@ describe("the catalogue a run reconciles", () => {
 
 describe("the key from evidence to the document it locates into", () => {
   it("refuses a cited document's deletion until nothing cites it", async () => {
-    await withBindings(async (client) => {
+    await withConnectedSources(async (client) => {
       await seedCataloguedDocument(client, THE_HANDBOOK);
       await citeDocument(client, WORKSPACE, HANDBOOK);
 
@@ -364,16 +371,16 @@ describe("the key from evidence to the document it locates into", () => {
     });
   });
 
-  it("refuses a binding's deletion while its document is cited", async () => {
-    await withBindings(async (client) => {
+  it("refuses a connected source's deletion while its document is cited", async () => {
+    await withConnectedSources(async (client) => {
       await seedCataloguedDocument(client, THE_HANDBOOK);
       await citeDocument(client, WORKSPACE, HANDBOOK);
 
       expect(
         await refusalOf(client, () =>
-          client.query("DELETE FROM source_binding WHERE workspace_id = $1 AND id = $2", [
+          client.query("DELETE FROM connected_source WHERE workspace_id = $1 AND id = $2", [
             WORKSPACE,
-            UPLOAD_BINDING,
+            UPLOAD_CONNECTED_SOURCE,
           ]),
         ),
       ).toBe("evidence_source_document_fk");

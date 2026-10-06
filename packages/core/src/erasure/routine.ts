@@ -297,12 +297,12 @@ const SOURCE_DOCUMENT: ErasureFamily = "source-document";
 
 const withTheDocumentsStep = (
   actions: ErasureActions,
-  documents: Suppressed & Pick<Rederived, "bindingsToReprocess">,
+  documents: Suppressed & Pick<Rederived, "connectedSourcesToReprocess">,
 ): ErasureActions => ({
   ...actions,
   [SOURCE_DOCUMENT]: {
     ...actions[SOURCE_DOCUMENT],
-    bindingsReindexed: documents.bindingsToReprocess.length,
+    bindingsReindexed: documents.connectedSourcesToReprocess.length,
     identifiersWithheld: documents.identifiersWithheld,
   },
 });
@@ -572,7 +572,10 @@ export const runErasure = async (
         ),
         identity.value,
       ),
-      { ...suppressed.value, bindingsToReprocess: rederived.value.bindingsToReprocess },
+      {
+        ...suppressed.value,
+        connectedSourcesToReprocess: rederived.value.connectedSourcesToReprocess,
+      },
     );
     return completeTheRequest(platform, doors, workspaceId, opened.value, actions);
   });

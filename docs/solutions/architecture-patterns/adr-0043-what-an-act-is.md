@@ -72,7 +72,7 @@ Every Postgres door rolls back when its work answers a refusal or throws. A prin
 
 - Refusal words retyped per act, admission answered in three places, input stated per transport and three composition roads were one absence. Only the audit half of an act was declared.
 - Classes sort a word by what its caller can do about it, so they fall one-to-one onto the status taxonomy every transport already has.
-- A spike built the constructor and dropped it. The hand-written `readMembership` answered its callers; the constructed `narrowBinding` answered impacted 0, risk unknown. A code index that answers a lower bound for every act cannot tell anyone what an edit breaks.
+- A spike built the constructor and dropped it. The hand-written `readMembership` answered its callers; the constructed `narrowConnectedSource` answered impacted 0, risk unknown. A code index that answers a lower bound for every act cannot tell anyone what an edit breaks.
 - Transaction ownership differs by act, bytes before rows and git before rows (ADR 0012), so nothing may own it generically.
 - A procedure holding a pooled connection for the whole call made an upload hold two of the pool's ten.
 - A door that committed a refused work kept the rows landed before the refusal. When the door folded its own refusal into the work's, a caller could not tell a refused principal from a refused act.

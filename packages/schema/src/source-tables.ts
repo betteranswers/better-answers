@@ -26,15 +26,19 @@ export const RETENTION_CLASSES = ["mirror", "keep", "transient"] as const;
 
 export const RETENTION_CLASS_DEFAULT = "keep" satisfies (typeof RETENTION_CLASSES)[number];
 
-export const BINDING_STATES = ["landed", "indexing", "indexed", "published"] as const;
+export const CONNECTED_SOURCE_STATES = ["received", "indexing", "indexed", "published"] as const;
 
-export const BINDING_LANDED_STATE = "landed" satisfies (typeof BINDING_STATES)[number];
+export const CONNECTED_SOURCE_RECEIVED_STATE =
+  "received" satisfies (typeof CONNECTED_SOURCE_STATES)[number];
 
-export const BINDING_INDEXING_STATE = "indexing" satisfies (typeof BINDING_STATES)[number];
+export const CONNECTED_SOURCE_INDEXING_STATE =
+  "indexing" satisfies (typeof CONNECTED_SOURCE_STATES)[number];
 
-export const BINDING_INDEXED_STATE = "indexed" satisfies (typeof BINDING_STATES)[number];
+export const CONNECTED_SOURCE_INDEXED_STATE =
+  "indexed" satisfies (typeof CONNECTED_SOURCE_STATES)[number];
 
-export const BINDING_PUBLISHED_STATE = "published" satisfies (typeof BINDING_STATES)[number];
+export const CONNECTED_SOURCE_PUBLISHED_STATE =
+  "published" satisfies (typeof CONNECTED_SOURCE_STATES)[number];
 
 export const DOCUMENT_OUTCOMES = ["converted", "quarantined"] as const;
 
@@ -60,8 +64,8 @@ const destinationIsAKnownSet = `cardinality(destination) > 0
          AND array_position(destination, NULL) IS NULL
          AND destination <@ ARRAY[${listed(DESTINATIONS)}]::text[]`;
 
-export const sourceBinding = withRLS(
-  "source_binding",
+export const connectedSource = withRLS(
+  "connected_source",
 
   {
     ...readableRecordColumns(),
@@ -77,24 +81,24 @@ export const sourceBinding = withRLS(
 
     retentionClass: text("retention_class").notNull().default(RETENTION_CLASS_DEFAULT),
 
-    state: text("state").notNull().default(BINDING_LANDED_STATE),
+    state: text("state").notNull().default(CONNECTED_SOURCE_RECEIVED_STATE),
 
     rulesInForce: jsonb("rules_in_force").notNull().default(RULES_IN_FORCE_DEFAULT),
   },
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    ...readableUnitChecks("source_binding"),
-    check("source_binding_rules_in_force_check", sql.raw(rulesInForceIsShaped)),
+    ...readableUnitChecks("connected_source"),
+    check("connected_source_rules_in_force_check", sql.raw(rulesInForceIsShaped)),
 
-    check("source_binding_connector_check", sql.raw(`connector IN (${listed(CONNECTORS)})`)),
-    check("source_binding_destination_check", sql.raw(destinationIsAKnownSet)),
+    check("connected_source_connector_check", sql.raw(`connector IN (${listed(CONNECTORS)})`)),
+    check("connected_source_destination_check", sql.raw(destinationIsAKnownSet)),
     check(
-      "source_binding_retention_class_check",
+      "connected_source_retention_class_check",
       sql.raw(`retention_class IN (${listed(RETENTION_CLASSES)})`),
     ),
 
-    check("source_binding_state_check", sql.raw(`state IN (${listed(BINDING_STATES)})`)),
+    check("connected_source_state_check", sql.raw(`state IN (${listed(CONNECTED_SOURCE_STATES)})`)),
   ],
 );
 
@@ -104,7 +108,7 @@ export const sourceDocument = withRLS(
     workspaceId: text("workspace_id").notNull(),
 
     id: text("id").notNull(),
-    bindingId: text("binding_id").notNull(),
+    connectedSourceId: text("connected_source_id").notNull(),
 
     sourceSystemId: text("source_system_id").notNull(),
 
@@ -143,16 +147,19 @@ export const sourceDocument = withRLS(
     primaryKey({ columns: [table.workspaceId, table.id] }),
 
     foreignKey({
-      columns: [table.workspaceId, table.bindingId],
-      foreignColumns: [sourceBinding.workspaceId, sourceBinding.id],
-      name: "source_document_binding_fk",
+      columns: [table.workspaceId, table.connectedSourceId],
+      foreignColumns: [connectedSource.workspaceId, connectedSource.id],
+      name: "source_document_connected_source_fk",
     }).onDelete("cascade"),
 
-    index("source_document_workspace_id_binding_id_idx").on(table.workspaceId, table.bindingId),
-
-    uniqueIndex("source_document_workspace_id_binding_id_source_system_id_uidx").on(
+    index("source_document_workspace_id_connected_source_id_idx").on(
       table.workspaceId,
-      table.bindingId,
+      table.connectedSourceId,
+    ),
+
+    uniqueIndex("source_document_connected_source_id_source_system_id_uidx").on(
+      table.workspaceId,
+      table.connectedSourceId,
       table.sourceSystemId,
     ),
 

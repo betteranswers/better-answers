@@ -246,7 +246,7 @@ type SeedDocument = {
   readonly cited?: boolean;
 };
 
-export type SeedBinding = {
+export type SeedConnectedSource = {
   readonly name: string;
   readonly sensitivity?: Sensitivity;
   readonly audience?: "everyone" | "groups";
@@ -255,10 +255,10 @@ export type SeedBinding = {
   readonly documents?: readonly SeedDocument[];
 };
 
-const seededBindings = z.object({
-  bindings: z.array(
+const seededConnectedSources = z.object({
+  connectedSources: z.array(
     z.object({
-      bindingId: z.string(),
+      connectedSourceId: z.string(),
       name: z.string(),
       documents: z.array(
         z.object({
@@ -271,10 +271,10 @@ const seededBindings = z.object({
   ),
 });
 
-export const seedBindings = (
+export const seedConnectedSources = (
   api: APIRequestContext,
-  input: { workspaceId: string; bindings: readonly SeedBinding[] },
-) => ask(api, "/bindings", input, seededBindings);
+  input: { workspaceId: string; connectedSources: readonly SeedConnectedSource[] },
+) => ask(api, "/connected-sources", input, seededConnectedSources);
 
 const indexRunMoved = z.object({ jobId: z.string() });
 

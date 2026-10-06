@@ -1,23 +1,23 @@
 export { instantWords } from "@/shared/words.ts";
 
-import type { ListedBinding } from "./sources-api.ts";
+import type { ListedConnectedSource } from "./sources-api.ts";
 
 type Meaning = { readonly word: string; readonly means: string };
 
 export const STATE_MEANS = {
-  landed: "Its documents are in the object store; no run has turned them into chunks yet.",
+  received: "Its documents have been received; no run has turned them into chunks yet.",
   indexing: "A run is turning its documents into chunks.",
   indexed: "The run has finished and there is something to review.",
   published: "Its chunks reach the readers in its audience.",
-} satisfies Record<ListedBinding["state"], string>;
+} satisfies Record<ListedConnectedSource["state"], string>;
 
 export const AUDIENCE_WORDS = {
   everyone: "Everyone in the workspace",
   groups: "Named groups",
-} satisfies Record<ListedBinding["audience"], string>;
+} satisfies Record<ListedConnectedSource["audience"], string>;
 
-/** The empty list's one line: the toolbar's Bind a document is how a document is bound. */
-export const NOTHING_BOUND = "No document is bound yet.";
+/** The empty list's one line: the toolbar's Connect a document is how a document is connected. */
+export const NOTHING_CONNECTED = "No document is connected yet.";
 
 const DESTINATIONS = new Map<string, Meaning>([
   [

@@ -199,6 +199,9 @@ const landedNow = (row: Renamed, change: Partial<Renamed> = {}): Renamed => ({
   ...change,
 });
 
+/** A landed row as it stood before its sweep, for a fixture about a word still pending. */
+const pendingNow = (row: Renamed): Renamed => ({ ...row, state: "pending" });
+
 /** Spelled in halves, so no fixture reads as a finding should this file's carve-out be lifted. */
 const WORD = ["a", "pp"].join("");
 const APP = rowOf(WORD);
@@ -484,7 +487,7 @@ describe("a word that lands with its sweep", () => {
   };
 
   it("passes in code while pending, and fails once landed", () => {
-    expect(linesOver(AT_SOURCE, [rowOf(BOUND)])).toEqual([]);
+    expect(linesOver(AT_SOURCE, [pendingNow(rowOf(BOUND))])).toEqual([]);
     expect(linesOver(AT_SOURCE, [BINDING])).toEqual([
       `packages/core/src/planted.ts:1: const ${BOUND} = await read(tx);`,
     ]);
@@ -1015,7 +1018,7 @@ describe("the ratchet on pending words", () => {
         [NAVIGATION]: navigation,
         "apps/web/src/features/sources/table.tsx": `const T = "${BOUND} ${BOUND}";`,
       }),
-      [rowOf(BOUND), rowOf("route"), landedNow(rowOf("screen"))],
+      [pendingNow(rowOf(BOUND)), rowOf("route"), landedNow(rowOf("screen"))],
     );
 
   it("counts a pending word in a page's words alone", () => {

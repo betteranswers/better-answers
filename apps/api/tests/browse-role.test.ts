@@ -99,8 +99,8 @@ beforeAll(async () => {
   const client = await db.pool.connect();
   try {
     const data = testData(client);
-    const first = await data.sourceBinding();
-    const second = await data.sourceBinding();
+    const first = await data.connectedSource();
+    const second = await data.connectedSource();
     await data.oauthRefreshToken();
     // The partition's lifecycle function reads a transaction's scope, so it runs in one.
     await client.query("BEGIN");
@@ -152,7 +152,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
   it("reads every workspace's rows with no workspace scope set", async () => {
     const read = await browse.query<{ workspace_id: string; scope: string | null }>(
       `SELECT workspace_id, nullif(current_setting('app.workspace_id', true), '') AS scope
-         FROM source_binding ORDER BY workspace_id`,
+         FROM connected_source ORDER BY workspace_id`,
     );
     expect(read.rows).toEqual(
       workspaces.map((workspace) => ({ workspace_id: workspace, scope: null })),
@@ -229,7 +229,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
       "SHOW default_transaction_read_only",
     );
     expect(shown.rows).toEqual([{ default_transaction_read_only: "on" }]);
-    await expect(browse.query("UPDATE source_binding SET name = 'renamed'")).rejects.toThrow(
+    await expect(browse.query("UPDATE connected_source SET name = 'renamed'")).rejects.toThrow(
       /cannot execute UPDATE in a read-only transaction/,
     );
   });
@@ -239,9 +239,9 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     try {
       await client.query("BEGIN READ WRITE");
       await refusesEach(client, [
-        ["UPDATE source_binding SET name = 'renamed'", "an update to a tenant table"],
-        ["DELETE FROM source_binding", "a delete from a tenant table"],
-        ["TRUNCATE source_binding", "a truncate of a tenant table"],
+        ["UPDATE connected_source SET name = 'renamed'", "an update to a tenant table"],
+        ["DELETE FROM connected_source", "a delete from a tenant table"],
+        ["TRUNCATE connected_source", "a truncate of a tenant table"],
         ["UPDATE member SET role = 'Admin'", "an update to the identity set"],
         ['DELETE FROM "index".chunk', "a delete from the chunk index"],
         [
@@ -252,7 +252,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
         ["CREATE TABLE public.browse_probe (id int)", "a table made in public"],
         ['CREATE TABLE "index".browse_probe (id int)', "a table made in index"],
         [
-          "ALTER TABLE source_binding ADD COLUMN probe int",
+          "ALTER TABLE connected_source ADD COLUMN probe int",
           "a column added to a tenant table",
           [],
           /must be owner/,
@@ -304,9 +304,9 @@ describe("the read-only browsing role, applied over the whole journal", () => {
       expect(refusal).toMatch(/relation "public.jwks" does not exist/);
       const readable = await client.query(
         `SELECT has_column_privilege('browse_ro', 'public.session', 'token', 'SELECT') AS token,
-                has_table_privilege('browse_ro', 'public.source_binding', 'SELECT') AS binding`,
+                has_table_privilege('browse_ro', 'public.connected_source', 'SELECT') AS "connectedSource"`,
       );
-      expect(readable.rows).toEqual([{ token: false, binding: false }]);
+      expect(readable.rows).toEqual([{ token: false, connectedSource: false }]);
     } finally {
       await client.query("ALTER TABLE jwks_set_aside RENAME TO jwks");
       await client.query(roleFile);

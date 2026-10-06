@@ -8,7 +8,7 @@ import type { z } from "zod";
 import {
   ACCESS_REQUEST_OPEN_STATUS,
   AUDIENCE_EVERYONE,
-  BINDING_LANDED_STATE,
+  CONNECTED_SOURCE_RECEIVED_STATE,
   boundarySchemas,
   CONCEPT_STABLE_STATUS,
   conceptIriOf,
@@ -117,7 +117,9 @@ export type TestData = {
     overrides?: Partial<InsertInput<"conceptWriteRequest">>,
   ): Promise<Row<"conceptWriteRequest">>;
 
-  sourceBinding(overrides?: Partial<InsertInput<"sourceBinding">>): Promise<Row<"sourceBinding">>;
+  connectedSource(
+    overrides?: Partial<InsertInput<"connectedSource">>,
+  ): Promise<Row<"connectedSource">>;
 
   sourceDocument(
     overrides?: Partial<InsertInput<"sourceDocument">>,
@@ -332,7 +334,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       content: "test content",
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0),
       embeddingRouteId: `model-choice-${ulid()}`,
-      bindingId: `binding-${ulid()}`,
+      connectedSourceId: `connected-source-${ulid()}`,
 
       sourceDocumentId: null,
       locator: null,
@@ -674,9 +676,9 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  const sourceBinding: TestData["sourceBinding"] = async (overrides = {}) => {
+  const connectedSource: TestData["connectedSource"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "sourceBinding", {
+    return insertRow(client, "connectedSource", {
       id: ulid(),
       publishedAt: new Date(),
       sensitivity: "Internal",
@@ -687,7 +689,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       connector: CONNECTOR_UPLOAD,
       destination: [...UPLOAD_DESTINATIONS],
       retentionClass: RETENTION_CLASS_DEFAULT,
-      state: BINDING_LANDED_STATE,
+      state: CONNECTED_SOURCE_RECEIVED_STATE,
 
       rulesInForce: RULES_IN_FORCE_DEFAULT,
       ...overrides,
@@ -697,7 +699,8 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const sourceDocument: TestData["sourceDocument"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    const bindingId = overrides.bindingId ?? (await sourceBinding({ workspaceId })).id;
+    const connectedSourceId =
+      overrides.connectedSourceId ?? (await connectedSource({ workspaceId })).id;
     return insertRow(client, "sourceDocument", {
       id: ulid(),
 
@@ -720,7 +723,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       narrowedTo: null,
       ...overrides,
       workspaceId,
-      bindingId,
+      connectedSourceId,
     });
   };
 
@@ -932,7 +935,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     job,
     suggestion,
     conceptWriteRequest,
-    sourceBinding,
+    connectedSource,
     sourceDocument,
     finding,
     subjectRequest,

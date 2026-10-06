@@ -29,7 +29,7 @@ def chunk_rows(run: IndexRun, document: ReadDocument) -> tuple[Mapping[str, Any]
             "id": chunk.id,
             "workspace_id": run.workspace_id,
             "content": chunk.content,
-            "binding_id": run.binding_id,
+            "binding_id": run.connected_source_id,
             "source_document_id": document.source_document_id,
             "locator": chunk.locator,
             "ordinal": chunk.ordinal,

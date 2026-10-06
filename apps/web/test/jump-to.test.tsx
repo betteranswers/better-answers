@@ -107,7 +107,10 @@ describe("what jump-to lists", () => {
   it("lists an Admin's built pages, the invite act and members", () => {
     expect(outline(jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT))).toEqual([
       [JUMP_TO.groups.areas, ["Control Centre"]],
-      [JUMP_TO.groups.pages, ["Bindings", "Models and spend", "Members", "Groups", "Audit log"]],
+      [
+        JUMP_TO.groups.pages,
+        ["Connected sources", "Models and spend", "Members", "Groups", "Audit log"],
+      ],
       [JUMP_TO.groups.acts, [INVITE_A_PERSON.name]],
       [JUMP_TO.groups.members, ["Priya Shah", "new@example.test"]],
     ]);

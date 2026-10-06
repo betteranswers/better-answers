@@ -90,14 +90,14 @@ import { AUDIENCES, SENSITIVITIES } from "./readable-columns.ts";
 import { ROLES } from "./roles.ts";
 import { modelChoice, workspaceConfig } from "./schema.ts";
 import {
-  BINDING_STATES,
+  CONNECTED_SOURCE_STATES,
   CONNECTORS,
   DESTINATIONS,
   DOCUMENT_OUTCOMES,
   QUARANTINE_ERROR,
   RETENTION_CLASSES,
   type RULES_IN_FORCE_KEYS,
-  sourceBinding,
+  connectedSource,
   sourceDocument,
 } from "./source-tables.ts";
 import {
@@ -117,7 +117,7 @@ const userId = (schema: z.ZodString) => schema.regex(ULID).brand<"UserId">();
 
 const groupId = (schema: z.ZodString) => schema.regex(ULID).brand<"GroupId">();
 
-const bindingId = (schema: z.ZodString) => schema.regex(ULID).brand<"BindingId">();
+const connectedSourceId = (schema: z.ZodString) => schema.regex(ULID).brand<"ConnectedSourceId">();
 
 const compositionId = (schema: z.ZodString) => schema.regex(ULID).brand<"CompositionId">();
 
@@ -185,7 +185,7 @@ const chunkRefinements = {
 
   embedding: z.array(z.number()).length(EMBEDDING_DIMENSIONS).nullable(),
   embeddingRouteId: (schema: z.ZodString) => schema.trim().min(1),
-  bindingId: (schema: z.ZodString) => schema.trim().min(1),
+  connectedSourceId: (schema: z.ZodString) => schema.trim().min(1),
   sourceDocumentId: (schema: z.ZodString) => schema.trim().min(1),
   locator: (schema: z.ZodString) => schema.trim().min(1),
   ordinal: (schema: z.ZodNumber) => schema.int().nonnegative(),
@@ -582,27 +582,36 @@ const rulesInForce = z.union([
   z.null(),
 ]);
 
-const sourceBindingRefinements = {
+const connectedSourceRefinements = {
   workspaceId,
-  id: bindingId,
+  id: connectedSourceId,
   ...readableUnit,
   name: (schema: z.ZodString) => schema.trim().min(1),
   connector: (schema: z.ZodString) => schema.pipe(z.enum(CONNECTORS)),
   destination: (schema: z.ZodArray<z.ZodString>) =>
     z.array(schema.element.pipe(z.enum(DESTINATIONS))).min(1),
   retentionClass: (schema: z.ZodString) => schema.pipe(z.enum(RETENTION_CLASSES)),
-  state: (schema: z.ZodString) => schema.pipe(z.enum(BINDING_STATES)),
+  state: (schema: z.ZodString) => schema.pipe(z.enum(CONNECTED_SOURCE_STATES)),
   rulesInForce: (schema: z.ZodType) => schema.pipe(rulesInForce),
 };
 
-export const sourceBindingSelect = createSelectSchema(sourceBinding, sourceBindingRefinements);
-export const sourceBindingInsert = createInsertSchema(sourceBinding, sourceBindingRefinements);
-export const sourceBindingUpdate = createUpdateSchema(sourceBinding, sourceBindingRefinements);
+export const connectedSourceSelect = createSelectSchema(
+  connectedSource,
+  connectedSourceRefinements,
+);
+export const connectedSourceInsert = createInsertSchema(
+  connectedSource,
+  connectedSourceRefinements,
+);
+export const connectedSourceUpdate = createUpdateSchema(
+  connectedSource,
+  connectedSourceRefinements,
+);
 
 const sourceDocumentRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.trim().min(1),
-  bindingId,
+  connectedSourceId,
   sourceSystemId: (schema: z.ZodString) => schema.trim().min(1),
   title: (schema: z.ZodString) => schema.trim().min(1),
   mediaType: (schema: z.ZodString) => schema.trim().min(1),
@@ -1056,11 +1065,11 @@ export const boundarySchemas = {
     insert: conceptClassOverrideInsert,
     update: conceptClassOverrideUpdate,
   },
-  sourceBinding: {
-    table: sourceBinding,
-    select: sourceBindingSelect,
-    insert: sourceBindingInsert,
-    update: sourceBindingUpdate,
+  connectedSource: {
+    table: connectedSource,
+    select: connectedSourceSelect,
+    insert: connectedSourceInsert,
+    update: connectedSourceUpdate,
   },
   sourceDocument: {
     table: sourceDocument,

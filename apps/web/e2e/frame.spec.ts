@@ -50,7 +50,7 @@ const SYSTEM = menuGroupIn(CONTROL_CENTRE, "system");
 
 /** What an Admin is shown today, spelled out rather than read through the filter that draws it. */
 const AN_ADMINS_PAGES = [
-  [SOURCES, pageNamed(SOURCES, "Bindings")],
+  [SOURCES, pageNamed(SOURCES, "Connected sources")],
   [MODELS, MODELS_AND_SPEND],
   [PEOPLE, MEMBERS],
   [PEOPLE, pageNamed(PEOPLE, "Groups")],
@@ -341,7 +341,7 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
       - heading "Sources" [level=3]
       - list:
         - listitem:
-          - link "Bindings"
+          - link "Connected sources"
       - heading "Models" [level=3]
       - list:
         - listitem:

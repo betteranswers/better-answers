@@ -1,6 +1,7 @@
 ---
 title: "What a rename sweep's runner and prose pass get wrong, and the checks that catch it"
 date: 2026-10-04
+last_updated: 2026-10-06
 category: best-practices
 module: packages/devtools
 problem_type: best_practice
@@ -12,12 +13,17 @@ applies_when:
   - "Writing a keep rule or a sense regex for a sweep's map"
   - "A sweep moves files that a pending map under packages/devtools/renames/ names by literal path"
   - "A sweep touches a fixture under contracts/ or a landed phrase of more than one word"
+  - "The old word has a second sense in code, such as bind for a SQL parameter, or a one-word noun becomes two"
+  - "A sweep renames a page address or a column that one statement shares with a table the sweep leaves alone"
 symptoms:
   - "The runner's text pass renamed a stored localStorage key that R22 keeps, and a test title meaning the colour token --surface-page"
   - "A blanket pass turned non-navigation senses of surface and screen (api exposure, the MCP surface, the roles surface, design colours, the verb, a device display) into area and page"
   - "A Testing Library keep rule and a Tailwind keep rule matched inside file paths and class names such as auth-screen"
   - "ts-morph's property rename left shorthand properties unrenamed, and only tsc caught it"
   - "A pending map names files by literal path that a sweep moved, and nothing tests that the paths exist"
+  - "The prose pass rewrote code in files a sense had shielded: a Python local became two words, a movedFrom address stopped redirecting, a button's gerund became a noun"
+  - "The contract digest moved after both stamps were generated, and the worker's hand-edited-digest test failed"
+  - "The runner renamed the store door's SQL-parameter helper bind to connect wherever it is imported"
 root_cause: missing_workflow_step
 resolution_type: workflow_improvement
 related_components:
@@ -214,6 +220,38 @@ On U7's head, after the review fix, the replay takes about six seconds. It repor
 
 Read the `outside the allowlist` section too. In U7 it holds the `contracts/` fixture and two strings in the design system's lint config, which the map's paths do not reach.
 
+### What the second sweep added (U11)
+
+U11 renamed *binding* to *connected source* (branch `liam/ba-29-u11-connected-source`). Its map is `packages/devtools/renames/connected-source.json`. Steps 14 to 19 are what it got wrong past steps 1 to 13, in the order a sweep meets them.
+
+**14. Before the runner applies, list every sense the old word has in code, not only in prose.** Step 3 asks this for prose. U11 found two code senses the dry run did not separate from the noun:
+
+- `bind` is the store door's helper that sets a SQL statement's parameter: `bind: (value: Bindable): number => values.push(value)` and `export type Bind` (`packages/core/src/store/postgres/index.ts:45`, `:48`). The audit and members slices import it. The symbol pass renamed it to `connect` wherever it is imported, and only a read of the dry run's symbol renames by file showed it.
+- The sign-in link's *binding cookie*, which ties a link to the browser that asked (`apps/api/src/auth/routes.ts`), and a sign-in test's title.
+
+Give each a sense in the map before applying, as `connected-source.json:158` and `:138` do, and a permitted sense on the words test row (`SQL_PARAMETER_TREES`, `apps/api/tests/old-words.ts:367`). To find them, sort the dry run's symbol renames by file and read every file outside the noun's own slice:
+
+```sh
+pnpm --filter @better-answers/devtools rename --map <name> | grep -E '^  symbol .* → ' | awk '{print $2}' | sed 's/:[0-9]*:[0-9]*$//' | sort | uniq -c
+```
+
+**15. A sense is matched against the whole string, so a statement over two tables is edited by hand.** `senseOf` tests a pattern against the whole fragment the runner found (step 2). U11 renamed `source_document.binding_id` and kept `binding_id` on `index.chunk` until U12. A template that names both, such as the Sources list's count of documents and chunks in `packages/core/src/sources/listing.ts`, matches the chunk sense and is kept whole, so its `source_document` half stays old. A sense with `paths` keeps every matching identifier in those files too: in the worker files whose chunk strings the sense held, the run's `binding_id` attribute kept its old name until it was renamed by hand, while `pipeline/rows.py` still writes the chunk column as `"binding_id"`. After applying, grep the kept-by-sense lines for the renamed table's names and rename those halves by hand.
+
+**16. The prose pass edits whatever its pattern reaches, including code and data a sense shielded.** The runner stops at a sense; a regex over every tracked file does not. U11's prose pass protected the stored names it knew of and still made four errors, each caught only later:
+
+- A Python local `binding` in two worker tests became `connected source`, a syntax error the worker's own check caught.
+- `movedFrom: ["/sources/bindings"]` became `"/sources/connected sources"`. The old address stopped leading to the page, and nothing failed until the old address went into the navigation test's moved-address list (`apps/web/test/navigation.test.ts:338`). It is restored at `apps/web/src/shared/navigation.ts:241`.
+- The pending label "Binding the document" became "Connected source the document". The old word was a gerund, which a noun substitution cannot read. It now says "Connecting the document" (`apps/web/src/features/sources/connect-act.tsx:155`).
+- The pass reworded contract fixture prose after both stamps were generated, so the digest moved under them. The worker's `test_a_hand_edited_digest_fails_this_tiers_own_check` (`apps/worker/tests/test_tier_contract.py:268`) caught it.
+
+So: hold `movedFrom` values and any quoted address or path in the pass's keep list. After the pass, grep code files for the new noun in a code position (`= `, `.`, `(`, a comma before a newline) outside quotes and comments. Grep for the gerund (`Binding the`, `binding a`) before the pass and reword it by hand. Regenerate both contract stamps after the prose pass, not before it. An exclude glob such as `':!*migrations*'` also skips any file whose name holds the word, such as `adr-0007-plain-postgres-and-app-owned-migrations.md`, so check what a glob drops.
+
+**17. Revert what the runner does to the words test's own files.** The runner keeps `apps/api/tests/old-words.ts` (step 11's kept list) but not `apps/api/tests/avoid-words.test.ts` or `apps/api/tests/old-words-ratchet.json`. U11's text pass renamed the planted fixtures' word and the ratchet's keys. Restore both from `origin/main`, and give `avoid-words.test.ts` a path sense in the map. Its planted fixtures use the sweep's word as their pending example, so once the row lands, pin them to a pending copy of the row rather than rewriting them (`pendingNow`, beside `landedNow` in that file).
+
+**18. A noun that grows a word pushes test titles past their cap.** `MOST_WORDS = 10` (`packages/schema/test/test-title.ts:1`) and the Python suite holds the same cap. *Binding* to *connected source* put about sixty titles over it. Most read well with *source* for one *connected source*; a title where the old word was a verb ("binding nothing") needs its own words. Run every suite's title check before committing, not just the one in hand.
+
+**19. Test a renamed page address in the moved-address list.** `movedFrom` keeps an old address leading to its page (KTD11 of the glossary plan), and step 16 shows a pass can break it without a failing test. Add each renamed address to `apps/web/test/navigation.test.ts`'s `MOVED` list in the same commit, and watch it fail before the address is right.
+
 ## Why This Matters
 
 Every one of U7's mistakes got past the runner, and several got past every automatic gate:
@@ -221,7 +259,7 @@ Every one of U7's mistakes got past the runner, and several got past every autom
 - A renamed storage key changes nothing a test reads, but it resets a choice on every reader's browser (R22).
 - A renamed token name, or a non-navigation *surface* turned into *area*, reads plausibly and fails nothing.
 
-tsc, the contract digest test, code review and a hand-read word diff caught them, and only the first two run on their own. The ten remaining sweeps each bring their own words and senses. U9 replays the model-choice map whose paths U7 moved. U12 renames passage together with the worker's stored names, where more of what the runner meets is stored rather than read. Steps 1, 6, 8, 9, 11 and 13 are each one command, and each would have shown a U7 mistake before review did.
+tsc, the contract digest test, code review and a hand-read word diff caught them, and only the first two run on their own. Each sweep brings its own words and senses. U12 renames passage together with the worker's stored names, where more of what the runner meets is stored rather than read. Steps 1, 6, 8, 9, 11 and 13 are each one command, and each would have shown a U7 mistake before review did. U11 added steps 14 to 19, because the prose pass reaches code the runner spared and its errors surface only in a test that reads the result.
 
 ## When to Apply
 

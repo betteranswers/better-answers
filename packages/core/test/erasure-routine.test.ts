@@ -1725,22 +1725,22 @@ const anOpenErasure = (workspaceId: string) =>
     return seed.erasureRequest({ workspaceId, subjectRequestId: request.id });
   });
 
-const documentIn = (workspaceId: string, bindingId: string) =>
-  seedingWith(db().pool, (seed) => seed.sourceDocument({ workspaceId, bindingId }));
+const documentIn = (workspaceId: string, connectedSourceId: string) =>
+  seedingWith(db().pool, (seed) => seed.sourceDocument({ workspaceId, connectedSourceId }));
 
-const bindingIn = (workspaceId: string) =>
-  seedingWith(db().pool, (seed) => seed.sourceBinding({ workspaceId }));
+const connectedSourceIn = (workspaceId: string) =>
+  seedingWith(db().pool, (seed) => seed.connectedSource({ workspaceId }));
 
 const chunksUnder = (
   workspaceId: string,
-  documents: readonly { readonly id: string; readonly bindingId: string }[],
+  documents: readonly { readonly id: string; readonly connectedSourceId: string }[],
   content = "Priya Anand approves expenses.",
 ) =>
   seedingWith(db().pool, async (seed) => {
     for (const document of documents) {
       await seed.chunk({
         workspaceId,
-        bindingId: document.bindingId,
+        connectedSourceId: document.connectedSourceId,
         sourceDocumentId: document.id,
         content,
         locator: `${document.id}/chars:0-${content.length}`,
@@ -1774,11 +1774,11 @@ const queuedIn = async (workspaceId: string) => {
   return read.rows;
 };
 
-const aMapOverTwoOfThreeBindings = async () => {
+const aMapOverTwoOfThreeConnectedSources = async () => {
   const scenario = await arrange();
-  const shared = await bindingIn(scenario.workspaceId);
-  const apart = await bindingIn(scenario.workspaceId);
-  const untouched = await bindingIn(scenario.workspaceId);
+  const shared = await connectedSourceIn(scenario.workspaceId);
+  const apart = await connectedSourceIn(scenario.workspaceId);
+  const untouched = await connectedSourceIn(scenario.workspaceId);
   const found = [
     await documentIn(scenario.workspaceId, shared.id),
     await documentIn(scenario.workspaceId, shared.id),
@@ -1953,15 +1953,15 @@ describe("the suppression the workspace keeps for the request", () => {
     expect(await suppressionsIn(scenario.workspaceId)).toEqual(before);
   });
 
-  it("counts documents, bindings and identifiers on the report, naming none", async () => {
+  it("counts documents, sources and identifiers on the report, naming none", async () => {
     const {
       scenario,
       signsInWith,
       email: atHome,
       subjectRequestId,
     } = await aMemberAskingUnder(aHomeAddress);
-    const binding = await bindingIn(scenario.workspaceId);
-    await documentIn(scenario.workspaceId, binding.id);
+    const connectedSource = await connectedSourceIn(scenario.workspaceId);
+    await documentIn(scenario.workspaceId, connectedSource.id);
 
     const done = await completing(scenario, subjectRequestId);
 
@@ -1996,21 +1996,21 @@ describe("the full-rebuild the erasure asks for", () => {
     ]);
   });
 
-  it("names each binding holding a found document once", async () => {
-    const { scenario, shared, apart, found } = await aMapOverTwoOfThreeBindings();
+  it("names each connected source holding a found document once", async () => {
+    const { scenario, shared, apart, found } = await aMapOverTwoOfThreeConnectedSources();
 
     const rederived = await rederivingOver(scenario, found, LOCKED_AT);
 
-    expect(rederived.bindingsToReprocess).toEqual([shared.id, apart.id].sort());
+    expect(rederived.connectedSourcesToReprocess).toEqual([shared.id, apart.id].sort());
     expect(rederived.rebuildJobId).toBeNull();
   });
 });
 
 const THE_REBUILD = { kind: "full-rebuild", subject_id: null, reason: "erasure", status: "queued" };
 
-const wipesOf = (bindings: readonly { readonly id: string }[]) =>
-  bindings
-    .map((binding) => binding.id)
+const wipesOf = (connectedSources: readonly { readonly id: string }[]) =>
+  connectedSources
+    .map((connectedSource) => connectedSource.id)
     .sort()
     .map((subject_id) => ({ kind: "index", subject_id, reason: "wiped", status: "queued" }));
 
@@ -2019,28 +2019,30 @@ const whatTheWipeLeft = async (workspaceId: string) => ({
   queued: await queuedIn(workspaceId),
 });
 
-const everyBindingWiped = (arranged: Awaited<ReturnType<typeof aMapOverTwoOfThreeBindings>>) => ({
+const everyConnectedSourceWiped = (
+  arranged: Awaited<ReturnType<typeof aMapOverTwoOfThreeConnectedSources>>,
+) => ({
   chunks: [{ binding_id: arranged.untouched.id, chunks: 1 }],
   queued: [THE_REBUILD, ...wipesOf([arranged.shared, arranged.apart])],
 });
 
-describe("the wipe of every binding the map found", () => {
-  it("deletes each binding's chunks, queueing its index run as wiped", async () => {
-    const arranged = await aMapOverTwoOfThreeBindings();
+describe("the wipe of every connected source the map found", () => {
+  it("deletes each source's chunks, queueing its index run as wiped", async () => {
+    const arranged = await aMapOverTwoOfThreeConnectedSources();
 
     const rederived = await rederivingOver(arranged.scenario, arranged.found, null);
 
     expect(rederived.rebuildJobId).not.toBeNull();
     expect(await whatTheWipeLeft(arranged.scenario.workspaceId)).toEqual(
-      everyBindingWiped(arranged),
+      everyConnectedSourceWiped(arranged),
     );
   });
 
-  it("wipes a binding naming the subject when the routine runs", async () => {
+  it("wipes a source naming the subject when the routine runs", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
     const workspaceId = scenario.workspaceId;
-    const naming = await bindingIn(workspaceId);
-    const elsewhere = await bindingIn(workspaceId);
+    const naming = await connectedSourceIn(workspaceId);
+    const elsewhere = await connectedSourceIn(workspaceId);
     const named = await documentIn(workspaceId, naming.id);
     const unnamed = await documentIn(workspaceId, elsewhere.id);
     await chunksUnder(workspaceId, [named]);
@@ -2061,7 +2063,7 @@ describe("the wipe of every binding the map found", () => {
   });
 
   it("wipes restored rows on a replay, queueing no second run", async () => {
-    const arranged = await aMapOverTwoOfThreeBindings();
+    const arranged = await aMapOverTwoOfThreeConnectedSources();
 
     await rederivingOver(arranged.scenario, arranged.found, null);
     await chunksUnder(arranged.scenario.workspaceId, arranged.found);
@@ -2069,7 +2071,7 @@ describe("the wipe of every binding the map found", () => {
 
     expect(replayed.rebuildJobId).toBeNull();
     expect(await whatTheWipeLeft(arranged.scenario.workspaceId)).toEqual(
-      everyBindingWiped(arranged),
+      everyConnectedSourceWiped(arranged),
     );
   });
 
@@ -2077,7 +2079,7 @@ describe("the wipe of every binding the map found", () => {
     ["restored", "wiped"],
     ["rule-change", "rule-change"],
   ] as const)("queues nothing behind one queued as %s, leaving it %s", async (queuedAs, left) => {
-    const { scenario, shared, apart, found } = await aMapOverTwoOfThreeBindings();
+    const { scenario, shared, apart, found } = await aMapOverTwoOfThreeConnectedSources();
     await seedingWith(db().pool, (seed) =>
       seed.job({
         workspaceId: scenario.workspaceId,

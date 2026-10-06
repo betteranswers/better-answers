@@ -23,12 +23,12 @@ SELECT set_config('app.workspace_id', :'workspace', true) \g /dev/null
 SELECT create_workspace_partition(:'workspace')
  WHERE to_regclass(format('"index".%I', 'chunk_' || :'workspace')) IS NULL \g /dev/null
 CREATE TEMPORARY TABLE fixture ON COMMIT DROP AS SELECT :'cases'::jsonb -> 'document' AS d;
-INSERT INTO source_binding (workspace_id, id, name, connector, state)
+INSERT INTO connected_source (workspace_id, id, name, connector, state)
   SELECT :'workspace', d ->> 'binding_id', 'Synthetic invoice', 'upload', 'indexed' FROM fixture
   ON CONFLICT (workspace_id, id) DO NOTHING;
 INSERT INTO source_document
-    (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key,
-     outcome)
+    (workspace_id, id, connected_source_id, source_system_id, title, media_type, byte_size,
+     original_key, outcome)
   SELECT :'workspace', d ->> 'source_document_id', d ->> 'binding_id', 'invoice-2026-041.md',
          'invoice-2026-041.md', d ->> 'media_type', octet_length(d ->> 'normalised_text'),
          'uploads/' || lower(d ->> 'binding_id') || '/' || lower(d ->> 'source_document_id')
@@ -43,9 +43,9 @@ INSERT INTO "index".chunk
          c ->> 'locator', c ->> 'content'
     FROM fixture, jsonb_array_elements(d -> 'chunks') AS c
   ON CONFLICT DO NOTHING;
-SELECT format('synthetic fixture present: workspace %s, slug synthetic, %s binding, %s document, %s chunks',
+SELECT format('synthetic fixture present: workspace %s, slug synthetic, %s connected source, %s document, %s chunks',
               :'workspace',
-              (SELECT count(*) FROM source_binding WHERE workspace_id = :'workspace'),
+              (SELECT count(*) FROM connected_source WHERE workspace_id = :'workspace'),
               (SELECT count(*) FROM source_document WHERE workspace_id = :'workspace'),
               (SELECT count(*) FROM "index".chunk WHERE workspace_id = :'workspace'));
 COMMIT;

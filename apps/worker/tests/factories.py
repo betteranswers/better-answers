@@ -78,11 +78,11 @@ def seed_model_choice(
     return _returning_row(cursor)
 
 
-def seed_source_binding(
+def seed_connected_source(
     cursor: Cursor[Any],
     *,
     workspace_id: str,
-    binding_id: str | None = None,
+    connected_source_id: str | None = None,
     name: str = "The bid library",
     connector: str = "upload",
     sensitivity: str = "Internal",
@@ -92,12 +92,12 @@ def seed_source_binding(
     rules_in_force: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
     cursor.execute(
-        "INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity,"
+        "INSERT INTO connected_source (workspace_id, id, name, connector, sensitivity,"
         " audience, audience_groups, published_at, rules_in_force)"
         " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb) RETURNING *",
         (
             workspace_id,
-            binding_id or ulid(),
+            connected_source_id or ulid(),
             name,
             connector,
             sensitivity,
@@ -118,7 +118,7 @@ def seed_source_document(
     cursor: Cursor[Any],
     *,
     workspace_id: str,
-    binding_id: str,
+    connected_source_id: str,
     document_id: str | None = None,
     source_system_id: str | None = None,
     title: str = "The handbook",
@@ -130,13 +130,14 @@ def seed_source_document(
 ) -> dict[str, Any]:
     identifier = document_id or ulid()
     cursor.execute(
-        "INSERT INTO source_document (workspace_id, id, binding_id, source_system_id,"
-        " title, media_type, byte_size, original_key, normalised_key, sensitivity)"
+        "INSERT INTO source_document (workspace_id, id, connected_source_id,"
+        " source_system_id, title, media_type, byte_size, original_key, normalised_key,"
+        " sensitivity)"
         " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
         (
             workspace_id,
             identifier,
-            binding_id,
+            connected_source_id,
             source_system_id or f"{identifier.lower()}.md",
             title,
             media_type,
@@ -439,7 +440,7 @@ def seed_chunk(
     cursor: Cursor[Any],
     *,
     workspace_id: str,
-    binding_id: str,
+    connected_source_id: str,
     chunk_id: str,
     content: str = "body",
 ) -> dict[str, Any]:
@@ -447,7 +448,7 @@ def seed_chunk(
         'INSERT INTO "index".chunk (id, workspace_id, content, binding_id)'
         " VALUES (%s, %s, %s, %s)"
         " RETURNING id, workspace_id, content, binding_id",
-        (chunk_id, workspace_id, content, binding_id),
+        (chunk_id, workspace_id, content, connected_source_id),
     )
     return _returning_row(cursor)
 

@@ -7,7 +7,7 @@ from ..log import logger
 from ..redaction.withholdings import overridden_in
 from .catalogue import (
     quarantine_catalogue,
-    read_binding,
+    read_connected_source,
     reconcile_catalogue,
     record_findings,
 )
@@ -22,7 +22,7 @@ RULE_CHANGE_REASON = "rule-change"
 
 # The store is the target-state tracking: rows the api deleted beside a store
 # left standing are re-upserted by nothing, the engine believing them landed.
-REASONS_EMPTYING_THE_BINDING = frozenset({WIPED_REASON, RULE_CHANGE_REASON})
+REASONS_EMPTYING_THE_CONNECTED_SOURCE = frozenset({WIPED_REASON, RULE_CHANGE_REASON})
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +35,7 @@ class OverriddenRestore:
 
 @dataclass(frozen=True, slots=True)
 class IndexOutcome:
-    """`lmdb_bytes` is what the binding's stores hold on disk after the run;
+    """`lmdb_bytes` is what the connected source's stores hold on disk after the run;
     `restores_overridden_by_erasure` names restored spans an erasure withholds again."""
 
     documents: int
@@ -61,7 +61,7 @@ class IndexOutcome:
         }
 
 
-def index_binding(
+def index_connected_source(
     bootstrap: Bootstrap,
     run: IndexRun,
     *,
@@ -69,32 +69,32 @@ def index_binding(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> IndexOutcome:
-    """Redacts and chunks the binding's live documents and lands their chunk rows.
-    A `wiped` or `rule-change` run first empties the binding's store; a binding
-    that is gone lands nothing. `copies` defaults to the workspace's bucket."""
+    """Redacts and chunks the connected source's live documents and lands their chunk
+    rows. A `wiped` or `rule-change` run first empties the source's store; a source that
+    is gone lands nothing. `copies` defaults to the workspace's bucket."""
     with Host(bootstrap) as host:
-        if run.reason in REASONS_EMPTYING_THE_BINDING:
-            host.remove_binding_store(run)
+        if run.reason in REASONS_EMPTYING_THE_CONNECTED_SOURCE:
+            host.remove_connected_source_store(run)
         store = copies or Bucket(bootstrap.object_store, run.workspace_id)
         with queue.connected(bootstrap.database_url) as connection:
             with queue.scoped(connection, run.workspace_id) as cursor:
-                binding = read_binding(cursor, run)
-            if binding is None:
+                connected_source = read_connected_source(cursor, run)
+            if connected_source is None:
                 logger.info(
-                    "the index run found no binding to index",
-                    binding_id=run.binding_id,
+                    "the index run found no connected source to index",
+                    connected_source_id=run.connected_source_id,
                     reason=run.reason,
                 )
-                host.open_binding(run)
+                host.open_connected_source(run)
                 return _finished(IndexOutcome(0, 0, host.lmdb_bytes(run)), run)
 
             landed = redact_landed_copies(
                 host,
                 run,
-                binding.documents,
+                connected_source.documents,
                 store,
-                binding.rules_in_force,
-                run.binding_id,
+                connected_source.rules_in_force,
+                run.connected_source_id,
                 ms_per_page=ms_per_page,
                 margin_ms=margin_ms,
             )
@@ -127,7 +127,7 @@ def index_binding(
 def _finished(outcome: IndexOutcome, run: IndexRun) -> IndexOutcome:
     logger.info(
         "the index run finished",
-        binding_id=run.binding_id,
+        connected_source_id=run.connected_source_id,
         reason=run.reason,
         **outcome.as_row(),
     )

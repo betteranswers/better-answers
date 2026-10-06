@@ -16,7 +16,7 @@ import {
 } from "../src/sources/index.ts";
 import { contractFixture, documentChunkRow, OPEN_OUTCOMES } from "./contract-fixture.ts";
 import {
-  bindingHolding,
+  connectedSourceHolding,
   conceptCiting,
   groupNamed,
   seededBy,
@@ -54,7 +54,7 @@ const INVOICE_TITLE = "The bid library's invoice";
 
 const seedTheAgreementsDocument = (workspaceId: string): Promise<void> =>
   seededBy(db(), async (seed) => {
-    const binding = await seed.sourceBinding({
+    const connectedSource = await seed.connectedSource({
       workspaceId,
       id: document.binding_id,
       publishedAt: PUBLISHED,
@@ -62,14 +62,14 @@ const seedTheAgreementsDocument = (workspaceId: string): Promise<void> =>
     });
     await seed.sourceDocument({
       workspaceId,
-      bindingId: binding.id,
+      connectedSourceId: connectedSource.id,
       id: document.source_document_id,
       title: INVOICE_TITLE,
     });
     for (const row of document.chunks) {
       await seed.chunk({
         workspaceId,
-        bindingId: binding.id,
+        connectedSourceId: connectedSource.id,
         sourceDocumentId: document.source_document_id,
         id: row.id,
         ordinal: row.ordinal,
@@ -100,7 +100,7 @@ const documentWithOneChunk = (
         ? { audience: "everyone", audienceGroups: null }
         : { audience: "groups", audienceGroups: [...what.audienceGroups] };
     const publishedAt = what.publishedAt === undefined ? PUBLISHED : what.publishedAt;
-    const binding = await seed.sourceBinding({
+    const connectedSource = await seed.connectedSource({
       workspaceId,
       publishedAt,
       sensitivity: what.sensitivity,
@@ -108,12 +108,12 @@ const documentWithOneChunk = (
     });
     const held = await seed.sourceDocument({
       workspaceId,
-      bindingId: binding.id,
+      connectedSourceId: connectedSource.id,
       title: what.title,
     });
     await seed.chunk({
       workspaceId,
-      bindingId: binding.id,
+      connectedSourceId: connectedSource.id,
       sourceDocumentId: held.id,
       content: what.text,
       locator: `${held.id}/chars:0-${what.charEnd}`,
@@ -136,21 +136,21 @@ const documentWithTwoChunks = (
     readonly title: string;
     readonly leading: StraddledRow;
     readonly trailing: StraddledRow;
-    readonly bindingClass?: string;
+    readonly connectedSourceClass?: string;
     readonly documentClass?: string | null;
   },
 ): Promise<string> =>
   seededBy(db(), async (seed) => {
-    const bindingClass = what.bindingClass ?? "Internal";
+    const connectedSourceClass = what.connectedSourceClass ?? "Internal";
     const documentClass = what.documentClass ?? null;
-    const binding = await seed.sourceBinding({
+    const connectedSource = await seed.connectedSource({
       workspaceId,
       publishedAt: PUBLISHED,
-      sensitivity: bindingClass,
+      sensitivity: connectedSourceClass,
     });
     const held = await seed.sourceDocument({
       workspaceId,
-      bindingId: binding.id,
+      connectedSourceId: connectedSource.id,
       title: what.title,
       sensitivity: documentClass,
     });
@@ -161,7 +161,7 @@ const documentWithTwoChunks = (
     for (const row of rows) {
       await seed.chunk({
         workspaceId,
-        bindingId: binding.id,
+        connectedSourceId: connectedSource.id,
         sourceDocumentId: held.id,
         content: row.text,
         locator: `${held.id}/chars:${row.charStart}-${row.charEnd}`,
@@ -264,7 +264,7 @@ describe("the passage a wire locator opens", () => {
       title: STRADDLED_TITLE,
       leading: STRADDLED_LEADING,
       trailing: STRADDLED_TRAILING,
-      bindingClass: "Internal",
+      connectedSourceClass: "Internal",
       documentClass: "Restricted",
     });
     const wire = `${documentId}/${STRADDLING_SPAN}`;
@@ -339,11 +339,11 @@ describe("what a passage read refuses", () => {
   it("refuses a narrowed straddle whole, yet serves it to Admins", async () => {
     const scenario = await arrange();
 
-    const narrowedBinding = await documentWithTwoChunks(scenario.workspaceId, {
+    const narrowedConnectedSource = await documentWithTwoChunks(scenario.workspaceId, {
       title: STRADDLED_TITLE,
       leading: STRADDLED_LEADING,
       trailing: STRADDLED_TRAILING,
-      bindingClass: "Restricted",
+      connectedSourceClass: "Restricted",
     });
     const narrowedDocument = await documentWithTwoChunks(scenario.workspaceId, {
       title: STRADDLED_TITLE,
@@ -351,21 +351,27 @@ describe("what a passage read refuses", () => {
       trailing: STRADDLED_TRAILING,
       documentClass: "Restricted",
     });
-    const atNarrowedBinding = `${narrowedBinding}/${STRADDLING_SPAN}`;
+    const atNarrowedConnectedSource = `${narrowedConnectedSource}/${STRADDLING_SPAN}`;
     const atNarrowedDocument = `${narrowedDocument}/${STRADDLING_SPAN}`;
 
     const answered = {
-      "the Viewer, binding narrowed": await opening(scenario.viewer, atNarrowedBinding),
+      "the Viewer, connected source narrowed": await opening(
+        scenario.viewer,
+        atNarrowedConnectedSource,
+      ),
       "the Viewer, document narrowed": await opening(scenario.viewer, atNarrowedDocument),
-      "the Admin, binding narrowed": await opening(scenario.admin, atNarrowedBinding),
+      "the Admin, connected source narrowed": await opening(
+        scenario.admin,
+        atNarrowedConnectedSource,
+      ),
       "the Admin, document narrowed": await opening(scenario.admin, atNarrowedDocument),
     };
 
     expect(answered).toEqual({
-      "the Viewer, binding narrowed": NOT_FOUND,
+      "the Viewer, connected source narrowed": NOT_FOUND,
       "the Viewer, document narrowed": NOT_FOUND,
-      "the Admin, binding narrowed": {
-        locator: atNarrowedBinding,
+      "the Admin, connected source narrowed": {
+        locator: atNarrowedConnectedSource,
         title: "The staff handbook",
         text: "holiday policy grants twenty-eight days",
         sensitivity: "Restricted",
@@ -453,7 +459,7 @@ describe("the passages a search finds", () => {
       sensitivity: "Internal",
     });
 
-    const boardroom = await bindingHolding(db(), scenario.workspaceId, {
+    const boardroom = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Restricted",
     });
     await conceptCiting(scenario, scenario.editor, [handbook, boardroom.documentId]);
@@ -467,7 +473,7 @@ describe("the passages a search finds", () => {
     expect(await searching(scenario.viewer, 1)).toEqual([hitOn(manual, MANUAL)]);
   });
 
-  it("finds a passage only for readers in the binding's audience", async () => {
+  it("finds a passage only for readers in the source's audience", async () => {
     const scenario = await arrange();
     const board = await groupNamed(db(), scenario, "Board", [scenario.editor]);
     const minutes = await documentWithOneChunk(scenario.workspaceId, {
@@ -483,7 +489,7 @@ describe("the passages a search finds", () => {
     expect(inside).toEqual([hitOn(minutes, MINUTES)]);
   });
 
-  it("finds no chunk of a binding under review for anyone", async () => {
+  it("finds no chunk of a source under review for anyone", async () => {
     const scenario = await arrange();
     await documentWithOneChunk(scenario.workspaceId, {
       ...DRAFT,
@@ -504,12 +510,12 @@ describe("the passages a search finds", () => {
   });
 });
 
-const REVIEW_BINDING = "01M2B1ND1NGREV13WAAAAAAAAA";
+const REVIEW_CONNECTED_SOURCE = "01M2B1ND1NGREV13WAAAAAAAAA";
 const TERMS = "01M2D0CREV13WAAAAAAAAAAAA1";
 const ANNEX = "01M2D0CREV13WAAAAAAAAAAAA2";
 
-const ARMS_BINDING = "01M2B1ND1NGARMSAAAAAAAAAAA";
-const GROUP_BINDING = "01M2B1ND1NGARMSGRPAAAAAAAA";
+const ARMS_CONNECTED_SOURCE = "01M2B1ND1NGARMSAAAAAAAAAAA";
+const GROUP_CONNECTED_SOURCE = "01M2B1ND1NGARMSGRPAAAAAAAA";
 const BOARD_DOC = "01M2D0CARMSAAAAAAAAAAAAAA1";
 const GROUP_DOC = "01M2D0CARMSAAAAAAAAAAAAAA2";
 
@@ -526,21 +532,21 @@ type ReviewedDocument = {
   }[];
 };
 
-const bindingUnderReview = (
+const connectedSourceUnderReview = (
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
   documents: readonly ReviewedDocument[],
-  onTheBinding: { readonly audienceGroups?: readonly string[] } = {},
+  onTheConnectedSource: { readonly audienceGroups?: readonly string[] } = {},
 ): Promise<void> =>
   seededBy(db(), async (seed) => {
-    const { audienceGroups } = onTheBinding;
+    const { audienceGroups } = onTheConnectedSource;
     const audience =
       audienceGroups === undefined
         ? { audience: "everyone", audienceGroups: null }
         : { audience: "groups", audienceGroups: [...audienceGroups] };
-    const binding = await seed.sourceBinding({
+    const connectedSource = await seed.connectedSource({
       workspaceId,
-      id: bindingId,
+      id: connectedSourceId,
       publishedAt: null,
       sensitivity: "Internal",
       ...audience,
@@ -548,7 +554,7 @@ const bindingUnderReview = (
     for (const held of documents) {
       await seed.sourceDocument({
         workspaceId,
-        bindingId: binding.id,
+        connectedSourceId: connectedSource.id,
         id: held.id,
         title: held.title,
         sensitivity: held.sensitivity ?? null,
@@ -556,7 +562,7 @@ const bindingUnderReview = (
       for (const row of held.chunks) {
         await seed.chunk({
           workspaceId,
-          bindingId: binding.id,
+          connectedSourceId: connectedSource.id,
           sourceDocumentId: held.id,
           id: row.id,
           ordinal: row.ordinal,
@@ -573,8 +579,8 @@ const bindingUnderReview = (
  * Both documents hold a chunk matching the search's words, so an empty search over them is the
  * published arm at work, not an unmatched query.
  */
-const seedTheBindingUnderReview = (workspaceId: string): Promise<void> =>
-  bindingUnderReview(workspaceId, REVIEW_BINDING, [
+const seedTheConnectedSourceUnderReview = (workspaceId: string): Promise<void> =>
+  connectedSourceUnderReview(workspaceId, REVIEW_CONNECTED_SOURCE, [
     {
       id: TERMS,
       title: "The draft terms",
@@ -612,23 +618,27 @@ const seedTheBindingUnderReview = (workspaceId: string): Promise<void> =>
 
 const previewing = async (
   person: UserPrincipal,
-  bindingId: string,
+  connectedSourceId: string,
 ): Promise<readonly PreviewedChunk[] | string | Error> =>
   answered(
     await reading(person, async (reader, tx) => {
-      const read = await previewChunks(reader, tx, inputOf(previewChunksInput, { bindingId }));
+      const read = await previewChunks(
+        reader,
+        tx,
+        inputOf(previewChunksInput, { connectedSourceId }),
+      );
       return read.ok ? read.value : read.error;
     }),
   );
 
-describe("the review list a binding is previewed with", () => {
+describe("the review list a connected source is previewed with", () => {
   it("lists every chunk by document and ordinal, to Admins alone", async () => {
     const scenario = await arrange();
-    await seedTheBindingUnderReview(scenario.workspaceId);
+    await seedTheConnectedSourceUnderReview(scenario.workspaceId);
 
-    const admin = await previewing(scenario.admin, REVIEW_BINDING);
-    const viewer = await previewing(scenario.viewer, REVIEW_BINDING);
-    const editor = await previewing(scenario.editor, REVIEW_BINDING);
+    const admin = await previewing(scenario.admin, REVIEW_CONNECTED_SOURCE);
+    const viewer = await previewing(scenario.viewer, REVIEW_CONNECTED_SOURCE);
+    const editor = await previewing(scenario.editor, REVIEW_CONNECTED_SOURCE);
 
     expect(admin).toEqual([
       {
@@ -654,17 +664,17 @@ describe("the review list a binding is previewed with", () => {
     expect(viewer).toBe("role-forbids");
     expect(editor).toBe("role-forbids");
 
-    expect(parse(previewChunksInput, { bindingId: "not-a-binding-id" })).toEqual({
+    expect(parse(previewChunksInput, { connectedSourceId: "not-a-connected-source-id" })).toEqual({
       ok: false,
-      error: { word: "malformed", fields: { bindingId: "bad-format" } },
+      error: { word: "malformed", fields: { connectedSourceId: "bad-format" } },
     });
   });
 
   it("alone reaches the rows; neither search nor open does", async () => {
     const scenario = await arrange();
-    await seedTheBindingUnderReview(scenario.workspaceId);
+    await seedTheConnectedSourceUnderReview(scenario.workspaceId);
 
-    const previewed = await previewing(scenario.admin, REVIEW_BINDING);
+    const previewed = await previewing(scenario.admin, REVIEW_CONNECTED_SOURCE);
     const found = await searching(scenario.admin);
     const opened = await opening(scenario.admin, `${TERMS}/chars:0-33`);
 
@@ -676,7 +686,7 @@ describe("the review list a binding is previewed with", () => {
   it("applies the class and audience arms all the same", async () => {
     const scenario = await arrange();
     const board = await groupNamed(db(), scenario, "Board", [scenario.editor]);
-    await bindingUnderReview(scenario.workspaceId, ARMS_BINDING, [
+    await connectedSourceUnderReview(scenario.workspaceId, ARMS_CONNECTED_SOURCE, [
       {
         id: BOARD_DOC,
         title: "The board's draft",
@@ -692,9 +702,9 @@ describe("the review list a binding is previewed with", () => {
         ],
       },
     ]);
-    await bindingUnderReview(
+    await connectedSourceUnderReview(
       scenario.workspaceId,
-      GROUP_BINDING,
+      GROUP_CONNECTED_SOURCE,
       [
         {
           id: GROUP_DOC,
@@ -713,8 +723,8 @@ describe("the review list a binding is previewed with", () => {
       { audienceGroups: [board] },
     );
 
-    const reachedByClass = await previewing(scenario.admin, ARMS_BINDING);
-    const withheldByAudience = await previewing(scenario.admin, GROUP_BINDING);
+    const reachedByClass = await previewing(scenario.admin, ARMS_CONNECTED_SOURCE);
+    const withheldByAudience = await previewing(scenario.admin, GROUP_CONNECTED_SOURCE);
 
     expect(reachedByClass).toEqual([
       {

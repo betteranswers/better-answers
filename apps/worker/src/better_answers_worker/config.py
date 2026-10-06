@@ -39,7 +39,7 @@ class ObjectStore:
 
 @dataclass(frozen=True, slots=True)
 class Engine:
-    """`lmdb_map_bytes` is one binding's cap across
+    """`lmdb_map_bytes` is one connected source's cap across
     both its stores; `concurrent_runs` is always one."""
 
     lmdb_dir: str

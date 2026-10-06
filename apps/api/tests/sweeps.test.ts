@@ -112,7 +112,7 @@ const withAnOrphan = async () => {
     workspace.admin,
     objects().door,
     orphan,
-    new Blob(["The bytes of a bind whose row never landed."]).stream(),
+    new Blob(["The bytes of a connect whose row never landed."]).stream(),
   );
   if (!put.ok) throw new Error(`the orphan was refused: ${put.error}`);
   return { ...workspace, orphan };

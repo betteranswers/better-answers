@@ -7,7 +7,7 @@ import { useTRPC, useTRPCClient, type ApiError } from "@/shared/api/trpc.ts";
 
 type Api = ReturnType<typeof useTRPC>;
 
-export type ListedBinding = inferOutput<Api["sources"]["list"]>[number];
+export type ListedConnectedSource = inferOutput<Api["sources"]["list"]>[number];
 
 export type FindingGroup = inferOutput<Api["sources"]["findings"]>[number];
 
@@ -15,15 +15,15 @@ export type FindingGroupKey = Pick<FindingGroup, "documentId" | "category" | "ru
 
 export type DocumentsNarrowed = inferOutput<Api["sources"]["narrowDocuments"]>;
 
-export type BindingNarrowed = inferOutput<Api["sources"]["narrow"]>;
+export type ConnectedSourceNarrowed = inferOutput<Api["sources"]["narrow"]>;
 
-export type BindingWidened = inferOutput<Api["sources"]["widen"]>;
+export type ConnectedSourceWidened = inferOutput<Api["sources"]["widen"]>;
 
 export type DismissedAsNotSpecialCategory = inferOutput<
   Api["sources"]["dismissAsNotSpecialCategory"]
 >;
 
-export type Sensitivity = ListedBinding["sensitivity"];
+export type Sensitivity = ListedConnectedSource["sensitivity"];
 
 /** Narrowest first, the order a narrowing moves in. */
 export const CLASSES: readonly Sensitivity[] = ["Restricted", "Internal", "Public"];
@@ -32,21 +32,22 @@ export const NARROWEST: Sensitivity = "Restricted";
 
 const WIDEST: Sensitivity = "Public";
 
-export const EVERYONE: ListedBinding["audience"] = "everyone";
+export const EVERYONE: ListedConnectedSource["audience"] = "everyone";
 
-export const widestAlready = (binding: ListedBinding): boolean =>
-  binding.sensitivity === WIDEST && binding.audience === EVERYONE;
+export const widestAlready = (connectedSource: ListedConnectedSource): boolean =>
+  connectedSource.sensitivity === WIDEST && connectedSource.audience === EVERYONE;
 
 const RUN_IN_FLIGHT: ReadonlySet<string> = new Set(["queued", "claimed"]);
 
 const WATCHING_A_RUN_MS = 1000;
 
-const aRunIsInFlight = (bindings: readonly ListedBinding[] | undefined): boolean =>
-  (bindings ?? []).some(
-    (binding) => binding.lastRun !== null && RUN_IN_FLIGHT.has(binding.lastRun.status),
+const aRunIsInFlight = (connectedSources: readonly ListedConnectedSource[] | undefined): boolean =>
+  (connectedSources ?? []).some(
+    (connectedSource) =>
+      connectedSource.lastRun !== null && RUN_IN_FLIGHT.has(connectedSource.lastRun.status),
   );
 
-export const useBindings = () => {
+export const useConnectedSources = () => {
   const api = useTRPC();
   return useQuery({
     ...api.sources.list.queryOptions(),
@@ -55,27 +56,27 @@ export const useBindings = () => {
   });
 };
 
-export const useFindings = (bindingId: string) => {
+export const useFindings = (connectedSourceId: string) => {
   const api = useTRPC();
-  return useQuery(api.sources.findings.queryOptions({ bindingId }));
+  return useQuery(api.sources.findings.queryOptions({ connectedSourceId }));
 };
 
-export const usePreview = (bindingId: string, enabled: boolean) => {
+export const usePreview = (connectedSourceId: string, enabled: boolean) => {
   const api = useTRPC();
-  return useQuery({ ...api.sources.preview.queryOptions({ bindingId }), enabled });
+  return useQuery({ ...api.sources.preview.queryOptions({ connectedSourceId }), enabled });
 };
 
 /**
  * The one act whose input is bytes: its descriptor rides beside them, so it goes through the
  * client rather than an options factory built once.
  */
-export const useBind = () => {
+export const useConnect = () => {
   const api = useTRPC();
   const client = useTRPCClient();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (asked: { readonly file: Blob; readonly descriptor: UploadDescriptor }) =>
-      client.sources.bind.mutate(asked.file, uploadOptions(asked.descriptor)),
+      client.sources.connect.mutate(asked.file, uploadOptions(asked.descriptor)),
     onSettled: () => queryClient.invalidateQueries({ queryKey: api.sources.list.queryKey() }),
   });
 };
@@ -84,19 +85,28 @@ export const useBind = () => {
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
-  return (bindingId?: string) =>
+  return (connectedSourceId?: string) =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: api.sources.list.queryKey() }),
-      bindingId === undefined
+      connectedSourceId === undefined
         ? undefined
-        : queryClient.invalidateQueries({ queryKey: api.sources.findings.queryKey({ bindingId }) }),
+        : queryClient.invalidateQueries({
+            queryKey: api.sources.findings.queryKey({ connectedSourceId }),
+          }),
     ]);
 };
 
-const onTheBinding =
-  (bindingId: string, change: (binding: ListedBinding) => ListedBinding) =>
-  (list: readonly ListedBinding[]) =>
-    list.map((binding) => (binding.bindingId === bindingId ? change(binding) : binding));
+const onTheConnectedSource =
+  (
+    connectedSourceId: string,
+    change: (connectedSource: ListedConnectedSource) => ListedConnectedSource,
+  ) =>
+  (list: readonly ListedConnectedSource[]) =>
+    list.map((connectedSource) =>
+      connectedSource.connectedSourceId === connectedSourceId
+        ? change(connectedSource)
+        : connectedSource,
+    );
 
 export const usePublish = () => {
   const api = useTRPC();
@@ -107,8 +117,8 @@ export const usePublish = () => {
       onMutate: (asked) =>
         optimistic(
           api.sources.list.queryKey(),
-          onTheBinding(asked.bindingId, (binding) => ({
-            ...binding,
+          onTheConnectedSource(asked.connectedSourceId, (connectedSource) => ({
+            ...connectedSource,
             state: "published",
             publishedAt: new Date().toISOString(),
           })),
@@ -127,11 +137,12 @@ type ClassAsked = inferInput<Api["sources"]["widen"]>;
 
 const classSetAsAsked =
   (asked: ClassAsked) =>
-  (binding: ListedBinding): ListedBinding => {
-    const sensitivity = CLASSES.find((word) => word === asked.sensitivity) ?? binding.sensitivity;
+  (connectedSource: ListedConnectedSource): ListedConnectedSource => {
+    const sensitivity =
+      CLASSES.find((word) => word === asked.sensitivity) ?? connectedSource.sensitivity;
     return asked.audience === EVERYONE
-      ? { ...binding, sensitivity, audience: EVERYONE, audienceGroups: null }
-      : { ...binding, sensitivity };
+      ? { ...connectedSource, sensitivity, audience: EVERYONE, audienceGroups: null }
+      : { ...connectedSource, sensitivity };
   };
 
 /** A narrowing and a widening draw the same class on the row, and undo it the same way. */
@@ -143,19 +154,19 @@ const useClassSetOnTheRow = () => {
     onMutate: (asked: ClassAsked) =>
       optimistic(
         api.sources.list.queryKey(),
-        onTheBinding(asked.bindingId, classSetAsAsked(asked)),
+        onTheConnectedSource(asked.connectedSourceId, classSetAsAsked(asked)),
       ),
     onError: (_refusal: ApiError, _asked: ClassAsked, held: Undo | undefined) => held?.undo(),
     onSettled: () => reconcile(),
   };
 };
 
-export const useNarrowBinding = () => {
+export const useNarrowConnectedSource = () => {
   const api = useTRPC();
   return useMutation(api.sources.narrow.mutationOptions(useClassSetOnTheRow()));
 };
 
-export const useWidenBinding = () => {
+export const useWidenConnectedSource = () => {
   const api = useTRPC();
   return useMutation(api.sources.widen.mutationOptions(useClassSetOnTheRow()));
 };
@@ -185,7 +196,7 @@ export const useKeepInText = () => {
   const reconcile = useReconcile();
   return useMutation(
     api.sources.keepInText.mutationOptions({
-      onSettled: (_kept, _refusal, asked) => reconcile(asked.bindingId),
+      onSettled: (_kept, _refusal, asked) => reconcile(asked.connectedSourceId),
     }),
   );
 };
@@ -198,14 +209,16 @@ export const useNarrowDocuments = () => {
     api.sources.narrowDocuments.mutationOptions({
       onMutate: (asked) => {
         const narrowed = new Set(asked.findingGroups.map((group) => group.documentId));
-        return optimistic(api.sources.findings.queryKey({ bindingId: asked.bindingId }), (groups) =>
-          groups.map((group) =>
-            narrowed.has(group.documentId) ? { ...group, sensitivity: NARROWEST } : group,
-          ),
+        return optimistic(
+          api.sources.findings.queryKey({ connectedSourceId: asked.connectedSourceId }),
+          (groups) =>
+            groups.map((group) =>
+              narrowed.has(group.documentId) ? { ...group, sensitivity: NARROWEST } : group,
+            ),
         );
       },
       onError: (_refusal, _asked, held) => held?.undo(),
-      onSettled: (_narrowed, _refusal, asked) => reconcile(asked.bindingId),
+      onSettled: (_narrowed, _refusal, asked) => reconcile(asked.connectedSourceId),
     }),
   );
 };
@@ -217,13 +230,15 @@ export const useDismissAsNotSpecialCategory = () => {
   return useMutation(
     api.sources.dismissAsNotSpecialCategory.mutationOptions({
       onMutate: (asked) =>
-        optimistic(api.sources.findings.queryKey({ bindingId: asked.bindingId }), (groups) =>
-          groups.map((group) =>
-            groupIsIn(asked.findingGroups, group) ? { ...group, dismissed: group.found } : group,
-          ),
+        optimistic(
+          api.sources.findings.queryKey({ connectedSourceId: asked.connectedSourceId }),
+          (groups) =>
+            groups.map((group) =>
+              groupIsIn(asked.findingGroups, group) ? { ...group, dismissed: group.found } : group,
+            ),
         ),
       onError: (_refusal, _asked, held) => held?.undo(),
-      onSettled: (_dismissed, _refusal, asked) => reconcile(asked.bindingId),
+      onSettled: (_dismissed, _refusal, asked) => reconcile(asked.connectedSourceId),
     }),
   );
 };

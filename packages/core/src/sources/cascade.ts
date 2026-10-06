@@ -5,12 +5,15 @@ import type { Tx } from "../store/postgres/index.ts";
 
 /**
  * Returns every indexed concept citing the documents, each recomputed, and the compositions
- * recomputed over them. Without `documentIds`, every document in the binding counts.
+ * recomputed over them. Without `documentIds`, every document in the connected source counts.
  */
 export const cascadeOverEvidence = async (
   admin: AdminUserPrincipal,
   tx: Tx,
-  input: { readonly bindingId: string; readonly documentIds?: readonly string[] | undefined },
+  input: {
+    readonly connectedSourceId: string;
+    readonly documentIds?: readonly string[] | undefined;
+  },
 ): Promise<{
   readonly concepts: readonly string[];
   readonly compositions: readonly string[];

@@ -96,14 +96,14 @@ export const A_TESTING_DOMAIN_MARKED = `INSERT INTO test_workspace_mark (workspa
 export const THREE_INVITATION_EMAILS_COUNTED = `INSERT INTO invitation_email_counter (workspace_id, key, window_start, count)
        VALUES ($1, 'workspace', now(), 3)`;
 
-export const A_SOURCE_BINDING =
-  "INSERT INTO source_binding (workspace_id, id, name, connector) VALUES ($1, $2, $3, 'upload')";
+export const A_CONNECTED_SOURCE =
+  "INSERT INTO connected_source (workspace_id, id, name, connector) VALUES ($1, $2, $3, 'upload')";
 
-export const A_SOURCE_BINDING_CLASSED = `INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity, audience)
+export const A_CONNECTED_SOURCE_CLASSED = `INSERT INTO connected_source (workspace_id, id, name, connector, sensitivity, audience)
        VALUES ($1, $2, $3, 'upload', 'Restricted', 'everyone')`;
 
 export const A_SOURCE_DOCUMENT = `INSERT INTO source_document
-         (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key)
+         (workspace_id, id, connected_source_id, source_system_id, title, media_type, byte_size, original_key)
        VALUES ($1, $2, $3, $4, $5, 'text/markdown', $6, 'documents/x/original')`;
 
 export const A_COMPOSITION_INCLUDE = `INSERT INTO composition_include (workspace_id, composition_id, id, ordinal, iri)

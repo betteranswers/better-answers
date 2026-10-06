@@ -53,7 +53,7 @@ const HANDBOOK_BYTES = 43;
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 const handbookDescribed = (overrides: Partial<UploadDescriptor> = {}): UploadDescriptor => ({
-  bindingId: ulid(),
+  connectedSourceId: ulid(),
   name: "The staff handbook",
   fileName: "handbook.md",
   mediaType: "text/markdown",
@@ -63,24 +63,28 @@ const handbookDescribed = (overrides: Partial<UploadDescriptor> = {}): UploadDes
 
 const anAdmin = () => anAdminOnTheWeb(app);
 
-const unpublishedBinding = (workspaceId: string, name = "The staff handbook") =>
+const unpublishedConnectedSource = (workspaceId: string, name = "The staff handbook") =>
   seededIn(app, async (seed) => {
-    const binding = await seed.sourceBinding({ workspaceId, name, publishedAt: null });
+    const connectedSource = await seed.connectedSource({ workspaceId, name, publishedAt: null });
     const document = await seed.sourceDocument({
       workspaceId,
-      bindingId: binding.id,
+      connectedSourceId: connectedSource.id,
       title: "handbook.md",
     });
-    return { bindingId: binding.id, documentId: document.id };
+    return { connectedSourceId: connectedSource.id, documentId: document.id };
   });
 
-const finishedRun = (workspaceId: string, bindingId: string, outcome: Record<string, unknown>) =>
+const finishedRun = (
+  workspaceId: string,
+  connectedSourceId: string,
+  outcome: Record<string, unknown>,
+) =>
   seededIn(app, (seed) =>
     seed.job({
       workspaceId,
       kind: "index",
-      subjectId: bindingId,
-      reason: "bound",
+      subjectId: connectedSourceId,
+      reason: "connected",
       status: "done",
       attempts: 1,
       finishedAt: PINNED_AT,
@@ -91,16 +95,16 @@ const finishedRun = (workspaceId: string, bindingId: string, outcome: Record<str
 const OVERRIDDEN_KEY = "restores_overridden_by_erasure";
 
 type RunOverridingASpan = {
-  readonly bindingId: string;
+  readonly connectedSourceId: string;
   readonly jobId: string;
   readonly documentId: string;
   readonly ruleId: string;
 };
 
 const aRunThatOverrodeAKeptSpan = async (workspaceId: string): Promise<RunOverridingASpan> => {
-  const { bindingId, documentId } = await unpublishedBinding(workspaceId);
+  const { connectedSourceId, documentId } = await unpublishedConnectedSource(workspaceId);
   const kept = await seededIn(app, (seed) => seed.finding({ workspaceId, documentId }));
-  const run = await finishedRun(workspaceId, bindingId, {
+  const run = await finishedRun(workspaceId, connectedSourceId, {
     documents: 1,
     chunks: 1,
     [OVERRIDDEN_KEY]: [
@@ -112,7 +116,7 @@ const aRunThatOverrodeAKeptSpan = async (workspaceId: string): Promise<RunOverri
       },
     ],
   });
-  return { bindingId, jobId: run.id, documentId, ruleId: kept.ruleId };
+  return { connectedSourceId, jobId: run.id, documentId, ruleId: kept.ruleId };
 };
 
 const addressesIn = (answer: unknown, run: RunOverridingASpan): readonly string[] => {
@@ -122,7 +126,7 @@ const addressesIn = (answer: unknown, run: RunOverridingASpan): readonly string[
   );
 };
 
-const rowsFor = async (workspaceId: string, bindingId: string) => {
+const rowsFor = async (workspaceId: string, connectedSourceId: string) => {
   const read = await app.database.superuser.query<{
     name: string;
     sensitivity: string;
@@ -136,21 +140,21 @@ const rowsFor = async (workspaceId: string, bindingId: string) => {
   }>(
     `SELECT b.name, b.sensitivity, b.audience, b.audience_groups,
             d.title, d.media_type, d.byte_size, j.kind, j.reason
-       FROM source_binding b
-       JOIN source_document d ON d.workspace_id = b.workspace_id AND d.binding_id = b.id
+       FROM connected_source b
+       JOIN source_document d ON d.workspace_id = b.workspace_id AND d.connected_source_id = b.id
        JOIN job j ON j.workspace_id = b.workspace_id AND j.subject_id = b.id
       WHERE b.workspace_id = $1 AND b.id = $2`,
-    [workspaceId, bindingId],
+    [workspaceId, connectedSourceId],
   );
   return read.rows;
 };
 
-const bindingsIn = async (workspaceId: string): Promise<number> => {
-  const read = await app.database.superuser.query<{ bindings: number }>(
-    "SELECT count(*)::int AS bindings FROM source_binding WHERE workspace_id = $1",
+const connectedSourcesIn = async (workspaceId: string): Promise<number> => {
+  const read = await app.database.superuser.query<{ connectedSources: number }>(
+    "SELECT count(*)::int AS connected_sources FROM connected_source WHERE workspace_id = $1",
     [workspaceId],
   );
-  return read.rows[0]?.bindings ?? 0;
+  return read.rows[0]?.connectedSources ?? 0;
 };
 
 const uploadRaw = (
@@ -158,7 +162,7 @@ const uploadRaw = (
   descriptor: UploadDescriptor,
   body: ReadableStream<Uint8Array>,
 ): Promise<Response> =>
-  client.fetch(`${TRPC_ENDPOINT}/sources.bind`, {
+  client.fetch(`${TRPC_ENDPOINT}/sources.connect`, {
     method: "POST",
     headers: uploadHeaders(descriptor),
     body,
@@ -227,7 +231,7 @@ describe("the upload, one mutation over the split link", () => {
     );
   });
 
-  it("lands a binding with its document and index job", async () => {
+  it("lands a connected source with its document and index job", async () => {
     const { workspace, api, sent } = await anAdmin();
     const finance = await seededIn(app, (seed) =>
       seed.group({ workspaceId: workspace.workspaceId }),
@@ -238,22 +242,22 @@ describe("the upload, one mutation over the split link", () => {
       audienceGroups: [finance.id],
     });
 
-    const bound = await api.sources.bind.mutate(
+    const bound = await api.sources.connect.mutate(
       new Blob([HANDBOOK], { type: "text/markdown" }),
       uploadOptions(described),
     );
 
     expect(bound).toEqual({
-      bindingId: described.bindingId,
+      connectedSourceId: described.connectedSourceId,
       documentId: expect.any(String),
       jobId: expect.any(String),
       auditEventId: expect.any(String),
       originalKey: expect.any(String),
     });
     expect(bound.originalKey).toEqual(
-      `uploads/${described.bindingId.toLowerCase()}/${bound.documentId.toLowerCase()}/original`,
+      `uploads/${described.connectedSourceId.toLowerCase()}/${bound.documentId.toLowerCase()}/original`,
     );
-    expect(await rowsFor(workspace.workspaceId, described.bindingId)).toEqual([
+    expect(await rowsFor(workspace.workspaceId, described.connectedSourceId)).toEqual([
       {
         name: "The staff handbook",
         sensitivity: "Internal",
@@ -263,7 +267,7 @@ describe("the upload, one mutation over the split link", () => {
         media_type: "text/markdown",
         byte_size: HANDBOOK_BYTES,
         kind: "index",
-        reason: "bound",
+        reason: "connected",
       },
     ]);
     const stored = await actingIn(
@@ -274,7 +278,7 @@ describe("the upload, one mutation over the split link", () => {
     expect(await textOf(stored)).toBe(HANDBOOK);
     expect(sent).toEqual([
       {
-        path: "/trpc/sources.bind",
+        path: "/trpc/sources.connect",
         batched: false,
         contentType: "application/octet-stream",
       },
@@ -285,9 +289,9 @@ describe("the upload, one mutation over the split link", () => {
     const { workspace, api } = await anAdmin();
     const described = handbookDescribed({ name: "Llawlyfr y staff — ŵ" });
 
-    await api.sources.bind.mutate(new Blob([HANDBOOK]), uploadOptions(described));
+    await api.sources.connect.mutate(new Blob([HANDBOOK]), uploadOptions(described));
 
-    expect((await rowsFor(workspace.workspaceId, described.bindingId))[0]?.name).toBe(
+    expect((await rowsFor(workspace.workspaceId, described.connectedSourceId))[0]?.name).toBe(
       "Llawlyfr y staff — ŵ",
     );
   });
@@ -319,7 +323,7 @@ describe("the upload, one mutation over the split link", () => {
     expect(response.status).toBe(422);
     expect(await refusalIn(response)).toEqual({ word: "too-large", class: "inapplicable" });
     expect(held.ended).toBe(false);
-    expect(await bindingsIn(workspace.workspaceId)).toBe(0);
+    expect(await connectedSourcesIn(workspace.workspaceId)).toBe(0);
   });
 
   it("refuses a body passing the cap mid-stream, before its end", async () => {
@@ -331,7 +335,7 @@ describe("the upload, one mutation over the split link", () => {
     expect(response.status).toBe(422);
     expect(await refusalIn(response)).toEqual({ word: "too-large", class: "inapplicable" });
     expect(sent.bytes).toBeLessThan(total);
-    expect(await bindingsIn(workspace.workspaceId)).toBe(0);
+    expect(await connectedSourcesIn(workspace.workspaceId)).toBe(0);
   }, 180_000);
 
   it("refuses missing or unreadable descriptor fields by name alone", async () => {
@@ -340,7 +344,7 @@ describe("the upload, one mutation over the split link", () => {
     headers.delete("x-upload-file-name");
     headers.set("x-upload-byte-size", "%E0%A4%A");
 
-    const response = await client.fetch(`${TRPC_ENDPOINT}/sources.bind`, {
+    const response = await client.fetch(`${TRPC_ENDPOINT}/sources.connect`, {
       method: "POST",
       headers,
       body: new Blob([HANDBOOK]),
@@ -352,7 +356,7 @@ describe("the upload, one mutation over the split link", () => {
       class: "malformed",
       fields: { fileName: "missing", byteSize: "bad-format" },
     });
-    expect(await bindingsIn(workspace.workspaceId)).toBe(0);
+    expect(await connectedSourcesIn(workspace.workspaceId)).toBe(0);
   });
 });
 
@@ -395,11 +399,11 @@ describe("ten concurrent uploads, whose act opens its own transaction", () => {
 describe("a revocation landed while a mutation runs", () => {
   it("refuses the mutation, whose membership read waits on it", async () => {
     const { workspace, api } = await anAdmin();
-    const { bindingId } = await unpublishedBinding(workspace.workspaceId);
+    const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
     const revocation = await revocationHeldOpen(app, workspace.admin.id);
     try {
       const narrowing = api.sources.narrow
-        .mutate({ bindingId, sensitivity: "Restricted", audience: "everyone" })
+        .mutate({ connectedSourceId, sensitivity: "Restricted", audience: "everyone" })
         .then(
           () => undefined,
           (refused: unknown) => refused,
@@ -416,21 +420,21 @@ describe("a revocation landed while a mutation runs", () => {
     } finally {
       await revocation.abandon();
     }
-    const binding = await app.database.superuser.query<{ sensitivity: string }>(
-      "SELECT sensitivity FROM source_binding WHERE workspace_id = $1 AND id = $2",
-      [workspace.workspaceId, bindingId],
+    const connectedSource = await app.database.superuser.query<{ sensitivity: string }>(
+      "SELECT sensitivity FROM connected_source WHERE workspace_id = $1 AND id = $2",
+      [workspace.workspaceId, connectedSourceId],
     );
-    expect(binding.rows).toEqual([{ sensitivity: "Internal" }]);
+    expect(connectedSource.rows).toEqual([{ sensitivity: "Internal" }]);
   });
 
   it("does not hold up a read, which resolves membership unheld", async () => {
     const { workspace, api } = await anAdmin();
-    await unpublishedBinding(workspace.workspaceId);
+    await unpublishedConnectedSource(workspace.workspaceId);
     const revocation = await revocationHeldOpen(app, workspace.admin.id);
     try {
       const listed = await api.sources.list.query();
 
-      expect(listed.map((binding) => binding.name)).toEqual(["The staff handbook"]);
+      expect(listed.map((connectedSource) => connectedSource.name)).toEqual(["The staff handbook"]);
     } finally {
       await revocation.abandon();
     }
@@ -439,41 +443,41 @@ describe("a revocation landed while a mutation runs", () => {
 
 const A_HEALTH_CUE = { category: "special-category", ruleId: "HEALTH_CUE" } as const;
 
-const anAdminWhoseBindingHoldsAHealthCue = async () => {
+const anAdminWhoseConnectedSourceHoldsAHealthCue = async () => {
   const { workspace, api } = await anAdmin();
-  const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
+  const { connectedSourceId, documentId } = await unpublishedConnectedSource(workspace.workspaceId);
   await seededIn(app, (seed) =>
     seed.finding({ workspaceId: workspace.workspaceId, documentId, ...A_HEALTH_CUE }),
   );
-  return { api, bindingId, documentId };
+  return { api, connectedSourceId, documentId };
 };
 
 describe("the Sources procedures over the wire", () => {
   it("lists an upload's state, counts, last run and quarantine reason", async () => {
     const { workspace, api } = await anAdmin();
     const described = handbookDescribed();
-    const bound = await api.sources.bind.mutate(new Blob([HANDBOOK]), uploadOptions(described));
+    const bound = await api.sources.connect.mutate(new Blob([HANDBOOK]), uploadOptions(described));
     const scans = await seededIn(app, async (seed) => {
-      const binding = await seed.sourceBinding({
+      const connectedSource = await seed.connectedSource({
         workspaceId: workspace.workspaceId,
         name: "Scans",
         publishedAt: null,
       });
       const document = await seed.sourceDocument({
         workspaceId: workspace.workspaceId,
-        bindingId: binding.id,
+        connectedSourceId: connectedSource.id,
         title: "Floor plan",
         outcome: "quarantined",
         quarantineError: "NeedsOcrError",
       });
-      return { bindingId: binding.id, documentId: document.id };
+      return { connectedSourceId: connectedSource.id, documentId: document.id };
     });
 
     const listed = await api.sources.list.query();
 
     expect(listed).toEqual([
       {
-        bindingId: scans.bindingId,
+        connectedSourceId: scans.connectedSourceId,
         name: "Scans",
         connector: "upload",
         sensitivity: "Internal",
@@ -481,7 +485,7 @@ describe("the Sources procedures over the wire", () => {
         audienceGroups: null,
         destination: ["chunk-index", "bundle"],
         retentionClass: "keep",
-        state: "landed",
+        state: "received",
         publishedAt: null,
         documentCount: 1,
         chunkCount: 0,
@@ -492,7 +496,7 @@ describe("the Sources procedures over the wire", () => {
         quarantinedByError: { NeedsOcrError: 1 },
       },
       {
-        bindingId: described.bindingId,
+        connectedSourceId: described.connectedSourceId,
         name: "The staff handbook",
         connector: "upload",
         sensitivity: "Restricted",
@@ -500,14 +504,14 @@ describe("the Sources procedures over the wire", () => {
         audienceGroups: null,
         destination: ["chunk-index", "bundle"],
         retentionClass: "keep",
-        state: "landed",
+        state: "received",
         publishedAt: null,
         documentCount: 1,
         chunkCount: 0,
         lastRun: {
           jobId: bound.jobId,
           kind: "index",
-          reason: "bound",
+          reason: "connected",
           status: "queued",
           attempts: 0,
           enqueuedAt: expect.stringMatching(ISO_INSTANT),
@@ -519,18 +523,18 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("answers the runs of a binding by its subject", async () => {
+  it("answers the runs of a connected source by its subject", async () => {
     const { api } = await anAdmin();
     const described = handbookDescribed();
-    const bound = await api.sources.bind.mutate(new Blob([HANDBOOK]), uploadOptions(described));
+    const bound = await api.sources.connect.mutate(new Blob([HANDBOOK]), uploadOptions(described));
 
-    const runs = await api.runs.ofSubject.query({ subjectId: described.bindingId });
+    const runs = await api.runs.ofSubject.query({ subjectId: described.connectedSourceId });
 
     expect(runs).toEqual([
       {
         jobId: bound.jobId,
         kind: "index",
-        reason: "bound",
+        reason: "connected",
         status: "queued",
         attempts: 0,
         enqueuedAt: expect.stringMatching(ISO_INSTANT),
@@ -545,11 +549,11 @@ describe("the Sources procedures over the wire", () => {
 
     const listed = await api.sources.list.query();
 
-    expect(listed.map((binding) => binding.lastRun)).toEqual([
+    expect(listed.map((connectedSource) => connectedSource.lastRun)).toEqual([
       {
         jobId: run.jobId,
         kind: "index",
-        reason: "bound",
+        reason: "connected",
         status: "done",
         attempts: 1,
         enqueuedAt: expect.stringMatching(ISO_INSTANT),
@@ -563,7 +567,7 @@ describe("the Sources procedures over the wire", () => {
     const { workspace, api } = await anAdmin();
     const run = await aRunThatOverrodeAKeptSpan(workspace.workspaceId);
 
-    const runs = await api.runs.ofSubject.query({ subjectId: run.bindingId });
+    const runs = await api.runs.ofSubject.query({ subjectId: run.connectedSourceId });
 
     expect(runs.map((listedRun) => listedRun.jobId)).toEqual([run.jobId]);
     expect(addressesIn(runs, run)).toEqual([]);
@@ -571,7 +575,9 @@ describe("the Sources procedures over the wire", () => {
 
   it("reads findings by group, counting kept spans an erasure overrides", async () => {
     const { workspace, api } = await anAdmin();
-    const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
+    const { connectedSourceId, documentId } = await unpublishedConnectedSource(
+      workspace.workspaceId,
+    );
     const kept = await seededIn(app, async (seed) => {
       await seed.finding({ workspaceId: workspace.workspaceId, documentId });
       return seed.finding({
@@ -582,7 +588,7 @@ describe("the Sources procedures over the wire", () => {
         restoreReason: "The sort code is the company's own.",
       });
     });
-    await finishedRun(workspace.workspaceId, bindingId, {
+    await finishedRun(workspace.workspaceId, connectedSourceId, {
       documents: 1,
       chunks: 1,
       [OVERRIDDEN_KEY]: [
@@ -595,7 +601,7 @@ describe("the Sources procedures over the wire", () => {
       ],
     });
 
-    const findings = await api.sources.findings.query({ bindingId });
+    const findings = await api.sources.findings.query({ connectedSourceId });
 
     expect(findings).toEqual([
       {
@@ -615,7 +621,9 @@ describe("the Sources procedures over the wire", () => {
 
   it("keeps findings in text, hiding finding ids, queuing a run", async () => {
     const { workspace, api } = await anAdmin();
-    const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
+    const { connectedSourceId, documentId } = await unpublishedConnectedSource(
+      workspace.workspaceId,
+    );
     const { one, other } = await seededIn(app, async (seed) => ({
       one: await seed.finding({ workspaceId: workspace.workspaceId, documentId }),
       other: await seed.finding({
@@ -627,7 +635,7 @@ describe("the Sources procedures over the wire", () => {
     }));
 
     const kept = await api.sources.keepInText.mutate({
-      bindingId,
+      connectedSourceId,
       findingGroups: [
         {
           documentId,
@@ -640,7 +648,7 @@ describe("the Sources procedures over the wire", () => {
     });
 
     expect(kept).toEqual({
-      bindingId,
+      connectedSourceId,
       documentIds: [documentId],
       batchId: expect.any(String),
       jobId: expect.any(String),
@@ -648,23 +656,28 @@ describe("the Sources procedures over the wire", () => {
     const answered = JSON.stringify(kept);
     expect(answered).not.toContain(one.id);
     expect(answered).not.toContain(other.id);
-    const runs = await api.runs.ofSubject.query({ subjectId: bindingId });
+    const runs = await api.runs.ofSubject.query({ subjectId: connectedSourceId });
     expect(runs.map((run) => [run.jobId, run.reason, run.status])).toEqual([
       [kept.jobId, "restored", "queued"],
     ]);
   });
 
   it("dismisses a special-category group and queues the run reading it", async () => {
-    const { api, bindingId, documentId } = await anAdminWhoseBindingHoldsAHealthCue();
+    const { api, connectedSourceId, documentId } =
+      await anAdminWhoseConnectedSourceHoldsAHealthCue();
 
     const dismissed = await api.sources.dismissAsNotSpecialCategory.mutate({
-      bindingId,
+      connectedSourceId,
       findingGroups: [{ documentId, ...A_HEALTH_CUE, tier: "always" }],
       reason: "Our engineers diagnose faults in pumps, never in people.",
     });
 
-    expect(dismissed).toEqual({ bindingId, documentIds: [documentId], jobId: expect.any(String) });
-    const runs = await api.runs.ofSubject.query({ subjectId: bindingId });
+    expect(dismissed).toEqual({
+      connectedSourceId,
+      documentIds: [documentId],
+      jobId: expect.any(String),
+    });
+    const runs = await api.runs.ofSubject.query({ subjectId: connectedSourceId });
     expect(runs.map((run) => [run.jobId, run.reason, run.status])).toEqual([
       [dismissed.jobId, "dismissed", "queued"],
     ]);
@@ -672,11 +685,13 @@ describe("the Sources procedures over the wire", () => {
 
   it("refuses to dismiss a non-special-category group in its own word", async () => {
     const { workspace, api } = await anAdmin();
-    const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
+    const { connectedSourceId, documentId } = await unpublishedConnectedSource(
+      workspace.workspaceId,
+    );
 
     const refused = await refusalOfCall(
       api.sources.dismissAsNotSpecialCategory.mutate({
-        bindingId,
+        connectedSourceId,
         findingGroups: [
           {
             documentId,
@@ -699,11 +714,13 @@ describe("the Sources procedures over the wire", () => {
 
   it("narrows the documents a finding group sits in", async () => {
     const { workspace, api } = await anAdmin();
-    const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
+    const { connectedSourceId, documentId } = await unpublishedConnectedSource(
+      workspace.workspaceId,
+    );
     await seededIn(app, (seed) => seed.finding({ workspaceId: workspace.workspaceId, documentId }));
 
     const narrowed = await api.sources.narrowDocuments.mutate({
-      bindingId,
+      connectedSourceId,
       findingGroups: [
         {
           documentId,
@@ -715,7 +732,7 @@ describe("the Sources procedures over the wire", () => {
     });
 
     expect(narrowed).toEqual({
-      bindingId,
+      connectedSourceId,
       documentIds: [documentId],
       sensitivity: "Restricted",
       concepts: [],
@@ -723,18 +740,18 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
-  it("publishes an indexed binding at the instant the Clock gives", async () => {
+  it("publishes an indexed source at the instant the Clock gives", async () => {
     const { workspace, api } = await anAdmin();
-    const { bindingId } = await unpublishedBinding(workspace.workspaceId);
-    await finishedRun(workspace.workspaceId, bindingId, { documents: 1, chunks: 1 });
+    const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
+    await finishedRun(workspace.workspaceId, connectedSourceId, { documents: 1, chunks: 1 });
 
     const published = await api.sources.publish.mutate({
-      bindingId,
+      connectedSourceId,
       confirmations: THE_THREE_CONFIRMATIONS,
     });
 
     expect(published).toEqual({
-      bindingId,
+      connectedSourceId,
       auditEventId: expect.any(String),
       dpiaHash: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
@@ -742,18 +759,18 @@ describe("the Sources procedures over the wire", () => {
     expect([listed?.state, listed?.publishedAt]).toEqual(["published", "2026-09-23T09:00:00.000Z"]);
   });
 
-  it("narrows a binding's class", async () => {
+  it("narrows a connected source's class", async () => {
     const { workspace, api } = await anAdmin();
-    const { bindingId } = await unpublishedBinding(workspace.workspaceId);
+    const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
 
     const narrowed = await api.sources.narrow.mutate({
-      bindingId,
+      connectedSourceId,
       sensitivity: "Restricted",
       audience: "everyone",
     });
 
     expect(narrowed).toEqual({
-      bindingId,
+      connectedSourceId,
       auditEventId: expect.any(String),
       visibility: { sensitivity: "Restricted", audience: "everyone", audienceGroups: null },
       concepts: [],
@@ -761,21 +778,25 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
-  it("widens a binding's class, refusing a non-wider one", async () => {
+  it("widens a connected source's class, refusing a non-wider one", async () => {
     const { workspace, api } = await anAdmin();
-    const { bindingId } = await unpublishedBinding(workspace.workspaceId);
+    const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
 
     const widened = await api.sources.widen.mutate({
-      bindingId,
+      connectedSourceId,
       sensitivity: "Public",
       audience: "everyone",
     });
     const refused = await refusalOfCall(
-      api.sources.widen.mutate({ bindingId, sensitivity: "Internal", audience: "everyone" }),
+      api.sources.widen.mutate({
+        connectedSourceId,
+        sensitivity: "Internal",
+        audience: "everyone",
+      }),
     );
 
     expect(widened).toEqual({
-      bindingId,
+      connectedSourceId,
       auditEventId: expect.any(String),
       visibility: { sensitivity: "Public", audience: "everyone", audienceGroups: null },
       concepts: [],
@@ -786,13 +807,15 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
-  it("previews an unpublished binding's chunks to its Admin", async () => {
+  it("previews an unpublished connected source's chunks to its Admin", async () => {
     const { workspace, api } = await anAdmin();
-    const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
+    const { connectedSourceId, documentId } = await unpublishedConnectedSource(
+      workspace.workspaceId,
+    );
     const chunk = await seededIn(app, (seed) =>
       seed.chunk({
         workspaceId: workspace.workspaceId,
-        bindingId,
+        connectedSourceId,
         sourceDocumentId: documentId,
         content: HANDBOOK,
         locator: `chars:0-${String(HANDBOOK_BYTES)}`,
@@ -802,7 +825,7 @@ describe("the Sources procedures over the wire", () => {
       }),
     );
 
-    const previewed = await api.sources.preview.query({ bindingId });
+    const previewed = await api.sources.preview.query({ connectedSourceId });
 
     expect(previewed).toEqual([
       {

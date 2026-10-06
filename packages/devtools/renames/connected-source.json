@@ -1,0 +1,194 @@
+{
+  "noun": "binding",
+  "readerWord": "connected source",
+  "sweep": "U11. Connected source",
+  "collisions": [
+    {
+      "with": "the connector a connected source names, and the worker's database connection",
+      "codeWord": "connected source"
+    },
+    {
+      "with": "psycopg's and pg's `connect`, which open a database connection",
+      "codeWord": "connect"
+    }
+  ],
+  "words": [
+    {
+      "from": "source binding",
+      "to": "connected source"
+    },
+    {
+      "from": "source bindings",
+      "to": "connected sources"
+    },
+    {
+      "from": "binding",
+      "to": "connected source"
+    },
+    {
+      "from": "bindings",
+      "to": "connected sources"
+    },
+    {
+      "from": "bind",
+      "to": "connect"
+    },
+    {
+      "from": "binds",
+      "to": "connects"
+    }
+  ],
+  "symbols": {
+    "paths": [
+      "packages/schema/src/**",
+      "packages/schema/scripts/**",
+      "packages/schema/test/**",
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/web/journeys/**"
+    ]
+  },
+  "text": {
+    "paths": [
+      "packages/schema/src/**",
+      "packages/schema/scripts/**",
+      "packages/schema/test/**",
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/web/journeys/**",
+      "apps/worker/src/better_answers_worker/**",
+      "apps/worker/tests/**",
+      "contracts/emptying-a-connected-source/**",
+      "contracts/queue/**",
+      "contracts/redaction/**",
+      "contracts/upload-media-types/**",
+      "contracts/manifest.json"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "generated after the migration",
+      "paths": [
+        "packages/schema/roles-surface.json",
+        "apps/worker/src/better_answers_worker/schema_view.py"
+      ]
+    },
+    {
+      "sense": "the refusal word, which clients read (R21)",
+      "matches": ["^no-such-binding$"]
+    },
+    {
+      "sense": "the stored detail key, which audit rows keep (R22)",
+      "paths": [
+        "apps/web/src/features/people/audit-details.ts",
+        "apps/web/test/audit-sentences.test.ts"
+      ],
+      "matches": ["^bindingId$"]
+    },
+    {
+      "sense": "the binding_id column on index.chunk and its view, which the passage sweep renames (U12)",
+      "matches": [
+        "\"index\"\\.chunk",
+        "readable_chunk",
+        "\\bc\\.binding_id\\b",
+        "chunk_binding_id",
+        "chunk_workspace_id_binding_id",
+        "binding_id, source_document_id"
+      ]
+    },
+    {
+      "sense": "the binding_id column on index.chunk, as the worker and the column tests name it (U12)",
+      "paths": [
+        "packages/schema/src/index-tables.ts",
+        "apps/worker/src/better_answers_worker/pipeline/rows.py",
+        "apps/worker/tests/factories.py",
+        "apps/worker/tests/test_pipeline_host.py",
+        "apps/worker/tests/test_pipeline_index.py",
+        "packages/schema/test/chunk-columns.test.ts",
+        "apps/api/tests/local-database.test.ts",
+        "packages/core/test/document-chunk.contract.test.ts",
+        "packages/core/test/erasure-replay.test.ts",
+        "packages/core/test/erasure-routine.test.ts",
+        "packages/core/test/passages.test.ts"
+      ],
+      "matches": ["^binding_id$", "content, binding_id"]
+    },
+    {
+      "sense": "the worker's store directory and its size key, which the passage sweep renames (U12)",
+      "matches": ["^BINDING_STORE$", "^binding$", "^binding:", "LMDB_MAX_BYTES_PER_BINDING"],
+      "paths": [
+        "apps/worker/src/better_answers_worker/pipeline/host.py",
+        "apps/worker/src/better_answers_worker/pipeline/__init__.py",
+        "apps/worker/src/better_answers_worker/config.py",
+        "apps/worker/tests/**",
+        "packages/core/test/cross-tier-document.test.ts"
+      ]
+    },
+    {
+      "sense": "the sign-in link's binding cookie, which ties a link to one browser",
+      "matches": ["binding cookie"]
+    },
+    {
+      "sense": "a component's own prop for its vim key bindings",
+      "matches": ["^vimBindings$"]
+    },
+    {
+      "sense": "an erasure report's action key, which erasure requests store (R22)",
+      "matches": ["bindingsReindexed"]
+    },
+    {
+      "sense": "a fixture's ULID, which must stay 26 characters",
+      "matches": ["^01K5T0+BIND\\d$"]
+    },
+    {
+      "sense": "the sign-in link's cookie and the act that sets it, which tie a link to one browser",
+      "paths": ["apps/api/src/auth/**"]
+    },
+    {
+      "sense": "setting a SQL statement's parameter, as the store door's helper names it",
+      "paths": [
+        "packages/core/src/store/postgres/index.ts",
+        "packages/core/src/audit/index.ts",
+        "packages/core/src/members/audit-log.ts",
+        "packages/core/src/members/invitation-statuses.ts"
+      ],
+      "matches": ["^[Bb]ind$"]
+    },
+    {
+      "sense": "the words test's planted fixtures, which name the word they test",
+      "paths": ["apps/api/tests/avoid-words.test.ts"]
+    },
+    {
+      "sense": "the table's name before migration 0068, as older migrations and snapshots write it",
+      "paths": [
+        "packages/schema/test/job-kinds.test.ts",
+        "packages/schema/test/renamed-names.test.ts"
+      ],
+      "matches": ["source_binding", "^binding$"]
+    },
+    {
+      "sense": "the stored subject kind, which audit rows keep (R22)",
+      "paths": ["packages/core/src/members/audit-log.ts"],
+      "matches": ["^binding$"]
+    },
+    {
+      "sense": "a stored act name inside a statement (R22)",
+      "matches": ["sources\\.binding\\."]
+    },
+    {
+      "sense": "the sign-in link's cookie, which binds a link to the browser that asked",
+      "paths": ["apps/api/tests/sign-in-link.test.ts"],
+      "matches": ["binds the browser"]
+    }
+  ]
+}

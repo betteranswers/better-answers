@@ -1,6 +1,6 @@
 import { boundarySchemas, ULID } from "@better-answers/schema";
 
-import { act, declareActs, recordEach } from "../audit/index.ts";
+import { act, declareActs, recordEach, STORED_DETAIL_KEYS } from "../audit/index.ts";
 import { attempt, err, ok, type PlatformPrincipal, type Result } from "../kernel/index.ts";
 import {
   listWorkspaceObjects,
@@ -9,7 +9,7 @@ import {
   type StoredObject,
 } from "../store/objects/index.ts";
 import { withScope, type PostgresDoor } from "../store/postgres/index.ts";
-import { UPLOAD_ORIGINALS_PREFIX } from "./binding.ts";
+import { UPLOAD_ORIGINALS_PREFIX } from "./connected-source.ts";
 
 const UPLOAD_SWEEP_ACTOR = "process:better-answers-uploads";
 
@@ -23,7 +23,10 @@ export const UPLOAD_SWEEP: UploadSweepPrincipal = {
 };
 
 const SWEEP_ACTS = declareActs("sources", {
-  swept: act("sources.upload.swept", { bindingId: "id", documentId: "id?" }),
+  swept: act("sources.upload.swept", {
+    [STORED_DETAIL_KEYS.connectedSourceId]: "id",
+    documentId: "id?",
+  }),
 });
 
 export const ORPHANED_UPLOAD_GRACE_HOURS = 24;
@@ -31,8 +34,8 @@ export const ORPHANED_UPLOAD_GRACE_HOURS = 24;
 const AN_HOUR_MS = 60 * 60 * 1000;
 
 /**
- * Both shapes stand in the store: `uploads/<binding>/<document>/original` and
- * `uploads/<binding>/original`.
+ * Both shapes stand in the store: `uploads/<connected source>/<document>/original` and
+ * `uploads/<connected source>/original`.
  */
 const AN_ORIGINAL = /^uploads\/([^/]+)\/(?:([^/]+)\/)?original$/;
 
@@ -54,7 +57,7 @@ export type SweepUploadsInput = {
 
 export type SweepUploadsRefusal = "malformed" | Error;
 
-type KeyIds = { readonly bindingId: string; readonly documentId?: string };
+type KeyIds = { readonly connectedSourceId: string; readonly documentId?: string };
 
 const idOf = (segment: string | undefined): string | undefined => {
   const id = segment?.toUpperCase();
@@ -62,12 +65,12 @@ const idOf = (segment: string | undefined): string | undefined => {
 };
 
 const idsOfKey = (key: string): KeyIds | undefined => {
-  const [, binding, document] = AN_ORIGINAL.exec(key) ?? [];
-  const bindingId = idOf(binding);
-  if (bindingId === undefined) return undefined;
-  if (document === undefined) return { bindingId };
+  const [, connectedSource, document] = AN_ORIGINAL.exec(key) ?? [];
+  const connectedSourceId = idOf(connectedSource);
+  if (connectedSourceId === undefined) return undefined;
+  if (document === undefined) return { connectedSourceId };
   const documentId = idOf(document);
-  return documentId === undefined ? undefined : { bindingId, documentId };
+  return documentId === undefined ? undefined : { connectedSourceId, documentId };
 };
 
 const asDefect = async <Value, Word>(
@@ -93,7 +96,10 @@ const recordTheSweep = async (
         platform,
         tx,
         SWEEP_ACTS.swept,
-        swept.map((ids) => ({ subjectId: ids.bindingId, detail: ids })),
+        swept.map(({ connectedSourceId, ...document }) => ({
+          subjectId: connectedSourceId,
+          detail: { [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId, ...document },
+        })),
       ),
     ),
   );
@@ -145,7 +151,7 @@ const removeOrphans = async (
 
 /**
  * Removes each original under `uploads/` that no document names once past the grace hours: a
- * failed bind's, or a lost race's. Each removal's audit event names its binding, and its document
+ * failed connect's, or a lost race's. Each removal's audit event names its source, and its document
  * when the key has one. `dryRun` only counts. A failed removal is an Error saying how many went
  * first.
  */

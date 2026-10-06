@@ -189,12 +189,12 @@ describe("what the api puts on the worker's queue", () => {
   });
 });
 
-const BINDING = "01K4Q9F3V8YXP7R2M6ZKWC3TDS";
+const CONNECTED_SOURCE = "01K4Q9F3V8YXP7R2M6ZKWC3TDS";
 
-const ANOTHER_BINDING = "01K4Q9F3V8YXP7R2M6ZKWC3TDT";
+const ANOTHER_CONNECTED_SOURCE = "01K4Q9F3V8YXP7R2M6ZKWC3TDT";
 
 const boundJob = (workspaceId: WorkspaceId) =>
-  ({ workspaceId, kind: "index", subjectId: BINDING, reason: "bound" }) as const;
+  ({ workspaceId, kind: "index", subjectId: CONNECTED_SOURCE, reason: "connected" }) as const;
 
 const actOf = <T>(scenario: Scenario, work: (tx: Tx) => Promise<T>): Promise<T> =>
   withScope(mapMaintenance, scenario.postgres, scenario.workspaceId, (tx) => work(tx));
@@ -233,7 +233,7 @@ describe("an act landing its rows and job in one transaction", () => {
     expect(await jobsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("answers an already-queued binding's job id, and the act commits", async () => {
+  it("answers an already-queued source's job id, and the act commits", async () => {
     const scenario = await arrange();
     const firstJobId = await queuedBound(scenario);
 
@@ -252,8 +252,8 @@ describe("an act landing its rows and job in one transaction", () => {
       {
         id: firstJobId,
         kind: "index",
-        subject_id: BINDING,
-        reason: "bound",
+        subject_id: CONNECTED_SOURCE,
+        reason: "connected",
         status: "queued",
       },
     ]);
@@ -315,14 +315,14 @@ describe("an act landing its rows and job in one transaction", () => {
     expect(await jobsIn(scenario.workspaceId)).toHaveLength(1);
   });
 
-  it("queues a second binding separately, one run key per subject", async () => {
+  it("queues a second source separately, one run key per subject", async () => {
     const scenario = await arrange();
 
     const firstJobId = await queuedBound(scenario);
     const other = await actOf(scenario, (tx) =>
       enqueueJobIn(mapMaintenance, tx, {
         ...boundJob(scenario.workspaceId),
-        subjectId: ANOTHER_BINDING,
+        subjectId: ANOTHER_CONNECTED_SOURCE,
       }),
     );
 
@@ -331,27 +331,30 @@ describe("an act landing its rows and job in one transaction", () => {
       {
         id: firstJobId,
         kind: "index",
-        subject_id: BINDING,
-        reason: "bound",
+        subject_id: CONNECTED_SOURCE,
+        reason: "connected",
         status: "queued",
       },
       {
         id: other.value.jobId,
         kind: "index",
-        subject_id: ANOTHER_BINDING,
-        reason: "bound",
+        subject_id: ANOTHER_CONNECTED_SOURCE,
+        reason: "connected",
         status: "queued",
       },
     ]);
   });
 
   it.each([
-    ["an index job with no subject", { kind: "index", reason: "bound" }],
-    ["a nightly audit naming a subject", { kind: "nightly-audit", subjectId: BINDING }],
+    ["an index job with no subject", { kind: "index", reason: "connected" }],
+    ["a nightly audit naming a subject", { kind: "nightly-audit", subjectId: CONNECTED_SOURCE }],
     ["a rebuild with none of its reasons", { kind: "full-rebuild" }],
-    ["an index reason on a rebuild", { kind: "full-rebuild", reason: "bound" }],
-    ["a rebuild reason on an index job", { kind: "index", subjectId: BINDING, reason: "drill" }],
-    ["a kind the queue does not carry", { kind: "prune", subjectId: BINDING }],
+    ["an index reason on a rebuild", { kind: "full-rebuild", reason: "connected" }],
+    [
+      "a rebuild reason on an index job",
+      { kind: "index", subjectId: CONNECTED_SOURCE, reason: "drill" },
+    ],
+    ["a kind the queue does not carry", { kind: "prune", subjectId: CONNECTED_SOURCE }],
   ])("refuses %s as malformed", async (_what, asked) => {
     const scenario = await arrange();
 
@@ -403,8 +406,8 @@ describe("an act landing its rows and job in one transaction", () => {
       {
         id: queued.value.jobId,
         kind: "index",
-        subject_id: BINDING,
-        reason: "bound",
+        subject_id: CONNECTED_SOURCE,
+        reason: "connected",
         status: "queued",
       },
     ]);

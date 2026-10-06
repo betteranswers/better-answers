@@ -6,7 +6,7 @@ published for test data, and the sort codes and account numbers are issued to no
 
 | File | What it holds | What it proves |
 | --- | --- | --- |
-| `supplier-information-pack.md` | Ten headings and the eight spans a real supplier pack was flagged for — an officers block, a home address around a signatory's name, two email addresses on different domains, a date of birth in context, a health sentence, an NHS number, a sort code with its account number and a fenced one that looks like it | What the seam finds, at which tier, and what each binding writes out. The counts are `planted_page.py`'s and the image suite holds the same page to the same answers |
+| `supplier-information-pack.md` | Ten headings and the eight spans a real supplier pack was flagged for — an officers block, a home address around a signatory's name, two email addresses on different domains, a date of birth in context, a health sentence, an NHS number, a sort code with its account number and a fenced one that looks like it | What the seam finds, at which tier, and what each connected source writes out. The counts are `planted_page.py`'s and the image suite holds the same page to the same answers |
 | `depot-delivery-terms.txt` | Six paragraphs of a depot's terms and **no heading at all**, one of them 661 characters — longer than the ceiling a run is read whole to | That a page's length decides nothing on a document with no heading either. Plain text is what T-130's converter lands byte for byte, so this is the shape a real one arrives in; its long paragraph is the only road to the stepping branch of `AnchoredWindows`, which is where the word-boundary rule still has work to do (T-177) |
 
 The planted page is Markdown rather than a Python string so that the worker image's own

@@ -21,13 +21,19 @@ export const REBUILD_REASONS = [
   "drill",
 ] as const;
 
-export const INDEX_REASONS = ["bound", "restored", "dismissed", "rule-change", "wiped"] as const;
+export const INDEX_REASONS = [
+  "connected",
+  "restored",
+  "dismissed",
+  "rule-change",
+  "wiped",
+] as const;
 
 /**
  * The store is the target-state tracking: rows deleted beside a store left standing are
  * re-upserted by nothing, the engine believing them landed.
  */
-export const REASONS_EMPTYING_THE_BINDING = [
+export const REASONS_EMPTYING_THE_CONNECTED_SOURCE = [
   "rule-change",
   "wiped",
 ] as const satisfies readonly (typeof INDEX_REASONS)[number][];
