@@ -714,6 +714,7 @@ describe("the glossary's entries", () => {
       "It runs once per claim.",
       "",
       "### connected source",
+      "",
       "_Code rename pending._ an Admin's connection of one source.",
       "## Flagged ambiguities",
       "- **cursor** — _Internal._ a bullet entry beside the headed ones.",

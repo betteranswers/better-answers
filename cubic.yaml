@@ -24,8 +24,9 @@ reviews:
 
     - `AGENTS.md` — the map: layout, how a task is worked, which skill applies.
     - `CONCEPTS.md` — the glossary. Every domain word has one settled meaning.
-      A new domain word is settled here BEFORE it appears in code; a diff that
-      introduces a domain term absent from the glossary is a finding.
+      A new domain word is defined here in the same change as the code that
+      first uses it, or before; a diff that introduces a domain term absent from
+      the glossary at its head is a finding.
     - `CODING_STANDARDS.md` — the constitution.
     - `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md`,
       `apps/worker/CODING_STANDARDS.md` and `deploy/CODING_STANDARDS.md` — a directory's
