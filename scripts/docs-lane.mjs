@@ -43,10 +43,25 @@ const isAnImageInput = (changed) =>
 /** Unsure means `yes`: a probe run needlessly costs minutes; one skipped ships an image unread. */
 const imagesOf = (paths) => (paths.length === 0 || paths.some(isAnImageInput) ? "yes" : "no");
 
+const DEPENDENCY_INPUTS = [
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "apps/worker/pyproject.toml",
+  "apps/worker/uv.lock",
+];
+
+const isADependencyInput = (changed) => isAManifest(changed) || DEPENDENCY_INPUTS.includes(changed);
+
+/** Unsure means `yes`: a typecheck run needlessly costs minutes; one skipped reaches the queue. */
+const dependenciesOf = (paths) =>
+  paths.length === 0 || paths.some(isADependencyInput) ? "yes" : "no";
+
 /** One separator, never both: a NUL stream split on newlines too reads one path as two. */
 const changedPaths = (raw) =>
   raw.split(raw.includes("\0") ? "\0" : "\n").filter((changed) => changed.length > 0);
 
 const changed = changedPaths(readFileSync(0, "utf8"));
 
-process.stdout.write(`lane=${laneOf(changed)}\nimages=${imagesOf(changed)}\n`);
+process.stdout.write(
+  `lane=${laneOf(changed)}\nimages=${imagesOf(changed)}\ndependencies=${dependenciesOf(changed)}\n`,
+);

@@ -37,6 +37,7 @@ jobs:
     outputs:
       lane: ${{ steps.lane.outputs.lane }}
       images: ${{ steps.lane.outputs.images }}
+      dependencies: ${{ steps.lane.outputs.dependencies }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,21 +49,21 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           MERGE_GROUP_TARGET: ${{ github.event.merge_group.base_ref }}
+          PULL_REQUEST_BASE: ${{ github.event.pull_request.base.sha }}
           PUSHED_FROM: ${{ github.event.before }}
         run: |
           # `base_sha` is the head of the group queued ahead, whose changes merge with this one, so
           # the diff starts at the target branch.
           case "${EVENT}" in
             merge_group) base="${MERGE_GROUP_TARGET}" ;;
+            pull_request) base="${PULL_REQUEST_BASE}" ;;
             push | workflow_call) base="${PUSHED_FROM}" ;;
             *) base="" ;;
           esac
           lane=full
           images=yes
-          # The queue runs the suites on the tree that lands, so a pull request runs none.
-          if [ "${EVENT}" = "pull_request" ]; then
-            lane="pr"
-          elif [ -n "${base}" ] && [ "${base}" != "0000000000000000000000000000000000000000" ] &&
+          dependencies=yes
+          if [ -n "${base}" ] && [ "${base}" != "0000000000000000000000000000000000000000" ] &&
             git fetch --no-tags --depth=1 origin "${base}" &&
             from="$(git rev-parse FETCH_HEAD)" &&
             git diff -z --name-only --no-renames "${from}" HEAD > "${RUNNER_TEMP}/changed-paths"; then
@@ -71,8 +72,17 @@ jobs:
             decided="$(node scripts/docs-lane.mjs < "${RUNNER_TEMP}/changed-paths")"
             lane="$(printf '%s\n' "${decided}" | sed -n 's/^lane=//p')"
             images="$(printf '%s\n' "${decided}" | sed -n 's/^images=//p')"
+            dependencies="$(printf '%s\n' "${decided}" | sed -n 's/^dependencies=//p')"
           else
-            echo "::notice::no diff against a base (event ${EVENT}, base '${base}'), so this run takes the full lane and probes the images"
+            echo "::notice::no diff against a base (event ${EVENT}, base '${base}'), so this run takes every path as changed"
+          fi
+          # The queue runs the suites on the tree that lands, so a pull request runs none. It
+          # typechecks when its dependencies moved, because a dependency pull request is Renovate's,
+          # and nothing ran its types before the queue; every other lane typechecks whole or not at all.
+          if [ "${EVENT}" = "pull_request" ]; then
+            lane="pr"
+          else
+            dependencies=no
           fi
           # Every leg is gated on these words, so a fourth is a run that requires nothing.
           case "${lane}" in
@@ -89,10 +99,18 @@ jobs:
               exit 1
               ;;
           esac
-          echo "this run is in the ${lane} lane, and an image's inputs changed: ${images}"
+          case "${dependencies}" in
+            yes | no) ;;
+            *)
+              echo "::error::whether a pull request's dependencies changed resolved to '${dependencies}', which is neither yes nor no"
+              exit 1
+              ;;
+          esac
+          echo "this run is in the ${lane} lane, an image's inputs changed: ${images}, and it typechecks a dependency change: ${dependencies}"
           {
             echo "lane=${lane}"
             echo "images=${images}"
+            echo "dependencies=${dependencies}"
           } >> "$GITHUB_OUTPUT"
 
   docs-gates:
@@ -328,10 +346,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
       # Read when it runs, not from the event, so a re-run reads a retitle. A merge group's ref
-      # names its pull request.
+      # names its pull request. commitlint comes from the root manifest's pins rather than an
+      # install, so a stale lockfile fails `pr-lockfile` and not this job.
       - name: the pull request's title, through commitlint
         env:
           GH_TOKEN: ${{ github.token }}
@@ -343,8 +360,57 @@ jobs:
             echo "::error::no pull request number in this event (ref '${QUEUED_REF}')"
             exit 1
           fi
+          cli="$(jq -re '.devDependencies["@commitlint/cli"]' package.json)"
+          preset="$(jq -re '.devDependencies["@commitlint/config-conventional"]' package.json)"
           title="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${number}" --jq .title)"
-          printf '%s\n' "${title}" | pnpm exec commitlint
+          printf '%s\n' "${title}" |
+            pnpm dlx --package="@commitlint/cli@${cli}" --package="@commitlint/config-conventional@${preset}" commitlint
+
+  # Every manifest against the lockfile, with nothing downloaded: a stale lockfile fails here,
+  # under its own name, before the queue's install meets it.
+  pr-lockfile:
+    needs: lane
+    if: ${{ needs.lane.outputs.lane == 'pr' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - run: pnpm install --frozen-lockfile --lockfile-only --ignore-scripts
+
+  # No lane's leg: it runs on a pull request whose dependencies moved, and the verdict wants its
+  # skip everywhere else, which a `pr-` name would not let it say.
+  dependency-typecheck:
+    needs: lane
+    if: ${{ needs.lane.outputs.dependencies == 'yes' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version-file: apps/worker/.tool-versions
+          enable-cache: true
+      - run: pnpm install --frozen-lockfile
+      # `packages/devtools`' typecheck runs mypy through the worker's environment, so a Python
+      # change reaches both halves.
+      - run: uv sync --frozen
+        working-directory: apps/worker
+      - run: pnpm -r --no-bail --if-present run typecheck
+      - run: uv run --frozen mypy
+        working-directory: apps/worker
 
   check:
     needs:
@@ -357,6 +423,8 @@ jobs:
         full-web,
         full-worker,
         pr-title,
+        pr-lockfile,
+        dependency-typecheck,
       ]
     # A skipped required check never reports, so this runs whatever the legs did.
     if: ${{ always() }}
@@ -368,6 +436,7 @@ jobs:
           LANE: ${{ needs.lane.outputs.lane }}
           LEGS: ${{ toJSON(needs) }}
           TITLE_WANTED: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'success' || 'skipped' }}
+          TYPECHECK_WANTED: ${{ (needs.lane.outputs.dependencies == 'yes') && 'success' || 'skipped' }}
         run: |
           named=0
           required=0
@@ -378,18 +447,24 @@ jobs:
             case "${leg}" in
               lane) wanted=success ;;
               pr-title) wanted="${TITLE_WANTED}" ;;
+              dependency-typecheck)
+                wanted="${TYPECHECK_WANTED}"
+                if [ "${wanted}" = "success" ]; then required=$((required + 1)); fi
+                ;;
               "${LANE}-"*) wanted=success; required=$((required + 1)) ;;
               *) wanted=skipped ;;
             esac
             echo "${leg}: ${was} (this lane wants ${wanted})"
             [ "${was}" = "${wanted}" ] || wrong="${wrong} ${leg}=${was}"
           done
-          # The pr lane runs no leg, so the title it reads is the one thing it requires.
+          # The title is the one thing every pull request is read for, so the pr lane requires it.
           if [ "${LANE}" = "pr" ] && [ "${TITLE_WANTED}" = "success" ]; then
             required=$((required + 1))
           fi
-          # A floor, not a count to keep current: a verdict requiring nothing of anybody passes.
-          if [ "${named}" -lt 2 ] || [ "${required}" -lt 1 ]; then
+          # A floor, not a count to keep current: a verdict requiring nothing of anybody passes, and
+          # a pr-lane verdict that read no title passes on the lockfile alone.
+          if [ "${named}" -lt 2 ] || [ "${required}" -lt 1 ] ||
+            { [ "${LANE}" = "pr" ] && [ "${TITLE_WANTED}" != "success" ]; }; then
             echo "::error::this verdict read ${named} jobs and required ${required} of them, so it proved nothing"
             exit 1
           fi

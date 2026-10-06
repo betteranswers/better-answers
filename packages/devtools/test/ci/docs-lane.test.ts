@@ -40,20 +40,28 @@ type Decision = { readonly lane: string; readonly images: string };
 const answerOf = (published: string, key: string): string =>
   new RegExp(`^${key}=(?<value>.*)$`, "m").exec(published)?.groups?.["value"] ?? "";
 
-const decide = (changed: readonly string[], separator = "\n"): Decision => {
+const answersTo = (changed: readonly string[], separator = "\n"): string => {
   const run = spawnSync("node", [path.join(repositoryRoot, LANE_SCRIPT)], {
     input: changed.map((changedPath) => `${changedPath}${separator}`).join(""),
     encoding: "utf8",
   });
 
   expect(run.status, `${LANE_SCRIPT} ended non-zero: ${run.stderr}`).toBe(0);
-  return { lane: answerOf(run.stdout, "lane"), images: answerOf(run.stdout, "images") };
+  return run.stdout;
+};
+
+const decide = (changed: readonly string[], separator = "\n"): Decision => {
+  const answered = answersTo(changed, separator);
+  return { lane: answerOf(answered, "lane"), images: answerOf(answered, "images") };
 };
 
 const laneOf = (changed: readonly string[], separator = "\n"): string =>
   decide(changed, separator).lane;
 
 const imagesOf = (changed: readonly string[]): string => decide(changed).images;
+
+const dependenciesOf = (changed: readonly string[]): string =>
+  answerOf(answersTo(changed), "dependencies");
 
 type LaneCase = {
   readonly changed: readonly string[];
@@ -249,6 +257,28 @@ describe("which lane a change runs in", () => {
     expect(laneOf(["docs/a.md", "docs/b.md"], "\0")).toEqual("docs");
     expect(laneOf(["docs/a\nb.md"], "\0")).toEqual("docs");
     expect(laneOf(["docs/a.md", "src/b.ts"], "\0")).toEqual("full");
+  });
+});
+
+describe("which paths are a dependency change", () => {
+  it.each([
+    "package.json",
+    "apps/api/package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "apps/worker/pyproject.toml",
+    "apps/worker/uv.lock",
+  ])("typechecks a pull request that changes %s", (changed) => {
+    expect(dependenciesOf(["apps/api/src/main.ts", changed])).toEqual("yes");
+  });
+
+  it("leaves a change to no manifest or lockfile untypechecked", () => {
+    expect(dependenciesOf(["apps/api/src/main.ts", "docs/vision.md"])).toEqual("no");
+    expect(dependenciesOf(["apps/web/package.json.bak", "packages/core/uv.lock"])).toEqual("no");
+  });
+
+  it("typechecks when given no paths", () => {
+    expect(dependenciesOf([])).toEqual("yes");
   });
 });
 
@@ -518,6 +548,11 @@ const FAN_IN = "check";
 /** No lane's leg, though its name starts like the pr lane's: it reads the title in the queue too. */
 const TITLE_JOB = "pr-title";
 
+/** No lane's leg either: it runs on a pull request whose dependencies moved, and nowhere else. */
+const TYPECHECK_JOB = "dependency-typecheck";
+
+const LOCKFILE_JOB = "pr-lockfile";
+
 const checkJobs = (): Readonly<Record<string, Job>> => workflow("check.yml").jobs;
 
 /** The fan-in reads the prefix to decide what it requires, so it is load-bearing, not tidiness. */
@@ -602,16 +637,60 @@ type LaneStepCase = {
   readonly lane: string;
 
   readonly images: string;
+
+  readonly dependencies: string;
 };
+
+const aPullRequestOn = (base: string): Context => ({
+  "github.event_name": "pull_request",
+  "github.event.pull_request.base.sha": base,
+});
 
 const LANE_STEPS: readonly LaneStepCase[] = [
   {
-    run: "a pull request",
-    github: { "github.event_name": "pull_request" },
+    run: "a pull request changing the lockfile",
+    github: aPullRequestOn(TARGET_TIP),
     fetched: true,
     changedSince: { [TARGET_TIP]: ["pnpm-lock.yaml"] },
     lane: "pr",
     images: "yes",
+    dependencies: "yes",
+  },
+  {
+    run: "a pull request changing the worker's lockfile",
+    github: aPullRequestOn(TARGET_TIP),
+    fetched: true,
+    changedSince: { [TARGET_TIP]: ["apps/worker/uv.lock"] },
+    lane: "pr",
+    images: "yes",
+    dependencies: "yes",
+  },
+  {
+    run: "a pull request changing source",
+    github: aPullRequestOn(TARGET_TIP),
+    fetched: true,
+    changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts"] },
+    lane: "pr",
+    images: "no",
+    dependencies: "no",
+  },
+  {
+    run: "a docs-only pull request",
+    github: aPullRequestOn(TARGET_TIP),
+    fetched: true,
+    changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
+    lane: "pr",
+    images: "no",
+    dependencies: "no",
+  },
+  {
+    run: "an unfetched pull request base",
+    github: aPullRequestOn(TARGET_TIP),
+    fetched: false,
+    changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts"] },
+    lane: "pr",
+    images: "yes",
+    dependencies: "yes",
   },
   {
     run: "a docs-only merge group",
@@ -620,6 +699,7 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
     lane: "docs",
     images: "no",
+    dependencies: "no",
   },
   {
     run: "a merge group changing source",
@@ -628,6 +708,7 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts"] },
     lane: "full",
     images: "no",
+    dependencies: "no",
   },
   {
     run: "a merge group changing a lockfile",
@@ -636,6 +717,7 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts", "pnpm-lock.yaml"] },
     lane: "full",
     images: "yes",
+    dependencies: "no",
   },
   {
     run: "a docs group behind an image change",
@@ -647,6 +729,7 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     },
     lane: "full",
     images: "yes",
+    dependencies: "no",
   },
   {
     run: "a test-only group behind an image change",
@@ -658,6 +741,7 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     },
     lane: "full",
     images: "yes",
+    dependencies: "no",
   },
   {
     run: "an unfetched merge group base",
@@ -666,6 +750,7 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
     lane: "full",
     images: "yes",
+    dependencies: "no",
   },
   {
     run: "a merge group with no base",
@@ -674,6 +759,7 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
     lane: "full",
     images: "yes",
+    dependencies: "no",
   },
   {
     run: "a branch's first push",
@@ -682,6 +768,7 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { ["0".repeat(40)]: ["docs/vision.md"] },
     lane: "full",
     images: "yes",
+    dependencies: "no",
   },
   {
     run: "a called run changing source",
@@ -690,13 +777,14 @@ const LANE_STEPS: readonly LaneStepCase[] = [
     changedSince: { [A_BASE]: ["packages/core/src/kernel/actor.ts"] },
     lane: "full",
     images: "no",
+    dependencies: "no",
   },
 ];
 
 type LaneStepRun = {
   readonly status: number | null;
 
-  readonly published: Decision;
+  readonly published: Decision & { readonly dependencies: string };
 
   /** The git subcommands the step ran, in order. */
   readonly asked: readonly string[];
@@ -785,7 +873,11 @@ const runTheLaneStep = (
   const outputs = readFileSync(published, "utf8");
   const run = {
     status: ran.status,
-    published: { lane: answerOf(outputs, "lane"), images: answerOf(outputs, "images") },
+    published: {
+      lane: answerOf(outputs, "lane"),
+      images: answerOf(outputs, "images"),
+      dependencies: answerOf(outputs, "dependencies"),
+    },
     asked: readFileSync(asked, "utf8")
       .split("\n")
       .filter((line) => line !== ""),
@@ -800,42 +892,64 @@ describe("the lane inside check.yml", () => {
     const run = runTheLaneStep(scenario);
 
     expect(run.status, `the step printed: ${run.output}`).toBe(0);
-    expect(run.published).toEqual({ lane: scenario.lane, images: scenario.images });
+    expect(run.published).toEqual({
+      lane: scenario.lane,
+      images: scenario.images,
+      dependencies: scenario.dependencies,
+    });
   });
 
-  it("asks git nothing on a pull request", () => {
-    const asked = LANE_STEPS.filter(
-      (scenario) => scenario.github["github.event_name"] === "pull_request",
-    ).map((scenario) => runTheLaneStep(scenario).asked);
+  it("diffs a pull request from its base", () => {
+    const run = runTheLaneStep({
+      run: "a pull request",
+      github: aPullRequestOn(A_BASE),
+      fetched: true,
+      changedSince: { [A_BASE]: ["package.json"] },
+      lane: "pr",
+      images: "yes",
+      dependencies: "yes",
+    });
 
-    expect(asked, "a pull request's run diffs a base, which only the queue's run reads").toEqual([
-      [],
-    ]);
+    expect(run.asked).toEqual(["fetch", "rev-parse", "diff"]);
+    expect(run.published.dependencies).toEqual("yes");
   });
 
   it.each([
     {
       word: "the retired affected lane",
-      answered: "lane=affected\\nimages=no\\n",
+      github: aGroupOn(TARGET_TIP),
+      answered: "lane=affected\\nimages=no\\ndependencies=no\\n",
       says: "no lane",
     },
-    { word: "an images answer of maybe", answered: "lane=full\\nimages=maybe\\n", says: "neither" },
-  ])("refuses $word, publishing nothing", ({ answered, says }) => {
+    {
+      word: "an images answer of maybe",
+      github: aGroupOn(TARGET_TIP),
+      answered: "lane=full\\nimages=maybe\\ndependencies=no\\n",
+      says: "neither",
+    },
+    {
+      word: "a pull request's dependencies answer of maybe",
+      github: aPullRequestOn(TARGET_TIP),
+      answered: "lane=full\\nimages=no\\ndependencies=maybe\\n",
+      says: "neither",
+    },
+  ])("refuses $word, publishing nothing", ({ github, answered, says }) => {
     const run = runTheLaneStep(
       {
-        run: "a merge group",
-        github: aGroupOn(TARGET_TIP),
+        run: "a change",
+        github,
         fetched: true,
         changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
         lane: "",
         images: "",
+        dependencies: "",
       },
       answered,
     );
 
     expect(run.status, `the step printed: ${run.output}`).not.toBe(0);
     expect(run.output).toContain(says);
-    expect(run.published).toEqual({ lane: "", images: "" });
+    expect(run.published).toEqual({ lane: "", images: "", dependencies: "" });
   });
 });
 
@@ -953,6 +1067,9 @@ type VerdictCase = {
 
   readonly wanted: string;
 
+  /** The dependency typecheck's result and what the fan-in wants of it; both `skipped` if absent. */
+  readonly typecheck?: { readonly was: string; readonly wanted: string };
+
   /** Drops the lane's legs from the jobs the verdict reads, as a lane with no leg would. */
   readonly withoutItsLegs?: boolean;
 
@@ -969,7 +1086,7 @@ const VERDICTS: readonly VerdictCase[] = [
     verdict: "passes",
     run: "a pull request whose title passed",
     lane: "pr",
-    ran: [],
+    ran: [LOCKFILE_JOB],
     title: "success",
     wanted: "success",
   },
@@ -977,15 +1094,23 @@ const VERDICTS: readonly VerdictCase[] = [
     verdict: "fails",
     run: "a pull request whose title failed",
     lane: "pr",
-    ran: [],
+    ran: [LOCKFILE_JOB],
     title: "failure",
+    wanted: "success",
+  },
+  {
+    verdict: "fails",
+    run: "a pull request that read no lockfile",
+    lane: "pr",
+    ran: [],
+    title: "success",
     wanted: "success",
   },
   {
     verdict: "fails",
     run: "a pull request that ran a suite",
     lane: "pr",
-    ran: ["full-api"],
+    ran: [LOCKFILE_JOB, "full-api"],
     title: "success",
     wanted: "success",
   },
@@ -993,10 +1118,46 @@ const VERDICTS: readonly VerdictCase[] = [
     verdict: "fails",
     run: "a pr lane that read no title",
     lane: "pr",
-    ran: [],
+    ran: [LOCKFILE_JOB],
     title: "skipped",
     wanted: "skipped",
     says: PROVED_NOTHING,
+  },
+  {
+    verdict: "passes",
+    run: "a dependency pull request that typechecked",
+    lane: "pr",
+    ran: [LOCKFILE_JOB],
+    title: "success",
+    wanted: "success",
+    typecheck: { was: "success", wanted: "success" },
+  },
+  {
+    verdict: "fails",
+    run: "a dependency pull request whose typecheck failed",
+    lane: "pr",
+    ran: [LOCKFILE_JOB],
+    title: "success",
+    wanted: "success",
+    typecheck: { was: "failure", wanted: "success" },
+  },
+  {
+    verdict: "fails",
+    run: "a dependency pull request that skipped its typecheck",
+    lane: "pr",
+    ran: [LOCKFILE_JOB],
+    title: "success",
+    wanted: "success",
+    typecheck: { was: "skipped", wanted: "success" },
+  },
+  {
+    verdict: "fails",
+    run: "a merge group that typechecked dependencies",
+    lane: "full",
+    ran: FULL_LEGS,
+    title: "success",
+    wanted: "success",
+    typecheck: { was: "success", wanted: "skipped" },
   },
   {
     verdict: "passes",
@@ -1057,10 +1218,11 @@ const verdictOn = ({
   ran,
   title,
   wanted,
+  typecheck = { was: "skipped", wanted: "skipped" },
   withoutItsLegs,
 }: VerdictCase): SpawnSyncReturns<string> => {
   const legs = Object.keys(checkJobs())
-    .filter((job) => job !== FAN_IN && job !== LANE && job !== TITLE_JOB)
+    .filter((job) => ![FAN_IN, LANE, TITLE_JOB, TYPECHECK_JOB].includes(job))
     .filter((job) => withoutItsLegs !== true || !job.startsWith(`${lane}-`))
     .map((job) => [job, { result: ran.includes(job) ? "success" : "skipped" }] as const);
 
@@ -1073,8 +1235,10 @@ const verdictOn = ({
         ...Object.fromEntries(legs),
         [LANE]: { result: "success" },
         [TITLE_JOB]: { result: title },
+        [TYPECHECK_JOB]: { result: typecheck.was },
       }),
       TITLE_WANTED: wanted,
+      TYPECHECK_WANTED: typecheck.wanted,
     },
   });
 };
@@ -1094,13 +1258,17 @@ describe("the one verdict check.yml reports", () => {
     ).toEqual("${{ always() }}");
   });
 
-  it("wants the title job's success exactly where it runs", () => {
-    const runsOn = /^\$\{\{ (?<condition>.+) \}\}$/.exec(checkJobs()[TITLE_JOB]?.if ?? "")
-      ?.groups?.["condition"];
+  it.each([
+    { job: TITLE_JOB, wantedBy: "TITLE_WANTED" },
+    { job: TYPECHECK_JOB, wantedBy: "TYPECHECK_WANTED" },
+  ])("wants $job's success exactly where it runs", ({ job, wantedBy }) => {
+    const runsOn = /^\$\{\{ (?<condition>.+) \}\}$/.exec(checkJobs()[job]?.if ?? "")?.groups?.[
+      "condition"
+    ];
     const env = stepsOfJob(FAN_IN).flatMap((step) => Object.entries(step.env ?? {}));
 
-    expect(runsOn, "the title job runs on no condition this reading can find").toBeDefined();
-    expect(Object.fromEntries(env)["TITLE_WANTED"]).toEqual(
+    expect(runsOn, `${job} runs on no condition this reading can find`).toBeDefined();
+    expect(Object.fromEntries(env)[wantedBy]).toEqual(
       `\${{ (${runsOn ?? ""}) && 'success' || 'skipped' }}`,
     );
   });
@@ -1114,19 +1282,41 @@ describe("the one verdict check.yml reports", () => {
     expect(ran.stdout).toContain(
       `${TITLE_JOB}: ${scenario.title} (this lane wants ${scenario.wanted})`,
     );
+    expect(ran.stdout).toContain(
+      `${TYPECHECK_JOB}: ${scenario.typecheck?.was ?? "skipped"} (this lane wants ${scenario.typecheck?.wanted ?? "skipped"})`,
+    );
     expect(ran.stdout).toContain(scenario.says ?? "");
   });
 });
 
 describe("the pull request's title, read by check.yml", () => {
-  const TITLE_COMMAND = "pnpm exec commitlint";
+  const TITLE_COMMAND = "commitlint";
   const PULL_REQUEST = "7";
   const REPOSITORY = "betteranswers/better-answers";
   const CONVENTIONAL = "ci: check the pull request's title with commitlint";
   const FROM_A_PULL_REQUEST = { PULL_REQUEST, QUEUED_REF: "" };
 
+  const COMMITLINT = ["@commitlint/cli", "@commitlint/config-conventional"];
+
   const titleStep = (): Step | undefined =>
     stepsOfJob(TITLE_JOB).find((one) => (one.run ?? "").includes(TITLE_COMMAND));
+
+  const pinnedVersion = (name: string): string =>
+    z
+      .object({ devDependencies: z.record(z.string(), z.string()) })
+      .parse(JSON.parse(read("package.json"))).devDependencies[name] ?? "";
+
+  const installedVersion = (name: string): string =>
+    z
+      .object({ version: z.string() })
+      .parse(JSON.parse(read(path.join("node_modules", name, "package.json")))).version;
+
+  /** The installed commitlint, run in dlx's place so the test never reaches the registry. */
+  const offlineDlx = (): string => {
+    const asked = COMMITLINT.map((name) => `--package=${name}@${installedVersion(name)}`);
+    const installed = path.join(repositoryRoot, "node_modules", ".bin", "commitlint");
+    return `#!/bin/sh\n[ "$*" = "dlx ${asked.join(" ")} commitlint" ] || { echo "pnpm was asked: $*" >&2; exit 3; }\nexec '${installed}'\n`;
+  };
 
   /** gh answers the one question the step should ask, and fails any other. */
   const titleStepWith = (
@@ -1139,6 +1329,8 @@ describe("the pull request's title, read by check.yml", () => {
       `#!/bin/sh\n[ "$*" = "api repos/${REPOSITORY}/pulls/${PULL_REQUEST} --jq .title" ] || exit 3\nprintf '%s\\n' "$TITLE"\n`,
     );
     chmodSync(path.join(bin, "gh"), 0o755);
+    writeFileSync(path.join(bin, "pnpm"), offlineDlx());
+    chmodSync(path.join(bin, "pnpm"), 0o755);
     const ran = spawnSync("bash", ["-e", "-c", titleStep()?.run ?? "exit 9"], {
       cwd: repositoryRoot,
       encoding: "utf8",
@@ -1153,6 +1345,10 @@ describe("the pull request's title, read by check.yml", () => {
     rmSync(bin, { recursive: true, force: true });
     return ran;
   };
+
+  it("fetches the commitlint the root manifest pins and installs", () => {
+    expect(COMMITLINT.map(pinnedVersion)).toEqual(COMMITLINT.map(installedVersion));
+  });
 
   it("passes a Conventional title", () => {
     const run = titleStepWith(CONVENTIONAL, FROM_A_PULL_REQUEST);

@@ -376,8 +376,8 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
 
 /** The organisation's plan runs 20 jobs at once. */
 const CONCURRENT_JOBS = 20;
-/** A pull request runs a lane job and a title job. */
-const PULL_REQUEST_JOBS = 2;
+/** A pull request runs a lane job, a title job, a lockfile job and, when its dependencies moved, a typecheck. */
+const PULL_REQUEST_JOBS = 4;
 const A_LANE_JOB = 1;
 
 const checkLegsSchema = z.object({
