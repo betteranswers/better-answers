@@ -130,7 +130,7 @@ same as one whose Ryuk is gone. Nor is a container with no session to judge.
 
 Its suite stubs `docker` on the path for the cases that remove. Over the real daemon, it holds
 that a dry run spares a live run's container and names an ended one's.
-`test/testcontainers-patch.test.ts` holds `patches/testcontainers@12.1.0.patch`, which gives
+`test/testcontainers-patch.test.ts` holds `patches/testcontainers.patch`, which gives
 each test process a Ryuk of its own (`docs/agents/workflow.md`, *Environment*).
 
 `test/test-title-setup.test.ts` runs real vitest over a throwaway tree to prove the rendered
