@@ -145,12 +145,6 @@
       "skillPath": "skills/hono/SKILL.md",
       "computedHash": "220e5e1b12bbaeec49ec362b6e2262d77632d0536e9758bba9acbbc323fef990"
     },
-    "human-writing": {
-      "source": "factory-ai/factory-plugins",
-      "sourceType": "github",
-      "skillPath": "plugins/droid-evolved/skills/human-writing/SKILL.md",
-      "computedHash": "46f8dfb97de1db8a7bc901b863354e7a14634be2ab309d001821f1a6ea7f84f1"
-    },
     "implementing-gdpr-data-subject-access-request": {
       "source": "mukul975/anthropic-cybersecurity-skills",
       "sourceType": "github",
