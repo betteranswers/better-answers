@@ -622,10 +622,13 @@ const withTheOldMapValuesAdmitted = (fn: (client: pg.PoolClient) => Promise<void
     await client.query(theDestinationCheckBeforeTheMap());
   });
 
-const replayingItsRewrites = (client: pg.PoolClient): Promise<void> =>
+const replaying = (client: pg.PoolClient, statements: readonly string[]): Promise<void> =>
   asTheMigrationOwnerOf(client, ["TABLE public.job", "TABLE public.connected_source"], async () => {
-    for (const statement of itsStatementsOnTheValuesItRewrites()) await client.query(statement);
+    for (const statement of statements) await client.query(statement);
   });
+
+const replayingItsRewrites = (client: pg.PoolClient): Promise<void> =>
+  replaying(client, itsStatementsOnTheValuesItRewrites());
 
 const destinationsStandingIn = async (
   client: pg.PoolClient,
@@ -693,7 +696,7 @@ const itsValueRewrites = (): readonly string[] =>
       ),
   );
 
-/** The CHECK 0068 drops, by the name the map's snapshot gives it and with the state it admitted. */
+/** Added by its old name, which 0068's DROP names: the table's other renames ran with the database. */
 const theStateCheckBeforeTheRename = (): string =>
   aCheckFrom("0067_snapshot.json", "state_check", `${THE_TABLE_THE_MAP_NAMED}_state_check`);
 
@@ -708,9 +711,7 @@ const withTheOldConnectedSourceValuesAdmitted = (
   });
 
 const replayingItsValueRewrites = (client: pg.PoolClient): Promise<void> =>
-  asTheMigrationOwnerOf(client, ["TABLE public.job", "TABLE public.connected_source"], async () => {
-    for (const statement of itsValueRewrites()) await client.query(statement);
-  });
+  replaying(client, itsValueRewrites());
 
 const statesStandingIn = async (
   client: pg.PoolClient,

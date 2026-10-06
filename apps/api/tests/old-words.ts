@@ -491,6 +491,11 @@ const VENDORED: readonly CarveOut[] = [
   },
 ];
 
+const CONNECTED_SOURCE_ROWS_CARVED_OUT: readonly CarveOut[] = [
+  ...CONNECTED_SOURCE_CARVED_OUT,
+  ...VENDORED,
+];
+
 export const OLD_WORDS: readonly OldWord[] = [
   avoided("2FA", "second factor"),
   avoided("access token", "personal token"),
@@ -556,7 +561,7 @@ export const OLD_WORDS: readonly OldWord[] = [
     state: "landed",
     reach: "one sense",
     permitted: BIND_SENSES,
-    carvedOut: [...CONNECTED_SOURCE_CARVED_OUT, ...VENDORED],
+    carvedOut: CONNECTED_SOURCE_ROWS_CARVED_OUT,
   },
   {
     word: "binding",
@@ -566,7 +571,7 @@ export const OLD_WORDS: readonly OldWord[] = [
     state: "landed",
     reach: "everywhere",
     permitted: BINDING_SENSES,
-    carvedOut: [...CONNECTED_SOURCE_CARVED_OUT, ...VENDORED],
+    carvedOut: CONNECTED_SOURCE_ROWS_CARVED_OUT,
   },
   avoided("budget cap", "spending limit"),
   pending("bulk act", "bulk action", "bulk action", "action", "everywhere"),
@@ -851,7 +856,7 @@ export const OLD_WORDS: readonly OldWord[] = [
     state: "landed",
     reach: "one sense",
     permitted: REFERENCED_SENSES,
-    carvedOut: [...CONNECTED_SOURCE_CARVED_OUT, ...VENDORED],
+    carvedOut: CONNECTED_SOURCE_ROWS_CARVED_OUT,
   },
   avoided("registered client", "assistant"),
   avoided("rejection", "refusal"),

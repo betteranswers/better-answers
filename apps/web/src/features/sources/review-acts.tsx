@@ -38,11 +38,12 @@ type Settled<Answer> = {
 
 const takesAnyGroup = (): boolean => true;
 
-const reasonedAsk = (ready: TickedGroups, reason: string) => ({
+const askOf = (ready: TickedGroups) => ({
   connectedSourceId: ready.connectedSourceId,
   findingGroups: ready.groups.map(keyOf),
-  reason,
 });
+
+const reasonedAsk = (ready: TickedGroups, reason: string) => ({ ...askOf(ready), reason });
 
 /**
  * Inert until this connected source's review has ticked groups the act takes: an act over nothing is
@@ -254,10 +255,7 @@ export function NarrowDocumentsAct(properties: { readonly connectedSourceId: str
       done: (narrowed) =>
         `Narrowed ${counted(narrowed.documentIds.length, "document", "documents")} to ${NARROWEST}; ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.compositions.length, "composition", "compositions")} moved with them.`,
       run: (ready, settled) => {
-        narrow.mutate(
-          { connectedSourceId: ready.connectedSourceId, findingGroups: ready.groups.map(keyOf) },
-          settled,
-        );
+        narrow.mutate(askOf(ready), settled);
       },
     });
   };
