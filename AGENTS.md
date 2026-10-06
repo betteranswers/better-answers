@@ -78,11 +78,21 @@ Other skills live beside the code that uses them most, such as `apps/worker/.cla
 
 `project_tracker: linear`
 
-The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. It holds work not yet planned and review findings put off for later. A plan in `docs/plans/` is the unit of build work, and the pull request that lands it names its issue as `Fixes BA-N`. The tasks before Linear were ordna's `T-nnn`, and they stay readable in git. The procedure is in `docs/agents/issue-tracker.md`.
+The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. It holds work not yet planned and review findings put off for later. A plan in `docs/plans/` is the unit of build work, and the pull request that lands it names its issue in the body's issue line (*Workflow*, below). The tasks before Linear were ordna's `T-nnn`, and they stay readable in git. The procedure is in `docs/agents/issue-tracker.md`.
 
 ### Workflow
 
 Work runs on the Compound Engineering plugin (CE), pinned by release tag in `.claude/settings.json`. Renovate opens a pull request for each new release. A change goes through `/lfg`, or `/ce-plan` then `/ce-work`. `ce-commit-push-pr` opens the pull request. `arm-merge.yml` arms its merge once Cubic has read the head, and the merge queue merges it when `check` is green. CI's `check` is the arbiter.
+
+A pull request's body becomes its merge commit's body on `main`, so every body an agent writes has one form. It opens with what is now different, and `ce-commit-push-pr` sizes and arranges the rest. The body closes with these lines, after every section and before any attribution a tool appends:
+
+- `Merge risk:` is required on every body. It says whether reverting the merge commit undoes the change, `reversible` or `not reversible`, then what a failure would reach. A migration that has run, data written to a store, an email sent, or a `contracts/` change the other tier has read is not reversible.
+- The issue line follows it whenever the pull request has an issue: `Fixes BA-N` when the pull request completes the issue, or `Related to BA-N` when it does not.
+
+```text
+Merge risk: reversible, docs only
+Fixes BA-58
+```
 
 Every commit reaches `main` through the merge queue. A commit's subject and a PR's title take the Conventional Commits form, and commitlint refuses a commit or a PR title that breaks it.
 
