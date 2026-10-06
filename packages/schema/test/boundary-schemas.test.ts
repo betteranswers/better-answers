@@ -42,7 +42,7 @@ const CONTENT_SHA256 = "a".repeat(64);
 const COMMIT_SHA = "b".repeat(40);
 const SUGGESTION_SET_ID = "01J6RRRRRRRRRRRRRRRRRRRRRR";
 const SUGGESTION_ID = "01J6SSSSSSSSSSSSSSSSSSSSSS";
-const BINDING_ID = "01J6VVVVVVVVVVVVVVVVVVVVVV";
+const CONNECTED_SOURCE_ID = "01J6VVVVVVVVVVVVVVVVVVVVVV";
 
 const DOCUMENT_ID = "01J6NNNNNNNNNNNNNNNNNNNNNN";
 const COMPOSITION_ID = "01J6WWWWWWWWWWWWWWWWWWWWWW";
@@ -289,14 +289,14 @@ const acceptedRows = {
       content: "hello",
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.5),
       embeddingRouteId: "model-choice-embed",
-      bindingId: "binding-1",
+      connectedSourceId: "connected-source-1",
     },
   ],
 
-  sourceBinding: [
+  connectedSource: [
     {
       workspaceId: WS_ID,
-      id: BINDING_ID,
+      id: CONNECTED_SOURCE_ID,
       publishedAt: NOW,
       sensitivity: "Restricted",
       audience: "everyone",
@@ -304,7 +304,7 @@ const acceptedRows = {
       connector: "upload",
       destination: ["chunk-index", "bundle"],
       retentionClass: "keep",
-      state: "landed",
+      state: "received",
     },
     {
       workspaceId: WS_ID,
@@ -327,7 +327,7 @@ const acceptedRows = {
     {
       workspaceId: WS_ID,
       id: DOCUMENT_ID,
-      bindingId: BINDING_ID,
+      connectedSourceId: CONNECTED_SOURCE_ID,
       sourceSystemId: "board-minutes-2026-03.md",
       title: "Board minutes, March 2026",
       mediaType: "text/markdown",
@@ -337,7 +337,7 @@ const acceptedRows = {
     {
       workspaceId: WS_ID,
       id: "01J6NNNNNNNNNNNNNNNNNNNNN2",
-      bindingId: BINDING_ID,
+      connectedSourceId: CONNECTED_SOURCE_ID,
       sourceSystemId: "handbook.md",
       title: "The handbook",
       mediaType: "text/markdown",
@@ -833,7 +833,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "conceptIndex",
         "bundleCommit",
 
-        "sourceBinding",
+        "connectedSource",
         "sourceDocument",
         "evidence",
         "conceptVerification",
@@ -1000,20 +1000,20 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.finding[2], restoreReason: "x".repeat(FINDING_REASON_MAX + 1) },
     ],
 
-    sourceBinding: [
+    connectedSource: [
       {
-        ...acceptedRows.sourceBinding[1],
+        ...acceptedRows.connectedSource[1],
         rulesInForce: { default_on: true, default_off: false, always: false },
       },
-      { ...acceptedRows.sourceBinding[1], rulesInForce: { default_on: true } },
-      { ...acceptedRows.sourceBinding[1], rulesInForce: { default_on: true, default_off: "no" } },
+      { ...acceptedRows.connectedSource[1], rulesInForce: { default_on: true } },
+      { ...acceptedRows.connectedSource[1], rulesInForce: { default_on: true, default_off: "no" } },
 
-      { ...acceptedRows.sourceBinding[0], connector: "sharepoint" },
-      { ...acceptedRows.sourceBinding[0], name: "   " },
-      { ...acceptedRows.sourceBinding[0], destination: ["chunk-index", "warehouse"] },
-      { ...acceptedRows.sourceBinding[0], destination: [] },
-      { ...acceptedRows.sourceBinding[0], retentionClass: "forever" },
-      { ...acceptedRows.sourceBinding[0], state: "reviewing" },
+      { ...acceptedRows.connectedSource[0], connector: "sharepoint" },
+      { ...acceptedRows.connectedSource[0], name: "   " },
+      { ...acceptedRows.connectedSource[0], destination: ["chunk-index", "warehouse"] },
+      { ...acceptedRows.connectedSource[0], destination: [] },
+      { ...acceptedRows.connectedSource[0], retentionClass: "forever" },
+      { ...acceptedRows.connectedSource[0], state: "reviewing" },
     ],
 
     sourceDocument: [
@@ -1137,11 +1137,11 @@ describe("what a finding may hold", () => {
   });
 });
 
-describe("the rules in force a binding carries", () => {
+describe("the rules in force a connected source carries", () => {
   const asKey = (tier: string) => tier.replaceAll("-", "_");
   const keyed: readonly string[] = RULES_IN_FORCE_KEYS;
 
-  it("keys the column on the two tiers a binding switches", () => {
+  it("keys the column on the two tiers a source switches", () => {
     expect(RULES_IN_FORCE_KEYS).toEqual(["default_on", "default_off"]);
     expect(RULES_IN_FORCE_KEYS).toEqual(
       REDACTION_TIERS.filter((tier) => tier !== REDACTION_ALWAYS_TIER).map(asKey),
@@ -1152,10 +1152,10 @@ describe("the rules in force a binding carries", () => {
     ]);
   });
 
-  it("defaults to the safe set for an unconfigured binding", () => {
+  it("defaults to the safe set for an unconfigured connected source", () => {
     expect(RULES_IN_FORCE_DEFAULT).toEqual({ default_on: true, default_off: false });
     expect(
-      boundarySchemas.sourceBinding.select.shape.rulesInForce.safeParse(RULES_IN_FORCE_DEFAULT)
+      boundarySchemas.connectedSource.select.shape.rulesInForce.safeParse(RULES_IN_FORCE_DEFAULT)
         .success,
     ).toBe(true);
   });
@@ -1448,7 +1448,7 @@ describe("5 — the inferred type is pinned", () => {
         content: string;
         embedding: number[] | null;
         embeddingRouteId: string | null;
-        bindingId: string;
+        connectedSourceId: string;
         sourceDocumentId: string | null;
         locator: string | null;
         ordinal: number | null;

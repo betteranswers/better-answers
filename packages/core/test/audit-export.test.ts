@@ -250,8 +250,8 @@ describe("the audit log's export", () => {
     const workspace = await provisionedWorkspace(db(), "ExportSources");
     const { workspaceId } = workspace;
     await seedingWith(db().pool, async (seed) => {
-      const binding = await seed.sourceBinding({ workspaceId, name: "Staff handbook" });
-      for (const subjectId of ["01J6ZZZZZZZZZZZZZZZZZZZZZZ", binding.id]) {
+      const connectedSource = await seed.connectedSource({ workspaceId, name: "Staff handbook" });
+      for (const subjectId of ["01J6ZZZZZZZZZZZZZZZZZZZZZZ", connectedSource.id]) {
         await seed.auditEvent({
           workspaceId,
           act: "sources.binding.published",

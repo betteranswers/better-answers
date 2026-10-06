@@ -198,7 +198,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   map-sweep --workspace <id>                                delete every generation of the map but the live one
   map-counts --workspace <id>                               nodes per label and edges, as JSON, for the drill's diff
   reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed
-  object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed bind or a lost race left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
+  object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed connect or a lost race left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
     --list         say how many there are, removing none
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
   erasure-rehearsal --workspace <id> --synthetic --seed [--wait-seconds <n>]
@@ -614,7 +614,7 @@ const objectStoreOrphans = async (
   }
   const objects = doorTold(
     doors.objects,
-    "no object store is configured (S3_ENDPOINT, S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY on the api service), so the bytes a failed bind left cannot be reached",
+    "no object store is configured (S3_ENDPOINT, S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY on the api service), so the bytes a failed connect left cannot be reached",
   );
   if (!objects.ok) {
     io.say(`object-store-orphans: REFUSED — ${objects.error}`);

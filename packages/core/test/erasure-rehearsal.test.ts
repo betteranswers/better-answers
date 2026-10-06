@@ -95,9 +95,9 @@ const jobRow = async (workspaceId: string, jobId: string) => {
   return read.rows[0];
 };
 
-const bindingsIn = async (workspaceId: string): Promise<readonly string[]> => {
+const connectedSourcesIn = async (workspaceId: string): Promise<readonly string[]> => {
   const read = await db().pool.query<{ id: string }>(
-    "SELECT id FROM source_binding WHERE workspace_id = $1",
+    "SELECT id FROM connected_source WHERE workspace_id = $1",
     [workspaceId],
   );
   return read.rows.map((row) => row.id);
@@ -117,7 +117,7 @@ describe("the seed", () => {
     ]);
   });
 
-  it("binds a document naming the subject, queueing its index run", async () => {
+  it("connects a document naming the subject, queueing its index run", async () => {
     const scenario = await arrange();
     const [email, , name] = expectedTokensFor(scenario.workspaceId);
 
@@ -130,13 +130,13 @@ describe("the seed", () => {
     );
     expect(await jobRow(scenario.workspaceId, document.indexJobId)).toEqual({
       kind: "index",
-      subject_id: document.bindingId,
-      reason: "bound",
+      subject_id: document.connectedSourceId,
+      reason: "connected",
       status: "queued",
     });
   });
 
-  it("binds a new document for a subject seeded after erasure", async () => {
+  it("connects a new document for a subject seeded after erasure", async () => {
     const scenario = await arrange();
     const erased = await seeding(scenario);
     await rehearsing(scenario);
@@ -144,14 +144,14 @@ describe("the seed", () => {
     const next = await seeding(scenario);
 
     expect(next.personId).not.toBe(erased.personId);
-    expect(next.document.bindingId).not.toBe(erased.document.bindingId);
+    expect(next.document.connectedSourceId).not.toBe(erased.document.connectedSourceId);
     expect(await jobRow(scenario.workspaceId, next.document.indexJobId)).toEqual({
       kind: "index",
-      subject_id: next.document.bindingId,
-      reason: "bound",
+      subject_id: next.document.connectedSourceId,
+      reason: "connected",
       status: "queued",
     });
-    expect(await bindingsIn(scenario.workspaceId)).toHaveLength(2);
+    expect(await connectedSourcesIn(scenario.workspaceId)).toHaveLength(2);
   });
 
   it("names the subject in the concept file in rewritable form", async () => {
@@ -177,7 +177,9 @@ describe("the seed", () => {
     expect(second.document).toEqual(first.document);
     expect(await membershipRows(scenario.workspaceId, first.personId)).toHaveLength(1);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
-    expect(await bindingsIn(scenario.workspaceId)).toEqual([first.document.bindingId]);
+    expect(await connectedSourcesIn(scenario.workspaceId)).toEqual([
+      first.document.connectedSourceId,
+    ]);
   });
 
   it("refuses where another concept holds the drill's path, head unmoved", async () => {

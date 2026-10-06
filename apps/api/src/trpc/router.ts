@@ -4,24 +4,24 @@ import { err } from "@better-answers/core/kernel";
 import { listModelChoices } from "@better-answers/core/llm";
 import { runsOfSubject, runsOfSubjectInput } from "@better-answers/core/runs";
 import {
-  bindUpload,
+  connectUpload,
   dismissAsNotSpecialCategory,
   dismissAsNotSpecialCategoryInput,
   findingsOf,
   findingsOfInput,
   keepInText,
   keepInTextInput,
-  listBindings,
-  narrowBinding,
-  narrowBindingInput,
+  listConnectedSources,
+  narrowConnectedSource,
+  narrowConnectedSourceInput,
   narrowDocuments,
   narrowDocumentsInput,
   previewChunks,
   previewChunksInput,
-  publishBinding,
-  publishBindingInput,
-  widenBinding,
-  widenBindingInput,
+  publishConnectedSource,
+  publishConnectedSourceInput,
+  widenConnectedSource,
+  widenConnectedSourceInput,
 } from "@better-answers/core/sources";
 import { readMembership, standingAsOperator } from "@better-answers/core/workspaces";
 
@@ -64,16 +64,16 @@ export const appRouter = router({
   }),
   sources: router({
     list: queryProcedure.query(({ ctx }) =>
-      crossing(ctx, listBindings.name, listBindings(ctx.principal, ctx.tx)),
+      crossing(ctx, listConnectedSources.name, listConnectedSources(ctx.principal, ctx.tx)),
     ),
-    bind: ownTransactionProcedure.input(octetInputParser).mutation(({ ctx, input }) =>
+    connect: ownTransactionProcedure.input(octetInputParser).mutation(({ ctx, input }) =>
       crossing(
         ctx,
-        bindUpload.name,
+        connectUpload.name,
         given(descriptorOf(ctx.headers), async (fields) => {
           const doors = uploadDoorsOf(ctx.doors);
           if (!doors.ok) return err(doors.error);
-          return bindUpload(ctx.principal, doors.value, { ...fields, body: input });
+          return connectUpload(ctx.principal, doors.value, { ...fields, body: input });
         }),
       ),
     ),
@@ -85,19 +85,26 @@ export const appRouter = router({
     dismissAsNotSpecialCategory: mutationProcedure
       .input(parsedBy(dismissAsNotSpecialCategoryInput))
       .mutation(answeredBy(dismissAsNotSpecialCategory)),
-    publish: mutationProcedure.input(parsedBy(publishBindingInput)).mutation(({ ctx, input }) =>
-      crossing(
-        ctx,
-        publishBinding.name,
-        given(input, (asked) =>
-          publishBinding(ctx.principal, ctx.tx, { ...asked, publishedAt: ctx.clock.now() }),
+    publish: mutationProcedure
+      .input(parsedBy(publishConnectedSourceInput))
+      .mutation(({ ctx, input }) =>
+        crossing(
+          ctx,
+          publishConnectedSource.name,
+          given(input, (asked) =>
+            publishConnectedSource(ctx.principal, ctx.tx, {
+              ...asked,
+              publishedAt: ctx.clock.now(),
+            }),
+          ),
         ),
       ),
-    ),
     narrow: mutationProcedure
-      .input(parsedBy(narrowBindingInput))
-      .mutation(answeredBy(narrowBinding)),
-    widen: mutationProcedure.input(parsedBy(widenBindingInput)).mutation(answeredBy(widenBinding)),
+      .input(parsedBy(narrowConnectedSourceInput))
+      .mutation(answeredBy(narrowConnectedSource)),
+    widen: mutationProcedure
+      .input(parsedBy(widenConnectedSourceInput))
+      .mutation(answeredBy(widenConnectedSource)),
     preview: queryProcedure.input(parsedBy(previewChunksInput)).query(answeredBy(previewChunks)),
   }),
   runs: router({

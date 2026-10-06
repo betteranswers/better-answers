@@ -19,7 +19,7 @@ import {
 } from "@/shared/ui/select.tsx";
 
 import { outcomeOfFailure, refusedFor } from "./refusal.tsx";
-import { CLASSES, EVERYONE, NARROWEST, useBind } from "./sources-api.ts";
+import { CLASSES, EVERYONE, NARROWEST, useConnect } from "./sources-api.ts";
 import { SOURCES_KEYSTROKES } from "./sources-state.ts";
 import { AUDIENCE_WORDS, UPLOAD_CAP_MB } from "./words.ts";
 
@@ -63,11 +63,11 @@ const textOf = (form: FormData, field: string): string => {
   return typeof value === "string" ? value.trim() : "";
 };
 
-export function BindAct() {
+export function ConnectAct() {
   const [open, setOpen] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>();
   const [uploading, setUploading] = useState<Uploading>();
-  const bind = useBind();
+  const connect = useConnect();
   const ids = {
     form: useId(),
     name: useId(),
@@ -80,7 +80,7 @@ export function BindAct() {
     setOutcome(undefined);
     setOpen(true);
   };
-  useKeystroke(SOURCES_KEYSTROKES.bind, show);
+  useKeystroke(SOURCES_KEYSTROKES.connect, show);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -99,18 +99,18 @@ export function BindAct() {
     }
 
     const name = textOf(form, "name");
-    const bindingId = ulid();
+    const connectedSourceId = ulid();
     setOutcome(undefined);
     setUploading({ fileName: file.name, sentBytes: 0, totalBytes: file.size });
-    const unwatch = watchUpload(bindingId, (progress) => {
+    const unwatch = watchUpload(connectedSourceId, (progress) => {
       setUploading({ fileName: file.name, ...progress });
     });
 
-    bind.mutate(
+    connect.mutate(
       {
         file,
         descriptor: {
-          bindingId,
+          connectedSourceId,
           name,
           fileName: file.name,
           mediaType,
@@ -124,7 +124,7 @@ export function BindAct() {
           setOpen(false);
           setOutcome({
             tone: "said",
-            words: `Bound “${name}”: ${file.name} landed and its index run is queued.`,
+            words: `Connected “${name}”: ${file.name} was received and its index run is queued.`,
           });
         },
         onError: (failure) => {
@@ -142,17 +142,17 @@ export function BindAct() {
     <>
       {/* Heard, not seen: the new row is what the eye reads, and the band has no width at 320px. */}
       <OutcomeLine outcome={open ? undefined : outcome} className="sr-only" />
-      <Button size="sm" aria-keyshortcuts={SOURCES_KEYSTROKES.bind.key} onClick={show}>
-        Bind a document
+      <Button size="sm" aria-keyshortcuts={SOURCES_KEYSTROKES.connect.key} onClick={show}>
+        Connect a document
       </Button>
       <ActDialog
         open={open}
         onOpenChange={setOpen}
-        title="Bind a document"
-        consequence="The binding starts unpublished: nobody but an Admin reads a word of it until you publish it. Its index run starts once the file lands."
+        title="Connect a document"
+        consequence="The connected source starts unpublished: nobody but an Admin reads a word of it until you publish it. Its index run starts once the file lands."
         commit={
-          <Button type="submit" form={ids.form} disabled={bind.isPending}>
-            {bind.isPending ? "Binding the document" : "Bind the document"}
+          <Button type="submit" form={ids.form} disabled={connect.isPending}>
+            {connect.isPending ? "Connected source the document" : "Connect the document"}
           </Button>
         }
       >

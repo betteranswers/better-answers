@@ -55,7 +55,10 @@ import { GroupsPage } from "@/features/people/groups-page.tsx";
 import { MemberPage } from "@/features/people/member-page.tsx";
 import { PERSON_ID } from "@/features/people/members-address.ts";
 import { MEMBERS_TOOLBAR, MembersPage } from "@/features/people/members-page.tsx";
-import { BINDINGS_TOOLBAR, BindingsPage } from "@/features/sources/bindings-page.tsx";
+import {
+  CONNECTED_SOURCES_TOOLBAR,
+  ConnectedSourcesPage,
+} from "@/features/sources/connected-sources-page.tsx";
 import type { FailedDuring } from "@/shared/api/query-client.ts";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
 import {
@@ -91,7 +94,10 @@ type BuiltPage = { readonly draw: () => ReactElement; readonly toolbar?: PageToo
 
 /** The list decides which pages are built; this map only says by what, and with what in hand. */
 const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>([
-  ["/sources/bindings", { draw: BindingsPage, toolbar: BINDINGS_TOOLBAR }],
+  [
+    "/sources/connected-sources",
+    { draw: ConnectedSourcesPage, toolbar: CONNECTED_SOURCES_TOOLBAR },
+  ],
   ["/models/models-and-spend", { draw: ModelsAndSpendPage, toolbar: MODELS_AND_SPEND_TOOLBAR }],
   ["/people/members", { draw: MembersPage, toolbar: MEMBERS_TOOLBAR }],
   ["/people/groups", { draw: GroupsPage }],

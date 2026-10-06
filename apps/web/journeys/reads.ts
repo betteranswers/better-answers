@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { refusedTheRun } from "./sign-in.ts";
 
-/** Named, not imported: the SPA's client module brings its React bindings with it. */
+/** Named, not imported: the SPA's client module brings React's own with it. */
 const TRPC = "/trpc";
 
 const asked = async (page: Page, procedure: string): Promise<APIResponse> => {
@@ -87,30 +87,30 @@ export type Member = z.output<typeof MEMBERS>[number];
 
 const INVITATION_COUNTS = z.object({ waiting: z.number() });
 
-const BINDINGS = z.array(z.unknown());
+const CONNECTED_SOURCES = z.array(z.unknown());
 
 export type StandingRead = {
   readonly members: readonly Member[];
   readonly waitingInvitations: number;
-  readonly bindings: number;
+  readonly connectedSources: number;
 };
 
 /** The three reads the fixture check judges; the first refusal, if any, stands for them all. */
 export const standingOf = async (page: Page): Promise<Checked<StandingRead>> => {
-  const [members, counts, bindings] = await Promise.all([
+  const [members, counts, connectedSources] = await Promise.all([
     checkedThroughTheSession(page, "members.list", MEMBERS),
     checkedThroughTheSession(page, "members.invitationCounts", INVITATION_COUNTS),
-    checkedThroughTheSession(page, "sources.list", BINDINGS),
+    checkedThroughTheSession(page, "sources.list", CONNECTED_SOURCES),
   ]);
   if (members.kind === "refused") return members;
   if (counts.kind === "refused") return counts;
-  if (bindings.kind === "refused") return bindings;
+  if (connectedSources.kind === "refused") return connectedSources;
   return {
     kind: "read",
     value: {
       members: members.value,
       waitingInvitations: counts.value.waiting,
-      bindings: bindings.value.length,
+      connectedSources: connectedSources.value.length,
     },
   };
 };

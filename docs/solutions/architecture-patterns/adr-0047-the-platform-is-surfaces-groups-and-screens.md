@@ -66,7 +66,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | Inbox | (none) | Waiting on you | Admins and owners |
 | Control Centre | Overview | Overview | Admin |
 | | Suggestions | Queue | Admin |
-| | Sources | **Bindings** · Publish and accept gates · Priced plan · Backlogs · Gone-at-source impact · Agent tokens | Admin |
+| | Sources | **Connected sources** · Publish and accept gates · Priced plan · Backlogs · Gone-at-source impact · Agent tokens | Admin |
 | | Models | **Models and spend** · Spending limit | Admin |
 | | Questions | Answer audit · Answer tests | Admin |
 | | People | **Members** · **Groups** · Tokens | Admin |
@@ -121,7 +121,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of acts an agent takes as the person |
-| Control Centre | Bindings. Models and spend. Members, Groups. Audit log | Overview, which no block names. Queue (S5). Priced plan (S4). Publish and accept gates, Backlogs, Gone-at-source impact. Spending limit (S7). Answer audit, Answer tests (S2). Tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Agent tokens, with the share agent. Runs, Connected clients, Settings. Then: feeds and referenced systems in Sources, Approvals in Agent Operations |
+| Control Centre | Connected sources. Models and spend. Members, Groups. Audit log | Overview, which no block names. Queue (S5). Priced plan (S4). Publish and accept gates, Backlogs, Gone-at-source impact. Spending limit (S7). Answer audit, Answer tests (S2). Tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Agent tokens, with the share agent. Runs, Connected clients, Settings. Then: feeds and systems read live in Sources, Approvals in Agent Operations |
 | Console | Everyone, Names waiting, Every workspace | none | The identity-set audit log |
 
 Two things stay open:
@@ -133,7 +133,7 @@ Two things stay open:
 
 - People come to do one of a few things: ask, read the map, produce work, decide what waits on them, or run the workspace. One person often does several. A rail of areas lets each reach the job they came for in one move. A rail of Control Centre's parts showed every role pages it could not use.
 - Deciding is not only an Admin's job. An owner of any role decides edit suggestions and checks on their domain, and one of the personas is a Viewer who owns a specialism. So curation sits on Knowledge, what waits on a person sits in their Inbox, and ownership, not role alone, decides what they see.
-- Unpublished content is shown to Admins alone, in Control Centre. A suggestion's payload can come from an unpublished binding, so the queue stays in Control Centre, and each Inbox points into it.
+- Unpublished content is shown to Admins alone, in Control Centre. A suggestion's payload can come from an unpublished connected source, so the queue stays in Control Centre, and each Inbox points into it.
 - A withheld concept must be indistinguishable from one that does not exist. An address that says "not for you" or "not built yet" tells a person what exists. Nobody should learn what exists by guessing addresses.
 - The infrequent reader forgets the tool between visits. A few plainly named areas, with nothing listed that cannot be opened, are what such a reader holds.
 - Control Centre's groups each hold their own pages, as Flux AgentOps' do. One noun per thing an Admin answers for is what a person holds without reading (ADR 0017). Questions stays apart from Agent Operations: what the platform answered is a matter of content, and what its agents did is a matter of operations and spend. Personal data stays apart from People: a subject request runs on its own one-month clock.

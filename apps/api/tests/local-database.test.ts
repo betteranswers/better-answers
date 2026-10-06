@@ -150,13 +150,13 @@ describe("the local database", () => {
       await browse.end();
     });
 
-    it("holds one binding in the synthetic workspace, indexed and unpublished", async () => {
-      const bindings = await browse.query(
-        `SELECT id, connector, state, published_at FROM source_binding
+    it("holds one source in the synthetic workspace, indexed and unpublished", async () => {
+      const connectedSources = await browse.query(
+        `SELECT id, connector, state, published_at FROM connected_source
           WHERE workspace_id = $1`,
         [SYNTHETIC_WORKSPACE],
       );
-      expect(bindings.rows).toEqual([
+      expect(connectedSources.rows).toEqual([
         {
           id: "01M2B1ND1NGAAAAAAAAAAAAAAA",
           connector: "upload",
@@ -168,14 +168,14 @@ describe("the local database", () => {
 
     it("holds one converted markdown document, naming no landed copy", async () => {
       const documents = await browse.query(
-        `SELECT id, binding_id, media_type, outcome, normalised_key, content_hash
+        `SELECT id, connected_source_id, media_type, outcome, normalised_key, content_hash
            FROM source_document WHERE workspace_id = $1`,
         [SYNTHETIC_WORKSPACE],
       );
       expect(documents.rows).toEqual([
         {
           id: "01M2Q3R4S5T6V7W8X9YZAB0001",
-          binding_id: "01M2B1ND1NGAAAAAAAAAAAAAAA",
+          connected_source_id: "01M2B1ND1NGAAAAAAAAAAAAAAA",
           media_type: "text/markdown",
           outcome: "converted",
           normalised_key: null,
@@ -229,7 +229,7 @@ describe("the local database", () => {
       );
       expect({ status: seeded.status, stderr: seeded.stderr }).toEqual({ status: 0, stderr: "" });
       expect(seeded.stdout).toContain(
-        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic, 1 binding, 1 document, 3 chunks`,
+        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic, 1 connected source, 1 document, 3 chunks`,
       );
     });
   });
@@ -257,12 +257,13 @@ describe("the local database", () => {
     try {
       const held = await reopened.query(
         `SELECT (SELECT count(*)::int FROM workspace WHERE id = $1) AS marker,
-                (SELECT count(*)::int FROM source_binding WHERE workspace_id = $2) AS bindings,
+                (SELECT count(*)::int FROM connected_source WHERE workspace_id = $2)
+                  AS "connectedSources",
                 (SELECT count(*)::int FROM source_document WHERE workspace_id = $2) AS documents,
                 (SELECT count(*)::int FROM "index".chunk WHERE workspace_id = $2) AS chunks`,
         [marker, SYNTHETIC_WORKSPACE],
       );
-      expect(held.rows).toEqual([{ marker: 1, bindings: 1, documents: 1, chunks: 3 }]);
+      expect(held.rows).toEqual([{ marker: 1, connectedSources: 1, documents: 1, chunks: 3 }]);
     } finally {
       await reopened.end();
     }

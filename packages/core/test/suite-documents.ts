@@ -3,7 +3,7 @@ import type pg from "pg";
 import { testData } from "@better-answers/schema/testing";
 
 export type LandedDocument = {
-  readonly bindingId: string;
+  readonly connectedSourceId: string;
   readonly documentId: string;
 
   readonly locator: string;
@@ -38,7 +38,7 @@ export const documentLanded = async (
       shape.audienceGroups === undefined
         ? {}
         : { audience: "groups", audienceGroups: [...shape.audienceGroups] };
-    const binding = await seed.sourceBinding({
+    const connectedSource = await seed.connectedSource({
       workspaceId,
       publishedAt,
       sensitivity,
@@ -46,13 +46,13 @@ export const documentLanded = async (
     });
     const document = await seed.sourceDocument({
       workspaceId,
-      bindingId: binding.id,
+      connectedSourceId: connectedSource.id,
       title: shape.title,
     });
     const charEnd = codePointsOf(shape.text);
     await seed.chunk({
       workspaceId,
-      bindingId: binding.id,
+      connectedSourceId: connectedSource.id,
       sourceDocumentId: document.id,
       content: shape.text,
       locator: `chars:0-${charEnd}`,
@@ -62,7 +62,7 @@ export const documentLanded = async (
     });
     await client.query("COMMIT");
     return {
-      bindingId: binding.id,
+      connectedSourceId: connectedSource.id,
       documentId: document.id,
       locator: `${document.id}/chars:0-${charEnd}`,
     };

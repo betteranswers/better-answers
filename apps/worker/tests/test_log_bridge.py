@@ -7,7 +7,7 @@ WRITES_BOTH_WAYS = """
 import logging
 from better_answers_worker.log import logger
 
-logger.info("the tier wrote this", binding_id="binding-one")
+logger.info("the tier wrote this", connected_source_id="connected-source-one")
 logging.getLogger("cocoindex.connectors.postgres").warning("a library wrote this")
 """
 
@@ -33,7 +33,7 @@ def test_library_and_worker_lines_leave_in_the_same_json_shape() -> None:
 
     assert ours["event"] == "the tier wrote this"
     assert ours["level"] == "info"
-    assert ours["binding_id"] == "binding-one"
+    assert ours["connected_source_id"] == "connected-source-one"
 
     assert theirs["event"] == "a library wrote this"
     assert theirs["level"] == "warning"

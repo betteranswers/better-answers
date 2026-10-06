@@ -14,7 +14,7 @@ import {
   groupKeyText,
   keyOf,
   NARROWEST,
-  useBindings,
+  useConnectedSources,
   useDismissAsNotSpecialCategory,
   useKeepInText,
   useNarrowDocuments,
@@ -38,18 +38,29 @@ type Settled<Answer> = {
 
 const takesAnyGroup = (): boolean => true;
 
+const reasonedAsk = (ready: TickedGroups, reason: string) => ({
+  connectedSourceId: ready.connectedSourceId,
+  findingGroups: ready.groups.map(keyOf),
+  reason,
+});
+
 /**
- * Inert until this binding's review has ticked groups the act takes: an act over nothing is
+ * Inert until this connected source's review has ticked groups the act takes: an act over nothing is
  * disabled and reads as such.
  */
-const useBulkAct = (bindingId: string, takes: (group: FindingGroup) => boolean = takesAnyGroup) => {
+const useBulkAct = (
+  connectedSourceId: string,
+  takes: (group: FindingGroup) => boolean = takesAnyGroup,
+) => {
   const [ticked, tick] = useTickedGroups();
   const [open, setOpen] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>();
   const opener = useRef<HTMLElement>(null);
-  const selected = groupsTickedIn(ticked, bindingId);
+  const selected = groupsTickedIn(ticked, connectedSourceId);
   const ready: TickedGroups | undefined =
-    selected.length > 0 && selected.every(takes) ? { bindingId, groups: selected } : undefined;
+    selected.length > 0 && selected.every(takes)
+      ? { connectedSourceId, groups: selected }
+      : undefined;
 
   const show = () => {
     if (ready === undefined) return;
@@ -80,7 +91,7 @@ const useBulkAct = (bindingId: string, takes: (group: FindingGroup) => boolean =
   }) => {
     if (ready === undefined) return;
     setOpen(false);
-    tick({ bindingId: ready.bindingId, groups: [] });
+    tick({ connectedSourceId: ready.connectedSourceId, groups: [] });
     setOutcome({ tone: "said", words: said.pending });
     said.run(ready, {
       onSuccess: (answer) => {
@@ -190,8 +201,8 @@ function ReasonedDialog(properties: {
   );
 }
 
-export function KeepInTextAct(properties: { readonly bindingId: string }) {
-  const act = useBulkAct(properties.bindingId);
+export function KeepInTextAct(properties: { readonly connectedSourceId: string }) {
+  const act = useBulkAct(properties.connectedSourceId);
   const keep = useKeepInText();
   const groups = act.ready?.groups ?? [];
   const named = counted(groups.length, "finding group", "finding groups");
@@ -208,10 +219,7 @@ export function KeepInTextAct(properties: { readonly bindingId: string }) {
       done: () =>
         `Kept ${named} in text: ${spans} restored, and the index run that lets them back in is queued.`,
       run: (ready, settled) => {
-        keep.mutate(
-          { bindingId: ready.bindingId, findingGroups: ready.groups.map(keyOf), reason },
-          settled,
-        );
+        keep.mutate(reasonedAsk(ready, reason), settled);
       },
     });
   };
@@ -233,8 +241,8 @@ export function KeepInTextAct(properties: { readonly bindingId: string }) {
   );
 }
 
-export function NarrowDocumentsAct(properties: { readonly bindingId: string }) {
-  const act = useBulkAct(properties.bindingId);
+export function NarrowDocumentsAct(properties: { readonly connectedSourceId: string }) {
+  const act = useBulkAct(properties.connectedSourceId);
   const narrow = useNarrowDocuments();
   const groups = act.ready?.groups ?? [];
   const documents = [...new Map(groups.map((group) => [group.documentId, group.title]))];
@@ -247,7 +255,7 @@ export function NarrowDocumentsAct(properties: { readonly bindingId: string }) {
         `Narrowed ${counted(narrowed.documentIds.length, "document", "documents")} to ${NARROWEST}; ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.compositions.length, "composition", "compositions")} moved with them.`,
       run: (ready, settled) => {
         narrow.mutate(
-          { bindingId: ready.bindingId, findingGroups: ready.groups.map(keyOf) },
+          { connectedSourceId: ready.connectedSourceId, findingGroups: ready.groups.map(keyOf) },
           settled,
         );
       },
@@ -284,16 +292,18 @@ export function NarrowDocumentsAct(properties: { readonly bindingId: string }) {
 }
 
 /** A ulid sorts by when it was minted, so a run at or past the act's own is one that reads it. */
-function RunStatus(properties: { readonly bindingId: string; readonly jobId: string }) {
-  const bindings = useBindings();
-  const run = bindings.data?.find((binding) => binding.bindingId === properties.bindingId)?.lastRun;
+function RunStatus(properties: { readonly connectedSourceId: string; readonly jobId: string }) {
+  const connectedSources = useConnectedSources();
+  const run = connectedSources.data?.find(
+    (connectedSource) => connectedSource.connectedSourceId === properties.connectedSourceId,
+  )?.lastRun;
   return run === undefined || run === null || run.jobId < properties.jobId ? "queued" : run.status;
 }
 
 const isSpecialCategory = (group: FindingGroup): boolean => group.specialCategory;
 
-export function DismissAsNotSpecialCategoryAct(properties: { readonly bindingId: string }) {
-  const act = useBulkAct(properties.bindingId, isSpecialCategory);
+export function DismissAsNotSpecialCategoryAct(properties: { readonly connectedSourceId: string }) {
+  const act = useBulkAct(properties.connectedSourceId, isSpecialCategory);
   const dismiss = useDismissAsNotSpecialCategory();
   const named = counted(act.ready?.groups.length ?? 0, "finding group", "finding groups");
 
@@ -304,14 +314,12 @@ export function DismissAsNotSpecialCategoryAct(properties: { readonly bindingId:
         <>
           Dismissed {named} as not special category in{" "}
           {counted(answer.documentIds.length, "document", "documents")}. The index run that reads
-          the dismissal: <RunStatus bindingId={answer.bindingId} jobId={answer.jobId} />.
+          the dismissal:{" "}
+          <RunStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />.
         </>
       ),
       run: (ready, settled) => {
-        dismiss.mutate(
-          { bindingId: ready.bindingId, findingGroups: ready.groups.map(keyOf), reason },
-          settled,
-        );
+        dismiss.mutate(reasonedAsk(ready, reason), settled);
       },
     });
   };
@@ -330,7 +338,7 @@ export function DismissAsNotSpecialCategoryAct(properties: { readonly bindingId:
         <ReasonedDialog
           act={act}
           title={`Dismiss ${named} as not special category`}
-          consequence="Every span of each group is reviewed as dismissed under your name with this reason, and the index run that reads the dismissal is queued. On that run, a document whose every special category finding is dismissed goes back to the class an Admin narrowed it to, or to its binding's class if none did. The spans stay withheld unless kept in text."
+          consequence="Every span of each group is reviewed as dismissed under your name with this reason, and the index run that reads the dismissal is queued. On that run, a document whose every special category finding is dismissed goes back to the class an Admin narrowed it to, or to its connected source's class if none did. The spans stay withheld unless kept in text."
           onReason={dismissed}
         />
       }

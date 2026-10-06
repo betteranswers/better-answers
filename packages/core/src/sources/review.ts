@@ -14,7 +14,7 @@ import {
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { narrower, type Sensitivity } from "../access/index.ts";
-import { act, batchIdFor, declareActs, recordEach } from "../audit/index.ts";
+import { act, batchIdFor, declareActs, recordEach, STORED_DETAIL_KEYS } from "../audit/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import { actorIdOf, attempt, err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import {
@@ -25,18 +25,18 @@ import {
 } from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import {
-  adminOnBinding,
-  bindingNamed,
-  BINDING_ID,
-  type ActingOnBinding,
-  type BindingId,
-} from "./admin-binding.ts";
+  adminOnConnectedSource,
+  connectedSourceNamed,
+  CONNECTED_SOURCE_ID,
+  type ActingOnConnectedSource,
+  type ConnectedSourceId,
+} from "./admin-connected-source.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import { REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun, RESTORE_REASON, restoreFinding } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
-export const findingsOfInput = z.object({ bindingId: BINDING_ID });
+export const findingsOfInput = z.object({ connectedSourceId: CONNECTED_SOURCE_ID });
 
 export type FindingsOfInput = z.output<typeof findingsOfInput>;
 
@@ -66,18 +66,18 @@ const SPECIAL_CATEGORIES = new Set<string>(
 const HOLDS_AN_UNREVIEWED_SPECIAL_CATEGORY = `SELECT EXISTS (
     SELECT 1 FROM finding f
       JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
-     WHERE f.workspace_id = $1 AND d.binding_id = $2 AND f.category = ANY($3::text[])
+     WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND f.category = ANY($3::text[])
        AND f.review_state = $4 AND ${raisedByTheLastRun("f", "d")}
   ) AS held`;
 
 export const holdsAnUnreviewedSpecialCategory = async (
-  acting: ActingOnBinding,
+  acting: ActingOnConnectedSource,
   tx: Tx,
 ): Promise<Result<boolean, Error>> => {
   const found = await attempt(() =>
     tx.query<{ held: boolean }>(HOLDS_AN_UNREVIEWED_SPECIAL_CATEGORY, [
       acting.workspaceId,
-      acting.bindingId,
+      acting.connectedSourceId,
       [...SPECIAL_CATEGORIES],
       FINDING_UNREVIEWED_STATE,
     ]),
@@ -89,8 +89,8 @@ export const holdsAnUnreviewedSpecialCategory = async (
 const classOf = (word: string): Sensitivity | undefined =>
   SENSITIVITIES.find((known) => known === word);
 
-const effectiveClass = (own: string | null, binding: string): Sensitivity | undefined => {
-  const inherited = classOf(binding);
+const effectiveClass = (own: string | null, connectedSource: string): Sensitivity | undefined => {
+  const inherited = classOf(connectedSource);
   if (inherited === undefined || own === null) return inherited;
   const held = classOf(own);
   return held === undefined ? undefined : narrower(held, inherited);
@@ -99,7 +99,7 @@ const effectiveClass = (own: string | null, binding: string): Sensitivity | unde
 const BROKEN_CLASS = new Error("a source document's class is not one the visibility words hold");
 
 const FINDING_GROUPS = `SELECT d.id AS "documentId", d.title,
-            d.sensitivity AS "documentSensitivity", b.sensitivity AS "bindingSensitivity",
+            d.sensitivity AS "documentSensitivity", b.sensitivity AS "connectedSourceSensitivity",
             f.category, f.rule_id AS "ruleId", f.tier, count(*)::int AS found,
             count(*) FILTER (
               WHERE f.restored_at IS NOT NULL
@@ -109,8 +109,8 @@ const FINDING_GROUPS = `SELECT d.id AS "documentId", d.title,
             count(*) FILTER (WHERE f.review_state = '${FINDING_DISMISSED_STATE}')::int AS dismissed
        FROM finding f
        JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
-       JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
-      WHERE f.workspace_id = $1 AND d.binding_id = $2 AND ${raisedByTheLastRun("f", "d")}
+       JOIN connected_source b ON b.workspace_id = d.workspace_id AND b.id = d.connected_source_id
+      WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND ${raisedByTheLastRun("f", "d")}
       GROUP BY d.id, d.title, d.sensitivity, b.sensitivity, f.category, f.rule_id, f.tier
       ORDER BY f.category, f.rule_id, d.title, d.id`;
 
@@ -125,7 +125,7 @@ const OVERRIDDEN_SPAN = z.object({
 });
 
 const UNREADABLE_RUN = new Error(
-  "the binding's last index run names the kept spans an erasure overrode in a shape the review cannot read",
+  "the connected source's last index run names the kept spans an erasure overrode in a shape the review cannot read",
 );
 
 const overriddenSpansOf = (
@@ -139,7 +139,7 @@ const overriddenSpansOf = (
 
 type GroupRow = Omit<FindingGroup, "specialCategory" | "sensitivity"> & {
   readonly documentSensitivity: string | null;
-  readonly bindingSensitivity: string;
+  readonly connectedSourceSensitivity: string;
 };
 
 export const findingsOf = async (
@@ -147,14 +147,14 @@ export const findingsOf = async (
   tx: Tx,
   input: FindingsOfInput,
 ): Promise<Result<readonly FindingGroup[], FindingsOfRefusal>> => {
-  const acting = adminOnBinding(principal, input.bindingId);
+  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
-  const { workspaceId, bindingId } = acting.value;
+  const { workspaceId, connectedSourceId } = acting.value;
 
-  const standing = await bindingNamed(acting.value, tx, { columns: "1", lock: "none" });
+  const standing = await connectedSourceNamed(acting.value, tx, { columns: "1", lock: "none" });
   if (!standing.ok) return err(standing.error);
 
-  const lastRun = await latestIndexOutcomeIn(principal, tx, { bindingId });
+  const lastRun = await latestIndexOutcomeIn(principal, tx, { connectedSourceId });
   if (!lastRun.ok) return err(lastRun.error);
   const named = overriddenSpansOf(lastRun.value);
   if (!named.ok) return err(named.error);
@@ -163,7 +163,7 @@ export const findingsOf = async (
   const grouped = await attempt(() =>
     tx.query<GroupRow>(FINDING_GROUPS, [
       workspaceId,
-      bindingId,
+      connectedSourceId,
       overridden.map((span) => span.document_id),
       overridden.map((span) => span.rule_id),
       overridden.map((span) => span.char_start),
@@ -173,8 +173,8 @@ export const findingsOf = async (
   if (!grouped.ok) return err(grouped.error);
 
   const groups: FindingGroup[] = [];
-  for (const { documentSensitivity, bindingSensitivity, ...row } of grouped.value.rows) {
-    const sensitivity = effectiveClass(documentSensitivity, bindingSensitivity);
+  for (const { documentSensitivity, connectedSourceSensitivity, ...row } of grouped.value.rows) {
+    const sensitivity = effectiveClass(documentSensitivity, connectedSourceSensitivity);
     if (sensitivity === undefined) return err(BROKEN_CLASS);
     groups.push({ ...row, sensitivity, specialCategory: SPECIAL_CATEGORIES.has(row.category) });
   }
@@ -220,7 +220,7 @@ const findingGroupClause = (alias: string, first: number): string =>
                               $${first + 2}::text[], $${first + 3}::text[]))`;
 
 export const keepInTextInput = z.object({
-  bindingId: BINDING_ID,
+  connectedSourceId: CONNECTED_SOURCE_ID,
 
   findingGroups: commandedGroups,
 
@@ -234,7 +234,7 @@ export type KeepInTextRefusal =
   | Error;
 
 export type KeptInText = {
-  readonly bindingId: string;
+  readonly connectedSourceId: string;
 
   readonly documentIds: readonly string[];
 
@@ -247,7 +247,7 @@ const FINDINGS_OF_GROUPS = `SELECT f.id, f.document_id AS "documentId", f.catego
             f.rule_id AS "ruleId", f.tier
        FROM finding f
        JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
-      WHERE f.workspace_id = $1 AND d.binding_id = $2 AND ${raisedByTheLastRun("f", "d")}
+      WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND ${raisedByTheLastRun("f", "d")}
         AND ${findingGroupClause("f", 3)}
       ORDER BY f.id
         FOR UPDATE OF f`;
@@ -257,13 +257,13 @@ type HeldSpan = FindingGroupKey & { readonly id: string };
 const spansOfGroups = async (
   tx: Tx,
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
   findingGroups: readonly FindingGroupKey[],
 ): Promise<Result<readonly HeldSpan[], "no-such-finding" | Error>> => {
   const held = await attempt(() =>
     tx.query<HeldSpan>(FINDINGS_OF_GROUPS, [
       workspaceId,
-      bindingId,
+      connectedSourceId,
       ...findingGroupParameters(findingGroups),
     ]),
   );
@@ -278,7 +278,10 @@ const spansOfGroups = async (
 const documentsHolding = (spans: readonly HeldSpan[]): readonly string[] =>
   [...new Set(spans.map((span) => span.documentId))].toSorted(byCodeUnit);
 
-type CommandedSpans = { readonly acting: ActingOnBinding; readonly spans: readonly HeldSpan[] };
+type CommandedSpans = {
+  readonly acting: ActingOnConnectedSource;
+  readonly spans: readonly HeldSpan[];
+};
 
 type SpansRefusal<GroupRefusal> =
   | GroupRefusal
@@ -289,10 +292,13 @@ type SpansRefusal<GroupRefusal> =
 const spansCommanded = async <GroupRefusal extends string>(
   principal: UserPrincipal,
   tx: Tx,
-  input: { readonly bindingId: BindingId; readonly findingGroups: readonly FindingGroupKey[] },
+  input: {
+    readonly connectedSourceId: ConnectedSourceId;
+    readonly findingGroups: readonly FindingGroupKey[];
+  },
   refusalOf: (findingGroup: FindingGroupKey) => GroupRefusal | undefined,
 ): Promise<Result<CommandedSpans, SpansRefusal<GroupRefusal>>> => {
-  const acting = adminOnBinding(principal, input.bindingId);
+  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
 
   const findingGroups = distinctFindingGroups(input.findingGroups);
@@ -301,13 +307,16 @@ const spansCommanded = async <GroupRefusal extends string>(
     if (refused !== undefined) return err(refused);
   }
 
-  const standing = await bindingNamed(acting.value, tx, { columns: "1", lock: "for-update" });
+  const standing = await connectedSourceNamed(acting.value, tx, {
+    columns: "1",
+    lock: "for-update",
+  });
   if (!standing.ok) return err(standing.error);
 
   const held = await spansOfGroups(
     tx,
     acting.value.workspaceId,
-    acting.value.bindingId,
+    acting.value.connectedSourceId,
     findingGroups,
   );
   if (!held.ok) return err(held.error);
@@ -315,14 +324,14 @@ const spansCommanded = async <GroupRefusal extends string>(
 };
 
 const indexRunQueued = async (
-  { admin, workspaceId, bindingId }: ActingOnBinding,
+  { admin, workspaceId, connectedSourceId }: ActingOnConnectedSource,
   tx: Tx,
   reason: Extract<(typeof INDEX_REASONS)[number], "restored" | "dismissed">,
 ): Promise<string> => {
   const queued = await enqueueJobIn(admin, tx, {
     workspaceId,
     kind: INDEX_KIND,
-    subjectId: bindingId,
+    subjectId: connectedSourceId,
     reason,
   });
   if (!queued.ok) {
@@ -357,7 +366,7 @@ export const keepInText = async (
   );
   if (!commanded.ok) return err(commanded.error);
   const { acting, spans } = commanded.value;
-  const { admin, workspaceId, bindingId } = acting;
+  const { admin, workspaceId, connectedSourceId } = acting;
 
   const named = spans.map((span) => span.id);
   /** One audit event per span, so the batch counts spans, not the documents the answer names. */
@@ -376,24 +385,24 @@ export const keepInText = async (
   if (!reviewed.ok) return err(reviewed.error);
 
   const jobId = await indexRunQueued(acting, tx, "restored");
-  return ok({ bindingId, documentIds: documentsHolding(spans), batchId, jobId });
+  return ok({ connectedSourceId, documentIds: documentsHolding(spans), batchId, jobId });
 };
 
 const REVIEW_ACTS = declareActs("sources", {
   narrowed: act("sources.document.narrowed", {
     documentId: "id",
-    bindingId: "id",
+    [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     sensitivity: "sensitivity",
   }),
   dismissed: act("sources.document.special_category_dismissed", {
     documentId: "id",
-    bindingId: "id",
+    [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     findingCount: "count",
   }),
 });
 
 export const narrowDocumentsInput = z.object({
-  bindingId: BINDING_ID,
+  connectedSourceId: CONNECTED_SOURCE_ID,
 
   findingGroups: commandedGroups,
 
@@ -409,7 +418,7 @@ export type NarrowDocumentsRefusal =
   | Error;
 
 export type DocumentsNarrowed = {
-  readonly bindingId: string;
+  readonly connectedSourceId: string;
 
   readonly documentIds: readonly string[];
   readonly sensitivity: Sensitivity;
@@ -422,7 +431,7 @@ export type DocumentsNarrowed = {
 };
 
 const DOCUMENTS_UNDER = `SELECT id, sensitivity FROM source_document
-      WHERE workspace_id = $1 AND binding_id = $2 AND id = ANY($3::text[])
+      WHERE workspace_id = $1 AND connected_source_id = $2 AND id = ANY($3::text[])
       ORDER BY id
         FOR UPDATE`;
 
@@ -438,26 +447,26 @@ const NARROWED_REVIEW = `UPDATE finding f
         AND ${raisedByTheLastRun("f", "d")}`;
 
 const documentsToNarrow = async (
-  acting: ActingOnBinding,
+  acting: ActingOnConnectedSource,
   tx: Tx,
   named: readonly string[],
   next: Sensitivity,
 ): Promise<Result<readonly DocumentRow[], NarrowDocumentsRefusal>> => {
-  const binding = await bindingNamed<{ readonly sensitivity: string }>(acting, tx, {
+  const connectedSource = await connectedSourceNamed<{ readonly sensitivity: string }>(acting, tx, {
     columns: "sensitivity",
     lock: "for-update",
   });
-  if (!binding.ok) return err(binding.error);
+  if (!connectedSource.ok) return err(connectedSource.error);
 
   const documents = await attempt(() =>
-    tx.query<DocumentRow>(DOCUMENTS_UNDER, [acting.workspaceId, acting.bindingId, named]),
+    tx.query<DocumentRow>(DOCUMENTS_UNDER, [acting.workspaceId, acting.connectedSourceId, named]),
   );
   if (!documents.ok) return err(documents.error);
   const rows = documents.value.rows;
   if (rows.length !== named.length) return err("no-such-document");
 
   for (const row of rows) {
-    const effective = effectiveClass(row.sensitivity, binding.value.sensitivity);
+    const effective = effectiveClass(row.sensitivity, connectedSource.value.sensitivity);
     if (effective === undefined) return err(BROKEN_CLASS);
     if (narrower(next, effective) !== next) return err("widening-refused");
   }
@@ -467,16 +476,16 @@ const documentsToNarrow = async (
 /**
  * Sets each named document's class, marks the groups' unreviewed findings narrowed, and recomputes
  * the visibility of what those documents source. A class wider than one document's effective
- * class, the narrower of its own and its binding's, refuses the whole command.
+ * class, the narrower of its own and its connected source's, refuses the whole command.
  */
 export const narrowDocuments = async (
   principal: UserPrincipal,
   tx: Tx,
   input: NarrowDocumentsInput,
 ): Promise<Result<DocumentsNarrowed, NarrowDocumentsRefusal>> => {
-  const acting = adminOnBinding(principal, input.bindingId);
+  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
-  const { admin, workspaceId, bindingId } = acting.value;
+  const { admin, workspaceId, connectedSourceId } = acting.value;
 
   const next = input.sensitivity;
   const findingGroups = distinctFindingGroups(input.findingGroups);
@@ -491,8 +500,8 @@ export const narrowDocuments = async (
   const narrowed = await attempt(() =>
     tx.query(
       `UPDATE source_document SET sensitivity = $4, narrowed_to = $4
-        WHERE workspace_id = $1 AND binding_id = $2 AND id = ANY($3::text[])`,
-      [workspaceId, bindingId, named, next],
+        WHERE workspace_id = $1 AND connected_source_id = $2 AND id = ANY($3::text[])`,
+      [workspaceId, connectedSourceId, named, next],
     ),
   );
   if (!narrowed.ok) return err(narrowed.error);
@@ -515,18 +524,24 @@ export const narrowDocuments = async (
     REVIEW_ACTS.narrowed,
     documentIds.map((documentId) => ({
       subjectId: documentId,
-      detail: { documentId, bindingId, sensitivity: next },
+      detail: {
+        documentId,
+        [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId,
+        sensitivity: next,
+      },
     })),
   );
 
-  const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId, documentIds }));
+  const cascaded = await attempt(() =>
+    cascadeOverEvidence(admin, tx, { connectedSourceId, documentIds }),
+  );
   if (!cascaded.ok) return err(cascaded.error);
 
-  return ok({ bindingId, documentIds, sensitivity: next, batchId, ...cascaded.value });
+  return ok({ connectedSourceId, documentIds, sensitivity: next, batchId, ...cascaded.value });
 };
 
 export const dismissAsNotSpecialCategoryInput = z.object({
-  bindingId: BINDING_ID,
+  connectedSourceId: CONNECTED_SOURCE_ID,
 
   findingGroups: commandedGroups,
 
@@ -540,7 +555,7 @@ export type DismissAsNotSpecialCategoryRefusal =
   | Error;
 
 export type DismissedAsNotSpecialCategory = {
-  readonly bindingId: string;
+  readonly connectedSourceId: string;
 
   readonly documentIds: readonly string[];
 
@@ -568,7 +583,7 @@ export const dismissAsNotSpecialCategory = async (
   );
   if (!commanded.ok) return err(commanded.error);
   const { acting, spans } = commanded.value;
-  const { admin, workspaceId, bindingId } = acting;
+  const { admin, workspaceId, connectedSourceId } = acting;
 
   const reviewed = await attempt(() =>
     tx.query(DISMISSED_REVIEW, [
@@ -590,12 +605,12 @@ export const dismissAsNotSpecialCategory = async (
       subjectId: documentId,
       detail: {
         documentId,
-        bindingId,
+        [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId,
         findingCount: spans.filter((span) => span.documentId === documentId).length,
       },
     })),
   );
 
   const jobId = await indexRunQueued(acting, tx, "dismissed");
-  return ok({ bindingId, documentIds, batchId, jobId });
+  return ok({ connectedSourceId, documentIds, batchId, jobId });
 };

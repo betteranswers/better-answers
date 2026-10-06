@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { publishBinding, publishBindingInput } from "@better-answers/core/sources";
+import { publishConnectedSource, publishConnectedSourceInput } from "@better-answers/core/sources";
 import {
-  bindTheHandbook,
+  connectTheHandbook,
   locatorOf,
   THE_ACCOUNT_NUMBER,
   THE_PASSAGE,
@@ -51,16 +51,16 @@ describe("one uploaded document, read back over the MCP surface", () => {
 
       const who = { workspaceId: workspace.workspaceId, userId: workspace.admin.id };
       const admin = await actingIn(app, who, async (principal) => principal);
-      const bound = await bindTheHandbook(admin, {
+      const bound = await connectTheHandbook(admin, {
         postgres: app.doors.postgres,
         objects: store().door,
       });
 
       await runWorkerOnce(app.database.connectionUri, app.gitStoreDir, "mcp-cross-tier", store());
       await actingIn(app, who, (principal, tx) =>
-        publishBinding(principal, tx, {
-          ...inputOf(publishBindingInput, {
-            bindingId: bound.bindingId,
+        publishConnectedSource(principal, tx, {
+          ...inputOf(publishConnectedSourceInput, {
+            connectedSourceId: bound.connectedSourceId,
             confirmations: CONFIRMED,
           }),
           publishedAt: PUBLISHED_AT,

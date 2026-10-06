@@ -23,10 +23,10 @@ import {
   nameFlagging,
 } from "./harness-people.ts";
 import {
-  bindingsSeeding,
+  connectedSourcesSeeding,
   indexRunMoving,
   moveTheIndexRun,
-  seedBindings,
+  seedConnectedSources,
 } from "./harness-sources.ts";
 import type { TestApp } from "./harness.ts";
 import {
@@ -219,9 +219,9 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json({ seeded: asked.modelChoices.length });
   });
 
-  control.post(`${HARNESS_PREFIX}/bindings`, async (context) => {
-    const asked = await readBody(context.req.raw, bindingsSeeding);
-    return context.json({ bindings: await seedBindings(app, asked) });
+  control.post(`${HARNESS_PREFIX}/connected-sources`, async (context) => {
+    const asked = await readBody(context.req.raw, connectedSourcesSeeding);
+    return context.json({ connectedSources: await seedConnectedSources(app, asked) });
   });
 
   control.post(`${HARNESS_PREFIX}/index-runs`, async (context) => {

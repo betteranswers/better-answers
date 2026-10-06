@@ -133,25 +133,25 @@ def test_the_loop_runs_each_kind_one_job_at_a_time(
 
 def an_index_job_older_than_an_audit(database: psycopg.Connection) -> tuple[str, str]:
     workspace = str(seed_workspace(database.cursor())["id"])
-    binding_id = ulid()
+    connected_source_id = ulid()
     with database.cursor() as cursor:
         seed_job(
             cursor,
             workspace_id=workspace,
             kind="index",
-            reason="bound",
-            subject_id=binding_id,
+            reason="connected",
+            subject_id=connected_source_id,
             enqueued_ago_seconds=2,
         )
         seed_job(cursor, workspace_id=workspace, kind="nightly-audit")
     database.commit()
-    return workspace, binding_id
+    return workspace, connected_source_id
 
 
 def test_a_claim_leaves_unnamed_kinds_queued_and_unpoisoned(
     database: psycopg.Connection,
 ) -> None:
-    workspace, binding_id = an_index_job_older_than_an_audit(database)
+    workspace, connected_source_id = an_index_job_older_than_an_audit(database)
 
     with queue.connected(_WHERE[database]) as worker:
         with scoped(worker, workspace) as cursor:
@@ -171,13 +171,13 @@ def test_a_claim_leaves_unnamed_kinds_queued_and_unpoisoned(
     assert passed_over == [("queued", None, 0)]
 
     assert indexing is not None
-    assert (indexing.kind, indexing.subject_id) == ("index", binding_id)
+    assert (indexing.kind, indexing.subject_id) == ("index", connected_source_id)
 
 
 def test_a_claim_hands_the_handler_what_the_job_is_about(
     database: psycopg.Connection,
 ) -> None:
-    workspace, binding_id = an_index_job_older_than_an_audit(database)
+    workspace, connected_source_id = an_index_job_older_than_an_audit(database)
 
     with queue.connected(_WHERE[database]) as worker:
         with scoped(worker, workspace) as cursor:
@@ -187,8 +187,8 @@ def test_a_claim_hands_the_handler_what_the_job_is_about(
 
     assert indexing is not None
     assert indexing.kind == "index"
-    assert indexing.reason == "bound"
-    assert indexing.subject_id == binding_id
+    assert indexing.reason == "connected"
+    assert indexing.subject_id == connected_source_id
 
     assert auditing is not None
     assert auditing.kind == "nightly-audit"

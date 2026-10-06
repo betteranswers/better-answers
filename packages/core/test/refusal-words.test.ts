@@ -28,7 +28,7 @@ import type {
   RevokeCredentialsHereRefusal,
   TestWorkspaceRefusal,
 } from "../src/members/index.ts";
-import type { BindUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
+import type { ConnectUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
 import type {
   AddMemberRefusal,
   AddPersonRefusal,
@@ -195,7 +195,7 @@ describe("the refusal-word walk", () => {
   });
 
   it("answers an act's union in registered words alone", () => {
-    expectTypeOf<BindUploadRefusal>().toExtend<EveryRegisteredWord | Error>();
+    expectTypeOf<ConnectUploadRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<ProvisionRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<AddMemberRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<AddPersonRefusal>().toExtend<EveryRegisteredWord>();

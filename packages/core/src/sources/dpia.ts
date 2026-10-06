@@ -7,7 +7,11 @@ import { boundarySchemas, RULES_IN_FORCE_KEYS, type REDACTION_TIERS } from "@bet
 import { err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { listModelChoices, type LlmPurpose } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { adminOnBinding, bindingNamed, BINDING_ID } from "./admin-binding.ts";
+import {
+  adminOnConnectedSource,
+  connectedSourceNamed,
+  CONNECTED_SOURCE_ID,
+} from "./admin-connected-source.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
 export const NOT_RECORDED = "not recorded";
@@ -34,7 +38,7 @@ export const REDACTION_CATEGORIES = [
 export const PLATFORM_HELD_CATEGORIES = [
   "human:<email> in concept files",
   "the Person concept",
-  "the per-binding LMDB",
+  "the per-connected-source LMDB",
   "authored concept bodies",
 ] as const;
 
@@ -64,7 +68,7 @@ type DpiaModelChoice = {
 };
 
 export type DpiaInput = {
-  readonly bindingId: string;
+  readonly connectedSourceId: string;
 
   readonly personalDataCategories: readonly string[];
 
@@ -82,7 +86,7 @@ export type DpiaInput = {
   readonly audience: string;
 };
 
-export const dpiaReadInput = z.object({ bindingId: BINDING_ID });
+export const dpiaReadInput = z.object({ connectedSourceId: CONNECTED_SOURCE_ID });
 
 export type DpiaReadInput = z.output<typeof dpiaReadInput>;
 
@@ -94,9 +98,9 @@ export type DpiaInputRead = {
   readonly hash: string;
 };
 
-const RULES_IN_FORCE = boundarySchemas.sourceBinding.select.shape.rulesInForce;
+const RULES_IN_FORCE = boundarySchemas.connectedSource.select.shape.rulesInForce;
 
-type BindingRow = {
+type ConnectedSourceRow = {
   readonly sensitivity: string;
   readonly audience: string;
   readonly rules_in_force: unknown;
@@ -135,21 +139,23 @@ export const dpiaInputFor = async (
   tx: Tx,
   input: DpiaReadInput,
 ): Promise<Result<DpiaInputRead, DpiaInputRefusal>> => {
-  const acting = adminOnBinding(principal, input.bindingId);
+  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
-  const { admin, bindingId } = acting.value;
+  const { admin, connectedSourceId } = acting.value;
 
-  const read = await bindingNamed<BindingRow>(acting.value, tx, {
+  const read = await connectedSourceNamed<ConnectedSourceRow>(acting.value, tx, {
     columns: "sensitivity, audience, rules_in_force",
     lock: "none",
   });
   if (!read.ok) return err(read.error);
-  const binding = read.value;
+  const connectedSource = read.value;
 
-  const parsed = RULES_IN_FORCE.safeParse(binding.rules_in_force);
+  const parsed = RULES_IN_FORCE.safeParse(connectedSource.rules_in_force);
 
   if (!parsed.success || parsed.data === null) {
-    return err(new Error("the binding's rules in force are not the shape the column holds"));
+    return err(
+      new Error("the connected source's rules in force are not the shape the column holds"),
+    );
   }
   const rulesInForce: Readonly<Record<string, boolean>> = parsed.data;
 
@@ -157,14 +163,14 @@ export const dpiaInputFor = async (
   if (!listed.ok) return err(listed.error);
 
   const document: DpiaInput = {
-    bindingId,
+    connectedSourceId,
     personalDataCategories: REDACTION_CATEGORIES.filter((entry) =>
       raisedUnder(rulesInForce, entry.tier),
     ).map((entry) => entry.category),
     platformHeldCategories: [...PLATFORM_HELD_CATEGORIES],
     specialCategory: { category: SPECIAL_CATEGORY, condition: SPECIAL_CATEGORY_CONDITION },
     scope: NOT_RECORDED,
-    class: binding.sensitivity,
+    class: connectedSource.sensitivity,
     rulesInForce,
     modelChoices: listed.value.flatMap((modelChoice) => {
       if (modelChoice.purpose === EXCLUDED_PURPOSE) return [];
@@ -182,7 +188,7 @@ export const dpiaInputFor = async (
       ];
     }),
     retentionClass: NOT_RECORDED,
-    audience: binding.audience,
+    audience: connectedSource.audience,
   };
 
   return ok({ document, hash: createHash("sha256").update(canonical(document)).digest("hex") });

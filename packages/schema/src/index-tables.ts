@@ -27,7 +27,7 @@ export const chunk = indexSchema.table("chunk", {
   embedding: embeddingVector("embedding"),
   embeddingRouteId: text("embedding_route_id"),
 
-  bindingId: text("binding_id").notNull(),
+  connectedSourceId: text("binding_id").notNull(),
 
   sourceDocumentId: text("source_document_id"),
   locator: text("locator"),

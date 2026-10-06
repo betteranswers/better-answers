@@ -4,9 +4,13 @@ import type { z } from "zod";
 import { head } from "@better-answers/core/store/git";
 import { conceptIriOf, ulid } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
-import { bindingIdTakenAgain, conceptIriTakenAgain } from "@better-answers/schema/testing/probes";
+import {
+  connectedSourceIdTakenAgain,
+  conceptIriTakenAgain,
+} from "@better-answers/schema/testing/probes";
 
 import { ask, find, open } from "../src/answering/index.ts";
+import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import {
   evidencePaneOf,
   overrideConceptClass,
@@ -16,18 +20,18 @@ import {
 import { footnotesOf } from "../src/guides/index.ts";
 import { attempt, parse, type UserPrincipal } from "../src/kernel/index.ts";
 import {
-  narrowBinding,
-  narrowBindingInput,
+  narrowConnectedSource,
+  narrowConnectedSourceInput,
   narrowDocuments,
   narrowDocumentsInput,
-  widenBinding,
-  widenBindingInput,
+  widenConnectedSource,
+  widenConnectedSourceInput,
 } from "../src/sources/index.ts";
 import type { Folded, Tx } from "../src/store/postgres/index.ts";
 import { bundleHistory } from "./bundle.ts";
 import {
-  bindingForGroups,
-  bindingHolding,
+  connectedSourceForGroups,
+  connectedSourceHolding,
   chunkUnder,
   chunkVersionsOf,
   conceptCiting,
@@ -56,19 +60,19 @@ import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange, reading } = visibilitySuite();
 
-type NarrowingAsked = z.input<typeof narrowBindingInput>;
+type NarrowingAsked = z.input<typeof narrowConnectedSourceInput>;
 
 const narrowingAsked = (
-  principal: Parameters<typeof narrowBinding>[0],
-  tx: Parameters<typeof narrowBinding>[1],
+  principal: Parameters<typeof narrowConnectedSource>[0],
+  tx: Parameters<typeof narrowConnectedSource>[1],
   asked: NarrowingAsked,
-) => narrowBinding(principal, tx, inputOf(narrowBindingInput, asked));
+) => narrowConnectedSource(principal, tx, inputOf(narrowConnectedSourceInput, asked));
 
 const wideningAsked = (
-  principal: Parameters<typeof widenBinding>[0],
-  tx: Parameters<typeof widenBinding>[1],
-  asked: z.input<typeof widenBindingInput>,
-) => widenBinding(principal, tx, inputOf(widenBindingInput, asked));
+  principal: Parameters<typeof widenConnectedSource>[0],
+  tx: Parameters<typeof widenConnectedSource>[1],
+  asked: z.input<typeof widenConnectedSourceInput>,
+) => widenConnectedSource(principal, tx, inputOf(widenConnectedSourceInput, asked));
 
 const RESTRICTED = { sensitivity: "Restricted" } as const;
 
@@ -90,14 +94,17 @@ const HOLIDAY = "Holiday is twenty-eight days including bank holidays.";
 
 const LOCK_NOT_AVAILABLE = "55P03";
 
-const chunkRowsAreHeld = async (workspaceId: string, bindingId: string): Promise<boolean> => {
+const chunkRowsAreHeld = async (
+  workspaceId: string,
+  connectedSourceId: string,
+): Promise<boolean> => {
   const probe = await db().pool.connect();
   try {
     await probe.query("BEGIN");
     await probe.query("SET LOCAL lock_timeout = '250ms'");
     await probe.query(
       `UPDATE "index".chunk SET content = content WHERE workspace_id = $1 AND binding_id = $2`,
-      [workspaceId, bindingId],
+      [workspaceId, connectedSourceId],
     );
     return false;
   } catch (reason) {
@@ -116,7 +123,7 @@ const chunkRowsAreHeld = async (workspaceId: string, bindingId: string): Promise
  */
 const whileAChunkRowIsHeld = async <T>(
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
   work: () => Promise<T>,
 ): Promise<T> => {
   const holder = await db().pool.connect();
@@ -124,7 +131,7 @@ const whileAChunkRowIsHeld = async <T>(
     await holder.query("BEGIN");
     await holder.query(
       `SELECT 1 FROM "index".chunk WHERE workspace_id = $1 AND binding_id = $2 FOR UPDATE`,
-      [workspaceId, bindingId],
+      [workspaceId, connectedSourceId],
     );
     return await work();
   } finally {
@@ -133,18 +140,18 @@ const whileAChunkRowIsHeld = async <T>(
   }
 };
 
-/** A second binding under a held id fails the transaction after the act has landed every row. */
+/** A second connected source under a held id fails the transaction after the act has landed every row. */
 const landedThenTheTransactionFailed = (
   scenario: Scenario,
-  bindingId: string,
+  connectedSourceId: string,
   act: (admin: UserPrincipal, tx: Tx) => Promise<{ readonly ok: boolean }>,
 ) =>
   expect(
     reading(scenario.admin, async (admin, tx) => {
       expect((await act(admin, tx)).ok).toBe(true);
       await attempt(() =>
-        bindingIdTakenAgain(tx, scenario.workspaceId, {
-          bindingId,
+        connectedSourceIdTakenAgain(tx, scenario.workspaceId, {
+          connectedSourceId,
           name: "The handbook",
           sensitivity: "Internal",
         }),
@@ -152,9 +159,9 @@ const landedThenTheTransactionFailed = (
     }),
   ).rejects.toThrow(/did not commit/);
 
-const widenedTo = (scenario: Scenario, bindingId: string, sensitivity: string) =>
+const widenedTo = (scenario: Scenario, connectedSourceId: string, sensitivity: string) =>
   reading(scenario.admin, (admin, tx) =>
-    wideningAsked(admin, tx, { bindingId, sensitivity, audience: "everyone" }),
+    wideningAsked(admin, tx, { connectedSourceId, sensitivity, audience: "everyone" }),
   );
 
 const overriddenTo = (scenario: Scenario, iri: string, sensitivity: string) =>
@@ -240,7 +247,7 @@ const compositionIncluding = (
     return composition.id;
   });
 
-describe("what a governed write derives from its cited bindings", () => {
+describe("what a governed write derives from its cited connected sources", () => {
   it("lands the most restrictive class on both row and map", async () => {
     const scenario = await arrange();
     const { written } = await conceptOnBoth(db(), scenario);
@@ -255,15 +262,15 @@ describe("what a governed write derives from its cited bindings", () => {
     const [hr, sales, board] = await Promise.all(
       ["HR", "Sales", "Board"].map((name) => groupNamed(db(), scenario, name, [])),
     );
-    const forHrAndSales = await bindingForGroups(db(), scenario.workspaceId, [
+    const forHrAndSales = await connectedSourceForGroups(db(), scenario.workspaceId, [
       hr ?? "",
       sales ?? "",
     ]);
-    const forSalesAndBoard = await bindingForGroups(db(), scenario.workspaceId, [
+    const forSalesAndBoard = await connectedSourceForGroups(db(), scenario.workspaceId, [
       sales ?? "",
       board ?? "",
     ]);
-    const forEveryone = await bindingHolding(db(), scenario.workspaceId);
+    const forEveryone = await connectedSourceHolding(db(), scenario.workspaceId);
 
     const narrowed = await conceptCiting(scenario, scenario.editor, [
       forHrAndSales.documentId,
@@ -291,8 +298,8 @@ describe("what a governed write derives from its cited bindings", () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.viewer]);
     const sales = await groupNamed(db(), scenario, "Sales", []);
-    const forHr = await bindingForGroups(db(), scenario.workspaceId, [hr]);
-    const forSales = await bindingForGroups(db(), scenario.workspaceId, [sales]);
+    const forHr = await connectedSourceForGroups(db(), scenario.workspaceId, [hr]);
+    const forSales = await connectedSourceForGroups(db(), scenario.workspaceId, [sales]);
 
     const written = await conceptCiting(scenario, scenario.editor, [
       forHr.documentId,
@@ -311,7 +318,9 @@ describe("what a governed write derives from its cited bindings", () => {
 
   it("floors a Person at Restricted whatever its evidence says", async () => {
     const scenario = await arrange();
-    const website = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Public" });
+    const website = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Public",
+    });
 
     const person = await conceptCiting(scenario, scenario.editor, [website.documentId], {
       kind: "Person",
@@ -388,16 +397,16 @@ describe("what a governed write derives from its cited bindings", () => {
     });
   });
 
-  it("lets a write cite an unpublished binding, landing at Restricted", async () => {
+  it("lets a write cite an unpublished source, landing at Restricted", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
-    const unpublished = await bindingHolding(db(), scenario.workspaceId, {
+    const unpublished = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Public",
       audience: "groups",
       audienceGroups: [hr],
       publishedAt: null,
     });
-    const published = await bindingHolding(db(), scenario.workspaceId);
+    const published = await connectedSourceHolding(db(), scenario.workspaceId);
 
     const created = await conceptCiting(scenario, scenario.editor, [unpublished.documentId]);
     const standing = await conceptCiting(scenario, scenario.editor, [published.documentId]);
@@ -456,7 +465,7 @@ describe("what a re-write may not do to a concept's class", () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
-    const forHr = await bindingForGroups(db(), scenario.workspaceId, [hr]);
+    const forHr = await connectedSourceForGroups(db(), scenario.workspaceId, [hr]);
 
     const restrictedNote = await conceptCiting(scenario, scenario.admin, [restricted.documentId]);
     const hrNote = await conceptCiting(scenario, scenario.editor, [forHr.documentId]);
@@ -485,9 +494,9 @@ describe("what a re-write may not do to a concept's class", () => {
 
   it("refuses an Editor re-writing a withheld concept, even their own", async () => {
     const scenario = await arrange();
-    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const board = await groupNamed(db(), scenario, "Board", []);
-    const forBoard = await bindingForGroups(db(), scenario.workspaceId, [board]);
+    const forBoard = await connectedSourceForGroups(db(), scenario.workspaceId, [board]);
     const restrictedNote = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
     const boardNote = await conceptCiting(scenario, scenario.editor, [forBoard.documentId]);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
@@ -511,7 +520,7 @@ describe("what a re-write may not do to a concept's class", () => {
 
   it("answers a withheld IRI as unminted, refusing its merge key", async () => {
     const scenario = await arrange();
-    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
       kind: "Person",
       frontmatter: { title: "Jane Doe", type: "Person" },
@@ -574,20 +583,20 @@ describe("what a re-write may not do to a concept's class", () => {
   });
 });
 
-const workspaceWithHrBinding = async () => {
+const workspaceWithHrConnectedSource = async () => {
   const scenario = await arrange();
   const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
-  const binding = await bindingHolding(db(), scenario.workspaceId);
-  return { scenario, hr, binding };
+  const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+  return { scenario, hr, connectedSource };
 };
 
-describe("narrowing a binding", () => {
+describe("narrowing a connected source", () => {
   it("cascades to citing concepts and compositions, writing one audit event", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId);
-    const other = await bindingHolding(db(), scenario.workspaceId);
-    const cited = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
-    const linked = await conceptCiting(scenario, scenario.editor, [binding.documentId], {
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+    const other = await connectedSourceHolding(db(), scenario.workspaceId);
+    const cited = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
+    const linked = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId], {
       body: `See [the first note](/${cited.path}).`,
     });
     const untouched = await conceptCiting(scenario, scenario.editor, [other.documentId]);
@@ -598,7 +607,7 @@ describe("narrowing a binding", () => {
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
-        bindingId: binding.bindingId,
+        connectedSourceId: connectedSource.connectedSourceId,
         sensitivity: "Restricted",
         audience: "everyone",
       }),
@@ -607,7 +616,7 @@ describe("narrowing a binding", () => {
     expect(narrowed).toMatchObject({
       ok: true,
       value: {
-        bindingId: binding.bindingId,
+        connectedSourceId: connectedSource.connectedSourceId,
         concepts: [cited.iri, linked.iri].toSorted(),
         compositions: [composition],
       },
@@ -638,23 +647,32 @@ describe("narrowing a binding", () => {
       {
         id: narrowed.ok ? narrowed.value.auditEventId : "",
         actor: `human:${scenario.admin.userId}`,
-        subject_id: binding.bindingId,
-        detail: { bindingId: binding.bindingId, sensitivity: "Restricted", audience: "everyone" },
+        subject_id: connectedSource.connectedSourceId,
+        detail: {
+          [STORED_DETAIL_KEYS.connectedSourceId]: connectedSource.connectedSourceId,
+          sensitivity: "Restricted",
+          audience: "everyone",
+        },
       },
     ]);
   });
 
   it("touches no document's chunk row, whatever its own class", async () => {
-    const { scenario, hr, binding } = await workspaceWithHrBinding();
+    const { scenario, hr, connectedSource } = await workspaceWithHrConnectedSource();
 
     const narrowed = await documentUnder(
       db(),
       scenario.workspaceId,
-      binding.bindingId,
+      connectedSource.connectedSourceId,
       "Restricted",
     );
-    const wider = await documentUnder(db(), scenario.workspaceId, binding.bindingId, "Public");
-    for (const document of [binding, narrowed, wider]) {
+    const wider = await documentUnder(
+      db(),
+      scenario.workspaceId,
+      connectedSource.connectedSourceId,
+      "Public",
+    );
+    for (const document of [connectedSource, narrowed, wider]) {
       await chunkUnder(db(), scenario.workspaceId, document, {
         content: HOLIDAY,
         ordinal: 0,
@@ -662,11 +680,15 @@ describe("narrowing a binding", () => {
         charEnd: 53,
       });
     }
-    const stoodAt = await chunkVersionsOf(db(), scenario.workspaceId, binding.bindingId);
+    const stoodAt = await chunkVersionsOf(
+      db(),
+      scenario.workspaceId,
+      connectedSource.connectedSourceId,
+    );
 
     const moved = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
-        bindingId: binding.bindingId,
+        connectedSourceId: connectedSource.connectedSourceId,
         sensitivity: "Internal",
         audience: "groups",
         audienceGroups: [hr],
@@ -675,12 +697,19 @@ describe("narrowing a binding", () => {
 
     expect(moved.ok).toBe(true);
     expect(
-      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+      await visibilityHeld(
+        db().pool,
+        "connected_source",
+        scenario.workspaceId,
+        connectedSource.connectedSourceId,
+      ),
     ).toEqual({ sensitivity: "Internal", audience: "groups", audience_groups: [hr] });
-    expect(await chunkVersionsOf(db(), scenario.workspaceId, binding.bindingId)).toEqual(stoodAt);
+    expect(
+      await chunkVersionsOf(db(), scenario.workspaceId, connectedSource.connectedSourceId),
+    ).toEqual(stoodAt);
 
     const toTheGroup = { audience: "groups", audience_groups: [hr] };
-    expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([
+    expect(await chunkVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
       { sensitivity: "Internal", ...toTheGroup },
     ]);
 
@@ -694,10 +723,10 @@ describe("narrowing a binding", () => {
 
   it("holds no chunk row while waiting on the concept index", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId);
-    const elsewhere = await bindingHolding(db(), scenario.workspaceId);
-    await conceptCiting(scenario, scenario.editor, [binding.documentId]);
-    for (const document of [binding, elsewhere]) {
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+    const elsewhere = await connectedSourceHolding(db(), scenario.workspaceId);
+    await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
+    for (const document of [connectedSource, elsewhere]) {
       await chunkUnder(db(), scenario.workspaceId, document, {
         content: HOLIDAY,
         ordinal: 0,
@@ -707,42 +736,44 @@ describe("narrowing a binding", () => {
     }
 
     expect(
-      await whileAChunkRowIsHeld(scenario.workspaceId, binding.bindingId, () =>
-        chunkRowsAreHeld(scenario.workspaceId, binding.bindingId),
+      await whileAChunkRowIsHeld(scenario.workspaceId, connectedSource.connectedSourceId, () =>
+        chunkRowsAreHeld(scenario.workspaceId, connectedSource.connectedSourceId),
       ),
     ).toBe(true);
 
     await whileActsWaitAt(db().pool, "concept_index", "UPDATE", async (release) => {
       const narrowing = reading(scenario.admin, (admin, tx) =>
         narrowingAsked(admin, tx, {
-          bindingId: binding.bindingId,
+          connectedSourceId: connectedSource.connectedSourceId,
           sensitivity: "Restricted",
           audience: "everyone",
         }),
       );
       await until(async () => (await countWaitingOnLocks(db().pool)) >= 1);
 
-      expect(await chunkRowsAreHeld(scenario.workspaceId, binding.bindingId)).toBe(false);
+      expect(await chunkRowsAreHeld(scenario.workspaceId, connectedSource.connectedSourceId)).toBe(
+        false,
+      );
 
-      expect(await chunkRowsAreHeld(scenario.workspaceId, elsewhere.bindingId)).toBe(false);
+      expect(await chunkRowsAreHeld(scenario.workspaceId, elsewhere.connectedSourceId)).toBe(false);
 
       await release();
       expect(await narrowing).toMatchObject({ ok: true });
     });
 
-    expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([
+    expect(await chunkVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
       { sensitivity: "Restricted", ...EVERYONE },
     ]);
   });
 
   it("narrows to named groups; an outside Viewer loses the concept", async () => {
-    const { scenario, hr, binding } = await workspaceWithHrBinding();
-    const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+    const { scenario, hr, connectedSource } = await workspaceWithHrConnectedSource();
+    const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
     const composition = await compositionIncluding(scenario.workspaceId, [written.iri]);
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
-        bindingId: binding.bindingId,
+        connectedSourceId: connectedSource.connectedSourceId,
         sensitivity: "Internal",
         audience: "groups",
         audienceGroups: [hr],
@@ -752,7 +783,12 @@ describe("narrowing a binding", () => {
     expect(narrowed.ok).toBe(true);
     const named = { sensitivity: "Internal", audience: "groups", audience_groups: [hr] };
     expect(
-      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+      await visibilityHeld(
+        db().pool,
+        "connected_source",
+        scenario.workspaceId,
+        connectedSource.connectedSourceId,
+      ),
     ).toEqual(named);
     expect(await heldRow(scenario.workspaceId, written.iri)).toEqual(named);
     expect(
@@ -770,20 +806,23 @@ describe("narrowing a binding", () => {
   // A shape says nothing of a tenant's state, so refusing it ahead of the role leaks nothing.
   it("names a malformed field before weighing role, and moves nothing", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId);
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
 
     expect(
-      parse(narrowBindingInput, {
-        bindingId: "not-a-binding-id",
+      parse(narrowConnectedSourceInput, {
+        connectedSourceId: "not-a-connected-source-id",
         sensitivity: "Restricted",
         audience: "everyone",
       }),
-    ).toEqual({ ok: false, error: { word: "malformed", fields: { bindingId: "bad-format" } } });
+    ).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { connectedSourceId: "bad-format" } },
+    });
 
     for (const person of [scenario.viewer, scenario.editor]) {
       const refused = await reading(person, (reader, tx) =>
         narrowingAsked(reader, tx, {
-          bindingId: binding.bindingId,
+          connectedSourceId: connectedSource.connectedSourceId,
           sensitivity: "Restricted",
           audience: "everyone",
         }),
@@ -791,7 +830,12 @@ describe("narrowing a binding", () => {
       expect(refused).toEqual({ ok: false, error: "role-forbids" });
     }
     expect(
-      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+      await visibilityHeld(
+        db().pool,
+        "connected_source",
+        scenario.workspaceId,
+        connectedSource.connectedSourceId,
+      ),
     ).toEqual({
       sensitivity: "Internal",
       ...EVERYONE,
@@ -802,14 +846,18 @@ describe("narrowing a binding", () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const sales = await groupNamed(db(), scenario, "Sales", []);
-    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
-    const forHr = await bindingForGroups(db(), scenario.workspaceId, [hr]);
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
+    const forHr = await connectedSourceForGroups(db(), scenario.workspaceId, [hr]);
 
     const moves = [
-      { bindingId: restricted.bindingId, sensitivity: "Internal", audience: "everyone" },
-      { bindingId: forHr.bindingId, sensitivity: "Internal", audience: "everyone" },
       {
-        bindingId: forHr.bindingId,
+        connectedSourceId: restricted.connectedSourceId,
+        sensitivity: "Internal",
+        audience: "everyone",
+      },
+      { connectedSourceId: forHr.connectedSourceId, sensitivity: "Internal", audience: "everyone" },
+      {
+        connectedSourceId: forHr.connectedSourceId,
         sensitivity: "Internal",
         audience: "groups",
         audienceGroups: [hr, sales],
@@ -822,7 +870,7 @@ describe("narrowing a binding", () => {
 
     const kept = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
-        bindingId: forHr.bindingId,
+        connectedSourceId: forHr.connectedSourceId,
         sensitivity: "Restricted",
         audience: "groups",
         audienceGroups: [hr],
@@ -831,21 +879,21 @@ describe("narrowing a binding", () => {
     expect(kept.ok).toBe(true);
   });
 
-  it("refuses a group or binding this workspace does not hold", async () => {
+  it("refuses a group or source this workspace does not hold", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId);
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const elsewhere = await arrange();
     const theirGroup = await groupNamed(db(), elsewhere, "HR", []);
 
     const refusals = await Promise.all(
       [
         {
-          bindingId: binding.bindingId,
+          connectedSourceId: connectedSource.connectedSourceId,
           sensitivity: "Internal",
           audience: "groups",
           audienceGroups: [theirGroup],
         },
-        { bindingId: ulid(), sensitivity: "Restricted", audience: "everyone" },
+        { connectedSourceId: ulid(), sensitivity: "Restricted", audience: "everyone" },
       ].map((move) => reading(scenario.admin, (admin, tx) => narrowingAsked(admin, tx, move))),
     );
 
@@ -857,14 +905,14 @@ describe("narrowing a binding", () => {
 
   const writeBesideAnOpenNarrowing = async (
     scenario: Scenario,
-    bindingId: string,
+    connectedSourceId: string,
     write: () => Promise<Awaited<ReturnType<typeof rewriteCiting>>>,
   ) => {
     const { outcome } = await besideAnOpenNarrowing(
       scenario,
       (tx) =>
         narrowingAsked(scenario.admin, tx, {
-          bindingId,
+          connectedSourceId,
           sensitivity: "Restricted",
           audience: "everyone",
         }),
@@ -875,11 +923,11 @@ describe("narrowing a binding", () => {
 
   it("makes a concurrent write wait, so it never lands wider", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId);
-    const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
 
-    await writeBesideAnOpenNarrowing(scenario, binding.bindingId, () =>
-      rewriteCiting(scenario, scenario.editor, written, [binding.documentId]),
+    await writeBesideAnOpenNarrowing(scenario, connectedSource.connectedSourceId, () =>
+      rewriteCiting(scenario, scenario.editor, written, [connectedSource.documentId]),
     );
 
     expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
@@ -889,11 +937,11 @@ describe("narrowing a binding", () => {
 
   it("clamps a swapped-evidence re-write to the row a cascade narrowed", async () => {
     const scenario = await arrange();
-    const cited = await bindingHolding(db(), scenario.workspaceId);
-    const other = await bindingHolding(db(), scenario.workspaceId);
+    const cited = await connectedSourceHolding(db(), scenario.workspaceId);
+    const other = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [cited.documentId]);
 
-    await writeBesideAnOpenNarrowing(scenario, cited.bindingId, () =>
+    await writeBesideAnOpenNarrowing(scenario, cited.connectedSourceId, () =>
       rewriteCiting(scenario, scenario.editor, written, [other.documentId]),
     );
 
@@ -904,8 +952,8 @@ describe("narrowing a binding", () => {
 
   it("counts an include with no concept row as Restricted", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId);
-    const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
 
     const composition = await seededBy(db(), async (seed) => {
       const page = await seed.composition({ workspaceId: scenario.workspaceId });
@@ -925,7 +973,7 @@ describe("narrowing a binding", () => {
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
-        bindingId: binding.bindingId,
+        connectedSourceId: connectedSource.connectedSourceId,
         sensitivity: "Internal",
         audience: "everyone",
       }),
@@ -958,8 +1006,8 @@ describe("narrowing a binding", () => {
 
   it("re-derives after waiting on a re-write, ignoring its dropped citation", async () => {
     const scenario = await arrange();
-    const dropped = await bindingHolding(db(), scenario.workspaceId);
-    const kept = await bindingHolding(db(), scenario.workspaceId);
+    const dropped = await connectedSourceHolding(db(), scenario.workspaceId);
+    const kept = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [dropped.documentId]);
 
     await narrowingBesideAParkedWrite(
@@ -967,7 +1015,11 @@ describe("narrowing a binding", () => {
       "bundle_commit",
       "INSERT",
       () => rewriteCiting(scenario, scenario.editor, written, [kept.documentId]),
-      { bindingId: dropped.bindingId, sensitivity: "Restricted", audience: "everyone" },
+      {
+        connectedSourceId: dropped.connectedSourceId,
+        sensitivity: "Restricted",
+        audience: "everyone",
+      },
     );
 
     expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
@@ -979,9 +1031,9 @@ describe("narrowing a binding", () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
     const sales = await groupNamed(db(), scenario, "Sales", [scenario.viewer]);
-    const forHr = await bindingForGroups(db(), scenario.workspaceId, [hr]);
-    const open = await bindingHolding(db(), scenario.workspaceId);
-    const other = await bindingHolding(db(), scenario.workspaceId);
+    const forHr = await connectedSourceForGroups(db(), scenario.workspaceId, [hr]);
+    const open = await connectedSourceHolding(db(), scenario.workspaceId);
+    const other = await connectedSourceHolding(db(), scenario.workspaceId);
     const narrowing = await conceptCiting(scenario, scenario.editor, [other.documentId]);
     const cited = await conceptCiting(scenario, scenario.editor, [open.documentId]);
     const composition = await compositionIncluding(scenario.workspaceId, [
@@ -995,7 +1047,7 @@ describe("narrowing a binding", () => {
       "UPDATE",
       () => rewriteCiting(scenario, scenario.editor, narrowing, [forHr.documentId]),
       {
-        bindingId: open.bindingId,
+        connectedSourceId: open.connectedSourceId,
         sensitivity: "Internal",
         audience: "groups",
         audienceGroups: [sales],
@@ -1007,22 +1059,22 @@ describe("narrowing a binding", () => {
     ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
   });
 
-  it("serialises narrowings of two bindings one concept cites, never deadlocking", async () => {
+  it("serialises narrowings of two sources one concept cites, never deadlocking", async () => {
     const scenario = await arrange();
-    const first = await bindingHolding(db(), scenario.workspaceId);
-    const second = await bindingHolding(db(), scenario.workspaceId);
+    const first = await connectedSourceHolding(db(), scenario.workspaceId);
+    const second = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [
       first.documentId,
       second.documentId,
     ]);
 
     await whileActsWaitAt(db().pool, "audit_event", "INSERT", async (release) => {
-      const narrowings: Promise<Folded<Awaited<ReturnType<typeof narrowBinding>>>>[] = [];
-      for (const [at, binding] of [first, second].entries()) {
+      const narrowings: Promise<Folded<Awaited<ReturnType<typeof narrowConnectedSource>>>>[] = [];
+      for (const [at, connectedSource] of [first, second].entries()) {
         narrowings.push(
           reading(scenario.admin, (admin, tx) =>
             narrowingAsked(admin, tx, {
-              bindingId: binding.bindingId,
+              connectedSourceId: connectedSource.connectedSourceId,
               sensitivity: "Restricted",
               audience: "everyone",
             }),
@@ -1048,25 +1100,30 @@ describe("narrowing a binding", () => {
 
   it("leaves nothing, chunks included, when the transaction fails after it", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId);
-    const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
-    await chunkUnder(db(), scenario.workspaceId, binding, {
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
+    await chunkUnder(db(), scenario.workspaceId, connectedSource, {
       content: HOLIDAY,
       ordinal: 0,
       charStart: 0,
       charEnd: 53,
     });
 
-    await landedThenTheTransactionFailed(scenario, binding.bindingId, (admin, tx) =>
+    await landedThenTheTransactionFailed(scenario, connectedSource.connectedSourceId, (admin, tx) =>
       narrowingAsked(admin, tx, {
-        bindingId: binding.bindingId,
+        connectedSourceId: connectedSource.connectedSourceId,
         sensitivity: "Restricted",
         audience: "everyone",
       }),
     );
 
     expect(
-      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+      await visibilityHeld(
+        db().pool,
+        "connected_source",
+        scenario.workspaceId,
+        connectedSource.connectedSourceId,
+      ),
     ).toEqual({
       sensitivity: "Internal",
       ...EVERYONE,
@@ -1076,7 +1133,7 @@ describe("narrowing a binding", () => {
       ...EVERYONE,
     });
 
-    expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([
+    expect(await chunkVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
       { sensitivity: "Internal", ...EVERYONE },
     ]);
     expect(
@@ -1085,7 +1142,7 @@ describe("narrowing a binding", () => {
   });
 });
 
-describe("publishing a binding", () => {
+describe("publishing a connected source", () => {
   it("releases its recorded class to citing concepts and compositions only", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
@@ -1095,9 +1152,13 @@ describe("publishing a binding", () => {
       audienceGroups: [hr],
       publishedAt: null,
     };
-    const binding = await bindingHolding(db(), scenario.workspaceId, unpublishedForHr);
-    const other = await bindingHolding(db(), scenario.workspaceId, unpublishedForHr);
-    const cited = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+    const connectedSource = await connectedSourceHolding(
+      db(),
+      scenario.workspaceId,
+      unpublishedForHr,
+    );
+    const other = await connectedSourceHolding(db(), scenario.workspaceId, unpublishedForHr);
+    const cited = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
     const untouched = await conceptCiting(scenario, scenario.editor, [other.documentId]);
     const composition = await compositionIncluding(scenario.workspaceId, [cited.iri], {
       sensitivity: "Restricted",
@@ -1106,7 +1167,11 @@ describe("publishing a binding", () => {
     const restrictedToHr = { sensitivity: "Restricted", audience: "groups", audience_groups: [hr] };
     expect(await heldRow(scenario.workspaceId, cited.iri)).toEqual(restrictedToHr);
 
-    const published = await publishedOnceIndexed(db(), scenario.admin, binding.bindingId);
+    const published = await publishedOnceIndexed(
+      db(),
+      scenario.admin,
+      connectedSource.connectedSourceId,
+    );
 
     expect(published.ok).toBe(true);
     const internalToHr = { sensitivity: "Internal", audience: "groups", audience_groups: [hr] };
@@ -1118,7 +1183,10 @@ describe("publishing a binding", () => {
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
     ).toMatchObject([
-      { subject_id: binding.bindingId, detail: { sensitivity: "Internal", audience: "groups" } },
+      {
+        subject_id: connectedSource.connectedSourceId,
+        detail: { sensitivity: "Internal", audience: "groups" },
+      },
     ]);
   });
 });
@@ -1147,27 +1215,32 @@ const dismissedBy = (scenario: Scenario) => ({
   reviewReason: "Our engineers diagnose faults in pumps, never in people.",
 });
 
-const documentClassesUnder = async (workspaceId: string, bindingId: string) => {
+const documentClassesUnder = async (workspaceId: string, connectedSourceId: string) => {
   const read = await db().pool.query<{ id: string; sensitivity: string | null }>(
-    "SELECT id, sensitivity FROM source_document WHERE workspace_id = $1 AND binding_id = $2",
-    [workspaceId, bindingId],
+    "SELECT id, sensitivity FROM source_document WHERE workspace_id = $1 AND connected_source_id = $2",
+    [workspaceId, connectedSourceId],
   );
   return Object.fromEntries(read.rows.map((row) => [row.id, row.sensitivity]));
 };
 
-describe("widening a binding", () => {
-  it("widens a published binding and cascade, recording from and to", async () => {
+describe("widening a connected source", () => {
+  it("widens a published source and cascade, recording from and to", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
-    const binding = await bindingForGroups(db(), scenario.workspaceId, [hr], "Restricted");
-    const other = await bindingForGroups(db(), scenario.workspaceId, [hr], "Restricted");
-    const cited = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
+    const connectedSource = await connectedSourceForGroups(
+      db(),
+      scenario.workspaceId,
+      [hr],
+      "Restricted",
+    );
+    const other = await connectedSourceForGroups(db(), scenario.workspaceId, [hr], "Restricted");
+    const cited = await conceptCiting(scenario, scenario.admin, [connectedSource.documentId]);
     const untouched = await conceptCiting(scenario, scenario.admin, [other.documentId]);
     const composition = await compositionIncluding(scenario.workspaceId, [cited.iri], {
       sensitivity: "Restricted",
       audienceGroups: [hr],
     });
-    await chunkUnder(db(), scenario.workspaceId, binding, {
+    await chunkUnder(db(), scenario.workspaceId, connectedSource, {
       content: HOLIDAY,
       ordinal: 0,
       charStart: 0,
@@ -1176,12 +1249,12 @@ describe("widening a binding", () => {
     const restrictedToHr = { sensitivity: "Restricted", audience: "groups", audience_groups: [hr] };
     expect(await heldRow(scenario.workspaceId, cited.iri)).toEqual(restrictedToHr);
 
-    const widened = await widenedTo(scenario, binding.bindingId, "Internal");
+    const widened = await widenedTo(scenario, connectedSource.connectedSourceId, "Internal");
 
     expect(widened).toMatchObject({
       ok: true,
       value: {
-        bindingId: binding.bindingId,
+        connectedSourceId: connectedSource.connectedSourceId,
         visibility: { sensitivity: "Internal", audience: "everyone", audienceGroups: null },
         concepts: [cited.iri],
         compositions: [composition],
@@ -1189,13 +1262,20 @@ describe("widening a binding", () => {
     });
     const internal = { sensitivity: "Internal", ...EVERYONE };
     expect(
-      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+      await visibilityHeld(
+        db().pool,
+        "connected_source",
+        scenario.workspaceId,
+        connectedSource.connectedSourceId,
+      ),
     ).toEqual(internal);
     expect(await rowAndNode(scenario.workspaceId, cited.iri)).toEqual(bothAt(internal));
     expect(
       await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
     ).toEqual(internal);
-    expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([internal]);
+    expect(await chunkVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
+      internal,
+    ]);
     expect(await heldRow(scenario.workspaceId, untouched.iri)).toEqual(restrictedToHr);
 
     expect(
@@ -1204,9 +1284,9 @@ describe("widening a binding", () => {
       {
         id: widened.ok ? widened.value.auditEventId : "",
         actor: `human:${scenario.admin.userId}`,
-        subject_id: binding.bindingId,
+        subject_id: connectedSource.connectedSourceId,
         detail: {
-          bindingId: binding.bindingId,
+          [STORED_DETAIL_KEYS.connectedSourceId]: connectedSource.connectedSourceId,
           fromSensitivity: "Restricted",
           fromAudience: "groups",
           sensitivity: "Internal",
@@ -1218,27 +1298,29 @@ describe("widening a binding", () => {
 
   it("never widens a document or concept past the document's class", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const verdict = await documentUnder(
       db(),
       scenario.workspaceId,
-      binding.bindingId,
+      connectedSource.connectedSourceId,
       "Restricted",
     );
     await findingIn(scenario, verdict, { ...A_HEALTH_CUE, ...dismissedBy(scenario) });
     const narrowed = await seededBy(db(), async (seed) => {
       const document = await seed.sourceDocument({
         workspaceId: scenario.workspaceId,
-        bindingId: binding.bindingId,
+        connectedSourceId: connectedSource.connectedSourceId,
         sensitivity: "Internal",
         narrowedTo: "Internal",
       });
-      return { bindingId: binding.bindingId, documentId: document.id };
+      return { connectedSourceId: connectedSource.connectedSourceId, documentId: document.id };
     });
-    const onTheBinding = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
+    const onTheConnectedSource = await conceptCiting(scenario, scenario.admin, [
+      connectedSource.documentId,
+    ]);
     const onTheVerdict = await conceptCiting(scenario, scenario.admin, [verdict.documentId]);
     const onTheNarrowing = await conceptCiting(scenario, scenario.admin, [narrowed.documentId]);
-    for (const document of [binding, verdict, narrowed]) {
+    for (const document of [connectedSource, verdict, narrowed]) {
       await chunkUnder(db(), scenario.workspaceId, document, {
         content: HOLIDAY,
         ordinal: 0,
@@ -1246,14 +1328,14 @@ describe("widening a binding", () => {
         charEnd: 53,
       });
     }
-    const widened = await widenedTo(scenario, binding.bindingId, "Public");
+    const widened = await widenedTo(scenario, connectedSource.connectedSourceId, "Public");
 
     expect(widened.ok).toBe(true);
     const at = (sensitivity: string) => ({ sensitivity, ...EVERYONE });
-    expect(await heldRow(scenario.workspaceId, onTheBinding.iri)).toEqual(at("Public"));
+    expect(await heldRow(scenario.workspaceId, onTheConnectedSource.iri)).toEqual(at("Public"));
     expect(await heldRow(scenario.workspaceId, onTheVerdict.iri)).toEqual(at("Restricted"));
     expect(await heldRow(scenario.workspaceId, onTheNarrowing.iri)).toEqual(at("Internal"));
-    expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([
+    expect(await chunkVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
       at("Public"),
     ]);
     expect(await chunkVisibilityOf(scenario.workspaceId, verdict.documentId)).toEqual([
@@ -1262,29 +1344,33 @@ describe("widening a binding", () => {
     expect(await chunkVisibilityOf(scenario.workspaceId, narrowed.documentId)).toEqual([
       at("Internal"),
     ]);
-    expect(await documentClassesUnder(scenario.workspaceId, binding.bindingId)).toEqual({
-      [binding.documentId]: null,
+    expect(
+      await documentClassesUnder(scenario.workspaceId, connectedSource.connectedSourceId),
+    ).toEqual({
+      [connectedSource.documentId]: null,
       [verdict.documentId]: "Restricted",
       [narrowed.documentId]: "Internal",
     });
   });
 
-  it("widens an unpublished binding, releasing nothing until the publish", async () => {
+  it("widens an unpublished connected source, releasing nothing until the publish", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId, {
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Restricted",
       publishedAt: null,
     });
-    const cited = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
+    const cited = await conceptCiting(scenario, scenario.admin, [connectedSource.documentId]);
 
-    const widened = await widenedTo(scenario, binding.bindingId, "Internal");
+    const widened = await widenedTo(scenario, connectedSource.connectedSourceId, "Internal");
 
     expect(widened).toMatchObject({ ok: true, value: { concepts: [cited.iri] } });
     expect(await heldRow(scenario.workspaceId, cited.iri)).toEqual({
       sensitivity: "Restricted",
       ...EVERYONE,
     });
-    expect((await publishedOnceIndexed(db(), scenario.admin, binding.bindingId)).ok).toBe(true);
+    expect(
+      (await publishedOnceIndexed(db(), scenario.admin, connectedSource.connectedSourceId)).ok,
+    ).toBe(true);
     expect(await heldRow(scenario.workspaceId, cited.iri)).toEqual({
       sensitivity: "Internal",
       ...EVERYONE,
@@ -1293,20 +1379,25 @@ describe("widening a binding", () => {
 
   it("refuses over an unreviewed special-category finding, and moves nothing", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
-    const cited = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
-    await findingIn(scenario, binding, A_HEALTH_CUE);
-    const reviewed = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
+    const cited = await conceptCiting(scenario, scenario.admin, [connectedSource.documentId]);
+    await findingIn(scenario, connectedSource, A_HEALTH_CUE);
+    const reviewed = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     await findingIn(scenario, reviewed, { ...A_HEALTH_CUE, ...dismissedBy(scenario) });
     await findingIn(scenario, reviewed, {});
 
-    const refused = await widenedTo(scenario, binding.bindingId, "Internal");
-    const widened = await widenedTo(scenario, reviewed.bindingId, "Internal");
+    const refused = await widenedTo(scenario, connectedSource.connectedSourceId, "Internal");
+    const widened = await widenedTo(scenario, reviewed.connectedSourceId, "Internal");
 
     expect(refused).toEqual({ ok: false, error: "special-category-unreviewed" });
     expect(widened.ok).toBe(true);
     expect(
-      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+      await visibilityHeld(
+        db().pool,
+        "connected_source",
+        scenario.workspaceId,
+        connectedSource.connectedSourceId,
+      ),
     ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
     expect(await heldRow(scenario.workspaceId, cited.iri)).toEqual({
       sensitivity: "Restricted",
@@ -1314,14 +1405,14 @@ describe("widening a binding", () => {
     });
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened"),
-    ).toMatchObject([{ subject_id: reviewed.bindingId }]);
+    ).toMatchObject([{ subject_id: reviewed.connectedSourceId }]);
   });
 
   it("refuses a request that is not wider, and moves nothing", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const sales = await groupNamed(db(), scenario, "Sales", []);
-    const forBoth = await bindingForGroups(db(), scenario.workspaceId, [hr, sales]);
+    const forBoth = await connectedSourceForGroups(db(), scenario.workspaceId, [hr, sales]);
 
     const asks = [
       { sensitivity: "Internal", audience: "groups", audienceGroups: [hr, sales] },
@@ -1330,35 +1421,43 @@ describe("widening a binding", () => {
     ];
     for (const asked of asks) {
       const refused = await reading(scenario.admin, (admin, tx) =>
-        wideningAsked(admin, tx, { bindingId: forBoth.bindingId, ...asked }),
+        wideningAsked(admin, tx, { connectedSourceId: forBoth.connectedSourceId, ...asked }),
       );
       expect(refused).toEqual({ ok: false, error: "not-wider" });
     }
     expect(
-      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, forBoth.bindingId),
+      await visibilityHeld(
+        db().pool,
+        "connected_source",
+        scenario.workspaceId,
+        forBoth.connectedSourceId,
+      ),
     ).toEqual({ sensitivity: "Internal", audience: "groups", audience_groups: [hr, sales] });
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened"),
     ).toEqual([]);
   });
 
-  it("refuses a non-Admin, an unknown binding and a foreign group", async () => {
+  it("refuses a non-Admin, an unknown source and a foreign group", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const elsewhere = await arrange();
     const theirGroup = await groupNamed(db(), elsewhere, "HR", []);
     const toInternal = { sensitivity: "Internal", audience: "everyone" };
 
     const refusals = await Promise.all([
       reading(scenario.editor, (editor, tx) =>
-        wideningAsked(editor, tx, { bindingId: binding.bindingId, ...toInternal }),
+        wideningAsked(editor, tx, {
+          connectedSourceId: connectedSource.connectedSourceId,
+          ...toInternal,
+        }),
       ),
       reading(scenario.admin, (admin, tx) =>
-        wideningAsked(admin, tx, { bindingId: ulid(), ...toInternal }),
+        wideningAsked(admin, tx, { connectedSourceId: ulid(), ...toInternal }),
       ),
       reading(scenario.admin, (admin, tx) =>
         wideningAsked(admin, tx, {
-          bindingId: binding.bindingId,
+          connectedSourceId: connectedSource.connectedSourceId,
           sensitivity: "Internal",
           audience: "groups",
           audienceGroups: [theirGroup],
@@ -1375,12 +1474,12 @@ describe("widening a binding", () => {
 
   it("leaves nothing, cascade included, when the transaction fails after it", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
-    const written = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
+    const written = await conceptCiting(scenario, scenario.admin, [connectedSource.documentId]);
 
-    await landedThenTheTransactionFailed(scenario, binding.bindingId, (admin, tx) =>
+    await landedThenTheTransactionFailed(scenario, connectedSource.connectedSourceId, (admin, tx) =>
       wideningAsked(admin, tx, {
-        bindingId: binding.bindingId,
+        connectedSourceId: connectedSource.connectedSourceId,
         sensitivity: "Public",
         audience: "everyone",
       }),
@@ -1388,7 +1487,12 @@ describe("widening a binding", () => {
 
     const restricted = { sensitivity: "Restricted", ...EVERYONE };
     expect(
-      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+      await visibilityHeld(
+        db().pool,
+        "connected_source",
+        scenario.workspaceId,
+        connectedSource.connectedSourceId,
+      ),
     ).toEqual(restricted);
     expect(await heldRow(scenario.workspaceId, written.iri)).toEqual(restricted);
     expect(
@@ -1411,7 +1515,7 @@ describe("narrowing documents", () => {
           scenario.admin,
           tx,
           inputOf(narrowDocumentsInput, {
-            bindingId: narrowed.bindingId,
+            connectedSourceId: narrowed.connectedSourceId,
             findingGroups: [
               {
                 documentId: narrowed.documentId,
@@ -1431,9 +1535,9 @@ describe("narrowing documents", () => {
 
   it("holds a concurrent concept, which lands at the narrowed class", async () => {
     const scenario = await arrange();
-    const handbook = await bindingHolding(db(), scenario.workspaceId);
+    const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
     // A shared evidence row: a new one's foreign key would wait on the narrowed document before
-    // the landing reached the binding.
+    // the landing reached the connected source.
     await conceptCiting(scenario, scenario.editor, [handbook.documentId]);
 
     const landed = await besideAnOpenDocumentNarrowing(scenario, handbook, "FOR SHARE", () =>
@@ -1447,8 +1551,8 @@ describe("narrowing documents", () => {
 
   it("holds a re-write's check so it weighs the narrowed class", async () => {
     const scenario = await arrange();
-    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
-    const handbook = await bindingHolding(db(), scenario.workspaceId);
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
+    const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.admin, [restricted.documentId]);
 
     const rewritten = await besideAnOpenDocumentNarrowing(
@@ -1464,10 +1568,12 @@ describe("narrowing documents", () => {
     );
   });
 
-  it("holds another binding's cascade, which then sees the narrowed document", async () => {
+  it("holds another source's cascade, which then sees the narrowed document", async () => {
     const scenario = await arrange();
-    const handbook = await bindingHolding(db(), scenario.workspaceId);
-    const brochure = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Public" });
+    const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
+    const brochure = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Public",
+    });
     const written = await conceptCiting(scenario, scenario.editor, [
       handbook.documentId,
       brochure.documentId,
@@ -1480,7 +1586,7 @@ describe("narrowing documents", () => {
       () =>
         reading(scenario.admin, (admin, tx) =>
           narrowingAsked(admin, tx, {
-            bindingId: brochure.bindingId,
+            connectedSourceId: brochure.connectedSourceId,
             sensitivity: "Internal",
             audience: "everyone",
           }),
@@ -1497,7 +1603,7 @@ describe("narrowing documents", () => {
 describe("an Admin's recorded override", () => {
   it("widens past floor and evidence, names the Admin, and cascades", async () => {
     const scenario = await arrange();
-    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const person = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
       kind: "Person",
       frontmatter: { title: "Ada Lovelace", type: "Person" },
@@ -1549,15 +1655,15 @@ describe("an Admin's recorded override", () => {
     expect(seen.ok && seen.value.found).toBe(true);
   });
 
-  it("stands when the binding is later narrowed, outranking the evidence", async () => {
+  it("stands when the source is later narrowed, outranking the evidence", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId);
-    const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
     await overriddenTo(scenario, written.iri, "Public");
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
-        bindingId: binding.bindingId,
+        connectedSourceId: connectedSource.connectedSourceId,
         sensitivity: "Restricted",
         audience: "everyone",
       }),
@@ -1603,7 +1709,7 @@ describe("an Admin's recorded override", () => {
 
   it("leaves no override or audit event when the transaction fails", async () => {
     const scenario = await arrange();
-    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const written = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
 
     await expect(
@@ -1671,7 +1777,7 @@ describe("the evidence pane", () => {
 
   it("answers a withheld concept exactly as one nobody minted", async () => {
     const scenario = await arrange();
-    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const written = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
 
     const withheld = await paneFor(scenario.viewer, written.iri);
@@ -1704,7 +1810,7 @@ describe("the evidence pane", () => {
 
   it("names the overriding Admin and hides evidence the override outruns", async () => {
     const scenario = await arrange();
-    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const written = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
       kind: "Person",
       frontmatter: { title: "Ada Lovelace", type: "Person" },
@@ -1749,7 +1855,7 @@ describe("the evidence pane", () => {
     const unsourced = await conceptCiting(scenario, scenario.editor, [], {
       sensitivity: "Internal",
     });
-    const internal = await bindingHolding(db(), scenario.workspaceId);
+    const internal = await connectedSourceHolding(db(), scenario.workspaceId);
     const sourced = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
     await overriddenTo(scenario, sourced.iri, "Public");
 
@@ -1770,9 +1876,11 @@ describe("the evidence pane", () => {
     });
   });
 
-  it("withholds evidence whose binding is unpublished, naming no Admin", async () => {
+  it("withholds evidence whose connected source is unpublished, naming no Admin", async () => {
     const scenario = await arrange();
-    const unpublished = await bindingHolding(db(), scenario.workspaceId, { publishedAt: null });
+    const unpublished = await connectedSourceHolding(db(), scenario.workspaceId, {
+      publishedAt: null,
+    });
     const written = await conceptCiting(scenario, scenario.editor, [unpublished.documentId], {
       sensitivity: "Internal",
     });
@@ -1789,8 +1897,8 @@ describe("the evidence pane", () => {
 
   it("reads count and rows from one snapshot across a re-write", async () => {
     const scenario = await arrange();
-    const kept = await bindingHolding(db(), scenario.workspaceId);
-    const added = await bindingHolding(db(), scenario.workspaceId);
+    const kept = await connectedSourceHolding(db(), scenario.workspaceId);
+    const added = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [kept.documentId]);
 
     const { pane, wrote } = await paneAcross(
@@ -1963,7 +2071,7 @@ describe("find", () => {
 
   it("keeps the limit, reads queries literally, answers nothing to nothing", async () => {
     const scenario = await arrange();
-    const internal = await bindingHolding(db(), scenario.workspaceId);
+    const internal = await connectedSourceHolding(db(), scenario.workspaceId);
     for (const title of ["Alpha note", "Beta note", "Gamma note"]) {
       await conceptCiting(scenario, scenario.editor, [internal.documentId], { title });
     }

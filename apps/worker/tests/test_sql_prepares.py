@@ -172,7 +172,7 @@ def _readings_of_parameter(
     position = _parameters(function).index(parameter)
     callers = _callers(module, function)
     if not callers:
-        raise UnreadableError(f"{parameter}, which no call in the module binds")
+        raise UnreadableError(f"{parameter}, which no call in the module passes")
     readings: list[Reading] = []
     for call in callers:
         argument = _argument_at(call, position, parameter)
@@ -216,7 +216,7 @@ def _readings_of_joined(
 
 
 def readings_of(module: Module, node: ast.expr, seen: set[ast.AST]) -> list[Reading]:
-    """Every text `node` can hold, each with the parameter bindings that gave it."""
+    """Every text `node` can hold, each with the parameter values that gave it."""
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         seen.add(node)
         return [(node.value, ())]

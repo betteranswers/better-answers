@@ -7,15 +7,15 @@ import type { Sensitivity } from "../src/access/index.ts";
 import { find, open } from "../src/answering/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import {
-  narrowBinding,
-  narrowBindingInput,
+  narrowConnectedSource,
+  narrowConnectedSourceInput,
   narrowDocuments,
   narrowDocumentsInput,
   passageAt,
   previewChunks,
   previewChunksInput,
-  publishBinding,
-  publishBindingInput,
+  publishConnectedSource,
+  publishConnectedSourceInput,
 } from "../src/sources/index.ts";
 import { seededBy, visibilitySuite } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
@@ -56,10 +56,10 @@ const PUBLISHED_AND_INTERNAL: Visibility = {
   audienceGroups: null,
 };
 
-const aBinding = (workspaceId: string, said: Partial<Visibility> = {}): Promise<string> =>
+const aConnectedSource = (workspaceId: string, said: Partial<Visibility> = {}): Promise<string> =>
   seededBy(db(), async (seed) => {
     const held = { ...PUBLISHED_AND_INTERNAL, ...said };
-    const row = await seed.sourceBinding({
+    const row = await seed.connectedSource({
       workspaceId,
       ...held,
       audienceGroups: held.audienceGroups === null ? null : [...held.audienceGroups],
@@ -69,13 +69,13 @@ const aBinding = (workspaceId: string, said: Partial<Visibility> = {}): Promise<
 
 const aDocument = (
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
   said: { readonly title: string; readonly sensitivity?: Sensitivity | null },
 ): Promise<string> =>
   seededBy(db(), async (seed) => {
     const row = await seed.sourceDocument({
       workspaceId,
-      bindingId,
+      connectedSourceId,
       title: said.title,
       sensitivity: said.sensitivity ?? null,
     });
@@ -83,7 +83,7 @@ const aDocument = (
   });
 
 type Landing = {
-  readonly bindingId: string;
+  readonly connectedSourceId: string;
   readonly documentId: string;
   readonly text: string;
 };
@@ -94,7 +94,7 @@ const landed = (workspaceId: string, where: Landing): Promise<void> =>
   seededBy(db(), async (seed) => {
     await seed.chunk({
       workspaceId,
-      bindingId: where.bindingId,
+      connectedSourceId: where.connectedSourceId,
       sourceDocumentId: where.documentId,
       content: where.text,
       locator: wireOf(where.documentId, where.text),
@@ -107,13 +107,13 @@ const landed = (workspaceId: string, where: Landing): Promise<void> =>
 const landedBeside = (
   workspaceId: string,
   first: Landing,
-  bindingId: string,
+  connectedSourceId: string,
   text: string,
 ): Promise<void> =>
   seededBy(db(), async (seed) => {
     await seed.chunk({
       workspaceId,
-      bindingId,
+      connectedSourceId,
       sourceDocumentId: first.documentId,
       content: text,
       locator: `${first.documentId}/chars:${first.text.length}-${first.text.length + text.length}`,
@@ -123,13 +123,13 @@ const landedBeside = (
     });
   });
 
-const aFinishedRun = (workspaceId: string, bindingId: string): Promise<void> =>
+const aFinishedRun = (workspaceId: string, connectedSourceId: string): Promise<void> =>
   seededBy(db(), async (seed) => {
     await seed.job({
       workspaceId,
       kind: "index",
-      subjectId: bindingId,
-      reason: "bound",
+      subjectId: connectedSourceId,
+      reason: "connected",
       status: "done",
       enqueuedAt: RUN_FINISHED_AT,
       attempts: 1,
@@ -144,19 +144,19 @@ const aFinishedRun = (workspaceId: string, bindingId: string): Promise<void> =>
  * Every act refuses a widening, so the restoring half of each pair can only be written onto
  * the source row itself.
  */
-const theBindingRowNowSays = async (
+const theConnectedSourceRowNowSays = async (
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
   said: Partial<Visibility>,
 ): Promise<void> => {
   const held = { ...PUBLISHED_AND_INTERNAL, ...said };
   await db().pool.query(
-    `UPDATE source_binding
+    `UPDATE connected_source
         SET published_at = $3, sensitivity = $4, audience = $5, audience_groups = $6
       WHERE workspace_id = $1 AND id = $2`,
     [
       workspaceId,
-      bindingId,
+      connectedSourceId,
       held.publishedAt,
       held.sensitivity,
       held.audience,
@@ -178,13 +178,17 @@ const theDocumentRowNowSays = async (
   );
 };
 
-const aBindingHoldingOneDocument = async (
+const aConnectedSourceHoldingOneDocument = async (
   workspaceId: string,
-  said: { readonly title: string; readonly text: string; readonly binding?: Partial<Visibility> },
+  said: {
+    readonly title: string;
+    readonly text: string;
+    readonly connectedSource?: Partial<Visibility>;
+  },
 ): Promise<Landing> => {
-  const bindingId = await aBinding(workspaceId, said.binding);
-  const documentId = await aDocument(workspaceId, bindingId, { title: said.title });
-  return { bindingId, documentId, text: said.text };
+  const connectedSourceId = await aConnectedSource(workspaceId, said.connectedSource);
+  const documentId = await aDocument(workspaceId, connectedSourceId, { title: said.title });
+  return { connectedSourceId, documentId, text: said.text };
 };
 
 const aSiblingUnder = async (
@@ -192,8 +196,8 @@ const aSiblingUnder = async (
   where: Landing,
   said: { readonly title: string; readonly text: string },
 ): Promise<Landing> => ({
-  bindingId: where.bindingId,
-  documentId: await aDocument(workspaceId, where.bindingId, { title: said.title }),
+  connectedSourceId: where.connectedSourceId,
+  documentId: await aDocument(workspaceId, where.connectedSourceId, { title: said.title }),
   text: said.text,
 });
 
@@ -235,37 +239,52 @@ const opening = async (person: UserPrincipal, wire: string): Promise<unknown> =>
     }),
   );
 
-const previewing = async (person: UserPrincipal, bindingId: string): Promise<readonly string[]> =>
+const previewing = async (
+  person: UserPrincipal,
+  connectedSourceId: string,
+): Promise<readonly string[]> =>
   answered(
     await reading(person, async (reader, tx) => {
-      const listed = await previewChunks(reader, tx, inputOf(previewChunksInput, { bindingId }));
+      const listed = await previewChunks(
+        reader,
+        tx,
+        inputOf(previewChunksInput, { connectedSourceId }),
+      );
       if (!listed.ok) throw new Error(`the preview was refused: ${String(listed.error)}`);
       return listed.value.map((chunk) => chunk.locator);
     }),
   );
 
 const narrowedTo = (
-  bindingId: string,
+  connectedSourceId: string,
   sensitivity: Sensitivity,
-): z.input<typeof narrowBindingInput> => ({
-  bindingId,
+): z.input<typeof narrowConnectedSourceInput> => ({
+  connectedSourceId,
   sensitivity,
   audience: "everyone",
   audienceGroups: null,
 });
 
-const narrowingTheBinding = (scenario: Scenario, bindingId: string, to: Sensitivity) =>
+const narrowingTheConnectedSource = (
+  scenario: Scenario,
+  connectedSourceId: string,
+  to: Sensitivity,
+) =>
   reading(scenario.admin, (admin, tx) =>
-    narrowBinding(admin, tx, inputOf(narrowBindingInput, narrowedTo(bindingId, to))),
+    narrowConnectedSource(
+      admin,
+      tx,
+      inputOf(narrowConnectedSourceInput, narrowedTo(connectedSourceId, to)),
+    ),
   );
 
-const narrowingTheDocument = (scenario: Scenario, bindingId: string, documentId: string) =>
+const narrowingTheDocument = (scenario: Scenario, connectedSourceId: string, documentId: string) =>
   reading(scenario.admin, (admin, tx) =>
     narrowDocuments(
       admin,
       tx,
       inputOf(narrowDocumentsInput, {
-        bindingId,
+        connectedSourceId,
         findingGroups: [
           {
             documentId,
@@ -279,11 +298,11 @@ const narrowingTheDocument = (scenario: Scenario, bindingId: string, documentId:
     ),
   );
 
-const publishingTheBinding = (scenario: Scenario, bindingId: string) =>
+const publishingTheConnectedSource = (scenario: Scenario, connectedSourceId: string) =>
   reading(scenario.admin, (admin, tx) =>
-    publishBinding(admin, tx, {
-      ...inputOf(publishBindingInput, {
-        bindingId,
+    publishConnectedSource(admin, tx, {
+      ...inputOf(publishConnectedSourceInput, {
+        connectedSourceId,
         confirmations: {
           lawfulBasisRecorded: true,
           privacyInformationUpdated: true,
@@ -295,19 +314,21 @@ const publishingTheBinding = (scenario: Scenario, bindingId: string) =>
   );
 
 describe("a reader's answer as the Admin's acts move source rows", () => {
-  it("withholds a binding's passages when narrowed, restoring them once widened", async () => {
+  it("withholds a source's passages when narrowed, restoring them once widened", async () => {
     const scenario = await arrange();
-    const where = await aBindingHoldingOneDocument(scenario.workspaceId, {
+    const where = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
       text: HANDBOOK,
     });
-    const { bindingId } = where;
+    const { connectedSourceId } = where;
     await landed(scenario.workspaceId, where);
 
     const before = await reaches(scenario.viewer, where);
-    answered(await narrowingTheBinding(scenario, bindingId, "Restricted"));
+    answered(await narrowingTheConnectedSource(scenario, connectedSourceId, "Restricted"));
     const after = await reaches(scenario.viewer, where);
-    await theBindingRowNowSays(scenario.workspaceId, bindingId, { sensitivity: "Internal" });
+    await theConnectedSourceRowNowSays(scenario.workspaceId, connectedSourceId, {
+      sensitivity: "Internal",
+    });
     const widened = await reaches(scenario.viewer, where);
 
     expect({ before, after, widened }).toEqual({
@@ -319,7 +340,7 @@ describe("a reader's answer as the Admin's acts move source rows", () => {
 
   it("withholds a narrowed document's chunks, sparing its sibling, both ways", async () => {
     const scenario = await arrange();
-    const theOne = await aBindingHoldingOneDocument(scenario.workspaceId, {
+    const theOne = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
       text: HANDBOOK,
     });
@@ -328,11 +349,11 @@ describe("a reader's answer as the Admin's acts move source rows", () => {
       text: ANNEX,
     });
     await landed(scenario.workspaceId, theOne);
-    await landedBeside(scenario.workspaceId, theOne, theOne.bindingId, SECOND_ROW);
+    await landedBeside(scenario.workspaceId, theOne, theOne.connectedSourceId, SECOND_ROW);
     await landed(scenario.workspaceId, theOther);
 
     const before = await rowsFound(scenario.viewer, theOne.documentId);
-    answered(await narrowingTheDocument(scenario, theOne.bindingId, theOne.documentId));
+    answered(await narrowingTheDocument(scenario, theOne.connectedSourceId, theOne.documentId));
     const after = await rowsFound(scenario.viewer, theOne.documentId);
     const siblingAfter = await reaches(scenario.viewer, theOther);
     await theDocumentRowNowSays(scenario.workspaceId, theOne.documentId, null);
@@ -353,21 +374,23 @@ describe("a reader's answer as the Admin's acts move source rows", () => {
     });
   });
 
-  it("reveals a binding's passages when published, withholding them once unpublished", async () => {
+  it("reveals a source's passages when published, withholding them once unpublished", async () => {
     const scenario = await arrange();
-    const where = await aBindingHoldingOneDocument(scenario.workspaceId, {
+    const where = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The board's minutes",
       text: MINUTES,
-      binding: { publishedAt: null },
+      connectedSource: { publishedAt: null },
     });
-    const { bindingId } = where;
+    const { connectedSourceId } = where;
     await landed(scenario.workspaceId, where);
-    await aFinishedRun(scenario.workspaceId, bindingId);
+    await aFinishedRun(scenario.workspaceId, connectedSourceId);
 
     const before = await reaches(scenario.viewer, where);
-    answered(await publishingTheBinding(scenario, bindingId));
+    answered(await publishingTheConnectedSource(scenario, connectedSourceId));
     const after = await reaches(scenario.viewer, where);
-    await theBindingRowNowSays(scenario.workspaceId, bindingId, { publishedAt: null });
+    await theConnectedSourceRowNowSays(scenario.workspaceId, connectedSourceId, {
+      publishedAt: null,
+    });
     const unpublished = await reaches(scenario.viewer, where);
 
     expect({ before, after, unpublished }).toEqual({
@@ -394,37 +417,43 @@ const jobsOf = async (workspaceId: string): Promise<readonly JobRow[]> =>
   ).rows;
 
 describe("a narrowing queues no run", () => {
-  it("adds no job when an Admin narrows bindings or documents", async () => {
+  it("adds no job when an Admin narrows sources or documents", async () => {
     const scenario = await arrange();
-    const theBinding = await aBindingHoldingOneDocument(scenario.workspaceId, {
+    const theConnectedSource = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
       text: HANDBOOK,
     });
-    const theOther = await aBindingHoldingOneDocument(scenario.workspaceId, {
+    const theOther = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The handbook annex",
       text: ANNEX,
     });
-    await landed(scenario.workspaceId, theBinding);
+    await landed(scenario.workspaceId, theConnectedSource);
     await landed(scenario.workspaceId, theOther);
     // The run that had already been and gone, so an empty answer below is the act and not a
     // reader that sees nothing.
-    await aFinishedRun(scenario.workspaceId, theOther.bindingId);
+    await aFinishedRun(scenario.workspaceId, theOther.connectedSourceId);
     const theRunThatRan = {
       kind: "index",
-      reason: "bound",
-      subject_id: theOther.bindingId,
+      reason: "connected",
+      subject_id: theOther.connectedSourceId,
       status: "done",
     };
 
     const before = await jobsOf(scenario.workspaceId);
-    answered(await narrowingTheBinding(scenario, theBinding.bindingId, "Restricted"));
-    const afterTheBinding = await jobsOf(scenario.workspaceId);
-    answered(await narrowingTheDocument(scenario, theOther.bindingId, theOther.documentId));
+    answered(
+      await narrowingTheConnectedSource(
+        scenario,
+        theConnectedSource.connectedSourceId,
+        "Restricted",
+      ),
+    );
+    const afterTheConnectedSource = await jobsOf(scenario.workspaceId);
+    answered(await narrowingTheDocument(scenario, theOther.connectedSourceId, theOther.documentId));
     const afterTheDocuments = await jobsOf(scenario.workspaceId);
 
-    expect({ before, afterTheBinding, afterTheDocuments }).toEqual({
+    expect({ before, afterTheConnectedSource, afterTheDocuments }).toEqual({
       before: [theRunThatRan],
-      afterTheBinding: [theRunThatRan],
+      afterTheConnectedSource: [theRunThatRan],
       afterTheDocuments: [theRunThatRan],
     });
   });
@@ -438,14 +467,14 @@ type HeldNarrowing = { readonly commit: () => Promise<void> };
  */
 const aNarrowingHeldUncommitted = async (
   scenario: Scenario,
-  bindingId: string,
+  connectedSourceId: string,
 ): Promise<HeldNarrowing> => {
   const applied = Promise.withResolvers<void>();
   const held = Promise.withResolvers<void>();
-  const asked = inputOf(narrowBindingInput, narrowedTo(bindingId, "Restricted"));
+  const asked = inputOf(narrowConnectedSourceInput, narrowedTo(connectedSourceId, "Restricted"));
   const act = reading(scenario.admin, async (admin, tx) => {
     try {
-      return await narrowBinding(admin, tx, asked);
+      return await narrowConnectedSource(admin, tx, asked);
     } finally {
       applied.resolve();
       await held.promise;
@@ -463,12 +492,12 @@ const aNarrowingHeldUncommitted = async (
 describe("the race with a narrowing in flight", () => {
   it("reads rows landed under an open narrowing until it commits", async () => {
     const scenario = await arrange();
-    const where = await aBindingHoldingOneDocument(scenario.workspaceId, {
+    const where = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
       text: HANDBOOK,
     });
 
-    const narrowing = await aNarrowingHeldUncommitted(scenario, where.bindingId);
+    const narrowing = await aNarrowingHeldUncommitted(scenario, where.connectedSourceId);
     await landed(scenario.workspaceId, where);
     const beforeTheCommit = await reaches(scenario.viewer, where);
 
@@ -484,7 +513,7 @@ describe("the race with a narrowing in flight", () => {
 
   it("withholds rows landed during a narrowing as those landed before", async () => {
     const scenario = await arrange();
-    const theOld = await aBindingHoldingOneDocument(scenario.workspaceId, {
+    const theOld = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
       text: HANDBOOK,
     });
@@ -494,7 +523,7 @@ describe("the race with a narrowing in flight", () => {
     });
     await landed(scenario.workspaceId, theOld);
 
-    const narrowing = await aNarrowingHeldUncommitted(scenario, theOld.bindingId);
+    const narrowing = await aNarrowingHeldUncommitted(scenario, theOld.connectedSourceId);
     await landed(scenario.workspaceId, theNew);
     await narrowing.commit();
 
@@ -505,16 +534,16 @@ describe("the race with a narrowing in flight", () => {
   });
 });
 
-describe("a passage whose rows do not all name one binding", () => {
-  // The binding id has no foreign key, so one document's rows can name two bindings — which is
+describe("a passage whose rows do not all name one source", () => {
+  // The connected source id has no foreign key, so one document's rows can name two connected sources — which is
   // what keeps `passageAt`'s fold reachable.
-  it("is opened at the narrower binding, withheld whole from Viewers", async () => {
+  it("is opened at the narrower source, withheld whole from Viewers", async () => {
     const scenario = await arrange();
-    const wide = await aBindingHoldingOneDocument(scenario.workspaceId, {
+    const wide = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
       text: LEADING,
     });
-    const narrow = await aBinding(scenario.workspaceId, { sensitivity: "Restricted" });
+    const narrow = await aConnectedSource(scenario.workspaceId, { sensitivity: "Restricted" });
     await landed(scenario.workspaceId, wide);
     await landedBeside(scenario.workspaceId, wide, narrow, TRAILING);
     const wire = `${wide.documentId}/chars:0-${LEADING.length + TRAILING.length}`;
@@ -534,12 +563,12 @@ describe("a passage whose rows do not all name one binding", () => {
   });
 });
 
-describe("a chunk whose binding row is absent", () => {
-  // The chunk's binding id carries no foreign key, so only the read closes this shape.
+describe("a chunk whose connected source row is absent", () => {
+  // The chunk's connected source id carries no foreign key, so only the read closes this shape.
   it("is read and listed by nobody, unlike a live neighbour", async () => {
     const scenario = await arrange();
     const absent = ulid();
-    const neighbour = await aBindingHoldingOneDocument(scenario.workspaceId, {
+    const neighbour = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The handbook annex",
       text: ANNEX,
     });
@@ -548,14 +577,14 @@ describe("a chunk whose binding row is absent", () => {
         title: "The staff handbook",
         text: HANDBOOK,
       })),
-      bindingId: absent,
+      connectedSourceId: absent,
     };
     await landed(scenario.workspaceId, orphaned);
     await landed(scenario.workspaceId, neighbour);
 
     expect({
       orphanedPreview: await previewing(scenario.admin, absent),
-      neighbourPreview: await previewing(scenario.admin, neighbour.bindingId),
+      neighbourPreview: await previewing(scenario.admin, neighbour.connectedSourceId),
       orphanedReach: await reaches(scenario.viewer, orphaned),
       neighbourReach: await reaches(scenario.viewer, neighbour),
     }).toEqual({

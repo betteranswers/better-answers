@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { runsOfSubject, runsOfSubjectInput } from "../src/runs/index.ts";
-import { listBindings } from "../src/sources/index.ts";
+import { listConnectedSources } from "../src/sources/index.ts";
 import { chunkUnder, seededBy } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
@@ -17,23 +17,23 @@ const FINISHED_AT = new Date("2026-09-11T09:30:00.000Z");
 const PUBLISHED_AT = new Date("2026-09-11T10:00:00.000Z");
 
 const listedFor = (who: UserPrincipal) =>
-  readingAs(db().runtimePool, who, (principal, tx) => listBindings(principal, tx));
+  readingAs(db().runtimePool, who, (principal, tx) => listConnectedSources(principal, tx));
 
 const runsFor = (who: UserPrincipal, subjectId: string) =>
   readingAs(db().runtimePool, who, (principal, tx) =>
     runsOfSubject(principal, tx, inputOf(runsOfSubjectInput, { subjectId })),
   );
 
-type Seeded = { readonly bindingId: string; readonly documentIds: readonly string[] };
+type Seeded = { readonly connectedSourceId: string; readonly documentIds: readonly string[] };
 
-const bindingOf = (
+const connectedSourceOf = (
   scenario: Scenario,
   name: string,
   documents: ReadonlyArray<{ readonly title: string; readonly quarantineError?: string }>,
   publishedAt: Date | null = null,
 ): Promise<Seeded> =>
   seededBy(db(), async (seed) => {
-    const binding = await seed.sourceBinding({
+    const connectedSource = await seed.connectedSource({
       workspaceId: scenario.workspaceId,
       name,
       publishedAt,
@@ -44,13 +44,13 @@ const bindingOf = (
         quarantineError === undefined ? {} : { outcome: "quarantined", quarantineError };
       const document = await seed.sourceDocument({
         workspaceId: scenario.workspaceId,
-        bindingId: binding.id,
+        connectedSourceId: connectedSource.id,
         title,
         ...quarantined,
       });
       documentIds.push(document.id);
     }
-    return { bindingId: binding.id, documentIds };
+    return { connectedSourceId: connectedSource.id, documentIds };
   });
 
 type RunShape = {
@@ -77,12 +77,12 @@ const columnsOf = (run: RunShape) => {
   return { ...claimed, finishedAt: run.finishedAt ?? null, outcome: run.outcome ?? {} };
 };
 
-const runOver = (scenario: Scenario, bindingId: string, run: RunShape): Promise<string> =>
+const runOver = (scenario: Scenario, connectedSourceId: string, run: RunShape): Promise<string> =>
   seededBy(db(), async (seed) => {
     const row = await seed.job({
       workspaceId: scenario.workspaceId,
       kind: "index",
-      subjectId: bindingId,
+      subjectId: connectedSourceId,
       reason: run.reason,
       status: run.status,
       enqueuedAt: run.enqueuedAt,
@@ -93,7 +93,7 @@ const runOver = (scenario: Scenario, bindingId: string, run: RunShape): Promise<
 
 const chunksUnder = async (
   scenario: Scenario,
-  bindingId: string,
+  connectedSourceId: string,
   documentId: string,
   count: number,
 ): Promise<void> => {
@@ -101,7 +101,7 @@ const chunksUnder = async (
     await chunkUnder(
       db(),
       scenario.workspaceId,
-      { bindingId, documentId },
+      { connectedSourceId, documentId },
       {
         content: `Paragraph ${String(ordinal)}.`,
         ordinal,
@@ -124,45 +124,45 @@ const AS_BOUND = {
 };
 
 describe("the Sources list an Admin reads", () => {
-  it("names each binding's state, counts and last run", async () => {
+  it("names each connected source's state, counts and last run", async () => {
     const scenario = await arrange();
-    const handbook = await bindingOf(scenario, "Handbook", [{ title: "handbook.md" }]);
-    const handbookRun = await runOver(scenario, handbook.bindingId, {
-      reason: "bound",
+    const handbook = await connectedSourceOf(scenario, "Handbook", [{ title: "handbook.md" }]);
+    const handbookRun = await runOver(scenario, handbook.connectedSourceId, {
+      reason: "connected",
       status: "queued",
       enqueuedAt: QUEUED_AT,
     });
-    const policies = await bindingOf(scenario, "Policies", [
+    const policies = await connectedSourceOf(scenario, "Policies", [
       { title: "leave.md" },
       { title: "expenses.md" },
     ]);
-    await runOver(scenario, policies.bindingId, {
-      reason: "bound",
+    await runOver(scenario, policies.connectedSourceId, {
+      reason: "connected",
       status: "failed",
       enqueuedAt: QUEUED_AT,
       finishedAt: FAILED_AT,
       outcome: TIMED_OUT,
     });
-    const policiesRun = await runOver(scenario, policies.bindingId, {
+    const policiesRun = await runOver(scenario, policies.connectedSourceId, {
       reason: "restored",
       status: "done",
       enqueuedAt: REQUEUED_AT,
       finishedAt: FINISHED_AT,
       outcome: INDEXED,
     });
-    await chunksUnder(scenario, policies.bindingId, policies.documentIds[0] ?? "", 2);
-    await chunksUnder(scenario, policies.bindingId, policies.documentIds[1] ?? "", 1);
-    const rota = await bindingOf(scenario, "Rota", [{ title: "rota.md" }], PUBLISHED_AT);
-    const rotaRun = await runOver(scenario, rota.bindingId, {
-      reason: "bound",
+    await chunksUnder(scenario, policies.connectedSourceId, policies.documentIds[0] ?? "", 2);
+    await chunksUnder(scenario, policies.connectedSourceId, policies.documentIds[1] ?? "", 1);
+    const rota = await connectedSourceOf(scenario, "Rota", [{ title: "rota.md" }], PUBLISHED_AT);
+    const rotaRun = await runOver(scenario, rota.connectedSourceId, {
+      reason: "connected",
       status: "done",
       enqueuedAt: QUEUED_AT,
       finishedAt: FINISHED_AT,
       outcome: INDEXED,
     });
-    const contracts = await bindingOf(scenario, "Contracts", [{ title: "contracts.pdf" }]);
-    const contractsRun = await runOver(scenario, contracts.bindingId, {
-      reason: "bound",
+    const contracts = await connectedSourceOf(scenario, "Contracts", [{ title: "contracts.pdf" }]);
+    const contractsRun = await runOver(scenario, contracts.connectedSourceId, {
+      reason: "connected",
       status: "claimed",
       enqueuedAt: QUEUED_AT,
     });
@@ -172,7 +172,7 @@ describe("the Sources list an Admin reads", () => {
     expect(listed).toEqual([
       {
         ...AS_BOUND,
-        bindingId: contracts.bindingId,
+        connectedSourceId: contracts.connectedSourceId,
         name: "Contracts",
         state: "indexing",
         publishedAt: null,
@@ -181,7 +181,7 @@ describe("the Sources list an Admin reads", () => {
         lastRun: {
           jobId: contractsRun,
           kind: "index",
-          reason: "bound",
+          reason: "connected",
           status: "claimed",
           attempts: 1,
           enqueuedAt: "2026-09-11T08:00:00.000Z",
@@ -190,16 +190,16 @@ describe("the Sources list an Admin reads", () => {
       },
       {
         ...AS_BOUND,
-        bindingId: handbook.bindingId,
+        connectedSourceId: handbook.connectedSourceId,
         name: "Handbook",
-        state: "landed",
+        state: "received",
         publishedAt: null,
         documentCount: 1,
         chunkCount: 0,
         lastRun: {
           jobId: handbookRun,
           kind: "index",
-          reason: "bound",
+          reason: "connected",
           status: "queued",
           attempts: 0,
           enqueuedAt: "2026-09-11T08:00:00.000Z",
@@ -208,7 +208,7 @@ describe("the Sources list an Admin reads", () => {
       },
       {
         ...AS_BOUND,
-        bindingId: policies.bindingId,
+        connectedSourceId: policies.connectedSourceId,
         name: "Policies",
         state: "indexed",
         publishedAt: null,
@@ -226,7 +226,7 @@ describe("the Sources list an Admin reads", () => {
       },
       {
         ...AS_BOUND,
-        bindingId: rota.bindingId,
+        connectedSourceId: rota.connectedSourceId,
         name: "Rota",
         state: "published",
         publishedAt: "2026-09-11T10:00:00.000Z",
@@ -235,7 +235,7 @@ describe("the Sources list an Admin reads", () => {
         lastRun: {
           jobId: rotaRun,
           kind: "index",
-          reason: "bound",
+          reason: "connected",
           status: "done",
           attempts: 1,
           enqueuedAt: "2026-09-11T08:00:00.000Z",
@@ -245,20 +245,24 @@ describe("the Sources list an Admin reads", () => {
     ]);
   });
 
-  it("shows an unrun binding as landed with no last run", async () => {
+  it("shows an unrun source as received with no last run", async () => {
     const scenario = await arrange();
-    const minutes = await bindingOf(scenario, "Minutes", [{ title: "minutes.md" }]);
+    const minutes = await connectedSourceOf(scenario, "Minutes", [{ title: "minutes.md" }]);
 
     const listed = answered(await listedFor(scenario.admin));
 
-    expect(listed.map((binding) => [binding.bindingId, binding.state, binding.lastRun])).toEqual([
-      [minutes.bindingId, "landed", null],
-    ]);
+    expect(
+      listed.map((connectedSource) => [
+        connectedSource.connectedSourceId,
+        connectedSource.state,
+        connectedSource.lastRun,
+      ]),
+    ).toEqual([[minutes.connectedSourceId, "received", null]]);
   });
 
   it("names each quarantined document's error and counts by error", async () => {
     const scenario = await arrange();
-    const scans = await bindingOf(scenario, "Scans", [
+    const scans = await connectedSourceOf(scenario, "Scans", [
       { title: "Minutes" },
       { title: "Floor plan", quarantineError: "NeedsOcrError" },
       { title: "Site survey", quarantineError: "NeedsOcrError" },
@@ -277,10 +281,10 @@ describe("the Sources list an Admin reads", () => {
     expect(listed?.quarantinedByError).toEqual({ NeedsOcrError: 2, DeadlineExceededError: 1 });
   });
 
-  it("lists no binding another workspace holds", async () => {
+  it("lists no connected source another workspace holds", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
-    await bindingOf(elsewhere, "Their handbook", [{ title: "theirs.md" }]);
+    await connectedSourceOf(elsewhere, "Their handbook", [{ title: "theirs.md" }]);
 
     expect(answered(await listedFor(scenario.admin))).toEqual([]);
   });
@@ -289,37 +293,37 @@ describe("the Sources list an Admin reads", () => {
     "refuses the %s, as the list is an Admin's",
     async (role) => {
       const scenario = await arrange();
-      await bindingOf(scenario, "Handbook", [{ title: "handbook.md" }]);
+      await connectedSourceOf(scenario, "Handbook", [{ title: "handbook.md" }]);
 
       expect(await listedFor(scenario[role])).toEqual({ ok: false, error: "role-forbids" });
     },
   );
 });
 
-describe("the runs of a binding, read by subject", () => {
+describe("the runs of a connected source, read by subject", () => {
   it("answers every run newest first, in ISO instants", async () => {
     const scenario = await arrange();
-    const handbook = await bindingOf(scenario, "Handbook", [{ title: "handbook.md" }]);
-    const failed = await runOver(scenario, handbook.bindingId, {
-      reason: "bound",
+    const handbook = await connectedSourceOf(scenario, "Handbook", [{ title: "handbook.md" }]);
+    const failed = await runOver(scenario, handbook.connectedSourceId, {
+      reason: "connected",
       status: "failed",
       enqueuedAt: QUEUED_AT,
       finishedAt: FAILED_AT,
       outcome: TIMED_OUT,
     });
-    const requeued = await runOver(scenario, handbook.bindingId, {
+    const requeued = await runOver(scenario, handbook.connectedSourceId, {
       reason: "restored",
       status: "queued",
       enqueuedAt: REQUEUED_AT,
     });
-    const other = await bindingOf(scenario, "Rota", [{ title: "rota.md" }]);
-    await runOver(scenario, other.bindingId, {
-      reason: "bound",
+    const other = await connectedSourceOf(scenario, "Rota", [{ title: "rota.md" }]);
+    await runOver(scenario, other.connectedSourceId, {
+      reason: "connected",
       status: "queued",
       enqueuedAt: QUEUED_AT,
     });
 
-    const runs = answered(await runsFor(scenario.admin, handbook.bindingId));
+    const runs = answered(await runsFor(scenario.admin, handbook.connectedSourceId));
 
     expect(runs).toEqual([
       {
@@ -334,7 +338,7 @@ describe("the runs of a binding, read by subject", () => {
       {
         jobId: failed,
         kind: "index",
-        reason: "bound",
+        reason: "connected",
         status: "failed",
         attempts: 1,
         enqueuedAt: "2026-09-11T08:00:00.000Z",
@@ -346,21 +350,21 @@ describe("the runs of a binding, read by subject", () => {
   it("answers another workspace's subject with nothing", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
-    const theirs = await bindingOf(elsewhere, "Handbook", [{ title: "handbook.md" }]);
-    await runOver(elsewhere, theirs.bindingId, {
-      reason: "bound",
+    const theirs = await connectedSourceOf(elsewhere, "Handbook", [{ title: "handbook.md" }]);
+    await runOver(elsewhere, theirs.connectedSourceId, {
+      reason: "connected",
       status: "queued",
       enqueuedAt: QUEUED_AT,
     });
 
-    expect(answered(await runsFor(scenario.admin, theirs.bindingId))).toEqual([]);
+    expect(answered(await runsFor(scenario.admin, theirs.connectedSourceId))).toEqual([]);
   });
 
   it.each(["editor", "viewer"] as const)("refuses the %s", async (role) => {
     const scenario = await arrange();
-    const handbook = await bindingOf(scenario, "Handbook", [{ title: "handbook.md" }]);
+    const handbook = await connectedSourceOf(scenario, "Handbook", [{ title: "handbook.md" }]);
 
-    expect(await runsFor(scenario[role], handbook.bindingId)).toEqual({
+    expect(await runsFor(scenario[role], handbook.connectedSourceId)).toEqual({
       ok: false,
       error: "role-forbids",
     });

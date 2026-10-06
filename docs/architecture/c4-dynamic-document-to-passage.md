@@ -4,31 +4,31 @@ The route's one new seam: the document-shaped cross-tier test, modelled on rebui
 
 ```mermaid
 C4Dynamic
-  title Dynamic diagram — bind, index, review, publish, open by locator
+  title Dynamic diagram — connect, index, review, publish, open by locator
 
-  Person(admin, "Admin", "Binds, reviews, publishes on the Sources page")
-  Container(trpc, "tRPC sources router", "sources.bind on ownTransactionProcedure; the rest on mutationProcedure", "The upload is an octet-stream mutation; no second HTTP route")
+  Person(admin, "Admin", "Connects, reviews, publishes on the Sources page")
+  Container(trpc, "tRPC sources router", "sources.connect on ownTransactionProcedure; the rest on mutationProcedure", "The upload is an octet-stream mutation; no second HTTP route")
 
   Container_Boundary(api, "api and packages/core") {
-    Component(sources, "sources slice", "bindUpload, the review acts, publishBinding, passageAt", "Owns the binding, its documents, its findings and the chunk's read")
-    Component(runs, "runs slice", "enqueueJobIn", "The index job in the bind act's own transaction")
+    Component(sources, "sources slice", "connectUpload, the review acts, publishConnectedSource, passageAt", "Owns the connected source, its documents, its findings and the chunk's read")
+    Component(runs, "runs slice", "enqueueJobIn", "The index job in the connect act's own transaction")
     Component(mcp, "MCP surface", "find, open", "The same predicate and audit as the web")
   }
 
   Container(worker, "worker", "the index run", "Claims the job; convert, detect, withhold, land")
   ContainerDb(objects, "Object store", "Garage", "The original and the normalised redacted copy")
-  ContainerDb(postgres, "Postgres", "RLS", "source_binding, source_document, finding, job, index.chunk, index.readable_chunk")
+  ContainerDb(postgres, "Postgres", "RLS", "connected_source, source_document, finding, job, index.chunk, index.readable_chunk")
 
-  Rel(admin, trpc, "1. Uploads the file, the binding's descriptor in headers, the binding id minted by the client", "application/octet-stream")
-  Rel(trpc, sources, "2. Calls bindUpload with the Principal and the Postgres and object doors, no transaction open")
-  Rel(sources, objects, "3. Streams the original under the binding's key, counting bytes against the cap, before any row", "S3")
-  Rel(sources, postgres, "4. One transaction: source_binding with the class and audience the Admin typed — Restricted and everyone when none is typed — unpublished, source_document, the audit event")
-  Rel(sources, runs, "5. In that transaction: the index job, subject the binding, reason bound")
+  Rel(admin, trpc, "1. Uploads the file, the connected source's descriptor in headers, the connected source id minted by the client", "application/octet-stream")
+  Rel(trpc, sources, "2. Calls connectUpload with the Principal and the Postgres and object doors, no transaction open")
+  Rel(sources, objects, "3. Streams the original under the connected source's key, counting bytes against the cap, before any row", "S3")
+  Rel(sources, postgres, "4. One transaction: connected_source with the class and audience the Admin typed — Restricted and everyone when none is typed — unpublished, source_document, the audit event")
+  Rel(sources, runs, "5. In that transaction: the index job, subject the connected source, reason connected")
   Rel(worker, postgres, "6. Claims the job; commits findings and the catalogue, then lands index.chunk rows; finishes with the outcome", "psycopg, asyncpg")
   Rel(worker, objects, "7. Reads the original; writes the normalised redacted copy", "S3")
   Rel(admin, sources, "8. Reviews the finding groups: keeps in text, narrows documents, dismisses as not special category")
   Rel(admin, sources, "9. Publishes with the three confirmations; refused until the latest index run is done")
-  Rel(sources, postgres, "10. published_at and the state on the binding, the audit event with the finding counts, the DPIA hash and the class and audience it releases, and the cascade to the citing concepts; no chunk, no job")
+  Rel(sources, postgres, "10. published_at and the state on the connected source, the audit event with the finding counts, the DPIA hash and the class and audience it releases, and the cascade to the citing concepts; no chunk, no job")
   Rel(mcp, postgres, "11. find: full-text over index.readable_chunk under the predicate; the hit marked Not company knowledge")
   Rel(mcp, sources, "12. open by locator calls passageAt, the predicate applied there once; the passage verbatim")
 
@@ -38,12 +38,12 @@ C4Dynamic
 ## What the flow guarantees
 
 - **Nothing is embedded.** `index.chunk.embedding` and `embedding_route_id` go nullable together under one CHECK; the full-text vector is a generated column neither tier writes; the embedding model choice stays fixed and unread until S8's trigger (ADRs 0016 and 0020, amended 2026-09-09; probe 1 proved the ALTER on the partitioned parent).
-- **The bind act is idempotent and one transaction.** The client mints the binding id, the original's key derives from it, and a repeat answers the first bind's outcome before a byte is read again (T-236). The binding, its document, its audit event and the index job land together through `enqueueJobIn(principal, tx, input)`; the job's `subject_id` names the binding under a per-kind CHECK, so an index job is never about nothing (T-113, owner D3).
-- **The publish act enqueues nothing.** The chunks exist unpublished from the first run, so the publish stamps the binding, records the class and audience it releases, cascades that class to the concepts citing the binding and the compositions including them, and is refused until that run has finished. A chunk's visibility is read, not carried: `index.readable_chunk` joins the chunk to its binding and its document, the class the narrower of the two, so a narrowing or a publish is a write to the source row and queues no run (ADR 0044).
-- **The binding keeps the class the Admin typed, and counts as Restricted until its publish releases it** (story 2; ADR 0013, amended 24/09/2026; T-370). Restricted and everyone are the defaults when nothing is typed. No reader sees an unpublished binding at any class, because the read predicate requires `published_at`, and every derivation counts an unpublished binding as Restricted, so a concept citing its documents lands Restricted until the publish cascade moves it. A concept the reconciler pinned Restricted stays pinned through that cascade. `narrowBinding` and `narrowDocuments` refuse `widening-refused`; the one road wider is `widenBinding`, the Sources page's *Widen* act (T-371): the binding moves to a wider class, audience or both, its audit event carrying the pair it moved from and to, and the same cascade moves the concepts citing it. It is refused `not-wider` for a request that widens no term, and `special-category-unreviewed` while a special-category finding the last run raised is unreviewed. A document's own class only narrows it: the seam's special-category verdict or an Admin's narrowing, lifted only by a dismissal, and never past the Admin's own narrowing (`CONCEPTS.md`, *effective class*), so a widening leaves it where it is.
+- **The connect act is idempotent and one transaction.** The client mints the connected source id, the original's key derives from it, and a repeat answers the first connect's outcome before a byte is read again (T-236). The connected source, its document, its audit event and the index job land together through `enqueueJobIn(principal, tx, input)`; the job's `subject_id` names the connected source under a per-kind CHECK, so an index job is never about nothing (T-113, owner D3).
+- **The publish act enqueues nothing.** The chunks exist unpublished from the first run, so the publish stamps the connected source, records the class and audience it releases, cascades that class to the concepts citing the connected source and the compositions including them, and is refused until that run has finished. A chunk's visibility is read, not carried: `index.readable_chunk` joins the chunk to its connected source and its document, the class the narrower of the two, so a narrowing or a publish is a write to the source row and queues no run (ADR 0044).
+- **The connected source keeps the class the Admin typed, and counts as Restricted until its publish releases it** (story 2; ADR 0013, amended 24/09/2026; T-370). Restricted and everyone are the defaults when nothing is typed. No reader sees an unpublished connected source at any class, because the read predicate requires `published_at`, and every derivation counts an unpublished connected source as Restricted, so a concept citing its documents lands Restricted until the publish cascade moves it. A concept the reconciler pinned Restricted stays pinned through that cascade. `narrowConnectedSource` and `narrowDocuments` refuse `widening-refused`; the one road wider is `widenConnectedSource`, the Sources page's *Widen* act (T-371): the connected source moves to a wider class, audience or both, its audit event carrying the pair it moved from and to, and the same cascade moves the concepts citing it. It is refused `not-wider` for a request that widens no term, and `special-category-unreviewed` while a special-category finding the last run raised is unreviewed. A document's own class only narrows it: the seam's special-category verdict or an Admin's narrowing, lifted only by a dismissal, and never past the Admin's own narrowing (`CONCEPTS.md`, *effective class*), so a widening leaves it where it is.
 - **No memo ever holds an unredacted span.** The index run converts outside every memo and memoises only the detector's spans, keyed by the normalised text and the *detection key*; `c4-dynamic-index-run.md` draws it.
-- **The read is one door.** `passageAt(principal, tx, locator)` on the sources slice applies the chunk's predicate once; `open` by locator (T-134), S2's unmapped passages and S4's citation repair all take it. A binding's drop is blocked while cited evidence stands (owner D5).
+- **The read is one door.** `passageAt(principal, tx, locator)` on the sources slice applies the chunk's predicate once; `open` by locator (T-134), S2's unmapped passages and S4's citation repair all take it. A connected source's drop is blocked while cited evidence stands (owner D5).
 
 ## What the test asserts
 
-The Admin's acts and their refusals through seam 1; the worker as a real process against the same stores (seam 8); the passage as a literal through the core interface and the MCP surface (seam 2); the Sources page through the browser suite with its ADR 0037 budget (seam 3); the probe measurements the gate turned into tests — neither LMDB store holds the text or a withheld span, `drop` on one binding cannot take the shared table, the `detect_change` blast radius stays per document, the LMDB size per binding is a signal (gate §4). The cascade ceiling is measured: 1,106 ms for a narrowing over a binding 300 concepts cite, 3.7 ms per citing concept (probe 3, re-run 27/09/2026; the reading is in S1's spec).
+The Admin's acts and their refusals through seam 1; the worker as a real process against the same stores (seam 8); the passage as a literal through the core interface and the MCP surface (seam 2); the Sources page through the browser suite with its ADR 0037 budget (seam 3); the probe measurements the gate turned into tests — neither LMDB store holds the text or a withheld span, `drop` on one connected source cannot take the shared table, the `detect_change` blast radius stays per document, the LMDB size per connected source is a signal (gate §4). The cascade ceiling is measured: 1,106 ms for a narrowing over a connected source 300 concepts cite, 3.7 ms per citing concept (probe 3, re-run 27/09/2026; the reading is in S1's spec).

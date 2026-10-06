@@ -29,7 +29,7 @@ Each class of caller gets its own contract, all from the api's one process.
 - The SPA calls the api over tRPC (`@hono/trpc-server`), so a field changed in the api fails the SPA's type-check until fixed.
 - A customer integration, a script or a partner gets an OpenAPI document generated from the same router, never hand-edited. Breaking a route in it is a versioned change. The tree does not mount it yet.
 - Agents get the tools-only MCP surface: MCP SDK v2 over Streamable HTTP, at `app.<domain>/mcp`. Every MCP entry is a named, described, zod-typed function, and none reaches the database directly.
-- The share agent gets `/agent/v1`: hand-written Hono routes over `packages/core`, on the `agent.` hostname, under a binding-scoped agent token, with a 100 MB per-file cap, a per-agent rate limit, streaming to the object store, and agent versions N and N-1 accepted. The host router already reserves `/agent/v1/*` on `agent.`; the routes themselves are not in the tree yet.
+- The share agent gets `/agent/v1`: hand-written Hono routes over `packages/core`, on the `agent.` hostname, under a connected-source-scoped agent token, with a 100 MB per-file cap, a per-agent rate limit, streaming to the object store, and agent versions N and N-1 accepted. The host router already reserves `/agent/v1/*` on `agent.`; the routes themselves are not in the tree yet.
 - The worker uses none of these. It shares the stores (ADR 0005).
 - zod v4 is the one validation library at every boundary.
 

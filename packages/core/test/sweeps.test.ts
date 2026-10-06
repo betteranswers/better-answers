@@ -34,7 +34,7 @@ const workspaceWithLeftovers = async (name: string) => {
     admin,
     store().door,
     orphan,
-    new Blob(["The bytes of a bind whose row never landed."]).stream(),
+    new Blob(["The bytes of a connect whose row never landed."]).stream(),
   );
   if (!put.ok) throw new Error(`the orphan was refused: ${put.error}`);
   await seedingWith(db().pool, async (seed) => {
@@ -127,7 +127,7 @@ describe("a sweep pass over every workspace", () => {
     const orphaned = await provisionedWorkspace(db(), "Orphaned");
     const orphan = `uploads/${ulid().toLowerCase()}/${ulid().toLowerCase()}/original`;
     const admin = principalOf(orphaned.workspaceId, orphaned.adminUserId, "Admin");
-    await putObject(admin, store().door, orphan, new Blob(["Left by a failed bind."]).stream());
+    await putObject(admin, store().door, orphan, new Blob(["Left by a failed connect."]).stream());
 
     const pass = await whileWritesAreRefused(db().pool, "map_node", () =>
       sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "remove" }),

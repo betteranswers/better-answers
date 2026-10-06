@@ -451,31 +451,40 @@ describe("the replay copy for a request named by address alone", () => {
   });
 });
 
-type IndexedBinding = {
+type IndexedConnectedSource = {
   readonly id: string;
   readonly documentId: string;
   readonly content: string;
 };
 
-const aBindingIndexing = (workspaceId: string, content: string): Promise<IndexedBinding> =>
+const aConnectedSourceIndexing = (
+  workspaceId: string,
+  content: string,
+): Promise<IndexedConnectedSource> =>
   seedingWith(db().pool, async (seed) => {
-    const binding = await seed.sourceBinding({ workspaceId });
-    const document = await seed.sourceDocument({ workspaceId, bindingId: binding.id });
-    return { id: binding.id, documentId: document.id, content };
+    const connectedSource = await seed.connectedSource({ workspaceId });
+    const document = await seed.sourceDocument({
+      workspaceId,
+      connectedSourceId: connectedSource.id,
+    });
+    return { id: connectedSource.id, documentId: document.id, content };
   });
 
-const theIndexRestored = (workspaceId: string, bindings: readonly IndexedBinding[]) =>
+const theIndexRestored = (
+  workspaceId: string,
+  connectedSources: readonly IndexedConnectedSource[],
+) =>
   seedingWith(db().pool, async (seed) => {
-    for (const binding of bindings) {
+    for (const connectedSource of connectedSources) {
       await seed.chunk({
         workspaceId,
-        bindingId: binding.id,
-        sourceDocumentId: binding.documentId,
-        content: binding.content,
-        locator: `${binding.documentId}/chars:0-${binding.content.length}`,
+        connectedSourceId: connectedSource.id,
+        sourceDocumentId: connectedSource.documentId,
+        content: connectedSource.content,
+        locator: `${connectedSource.documentId}/chars:0-${connectedSource.content.length}`,
         ordinal: 0,
         charStart: 0,
-        charEnd: binding.content.length,
+        charEnd: connectedSource.content.length,
       });
     }
   });
@@ -483,11 +492,11 @@ const theIndexRestored = (workspaceId: string, bindings: readonly IndexedBinding
 const asIfRestoredFromADumpOlderThanIt = async (
   workspaceId: string,
   erased: Erased,
-  bindings: readonly IndexedBinding[],
+  connectedSources: readonly IndexedConnectedSource[],
 ): Promise<void> => {
   await asIfTheDumpPredatedIt(workspaceId, erased);
   await db().pool.query("DELETE FROM job WHERE workspace_id = $1", [workspaceId]);
-  await theIndexRestored(workspaceId, bindings);
+  await theIndexRestored(workspaceId, connectedSources);
 };
 
 const whatTheReplayLeft = async (workspaceId: string) => ({
@@ -512,14 +521,17 @@ const whatTheReplayLeft = async (workspaceId: string) => ({
 });
 
 describe("a restore from a dump older than the request", () => {
-  it("re-creates the suppression, wiping only the binding naming the subject", async () => {
+  it("re-creates the suppression, wiping only the source naming the subject", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
-    const naming = await aBindingIndexing(
+    const naming = await aConnectedSourceIndexing(
       workspaceId,
       "Expense claims go to Priya Anand for approval.",
     );
-    const beside = await aBindingIndexing(workspaceId, "Expenses are claimed within thirty days.");
+    const beside = await aConnectedSourceIndexing(
+      workspaceId,
+      "Expenses are claimed within thirty days.",
+    );
     await theIndexRestored(workspaceId, [naming, beside]);
     const erased = await completedInTheRows(workspaceId, INDEX_RESTORED_AT);
     await leavingAReplayCopy(scenario, erased, INDEX_RESTORED_AT);

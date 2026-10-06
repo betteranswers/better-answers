@@ -32,12 +32,9 @@
   },
   "apps/web/src/features/people/refusal-words.ts": {
     "check": 1,
-    "domain": 4,
-    "landed": 4
+    "domain": 4
   },
   "apps/web/src/features/sources/refusal-words.ts": {
-    "bind": 1,
-    "binding": 10,
     "check": 1,
     "class": 3,
     "finding group": 5,
@@ -47,17 +44,12 @@
     "act": 1,
     "bundle": 2,
     "chunk": 4,
-    "object store": 1,
     "run": 4
-  },
-  "apps/web/src/shared/keystroke-words.ts": {
-    "binding": 1
   },
   "apps/web/src/shared/navigation.ts": {
     "act": 1,
     "agent token": 1,
     "answer audit": 1,
-    "binding": 1,
     "check": 1,
     "Checks due": 1,
     "domain": 2,

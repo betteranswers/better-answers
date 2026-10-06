@@ -67,7 +67,7 @@
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "id": "01J6J8AAAAAAAAAAAAAAAAAAAA",
       "kind": "index",
-      "reason": "bound",
+      "reason": "connected",
       "subject_id": "01J6D1AAAAAAAAAAAAAAAAAAAA",
       "status": "queued",
       "attempts": 0,
@@ -133,11 +133,11 @@
       "lease_expires_in_seconds": null
     },
     {
-      "why": "the run in flight over one binding: claimed under a lease that still stands, so nothing may start a second run over the same binding",
+      "why": "the run in flight over one connected source: claimed under a lease that still stands, so nothing may start a second run over the same connected source",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6J9BBBBBBBBBBBBBBBBBBBB",
       "kind": "index",
-      "reason": "bound",
+      "reason": "connected",
       "subject_id": "01J6D2BBBBBBBBBBBBBBBBBBBB",
       "status": "claimed",
       "attempts": 1,
@@ -147,7 +147,7 @@
       "lease_expires_in_seconds": 120
     },
     {
-      "why": "the same binding's next run, enqueued while the first was in flight — which the run key admits, because the row it would collide with is claimed and not queued — and which every claim below passes over for as long as that lease stands",
+      "why": "the same connected source's next run, enqueued while the first was in flight — which the run key admits, because the row it would collide with is claimed and not queued — and which every claim below passes over for as long as that lease stands",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6JABBBBBBBBBBBBBBBBBBBB",
       "kind": "index",
@@ -161,11 +161,11 @@
       "lease_expires_in_seconds": null
     },
     {
-      "why": "a second binding's run in flight, whose lease the claims below let lapse so the binding's work can be handed out again",
+      "why": "a second connected source's run in flight, whose lease the claims below let lapse so the connected source's work can be handed out again",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6JBBBBBBBBBBBBBBBBBBBBB",
       "kind": "index",
-      "reason": "bound",
+      "reason": "connected",
       "subject_id": "01J6D3BBBBBBBBBBBBBBBBBBBB",
       "status": "claimed",
       "attempts": 1,
@@ -175,7 +175,7 @@
       "lease_expires_in_seconds": 120
     },
     {
-      "why": "that binding's next run, waiting behind it: never claimed here, because the binding's own work went back to the row that lost its lease and a binding has one run at a time whichever row carries it",
+      "why": "that connected source's next run, waiting behind it: never claimed here, because the connected source's own work went back to the row that lost its lease and a connected source has one run at a time whichever row carries it",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6JCBBBBBBBBBBBBBBBBBBBB",
       "kind": "index",
@@ -191,11 +191,11 @@
   ],
   "refused_enqueues": [
     {
-      "why": "a second queued job for a binding that already has one waiting is the database's refusal and never a second row — the *run key* over queued rows — so the act that enqueued it reads the waiting job's id back instead of landing a duplicate run",
+      "why": "a second queued job for a connected source that already has one waiting is the database's refusal and never a second row — the *run key* over queued rows — so the act that enqueued it reads the waiting job's id back instead of landing a duplicate run",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6JDBBBBBBBBBBBBBBBBBBBB",
       "kind": "index",
-      "reason": "bound",
+      "reason": "connected",
       "subject_id": "01J6D2BBBBBBBBBBBBBBBBBBBB",
       "sqlstate": "23505"
     }
@@ -242,7 +242,7 @@
       "expect_ids": ["01J6J5BBBBBBBBBBBBBBBBBBBB"]
     },
     {
-      "why": "a claimant passing the index kind finds nothing, though two index jobs are queued: each one's binding already has a run claimed under a lease that stands, and a binding is indexed by one run at a time",
+      "why": "a claimant passing the index kind finds nothing, though two index jobs are queued: each one's connected source already has a run claimed under a lease that stands, and a connected source is indexed by one run at a time",
       "role": "worker_rt",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "worker_id": "worker-3",
@@ -250,7 +250,7 @@
       "expect_ids": []
     },
     {
-      "why": "let the second binding's run lose its lease and the same claim answers: the binding's work is claimable again the instant nothing holds it, and it goes to the row that lost it, which is the older of that binding's two",
+      "why": "let the second connected source's run lose its lease and the same claim answers: the connected source's work is claimable again the instant nothing holds it, and it goes to the row that lost it, which is the older of that connected source's two",
       "role": "worker_rt",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "worker_id": "worker-3",
@@ -259,7 +259,7 @@
       "expect_ids": ["01J6JBBBBBBBBBBBBBBBBBBBBB"]
     },
     {
-      "why": "and nothing again: the claim just made is itself a live lease on that binding, so the job waiting behind it waits, exactly as the first binding's does",
+      "why": "and nothing again: the claim just made is itself a live lease on that connected source, so the job waiting behind it waits, exactly as the first connected source's does",
       "role": "worker_rt",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "worker_id": "worker-3",
@@ -455,7 +455,7 @@
       "claimed_by": "ops-1"
     },
     {
-      "why": "the first binding's run kept its lease throughout, so nothing took its binding from it",
+      "why": "the first connected source's run kept its lease throughout, so nothing took its connected source from it",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6J9BBBBBBBBBBBBBBBBBBBB",
       "status": "claimed",
@@ -463,7 +463,7 @@
       "claimed_by": "worker-alive"
     },
     {
-      "why": "and its binding's next run is still queued, passed over by every claim: one run per binding is the queue's rule and not the claimant's manners",
+      "why": "and its connected source's next run is still queued, passed over by every claim: one run per connected source is the queue's rule and not the claimant's manners",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6JABBBBBBBBBBBBBBBBBBBB",
       "status": "queued",
@@ -471,7 +471,7 @@
       "claimed_by": null
     },
     {
-      "why": "the second binding's run, handed out again the instant its lease lapsed and now held by the worker that took it, on its second attempt",
+      "why": "the second connected source's run, handed out again the instant its lease lapsed and now held by the worker that took it, on its second attempt",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6JBBBBBBBBBBBBBBBBBBBBB",
       "status": "claimed",
@@ -479,7 +479,7 @@
       "claimed_by": "worker-3"
     },
     {
-      "why": "and the job waiting behind it is still queued, because the binding was taken again before it came up",
+      "why": "and the job waiting behind it is still queued, because the connected source was taken again before it came up",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6JCBBBBBBBBBBBBBBBBBBBB",
       "status": "queued",

@@ -67,7 +67,7 @@ Decided for the S3 block and not yet in the tree:
 
 - A parties family now: a second home for facts the bundle already states, and personal data for a use case not in v0.1.
 - Two composition families, or a response as an audit row only: the same columns twice, or no version to export.
-- No question-set record, or an upload binding as the question set: no title, order or re-run, or a buyer's document treated as company knowledge.
+- No question-set record, or an upload connected source as the question set: no title, order or re-run, or a buyer's document treated as company knowledge.
 - Per-act audit tables, or audit in the application's own log: a union across tables, or nothing queryable by target.
 - One generic JSON version table, or before and after in audit payloads: no types, and a history a UI cannot list, diff or restore.
 - Verification as columns on the row: a second reviewer overwrites the first.

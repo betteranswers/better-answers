@@ -30,7 +30,7 @@ A workspace's knowledge is one OKF bundle in v0.1. Its concepts are trust-bearin
 - A domain directory is a future bundle boundary, so a bundle per domain stays a promotion rather than a rewrite.
 - Guides and their sections are assembled over atoms and are never the unit of trust.
 - Merge by identity is keyed `(workspace, bundle, type, normalised label)` in `concept_identity`. In the tree the key is one `merge_key` column: the folded kind, a colon, then the title trimmed, its whitespace collapsed and lower-cased (`mergeKeyOf`, `packages/core/src/concepts/landing.ts`). It is unique per workspace, and the bundle is implicit because a workspace holds one.
-- A source binding names the domain its knowledge lands in, and extraction proposes only within it.
+- A connected source names the domain its knowledge lands in, and extraction proposes only within it.
 - Contradictory values found at extraction are recorded as `conflict` records. The pipeline never resolves them; a person does.
 
 The atom-boundary rule:

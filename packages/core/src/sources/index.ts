@@ -1,37 +1,48 @@
 import { z } from "zod";
 
 import { visibilityAgreed, visibilityOf, widens, type Visibility } from "../access/index.ts";
-import { act, declareActs, record, type AuditEvent, type AuditAct } from "../audit/index.ts";
+import {
+  act,
+  declareActs,
+  record,
+  STORED_DETAIL_KEYS,
+  type AuditEvent,
+  type AuditAct,
+} from "../audit/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import { attempt, err, ok, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import {
-  adminOnBinding,
-  bindingNamed,
-  BINDING_ID,
-  BINDING_VISIBILITY,
-  type ActingOnBinding,
-} from "./admin-binding.ts";
+  adminOnConnectedSource,
+  connectedSourceNamed,
+  CONNECTED_SOURCE_ID,
+  CONNECTED_SOURCE_VISIBILITY,
+  type ActingOnConnectedSource,
+} from "./admin-connected-source.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import { holdsAnUnreviewedSpecialCategory } from "./review.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
-export { adminOnBinding, BINDING_ID, type BindingId } from "./admin-binding.ts";
 export {
-  bindUpload,
-  bindUploadFields,
-  publishBinding,
-  publishBindingInput,
-  reprocessBinding,
-  reprocessBindingAct,
-  reprocessBindingInput,
+  adminOnConnectedSource,
+  CONNECTED_SOURCE_ID,
+  type ConnectedSourceId,
+} from "./admin-connected-source.ts";
+export {
+  connectUpload,
+  connectUploadFields,
+  publishConnectedSource,
+  publishConnectedSourceInput,
+  reprocessConnectedSource,
+  reprocessConnectedSourceAct,
+  reprocessConnectedSourceInput,
   UPLOAD_BYTE_CAP,
   UPLOAD_MEDIA_TYPES,
-  type BindUploadFields,
-  type BindUploadRefusal,
-  type ReprocessBindingInput,
-  type ReprocessBindingRefusal,
-} from "./binding.ts";
+  type ConnectUploadFields,
+  type ConnectUploadRefusal,
+  type ReprocessConnectedSourceInput,
+  type ReprocessConnectedSourceRefusal,
+} from "./connected-source.ts";
 export {
   ORPHANED_UPLOAD_GRACE_HOURS,
   sweepOrphanedUploads,
@@ -73,18 +84,18 @@ export {
   type PassageHit,
   type PreviewedChunk,
 } from "./passages.ts";
-export { listBindings } from "./listing.ts";
+export { listConnectedSources } from "./listing.ts";
 export { SOURCE_REFUSALS, type SourceRefusal } from "./vocabulary.ts";
 
 const SOURCE_ACTS = declareActs("sources", {
   narrowed: act("sources.binding.narrowed", {
-    bindingId: "id",
+    [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     sensitivity: "sensitivity",
     audience: "audience",
   }),
 
   widened: act("sources.binding.widened", {
-    bindingId: "id",
+    [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     fromSensitivity: "sensitivity",
     fromAudience: "audience",
     sensitivity: "sensitivity",
@@ -97,27 +108,27 @@ const SOURCE_ACTS = declareActs("sources", {
  * two names is a duplicate export.
  */
 const theClassAsked = () =>
-  BINDING_VISIBILITY.extend({
-    bindingId: BINDING_ID,
-    audienceGroups: BINDING_VISIBILITY.shape.audienceGroups.default(null),
-  }).transform(({ bindingId, ...asked }, ctx) => {
+  CONNECTED_SOURCE_VISIBILITY.extend({
+    connectedSourceId: CONNECTED_SOURCE_ID,
+    audienceGroups: CONNECTED_SOURCE_VISIBILITY.shape.audienceGroups.default(null),
+  }).transform(({ connectedSourceId, ...asked }, ctx) => {
     const visibility = visibilityAgreed(asked, ctx);
-    return visibility === undefined ? z.NEVER : { bindingId, visibility };
+    return visibility === undefined ? z.NEVER : { connectedSourceId, visibility };
   });
 
-export const narrowBindingInput = theClassAsked();
+export const narrowConnectedSourceInput = theClassAsked();
 
-export type NarrowBindingInput = z.output<typeof narrowBindingInput>;
+export type NarrowConnectedSourceInput = z.output<typeof narrowConnectedSourceInput>;
 
-export const widenBindingInput = theClassAsked();
+export const widenConnectedSourceInput = theClassAsked();
 
-export type WidenBindingInput = z.output<typeof widenBindingInput>;
+export type WidenConnectedSourceInput = z.output<typeof widenConnectedSourceInput>;
 
-export type NarrowBindingRefusal =
+export type NarrowConnectedSourceRefusal =
   | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-group" | "widening-refused">
   | Error;
 
-export type WidenBindingRefusal =
+export type WidenConnectedSourceRefusal =
   | SourceRefusal<
       | "role-forbids"
       | "no-such-binding"
@@ -127,8 +138,8 @@ export type WidenBindingRefusal =
     >
   | Error;
 
-type BindingClassSet = {
-  readonly bindingId: string;
+type ConnectedSourceClassSet = {
+  readonly connectedSourceId: string;
   readonly auditEventId: string;
   readonly visibility: Visibility;
 
@@ -137,11 +148,11 @@ type BindingClassSet = {
   readonly compositions: readonly string[];
 };
 
-export type BindingNarrowed = BindingClassSet;
+export type ConnectedSourceNarrowed = ConnectedSourceClassSet;
 
-export type BindingWidened = BindingClassSet;
+export type ConnectedSourceWidened = ConnectedSourceClassSet;
 
-type BindingRow = {
+type ConnectedSourceRow = {
   readonly sensitivity: string;
   readonly audience: string;
   readonly audience_groups: readonly string[] | null;
@@ -150,13 +161,13 @@ type BindingRow = {
 type ClassHeldRefusal = SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-group"> | Error;
 
 type ClassAsked = {
-  readonly acting: ActingOnBinding;
+  readonly acting: ActingOnConnectedSource;
   readonly from: Visibility;
   readonly next: Visibility;
 };
 
 /**
- * A narrowing and a widening both open the cascade before they lock the binding, so the two queue
+ * A narrowing and a widening both open the cascade before they lock the connected source, so the two queue
  * behind each other rather than deadlock.
  */
 const classAskedOf = async (
@@ -164,7 +175,7 @@ const classAskedOf = async (
   tx: Tx,
   input: z.output<ReturnType<typeof theClassAsked>>,
 ): Promise<Result<ClassAsked, ClassHeldRefusal>> => {
-  const acting = adminOnBinding(principal, input.bindingId);
+  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
   const next = input.visibility;
 
@@ -174,7 +185,7 @@ const classAskedOf = async (
     next.audienceGroups ?? [],
   );
   if (!groups.ok) return err(groups.error);
-  const current = await bindingNamed<BindingRow>(acting.value, tx, {
+  const current = await connectedSourceNamed<ConnectedSourceRow>(acting.value, tx, {
     columns: "sensitivity, audience, audience_groups",
     lock: "for-update",
   });
@@ -184,37 +195,37 @@ const classAskedOf = async (
 };
 
 const classSet = async <A extends AuditAct>(
-  acting: ActingOnBinding,
+  acting: ActingOnConnectedSource,
   tx: Tx,
   next: Visibility,
   auditEvent: Pick<AuditEvent<A>, "act" | "detail">,
-): Promise<Result<BindingClassSet, Error>> => {
-  const { admin, workspaceId, bindingId } = acting;
+): Promise<Result<ConnectedSourceClassSet, Error>> => {
+  const { admin, workspaceId, connectedSourceId } = acting;
   const written = await attempt(() =>
     tx.query(
-      `UPDATE source_binding SET sensitivity = $3, audience = $4, audience_groups = $5
+      `UPDATE connected_source SET sensitivity = $3, audience = $4, audience_groups = $5
         WHERE workspace_id = $1 AND id = $2`,
-      [workspaceId, bindingId, next.sensitivity, next.audience, next.audienceGroups],
+      [workspaceId, connectedSourceId, next.sensitivity, next.audience, next.audienceGroups],
     ),
   );
   if (!written.ok) return err(written.error);
 
   const auditEventId = ulid();
-  await record(admin, tx, { id: auditEventId, subjectId: bindingId, ...auditEvent });
-  const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId }));
+  await record(admin, tx, { id: auditEventId, subjectId: connectedSourceId, ...auditEvent });
+  const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { connectedSourceId }));
   if (!cascaded.ok) return err(cascaded.error);
-  return ok({ bindingId, auditEventId, visibility: next, ...cascaded.value });
+  return ok({ connectedSourceId, auditEventId, visibility: next, ...cascaded.value });
 };
 
 /**
  * `widening-refused` if the class asked is wider in sensitivity or audience, even when it is
  * narrower in the other.
  */
-export const narrowBinding = async (
+export const narrowConnectedSource = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: NarrowBindingInput,
-): Promise<Result<BindingNarrowed, NarrowBindingRefusal>> => {
+  input: NarrowConnectedSourceInput,
+): Promise<Result<ConnectedSourceNarrowed, NarrowConnectedSourceRefusal>> => {
   const asked = await classAskedOf(principal, tx, input);
   if (!asked.ok) return err(asked.error);
   const { acting, from, next } = asked.value;
@@ -223,7 +234,7 @@ export const narrowBinding = async (
   return classSet(acting, tx, next, {
     act: SOURCE_ACTS.narrowed,
     detail: {
-      bindingId: acting.bindingId,
+      [STORED_DETAIL_KEYS.connectedSourceId]: acting.connectedSourceId,
       sensitivity: next.sensitivity,
       audience: next.audience,
     },
@@ -232,13 +243,13 @@ export const narrowBinding = async (
 
 /**
  * `not-wider` unless the class asked is wider in sensitivity or audience and narrower in neither.
- * A document's own class is left alone: the derivation reads the narrower of it and the binding's.
+ * A document's own class is left alone: the derivation reads the narrower of it and the connected source's.
  */
-export const widenBinding = async (
+export const widenConnectedSource = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: WidenBindingInput,
-): Promise<Result<BindingWidened, WidenBindingRefusal>> => {
+  input: WidenConnectedSourceInput,
+): Promise<Result<ConnectedSourceWidened, WidenConnectedSourceRefusal>> => {
   const asked = await classAskedOf(principal, tx, input);
   if (!asked.ok) return err(asked.error);
   const { acting, from, next } = asked.value;
@@ -251,7 +262,7 @@ export const widenBinding = async (
   return classSet(acting, tx, next, {
     act: SOURCE_ACTS.widened,
     detail: {
-      bindingId: acting.bindingId,
+      [STORED_DETAIL_KEYS.connectedSourceId]: acting.connectedSourceId,
       fromSensitivity: from.sensitivity,
       fromAudience: from.audience,
       sensitivity: next.sensitivity,

@@ -71,7 +71,7 @@ COPY packages/schema/package.json packages/schema/
 FROM manifests AS web
 RUN pnpm install --frozen-lockfile
 COPY packages/design-system/ packages/design-system/
-# The SPA mints a binding's id with the platform's one minter, which the schema package holds.
+# The SPA mints a connected source's id with the platform's one minter, which the schema package holds.
 COPY packages/schema/src packages/schema/src
 COPY apps/web/ apps/web/
 RUN pnpm --filter @better-answers/web run build

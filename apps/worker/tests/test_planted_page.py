@@ -11,7 +11,7 @@ from planted_page import (
 )
 
 THE_SAFE_SET = {"default_on": True, "default_off": False}
-AN_HR_SHAPED_BINDING = {"default_on": True, "default_off": True}
+AN_HR_SHAPED_CONNECTED_SOURCE = {"default_on": True, "default_off": True}
 NOTHING_SWITCHABLE = {"default_on": False, "default_off": False}
 
 
@@ -35,7 +35,7 @@ def test_a_span_goes_only_when_its_tier_is_switched_on() -> None:
 
     assert A_CONSUMER_ADDRESS in unconfigured
     assert A_PLANTED_JOB_TITLE not in unconfigured
-    assert A_PLANTED_JOB_TITLE in spans_withheld_under(AN_HR_SHAPED_BINDING)
+    assert A_PLANTED_JOB_TITLE in spans_withheld_under(AN_HR_SHAPED_CONNECTED_SOURCE)
 
 
 def test_writes_a_typed_word_for_each_switched_on_tier() -> None:
@@ -49,7 +49,7 @@ def test_writes_a_typed_word_for_each_switched_on_tier() -> None:
     assert typed_placeholders_under(NOTHING_SWITCHABLE) == {}
 
 
-def test_refuses_a_binding_whose_tier_the_page_cannot_count() -> None:
+def test_refuses_a_connected_source_whose_tier_the_page_cannot_count() -> None:
 
     with pytest.raises(RuntimeError, match="no count"):
-        typed_placeholders_under(AN_HR_SHAPED_BINDING)
+        typed_placeholders_under(AN_HR_SHAPED_CONNECTED_SOURCE)

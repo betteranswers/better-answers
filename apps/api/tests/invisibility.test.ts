@@ -71,12 +71,15 @@ const restrictedSourcedConcept = async () => {
   let documentId: string;
   try {
     const seed = testData(client);
-    const binding = await seed.sourceBinding({
+    const connectedSource = await seed.connectedSource({
       workspaceId: workspace.workspaceId,
       sensitivity: "Restricted",
     });
     documentId = (
-      await seed.sourceDocument({ workspaceId: workspace.workspaceId, bindingId: binding.id })
+      await seed.sourceDocument({
+        workspaceId: workspace.workspaceId,
+        connectedSourceId: connectedSource.id,
+      })
     ).id;
   } finally {
     client.release();
@@ -167,7 +170,7 @@ const documentsAndTheConceptOverThem = async () => {
   const standalone = await landing({ title: INVOICE_TITLE, text: INVOICE_TEXT });
   const covered = await landing({ title: COVERED_TITLE, text: COVERED_TEXT });
   const underReview = await landing({
-    title: "The binding still under review",
+    title: "The connected source still under review",
     text: COVERED_TEXT,
     publishedAt: null,
   });

@@ -133,24 +133,24 @@ export const refusesEach = async (
   }
 };
 
-export type BindingWords = {
+export type ConnectedSourceWords = {
   readonly connector: string;
   readonly destination: readonly (string | null)[];
   readonly retentionClass: string;
   readonly state: string;
 };
 
-const BINDING_OF_WORDS = `INSERT INTO source_binding
+const CONNECTED_SOURCE_OF_WORDS = `INSERT INTO connected_source
     (workspace_id, id, name, connector, destination, retention_class, state)
   VALUES ($1, $2, $3, $4, $5, $6, $7)`;
 
-export const attemptBindingOf = (
+export const attemptConnectedSourceOf = (
   client: pg.PoolClient,
   workspaceId: string,
-  words: BindingWords,
+  words: ConnectedSourceWords,
 ): Promise<string> =>
   refusalOf(client, () =>
-    client.query(BINDING_OF_WORDS, [
+    client.query(CONNECTED_SOURCE_OF_WORDS, [
       workspaceId,
       ulid(),
       "The handbook",
@@ -163,13 +163,13 @@ export const attemptBindingOf = (
 
 const documentCarrying = (column: string, word: string): string =>
   `INSERT INTO source_document
-     (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size,
+     (workspace_id, id, connected_source_id, source_system_id, title, media_type, byte_size,
       original_key, ${column})
    VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original', '${word}')`;
 
 const documentReporting = (outcome: string | null, quarantineError: string | null): string =>
   `INSERT INTO source_document
-     (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size,
+     (workspace_id, id, connected_source_id, source_system_id, title, media_type, byte_size,
       original_key, outcome, quarantine_error)
    VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original',
            ${outcome === null ? "NULL" : `'${outcome}'`},
@@ -177,13 +177,13 @@ const documentReporting = (outcome: string | null, quarantineError: string | nul
 
 const documentSized = (bytes: number): string =>
   `INSERT INTO source_document
-     (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key)
+     (workspace_id, id, connected_source_id, source_system_id, title, media_type, byte_size, original_key)
    VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', ${String(bytes)}, 'documents/x/original')`;
 
 const anotherItemUnder = (place: CataloguePlace): readonly unknown[] => [
   place.workspaceId,
   ulid(),
-  place.bindingId,
+  place.connectedSourceId,
   ulid(),
 ];
 
@@ -247,7 +247,7 @@ export const attemptAuditEventRowReusingAnId = (
   refusalOf(client, () =>
     client.query(
       `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
-           VALUES ($1, $2, 'sources.binding.created', 'process:better-answers-test', $3, '{}'::jsonb)`,
+           VALUES ($1, $2, 'sources.binding.bound', 'process:better-answers-test', $3, '{}'::jsonb)`,
       [id, workspaceId, ulid()],
     ),
   );
@@ -258,12 +258,12 @@ const CHUNK_AND_ITS_EMBEDDING = `INSERT INTO "index".chunk
 
 const CHUNK_CARRYING_ITS_OWN_FULL_TEXT = `INSERT INTO "index".chunk
      (workspace_id, id, content, binding_id, search)
-   VALUES ($1, $2, 'a paragraph', 'binding-1', to_tsvector('english', 'something else'))`;
+   VALUES ($1, $2, 'a paragraph', 'connected-source-1', to_tsvector('english', 'something else'))`;
 
 export const attemptChunkEmbeddedBy = (
   client: pg.PoolClient,
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
   embedding: string | null,
   modelChoice: string | null,
 ): Promise<string> =>
@@ -273,7 +273,7 @@ export const attemptChunkEmbeddedBy = (
       `chunk-${ulid()}`,
       embedding,
       modelChoice,
-      bindingId,
+      connectedSourceId,
     ]),
   );
 
@@ -308,15 +308,24 @@ export const configProbeWritten = (
     key,
   ]);
 
-export const bindingIdTakenAgain = (
+export const connectedSourceIdTakenAgain = (
   client: Writer,
   workspaceId: string,
-  binding: { readonly bindingId: string; readonly name: string; readonly sensitivity: string },
+  connectedSource: {
+    readonly connectedSourceId: string;
+    readonly name: string;
+    readonly sensitivity: string;
+  },
 ): Promise<unknown> =>
   client.query(
-    `INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity, audience)
+    `INSERT INTO connected_source (workspace_id, id, name, connector, sensitivity, audience)
      VALUES ($1, $2, $3, 'upload', $4, 'everyone')`,
-    [workspaceId, binding.bindingId, binding.name, binding.sensitivity],
+    [
+      workspaceId,
+      connectedSource.connectedSourceId,
+      connectedSource.name,
+      connectedSource.sensitivity,
+    ],
   );
 
 export const conceptIriTakenAgain = (

@@ -2,8 +2,9 @@ import type pg from "pg";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
-import { REASONS_EMPTYING_THE_BINDING } from "@better-answers/schema";
+import { REASONS_EMPTYING_THE_CONNECTED_SOURCE } from "@better-answers/schema";
 
+import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import { parse, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   dismissAsNotSpecialCategory,
@@ -15,12 +16,12 @@ import {
   narrowDocuments,
   narrowDocumentsInput,
   passageAt,
-  reprocessBinding,
-  reprocessBindingInput,
+  reprocessConnectedSource,
+  reprocessConnectedSourceInput,
   type findingGroupKey,
 } from "../src/sources/index.ts";
 import {
-  bindingHolding,
+  connectedSourceHolding,
   chunkUnder,
   chunkVersionsOf,
   conceptCiting,
@@ -41,20 +42,20 @@ type FindingGroupAsked = z.input<typeof findingGroupKey>;
 
 const keepAs = (
   who: UserPrincipal,
-  bindingId: string,
+  connectedSourceId: string,
   findingGroups: readonly FindingGroupAsked[],
 ) =>
   acting(who, (principal, tx) =>
     keepInText(
       principal,
       tx,
-      inputOf(keepInTextInput, { bindingId, findingGroups, reason: BUSINESS_FACT }),
+      inputOf(keepInTextInput, { connectedSourceId, findingGroups, reason: BUSINESS_FACT }),
     ),
   );
 
 const narrowAs = (
   who: UserPrincipal,
-  bindingId: string,
+  connectedSourceId: string,
   findingGroups: readonly FindingGroupAsked[],
   to: { readonly sensitivity?: string } = {},
 ) =>
@@ -62,7 +63,11 @@ const narrowAs = (
     narrowDocuments(
       principal,
       tx,
-      inputOf(narrowDocumentsInput, { bindingId, findingGroups, sensitivity: to.sensitivity }),
+      inputOf(narrowDocumentsInput, {
+        connectedSourceId,
+        findingGroups,
+        sensitivity: to.sensitivity,
+      }),
     ),
   );
 
@@ -72,7 +77,7 @@ const HEALTH = { category: "special-category", ruleId: "HEALTH_CUE" };
 
 const dismissAs = (
   who: UserPrincipal,
-  bindingId: string,
+  connectedSourceId: string,
   findingGroups: readonly FindingGroupAsked[],
 ) =>
   acting(who, (principal, tx) =>
@@ -80,7 +85,7 @@ const dismissAs = (
       principal,
       tx,
       inputOf(dismissAsNotSpecialCategoryInput, {
-        bindingId,
+        connectedSourceId,
         findingGroups,
         reason: NOT_HEALTH_DATA,
       }),
@@ -129,7 +134,7 @@ const SORT_CODE_RULE = { rule_id: "sort-code-with-account-number" };
 
 const finishedIndexRun = (
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
   finishedAt: string,
   overridden: ReadonlyArray<{
     readonly document_id: string;
@@ -142,8 +147,8 @@ const finishedIndexRun = (
     seed.job({
       workspaceId,
       kind: "index",
-      subjectId: bindingId,
-      reason: "bound",
+      subjectId: connectedSourceId,
+      reason: "connected",
       status: "done",
       attempts: 1,
       finishedAt: new Date(finishedAt),
@@ -159,10 +164,10 @@ const finishedIndexRun = (
 const NO_LONGER_RAISED = { ruleVersion: "0" };
 
 const aGroupHoldingADroppedSpan = async (scenario: Scenario) => {
-  const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+  const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
   const raised = await findingIn(scenario.workspaceId, first.documentId);
   const dropped = await findingIn(scenario.workspaceId, first.documentId, NO_LONGER_RAISED);
-  return { bindingId, group: findingGroupIn(first.documentId), raised, dropped };
+  return { connectedSourceId, group: findingGroupIn(first.documentId), raised, dropped };
 };
 
 const readAgainAt = async (workspaceId: string, findingId: string, tier: string) => {
@@ -259,15 +264,22 @@ const narrowingLeftBehindIn = async (workspaceId: string, documentId: string) =>
 
 const NOTHING_NARROWED = { classes: ["Internal"], auditEvents: [], jobs: [] };
 
-const findingsAs = (who: UserPrincipal, bindingId: string) =>
+const findingsAs = (who: UserPrincipal, connectedSourceId: string) =>
   acting(who, (principal, tx) =>
-    findingsOf(principal, tx, inputOf(findingsOfInput, { bindingId })),
+    findingsOf(principal, tx, inputOf(findingsOfInput, { connectedSourceId })),
   );
 
-const documentHeldAboveItsBinding = async (workspaceId: string) => {
-  const binding = await bindingHolding(db(), workspaceId, { sensitivity: "Restricted" });
-  const held = await documentUnder(db(), workspaceId, binding.bindingId, "Internal");
-  return { bindingId: binding.bindingId, held };
+const documentHeldAboveItsConnectedSource = async (workspaceId: string) => {
+  const connectedSource = await connectedSourceHolding(db(), workspaceId, {
+    sensitivity: "Restricted",
+  });
+  const held = await documentUnder(
+    db(),
+    workspaceId,
+    connectedSource.connectedSourceId,
+    "Internal",
+  );
+  return { connectedSourceId: connectedSource.connectedSourceId, held };
 };
 
 const pageIncluding = (workspaceId: string, iri: string): Promise<string> =>
@@ -285,9 +297,11 @@ const findingCountOf = async (workspaceId: string, documentId: string) => {
   return found.rows[0]?.held ?? 0;
 };
 
-const bindingWithTwoDocuments = async (scenario: Scenario) => {
-  const first = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
-  const second = await documentUnder(db(), scenario.workspaceId, first.bindingId, null);
+const connectedSourceWithTwoDocuments = async (scenario: Scenario) => {
+  const first = await connectedSourceHolding(db(), scenario.workspaceId, {
+    sensitivity: "Internal",
+  });
+  const second = await documentUnder(db(), scenario.workspaceId, first.connectedSourceId, null);
   for (const document of [first, second]) {
     await chunkUnder(db(), scenario.workspaceId, document, {
       content: "12-34-56",
@@ -296,13 +310,25 @@ const bindingWithTwoDocuments = async (scenario: Scenario) => {
       charEnd: 8,
     });
   }
-  return { bindingId: first.bindingId, first, second };
+  return { connectedSourceId: first.connectedSourceId, first, second };
 };
 
 const twoDocumentsTheSeamNarrowed = async (scenario: Scenario) => {
-  const binding = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
-  const first = await documentUnder(db(), scenario.workspaceId, binding.bindingId, "Restricted");
-  const second = await documentUnder(db(), scenario.workspaceId, binding.bindingId, "Restricted");
+  const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, {
+    sensitivity: "Internal",
+  });
+  const first = await documentUnder(
+    db(),
+    scenario.workspaceId,
+    connectedSource.connectedSourceId,
+    "Restricted",
+  );
+  const second = await documentUnder(
+    db(),
+    scenario.workspaceId,
+    connectedSource.connectedSourceId,
+    "Restricted",
+  );
   for (const document of [first, second]) {
     await chunkUnder(db(), scenario.workspaceId, document, {
       content: "He was diagnosed with a heart condition.",
@@ -311,13 +337,13 @@ const twoDocumentsTheSeamNarrowed = async (scenario: Scenario) => {
       charEnd: 40,
     });
   }
-  return { bindingId: binding.bindingId, first, second };
+  return { connectedSourceId: connectedSource.connectedSourceId, first, second };
 };
 
-describe("the review read of a binding's findings", () => {
+describe("the review read of a connected source's findings", () => {
   it("groups findings by document, category and rule, with a count", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
     await findingIn(scenario.workspaceId, first.documentId);
     await findingIn(scenario.workspaceId, first.documentId, {
@@ -326,7 +352,7 @@ describe("the review read of a binding's findings", () => {
     });
     await findingIn(scenario.workspaceId, second.documentId);
 
-    const read = await findingsAs(scenario.admin, bindingId);
+    const read = await findingsAs(scenario.admin, connectedSourceId);
 
     expect(read).toEqual({
       ok: true,
@@ -373,10 +399,10 @@ describe("the review read of a binding's findings", () => {
 
   it("carries no value and no offset", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
 
-    const read = await findingsAs(scenario.admin, bindingId);
+    const read = await findingsAs(scenario.admin, connectedSourceId);
 
     expect(read.ok ? Object.keys(read.value[0] ?? {}).toSorted() : []).toEqual([
       "category",
@@ -394,21 +420,23 @@ describe("the review read of a binding's findings", () => {
 
   it("reads a document the seam narrowed as already Restricted", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Internal",
+    });
 
     const narrowed = await documentUnder(
       db(),
       scenario.workspaceId,
-      binding.bindingId,
+      connectedSource.connectedSourceId,
       "Restricted",
     );
     await findingIn(scenario.workspaceId, narrowed.documentId, {
       category: "special-category",
       ruleId: "health-condition",
     });
-    await findingIn(scenario.workspaceId, binding.documentId);
+    await findingIn(scenario.workspaceId, connectedSource.documentId);
 
-    const read = await findingsAs(scenario.admin, binding.bindingId);
+    const read = await findingsAs(scenario.admin, connectedSource.connectedSourceId);
 
     expect(
       read.ok
@@ -426,7 +454,7 @@ describe("the review read of a binding's findings", () => {
 
   it("counts the spans an Admin dismissed in a special-category group", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await twoDocumentsTheSeamNarrowed(scenario);
+    const { connectedSourceId, first, second } = await twoDocumentsTheSeamNarrowed(scenario);
     await findingIn(scenario.workspaceId, first.documentId, HEALTH);
     await findingIn(scenario.workspaceId, first.documentId, {
       ...HEALTH,
@@ -434,9 +462,9 @@ describe("the review read of a binding's findings", () => {
       charEnd: 120,
     });
     await findingIn(scenario.workspaceId, second.documentId, HEALTH);
-    await dismissAs(scenario.admin, bindingId, [findingGroupIn(first.documentId, HEALTH)]);
+    await dismissAs(scenario.admin, connectedSourceId, [findingGroupIn(first.documentId, HEALTH)]);
 
-    const read = await findingsAs(scenario.admin, bindingId);
+    const read = await findingsAs(scenario.admin, connectedSourceId);
 
     expect(
       read.ok
@@ -452,19 +480,21 @@ describe("the review read of a binding's findings", () => {
     ]);
   });
 
-  it("reads a document above its binding at the binding's class", async () => {
+  it("reads a document above its source at the source's class", async () => {
     const scenario = await arrange();
-    const { bindingId, held } = await documentHeldAboveItsBinding(scenario.workspaceId);
+    const { connectedSourceId, held } = await documentHeldAboveItsConnectedSource(
+      scenario.workspaceId,
+    );
     await findingIn(scenario.workspaceId, held.documentId);
 
-    const read = await findingsAs(scenario.admin, bindingId);
+    const read = await findingsAs(scenario.admin, connectedSourceId);
 
     expect(read.ok ? read.value.map((group) => group.sensitivity) : []).toEqual(["Restricted"]);
   });
 
   it("omits spans and groups the last run no longer raises", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
     await findingIn(scenario.workspaceId, first.documentId, NO_LONGER_RAISED);
     await findingIn(scenario.workspaceId, first.documentId, {
@@ -472,7 +502,7 @@ describe("the review read of a binding's findings", () => {
       ...NO_LONGER_RAISED,
     });
 
-    const read = await findingsAs(scenario.admin, bindingId);
+    const read = await findingsAs(scenario.admin, connectedSourceId);
 
     expect(
       read.ok ? read.value.map((group) => ({ ruleId: group.ruleId, found: group.found })) : [],
@@ -481,20 +511,22 @@ describe("the review read of a binding's findings", () => {
 
   it("counts kept spans the last finished run withheld for erasure", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId, { charStart: 54, charEnd: 97 });
     await findingIn(scenario.workspaceId, first.documentId, { charStart: 120, charEnd: 128 });
     await findingIn(scenario.workspaceId, second.documentId, { charStart: 54, charEnd: 97 });
-    await finishedIndexRun(scenario.workspaceId, bindingId, "2026-09-20T10:00:00.000Z", [
+    await finishedIndexRun(scenario.workspaceId, connectedSourceId, "2026-09-20T10:00:00.000Z", [
       { ...SORT_CODE_RULE, document_id: second.documentId, char_start: 54, char_end: 97 },
     ]);
-    await finishedIndexRun(scenario.workspaceId, bindingId, "2026-09-20T11:00:00.000Z", [
+    await finishedIndexRun(scenario.workspaceId, connectedSourceId, "2026-09-20T11:00:00.000Z", [
       { ...SORT_CODE_RULE, document_id: first.documentId, char_start: 54, char_end: 97 },
     ]);
-    const elsewhere = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
+    const elsewhere = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Internal",
+    });
     await finishedIndexRun(
       scenario.workspaceId,
-      elsewhere.bindingId,
+      elsewhere.connectedSourceId,
       "2026-09-20T13:00:00.000Z",
       [],
     );
@@ -503,7 +535,7 @@ describe("the review read of a binding's findings", () => {
       seed.job({
         workspaceId: scenario.workspaceId,
         kind: "index",
-        subjectId: bindingId,
+        subjectId: connectedSourceId,
         reason: "rule-change",
         status: "failed",
         attempts: 1,
@@ -511,12 +543,12 @@ describe("the review read of a binding's findings", () => {
         outcome: { error: "TimeoutError" },
       }),
     );
-    await keepAs(scenario.admin, bindingId, [
+    await keepAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId),
       findingGroupIn(second.documentId),
     ]);
 
-    const read = await findingsAs(scenario.admin, bindingId);
+    const read = await findingsAs(scenario.admin, connectedSourceId);
 
     expect(
       read.ok
@@ -535,14 +567,14 @@ describe("the review read of a binding's findings", () => {
 
   it("fails, rather than read nought, on an unreadable kept-span list", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
     await seededBy(db(), (seed) =>
       seed.job({
         workspaceId: scenario.workspaceId,
         kind: "index",
-        subjectId: bindingId,
-        reason: "bound",
+        subjectId: connectedSourceId,
+        reason: "connected",
         status: "done",
         attempts: 1,
         finishedAt: new Date("2026-09-20T11:00:00.000Z"),
@@ -553,30 +585,30 @@ describe("the review read of a binding's findings", () => {
       }),
     );
 
-    const read = await findingsAs(scenario.admin, bindingId);
+    const read = await findingsAs(scenario.admin, connectedSourceId);
 
     expect(read.ok).toBe(false);
     expect(read.ok ? undefined : read.error).toEqual(
       new Error(
-        "the binding's last index run names the kept spans an erasure overrode in a shape the review cannot read",
+        "the connected source's last index run names the kept spans an erasure overrode in a shape the review cannot read",
       ),
     );
   });
 
-  it("reads a binding's findings while another holds its row", async () => {
+  it("reads a connected source's findings while another holds its row", async () => {
     const scenario = await arrange();
-    const { bindingId } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId } = await connectedSourceWithTwoDocuments(scenario);
     const holder = await db().pool.connect();
     try {
       await holder.query("BEGIN");
       await holder.query(
-        "SELECT 1 FROM source_binding WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
-        [scenario.workspaceId, bindingId],
+        "SELECT 1 FROM connected_source WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
+        [scenario.workspaceId, connectedSourceId],
       );
 
       const read = await acting(scenario.admin, async (principal, tx) => {
         await tx.query("SET LOCAL lock_timeout = '2s'");
-        return findingsOf(principal, tx, inputOf(findingsOfInput, { bindingId }));
+        return findingsOf(principal, tx, inputOf(findingsOfInput, { connectedSourceId }));
       });
 
       expect(read).toEqual({ ok: true, value: [] });
@@ -586,13 +618,13 @@ describe("the review read of a binding's findings", () => {
     }
   });
 
-  it("answers the store's failure to read the binding", async () => {
+  it("answers the store's failure to read the connected source", async () => {
     const scenario = await arrange();
-    const { bindingId } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId } = await connectedSourceWithTwoDocuments(scenario);
 
     const read = await acting(scenario.admin, async (principal, tx) => {
       await tx.query("SELECT 1 / 0").catch(() => undefined);
-      return findingsOf(principal, tx, inputOf(findingsOfInput, { bindingId }));
+      return findingsOf(principal, tx, inputOf(findingsOfInput, { connectedSourceId }));
     });
 
     expect(read.ok ? undefined : read.error).toEqual(
@@ -604,13 +636,13 @@ describe("the review read of a binding's findings", () => {
 
   it("counts a named span only while an Admin's keep stands", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId, { charStart: 54, charEnd: 97 });
-    await finishedIndexRun(scenario.workspaceId, bindingId, "2026-09-20T11:00:00.000Z", [
+    await finishedIndexRun(scenario.workspaceId, connectedSourceId, "2026-09-20T11:00:00.000Z", [
       { ...SORT_CODE_RULE, document_id: first.documentId, char_start: 54, char_end: 97 },
     ]);
 
-    const read = await findingsAs(scenario.admin, bindingId);
+    const read = await findingsAs(scenario.admin, connectedSourceId);
 
     expect(read.ok ? read.value.map((group) => group.overriddenByErasure) : []).toEqual([0]);
   });
@@ -620,17 +652,17 @@ describe("the review read of a binding's findings", () => {
     ["a Viewer", (scenario: Scenario) => scenario.viewer],
   ] as const)("refuses %s, who never learns what the seam found", async (_who, personOf) => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
 
-    const read = await findingsAs(personOf(scenario), bindingId);
+    const read = await findingsAs(personOf(scenario), connectedSourceId);
 
     expect(read).toEqual({ ok: false, error: "role-forbids" });
   });
 });
 
 const keepingTwoGroupsOfThree = async (scenario: Scenario) => {
-  const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+  const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
   const kept = await findingIn(scenario.workspaceId, first.documentId);
   const keptBesideIt = await findingIn(scenario.workspaceId, first.documentId, {
     charStart: 40,
@@ -638,26 +670,26 @@ const keepingTwoGroupsOfThree = async (scenario: Scenario) => {
   });
   const alsoKept = await findingIn(scenario.workspaceId, second.documentId);
   const left = await findingIn(scenario.workspaceId, first.documentId, NATIONAL_INSURANCE);
-  const outcome = await keepAs(scenario.admin, bindingId, [
+  const outcome = await keepAs(scenario.admin, connectedSourceId, [
     findingGroupIn(first.documentId),
     findingGroupIn(second.documentId),
   ]);
 
   const spans = [kept, keptBesideIt, alsoKept].toSorted();
-  return { bindingId, first, second, kept, keptBesideIt, alsoKept, left, spans, outcome };
+  return { connectedSourceId, first, second, kept, keptBesideIt, alsoKept, left, spans, outcome };
 };
 
 describe("an Admin keeping named finding groups in the text", () => {
   it("restores every span in one batch, queueing one index run", async () => {
     const scenario = await arrange();
 
-    const { bindingId, first, second, kept, keptBesideIt, alsoKept, left, spans, outcome } =
+    const { connectedSourceId, first, second, kept, keptBesideIt, alsoKept, left, spans, outcome } =
       await keepingTwoGroupsOfThree(scenario);
 
     expect(outcome).toEqual({
       ok: true,
       value: {
-        bindingId,
+        connectedSourceId,
         documentIds: [first.documentId, second.documentId].toSorted(),
         batchId: expect.any(String),
         jobId: expect.any(String),
@@ -690,18 +722,18 @@ describe("an Admin keeping named finding groups in the text", () => {
       spans.map((span) => ({ subject_id: span, batch_id: batchId, detail: { findingId: span } })),
     );
     expect(await jobsOf(scenario.workspaceId)).toEqual([
-      { kind: "index", reason: "restored", subject_id: bindingId },
+      { kind: "index", reason: "restored", subject_id: connectedSourceId },
     ]);
   });
 
   it("rejects, keeping no span, when the queue refuses its run", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const kept = await findingIn(scenario.workspaceId, first.documentId);
 
     await expect(
       whileWritesAreRefused(db().pool, "job", () =>
-        keepAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]),
+        keepAs(scenario.admin, connectedSourceId, [findingGroupIn(first.documentId)]),
       ),
     ).rejects.toThrow(/refused a write to job/);
 
@@ -736,11 +768,13 @@ describe("an Admin keeping named finding groups in the text", () => {
 
   it("keeps one group of two spans under a batch id", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
     await findingIn(scenario.workspaceId, first.documentId, { charStart: 40, charEnd: 48 });
 
-    const outcome = await keepAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    const outcome = await keepAs(scenario.admin, connectedSourceId, [
+      findingGroupIn(first.documentId),
+    ]);
 
     const batchId = outcome.ok ? outcome.value.batchId : undefined;
     expect(typeof batchId).toBe("string");
@@ -756,12 +790,12 @@ describe("an Admin keeping named finding groups in the text", () => {
     ["named twice, still one group", 2],
   ] as const)("keeps a one-span group, %s, unbatched", async (_how, times) => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const kept = await findingIn(scenario.workspaceId, first.documentId);
 
     const outcome = await keepAs(
       scenario.admin,
-      bindingId,
+      connectedSourceId,
       Array.from({ length: times }, () => findingGroupIn(first.documentId)),
     );
 
@@ -779,10 +813,12 @@ describe("an Admin keeping named finding groups in the text", () => {
     ["a Viewer", (scenario: Scenario) => scenario.viewer, "role-forbids"],
   ] as const)("refuses %s, moving neither a row nor a run", async (_who, personOf, refusal) => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId);
 
-    const outcome = await keepAs(personOf(scenario), bindingId, [findingGroupIn(first.documentId)]);
+    const outcome = await keepAs(personOf(scenario), connectedSourceId, [
+      findingGroupIn(first.documentId),
+    ]);
 
     expect(outcome).toEqual({ ok: false, error: refusal });
     expect(await restoreOf(scenario.workspaceId, named)).toMatchObject({ restored: false });
@@ -791,18 +827,18 @@ describe("an Admin keeping named finding groups in the text", () => {
 
   it("refuses a group outside the always set, landing neither group", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const alwaysSet = await findingIn(scenario.workspaceId, first.documentId);
-    const switchedAtTheBinding = {
+    const switchedAtTheConnectedSource = {
       tier: "default-on",
       category: "home-address",
       ruleId: "postal-address",
     };
-    await findingIn(scenario.workspaceId, first.documentId, switchedAtTheBinding);
+    await findingIn(scenario.workspaceId, first.documentId, switchedAtTheConnectedSource);
 
-    const outcome = await keepAs(scenario.admin, bindingId, [
+    const outcome = await keepAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId),
-      findingGroupIn(first.documentId, switchedAtTheBinding),
+      findingGroupIn(first.documentId, switchedAtTheConnectedSource),
     ]);
 
     expect(outcome).toEqual({ ok: false, error: "not-the-always-set" });
@@ -811,13 +847,17 @@ describe("an Admin keeping named finding groups in the text", () => {
     expect(await jobsOf(scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses a group of another binding", async () => {
+  it("refuses a group of another connected source", async () => {
     const scenario = await arrange();
-    const { bindingId } = await bindingWithTwoDocuments(scenario);
-    const elsewhere = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
+    const { connectedSourceId } = await connectedSourceWithTwoDocuments(scenario);
+    const elsewhere = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Internal",
+    });
     const theirs = await findingIn(scenario.workspaceId, elsewhere.documentId);
 
-    const outcome = await keepAs(scenario.admin, bindingId, [findingGroupIn(elsewhere.documentId)]);
+    const outcome = await keepAs(scenario.admin, connectedSourceId, [
+      findingGroupIn(elsewhere.documentId),
+    ]);
 
     expect(outcome).toEqual({ ok: false, error: "no-such-finding" });
     expect(await restoreOf(scenario.workspaceId, theirs)).toMatchObject({ restored: false });
@@ -825,10 +865,10 @@ describe("an Admin keeping named finding groups in the text", () => {
 
   it("refuses a group holding no finding, landing neither group", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const held = await findingIn(scenario.workspaceId, first.documentId);
 
-    const outcome = await keepAs(scenario.admin, bindingId, [
+    const outcome = await keepAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId),
       findingGroupIn(first.documentId, NATIONAL_INSURANCE),
     ]);
@@ -840,9 +880,9 @@ describe("an Admin keeping named finding groups in the text", () => {
 
   it("keeps only the spans the last run raised", async () => {
     const scenario = await arrange();
-    const { bindingId, group, raised, dropped } = await aGroupHoldingADroppedSpan(scenario);
+    const { connectedSourceId, group, raised, dropped } = await aGroupHoldingADroppedSpan(scenario);
 
-    const outcome = await keepAs(scenario.admin, bindingId, [group]);
+    const outcome = await keepAs(scenario.admin, connectedSourceId, [group]);
 
     expect(outcome).toMatchObject({ ok: true });
     expect(await restoreOf(scenario.workspaceId, raised)).toMatchObject({ restored: true });
@@ -851,15 +891,15 @@ describe("an Admin keeping named finding groups in the text", () => {
 
   it("keeps a name refused at default-off once re-read at always", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const readAtFirst = { ...NAMES, tier: "default-off" };
     const officer = await findingIn(scenario.workspaceId, first.documentId, readAtFirst);
 
-    const before = await keepAs(scenario.admin, bindingId, [
+    const before = await keepAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId, readAtFirst),
     ]);
     await readAgainAt(scenario.workspaceId, officer, "always");
-    const after = await keepAs(scenario.admin, bindingId, [
+    const after = await keepAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId, NAMES),
     ]);
 
@@ -870,7 +910,7 @@ describe("an Admin keeping named finding groups in the text", () => {
 
   it("keeps an always-tier officer's name, not the rule's default-off names", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const officer = await findingIn(scenario.workspaceId, first.documentId, NAMES);
     const bidWriter = await findingIn(scenario.workspaceId, first.documentId, {
       ...NAMES,
@@ -879,7 +919,7 @@ describe("an Admin keeping named finding groups in the text", () => {
       charEnd: 48,
     });
 
-    const outcome = await keepAs(scenario.admin, bindingId, [
+    const outcome = await keepAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId, NAMES),
     ]);
 
@@ -892,16 +932,18 @@ describe("an Admin keeping named finding groups in the text", () => {
 describe("an Admin narrowing named documents", () => {
   it("takes each to Restricted with one audit event, chunks untouched", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
-    const stoodAt = await chunkVersionsOf(db(), scenario.workspaceId, bindingId);
+    const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
+    const stoodAt = await chunkVersionsOf(db(), scenario.workspaceId, connectedSourceId);
 
-    const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    const outcome = await narrowAs(scenario.admin, connectedSourceId, [
+      findingGroupIn(first.documentId),
+    ]);
 
     expect(outcome).toMatchObject({
       ok: true,
-      value: { bindingId, documentIds: [first.documentId], sensitivity: "Restricted" },
+      value: { connectedSourceId, documentIds: [first.documentId], sensitivity: "Restricted" },
     });
-    expect(await chunkVersionsOf(db(), scenario.workspaceId, bindingId)).toEqual(stoodAt);
+    expect(await chunkVersionsOf(db(), scenario.workspaceId, connectedSourceId)).toEqual(stoodAt);
     expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Restricted"]);
 
     expect(await chunkClassesOf(scenario.workspaceId, second.documentId)).toEqual(["Internal"]);
@@ -911,14 +953,18 @@ describe("an Admin narrowing named documents", () => {
       {
         subject_id: first.documentId,
         batch_id: null,
-        detail: { documentId: first.documentId, bindingId, sensitivity: "Restricted" },
+        detail: {
+          documentId: first.documentId,
+          [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId,
+          sensitivity: "Restricted",
+        },
       },
     ]);
   });
 
   it("reviews only the named groups' findings as narrowed", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
     const answered = await findingIn(scenario.workspaceId, first.documentId);
 
     const unopened = await findingIn(scenario.workspaceId, first.documentId, {
@@ -927,7 +973,7 @@ describe("an Admin narrowing named documents", () => {
     });
     const siblings = await findingIn(scenario.workspaceId, second.documentId);
 
-    await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    await narrowAs(scenario.admin, connectedSourceId, [findingGroupIn(first.documentId)]);
 
     expect(await reviewOf(scenario.workspaceId, answered)).toEqual({
       review_state: "narrowed",
@@ -942,9 +988,9 @@ describe("an Admin narrowing named documents", () => {
 
   it("reviews no span the last run no longer raises", async () => {
     const scenario = await arrange();
-    const { bindingId, group, raised, dropped } = await aGroupHoldingADroppedSpan(scenario);
+    const { connectedSourceId, group, raised, dropped } = await aGroupHoldingADroppedSpan(scenario);
 
-    await narrowAs(scenario.admin, bindingId, [group]);
+    await narrowAs(scenario.admin, connectedSourceId, [group]);
 
     expect(await reviewOf(scenario.workspaceId, raised)).toMatchObject({
       review_state: "narrowed",
@@ -954,16 +1000,16 @@ describe("an Admin narrowing named documents", () => {
 
   it("leaves an already-kept span kept inside a narrowed group", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const kept = await findingIn(scenario.workspaceId, first.documentId);
-    await keepAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    await keepAs(scenario.admin, connectedSourceId, [findingGroupIn(first.documentId)]);
 
     const raisedSince = await findingIn(scenario.workspaceId, first.documentId, {
       charStart: 40,
       charEnd: 48,
     });
 
-    await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    await narrowAs(scenario.admin, connectedSourceId, [findingGroupIn(first.documentId)]);
 
     expect(await reviewOf(scenario.workspaceId, kept)).toMatchObject({
       review_state: "kept-in-text",
@@ -976,9 +1022,9 @@ describe("an Admin narrowing named documents", () => {
 
   it("records the narrowed class beside the document's read class", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
 
-    await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    await narrowAs(scenario.admin, connectedSourceId, [findingGroupIn(first.documentId)]);
 
     expect(await narrowedToOf(scenario.workspaceId, first.documentId)).toEqual({
       sensitivity: "Restricted",
@@ -992,9 +1038,9 @@ describe("an Admin narrowing named documents", () => {
 
   it("queues no job, however many documents it narrows", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
 
-    const outcome = await narrowAs(scenario.admin, bindingId, [
+    const outcome = await narrowAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId),
       findingGroupIn(second.documentId),
     ]);
@@ -1005,12 +1051,12 @@ describe("an Admin narrowing named documents", () => {
 
   it("narrows no document when the audit log refuses the event", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const shown = await findingIn(scenario.workspaceId, first.documentId);
 
     await expect(
       whileWritesAreRefused(db().pool, "audit_event", () =>
-        narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]),
+        narrowAs(scenario.admin, connectedSourceId, [findingGroupIn(first.documentId)]),
       ),
     ).rejects.toThrow(/refused a write to audit_event/);
 
@@ -1022,27 +1068,31 @@ describe("an Admin narrowing named documents", () => {
 
   it("leaves a keep's queued run standing and queues none itself", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
-    const keep = await keepAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    const keep = await keepAs(scenario.admin, connectedSourceId, [
+      findingGroupIn(first.documentId),
+    ]);
     expect(typeof (keep.ok ? keep.value.jobId : undefined)).toBe("string");
 
-    const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    const outcome = await narrowAs(scenario.admin, connectedSourceId, [
+      findingGroupIn(first.documentId),
+    ]);
 
     expect(outcome).toMatchObject({ ok: true });
     expect(await jobsOf(scenario.workspaceId)).toEqual([
-      { kind: "index", reason: "restored", subject_id: bindingId },
+      { kind: "index", reason: "restored", subject_id: connectedSourceId },
     ]);
   });
 
   it("writes one row per document under one batch id", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
     const named = [first.documentId, second.documentId].toSorted();
 
     const outcome = await narrowAs(
       scenario.admin,
-      bindingId,
+      connectedSourceId,
       named.map((documentId) => findingGroupIn(documentId)),
     );
 
@@ -1057,13 +1107,15 @@ describe("an Admin narrowing named documents", () => {
 
   it("cascades only from concepts citing the narrowed documents", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
     const citing = await conceptCiting(scenario, scenario.editor, [first.documentId]);
     const untouched = await conceptCiting(scenario, scenario.editor, [second.documentId]);
 
     const page = await pageIncluding(scenario.workspaceId, citing.iri);
 
-    const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    const outcome = await narrowAs(scenario.admin, connectedSourceId, [
+      findingGroupIn(first.documentId),
+    ]);
 
     expect(outcome).toMatchObject({
       ok: true,
@@ -1083,10 +1135,10 @@ describe("an Admin narrowing named documents", () => {
 
   it("hides a narrowed document from a Viewer, not its sibling", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
     const spanOf = (documentId: string) => `${documentId}/chars:0-8`;
 
-    await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    await narrowAs(scenario.admin, connectedSourceId, [findingGroupIn(first.documentId)]);
 
     const narrowed = await acting(scenario.viewer, (principal, tx) =>
       passageAt(principal, tx, spanOf(first.documentId)),
@@ -1100,11 +1152,16 @@ describe("an Admin narrowing named documents", () => {
 
   it("refuses a class wider than the document's, and nothing moves", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
 
-    const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)], {
-      sensitivity: "Public",
-    });
+    const outcome = await narrowAs(
+      scenario.admin,
+      connectedSourceId,
+      [findingGroupIn(first.documentId)],
+      {
+        sensitivity: "Public",
+      },
+    );
 
     expect(outcome).toEqual({ ok: false, error: "widening-refused" });
     expect(await narrowingLeftBehindIn(scenario.workspaceId, first.documentId)).toEqual(
@@ -1112,9 +1169,11 @@ describe("an Admin narrowing named documents", () => {
     );
   });
 
-  it("refuses widening past the binding's class over a wider document", async () => {
+  it("refuses widening past the source's class over a wider document", async () => {
     const scenario = await arrange();
-    const { bindingId, held } = await documentHeldAboveItsBinding(scenario.workspaceId);
+    const { connectedSourceId, held } = await documentHeldAboveItsConnectedSource(
+      scenario.workspaceId,
+    );
     await chunkUnder(db(), scenario.workspaceId, held, {
       content: "12-34-56",
       ordinal: 0,
@@ -1122,20 +1181,27 @@ describe("an Admin narrowing named documents", () => {
       charEnd: 8,
     });
 
-    const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(held.documentId)], {
-      sensitivity: "Internal",
-    });
+    const outcome = await narrowAs(
+      scenario.admin,
+      connectedSourceId,
+      [findingGroupIn(held.documentId)],
+      {
+        sensitivity: "Internal",
+      },
+    );
 
     expect(outcome).toEqual({ ok: false, error: "widening-refused" });
     expect(await chunkClassesOf(scenario.workspaceId, held.documentId)).toEqual(["Restricted"]);
   });
 
-  it("refuses another binding's document, failing the whole batch", async () => {
+  it("refuses another connected source's document, failing the whole batch", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
-    const elsewhere = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
+    const elsewhere = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Internal",
+    });
 
-    const outcome = await narrowAs(scenario.admin, bindingId, [
+    const outcome = await narrowAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId),
       findingGroupIn(elsewhere.documentId),
     ]);
@@ -1149,9 +1215,9 @@ describe("an Admin narrowing named documents", () => {
     ["a Viewer", (scenario: Scenario) => scenario.viewer],
   ] as const)("refuses %s, and no document moves", async (_who, personOf) => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
 
-    const outcome = await narrowAs(personOf(scenario), bindingId, [
+    const outcome = await narrowAs(personOf(scenario), connectedSourceId, [
       findingGroupIn(first.documentId),
     ]);
 
@@ -1161,7 +1227,7 @@ describe("an Admin narrowing named documents", () => {
 });
 
 const dismissingTwoGroupsOfThree = async (scenario: Scenario) => {
-  const { bindingId, first, second } = await twoDocumentsTheSeamNarrowed(scenario);
+  const { connectedSourceId, first, second } = await twoDocumentsTheSeamNarrowed(scenario);
   const dismissed = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
   const dismissedBesideIt = await findingIn(scenario.workspaceId, first.documentId, {
     ...HEALTH,
@@ -1170,12 +1236,12 @@ const dismissingTwoGroupsOfThree = async (scenario: Scenario) => {
   });
   const alsoDismissed = await findingIn(scenario.workspaceId, second.documentId, HEALTH);
   const left = await findingIn(scenario.workspaceId, first.documentId);
-  const outcome = await dismissAs(scenario.admin, bindingId, [
+  const outcome = await dismissAs(scenario.admin, connectedSourceId, [
     findingGroupIn(first.documentId, HEALTH),
     findingGroupIn(second.documentId, HEALTH),
   ]);
   return {
-    bindingId,
+    connectedSourceId,
     first,
     second,
     dismissed,
@@ -1208,11 +1274,12 @@ describe("an Admin dismissing finding groups as not special category", () => {
   it("writes a batched audit event per document, queueing one run", async () => {
     const scenario = await arrange();
 
-    const { bindingId, first, second, outcome } = await dismissingTwoGroupsOfThree(scenario);
+    const { connectedSourceId, first, second, outcome } =
+      await dismissingTwoGroupsOfThree(scenario);
 
     const documentIds = [first.documentId, second.documentId].toSorted();
     const batchId = outcome.ok ? outcome.value.batchId : undefined;
-    expect(outcome).toMatchObject({ ok: true, value: { bindingId, documentIds } });
+    expect(outcome).toMatchObject({ ok: true, value: { connectedSourceId, documentIds } });
     expect(typeof batchId).toBe("string");
     expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACT)).toEqual(
       documentIds.map((documentId) => ({
@@ -1220,13 +1287,13 @@ describe("an Admin dismissing finding groups as not special category", () => {
         batch_id: batchId,
         detail: {
           documentId,
-          bindingId,
+          [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId,
           findingCount: documentId === first.documentId ? 2 : 1,
         },
       })),
     );
     expect(await jobsOf(scenario.workspaceId)).toEqual([
-      { kind: "index", reason: "dismissed", subject_id: bindingId },
+      { kind: "index", reason: "dismissed", subject_id: connectedSourceId },
     ]);
   });
 
@@ -1241,10 +1308,10 @@ describe("an Admin dismissing finding groups as not special category", () => {
 
   it("writes one unbatched row for one document's group", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+    const { connectedSourceId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     await findingIn(scenario.workspaceId, first.documentId, HEALTH);
 
-    const outcome = await dismissAs(scenario.admin, bindingId, [
+    const outcome = await dismissAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId, HEALTH),
     ]);
 
@@ -1253,21 +1320,25 @@ describe("an Admin dismissing finding groups as not special category", () => {
       {
         subject_id: first.documentId,
         batch_id: null,
-        detail: { documentId: first.documentId, bindingId, findingCount: 1 },
+        detail: {
+          documentId: first.documentId,
+          [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId,
+          findingCount: 1,
+        },
       },
     ]);
   });
 
   it("dismisses only the spans the last run raised", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+    const { connectedSourceId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const raised = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
     const dropped = await findingIn(scenario.workspaceId, first.documentId, {
       ...HEALTH,
       ...NO_LONGER_RAISED,
     });
 
-    await dismissAs(scenario.admin, bindingId, [findingGroupIn(first.documentId, HEALTH)]);
+    await dismissAs(scenario.admin, connectedSourceId, [findingGroupIn(first.documentId, HEALTH)]);
 
     expect(await reviewOf(scenario.workspaceId, raised)).toMatchObject({
       review_state: "dismissed",
@@ -1280,12 +1351,12 @@ describe("an Admin dismissing finding groups as not special category", () => {
     ["kept-in-text, then dismissed", ["keep", "dismiss"]],
   ] as const)("leaves a span %s, both dismissed and restored", async (_order, acts) => {
     const scenario = await arrange();
-    const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+    const { connectedSourceId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
     const group = [findingGroupIn(first.documentId, HEALTH)];
 
     for (const taken of acts) {
-      await (taken === "dismiss" ? dismissAs : keepAs)(scenario.admin, bindingId, group);
+      await (taken === "dismiss" ? dismissAs : keepAs)(scenario.admin, connectedSourceId, group);
     }
 
     expect(await reviewOf(scenario.workspaceId, named)).toMatchObject({
@@ -1303,12 +1374,12 @@ describe("an Admin dismissing finding groups as not special category", () => {
     ["the audit log refuses", "audit_event"],
   ] as const)("rejects, dismissing no span, when %s", async (_when, table) => {
     const scenario = await arrange();
-    const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+    const { connectedSourceId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
 
     await expect(
       whileWritesAreRefused(db().pool, table, () =>
-        dismissAs(scenario.admin, bindingId, [findingGroupIn(first.documentId, HEALTH)]),
+        dismissAs(scenario.admin, connectedSourceId, [findingGroupIn(first.documentId, HEALTH)]),
       ),
     ).rejects.toThrow(new RegExp(`refused a write to ${table}`));
 
@@ -1322,10 +1393,10 @@ describe("an Admin dismissing finding groups as not special category", () => {
     ["a Viewer", (scenario: Scenario) => scenario.viewer],
   ] as const)("refuses %s, moving neither a row nor a run", async (_who, personOf) => {
     const scenario = await arrange();
-    const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+    const { connectedSourceId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
 
-    const outcome = await dismissAs(personOf(scenario), bindingId, [
+    const outcome = await dismissAs(personOf(scenario), connectedSourceId, [
       findingGroupIn(first.documentId, HEALTH),
     ]);
 
@@ -1336,11 +1407,11 @@ describe("an Admin dismissing finding groups as not special category", () => {
 
   it("refuses a non-special-category group, landing neither group", async () => {
     const scenario = await arrange();
-    const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+    const { connectedSourceId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const health = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
     const sortCode = await findingIn(scenario.workspaceId, first.documentId);
 
-    const outcome = await dismissAs(scenario.admin, bindingId, [
+    const outcome = await dismissAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId, HEALTH),
       findingGroupIn(first.documentId),
     ]);
@@ -1351,23 +1422,25 @@ describe("an Admin dismissing finding groups as not special category", () => {
     expect(await jobsOf(scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses a group the binding lacks, landing neither group", async () => {
+  it("refuses a group the connected source lacks, landing neither group", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await twoDocumentsTheSeamNarrowed(scenario);
+    const { connectedSourceId, first, second } = await twoDocumentsTheSeamNarrowed(scenario);
     const health = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
-    const elsewhere = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
+    const elsewhere = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Internal",
+    });
     const theirs = await findingIn(scenario.workspaceId, elsewhere.documentId, HEALTH);
 
-    const noSpan = await dismissAs(scenario.admin, bindingId, [
+    const noSpan = await dismissAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId, HEALTH),
       findingGroupIn(second.documentId, HEALTH),
     ]);
-    const anotherBinding = await dismissAs(scenario.admin, bindingId, [
+    const anotherConnectedSource = await dismissAs(scenario.admin, connectedSourceId, [
       findingGroupIn(elsewhere.documentId, HEALTH),
     ]);
 
     expect(noSpan).toEqual({ ok: false, error: "no-such-finding" });
-    expect(anotherBinding).toEqual({ ok: false, error: "no-such-finding" });
+    expect(anotherConnectedSource).toEqual({ ok: false, error: "no-such-finding" });
     expect(await reviewOf(scenario.workspaceId, health)).toEqual(UNREVIEWED);
     expect(await reviewOf(scenario.workspaceId, theirs)).toEqual(UNREVIEWED);
     expect(await jobsOf(scenario.workspaceId)).toEqual([]);
@@ -1376,19 +1449,23 @@ describe("an Admin dismissing finding groups as not special category", () => {
 
 const reprocessAsAdmin = (
   scenario: Scenario,
-  bindingId: string,
-  reason: z.input<typeof reprocessBindingInput>["reason"],
+  connectedSourceId: string,
+  reason: z.input<typeof reprocessConnectedSourceInput>["reason"],
 ) =>
   acting(scenario.admin, (principal, tx) =>
-    reprocessBinding(
+    reprocessConnectedSource(
       principal,
       tx,
-      inputOf(reprocessBindingInput, { workspaceId: scenario.workspaceId, bindingId, reason }),
+      inputOf(reprocessConnectedSourceInput, {
+        workspaceId: scenario.workspaceId,
+        connectedSourceId,
+        reason,
+      }),
     ),
   );
 
 describe("a bulk act handed no finding group at all", () => {
-  const A_BINDING = "01J6NNNNNNNNNNNNNNNNNNNNN1";
+  const A_CONNECTED_SOURCE = "01J6NNNNNNNNNNNNNNNNNNNNN1";
 
   const EMPTY_LIST = {
     ok: false,
@@ -1398,7 +1475,7 @@ describe("a bulk act handed no finding group at all", () => {
   it("names an empty list for a keep", () => {
     expect(
       parse(keepInTextInput, {
-        bindingId: A_BINDING,
+        connectedSourceId: A_CONNECTED_SOURCE,
         findingGroups: [],
         reason: BUSINESS_FACT,
       }),
@@ -1406,15 +1483,15 @@ describe("a bulk act handed no finding group at all", () => {
   });
 
   it("names an empty list for a narrowing", () => {
-    expect(parse(narrowDocumentsInput, { bindingId: A_BINDING, findingGroups: [] })).toEqual(
-      EMPTY_LIST,
-    );
+    expect(
+      parse(narrowDocumentsInput, { connectedSourceId: A_CONNECTED_SOURCE, findingGroups: [] }),
+    ).toEqual(EMPTY_LIST);
   });
 
   it("names an empty list for a dismissal", () => {
     expect(
       parse(dismissAsNotSpecialCategoryInput, {
-        bindingId: A_BINDING,
+        connectedSourceId: A_CONNECTED_SOURCE,
         findingGroups: [],
         reason: NOT_HEALTH_DATA,
       }),
@@ -1425,12 +1502,12 @@ describe("a bulk act handed no finding group at all", () => {
 describe("the reprocess that follows a review", () => {
   it("takes unmarked findings away with the chunks", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
     await findingIn(scenario.workspaceId, first.documentId, { category: "government-id" });
     await findingIn(scenario.workspaceId, second.documentId);
 
-    const outcome = await reprocessAsAdmin(scenario, bindingId, "rule-change");
+    const outcome = await reprocessAsAdmin(scenario, connectedSourceId, "rule-change");
 
     expect(outcome).toMatchObject({ ok: true, value: { chunks: 2, findings: 3 } });
     expect(await findingCountOf(scenario.workspaceId, first.documentId)).toBe(0);
@@ -1440,8 +1517,8 @@ describe("the reprocess that follows a review", () => {
   it("leaves a kept span whole and takes the unmarked one", async () => {
     const scenario = await arrange();
 
-    const { bindingId, kept, left } = await keepingTwoGroupsOfThree(scenario);
-    const outcome = await reprocessAsAdmin(scenario, bindingId, "rule-change");
+    const { connectedSourceId, kept, left } = await keepingTwoGroupsOfThree(scenario);
+    const outcome = await reprocessAsAdmin(scenario, connectedSourceId, "rule-change");
 
     expect(outcome).toMatchObject({ ok: true, value: { findings: 1 } });
     expect(await restoreOf(scenario.workspaceId, kept)).toEqual({
@@ -1455,17 +1532,17 @@ describe("the reprocess that follows a review", () => {
     expect(await marksOf(scenario.workspaceId, left)).toBeUndefined();
   });
 
-  it.each(REASONS_EMPTYING_THE_BINDING)(
+  it.each(REASONS_EMPTYING_THE_CONNECTED_SOURCE)(
     "hands the keep's still-queued run the reason %s",
     async (reason) => {
       const scenario = await arrange();
-      const { bindingId } = await keepingTwoGroupsOfThree(scenario);
+      const { connectedSourceId } = await keepingTwoGroupsOfThree(scenario);
 
-      const outcome = await reprocessAsAdmin(scenario, bindingId, reason);
+      const outcome = await reprocessAsAdmin(scenario, connectedSourceId, reason);
 
       expect(outcome).toMatchObject({ ok: true, value: { chunks: 2 } });
       expect(await jobsOf(scenario.workspaceId)).toEqual([
-        { kind: "index", reason, subject_id: bindingId },
+        { kind: "index", reason, subject_id: connectedSourceId },
       ]);
     },
   );
@@ -1483,7 +1560,7 @@ describe("the reprocess that follows a review", () => {
     ],
   ] as const)("spares a finding %s", async (_how, marks, actorColumn) => {
     const scenario = await arrange();
-    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const marked = await seededBy(db(), async (seed) => {
       const row = await seed.finding({
         workspaceId: scenario.workspaceId,
@@ -1494,19 +1571,21 @@ describe("the reprocess that follows a review", () => {
       return row.id;
     });
 
-    const outcome = await reprocessAsAdmin(scenario, bindingId, "wiped");
+    const outcome = await reprocessAsAdmin(scenario, connectedSourceId, "wiped");
 
     expect(outcome).toMatchObject({ ok: true, value: { findings: 0 } });
     expect(await marksOf(scenario.workspaceId, marked)).toBeDefined();
   });
 
-  it("leaves another binding's findings where they are", async () => {
+  it("leaves another connected source's findings where they are", async () => {
     const scenario = await arrange();
-    const { bindingId } = await bindingWithTwoDocuments(scenario);
-    const elsewhere = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
+    const { connectedSourceId } = await connectedSourceWithTwoDocuments(scenario);
+    const elsewhere = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Internal",
+    });
     await findingIn(scenario.workspaceId, elsewhere.documentId);
 
-    await reprocessAsAdmin(scenario, bindingId, "rule-change");
+    await reprocessAsAdmin(scenario, connectedSourceId, "rule-change");
 
     expect(await findingCountOf(scenario.workspaceId, elsewhere.documentId)).toBe(1);
   });

@@ -18,12 +18,12 @@ C4Component
     Component(llm, "llm", "model choice rows", "listModelChoices over model_choice; the llm_call ledger and the fetch-shaped model client planned S2")
     Component(audit, "audit", "insert-only audit log", "The one append-only audit log: the typed event vocabulary, two doors, four families")
 
-    Component(sources, "sources", "slice", "Bind, publish, narrow, widen; the review acts; reprocess; the DPIA input; passages; the upload sweep")
+    Component(sources, "sources", "slice", "Connect, publish, narrow, widen; the review acts; reprocess; the DPIA input; passages; the upload sweep")
     Component(concepts, "concepts", "slice", "The write path, the inbox, the loader, the reconciler, visibility and the cascade's first level, map maintenance")
     Component(answering, "answering", "slice", "find, ask, open, give_feedback; S2 re-seams ask as plan, draft, record")
     Component(guides, "guides", "slice", "Compositions and includes, recomputed as the cascade's second level; definitions and sections at S3")
     Component(erasure, "erasure", "slice", "Subject requests, the erasure map, suppressions, the routine, replay on restore, the rehearsal; the top of the slice graph")
-    Component(runs, "runs", "slice", "enqueueJobIn in the act's transaction, one queued index job per binding; job and run views")
+    Component(runs, "runs", "slice", "enqueueJobIn in the act's transaction, one queued index job per connected source; job and run views")
     Component(workspaces, "workspaces", "slice", "Provisioning and first membership under the platform principal, the picker's read, the workspace list")
     Component(members, "members", "slice", "Groups and their memberships, access requests; the People acts at P1")
     Component(sweeps, "sweeps", "slice", "The daily sweep pass over every workspace under session lock 42; one sweep_pass row a pass")
@@ -39,7 +39,7 @@ C4Component
   Rel(api, sweeps, "Runs the pass through")
 
   Rel(erasure, concepts, "Moves bundle commits and checks through")
-  Rel(erasure, sources, "Wipes the bindings holding found documents through")
+  Rel(erasure, sources, "Wipes the connected sources holding found documents through")
   Rel(erasure, runs, "Queues the map's full rebuild through")
   Rel(erasure, gitdoor, "Rewrites history through")
   Rel(erasure, objdoor, "Writes replay copies through")
@@ -95,7 +95,7 @@ Enforced by one plugin rule, `better-answers/import-direction` (`packages/devtoo
 | `members` | `group`, `group_member`, `access_request` |
 | `llm` | `model_choice`; `llm_call` at S2 |
 | `audit` | `audit_event` |
-| `sources` | `source_binding`, `source_document`, `finding`, `index.chunk` |
+| `sources` | `connected_source`, `source_document`, `finding`, `index.chunk` |
 | `concepts` | `concept_identity`, `concept_index`, `bundle_commit`, `evidence`, `concept_evidence`, `concept_verification`, `concept_class_override`, `suggestion`, `concept_write_request`, `map_generation`, `map_node`, `map_edge`; `concept_owner` at S3 |
 | `guides` | `composition`, `composition_include`; definitions, sections and versions at S3 |
 | `erasure` | `subject_request`, `erasure_request`, `suppression` |
@@ -109,5 +109,5 @@ The map is the TypeScript tier's. The worker is in no row: it writes `finding` r
 
 - **S2 splits `ask` into three functions**: `planAnswer(principal, tx, question)` in the resolving transaction, `draftAnswer(plan, model)` an async generator holding no transaction, `recordAnswer(principal, tx, plan, drafted)` in a second short transaction — the review's one blocking finding. The map door's `walkFrom` takes a set with one shared cap and a per-statement timeout (ADR 0023, amended 2026-09-10).
 - **S3 makes `concept_owner` a table on `concepts`**, keyed against `concept_identity` with a per-domain default; exports `attachedByIri()` and `versionColumns()` from `packages/schema`; declares `COMPOSITION_HOMES = ["section", "response"]` so S6 adds a writer and never a migration (ADR 0014, amended 2026-09-10).
-- **The class at publish (T-370) and the widen act (T-371)**, as the owner ruled on 24/09/2026. The binding stores the class the Admin typed at bind (Restricted and everyone when none is typed); every derivation counts an unpublished binding as Restricted, so the concepts citing it land Restricted; `publishBinding` records the class and audience it releases on its audit event and cascades that class to the citing concepts and their compositions, keeping a concept the reconciler pinned Restricted where it is (T-370). `widenBinding` moves a binding, published or not, to a wider class, audience or both: it records the pair it moved from and to on its audit event, runs the same cascade, refuses `not-wider` and, while a special-category finding the last run raised is unreviewed, `special-category-unreviewed`, and never moves a document's own narrower class (T-371).
-- **T-366 gives `erasure` its documents.** Since T-375 a suppression is the workspace's, one row per request holding the request's identifiers and the person's sign-in addresses, and recording refuses an identifier too broad to withhold (`identifier-too-broad`). Since T-376 the seam withholds every exact, case-folded occurrence of a suppression's identifiers, and recording measures an identifier against the floor by the `erasure-match` agreement both tiers read. Since T-377 the erasure map's `source-document` finder names the live documents whose indexed text holds one of the identifiers the suppression holds, probing the full-text index and checking each candidate under that agreement, so the routine wipes and re-indexes their bindings now.
+- **The class at publish (T-370) and the widen act (T-371)**, as the owner ruled on 24/09/2026. The connected source stores the class the Admin typed at connect (Restricted and everyone when none is typed); every derivation counts an unpublished connected source as Restricted, so the concepts citing it land Restricted; `publishConnectedSource` records the class and audience it releases on its audit event and cascades that class to the citing concepts and their compositions, keeping a concept the reconciler pinned Restricted where it is (T-370). `widenConnectedSource` moves a connected source, published or not, to a wider class, audience or both: it records the pair it moved from and to on its audit event, runs the same cascade, refuses `not-wider` and, while a special-category finding the last run raised is unreviewed, `special-category-unreviewed`, and never moves a document's own narrower class (T-371).
+- **T-366 gives `erasure` its documents.** Since T-375 a suppression is the workspace's, one row per request holding the request's identifiers and the person's sign-in addresses, and recording refuses an identifier too broad to withhold (`identifier-too-broad`). Since T-376 the seam withholds every exact, case-folded occurrence of a suppression's identifiers, and recording measures an identifier against the floor by the `erasure-match` agreement both tiers read. Since T-377 the erasure map's `source-document` finder names the live documents whose indexed text holds one of the identifiers the suppression holds, probing the full-text index and checking each candidate under that agreement, so the routine wipes and re-indexes their connected sources now.

@@ -26,7 +26,7 @@ import {
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import { actorIdOf, type Result, type UserPrincipal } from "../src/kernel/index.ts";
-import { narrowBinding, narrowBindingInput } from "../src/sources/index.ts";
+import { narrowConnectedSource, narrowConnectedSourceInput } from "../src/sources/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   bundleHistory,
@@ -37,7 +37,7 @@ import {
   objectRemovedFrom,
   removeRepository,
 } from "./bundle.ts";
-import { bindingHolding, publishedOnceIndexed } from "./sourced-concept.ts";
+import { connectedSourceHolding, publishedOnceIndexed } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -533,8 +533,8 @@ describe("a re-write whose rows were lost", () => {
 
   it("lands Restricted, flagged in its audit event, when sources differ", async () => {
     const scenario = await arrange();
-    const internal = await bindingHolding(db(), scenario.workspaceId);
-    const restricted = await bindingHolding(db(), scenario.workspaceId, {
+    const internal = await connectedSourceHolding(db(), scenario.workspaceId);
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Restricted",
     });
     const input = guideline("Allowances", {
@@ -582,11 +582,11 @@ describe("a re-write whose rows were lost", () => {
 
   it("stays Restricted through publish and narrowing cascades, unlike its neighbour", async () => {
     const scenario = await arrange();
-    const website = await bindingHolding(db(), scenario.workspaceId, {
+    const website = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Public",
       publishedAt: null,
     });
-    const restricted = await bindingHolding(db(), scenario.workspaceId, {
+    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Restricted",
     });
     const citingTheWebsite = (title: string) =>
@@ -619,7 +619,7 @@ describe("a re-write whose rows were lost", () => {
       ),
     ).toEqual([false]);
 
-    const published = await publishedOnceIndexed(db(), scenario.admin, website.bindingId);
+    const published = await publishedOnceIndexed(db(), scenario.admin, website.connectedSourceId);
 
     expect(published.ok).toBe(true);
     expect(await sensitivitiesOf(scenario.workspaceId, [first.iri, beside.iri])).toEqual([
@@ -628,11 +628,11 @@ describe("a re-write whose rows were lost", () => {
     ]);
 
     const narrowed = await readingAs(db().runtimePool, scenario.admin, (admin, tx) =>
-      narrowBinding(
+      narrowConnectedSource(
         admin,
         tx,
-        inputOf(narrowBindingInput, {
-          bindingId: website.bindingId,
+        inputOf(narrowConnectedSourceInput, {
+          connectedSourceId: website.connectedSourceId,
           sensitivity: "Internal",
           audience: "everyone",
         }),
@@ -648,8 +648,10 @@ describe("a re-write whose rows were lost", () => {
 
   it("is replayed though its author may no longer read it", async () => {
     const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId);
-    const cited = [{ sourceDocumentId: binding.documentId, locator: "p.1", resource: "Handbook" }];
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+    const cited = [
+      { sourceDocumentId: connectedSource.documentId, locator: "p.1", resource: "Handbook" },
+    ];
     const input = guideline("Hospitality", { evidence: cited });
     const first = await landed(scenario, scenario.editor, input);
     const body = "# Hospitality\n\nA meal a day, receipted.";
@@ -661,11 +663,11 @@ describe("a re-write whose rows were lost", () => {
     });
 
     const narrowed = await readingAs(db().runtimePool, scenario.admin, (admin, tx) =>
-      narrowBinding(
+      narrowConnectedSource(
         admin,
         tx,
-        inputOf(narrowBindingInput, {
-          bindingId: binding.bindingId,
+        inputOf(narrowConnectedSourceInput, {
+          connectedSourceId: connectedSource.connectedSourceId,
           sensitivity: "Restricted",
           audience: "everyone",
         }),

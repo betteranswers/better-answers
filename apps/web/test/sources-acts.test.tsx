@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
-import { SAID_OF_A_BINDING } from "@/features/sources/refusal-words.ts";
+import { SAID_OF_A_CONNECTED_SOURCE } from "@/features/sources/refusal-words.ts";
 import { refusedFor } from "@/features/sources/refusal.tsx";
 import {
   DismissAsNotSpecialCategoryAct,
@@ -15,9 +15,9 @@ import { ViewStateSlot } from "@/shared/page-toolbar.tsx";
 
 afterEach(cleanup);
 
-const THE_BINDING = "01K5T0000000000000000BIND1";
+const THE_CONNECTED_SOURCE = "01K5T0000000000000000BIND1";
 
-const ANOTHER_BINDING = "01K5T0000000000000000BIND2";
+const ANOTHER_CONNECTED_SOURCE = "01K5T0000000000000000BIND2";
 
 const BANK_DETAILS: FindingGroup = {
   documentId: "01K5T00000000000000000DOC1",
@@ -45,15 +45,15 @@ const HEALTH_CUE: FindingGroup = {
   dismissed: 0,
 };
 
-const { why, next } = SAID_OF_A_BINDING["not-special-category"];
+const { why, next } = SAID_OF_A_CONNECTED_SOURCE["not-special-category"];
 
 const NOT_SPECIAL_CATEGORY = `${why} ${next}`;
 
 /** The review's half of the slot, standing in for the findings table a click writes through. */
-function TicksIn(properties: { readonly bindingId: string }) {
+function TicksIn(properties: { readonly connectedSourceId: string }) {
   const [, tick] = useTickedGroups();
   const ticking = (groups: readonly FindingGroup[]) => () => {
-    tick({ bindingId: properties.bindingId, groups });
+    tick({ connectedSourceId: properties.connectedSourceId, groups });
   };
   return (
     <>
@@ -70,14 +70,14 @@ function TicksIn(properties: { readonly bindingId: string }) {
   );
 }
 
-const reviewing = (bindingId: string, tickedIn: string) =>
+const reviewing = (connectedSourceId: string, tickedIn: string) =>
   render(
     <Providers clients={createAppClients()}>
       <ViewStateSlot>
-        <TicksIn bindingId={tickedIn} />
-        <KeepInTextAct bindingId={bindingId} />
-        <NarrowDocumentsAct bindingId={bindingId} />
-        <DismissAsNotSpecialCategoryAct bindingId={bindingId} />
+        <TicksIn connectedSourceId={tickedIn} />
+        <KeepInTextAct connectedSourceId={connectedSourceId} />
+        <NarrowDocumentsAct connectedSourceId={connectedSourceId} />
+        <DismissAsNotSpecialCategoryAct connectedSourceId={connectedSourceId} />
       </ViewStateSlot>
     </Providers>,
   );
@@ -86,7 +86,7 @@ const act = (name: string) => screen.getByRole<HTMLButtonElement>("button", { na
 
 describe("the review's three bulk acts", () => {
   it("stand disabled until the review ticks a finding group", () => {
-    reviewing(THE_BINDING, THE_BINDING);
+    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
     expect(act("Keep in text").disabled).toBe(true);
     expect(act("Narrow these documents").disabled).toBe(true);
@@ -95,7 +95,7 @@ describe("the review's three bulk acts", () => {
   });
 
   it("name the ticked groups kept and documents narrowed", () => {
-    reviewing(THE_BINDING, THE_BINDING);
+    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
     fireEvent.click(act("Tick bank details"));
 
@@ -103,8 +103,8 @@ describe("the review's three bulk acts", () => {
     expect(act("Narrow 1 document").disabled).toBe(false);
   });
 
-  it("never take groups another binding's review ticked", () => {
-    reviewing(THE_BINDING, ANOTHER_BINDING);
+  it("never take groups another connected source's review ticked", () => {
+    reviewing(THE_CONNECTED_SOURCE, ANOTHER_CONNECTED_SOURCE);
 
     fireEvent.click(act("Tick the health cue"));
 
@@ -116,7 +116,7 @@ describe("the review's three bulk acts", () => {
 
 describe("the dismissal as not special category", () => {
   it("is offered over ticked special category groups alone", () => {
-    reviewing(THE_BINDING, THE_BINDING);
+    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
     fireEvent.click(act("Tick the health cue"));
 
@@ -125,7 +125,7 @@ describe("the dismissal as not special category", () => {
   });
 
   it("stands disabled over a mixed selection, and says why", () => {
-    reviewing(THE_BINDING, THE_BINDING);
+    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
     fireEvent.click(act("Tick both"));
 
@@ -138,7 +138,7 @@ describe("the dismissal as not special category", () => {
   });
 
   it("opens on s, asking a reason and naming no finding", () => {
-    reviewing(THE_BINDING, THE_BINDING);
+    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
     fireEvent.click(act("Tick the health cue"));
 
     fireEvent.keyDown(document.body, { key: "s" });

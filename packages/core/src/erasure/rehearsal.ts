@@ -11,7 +11,7 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { bindUpload, bindUploadFields } from "../sources/index.ts";
+import { connectUpload, connectUploadFields } from "../sources/index.ts";
 import { head } from "../store/git/index.ts";
 import {
   withIdentityRead,
@@ -48,7 +48,7 @@ type SyntheticSubject = {
 };
 
 type SeededDocument = {
-  readonly bindingId: string;
+  readonly connectedSourceId: string;
   readonly documentId: string;
 
   readonly indexJobId: string;
@@ -77,10 +77,10 @@ const CONCEPT_BODY =
   "The drill's synthetic note. It names the rehearsal's subject in the frontmatter's " +
   "`verified` entry and nowhere else, because that is the one form an erasure rewrites.";
 
-const DOCUMENT_BINDING = "Erasure rehearsal";
+const DOCUMENT_CONNECTED_SOURCE = "Erasure rehearsal";
 
 /**
- * Named for the subject, so a re-run finds its binding and a subject seeded after an erasure
+ * Named for the subject, so a re-run finds its connected source and a subject seeded after an erasure
  * gets a document naming them.
  */
 const documentFileOf = (subject: SyntheticSubject): string =>
@@ -201,20 +201,20 @@ const conceptSeeded = async (
   return err(new Error(`erasure: the rehearsal's concept was refused: ${String(written.error)}`));
 };
 
-const bindingHolding = (
+const connectedSourceHolding = (
   platform: ErasurePrincipal,
   door: PostgresDoor,
   workspaceId: string,
   fileName: string,
 ): Promise<string | undefined> =>
   withScope(platform, door, workspaceId, async (tx) => {
-    const found = await tx.query<{ binding_id: string }>(
-      `SELECT binding_id FROM source_document
+    const found = await tx.query<{ connected_source_id: string }>(
+      `SELECT connected_source_id FROM source_document
         WHERE workspace_id = $1 AND source_system_id = $2
-        ORDER BY binding_id LIMIT 1`,
+        ORDER BY connected_source_id LIMIT 1`,
       [workspaceId, fileName],
     );
-    return found.rows[0]?.binding_id;
+    return found.rows[0]?.connected_source_id;
   });
 
 const documentSeeded = async (
@@ -225,15 +225,15 @@ const documentSeeded = async (
 ): Promise<Result<SeededDocument, Error>> => {
   const fileName = documentFileOf(subject);
   const standing = await attempt(() =>
-    bindingHolding(platform, doors.postgres, writer.workspaceId, fileName),
+    connectedSourceHolding(platform, doors.postgres, writer.workspaceId, fileName),
   );
   if (!standing.ok) return err(standing.error);
   const text = new TextEncoder().encode(documentNaming(subject));
-  const bound = await bindUpload(writer, doors, {
-    ...bindUploadFields.parse({
-      // A re-run binds under the standing id, which the bind answers with its first outcome.
-      bindingId: standing.value ?? ulid(),
-      name: DOCUMENT_BINDING,
+  const bound = await connectUpload(writer, doors, {
+    ...connectUploadFields.parse({
+      // A re-run connects under the standing id, which the connect answers with its first outcome.
+      connectedSourceId: standing.value ?? ulid(),
+      name: DOCUMENT_CONNECTED_SOURCE,
       fileName,
       mediaType: "text/markdown",
       byteSize: text.byteLength,
@@ -244,14 +244,14 @@ const documentSeeded = async (
     return err(new Error(`erasure: the rehearsal's document was refused: ${String(bound.error)}`));
   }
   return ok({
-    bindingId: bound.value.bindingId,
+    connectedSourceId: bound.value.connectedSourceId,
     documentId: bound.value.documentId,
     indexJobId: bound.value.jobId,
   });
 };
 
 /* jscpd:ignore-start */
-/** A rerun finds the person, membership, concept and binding the first run seeded. */
+/** A rerun finds the person, membership, concept and connected source the first run seeded. */
 export const seedSyntheticSubject = async (
   platform: ErasurePrincipal,
   doors: ErasureDoors,

@@ -276,7 +276,7 @@ const NAMES_IN = {
   invitation:
     "SELECT id, email AS name FROM invitation WHERE workspace_id = $1 AND id = ANY($2::text[])",
   "connected-source":
-    "SELECT id, name FROM source_binding WHERE workspace_id = $1 AND id = ANY($2::text[])",
+    "SELECT id, name FROM connected_source WHERE workspace_id = $1 AND id = ANY($2::text[])",
   document:
     "SELECT id, title AS name FROM source_document WHERE workspace_id = $1 AND id = ANY($2::text[])",
   concept:

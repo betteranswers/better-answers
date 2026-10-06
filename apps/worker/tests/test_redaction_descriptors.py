@@ -210,7 +210,7 @@ def test_the_twenty_seventh_name_keeps_the_shape_the_agreement_pins() -> None:
     shape = re.compile(agreement()["placeholder_shape"])
     met_in_order = [f"Person Number {index}" for index in range(27)]
 
-    letters = pseudonyms_for(met_in_order, "a-binding-seed")
+    letters = pseudonyms_for(met_in_order, "a-connected-source-seed")
 
     assert len(letters) == 27
     first = letters[normalised(met_in_order[0])]

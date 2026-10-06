@@ -95,9 +95,9 @@ const restingOn = (row: SourcedVisibilityRow): readonly Visibility[] => [
 ];
 
 /**
- * Derives the class from the bindings and documents the concept cites, or from `citing` in
+ * Derives the class from the connected sources and documents the concept cites, or from `citing` in
  * place of its standing citations. `alsoOn` adds classes, `onTheRow` adds its index row locked
- * for update, and an override wins outright. Share-locks each binding it reads.
+ * for update, and an override wins outright. Share-locks each connected source it reads.
  */
 export const conceptVisibilityFrom = async (
   principal: Principal,
@@ -119,20 +119,20 @@ export const conceptVisibilityFrom = async (
       ? {
           clause: `FROM concept_evidence ce
              JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
-             JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
+             JOIN connected_source b ON b.workspace_id = d.workspace_id AND b.id = d.connected_source_id
             WHERE ce.workspace_id = ${scopeClause(1)} AND ce.iri = $2`,
           parameters: [scopeParameter(principal), concept.iri],
         }
       : {
           clause: `FROM source_document d
-             JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
+             JOIN connected_source b ON b.workspace_id = d.workspace_id AND b.id = d.connected_source_id
             WHERE d.workspace_id = ${scopeClause(1)} AND d.id = ANY($2::text[])`,
           parameters: [scopeParameter(principal), [...new Set(concept.citing)]],
         };
   // A statement that waited on a lock still reads unlocked rows at its first snapshot, so the
   // document's class is read in the next.
   await tx.query(`SELECT 1 ${rowsCited.clause} FOR SHARE OF b`, rowsCited.parameters);
-  const bindings = await tx.query<SourcedVisibilityRow>(
+  const connectedSources = await tx.query<SourcedVisibilityRow>(
     `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity,
             b.published_at IS NOT NULL AS published
        ${rowsCited.clause}`,
@@ -141,7 +141,7 @@ export const conceptVisibilityFrom = async (
   const override = await overrideOf(principal, tx, concept.iri);
 
   /**
-   * After the bindings, never before: taking this row first is the one order that deadlocks
+   * After the connected sources, never before: taking this row first is the one order that deadlocks
    * with a narrowing.
    */
   const row =
@@ -155,7 +155,7 @@ export const conceptVisibilityFrom = async (
   return derivedVisibility({
     kind: concept.kind,
     from: [
-      ...bindings.rows.flatMap(restingOn),
+      ...connectedSources.rows.flatMap(restingOn),
       ...(concept.alsoOn ?? []),
       ...(row?.rows ?? []).map(visibilityOf),
     ],
@@ -229,22 +229,25 @@ const recomputeConceptVisibility = async (
 };
 
 /**
- * Recomputes each indexed concept citing the binding's documents, or only those among
+ * Recomputes each indexed concept citing the connected source's documents, or only those among
  * `documentIds`, and returns every one, whether or not its class moved.
  */
 export const recomputeVisibilitySourcedFrom = async (
   principal: Principal,
   tx: Tx,
-  input: { readonly bindingId: string; readonly documentIds?: readonly string[] | undefined },
+  input: {
+    readonly connectedSourceId: string;
+    readonly documentIds?: readonly string[] | undefined;
+  },
 ): Promise<readonly string[]> => {
   const citing = await tx.query<{ iri: string }>(
     `SELECT DISTINCT ce.iri
        FROM concept_evidence ce
        JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
-      WHERE ce.workspace_id = ${scopeClause(1)} AND d.binding_id = $2
+      WHERE ce.workspace_id = ${scopeClause(1)} AND d.connected_source_id = $2
         AND ($3::text[] IS NULL OR d.id = ANY($3::text[]))
       ORDER BY ce.iri`,
-    [scopeParameter(principal), input.bindingId, input.documentIds ?? null],
+    [scopeParameter(principal), input.connectedSourceId, input.documentIds ?? null],
   );
   const recomputed: string[] = [];
   for (const { iri } of citing.rows) {
@@ -431,7 +434,7 @@ export const evidencePaneOf = async (
          LEFT JOIN (evidence e
                     JOIN source_document d
                       ON d.workspace_id = e.workspace_id AND d.id = e.source_document_id
-                    JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id)
+                    JOIN connected_source b ON b.workspace_id = d.workspace_id AND b.id = d.connected_source_id)
                 ON e.workspace_id = ce.workspace_id AND e.source_document_id = ce.source_document_id
                AND e.locator = ce.locator AND ${readableClause("b", 3)}
         WHERE c.workspace_id = $1 AND c.iri = $2 AND ${readableClause("c", 3)}

@@ -43,7 +43,7 @@ The agreements live in top-level `contracts/`, listed in `contracts/manifest.jso
 - `document-chunk`: the derived chunk id, the locator's span in code points, and how chunk rows partition a text.
 - `upload-media-types`: the media types an upload is admitted under.
 - `citation`: the patterns each tier's comment gate refuses.
-- `emptying-a-binding`: the reasons on an index job that empty its binding.
+- `emptying-a-connected-source`: the reasons on an index job that empty its connected source.
 - `erasure-match`: what counts as an occurrence of a suppressed identifier.
 
 All but the first four are fixtured.
@@ -52,7 +52,7 @@ Each agreement is proved by both tiers' suites from its own side, in `packages/c
 
 The contract's version is a digest of `contracts/`, which each tier computes at build. `migrate` stamps it, and the worker compares its own beside the schema stamp. A mismatch refuses the claim. Editing a fixture edits no version number. The worker also claims no job while its schema stamp does not match the migration journal.
 
-The read predicate's logic is api-only. The worker's reads are a producer's reads and are never filtered by it. `visibility-columns` has retired: a chunk row carries none of the terms it named, since a chunk's visibility is read from its binding and its document (ADR 0044). What the worker writes on a map element it lands is left to the route block that first lands one. The full map rebuild is the worker's.
+The read predicate's logic is api-only. The worker's reads are a producer's reads and are never filtered by it. `visibility-columns` has retired: a chunk row carries none of the terms it named, since a chunk's visibility is read from its connected source and its document (ADR 0044). What the worker writes on a map element it lands is left to the route block that first lands one. The full map rebuild is the worker's.
 
 ## Why
 

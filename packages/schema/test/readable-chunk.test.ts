@@ -55,7 +55,7 @@ const seenBy = async (
 
 type Arrangement = {
   readonly workspaceId?: string;
-  readonly bindingClass?: string | undefined;
+  readonly connectedSourceClass?: string | undefined;
   readonly documentClass?: string | null | undefined;
   readonly audience?: string | undefined;
   readonly audienceGroups?: readonly string[] | undefined;
@@ -63,31 +63,36 @@ type Arrangement = {
   readonly withoutADocument?: boolean | undefined;
 };
 
-const bindingArranged = (workspaceId: string, arrangement: Arrangement) => ({
+const connectedSourceArranged = (workspaceId: string, arrangement: Arrangement) => ({
   workspaceId,
-  sensitivity: arrangement.bindingClass ?? "Internal",
+  sensitivity: arrangement.connectedSourceClass ?? "Internal",
   audience: arrangement.audience ?? AUDIENCE_EVERYONE,
   audienceGroups: arrangement.audienceGroups ? [...arrangement.audienceGroups] : null,
   publishedAt: arrangement.publishedAt === undefined ? new Date() : arrangement.publishedAt,
 });
 
-const aChunkUnderABinding = async (client: pg.PoolClient, arrangement: Arrangement = {}) => {
+const aChunkUnderAConnectedSource = async (
+  client: pg.PoolClient,
+  arrangement: Arrangement = {},
+) => {
   const workspaceId = arrangement.workspaceId ?? WS_A;
   const seed = testData(client);
-  const binding = await seed.sourceBinding(bindingArranged(workspaceId, arrangement));
+  const connectedSource = await seed.connectedSource(
+    connectedSourceArranged(workspaceId, arrangement),
+  );
   const document = arrangement.withoutADocument
     ? undefined
     : await seed.sourceDocument({
         workspaceId,
-        bindingId: binding.id,
+        connectedSourceId: connectedSource.id,
         sensitivity: arrangement.documentClass ?? null,
       });
   const chunk = await seed.chunk({
     workspaceId,
-    bindingId: binding.id,
+    connectedSourceId: connectedSource.id,
     sourceDocumentId: document?.id ?? null,
   });
-  return { binding, document, chunk };
+  return { connectedSource, document, chunk };
 };
 
 const twoWorkspaces = async (client: pg.PoolClient): Promise<void> => {
@@ -111,42 +116,42 @@ const columnsOf = async (relation: string): Promise<readonly string[]> => {
 };
 
 const THE_FOLD = [
-  { binding: "Restricted", document: "Restricted", narrower: "Restricted", viewer: false },
-  { binding: "Restricted", document: "Internal", narrower: "Restricted", viewer: false },
-  { binding: "Restricted", document: "Public", narrower: "Restricted", viewer: false },
-  { binding: "Internal", document: "Restricted", narrower: "Restricted", viewer: false },
-  { binding: "Internal", document: "Internal", narrower: "Internal", viewer: true },
-  { binding: "Internal", document: "Public", narrower: "Internal", viewer: true },
-  { binding: "Public", document: "Restricted", narrower: "Restricted", viewer: false },
-  { binding: "Public", document: "Internal", narrower: "Internal", viewer: true },
-  { binding: "Public", document: "Public", narrower: "Public", viewer: true },
+  { connectedSource: "Restricted", document: "Restricted", narrower: "Restricted", viewer: false },
+  { connectedSource: "Restricted", document: "Internal", narrower: "Restricted", viewer: false },
+  { connectedSource: "Restricted", document: "Public", narrower: "Restricted", viewer: false },
+  { connectedSource: "Internal", document: "Restricted", narrower: "Restricted", viewer: false },
+  { connectedSource: "Internal", document: "Internal", narrower: "Internal", viewer: true },
+  { connectedSource: "Internal", document: "Public", narrower: "Internal", viewer: true },
+  { connectedSource: "Public", document: "Restricted", narrower: "Restricted", viewer: false },
+  { connectedSource: "Public", document: "Internal", narrower: "Internal", viewer: true },
+  { connectedSource: "Public", document: "Public", narrower: "Public", viewer: true },
 ] as const;
 
 const THE_DOCUMENT_NAMES_NO_CLASS = [
-  { binding: "Restricted", document: null, narrower: "Restricted", viewer: false },
-  { binding: "Internal", document: null, narrower: "Internal", viewer: true },
-  { binding: "Public", document: null, narrower: "Public", viewer: true },
+  { connectedSource: "Restricted", document: null, narrower: "Restricted", viewer: false },
+  { connectedSource: "Internal", document: null, narrower: "Internal", viewer: true },
+  { connectedSource: "Public", document: null, narrower: "Public", viewer: true },
 ] as const;
 
 const A_WORD_OUTSIDE_THE_SET = [
-  { binding: "Secret", document: "Public", narrower: null },
-  { binding: "Public", document: "Secret", narrower: null },
-  { binding: "Secret", document: null, narrower: null },
-  { binding: null, document: "Public", narrower: null },
-  { binding: null, document: null, narrower: null },
+  { connectedSource: "Secret", document: "Public", narrower: null },
+  { connectedSource: "Public", document: "Secret", narrower: null },
+  { connectedSource: "Secret", document: null, narrower: null },
+  { connectedSource: null, document: "Public", narrower: null },
+  { connectedSource: null, document: null, narrower: null },
 ] as const;
 
 const THE_FOLD_AT_ITS_EDGES = [...THE_DOCUMENT_NAMES_NO_CLASS, ...A_WORD_OUTSIDE_THE_SET];
 
 const folded = async (
   client: pg.PoolClient,
-  pairs: readonly { readonly binding: string | null; readonly document: string | null }[],
+  pairs: readonly { readonly connectedSource: string | null; readonly document: string | null }[],
 ): Promise<readonly (string | null)[]> => {
   const answered = await client.query<{ narrower: string | null }>(
     `SELECT narrower_class(pair.a, pair.b) AS narrower
        FROM unnest($1::text[], $2::text[]) WITH ORDINALITY AS pair(a, b, at)
       ORDER BY pair.at`,
-    [pairs.map((pair) => pair.binding), pairs.map((pair) => pair.document)],
+    [pairs.map((pair) => pair.connectedSource), pairs.map((pair) => pair.document)],
   );
   return answered.rows.map((row) => row.narrower);
 };
@@ -158,7 +163,7 @@ describe("the one SQL statement of the class ranking", () => {
     });
   });
 
-  it("answers the binding's class alone, and null for unknown words", async () => {
+  it("answers the source's class alone, and null for unknown words", async () => {
     await withRollback(db().pool, async (client) => {
       expect(await folded(client, THE_FOLD_AT_ITS_EDGES)).toEqual(
         THE_FOLD_AT_ITS_EDGES.map((pair) => pair.narrower),
@@ -167,7 +172,7 @@ describe("the one SQL statement of the class ranking", () => {
   });
 
   it("ranks the three classes this package declares and no fourth", () => {
-    const ranked = new Set(THE_FOLD.flatMap((pair) => [pair.binding, pair.document]));
+    const ranked = new Set(THE_FOLD.flatMap((pair) => [pair.connectedSource, pair.document]));
 
     expect([...ranked].toSorted()).toEqual([...SENSITIVITIES].toSorted());
   });
@@ -185,7 +190,7 @@ describe("the one SQL statement of the class ranking", () => {
   it("serves the worker, which still cannot read the view", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      await aChunkUnderABinding(client, { bindingClass: "Public" });
+      await aChunkUnderAConnectedSource(client, { connectedSourceClass: "Public" });
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
@@ -240,20 +245,20 @@ describe("the shape the view presents", () => {
 
   // From the definition, not a plan: at this suite's row counts a sequential scan is the
   // right plan whether or not the workspace id prunes.
-  it("joins the binding inner and the document left, by workspace", async () => {
+  it("joins the source inner and the document left, by workspace", async () => {
     const read = await db().pool.query<{ definition: string }>(
       `SELECT pg_get_viewdef('"index".readable_chunk'::regclass, true) AS definition`,
     );
     const written = (read.rows[0]?.definition ?? "").replaceAll(/\s+/gu, " ");
 
     expect({
-      binding: written.includes(
-        "JOIN source_binding b ON b.workspace_id = c.workspace_id AND b.id = c.binding_id",
+      connectedSource: written.includes(
+        "JOIN connected_source b ON b.workspace_id = c.workspace_id AND b.id = c.binding_id",
       ),
       document: written.includes(
         "LEFT JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id",
       ),
-    }).toEqual({ binding: true, document: true });
+    }).toEqual({ connectedSource: true, document: true });
   });
 
   it("runs as the invoker, with no security barrier", async () => {
@@ -274,8 +279,8 @@ describe("what the view reports for a chunk, as app_rt", () => {
       const landed: { readonly id: string; readonly expected: string; readonly viewer: boolean }[] =
         [];
       for (const pair of [...THE_FOLD, ...THE_DOCUMENT_NAMES_NO_CLASS]) {
-        const { chunk } = await aChunkUnderABinding(client, {
-          bindingClass: pair.binding,
+        const { chunk } = await aChunkUnderAConnectedSource(client, {
+          connectedSourceClass: pair.connectedSource,
           documentClass: pair.document,
         });
         landed.push({ id: chunk.id, expected: pair.narrower, viewer: pair.viewer });
@@ -300,13 +305,13 @@ describe("what the view reports for a chunk, as app_rt", () => {
     });
   });
 
-  it("carries the binding's audience, readable only inside the named group", async () => {
+  it("carries the source's audience, readable only inside the named group", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const held = ulid();
       const unheld = ulid();
-      const everyone = await aChunkUnderABinding(client);
-      const toTheGroup = await aChunkUnderABinding(client, {
+      const everyone = await aChunkUnderAConnectedSource(client);
+      const toTheGroup = await aChunkUnderAConnectedSource(client, {
         audience: AUDIENCE_GROUPS,
         audienceGroups: [held],
       });
@@ -326,11 +331,11 @@ describe("what the view reports for a chunk, as app_rt", () => {
     });
   });
 
-  it("carries the publish stamp, hiding an unpublished binding's chunk", async () => {
+  it("carries the publish stamp, hiding an unpublished connected source's chunk", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      await aChunkUnderABinding(client, { publishedAt: null });
-      const published = await aChunkUnderABinding(client);
+      await aChunkUnderAConnectedSource(client, { publishedAt: null });
+      const published = await aChunkUnderAConnectedSource(client);
       await asAppRt(client, WS_A);
 
       expect({
@@ -347,16 +352,18 @@ describe("what the view reports for a chunk, as app_rt", () => {
     });
   });
 
-  it("reads the binding live, so later narrowing shows at once", async () => {
+  it("reads the source live, so later narrowing shows at once", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const { binding, chunk } = await aChunkUnderABinding(client, { bindingClass: "Public" });
+      const { connectedSource, chunk } = await aChunkUnderAConnectedSource(client, {
+        connectedSourceClass: "Public",
+      });
       await asAppRt(client, WS_A);
       const before = await client.query<{ sensitivity: string }>(THE_VIEW);
 
       await client.query("RESET ROLE");
-      await client.query("UPDATE source_binding SET sensitivity = 'Restricted' WHERE id = $1", [
-        binding.id,
+      await client.query("UPDATE connected_source SET sensitivity = 'Restricted' WHERE id = $1", [
+        connectedSource.id,
       ]);
       await asAppRt(client, WS_A);
 
@@ -381,10 +388,10 @@ describe("what the view withholds", () => {
   it("shows a reader scoped to one workspace nothing of another's", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const mine = await aChunkUnderABinding(client, { bindingClass: "Public" });
-      const theirs = await aChunkUnderABinding(client, {
+      const mine = await aChunkUnderAConnectedSource(client, { connectedSourceClass: "Public" });
+      const theirs = await aChunkUnderAConnectedSource(client, {
         workspaceId: WS_B,
-        bindingClass: "Public",
+        connectedSourceClass: "Public",
       });
       await asAppRt(client, WS_A);
 
@@ -402,17 +409,21 @@ describe("what the view withholds", () => {
     });
   });
 
-  it("drops a chunk whose binding has gone, keeping its neighbour", async () => {
+  it("drops a chunk whose source has gone, keeping its neighbour", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      // A chunk naming a document cascades away with the binding; one naming none outlives
+      // A chunk naming a document cascades away with the connected source; one naming none outlives
       // it, and the inner join is what withholds it.
-      const orphaned = await aChunkUnderABinding(client, {
-        bindingClass: "Public",
+      const orphaned = await aChunkUnderAConnectedSource(client, {
+        connectedSourceClass: "Public",
         withoutADocument: true,
       });
-      const neighbour = await aChunkUnderABinding(client, { bindingClass: "Public" });
-      await client.query("DELETE FROM source_binding WHERE id = $1", [orphaned.binding.id]);
+      const neighbour = await aChunkUnderAConnectedSource(client, {
+        connectedSourceClass: "Public",
+      });
+      await client.query("DELETE FROM connected_source WHERE id = $1", [
+        orphaned.connectedSource.id,
+      ]);
       const standing = await client.query('SELECT id FROM "index".chunk WHERE id = $1', [
         orphaned.chunk.id,
       ]);
@@ -430,11 +441,11 @@ describe("what the view withholds", () => {
     });
   });
 
-  it("keeps a chunk naming no document, at its binding's class", async () => {
+  it("keeps a chunk naming no document, at its source's class", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const { chunk } = await aChunkUnderABinding(client, {
-        bindingClass: "Public",
+      const { chunk } = await aChunkUnderAConnectedSource(client, {
+        connectedSourceClass: "Public",
         withoutADocument: true,
       });
       await asAppRt(client, WS_A);
@@ -453,7 +464,9 @@ describe("who may read the view", () => {
   it("is selected by app_rt, and worker_rt holds nothing on it", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const { chunk } = await aChunkUnderABinding(client, { bindingClass: "Public" });
+      const { chunk } = await aChunkUnderAConnectedSource(client, {
+        connectedSourceClass: "Public",
+      });
 
       const forTheApp = await privilegesHeld(client, "app_rt", '"index".readable_chunk');
       const forTheWorker = await privilegesHeld(client, "worker_rt", '"index".readable_chunk');
@@ -499,14 +512,14 @@ describe("a partition attached after the view was made", () => {
   it("reads through it as through the first partition", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const first = await aChunkUnderABinding(client, { bindingClass: "Public" });
+      const first = await aChunkUnderAConnectedSource(client, { connectedSourceClass: "Public" });
       await asAppRt(client, WS_A);
       const before = await seenBy(client, VIEWER);
 
       await client.query("RESET ROLE");
-      const later = await aChunkUnderABinding(client, {
+      const later = await aChunkUnderAConnectedSource(client, {
         workspaceId: WS_B,
-        bindingClass: "Public",
+        connectedSourceClass: "Public",
       });
       await asAppRt(client, WS_B);
 

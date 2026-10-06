@@ -15,24 +15,24 @@ type Watcher = (progress: UploadProgress) => void;
 
 const watchers = new Map<string, Watcher>();
 
-/** The binding's id is minted before the bytes leave, so it names the upload a form is watching. */
-export const watchUpload = (bindingId: string, watcher: Watcher): (() => void) => {
-  watchers.set(bindingId, watcher);
+/** The connected source's id is minted before the bytes leave, so it names the upload a form is watching. */
+export const watchUpload = (connectedSourceId: string, watcher: Watcher): (() => void) => {
+  watchers.set(connectedSourceId, watcher);
   return () => {
-    watchers.delete(bindingId);
+    watchers.delete(connectedSourceId);
   };
 };
 
-const bindingIdOf = (headers: Headers): string | undefined => {
-  const held = headers.get(UPLOAD_HEADER_OF_FIELD.bindingId);
+const connectedSourceIdOf = (headers: Headers): string | undefined => {
+  const held = headers.get(UPLOAD_HEADER_OF_FIELD.connectedSourceId);
   if (held === null) return undefined;
   const parsed: unknown = JSON.parse(decodeURIComponent(held));
   return typeof parsed === "string" ? parsed : undefined;
 };
 
 const watcherOf = (headers: Headers): Watcher | undefined => {
-  const bindingId = bindingIdOf(headers);
-  return bindingId === undefined ? undefined : watchers.get(bindingId);
+  const connectedSourceId = connectedSourceIdOf(headers);
+  return connectedSourceId === undefined ? undefined : watchers.get(connectedSourceId);
 };
 
 const addressOf = (url: Parameters<Fetch>[0]): string => {

@@ -63,7 +63,7 @@ const HANDBOOK = {
 } as const;
 
 /**
- * Any other path reads a partition or binding whole: cheaper than a GIN probe below about a
+ * Any other path reads a partition or connected source whole: cheaper than a GIN probe below about a
  * hundred rows, dearer at this many.
  */
 const INVOICE_LINES = 500;
@@ -71,7 +71,7 @@ const INVOICE_LINES = 500;
 type Arranged = {
   readonly admin: UserPrincipal;
   readonly workspaceId: string;
-  readonly handbookBinding: string;
+  readonly handbookConnectedSource: string;
   readonly handbook: string;
 };
 
@@ -79,19 +79,19 @@ const arrangedWithInvoices = async (): Promise<Arranged> => {
   const scenario = await arrange();
   const { workspaceId } = scenario;
   const seeded = await seededBy(db(), async (seed) => {
-    const handbookBinding = await seed.sourceBinding({
+    const handbookConnectedSource = await seed.connectedSource({
       workspaceId,
       publishedAt: PUBLISHED,
       sensitivity: "Internal",
     });
     const handbook = await seed.sourceDocument({
       workspaceId,
-      bindingId: handbookBinding.id,
+      connectedSourceId: handbookConnectedSource.id,
       title: HANDBOOK.title,
     });
     await seed.chunk({
       workspaceId,
-      bindingId: handbookBinding.id,
+      connectedSourceId: handbookConnectedSource.id,
       sourceDocumentId: handbook.id,
       content: HANDBOOK.text,
       locator: `${handbook.id}/chars:0-${HANDBOOK.charEnd}`,
@@ -100,17 +100,20 @@ const arrangedWithInvoices = async (): Promise<Arranged> => {
       charEnd: HANDBOOK.charEnd,
     });
 
-    const invoicesBinding = await seed.sourceBinding({
+    const invoicesConnectedSource = await seed.connectedSource({
       workspaceId,
       publishedAt: PUBLISHED,
       sensitivity: "Internal",
     });
-    const invoices = await seed.sourceDocument({ workspaceId, bindingId: invoicesBinding.id });
+    const invoices = await seed.sourceDocument({
+      workspaceId,
+      connectedSourceId: invoicesConnectedSource.id,
+    });
     for (let line = 0; line < INVOICE_LINES; line += 1) {
       const text = `Invoice ${String(line)} was paid in full.`;
       await seed.chunk({
         workspaceId,
-        bindingId: invoicesBinding.id,
+        connectedSourceId: invoicesConnectedSource.id,
         sourceDocumentId: invoices.id,
         content: text,
         locator: `${invoices.id}/chars:${String(line * 100)}-${String(line * 100 + text.length)}`,
@@ -119,7 +122,7 @@ const arrangedWithInvoices = async (): Promise<Arranged> => {
         charEnd: line * 100 + text.length,
       });
     }
-    return { handbookBinding: handbookBinding.id, handbook: handbook.id };
+    return { handbookConnectedSource: handbookConnectedSource.id, handbook: handbook.id };
   });
   // VACUUM flushes GIN's pending list and ANALYZE counts the rows; the planner prices both, and
   // guesses a few rows without them.
@@ -178,14 +181,14 @@ describe("find's plan, as the api and under the chunk's policy", () => {
 });
 
 describe("previewChunks' plan, as the api and under the chunk's policy", () => {
-  it("lists a binding's chunks through the binding-first index", async () => {
+  it("lists a connected source's chunks through the connected-source-first index", async () => {
     const arranged = await arrangedWithInvoices();
 
     const previewed = await planned(arranged.admin, (admin, tx) =>
       previewChunks(
         admin,
         tx,
-        inputOf(previewChunksInput, { bindingId: arranged.handbookBinding }),
+        inputOf(previewChunksInput, { connectedSourceId: arranged.handbookConnectedSource }),
       ),
     );
 

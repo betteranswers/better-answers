@@ -13,8 +13,8 @@ import {
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
-import { narrowBinding, narrowBindingInput } from "../src/sources/index.ts";
-import { bindingHolding, groupNamed } from "./sourced-concept.ts";
+import { narrowConnectedSource, narrowConnectedSourceInput } from "../src/sources/index.ts";
+import { connectedSourceHolding, groupNamed } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { readingAs } from "./suite-postgres.ts";
 import { runWorkerOnce } from "./worker-process.ts";
@@ -124,7 +124,7 @@ const liveGenerationOf = async (workspaceId: string): Promise<number | undefined
 };
 
 const buildTheMap = async (scenario: Scenario) => {
-  const binding = await bindingHolding(db(), scenario.workspaceId);
+  const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
   const group = await groupNamed(db(), scenario, "HR", [scenario.editor]);
 
   const superseded = await wrote(scenario, scenario.editor, {
@@ -175,7 +175,9 @@ const buildTheMap = async (scenario: Scenario) => {
       ],
     },
 
-    evidence: [{ sourceDocumentId: binding.documentId, locator: "p.1", resource: "The handbook" }],
+    evidence: [
+      { sourceDocumentId: connectedSource.documentId, locator: "p.1", resource: "The handbook" },
+    ],
   });
 
   await wrote(scenario, scenario.editor, {
@@ -197,11 +199,11 @@ const buildTheMap = async (scenario: Scenario) => {
   });
 
   const narrowed = await readingAs(db().runtimePool, scenario.admin, (admin, tx) =>
-    narrowBinding(
+    narrowConnectedSource(
       admin,
       tx,
-      inputOf(narrowBindingInput, {
-        bindingId: binding.bindingId,
+      inputOf(narrowConnectedSourceInput, {
+        connectedSourceId: connectedSource.connectedSourceId,
         sensitivity: "Internal",
         audience: "groups",
         audienceGroups: [group],

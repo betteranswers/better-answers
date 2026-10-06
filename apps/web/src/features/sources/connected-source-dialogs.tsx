@@ -14,28 +14,28 @@ import {
 } from "@/shared/ui/select.tsx";
 import { counted } from "@/shared/words.ts";
 
-import { bindingHeadingId } from "./binding-list.tsx";
+import { connectedSourceHeadingId } from "./connected-source-list.tsx";
 import { outcomeOfFailure, whyAndNextOf } from "./refusal.tsx";
 import {
   CLASSES,
   EVERYONE,
   NARROWEST,
   useFindings,
-  type ListedBinding,
+  type ListedConnectedSource,
   type Sensitivity,
 } from "./sources-api.ts";
 import { AUDIENCE_WORDS, AUDITED_CATEGORIES, spokenWord } from "./words.ts";
 
 type DialogProperties<Asked> = {
-  readonly binding: ListedBinding;
+  readonly connectedSource: ListedConnectedSource;
   readonly onClose: () => void;
   readonly onConfirm: (asked: Asked) => void;
 };
 
-/** The act's own row may lose the control that opened it, so focus goes back to the binding. */
-const toTheBinding = (bindingId: string) => (event: Event) => {
+/** The act's own row may lose the control that opened it, so focus goes back to the connected source. */
+const toTheConnectedSource = (connectedSourceId: string) => (event: Event) => {
   event.preventDefault();
-  document.getElementById(bindingHeadingId(bindingId))?.focus();
+  document.getElementById(connectedSourceHeadingId(connectedSourceId))?.focus();
 };
 
 const closedBy = (onClose: () => void) => (open: boolean) => {
@@ -60,7 +60,7 @@ const ACTION_WORDS = {
 
 function TheAuditRow(properties: {
   readonly action: keyof typeof ACTION_WORDS;
-  readonly binding: ListedBinding;
+  readonly connectedSource: ListedConnectedSource;
   readonly children: ReactNode;
 }) {
   const headingId = useId();
@@ -72,7 +72,7 @@ function TheAuditRow(properties: {
       </h3>
       <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
         <SummaryRow term="Action">{ACTION_WORDS[properties.action]}</SummaryRow>
-        <SummaryRow term="Connected source">{properties.binding.name}</SummaryRow>
+        <SummaryRow term="Connected source">{properties.connectedSource.name}</SummaryRow>
         <SummaryRow term="By">You, at the instant the platform records it</SummaryRow>
         {properties.children}
       </dl>
@@ -81,19 +81,19 @@ function TheAuditRow(properties: {
 }
 
 function WhatTheRowCarries(properties: {
-  readonly binding: ListedBinding;
+  readonly connectedSource: ListedConnectedSource;
   readonly ticked: ReadonlySet<Confirmation>;
 }) {
-  const findings = useFindings(properties.binding.bindingId);
+  const findings = useFindings(properties.connectedSource.connectedSourceId);
   const totals = new Map<string, number>();
   for (const group of findings.data ?? []) {
     totals.set(group.category, (totals.get(group.category) ?? 0) + group.found);
   }
 
   return (
-    <TheAuditRow action="published" binding={properties.binding}>
-      <SummaryRow term="Class">{properties.binding.sensitivity}</SummaryRow>
-      <SummaryRow term="Audience">{AUDIENCE_WORDS[properties.binding.audience]}</SummaryRow>
+    <TheAuditRow action="published" connectedSource={properties.connectedSource}>
+      <SummaryRow term="Class">{properties.connectedSource.sensitivity}</SummaryRow>
+      <SummaryRow term="Audience">{AUDIENCE_WORDS[properties.connectedSource.audience]}</SummaryRow>
       {CONFIRMATIONS.map((confirmation) => (
         <SummaryRow key={confirmation.field} term={confirmation.said}>
           {properties.ticked.has(confirmation.field) ? "Confirmed" : "Not yet confirmed"}
@@ -113,14 +113,14 @@ function WhatTheRowCarries(properties: {
         ))
       )}
       <SummaryRow term="DPIA input">
-        The hash of this binding's DPIA input, taken at the click
+        The hash of this connected source's DPIA input, taken at the click
       </SummaryRow>
     </TheAuditRow>
   );
 }
 
 export function PublishDialog(properties: DialogProperties<Confirmations>) {
-  const { binding, onClose, onConfirm } = properties;
+  const { connectedSource, onClose, onConfirm } = properties;
   const [ticked, setTicked] = useState<ReadonlySet<Confirmation>>(new Set());
   const hintId = useId();
   const allConfirmed = CONFIRMATIONS.every((confirmation) => ticked.has(confirmation.field));
@@ -139,13 +139,13 @@ export function PublishDialog(properties: DialogProperties<Confirmations>) {
       onOpenChange={closedBy(onClose)}
       content={{
         className: "max-h-[calc(100vh-2rem)] overflow-y-auto",
-        onCloseAutoFocus: toTheBinding(binding.bindingId),
+        onCloseAutoFocus: toTheConnectedSource(connectedSource.connectedSourceId),
       }}
-      title={`Publish ${binding.name}`}
-      consequence={`Its passages reach ${AUDIENCE_WORDS[binding.audience].toLowerCase()} at the class ${binding.sensitivity} the moment you publish. This page cannot unpublish it.`}
+      title={`Publish ${connectedSource.name}`}
+      consequence={`Its passages reach ${AUDIENCE_WORDS[connectedSource.audience].toLowerCase()} at the class ${connectedSource.sensitivity} the moment you publish. This page cannot unpublish it.`}
       commit={
         <Button disabled={!allConfirmed} aria-describedby={hintId} onClick={confirm}>
-          Publish {binding.name}
+          Publish {connectedSource.name}
         </Button>
       }
     >
@@ -168,7 +168,7 @@ export function PublishDialog(properties: DialogProperties<Confirmations>) {
         ))}
       </fieldset>
 
-      <WhatTheRowCarries binding={binding} ticked={ticked} />
+      <WhatTheRowCarries connectedSource={connectedSource} ticked={ticked} />
 
       <p id={hintId} className="text-sm text-muted-foreground">
         {allConfirmed
@@ -239,16 +239,16 @@ function WordPicked<Word extends string>(properties: {
 }
 
 export function NarrowDialog(properties: DialogProperties<Sensitivity>) {
-  const { binding, onClose, onConfirm } = properties;
-  const narrower = narrowerThan(binding.sensitivity);
+  const { connectedSource, onClose, onConfirm } = properties;
+  const narrower = narrowerThan(connectedSource.sensitivity);
   const [sensitivity, setSensitivity] = useState<Sensitivity>(narrower[0] ?? NARROWEST);
 
   return (
     <ActDialog
       open
       onOpenChange={closedBy(onClose)}
-      content={{ onCloseAutoFocus: toTheBinding(binding.bindingId) }}
-      title={`Narrow ${binding.name}`}
+      content={{ onCloseAutoFocus: toTheConnectedSource(connectedSource.connectedSourceId) }}
+      title={`Narrow ${connectedSource.name}`}
       consequence="Every concept citing its documents, and every composition including one of those concepts, moves with it in the same act. A narrowing never widens; widening it back is an act of its own."
       commit={
         <Button
@@ -256,20 +256,20 @@ export function NarrowDialog(properties: DialogProperties<Sensitivity>) {
             onConfirm(sensitivity);
           }}
         >
-          Narrow {binding.name} to {sensitivity}
+          Narrow {connectedSource.name} to {sensitivity}
         </Button>
       }
     >
       <WordPicked label="Class" value={sensitivity} words={narrower} onPick={setSensitivity} />
       <p className="text-sm text-muted-foreground">
-        It is {binding.sensitivity} now. Its audience stays{" "}
-        {AUDIENCE_WORDS[binding.audience].toLowerCase()}.
+        It is {connectedSource.sensitivity} now. Its audience stays{" "}
+        {AUDIENCE_WORDS[connectedSource.audience].toLowerCase()}.
       </p>
     </ActDialog>
   );
 }
 
-type Audience = ListedBinding["audience"];
+type Audience = ListedConnectedSource["audience"];
 
 export type Widening = { readonly sensitivity: Sensitivity; readonly audience: Audience };
 
@@ -277,20 +277,20 @@ const asWideOrWiderThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
   CLASSES.slice(CLASSES.indexOf(sensitivity));
 
 /** The dialog opens on a widening, so the one click it asks for is never refused as not wider. */
-const firstWidening = (binding: ListedBinding): Widening => {
-  const wider = CLASSES[CLASSES.indexOf(binding.sensitivity) + 1];
+const firstWidening = (connectedSource: ListedConnectedSource): Widening => {
+  const wider = CLASSES[CLASSES.indexOf(connectedSource.sensitivity) + 1];
   return wider === undefined
-    ? { sensitivity: binding.sensitivity, audience: EVERYONE }
-    : { sensitivity: wider, audience: binding.audience };
+    ? { sensitivity: connectedSource.sensitivity, audience: EVERYONE }
+    : { sensitivity: wider, audience: connectedSource.audience };
 };
 
 /**
  * The dialog offers no narrower class and no other groups, so a wider term is the whole
  * question.
  */
-const asksWider = (binding: ListedBinding, asked: Widening): boolean =>
-  CLASSES.indexOf(asked.sensitivity) > CLASSES.indexOf(binding.sensitivity) ||
-  (asked.audience === EVERYONE && binding.audience !== EVERYONE);
+const asksWider = (connectedSource: ListedConnectedSource, asked: Widening): boolean =>
+  CLASSES.indexOf(asked.sensitivity) > CLASSES.indexOf(connectedSource.sensitivity) ||
+  (asked.audience === EVERYONE && connectedSource.audience !== EVERYONE);
 
 const WIDENING_CONSEQUENCE = {
   published:
@@ -305,11 +305,11 @@ export const classAndAudienceWords = (widening: Widening): string =>
   `${widening.sensitivity} for ${AUDIENCE_WORDS[widening.audience].toLowerCase()}`;
 
 export function WidenDialog(properties: DialogProperties<Widening>) {
-  const { binding, onClose, onConfirm } = properties;
-  const [asked, setAsked] = useState<Widening>(() => firstWidening(binding));
+  const { connectedSource, onClose, onConfirm } = properties;
+  const [asked, setAsked] = useState<Widening>(() => firstWidening(connectedSource));
   const hintId = useId();
-  const wider = asksWider(binding, asked);
-  const publication = binding.publishedAt === null ? "unpublished" : "published";
+  const wider = asksWider(connectedSource, asked);
+  const publication = connectedSource.publishedAt === null ? "unpublished" : "published";
 
   return (
     <ActDialog
@@ -317,9 +317,9 @@ export function WidenDialog(properties: DialogProperties<Widening>) {
       onOpenChange={closedBy(onClose)}
       content={{
         className: "max-h-[calc(100vh-2rem)] overflow-y-auto",
-        onCloseAutoFocus: toTheBinding(binding.bindingId),
+        onCloseAutoFocus: toTheConnectedSource(connectedSource.connectedSourceId),
       }}
-      title={`Widen ${binding.name}`}
+      title={`Widen ${connectedSource.name}`}
       consequence={`${WIDENING_CONSEQUENCE[publication]} ${ITS_OWN_CLASS_STANDS}`}
       commit={
         <Button
@@ -329,24 +329,24 @@ export function WidenDialog(properties: DialogProperties<Widening>) {
             onConfirm(asked);
           }}
         >
-          Widen {binding.name} to {classAndAudienceWords(asked)}
+          Widen {connectedSource.name} to {classAndAudienceWords(asked)}
         </Button>
       }
     >
       <WordPicked
         label="Class"
         value={asked.sensitivity}
-        words={asWideOrWiderThan(binding.sensitivity)}
+        words={asWideOrWiderThan(connectedSource.sensitivity)}
         onPick={(sensitivity) => {
           setAsked({ ...asked, sensitivity });
         }}
       />
 
-      {binding.audience === EVERYONE ? null : (
+      {connectedSource.audience === EVERYONE ? null : (
         <WordPicked
           label="Audience"
           value={asked.audience}
-          words={[binding.audience, EVERYONE]}
+          words={[connectedSource.audience, EVERYONE]}
           said={(audience) => AUDIENCE_WORDS[audience]}
           onPick={(audience) => {
             setAsked({ ...asked, audience });
@@ -355,14 +355,14 @@ export function WidenDialog(properties: DialogProperties<Widening>) {
       )}
 
       <p className="text-sm text-muted-foreground">
-        It is {classAndAudienceWords(binding)} now
-        {binding.audience === EVERYONE ? ", and no audience is wider." : "."}
+        It is {classAndAudienceWords(connectedSource)} now
+        {connectedSource.audience === EVERYONE ? ", and no audience is wider." : "."}
       </p>
 
-      <TheAuditRow action="widened" binding={binding}>
-        <SummaryRow term="Class, from">{binding.sensitivity}</SummaryRow>
+      <TheAuditRow action="widened" connectedSource={connectedSource}>
+        <SummaryRow term="Class, from">{connectedSource.sensitivity}</SummaryRow>
         <SummaryRow term="Class, to">{asked.sensitivity}</SummaryRow>
-        <SummaryRow term="Audience, from">{AUDIENCE_WORDS[binding.audience]}</SummaryRow>
+        <SummaryRow term="Audience, from">{AUDIENCE_WORDS[connectedSource.audience]}</SummaryRow>
         <SummaryRow term="Audience, to">{AUDIENCE_WORDS[asked.audience]}</SummaryRow>
       </TheAuditRow>
 

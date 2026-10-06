@@ -233,11 +233,12 @@ export const CONTROL_CENTRE = {
       movedFrom: ["/sources"],
       pages: [
         {
-          name: "Bindings",
-          path: "/sources/bindings",
+          name: "Connected sources",
+          path: "/sources/connected-sources",
           icon: "database",
           built: true,
           seenBy: ADMINS,
+          movedFrom: ["/sources/bindings"],
         },
         {
           name: "Publish and accept gates",

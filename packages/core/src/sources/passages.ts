@@ -11,7 +11,7 @@ import {
 } from "../access/index.ts";
 import { attempt, err, NOT_FOUND, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { adminOnBinding, BINDING_ID } from "./admin-binding.ts";
+import { adminOnConnectedSource, CONNECTED_SOURCE_ID } from "./admin-connected-source.ts";
 import { locatorOf, parseLocator, spanText, type LocatorRefusal } from "./chunk-address.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
@@ -190,7 +190,7 @@ export type PreviewedChunk = {
   readonly content: string;
 };
 
-const BINDING_CHUNKS = `SELECT c.id, c.source_document_id, c.char_start, c.char_end, c.content
+const CONNECTED_SOURCE_CHUNKS = `SELECT c.id, c.source_document_id, c.char_start, c.char_end, c.content
      FROM "index".readable_chunk c
     WHERE c.workspace_id = $1
       AND c.binding_id = $2
@@ -209,7 +209,7 @@ type PreviewRow = {
 };
 
 export const previewChunksInput = z.object({
-  bindingId: BINDING_ID,
+  connectedSourceId: CONNECTED_SOURCE_ID,
 
   limit: z.int().positive().default(MAX_PASSAGE_HITS),
 });
@@ -224,14 +224,14 @@ export const previewChunks = async (
   tx: Tx,
   input: PreviewChunksInput,
 ): Promise<Result<readonly PreviewedChunk[], PreviewChunksRefusal>> => {
-  const acting = adminOnBinding(principal, input.bindingId);
+  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
-  const { admin, bindingId } = acting.value;
+  const { admin, connectedSourceId } = acting.value;
 
   return attempt(async () => {
-    const read = await tx.query<PreviewRow>(BINDING_CHUNKS, [
+    const read = await tx.query<PreviewRow>(CONNECTED_SOURCE_CHUNKS, [
       admin.workspaceId,
-      bindingId,
+      connectedSourceId,
       ...readableParameters(admin),
       hitsAsked(input.limit),
     ]);

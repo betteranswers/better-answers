@@ -57,9 +57,12 @@ const indexShapeOf = async (
 const seedOneDocument = async (client: pg.PoolClient, workspaceId: string) => {
   const seed = testData(client);
   await seed.workspace({ id: workspaceId, name: "A" });
-  const binding = await seed.sourceBinding({ workspaceId });
-  const document = await seed.sourceDocument({ workspaceId, bindingId: binding.id });
-  return { seed, binding, document };
+  const connectedSource = await seed.connectedSource({ workspaceId });
+  const document = await seed.sourceDocument({
+    workspaceId,
+    connectedSourceId: connectedSource.id,
+  });
+  return { seed, connectedSource, document };
 };
 
 const VECTOR = JSON.stringify(Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0));
@@ -133,12 +136,13 @@ describe("the chunk's columns, on the parent and on a partition", () => {
         return {
           note: attributes.find((column) => column.column === "probe_note")?.generated,
           search: attributes.find((column) => column.column === "probe_search")?.generated,
-          bindingIdNotNull: attributes.find((column) => column.column === "binding_id")?.notNull,
+          connectedSourceIdNotNull: attributes.find((column) => column.column === "binding_id")
+            ?.notNull,
           checks: constraint.rowCount,
         };
       };
 
-      const propagated = { note: "", search: "s", bindingIdNotNull: false, checks: 1 };
+      const propagated = { note: "", search: "s", connectedSourceIdNotNull: false, checks: 1 };
       expect({
         existing: await shapeOf(`chunk_${WS_A}`),
         madeAfter: await shapeOf(`chunk_${WS_B}`),
@@ -152,10 +156,10 @@ describe("the embedding and the model choice it came from", () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });
-      const binding = `binding-${ulid()}`;
+      const connectedSource = `connected-source-${ulid()}`;
 
       const probe = (embedding: string | null, modelChoice: string | null) =>
-        attemptChunkEmbeddedBy(client, WS_A, binding, embedding, modelChoice);
+        attemptChunkEmbeddedBy(client, WS_A, connectedSource, embedding, modelChoice);
 
       expect({
         vectorWithoutItsModelChoice: await probe(VECTOR, null),
@@ -238,8 +242,11 @@ describe("a partition's indexes", () => {
 describe("the chunk and the document it locates into", () => {
   it("goes with its document, leaving another document's chunks standing", async () => {
     await withRollback(db().pool, async (client) => {
-      const { seed, binding, document } = await seedOneDocument(client, WS_A);
-      const sibling = await seed.sourceDocument({ workspaceId: WS_A, bindingId: binding.id });
+      const { seed, connectedSource, document } = await seedOneDocument(client, WS_A);
+      const sibling = await seed.sourceDocument({
+        workspaceId: WS_A,
+        connectedSourceId: connectedSource.id,
+      });
       await seed.chunk(firstSpanOf(document.id));
       await seed.chunk(firstSpanOf(sibling.id));
 

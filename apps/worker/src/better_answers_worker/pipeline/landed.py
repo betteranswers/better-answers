@@ -326,13 +326,13 @@ def redact_landed_copies(
     for refusal in quarantined:
         logger.warning(
             "the run could not read a document and quarantined it",
-            binding_id=run.binding_id,
+            connected_source_id=run.connected_source_id,
             source_document_id=refusal.source_document_id,
             error=refusal.error,
         )
     logger.info(
-        "the binding's landed copies were read",
-        binding_id=run.binding_id,
+        "the connected source's landed copies were read",
+        connected_source_id=run.connected_source_id,
         documents=len(answered),
         detected_afresh=list(outcome.detected_afresh),
         quarantined=len(quarantined),

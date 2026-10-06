@@ -8,8 +8,8 @@ severity: high
 applies_when:
   - "Adding a readable unit, or a table whose rows a reader's audience must filter"
   - "Writing or changing the read predicate or the visibility derivation"
-  - "Narrowing a binding, or anything that re-derives a concept's or a composition's visibility"
-  - "Minting a group for a Restricted binding's named people"
+  - "Narrowing a connected source, or anything that re-derives a concept's or a composition's visibility"
+  - "Minting a group for a Restricted connected source's named people"
 tags:
   - adr-0039
   - audience
@@ -24,13 +24,13 @@ tags:
 
 ## The decision
 
-**The representation.** Every readable unit and the binding carry a pair: `concept_index`, `composition`, `source_binding`, `concept_class_override`, `map_node` and `map_edge`.
+**The representation.** Every readable unit and the connected source carry a pair: `concept_index`, `composition`, `connected_source`, `concept_class_override`, `map_node` and `map_edge`.
 
 - `audience` is *everyone* or *groups*, narrowed at the boundary.
 - `audience_groups text[]` holds ADR 0038's group ids.
 - One CHECK ties them, `AUDIENCE_CHECK` in `packages/schema/src/readable-columns.ts`. *Everyone* holds no array. *Groups* holds a non-empty array with no NULL element.
 
-A chunk carries no pair of its own. It reads its binding's through `index.readable_chunk` (ADR 0044).
+A chunk carries no pair of its own. It reads its connected source's through `index.readable_chunk` (ADR 0044).
 
 **The predicate's third term** is `audience = 'everyone' OR audience_groups && $groups`. The caller's group ids are resolved on each call by the Principal resolver.
 
@@ -41,12 +41,12 @@ A chunk carries no pair of its own. It reads its binding's through `index.readab
 
 - A recorded Admin override outranks everything, then the combination. A unit resting on nothing takes its fallback. The per-kind floor narrows the class and never widens it.
 - It runs at write time: the governed write derives the row it lands.
-- A narrowing re-derives synchronously two levels down, in the narrowing act's own transaction: every concept citing the binding's documents, then every composition including them.
+- A narrowing re-derives synchronously two levels down, in the narrowing act's own transaction: every concept citing the connected source's documents, then every composition including them.
 - The map's copies of the columns are rewritten in that same transaction.
 
 **An empty intersection forces the unit Restricted, and is never stored.** It becomes *Restricted* for *everyone*, which the predicate reads as Admins alone. It is never stored as *groups* over an empty list.
 
-**A Restricted binding's named people are a `group` row** of ADR 0038's implicit origin, whose id `audience_groups` names. Nothing here mints one. Minting it is an act of binding management.
+**A Restricted connected source's named people are a `group` row** of ADR 0038's implicit origin, whose id `audience_groups` names. Nothing here mints one. Minting it is an act of connected source management.
 
 ## Why
 
@@ -62,8 +62,8 @@ A chunk carries no pair of its own. It reads its binding's through `index.readab
 - A join table per readable unit: the predicate stops being a column, *everyone* needs a sentinel row, and the cascade becomes deletes and inserts across side tables.
 - The empty intersection stored as *groups* over an empty list: the zero value would mean *nobody* on purpose and *everyone was forgotten* by accident.
 - Combining by union: a concept minted from HR's document and Sales's would be wider than either piece of evidence.
-- An Admin arm on the audience term: an Admin outside a Restricted binding's group would see what the binding withholds.
-- A second table for a binding's named people: refused by ADR 0038.
+- An Admin arm on the audience term: an Admin outside a Restricted connected source's group would see what the connected source withholds.
+- A second table for a connected source's named people: refused by ADR 0038.
 
 ## History
 

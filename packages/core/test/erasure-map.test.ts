@@ -385,10 +385,10 @@ const documentHolding = (
   shape: { readonly goneAt?: Date } = {},
 ): Promise<string> =>
   seedingWith(db().pool, async (seed) => {
-    const binding = await seed.sourceBinding({ workspaceId });
+    const connectedSource = await seed.connectedSource({ workspaceId });
     const document = await seed.sourceDocument({
       workspaceId,
-      bindingId: binding.id,
+      connectedSourceId: connectedSource.id,
       goneAt: shape.goneAt ?? null,
     });
     const lengths = chunks.map((content) => Array.from(content).length);
@@ -397,7 +397,7 @@ const documentHolding = (
       const charEnd = charStart + (lengths[ordinal] ?? 0);
       await seed.chunk({
         workspaceId,
-        bindingId: binding.id,
+        connectedSourceId: connectedSource.id,
         sourceDocumentId: document.id,
         content,
         locator: `${document.id}/chars:${charStart}-${charEnd}`,

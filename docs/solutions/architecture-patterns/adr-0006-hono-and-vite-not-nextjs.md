@@ -30,7 +30,7 @@ The api is a plain long-running Node process on Hono, Node 24. One process carri
 - `apps/web` imports nothing from `apps/api` but `AppRouter`, as an `import type`, in `apps/web/src/shared/api/trpc.ts` and no second file. A lint override in `.oxlintrc.json` holds it. Runtime coupling stays zero.
 - "Talk only over tRPC" means everything with a shape that crosses between `apps/web` and `apps/api` (a field, an output, a refusal word) is checked by the compiler through that one type. A change on one side fails the other's type-check until fixed.
 - Two things sit beside tRPC. The Better Auth client carries identity with its own typed client: the session, sign-in, sign-out, the workspace, OAuth. Bytes have no shape a compiler checks.
-- Bytes in: the upload is a tRPC mutation over `application/octet-stream`, with the binding's descriptor beside the bytes (ADR 0043). It needs no exception here.
+- Bytes in: the upload is a tRPC mutation over `application/octet-stream`, with the connected source's descriptor beside the bytes (ADR 0043). It needs no exception here.
 - Bytes out: tRPC answers JSON and cannot stream a file, so a download is a route beside tRPC on the same origin, under the same principal resolution and the same crossing table. The ADR of the block that lands it opens it.
 - A route beside tRPC for a shape tRPC carries is refused.
 - Public pages, when they arrive, are a separate site in their own package, never a mode of the api.

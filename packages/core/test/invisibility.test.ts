@@ -10,7 +10,7 @@ import type { UserPrincipal } from "../src/kernel/index.ts";
 import { addToGroup, deleteGroup } from "../src/members/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import {
-  bindingForGroups,
+  connectedSourceForGroups,
   conceptCiting,
   conceptForGroup,
   documentUnder,
@@ -55,7 +55,7 @@ const chunkOf = async (workspaceId: string, document: Sourced): Promise<string> 
   const row = await seededBy(db(), (seed) =>
     seed.chunk({
       workspaceId,
-      bindingId: document.bindingId,
+      connectedSourceId: document.connectedSourceId,
       sourceDocumentId: document.documentId,
       content: "The handbook's holiday policy.",
       locator: `${document.documentId}/chars:0-30`,
@@ -125,7 +125,12 @@ describe("the audience arm of the read predicate", () => {
     const scenario = await arrange();
     const board = await groupNamed(db(), scenario, "Board", [scenario.viewer]);
     const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
-    const boardOnly = await bindingForGroups(db(), scenario.workspaceId, [board], "Restricted");
+    const boardOnly = await connectedSourceForGroups(
+      db(),
+      scenario.workspaceId,
+      [board],
+      "Restricted",
+    );
     const forAdmins = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
     const forBoardAdmins = await conceptCiting(scenario, scenario.editor, [boardOnly.documentId]);
 
@@ -238,8 +243,8 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
   });
 });
 
-describe("a document narrowed under a binding its siblings stand under", () => {
-  it("leaves a concept at its bindings' class without document classes", async () => {
+describe("a document narrowed under a source its siblings stand under", () => {
+  it("leaves a concept at its sources' class without document classes", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const onInternal = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
@@ -325,10 +330,15 @@ describe("a document narrowed under a binding its siblings stand under", () => {
     ]).toEqual([false, true, true, true]);
   });
 
-  it("cannot exceed its binding's class: Internal under Restricted stays Restricted", async () => {
+  it("cannot exceed its source's class: Internal under Restricted stays Restricted", async () => {
     const scenario = await arrange();
     const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
-    const wider = await documentUnder(db(), scenario.workspaceId, restricted.bindingId, "Internal");
+    const wider = await documentUnder(
+      db(),
+      scenario.workspaceId,
+      restricted.connectedSourceId,
+      "Internal",
+    );
     const onWider = await conceptCiting(scenario, scenario.editor, [wider.documentId]);
 
     expect(

@@ -149,7 +149,7 @@ The pinned `wrangler`, and a `deploy` that must be run through `run` (`apps/test
 "deploy": "pnpm run wrangler deploy"
 ```
 
-The D1 binding by name, with no `database_id` (`apps/test-inbox/wrangler.jsonc:9-15`):
+The D1 connected source by name, with no `database_id` (`apps/test-inbox/wrangler.jsonc:9-15`):
 
 ```jsonc
 "d1_databases": [

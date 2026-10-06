@@ -100,7 +100,7 @@ describe("what a procedure may answer the wire", () => {
       "runs.ofSubject",
       "session.membership",
       "session.operator",
-      "sources.bind",
+      "sources.connect",
       "sources.dismissAsNotSpecialCategory",
       "sources.findings",
       "sources.keepInText",
@@ -161,7 +161,7 @@ describe("what a procedure may answer the wire", () => {
       | "members.declineRequest"
       | "modelChoices.list"
       | "sources.list"
-      | "sources.bind"
+      | "sources.connect"
       | "sources.findings"
       | "sources.keepInText"
       | "sources.narrowDocuments"

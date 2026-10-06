@@ -12,20 +12,20 @@ import {
   findingsOfInput,
   keepInText,
   keepInTextInput,
-  narrowBinding,
-  narrowBindingInput,
+  narrowConnectedSource,
+  narrowConnectedSourceInput,
   previewChunks,
   previewChunksInput,
-  publishBinding,
-  publishBindingInput,
-  reprocessBinding,
-  reprocessBindingInput,
+  publishConnectedSource,
+  publishConnectedSourceInput,
+  reprocessConnectedSource,
+  reprocessConnectedSourceInput,
 } from "../src/sources/index.ts";
 import { getObject } from "../src/store/objects/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import {
   bankDetailsGroupOf,
-  bindTheHandbook,
+  connectTheHandbook,
   locatorOf,
   THE_ACCOUNT_NUMBER,
   THE_BANK_DETAILS,
@@ -74,7 +74,7 @@ const runTheWorker = (workerId: string): Promise<void> =>
   runWorkerOnce(db().connectionUri, bundles().root, workerId, store());
 
 const boundHandbook = (scenario: Scenario, called?: string, text?: string) =>
-  bindTheHandbook(scenario.admin, doorsOf(scenario), called, text);
+  connectTheHandbook(scenario.admin, doorsOf(scenario), called, text);
 
 type ChunkRow = {
   readonly id: string;
@@ -86,11 +86,14 @@ type ChunkRow = {
   readonly source_document_id: string;
 };
 
-const chunksOf = async (workspaceId: string, bindingId: string): Promise<readonly ChunkRow[]> => {
+const chunksOf = async (
+  workspaceId: string,
+  connectedSourceId: string,
+): Promise<readonly ChunkRow[]> => {
   const read = await db().pool.query<ChunkRow>(
     `SELECT id, content, locator, ordinal, char_start, char_end, source_document_id
        FROM "index".chunk WHERE workspace_id = $1 AND binding_id = $2 ORDER BY id`,
-    [workspaceId, bindingId],
+    [workspaceId, connectedSourceId],
   );
   return read.rows;
 };
@@ -103,12 +106,12 @@ type ReadableRow = {
 
 const readableChunksOf = async (
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
 ): Promise<readonly ReadableRow[]> => {
   const read = await db().pool.query<ReadableRow>(
     `SELECT sensitivity, audience, published_at FROM "index".readable_chunk
       WHERE workspace_id = $1 AND binding_id = $2 ORDER BY ordinal`,
-    [workspaceId, bindingId],
+    [workspaceId, connectedSourceId],
   );
   return read.rows;
 };
@@ -144,11 +147,14 @@ type JobRow = {
   } | null;
 };
 
-const indexRunsOf = async (workspaceId: string, bindingId: string): Promise<readonly JobRow[]> => {
+const indexRunsOf = async (
+  workspaceId: string,
+  connectedSourceId: string,
+): Promise<readonly JobRow[]> => {
   const read = await db().pool.query<JobRow>(
     `SELECT id, status, attempts, outcome FROM job
       WHERE workspace_id = $1 AND kind = 'index' AND subject_id = $2 ORDER BY enqueued_at, id`,
-    [workspaceId, bindingId],
+    [workspaceId, connectedSourceId],
   );
   return read.rows;
 };
@@ -174,19 +180,19 @@ const bytesUnder = (directory: string): Buffer => {
   return Buffer.concat(held);
 };
 
-const storeOf = (workspaceId: string, bindingId: string): string =>
-  path.join(lmdbRootUnder(bundles().root), workspaceId, bindingId);
+const storeOf = (workspaceId: string, connectedSourceId: string): string =>
+  path.join(lmdbRootUnder(bundles().root), workspaceId, connectedSourceId);
 
-/** A binding's own store, which a wipe removes; the findings memo's sits beside it. */
-const BINDING_STORE = "binding";
-/** The findings memo's store, beside the binding's own, which a wipe spares. */
+/** A connected source's own store, which a wipe removes; the findings memo's sits beside it. */
+const CONNECTED_SOURCE_STORE = "binding";
+/** The findings memo's store, beside the connected source's own, which a wipe spares. */
 const FINDINGS_STORE = "findings";
 
-const bindingStoreOf = (workspaceId: string, bindingId: string): string =>
-  path.join(storeOf(workspaceId, bindingId), BINDING_STORE);
+const connectedSourceStoreOf = (workspaceId: string, connectedSourceId: string): string =>
+  path.join(storeOf(workspaceId, connectedSourceId), CONNECTED_SOURCE_STORE);
 
-const findingsStoreOf = (workspaceId: string, bindingId: string): string =>
-  path.join(storeOf(workspaceId, bindingId), FINDINGS_STORE);
+const findingsStoreOf = (workspaceId: string, connectedSourceId: string): string =>
+  path.join(storeOf(workspaceId, connectedSourceId), FINDINGS_STORE);
 
 const spanOf = (chunks: readonly ChunkRow[]) => {
   const first = chunks[0];
@@ -194,10 +200,10 @@ const spanOf = (chunks: readonly ChunkRow[]) => {
   return { start: first.char_start, end: first.char_end };
 };
 
-const publishedHandbook = async (scenario: Scenario, bindingId: string) => {
+const publishedHandbook = async (scenario: Scenario, connectedSourceId: string) => {
   const published = await acting(scenario.admin, (admin, tx) =>
-    publishBinding(admin, tx, {
-      ...inputOf(publishBindingInput, { bindingId, confirmations: CONFIRMED }),
+    publishConnectedSource(admin, tx, {
+      ...inputOf(publishConnectedSourceInput, { connectedSourceId, confirmations: CONFIRMED }),
       publishedAt: PUBLISHED_AT,
     }),
   );
@@ -220,17 +226,21 @@ describe("one uploaded document, read back through both tiers", () => {
       await leaseLetLapse(db().pool, { workspaceId: scenario.workspaceId, jobId: bound.jobId });
       await runTheWorker("cross-tier-1");
 
-      const landed = await chunksOf(scenario.workspaceId, bound.bindingId);
+      const landed = await chunksOf(scenario.workspaceId, bound.connectedSourceId);
       const locator = locatorOf(bound.documentId, THE_WITHHELD_SPAN);
 
       const previewed = answered(
         await acting(scenario.admin, (admin, tx) =>
-          previewChunks(admin, tx, inputOf(previewChunksInput, { bindingId: bound.bindingId })),
+          previewChunks(
+            admin,
+            tx,
+            inputOf(previewChunksInput, { connectedSourceId: bound.connectedSourceId }),
+          ),
         ),
       );
       const blindFind = answered(await finding(scenario.viewer, THE_QUERY));
       const blindOpen = answered(await opening(scenario.viewer, locator));
-      const unpublished = await readableChunksOf(scenario.workspaceId, bound.bindingId);
+      const unpublished = await readableChunksOf(scenario.workspaceId, bound.connectedSourceId);
 
       expect(landed.map((chunk) => chunk.content)).toEqual([THE_PASSAGE]);
       expect(spanOf(landed)).toEqual(THE_WITHHELD_SPAN);
@@ -242,11 +252,11 @@ describe("one uploaded document, read back through both tiers", () => {
         { sensitivity: "Internal", audience: "everyone", published_at: null },
       ]);
 
-      await publishedHandbook(scenario, bound.bindingId);
+      await publishedHandbook(scenario, bound.connectedSourceId);
 
       const found = answered(await finding(scenario.viewer, THE_QUERY));
       const opened = answered(await opening(scenario.viewer, locator));
-      const published = await readableChunksOf(scenario.workspaceId, bound.bindingId);
+      const published = await readableChunksOf(scenario.workspaceId, bound.connectedSourceId);
 
       expect(found.hits).toEqual([
         {
@@ -274,14 +284,16 @@ describe("one uploaded document, read back through both tiers", () => {
         { sensitivity: "Internal", audience: "everyone", published_at: PUBLISHED_AT },
       ]);
 
-      const runs = await indexRunsOf(scenario.workspaceId, bound.bindingId);
+      const runs = await indexRunsOf(scenario.workspaceId, bound.connectedSourceId);
       expect(runs.map((run) => [run.status, run.attempts])).toEqual([["done", 2]]);
       expect(runs[0]?.outcome?.lmdb_bytes).toBeGreaterThan(0);
 
-      const binding = bytesUnder(bindingStoreOf(scenario.workspaceId, bound.bindingId));
-      const findings = bytesUnder(findingsStoreOf(scenario.workspaceId, bound.bindingId));
+      const connectedSource = bytesUnder(
+        connectedSourceStoreOf(scenario.workspaceId, bound.connectedSourceId),
+      );
+      const findings = bytesUnder(findingsStoreOf(scenario.workspaceId, bound.connectedSourceId));
       expect(findings.byteLength).toBeGreaterThan(0);
-      for (const held of [binding, findings]) {
+      for (const held of [connectedSource, findings]) {
         expect(held.includes(THE_PLACEHOLDER)).toBe(false);
         expect(held.includes(THE_BANK_DETAILS)).toBe(false);
         expect(held.includes(THE_SORT_CODE)).toBe(false);
@@ -297,37 +309,37 @@ describe("one uploaded document, read back through both tiers", () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario);
       await runTheWorker("cross-tier-2");
-      const landed = await chunksOf(scenario.workspaceId, bound.bindingId);
+      const landed = await chunksOf(scenario.workspaceId, bound.connectedSourceId);
       const raised = await findingsOf(scenario.workspaceId, bound.documentId);
 
       answered(
         await enqueueJob(scenario.admin, scenario.postgres, {
           workspaceId: scenario.workspaceId,
           kind: "index",
-          subjectId: bound.bindingId,
+          subjectId: bound.connectedSourceId,
           reason: "restored",
         }),
       );
       await runTheWorker("cross-tier-2");
-      const unchanged = await chunksOf(scenario.workspaceId, bound.bindingId);
+      const unchanged = await chunksOf(scenario.workspaceId, bound.connectedSourceId);
       const raisedAgain = await findingsOf(scenario.workspaceId, bound.documentId);
 
       const reprocessed = answered(
         await acting(scenario.admin, (admin, tx) =>
-          reprocessBinding(
+          reprocessConnectedSource(
             admin,
             tx,
-            inputOf(reprocessBindingInput, {
+            inputOf(reprocessConnectedSourceInput, {
               workspaceId: scenario.workspaceId,
-              bindingId: bound.bindingId,
+              connectedSourceId: bound.connectedSourceId,
               reason: "rule-change",
             }),
           ),
         ),
       );
-      const emptied = await chunksOf(scenario.workspaceId, bound.bindingId);
+      const emptied = await chunksOf(scenario.workspaceId, bound.connectedSourceId);
       await runTheWorker("cross-tier-2");
-      const again = await chunksOf(scenario.workspaceId, bound.bindingId);
+      const again = await chunksOf(scenario.workspaceId, bound.connectedSourceId);
 
       expect(landed.map((chunk) => chunk.content)).toEqual([THE_PASSAGE]);
       expect(raised.map(({ id: _id, ...span }) => span)).toEqual([
@@ -353,7 +365,7 @@ describe("one uploaded document, read back through both tiers", () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "kept-handbook.md");
       await runTheWorker("cross-tier-5");
-      const withheld = await chunksOf(scenario.workspaceId, bound.bindingId);
+      const withheld = await chunksOf(scenario.workspaceId, bound.connectedSourceId);
 
       answered(
         await acting(scenario.admin, (admin, tx) =>
@@ -361,7 +373,7 @@ describe("one uploaded document, read back through both tiers", () => {
             admin,
             tx,
             inputOf(keepInTextInput, {
-              bindingId: bound.bindingId,
+              connectedSourceId: bound.connectedSourceId,
               findingGroups: [bankDetailsGroupOf(bound.documentId)],
               reason: "The depot's own account, printed on the company's own page.",
             }),
@@ -369,9 +381,9 @@ describe("one uploaded document, read back through both tiers", () => {
         ),
       );
       await runTheWorker("cross-tier-5");
-      const kept = await chunksOf(scenario.workspaceId, bound.bindingId);
+      const kept = await chunksOf(scenario.workspaceId, bound.connectedSourceId);
       const restored = locatorOf(bound.documentId, THE_RESTORED_SPAN);
-      await publishedHandbook(scenario, bound.bindingId);
+      await publishedHandbook(scenario, bound.connectedSourceId);
 
       const found = answered(await finding(scenario.viewer, THE_QUERY));
       const opened = answered(await opening(scenario.viewer, restored));
@@ -384,12 +396,12 @@ describe("one uploaded document, read back through both tiers", () => {
       );
       answered(
         await acting(scenario.admin, (admin, tx) =>
-          reprocessBinding(
+          reprocessConnectedSource(
             admin,
             tx,
-            inputOf(reprocessBindingInput, {
+            inputOf(reprocessConnectedSourceInput, {
               workspaceId: scenario.workspaceId,
-              bindingId: bound.bindingId,
+              connectedSourceId: bound.connectedSourceId,
               reason: "wiped",
             }),
           ),
@@ -397,11 +409,15 @@ describe("one uploaded document, read back through both tiers", () => {
       );
       await runTheWorker("cross-tier-5");
 
-      const erased = await chunksOf(scenario.workspaceId, bound.bindingId);
-      const runs = await indexRunsOf(scenario.workspaceId, bound.bindingId);
+      const erased = await chunksOf(scenario.workspaceId, bound.connectedSourceId);
+      const runs = await indexRunsOf(scenario.workspaceId, bound.connectedSourceId);
       const reviewed = answered(
         await acting(scenario.admin, (admin, tx) =>
-          findingGroupsOf(admin, tx, inputOf(findingsOfInput, { bindingId: bound.bindingId })),
+          findingGroupsOf(
+            admin,
+            tx,
+            inputOf(findingsOfInput, { connectedSourceId: bound.connectedSourceId }),
+          ),
         ),
       );
       const withheldAgain = answered(
@@ -456,11 +472,11 @@ describe("one uploaded document, read back through both tiers", () => {
       await until(async () => (await statusOf(scenario.workspaceId, bound.jobId)) === "claimed");
       answered(
         await acting(scenario.admin, (admin, tx) =>
-          narrowBinding(
+          narrowConnectedSource(
             admin,
             tx,
-            inputOf(narrowBindingInput, {
-              bindingId: bound.bindingId,
+            inputOf(narrowConnectedSourceInput, {
+              connectedSourceId: bound.connectedSourceId,
               sensitivity: "Restricted",
               audience: "everyone",
             }),
@@ -470,9 +486,9 @@ describe("one uploaded document, read back through both tiers", () => {
       const whenTheNarrowingLanded = await statusOf(scenario.workspaceId, bound.jobId);
       await running;
 
-      await publishedHandbook(scenario, bound.bindingId);
-      const raced = await chunksOf(scenario.workspaceId, bound.bindingId);
-      const racedClass = await readableChunksOf(scenario.workspaceId, bound.bindingId);
+      await publishedHandbook(scenario, bound.connectedSourceId);
+      const raced = await chunksOf(scenario.workspaceId, bound.connectedSourceId);
+      const racedClass = await readableChunksOf(scenario.workspaceId, bound.connectedSourceId);
       const racedByTheViewer = answered(await finding(scenario.viewer, THE_QUERY));
       const racedByTheAdmin = answered(await finding(scenario.admin, THE_QUERY));
 
@@ -481,11 +497,11 @@ describe("one uploaded document, read back through both tiers", () => {
       const depot = await groupNamed(db(), scenario, "Depot", [scenario.editor]);
       answered(
         await acting(scenario.admin, (admin, tx) =>
-          narrowBinding(
+          narrowConnectedSource(
             admin,
             tx,
-            inputOf(narrowBindingInput, {
-              bindingId: later.bindingId,
+            inputOf(narrowConnectedSourceInput, {
+              connectedSourceId: later.connectedSourceId,
               sensitivity: "Internal",
               audience: "groups",
               audienceGroups: [depot],
@@ -493,9 +509,9 @@ describe("one uploaded document, read back through both tiers", () => {
           ),
         ),
       );
-      await publishedHandbook(scenario, later.bindingId);
-      const afterwards = await chunksOf(scenario.workspaceId, later.bindingId);
-      const afterwardsClass = await readableChunksOf(scenario.workspaceId, later.bindingId);
+      await publishedHandbook(scenario, later.connectedSourceId);
+      const afterwards = await chunksOf(scenario.workspaceId, later.connectedSourceId);
+      const afterwardsClass = await readableChunksOf(scenario.workspaceId, later.connectedSourceId);
       const seenByTheGroup = answered(await finding(scenario.editor, THE_QUERY));
       const seenByTheRest = answered(await finding(scenario.viewer, THE_QUERY));
 
@@ -522,40 +538,40 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 
   it(
-    "spares one binding's chunks and store when another is wiped",
+    "spares one source's chunks and store when another is wiped",
     async () => {
       const scenario = await arrange();
       const kept = await boundHandbook(scenario, "the-handbook-that-stays.md");
       const dropped = await boundHandbook(scenario, "the-handbook-that-goes.md");
       await runTheWorker("cross-tier-4");
       await runTheWorker("cross-tier-4");
-      const before = await chunksOf(scenario.workspaceId, kept.bindingId);
+      const before = await chunksOf(scenario.workspaceId, kept.connectedSourceId);
 
       answered(
         await acting(scenario.admin, (admin, tx) =>
-          reprocessBinding(
+          reprocessConnectedSource(
             admin,
             tx,
-            inputOf(reprocessBindingInput, {
+            inputOf(reprocessConnectedSourceInput, {
               workspaceId: scenario.workspaceId,
-              bindingId: dropped.bindingId,
+              connectedSourceId: dropped.connectedSourceId,
               reason: "wiped",
             }),
           ),
         ),
       );
-      // This delete stands in for withdrawing the binding's documents, and leaves the same rows.
+      // This delete stands in for withdrawing the connected source's documents, and leaves the same rows.
       await db().pool.query(
-        "DELETE FROM source_document WHERE workspace_id = $1 AND binding_id = $2",
-        [scenario.workspaceId, dropped.bindingId],
+        "DELETE FROM source_document WHERE workspace_id = $1 AND connected_source_id = $2",
+        [scenario.workspaceId, dropped.connectedSourceId],
       );
       await runTheWorker("cross-tier-4");
 
-      const standing = bytesUnder(findingsStoreOf(scenario.workspaceId, kept.bindingId));
+      const standing = bytesUnder(findingsStoreOf(scenario.workspaceId, kept.connectedSourceId));
 
       expect(before.map((chunk) => chunk.content)).toEqual([THE_PASSAGE]);
-      expect(await chunksOf(scenario.workspaceId, dropped.bindingId)).toEqual([]);
-      expect(await chunksOf(scenario.workspaceId, kept.bindingId)).toEqual(before);
+      expect(await chunksOf(scenario.workspaceId, dropped.connectedSourceId)).toEqual([]);
+      expect(await chunksOf(scenario.workspaceId, kept.connectedSourceId)).toEqual(before);
       expect(standing.byteLength).toBeGreaterThan(0);
       expect(standing.includes(THE_PLACEHOLDER)).toBe(false);
     },
@@ -646,7 +662,7 @@ describe("an erasure over a bound document, read through both tiers", () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "claims-handbook.md", THE_HANDBOOK_NAMING_ANN);
       await runTheWorker("cross-tier-6");
-      await publishedHandbook(scenario, bound.bindingId);
+      await publishedHandbook(scenario, bound.connectedSourceId);
       const namedBefore = await passagesFoundBy(scenario.viewer, THE_SURNAME);
       const addressedBefore = await passagesFoundBy(scenario.viewer, THE_WORK_ADDRESS);
       const copiedBefore = await normalisedCopyOf(scenario, bound.documentId);
@@ -659,8 +675,8 @@ describe("an erasure over a bound document, read through both tiers", () => {
       const namedByAddress = await passagesFoundBy(scenario.viewer, THE_WORK_ADDRESS);
       const onTheTopic = await passagesFoundBy(scenario.viewer, THE_QUERY);
       const copied = await normalisedCopyOf(scenario, bound.documentId);
-      const landed = await chunksOf(scenario.workspaceId, bound.bindingId);
-      const runs = await indexRunsOf(scenario.workspaceId, bound.bindingId);
+      const landed = await chunksOf(scenario.workspaceId, bound.connectedSourceId);
+      const runs = await indexRunsOf(scenario.workspaceId, bound.connectedSourceId);
 
       const again = await erasing(scenario, subjectRequestId, ERASED_AGAIN_AT);
 
@@ -676,8 +692,8 @@ describe("an erasure over a bound document, read through both tiers", () => {
       expect(runs.map((run) => run.status)).toEqual(["done", "done"]);
 
       expect(documentsTheMapFound(again)).toEqual([]);
-      expect(await chunksOf(scenario.workspaceId, bound.bindingId)).toEqual(landed);
-      expect(await indexRunsOf(scenario.workspaceId, bound.bindingId)).toEqual(runs);
+      expect(await chunksOf(scenario.workspaceId, bound.connectedSourceId)).toEqual(landed);
+      expect(await indexRunsOf(scenario.workspaceId, bound.connectedSourceId)).toEqual(runs);
     },
     A_CROSS_TIER_ALLOWANCE_MS,
   );

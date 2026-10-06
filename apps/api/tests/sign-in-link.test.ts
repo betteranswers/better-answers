@@ -14,7 +14,7 @@ const LINK_PAGE = "/sign-in/link";
 const DESCRIBE = "/sign-in-link/describe";
 const SIGN_IN_BY_LINK = "/sign-in-link/sign-in";
 const SEND_CODE = "/email-otp/send-verification-otp";
-const BINDING_COOKIE = "__Host-better-answers.sign-in-link";
+const CONNECTED_SOURCE_COOKIE = "__Host-better-answers.sign-in-link";
 
 const DEAD = { state: "dead" };
 
@@ -147,13 +147,13 @@ describe("the code request", () => {
     expect(await linkRowsOf(person.email)).toBe(1);
   });
 
-  it("binds the browser that asked with a host-only cookie", async () => {
+  it("connects the browser that asked with a host-only cookie", async () => {
     const person = await app().person();
 
     const { asked } = await askedFor(app().client(), person.email);
 
     const [cookie] = asked.headers.getSetCookie();
-    expect(cookie).toMatch(new RegExp(`^${BINDING_COOKIE}=[A-Za-z0-9_-]{43};`));
+    expect(cookie).toMatch(new RegExp(`^${CONNECTED_SOURCE_COOKIE}=[A-Za-z0-9_-]{43};`));
     expect(cookie?.split("; ").slice(1).toSorted()).toEqual(
       ["HttpOnly", "Max-Age=300", "Path=/", "SameSite=Lax", "Secure"].toSorted(),
     );

@@ -43,7 +43,7 @@ const SEEDED_RUNS = ["none", "queued", "claimed", "done"] as const;
 
 const MOVED_RUNS = ["claimed", "done"] as const;
 
-const aBinding = z.object({
+const aConnectedSource = z.object({
   name: z.string().min(1),
   sensitivity: z.enum(SENSITIVITIES).default("Restricted"),
   audience: z.enum(AUDIENCES).default("everyone"),
@@ -52,12 +52,12 @@ const aBinding = z.object({
   documents: z.array(aDocument).default([]),
 });
 
-export const bindingsSeeding = z.object({
+export const connectedSourcesSeeding = z.object({
   workspaceId: z.string().min(1),
-  bindings: z.array(aBinding).min(1),
+  connectedSources: z.array(aConnectedSource).min(1),
 });
 
-/** By workspace alone: a binding the browser bound carries an id only the page minted. */
+/** By workspace alone: a connected source the browser bound carries an id only the page minted. */
 export const indexRunMoving = z.object({
   workspaceId: z.string().min(1),
   to: z.enum(MOVED_RUNS),
@@ -69,8 +69,8 @@ type SeededDocument = {
   readonly citedBy: { readonly iri: string; readonly compositionId: string } | null;
 };
 
-type SeededBinding = {
-  readonly bindingId: string;
+type SeededConnectedSource = {
+  readonly connectedSourceId: string;
   readonly name: string;
   readonly documents: readonly SeededDocument[];
 };
@@ -154,7 +154,7 @@ const seedFindings = async (
 const seedChunks = async (
   seed: TestData,
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
   documentId: string,
   chunks: readonly string[],
 ): Promise<void> => {
@@ -163,7 +163,7 @@ const seedChunks = async (
     const charEnd = charStart + Array.from(content).length;
     await seed.chunk({
       workspaceId,
-      bindingId,
+      connectedSourceId,
       sourceDocumentId: documentId,
       content,
       ordinal,
@@ -201,7 +201,7 @@ const runColumns = (
   return { ...claimed, status: "done", finishedAt: now, outcome };
 };
 
-type DocumentsOfABinding = {
+type DocumentsOfAConnectedSource = {
   readonly documents: readonly SeededDocument[];
   readonly overridden: readonly OverriddenSpan[];
   readonly chunkCount: number;
@@ -210,9 +210,9 @@ type DocumentsOfABinding = {
 const seedDocuments = async (
   seed: TestData,
   workspaceId: string,
-  bindingId: string,
+  connectedSourceId: string,
   asked: readonly z.output<typeof aDocument>[],
-): Promise<DocumentsOfABinding> => {
+): Promise<DocumentsOfAConnectedSource> => {
   const documents: SeededDocument[] = [];
   const overridden: OverriddenSpan[] = [];
   let chunkCount = 0;
@@ -220,14 +220,14 @@ const seedDocuments = async (
     const quarantined = document.quarantineError !== null;
     const landed = await seed.sourceDocument({
       workspaceId,
-      bindingId,
+      connectedSourceId,
       title: document.title,
       sourceSystemId: document.title,
       sensitivity: document.sensitivity,
       ...(quarantined ? { outcome: "quarantined", quarantineError: document.quarantineError } : {}),
     });
     overridden.push(...(await seedFindings(seed, workspaceId, landed.id, document.findings)));
-    await seedChunks(seed, workspaceId, bindingId, landed.id, document.chunks);
+    await seedChunks(seed, workspaceId, connectedSourceId, landed.id, document.chunks);
     chunkCount += document.chunks.length;
     documents.push({
       documentId: landed.id,
@@ -240,47 +240,47 @@ const seedDocuments = async (
 
 /**
  * Rows written as each act and the worker would leave them, so the page reads what a real
- * binding's history leaves behind.
+ * connected source's history leaves behind.
  */
-export const seedBindings = async (
+export const seedConnectedSources = async (
   app: TestApp,
-  asked: z.output<typeof bindingsSeeding>,
-): Promise<readonly SeededBinding[]> =>
+  asked: z.output<typeof connectedSourcesSeeding>,
+): Promise<readonly SeededConnectedSource[]> =>
   inOneTransaction(app, async (client) => {
     const seed = testData(client);
     const { workspaceId } = asked;
-    const seeded: SeededBinding[] = [];
+    const seeded: SeededConnectedSource[] = [];
 
-    for (const binding of asked.bindings) {
+    for (const connectedSource of asked.connectedSources) {
       /** The audience CHECK wants a named group beside the word; the page names none. */
       const readers =
-        binding.audience === "groups"
-          ? [(await seed.group({ workspaceId, name: `${binding.name} readers` })).id]
+        connectedSource.audience === "groups"
+          ? [(await seed.group({ workspaceId, name: `${connectedSource.name} readers` })).id]
           : null;
-      const row = await seed.sourceBinding({
+      const row = await seed.connectedSource({
         workspaceId,
-        name: binding.name,
-        sensitivity: binding.sensitivity,
-        audience: binding.audience,
+        name: connectedSource.name,
+        sensitivity: connectedSource.sensitivity,
+        audience: connectedSource.audience,
         audienceGroups: readers,
-        publishedAt: binding.published ? new Date() : null,
-        state: binding.published ? "published" : "landed",
+        publishedAt: connectedSource.published ? new Date() : null,
+        state: connectedSource.published ? "published" : "received",
       });
 
       const { documents, overridden, chunkCount } = await seedDocuments(
         seed,
         workspaceId,
         row.id,
-        binding.documents,
+        connectedSource.documents,
       );
 
-      if (binding.run !== "none") {
+      if (connectedSource.run !== "none") {
         await seed.job({
           workspaceId,
           kind: "index",
           subjectId: row.id,
-          reason: "bound",
-          ...runColumns(binding.run, {
+          reason: "connected",
+          ...runColumns(connectedSource.run, {
             documents: documents.length,
             chunks: chunkCount,
             lmdb_bytes: 0,
@@ -288,7 +288,7 @@ export const seedBindings = async (
           }),
         });
       }
-      seeded.push({ bindingId: row.id, name: binding.name, documents });
+      seeded.push({ connectedSourceId: row.id, name: connectedSource.name, documents });
     }
     return seeded;
   });

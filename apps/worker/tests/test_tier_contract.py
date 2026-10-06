@@ -15,7 +15,7 @@ SPOKEN_AGREEMENTS = {
     "concept-inbox": "sql-function",
     "cost-ledger": "generated",
     "document-chunk": "fixtured",
-    "emptying-a-binding": "fixtured",
+    "emptying-a-connected-source": "fixtured",
     "erasure-match": "fixtured",
     "id-shape": "fixtured",
     "credential-envelope": "fixtured",

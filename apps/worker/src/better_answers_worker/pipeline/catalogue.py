@@ -23,26 +23,30 @@ NORMALISED_KEY_SUFFIX = "normalised"
 
 
 @dataclass(frozen=True, slots=True)
-class BindingRun:
+class ConnectedSourceRun:
     rules_in_force: Mapping[str, bool]
     documents: tuple[LandedDocument, ...]
 
 
-def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
-    """None when the binding is gone. Only live documents are read, each carrying
-    the workspace's suppressions and its own restored and dismissed findings."""
+def read_connected_source(
+    cursor: Cursor[Any], run: IndexRun
+) -> ConnectedSourceRun | None:
+    """None when the connected source is gone. Only live documents are read, each
+    carrying the workspace's suppressions and its own restored and dismissed
+    findings."""
     cursor.execute(
-        "SELECT rules_in_force FROM source_binding WHERE id = %s",
-        (run.binding_id,),
+        "SELECT rules_in_force FROM connected_source WHERE id = %s",
+        (run.connected_source_id,),
     )
-    binding = cursor.fetchone()
-    if binding is None:
+    connected_source = cursor.fetchone()
+    if connected_source is None:
         return None
 
     cursor.execute(
         "SELECT id, media_type, original_key, normalised_key"
-        " FROM source_document WHERE binding_id = %s AND gone_at IS NULL ORDER BY id",
-        (run.binding_id,),
+        " FROM source_document WHERE connected_source_id = %s AND gone_at IS NULL"
+        " ORDER BY id",
+        (run.connected_source_id,),
     )
     catalogued = cursor.fetchall()
     document_ids = [str(row[0]) for row in catalogued]
@@ -50,8 +54,10 @@ def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
     restores = _spans_by_document(cursor, document_ids, _RESTORED, Restore)
     dismissals = _spans_by_document(cursor, document_ids, _DISMISSED, Dismissal)
 
-    return BindingRun(
-        rules_in_force={str(tier): bool(state) for tier, state in binding[0].items()},
+    return ConnectedSourceRun(
+        rules_in_force={
+            str(tier): bool(state) for tier, state in connected_source[0].items()
+        },
         documents=tuple(
             LandedDocument(
                 source_document_id=str(row[0]),

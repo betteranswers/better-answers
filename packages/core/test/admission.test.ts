@@ -22,15 +22,15 @@ import {
 } from "../src/kernel/index.ts";
 import { enqueueJobAct, enqueueJobInput } from "../src/runs/index.ts";
 import {
-  reprocessBindingAct,
-  reprocessBindingInput,
-  type adminOnBinding,
+  reprocessConnectedSourceAct,
+  reprocessConnectedSourceInput,
+  type adminOnConnectedSource,
   type dpiaInputFor,
   type previewChunks,
-  type publishBinding,
-  type reprocessBinding,
-  type ReprocessBindingInput,
-  type ReprocessBindingRefusal,
+  type publishConnectedSource,
+  type reprocessConnectedSource,
+  type ReprocessConnectedSourceInput,
+  type ReprocessConnectedSourceRefusal,
 } from "../src/sources/index.ts";
 
 const person = (role: Role): UserPrincipal => ({
@@ -218,11 +218,11 @@ describe("what a declaration will not let an act say", () => {
 });
 
 describe("the two acts that carry a declaration today", () => {
-  it("states what reprocessing a binding admits, takes, answers and does", () => {
+  it("states what reprocessing a source admits, takes, answers and does", () => {
     expect({
-      admits: reprocessBindingAct.admits,
-      refuses: reprocessBindingAct.refuses,
-      effect: reprocessBindingAct.effect,
+      admits: reprocessConnectedSourceAct.admits,
+      refuses: reprocessConnectedSourceAct.refuses,
+      effect: reprocessConnectedSourceAct.effect,
     }).toEqual({
       admits: { role: "Admin", purposes: ["erasure"] },
       refuses: ["role-forbids", "no-such-binding"],
@@ -231,9 +231,9 @@ describe("the two acts that carry a declaration today", () => {
   });
 
   it("admits only an Admin and the erasure process to reprocess", () => {
-    const wipe = reprocessBindingInput.parse({
+    const wipe = reprocessConnectedSourceInput.parse({
       workspaceId: "01JQ0000000000000000000WSP",
-      bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN1",
+      connectedSourceId: "01J6NNNNNNNNNNNNNNNNNNNNN1",
       reason: "wiped",
     });
 
@@ -245,8 +245,8 @@ describe("the two acts that carry a declaration today", () => {
         person("Admin"),
         person("Editor"),
         person("Viewer"),
-      ].map((principal) => admit(reprocessBindingAct, principal, wipe).ok),
-      refused: admit(reprocessBindingAct, processActor("reconciler"), wipe),
+      ].map((principal) => admit(reprocessConnectedSourceAct, principal, wipe).ok),
+      refused: admit(reprocessConnectedSourceAct, processActor("reconciler"), wipe),
       itsClass: classOf("role-forbids"),
     }).toEqual({
       admitted: [true, false, false, true, false, false],
@@ -256,23 +256,25 @@ describe("the two acts that carry a declaration today", () => {
   });
 
   it("derives the act's input and refusal types from its declaration", () => {
-    expectTypeOf<InputOf<typeof reprocessBindingAct>>().toEqualTypeOf<ReprocessBindingInput>();
-    expectTypeOf<RefusalOf<typeof reprocessBindingAct>>().toEqualTypeOf<
+    expectTypeOf<
+      InputOf<typeof reprocessConnectedSourceAct>
+    >().toEqualTypeOf<ReprocessConnectedSourceInput>();
+    expectTypeOf<RefusalOf<typeof reprocessConnectedSourceAct>>().toEqualTypeOf<
       "role-forbids" | "no-such-binding"
     >();
-    expectTypeOf<"no-such-binding">().toExtend<ReprocessBindingRefusal>();
-    expectTypeOf<AdmittedOf<typeof reprocessBindingAct>>().toExtend<
+    expectTypeOf<"no-such-binding">().toExtend<ReprocessConnectedSourceRefusal>();
+    expectTypeOf<AdmittedOf<typeof reprocessConnectedSourceAct>>().toExtend<
       UserPrincipal | PlatformPrincipal
     >();
-    expectTypeOf<PlatformPrincipal>().toExtend<AdmittedOf<typeof reprocessBindingAct>>();
+    expectTypeOf<PlatformPrincipal>().toExtend<AdmittedOf<typeof reprocessConnectedSourceAct>>();
   });
 
   it("lets the platform reprocess but not publish, preview or administer", () => {
-    expectTypeOf<PlatformPrincipal>().toExtend<Parameters<typeof reprocessBinding>[0]>();
-    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof publishBinding>[0]>();
+    expectTypeOf<PlatformPrincipal>().toExtend<Parameters<typeof reprocessConnectedSource>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof publishConnectedSource>[0]>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof dpiaInputFor>[0]>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof previewChunks>[0]>();
-    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof adminOnBinding>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof adminOnConnectedSource>[0]>();
   });
 
   it("reads the enqueue's level off the kind's descriptor", () => {
@@ -302,6 +304,6 @@ describe("the two acts that carry a declaration today", () => {
   });
 
   it("declares both the enqueue and reprocessing as writes", () => {
-    expect([enqueueJobAct.effect, reprocessBindingAct.effect]).toEqual(["write", "write"]);
+    expect([enqueueJobAct.effect, reprocessConnectedSourceAct.effect]).toEqual(["write", "write"]);
   });
 });

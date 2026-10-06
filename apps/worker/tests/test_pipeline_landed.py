@@ -41,7 +41,7 @@ from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
 from test_pipeline_host import bootstrap_for
 
 WORKSPACE = "01M2Q3R4S5T6V7W8X9YZAB0000"
-BINDING = "01M2B1ND1NGAAAAAAAAAAAAAAA"
+CONNECTED_SOURCE = "01M2B1ND1NGAAAAAAAAAAAAAAA"
 
 
 THE_SAFE_SET: Mapping[str, bool] = {"default_on": True, "default_off": False}
@@ -231,8 +231,10 @@ def a_bootstrap(tmp_path: Path) -> Bootstrap:
     return bootstrap_for("postgresql://unreached/unreached", tmp_path)
 
 
-def a_run(reason: str = "bound") -> IndexRun:
-    return IndexRun(workspace_id=WORKSPACE, binding_id=BINDING, reason=reason)
+def a_run(reason: str = "connected") -> IndexRun:
+    return IndexRun(
+        workspace_id=WORKSPACE, connected_source_id=CONNECTED_SOURCE, reason=reason
+    )
 
 
 def read_the_copies(
@@ -381,7 +383,7 @@ def test_neither_store_holds_any_text_the_seam_withheld(
     read_the_copies(bootstrap, bucket, (THE_INVOICE,))
     a_control_memo_over(A_SENTENCE_OF_THE_INVOICE, control)
 
-    findings, binding = (
+    findings, chunk_store = (
         bytes_of(bootstrap, FINDINGS_STORE),
         bytes_of(bootstrap, BINDING_STORE),
     )
@@ -389,7 +391,7 @@ def test_neither_store_holds_any_text_the_seam_withheld(
     # Both ways, so an absence below is the store's and never the scan's.
     assert THE_RULE_THE_MEMO_STORES in findings
     assert A_SENTENCE_OF_THE_INVOICE in bytes_under(control)
-    for held in (findings, binding):
+    for held in (findings, chunk_store):
         assert THE_ACCOUNT_NUMBER.encode() not in held
         assert b"00-00-00" not in held
         assert A_PLACEHOLDER_WORD not in held
@@ -408,17 +410,17 @@ def test_a_wipe_spares_the_memo_and_erases_the_named_person(
 
     read_the_copies(bootstrap, bucket, both)
     with Host(bootstrap) as opened:
-        opened.remove_binding_store(a_run())
+        opened.remove_connected_source_store(a_run())
     answer = read_the_copies(bootstrap, bucket, erased)
 
     assert answer.detected_afresh == ()
     assert text_of(answer, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE_SUPPRESSED
-    findings, binding = (
+    findings, chunk_store = (
         bytes_of(bootstrap, FINDINGS_STORE),
         bytes_of(bootstrap, BINDING_STORE),
     )
     assert THE_RULE_THE_MEMO_STORES in findings
-    for held in (findings, binding):
+    for held in (findings, chunk_store):
         assert HER_NAME not in held
 
 
@@ -543,7 +545,7 @@ def test_a_moved_detection_key_detects_every_document_afresh(
     assert sorted(answer.detected_afresh) == [AN_INVOICE_ID, A_DELIVERY_NOTE_ID]
 
 
-def test_a_rule_switched_off_on_the_binding_detects_nothing_afresh(
+def test_a_rule_switched_off_on_the_source_detects_nothing_afresh(
     bootstrap: Bootstrap,
 ) -> None:
     bucket = a_bucket_holding_both()
