@@ -27,7 +27,7 @@ A route block (`docs/specs/v01-route.md`) is one `/ce-brainstorm`, then `/ce-pla
 
 **Every commit reaches `main` through the merge queue.**
 
-1. `ce-commit-push-pr` opens the pull request. Its title is the commit's subject, and its body is the commit's body, footer included (*The commit's form*, below). Repository settings make these the merge commit's subject and body.
+1. `ce-commit-push-pr` opens the pull request. Its title is the commit's subject, and its body takes the form `AGENTS.md` states in *Workflow*. Repository settings make these the merge commit's subject and body.
 2. Cubic reviews the head. When its check completes with success, `arm-merge.yml` arms the merge. A push disarms it, and Cubic's check on the new head arms it again, so the queue never takes a head Cubic has not read.
 3. The `main` ruleset holds the merge until every review thread is resolved. `ce-babysit-pr` fixes or answers Cubic's threads, and Cubic resolves the ones it sees addressed.
 4. The PR's own `check` reads only its title, so it goes green in a minute or two and the armed PR enters the **merge queue**. The queue runs the suites on the merge group and merges on green.
@@ -83,7 +83,7 @@ One commitlint config, `commitlint.config.mjs`, holds the form in two places. Ea
 - lefthook's `commit-msg` hook checks every commit.
 - The `pr-title` job in `check.yml` checks the pull request's title, which becomes the merge commit's subject. The job runs on the pull request and again in the merge queue. It reads the title when it runs, so a retitle is read before the merge, and a red `pr-title` goes green on `gh run rerun <run> --failed`.
 
-The repository's `merge_commit_message` is `PR_BODY`. So the body and its footer reach `main` with the subject, instead of being dropped at the merge.
+The repository's `merge_commit_message` is `PR_BODY`. So the pull request's body, in the form `AGENTS.md` states, becomes the merge commit's body on `main`. The branch's own commits reach `main` too, each with its `Refs:` footer.
 
 ## What `check` runs where
 
