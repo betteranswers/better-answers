@@ -120,6 +120,8 @@ A kept worktree is removed by hand with `git worktree remove --force`. The hook 
 
 A worktree the hook or the sweep removes also gives up the jCodeMunch index provisioning gave it. Without that, the registry keeps naming a root no longer on disk — the state the owner's machine was found in, seven create events and no removals, the oldest naming a path gone for a fortnight. A jCodeMunch repository id is not derivable from its path, so it is read from what `list-repos --json` prints.
 
+A worktree removed any other way, by the harness, by hand or by `rm -rf`, runs neither, and its jDocMunch index outlived it: 28 of 33 doc indexes named a gone folder on 06/10/2026. So each sweep run also drops every doc index whose root lies under `.claude/worktrees/` and is no longer a directory, read from what `jdocmunch-mcp watch-status` prints. An index whose folder exists, or that lies anywhere else, is left alone.
+
 ### Provisioning a worktree
 
 `provision-worktree.sh <worktree-path>` installs a fresh checkout's dependencies and the agent tooling a checkout cannot carry, so an agent's first act in a worktree is its task and not `pnpm install`. The create hook runs it; run it by hand after a `git worktree add`, which fires no hook. Six stages, each reporting on its own line and none stopping the next:
