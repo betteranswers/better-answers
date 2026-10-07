@@ -103,7 +103,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | --- | --- |
 | `provision` | A workspace with its first Admin — the platform-provisioned act; the product offers no way to make one. It answers the workspace's id, name and slug, and the Admin |
 | `person` | A person in no workspace, for the refused page and the picker |
-| `addMember` | Makes a person a member at a named role — Admin, Editor or Viewer |
+| `addMember` | A second member at a named role — Admin, Editor or Viewer |
 | `removeMember` | Removes a member, as the People page will |
 | `endEverySignInAndToken` | Ends every sign-in and token a person holds, so the next request is refused |
 | `markTheOperator` | Grants the operator mark to the person holding an address, or clears it with `"revoke"`, through the ops command's own act and principal — the console's door, and a mark cleared under an open page |
