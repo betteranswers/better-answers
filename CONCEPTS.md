@@ -582,7 +582,7 @@ from concepts elsewhere; the prose stays a platform record.
   (a Q&A pair), which an answer may reuse or cite.
 - **answer contract** — _Internal._ the one shape an answer takes for the UI, MCP and the response
   record: an event stream — verdict first — folded into one object (ADR 0016).
-- **match** — _Code rename pending._ one unit a search returns, typed by its knowledge layer: a
+- **match** — one unit a search returns, typed by its knowledge layer: a
   concept, with the guide sections it appears in and the documents it rests on nested under it; a
   guide section or a document on its own only when no concept covers it. Every match wears its trust
   or sensitivity word; a document nothing rests on reads *Not company knowledge*. The MCP wire's key

@@ -267,14 +267,14 @@ describe("the answer's rendering", () => {
 });
 
 describe("the preview's rendering", () => {
-  it("says nothing matches without hits, else one line per hit", () => {
-    expect(renderFind({ query: "expenses", hits: [] })).toBe(
+  it("says nothing matches when empty, else one line per match", () => {
+    expect(renderFind({ query: "expenses", matches: [] })).toBe(
       "Nothing in the company's knowledge matches that.",
     );
     expect(
       renderFind({
         query: "expenses",
-        hits: [
+        matches: [
           {
             layer: "bundles",
             iri: "https://better-answers.com/c/01A",
@@ -430,14 +430,14 @@ describe("what the slice's four acts answer", () => {
     expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<Result<FeedbackReceipt, never>>();
   });
 
-  it("answers the query and no hits where neither arm matches", async () => {
+  it("answers the query and no matches when neither arm finds", async () => {
     const reader = await arrange();
 
     const found = await acting(reader, (principal, tx) =>
       find(principal, tx, { query: "expenses", limit: 10 }, now),
     );
 
-    expect(found).toEqual({ ok: true, value: { query: "expenses", hits: [] } });
+    expect(found).toEqual({ ok: true, value: { query: "expenses", matches: [] } });
   });
 
   it("refuses every question with the one sentence, the map live", async () => {
@@ -578,7 +578,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
       ok: true,
       value: {
         query: QUERY,
-        hits: [
+        matches: [
           {
             layer: "bundles",
             iri,
@@ -606,22 +606,22 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     );
   });
 
-  it("caps hits at the limit across both layers, concepts first", async () => {
+  it("caps matches at the limit across both layers, concepts first", async () => {
     const reader = await arrange();
     const { invoice, iri } = await aDocumentEachWay(reader);
 
     const [ofOne, ofTwo] = await Promise.all([searching(reader, 1), searching(reader, 2)]);
 
-    expect(ofOne.ok && ofOne.value.hits).toEqual([
+    expect(ofOne.ok && ofOne.value.matches).toEqual([
       expect.objectContaining({ layer: "bundles", iri }),
     ]);
-    expect(ofTwo.ok && ofTwo.value.hits).toEqual([
+    expect(ofTwo.ok && ofTwo.value.matches).toEqual([
       expect.objectContaining({ layer: "bundles", iri }),
       expect.objectContaining({ layer: "sources", locator: invoice.locator }),
     ]);
   });
 
-  it("opens a hit's passage with its document and sensitivity word", async () => {
+  it("opens a match's passage with its document and sensitivity word", async () => {
     const reader = await arrange();
     const invoice = await documentHolding(reader.workspaceId, {
       title: INVOICE_TITLE,
@@ -694,7 +694,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     });
     expect(tooFar).toEqual({ ok: true, value: { found: false, locator: pastTheEnd } });
 
-    expect(found.ok && found.value.hits).toEqual([
+    expect(found.ok && found.value.matches).toEqual([
       {
         layer: "sources",
         kind: "document",

@@ -29,7 +29,7 @@ C4Dynamic
   Rel(landed, objects, "5. Reads each original", "boto3")
   Rel(landed, converter, "6. Counts pages, then converts, outside every memo; an unreadable document, or one past its ceiling, is quarantined")
   Rel(landed, detected, "7. Asks for the spans of the normalised text under the detection key")
-  Rel(detected, lmdb, "8. A hit answers from findings/ — rule id, offsets, score; a miss runs the body")
+  Rel(detected, lmdb, "8. A cache hit answers from findings/ — rule id, offsets, score; a miss runs the body")
   Rel(detected, redaction, "9. On a miss only: spans_detected over the whole normalised text")
   Rel(landed, redaction, "10. redact: findings raised by the block rule, withheld or left by reason, placeholders written; the text split into passages")
   Rel(landed, objects, "11. Writes each document's normalised redacted copy", "boto3")

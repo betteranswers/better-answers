@@ -82,7 +82,7 @@ export {
   previewPassages,
   previewPassagesInput,
   type Passage,
-  type PassageHit,
+  type PassageMatch,
   type PreviewedPassage,
 } from "./passages.ts";
 export { listConnectedSources } from "./listing.ts";

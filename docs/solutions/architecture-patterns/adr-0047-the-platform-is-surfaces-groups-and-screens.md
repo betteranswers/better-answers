@@ -116,7 +116,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
-| Ask | none; the home says it is on its way | New question, Your questions, and the concept page a hit or a citation opens (S2) | none yet |
+| Ask | none; the home says it is on its way | New question, Your questions, and the concept page a match or a citation opens (S2) | none yet |
 | Knowledge | none | Search (S2). Guides, All knowledge, Kinds, Domains and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your domains since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |

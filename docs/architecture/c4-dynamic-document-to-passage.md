@@ -29,7 +29,7 @@ C4Dynamic
   Rel(admin, sources, "8. Reviews the groups of findings: keeps in text, narrows documents, dismisses as not special category")
   Rel(admin, sources, "9. Publishes with the three confirmations; refused until the latest sync is done")
   Rel(sources, postgres, "10. published_at and the state on the connected source, the audit event with the finding counts, the DPIA hash and the class and audience it releases, and the cascade to the citing concepts; no passage, no job")
-  Rel(mcp, postgres, "11. find: full-text over index.readable_passage under the predicate; the hit marked Not company knowledge")
+  Rel(mcp, postgres, "11. find: full-text over index.readable_passage under the predicate; the match marked Not company knowledge")
   Rel(mcp, sources, "12. open by locator calls passageAt, the predicate applied there once; the passage verbatim")
 
   UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")

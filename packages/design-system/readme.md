@@ -38,7 +38,7 @@ The areas the rail lists, each holding groups of pages (§4, *The shell*):
 
 - **Ask** — a question, a cited answer, and what it could not answer. Every role.
 - **Knowledge** — search, guides and the map's concepts for every role; its curation
-  pages for Admins and the owners of a domain. A search hit is typed by knowledge layer
+  pages for Admins and the owners of a domain. A search match is typed by knowledge layer
   and wears its trust or sensitivity word. A guide is assembled *Brief* and quoted
   *Detail* layers over the concepts, with coverage.
 - **Inbox** — what waits on a person who decides something: Admins, and the owners of a

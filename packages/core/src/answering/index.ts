@@ -85,7 +85,7 @@ const ukLongDate = (iso: string): string => {
 
 export const NOT_COMPANY_KNOWLEDGE = "Not company knowledge";
 
-type ConceptHit = {
+type ConceptMatch = {
   readonly layer: "bundles";
   readonly iri: string;
   readonly kind: string;
@@ -95,7 +95,7 @@ type ConceptHit = {
   readonly tags: readonly string[];
 };
 
-type DocumentHit = {
+type DocumentMatch = {
   readonly layer: "sources";
   readonly kind: "document";
   readonly title: string;
@@ -103,11 +103,11 @@ type DocumentHit = {
   readonly sensitivity: string;
 };
 
-export type FindHit = ConceptHit | DocumentHit;
+export type FindMatch = ConceptMatch | DocumentMatch;
 
 export type FindResult = {
   readonly query: string;
-  readonly hits: readonly FindHit[];
+  readonly matches: readonly FindMatch[];
 };
 
 export type { FrontmatterValue } from "../concepts/index.ts";
@@ -219,8 +219,8 @@ export const find = async (
   if (!passages.ok) return err(passages.error);
   return ok({
     query: input.query,
-    hits: [
-      ...found.value.map((concept): ConceptHit => ({
+    matches: [
+      ...found.value.map((concept): ConceptMatch => ({
         layer: "bundles",
         iri: concept.iri,
         kind: concept.kind,
@@ -229,12 +229,12 @@ export const find = async (
         bundle: bundleOf(concept.path),
         tags: tagsOf(concept.frontmatter),
       })),
-      ...passages.value.map((hit): DocumentHit => ({
+      ...passages.value.map((match): DocumentMatch => ({
         layer: "sources",
         kind: "document",
-        title: hit.title,
-        locator: hit.locator,
-        sensitivity: hit.sensitivity,
+        title: match.title,
+        locator: match.locator,
+        sensitivity: match.sensitivity,
       })),
     ],
   });
@@ -355,7 +355,7 @@ const termsOf = (question: string): readonly string[] =>
   );
 
 const ASK_TERMS_AT_MOST = 8;
-const ASK_HITS_PER_TERM = 5;
+const ASK_MATCHES_PER_TERM = 5;
 
 /**
  * Answers no question: the verdict is always `refuse`, and the citations are the concepts its
@@ -368,7 +368,7 @@ export const ask = async (
 ): Promise<Result<AnswerResult, Error>> => {
   const named = new Map<string, OpenedConcept>();
   for (const term of termsOf(input.question)) {
-    const found = await findConcepts(principal, tx, { query: term, limit: ASK_HITS_PER_TERM });
+    const found = await findConcepts(principal, tx, { query: term, limit: ASK_MATCHES_PER_TERM });
     if (!found.ok) return err(found.error);
     for (const concept of found.value) named.set(concept.iri, concept);
   }
@@ -395,15 +395,15 @@ export const giveFeedback = async (
   input: FeedbackInput,
 ): Promise<Result<FeedbackReceipt, never>> => ok({ outcome: "received", feedback: input });
 
-const findLine = (hit: FindHit): string =>
-  hit.layer === "bundles"
-    ? `${hit.kind} · ${hit.title} · ${trustWords(hit.trust)} · ${hit.iri}`
-    : `${hit.kind} · ${hit.title} · ${NOT_COMPANY_KNOWLEDGE} · ${hit.sensitivity} · ${hit.locator}`;
+const findLine = (match: FindMatch): string =>
+  match.layer === "bundles"
+    ? `${match.kind} · ${match.title} · ${trustWords(match.trust)} · ${match.iri}`
+    : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator}`;
 
 export const renderFind = (result: FindResult): string =>
-  result.hits.length === 0
+  result.matches.length === 0
     ? "Nothing in the company's knowledge matches that."
-    : result.hits.map(findLine).join("\n");
+    : result.matches.map(findLine).join("\n");
 
 export const renderOpen = (result: OpenResult): string => {
   if (!result.found) {

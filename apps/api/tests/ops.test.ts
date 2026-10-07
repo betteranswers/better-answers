@@ -3312,14 +3312,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const found = await reading(app(), workspaceId, admin.id, (principal, tx) =>
         find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),
       );
-      const [hit, ...rest] = found.hits;
+      const [match, ...rest] = found.matches;
       expect(rest).toEqual([]);
-      if (hit?.layer !== "bundles") throw new Error("the hit is not a concept");
+      if (match?.layer !== "bundles") throw new Error("the match is not a concept");
       expect({
-        kind: hit.kind,
-        title: hit.title,
-        tags: hit.tags,
-        words: trustWords(hit.trust),
+        kind: match.kind,
+        title: match.title,
+        tags: match.tags,
+        words: trustWords(match.trust),
       }).toEqual({
         kind: "Answer",
         title: "Data retention period",
@@ -3328,7 +3328,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
 
       const opened = await reading(app(), workspaceId, admin.id, (principal, tx) =>
-        open(principal, tx, { iri: hit.iri }, IMPORTED_AT),
+        open(principal, tx, { iri: match.iri }, IMPORTED_AT),
       );
       if (!opened.found) throw new Error("the concept was not found");
       expect(opened.concept?.trust).toEqual({
@@ -3599,9 +3599,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const found = await reading(app(), workspaceId, owner.id, (principal, tx) =>
         find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),
       );
-      const hit = found.hits[0];
-      if (hit?.layer !== "bundles") throw new Error("the hit is not a concept");
-      expect(trustWords(hit.trust)).toBe("Verified by Theo Approver · 1 June 2026 · imported");
+      const match = found.matches[0];
+      if (match?.layer !== "bundles") throw new Error("the match is not a concept");
+      expect(trustWords(match.trust)).toBe("Verified by Theo Approver · 1 June 2026 · imported");
     });
   });
 });

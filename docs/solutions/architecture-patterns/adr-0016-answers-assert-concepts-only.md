@@ -56,11 +56,11 @@ The concept unit of the one index, with its vectors and its catch-up run, is the
 - Search first, reason never: the map unused.
 - Drafting from documents when no concept answers: fluent prose nobody owns.
 - A candidate concept prepared automatically from the passages: extraction spend per unanswered question.
-- Every matching unit as its own hit, ranked flat: the same fact three times.
+- Every matching unit as its own match, ranked flat: the same fact three times.
 - Reuse judged by similarity plus keyword agreement: "uptime SLA" and "support SLA" sit 0.02 apart.
 - A cross-encoder reranker in v0.1: seconds per query on a CPU for a marginal gain.
 - Two contracts, one per transport: the drift one renderer exists to prevent.
-- Telling the caller that hits were withheld: an existence leak.
+- Telling the caller that matches were withheld: an existence leak.
 
 ## History
 

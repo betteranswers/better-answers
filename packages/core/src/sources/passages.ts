@@ -110,17 +110,17 @@ export const passageAt = async (
   });
 };
 
-export type PassageHit = {
+export type PassageMatch = {
   readonly sourceDocumentId: string;
   readonly title: string;
   readonly locator: string;
   readonly sensitivity: Sensitivity;
 };
 
-const MAX_PASSAGE_HITS = 20;
+const MAX_PASSAGE_MATCHES = 20;
 
-const hitsAsked = (limit: number): number =>
-  Math.min(Math.max(Math.trunc(limit), 0), MAX_PASSAGE_HITS);
+const matchesAsked = (limit: number): number =>
+  Math.min(Math.max(Math.trunc(limit), 0), MAX_PASSAGE_MATCHES);
 
 const wireLocatorOf = (row: {
   readonly source_document_id: string;
@@ -146,7 +146,7 @@ const MATCHING_ROWS = `SELECT c.source_document_id, c.char_start, c.char_end, c.
     ORDER BY ts_rank(c.search, q) DESC, c.source_document_id, c.char_start
     LIMIT $7`;
 
-type HitRow = {
+type MatchRow = {
   readonly source_document_id: string;
   readonly char_start: number;
   readonly char_end: number;
@@ -163,15 +163,15 @@ export const findPassages = (
   tx: Tx,
   query: string,
   limit: number,
-): Promise<Result<readonly PassageHit[], Error>> => {
+): Promise<Result<readonly PassageMatch[], Error>> => {
   const parameters = readableParameters(principal);
   return attempt(async () => {
-    const read = await tx.query<HitRow>(MATCHING_ROWS, [
+    const read = await tx.query<MatchRow>(MATCHING_ROWS, [
       principal.workspaceId,
       query,
       ...parameters,
       ...parameters,
-      hitsAsked(limit),
+      matchesAsked(limit),
     ]);
 
     return read.rows.map((row) => ({
@@ -211,7 +211,7 @@ type PreviewRow = {
 export const previewPassagesInput = z.object({
   connectedSourceId: CONNECTED_SOURCE_ID,
 
-  limit: z.int().positive().default(MAX_PASSAGE_HITS),
+  limit: z.int().positive().default(MAX_PASSAGE_MATCHES),
 });
 
 export type PreviewPassagesInput = z.output<typeof previewPassagesInput>;
@@ -233,7 +233,7 @@ export const previewPassages = async (
       admin.workspaceId,
       connectedSourceId,
       ...readableParameters(admin),
-      hitsAsked(input.limit),
+      matchesAsked(input.limit),
     ]);
     return read.rows.map((row) => ({
       id: row.id,

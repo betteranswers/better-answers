@@ -2016,7 +2016,7 @@ describe("find", () => {
       ok: true,
       value: {
         query: "expenses",
-        hits: [
+        matches: [
           {
             layer: "bundles",
             iri: visible.iri,
@@ -2038,7 +2038,9 @@ describe("find", () => {
 
     expect(
       admin.ok &&
-        admin.value.hits.flatMap((hit) => (hit.layer === "bundles" ? [hit.iri] : [])).toSorted(),
+        admin.value.matches
+          .flatMap((match) => (match.layer === "bundles" ? [match.iri] : []))
+          .toSorted(),
     ).toEqual([visible.iri, withheld.iri].toSorted());
   });
 
@@ -2086,11 +2088,11 @@ describe("find", () => {
       ].map((input) => reading(scenario.viewer, (reader, tx) => find(reader, tx, input, now))),
     );
 
-    expect(limited?.ok && limited.value.hits.map((hit) => hit.title)).toEqual([
+    expect(limited?.ok && limited.value.matches.map((match) => match.title)).toEqual([
       "Alpha note",
       "Beta note",
     ]);
-    expect(pattern?.ok && pattern.value.hits).toEqual([]);
-    expect(empty?.ok && empty.value.hits).toEqual([]);
+    expect(pattern?.ok && pattern.value.matches).toEqual([]);
+    expect(empty?.ok && empty.value.matches).toEqual([]);
   });
 });

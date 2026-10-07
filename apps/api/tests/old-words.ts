@@ -999,6 +999,22 @@ const KNOWLEDGE_WORDS_LANDED = "2026-10-07";
 
 const KNOWLEDGE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(KNOWLEDGE_WORDS_LANDED)];
 
+const HIT_SENSES: readonly Sense[] = [
+  { sense: "a cache hit", written: /\bcache[- ]hit\b/gi },
+  {
+    sense: "a reconciler hit, one commit the reconciler replayed (internal)",
+    written: /\breconciler[- ]hits?\b/gi,
+  },
+  ...["packages/core/src/concepts/reconciler-hit.ts", "packages/core/test/reconciler.test.ts"].map(
+    (within) => ({
+      sense: "a reconciler hit, in the module and the test that read them",
+      within,
+      written: /\bhit\b/g,
+    }),
+  ),
+  { sense: "the area a control answers a pointer over", written: /\bhit area\b/g },
+];
+
 const TYPE_VOCABULARY_SENSES: readonly Sense[] = [
   {
     sense: "TypeScript's type keyword before the refusal vocabulary's type, a set of refusal words",
@@ -1324,7 +1340,16 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("guard", "admission"),
   avoided("hamburger", "navigation control"),
   avoided("helper", "step (of an action)"),
-  pending("hit", "match", "match", "match", "one sense"),
+  {
+    word: "hit",
+    use: "match",
+    entry: "match",
+    sweep: "match",
+    state: "landed",
+    reach: "one sense",
+    permitted: HIT_SENSES,
+    carvedOut: [...KNOWLEDGE_WORDS_CARVED_OUT, ...VENDORED],
+  },
   avoided("holder", "claimant"),
   avoided("id generator", "minter"),
   avoided("idempotency key", "run key", "cocoindex's word for its stable data ids"),

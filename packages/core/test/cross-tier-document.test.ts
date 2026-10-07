@@ -246,7 +246,7 @@ describe("one uploaded document, read back through both tiers", () => {
       expect(spanOf(landed)).toEqual(THE_WITHHELD_SPAN);
       expect(previewed.map((passage) => passage.locator)).toEqual([locator]);
       expect(previewed.map((passage) => passage.content)).toEqual([THE_PASSAGE]);
-      expect(blindFind.hits).toEqual([]);
+      expect(blindFind.matches).toEqual([]);
       expect(blindOpen).toEqual({ found: false, locator });
       expect(unpublished).toEqual([
         { sensitivity: "Internal", audience: "everyone", published_at: null },
@@ -258,7 +258,7 @@ describe("one uploaded document, read back through both tiers", () => {
       const opened = answered(await opening(scenario.viewer, locator));
       const published = await readablePassagesOf(scenario.workspaceId, bound.connectedSourceId);
 
-      expect(found.hits).toEqual([
+      expect(found.matches).toEqual([
         {
           layer: "sources",
           kind: "document",
@@ -427,9 +427,9 @@ describe("one uploaded document, read back through both tiers", () => {
       expect(withheld.map((passage) => passage.content)).toEqual([THE_PASSAGE]);
       expect(kept.map((passage) => passage.content)).toEqual([THE_HANDBOOK]);
       expect(spanOf(kept)).toEqual(THE_RESTORED_SPAN);
-      expect(found.hits.map((hit) => (hit.layer === "sources" ? hit.locator : hit.iri))).toEqual([
-        restored,
-      ]);
+      expect(
+        found.matches.map((match) => (match.layer === "sources" ? match.locator : match.iri)),
+      ).toEqual([restored]);
       expect(opened).toEqual({
         found: true,
         passage: {
@@ -523,9 +523,11 @@ describe("one uploaded document, read back through both tiers", () => {
       expect(racedClass.map((passage) => [passage.sensitivity, passage.audience])).toEqual([
         ["Restricted", "everyone"],
       ]);
-      expect(racedByTheViewer.hits).toEqual([]);
+      expect(racedByTheViewer.matches).toEqual([]);
       expect(
-        racedByTheAdmin.hits.map((hit) => (hit.layer === "sources" ? hit.locator : hit.iri)),
+        racedByTheAdmin.matches.map((match) =>
+          match.layer === "sources" ? match.locator : match.iri,
+        ),
       ).toEqual([locatorOf(bound.documentId, THE_WITHHELD_SPAN)]);
 
       expect(afterwards.map((passage) => passage.content)).toEqual([THE_PASSAGE]);
@@ -533,9 +535,11 @@ describe("one uploaded document, read back through both tiers", () => {
         ["Internal", "groups"],
       ]);
       expect(
-        seenByTheGroup.hits.map((hit) => (hit.layer === "sources" ? hit.locator : hit.iri)),
+        seenByTheGroup.matches.map((match) =>
+          match.layer === "sources" ? match.locator : match.iri,
+        ),
       ).toEqual([locatorOf(later.documentId, THE_WITHHELD_SPAN)]);
-      expect(seenByTheRest.hits).toEqual([]);
+      expect(seenByTheRest.matches).toEqual([]);
     },
     A_CROSS_TIER_ALLOWANCE_MS,
   );
@@ -638,9 +642,9 @@ const documentsTheMapFound = (run: Awaited<ReturnType<typeof erasing>>) =>
 const passagesFoundBy = async (who: UserPrincipal, query: string) => {
   const found = answered(await finding(who, query));
   const passages: string[] = [];
-  for (const hit of found.hits) {
-    if (hit.layer !== "sources") continue;
-    const opened = answered(await opening(who, hit.locator));
+  for (const match of found.matches) {
+    if (match.layer !== "sources") continue;
+    const opened = answered(await opening(who, match.locator));
     if (opened.found && opened.passage !== undefined) passages.push(opened.passage.text);
   }
   return passages;
