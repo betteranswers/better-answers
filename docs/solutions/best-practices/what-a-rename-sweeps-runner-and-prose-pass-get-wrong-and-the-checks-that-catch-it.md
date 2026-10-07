@@ -1,7 +1,7 @@
 ---
 title: "What a rename sweep's runner and prose pass get wrong, and the checks that catch it"
 date: 2026-10-04
-last_updated: 2026-10-06
+last_updated: 2026-10-07
 category: best-practices
 module: packages/devtools
 problem_type: best_practice
@@ -15,6 +15,8 @@ applies_when:
   - "A sweep touches a fixture under contracts/ or a landed phrase of more than one word"
   - "The old word has a second sense in code, such as bind for a SQL parameter, or a one-word noun becomes two"
   - "A sweep renames a page address or a column that one statement shares with a table the sweep leaves alone"
+  - "A sweep renames a page that is not built yet"
+  - "The old word is also one part of longer names in other senses, as domain is in testingDomain"
 symptoms:
   - "The runner's text pass renamed a stored localStorage key that R22 keeps, and a test title meaning the colour token --surface-page"
   - "A blanket pass turned non-navigation senses of surface and screen (api exposure, the MCP surface, the roles surface, design colours, the verb, a device display) into area and page"
@@ -24,6 +26,8 @@ symptoms:
   - "The prose pass rewrote code in files a sense had shielded: a Python local became two words, a movedFrom address stopped redirecting, a button's gerund became a noun"
   - "The contract digest moved after both stamps were generated, and the worker's hand-edited-digest test failed"
   - "The runner renamed the store door's SQL-parameter helper bind to connect wherever it is imported"
+  - "KTD11 and this doc said every renamed page address redirects, but the frame test refuses a moved address that leads only to unbuilt pages"
+  - "A map word matches inside longer names in other senses: domain in testingDomain, domainOf and the stored column name testing_domain"
 root_cause: missing_workflow_step
 resolution_type: workflow_improvement
 related_components:
@@ -36,6 +40,8 @@ tags:
   - ts-morph
   - replay-check
   - words-test
+  - moved-address
+  - camel-case
   - ba-29
 ---
 
@@ -175,7 +181,7 @@ rg -U -n -i 'secondary[\s*/#]+nav' \
 
 The globs leave out the paths the words test carves out or never reads: stored history, the plans and dogfood reports, the list, the maps and this doc, which quotes the words it teaches a sweep to remove. Run against `icon.tsx` as the sweep commit left it, this finds the wrapped pair at lines 108-109, which a single-line grep misses. On U7's head it prints nothing.
 
-**10. Leave a fixture under `contracts/` as written, and add a sense for it instead.** Both tiers read the fixtures under `contracts/`. The api tier's contract digest is computed from them, and `packages/schema/test/contract-digest.test.ts:14-18` fails when the committed stamp no longer matches. The sweep reworded a `why` in `contracts/concept-inbox/cases.json:107` ("the summary is a decision surface"). That moved the digest with no change in meaning. A fix commit put the fixture back and added a sense scoped to that directory (`old-words.ts:182-186`). The sense is one entry in the list. Rewording the fixture means regenerating the stamp, which is a tier contract change made for wording alone. The sibling doc covers how to write the sense.
+**10. Leave a fixture under `contracts/` as written, and add a sense for it instead.** Both tiers read the fixtures under `contracts/`. The api tier's contract digest is computed from them, and `packages/schema/test/contract-digest.test.ts:14-18` fails when the committed stamp no longer matches. The sweep reworded a `why` in `contracts/concept-inbox/cases.json:107` ("the summary is a decision surface"). That moved the digest with no change in meaning. A fix commit put the fixture back and added a sense scoped to that directory. U15 (c) (#613) moved the fixture to `contracts/suggestions/`, and the sense with it (`old-words.ts:184-188`). The sense is one entry in the list. Rewording the fixture means regenerating the stamp, which is a tier contract change made for wording alone. The sibling doc covers how to write the sense.
 
 **11. Update pending maps by hand for every file the sweep moves.** A map names files by literal path, in its `symbols.paths`, its `text.paths` and its senses' `paths`. Nothing catches a stale path:
 
@@ -250,7 +256,44 @@ So: hold `movedFrom` values and any quoted address or path in the pass's keep li
 
 **18. A noun that grows a word pushes test titles past their cap.** `MOST_WORDS = 10` (`packages/schema/test/test-title.ts:1`) and the Python suite holds the same cap. *Binding* to *connected source* put about sixty titles over it. Most read well with *source* for one *connected source*; a title where the old word was a verb ("binding nothing") needs its own words. Run every suite's title check before committing, not just the one in hand.
 
-**19. Test a renamed page address in the moved-address list.** `movedFrom` keeps an old address leading to its page (KTD11 of the glossary plan), and step 16 shows a pass can break it without a failing test. Add each renamed address to `apps/web/test/navigation.test.ts`'s `MOVED` list in the same commit, and watch it fail before the address is right.
+**19. Redirect a renamed page only if it is built, and test the redirect in the moved-address list.** `movedFrom` keeps an old address leading to its page (KTD11 of the glossary plan), and step 16 shows a pass can break it without a failing test. When the page has `built: true` in `apps/web/src/shared/navigation.ts`, add each old address to its `movedFrom` and to the `MOVED` list in `apps/web/test/navigation.test.ts` (lines 339-347) in the same commit, and watch the test fail before the address is right.
+
+When the page has `built: false`, give it neither. It was never routed. Its old address showed the not-found page, as an address that never existed does (ADR 0047), so a redirect would keep nothing. The frame test "routes every moved address, each leading to a built page" (`apps/web/test/frame.test.tsx:297-304`) fails on any moved address whose pages are all unbuilt. A group's `movedFrom` passes the test as long as one of its pages is built.
+
+KTD11 reads "Every renamed page address redirects", and this step said the same until U15. Neither names the exception, so each sweep that renamed an unbuilt page worked it out again:
+
+- U9, Spending limit (#552)
+- U14, Due for verification (#605)
+- U16, four pages including Publishing rules and Personal tokens (#604)
+- U15, Cost estimates and Questions asked (#610), Collections and owners (#611) and To decide (#613)
+
+Every page-level `movedFrom` in `navigation.ts` today is on a built page.
+
+### What the knowledge sweep added (U15)
+
+U15 renamed the knowledge words in three pull requests (#610, #611, #613). Step 20 comes from U15 (b).
+
+**20. A map word matches inside longer names, so narrow the map's paths when the word is common in other senses.** The runner splits each identifier and string into tokens at camel humps, acronyms, digits and joiners (`TOKEN`, `packages/devtools/src/rename/words.ts:8`). It then compares a map's words with the tokens one at a time, ignoring case (`matchAt`, `words.ts:35-56`). So the word matches when it is one part of a longer name. With U15 (b)'s *domain* to *collection* words, `renamedText` (`words.ts:126-136`) gives:
+
+| Found | Becomes |
+|---|---|
+| `testingDomain` | `testingCollection` |
+| `domainOf` | `collectionOf` |
+| `OFF_TESTING_DOMAIN` | `OFF_TESTING_COLLECTION` |
+| `consumer_domains` | `consumer_collections` |
+| `testing_domain` | `testing_collection` |
+| `subdomain` | `subdomain`: one lowercase run is one token |
+
+*hit* to *match* turns `reconcilerHits` (`packages/core/src/concepts/reconciler.ts:407`) into `reconcilerMatches`. None of these meant the reader's word: they are email domains and the commits a reconciler replayed. The `testing_domain` row is a stored name. `text("testing_domain")` at `packages/schema/src/test-workspace-tables.ts:14` names a column, and the text pass would rewrite it with no migration.
+
+U15 (b) kept each of them in one of two ways, or both:
+
+- **Narrow paths.** `collection.json` lists only `apps/web/src/shared/navigation.ts` and its test in `symbols.paths` and `text.paths`. The docs that meant a collection were edited in the prose pass. Replayed on the swept tree, the map lists 217 occurrences as `outside the allowlist`, among them `domainOf` and `to_domain` in `apps/api/src/smtp.ts` and `onDomain` in the invitation tests. `match.json` lists the answering, sources and MCP trees and nine named test files.
+- **Unanchored senses.** A sense pattern without `^` and `$` keeps a longer name that holds the word, as `[Tt]esting[-_ ]?[Dd]omain` in `collection.json` and `[Rr]econciler[ _]?[Hh]its?` in `match.json` do. A pattern is case-sensitive, so the first keeps `testingDomain` and `testing_domain` but not `OFF_TESTING_DOMAIN`, which only the narrow paths keep. An anchored pattern, such as step 2's `^screen$`, keeps the bare word alone.
+
+Read the dry run's `text` lines for longer names as well as its `symbol` lines. Step 14's command counts only `symbol` lines, and a string such as `--domain` or a Python name such as `consumer_domains` comes up on a `text` line. A narrow map names files by literal path, so step 11 applies to it whenever a later sweep moves one of them.
+
+Narrow paths also leave unrenamed any longer name outside them that does mean the reader's word. The words test will not find it once the row lands, because a landed one-sense row matches the whole word only (the sibling doc's trap 3). Grep the word's own trees for longer names before calling the sweep done, as step 5 of the sibling doc's "Landing a shared word that is mostly other senses" does.
 
 ## Why This Matters
 
@@ -259,7 +302,7 @@ Every one of U7's mistakes got past the runner, and several got past every autom
 - A renamed storage key changes nothing a test reads, but it resets a choice on every reader's browser (R22).
 - A renamed token name, or a non-navigation *surface* turned into *area*, reads plausibly and fails nothing.
 
-tsc, the contract digest test, code review and a hand-read word diff caught them, and only the first two run on their own. Each sweep brings its own words and senses. U12 renames passage together with the worker's stored names, where more of what the runner meets is stored rather than read. Steps 1, 6, 8, 9, 11 and 13 are each one command, and each would have shown a U7 mistake before review did. U11 added steps 14 to 19, because the prose pass reaches code the runner spared and its errors surface only in a test that reads the result.
+tsc, the contract digest test, code review and a hand-read word diff caught them, and only the first two run on their own. Each sweep brings its own words and senses. U12 renames passage together with the worker's stored names, where more of what the runner meets is stored rather than read. Steps 1, 6, 8, 9, 11 and 13 are each one command, and each would have shown a U7 mistake before review did. U11 added steps 14 to 19, because the prose pass reaches code the runner spared and its errors surface only in a test that reads the result. U15 limited step 19 to built pages. It added step 20 because, with broad paths, a common word would rename longer names that mean something else, a stored column among them.
 
 ## When to Apply
 
@@ -267,6 +310,8 @@ tsc, the contract digest test, code review and a hand-read word diff caught them
 - Writing or changing a sense in a map under `packages/devtools/renames/`, or a keep rule in a prose pass.
 - Renaming a property or type by hand through ts-morph, outside a map.
 - Running a sweep that moves files while another map under `packages/devtools/renames/` is still pending.
+- Renaming a page, built or not.
+- Writing a map for a word that is also part of longer names in other senses.
 - Reviewing a sweep's pull request: steps 1, 8, 9, 11 and 13 work for a reviewer too.
 
 ## Examples
@@ -323,12 +368,12 @@ The words test row carries the same sense, scoped to `apps/web/` and written `/b
 /** Every page the browser was shown, so a page that came and went cannot pass unseen. */
 ```
 
-**A contract fixture kept as written.** A fix commit reverted `contracts/concept-inbox/cases.json:107` to "the summary is a decision surface" and added this sense to `SURFACE_SENSES` (`old-words.ts:182-186`):
+**A contract fixture kept as written.** A fix commit reverted `contracts/concept-inbox/cases.json:107` to "the summary is a decision surface" and added this sense to `SURFACE_SENSES`. Since U15 (c) its `within` reads `contracts/suggestions/` (`old-words.ts:184-188`):
 
 ```ts
 {
   sense: "what a person decides on, in a fixture whose every edit moves the contract's digest",
-  within: "contracts/concept-inbox/",
+  within: "contracts/suggestions/",
   written: /\bdecision surface\b/g,
 },
 ```
@@ -338,3 +383,5 @@ The words test row carries the same sense, scoped to `apps/web/` and written `/b
 - `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md`: the step after these two passes. It covers marking rows landed, permitted senses, carve-outs, the glossary marks and the ratchet, and the traps the words test does not report.
 - `docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`: U7's approach (R22 keeps the localStorage key) and the units U8 to U17 this doc is for.
 - `packages/devtools/src/rename/` (the runner), `packages/devtools/renames/page-area-menu.json` (U7's map, a worked example of senses) and `packages/devtools/renames/model-choice.json` (the U9 map whose paths U7 moved).
+- `packages/devtools/src/rename/words.ts` (how the runner splits a name into tokens and matches a word), and `packages/devtools/renames/collection.json` and `match.json` (U15 (b)'s narrow maps).
+- `apps/web/test/frame.test.tsx` (the test that refuses a moved address leading only to unbuilt pages) and `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md` (what an unbuilt or moved address shows).
