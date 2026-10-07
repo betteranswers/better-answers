@@ -169,7 +169,7 @@ describe("a governed write", () => {
     });
 
     const joined = await db().pool.query<{ act: string; sha: string }>(
-      `SELECT e.act, c.sha
+      `SELECT e.action AS act, c.sha
          FROM audit_event e JOIN bundle_commit c
            ON c.workspace_id = e.workspace_id AND c.audit_event_id = e.id
         WHERE e.id = $1`,

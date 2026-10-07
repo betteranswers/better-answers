@@ -476,6 +476,8 @@ describe("the migration separating an Admin's narrowing from the seam's verdict"
         subjectId: seamNarrowed.id,
         detail: { sensitivity: "Restricted" },
       });
+      // 0052 reads the column by the name it had before 0073.
+      await client.query('ALTER TABLE "audit_event" RENAME COLUMN "action" TO "act"');
 
       await asTheMigrationOwnerOf(
         client,

@@ -44,7 +44,7 @@ export const emailsTo = (app: TestApp, address: string) =>
 export const eventsOn = async (app: TestApp, subjectId: string): Promise<string[]> =>
   (
     await app.database.superuser.query<{ act: string }>(
-      "SELECT act FROM audit_event WHERE subject_id = $1 ORDER BY id",
+      "SELECT action AS act FROM audit_event WHERE subject_id = $1 ORDER BY id",
       [subjectId],
     )
   ).rows.map((row) => row.act);

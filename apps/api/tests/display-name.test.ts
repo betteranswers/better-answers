@@ -70,8 +70,8 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     await api.person.setDisplayName.mutate({ displayName });
 
     const recorded = await app().database.superuser.query(
-      `SELECT act, actor, subject_id, detail, row_to_json(identity_audit_event)::text AS whole
-         FROM identity_audit_event WHERE subject_id = $1 AND act = 'people.person.named'`,
+      `SELECT action AS act, actor, subject_id, detail, row_to_json(identity_audit_event)::text AS whole
+         FROM identity_audit_event WHERE subject_id = $1 AND action = 'people.person.named'`,
       [person.id],
     );
     expect(recorded.rows).toEqual([

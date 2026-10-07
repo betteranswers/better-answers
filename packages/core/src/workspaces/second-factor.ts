@@ -195,7 +195,7 @@ const recordingOnce = async (
 ): Promise<boolean> => {
   const recorded = await tx.query(
     `SELECT 1 FROM identity_audit_event
-      WHERE subject_kind = split_part($2, '.', 2) AND subject_id = $1 AND act = $2
+      WHERE subject_kind = split_part($2, '.', 2) AND subject_id = $1 AND action = $2
         AND detail->>'authenticatorId' = $3`,
     [personId, SECOND_FACTOR_ACTS.authenticatorAdded.name, authenticatorId],
   );

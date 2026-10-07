@@ -273,7 +273,7 @@ export const attemptAuditEventRowReusingAnId = (
 ): Promise<string> =>
   refusalOf(client, () =>
     client.query(
-      `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
+      `INSERT INTO audit_event (id, workspace_id, action, actor, subject_id, detail)
            VALUES ($1, $2, 'sources.binding.bound', 'process:better-answers-test', $3, '{}'::jsonb)`,
       [id, workspaceId, ulid()],
     ),

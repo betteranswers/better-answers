@@ -70,7 +70,7 @@ const raisedFor = async (personId: string) =>
       detail: object;
     }>(
       `SELECT actor, subject_kind, subject_id, detail FROM identity_audit_event
-        WHERE subject_id = $1 AND act = $2 ORDER BY at, id`,
+        WHERE subject_id = $1 AND action = $2 ORDER BY at, id`,
       [personId, FLAG_RAISED],
     )
   ).rows;

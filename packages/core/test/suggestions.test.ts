@@ -124,7 +124,7 @@ const suggestionRow = async (suggestionId: string) => {
 
 const auditEventsFor = async (workspaceId: string, act: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
-    "SELECT act, subject_id, subject_kind, batch_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
+    "SELECT action AS act, subject_id, subject_kind, batch_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
     [workspaceId, act],
   );
   return found.rows;

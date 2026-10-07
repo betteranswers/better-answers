@@ -88,8 +88,8 @@ const joinedEventsOf = async (personId: string) =>
       workspace_id: string;
       detail: Record<string, string>;
     }>(
-      `SELECT act, actor, workspace_id, detail FROM audit_event
-        WHERE subject_id = $1 AND act = 'people.member.joined' ORDER BY id`,
+      `SELECT action AS act, actor, workspace_id, detail FROM audit_event
+        WHERE subject_id = $1 AND action = 'people.member.joined' ORDER BY id`,
       [personId],
     )
   ).rows;

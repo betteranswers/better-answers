@@ -78,7 +78,7 @@ const displayNameHeld = async (personId: string): Promise<string | undefined> =>
 
 const identitySetRowsFor = async (personId: string) => {
   const found = await db().pool.query(
-    `SELECT id, act, family, actor, subject_kind, subject_id, detail, batch_id
+    `SELECT id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id
        FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id`,
     [personId],
   );

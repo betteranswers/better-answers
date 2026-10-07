@@ -444,7 +444,7 @@ describe("the audit log under app_rt", () => {
             "process:better-answers-test",
             ulid(),
           ]),
-        ).rejects.toThrow(/audit_event_act_check|audit_event_family_check/);
+        ).rejects.toThrow(/audit_event_action_check|audit_event_family_check/);
         await client.query("ROLLBACK TO SAVEPOINT act");
       }
     });
@@ -551,7 +551,7 @@ describe("the identity-set audit log", () => {
           AN_IDENTITY_SET_AUDIT_EVENT_ROW,
           `${act} is no act the audit logs name`,
           [ulid(), act, "process:better-answers-test", ulid()],
-          /identity_audit_event_act_check|identity_audit_event_family_check/,
+          /identity_audit_event_action_check|identity_audit_event_family_check/,
         ]),
       );
     });

@@ -15,17 +15,17 @@ const familyList = listed(FAMILIES);
 
 /** Both audit logs name an act the same way and carry the same row after the key. */
 const auditLogColumns = () => ({
-  act: text("act").notNull(),
+  act: text("action").notNull(),
 
   family: text("family")
     .notNull()
-    .generatedAlwaysAs(sql`split_part(act, '.', 1)`),
+    .generatedAlwaysAs(sql`split_part(action, '.', 1)`),
 
   actor: text("actor").notNull(),
 
   subjectKind: text("subject_kind")
     .notNull()
-    .generatedAlwaysAs(sql`split_part(act, '.', 2)`),
+    .generatedAlwaysAs(sql`split_part(action, '.', 2)`),
   subjectId: text("subject_id").notNull(),
   at: stamp("at").notNull().defaultNow(),
 
@@ -35,7 +35,7 @@ const auditLogColumns = () => ({
 });
 
 const auditLogChecks = (table: string) => [
-  check(`${table}_act_check`, sql.raw(`act ~ '${ACT_PATTERN}'`)),
+  check(`${table}_action_check`, sql.raw(`action ~ '${ACT_PATTERN}'`)),
   check(`${table}_family_check`, sql.raw(`family IN (${familyList})`)),
 ];
 

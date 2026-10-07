@@ -57,7 +57,7 @@ const aWorkspaceWithAFlaggable = async (name = "Calder Joinery") => {
 const flaggedIn = async (workspaceId: string) =>
   (
     await app.database.superuser.query<{ actor: string; subject_id: string; detail: object }>(
-      "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY at, id",
+      "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY at, id",
       [workspaceId, NAME_FLAGGED],
     )
   ).rows;
@@ -65,7 +65,7 @@ const flaggedIn = async (workspaceId: string) =>
 const raisedFor = async (personId: string) =>
   (
     await app.database.superuser.query<{ actor: string; subject_id: string; detail: object }>(
-      "SELECT actor, subject_id, detail FROM identity_audit_event WHERE subject_id = $1 AND act = $2 ORDER BY at, id",
+      "SELECT actor, subject_id, detail FROM identity_audit_event WHERE subject_id = $1 AND action = $2 ORDER BY at, id",
       [personId, FLAG_RAISED],
     )
   ).rows;

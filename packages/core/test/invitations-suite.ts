@@ -156,8 +156,8 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
         detail: Record<string, string>;
         batch_id: string | null;
       }>(
-        `SELECT act, actor, subject_id, detail, batch_id FROM audit_event
-          WHERE workspace_id = $1 AND act LIKE 'people.invitation.%' ORDER BY id`,
+        `SELECT action AS act, actor, subject_id, detail, batch_id FROM audit_event
+          WHERE workspace_id = $1 AND action LIKE 'people.invitation.%' ORDER BY id`,
         [workspace.workspaceId],
       )
     ).rows;

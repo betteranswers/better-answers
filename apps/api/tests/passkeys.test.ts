@@ -84,7 +84,7 @@ const signInsOf = async (personId: string) =>
   (
     await app().database.superuser.query<{ detail: unknown }>(
       `SELECT detail FROM identity_audit_event
-        WHERE subject_id = $1 AND act = 'people.person.signed_in' ORDER BY at, id`,
+        WHERE subject_id = $1 AND action = 'people.person.signed_in' ORDER BY at, id`,
       [personId],
     )
   ).rows.map((row) => row.detail);

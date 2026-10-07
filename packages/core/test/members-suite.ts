@@ -80,7 +80,7 @@ export const membersSuite = (db: () => MigratedPostgres) => {
       subject_id: string;
       detail: Readonly<Record<string, unknown>>;
     }>(
-      "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
+      "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
       [workspace.workspaceId, act],
     );
     return rows.rows;
@@ -89,7 +89,7 @@ export const membersSuite = (db: () => MigratedPostgres) => {
   /** The batch each of the workspace's `act` events stands in, in the order they were written. */
   const batchesOf = async (workspace: ProvisionedWorkspace, act: string) => {
     const rows = await db().pool.query<{ batch_id: string | null }>(
-      "SELECT batch_id FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
+      "SELECT batch_id FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
       [workspace.workspaceId, act],
     );
     return rows.rows.map((row) => row.batch_id);
@@ -102,7 +102,7 @@ export const membersSuite = (db: () => MigratedPostgres) => {
       detail: Readonly<Record<string, unknown>>;
     }>(
       `SELECT actor, detail FROM identity_audit_event
-        WHERE subject_id = $1 AND act = 'people.person.grants_ended' ORDER BY id`,
+        WHERE subject_id = $1 AND action = 'people.person.grants_ended' ORDER BY id`,
       [personId],
     );
     return rows.rows;

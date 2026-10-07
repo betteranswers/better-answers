@@ -34,7 +34,7 @@ export const restsAlsoOnItsReconcilerHit = async (
        FROM concept_index c
        JOIN bundle_commit bc ON bc.workspace_id = c.workspace_id AND bc.sha = c.commit_sha
        JOIN audit_event e ON e.workspace_id = bc.workspace_id AND e.id = bc.audit_event_id
-      WHERE c.workspace_id = ${scopeClause(1)} AND c.iri = $2 AND e.act = $3`,
+      WHERE c.workspace_id = ${scopeClause(1)} AND c.iri = $2 AND e.action = $3`,
     [scopeParameter(principal), iri, RECONCILER_ACTS.replayed.name, EVIDENCE_AGREES],
   );
   return restsAlsoOnWhenReplayed(hit.rows[0]?.evidence_agrees ?? true);

@@ -19,16 +19,16 @@ const sessionHolder = z.object({ user: z.object({ id: z.string() }) });
 
 const signInRowsOf = (personId: string) =>
   app().database.superuser.query(
-    `SELECT act, actor, subject_id, detail, row_to_json(identity_audit_event)::text AS whole
+    `SELECT action AS act, actor, subject_id, detail, row_to_json(identity_audit_event)::text AS whole
        FROM identity_audit_event
-      WHERE act = 'people.person.signed_in' AND subject_id = $1`,
+      WHERE action = 'people.person.signed_in' AND subject_id = $1`,
     [personId],
   );
 
 const consentRowsBy = (personId: string) =>
   app().database.superuser.query(
-    `SELECT workspace_id, act, actor, subject_id, detail FROM audit_event
-      WHERE act = 'people.client.consented' AND actor = $1`,
+    `SELECT workspace_id, action AS act, actor, subject_id, detail FROM audit_event
+      WHERE action = 'people.client.consented' AND actor = $1`,
     [`human:${personId}`],
   );
 

@@ -84,7 +84,7 @@ const peopleActs = async (
     subject_id: string;
     detail: Record<string, string>;
   }>(
-    "SELECT act, actor, subject_kind, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND family = 'people' ORDER BY id",
+    "SELECT action AS act, actor, subject_kind, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND family = 'people' ORDER BY id",
     [workspaceId],
   );
   return rows.rows;

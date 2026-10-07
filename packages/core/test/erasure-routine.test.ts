@@ -471,7 +471,7 @@ const rowTextIn = async (table: string, workspaceId: string) => {
 const grantsEndedRowsAbout = async (personId: string) => {
   const read = await db().pool.query<{ row: string }>(
     `SELECT row_to_json(e)::text AS row FROM identity_audit_event e
-      WHERE e.subject_id = $1 AND e.act = 'people.person.grants_ended'`,
+      WHERE e.subject_id = $1 AND e.action = 'people.person.grants_ended'`,
     [personId],
   );
   return read.rows.map((each) => each.row);

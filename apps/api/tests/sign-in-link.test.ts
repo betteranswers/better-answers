@@ -26,7 +26,7 @@ const signInRowsOf = async (email: string) =>
   (
     await app().database.superuser.query<{ detail: unknown }>(
       `SELECT e.detail FROM identity_audit_event e JOIN "user" u ON u.id = e.subject_id
-        WHERE e.act = 'people.person.signed_in' AND u.email = $1`,
+        WHERE e.action = 'people.person.signed_in' AND u.email = $1`,
       [email],
     )
   ).rows.map((row) => row.detail);

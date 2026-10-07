@@ -36,7 +36,7 @@ const revocationsIn = async (workspaceId: string) => {
     subject_id: string;
     detail: object;
   }>(
-    "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
+    "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
     [workspaceId, CREDENTIALS_REVOKED],
   );
   return rows.rows;

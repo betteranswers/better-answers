@@ -116,7 +116,7 @@ const markOf = async (workspaceId: string) =>
 const eventsIn = async (workspaceId: string) =>
   (
     await db().pool.query<{ act: string; actor: string; subject_id: string; detail: unknown }>(
-      "SELECT act, actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
+      "SELECT action AS act, actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
       [workspaceId],
     )
   ).rows;
@@ -124,8 +124,8 @@ const eventsIn = async (workspaceId: string) =>
 const identityEventsAbout = async (fixture: Fixture) =>
   (
     await db().pool.query<{ act: string }>(
-      `SELECT e.act FROM identity_audit_event e JOIN "user" u ON u.id = e.subject_id
-        WHERE lower(u.email) LIKE $1 ORDER BY e.act`,
+      `SELECT e.action AS act FROM identity_audit_event e JOIN "user" u ON u.id = e.subject_id
+        WHERE lower(u.email) LIKE $1 ORDER BY e.action`,
       [`%@${fixture.testingDomain}`],
     )
   ).rows;

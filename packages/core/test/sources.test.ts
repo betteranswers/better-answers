@@ -168,7 +168,7 @@ const oneOfEachIn = async (pool: pg.Pool, workspaceId: string) => {
               AS "connectedSources",
             (SELECT count(*)::int FROM source_document WHERE workspace_id = $1) AS documents,
             (SELECT count(*)::int FROM audit_event
-               WHERE workspace_id = $1 AND act = 'sources.binding.bound') AS "auditEvents",
+               WHERE workspace_id = $1 AND action = 'sources.binding.bound') AS "auditEvents",
             (SELECT count(*)::int FROM job
                WHERE workspace_id = $1 AND kind = 'index') AS jobs`,
     [workspaceId],

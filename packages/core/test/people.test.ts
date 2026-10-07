@@ -47,7 +47,7 @@ const inspected = (personId: string) =>
 const signInsOf = async (personId: string): Promise<readonly string[]> => {
   const found = await db().pool.query<{ at: Date }>(
     `SELECT at FROM identity_audit_event
-      WHERE subject_id = $1 AND act = 'people.person.signed_in' ORDER BY at`,
+      WHERE subject_id = $1 AND action = 'people.person.signed_in' ORDER BY at`,
     [personId],
   );
   return found.rows.map((row) => row.at.toISOString());
@@ -376,7 +376,7 @@ describe("inspecting a person's ended grants", () => {
   /** Newest first, as the inspection lists them. */
   const endedAtOf = async (act: string, personId: string) => {
     const found = await db().pool.query<{ at: Date }>(
-      "SELECT at FROM identity_audit_event WHERE subject_id = $1 AND act = $2 ORDER BY at DESC",
+      "SELECT at FROM identity_audit_event WHERE subject_id = $1 AND action = $2 ORDER BY at DESC",
       [personId, act],
     );
     return found.rows.map((row) => row.at.toISOString());
@@ -659,7 +659,7 @@ describe("inspecting a person's ended grants", () => {
       read.ok ? read.value.ended.filter((each) => each.assistant.id === clientId) : [],
     ).toEqual([]);
     const recorded = await db().pool.query<{ detail: unknown }>(
-      "SELECT detail FROM identity_audit_event WHERE subject_id = $1 AND act = $2",
+      "SELECT detail FROM identity_audit_event WHERE subject_id = $1 AND action = $2",
       [personId, "people.person.credentials_revoked"],
     );
     expect(recorded.rows).toEqual([{ detail: { grants: [] } }]);

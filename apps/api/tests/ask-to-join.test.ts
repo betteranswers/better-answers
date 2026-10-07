@@ -48,7 +48,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
       { workspace_id: workspace.workspaceId, reason: REASON, status: "waiting" },
     ]);
     const booked = await app().database.superuser.query(
-      "SELECT act, actor FROM audit_event WHERE workspace_id = $1 AND act = 'people.request.asked'",
+      "SELECT action AS act, actor FROM audit_event WHERE workspace_id = $1 AND action = 'people.request.asked'",
       [workspace.workspaceId],
     );
     expect(booked.rows).toEqual([{ act: "people.request.asked", actor: `human:${person.id}` }]);

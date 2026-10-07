@@ -30,7 +30,7 @@ export const secondFactorSuite = () => {
     identitySetRowsFor: async (personId: string) =>
       (
         await query<{ act: string; detail: unknown }>(
-          "SELECT act, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
+          "SELECT action AS act, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
           [personId],
         )
       ).rows,
