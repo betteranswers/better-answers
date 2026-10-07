@@ -1046,7 +1046,7 @@ const DOMAIN_SENSES: readonly Sense[] = [
   {
     sense: "an address on or off an email domain, or what reaches it",
     written:
-      /\b(?:on|off|reaches|to)(?: any other| that| this| its)? domain\b|\boff a marked workspace['’]s domain\b|\boff-domain\b|\bdomain of its own\b/gi,
+      /\baddress(?:es)? (?:on|off) (?:any other|that|this|its) domain\b|\bwhat reaches (?:that|this) domain\b|\boff a marked workspace['’]s domain\b|\boff-domain\b|\bdomain of its own\b/gi,
   },
   ...MAIL_AND_DNS_TREES.map((within) => ({
     sense: "an email or DNS domain, in a tree that writes no other",

@@ -2287,13 +2287,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("test-workspace — the journeys' fixture, made or repaired", () => {
     const aFixture = () => {
-      const testingDomain = `${ulid().toLowerCase()}.testing.invalid`;
+      const addressDomain = `${ulid().toLowerCase()}.testing.invalid`;
       return {
-        testingDomain,
+        addressDomain,
         shortName: `journeys-${ulid().toLowerCase()}`,
-        admin: `admin@${testingDomain}`,
-        editor: `editor@${testingDomain}`,
-        viewer: `viewer@${testingDomain}`,
+        admin: `admin@${addressDomain}`,
+        editor: `editor@${addressDomain}`,
+        viewer: `viewer@${addressDomain}`,
       };
     };
 
@@ -2301,7 +2301,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const flagsOf = (fixture: Fixture): readonly string[] => [
       "--domain",
-      fixture.testingDomain,
+      fixture.addressDomain,
       "--short-name",
       fixture.shortName,
       "--admin",
@@ -2334,7 +2334,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const peopleOn = async (app: TestApp, fixture: Fixture): Promise<number> => {
       const found = await app.database.superuser.query(
         'SELECT 1 FROM "user" WHERE lower(email) LIKE $1',
-        [`%@${fixture.testingDomain}`],
+        [`%@${fixture.addressDomain}`],
       );
       return found.rowCount ?? 0;
     };
@@ -2347,7 +2347,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.exitCode).toBe(0);
       const id = idOnTheDoneLine(run);
       expect(run.lines).toEqual([
-        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.testingDomain}; provisioned, mark written, 54 people added, 53 members added`,
+        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.addressDomain}; provisioned, mark written, 54 people added, 53 members added`,
       ]);
       expect(await rolesIn(app(), id)).toEqual([
         { role: "Admin", members: 1 },
@@ -2370,7 +2370,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 0,
         lines: [
-          `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.testingDomain}; nothing to do`,
+          `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.addressDomain}; nothing to do`,
         ],
       });
       expect(await auditRowsIn(app(), id)).toBe(recorded);
@@ -2380,7 +2380,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const fixture = aFixture();
       const padded = {
         ...fixture,
-        testingDomain: ` ${fixture.testingDomain.toUpperCase()} `,
+        addressDomain: ` ${fixture.addressDomain.toUpperCase()} `,
         shortName: ` ${fixture.shortName} `,
       };
 
@@ -2388,14 +2388,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const id = idOnTheDoneLine(run);
       expect(run.lines).toEqual([
-        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.testingDomain}; provisioned, mark written, 54 people added, 53 members added`,
+        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.addressDomain}; provisioned, mark written, 54 people added, 53 members added`,
       ]);
     });
 
     it("names a member outside the fixture, leaving them in place", async () => {
       const fixture = aFixture();
       const id = idOnTheDoneLine(await fixing(app(), fixture));
-      const stranger = await app().person(`stranger@${fixture.testingDomain}`, "Sam Stranger");
+      const stranger = await app().person(`stranger@${fixture.addressDomain}`, "Sam Stranger");
       await app().addMember(id, stranger.id, "Editor");
 
       const run = await fixing(app(), fixture);
@@ -2403,8 +2403,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 0,
         lines: [
-          `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.testingDomain}; nothing to do`,
-          `test-workspace: stranger@${fixture.testingDomain}, an Editor, is no part of the fixture; left in place`,
+          `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.addressDomain}; nothing to do`,
+          `test-workspace: stranger@${fixture.addressDomain}, an Editor, is no part of the fixture; left in place`,
         ],
       });
       expect(await membersOf(app(), id, stranger.id)).toEqual([
@@ -2420,7 +2420,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 7,
         lines: [
-          `test-workspace: REFUSED — off-testing-domain: viewer@elsewhere.invalid is not on ${fixture.testingDomain}, where every test person's address is`,
+          `test-workspace: REFUSED — off-testing-domain: viewer@elsewhere.invalid is not on ${fixture.addressDomain}, where every test person's address is`,
         ],
       });
       expect(await workspacesWithShortName(app(), fixture.shortName)).toBe(0);
@@ -2480,7 +2480,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 8,
         lines: [
-          `test-workspace: REFUSED — slug-taken: the workspace holding the short name ${fixture.shortName} has a member or a waiting invitation off ${fixture.testingDomain}, so it is not the test workspace; it is left as it is`,
+          `test-workspace: REFUSED — slug-taken: the workspace holding the short name ${fixture.shortName} has a member or a waiting invitation off ${fixture.addressDomain}, so it is not the test workspace; it is left as it is`,
         ],
       });
       expect(await auditRowsIn(app(), id)).toBe(recorded);
@@ -2526,7 +2526,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
       const again = await fixing(app(), fixture);
       expect(again.lines).toEqual([
-        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.testingDomain}; nothing to do`,
+        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.addressDomain}; nothing to do`,
       ]);
     });
 
