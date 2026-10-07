@@ -12,13 +12,17 @@ applies_when:
   - "Any change renames a table or column in packages/schema/src/ and needs a migration"
   - "A migration rewrites a stored value that a CHECK constraint lists, on a table that forces row-level security"
   - "A migration loops over objects or rows that exist only once a workspace does, such as its partitions"
+  - "A migration renames a column that raw SQL in packages/core/src or the test suites names, directly or through a table alias"
+  - "A test replays an older migration's SQL, or counts the journal's migrations, against the newest schema"
 symptoms:
   - "pnpm --filter @better-answers/schema run generate fails with: Interactive prompts require a TTY terminal (process.stdin.isTTY or process.stdout.isTTY is false)"
   - "generate --custom writes an empty SQL file and a snapshot that still carries the old table name"
+  - "After the release a query fails with: column \"<old name>\" does not exist"
+  - "A schema test that replays an older migration fails on a name a later migration changed"
 root_cause: missing_tooling
 resolution_type: migration
 retire_when: "drizzle-kit can resolve a rename without a terminal. Check with: pnpm --filter @better-answers/schema exec drizzle-kit generate --help, looking for a flag that answers the rename prompt"
-tags: [drizzle-kit, migration, snapshot, rename, custom-migration, rls, contract-stamp, glossary-sweep, partition, replay-test]
+tags: [drizzle-kit, migration, snapshot, rename, custom-migration, rls, contract-stamp, glossary-sweep, partition, replay-test, column-rename, table-alias, audit-event]
 ---
 
 # Renaming a table: drizzle-kit will not generate it, so the migration and its snapshot are written by hand
@@ -49,7 +53,7 @@ Error: Interactive prompts require a TTY terminal (process.stdin.isTTY or proces
    - when only CHECKs and views call a renamed function, the rename is the whole change. They hold it by oid, so `pg_get_constraintdef` and `pg_get_viewdef` print the new name at once, and a view with `security_invoker` keeps it because nothing rebuilds it. 0072 renamed `narrower_class` this way. A plpgsql or SQL body that names the function as text is different and still needs `CREATE OR REPLACE`;
    - for a stored value a CHECK lists, drop the CHECK, update inside each workspace's scope, then add the CHECK back. Migration 0048 has the same shape, with a delete where 0066 updates. `job` forces row-level security, so a bare `UPDATE` by the migration owner reaches no row. Re-adding the CHECK validates every row, which is the proof the rewrite was complete;
    - a row trigger that refuses the update (0072 met `suggestion_decides_once_trigger`, which keeps a suggestion's kind as its proposer wrote it, and `map_node_generation_guard`) blocks the rewrite. Disable it with `ALTER TABLE … DISABLE TRIGGER` before the update and enable it after, both inside the migration's transaction. List the table's triggers from `pg_trigger` first, and have the replay test assert each one is enabled (`tgenabled = 'O'`) after the rewrite, since a missing `ENABLE` fails nothing else.
-4. Edit the new snapshot in place. In the table's entry, change the key `public.<old>` and every name derived from it: `name`, the index, the foreign key's name and `tableFrom`, the policy's name and its `using` and `withCheck` expressions, and the check. Also change any stored value inside another table's CHECK (U9 changed `job_reason_check`). A table outside drizzle's schema has no entry, so for 0067 the two CHECK values were the whole edit. Keep the key order drizzle wrote, and leave the file with no trailing newline, as drizzle writes none.
+4. Edit the new snapshot in place. In the table's entry, change the key `public.<old>` and every name derived from it: `name`, the index, the foreign key's name and `tableFrom`, the policy's name and its `using` and `withCheck` expressions, and the check. Also change any stored value inside another table's CHECK (U9 changed `job_reason_check`). A table outside drizzle's schema has no entry, so for 0067 the two CHECK values were the whole edit. For a column rename, change the column's key and its `name`, and every generated column's `as` and every check's `value` that name it; 0073 changed all three on both audit tables. Keep the key order drizzle wrote, and leave the file with no trailing newline, as drizzle writes none.
 5. Run `generate` again. It must print `No schema changes, nothing to migrate`. That is the plan's proof that the snapshot is in step, and it replaces the TTY prompt you could not answer.
 6. Regenerate everything derived from the migrated database, and check that each changes only in names:
    - `pnpm --filter @better-answers/schema run generate:roles-surface`
@@ -61,13 +65,26 @@ Test the value rewrite the way `packages/schema/test/job-kinds.test.ts` ("the mi
 
 A loop over objects that exist only once a workspace does never runs when CI migrates its test database. Migration 0069 renames each workspace's partition of `index.chunk` by walking `pg_inherits`. `create_workspace_partition` makes a partition only when a workspace is created, so the freshly migrated test database has none, and until a replay test existed the loop ran zero times in every suite. Production had three. Test it the way `packages/schema/test/passage-columns.test.ts` ("migration 0069 over a partition made before it") does. Inside a rolled-back transaction, put back the names and the partition function from before the migration (`packages/schema/test/before-the-passage.ts`), create a workspace and its partition the old way, and replay the migration's statements. Then assert that no old word is left among the schema's constraints, relations and policies, and that the partition's own names are the new ones.
 
+A column rename has to reach every raw SQL string that names the column. drizzle's own queries follow the schema's key, but core's slices and the test suites hold many raw strings, and each one left behind fails with `column "<old name>" does not exist` on the first request that runs it. Find them by reading every occurrence of the old name in every file that names the column's table. In this tree each fragment that names the audit column (`AUDIT_EVENT_ROW`, `ROW_COLUMNS`, `STILL_WAITING`) sits in the same file as the statement that uses it, so that set of files holds every site. A count of regex hits proves nothing. The survey made before migration 0073 (BA-29 U17 (a), PR #615) kept a line only when `act` stood on it with an SQL keyword, and skipped any match after a dot. That left out TypeScript property reads such as `event.act`, but also every table-qualified reference (`e.act`, `raised.act`, `corrected.act`), and it missed five sites in core. Each would have answered with a 500 after the release:
+
+| Site | What would have failed |
+|---|---|
+| `packages/core/src/members/name-flags.ts:39` and `:42`, in `STILL_WAITING` | an Admin flagging a member's display name, which first checks whether a flag already waits, and the operator's list of waiting flags |
+| `packages/core/src/members/audit-log.ts:177`, in `namedInDetail` | the Audit log's search for a person named in an event's detail |
+| `packages/core/src/concepts/reconciler-hit.ts:37`, in `restsAlsoOnItsReconcilerHit` | `recomputeConceptVisibility`, which re-derives a concept's visibility in a cascade and reads the reconciler's replay event to do it |
+| `packages/core/src/sources/connected-source.ts:197`, in `FIRST_OUTCOME` | every upload connect, which first reads whether a committed connect already stands; a bind retried with the same id (AE7) is one of them |
+
+Where TypeScript still reads the old result key, a select list names the new column under the old alias (`action AS act`) until the code itself is renamed. The checks to run around the rename runner for code senses and two-table statements are steps 14 and 15 of `what-a-rename-sweeps-runner-and-prose-pass-get-wrong-and-the-checks-that-catch-it.md`.
+
+A test that replays an older migration's SQL against the newest schema has to put back every name a later migration changed. `packages/schema/test/source-catalogue.test.ts` replays the backfill `DO` block of 0052, which reads `WHERE act = 'sources.document.narrowed'`. After 0073 it first runs `NAMES_BEFORE_THE_ACTION` from `packages/schema/test/before-the-action.ts`, the statements that put back 0072's names. Keep one such before-module per rename migration, as `before-the-passage.ts` is for 0069, and import it rather than writing the reverse rename into each test. A test must also not assume its migration is the journal's last. `packages/schema/test/knowledge-words-end-to-end.test.ts` asserted that 0072 was the journal's last migration (`[journal - 1, journal]`), and 0073 broke it. It now finds 0072's index in `journalMigrationFiles()` and expects the real journal to apply 0072 and every migration after it.
+
 ## Why This Matters
 
-A snapshot left with the old name passes every test, because the migrations alone build the test database. Then the next sweep's `generate` diffs against the stale snapshot and proposes a drop and a create, which loses the table's rows if anyone accepts it. A function rebuilt with `DROP` and `CREATE` instead of a rename loses its `app_rt` grant and becomes callable by PUBLIC. A value rewrite without per-workspace scope reports success and changes nothing, and the CHECK added afterwards then refuses to validate on production.
+A snapshot left with the old name passes every test, because the migrations alone build the test database. Then the next sweep's `generate` diffs against the stale snapshot and proposes a drop and a create, which loses the table's rows if anyone accepts it. A function rebuilt with `DROP` and `CREATE` instead of a rename loses its `app_rt` grant and becomes callable by PUBLIC. A value rewrite without per-workspace scope reports success and changes nothing, and the CHECK added afterwards then refuses to validate on production. A raw SQL string that still names a renamed column passes every suite that never runs its path, then fails in production.
 
 ## When to Apply
 
-Every BA-29 sweep that renames stored names: U10 (the map tables, done in 0067), U11, U12 (`index.chunk`, its partitions, `create_workspace_partition`, `embedding_route_id`, done in 0069), U15 (`submit_suggestion_set`, `suggestion_repair_proposer_check`) and U17. Also any later change that renames a column: drizzle-kit resolves a column that disappears beside a new one through the same kind of prompt (`promptColumnsConflicts`).
+Every BA-29 sweep that renames stored names: U10 (the map tables, done in 0067), U11, U12 (`index.chunk`, its partitions, `create_workspace_partition`, `embedding_route_id`, done in 0069), U15 (`submit_suggestion_set`, `suggestion_repair_proposer_check`) and U17 (a) (the audit tables' `act` column, migration 0073, PR #615). Also any later change that renames a column: drizzle-kit resolves a column that disappears beside a new one through the same kind of prompt (`promptColumnsConflicts`), and `generate --custom --name=<tag>` avoids it here as it does for a table.
 
 ## Examples
 
