@@ -99,7 +99,7 @@ describe("a connected source nobody configured", () => {
       );
 
       expect(born.rows).toEqual([
-        { destination: ["chunk-index", "bundle"], retention_class: "keep", state: "received" },
+        { destination: ["passage-index", "bundle"], retention_class: "keep", state: "received" },
       ]);
     });
   });
@@ -115,7 +115,7 @@ describe("the four closed word sets a connected source carries", () => {
             await attemptConnectedSourceOf(
               client,
               WORKSPACE,
-              wordsOf(connector, ["chunk-index"], "keep", "received"),
+              wordsOf(connector, ["passage-index"], "keep", "received"),
             ),
           ),
         );
@@ -137,7 +137,7 @@ describe("the four closed word sets a connected source carries", () => {
             await attemptConnectedSourceOf(
               client,
               WORKSPACE,
-              wordsOf("upload", ["chunk-index"], retentionClass, "received"),
+              wordsOf("upload", ["passage-index"], retentionClass, "received"),
             ),
           ),
         );
@@ -148,7 +148,7 @@ describe("the four closed word sets a connected source carries", () => {
             await attemptConnectedSourceOf(
               client,
               WORKSPACE,
-              wordsOf("upload", ["chunk-index"], "keep", state),
+              wordsOf("upload", ["passage-index"], "keep", state),
             ),
           ),
         );
@@ -164,7 +164,7 @@ describe("the four closed word sets a connected source carries", () => {
         await attemptConnectedSourceOf(
           client,
           WORKSPACE,
-          wordsOf("sharepoint", ["chunk-index"], "keep", "received"),
+          wordsOf("sharepoint", ["passage-index"], "keep", "received"),
         ),
         await attemptConnectedSourceOf(
           client,
@@ -186,12 +186,12 @@ describe("the four closed word sets a connected source carries", () => {
         await attemptConnectedSourceOf(
           client,
           WORKSPACE,
-          wordsOf("upload", ["chunk-index"], "forever", "received"),
+          wordsOf("upload", ["passage-index"], "forever", "received"),
         ),
         await attemptConnectedSourceOf(
           client,
           WORKSPACE,
-          wordsOf("upload", ["chunk-index"], "keep", "reviewing"),
+          wordsOf("upload", ["passage-index"], "keep", "reviewing"),
         ),
       ];
       expect(refusals).toEqual([

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { runsOfSubject, runsOfSubjectInput } from "../src/runs/index.ts";
 import { listConnectedSources } from "../src/sources/index.ts";
-import { chunkUnder, seededBy } from "./sourced-concept.ts";
+import { passageUnder, seededBy } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -61,7 +61,7 @@ type RunShape = {
   readonly outcome?: Readonly<Record<string, string | number>>;
 };
 
-const INDEXED = { documents: 2, chunks: 3 };
+const INDEXED = { documents: 2, passages: 3 };
 
 const TIMED_OUT = { error: "DeadlineExceededError" };
 
@@ -91,14 +91,14 @@ const runOver = (scenario: Scenario, connectedSourceId: string, run: RunShape): 
     return row.id;
   });
 
-const chunksUnder = async (
+const passagesUnder = async (
   scenario: Scenario,
   connectedSourceId: string,
   documentId: string,
   count: number,
 ): Promise<void> => {
   for (let ordinal = 0; ordinal < count; ordinal += 1) {
-    await chunkUnder(
+    await passageUnder(
       db(),
       scenario.workspaceId,
       { connectedSourceId, documentId },
@@ -117,7 +117,7 @@ const AS_BOUND = {
   sensitivity: "Internal",
   audience: "everyone",
   audienceGroups: null,
-  destination: ["chunk-index", "bundle"],
+  destination: ["passage-index", "bundle"],
   retentionClass: "keep",
   quarantined: [],
   quarantinedByError: {},
@@ -150,8 +150,8 @@ describe("the Sources list an Admin reads", () => {
       finishedAt: FINISHED_AT,
       outcome: INDEXED,
     });
-    await chunksUnder(scenario, policies.connectedSourceId, policies.documentIds[0] ?? "", 2);
-    await chunksUnder(scenario, policies.connectedSourceId, policies.documentIds[1] ?? "", 1);
+    await passagesUnder(scenario, policies.connectedSourceId, policies.documentIds[0] ?? "", 2);
+    await passagesUnder(scenario, policies.connectedSourceId, policies.documentIds[1] ?? "", 1);
     const rota = await connectedSourceOf(scenario, "Rota", [{ title: "rota.md" }], PUBLISHED_AT);
     const rotaRun = await runOver(scenario, rota.connectedSourceId, {
       reason: "connected",
@@ -177,7 +177,7 @@ describe("the Sources list an Admin reads", () => {
         state: "indexing",
         publishedAt: null,
         documentCount: 1,
-        chunkCount: 0,
+        passageCount: 0,
         lastRun: {
           jobId: contractsRun,
           kind: "index",
@@ -195,7 +195,7 @@ describe("the Sources list an Admin reads", () => {
         state: "received",
         publishedAt: null,
         documentCount: 1,
-        chunkCount: 0,
+        passageCount: 0,
         lastRun: {
           jobId: handbookRun,
           kind: "index",
@@ -213,7 +213,7 @@ describe("the Sources list an Admin reads", () => {
         state: "indexed",
         publishedAt: null,
         documentCount: 2,
-        chunkCount: 3,
+        passageCount: 3,
         lastRun: {
           jobId: policiesRun,
           kind: "index",
@@ -231,7 +231,7 @@ describe("the Sources list an Admin reads", () => {
         state: "published",
         publishedAt: "2026-09-11T10:00:00.000Z",
         documentCount: 1,
-        chunkCount: 0,
+        passageCount: 0,
         lastRun: {
           jobId: rotaRun,
           kind: "index",

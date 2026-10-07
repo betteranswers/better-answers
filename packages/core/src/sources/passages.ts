@@ -12,7 +12,7 @@ import {
 import { attempt, err, NOT_FOUND, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnConnectedSource, CONNECTED_SOURCE_ID } from "./admin-connected-source.ts";
-import { locatorOf, parseLocator, spanText, type LocatorRefusal } from "./chunk-address.ts";
+import { locatorOf, parseLocator, spanText, type LocatorRefusal } from "./passage-address.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
 export type Passage = {
@@ -26,10 +26,10 @@ export type Passage = {
  * The view's class is NULL only for a word both source columns' CHECKs refuse; the predicate's
  * Admin arm passes it, and the parse fails it.
  */
-const CHUNK_SENSITIVITY = z.enum(SENSITIVITIES);
+const PASSAGE_SENSITIVITY = z.enum(SENSITIVITIES);
 
 const COVERING_ROWS = `SELECT c.content, c.char_start, c.char_end, c.sensitivity, d.title
-     FROM "index".readable_chunk c
+     FROM "index".readable_passage c
      JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id
     WHERE c.workspace_id = $1
       AND c.source_document_id = $4
@@ -47,7 +47,7 @@ type CoveringRow = {
 };
 
 /**
- * `not-found` unless chunks the caller can read cover the whole span without a gap. The class is
+ * `not-found` unless passages the caller can read cover the whole span without a gap. The class is
  * the narrowest among them.
  */
 export const passageAt = async (
@@ -75,10 +75,10 @@ export const passageAt = async (
       // opens a passage no row covers.
       if (points !== row.char_end - row.char_start) {
         throw new Error(
-          `the chunk row at ${locatorOf(sourceDocumentId, row.char_start, row.char_end)} holds ${String(points)} code points`,
+          `the passage row at ${locatorOf(sourceDocumentId, row.char_start, row.char_end)} holds ${String(points)} code points`,
         );
       }
-      return { ...row, sensitivity: CHUNK_SENSITIVITY.parse(row.sensitivity) };
+      return { ...row, sensitivity: PASSAGE_SENSITIVITY.parse(row.sensitivity) };
     });
   });
   if (!covering.ok) return err(covering.error);
@@ -129,7 +129,7 @@ const wireLocatorOf = (row: {
 }): string => locatorOf(row.source_document_id, row.char_start, row.char_end);
 
 const MATCHING_ROWS = `SELECT c.source_document_id, c.char_start, c.char_end, c.sensitivity, d.title
-     FROM "index".readable_chunk c
+     FROM "index".readable_passage c
      JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id
     CROSS JOIN websearch_to_tsquery('english', $2) AS q
     WHERE c.workspace_id = $1
@@ -155,7 +155,7 @@ type HitRow = {
 };
 
 /**
- * Leaves out a chunk whose document is evidence for a concept the caller can read. `limit` is held
+ * Leaves out a passage whose document is evidence for a concept the caller can read. `limit` is held
  * to 0 through 20.
  */
 export const findPassages = (
@@ -178,22 +178,22 @@ export const findPassages = (
       sourceDocumentId: row.source_document_id,
       title: row.title,
       locator: wireLocatorOf(row),
-      sensitivity: CHUNK_SENSITIVITY.parse(row.sensitivity),
+      sensitivity: PASSAGE_SENSITIVITY.parse(row.sensitivity),
     }));
   });
 };
 
-export type PreviewedChunk = {
+export type PreviewedPassage = {
   readonly id: string;
   readonly sourceDocumentId: string;
   readonly locator: string;
   readonly content: string;
 };
 
-const CONNECTED_SOURCE_CHUNKS = `SELECT c.id, c.source_document_id, c.char_start, c.char_end, c.content
-     FROM "index".readable_chunk c
+const CONNECTED_SOURCE_PASSAGES = `SELECT c.id, c.source_document_id, c.char_start, c.char_end, c.content
+     FROM "index".readable_passage c
     WHERE c.workspace_id = $1
-      AND c.binding_id = $2
+      AND c.connected_source_id = $2
       AND c.char_start IS NOT NULL
       AND c.char_end IS NOT NULL
       AND ${sensitivityAndAudienceClause("c", 3)}
@@ -208,28 +208,28 @@ type PreviewRow = {
   readonly content: string;
 };
 
-export const previewChunksInput = z.object({
+export const previewPassagesInput = z.object({
   connectedSourceId: CONNECTED_SOURCE_ID,
 
   limit: z.int().positive().default(MAX_PASSAGE_HITS),
 });
 
-export type PreviewChunksInput = z.output<typeof previewChunksInput>;
+export type PreviewPassagesInput = z.output<typeof previewPassagesInput>;
 
-type PreviewChunksRefusal = SourceRefusal<"role-forbids"> | Error;
+type PreviewPassagesRefusal = SourceRefusal<"role-forbids"> | Error;
 
 /** `limit` is held to 20 at most. */
-export const previewChunks = async (
+export const previewPassages = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: PreviewChunksInput,
-): Promise<Result<readonly PreviewedChunk[], PreviewChunksRefusal>> => {
+  input: PreviewPassagesInput,
+): Promise<Result<readonly PreviewedPassage[], PreviewPassagesRefusal>> => {
   const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
   const { admin, connectedSourceId } = acting.value;
 
   return attempt(async () => {
-    const read = await tx.query<PreviewRow>(CONNECTED_SOURCE_CHUNKS, [
+    const read = await tx.query<PreviewRow>(CONNECTED_SOURCE_PASSAGES, [
       admin.workspaceId,
       connectedSourceId,
       ...readableParameters(admin),

@@ -22,8 +22,8 @@ import {
 } from "../src/sources/index.ts";
 import {
   connectedSourceHolding,
-  chunkUnder,
-  chunkVersionsOf,
+  passageUnder,
+  passageVersionsOf,
   conceptCiting,
   documentUnder,
   seededBy,
@@ -154,7 +154,7 @@ const finishedIndexRun = (
       finishedAt: new Date(finishedAt),
       outcome: {
         documents: 2,
-        chunks: 2,
+        passages: 2,
         lmdb_bytes: 8192,
         restores_overridden_by_erasure: [...overridden],
       },
@@ -226,9 +226,9 @@ const UNREVIEWED = {
   review_reason: null,
 };
 
-const chunkClassesOf = async (workspaceId: string, documentId: string) => {
+const passageClassesOf = async (workspaceId: string, documentId: string) => {
   const found = await db().pool.query<{ sensitivity: string }>(
-    `SELECT sensitivity FROM "index".readable_chunk
+    `SELECT sensitivity FROM "index".readable_passage
       WHERE workspace_id = $1 AND source_document_id = $2 ORDER BY ordinal`,
     [workspaceId, documentId],
   );
@@ -257,7 +257,7 @@ const jobsOf = async (workspaceId: string) => {
 };
 
 const narrowingLeftBehindIn = async (workspaceId: string, documentId: string) => ({
-  classes: await chunkClassesOf(workspaceId, documentId),
+  classes: await passageClassesOf(workspaceId, documentId),
   auditEvents: await batchedRowsOf(db().pool, workspaceId, "sources.document.narrowed"),
   jobs: await jobsOf(workspaceId),
 });
@@ -303,7 +303,7 @@ const connectedSourceWithTwoDocuments = async (scenario: Scenario) => {
   });
   const second = await documentUnder(db(), scenario.workspaceId, first.connectedSourceId, null);
   for (const document of [first, second]) {
-    await chunkUnder(db(), scenario.workspaceId, document, {
+    await passageUnder(db(), scenario.workspaceId, document, {
       content: "12-34-56",
       ordinal: 0,
       charStart: 0,
@@ -330,7 +330,7 @@ const twoDocumentsTheSeamNarrowed = async (scenario: Scenario) => {
     "Restricted",
   );
   for (const document of [first, second]) {
-    await chunkUnder(db(), scenario.workspaceId, document, {
+    await passageUnder(db(), scenario.workspaceId, document, {
       content: "He was diagnosed with a heart condition.",
       ordinal: 0,
       charStart: 0,
@@ -930,10 +930,10 @@ describe("an Admin keeping named finding groups in the text", () => {
 });
 
 describe("an Admin narrowing named documents", () => {
-  it("takes each to Restricted with one audit event, chunks untouched", async () => {
+  it("takes each to Restricted with one audit event, passages untouched", async () => {
     const scenario = await arrange();
     const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
-    const stoodAt = await chunkVersionsOf(db(), scenario.workspaceId, connectedSourceId);
+    const stoodAt = await passageVersionsOf(db(), scenario.workspaceId, connectedSourceId);
 
     const outcome = await narrowAs(scenario.admin, connectedSourceId, [
       findingGroupIn(first.documentId),
@@ -943,10 +943,10 @@ describe("an Admin narrowing named documents", () => {
       ok: true,
       value: { connectedSourceId, documentIds: [first.documentId], sensitivity: "Restricted" },
     });
-    expect(await chunkVersionsOf(db(), scenario.workspaceId, connectedSourceId)).toEqual(stoodAt);
-    expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Restricted"]);
+    expect(await passageVersionsOf(db(), scenario.workspaceId, connectedSourceId)).toEqual(stoodAt);
+    expect(await passageClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Restricted"]);
 
-    expect(await chunkClassesOf(scenario.workspaceId, second.documentId)).toEqual(["Internal"]);
+    expect(await passageClassesOf(scenario.workspaceId, second.documentId)).toEqual(["Internal"]);
     expect(
       await batchedRowsOf(db().pool, scenario.workspaceId, "sources.document.narrowed"),
     ).toEqual([
@@ -1174,7 +1174,7 @@ describe("an Admin narrowing named documents", () => {
     const { connectedSourceId, held } = await documentHeldAboveItsConnectedSource(
       scenario.workspaceId,
     );
-    await chunkUnder(db(), scenario.workspaceId, held, {
+    await passageUnder(db(), scenario.workspaceId, held, {
       content: "12-34-56",
       ordinal: 0,
       charStart: 0,
@@ -1191,7 +1191,7 @@ describe("an Admin narrowing named documents", () => {
     );
 
     expect(outcome).toEqual({ ok: false, error: "widening-refused" });
-    expect(await chunkClassesOf(scenario.workspaceId, held.documentId)).toEqual(["Restricted"]);
+    expect(await passageClassesOf(scenario.workspaceId, held.documentId)).toEqual(["Restricted"]);
   });
 
   it("refuses another connected source's document, failing the whole batch", async () => {
@@ -1207,7 +1207,7 @@ describe("an Admin narrowing named documents", () => {
     ]);
 
     expect(outcome).toEqual({ ok: false, error: "no-such-document" });
-    expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
+    expect(await passageClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
   });
 
   it.each([
@@ -1222,7 +1222,7 @@ describe("an Admin narrowing named documents", () => {
     ]);
 
     expect(outcome).toEqual({ ok: false, error: "role-forbids" });
-    expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
+    expect(await passageClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
   });
 });
 
@@ -1303,7 +1303,7 @@ describe("an Admin dismissing finding groups as not special category", () => {
     const { first, dismissed } = await dismissingTwoGroupsOfThree(scenario);
 
     expect(await restoreOf(scenario.workspaceId, dismissed)).toMatchObject({ restored: false });
-    expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Restricted"]);
+    expect(await passageClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Restricted"]);
   });
 
   it("writes one unbatched row for one document's group", async () => {
@@ -1500,7 +1500,7 @@ describe("a bulk act handed no finding group at all", () => {
 });
 
 describe("the reprocess that follows a review", () => {
-  it("takes unmarked findings away with the chunks", async () => {
+  it("takes unmarked findings away with the passages", async () => {
     const scenario = await arrange();
     const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
@@ -1509,7 +1509,7 @@ describe("the reprocess that follows a review", () => {
 
     const outcome = await reprocessAsAdmin(scenario, connectedSourceId, "rule-change");
 
-    expect(outcome).toMatchObject({ ok: true, value: { chunks: 2, findings: 3 } });
+    expect(outcome).toMatchObject({ ok: true, value: { passages: 2, findings: 3 } });
     expect(await findingCountOf(scenario.workspaceId, first.documentId)).toBe(0);
     expect(await findingCountOf(scenario.workspaceId, second.documentId)).toBe(0);
   });
@@ -1540,7 +1540,7 @@ describe("the reprocess that follows a review", () => {
 
       const outcome = await reprocessAsAdmin(scenario, connectedSourceId, reason);
 
-      expect(outcome).toMatchObject({ ok: true, value: { chunks: 2 } });
+      expect(outcome).toMatchObject({ ok: true, value: { passages: 2 } });
       expect(await jobsOf(scenario.workspaceId)).toEqual([
         { kind: "index", reason, subject_id: connectedSourceId },
       ]);

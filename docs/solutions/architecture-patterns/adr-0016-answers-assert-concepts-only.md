@@ -46,7 +46,7 @@ The concept unit of the one index, with its vectors and its catch-up run, is the
 ## Why
 
 - The platform's value is that concepts can be reasoned over in a way embeddings cannot. An agent traverses the knowledge to find whether an answer already exists.
-- A sentence generated from document chunks belongs to no knowledge layer. No trust word can describe it, and once pasted into a tender it cannot be walked back.
+- A sentence generated from document passages belongs to no knowledge layer. No trust word can describe it, and once pasted into a tender it cannot be walked back.
 - A verdict that arrives after three streamed sentences has already shown them.
 - MCP cannot stream a partial tool result, so a contract defined as an object with a streamed field would drift between the two transports.
 - The embedding half of the entry step was decided while the estate carried a local embedding server. ADR 0024 removed that server the next day, and the need was never measured.

@@ -241,7 +241,7 @@ type SeedDocument = {
   readonly title: string;
   readonly sensitivity?: Sensitivity;
   readonly quarantineError?: string;
-  readonly chunks?: readonly string[];
+  readonly passages?: readonly string[];
   readonly findings?: readonly SeedFinding[];
   readonly cited?: boolean;
 };

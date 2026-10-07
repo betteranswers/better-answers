@@ -13,7 +13,7 @@ import pytest
 from better_answers_worker import loop, queue
 from better_answers_worker.kinds import index_run
 from better_answers_worker.pipeline import (
-    BINDING_STORE,
+    CONNECTED_SOURCE_STORE,
     DOCX_MEDIA_TYPE,
     FINDINGS_STORE,
     IndexRun,
@@ -34,12 +34,12 @@ from better_answers_worker.redaction.withholdings import (
 )
 from factories import (
     seed_admin_narrowing,
-    seed_chunk,
     seed_connected_source,
     seed_dismissal,
     seed_finding,
     seed_job,
     seed_narrowed,
+    seed_passage,
     seed_restore,
     seed_source_document,
     seed_suppression,
@@ -127,7 +127,7 @@ def an_invoice_read_as(
             content_hash=sha256_of(AN_INVOICE),
             detected_afresh=False,
         ),
-        chunks=(),
+        passages=(),
     )
 
 
@@ -251,11 +251,11 @@ def seed_a_row_an_earlier_release_landed(
         cursor.execute(
             "SELECT set_config('app.workspace_id', %s, true)", (workspace_id,)
         )
-        seed_chunk(
+        seed_passage(
             cursor,
             workspace_id=workspace_id,
             connected_source_id=CONNECTED_SOURCE,
-            chunk_id=f"{AN_INVOICE_ID}#000000",
+            passage_id=f"{AN_INVOICE_ID}#000000",
         )
     connection.commit()
 
@@ -278,13 +278,13 @@ def by_column(cursor: psycopg.Cursor[Any]) -> list[dict[str, Any]]:
     return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
 
 
-def chunk_rows_of(
+def passage_rows_of(
     connection: psycopg.Connection, workspace_id: str
 ) -> list[dict[str, Any]]:
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT id, workspace_id, content, binding_id, source_document_id,"
-            ' locator, ordinal, char_start, char_end FROM "index".chunk'
+            "SELECT id, workspace_id, content, connected_source_id, source_document_id,"
+            ' locator, ordinal, char_start, char_end FROM "index".passage'
             " WHERE workspace_id = %s ORDER BY id",
             (workspace_id,),
         )
@@ -296,7 +296,7 @@ def row_versions_of(
 ) -> list[tuple[Any, ...]]:
     with connection.cursor() as cursor:
         cursor.execute(
-            'SELECT id, xmin FROM "index".chunk WHERE workspace_id = %s ORDER BY id',
+            'SELECT id, xmin FROM "index".passage WHERE workspace_id = %s ORDER BY id',
             (workspace_id,),
         )
         return list(cursor.fetchall())
@@ -356,13 +356,13 @@ def test_the_loop_claims_runs_and_finishes_an_index_job(
         row = cursor.fetchone()
     assert row is not None
     assert row[:4] == ("index", "done", bootstrap.worker_id, True)
-    assert (row[4]["documents"], row[4]["chunks"]) == (0, 0)
+    assert (row[4]["documents"], row[4]["passages"]) == (0, 0)
     assert row[4]["lmdb_bytes"] > 0
 
     assert row[4]["restores_overridden_by_erasure"] == []
 
 
-def test_lands_every_chunk_column_under_a_source_with_a_visibility(
+def test_lands_every_passage_column_under_a_source_with_a_visibility(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -381,16 +381,16 @@ def test_lands_every_chunk_column_under_a_source_with_a_visibility(
 
     assert outcome.as_row() == {
         "documents": 1,
-        "chunks": 1,
+        "passages": 1,
         "lmdb_bytes": outcome.lmdb_bytes,
         "restores_overridden_by_erasure": [],
     }
-    assert chunk_rows_of(connection, workspace_id) == [
+    assert passage_rows_of(connection, workspace_id) == [
         {
             "id": f"{AN_INVOICE_ID}#000000",
             "workspace_id": workspace_id,
             "content": AN_INVOICE_REDACTED,
-            "binding_id": CONNECTED_SOURCE,
+            "connected_source_id": CONNECTED_SOURCE,
             "source_document_id": AN_INVOICE_ID,
             "locator": f"{AN_INVOICE_ID}/chars:0-127",
             "ordinal": 0,
@@ -490,7 +490,7 @@ def test_reconciles_the_catalogue_and_lands_the_copy_beside_the_original(
 
 
 # jscpd:ignore-start
-def test_a_special_category_verdict_narrows_the_document_and_its_chunks(
+def test_a_special_category_verdict_narrows_the_document_and_its_passages(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -511,7 +511,7 @@ def test_a_special_category_verdict_narrows_the_document_and_its_chunks(
     ] == [(AN_INVOICE_ID, None), (A_SICK_NOTE_ID, "Restricted")]
     assert [
         (row["source_document_id"], row["content"])
-        for row in chunk_rows_of(connection, workspace_id)
+        for row in passage_rows_of(connection, workspace_id)
     ] == [
         (AN_INVOICE_ID, AN_INVOICE_REDACTED),
         (A_SICK_NOTE_ID, A_SICK_NOTE_REDACTED),
@@ -620,7 +620,7 @@ def test_quarantines_an_unreadable_document_on_its_own_catalogue_row(
         "seen_again": True,
     }
     assert [
-        row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)
+        row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     ] == [AN_INVOICE_ID]
 
 
@@ -647,7 +647,7 @@ def test_a_textless_pdf_names_ocr_on_its_row(
         "NeedsOcrError",
     )
     assert [
-        row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)
+        row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     ] == [AN_INVOICE_ID]
 
 
@@ -683,7 +683,7 @@ def test_quarantines_an_unlisted_media_type_on_its_row(
         "normalised_key": None,
     }
     assert {
-        row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)
+        row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     } == {AN_INVOICE_ID}
 
 
@@ -702,7 +702,7 @@ def test_lands_the_deadline_on_an_overrunning_documents_row(
         margin_ms=0,
     )
 
-    assert (outcome.documents, outcome.chunks) == (0, 0)
+    assert (outcome.documents, outcome.passages) == (0, 0)
     quarantined = catalogue_rows_of(connection, workspace_id)[0]
     assert (quarantined["outcome"], quarantined["quarantine_error"]) == (
         "quarantined",
@@ -710,7 +710,7 @@ def test_lands_the_deadline_on_an_overrunning_documents_row(
     )
     assert quarantined["normalised_key"] is None
     assert bucket.writes == []
-    assert chunk_rows_of(connection, workspace_id) == []
+    assert passage_rows_of(connection, workspace_id) == []
 
 
 def test_a_quarantined_document_read_next_run_loses_its_error(
@@ -741,7 +741,7 @@ def test_a_quarantined_document_read_next_run_loses_its_error(
         "converted",
         None,
     )
-    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+    assert [row["content"] for row in passage_rows_of(connection, workspace_id)] == [
         A_RATE_CARD_CONVERTED
     ]
 
@@ -750,7 +750,7 @@ class ConverterOutOfMemoryError(Exception):
     pass
 
 
-def test_an_unexpected_document_failure_fails_the_run_and_keeps_chunks(
+def test_an_unexpected_document_failure_fails_the_run_and_keeps_passages(
     database: tuple[psycopg.Connection, str],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -765,7 +765,7 @@ def test_an_unexpected_document_failure_fails_the_run_and_keeps_chunks(
     bucket = a_bucket_holding_the_three()
     bucket.objects[original_key_of(A_SICK_NOTE_ID)] = AN_EXPENSES_POLICY_DOCX
     index_connected_source(bootstrap, run_for(workspace_id), copies=bucket)
-    chunks = chunk_rows_of(connection, workspace_id)
+    passages = passage_rows_of(connection, workspace_id)
     catalogue = catalogue_rows_of(connection, workspace_id)
     writes = list(bucket.writes)
 
@@ -776,11 +776,11 @@ def test_an_unexpected_document_failure_fails_the_run_and_keeps_chunks(
 
     with pytest.raises(ConverterOutOfMemoryError):
         index_connected_source(bootstrap, run_for(workspace_id), copies=bucket)
-    assert {row["source_document_id"] for row in chunks} == {
+    assert {row["source_document_id"] for row in passages} == {
         AN_INVOICE_ID,
         A_SICK_NOTE_ID,
     }
-    assert chunk_rows_of(connection, workspace_id) == chunks
+    assert passage_rows_of(connection, workspace_id) == passages
     assert catalogue_rows_of(connection, workspace_id) == catalogue
     assert bucket.writes == writes
 
@@ -797,7 +797,7 @@ def test_reads_a_suppression_off_the_table_and_keeps_it_out(
     index_connected_source(
         bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three()
     )
-    kept = [row["content"] for row in chunk_rows_of(connection, workspace_id)]
+    kept = [row["content"] for row in passage_rows_of(connection, workspace_id)]
 
     with connection.cursor() as cursor:
         seed_suppression(cursor, workspace_id=workspace_id)
@@ -810,7 +810,7 @@ def test_reads_a_suppression_off_the_table_and_keeps_it_out(
     )
 
     assert kept == [A_DELIVERY_NOTE]
-    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+    assert [row["content"] for row in passage_rows_of(connection, workspace_id)] == [
         A_DELIVERY_NOTE_SUPPRESSED
     ]
 
@@ -841,7 +841,7 @@ def test_an_earlier_suppression_reaches_every_document_the_connected_source_hold
 
     assert [
         (row["source_document_id"], row["content"])
-        for row in chunk_rows_of(connection, workspace_id)
+        for row in passage_rows_of(connection, workspace_id)
     ] == [
         (A_DELIVERY_NOTE_ID, A_DELIVERY_NOTE_SUPPRESSED),
         (ANOTHER_DELIVERY_NOTE_ID, A_DELIVERY_NOTE_SUPPRESSED),
@@ -876,7 +876,7 @@ def test_the_next_run_withholds_an_erased_address_without_a_finding(
     connection.commit()
     index_connected_source(bootstrap, run_for(workspace_id, "wiped"), copies=rota)
 
-    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+    assert [row["content"] for row in passage_rows_of(connection, workspace_id)] == [
         A_ROTA_ERASED
     ]
     assert finding_rows_of(connection, workspace_id) == before
@@ -1179,7 +1179,7 @@ def test_the_next_run_puts_an_admin_restored_span_back(
         bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three()
     )
     # jscpd:ignore-end
-    withheld = [row["content"] for row in chunk_rows_of(connection, workspace_id)]
+    withheld = [row["content"] for row in passage_rows_of(connection, workspace_id)]
 
     with connection.cursor() as cursor:
         kept = seed_restore(
@@ -1196,7 +1196,7 @@ def test_the_next_run_puts_an_admin_restored_span_back(
     index_connected_source(bootstrap, run_for(workspace_id, "restored"), copies=bucket)
 
     assert withheld == [AN_INVOICE_REDACTED]
-    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+    assert [row["content"] for row in passage_rows_of(connection, workspace_id)] == [
         AN_INVOICE
     ]
     assert bucket.objects[normalised_key_of(AN_INVOICE_ID)] == AN_INVOICE.encode()
@@ -1265,12 +1265,12 @@ def classes_read_at(
         )
         own, narrowed_to = cursor.fetchone() or (None, None)
         cursor.execute(
-            'SELECT DISTINCT sensitivity FROM "index".readable_chunk'
+            'SELECT DISTINCT sensitivity FROM "index".readable_passage'
             " WHERE workspace_id = %s AND source_document_id = %s",
             (workspace_id, document_id),
         )
-        chunks = sorted(str(row[0]) for row in cursor.fetchall())
-    return {"own": own, "narrowed_to": narrowed_to, "chunks": chunks}
+        passages = sorted(str(row[0]) for row in cursor.fetchall())
+    return {"own": own, "narrowed_to": narrowed_to, "passages": passages}
 
 
 class OneDocumentRun:
@@ -1315,11 +1315,11 @@ def test_dismissing_the_only_health_finding_returns_the_connected_sources_class(
     assert narrowed == {
         "own": "Restricted",
         "narrowed_to": None,
-        "chunks": ["Restricted"],
+        "passages": ["Restricted"],
     }
-    assert lifted == {"own": None, "narrowed_to": None, "chunks": ["Internal"]}
+    assert lifted == {"own": None, "narrowed_to": None, "passages": ["Internal"]}
     assert [
-        row["content"] for row in chunk_rows_of(connection, sick_note.workspace_id)
+        row["content"] for row in passage_rows_of(connection, sick_note.workspace_id)
     ] == [A_SICK_NOTE_REDACTED]
     assert [
         (row["char_start"], row["char_end"], row["review_state"])
@@ -1367,7 +1367,7 @@ def test_dismissing_an_engineers_diagnosis_gives_its_document_back(
     lifted = engineers_note.run("dismissed")
 
     assert narrowed["own"] == "Restricted"
-    assert lifted == {"own": None, "narrowed_to": None, "chunks": ["Internal"]}
+    assert lifted == {"own": None, "narrowed_to": None, "passages": ["Internal"]}
 
 
 def test_a_kept_health_sentence_returns_and_its_document_stays_restricted(
@@ -1381,9 +1381,13 @@ def test_a_kept_health_sentence_returns_and_its_document_stays_restricted(
     kept = sick_note.run("restored")
 
     assert [
-        row["content"] for row in chunk_rows_of(connection, sick_note.workspace_id)
+        row["content"] for row in passage_rows_of(connection, sick_note.workspace_id)
     ] == [A_SICK_NOTE]
-    assert kept == {"own": "Restricted", "narrowed_to": None, "chunks": ["Restricted"]}
+    assert kept == {
+        "own": "Restricted",
+        "narrowed_to": None,
+        "passages": ["Restricted"],
+    }
 
 
 def test_a_lifted_verdict_returns_to_the_admins_narrowing_only(
@@ -1405,7 +1409,7 @@ def test_a_lifted_verdict_returns_to_the_admins_narrowing_only(
     assert lifted == {
         "own": "Internal",
         "narrowed_to": "Internal",
-        "chunks": ["Internal"],
+        "passages": ["Internal"],
     }
 
 
@@ -1439,7 +1443,7 @@ def test_an_erased_kept_span_stays_withheld_and_is_reported(
         run_for(workspace_id, "restored"),
         copies=a_bucket_holding_the_three(),
     )
-    shown = [row["content"] for row in chunk_rows_of(connection, workspace_id)]
+    shown = [row["content"] for row in passage_rows_of(connection, workspace_id)]
 
     with connection.cursor() as cursor:
         seed_suppression(
@@ -1458,7 +1462,7 @@ def test_an_erased_kept_span_stays_withheld_and_is_reported(
 
     assert shown == [AN_INVOICE]
     assert kept.as_row()["restores_overridden_by_erasure"] == []
-    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+    assert [row["content"] for row in passage_rows_of(connection, workspace_id)] == [
         AN_INVOICE_REDACTED
     ]
     assert erased.as_row()["restores_overridden_by_erasure"] == [
@@ -1488,7 +1492,7 @@ def test_a_row_deleting_reason_empties_the_store_before_reading(
     workspace_id = seed_the_connected_source(connection, documents=(AN_INVOICE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
     connected_source_directory = (
-        tmp_path / workspace_id / CONNECTED_SOURCE / BINDING_STORE
+        tmp_path / workspace_id / CONNECTED_SOURCE / CONNECTED_SOURCE_STORE
     )
     findings_directory = tmp_path / workspace_id / CONNECTED_SOURCE / FINDINGS_STORE
 
@@ -1566,7 +1570,51 @@ def test_a_row_deleting_reason_empties_the_store_before_reading(
         inodes_of(findings_standing).items()
     )
     assert wiped.lmdb_bytes > 0
-    assert chunk_rows_of(connection, workspace_id)[0]["content"] == AN_INVOICE_REDACTED
+    assert (
+        passage_rows_of(connection, workspace_id)[0]["content"] == AN_INVOICE_REDACTED
+    )
+
+
+# The store's name before the passage sweep, as an earlier release left it.
+THE_STORE_AN_EARLIER_RELEASE_NAMED = "binding"
+
+
+def test_a_wipe_leaves_no_old_store_and_tracks_removals_again(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = seed_the_connected_source(
+        connection, documents=(AN_INVOICE_ID, A_DELIVERY_NOTE_ID)
+    )
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    old_store = (
+        tmp_path / workspace_id / CONNECTED_SOURCE / THE_STORE_AN_EARLIER_RELEASE_NAMED
+    )
+    old_store.mkdir(parents=True)
+    (old_store / "data.mdb").write_bytes(b"an earlier release's tracking")
+
+    index_connected_source(
+        bootstrap, run_for(workspace_id, "wiped"), copies=a_bucket_holding_the_three()
+    )
+    landed = {
+        row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
+    }
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE source_document SET gone_at = now() WHERE id = %s",
+            (A_DELIVERY_NOTE_ID,),
+        )
+    connection.commit()
+    index_connected_source(
+        bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three()
+    )
+
+    assert old_store.exists() is False
+    # The control: without both documents landed, the removal below would prove nothing.
+    assert landed == {AN_INVOICE_ID, A_DELIVERY_NOTE_ID}
+    assert {
+        row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
+    } == {AN_INVOICE_ID}
 
 
 A_REASON_NO_DESCRIPTOR_DECLARES = "a-word-no-descriptor-declares"
@@ -1586,7 +1634,7 @@ def test_a_run_with_an_unknown_reason_indexes_like_any_other(
     )
 
     assert outcome.documents == 1
-    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+    assert [row["content"] for row in passage_rows_of(connection, workspace_id)] == [
         AN_INVOICE_REDACTED
     ]
 
@@ -1610,7 +1658,7 @@ def test_the_claimant_runs_an_unknown_reason_job_without_raising(
         ),
     )
 
-    assert (outcome["documents"], outcome["chunks"]) == (0, 0)
+    assert (outcome["documents"], outcome["passages"]) == (0, 0)
     assert outcome["lmdb_bytes"] > 0
 
 
@@ -1621,7 +1669,7 @@ def test_a_run_dying_before_landing_leaves_only_the_verdict(
     workspace_id = seed_the_connected_source(connection, documents=(A_SICK_NOTE_ID,))
 
     def take_the_landing_away() -> None:
-        connection.execute('REVOKE INSERT ON "index".chunk FROM worker_rt')
+        connection.execute('REVOKE INSERT ON "index".passage FROM worker_rt')
         connection.commit()
 
     bucket = ABucket(
@@ -1644,22 +1692,22 @@ def test_a_run_dying_before_landing_leaves_only_the_verdict(
             catalogue_rows_of(connection, workspace_id)[0]["sensitivity"]
             == "Restricted"
         )
-        assert chunk_rows_of(connection, workspace_id) == []
+        assert passage_rows_of(connection, workspace_id) == []
     finally:
-        connection.execute('GRANT INSERT ON "index".chunk TO worker_rt')
+        connection.execute('GRANT INSERT ON "index".passage TO worker_rt')
         connection.commit()
 
     retried = index_connected_source(
         bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three()
     )
 
-    assert retried.chunks == 1
+    assert retried.passages == 1
     assert [
-        row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)
+        row["source_document_id"] for row in passage_rows_of(connection, workspace_id)
     ] == [A_SICK_NOTE_ID]
 
 
-def test_a_rule_change_relands_every_chunk_the_reprocess_deleted(
+def test_a_rule_change_relands_every_passage_the_reprocess_deleted(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1671,14 +1719,14 @@ def test_a_rule_change_relands_every_chunk_the_reprocess_deleted(
     index_connected_source(
         bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three()
     )
-    landed = chunk_rows_of(connection, workspace_id)
+    landed = passage_rows_of(connection, workspace_id)
 
     with connection.cursor() as cursor:
         cursor.execute(
-            'DELETE FROM "index".chunk WHERE workspace_id = %s', (workspace_id,)
+            'DELETE FROM "index".passage WHERE workspace_id = %s', (workspace_id,)
         )
     connection.commit()
-    emptied = chunk_rows_of(connection, workspace_id)
+    emptied = passage_rows_of(connection, workspace_id)
 
     index_connected_source(
         bootstrap,
@@ -1686,7 +1734,7 @@ def test_a_rule_change_relands_every_chunk_the_reprocess_deleted(
         copies=a_bucket_holding_the_three(),
     )
 
-    again = chunk_rows_of(connection, workspace_id)
+    again = passage_rows_of(connection, workspace_id)
 
     assert len(landed) == 3
     assert emptied == []
@@ -1717,7 +1765,7 @@ def test_rewrites_an_old_row_once_and_then_writes_nothing(
 
     assert rewritten != stood_at
     assert row_versions_of(connection, workspace_id) == rewritten
-    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+    assert [row["content"] for row in passage_rows_of(connection, workspace_id)] == [
         AN_INVOICE_REDACTED
     ]
 

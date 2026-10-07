@@ -9,7 +9,7 @@ import {
   keepInTextInput,
   narrowConnectedSourceInput,
   narrowDocumentsInput,
-  previewChunksInput,
+  previewPassagesInput,
   publishConnectedSourceInput,
   reprocessConnectedSourceInput,
 } from "../src/sources/index.ts";
@@ -236,12 +236,12 @@ describe("the shapes the Sources acts are handed", () => {
 
   it("refuses a fractional preview limit and defaults an absent one", () => {
     expect(
-      refusalOf(parse(previewChunksInput, { connectedSourceId: A_CONNECTED_SOURCE, limit: 2.5 })),
+      refusalOf(parse(previewPassagesInput, { connectedSourceId: A_CONNECTED_SOURCE, limit: 2.5 })),
     ).toEqual({
       word: "malformed",
       fields: { limit: "wrong-type" },
     });
-    expect(parse(previewChunksInput, { connectedSourceId: A_CONNECTED_SOURCE })).toEqual({
+    expect(parse(previewPassagesInput, { connectedSourceId: A_CONNECTED_SOURCE })).toEqual({
       ok: true,
       value: { connectedSourceId: A_CONNECTED_SOURCE, limit: 20 },
     });

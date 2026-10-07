@@ -11,7 +11,7 @@ import {
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { addToGroup, createGroup } from "../src/members/index.ts";
 import {
-  chunkIdOf,
+  passageIdOf,
   publishConnectedSource,
   publishConnectedSourceInput,
 } from "../src/sources/index.ts";
@@ -99,7 +99,7 @@ export const publishedOnceIndexed = async (
       claimedAt: INDEXED_AT,
       heartbeatAt: INDEXED_AT,
       finishedAt: INDEXED_AT,
-      outcome: { chunks: 1 },
+      outcome: { passages: 1 },
     }),
   );
   return readingAs(db.runtimePool, admin, (principal, tx) =>
@@ -145,7 +145,7 @@ export const documentUnder = (
     return { connectedSourceId, documentId: document.id };
   });
 
-export type ChunkShape = {
+export type PassageShape = {
   readonly content: string;
 
   readonly ordinal: number;
@@ -154,16 +154,16 @@ export type ChunkShape = {
 };
 
 /** The row's locator holds the span alone, without the document id. */
-export const chunkUnder = (
+export const passageUnder = (
   db: MigratedPostgres,
   workspaceId: string,
   document: Sourced,
-  shape: ChunkShape,
+  shape: PassageShape,
 ): Promise<string> =>
   seededBy(db, async (seed) => {
-    const row = await seed.chunk({
+    const row = await seed.passage({
       workspaceId,
-      id: chunkIdOf(document.documentId, shape.ordinal),
+      id: passageIdOf(document.documentId, shape.ordinal),
       connectedSourceId: document.connectedSourceId,
       sourceDocumentId: document.documentId,
       content: shape.content,
@@ -176,15 +176,15 @@ export const chunkUnder = (
     return row.id;
   });
 
-/** Each chunk row's `xmin`, in id order: it moves whenever the row is rewritten. */
-export const chunkVersionsOf = async (
+/** Each passage row's `xmin`, in id order: it moves whenever the row is rewritten. */
+export const passageVersionsOf = async (
   db: MigratedPostgres,
   workspaceId: string,
   connectedSourceId: string,
 ): Promise<readonly string[]> => {
   const read = await db.pool.query<{ version: string }>(
-    `SELECT xmin::text AS version FROM "index".chunk
-      WHERE workspace_id = $1 AND binding_id = $2 ORDER BY id`,
+    `SELECT xmin::text AS version FROM "index".passage
+      WHERE workspace_id = $1 AND connected_source_id = $2 ORDER BY id`,
     [workspaceId, connectedSourceId],
   );
   return read.rows.map((row) => row.version);

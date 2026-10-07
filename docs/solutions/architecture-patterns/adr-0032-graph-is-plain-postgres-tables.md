@@ -9,7 +9,7 @@ applies_when:
   - "Adding a tenant table, a grant, a policy or a definer function"
   - "Writing a map traversal, or proposing a graph engine or database"
   - "Writing a migration, or changing what worker_rt may reach"
-  - "Changing how find matches full text on index.chunk"
+  - "Changing how find matches full text on index.passage"
 tags:
   - adr-0032
   - map
@@ -37,9 +37,9 @@ The substrate:
 
 - One migration journal, Drizzle's, in `packages/schema`. It generates migrations for `public` and carries hand-written SQL for the `index` schema, extensions, policies, SQL functions and the map tables.
 - One policy seam: every tenant policy calls `current_workspace_id()`, written `(SELECT current_workspace_id())`.
-- `index.chunk`'s vector column is `vector(N)`, fixed, with `embedding_route_id` on every row and list partitioning by workspace.
-- A `SECURITY DEFINER` function, `create_workspace_partition`, makes each workspace's `index.chunk` partition with a GIN index over its full-text column, `search`. The HNSW index returns with the route's S8 block, when the embedding column is first written, in the same per-partition shape.
-- `worker_rt` is deny-by-default. A migration that wants the worker to reach a table says so in a GRANT. It holds SELECT, INSERT, UPDATE and DELETE on the `index.chunk` parent and nothing on a partition.
+- `index.passage`'s vector column is `vector(N)`, fixed, with `embedding_model_choice_id` on every row and list partitioning by workspace.
+- A `SECURITY DEFINER` function, `create_workspace_partition`, makes each workspace's `index.passage` partition with a GIN index over its full-text column, `search`. The HNSW index returns with the route's S8 block, when the embedding column is first written, in the same per-partition shape.
+- `worker_rt` is deny-by-default. A migration that wants the worker to reach a table says so in a GRANT. It holds SELECT, INSERT, UPDATE and DELETE on the `index.passage` parent and nothing on a partition.
 - The roles' surface, `packages/schema/roles-surface.json`, and the worker's schema view are generated from the catalogue after migrating, committed and drift-checked.
 - `migrate` connects as a superuser and, after the journal on every run, marks `pg_catalog.ts_match_vq` LEAKPROOF (`packages/schema/src/full-text-match.ts`). `find`'s full-text match then reaches the GIN index beneath the policy.
 

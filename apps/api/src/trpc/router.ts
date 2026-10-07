@@ -16,8 +16,8 @@ import {
   narrowConnectedSourceInput,
   narrowDocuments,
   narrowDocumentsInput,
-  previewChunks,
-  previewChunksInput,
+  previewPassages,
+  previewPassagesInput,
   publishConnectedSource,
   publishConnectedSourceInput,
   widenConnectedSource,
@@ -105,7 +105,9 @@ export const appRouter = router({
     widen: mutationProcedure
       .input(parsedBy(widenConnectedSourceInput))
       .mutation(answeredBy(widenConnectedSource)),
-    preview: queryProcedure.input(parsedBy(previewChunksInput)).query(answeredBy(previewChunks)),
+    preview: queryProcedure
+      .input(parsedBy(previewPassagesInput))
+      .query(answeredBy(previewPassages)),
   }),
   runs: router({
     ofSubject: queryProcedure.input(parsedBy(runsOfSubjectInput)).query(answeredBy(runsOfSubject)),

@@ -675,7 +675,7 @@ test.describe("reviewing a connected source's findings", () => {
     );
   });
 
-  test("previews an unpublished source's chunks to the Admin reviewing it", async ({
+  test("previews an unpublished source's passages to the Admin reviewing it", async ({
     page,
     request,
   }) => {
@@ -686,7 +686,7 @@ test.describe("reviewing a connected source's findings", () => {
           documents: [
             {
               title: "handbook.md",
-              chunks: ["The handbook says what the company decided.", "Pay goes to [withheld]."],
+              passages: ["The handbook says what the company decided.", "Pay goes to [withheld]."],
             },
           ],
         }),
@@ -696,7 +696,7 @@ test.describe("reviewing a connected source's findings", () => {
       .getByRole("button", { name: "Review Staff handbook" })
       .click();
     await page
-      .getByRole("button", { name: "Preview the chunks a reader would see once published" })
+      .getByRole("button", { name: "Preview the passages a reader would see once published" })
       .click();
 
     await expect(reviewOf(page, "Staff handbook").getByRole("listitem")).toHaveText([

@@ -8,7 +8,7 @@
     "id-shape": { "form": "fixtured" },
     "concept-file": { "form": "fixtured" },
     "redaction": { "form": "fixtured" },
-    "document-chunk": { "form": "fixtured" },
+    "document-passage": { "form": "fixtured" },
     "upload-media-types": { "form": "fixtured" },
     "citation": { "form": "fixtured" },
     "emptying-a-connected-source": { "form": "fixtured" },
@@ -22,7 +22,7 @@
     { "agreement": "concept-file", "path": "concept-file/cases.json" },
     { "agreement": "credential-envelope", "path": "credential-envelope/cases.json" },
     { "agreement": "redaction", "path": "redaction/cases.json" },
-    { "agreement": "document-chunk", "path": "document-chunk/cases.json" },
+    { "agreement": "document-passage", "path": "document-passage/cases.json" },
     { "agreement": "upload-media-types", "path": "upload-media-types/cases.json" },
     { "agreement": "citation", "path": "citation/cases.json" },
     {

@@ -82,19 +82,19 @@ export const citeDocument = (
     resource: "The handbook",
   });
 
-const CHUNK_THROUGH_THE_PARENT = `INSERT INTO "index".chunk
-     (workspace_id, id, content, binding_id,
+const PASSAGE_THROUGH_THE_PARENT = `INSERT INTO "index".passage
+     (workspace_id, id, content, connected_source_id,
       source_document_id, locator, ordinal, char_start, char_end)
    VALUES ($1, $2, 'a paragraph of the handbook', 'connected-source-1',
            $3, 'chars:0-40', 0, 0, 40)`;
 
-export const chunkWrittenThroughTheParent = async (
+export const passageWrittenThroughTheParent = async (
   client: pg.PoolClient,
   workspaceId: string,
   sourceDocumentId: string,
 ): Promise<string> => {
-  const id = `chunk-${ulid()}`;
-  await client.query(CHUNK_THROUGH_THE_PARENT, [workspaceId, id, sourceDocumentId]);
+  const id = `passage-${ulid()}`;
+  await client.query(PASSAGE_THROUGH_THE_PARENT, [workspaceId, id, sourceDocumentId]);
   return id;
 };
 
@@ -137,7 +137,7 @@ const FINISHED_JOB = `INSERT INTO job (workspace_id, id, kind, reason, subject_i
                       enqueued_at, claimed_by, claimed_at, finished_at, outcome)
        VALUES ($1, $2, $3, $4, $5, '${JOB_DONE_STATUS}', 1,
                now() - ($6 || ' seconds')::interval, 'worker-that-ran', now(), now(),
-               '{"chunks": 0}'::jsonb)`;
+               '{"passages": 0}'::jsonb)`;
 
 export const seedFinishedJob = async (
   client: pg.PoolClient,

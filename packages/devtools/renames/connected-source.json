@@ -96,45 +96,6 @@
       "matches": ["^bindingId$"]
     },
     {
-      "sense": "the binding_id column on index.chunk and its view, which the passage sweep renames (U12)",
-      "matches": [
-        "\"index\"\\.chunk",
-        "readable_chunk",
-        "\\bc\\.binding_id\\b",
-        "chunk_binding_id",
-        "chunk_workspace_id_binding_id",
-        "binding_id, source_document_id"
-      ]
-    },
-    {
-      "sense": "the binding_id column on index.chunk, as the worker and the column tests name it (U12)",
-      "paths": [
-        "packages/schema/src/index-tables.ts",
-        "apps/worker/src/better_answers_worker/pipeline/rows.py",
-        "apps/worker/tests/factories.py",
-        "apps/worker/tests/test_pipeline_host.py",
-        "apps/worker/tests/test_pipeline_index.py",
-        "packages/schema/test/chunk-columns.test.ts",
-        "apps/api/tests/local-database.test.ts",
-        "packages/core/test/document-chunk.contract.test.ts",
-        "packages/core/test/erasure-replay.test.ts",
-        "packages/core/test/erasure-routine.test.ts",
-        "packages/core/test/passages.test.ts"
-      ],
-      "matches": ["^binding_id$", "content, binding_id"]
-    },
-    {
-      "sense": "the worker's store directory and its size key, which the passage sweep renames (U12)",
-      "matches": ["^BINDING_STORE$", "^binding$", "^binding:", "LMDB_MAX_BYTES_PER_BINDING"],
-      "paths": [
-        "apps/worker/src/better_answers_worker/pipeline/host.py",
-        "apps/worker/src/better_answers_worker/pipeline/__init__.py",
-        "apps/worker/src/better_answers_worker/config.py",
-        "apps/worker/tests/**",
-        "packages/core/test/cross-tier-document.test.ts"
-      ]
-    },
-    {
       "sense": "the sign-in link's binding cookie, which ties a link to one browser",
       "matches": ["binding cookie"]
     },
@@ -189,6 +150,18 @@
       "sense": "the sign-in link's cookie, which binds a link to the browser that asked",
       "paths": ["apps/api/tests/sign-in-link.test.ts"],
       "matches": ["binds the browser"]
+    },
+    {
+      "sense": "the store's name before the passage sweep, which a wipe removes",
+      "paths": [
+        "apps/worker/src/better_answers_worker/pipeline/host.py",
+        "apps/worker/tests/test_pipeline_index.py"
+      ],
+      "matches": ["^binding$"]
+    },
+    {
+      "sense": "the names migration 0069 found, which a test puts back to run it again",
+      "paths": ["packages/schema/test/before-the-passage.ts"]
     }
   ]
 }

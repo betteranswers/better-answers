@@ -104,7 +104,7 @@ beforeAll(async () => {
     await data.oauthRefreshToken();
     // The partition's lifecycle function reads a transaction's scope, so it runs in one.
     await client.query("BEGIN");
-    await data.chunk({ workspaceId: first.workspaceId });
+    await data.passage({ workspaceId: first.workspaceId });
     await client.query("COMMIT");
     workspaces = [first.workspaceId, second.workspaceId].toSorted();
     const children = await client.query<{ relation: string }>(
@@ -112,7 +112,7 @@ beforeAll(async () => {
          FROM pg_inherits i
          JOIN pg_class c ON c.oid = i.inhrelid
          JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE i.inhparent = '"index".chunk'::regclass`,
+        WHERE i.inhparent = '"index".passage'::regclass`,
     );
     partition = children.rows[0]?.relation ?? "";
   } finally {
@@ -243,10 +243,10 @@ describe("the read-only browsing role, applied over the whole journal", () => {
         ["DELETE FROM connected_source", "a delete from a tenant table"],
         ["TRUNCATE connected_source", "a truncate of a tenant table"],
         ["UPDATE member SET role = 'Admin'", "an update to the identity set"],
-        ['DELETE FROM "index".chunk', "a delete from the chunk index"],
+        ['DELETE FROM "index".passage', "a delete from the passage index"],
         [
           `DELETE FROM ${partition}`,
-          "a delete from a workspace's chunk partition, reached directly",
+          "a delete from a workspace's passage partition, reached directly",
         ],
         [`UPDATE ${partition} SET content = 'rewritten'`, "an update to that partition, directly"],
         ["CREATE TABLE public.browse_probe (id int)", "a table made in public"],

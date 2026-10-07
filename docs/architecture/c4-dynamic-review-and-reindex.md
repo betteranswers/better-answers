@@ -17,8 +17,8 @@ C4Dynamic
     Component(runs, "runs — enqueueJobIn", "the act's transaction", "One queued index job per connected source; an emptying reason takes it over")
   }
 
-  ContainerDb(postgres, "Postgres", "RLS", "finding, source_document, connected_source, index.chunk, job, audit_event")
-  Container(worker, "worker", "the index run", "Empties binding/ on wiped or rule-change, then indexes")
+  ContainerDb(postgres, "Postgres", "RLS", "finding, source_document, connected_source, index.passage, job, audit_event")
+  Container(worker, "worker", "the index run", "Empties connected_source/ on wiped or rule-change, then indexes")
 
   Rel(admin, trpc, "1. Opens the review: the finding groups the last run raised, by document, category, rule and tier")
   Rel(trpc, review, "2. keepInText over always-set groups with one reason")
@@ -30,7 +30,7 @@ C4Dynamic
   Rel(review, cascade, "8. Re-derives the concepts citing those documents, then their compositions; queues no run")
   Rel(trpc, connectedSource, "9. narrow: the connected source's class and audience, only narrower; the same cascade; queues no run")
   Rel(erasure, connectedSource, "10. reprocessConnectedSource with reason wiped, per connected source holding a document the map found")
-  Rel(connectedSource, postgres, "11. Deletes the connected source's index.chunk rows and its unreviewed, unrestored findings")
+  Rel(connectedSource, postgres, "11. Deletes the connected source's index.passage rows and its unreviewed, unrestored findings")
   Rel(connectedSource, runs, "12. Queues reason wiped; rule-change is admitted and no entry asks for it yet")
   Rel(runs, postgres, "13. One queued index job per connected source: a later act adds no second job; an emptying reason takes over a queued one and stays")
   Rel(worker, postgres, "14. Claims the job and runs it with its reason")
@@ -42,16 +42,16 @@ C4Dynamic
 
 | Reason | Queued by | Empties the connected source | What the run changes |
 | --- | --- | --- | --- |
-| `connected` | `connectUpload` | no | The first run: findings, the catalogue, the chunks |
-| `restored` | `keepInText` | no | The kept spans back in the normalised copy and the chunks; an erasure still outranks them |
+| `connected` | `connectUpload` | no | The first run: findings, the catalogue, the passages |
+| `restored` | `keepInText` | no | The kept spans back in the normalised copy and the passages; an erasure still outranks them |
 | `dismissed` | `dismissAsNotSpecialCategory` | no | A document every one of whose special-category findings is dismissed has the seam's verdict lifted, back to the Admin's own narrowing or the connected source's class; the spans stay withheld |
-| `wiped` | `reprocessConnectedSource`, from the erasure routine's `rederiveAfterErasure` | yes | `binding/` removed, then every chunk landed again under the new suppressions; `findings/` spared, so nothing is detected afresh |
+| `wiped` | `reprocessConnectedSource`, from the erasure routine's `rederiveAfterErasure` | yes | `connected_source/` removed, then every passage landed again under the new suppressions; `findings/` spared, so nothing is detected afresh |
 | `rule-change` | `reprocessConnectedSource`; no entry asks for it yet | yes | As `wiped` |
 
 ## What the flow guarantees
 
 - **The review names no span.** A finding group is one document's findings of one category, raised by one rule at one tier; the three bulk acts take groups, and a finding the last run did not raise is not shown, acted on or counted at a publish (`CONCEPTS.md`, *finding group*).
 - **Only a dismissal widens a document, and never past the Admin.** `narrowDocuments` and `narrow` refuse `widening-refused`; a keep lets a span back into the text and lifts no class. A connected source widens by `widenConnectedSource` alone, over the cascade a narrowing and a publish run, and never moves a document's own narrower class (T-371; `c4-dynamic-document-to-passage.md`). The review decides when it may: a special-category finding the last run raised and nobody reviewed refuses it as `special-category-unreviewed`, and any review of that group (a keep, a narrowing or a dismissal) lets it through.
-- **A narrowing is a write to the source row.** The chunk's class is read through `index.readable_chunk`, so a narrowing queues no run and takes effect at its commit; the cascade re-derives the concepts citing the evidence and then the compositions including them, inside the same act (ADR 0044; `CONCEPTS.md`, *cascade*).
-- **The two halves of emptying go together.** `reprocessConnectedSource` deletes the chunk rows in the act's transaction and queues a reason the worker empties `binding/` on; the `emptying-a-connected-source` agreement holds both tiers to the same two reasons.
+- **A narrowing is a write to the source row.** The passage's class is read through `index.readable_passage`, so a narrowing queues no run and takes effect at its commit; the cascade re-derives the concepts citing the evidence and then the compositions including them, inside the same act (ADR 0044; `CONCEPTS.md`, *cascade*).
+- **The two halves of emptying go together.** `reprocessConnectedSource` deletes the passage rows in the act's transaction and queues a reason the worker empties `connected_source/` on; the `emptying-a-connected-source` agreement holds both tiers to the same two reasons.
 - **An erasure re-indexes now the documents its map finds.** The `source-document` finder names the live documents whose indexed text holds one of the identifiers the suppression holds (T-377), and the routine wipes their connected sources, so step 10 runs for each of them now. Every other document loses the identifiers on its connected source's next run: the suppression is the workspace's (T-375), and the seam withholds every exact occurrence of its identifiers (T-376).

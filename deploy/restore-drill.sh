@@ -135,7 +135,7 @@ done
 say "## 5 REPLAY ERASURES completed after the dump (ADR 0020 — beyond use, made honest)"
 platform run --rm --no-deps api pnpm --silent ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"
 
-say "## 5b the synthetic fixture joins the restored copy: its workspace's rows, chunk partition and an empty repository"
+say "## 5b the synthetic fixture joins the restored copy: its workspace's rows, passage partition and an empty repository"
 # No production dump holds it, and it is the one workspace the drill may always rebuild, seed a subject into and erase.
 STAGING_DATABASE_URL="${STAGING_DATABASE_URL}" "${DEPLOY_DIR}/seed-synthetic.sh" | tee -a "${REPORT}"
 [ -d "/data/git/${synthetic_workspace}.git" ] || sudo -u "#${API_UID}" git init --quiet --bare --initial-branch main "/data/git/${synthetic_workspace}.git"
@@ -194,12 +194,12 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
   if ! grep -q ': present in ' "${WORK}/pre-erasure.grep"; then
     say "REHEARSAL FAILED: the seeded subject is in no table of the pre-erasure dump"; exit 1
   fi
-  # A chunk table the subject was never in would pass the grep after the erasure without proving the index lets them go.
-  if ! grep -q -E ' of table index\."?chunk' "${WORK}/pre-erasure.grep"; then
-    say "REHEARSAL FAILED: the seeded subject is in no chunk of the pre-erasure dump, so the dump grep after would prove nothing of the index"; exit 1
+  # A passage table the subject was never in would pass the grep after the erasure without proving the index lets them go.
+  if ! grep -q -E ' of table index\."?passage' "${WORK}/pre-erasure.grep"; then
+    say "REHEARSAL FAILED: the seeded subject is in no passage of the pre-erasure dump, so the dump grep after would prove nothing of the index"; exit 1
   fi
   # <<< found before
-  say "dump grep before: the subject is in the pre-erasure copy, the index's chunk table among it (expected; the report's expiry dates cover it)"
+  say "dump grep before: the subject is in the pre-erasure copy, the index's passage table among it (expected; the report's expiry dates cover it)"
 
   platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --run --report /tmp/erasure.md | tee -a "${REPORT}"
   platform exec -T api cat /tmp/erasure.md >> "${REPORT}"

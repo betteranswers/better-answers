@@ -35,7 +35,9 @@ def test_the_bootstrap_carries_the_object_store_both_tiers_share() -> None:
 
 
 def test_engine_defaults_come_from_the_box_not_the_engine() -> None:
-    read = read_bootstrap({**COMPLETE, "LMDB_MAX_BYTES_PER_BINDING": "4294967296"})
+    read = read_bootstrap(
+        {**COMPLETE, "LMDB_MAX_BYTES_PER_CONNECTED_SOURCE": "4294967296"}
+    )
 
     assert read.engine.lmdb_dir == "/data/worker/lmdb"
     assert read.engine.lmdb_map_bytes == 4_294_967_296

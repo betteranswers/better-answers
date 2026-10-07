@@ -87,7 +87,7 @@ function GroupNotes(properties: {
 }
 
 /** Its own component, so the region and the read's words it holds mount together, on opening. */
-function PreviewChunks(properties: {
+function PreviewPassages(properties: {
   readonly preview: ReturnType<typeof usePreview>;
   readonly open: boolean;
 }) {
@@ -96,14 +96,14 @@ function PreviewChunks(properties: {
 
   return (
     <div aria-live="polite" className="mt-2">
-      {said.isPending && properties.open ? <p>The chunks are still loading.</p> : null}
+      {said.isPending && properties.open ? <p>The passages are still loading.</p> : null}
       {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
-      {preview.data?.length === 0 ? <p>No chunk has landed yet.</p> : null}
+      {preview.data?.length === 0 ? <p>No passage has landed yet.</p> : null}
       {preview.data === undefined || preview.data.length === 0 ? null : (
         <ol className="grid gap-2">
-          {preview.data.map((chunk) => (
-            <li key={chunk.id} className="border border-border bg-muted p-3">
-              {chunk.content}
+          {preview.data.map((passage) => (
+            <li key={passage.id} className="border border-border bg-muted p-3">
+              {passage.content}
             </li>
           ))}
         </ol>
@@ -120,14 +120,14 @@ function Preview(properties: { readonly connectedSource: ListedConnectedSource }
     <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
       <CollapsibleTrigger asChild>
         <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-          Preview the chunks a reader would see once published
+          Preview the passages a reader would see once published
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <p className="mt-2 text-muted-foreground">
           Seen by Admins here and by nobody else anywhere until the connected source is published.
         </p>
-        <PreviewChunks preview={preview} open={open} />
+        <PreviewPassages preview={preview} open={open} />
       </CollapsibleContent>
     </Collapsible>
   );

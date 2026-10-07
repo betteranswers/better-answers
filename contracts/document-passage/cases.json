@@ -1,6 +1,6 @@
 {
-  "description": "document-chunk (ADR 0031, ADR 0036, ADR 0020): one document's normalised redacted text, the chunk rows it is cut into and the passage a locator opens, said once for both tiers. The worker splits the text and writes the rows; the api parses a locator a citation carries, derives the same id from the same address and cuts the same passage back out. Two things make that an agreement rather than two implementations of one sentence. The first is the **id**: a chunk's id is derived from `(source_document_id, ordinal)` and never minted, so a reprocess upserts on the row's own key (ADR 0036's stable id) and either tier can compute a row's id from its address without asking the other. The second is the **offsets**: a locator's `chars:<start>-<end>` are Unicode code points into the normalised redacted text, and the two tiers do not count a string the same way — Python indexes by code point and JavaScript by UTF-16 unit. So the text below carries an astral character before every cited span, and its code-point length and its UTF-16 length are both written down and differ: a tier that counts units returns a passage one character early and one character short, which is a wrong answer that looks like a right one. The chunk rows **partition the text** — the first starts at 0, each one's end is the next one's start and the last one's end is the text's code-point length — so a span straddling two rows has exactly one answer whether it is cut from the whole text or from the rows it covers. `chunk_size` is the size these rows were cut at and not the size the pipeline runs at: the splitter is held to this file by running at the size this file names. Neither half holds the other's literals — the TypeScript half runs its own id derivation, locator parser and span cut (`packages/core/test/document-chunk.contract.test.ts`), and the Python half runs the arithmetic the splitter and the run will use (`apps/worker/tests/test_document_chunk_contract.py`). `passageAt` is held to the same rows when it lands (T-133).",
-  "chunk_id": {
+  "description": "document-passage (ADR 0031, ADR 0036, ADR 0020): one document's normalised redacted text, the passage rows it is cut into and the passage a locator opens, said once for both tiers. The worker splits the text and writes the rows; the api parses a locator a citation carries, derives the same id from the same address and cuts the same passage back out. Two things make that an agreement rather than two implementations of one sentence. The first is the **id**: a passage's id is derived from `(source_document_id, ordinal)` and never minted, so a reprocess upserts on the row's own key (ADR 0036's stable id) and either tier can compute a row's id from its address without asking the other. The second is the **offsets**: a locator's `chars:<start>-<end>` are Unicode code points into the normalised redacted text, and the two tiers do not count a string the same way — Python indexes by code point and JavaScript by UTF-16 unit. So the text below carries an astral character before every cited span, and its code-point length and its UTF-16 length are both written down and differ: a tier that counts units returns a passage one character early and one character short, which is a wrong answer that looks like a right one. The passage rows **partition the text** — the first starts at 0, each one's end is the next one's start and the last one's end is the text's code-point length — so a span straddling two rows has exactly one answer whether it is cut from the whole text or from the rows it covers. `passage_size` is the size these rows were cut at and not the size the pipeline runs at: the splitter is held to this file by running at the size this file names. Neither half holds the other's literals — the TypeScript half runs its own id derivation, locator parser and span cut (`packages/core/test/document-passage.contract.test.ts`), and the Python half runs the arithmetic the splitter and the run will use (`apps/worker/tests/test_document_passage_contract.py`). `passageAt` is held to the same rows when it lands (T-133).",
+  "passage_id": {
     "shape": "<source document id>#<ordinal, zero-padded to six digits>",
     "separator": "#",
     "ordinal_digits": 6,
@@ -10,13 +10,13 @@
         "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
         "ordinal": 0,
         "id": "01M2Q3R4S5T6V7W8X9YZAB0001#000000",
-        "why": "The splitter counts from zero, so the first chunk of every document is this row."
+        "why": "The splitter counts from zero, so the first passage of every document is this row."
       },
       {
         "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
         "ordinal": 1,
         "id": "01M2Q3R4S5T6V7W8X9YZAB0001#000001",
-        "why": "The padding is not decoration: without it chunk 10 would sort before chunk 2, and a document's rows would read out of the order the splitter cut them."
+        "why": "The padding is not decoration: without it passage 10 would sort before passage 2, and a document's rows would read out of the order the splitter cut them."
       },
       {
         "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
@@ -34,13 +34,13 @@
         "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
         "ordinal": 999999,
         "id": "01M2Q3R4S5T6V7W8X9YZAB0001#999999",
-        "why": "The widest ordinal the padding holds. A document with a million chunks is orders of magnitude past the bind act's per-file cap, so the width is a ceiling nothing reaches rather than a limit anyone has to think about."
+        "why": "The widest ordinal the padding holds. A document with a million passages is orders of magnitude past the connect act's per-file cap, so the width is a ceiling nothing reaches rather than a limit anyone has to think about."
       },
       {
         "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0002",
         "ordinal": 0,
         "id": "01M2Q3R4S5T6V7W8X9YZAB0002#000000",
-        "why": "Two documents' first chunks differ only in the document half, which is what makes the id an address and not a name."
+        "why": "Two documents' first passages differ only in the document half, which is what makes the id an address and not a name."
       }
     ]
   },
@@ -54,14 +54,14 @@
         "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
         "char_start": 39,
         "char_end": 66,
-        "why": "A span inside one chunk row, after the astral character: the ordinary shape a citation carries."
+        "why": "A span inside one passage row, after the astral character: the ordinary shape a citation carries."
       },
       {
         "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:71-122",
         "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
         "char_start": 71,
         "char_end": 122,
-        "why": "A span running from one chunk row into the next. The extraction that writes a locator per claim knows nothing of where the splitter cut, so this is the normal case and not the awkward one."
+        "why": "A span running from one passage row into the next. The extraction that writes a locator per claim knows nothing of where the splitter cut, so this is the normal case and not the awkward one."
       },
       {
         "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:0-37",
@@ -116,11 +116,11 @@
       },
       {
         "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chunks:0-1",
-        "why": "The chunk ordinal the span replaced (the architecture pass of 10/09/2026). An ordinal is the splitter's artefact and moves whenever the splitter does; a citation that carried one would be re-pointed by a configuration change."
+        "why": "The ordinal form the span replaced, as it was written (the architecture pass of 10/09/2026). An ordinal is the splitter's artefact and moves whenever the splitter does; a citation that carried one would be re-pointed by a configuration change."
       },
       {
         "wire": "01M2Q3R4S5T6V7W8X9YZAB0001#000001",
-        "why": "A chunk id. A row's key and an address into the text are different things, and the seam refuses to read one as the other."
+        "why": "A passage id. A row's key and an address into the text are different things, and the seam refuses to read one as the other."
       },
       {
         "wire": "01m2q3r4s5t6v7w8x9yzab0001/chars:39-66",
@@ -142,9 +142,9 @@
   },
   "document": {
     "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
-    "binding_id": "01M2B1ND1NGAAAAAAAAAAAAAAA",
+    "connected_source_id": "01M2B1ND1NGAAAAAAAAAAAAAAA",
     "media_type": "text/markdown",
-    "chunk_size": 80,
+    "passage_size": 80,
     "normalised_text": "Invoice 🧾 2026-041 is due on receipt.\n\nThe sort code is [withheld] and the account number is [withheld].\n\nDelivery follows within ten working days of a signed order.",
     "code_points": 165,
     "utf16_units": 166,
@@ -155,7 +155,7 @@
       "utf16_units": 2,
       "why": "One character outside the basic plane, before every cited span below. It costs one code point and two UTF-16 units, which is the whole of the disagreement: a tier counting units puts every later offset one place late, so a span it cuts starts one character early and ends one character short. The character is a receipt because the document is a bid library's, and the two `[withheld]` words are the redaction seam's placeholders, which is what makes this the *normalised redacted* text a locator is counted in."
     },
-    "chunks": [
+    "passages": [
       {
         "ordinal": 0,
         "id": "01M2Q3R4S5T6V7W8X9YZAB0001#000000",

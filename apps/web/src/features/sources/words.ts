@@ -5,10 +5,10 @@ import type { ListedConnectedSource } from "./sources-api.ts";
 type Meaning = { readonly word: string; readonly means: string };
 
 export const STATE_MEANS = {
-  received: "Its documents have been received; no run has turned them into chunks yet.",
-  indexing: "A run is turning its documents into chunks.",
+  received: "Its documents have been received; no run has turned them into passages yet.",
+  indexing: "A run is turning its documents into passages.",
   indexed: "The run has finished and there is something to review.",
-  published: "Its chunks reach the readers in its audience.",
+  published: "Its passages reach the readers in its audience.",
 } satisfies Record<ListedConnectedSource["state"], string>;
 
 export const AUDIENCE_WORDS = {
@@ -21,7 +21,7 @@ export const NOTHING_CONNECTED = "No document is connected yet.";
 
 const DESTINATIONS = new Map<string, Meaning>([
   [
-    "chunk-index",
+    "passage-index",
     {
       word: "searchable",
       means: "Its passages are found by search and opened by the readers it is published to.",
@@ -43,7 +43,7 @@ const RETENTIONS = new Map<string, Meaning>([
     {
       word: "mirror",
       means:
-        "The source holds the record; a document gone at source loses its chunks after a grace period.",
+        "The source holds the record; a document gone at source loses its passages after a grace period.",
     },
   ],
   [

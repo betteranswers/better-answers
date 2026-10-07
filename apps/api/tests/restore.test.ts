@@ -210,7 +210,7 @@ const seedAWorkspace = async (pool: pg.Pool): Promise<void> => {
     await data.oauthRefreshToken();
     // The partition's lifecycle function reads a transaction's scope, so it runs in one.
     await client.query("BEGIN");
-    await data.chunk({ workspaceId: document.workspaceId });
+    await data.passage({ workspaceId: document.workspaceId });
     await client.query("COMMIT");
   } finally {
     client.release();
@@ -223,7 +223,7 @@ const writeAfterTheDump = async (pool: pg.Pool): Promise<void> => {
     const data = testData(client);
     const later = await data.connectedSource();
     await client.query("BEGIN");
-    await data.chunk({ workspaceId: later.workspaceId });
+    await data.passage({ workspaceId: later.workspaceId });
     await client.query("COMMIT");
     await client.query("DELETE FROM oauth_refresh_token");
     await client.query("CREATE TABLE written_after_the_dump (id integer)");
@@ -370,7 +370,9 @@ describe("the production restore, over a database holding schema and rows", () =
     expect(replaced).toEqual({ code: 0, said: "" });
     expect(counted).toEqual(atTheDump);
     expect(counted).toMatchObject({ "public.workspace": 1, "public.oauth_refresh_token": 1 });
-    expect(Object.keys(counted).filter((named) => /^index\."?chunk_/.test(named))).toHaveLength(1);
+    expect(Object.keys(counted).filter((named) => /^index\."?passage_/.test(named))).toHaveLength(
+      1,
+    );
     expect(Object.keys(counted)).not.toContain("public.written_after_the_dump");
   });
 

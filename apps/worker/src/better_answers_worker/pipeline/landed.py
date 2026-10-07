@@ -10,7 +10,6 @@ from ..log import logger
 from ..redaction import Dismissal, Restore, redact
 from ..redaction.engine import Finding
 from ..redaction.withholdings import Withholding
-from .chunks import CHUNK_SIZE_BYTES, Chunk, split_into_chunks
 from .converter import (
     TEXT_ENCODING,
     UnreadableError,
@@ -25,6 +24,7 @@ from .detected import (
 )
 from .host import FINDINGS_STORE, LANDED_APP, Host, IndexRun
 from .objects import LandedCopies
+from .passages import PASSAGE_SIZE_BYTES, Passage, split_into_passages
 
 # A function memo is fetched by a prefix scan of its calling component's path, so these
 # names are as much its identity as its own.
@@ -103,7 +103,7 @@ class ReadDocument:
     source_document_id: str
     normalised_key: str
     redacted: RedactedDocument
-    chunks: tuple[Chunk, ...]
+    passages: tuple[Passage, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,7 +182,7 @@ class _Wave:
     rules_in_force: tuple[tuple[str, bool], ...]
     seed: str
     detection_key: str
-    chunk_size: int
+    passage_size: int
     ms_per_page: int
     margin_ms: int
 
@@ -227,15 +227,15 @@ async def _one_document(
         source_document_id=document.source_document_id,
         normalised_key=document.normalised_key,
         redacted=answer,
-        chunks=split_into_chunks(
-            document.source_document_id, answer.text, chunk_size=wave.chunk_size
+        passages=split_into_passages(
+            document.source_document_id, answer.text, passage_size=wave.passage_size
         ),
     )
 
 
 def _fail_the_run(error: BaseException, _: coco.ExceptionContext) -> None:
     # The engine's default logs and carries on, so the run would finish with the
-    # document neither read nor quarantined and land_rows would delete its chunks.
+    # document neither read nor quarantined and land_rows would delete its passages.
     raise error
 
 
@@ -271,7 +271,7 @@ def redact_landed_copies(
     rules_in_force: Mapping[str, bool],
     seed: str,
     *,
-    chunk_size: int = CHUNK_SIZE_BYTES,
+    passage_size: int = PASSAGE_SIZE_BYTES,
     detection_key: str | None = None,
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
@@ -300,7 +300,7 @@ def redact_landed_copies(
             detection_key=(
                 the_detection_key() if detection_key is None else detection_key
             ),
-            chunk_size=chunk_size,
+            passage_size=passage_size,
             ms_per_page=ms_per_page,
             margin_ms=margin_ms,
         ),

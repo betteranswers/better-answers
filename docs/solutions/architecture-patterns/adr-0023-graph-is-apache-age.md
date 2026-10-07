@@ -6,7 +6,7 @@ problem_type: architecture_pattern
 component: map
 severity: high
 applies_when:
-  - "Writing a query that walks the map or reads a concept, a composition or a chunk"
+  - "Writing a query that walks the map or reads a concept, a composition or a passage"
   - "Adding a node, an edge or a column to the map tables"
   - "Changing how a concept's or a composition's sensitivity and audience are derived"
   - "Adding a citation path to the governed write"
@@ -34,7 +34,7 @@ The engine is ADR 0032's: plain Postgres tables under RLS. This record holds the
 - The label set is closed and owned by the migrations. A concept's kind is a property, never a label.
 - A `Person` concept starts Restricted whatever its evidence says. Only a recorded Admin override widens it.
 
-The read predicate (published · sensitivity · audience) lives once, as `readableClause` in `packages/core/src/access/index.ts`. It is tested against columns: `published_at`, `sensitivity`, `audience` and `audience_groups` on `concept_index`, `composition`, `map_node` and `map_edge`. For a chunk it is tested against `index.readable_chunk`'s columns, because a chunk's visibility is read from its connected source and document and not carried (ADR 0044). The map door, `packages/core/src/store/map/index.ts`, applies it to every node and edge of a walk, and the template caps depth at 4.
+The read predicate (published · sensitivity · audience) lives once, as `readableClause` in `packages/core/src/access/index.ts`. It is tested against columns: `published_at`, `sensitivity`, `audience` and `audience_groups` on `concept_index`, `composition`, `map_node` and `map_edge`. For a passage it is tested against `index.readable_passage`'s columns, because a passage's visibility is read from its connected source and document and not carried (ADR 0044). The map door, `packages/core/src/store/map/index.ts`, applies it to every node and edge of a walk, and the template caps depth at 4.
 
 A class is derived:
 
@@ -53,7 +53,7 @@ The walk's timeout is set per statement, never on a role. Entry is by key, never
 - A queued recompute reopens the leak for the length of the queue. One level only lets the guide-footnote leak survive.
 - Generations, the debounce and the watermark bridged a second store the api could not write transactionally. That store is gone. Rebuild-equivalence and the nightly second parser keep the map derived.
 - A refusal after the commit would be the reconciler's finding, and the reconciler is for crashes.
-- A carried chunk visibility was a copy five writers in two tiers kept equal by racing.
+- A carried passage visibility was a copy five writers in two tiers kept equal by racing.
 - One walk per full-text hit multiplies the cost and the row cap's reach by the number of hits.
 
 ## Rejected

@@ -155,7 +155,7 @@ describe("the roles' surface", () => {
       expect(relations).toEqual([
         {
           role: "worker_rt",
-          object: "<partition-of index.chunk>",
+          object: "<partition-of index.passage>",
           kind: "table",
           is_partition: true,
           privilege: "SELECT",
@@ -233,13 +233,13 @@ describe("what worker_rt reaches after the flip", () => {
       expect({
         job: await privilegesHeld(client, "worker_rt", "public.job"),
         workspace: await privilegesHeld(client, "worker_rt", "public.workspace"),
-        chunk: await privilegesHeld(client, "worker_rt", '"index".chunk'),
+        passage: await privilegesHeld(client, "worker_rt", '"index".passage'),
         modelChoice: await privilegesHeld(client, "worker_rt", "public.model_choice"),
         workspaceConfig: await privilegesHeld(client, "worker_rt", "public.workspace_config"),
       }).toEqual({
         job: held("SELECT", "INSERT", "UPDATE"),
         workspace: held("SELECT"),
-        chunk: THE_FOUR_VERBS,
+        passage: THE_FOUR_VERBS,
         modelChoice: NOTHING_OF_THE_EIGHT,
         workspaceConfig: NOTHING_OF_THE_EIGHT,
       });

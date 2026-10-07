@@ -12,8 +12,8 @@ import {
   narrowDocuments,
   narrowDocumentsInput,
   passageAt,
-  previewChunks,
-  previewChunksInput,
+  previewPassages,
+  previewPassagesInput,
   publishConnectedSource,
   publishConnectedSourceInput,
 } from "../src/sources/index.ts";
@@ -92,7 +92,7 @@ const wireOf = (documentId: string, text: string): string => `${documentId}/char
 
 const landed = (workspaceId: string, where: Landing): Promise<void> =>
   seededBy(db(), async (seed) => {
-    await seed.chunk({
+    await seed.passage({
       workspaceId,
       connectedSourceId: where.connectedSourceId,
       sourceDocumentId: where.documentId,
@@ -111,7 +111,7 @@ const landedBeside = (
   text: string,
 ): Promise<void> =>
   seededBy(db(), async (seed) => {
-    await seed.chunk({
+    await seed.passage({
       workspaceId,
       connectedSourceId,
       sourceDocumentId: first.documentId,
@@ -136,7 +136,7 @@ const aFinishedRun = (workspaceId: string, connectedSourceId: string): Promise<v
       claimedBy: "worker-1",
       claimedAt: RUN_FINISHED_AT,
       finishedAt: RUN_FINISHED_AT,
-      outcome: { chunks: 1 },
+      outcome: { passages: 1 },
     });
   });
 
@@ -245,13 +245,13 @@ const previewing = async (
 ): Promise<readonly string[]> =>
   answered(
     await reading(person, async (reader, tx) => {
-      const listed = await previewChunks(
+      const listed = await previewPassages(
         reader,
         tx,
-        inputOf(previewChunksInput, { connectedSourceId }),
+        inputOf(previewPassagesInput, { connectedSourceId }),
       );
       if (!listed.ok) throw new Error(`the preview was refused: ${String(listed.error)}`);
-      return listed.value.map((chunk) => chunk.locator);
+      return listed.value.map((passage) => passage.locator);
     }),
   );
 
@@ -338,7 +338,7 @@ describe("a reader's answer as the Admin's acts move source rows", () => {
     });
   });
 
-  it("withholds a narrowed document's chunks, sparing its sibling, both ways", async () => {
+  it("withholds a narrowed document's passages, sparing its sibling, both ways", async () => {
     const scenario = await arrange();
     const theOne = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -563,8 +563,8 @@ describe("a passage whose rows do not all name one source", () => {
   });
 });
 
-describe("a chunk whose connected source row is absent", () => {
-  // The chunk's connected source id carries no foreign key, so only the read closes this shape.
+describe("a passage whose connected source row is absent", () => {
+  // The passage's connected source id carries no foreign key, so only the read closes this shape.
   it("is read and listed by nobody, unlike a live neighbour", async () => {
     const scenario = await arrange();
     const absent = ulid();

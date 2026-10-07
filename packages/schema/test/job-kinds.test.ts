@@ -329,7 +329,7 @@ describe("the run key", () => {
         subjectId: CONNECTED_SOURCE,
       });
       await client.query(
-        `UPDATE job SET status = 'done', finished_at = now(), outcome = '{"chunks": 0}'::jsonb
+        `UPDATE job SET status = 'done', finished_at = now(), outcome = '{"passages": 0}'::jsonb
            WHERE workspace_id = $1 AND id = $2`,
         [WS, first],
       );
@@ -600,12 +600,20 @@ const SNAPSHOT_CHECKS = z.object({
   ),
 });
 
-/** A CHECK declared inside its CREATE TABLE has no statement to replay, so a snapshot holds it. */
-const aCheckFrom = (snapshot: string, suffix: string, addedAs: string): string => {
-  const check = `${THE_TABLE_THE_MAP_NAMED}_${suffix}`;
+/**
+ * A CHECK declared in its CREATE TABLE has no statement to replay. `table` is the snapshot's
+ * key; the CHECK goes onto `connected_source`.
+ */
+const aCheckFrom = (
+  snapshot: string,
+  suffix: string,
+  addedAs: string,
+  table: string = THE_TABLE_THE_MAP_NAMED,
+): string => {
+  const check = `${table}_${suffix}`;
   const value = SNAPSHOT_CHECKS.parse(
     JSON.parse(readFileSync(path.join(journalMetaFolder, snapshot), "utf8")),
-  ).tables[`public.${THE_TABLE_THE_MAP_NAMED}`]?.checkConstraints[check]?.value;
+  ).tables[`public.${table}`]?.checkConstraints[check]?.value;
   if (value === undefined) throw new Error(`${snapshot} holds no ${check}`);
   return `ALTER TABLE "connected_source" ADD CONSTRAINT "${addedAs}" CHECK (${value})`;
 };
@@ -760,6 +768,66 @@ describe("the migration that named the connected source", () => {
           seedConnectedSourceIn(client, WS, A_THIRD_CONNECTED_SOURCE, OLD_STATE),
         ),
       ).toBe("connected_source_state_check");
+    });
+  });
+});
+
+const THE_PASSAGE_MIGRATION = "0069_the-passage.sql";
+
+const DESTINATION_BEFORE_THE_PASSAGE = ["chunk-index", "bundle"] as const;
+
+/** Its statements that rewrite a destination; the renames before them ran when the database did. */
+const itsDestinationRewrites = (): readonly string[] =>
+  migrationStatements(THE_PASSAGE_MIGRATION).filter(
+    (statement) =>
+      !statement.includes("RENAME") &&
+      /"connected_source"|public\.connected_source\b/v.test(statement),
+  );
+
+const withTheDestinationBeforeThePassageAdmitted = (
+  fn: (client: pg.PoolClient) => Promise<void>,
+): Promise<void> =>
+  withTheReasonCheckOf(THE_CONNECTED_SOURCE_MIGRATION, fn, async (client) => {
+    await client.query(
+      'ALTER TABLE "connected_source" DROP CONSTRAINT "connected_source_destination_check"',
+    );
+    await client.query(
+      aCheckFrom(
+        "0068_snapshot.json",
+        "destination_check",
+        "connected_source_destination_check",
+        "connected_source",
+      ),
+    );
+  });
+
+describe("the migration that named the passage", () => {
+  it("moves every workspace's chunk-index destination to passage-index", async () => {
+    await withTheDestinationBeforeThePassageAdmitted(async (client) => {
+      await seedConnectedSourceTo(client, WS, CONNECTED_SOURCE, DESTINATION_BEFORE_THE_PASSAGE);
+      await seedConnectedSourceTo(
+        client,
+        ANOTHER_WS,
+        CONNECTED_SOURCE,
+        DESTINATION_BEFORE_THE_PASSAGE,
+      );
+
+      await replaying(client, itsDestinationRewrites());
+
+      expect(await destinationsStandingIn(client, WS)).toEqual([["passage-index", "bundle"]]);
+      expect(await destinationsStandingIn(client, ANOTHER_WS)).toEqual([
+        ["passage-index", "bundle"],
+      ]);
+      expect(
+        await refusalOf(client, () =>
+          seedConnectedSourceTo(
+            client,
+            WS,
+            ANOTHER_CONNECTED_SOURCE,
+            DESTINATION_BEFORE_THE_PASSAGE,
+          ),
+        ),
+      ).toBe("connected_source_destination_check");
     });
   });
 });

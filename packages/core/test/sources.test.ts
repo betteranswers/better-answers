@@ -24,6 +24,8 @@ import {
   publishConnectedSourceInput,
   reprocessConnectedSource,
   reprocessConnectedSourceInput,
+  REINDEX,
+  reindexEveryConnectedSource,
   sweepOrphanedUploads,
   UPLOAD_BYTE_CAP,
   UPLOAD_SWEEP,
@@ -32,8 +34,8 @@ import { getObject, listObjects, putObject } from "../src/store/objects/index.ts
 import { withScope, type Tx } from "../src/store/postgres/index.ts";
 import { contractFixture, mediaTypeOutside } from "./contract-fixture.ts";
 import {
-  chunkUnder,
-  chunkVersionsOf,
+  passageUnder,
+  passageVersionsOf,
   auditEventRowsOf,
   groupNamed,
   seededBy,
@@ -213,7 +215,7 @@ describe("an Admin connects an upload", () => {
     expect(await connectedSourceRowOf(db().pool, scenario.workspaceId, connectedSourceId)).toEqual({
       name: "The staff handbook",
       connector: "upload",
-      destination: ["chunk-index", "bundle"],
+      destination: ["passage-index", "bundle"],
       retention_class: "keep",
       state: "received",
       rules_in_force: { default_on: true, default_off: false },
@@ -717,7 +719,7 @@ const claimColumnsOf = (status: string, at: Date) => {
   const claimed = { attempts: 1, claimedBy: "worker-1", claimedAt: at, heartbeatAt: at };
   if (status === "claimed") return { ...claimed, leaseExpiresAt: at };
   if (status === "poisoned") return { ...claimed, attempts: 3, finishedAt: at };
-  return { ...claimed, finishedAt: at, outcome: { chunks: 2 } };
+  return { ...claimed, finishedAt: at, outcome: { passages: 2 } };
 };
 
 const runOver = (workspaceId: string, connectedSourceId: string, status: string, at: Date) =>
@@ -762,10 +764,10 @@ const publishStateOf = async (pool: pg.Pool, workspaceId: string, connectedSourc
   return read.rows[0];
 };
 
-const chunkStampsOf = async (pool: pg.Pool, workspaceId: string, connectedSourceId: string) => {
+const passageStampsOf = async (pool: pg.Pool, workspaceId: string, connectedSourceId: string) => {
   const read = await pool.query<{ published_at: Date | null }>(
-    `SELECT published_at FROM "index".readable_chunk
-      WHERE workspace_id = $1 AND binding_id = $2 ORDER BY ordinal`,
+    `SELECT published_at FROM "index".readable_passage
+      WHERE workspace_id = $1 AND connected_source_id = $2 ORDER BY ordinal`,
     [workspaceId, connectedSourceId],
   );
   return read.rows.map((row) => row.published_at);
@@ -784,7 +786,7 @@ const passagesReadableBy = async (person: UserPrincipal, sourceDocumentId: strin
   answered(
     await readingAs(db().runtimePool, person, async (reader, tx) => {
       const read = await tx.query<{ content: string }>(
-        `SELECT c.content FROM "index".readable_chunk c
+        `SELECT c.content FROM "index".readable_passage c
         WHERE c.workspace_id = $1 AND c.source_document_id = $2 AND ${readableClause("c", 3)}
         ORDER BY c.ordinal`,
         [reader.workspaceId, sourceDocumentId, ...readableParameters(reader)],
@@ -793,7 +795,7 @@ const passagesReadableBy = async (person: UserPrincipal, sourceDocumentId: strin
     }),
   );
 
-const chunksOfTheHandbook = async (
+const passagesOfTheHandbook = async (
   workspaceId: string,
   document: { readonly connectedSourceId: string; readonly documentId: string },
 ) => {
@@ -801,7 +803,7 @@ const chunksOfTheHandbook = async (
     [0, HOLIDAY, 0, 53],
     [1, NOTICE, 54, 101],
   ] as const) {
-    await chunkUnder(db(), workspaceId, document, { content, ordinal, charStart, charEnd });
+    await passageUnder(db(), workspaceId, document, { content, ordinal, charStart, charEnd });
   }
 };
 
@@ -814,7 +816,7 @@ const indexedHandbook = async (scenario: Scenario) => {
     "done",
     RUN_FINISHED_AT,
   );
-  await chunksOfTheHandbook(scenario.workspaceId, bound);
+  await passagesOfTheHandbook(scenario.workspaceId, bound);
   return bound;
 };
 
@@ -882,8 +884,8 @@ describe("an Admin publishes a connected source", () => {
       sensitivity: "Internal",
     });
     await runEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", RUN_FINISHED_AT);
-    await chunksOfTheHandbook(scenario.workspaceId, { connectedSourceId, documentId });
-    const stoodAt = await chunkVersionsOf(db(), scenario.workspaceId, connectedSourceId);
+    await passagesOfTheHandbook(scenario.workspaceId, { connectedSourceId, documentId });
+    const stoodAt = await passageVersionsOf(db(), scenario.workspaceId, connectedSourceId);
 
     await seededBy(db(), async (seed) => {
       await seed.finding({
@@ -930,8 +932,8 @@ describe("an Admin publishes a connected source", () => {
       state: "published",
     });
 
-    expect(await chunkVersionsOf(db(), scenario.workspaceId, connectedSourceId)).toEqual(stoodAt);
-    expect(await chunkStampsOf(db().pool, scenario.workspaceId, connectedSourceId)).toEqual([
+    expect(await passageVersionsOf(db(), scenario.workspaceId, connectedSourceId)).toEqual(stoodAt);
+    expect(await passageStampsOf(db().pool, scenario.workspaceId, connectedSourceId)).toEqual([
       PUBLISHED_AT,
       PUBLISHED_AT,
     ]);
@@ -991,7 +993,7 @@ describe("an Admin publishes a connected source", () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId, jobId } = await boundHandbook(scenario);
     await runEndedAt(scenario.workspaceId, connectedSourceId, jobId, status, at);
-    await chunkUnder(
+    await passageUnder(
       db(),
       scenario.workspaceId,
       { connectedSourceId, documentId },
@@ -1014,7 +1016,9 @@ describe("an Admin publishes a connected source", () => {
       published_at: null,
       state: "received",
     });
-    expect(await chunkStampsOf(db().pool, scenario.workspaceId, connectedSourceId)).toEqual([null]);
+    expect(await passageStampsOf(db().pool, scenario.workspaceId, connectedSourceId)).toEqual([
+      null,
+    ]);
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
     ).toEqual([]);
@@ -1153,7 +1157,7 @@ describe("a Viewer inside the audience", () => {
   it("reads the connected source's passages only after the publish", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId } = await financeHandbook(scenario, [scenario.viewer]);
-    await chunksOfTheHandbook(scenario.workspaceId, { connectedSourceId, documentId });
+    await passagesOfTheHandbook(scenario.workspaceId, { connectedSourceId, documentId });
 
     expect(await passagesReadableBy(scenario.viewer, documentId)).toEqual([]);
 
@@ -1168,7 +1172,7 @@ describe("a Viewer inside the audience", () => {
   it("reads nothing published to a group they are not in", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId } = await financeHandbook(scenario, []);
-    await chunkUnder(
+    await passageUnder(
       db(),
       scenario.workspaceId,
       { connectedSourceId, documentId },
@@ -1182,12 +1186,12 @@ describe("a Viewer inside the audience", () => {
 });
 
 const connectedSourceHolds = async (workspaceId: string, connectedSourceId: string) => ({
-  chunks: await chunkStampsOf(db().pool, workspaceId, connectedSourceId),
+  passages: await passageStampsOf(db().pool, workspaceId, connectedSourceId),
   runs: await runsOver(db().pool, workspaceId, connectedSourceId),
 });
 
 const AS_IT_WAS_INDEXED = {
-  chunks: [null, null],
+  passages: [null, null],
   runs: [{ kind: "index", reason: "connected", status: "done" }],
 };
 
@@ -1209,8 +1213,8 @@ describe("an Admin reprocesses a connected source", () => {
     );
     if (!reprocessed.ok) throw new Error(`the reprocess was refused: ${String(reprocessed.error)}`);
 
-    expect(reprocessed.value.chunks).toEqual(2);
-    expect(await chunkStampsOf(db().pool, scenario.workspaceId, connectedSourceId)).toEqual([]);
+    expect(reprocessed.value.passages).toEqual(2);
+    expect(await passageStampsOf(db().pool, scenario.workspaceId, connectedSourceId)).toEqual([]);
     expect(await passagesReadableBy(scenario.admin, documentId)).toEqual([]);
 
     expect(await runsOver(db().pool, scenario.workspaceId, connectedSourceId)).toEqual([
@@ -1225,7 +1229,7 @@ describe("an Admin reprocesses a connected source", () => {
     });
   });
 
-  it("rejects, keeping the chunks, when the queue refuses its run", async () => {
+  it("rejects, keeping the passages, when the queue refuses its run", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1250,7 +1254,7 @@ describe("an Admin reprocesses a connected source", () => {
     );
   });
 
-  it("keeps chunks and queues nothing when its act later fails", async () => {
+  it("keeps passages and queues nothing when its act later fails", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1281,7 +1285,7 @@ describe("an Admin reprocesses a connected source", () => {
     );
   });
 
-  it("rejects a reason no index run carries, keeping the chunks", async () => {
+  it("rejects a reason no index run carries, keeping the passages", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1304,7 +1308,7 @@ describe("an Admin reprocesses a connected source", () => {
     );
   });
 
-  it("refuses Viewers, Editors, foreign sources and bad input, keeping chunks", async () => {
+  it("refuses Viewers, Editors, foreign sources and bad input, keeping passages", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1402,6 +1406,45 @@ describe("an Admin reprocesses a connected source", () => {
   });
 });
 
+/** A source a wipe emptied, its `wiped` run queued behind the run that first indexed it. */
+const WIPED_AND_QUEUED = {
+  passages: [],
+  runs: [
+    { kind: "index", reason: "wiped", status: "queued" },
+    { kind: "index", reason: "connected", status: "done" },
+  ],
+};
+
+describe("the operator's reindex of a workspace's connected sources", () => {
+  it("wipes every source and queues its run, deleting its passages", async () => {
+    const scenario = await arrange();
+    const { connectedSourceId, documentId } = await indexedHandbook(scenario);
+
+    const reindexed = await reindexEveryConnectedSource(REINDEX, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+    });
+    if (!reindexed.ok) throw new Error(`the reindex was refused: ${String(reindexed.error)}`);
+
+    expect(reindexed.value.map((source) => [source.connectedSourceId, source.passages])).toEqual([
+      [connectedSourceId, 2],
+    ]);
+    expect(await passagesReadableBy(scenario.admin, documentId)).toEqual([]);
+    expect(await connectedSourceHolds(scenario.workspaceId, connectedSourceId)).toEqual(
+      WIPED_AND_QUEUED,
+    );
+  });
+
+  it("refuses a workspace id of the wrong shape", async () => {
+    const scenario = await arrange();
+
+    expect(
+      await reindexEveryConnectedSource(REINDEX, scenario.postgres, {
+        workspaceId: "ws_synthetic",
+      }),
+    ).toEqual({ ok: false, error: "malformed" });
+  });
+});
+
 const reprocessingAs = (
   scenario: Scenario,
   platform: PlatformPrincipal,
@@ -1423,18 +1466,14 @@ describe("the erasure reprocesses a connected source as the platform", () => {
     });
     if (!wiped.ok) throw new Error(`the erasure's reprocess was refused: ${String(wiped.error)}`);
 
-    expect(wiped.value.chunks).toEqual(2);
+    expect(wiped.value.passages).toEqual(2);
     expect(await passagesReadableBy(scenario.admin, documentId)).toEqual([]);
-    expect(await connectedSourceHolds(scenario.workspaceId, connectedSourceId)).toEqual({
-      chunks: [],
-      runs: [
-        { kind: "index", reason: "wiped", status: "queued" },
-        { kind: "index", reason: "connected", status: "done" },
-      ],
-    });
+    expect(await connectedSourceHolds(scenario.workspaceId, connectedSourceId)).toEqual(
+      WIPED_AND_QUEUED,
+    );
   });
 
-  it("refuses the platform any purpose but erasure, keeping the chunks", async () => {
+  it("refuses a platform purpose it does not admit, keeping passages", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 

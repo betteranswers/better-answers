@@ -1,59 +1,67 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import type pg from "pg";
+import { describe, expect, it } from "vitest";
 
-import type { MigratedPostgres } from "./harness.ts";
-import { openMigratedPostgres } from "./warm-postgres.ts";
+import { testData } from "./factory.ts";
+import { withRollback } from "./harness.ts";
+import { postgresForSuite } from "./probes.ts";
 
-let db: MigratedPostgres;
-
-beforeAll(async () => {
-  db = await openMigratedPostgres();
-  return async () => {
-    await db.stop();
-  };
-});
+const db = postgresForSuite();
 
 /** A table rename leaves behind every name Postgres derived from the old one unless each is renamed too. */
 const RENAMED_TABLE_PREFIXES = ["llm_route", "graph", "source_binding"];
 
-/** Matched mid-name, as an index names its columns; index.chunk's binding_id sits outside public. */
-const RENAMED_COLUMN_WORDS = ["binding"];
+/** Matched mid-name, as an index names its columns and a partition its parent. */
+const RENAMED_WORDS = ["binding", "chunk", "route"];
 
-const NAMES_IN_PUBLIC = `
+const NAMES = `
   SELECT 'constraint' AS kind, conname AS name FROM pg_constraint
-    WHERE connamespace = 'public'::regnamespace
+    WHERE connamespace = ANY ($1::regnamespace[])
   UNION ALL
-  SELECT 'relation', relname FROM pg_class WHERE relnamespace = 'public'::regnamespace
+  SELECT 'relation', relname FROM pg_class WHERE relnamespace = ANY ($1::regnamespace[])
   UNION ALL
   SELECT 'column', attname FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
-    WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p', 'v', 'm')
+    WHERE c.relnamespace = ANY ($1::regnamespace[]) AND c.relkind IN ('r', 'p', 'v', 'm')
       AND a.attnum > 0 AND NOT a.attisdropped
   UNION ALL
   SELECT 'policy', polname FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
-    WHERE c.relnamespace = 'public'::regnamespace
+    WHERE c.relnamespace = ANY ($1::regnamespace[])
   UNION ALL
   SELECT 'trigger', tgname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
-    WHERE c.relnamespace = 'public'::regnamespace AND NOT t.tgisinternal
+    WHERE c.relnamespace = ANY ($1::regnamespace[]) AND NOT t.tgisinternal
   UNION ALL
-  SELECT 'function', proname FROM pg_proc WHERE pronamespace = 'public'::regnamespace`;
+  SELECT 'function', proname FROM pg_proc WHERE pronamespace = ANY ($1::regnamespace[])`;
+
+const WORKSPACE = "01J6EAAAAAAAAAAAAAAAAAAAAA";
+
+/** A workspace's partition, its indexes and its constraints are named only once one is made. */
+const namesWithAPartition = async (client: pg.PoolClient) => {
+  const seed = testData(client);
+  await seed.workspace({ id: WORKSPACE, name: "A" });
+  await seed.passage({ workspaceId: WORKSPACE });
+  const { rows } = await client.query<{ kind: string; name: string }>(NAMES, [["public", "index"]]);
+  return rows;
+};
 
 describe("the names a renamed table leaves behind", () => {
-  it("leaves no name in public under a renamed table's prefix", async () => {
-    const { rows } = await db.pool.query<{ kind: string; name: string }>(NAMES_IN_PUBLIC);
+  it("leaves no name under a renamed table's prefix", async () => {
+    await withRollback(db().pool, async (client) => {
+      const rows = await namesWithAPartition(client);
 
-    const left = rows.filter(({ name }) =>
-      RENAMED_TABLE_PREFIXES.some((prefix) => name.startsWith(`${prefix}_`)),
-    );
+      const left = rows.filter(({ name }) =>
+        RENAMED_TABLE_PREFIXES.some((prefix) => name.startsWith(`${prefix}_`)),
+      );
 
-    expect(left).toEqual([]);
+      expect(left).toEqual([]);
+    });
   });
 
-  it("leaves no name in public holding a renamed column's word", async () => {
-    const { rows } = await db.pool.query<{ kind: string; name: string }>(NAMES_IN_PUBLIC);
+  it("leaves no name holding a renamed word", async () => {
+    await withRollback(db().pool, async (client) => {
+      const rows = await namesWithAPartition(client);
 
-    const left = rows.filter(({ name }) =>
-      RENAMED_COLUMN_WORDS.some((word) => name.includes(word)),
-    );
+      const left = rows.filter(({ name }) => RENAMED_WORDS.some((word) => name.includes(word)));
 
-    expect(left).toEqual([]);
+      expect(left).toEqual([]);
+    });
   });
 });

@@ -10,7 +10,7 @@ from typing import TypeIs
 import psycopg
 import pytest
 
-from better_answers_worker.pipeline import CHUNK_TABLE, Table
+from better_answers_worker.pipeline import PASSAGE_TABLE, Table
 from pg_harness import migrated_postgres
 
 WORKER_PACKAGE = Path(__file__).resolve().parents[1] / "src" / "better_answers_worker"
@@ -46,7 +46,7 @@ PLACEHOLDER = re.compile(r"%\((\w+)\)s|%s|%%")
 UNPREPARABLE: Mapping[str, str] = {}
 
 # cocoindex writes these from the worker's own table and column names.
-TARGET_TABLES: Mapping[str, Table] = {"pipeline.rows:CHUNK_TABLE": CHUNK_TABLE}
+TARGET_TABLES: Mapping[str, Table] = {"pipeline.rows:PASSAGE_TABLE": PASSAGE_TABLE}
 
 SENDING_MODULES = {
     "audit",
@@ -552,7 +552,7 @@ def test_sets_aside_an_unpreparable_statement_named_with_its_reason(
 def test_refuses_an_exclusion_or_table_that_names_nothing(tmp_path: Path) -> None:
     planted = survey(
         plant(tmp_path, "VALUE = 1\n"),
-        tables={"planted:GONE": CHUNK_TABLE},
+        tables={"planted:GONE": PASSAGE_TABLE},
         unpreparable={"SET work_mem = 1": "SET is not a plannable statement"},
     )
 

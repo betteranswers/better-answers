@@ -40,12 +40,17 @@ POOL_MAX_SIZE = 2
 
 
 LANDED_APP = "landed"
-CHUNKS_APP = "chunks"
+PASSAGES_APP = "passages"
 
 
-# The connected source's own store: the chunk rows and the target-state tracking that
+# The connected source's own store: the passage rows and the target-state tracking that
 # says which of them have gone. A wipe removes it.
-BINDING_STORE = "binding"
+CONNECTED_SOURCE_STORE = "connected_source"
+
+
+# Names an earlier release gave the store. Such a store may hold text redacted under a
+# replaced rule, so a wipe removes it too.
+STORES_NAMED_BEFORE_THE_PASSAGE_SWEEP: tuple[str, ...] = ("binding",)
 
 
 # The second store: the landed app and the findings memo, no target declared and so no
@@ -53,11 +58,14 @@ BINDING_STORE = "binding"
 FINDINGS_STORE = "findings"
 
 
-STORES_A_CONNECTED_SOURCE_HOLDS: tuple[str, ...] = (BINDING_STORE, FINDINGS_STORE)
+STORES_A_CONNECTED_SOURCE_HOLDS: tuple[str, ...] = (
+    CONNECTED_SOURCE_STORE,
+    FINDINGS_STORE,
+)
 
 
 STORE_OF: Mapping[str, str] = MappingProxyType(
-    {CHUNKS_APP: BINDING_STORE, LANDED_APP: FINDINGS_STORE}
+    {PASSAGES_APP: CONNECTED_SOURCE_STORE, LANDED_APP: FINDINGS_STORE}
 )
 
 
@@ -226,8 +234,9 @@ class Host:
     def remove_connected_source_store(self, run: IndexRun) -> None:
         # Evicted before the directory goes: removing it under an open handle would
         # leave the engine writing into a store nothing can read.
-        self._evict(run, BINDING_STORE)
-        shutil.rmtree(self.store_directory(run, BINDING_STORE), ignore_errors=True)
+        self._evict(run, CONNECTED_SOURCE_STORE)
+        for store in (CONNECTED_SOURCE_STORE, *STORES_NAMED_BEFORE_THE_PASSAGE_SWEEP):
+            shutil.rmtree(self.store_directory(run, store), ignore_errors=True)
 
     def pool(self, workspace_id: str) -> asyncpg.Pool:
         held = self._pools.get(workspace_id)
@@ -274,7 +283,7 @@ class Host:
             store,
             lambda: coco.Environment(
                 settings,
-                name=f"binding:{run.connected_source_id}:{store}",
+                name=f"connected_source:{run.connected_source_id}:{store}",
                 context_provider=provider,
                 event_loop=self._loop.loop,
             ),
@@ -305,16 +314,18 @@ class Host:
         """A row the store tracks as landed is not written
         again, and one it tracked that `rows` omits is deleted."""
         declared = tuple(rows)
-        app = coco.App(self.app_config(run, CHUNKS_APP), declare_rows, table, declared)
+        app = coco.App(
+            self.app_config(run, PASSAGES_APP), declare_rows, table, declared
+        )
         # From the caller's thread, never the host's loop: the blocking form of an
         # update never returns when it is called from inside that loop.
         landed = app.update_blocking()
         return int(landed) if isinstance(landed, int) else len(declared)
 
     def drop_connected_source(self, run: IndexRun) -> None:
-        """Drops the engine's record of the connected source's chunks,
+        """Drops the engine's record of the connected source's passages,
         leaving the table, its indexes and every row it landed."""
-        coco.App(self.app_config(run, CHUNKS_APP), declare_nothing).drop_blocking()
+        coco.App(self.app_config(run, PASSAGES_APP), declare_nothing).drop_blocking()
 
     def close(self) -> None:
         self._environments.clear()

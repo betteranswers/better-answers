@@ -1731,14 +1731,14 @@ const documentIn = (workspaceId: string, connectedSourceId: string) =>
 const connectedSourceIn = (workspaceId: string) =>
   seedingWith(db().pool, (seed) => seed.connectedSource({ workspaceId }));
 
-const chunksUnder = (
+const passagesUnder = (
   workspaceId: string,
   documents: readonly { readonly id: string; readonly connectedSourceId: string }[],
   content = "Priya Anand approves expenses.",
 ) =>
   seedingWith(db().pool, async (seed) => {
     for (const document of documents) {
-      await seed.chunk({
+      await seed.passage({
         workspaceId,
         connectedSourceId: document.connectedSourceId,
         sourceDocumentId: document.id,
@@ -1751,10 +1751,10 @@ const chunksUnder = (
     }
   });
 
-const chunksIn = async (workspaceId: string) => {
-  const read = await db().pool.query<{ binding_id: string; chunks: number }>(
-    `SELECT binding_id, count(*)::int AS chunks FROM "index".chunk
-      WHERE workspace_id = $1 GROUP BY binding_id ORDER BY binding_id`,
+const passagesIn = async (workspaceId: string) => {
+  const read = await db().pool.query<{ connected_source_id: string; passages: number }>(
+    `SELECT connected_source_id, count(*)::int AS passages FROM "index".passage
+      WHERE workspace_id = $1 GROUP BY connected_source_id ORDER BY connected_source_id`,
     [workspaceId],
   );
   return read.rows;
@@ -1784,7 +1784,7 @@ const aMapOverTwoOfThreeConnectedSources = async () => {
     await documentIn(scenario.workspaceId, shared.id),
     await documentIn(scenario.workspaceId, apart.id),
   ];
-  await chunksUnder(scenario.workspaceId, [
+  await passagesUnder(scenario.workspaceId, [
     ...found,
     await documentIn(scenario.workspaceId, untouched.id),
   ]);
@@ -2015,19 +2015,19 @@ const wipesOf = (connectedSources: readonly { readonly id: string }[]) =>
     .map((subject_id) => ({ kind: "index", subject_id, reason: "wiped", status: "queued" }));
 
 const whatTheWipeLeft = async (workspaceId: string) => ({
-  chunks: await chunksIn(workspaceId),
+  passages: await passagesIn(workspaceId),
   queued: await queuedIn(workspaceId),
 });
 
 const everyConnectedSourceWiped = (
   arranged: Awaited<ReturnType<typeof aMapOverTwoOfThreeConnectedSources>>,
 ) => ({
-  chunks: [{ binding_id: arranged.untouched.id, chunks: 1 }],
+  passages: [{ connected_source_id: arranged.untouched.id, passages: 1 }],
   queued: [THE_REBUILD, ...wipesOf([arranged.shared, arranged.apart])],
 });
 
 describe("the wipe of every connected source the map found", () => {
-  it("deletes each source's chunks, queueing its index run as wiped", async () => {
+  it("deletes each source's passages, queueing its index run as wiped", async () => {
     const arranged = await aMapOverTwoOfThreeConnectedSources();
 
     const rederived = await rederivingOver(arranged.scenario, arranged.found, null);
@@ -2045,8 +2045,8 @@ describe("the wipe of every connected source the map found", () => {
     const elsewhere = await connectedSourceIn(workspaceId);
     const named = await documentIn(workspaceId, naming.id);
     const unnamed = await documentIn(workspaceId, elsewhere.id);
-    await chunksUnder(workspaceId, [named]);
-    await chunksUnder(workspaceId, [unnamed], "Expenses are claimed within thirty days.");
+    await passagesUnder(workspaceId, [named]);
+    await passagesUnder(workspaceId, [unnamed], "Expenses are claimed within thirty days.");
 
     const done = await completing(scenario, subjectRequestId);
 
@@ -2054,7 +2054,7 @@ describe("the wipe of every connected source the map found", () => {
       named.id,
     ]);
     expect(await whatTheWipeLeft(workspaceId)).toEqual({
-      chunks: [{ binding_id: elsewhere.id, chunks: 1 }],
+      passages: [{ connected_source_id: elsewhere.id, passages: 1 }],
       queued: [THE_REBUILD, ...wipesOf([naming])],
     });
     expect(done.report).toContain(
@@ -2066,7 +2066,7 @@ describe("the wipe of every connected source the map found", () => {
     const arranged = await aMapOverTwoOfThreeConnectedSources();
 
     await rederivingOver(arranged.scenario, arranged.found, null);
-    await chunksUnder(arranged.scenario.workspaceId, arranged.found);
+    await passagesUnder(arranged.scenario.workspaceId, arranged.found);
     const replayed = await rederivingOver(arranged.scenario, arranged.found, LOCKED_AT);
 
     expect(replayed.rebuildJobId).toBeNull();

@@ -6,7 +6,7 @@ problem_type: architecture_pattern
 component: privacy
 severity: high
 applies_when:
-  - "Adding a step that reads a document's text before chunking, embedding, extraction or a model call"
+  - "Adding a step that reads a document's text before splitting, embedding, extraction or a model call"
   - "Changing a redaction rule, a descriptor, the window rule or what a finding row holds"
   - "Touching the erasure routine, a subject request, a suppression or the replay copy"
   - "Adding a store, a column or a copy that could hold a person's identifier"
@@ -24,7 +24,7 @@ tags:
 
 ## The decision
 
-The **redaction seam** withholds personal data in the worker's conversion step and on the read-live tool's return. It runs before chunking, embedding, extraction and every model call, so no derived store and no model ever holds the value. The original bytes stay in the object store, opened only by an Admin, each view an audit event.
+The **redaction seam** withholds personal data in the worker's conversion step and on the read-live tool's return. It runs before splitting, embedding, extraction and every model call, so no derived store and no model ever holds the value. The original bytes stay in the object store, opened only by an Admin, each view an audit event.
 
 - **Sensitivity** has three classes: Restricted (the default for every connected source and every `Person`), Internal and Public. Only *Restricted* is a reader word; the other two are Admin words.
 - **Redaction rules** have three tiers: *always* (special-category cues, financial account and government identifiers), *default on* and *default off* per connected source. No connected source switches the always set off. The officer-block rule always wins. Special-category data narrows its document to Restricted on landing.
@@ -48,7 +48,7 @@ A **suppression** is the workspace's: one per erasure request, holding the reque
 ## Why
 
 - The first corpus's most useful file is also the flagged one. Quarantine is the manual work the product exists to remove, and role-gating in place puts a sort code in four stores and at a processor.
-- A placeholder written before chunking is the one control that holds whatever a predicate, a prompt or a client's context later does with the text.
+- A placeholder written before splitting is the one control that holds whatever a predicate, a prompt or a client's context later does with the text.
 - No detector clears 0.6 F1 on independent benchmarks, so the design is detector plus review by category plus a Restricted default.
 - The first Admin is a bid writer, not a DPO, so the safe set must be what they get by doing nothing.
 - An actor id is a record, so the platform may rewrite it across history. A name in a concept body is knowledge the company asserts about itself (ADR 0011); rewriting it would make every export already issued diverge.
@@ -59,7 +59,7 @@ A **suppression** is the workspace's: one per erasure request, holding the reque
 ## Rejected
 
 - Two classes, or a five-level government scheme: one word for the website and the board minutes, or levels nothing acts on.
-- Quarantining flagged documents, or role-gating the chunks: the useful file is the flagged one, and the value reaches every store.
+- Quarantining flagged documents, or role-gating the passages: the useful file is the flagged one, and the value reaches every store.
 - Pseudonymising every name, or nothing by default: a worse answer, or an unsafe default.
 - A publish block on special category: blocking widening is the control.
 - Reprocessing on a connected-source-wide rule version: about £750 and two days for one switch.

@@ -3,13 +3,6 @@ import os
 os.environ["COCOINDEX_DISABLE_USAGE_TRACKING"] = "1"
 os.environ["RUST_LOG"] = os.environ.get("RUST_LOG") or "warn"
 
-from .chunks import (
-    CHUNK_SIZE_BYTES,
-    Chunk,
-    chunk_id_of,
-    locator_of,
-    split_into_chunks,
-)
 from .converter import (
     CONVERTER_PIN,
     CONVERTERS,
@@ -24,11 +17,11 @@ from .converter import (
 )
 from .detected import detected, raised_by_the_detector
 from .host import (
-    BINDING_STORE,
-    CHUNKS_APP,
+    CONNECTED_SOURCE_STORE,
     ENVIRONMENTS_HELD,
     FINDINGS_STORE,
     LANDED_APP,
+    PASSAGES_APP,
     STORES_A_CONNECTED_SOURCE_HOLDS,
     Host,
     IndexRun,
@@ -49,7 +42,14 @@ from .landed import (
     timeout_for,
 )
 from .objects import Bucket, LandedCopies, object_key_of
-from .rows import CHUNK_TABLE, chunk_rows, rows_of
+from .passages import (
+    PASSAGE_SIZE_BYTES,
+    Passage,
+    locator_of,
+    passage_id_of,
+    split_into_passages,
+)
+from .rows import PASSAGE_TABLE, passage_rows, rows_of
 from .run import (
     REASONS_EMPTYING_THE_CONNECTED_SOURCE,
     WIPED_REASON,
@@ -59,10 +59,7 @@ from .run import (
 from .tables import Column, Table
 
 __all__ = [
-    "BINDING_STORE",
-    "CHUNKS_APP",
-    "CHUNK_SIZE_BYTES",
-    "CHUNK_TABLE",
+    "CONNECTED_SOURCE_STORE",
     "CONVERTERS",
     "CONVERTER_PIN",
     "DOCX_MEDIA_TYPE",
@@ -70,6 +67,9 @@ __all__ = [
     "FINDINGS_STORE",
     "LANDED_APP",
     "OCR_ANSWER",
+    "PASSAGES_APP",
+    "PASSAGE_SIZE_BYTES",
+    "PASSAGE_TABLE",
     "PASSED_THROUGH",
     "PDF_MEDIA_TYPE",
     "REASONS_EMPTYING_THE_CONNECTED_SOURCE",
@@ -79,7 +79,6 @@ __all__ = [
     "TIMEOUT_MARGIN_MS",
     "WIPED_REASON",
     "Bucket",
-    "Chunk",
     "Column",
     "Host",
     "IndexOutcome",
@@ -87,14 +86,13 @@ __all__ = [
     "LandedCopies",
     "LandedDocument",
     "LandedRun",
+    "Passage",
     "QuarantinedDocument",
     "ReadDocument",
     "RedactedDocument",
     "Suppression",
     "Table",
     "UnreadableError",
-    "chunk_id_of",
-    "chunk_rows",
     "converted",
     "converter_pin_of",
     "detected",
@@ -103,10 +101,12 @@ __all__ = [
     "object_key_of",
     "open_pool",
     "pages_of",
+    "passage_id_of",
+    "passage_rows",
     "raised_by_the_detector",
     "redact_landed_copies",
     "rows_of",
-    "split_into_chunks",
+    "split_into_passages",
     "suppression_of",
     "timeout_for",
 ]

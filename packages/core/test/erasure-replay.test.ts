@@ -476,7 +476,7 @@ const theIndexRestored = (
 ) =>
   seedingWith(db().pool, async (seed) => {
     for (const connectedSource of connectedSources) {
-      await seed.chunk({
+      await seed.passage({
         workspaceId,
         connectedSourceId: connectedSource.id,
         sourceDocumentId: connectedSource.documentId,
@@ -507,11 +507,11 @@ const whatTheReplayLeft = async (workspaceId: string) => ({
     )
   ).rows,
   indexed: (
-    await db().pool.query<{ binding_id: string }>(
-      `SELECT binding_id FROM "index".chunk WHERE workspace_id = $1 ORDER BY binding_id`,
+    await db().pool.query<{ connected_source_id: string }>(
+      `SELECT connected_source_id FROM "index".passage WHERE workspace_id = $1 ORDER BY connected_source_id`,
       [workspaceId],
     )
-  ).rows.map((row) => row.binding_id),
+  ).rows.map((row) => row.connected_source_id),
   queued: (
     await db().pool.query<{ kind: string; subject_id: string | null; reason: string | null }>(
       "SELECT kind, subject_id, reason FROM job WHERE workspace_id = $1 AND status = 'queued' ORDER BY kind",
@@ -535,7 +535,7 @@ describe("a restore from a dump older than the request", () => {
     await theIndexRestored(workspaceId, [naming, beside]);
     const erased = await completedInTheRows(workspaceId, INDEX_RESTORED_AT);
     await leavingAReplayCopy(scenario, erased, INDEX_RESTORED_AT);
-    // The chunk beside it was never wiped, so the restore brings back the one the wipe took.
+    // The passage beside it was never wiped, so the restore brings back the one the wipe took.
     await asIfRestoredFromADumpOlderThanIt(workspaceId, erased, [naming]);
     const restored = await whatTheReplayLeft(workspaceId);
 

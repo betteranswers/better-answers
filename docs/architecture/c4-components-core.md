@@ -95,7 +95,7 @@ Enforced by one plugin rule, `better-answers/import-direction` (`packages/devtoo
 | `members` | `group`, `group_member`, `access_request` |
 | `llm` | `model_choice`; `llm_call` at S2 |
 | `audit` | `audit_event` |
-| `sources` | `connected_source`, `source_document`, `finding`, `index.chunk` |
+| `sources` | `connected_source`, `source_document`, `finding`, `index.passage` |
 | `concepts` | `concept_identity`, `concept_index`, `bundle_commit`, `evidence`, `concept_evidence`, `concept_verification`, `concept_class_override`, `suggestion`, `concept_write_request`, `map_generation`, `map_node`, `map_edge`; `concept_owner` at S3 |
 | `guides` | `composition`, `composition_include`; definitions, sections and versions at S3 |
 | `erasure` | `subject_request`, `erasure_request`, `suppression` |
@@ -103,7 +103,7 @@ Enforced by one plugin rule, `better-answers/import-direction` (`packages/devtoo
 | `sweeps` | `sweep_pass` |
 | `answering` | `usage`, `answer_audit`, `question_set`, `question` — from S2, S3 and S6 |
 
-The map is the TypeScript tier's. The worker is in no row: it writes `finding` rows, the catalogue columns of `source_document` and `index.chunk` rows under its own database role, and the `redaction` and `document-chunk` agreements pin what both tiers read of them.
+The map is the TypeScript tier's. The worker is in no row: it writes `finding` rows, the catalogue columns of `source_document` and `index.passage` rows under its own database role, and the `redaction` and `document-passage` agreements pin what both tiers read of them.
 
 ## What the route changes here
 

@@ -15,7 +15,7 @@ export const contractFixture = <Schema extends z.ZodType>(
 
 export const OPEN_OUTCOMES = ["passage", "not-found"] as const;
 
-export const documentChunkRow = z.object({
+export const documentPassageRow = z.object({
   ordinal: z.int().nonnegative(),
   id: z.string().min(1),
   char_start: z.int().nonnegative(),

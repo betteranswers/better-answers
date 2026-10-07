@@ -34,7 +34,7 @@ const aDocument = z.object({
   title: z.string().min(1),
   sensitivity: z.enum(SENSITIVITIES).nullable().default(null),
   quarantineError: z.string().min(1).nullable().default(null),
-  chunks: z.array(z.string().min(1)).default([]),
+  passages: z.array(z.string().min(1)).default([]),
   findings: z.array(aFinding).default([]),
   cited: z.boolean().default(false),
 });
@@ -151,17 +151,17 @@ const seedFindings = async (
   return overridden;
 };
 
-const seedChunks = async (
+const seedPassages = async (
   seed: TestData,
   workspaceId: string,
   connectedSourceId: string,
   documentId: string,
-  chunks: readonly string[],
+  passages: readonly string[],
 ): Promise<void> => {
   let charStart = 0;
-  for (const [ordinal, content] of chunks.entries()) {
+  for (const [ordinal, content] of passages.entries()) {
     const charEnd = charStart + Array.from(content).length;
-    await seed.chunk({
+    await seed.passage({
       workspaceId,
       connectedSourceId,
       sourceDocumentId: documentId,
@@ -204,7 +204,7 @@ const runColumns = (
 type DocumentsOfAConnectedSource = {
   readonly documents: readonly SeededDocument[];
   readonly overridden: readonly OverriddenSpan[];
-  readonly chunkCount: number;
+  readonly passageCount: number;
 };
 
 const seedDocuments = async (
@@ -215,7 +215,7 @@ const seedDocuments = async (
 ): Promise<DocumentsOfAConnectedSource> => {
   const documents: SeededDocument[] = [];
   const overridden: OverriddenSpan[] = [];
-  let chunkCount = 0;
+  let passageCount = 0;
   for (const document of asked) {
     const quarantined = document.quarantineError !== null;
     const landed = await seed.sourceDocument({
@@ -227,15 +227,15 @@ const seedDocuments = async (
       ...(quarantined ? { outcome: "quarantined", quarantineError: document.quarantineError } : {}),
     });
     overridden.push(...(await seedFindings(seed, workspaceId, landed.id, document.findings)));
-    await seedChunks(seed, workspaceId, connectedSourceId, landed.id, document.chunks);
-    chunkCount += document.chunks.length;
+    await seedPassages(seed, workspaceId, connectedSourceId, landed.id, document.passages);
+    passageCount += document.passages.length;
     documents.push({
       documentId: landed.id,
       title: document.title,
       citedBy: document.cited ? await citationOf(seed, workspaceId, landed.id) : null,
     });
   }
-  return { documents, overridden, chunkCount };
+  return { documents, overridden, passageCount };
 };
 
 /**
@@ -267,7 +267,7 @@ export const seedConnectedSources = async (
         state: connectedSource.published ? "published" : "received",
       });
 
-      const { documents, overridden, chunkCount } = await seedDocuments(
+      const { documents, overridden, passageCount } = await seedDocuments(
         seed,
         workspaceId,
         row.id,
@@ -282,7 +282,7 @@ export const seedConnectedSources = async (
           reason: "connected",
           ...runColumns(connectedSource.run, {
             documents: documents.length,
-            chunks: chunkCount,
+            passages: passageCount,
             lmdb_bytes: 0,
             restores_overridden_by_erasure: overridden,
           }),
@@ -329,7 +329,7 @@ export const moveTheIndexRun = async (
         SUITE_WORKER,
         JSON.stringify({
           documents: 1,
-          chunks: 0,
+          passages: 0,
           lmdb_bytes: 0,
           restores_overridden_by_erasure: [],
         }),

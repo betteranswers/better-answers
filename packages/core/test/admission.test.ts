@@ -26,7 +26,7 @@ import {
   reprocessConnectedSourceInput,
   type adminOnConnectedSource,
   type dpiaInputFor,
-  type previewChunks,
+  type previewPassages,
   type publishConnectedSource,
   type reprocessConnectedSource,
   type ReprocessConnectedSourceInput,
@@ -224,13 +224,13 @@ describe("the two acts that carry a declaration today", () => {
       refuses: reprocessConnectedSourceAct.refuses,
       effect: reprocessConnectedSourceAct.effect,
     }).toEqual({
-      admits: { role: "Admin", purposes: ["erasure"] },
+      admits: { role: "Admin", purposes: ["erasure", "reindex"] },
       refuses: ["role-forbids", "no-such-binding"],
       effect: "write",
     });
   });
 
-  it("admits only an Admin and the erasure process to reprocess", () => {
+  it("admits an Admin, erasure and reindex to reprocess, nobody else", () => {
     const wipe = reprocessConnectedSourceInput.parse({
       workspaceId: "01JQ0000000000000000000WSP",
       connectedSourceId: "01J6NNNNNNNNNNNNNNNNNNNNN1",
@@ -240,6 +240,7 @@ describe("the two acts that carry a declaration today", () => {
     expect({
       admitted: [
         processActor("erasure"),
+        processActor("reindex"),
         processActor("reconciler"),
         processActor("upload-sweep"),
         person("Admin"),
@@ -249,7 +250,7 @@ describe("the two acts that carry a declaration today", () => {
       refused: admit(reprocessConnectedSourceAct, processActor("reconciler"), wipe),
       itsClass: classOf("role-forbids"),
     }).toEqual({
-      admitted: [true, false, false, true, false, false],
+      admitted: [true, true, false, false, true, false, false],
       refused: { ok: false, error: "role-forbids" },
       itsClass: "forbidden",
     });
@@ -273,7 +274,7 @@ describe("the two acts that carry a declaration today", () => {
     expectTypeOf<PlatformPrincipal>().toExtend<Parameters<typeof reprocessConnectedSource>[0]>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof publishConnectedSource>[0]>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof dpiaInputFor>[0]>();
-    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof previewChunks>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof previewPassages>[0]>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof adminOnConnectedSource>[0]>();
   });
 
