@@ -2313,14 +2313,14 @@ describe("the derivation's tables under app_rt", () => {
       await refusesEach(client, [
         [
           "UPDATE source_document SET narrowed_to = NULL",
-          "an Admin's narrowing is an act with an audit event, and a run that could clear it could widen a document at nobody's word",
+          "an Admin's narrowing is an act with an audit event, and a sync that could clear it could widen a document at nobody's word",
         ],
         [
-          "UPDATE source_document SET title = 'Retitled by a run'",
-          "what an upload catalogued is the upload's, and a run writes back only what it read",
+          "UPDATE source_document SET title = 'Retitled by a sync'",
+          "what an upload catalogued is the upload's, and a sync writes back only what it read",
         ],
         [
-          "UPDATE connected_source SET name = 'renamed by a run'",
+          "UPDATE connected_source SET name = 'renamed by a sync'",
           "a connected source is what an Admin made, and the tier that indexes it has no say in what it is",
         ],
         [
@@ -2339,7 +2339,7 @@ describe("the derivation's tables under app_rt", () => {
         ],
         [
           "DELETE FROM source_document",
-          "the withdrawal of a document is an act with an audit event, so the run marks one gone and never removes it",
+          "the withdrawal of a document is an act with an audit event, so the sync marks one gone and never removes it",
         ],
       ]);
     });
@@ -2480,19 +2480,19 @@ describe("the finding under both runtime roles", () => {
       await refusesEach(client, [
         [
           "SELECT restore_reason FROM finding",
-          "a reason is a sentence an Admin typed and may name a person, and the run needs only that the span was restored",
+          "a reason is a sentence an Admin typed and may name a person, and the sync needs only that the span was restored",
         ],
         [
           "SELECT restored_by FROM finding",
-          "who restored a span is the review's business and the audit log's, never the run's",
+          "who restored a span is the review's business and the audit log's, never the sync's",
         ],
         [
           "SELECT reviewed_by FROM finding",
-          "who reviewed a span is the review's business and the audit log's, never the run's",
+          "who reviewed a span is the review's business and the audit log's, never the sync's",
         ],
         [
           "SELECT reviewed_at FROM finding",
-          "the run needs only that a span was dismissed, never when",
+          "the sync needs only that a span was dismissed, never when",
         ],
         [
           "SELECT review_reason FROM finding",
@@ -2500,7 +2500,7 @@ describe("the finding under both runtime roles", () => {
         ],
         [
           "SELECT id FROM finding",
-          "a finding's id is the audit log's subject and nothing a run names",
+          "a finding's id is the audit log's subject and nothing a sync names",
         ],
         ["SELECT * FROM finding", "every column is more than the twelve the grants name"],
 
@@ -2738,7 +2738,7 @@ describe("the finding under both runtime roles", () => {
       await refusesEach(client, [
         [
           A_FINDING,
-          "the same span under the same rule is the same finding, and a bare insert of it is a run that would double the connected source's rows",
+          "the same span under the same rule is the same finding, and a bare insert of it is a sync that would double the connected source's rows",
           theSameSpanAgain(),
           /finding_span_key/,
         ],
@@ -3344,7 +3344,7 @@ describe("the queue under both runtime roles", () => {
       for (const role of ["app_rt", "worker_rt"]) {
         await client.query(`SET LOCAL ROLE ${role}`);
         await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-        await refusesEach(client, [["DELETE FROM job", `${role} removing the record of a run`]]);
+        await refusesEach(client, [["DELETE FROM job", `${role} removing the record of a job`]]);
         await client.query("RESET ROLE");
       }
 
@@ -3460,7 +3460,7 @@ describe("the sweep pass", () => {
       await refusesEach(client, [
         [
           "UPDATE sweep_pass SET removed = 0",
-          "a pass the api could rewrite could say a last run removed nothing when it removed much",
+          "a pass the api could rewrite could say a last pass removed nothing when it removed much",
         ],
         [
           "DELETE FROM sweep_pass",
@@ -3482,7 +3482,7 @@ describe("the sweep pass", () => {
         ["SELECT id FROM sweep_pass", "the worker sweeps nothing, so it has no pass to read"],
         [A_SWEEP_PASS, "and a worker that could record one could stand in for a pass", [ulid()]],
         ["UPDATE sweep_pass SET removed = 0", "or rewrite what a pass removed"],
-        ["DELETE FROM sweep_pass", "or remove the last run an operator reads"],
+        ["DELETE FROM sweep_pass", "or remove the last pass an operator reads"],
       ]);
     });
   });

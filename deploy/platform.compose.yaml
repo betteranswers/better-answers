@@ -79,7 +79,7 @@ services:
       HF_HOME: /data/worker/hf-cache
       HF_HUB_OFFLINE: "1"
       TLDEXTRACT_CACHE: /data/worker/tldextract-cache
-      # The engine calls a tracking host per index run otherwise, and nothing needs it.
+      # The engine calls a tracking host per sync otherwise, and nothing needs it.
       COCOINDEX_DISABLE_USAGE_TRACKING: "1"
       MAX_CONCURRENT_RUNS: "1"
       LMDB_MAX_BYTES_PER_CONNECTED_SOURCE: "4294967296"

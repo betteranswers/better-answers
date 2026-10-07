@@ -675,8 +675,8 @@ describe("the sweep collects what failed connects and lost races left", () => {
   });
 });
 
-const RUN_FAILED_AT = new Date("2026-09-11T08:00:00.000Z");
-const RUN_FINISHED_AT = new Date("2026-09-11T09:30:00.000Z");
+const SYNC_FAILED_AT = new Date("2026-09-11T08:00:00.000Z");
+const SYNC_FINISHED_AT = new Date("2026-09-11T09:30:00.000Z");
 const PUBLISHED_AT = new Date("2026-09-11T10:00:00.000Z");
 
 const CONFIRMED = {
@@ -722,7 +722,7 @@ const claimColumnsOf = (status: string, at: Date) => {
   return { ...claimed, finishedAt: at, outcome: { passages: 2 } };
 };
 
-const runOver = (workspaceId: string, connectedSourceId: string, status: string, at: Date) =>
+const syncOver = (workspaceId: string, connectedSourceId: string, status: string, at: Date) =>
   seededBy(db(), (seed) =>
     seed.job({
       workspaceId,
@@ -735,7 +735,7 @@ const runOver = (workspaceId: string, connectedSourceId: string, status: string,
     }),
   );
 
-const runEndedAt = async (
+const syncEndedAt = async (
   workspaceId: string,
   connectedSourceId: string,
   jobId: string,
@@ -746,7 +746,7 @@ const runEndedAt = async (
     workspaceId,
     jobId,
   ]);
-  await runOver(workspaceId, connectedSourceId, status, at);
+  await syncOver(workspaceId, connectedSourceId, status, at);
 };
 
 const reconciledUnder = async (workspaceId: string, documentId: string, version: string) => {
@@ -809,12 +809,12 @@ const passagesOfTheHandbook = async (
 
 const indexedHandbook = async (scenario: Scenario) => {
   const bound = await boundHandbook(scenario);
-  await runEndedAt(
+  await syncEndedAt(
     scenario.workspaceId,
     bound.connectedSourceId,
     bound.jobId,
     "done",
-    RUN_FINISHED_AT,
+    SYNC_FINISHED_AT,
   );
   await passagesOfTheHandbook(scenario.workspaceId, bound);
   return bound;
@@ -883,7 +883,7 @@ describe("an Admin publishes a connected source", () => {
     const { connectedSourceId, documentId, jobId } = await boundHandbook(scenario, {
       sensitivity: "Internal",
     });
-    await runEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", RUN_FINISHED_AT);
+    await syncEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", SYNC_FINISHED_AT);
     await passagesOfTheHandbook(scenario.workspaceId, { connectedSourceId, documentId });
     const stoodAt = await passageVersionsOf(db(), scenario.workspaceId, connectedSourceId);
 
@@ -965,11 +965,11 @@ describe("an Admin publishes a connected source", () => {
     expect(row?.detail["dpiaHash"]).toEqual(dpiaHashOfTheHandbook(connectedSourceId));
   });
 
-  it("publishes once the latest run is done, despite earlier failures", async () => {
+  it("publishes once the latest sync is done, despite earlier failures", async () => {
     const scenario = await arrange();
     const { connectedSourceId, jobId } = await boundHandbook(scenario);
-    await runEndedAt(scenario.workspaceId, connectedSourceId, jobId, "failed", RUN_FAILED_AT);
-    await runOver(scenario.workspaceId, connectedSourceId, "done", RUN_FINISHED_AT);
+    await syncEndedAt(scenario.workspaceId, connectedSourceId, jobId, "failed", SYNC_FAILED_AT);
+    await syncOver(scenario.workspaceId, connectedSourceId, "done", SYNC_FINISHED_AT);
 
     const published = await publishing(scenario, {
       connectedSourceId,
@@ -985,14 +985,14 @@ describe("an Admin publishes a connected source", () => {
   });
 
   it.each([
-    ["queued", RUN_FINISHED_AT],
-    ["claimed", RUN_FINISHED_AT],
-    ["failed", RUN_FINISHED_AT],
-    ["poisoned", RUN_FINISHED_AT],
-  ])("refuses as not-indexed while the latest run is %s", async (status, at) => {
+    ["queued", SYNC_FINISHED_AT],
+    ["claimed", SYNC_FINISHED_AT],
+    ["failed", SYNC_FINISHED_AT],
+    ["poisoned", SYNC_FINISHED_AT],
+  ])("refuses as not-indexed while the latest sync is %s", async (status, at) => {
     const scenario = await arrange();
     const { connectedSourceId, documentId, jobId } = await boundHandbook(scenario);
-    await runEndedAt(scenario.workspaceId, connectedSourceId, jobId, status, at);
+    await syncEndedAt(scenario.workspaceId, connectedSourceId, jobId, status, at);
     await passageUnder(
       db(),
       scenario.workspaceId,
@@ -1024,7 +1024,7 @@ describe("an Admin publishes a connected source", () => {
     ).toEqual([]);
   });
 
-  it("refuses as not-indexed when no run was ever queued", async () => {
+  it("refuses as not-indexed when no sync was ever queued", async () => {
     const scenario = await arrange();
     const { connectedSourceId, jobId } = await boundHandbook(scenario);
     await db().pool.query("DELETE FROM job WHERE workspace_id = $1 AND id = $2", [
@@ -1044,7 +1044,7 @@ describe("an Admin publishes a connected source", () => {
   it("refuses a second publish, keeping the first instant", async () => {
     const scenario = await arrange();
     const { connectedSourceId, jobId } = await boundHandbook(scenario);
-    await runEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", RUN_FINISHED_AT);
+    await syncEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", SYNC_FINISHED_AT);
 
     const first = await publishing(scenario, {
       connectedSourceId,
@@ -1076,7 +1076,7 @@ describe("an Admin publishes a connected source", () => {
   ])("refuses a publish unless %s, writing nothing", async (_case, override) => {
     const scenario = await arrange();
     const { connectedSourceId, jobId } = await boundHandbook(scenario);
-    await runEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", RUN_FINISHED_AT);
+    await syncEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", SYNC_FINISHED_AT);
 
     const published = await publishing(scenario, {
       connectedSourceId,
@@ -1097,7 +1097,7 @@ describe("an Admin publishes a connected source", () => {
   it("refuses an Editor the publish", async () => {
     const scenario = await arrange();
     const { connectedSourceId, jobId } = await boundHandbook(scenario);
-    await runEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", RUN_FINISHED_AT);
+    await syncEndedAt(scenario.workspaceId, connectedSourceId, jobId, "done", SYNC_FINISHED_AT);
 
     const published = await readingAs(db().runtimePool, scenario.editor, (editor, tx) =>
       publishConnectedSource(
@@ -1143,12 +1143,12 @@ const financeHandbook = async (scenario: Scenario, inTheGroup: readonly UserPrin
     audience: "groups",
     audienceGroups: [finance],
   });
-  await runEndedAt(
+  await syncEndedAt(
     scenario.workspaceId,
     bound.connectedSourceId,
     bound.jobId,
     "done",
-    RUN_FINISHED_AT,
+    SYNC_FINISHED_AT,
   );
   return { ...bound, finance };
 };
@@ -1196,7 +1196,7 @@ const AS_IT_WAS_INDEXED = {
 };
 
 describe("an Admin reprocesses a connected source", () => {
-  it("empties the source and queues one run carrying the reason", async () => {
+  it("empties the source and queues one sync carrying the reason", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId } = await indexedHandbook(scenario);
 
@@ -1229,7 +1229,7 @@ describe("an Admin reprocesses a connected source", () => {
     });
   });
 
-  it("rejects, keeping the passages, when the queue refuses its run", async () => {
+  it("rejects, keeping the passages, when the queue refuses its sync", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1285,7 +1285,7 @@ describe("an Admin reprocesses a connected source", () => {
     );
   });
 
-  it("rejects a reason no index run carries, keeping the passages", async () => {
+  it("rejects a reason no sync carries, keeping the passages", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
@@ -1297,11 +1297,11 @@ describe("an Admin reprocesses a connected source", () => {
             connectedSourceId,
             reason: "rule-change",
           }),
-          // @ts-expect-error a reason no index run carries, to reach the run's own refusal
+          // @ts-expect-error a reason no sync carries, to reach the sync's own refusal
           reason: "spring-clean",
         }),
       ),
-    ).rejects.toThrow(/the index run was refused \(malformed\)/);
+    ).rejects.toThrow(/the sync was refused \(malformed\)/);
 
     expect(await connectedSourceHolds(scenario.workspaceId, connectedSourceId)).toEqual(
       AS_IT_WAS_INDEXED,
@@ -1406,7 +1406,7 @@ describe("an Admin reprocesses a connected source", () => {
   });
 });
 
-/** A source a wipe emptied, its `wiped` run queued behind the run that first indexed it. */
+/** A source a wipe emptied, its `wiped` sync queued behind the sync that first indexed it. */
 const WIPED_AND_QUEUED = {
   passages: [],
   runs: [
@@ -1416,7 +1416,7 @@ const WIPED_AND_QUEUED = {
 };
 
 describe("the operator's reindex of a workspace's connected sources", () => {
-  it("wipes every source and queues its run, deleting its passages", async () => {
+  it("wipes every source and queues its sync, deleting its passages", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId } = await indexedHandbook(scenario);
 
@@ -1455,7 +1455,7 @@ const reprocessingAs = (
   );
 
 describe("the erasure reprocesses a connected source as the platform", () => {
-  it("empties the source and queues its run for the wipe", async () => {
+  it("empties the source and queues its sync for the wipe", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId } = await indexedHandbook(scenario);
 

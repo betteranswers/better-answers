@@ -117,7 +117,7 @@ describe("the seed", () => {
     ]);
   });
 
-  it("connects a document naming the subject, queueing its index run", async () => {
+  it("connects a document naming the subject, queueing its sync", async () => {
     const scenario = await arrange();
     const [email, , name] = expectedTokensFor(scenario.workspaceId);
 

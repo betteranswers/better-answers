@@ -24,8 +24,8 @@ import {
 } from "./harness-people.ts";
 import {
   connectedSourcesSeeding,
-  indexRunMoving,
-  moveTheIndexRun,
+  syncMoving,
+  moveTheSync,
   seedConnectedSources,
 } from "./harness-sources.ts";
 import type { TestApp } from "./harness.ts";
@@ -224,9 +224,9 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json({ connectedSources: await seedConnectedSources(app, asked) });
   });
 
-  control.post(`${HARNESS_PREFIX}/index-runs`, async (context) => {
-    const asked = await readBody(context.req.raw, indexRunMoving);
-    return context.json(await moveTheIndexRun(app, asked));
+  control.post(`${HARNESS_PREFIX}/syncs`, async (context) => {
+    const asked = await readBody(context.req.raw, syncMoving);
+    return context.json(await moveTheSync(app, asked));
   });
 
   // The ops command's own act under its own principal, so the mark lands as the owner's would.

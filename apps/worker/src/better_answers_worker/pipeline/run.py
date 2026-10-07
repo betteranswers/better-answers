@@ -11,7 +11,7 @@ from .catalogue import (
     reconcile_catalogue,
     record_findings,
 )
-from .host import Host, IndexRun
+from .host import Host, Sync
 from .landed import SEAM_MS_PER_PAGE, TIMEOUT_MARGIN_MS, redact_landed_copies
 from .objects import Bucket, LandedCopies
 from .rows import PASSAGE_TABLE, rows_of
@@ -35,7 +35,7 @@ class OverriddenRestore:
 
 @dataclass(frozen=True, slots=True)
 class IndexOutcome:
-    """`lmdb_bytes` is what the connected source's stores hold on disk after the run;
+    """`lmdb_bytes` is what the connected source's stores hold on disk after the sync;
     `restores_overridden_by_erasure` names restored spans an erasure withholds again."""
 
     documents: int
@@ -63,56 +63,56 @@ class IndexOutcome:
 
 def index_connected_source(
     bootstrap: Bootstrap,
-    run: IndexRun,
+    sync: Sync,
     *,
     copies: LandedCopies | None = None,
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> IndexOutcome:
     """Redacts the connected source's live documents, splits them into passages and
-    lands the passage rows. A `wiped` or `rule-change` run first empties the source's
+    lands the passage rows. A `wiped` or `rule-change` sync first empties the source's
     store; a source that is gone lands nothing. `copies` defaults to the workspace's
     bucket."""
     with Host(bootstrap) as host:
-        if run.reason in REASONS_EMPTYING_THE_CONNECTED_SOURCE:
-            host.remove_connected_source_store(run)
-        store = copies or Bucket(bootstrap.object_store, run.workspace_id)
+        if sync.reason in REASONS_EMPTYING_THE_CONNECTED_SOURCE:
+            host.remove_connected_source_store(sync)
+        store = copies or Bucket(bootstrap.object_store, sync.workspace_id)
         with queue.connected(bootstrap.database_url) as connection:
-            with queue.scoped(connection, run.workspace_id) as cursor:
-                connected_source = read_connected_source(cursor, run)
+            with queue.scoped(connection, sync.workspace_id) as cursor:
+                connected_source = read_connected_source(cursor, sync)
             if connected_source is None:
                 logger.info(
-                    "the index run found no connected source to index",
-                    connected_source_id=run.connected_source_id,
-                    reason=run.reason,
+                    "the sync found no connected source to index",
+                    connected_source_id=sync.connected_source_id,
+                    reason=sync.reason,
                 )
-                host.open_connected_source(run)
-                return _finished(IndexOutcome(0, 0, host.lmdb_bytes(run)), run)
+                host.open_connected_source(sync)
+                return _finished(IndexOutcome(0, 0, host.lmdb_bytes(sync)), sync)
 
             landed = redact_landed_copies(
                 host,
-                run,
+                sync,
                 connected_source.documents,
                 store,
                 connected_source.rules_in_force,
-                run.connected_source_id,
+                sync.connected_source_id,
                 ms_per_page=ms_per_page,
                 margin_ms=margin_ms,
             )
             # A document's class must be on its row before any of its passages is read.
-            with queue.scoped(connection, run.workspace_id) as cursor:
-                record_findings(cursor, run, landed.documents)
+            with queue.scoped(connection, sync.workspace_id) as cursor:
+                record_findings(cursor, sync, landed.documents)
                 reconcile_catalogue(cursor, landed.documents)
                 quarantine_catalogue(cursor, landed.quarantined)
 
             passages = host.land_rows(
-                run, PASSAGE_TABLE, rows_of(run, landed.documents)
+                sync, PASSAGE_TABLE, rows_of(sync, landed.documents)
             )
 
         outcome = IndexOutcome(
             documents=len(landed.documents),
             passages=passages,
-            lmdb_bytes=host.lmdb_bytes(run),
+            lmdb_bytes=host.lmdb_bytes(sync),
             restores_overridden_by_erasure=tuple(
                 OverriddenRestore(
                     document_id=document.source_document_id,
@@ -124,14 +124,14 @@ def index_connected_source(
                 for finding in overridden_in(document.redacted.withholdings)
             ),
         )
-    return _finished(outcome, run)
+    return _finished(outcome, sync)
 
 
-def _finished(outcome: IndexOutcome, run: IndexRun) -> IndexOutcome:
+def _finished(outcome: IndexOutcome, sync: Sync) -> IndexOutcome:
     logger.info(
-        "the index run finished",
-        connected_source_id=run.connected_source_id,
-        reason=run.reason,
+        "the sync finished",
+        connected_source_id=sync.connected_source_id,
+        reason=sync.reason,
         **outcome.as_row(),
     )
     return outcome

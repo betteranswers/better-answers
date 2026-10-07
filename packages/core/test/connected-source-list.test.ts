@@ -53,7 +53,7 @@ const connectedSourceOf = (
     return { connectedSourceId: connectedSource.id, documentIds };
   });
 
-type RunShape = {
+type SyncShape = {
   readonly reason: string;
   readonly status: "queued" | "claimed" | "done" | "failed";
   readonly enqueuedAt: Date;
@@ -65,7 +65,7 @@ const INDEXED = { documents: 2, passages: 3 };
 
 const TIMED_OUT = { error: "DeadlineExceededError" };
 
-const columnsOf = (run: RunShape) => {
+const columnsOf = (run: SyncShape) => {
   if (run.status === "queued") return {};
   const claimed = {
     attempts: 1,
@@ -77,7 +77,7 @@ const columnsOf = (run: RunShape) => {
   return { ...claimed, finishedAt: run.finishedAt ?? null, outcome: run.outcome ?? {} };
 };
 
-const runOver = (scenario: Scenario, connectedSourceId: string, run: RunShape): Promise<string> =>
+const syncOver = (scenario: Scenario, connectedSourceId: string, run: SyncShape): Promise<string> =>
   seededBy(db(), async (seed) => {
     const row = await seed.job({
       workspaceId: scenario.workspaceId,
@@ -124,10 +124,10 @@ const AS_BOUND = {
 };
 
 describe("the Sources list an Admin reads", () => {
-  it("names each connected source's state, counts and last run", async () => {
+  it("names each connected source's state, counts and last sync", async () => {
     const scenario = await arrange();
     const handbook = await connectedSourceOf(scenario, "Handbook", [{ title: "handbook.md" }]);
-    const handbookRun = await runOver(scenario, handbook.connectedSourceId, {
+    const handbookSync = await syncOver(scenario, handbook.connectedSourceId, {
       reason: "connected",
       status: "queued",
       enqueuedAt: QUEUED_AT,
@@ -136,14 +136,14 @@ describe("the Sources list an Admin reads", () => {
       { title: "leave.md" },
       { title: "expenses.md" },
     ]);
-    await runOver(scenario, policies.connectedSourceId, {
+    await syncOver(scenario, policies.connectedSourceId, {
       reason: "connected",
       status: "failed",
       enqueuedAt: QUEUED_AT,
       finishedAt: FAILED_AT,
       outcome: TIMED_OUT,
     });
-    const policiesRun = await runOver(scenario, policies.connectedSourceId, {
+    const policiesSync = await syncOver(scenario, policies.connectedSourceId, {
       reason: "restored",
       status: "done",
       enqueuedAt: REQUEUED_AT,
@@ -153,7 +153,7 @@ describe("the Sources list an Admin reads", () => {
     await passagesUnder(scenario, policies.connectedSourceId, policies.documentIds[0] ?? "", 2);
     await passagesUnder(scenario, policies.connectedSourceId, policies.documentIds[1] ?? "", 1);
     const rota = await connectedSourceOf(scenario, "Rota", [{ title: "rota.md" }], PUBLISHED_AT);
-    const rotaRun = await runOver(scenario, rota.connectedSourceId, {
+    const rotaSync = await syncOver(scenario, rota.connectedSourceId, {
       reason: "connected",
       status: "done",
       enqueuedAt: QUEUED_AT,
@@ -161,7 +161,7 @@ describe("the Sources list an Admin reads", () => {
       outcome: INDEXED,
     });
     const contracts = await connectedSourceOf(scenario, "Contracts", [{ title: "contracts.pdf" }]);
-    const contractsRun = await runOver(scenario, contracts.connectedSourceId, {
+    const contractsSync = await syncOver(scenario, contracts.connectedSourceId, {
       reason: "connected",
       status: "claimed",
       enqueuedAt: QUEUED_AT,
@@ -178,8 +178,8 @@ describe("the Sources list an Admin reads", () => {
         publishedAt: null,
         documentCount: 1,
         passageCount: 0,
-        lastRun: {
-          jobId: contractsRun,
+        lastSync: {
+          jobId: contractsSync,
           kind: "index",
           reason: "connected",
           status: "claimed",
@@ -196,8 +196,8 @@ describe("the Sources list an Admin reads", () => {
         publishedAt: null,
         documentCount: 1,
         passageCount: 0,
-        lastRun: {
-          jobId: handbookRun,
+        lastSync: {
+          jobId: handbookSync,
           kind: "index",
           reason: "connected",
           status: "queued",
@@ -214,8 +214,8 @@ describe("the Sources list an Admin reads", () => {
         publishedAt: null,
         documentCount: 2,
         passageCount: 3,
-        lastRun: {
-          jobId: policiesRun,
+        lastSync: {
+          jobId: policiesSync,
           kind: "index",
           reason: "restored",
           status: "done",
@@ -232,8 +232,8 @@ describe("the Sources list an Admin reads", () => {
         publishedAt: "2026-09-11T10:00:00.000Z",
         documentCount: 1,
         passageCount: 0,
-        lastRun: {
-          jobId: rotaRun,
+        lastSync: {
+          jobId: rotaSync,
           kind: "index",
           reason: "connected",
           status: "done",
@@ -245,7 +245,7 @@ describe("the Sources list an Admin reads", () => {
     ]);
   });
 
-  it("shows an unrun source as received with no last run", async () => {
+  it("shows an unrun source as received with no last sync", async () => {
     const scenario = await arrange();
     const minutes = await connectedSourceOf(scenario, "Minutes", [{ title: "minutes.md" }]);
 
@@ -255,7 +255,7 @@ describe("the Sources list an Admin reads", () => {
       listed.map((connectedSource) => [
         connectedSource.connectedSourceId,
         connectedSource.state,
-        connectedSource.lastRun,
+        connectedSource.lastSync,
       ]),
     ).toEqual([[minutes.connectedSourceId, "received", null]]);
   });
@@ -301,23 +301,23 @@ describe("the Sources list an Admin reads", () => {
 });
 
 describe("the runs of a connected source, read by subject", () => {
-  it("answers every run newest first, in ISO instants", async () => {
+  it("answers every sync newest first, in ISO instants", async () => {
     const scenario = await arrange();
     const handbook = await connectedSourceOf(scenario, "Handbook", [{ title: "handbook.md" }]);
-    const failed = await runOver(scenario, handbook.connectedSourceId, {
+    const failed = await syncOver(scenario, handbook.connectedSourceId, {
       reason: "connected",
       status: "failed",
       enqueuedAt: QUEUED_AT,
       finishedAt: FAILED_AT,
       outcome: TIMED_OUT,
     });
-    const requeued = await runOver(scenario, handbook.connectedSourceId, {
+    const requeued = await syncOver(scenario, handbook.connectedSourceId, {
       reason: "restored",
       status: "queued",
       enqueuedAt: REQUEUED_AT,
     });
     const other = await connectedSourceOf(scenario, "Rota", [{ title: "rota.md" }]);
-    await runOver(scenario, other.connectedSourceId, {
+    await syncOver(scenario, other.connectedSourceId, {
       reason: "connected",
       status: "queued",
       enqueuedAt: QUEUED_AT,
@@ -351,7 +351,7 @@ describe("the runs of a connected source, read by subject", () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const theirs = await connectedSourceOf(elsewhere, "Handbook", [{ title: "handbook.md" }]);
-    await runOver(elsewhere, theirs.connectedSourceId, {
+    await syncOver(elsewhere, theirs.connectedSourceId, {
       reason: "connected",
       status: "queued",
       enqueuedAt: QUEUED_AT,

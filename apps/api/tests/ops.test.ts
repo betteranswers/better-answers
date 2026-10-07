@@ -341,10 +341,10 @@ const theIndexJobEnded = async (
 };
 
 /**
- * This suite runs no worker, so it leaves the rows the worker's run would: each document's text in
+ * This suite runs no worker, so it leaves the rows the worker's sync would: each document's text in
  * one passage, and the job done.
  */
-const theIndexRunLanded = async (
+const theSyncLanded = async (
   app: TestApp,
   workspaceId: string,
   readerId: string,
@@ -378,7 +378,7 @@ const theIndexRunLanded = async (
   await theIndexJobEnded(app, workspaceId, run.id, "done");
 };
 
-const theIndexRunFailed = async (app: TestApp, workspaceId: string): Promise<void> => {
+const theSyncFailed = async (app: TestApp, workspaceId: string): Promise<void> => {
   const run = await queuedIndexJob(app, workspaceId);
   await theIndexJobEnded(app, workspaceId, run.id, "failed");
 };
@@ -406,7 +406,7 @@ const boundAndIndexed = async (
     },
   );
   if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
-  await theIndexRunLanded(app, workspaceId, adminId);
+  await theSyncLanded(app, workspaceId, adminId);
 };
 
 /** Completed while the documents finder answered nothing, so its run wiped no connected source. */
@@ -1011,7 +1011,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return provisioned;
     };
 
-    /** Phase one waits on the worker's run over its document, and the suite plays the worker. */
+    /** Phase one waits on the worker's sync over its document, and the suite plays the worker. */
     const seededBeside = async (workspaceId: string, worker: () => Promise<void>) => {
       const [seed] = await Promise.all([
         opsWith(
@@ -1025,7 +1025,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     };
 
     const seeded = (workspaceId: string, readerId: string) =>
-      seededBeside(workspaceId, () => theIndexRunLanded(app(), workspaceId, readerId));
+      seededBeside(workspaceId, () => theSyncLanded(app(), workspaceId, readerId));
 
     it("seeds the subject, answers once indexed, prints their tokens last", async () => {
       const { workspaceId, admin } = await aWorkspaceToDrillIn();
@@ -1080,12 +1080,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("refuses phase one when indexing the subject's document fails", async () => {
       const { workspaceId } = await aWorkspaceToDrillIn();
 
-      const run = await seededBeside(workspaceId, () => theIndexRunFailed(app(), workspaceId));
+      const run = await seededBeside(workspaceId, () => theSyncFailed(app(), workspaceId));
 
-      const [indexRun] = await indexJobsIn(app(), workspaceId);
+      const [sync] = await indexJobsIn(app(), workspaceId);
       const jobs = await jobsOf(app(), workspaceId);
       expect(run.exitCode).toBe(1);
-      expect(indexRun).toEqual({ reason: "connected", status: "failed" });
+      expect(sync).toEqual({ reason: "connected", status: "failed" });
       expect(run.lines).toEqual([
         `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${jobs[0]?.id ?? ""} is failed after 1 attempt; the job's own row says what it found`,
       ]);
@@ -1455,7 +1455,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("reindex-connected-sources — every source wiped and queued again", () => {
-    it("wipes an indexed source and queues its wiped run", async () => {
+    it("wipes an indexed source and queues its wiped sync", async () => {
       const { workspaceId, admin } = await app().provision();
       await boundAndIndexed(app(), workspaceId, admin.id, "Expense claims are paid monthly.\n");
 

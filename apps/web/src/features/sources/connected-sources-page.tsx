@@ -49,12 +49,12 @@ const LISTED = Object.values(SOURCES_KEYSTROKES);
 
 const NOTHING_IN_FOCUS = selectFirst("connectedSource");
 
-const waitsForItsRun = (connectedSource: ListedConnectedSource): Outcome => ({
+const waitsForItsSync = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
   words:
     connectedSource.state === "published"
       ? `“${connectedSource.name}” is already published.`
-      : `“${connectedSource.name}” is ${connectedSource.state}: publishing waits for its index run to finish.`,
+      : `“${connectedSource.name}” is ${connectedSource.state}: publishing waits for its sync to finish.`,
 });
 
 const narrowestAlready = (connectedSource: ListedConnectedSource): Outcome => ({
@@ -118,7 +118,7 @@ export function ConnectedSourcesPage() {
 
   const publish = (connectedSource: ListedConnectedSource) => {
     if (connectedSource.state === "indexed") setPublishing(connectedSource.connectedSourceId);
-    else setOutcome(waitsForItsRun(connectedSource));
+    else setOutcome(waitsForItsSync(connectedSource));
   };
 
   const narrow = (connectedSource: ListedConnectedSource) => {

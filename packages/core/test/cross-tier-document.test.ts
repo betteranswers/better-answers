@@ -147,7 +147,7 @@ type JobRow = {
   } | null;
 };
 
-const indexRunsOf = async (
+const syncsOf = async (
   workspaceId: string,
   connectedSourceId: string,
 ): Promise<readonly JobRow[]> => {
@@ -196,7 +196,7 @@ const findingsStoreOf = (workspaceId: string, connectedSourceId: string): string
 
 const spanOf = (passages: readonly PassageRow[]) => {
   const first = passages[0];
-  if (first === undefined) throw new Error("the run landed no passage row");
+  if (first === undefined) throw new Error("the sync landed no passage row");
   return { start: first.char_start, end: first.char_end };
 };
 
@@ -284,7 +284,7 @@ describe("one uploaded document, read back through both tiers", () => {
         { sensitivity: "Internal", audience: "everyone", published_at: PUBLISHED_AT },
       ]);
 
-      const runs = await indexRunsOf(scenario.workspaceId, bound.connectedSourceId);
+      const runs = await syncsOf(scenario.workspaceId, bound.connectedSourceId);
       expect(runs.map((run) => [run.status, run.attempts])).toEqual([["done", 2]]);
       expect(runs[0]?.outcome?.lmdb_bytes).toBeGreaterThan(0);
 
@@ -410,7 +410,7 @@ describe("one uploaded document, read back through both tiers", () => {
       await runTheWorker("cross-tier-5");
 
       const erased = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
-      const runs = await indexRunsOf(scenario.workspaceId, bound.connectedSourceId);
+      const runs = await syncsOf(scenario.workspaceId, bound.connectedSourceId);
       const reviewed = answered(
         await acting(scenario.admin, (admin, tx) =>
           findingGroupsOf(
@@ -463,7 +463,7 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 
   it(
-    "keeps a mid-run narrowing, and a later one to groups",
+    "keeps a mid-sync narrowing, and a later one to groups",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario);
@@ -652,7 +652,7 @@ const normalisedCopyOf = async (scenario: Scenario, documentId: string): Promise
     [scenario.workspaceId, documentId],
   );
   const key = read.rows[0]?.normalised_key;
-  if (key == null) throw new Error("the run wrote no normalised copy");
+  if (key == null) throw new Error("the sync wrote no normalised copy");
   const copy = await getObject(scenario.admin, store().door, key);
   if (!copy.ok) throw new Error(`the normalised copy was not readable: ${copy.error}`);
   return textOf(copy.value);
@@ -660,7 +660,7 @@ const normalisedCopyOf = async (scenario: Scenario, documentId: string): Promise
 
 describe("an erasure over a bound document, read through both tiers", () => {
   it(
-    "erases the subject everywhere, and a second run changes nothing",
+    "erases the subject everywhere, and a second sync changes nothing",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "claims-handbook.md", THE_HANDBOOK_NAMING_ANN);
@@ -679,7 +679,7 @@ describe("an erasure over a bound document, read through both tiers", () => {
       const onTheTopic = await passagesFoundBy(scenario.viewer, THE_QUERY);
       const copied = await normalisedCopyOf(scenario, bound.documentId);
       const landed = await passagesOf(scenario.workspaceId, bound.connectedSourceId);
-      const runs = await indexRunsOf(scenario.workspaceId, bound.connectedSourceId);
+      const runs = await syncsOf(scenario.workspaceId, bound.connectedSourceId);
 
       const again = await erasing(scenario, subjectRequestId, ERASED_AGAIN_AT);
 
@@ -696,7 +696,7 @@ describe("an erasure over a bound document, read through both tiers", () => {
 
       expect(documentsTheMapFound(again)).toEqual([]);
       expect(await passagesOf(scenario.workspaceId, bound.connectedSourceId)).toEqual(landed);
-      expect(await indexRunsOf(scenario.workspaceId, bound.connectedSourceId)).toEqual(runs);
+      expect(await syncsOf(scenario.workspaceId, bound.connectedSourceId)).toEqual(runs);
     },
     A_CROSS_TIER_ALLOWANCE_MS,
   );

@@ -37,22 +37,22 @@ export const EVERYONE: ListedConnectedSource["audience"] = "everyone";
 export const widestAlready = (connectedSource: ListedConnectedSource): boolean =>
   connectedSource.sensitivity === WIDEST && connectedSource.audience === EVERYONE;
 
-const RUN_IN_FLIGHT: ReadonlySet<string> = new Set(["queued", "claimed"]);
+const SYNC_IN_FLIGHT: ReadonlySet<string> = new Set(["queued", "claimed"]);
 
-const WATCHING_A_RUN_MS = 1000;
+const WATCHING_A_SYNC_MS = 1000;
 
-const aRunIsInFlight = (connectedSources: readonly ListedConnectedSource[] | undefined): boolean =>
+const aSyncIsInFlight = (connectedSources: readonly ListedConnectedSource[] | undefined): boolean =>
   (connectedSources ?? []).some(
     (connectedSource) =>
-      connectedSource.lastRun !== null && RUN_IN_FLIGHT.has(connectedSource.lastRun.status),
+      connectedSource.lastSync !== null && SYNC_IN_FLIGHT.has(connectedSource.lastSync.status),
   );
 
 export const useConnectedSources = () => {
   const api = useTRPC();
   return useQuery({
     ...api.sources.list.queryOptions(),
-    // A run in flight moves the state word, so the list watches until every run has landed.
-    refetchInterval: (query) => (aRunIsInFlight(query.state.data) ? WATCHING_A_RUN_MS : false),
+    // A sync in flight moves the state word, so the list watches until every sync has landed.
+    refetchInterval: (query) => (aSyncIsInFlight(query.state.data) ? WATCHING_A_SYNC_MS : false),
   });
 };
 

@@ -17,12 +17,7 @@ import { narrower, type Sensitivity } from "../access/index.ts";
 import { act, batchIdFor, declareActs, recordEach, STORED_DETAIL_KEYS } from "../audit/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import { actorIdOf, attempt, err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
-import {
-  enqueueJobIn,
-  indexRunRefused,
-  latestIndexOutcomeIn,
-  type JobOutcome,
-} from "../runs/index.ts";
+import { enqueueJobIn, syncRefused, latestIndexOutcomeIn, type JobOutcome } from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import {
   adminOnConnectedSource,
@@ -33,7 +28,7 @@ import {
 } from "./admin-connected-source.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import { REDACTION_CATEGORIES } from "./dpia.ts";
-import { raisedByTheLastRun, RESTORE_REASON, restoreFinding } from "./findings.ts";
+import { raisedByTheLastSync, RESTORE_REASON, restoreFinding } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
 export const findingsOfInput = z.object({ connectedSourceId: CONNECTED_SOURCE_ID });
@@ -67,7 +62,7 @@ const HOLDS_AN_UNREVIEWED_SPECIAL_CATEGORY = `SELECT EXISTS (
     SELECT 1 FROM finding f
       JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
      WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND f.category = ANY($3::text[])
-       AND f.review_state = $4 AND ${raisedByTheLastRun("f", "d")}
+       AND f.review_state = $4 AND ${raisedByTheLastSync("f", "d")}
   ) AS held`;
 
 export const holdsAnUnreviewedSpecialCategory = async (
@@ -110,7 +105,7 @@ const FINDING_GROUPS = `SELECT d.id AS "documentId", d.title,
        FROM finding f
        JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
        JOIN connected_source b ON b.workspace_id = d.workspace_id AND b.id = d.connected_source_id
-      WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND ${raisedByTheLastRun("f", "d")}
+      WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND ${raisedByTheLastSync("f", "d")}
       GROUP BY d.id, d.title, d.sensitivity, b.sensitivity, f.category, f.rule_id, f.tier
       ORDER BY f.category, f.rule_id, d.title, d.id`;
 
@@ -125,7 +120,7 @@ const OVERRIDDEN_SPAN = z.object({
 });
 
 const UNREADABLE_RUN = new Error(
-  "the connected source's last index run names the kept spans an erasure overrode in a shape the review cannot read",
+  "the connected source's last sync names the kept spans an erasure overrode in a shape the review cannot read",
 );
 
 const overriddenSpansOf = (
@@ -154,9 +149,9 @@ export const findingsOf = async (
   const standing = await connectedSourceNamed(acting.value, tx, { columns: "1", lock: "none" });
   if (!standing.ok) return err(standing.error);
 
-  const lastRun = await latestIndexOutcomeIn(principal, tx, { connectedSourceId });
-  if (!lastRun.ok) return err(lastRun.error);
-  const named = overriddenSpansOf(lastRun.value);
+  const lastSync = await latestIndexOutcomeIn(principal, tx, { connectedSourceId });
+  if (!lastSync.ok) return err(lastSync.error);
+  const named = overriddenSpansOf(lastSync.value);
   if (!named.ok) return err(named.error);
   const overridden = named.value;
 
@@ -247,7 +242,7 @@ const FINDINGS_OF_GROUPS = `SELECT f.id, f.document_id AS "documentId", f.catego
             f.rule_id AS "ruleId", f.tier
        FROM finding f
        JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
-      WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND ${raisedByTheLastRun("f", "d")}
+      WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND ${raisedByTheLastSync("f", "d")}
         AND ${findingGroupClause("f", 3)}
       ORDER BY f.id
         FOR UPDATE OF f`;
@@ -323,7 +318,7 @@ const spansCommanded = async <GroupRefusal extends string>(
   return ok({ acting: acting.value, spans: held.value });
 };
 
-const indexRunQueued = async (
+const syncQueued = async (
   { admin, workspaceId, connectedSourceId }: ActingOnConnectedSource,
   tx: Tx,
   reason: Extract<(typeof INDEX_REASONS)[number], "restored" | "dismissed">,
@@ -335,7 +330,7 @@ const indexRunQueued = async (
     reason,
   });
   if (!queued.ok) {
-    throw indexRunRefused(queued.error);
+    throw syncRefused(queued.error);
   }
   return queued.value.jobId;
 };
@@ -353,7 +348,7 @@ const KEPT_IN_TEXT_REVIEW = `UPDATE finding
 
 /**
  * Restores each span the document's last redaction raised in the groups, marks those not
- * dismissed as kept in text, and queues an index run. A group outside the always tier refuses the
+ * dismissed as kept in text, and queues a sync. A group outside the always tier refuses the
  * whole command.
  */
 export const keepInText = async (
@@ -384,7 +379,7 @@ export const keepInText = async (
   );
   if (!reviewed.ok) return err(reviewed.error);
 
-  const jobId = await indexRunQueued(acting, tx, "restored");
+  const jobId = await syncQueued(acting, tx, "restored");
   return ok({ connectedSourceId, documentIds: documentsHolding(spans), batchId, jobId });
 };
 
@@ -444,7 +439,7 @@ const NARROWED_REVIEW = `UPDATE finding f
        FROM source_document d
       WHERE f.workspace_id = $1 AND f.review_state = $4 AND ${findingGroupClause("f", 5)}
         AND d.workspace_id = f.workspace_id AND d.id = f.document_id
-        AND ${raisedByTheLastRun("f", "d")}`;
+        AND ${raisedByTheLastSync("f", "d")}`;
 
 const documentsToNarrow = async (
   acting: ActingOnConnectedSource,
@@ -570,7 +565,7 @@ const DISMISSED_REVIEW = `UPDATE finding
 
 /**
  * Dismisses each finding the document's last redaction raised in the groups, with an audit event per
- * document, and queues an index run. A group outside the special category refuses the whole
+ * document, and queues a sync. A group outside the special category refuses the whole
  * command.
  */
 export const dismissAsNotSpecialCategory = async (
@@ -611,6 +606,6 @@ export const dismissAsNotSpecialCategory = async (
     })),
   );
 
-  const jobId = await indexRunQueued(acting, tx, "dismissed");
+  const jobId = await syncQueued(acting, tx, "dismissed");
   return ok({ connectedSourceId, documentIds, batchId, jobId });
 };

@@ -372,7 +372,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   the redaction string that text carries. The one string a citation's evidence and a passage both
   carry, so a citation and a passage are one address. Written into concept files as
   `sources[].locator` and kept; a page shows it as a *link*.
-- **sync** — _Code rename pending._ one execution of a connected source by the scheduler (enumerate,
+- **sync** — one execution of a connected source by the scheduler (enumerate,
   index, extract, prune or reindex): claimed under a lease, keyed by its run key, checkpointed per
   batch, one per connected source at a time, parked after repeated failure; its outcome rows record
   what changed per document. A page reads *Last synced*, *Not synced yet* or *Sync failed*.

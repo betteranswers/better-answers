@@ -1209,7 +1209,7 @@ const findingIn = (scenario: Scenario, document: Sourced, finding: FindingSeeded
     }),
   );
 
-/** Reviewed, and the run that would lift the seam's verdict not yet run: the document keeps it. */
+/** Reviewed, and the sync that would lift the seam's verdict not yet run: the document keeps it. */
 const dismissedBy = (scenario: Scenario) => ({
   reviewState: "dismissed",
   reviewedBy: `human:${scenario.admin.userId}`,

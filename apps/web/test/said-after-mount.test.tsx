@@ -46,7 +46,7 @@ const A_CONNECTED_SOURCE: ListedConnectedSource = {
   publishedAt: null,
   documentCount: 1,
   passageCount: 0,
-  lastRun: null,
+  lastSync: null,
   quarantined: [],
   quarantinedByError: {},
 };

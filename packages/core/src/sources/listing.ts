@@ -53,7 +53,7 @@ export type ListedConnectedSource = Omit<ListedRow, "id" | "publishedAt"> & {
   readonly connectedSourceId: ListedRow["id"];
   readonly state: ConnectedSourceState;
   readonly publishedAt: string | null;
-  readonly lastRun: SubjectRun | null;
+  readonly lastSync: SubjectRun | null;
   readonly quarantined: readonly QuarantinedDocument[];
 
   readonly quarantinedByError: Readonly<Record<string, number>>;
@@ -92,12 +92,12 @@ const UNREADABLE_CONNECTED_SOURCE = new Error(
 
 /**
  * The worker cannot write the connected source's state column, so everything short of a publish is read
- * off the connected source's latest run.
+ * off the connected source's latest sync.
  */
-const stateOf = (publishedAt: Date | null, lastRun: SubjectRun | null): ConnectedSourceState => {
+const stateOf = (publishedAt: Date | null, lastSync: SubjectRun | null): ConnectedSourceState => {
   if (publishedAt !== null) return CONNECTED_SOURCE_PUBLISHED_STATE;
-  if (lastRun?.status === JOB_DONE_STATUS) return CONNECTED_SOURCE_INDEXED_STATE;
-  if (lastRun?.status === JOB_CLAIMED_STATUS) return CONNECTED_SOURCE_INDEXING_STATE;
+  if (lastSync?.status === JOB_DONE_STATUS) return CONNECTED_SOURCE_INDEXED_STATE;
+  if (lastSync?.status === JOB_CLAIMED_STATUS) return CONNECTED_SOURCE_INDEXING_STATE;
   return CONNECTED_SOURCE_RECEIVED_STATE;
 };
 
@@ -126,12 +126,12 @@ export const listConnectedSources = async (
   if (!parsed.success) return err(UNREADABLE_CONNECTED_SOURCE);
   const rows = parsed.data;
 
-  const lastRuns = await latestRunsOf(admin.value, tx, { subjectIds: rows.map((row) => row.id) });
-  if (!lastRuns.ok) return err(lastRuns.error);
+  const lastSyncs = await latestRunsOf(admin.value, tx, { subjectIds: rows.map((row) => row.id) });
+  if (!lastSyncs.ok) return err(lastSyncs.error);
 
   return ok(
     rows.map(({ id, publishedAt, ...row }) => {
-      const lastRun = lastRuns.value.get(id) ?? null;
+      const lastSync = lastSyncs.value.get(id) ?? null;
       const quarantined = read.value.quarantined
         .filter((document) => document.connected_source_id === id)
         .map((document) => ({
@@ -142,9 +142,9 @@ export const listConnectedSources = async (
       return {
         connectedSourceId: id,
         ...row,
-        state: stateOf(publishedAt, lastRun),
+        state: stateOf(publishedAt, lastSync),
         publishedAt: publishedAt?.toISOString() ?? null,
-        lastRun,
+        lastSync,
         quarantined,
         quarantinedByError: countedByError(quarantined),
       };

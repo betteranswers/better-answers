@@ -21,7 +21,7 @@ from better_answers_worker.pipeline import (
     PASSAGES_APP,
     STORES_A_CONNECTED_SOURCE_HOLDS,
     Host,
-    IndexRun,
+    Sync,
     index_connected_source,
     open_pool,
 )
@@ -165,12 +165,12 @@ def test_dropping_a_sources_state_keeps_the_table_indexes_and_rows(
     workspace_id = seed_partitioned_workspace(connection)
 
     with Host(bootstrap_for(dsn, tmp_path)) as host:
-        first = IndexRun(
+        first = Sync(
             workspace_id=workspace_id,
             connected_source_id="connected-source-one",
             reason="connected",
         )
-        second = IndexRun(
+        second = Sync(
             workspace_id=workspace_id,
             connected_source_id="connected-source-two",
             reason="connected",
@@ -201,7 +201,7 @@ def test_dropping_a_sources_state_keeps_the_table_indexes_and_rows(
         indexes_before = passage_indexes(connection, workspace_id)
         assert indexes_before != []
 
-    # Its own Host, as a run's would be: the engine can still hold the name the
+    # Its own Host, as a sync's would be: the engine can still hold the name the
     # landing Host registered.
     with Host(bootstrap_for(dsn, tmp_path)) as host:
         host.drop_connected_source(first)
@@ -210,8 +210,8 @@ def test_dropping_a_sources_state_keeps_the_table_indexes_and_rows(
     assert passage_indexes(connection, workspace_id) == indexes_before
 
 
-def a_run_on(connected_source_id: str) -> IndexRun:
-    return IndexRun(
+def a_sync_on(connected_source_id: str) -> Sync:
+    return Sync(
         workspace_id="01M2Q3R4S5T6V7W8X9YZAB0000",
         connected_source_id=connected_source_id,
         reason="connected",
@@ -233,7 +233,7 @@ def test_the_environment_cache_drops_the_oldest_source_at_its_bound(
         environments_held=4,
     ) as host:
         for connected_source_id in touched:
-            host.open_connected_source(a_run_on(connected_source_id))
+            host.open_connected_source(a_sync_on(connected_source_id))
 
         assert host.held_connected_sources() == (
             "connected-source-one",
@@ -247,14 +247,14 @@ def test_the_default_bound_holds_eight_handles_and_sheds_whole_sources(
     whole = bootstrap_for("postgresql://unreached/unreached", tmp_path / "whole")
     with Host(whole) as host:
         for n in range(1, 5):
-            host.open_connected_source(a_run_on(f"connected-source-{n}"))
-        host.app_config(a_run_on("connected-source-5"), PASSAGES_APP)
+            host.open_connected_source(a_sync_on(f"connected-source-{n}"))
+        host.app_config(a_sync_on("connected-source-5"), PASSAGES_APP)
         held_whole = host.held_connected_sources()
 
     half_open = bootstrap_for("postgresql://unreached/unreached", tmp_path / "half")
     with Host(half_open) as host:
         for n in range(1, 10):
-            host.app_config(a_run_on(f"connected-source-{n}"), PASSAGES_APP)
+            host.app_config(a_sync_on(f"connected-source-{n}"), PASSAGES_APP)
         held_half_open = host.held_connected_sources()
 
     assert ENVIRONMENTS_HELD == 8
@@ -287,7 +287,7 @@ def test_refuses_a_bound_below_one_connected_sources_two_handles(
         Host(bootstrap, environments_held=1)
 
     with Host(bootstrap, environments_held=2) as host:
-        host.open_connected_source(a_run_on("connected-source-one"))
+        host.open_connected_source(a_sync_on("connected-source-one"))
 
         assert host.held_connected_sources() == ("connected-source-one",)
 
@@ -297,13 +297,13 @@ def test_the_seam_answers_plain_numbers_and_opens_the_passage_store(
 ) -> None:
     connection, dsn = database
     workspace_id = seed_partitioned_workspace(connection)
-    run = IndexRun(
+    sync = Sync(
         workspace_id=workspace_id,
         connected_source_id="connected-source-one",
         reason="connected",
     )
 
-    outcome = index_connected_source(bootstrap_for(dsn, tmp_path), run)
+    outcome = index_connected_source(bootstrap_for(dsn, tmp_path), sync)
 
     assert outcome.as_row() == {
         "documents": 0,
@@ -332,20 +332,20 @@ def test_a_connected_sources_two_stores_share_the_operators_cap(
 def test_a_sources_stores_sit_at_sibling_paths_in_its_directory(
     tmp_path: Path,
 ) -> None:
-    run = IndexRun(
+    sync = Sync(
         workspace_id="01M2Q3R4S5T6V7W8X9YZAB0000",
         connected_source_id="connected-source-one",
         reason="connected",
     )
 
     with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
-        host.open_connected_source(run)
+        host.open_connected_source(sync)
 
-        passage_store = host.store_directory(run, CONNECTED_SOURCE_STORE)
-        findings = host.store_directory(run, FINDINGS_STORE)
+        passage_store = host.store_directory(sync, CONNECTED_SOURCE_STORE)
+        findings = host.store_directory(sync, FINDINGS_STORE)
 
     assert (
-        passage_store.parent == findings.parent == host.connected_source_directory(run)
+        passage_store.parent == findings.parent == host.connected_source_directory(sync)
     )
     assert passage_store != findings
     assert passage_store.is_dir() and findings.is_dir()
@@ -356,29 +356,29 @@ def test_a_connected_sources_lmdb_size_is_readable_after_its_run(
 ) -> None:
     connection, dsn = database
     workspace_id = seed_partitioned_workspace(connection)
-    run = IndexRun(
+    sync = Sync(
         workspace_id=workspace_id,
         connected_source_id="connected-source-one",
         reason="connected",
     )
 
     with Host(bootstrap_for(dsn, tmp_path)) as host:
-        assert host.lmdb_bytes(run) == 0
+        assert host.lmdb_bytes(sync) == 0
         host.land_rows(
-            run,
+            sync,
             PASSAGE_TABLE,
             [
                 passage_row(
                     workspace_id=workspace_id,
-                    connected_source_id=run.connected_source_id,
+                    connected_source_id=sync.connected_source_id,
                     passage_id="passage-one",
                 )
             ],
         )
-        after = host.lmdb_bytes(run)
+        after = host.lmdb_bytes(sync)
 
     assert after > 0
-    assert Path(host.connected_source_directory(run)).is_dir()
+    assert Path(host.connected_source_directory(sync)).is_dir()
 
 
 STILL_OPEN = (
@@ -405,18 +405,18 @@ def hold_until_waited_on(store: object, written: Sequence[Mapping[str, Any]]) ->
 
 def test_a_held_store_opens_once_the_engine_lets_go(tmp_path: Path) -> None:
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
-    run = a_run_on("connected-source-one")
+    sync = a_sync_on("connected-source-one")
 
     with capture_logs() as written:
         with Host(bootstrap) as first:
             holder = threading.Thread(
                 target=hold_until_waited_on,
-                args=(first.app_config(run, PASSAGES_APP), written),
+                args=(first.app_config(sync, PASSAGES_APP), written),
             )
         holder.start()
         try:
             with Host(bootstrap) as second:
-                second.app_config(run, PASSAGES_APP)
+                second.app_config(sync, PASSAGES_APP)
                 opened = second.held_connected_sources()
         finally:
             holder.join()
@@ -435,20 +435,20 @@ def test_a_held_store_opens_once_the_engine_lets_go(tmp_path: Path) -> None:
 
 def test_a_store_held_in_a_cycle_opens_after_a_collection(tmp_path: Path) -> None:
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
-    run = a_run_on("connected-source-one")
+    sync = a_sync_on("connected-source-one")
 
     # Off, so that only the open's own collection can free the cycle.
     gc.disable()
     try:
         with Host(bootstrap) as first:
-            cycle: list[object] = [first.app_config(run, PASSAGES_APP)]
+            cycle: list[object] = [first.app_config(sync, PASSAGES_APP)]
             cycle.append(cycle)
         del cycle
         with (
             capture_logs() as written,
             Host(bootstrap, release_wait_seconds=0.2) as second,
         ):
-            second.app_config(run, PASSAGES_APP)
+            second.app_config(sync, PASSAGES_APP)
             opened = second.held_connected_sources()
     finally:
         gc.enable()
@@ -467,16 +467,16 @@ def test_a_store_held_in_a_cycle_opens_after_a_collection(tmp_path: Path) -> Non
 
 def test_a_store_never_let_go_raises_after_the_wait(tmp_path: Path) -> None:
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
-    run = a_run_on("connected-source-one")
+    sync = a_sync_on("connected-source-one")
 
     with Host(bootstrap) as first, capture_logs() as written:
-        first.app_config(run, PASSAGES_APP)
+        first.app_config(sync, PASSAGES_APP)
         started = time.monotonic()
         with (
             pytest.raises(RuntimeError) as raised,
             Host(bootstrap, release_wait_seconds=0.2) as second,
         ):
-            second.app_config(run, PASSAGES_APP)
+            second.app_config(sync, PASSAGES_APP)
         waited = time.monotonic() - started
 
     assert str(raised.value) == STILL_OPEN
@@ -493,17 +493,17 @@ def test_a_store_never_let_go_raises_after_the_wait(tmp_path: Path) -> None:
 
 
 def test_an_unreadable_store_raises_without_waiting(tmp_path: Path) -> None:
-    run = a_run_on("connected-source-one")
+    sync = a_sync_on("connected-source-one")
 
     with (
         Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host,
         capture_logs() as written,
     ):
-        directory = host.store_directory(run, CONNECTED_SOURCE_STORE)
+        directory = host.store_directory(sync, CONNECTED_SOURCE_STORE)
         directory.mkdir(parents=True)
         (directory / "data.mdb").write_bytes(b"not an lmdb file" * 1000)
         with pytest.raises(RuntimeError) as raised:
-            host.app_config(run, PASSAGES_APP)
+            host.app_config(sync, PASSAGES_APP)
 
     assert str(raised.value) == "MDB_INVALID: File is not an LMDB file"
     assert waits_in(written) == []

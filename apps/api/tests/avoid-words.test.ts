@@ -636,6 +636,29 @@ describe("a word that lands with its sweep", () => {
       `apps/web/src/features/people/planted-words.ts:1: export const TAKEN = "Each act lands at once.";`,
     ]);
   });
+
+  it("refuses a sync written as a run, passing other runs", () => {
+    const run = ["r", "un"].join("");
+    const refused = {
+      [WORDS]: `export const SAID = "Last ${run} failed.";`,
+      "packages/core/src/sources/listing.ts": `* off the connected source's latest ${run}.`,
+      "docs/architecture/c4-dynamic-sync.md": `A document the ${run} cannot read is quarantined.`,
+      "packages/core/src/sources/connected-source.ts": `// its first ${run} and its publish`,
+    };
+    const passed = {
+      "apps/web/test/planted.test.ts": `// pnpm --filter @better-answers/web ${run} test`,
+      "docs/operations/CI.md": `The mutation ${run} keeps its baseline.`,
+      "docs/operations/local-gates.md": `A failed CI ${run} names its leg.`,
+      "apps/api/src/trpc/planted.ts": `  ${run}: (input) => answer(input),`,
+      "CONCEPTS.md": `- **${run} key** — _Internal._ the key a queued job is held to.`,
+    };
+
+    expect([...linesOver({ ...refused, ...passed }, [rowOf(run)])].toSorted()).toEqual(
+      Object.entries(refused)
+        .map(([file, text]) => `${file}:1: ${text}`)
+        .toSorted(),
+    );
+  });
 });
 
 describe("the product's name in a planted tree", () => {

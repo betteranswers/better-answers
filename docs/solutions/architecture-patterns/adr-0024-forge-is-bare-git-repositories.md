@@ -38,7 +38,7 @@ v0.1 runs on two boxes of 4 vCPU · 4 GB · 120 GB:
 - The growth steps, in order: A, split production across the two boxes over WireGuard if the swap-in signal says so; then E, a third contract.
 - A model-host box is a precondition of local embedding. The first workspace to ask for a local embedding model choice triggers it, as step E. Until then a hosted model choice is the default. `docs/operations/coolify.md` § The local embedding model choice carries the service.
 
-The worker holds the detector's weights once, mapped from the file. On VPC 1 it swaps nothing and settles near 650 MB of anonymous memory. It keeps its 1.5 GB cap, one index run at a time, and 1.5 GB of spill for what an index adds. S4's first index reads that.
+The worker holds the detector's weights once, mapped from the file. On VPC 1 it swaps nothing and settles near 650 MB of anonymous memory. It keeps its 1.5 GB cap, one sync at a time, and 1.5 GB of spill for what an index adds. S4's first index reads that.
 
 ## Why
 

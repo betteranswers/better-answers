@@ -74,7 +74,7 @@ const unpublishedConnectedSource = (workspaceId: string, name = "The staff handb
     return { connectedSourceId: connectedSource.id, documentId: document.id };
   });
 
-const finishedRun = (
+const finishedSync = (
   workspaceId: string,
   connectedSourceId: string,
   outcome: Record<string, unknown>,
@@ -94,17 +94,17 @@ const finishedRun = (
 
 const OVERRIDDEN_KEY = "restores_overridden_by_erasure";
 
-type RunOverridingASpan = {
+type SyncOverridingASpan = {
   readonly connectedSourceId: string;
   readonly jobId: string;
   readonly documentId: string;
   readonly ruleId: string;
 };
 
-const aRunThatOverrodeAKeptSpan = async (workspaceId: string): Promise<RunOverridingASpan> => {
+const aSyncThatOverrodeAKeptSpan = async (workspaceId: string): Promise<SyncOverridingASpan> => {
   const { connectedSourceId, documentId } = await unpublishedConnectedSource(workspaceId);
   const kept = await seededIn(app, (seed) => seed.finding({ workspaceId, documentId }));
-  const run = await finishedRun(workspaceId, connectedSourceId, {
+  const run = await finishedSync(workspaceId, connectedSourceId, {
     documents: 1,
     passages: 1,
     [OVERRIDDEN_KEY]: [
@@ -119,7 +119,7 @@ const aRunThatOverrodeAKeptSpan = async (workspaceId: string): Promise<RunOverri
   return { connectedSourceId, jobId: run.id, documentId, ruleId: kept.ruleId };
 };
 
-const addressesIn = (answer: unknown, run: RunOverridingASpan): readonly string[] => {
+const addressesIn = (answer: unknown, run: SyncOverridingASpan): readonly string[] => {
   const answered = JSON.stringify(answer);
   return [OVERRIDDEN_KEY, run.documentId, run.ruleId, "char_start", "char_end"].filter((part) =>
     answered.includes(part),
@@ -453,7 +453,7 @@ const anAdminWhoseConnectedSourceHoldsAHealthCue = async () => {
 };
 
 describe("the Sources procedures over the wire", () => {
-  it("lists an upload's state, counts, last run and quarantine reason", async () => {
+  it("lists an upload's state, counts, last sync and quarantine reason", async () => {
     const { workspace, api } = await anAdmin();
     const described = handbookDescribed();
     const bound = await api.sources.connect.mutate(new Blob([HANDBOOK]), uploadOptions(described));
@@ -489,7 +489,7 @@ describe("the Sources procedures over the wire", () => {
         publishedAt: null,
         documentCount: 1,
         passageCount: 0,
-        lastRun: null,
+        lastSync: null,
         quarantined: [
           { documentId: scans.documentId, title: "Floor plan", error: "NeedsOcrError" },
         ],
@@ -508,7 +508,7 @@ describe("the Sources procedures over the wire", () => {
         publishedAt: null,
         documentCount: 1,
         passageCount: 0,
-        lastRun: {
+        lastSync: {
           jobId: bound.jobId,
           kind: "index",
           reason: "connected",
@@ -543,13 +543,13 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("lists a run that overrode spans with no span's address", async () => {
+  it("lists a sync that overrode spans with no span's address", async () => {
     const { workspace, api } = await anAdmin();
-    const run = await aRunThatOverrodeAKeptSpan(workspace.workspaceId);
+    const run = await aSyncThatOverrodeAKeptSpan(workspace.workspaceId);
 
     const listed = await api.sources.list.query();
 
-    expect(listed.map((connectedSource) => connectedSource.lastRun)).toEqual([
+    expect(listed.map((connectedSource) => connectedSource.lastSync)).toEqual([
       {
         jobId: run.jobId,
         kind: "index",
@@ -565,11 +565,11 @@ describe("the Sources procedures over the wire", () => {
 
   it("answers a subject's runs with no span's address in them", async () => {
     const { workspace, api } = await anAdmin();
-    const run = await aRunThatOverrodeAKeptSpan(workspace.workspaceId);
+    const run = await aSyncThatOverrodeAKeptSpan(workspace.workspaceId);
 
     const runs = await api.runs.ofSubject.query({ subjectId: run.connectedSourceId });
 
-    expect(runs.map((listedRun) => listedRun.jobId)).toEqual([run.jobId]);
+    expect(runs.map((listedSync) => listedSync.jobId)).toEqual([run.jobId]);
     expect(addressesIn(runs, run)).toEqual([]);
   });
 
@@ -588,7 +588,7 @@ describe("the Sources procedures over the wire", () => {
         restoreReason: "The sort code is the company's own.",
       });
     });
-    await finishedRun(workspace.workspaceId, connectedSourceId, {
+    await finishedSync(workspace.workspaceId, connectedSourceId, {
       documents: 1,
       passages: 1,
       [OVERRIDDEN_KEY]: [
@@ -619,7 +619,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("keeps findings in text, hiding finding ids, queuing a run", async () => {
+  it("keeps findings in text, hiding finding ids, queuing a sync", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId, documentId } = await unpublishedConnectedSource(
       workspace.workspaceId,
@@ -662,7 +662,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("dismisses a special-category group and queues the run reading it", async () => {
+  it("dismisses a special-category group and queues the sync reading it", async () => {
     const { api, connectedSourceId, documentId } =
       await anAdminWhoseConnectedSourceHoldsAHealthCue();
 
@@ -743,7 +743,7 @@ describe("the Sources procedures over the wire", () => {
   it("publishes an indexed source at the instant the Clock gives", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
-    await finishedRun(workspace.workspaceId, connectedSourceId, { documents: 1, passages: 1 });
+    await finishedSync(workspace.workspaceId, connectedSourceId, { documents: 1, passages: 1 });
 
     const published = await api.sources.publish.mutate({
       connectedSourceId,

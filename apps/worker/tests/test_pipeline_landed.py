@@ -21,11 +21,11 @@ from better_answers_worker.pipeline import (
     THE_MEMOS_IDENTITY,
     TIMEOUT_MARGIN_MS,
     Host,
-    IndexRun,
     LandedDocument,
-    LandedRun,
+    LandedSync,
     Passage,
     Suppression,
+    Sync,
     converted,
     converter_pin_of,
     detected,
@@ -231,8 +231,8 @@ def a_bootstrap(tmp_path: Path) -> Bootstrap:
     return bootstrap_for("postgresql://unreached/unreached", tmp_path)
 
 
-def a_run(reason: str = "connected") -> IndexRun:
-    return IndexRun(
+def a_sync(reason: str = "connected") -> Sync:
+    return Sync(
         workspace_id=WORKSPACE, connected_source_id=CONNECTED_SOURCE, reason=reason
     )
 
@@ -246,13 +246,13 @@ def read_the_copies(
     detection_key: str | None = None,
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
-) -> LandedRun:
-    # A Host of its own, as every run opens one: in a shared Host the engine can still
+) -> LandedSync:
+    # A Host of its own, as every sync opens one: in a shared Host the engine can still
     # hold the name the last read registered.
     with Host(bootstrap) as host:
         return redact_landed_copies(
             host,
-            a_run(),
+            a_sync(),
             documents,
             bucket,
             rules_in_force,
@@ -263,13 +263,13 @@ def read_the_copies(
         )
 
 
-def quarantine_of(answer: LandedRun) -> dict[str, str]:
+def quarantine_of(answer: LandedSync) -> dict[str, str]:
     return {
         document.source_document_id: document.error for document in answer.quarantined
     }
 
 
-def text_of(answer: LandedRun, document_id: str) -> str:
+def text_of(answer: LandedSync, document_id: str) -> str:
     return next(
         document.redacted.text
         for document in answer.documents
@@ -298,7 +298,7 @@ def bytes_under(directory: Path) -> bytes:
 
 def bytes_of(bootstrap: Bootstrap, store: str) -> bytes:
     with Host(bootstrap) as host:
-        return bytes_under(host.store_directory(a_run(), store))
+        return bytes_under(host.store_directory(a_sync(), store))
 
 
 # In a process of its own because the tier may not import the engine.
@@ -410,7 +410,7 @@ def test_a_wipe_spares_the_memo_and_erases_the_named_person(
 
     read_the_copies(bootstrap, bucket, both)
     with Host(bootstrap) as opened:
-        opened.remove_connected_source_store(a_run())
+        opened.remove_connected_source_store(a_sync())
     answer = read_the_copies(bootstrap, bucket, erased)
 
     assert answer.detected_afresh == ()
@@ -424,7 +424,7 @@ def test_a_wipe_spares_the_memo_and_erases_the_named_person(
         assert HER_NAME not in held
 
 
-def test_a_second_run_over_an_unchanged_document_detects_nothing_afresh(
+def test_a_second_sync_over_an_unchanged_document_detects_nothing_afresh(
     bootstrap: Bootstrap,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -457,7 +457,7 @@ def test_a_suppression_withholds_the_name_without_rerunning_the_detector(
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_a_later_erasure_withholds_her_work_address_next_run(
+def test_a_later_erasure_withholds_her_work_address_next_sync(
     bootstrap: Bootstrap,
 ) -> None:
     rota = a_landed_document(A_ROTA_ID)
@@ -581,7 +581,7 @@ def test_a_moved_normalised_text_detects_that_document_and_no_other(
 def test_another_converter_over_the_same_normalised_text_detects_nothing_afresh(
     bootstrap: Bootstrap,
 ) -> None:
-    # Two converters, one text: the text is the key, so the second run answers out of
+    # Two converters, one text: the text is the key, so the second sync answers out of
     # the memo the first filled.
     bucket = a_bucket_holding_both()
     as_markdown = a_landed_document(AN_INVOICE_ID, media_type="text/markdown")
@@ -836,7 +836,7 @@ def test_reads_pdf_pages_and_measures_other_types_by_s0s_page() -> None:
     assert pages_of(fixture_bytes("expenses-policy.docx"), DOCX_MEDIA_TYPE) == 12
 
 
-def test_quarantines_a_document_past_its_ceiling_and_finishes_the_run(
+def test_quarantines_a_document_past_its_ceiling_and_finishes_the_sync(
     bootstrap: Bootstrap,
 ) -> None:
     bucket = a_bucket_holding_both()

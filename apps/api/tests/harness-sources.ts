@@ -39,7 +39,7 @@ const aDocument = z.object({
   cited: z.boolean().default(false),
 });
 
-const SEEDED_RUNS = ["none", "queued", "claimed", "done"] as const;
+const SEEDED_SYNCS = ["none", "queued", "claimed", "done"] as const;
 
 const MOVED_RUNS = ["claimed", "done"] as const;
 
@@ -47,7 +47,7 @@ const aConnectedSource = z.object({
   name: z.string().min(1),
   sensitivity: z.enum(SENSITIVITIES).default("Restricted"),
   audience: z.enum(AUDIENCES).default("everyone"),
-  run: z.enum(SEEDED_RUNS).default("done"),
+  sync: z.enum(SEEDED_SYNCS).default("done"),
   published: z.boolean().default(false),
   documents: z.array(aDocument).default([]),
 });
@@ -58,7 +58,7 @@ export const connectedSourcesSeeding = z.object({
 });
 
 /** By workspace alone: a connected source the browser connected carries an id only the page minted. */
-export const indexRunMoving = z.object({
+export const syncMoving = z.object({
   workspaceId: z.string().min(1),
   to: z.enum(MOVED_RUNS),
 });
@@ -188,14 +188,14 @@ const citationOf = async (seed: TestData, workspaceId: string, documentId: strin
   return { iri: concept.iri, compositionId: composition.id };
 };
 
-const runColumns = (
-  run: Exclude<(typeof SEEDED_RUNS)[number], "none">,
+const syncColumns = (
+  sync: Exclude<(typeof SEEDED_SYNCS)[number], "none">,
   outcome: Record<string, unknown>,
 ) => {
-  if (run === "queued") return {};
+  if (sync === "queued") return {};
   const now = new Date();
   const claimed = { attempts: 1, claimedBy: SUITE_WORKER, claimedAt: now, heartbeatAt: now };
-  if (run === "claimed") {
+  if (sync === "claimed") {
     return { ...claimed, status: "claimed", leaseExpiresAt: new Date(now.getTime() + LEASE_MS) };
   }
   return { ...claimed, status: "done", finishedAt: now, outcome };
@@ -274,13 +274,13 @@ export const seedConnectedSources = async (
         connectedSource.documents,
       );
 
-      if (connectedSource.run !== "none") {
+      if (connectedSource.sync !== "none") {
         await seed.job({
           workspaceId,
           kind: "index",
           subjectId: row.id,
           reason: "connected",
-          ...runColumns(connectedSource.run, {
+          ...syncColumns(connectedSource.sync, {
             documents: documents.length,
             passages: passageCount,
             lmdb_bytes: 0,
@@ -297,9 +297,9 @@ export const seedConnectedSources = async (
  * The suite runs no worker process, so the harness takes its two steps through the queue's own
  * functions, under the worker's role.
  */
-export const moveTheIndexRun = async (
+export const moveTheSync = async (
   app: TestApp,
-  asked: z.output<typeof indexRunMoving>,
+  asked: z.output<typeof syncMoving>,
 ): Promise<{ readonly jobId: string }> =>
   inOneTransaction(app, async (client) => {
     await client.query("SET LOCAL ROLE worker_rt");
@@ -311,7 +311,7 @@ export const moveTheIndexRun = async (
         [SUITE_WORKER, LEASE_MS / 1000],
       );
       const job = claimed.rows[0];
-      if (job === undefined) throw new Error(`no index run is queued in ${asked.workspaceId}`);
+      if (job === undefined) throw new Error(`no sync is queued in ${asked.workspaceId}`);
       return { jobId: job.id };
     }
 
@@ -321,7 +321,7 @@ export const moveTheIndexRun = async (
       [asked.workspaceId, SUITE_WORKER],
     );
     const jobId = held.rows[0]?.id;
-    if (jobId === undefined) throw new Error(`no index run is claimed in ${asked.workspaceId}`);
+    if (jobId === undefined) throw new Error(`no sync is claimed in ${asked.workspaceId}`);
     const finished = await client.query<{ finished: boolean }>(
       "SELECT finish_job($1, $2, $3::jsonb) AS finished",
       [
@@ -335,6 +335,6 @@ export const moveTheIndexRun = async (
         }),
       ],
     );
-    if (finished.rows[0]?.finished !== true) throw new Error(`the run ${jobId} did not finish`);
+    if (finished.rows[0]?.finished !== true) throw new Error(`the sync ${jobId} did not finish`);
     return { jobId };
   });

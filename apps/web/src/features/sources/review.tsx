@@ -42,10 +42,10 @@ import {
 import { spokenWord } from "./words.ts";
 
 const NOTHING_FOUND = {
-  received: "No index run has finished yet, so nothing has been found.",
-  indexing: "The index run has not finished, so nothing has been found yet.",
-  indexed: "The last run found nothing to withhold in this connected source.",
-  published: "The last run found nothing to withhold in this connected source.",
+  received: "No sync has finished yet, so nothing has been found.",
+  indexing: "The sync has not finished, so nothing has been found yet.",
+  indexed: "The last sync found nothing to withhold in this connected source.",
+  published: "The last sync found nothing to withhold in this connected source.",
 } satisfies Record<ListedConnectedSource["state"], string>;
 
 function Note(properties: { readonly tag: string; readonly children: ReactNode }) {
@@ -157,7 +157,7 @@ function FindingsTable(properties: {
   });
 
   /**
-   * A dismissed span narrows nothing once a run reads it, so only a span nobody dismissed says the
+   * A dismissed span narrows nothing once a sync reads it, so only a span nobody dismissed says the
    * seam narrowed its document.
    */
   const narrowedBySeam = new Set(
@@ -229,7 +229,7 @@ export function Review(properties: { readonly connectedSource: ListedConnectedSo
         Review of {connectedSource.name}
       </h2>
       <p className="mt-2 text-muted-foreground">
-        What the last run found, per category and rule, counted. No value is shown: the three acts
+        What the last sync found, per category and rule, counted. No value is shown: the three acts
         take a finding group, never what it found.
       </p>
 

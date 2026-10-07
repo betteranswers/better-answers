@@ -1,7 +1,7 @@
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from .host import IndexRun
+from .host import Sync
 from .landed import ReadDocument
 from .tables import Column, Table
 
@@ -23,15 +23,13 @@ PASSAGE_TABLE = Table(
 )
 
 
-def passage_rows(
-    run: IndexRun, document: ReadDocument
-) -> tuple[Mapping[str, Any], ...]:
+def passage_rows(sync: Sync, document: ReadDocument) -> tuple[Mapping[str, Any], ...]:
     return tuple(
         {
             "id": passage.id,
-            "workspace_id": run.workspace_id,
+            "workspace_id": sync.workspace_id,
             "content": passage.content,
-            "connected_source_id": run.connected_source_id,
+            "connected_source_id": sync.connected_source_id,
             "source_document_id": document.source_document_id,
             "locator": passage.locator,
             "ordinal": passage.ordinal,
@@ -43,6 +41,6 @@ def passage_rows(
 
 
 def rows_of(
-    run: IndexRun, documents: Sequence[ReadDocument]
+    sync: Sync, documents: Sequence[ReadDocument]
 ) -> tuple[Mapping[str, Any], ...]:
-    return tuple(row for document in documents for row in passage_rows(run, document))
+    return tuple(row for document in documents for row in passage_rows(sync, document))

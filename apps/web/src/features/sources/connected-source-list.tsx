@@ -10,6 +10,7 @@ import {
   AUDIENCE_WORDS,
   destinationOf,
   instantWords,
+  lastSyncedWords,
   NEEDS_OCR,
   quarantineWordOf,
   retentionOf,
@@ -26,11 +27,6 @@ export type ConnectedSourceActs = {
 
 export const connectedSourceHeadingId = (connectedSourceId: string): string =>
   `connected-source-${connectedSourceId.toLowerCase()}`;
-
-const lastRunWords = (lastRun: ListedConnectedSource["lastRun"]): string => {
-  if (lastRun === null) return "No run yet";
-  return `Index run ${lastRun.status} · ${instantWords(lastRun.finishedAt ?? lastRun.enqueuedAt)}`;
-};
 
 const audienceWords = (connectedSource: ListedConnectedSource): string => {
   const words = AUDIENCE_WORDS[connectedSource.audience];
@@ -191,7 +187,7 @@ function ConnectedSourceItem(properties: {
         <Row term="State">
           <Badge variant="outline">{connectedSource.state}</Badge>
         </Row>
-        <Row term="Last run">{lastRunWords(connectedSource.lastRun)}</Row>
+        <Row term="Last synced">{lastSyncedWords(connectedSource.lastSync)}</Row>
       </dl>
 
       <MoreAbout connectedSource={connectedSource} onFocus={focused} />

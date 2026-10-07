@@ -250,7 +250,7 @@ export type SeedConnectedSource = {
   readonly name: string;
   readonly sensitivity?: Sensitivity;
   readonly audience?: "everyone" | "groups";
-  readonly run?: "none" | "queued" | "claimed" | "done";
+  readonly sync?: "none" | "queued" | "claimed" | "done";
   readonly published?: boolean;
   readonly documents?: readonly SeedDocument[];
 };
@@ -276,15 +276,15 @@ export const seedConnectedSources = (
   input: { workspaceId: string; connectedSources: readonly SeedConnectedSource[] },
 ) => ask(api, "/connected-sources", input, seededConnectedSources);
 
-const indexRunMoved = z.object({ jobId: z.string() });
+const syncMoved = z.object({ jobId: z.string() });
 
 /**
  * The suite runs no worker, so a spec watching a state word move asks the harness for its steps.
  */
-export const moveTheIndexRun = (
+export const moveTheSync = (
   api: APIRequestContext,
   input: { workspaceId: string; to: "claimed" | "done" },
-) => ask(api, "/index-runs", input, indexRunMoved);
+) => ask(api, "/syncs", input, syncMoved);
 
 const groupsMade = z.object({ made: z.number() });
 
