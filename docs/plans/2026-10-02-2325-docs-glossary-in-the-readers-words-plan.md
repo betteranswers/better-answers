@@ -200,7 +200,7 @@ Planning Contract preservation: changed on 06/10/2026, after U11 released. The s
   6. never accepts a DROP that drizzle-kit generates for a renamed or generated column.
 
   After the migration, regenerate the snapshot, `roles-surface.json`, the worker's schema view and both contract stamps. A second `generate` shows no diff (`packages/schema/test/migration-ownership.test.ts`), and a sweep only adds files under `migrations/`. The regenerated `roles-surface.json`, once the rename map is applied, differs from the committed one only in names.
-- KTD5. **One noun per pull request, each a codemod with a committed rename map.** ts-morph renames symbols through its bundled compiler, and TypeScript 7's `tsc` proves the result. ast-grep renames strings, object keys, JSON, SQL and Python under the map's allowlist of senses. Each sweep:
+- KTD5. **One noun per pull request, each a codemod with a committed rename map.** The owner allowed U16 and U15 to group their nouns into three pull requests each, merged in order (07/10/2026); every noun still has its own map and commit. ts-morph renames symbols through its bundled compiler, and TypeScript 7's `tsc` proves the result. ast-grep renames strings, object keys, JSON, SQL and Python under the map's allowlist of senses. Each sweep:
   1. inventories the noun's occurrences by sense;
   2. runs the symbol pass, then the text pass;
   3. updates live docs, skills and ADR docs for the noun;
@@ -363,7 +363,7 @@ sequenceDiagram
 - The exact mechanics of a hand-written rename migration that keeps drizzle-kit's snapshot in step (U9).
 - Which parser extracts string and JSX text for the reader-text check: `oxc-parser` is already present as a transitive dependency.
 - The code word for each collision, recorded in that sweep's rename map.
-- Whether a unit's nouns split into more than one pull request. One noun per pull request is the rule (KTD5).
+- Whether a unit's nouns split into more than one pull request. One noun per pull request is the rule (KTD5), except U16 and U15, which the owner grouped into three pull requests each on 07/10/2026.
 - Whether U14 renames the column `concept_verification.checked_at` and its index with core's name. If it does, U14 carries a hand-written migration and releases under watch (KTD4). The wire keys stay either way (R21).
 - Whether U16 renames the column `workspace.slug`, with its `workspace_slug_unique` constraint, or keeps it and maps the new field name onto it through Better Auth's field option. A rename makes U16's *slug* pull request a KTD4 migration with a watched release, and adds it to the Verification Contract's `generate` rows.
 
