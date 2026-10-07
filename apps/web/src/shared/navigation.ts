@@ -336,7 +336,13 @@ export const CONTROL_CENTRE = {
           detail: { param: "personId" },
         },
         { name: "Groups", path: "/people/groups", icon: "groups", built: true, seenBy: ADMINS },
-        { name: "Tokens", path: "/people/tokens", icon: "token", built: false, seenBy: ADMINS },
+        {
+          name: "Personal tokens",
+          path: "/people/personal-tokens",
+          icon: "token",
+          built: false,
+          seenBy: ADMINS,
+        },
       ],
     },
     {

@@ -91,7 +91,7 @@ describe("the one navigation list", () => {
           ],
           ["Models", ["Models and spend", "Spending limit"]],
           ["Questions", ["Answer audit", "Answer tests"]],
-          ["People", ["Members", "Groups", "Tokens"]],
+          ["People", ["Members", "Groups", "Personal tokens"]],
           ["Personal data", ["Erasure and suppression"]],
           ["System", ["Audit log", "Signals", "Health", "Backups"]],
         ],

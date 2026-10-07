@@ -121,7 +121,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of acts an agent takes as the person |
-| Control Centre | Connected sources. Models and spend. Members, Groups. Audit log | Overview, which no block names. Queue (S5). Priced plan (S4). Publishing rules, Backlogs, Removed at source. Spending limit (S7). Answer audit, Answer tests (S2). Tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Share agents, with the share agent. Runs, Connected clients, Settings. Then: feeds and systems read live in Sources, Approvals in Agent Operations |
+| Control Centre | Connected sources. Models and spend. Members, Groups. Audit log | Overview, which no block names. Queue (S5). Priced plan (S4). Publishing rules, Backlogs, Removed at source. Spending limit (S7). Answer audit, Answer tests (S2). Personal tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Share agents, with the share agent. Runs, Connected clients, Settings. Then: feeds and systems read live in Sources, Approvals in Agent Operations |
 | Console | Everyone, Names waiting, Every workspace | none | The identity-set audit log |
 
 Two things stay open:
