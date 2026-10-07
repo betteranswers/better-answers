@@ -2,7 +2,7 @@ import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FAILED_PAGE, goHome, RAIL, unbuiltLineOf, UNKNOWN_PAGE } from "@/app/words.ts";
-import { MEMBER_PAGE_WORDS } from "@/features/people/member-act-words.ts";
+import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
 import {
   CONSOLE,

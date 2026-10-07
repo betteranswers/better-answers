@@ -49,7 +49,7 @@ export const membersAt = (query: string | undefined): string =>
 
 const OPENED_AT = ["member", "role", "groups", "credentials", "flag", "removal"] as const;
 
-/** Where focus lands as a member's page opens: on who they are, or on one act's control. */
+/** Where focus lands as a member's page opens: on who they are, or on one action's control. */
 export type OpenedAt = (typeof OPENED_AT)[number];
 
 /** Asked of a member's page through its history entry: a section has no address of its own. */

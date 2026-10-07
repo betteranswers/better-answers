@@ -46,7 +46,7 @@ const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const BELOW_ANY_PERSON = "01AAAAAAAAAAAAAAAAAAAAAAAA";
 const ABOVE_ANY_PERSON = "7ZZZZZZZZZZZZZZZZZZZZZZZZZ";
 
-type Act = (
+type Action = (
   principal: UserPrincipal,
   tx: Tx,
 ) => Promise<
@@ -54,12 +54,12 @@ type Act = (
 >;
 
 const changingRoles =
-  (personIds: readonly string[], role: string): Act =>
+  (personIds: readonly string[], role: string): Action =>
   (principal, tx) =>
     bulkChangeRole(principal, tx, inputOf(bulkChangeRoleInput, { personIds, role }));
 
 const removing =
-  (personIds: readonly string[]): Act =>
+  (personIds: readonly string[]): Action =>
   (principal, tx) =>
     bulkRemoveMembers(principal, tx, {
       ...inputOf(bulkRemoveMembersInput, { personIds }),
@@ -67,12 +67,12 @@ const removing =
     });
 
 const adding =
-  (groupId: string, personIds: readonly string[]): Act =>
+  (groupId: string, personIds: readonly string[]): Action =>
   (principal, tx) =>
     bulkAddToGroup(principal, tx, inputOf(bulkAddToGroupInput, { groupId, personIds }));
 
-const asAdmin = (workspace: ProvisionedWorkspace, act: Act) =>
-  heldAs(workspace, workspace.adminUserId, act);
+const asAdmin = (workspace: ProvisionedWorkspace, action: Action) =>
+  heldAs(workspace, workspace.adminUserId, action);
 
 const sorted = (ids: readonly string[]): readonly string[] => ids.toSorted(byCodeUnit);
 
@@ -103,12 +103,12 @@ const groupMembersOf = async (workspace: ProvisionedWorkspace, groupId: string) 
   return sorted(rows.rows.map((row) => row.user_id));
 };
 
-const subjectsOf = async (workspace: ProvisionedWorkspace, act: string) =>
-  sorted((await auditRowsOf(workspace, act)).map((row) => row.subject_id));
+const subjectsOf = async (workspace: ProvisionedWorkspace, action: string) =>
+  sorted((await auditRowsOf(workspace, action)).map((row) => row.subject_id));
 
-/** Every event of `act` stands in the one batch, which is a minted id. */
-const oneBatchOf = async (workspace: ProvisionedWorkspace, act: string) => {
-  const batches = await batchesOf(workspace, act);
+/** Every event of `action` stands in the one batch, which is a minted id. */
+const oneBatchOf = async (workspace: ProvisionedWorkspace, action: string) => {
+  const batches = await batchesOf(workspace, action);
   const [batch] = batches;
   expect(batch).toMatch(ULID);
   expect(batches).toEqual(batches.map(() => batch));
@@ -425,13 +425,13 @@ describe("adding many members to a group", () => {
   });
 });
 
-const EACH_ACT = [
+const EACH_ACTION = [
   ["change roles", (personId: string) => changingRoles([personId], "Editor")],
   ["remove members", (personId: string) => removing([personId])],
   ["add to a group", (personId: string, groupId: string) => adding(groupId, [personId])],
 ] as const;
 
-describe.each(EACH_ACT)("who may %s in bulk", (_verb, actOn) => {
+describe.each(EACH_ACTION)("who may %s in bulk", (_verb, actionOn) => {
   it.each(["Editor", "Viewer"] as const)(
     "refuses a member at %s, before any read",
     async (role) => {
@@ -441,7 +441,7 @@ describe.each(EACH_ACT)("who may %s in bulk", (_verb, actOn) => {
 
       const refused = await heldAs(workspace, actor, async (principal, tx) => {
         await abortTheTransaction(tx);
-        return actOn(viewer, ulid())(principal, tx);
+        return actionOn(viewer, ulid())(principal, tx);
       });
 
       expect(refused).toEqual({ ok: false, error: "role-forbids" });
@@ -571,37 +571,40 @@ const RACES = [
   ["removals, overlapping", "overlapping", (ids: readonly string[]) => removing(ids), REMOVED],
 ] as const;
 
-describe("two bulk acts racing", () => {
-  it.each(RACES)("lands one whole, refusing the other: %s", async (_race, rows, actOn, act) => {
-    const workspace = await provisionedWorkspace(db(), `BulkRaced${act}${rows}`);
-    const second = await joining(workspace, "Admin");
-    const [shared, firsts, seconds] = [
-      await joiningMany(workspace, "Viewer", rows === "overlapping" ? 1 : 0),
-      await joiningMany(workspace, "Viewer", 2),
-      await joiningMany(workspace, "Viewer", 2),
-    ];
-    const setOf = new Map([
-      [workspace.adminUserId, [...shared, ...firsts]],
-      [second, [...shared, ...seconds]],
-    ]);
+describe("two bulk actions racing", () => {
+  it.each(RACES)(
+    "lands one whole, refusing the other: %s",
+    async (_race, rows, actionOn, action) => {
+      const workspace = await provisionedWorkspace(db(), `BulkRaced${action}${rows}`);
+      const second = await joining(workspace, "Admin");
+      const [shared, firsts, seconds] = [
+        await joiningMany(workspace, "Viewer", rows === "overlapping" ? 1 : 0),
+        await joiningMany(workspace, "Viewer", 2),
+        await joiningMany(workspace, "Viewer", 2),
+      ];
+      const setOf = new Map([
+        [workspace.adminUserId, [...shared, ...firsts]],
+        [second, [...shared, ...seconds]],
+      ]);
 
-    const answers = await bothHoldingTheirOwnRow(
-      workspace,
-      [workspace.adminUserId, second],
-      (principal, tx) => actOn(setOf.get(principal.userId) ?? [])(principal, tx),
-    );
+      const answers = await bothHoldingTheirOwnRow(
+        workspace,
+        [workspace.adminUserId, second],
+        (principal, tx) => actionOn(setOf.get(principal.userId) ?? [])(principal, tx),
+      );
 
-    const landed = answers.flatMap((answer) => (answer.ok ? [answer.value.changed] : []));
-    expect(answers.flatMap((answer) => (answer.ok ? [] : [answer.error]))).toEqual([
-      "changed-meanwhile",
-    ]);
-    expect(landed).toHaveLength(1);
-    expect(await subjectsOf(workspace, act)).toEqual(landed[0]);
-    const won = new Set<string>(landed[0]);
-    const untouched = [...setOf.values()].flat().filter((id) => !won.has(id));
-    const roles = await rolesOf(workspace);
-    expect(untouched.map((id) => roles[id])).toEqual(["Viewer", "Viewer"]);
-  });
+      const landed = answers.flatMap((answer) => (answer.ok ? [answer.value.changed] : []));
+      expect(answers.flatMap((answer) => (answer.ok ? [] : [answer.error]))).toEqual([
+        "changed-meanwhile",
+      ]);
+      expect(landed).toHaveLength(1);
+      expect(await subjectsOf(workspace, action)).toEqual(landed[0]);
+      const won = new Set<string>(landed[0]);
+      const untouched = [...setOf.values()].flat().filter((id) => !won.has(id));
+      const roles = await rolesOf(workspace);
+      expect(untouched.map((id) => roles[id])).toEqual(["Viewer", "Viewer"]);
+    },
+  );
 
   it("writes one member_added per person for two overlapping adds", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkAddsRaced");
@@ -643,7 +646,7 @@ describe("two bulk acts racing", () => {
     const holder = await db().pool.connect();
     const HOLD = "SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE";
     const callerHeld = Promise.withResolvers<undefined>();
-    const actNow = Promise.withResolvers<undefined>();
+    const goAhead = Promise.withResolvers<undefined>();
     try {
       await holder.query("BEGIN");
       // The holder waits first and checks for a deadlock last, so the add finds the cycle.
@@ -651,13 +654,13 @@ describe("two bulk acts racing", () => {
       await holder.query(HOLD, [workspace.workspaceId, viewer]);
       const addingTheViewer = asAdmin(workspace, async (principal, tx) => {
         callerHeld.resolve(undefined);
-        await actNow.promise;
+        await goAhead.promise;
         return adding(sales, [viewer])(principal, tx);
       });
       await callerHeld.promise;
       const waitingOnTheCaller = holder.query(HOLD, [workspace.workspaceId, workspace.adminUserId]);
       await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
-      actNow.resolve(undefined);
+      goAhead.resolve(undefined);
 
       expect(await addingTheViewer).toEqual({ ok: false, error: "changed-meanwhile" });
       await waitingOnTheCaller;
@@ -669,15 +672,15 @@ describe("two bulk acts racing", () => {
   });
 });
 
-describe("a bulk act whose audit event fails", () => {
-  it.each(EACH_ACT)("leaves every row as it was: %s", async (_verb, actOn) => {
+describe("a bulk action whose audit event fails", () => {
+  it.each(EACH_ACTION)("leaves every row as it was: %s", async (_verb, actionOn) => {
     const workspace = await provisionedWorkspace(db(), "BulkUnrecorded");
     const viewer = await joining(workspace, "Viewer");
     const sales = await groupHolding(workspace, []);
-    const act = actOn(viewer, sales);
+    const action = actionOn(viewer, sales);
 
     const failed = await whileWritesAreRefused(db().pool, "audit_event", () =>
-      asAdmin(workspace, act),
+      asAdmin(workspace, action),
     );
 
     expect(failed).toEqual({ ok: false, error: expect.any(Error) });

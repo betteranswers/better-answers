@@ -53,7 +53,7 @@ const rowsFor = async (workspaceId: string) => {
 
 const knowledgeEventsOf = async (workspaceId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
-    `SELECT e.action AS act, e.actor, e.subject_kind, e.subject_id, e.detail, c.sha, c.parent_sha, c.actor AS committer
+    `SELECT e.action, e.actor, e.subject_kind, e.subject_id, e.detail, c.sha, c.parent_sha, c.actor AS committer
        FROM audit_event e
        LEFT JOIN bundle_commit c ON c.workspace_id = e.workspace_id AND c.audit_event_id = e.id
       WHERE e.workspace_id = $1 AND e.action LIKE 'knowledge.%'
@@ -118,7 +118,7 @@ describe("the manifest, the bundle's first commit", () => {
     );
     expect(await knowledgeEventsOf(scenario.workspaceId)).toEqual([
       {
-        act: "knowledge.manifest.written",
+        action: "knowledge.manifest.written",
         actor: `human:${scenario.editor.userId}`,
         subject_kind: "manifest",
         subject_id: BUNDLE_ID,

@@ -1,12 +1,12 @@
 ---
-title: "The api alone writes the bundle, one governed commit per act that the reconciler can replay"
+title: "The api alone writes the bundle, one governed commit per action that the reconciler can replay"
 date: 2026-09-27
 module: packages/core
 problem_type: architecture_pattern
 component: knowledge-layer
 severity: high
 applies_when:
-  - "Writing any act that changes a workspace's bundle"
+  - "Writing any action that changes a workspace's bundle"
   - "Adding a row that is written in a governed write's transaction"
   - "Changing the reconciler, the head check or `pnpm ops reconcile-watermark`"
   - "A workspace is stuck behind a commit the index refused"
@@ -20,15 +20,15 @@ tags:
   - audit-event
 ---
 
-# The api alone writes the bundle, one governed commit per act that the reconciler can replay
+# The api alone writes the bundle, one governed commit per action that the reconciler can replay
 
 ## The decision
 
-The bundle is a bare git repository per workspace (ADR 0024). Only the api writes it, through governed acts.
+The bundle is a bare git repository per workspace (ADR 0024). Only the api writes it, through governed actions.
 
-- Each act makes one commit, under the per-repository lock. The lock is held from the hash precondition through the Postgres COMMIT.
+- Each action makes one commit, under the per-repository lock. The lock is held from the hash precondition through the Postgres COMMIT.
 - The `audit_event` id is minted first and carried in the commit's `Audit:` trailer.
-- The act's rows are written in one transaction the slice owns. So `bundle_commit` history is always a prefix of git history.
+- The action's rows are written in one transaction the slice owns. So `bundle_commit` history is always a prefix of git history.
 - The manifest, `knowledge/manifest.yaml` inside the bundle, is such a commit too (`writeManifest`). It lands no concept row.
 - Platform-prepared changes wait as suggestions. Nothing platform-prepared reaches the bundle without acceptance.
 - A concept has two endings: deprecate, for anything that has been stable or is cited or linked, and discard, for the rest.
@@ -42,7 +42,7 @@ The reconciler replays the missed commits, oldest first, under `process:better-a
 - A commit the index refuses stops the replay there. It is reported, never skipped.
 - A live write on an unrecorded head fails on the parent key (`bundle_commit_parent_fk`), and the next tick heals it.
 
-A revocation inside the act's window does not stop the replay: the role is judged at time-of-act. Unwanted content is undone by a forward revert, never by a history rewrite.
+A revocation inside the action's window does not stop the replay: the role is judged at time-of-action. Unwanted content is undone by a forward revert, never by a history rewrite.
 
 Moving a ref back to its watermark is the operator's plumbing, written down on a runbook page: `docs/operations/RUNBOOK.md`, page 10, *A workspace is stuck behind a commit*. It is not that rewrite, since it drops only commits no row recorded. It is not an ops command either. It is rehearsed on staging, against a made-up stuck bundle, before the first customer's data is on the box.
 
@@ -54,7 +54,7 @@ Moving a ref back to its watermark is the operator's plumbing, written down on a
 - The id is minted first for the reconciler alone. An id minted after the commit would leave the trailer empty exactly when the row was never written, the one case the reconciler exists for.
 - The lock spanning both stores gives the prefix invariant, so the replay reads from a watermark and never hunts for holes.
 - The transport's own transaction is not used: a transaction held open across a git commit waits on a subprocess.
-- A widening is an Admin's recorded act, so a recovery never guesses a wider sensitivity.
+- A widening is an Admin's recorded action, so a recovery never guesses a wider sensitivity.
 - The commits after the watermark were never recorded, so no reader was ever served them. One ref moves and no object is rewritten. It stays a procedure because the question is whether to make the move at all, and no flag holds that judgement.
 
 ## Rejected
@@ -65,7 +65,7 @@ Moving a ref back to its watermark is the operator's plumbing, written down on a
 - Admins clone and push, checked on arrival: rules in two places and a history the platform did not make.
 - A read-only clone URL served by the api: a second authenticated endpoint before any customer asked.
 - Deprecate only, never remove: mistakes filed as history forever. A governed remove for any concept: real knowledge can leave the tree.
-- A `pnpm ops` command for the rewind: it could be run without the judgement the act turns on.
+- A `pnpm ops` command for the rewind: it could be run without the judgement the action turns on.
 
 ## History
 

@@ -43,11 +43,11 @@ export const emailsTo = (app: TestApp, address: string) =>
 
 export const eventsOn = async (app: TestApp, subjectId: string): Promise<string[]> =>
   (
-    await app.database.superuser.query<{ act: string }>(
-      "SELECT action AS act FROM audit_event WHERE subject_id = $1 ORDER BY id",
+    await app.database.superuser.query<{ action: string }>(
+      "SELECT action FROM audit_event WHERE subject_id = $1 ORDER BY id",
       [subjectId],
     )
-  ).rows.map((row) => row.act);
+  ).rows.map((row) => row.action);
 
 export const asksToJoin = async (
   app: TestApp,

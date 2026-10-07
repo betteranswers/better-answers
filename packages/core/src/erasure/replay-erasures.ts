@@ -1,6 +1,6 @@
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
+import { action, declareActions, record, type DetailOf } from "../audit/index.ts";
 import { attempt, err, ok, ulid, type PlatformPrincipal, type Result } from "../kernel/index.ts";
 import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
@@ -8,15 +8,15 @@ import { replayCopiesSince, type ReplayCopy } from "./replay.ts";
 import { dueDateOf } from "./requests.ts";
 import { beyondUseFrom, runErasure, type ErasureDoors, type ErasurePrincipal } from "./routine.ts";
 
-const REPLAY_ACTS = declareActs("platform", {
-  replayed: act("platform.erasure.replayed", {
+const REPLAY_ACTIONS = declareActions("platform", {
+  replayed: action("platform.erasure.replayed", {
     erasureRequestId: "id",
     subjectRequestId: "id",
     fromReplayCopy: "flag",
   }),
 });
 
-type ReplayedDetail = DetailOf<(typeof REPLAY_ACTS)["replayed"]["detail"]>;
+type ReplayedDetail = DetailOf<(typeof REPLAY_ACTIONS)["replayed"]["detail"]>;
 
 export type ReplayableErasure = {
   readonly workspaceId: string;
@@ -181,7 +181,7 @@ const recordTheReplay = async (
   await withScope(platform, door, erasure.workspaceId, (tx) =>
     record(platform, tx, {
       id: auditEventId,
-      act: REPLAY_ACTS.replayed,
+      action: REPLAY_ACTIONS.replayed,
       subjectId: erasure.erasureRequestId,
       detail: detailOf(erasure),
     }),

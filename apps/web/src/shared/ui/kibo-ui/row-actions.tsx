@@ -14,7 +14,7 @@ export type RowAction = {
   label: string;
   onSelect: () => void;
   destructive?: boolean | undefined;
-  /** Where focus goes once the menu has shut, for an act that takes its row away. */
+  /** Where focus goes once the menu has shut, for an action that takes its row away. */
   focusAfter?: (() => HTMLElement | null) | undefined;
 };
 
@@ -23,9 +23,9 @@ export type RowActionsProps = {
   actions: readonly RowAction[];
 };
 
-/** A destructive act sits apart, below the rest and one separator, whatever order a caller lists. */
+/** A destructive action sits apart, below the rest and one separator, whatever order a caller lists. */
 export const RowActions = ({ label, actions }: RowActionsProps) => {
-  // The open menu holds focus inside it, so an act's own focus lands only once it has shut.
+  // The open menu holds focus inside it, so an action's own focus lands only once it has shut.
   const chosen = useRef<RowAction>(undefined);
   const rest = actions.filter((action) => action.destructive !== true);
   const destructive = actions.filter((action) => action.destructive === true);

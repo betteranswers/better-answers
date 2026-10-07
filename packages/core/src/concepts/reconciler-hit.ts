@@ -1,10 +1,10 @@
 import { RESTRICTED_TO_ADMINS, type Visibility } from "../access/index.ts";
-import { act, declareActs, type DetailOf } from "../audit/index.ts";
+import { action, declareActions, type DetailOf } from "../audit/index.ts";
 import type { Principal } from "../kernel/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 
-export const RECONCILER_ACTS = declareActs("platform", {
-  replayed: act("platform.reconciler.replayed", {
+export const RECONCILER_ACTIONS = declareActions("platform", {
+  replayed: action("platform.reconciler.replayed", {
     commitSha: "gitSha",
     iri: "iri?",
     contentHash: "contentHash?",
@@ -17,7 +17,7 @@ export const restsAlsoOnWhenReplayed = (evidenceAgrees: boolean): readonly Visib
   evidenceAgrees ? [] : [RESTRICTED_TO_ADMINS];
 
 const EVIDENCE_AGREES = "evidenceAgrees" satisfies keyof DetailOf<
-  typeof RECONCILER_ACTS.replayed.detail
+  typeof RECONCILER_ACTIONS.replayed.detail
 >;
 
 /**
@@ -35,7 +35,7 @@ export const restsAlsoOnItsReconcilerHit = async (
        JOIN bundle_commit bc ON bc.workspace_id = c.workspace_id AND bc.sha = c.commit_sha
        JOIN audit_event e ON e.workspace_id = bc.workspace_id AND e.id = bc.audit_event_id
       WHERE c.workspace_id = ${scopeClause(1)} AND c.iri = $2 AND e.action = $3`,
-    [scopeParameter(principal), iri, RECONCILER_ACTS.replayed.name, EVIDENCE_AGREES],
+    [scopeParameter(principal), iri, RECONCILER_ACTIONS.replayed.name, EVIDENCE_AGREES],
   );
   return restsAlsoOnWhenReplayed(hit.rows[0]?.evidence_agrees ?? true);
 };

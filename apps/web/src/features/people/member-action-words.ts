@@ -32,7 +32,7 @@ export const MEMBER_PAGE_WORDS = {
 
 export const ACTIVITY_WORDS = {
   loading: "The activity is still loading.",
-  none: (name: string) => `No acts by or to ${name} in this workspace yet.`,
+  none: (name: string) => `No actions by or to ${name} in this workspace yet.`,
   older: "Older activity",
   direction: {
     by: (name: string) => `By ${name}`,
@@ -49,7 +49,7 @@ const andAlready = (skipped: number, already: string): string =>
 
 export const BULK_WORDS = {
   changeRole: {
-    act: "Change role",
+    action: "Change role",
     title: (count: number) => `Change the role of ${members(count)}`,
     consequence: `Each holds the new role from their next request. ${RECORDED}`,
     commit: (count: number, role: Role) => `Change ${members(count)} to ${role}`,
@@ -58,7 +58,7 @@ export const BULK_WORDS = {
       `Changed ${members(changed)} to ${role}${andAlready(skipped, `already in the ${role} role`)}`,
   },
   addToGroup: {
-    act: "Add to group",
+    action: "Add to group",
     title: (count: number) => `Add ${members(count)} to a group`,
     consequence: `Anyone already in the group stays in it. ${RECORDED}`,
     choose: "Choose a group",
@@ -68,7 +68,7 @@ export const BULK_WORDS = {
       `Added ${members(changed)} to ${group}${andAlready(skipped, "in it already")}`,
   },
   remove: {
-    act: "Remove",
+    action: "Remove",
     title: (count: number) => `Remove ${members(count)}`,
     consequence: `They lose access to this workspace on every session and assistant they hold. Any other workspace they belong to is untouched, and they stay named on what they checked. ${RECORDED}`,
     commit: (count: number) => `Remove ${members(count)} from this workspace`,
@@ -78,6 +78,6 @@ export const BULK_WORDS = {
   },
   refused: (count: number) =>
     `Nothing changed. ${counted(count, "member was", "members were")} refused:`,
-  stillGoing: "The act before this one is still going. Try again once it answers.",
-  tooMany: (most: number) => `Select at most ${members(most)} for one act.`,
+  stillGoing: "The action before this one is still going. Try again once it answers.",
+  tooMany: (most: number) => `Select at most ${members(most)} for one action.`,
 } as const;

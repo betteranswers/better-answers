@@ -8,11 +8,11 @@ import {
 } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-import { act, batchIdFor, declareActs, record } from "../audit/index.ts";
+import { action, batchIdFor, declareActions, record } from "../audit/index.ts";
 import {
   admit,
   attempt,
-  declareAct,
+  declareAction,
   emailAddressOf,
   err,
   ok,
@@ -37,13 +37,13 @@ import {
 } from "./testing-domain.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-export const INVITATION_ACTS = declareActs("people", {
-  created: act("people.invitation.created", { role: "role" }),
-  resent: act("people.invitation.resent", {}),
-  cancelled: act("people.invitation.cancelled", { replacedByInvitationId: "id?" }),
+export const INVITATION_ACTIONS = declareActions("people", {
+  created: action("people.invitation.created", { role: "role" }),
+  resent: action("people.invitation.resent", {}),
+  cancelled: action("people.invitation.cancelled", { replacedByInvitationId: "id?" }),
 });
 
-/** One act sends to, or holds, at most this many invitations until it commits. */
+/** One action sends to, or holds, at most this many invitations until it commits. */
 export const MOST_AT_ONCE = 50;
 
 const ROLE = boundarySchemas.member.select.shape.role;
@@ -55,13 +55,13 @@ export const ADMIN_ALONE = { role: "Admin", purposes: [] } as const;
 export const NO_SUCH_INVITATION =
   "no-such-invitation" satisfies MemberRefusal<"no-such-invitation">;
 
-/** An address any case spells, or none, reaches the act, which names each it refuses. */
+/** An address any case spells, or none, reaches the action, which names each it refuses. */
 export const inviteMembersInput = z.object({
   addresses: z.array(z.string()).min(1).max(MOST_AT_ONCE),
   role: z.string(),
 });
 
-const inviteMembersAct = declareAct({
+const inviteMembersAction = declareAction({
   admits: ADMIN_ALONE,
   input: inviteMembersInput,
   refuses: [
@@ -85,14 +85,14 @@ const ON_AN_INVITATION: readonly OnAnInvitationRefusal[] = [
   "no-such-invitation",
 ];
 
-const resendInvitationAct = declareAct({
+const resendInvitationAction = declareAction({
   admits: ADMIN_ALONE,
   input: invitationInput,
   refuses: [...ON_AN_INVITATION, OFF_TESTING_DOMAIN],
   effect: "write",
 });
 
-const cancelInvitationAct = declareAct({
+const cancelInvitationAction = declareAction({
   admits: ADMIN_ALONE,
   input: invitationInput,
   refuses: ON_AN_INVITATION,
@@ -107,9 +107,13 @@ export type InviteMembersRefusal =
   | RefusedItems<MemberRefusal<"malformed" | "off-testing-domain"> | AlreadyAMember>
   | Error;
 
-export type ResendInvitationRefusal = MemberRefusal<RefusalOf<typeof resendInvitationAct>> | Error;
+export type ResendInvitationRefusal =
+  | MemberRefusal<RefusalOf<typeof resendInvitationAction>>
+  | Error;
 
-export type CancelInvitationRefusal = MemberRefusal<RefusalOf<typeof cancelInvitationAct>> | Error;
+export type CancelInvitationRefusal =
+  | MemberRefusal<RefusalOf<typeof cancelInvitationAction>>
+  | Error;
 
 export const WAITING_ROW = z.object({
   invitationId: INVITATION_ID,
@@ -215,7 +219,7 @@ const mintsRecorded = async (
     const detail = { role: minting.role };
     await record(admin, tx, {
       id: ulid(),
-      act: INVITATION_ACTS.created,
+      action: INVITATION_ACTIONS.created,
       subjectId: invitationId,
       detail,
       batchId,
@@ -224,7 +228,7 @@ const mintsRecorded = async (
     if (cancelledId === undefined) continue;
     await record(admin, tx, {
       id: ulid(),
-      act: INVITATION_ACTS.cancelled,
+      action: INVITATION_ACTIONS.cancelled,
       subjectId: cancelledId,
       detail: { replacedByInvitationId: invitationId },
       batchId,
@@ -394,7 +398,7 @@ export const inviteMembers = async (
   tx: Tx,
   input: InviteMembersInput,
 ): Promise<Result<readonly InvitationMinted[], InviteMembersRefusal>> => {
-  const admitted = admit(inviteMembersAct, principal, input);
+  const admitted = admit(inviteMembersAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const role = ROLE.safeParse(input.role);
   if (!role.success) return err("no-such-role");
@@ -412,7 +416,7 @@ export const inviteMembers = async (
 
 export type ResendInvitationInput = z.output<typeof invitationInput> & { readonly now: Date };
 
-/** The parse brands the ids; a row it throws on fails the act like the query would. */
+/** The parse brands the ids; a row it throws on fails the action like the query would. */
 const firstWaitingOf = (rows: readonly unknown[]): WaitingInvitation | undefined => {
   const [row] = rows;
   return row === undefined ? undefined : waitingOf(WAITING_ROW.parse(row));
@@ -447,7 +451,7 @@ const renewedOne = async (
 
   await record(admin, tx, {
     id: ulid(),
-    act: INVITATION_ACTS.resent,
+    action: INVITATION_ACTIONS.resent,
     subjectId: renewed.invitationId,
     detail: {},
   });
@@ -463,7 +467,7 @@ export const resendInvitation = async (
   tx: Tx,
   input: ResendInvitationInput,
 ): Promise<Result<InvitationToSend, ResendInvitationRefusal>> => {
-  const admitted = admit(resendInvitationAct, principal, input);
+  const admitted = admit(resendInvitationAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const invitationId = INVITATION_ID.safeParse(input.invitationId);
   if (!invitationId.success) return err("malformed");
@@ -481,7 +485,7 @@ export const cancelInvitation = async (
   tx: Tx,
   input: CancelInvitationInput,
 ): Promise<Result<{ readonly invitationId: string }, CancelInvitationRefusal>> => {
-  const admitted = admit(cancelInvitationAct, principal, input);
+  const admitted = admit(cancelInvitationAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const invitationId = INVITATION_ID.safeParse(input.invitationId);
   if (!invitationId.success) return err("malformed");
@@ -503,7 +507,7 @@ export const cancelInvitation = async (
 
   await record(admitted.value, tx, {
     id: ulid(),
-    act: INVITATION_ACTS.cancelled,
+    action: INVITATION_ACTIONS.cancelled,
     subjectId: invitationId.data,
     detail: {},
   });

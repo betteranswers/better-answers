@@ -8,7 +8,7 @@ A gap in the goal, the done condition, or the safe failure direction; over-presc
 
 **A case a stated condition already decides is not a finding.** Before filing "what if X" against a rule, read the rule's condition and ask whether it decides X. If it does, do not file. If the condition is wrong or missing, file that — as a condition.
 
-**State the requested fix as a condition or an owning-layer move, never as a case to add.** "This probe fails open on network error" is a correct observation; the fix to request is "state the condition (act only on positive proof)" or "delete the probe", not "also check the exit code". "Command X fails in state Y" against a delegating skill is a representation finding: propose the deletion and the condition.
+**State the requested fix as a condition or an owning-layer move, never as a case to add.** "This probe fails open on network error" is a correct observation; the fix to request is "state the condition (go ahead only on positive proof)" or "delete the probe", not "also check the exit code". "Command X fails in state Y" against a delegating skill is a representation finding: propose the deletion and the condition.
 
 **A block restated to the standard is the expected shape of an edit**, not scope creep, when the restatement covers every path the old text served. Check that coverage; that is the review.
 

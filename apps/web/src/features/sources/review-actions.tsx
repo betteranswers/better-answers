@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 
-import { ActDialog } from "@/shared/act-dialog.tsx";
+import { ActionDialog } from "@/shared/action-dialog.tsx";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -46,10 +46,10 @@ const askOf = (ready: TickedGroups) => ({
 const reasonedAsk = (ready: TickedGroups, reason: string) => ({ ...askOf(ready), reason });
 
 /**
- * Inert until this connected source's review has ticked groups the act takes: an act over nothing is
+ * Inert until this connected source's review has ticked groups the action takes: an action over nothing is
  * disabled and reads as such.
  */
-const useBulkAct = (
+const useBulkAction = (
   connectedSourceId: string,
   takes: (group: GroupOfFindings) => boolean = takesAnyGroup,
 ) => {
@@ -70,7 +70,7 @@ const useBulkAct = (
   };
 
   /**
-   * The act's own button is disabled once the selection is spent, so focus it cannot take goes to
+   * The action's own button is disabled once the selection is spent, so focus it cannot take goes to
    * the review.
    */
   const returnFocus = (event: Event) => {
@@ -108,20 +108,20 @@ const useBulkAct = (
   return { selected, ready, open, setOpen, show, returnFocus, outcome, command };
 };
 
-type BulkActState = ReturnType<typeof useBulkAct>;
+type BulkActionState = ReturnType<typeof useBulkAction>;
 
-function BulkAct(properties: {
-  readonly act: BulkActState;
+function BulkAction(properties: {
+  readonly action: BulkActionState;
   readonly keystroke: Keystroke;
   readonly label: string;
   readonly refusedWhy?: string;
   readonly dialog: ReactNode;
 }) {
-  const { act } = properties;
+  const { action } = properties;
   const refusedWhyId = useId();
-  useKeystroke(properties.keystroke, act.show);
+  useKeystroke(properties.keystroke, action.show);
   const refusedWhy =
-    act.selected.length > 0 && act.ready === undefined ? properties.refusedWhy : undefined;
+    action.selected.length > 0 && action.ready === undefined ? properties.refusedWhy : undefined;
 
   return (
     <div className="grid content-start gap-1">
@@ -129,10 +129,10 @@ function BulkAct(properties: {
         variant="outline"
         size="sm"
         className="h-auto min-h-8 justify-self-start py-1 text-left whitespace-normal"
-        disabled={act.ready === undefined}
+        disabled={action.ready === undefined}
         aria-keyshortcuts={properties.keystroke.key}
         aria-describedby={refusedWhy === undefined ? undefined : refusedWhyId}
-        onClick={act.show}
+        onClick={action.show}
       >
         {properties.label}
       </Button>
@@ -142,7 +142,7 @@ function BulkAct(properties: {
         </p>
       )}
       {properties.dialog}
-      <OutcomeLine outcome={act.outcome} className="text-sm" />
+      <OutcomeLine outcome={action.outcome} className="text-sm" />
     </div>
   );
 }
@@ -161,16 +161,16 @@ function TickedList(properties: { readonly groups: readonly GroupOfFindings[] })
 }
 
 /**
- * Both reasoned acts land the reason in the audit log beside the Admin who gave it, so they ask for
+ * Both reasoned actions land the reason in the audit log beside the Admin who gave it, so they ask for
  * it alike.
  */
 function ReasonedDialog(properties: {
-  readonly act: BulkActState;
+  readonly action: BulkActionState;
   readonly title: string;
   readonly consequence: string;
   readonly onReason: (reason: string) => void;
 }) {
-  const { act } = properties;
+  const { action } = properties;
   const reasonId = useId();
   const formId = useId();
 
@@ -181,10 +181,10 @@ function ReasonedDialog(properties: {
   };
 
   return (
-    <ActDialog
-      open={act.open}
-      onOpenChange={act.setOpen}
-      content={{ onCloseAutoFocus: act.returnFocus }}
+    <ActionDialog
+      open={action.open}
+      onOpenChange={action.setOpen}
+      content={{ onCloseAutoFocus: action.returnFocus }}
       title={properties.title}
       consequence={properties.consequence}
       commit={
@@ -193,19 +193,19 @@ function ReasonedDialog(properties: {
         </Button>
       }
     >
-      <TickedList groups={act.ready?.groups ?? []} />
+      <TickedList groups={action.ready?.groups ?? []} />
       <form id={formId} onSubmit={submit} className="grid gap-2">
         <Label htmlFor={reasonId}>Reason</Label>
         <Input id={reasonId} name="reason" required autoComplete="off" />
       </form>
-    </ActDialog>
+    </ActionDialog>
   );
 }
 
-export function KeepInTextAct(properties: { readonly connectedSourceId: string }) {
-  const act = useBulkAct(properties.connectedSourceId);
+export function KeepInTextAction(properties: { readonly connectedSourceId: string }) {
+  const action = useBulkAction(properties.connectedSourceId);
   const keep = useKeepInText();
-  const groups = act.ready?.groups ?? [];
+  const groups = action.ready?.groups ?? [];
   const named = counted(groups.length, "group of findings", "groups of findings");
   /** Counted off the groups the review listed, so the page reads nothing of the spans kept. */
   const spans = counted(
@@ -215,7 +215,7 @@ export function KeepInTextAct(properties: { readonly connectedSourceId: string }
   );
 
   const kept = (reason: string) => {
-    act.command({
+    action.command({
       pending: `Keeping ${named} in text.`,
       done: () =>
         `Kept ${named} in text: ${spans} restored, and the sync that lets them back in is queued.`,
@@ -226,13 +226,13 @@ export function KeepInTextAct(properties: { readonly connectedSourceId: string }
   };
 
   return (
-    <BulkAct
-      act={act}
+    <BulkAction
+      action={action}
       keystroke={SOURCES_KEYSTROKES.keep}
-      label={act.ready === undefined ? "Keep in text" : `Keep ${named} in text`}
+      label={action.ready === undefined ? "Keep in text" : `Keep ${named} in text`}
       dialog={
         <ReasonedDialog
-          act={act}
+          action={action}
           title={`Keep ${named} in text`}
           consequence="Every span of each group goes back into its document's text on the next sync, restored under your name with this reason. An erasure request still outranks a keep."
           onReason={kept}
@@ -242,15 +242,15 @@ export function KeepInTextAct(properties: { readonly connectedSourceId: string }
   );
 }
 
-export function NarrowDocumentsAct(properties: { readonly connectedSourceId: string }) {
-  const act = useBulkAct(properties.connectedSourceId);
+export function NarrowDocumentsAction(properties: { readonly connectedSourceId: string }) {
+  const action = useBulkAction(properties.connectedSourceId);
   const narrow = useNarrowDocuments();
-  const groups = act.ready?.groups ?? [];
+  const groups = action.ready?.groups ?? [];
   const documents = [...new Map(groups.map((group) => [group.documentId, group.title]))];
   const named = counted(documents.length, "document", "documents");
 
   const confirm = () => {
-    act.command<DocumentsNarrowed>({
+    action.command<DocumentsNarrowed>({
       pending: `Narrowing ${named} to ${NARROWEST}.`,
       done: (narrowed) =>
         `Narrowed ${counted(narrowed.documentIds.length, "document", "documents")} to ${NARROWEST}; ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.writeUps.length, "write-up", "write-ups")} moved with them.`,
@@ -261,15 +261,15 @@ export function NarrowDocumentsAct(properties: { readonly connectedSourceId: str
   };
 
   return (
-    <BulkAct
-      act={act}
+    <BulkAction
+      action={action}
       keystroke={SOURCES_KEYSTROKES.narrowDocuments}
-      label={act.ready === undefined ? "Narrow these documents" : `Narrow ${named}`}
+      label={action.ready === undefined ? "Narrow these documents" : `Narrow ${named}`}
       dialog={
-        <ActDialog
-          open={act.open}
-          onOpenChange={act.setOpen}
-          content={{ onCloseAutoFocus: act.returnFocus }}
+        <ActionDialog
+          open={action.open}
+          onOpenChange={action.setOpen}
+          content={{ onCloseAutoFocus: action.returnFocus }}
           title={`Narrow ${named} to ${NARROWEST}`}
           consequence={`Each document takes the sensitivity ${NARROWEST}. The ticked groups' unreviewed findings are reviewed as narrowed, and every concept citing the documents moves with them. A narrowing never widens, and this page cannot undo it.`}
           commit={
@@ -283,13 +283,13 @@ export function NarrowDocumentsAct(properties: { readonly connectedSourceId: str
               <li key={documentId}>{title}</li>
             ))}
           </ul>
-        </ActDialog>
+        </ActionDialog>
       }
     />
   );
 }
 
-/** A ulid sorts by when it was minted, so a sync at or past the act's own is one that reads it. */
+/** A ulid sorts by when it was minted, so a sync at or past the action's own is one that reads it. */
 function SyncStatus(properties: { readonly connectedSourceId: string; readonly jobId: string }) {
   const connectedSources = useConnectedSources();
   const sync = connectedSources.data?.find(
@@ -302,13 +302,19 @@ function SyncStatus(properties: { readonly connectedSourceId: string; readonly j
 
 const isSpecialCategory = (group: GroupOfFindings): boolean => group.specialCategory;
 
-export function DismissAsNotSpecialCategoryAct(properties: { readonly connectedSourceId: string }) {
-  const act = useBulkAct(properties.connectedSourceId, isSpecialCategory);
+export function DismissAsNotSpecialCategoryAction(properties: {
+  readonly connectedSourceId: string;
+}) {
+  const action = useBulkAction(properties.connectedSourceId, isSpecialCategory);
   const dismiss = useDismissAsNotSpecialCategory();
-  const named = counted(act.ready?.groups.length ?? 0, "group of findings", "groups of findings");
+  const named = counted(
+    action.ready?.groups.length ?? 0,
+    "group of findings",
+    "groups of findings",
+  );
 
   const dismissed = (reason: string) => {
-    act.command<DismissedAsNotSpecialCategory>({
+    action.command<DismissedAsNotSpecialCategory>({
       pending: `Dismissing ${named} as not special category.`,
       done: (answer) => (
         <>
@@ -325,18 +331,18 @@ export function DismissAsNotSpecialCategoryAct(properties: { readonly connectedS
   };
 
   return (
-    <BulkAct
-      act={act}
+    <BulkAction
+      action={action}
       keystroke={SOURCES_KEYSTROKES.dismiss}
       label={
-        act.ready === undefined
+        action.ready === undefined
           ? "Dismiss as not special category"
           : `Dismiss ${named} as not special category`
       }
       refusedWhy={whyAndNextOf("not-special-category")}
       dialog={
         <ReasonedDialog
-          act={act}
+          action={action}
           title={`Dismiss ${named} as not special category`}
           consequence="Every span of each group is reviewed as dismissed under your name with this reason, and the sync that reads the dismissal is queued. On that sync, a document whose every special category finding is dismissed goes back to the sensitivity an Admin narrowed it to, or to its connected source's sensitivity if none did. The spans stay withheld unless kept in text."
           onReason={dismissed}

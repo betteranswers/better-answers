@@ -16,8 +16,8 @@ export type AccessRequestId = z.infer<typeof boundarySchemas.accessRequest.selec
 export type GroupId = z.infer<typeof boundarySchemas.group.select>["id"];
 
 /**
- * A Principal outlives the transaction that resolved it only where an act opens its own; never
- * the request, and that act's door re-judges it.
+ * A Principal outlives the transaction that resolved it only where an action opens its own; never
+ * the request, and that action's door re-judges it.
  */
 export type UserPrincipal = {
   readonly kind: "user";
@@ -39,7 +39,7 @@ export type PlatformPrincipal = {
 export type Principal = UserPrincipal | PlatformPrincipal;
 
 /**
- * Kept out of `Principal`, so no act over a workspace's data can be handed a caller who belongs
+ * Kept out of `Principal`, so no action over a workspace's data can be handed a caller who belongs
  * to none of them.
  */
 export type OperatorPrincipal = {

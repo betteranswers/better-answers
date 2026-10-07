@@ -130,7 +130,7 @@ export const listFaults = (
 const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * `auditRowsOf`, `AUDIT_ACT`, `HTTPAudit` and `an_audit_row` read as words, and an acronym's plural
+ * `auditRowsOf`, `AUDIT_ACTION`, `HTTPAudit` and `an_audit_row` read as words, and an acronym's plural
  * (`IRIs`) stays whole.
  */
 const wordsOfCompounds = (text: string): string =>

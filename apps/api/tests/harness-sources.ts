@@ -239,7 +239,7 @@ const seedDocuments = async (
 };
 
 /**
- * Rows written as each act and the worker would leave them, so the page reads what a real
+ * Rows written as each action and the worker would leave them, so the page reads what a real
  * connected source's history leaves behind.
  */
 export const seedConnectedSources = async (

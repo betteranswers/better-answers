@@ -44,7 +44,7 @@ import {
   signedInWithNoWorkspace,
   signIn,
   signInHeading,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 const thePicker = (page: Page) =>
@@ -54,7 +54,7 @@ const SEND_PATH = "/email-otp/send-verification-otp";
 
 const codeField = (page: Page) => page.getByLabel(SIGN_IN_WORDS.codeField, { exact: true });
 
-/** Asked for before the act that sends, or the answer can land before anything waits for it. */
+/** Asked for before the action that sends, or the answer can land before anything waits for it. */
 const theSendsAnswer = (page: Page) =>
   page.waitForResponse((response) => new URL(response.url()).pathname === SEND_PATH);
 
@@ -388,7 +388,7 @@ test("names the wait when a new code meets the ceiling", async ({
   await clockTheNextKey(page, { at: "//*[@role='status']", reads: sendingANewCode(email) });
   const answered = theSendsAnswer(page);
   await page.keyboard.press("n");
-  await theActLandedWithinItsBudget(page, "send a new code");
+  await theActionLandedWithinItsBudget(page, "send a new code");
 
   const said = sentenceOf(tooManyCodesAskedFor(await waitNamedBy(answered, "perEmail")));
   await expect(page.getByRole("alert")).toHaveText(said);

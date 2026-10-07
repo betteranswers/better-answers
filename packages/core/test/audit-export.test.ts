@@ -79,14 +79,14 @@ const groupMade = async (workspace: ProvisionedWorkspace, userId: string, name: 
     ),
   );
 
-/** A group named as given, past the trimming the factory and an Admin's own act both do. */
+/** A group named as given, past the trimming the factory and an Admin's own action both do. */
 const groupSeeded = (workspace: ProvisionedWorkspace, name: string) =>
   seedingWith(db().pool, async (seed) => {
     const group = await seed.group({ workspaceId: workspace.workspaceId, name: "Unnamed" });
     await db().pool.query('UPDATE "group" SET name = $1 WHERE id = $2', [name, group.id]);
     await seed.auditEvent({
       workspaceId: workspace.workspaceId,
-      act: "people.group.created",
+      action: "people.group.created",
       actor: `human:${workspace.adminUserId}`,
       subjectId: group.id,
       detail: {},
@@ -101,7 +101,7 @@ describe("the audit log's export", () => {
     const file = exported(await exportAs(workspace, workspace.adminUserId));
 
     expect(linesOf(file)).toEqual([
-      `"Time","Family","Act","Actor","Subject","Detail"`,
+      `"Time","Family","Action","Actor","Subject","Detail"`,
       expect.stringMatching(
         new RegExp(
           String.raw`^"${ISO_INSTANT}","people","people\.group\.created","Hannah Wright","Bid writers",""$`,
@@ -223,7 +223,7 @@ describe("the audit log's export", () => {
       });
       await seed.auditEvent({
         workspaceId: workspace.workspaceId,
-        act: "people.invitation.created",
+        action: "people.invitation.created",
         actor: `human:${workspace.adminUserId}`,
         subjectId: invitation.id,
         detail: { role: "Editor" },
@@ -254,7 +254,7 @@ describe("the audit log's export", () => {
       for (const subjectId of ["01J6ZZZZZZZZZZZZZZZZZZZZZZ", connectedSource.id]) {
         await seed.auditEvent({
           workspaceId,
-          act: "sources.binding.published",
+          action: "sources.binding.published",
           actor: `human:${workspace.adminUserId}`,
           subjectId,
           detail: {},
@@ -303,7 +303,7 @@ describe("the audit log's export", () => {
       for (let index = 0; index < 10_001; index += 1) {
         await seed.auditEvent({
           workspaceId: workspace.workspaceId,
-          act: "people.group.created",
+          action: "people.group.created",
           actor: `human:${workspace.adminUserId}`,
           detail: {},
         });

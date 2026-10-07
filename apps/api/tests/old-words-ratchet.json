@@ -1,17 +1,1 @@
-{
-  "apps/web/src/app/words.ts": {
-    "act": 2
-  },
-  "apps/web/src/features/people/invitation-words.ts": {
-    "act": 2
-  },
-  "apps/web/src/features/people/member-act-words.ts": {
-    "act": 3
-  },
-  "apps/web/src/features/sources/words.ts": {
-    "act": 1
-  },
-  "apps/web/src/shared/navigation.ts": {
-    "act": 1
-  }
-}
+{}

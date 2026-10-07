@@ -8,10 +8,10 @@ import { PaginationCounter } from "@/shared/ui/kibo-ui/pagination-counter.tsx";
 
 type FocusTarget = RefObject<HTMLElement | null>;
 
-/** Each state takes only the page's words. A focus target must outlive the state its act replaces. */
+/** Each state takes only the page's words. A focus target must outlive the state its action replaces. */
 type State =
   | { readonly kind: "loading"; readonly words: string }
-  | { readonly kind: "empty"; readonly words: string; readonly act: ReactNode }
+  | { readonly kind: "empty"; readonly words: string; readonly action: ReactNode }
   | {
       readonly kind: "emptied";
       readonly words: string;
@@ -26,7 +26,7 @@ type State =
     };
 
 /** Its press replaces the state that draws it, so focus on it would fall to the page. */
-function StateAct(properties: {
+function StateAction(properties: {
   readonly onPress: () => void;
   readonly focusAfter: FocusTarget;
   readonly children: ReactNode;
@@ -52,15 +52,15 @@ export function ListState(properties: { readonly state: State }) {
     case "loading":
       return <EmptyAction title={<output>{state.words}</output>} />;
     case "empty":
-      return <EmptyAction title={state.words} action={state.act} />;
+      return <EmptyAction title={state.words} action={state.action} />;
     case "emptied":
       return (
         <EmptyAction
           title={state.words}
           action={
-            <StateAct onPress={state.onClear} focusAfter={state.focusAfterClear}>
+            <StateAction onPress={state.onClear} focusAfter={state.focusAfterClear}>
               Clear filters
-            </StateAct>
+            </StateAction>
           }
         />
       );
@@ -69,9 +69,9 @@ export function ListState(properties: { readonly state: State }) {
         <EmptyAction
           title={<span role="alert">{state.words}</span>}
           action={
-            <StateAct onPress={state.onRetry} focusAfter={state.focusAfterRetry}>
+            <StateAction onPress={state.onRetry} focusAfter={state.focusAfterRetry}>
               Retry
-            </StateAct>
+            </StateAction>
           }
         />
       );

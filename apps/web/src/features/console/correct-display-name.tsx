@@ -7,22 +7,22 @@ import { CorrectNameDialog } from "./correct-name-dialog.tsx";
 import { backTo } from "./people-address.ts";
 import type { ListedPerson } from "./people-api.ts";
 import { nameOf } from "./person-words.tsx";
-import { SheetActButton } from "./sheet-act.tsx";
+import { SheetActionButton } from "./sheet-action.tsx";
 import { SignInAgain } from "./sign-in-again.tsx";
 import { useCorrecting } from "./use-correcting.ts";
 import { correctWords } from "./words.ts";
 
 export function CorrectDisplayName(properties: {
   readonly person: ListedPerson;
-  readonly actRef: RefObject<HTMLButtonElement | null>;
+  readonly actionRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { person, actRef } = properties;
+  const { person, actionRef } = properties;
   const [asking, setAsking] = useState(false);
   const correcting = useCorrecting();
   const consequenceId = useId();
   const name = nameOf(person);
 
-  /** The dialog closes first, so focus is back on the act when the name changes. */
+  /** The dialog closes first, so focus is back on the action when the name changes. */
   const save = (displayName: string) => {
     setAsking(false);
     correcting.save({ personId: person.id, was: name, displayName });
@@ -35,8 +35,8 @@ export function CorrectDisplayName(properties: {
         own name follows, and ends any flag waiting on it. Recorded on the identity-set audit log
         under your name.
       </p>
-      <SheetActButton
-        actRef={actRef}
+      <SheetActionButton
+        actionRef={actionRef}
         consequenceId={consequenceId}
         pending={correcting.pending}
         onAsk={() => {
@@ -44,7 +44,7 @@ export function CorrectDisplayName(properties: {
         }}
       >
         {correctWords(name)}
-      </SheetActButton>
+      </SheetActionButton>
       <OutcomeLine outcome={correcting.outcome} />
       {correcting.staleFor === undefined ? null : <SignInAgain back={backTo(person, "correct")} />}
 
@@ -58,7 +58,7 @@ export function CorrectDisplayName(properties: {
             setAsking(false);
           }}
           onFocusBack={() => {
-            actRef.current?.focus();
+            actionRef.current?.focus();
           }}
         />
       ) : null}

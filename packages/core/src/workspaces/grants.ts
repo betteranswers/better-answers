@@ -1,16 +1,16 @@
-import { act, declareIdentitySetActs, record, type EndedGrant } from "../audit/index.ts";
+import { action, declareIdentitySetActions, record, type EndedGrant } from "../audit/index.ts";
 import { ulid, type UserId, type UserPrincipal, type WorkspaceId } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /** The operator reads a person's ended grants from here, since no workspace's audit log is theirs. */
-const ENDING_ACTS = declareIdentitySetActs("people", {
-  revoked: act("people.person.credentials_revoked", { grants: "grants" }),
-  endedHere: act("people.person.grants_ended", { workspaceId: "id", grants: "grants" }),
+const ENDING_ACTIONS = declareIdentitySetActions("people", {
+  revoked: action("people.person.credentials_revoked", { grants: "grants" }),
+  endedHere: action("people.person.grants_ended", { workspaceId: "id", grants: "grants" }),
 });
 
-export const REVOKED_EVERYWHERE = ENDING_ACTS.revoked;
+export const REVOKED_EVERYWHERE = ENDING_ACTIONS.revoked;
 
-export const GRANTS_ENDED_HERE = ENDING_ACTS.endedHere;
+export const GRANTS_ENDED_HERE = ENDING_ACTIONS.endedHere;
 
 /** Every workspace's tokens where `workspaceId` is null; only those consented in it otherwise. */
 type TokensToEnd = {
@@ -78,8 +78,8 @@ export const endTokens = async (tx: Tx, asked: TokensToEnd): Promise<TokensEnded
 };
 
 /**
- * The step after a workspace act's own row, in its transaction: the person's ended grants on the
- * identity-set audit log, under the Admin. An act that ended none writes nothing here.
+ * The step after a workspace action's own row, in its transaction: the person's ended grants on the
+ * identity-set audit log, under the Admin. An action that ended none writes nothing here.
  */
 export const recordGrantsEndedHere = async (
   admin: UserPrincipal,
@@ -89,7 +89,7 @@ export const recordGrantsEndedHere = async (
   if (ended.grants.length === 0) return;
   await record(admin, tx, {
     id: ulid(),
-    act: GRANTS_ENDED_HERE,
+    action: GRANTS_ENDED_HERE,
     subjectId: ended.personId,
     detail: { workspaceId: admin.workspaceId, grants: ended.grants },
   });

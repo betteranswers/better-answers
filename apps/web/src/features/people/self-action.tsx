@@ -7,7 +7,7 @@ import { HOMES, type Role } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 
-import { homeNowSaid, INCLUDES_YOU } from "./member-act-words.ts";
+import { homeNowSaid, INCLUDES_YOU } from "./member-action-words.ts";
 import { useReaderId } from "./people-api.ts";
 import { roleOf } from "./role-meanings.ts";
 
@@ -42,8 +42,8 @@ const roleReadAgain = async (
   return read?.status === "success" && read.fetchStatus === "idle" ? read.data?.role : undefined;
 };
 
-/** The reader can no longer see the page the act was taken on, so each move replaces it. */
-export const useSelfActHome = () => {
+/** The reader can no longer see the page the action was taken on, so each move replaces it. */
+export const useSelfActionHome = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   const navigate = useNavigate();

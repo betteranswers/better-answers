@@ -23,7 +23,7 @@ import {
   saysItsSentenceNotItsWord,
   signIn,
   skipLinkReachesThePage,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -169,7 +169,7 @@ test.describe("the People group's Groups page", () => {
   }
 });
 
-test.describe("a group's acts", () => {
+test.describe("a group's actions", () => {
   test("lets an Admin create a group that lands at once", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Aire Valley Tooling");
 
@@ -177,7 +177,7 @@ test.describe("a group's acts", () => {
     await clockTheNextKey(page, { at: countCellOf("Site leads"), reads: "0 members" });
     await nameField(page).press("Enter");
 
-    await theActLandedWithinItsBudget(page, "create a group");
+    await theActionLandedWithinItsBudget(page, "create a group");
     await expect(groupButton(page, "Site leads")).toBeFocused();
     await expect(groupsRegion(page).getByRole("status")).toHaveText([
       "3 groups",
@@ -223,7 +223,7 @@ test.describe("a group's acts", () => {
     await expect(renamed.getByRole("region", { name: "Rename" }).getByRole("status")).toHaveText(
       "HR team is People team now.",
     );
-    await theActLandedWithinItsBudget(page, "rename a group");
+    await theActionLandedWithinItsBudget(page, "rename a group");
     await page.keyboard.press("Escape");
     await expect(groupButton(page, "People team")).toBeFocused();
     await expect(rowOf(page, "People team").getByRole("cell").nth(1)).toHaveText("2 members");
@@ -260,7 +260,7 @@ test.describe("a group's acts", () => {
     await page.keyboard.press("Enter");
 
     await expect(sheet).toHaveCount(0);
-    await theActLandedWithinItsBudget(page, "delete a group");
+    await theActionLandedWithinItsBudget(page, "delete a group");
     await expect(groupRows(page)).toHaveCount(1);
     await expect(groupsRegion(page).getByRole("status")).toHaveText([
       "1 group",
@@ -293,7 +293,7 @@ test.describe("a group's acts", () => {
     await page.keyboard.press("Space");
 
     await expect(said).toHaveText("Sam Okoro is in Bid writers now.");
-    await theActLandedWithinItsBudget(page, "put a member in a group");
+    await theActionLandedWithinItsBudget(page, "put a member in a group");
     await expect(sam).toBeChecked();
     await expect(sam).toBeFocused();
 
@@ -328,12 +328,12 @@ test.describe("a group's acts", () => {
     await clockTheNextKey(page, { at: SHEET_COUNT, reads: "0 members" });
     await page.keyboard.press("Space");
     await expect(said).toHaveText("Sam Okoro is out of Bid writers now.");
-    await theActLandedWithinItsBudget(page, "take a member out of a group");
+    await theActionLandedWithinItsBudget(page, "take a member out of a group");
     await page.keyboard.press("Escape");
     await expect(rowOf(page, "Bid writers").getByRole("cell").nth(1)).toHaveText("0 members");
   });
 
-  test("lets an Admin reach every group act by keyboard alone", async ({ page, request }) => {
+  test("lets an Admin reach every group action by keyboard alone", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Calder Castings");
     // A fresh document, so the first Tab starts from the top rather than from the rail's link.
     await page.goto(GROUPS_PAGE);
@@ -341,14 +341,14 @@ test.describe("a group's acts", () => {
     await skipLinkReachesThePage(page);
 
     const keystrokes = await keystrokesListed(page, GROUPS.name);
-    for (const act of [
+    for (const action of [
       "Create a group",
       "Open the group in focus",
       "Change the members of the group in focus",
       "Rename the group in focus",
       "Delete the group in focus",
     ]) {
-      await expect(keystrokes).toContainText(act);
+      await expect(keystrokes).toContainText(action);
     }
     // `d` removes a member on the Members page; here it deletes a group, and says only that.
     await expect(keystrokes).not.toContainText("Remove the member in focus");
@@ -457,7 +457,7 @@ test.describe("a member's groups, on their row and their page", () => {
     });
     await page.keyboard.press("Space");
     await expect(groups.getByRole("status")).toHaveText("Priya Shah is in Bid writers now.");
-    await theActLandedWithinItsBudget(page, "put a member in a group from their page");
+    await theActionLandedWithinItsBudget(page, "put a member in a group from their page");
 
     await picked.getByRole("checkbox", { name: "HR team" }).click();
     await expect(groups.getByRole("status")).toHaveText("Priya Shah is out of HR team now.");
@@ -489,7 +489,7 @@ test.describe("a member's groups, on their row and their page", () => {
       .getByRole("link", { name: "Test person", exact: true })
       .click();
     const groups = page.getByRole("main").getByRole("region", { name: "Groups", exact: true });
-    // The page has no way to create a group, so its empty state carries the one act.
+    // The page has no way to create a group, so its empty state carries the one action.
     await expect(groups).toMatchAriaSnapshot(`
       - region "Groups":
         - /children: equal
@@ -504,7 +504,7 @@ test.describe("a member's groups, on their row and their page", () => {
       - region "Groups":
         - heading "Groups" [level=2]
         - status: 0 groups
-        - form "${GROUPS_KEYSTROKES.create.act}":
+        - form "${GROUPS_KEYSTROKES.create.action}":
           - textbox "Name of a new group"
           - button "Create the group"
         - table:
@@ -516,7 +516,7 @@ test.describe("a member's groups, on their row and their page", () => {
     `);
     await expect(
       groupsRegion(page).getByRole("button"),
-      "the form above holds the one create act",
+      "the form above holds the one create action",
     ).toHaveCount(1);
     await page.keyboard.press(GROUPS_KEYSTROKES.create.key);
     await expect(nameField(page)).toBeFocused();

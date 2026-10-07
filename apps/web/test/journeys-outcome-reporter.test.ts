@@ -21,7 +21,7 @@ const specOf = (...lines: readonly string[]): string =>
   ].join("\n");
 
 const ADMIN_FAILS_ON_MEMBERS = [
-  'test("the Admin acts on every page", async () => {',
+  'test("the Admin works on every page", async () => {',
   '  playsTheRole("Admin");',
   '  await test.step("Members", async () => {',
   '    await test.step("moves three members to Editor", async () => {',
@@ -32,7 +32,7 @@ const ADMIN_FAILS_ON_MEMBERS = [
 ];
 
 /** The address comes from the environment, as a journey's does, and shows on the page and in a diff. */
-const ADMIN_FAILS_TO_ACT = [
+const ADMIN_FAILS_TO_SIGN_IN = [
   "const address = process.env.JOURNEYS_ADMIN_EMAIL;",
   "const status = '<main><p role=\"status\">Sign-in email sent to ' + address + '.</p></main>';",
   'test("the Admin signs in", async ({ page }) => {',
@@ -45,7 +45,7 @@ const ADMIN_FAILS_TO_ACT = [
 ];
 
 const ADMIN_FAILS_WITH_THE_ADDRESS_IN_VIEW = [
-  ...ADMIN_FAILS_TO_ACT,
+  ...ADMIN_FAILS_TO_SIGN_IN,
   'test("the Editor reads their sign-in status", async ({ page }) => {',
   '  playsTheRole("Editor");',
   "  await page.setContent(status);",
@@ -180,7 +180,7 @@ describe("the journeys' outcome reporter", () => {
   it("says outside any step for a failure outside every step", async () => {
     const run = await journeysOver({
       spec: specOf(
-        'test("the Admin acts on every page", () => {',
+        'test("the Admin works on every page", () => {',
         '  playsTheRole("Admin");',
         '  throw new Error("the journey broke between its steps");',
         "});",
@@ -194,7 +194,7 @@ describe("the journeys' outcome reporter", () => {
   it("writes fail for a timed-out journey, naming its step", async () => {
     const run = await journeysOver({
       spec: specOf(
-        'test("the Admin acts on every page", async () => {',
+        'test("the Admin works on every page", async () => {',
         "  test.setTimeout(1_000);",
         '  playsTheRole("Admin");',
         '  await test.step("Audit log", async () => {',
@@ -211,7 +211,7 @@ describe("the journeys' outcome reporter", () => {
   it("writes could-not-run for a run stopped midway", async () => {
     const run = await journeysOver({
       spec: specOf(
-        'test("the Admin acts on every page", async () => {',
+        'test("the Admin works on every page", async () => {',
         '  playsTheRole("Admin");',
         '  await test.step("Members", async () => {',
         '    process.kill(process.ppid, "SIGINT");',
@@ -227,7 +227,7 @@ describe("the journeys' outcome reporter", () => {
 
   it("writes could-not-run when no journey ran", async () => {
     const run = await journeysOver({
-      spec: specOf('test.skip("the Admin acts on every page", () => {});'),
+      spec: specOf('test.skip("the Admin works on every page", () => {});'),
     });
 
     expect(run.outcome).toBe("could-not-run\n");
@@ -296,11 +296,11 @@ describe("what a failed journey leaves behind", () => {
 
   it("leaves no page snapshot holding an address, prompt off", async () => {
     const withPrompt = await journeysOver({
-      spec: specOf(...ADMIN_FAILS_TO_ACT),
+      spec: specOf(...ADMIN_FAILS_TO_SIGN_IN),
       env: WITH_THE_ADDRESS,
     });
     const withoutPrompt = await journeysOver({
-      spec: specOf(...ADMIN_FAILS_TO_ACT),
+      spec: specOf(...ADMIN_FAILS_TO_SIGN_IN),
       env: { ...WITH_THE_ADDRESS, PLAYWRIGHT_NO_COPY_PROMPT: "1" },
     });
     const holdingTheAddress = (left: ReadonlyMap<string, string>) =>

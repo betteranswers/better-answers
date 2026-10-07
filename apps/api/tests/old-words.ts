@@ -592,7 +592,7 @@ const CLIENT_OBJECT_TREES = [
   "apps/web/src/shared/api/trpc.ts",
   "apps/worker/src/better_answers_worker/pipeline/objects.py",
   "docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md",
-  "docs/solutions/logic-errors/a-second-mutate-drops-the-first-acts-callbacks.md",
+  "docs/solutions/logic-errors/a-second-mutate-drops-the-first-actions-callbacks.md",
   "packages/core/src/store/",
   "packages/core/test/",
   "packages/schema/scripts/",
@@ -846,7 +846,7 @@ const OTHER_RUN_TREES = [
   "packages/core/src/sweeps/",
   "packages/core/src/workspaces/",
   "packages/core/stryker.config.mjs",
-  "packages/core/test/audit-acts.test.ts",
+  "packages/core/test/audit-actions.test.ts",
   "packages/core/test/concepts.test.ts",
   "packages/core/test/cost-ledger.contract.test.ts",
   "packages/core/test/environment-lint.test.ts",
@@ -1188,16 +1188,108 @@ const QUARANTINE_SENSES: readonly Sense[] = [
   },
 ];
 
+const ACTION = "action";
+
+const ACTION_LANDED = "2026-10-08";
+
+const ACTION_CARVED_OUT: readonly CarveOut[] = [
+  writtenBefore(ACTION_LANDED),
+  ...SWEEPS_OWN_WORDS,
+  ...VENDORED,
+];
+
+/** The names migration 0073 renamed, which a test puts back and runs the migration over again. */
+const STORED_BEFORE_0073: readonly Sense[] = [
+  ...[
+    "packages/schema/test/before-the-action.ts",
+    "packages/schema/test/action-column.test.ts",
+  ].map((within) => ({
+    sense: "the audit logs' column and constraints as migration 0073 found them (R22)",
+    within,
+    written: /\bact\b/g,
+  })),
+  {
+    sense:
+      "the column's name in the release note of migration 0073, and the error an older api answers",
+    within: "docs/operations/RUNBOOK.md",
+    written: /`act`|column "act" does not exist/g,
+  },
+];
+
+/**
+ * A determiner or a possessive before *act on* makes it the noun. The verb keeps to lower case, so
+ * a label "Acts for" stays refused.
+ */
+const NOT_A_NOUN_BEFORE = String.raw`(?<!\b(?:[Aa]n?|[Tt]he|[Ee]ach|[Ee]very|[Oo]ne|[Nn]o|[Aa]ny|[Ii]ts|[Tt]heir|[Tt]his|[Tt]hese|[Tt]hose|own|whose|two|bulk|set|group|[\w-]+['’]s)\s)`;
+
+const ACT_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  ...STORED_BEFORE_0073,
+  {
+    sense: "React's and Testing Library's act, in a call or its import",
+    within: "apps/web/test/",
+    written: /\bact(?=\()|\bact\b(?=[^;]*\bfrom "(?:react|@testing-library\/[\w-]+)")/g,
+  },
+  {
+    sense: "the plain verb, after a word that makes it one, or before on or as",
+    written: new RegExp(
+      String.raw`(?<=\b(?:to|can|cannot|can't|will|won't|would|could|should|must|may|might|never|not|who|that|they|[Ww]e|[Yy]ou|[Nn]obody)\s+(?:still\s+|only\s+|also\s+)?)act\b|${NOT_A_NOUN_BEFORE}\bact (?:on|as)\b`,
+      "g",
+    ),
+  },
+  {
+    sense: "the query key a page was asked with before this sweep, read still (R22)",
+    within: "apps/web/src/shared/address-ask.ts",
+    written: /\baction: "act"/g,
+  },
+  {
+    sense: "an address asking under that older query key, in the test that proves it is still read",
+    within: "apps/web/test/address-ask.test.tsx",
+    written: /[?&]act=/g,
+  },
+];
+
+const ACTS_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  {
+    sense: "the plain verb, its subject's own: who acts, or acts on, as or for something",
+    written: new RegExp(
+      String.raw`\b[Ww]ho acts\b|${NOT_A_NOUN_BEFORE}\bacts (?:on|as|for)\b`,
+      "g",
+    ),
+  },
+];
+
 export const OLD_WORDS: readonly OldWord[] = [
   avoided("2FA", "second factor"),
   avoided("access token", "personal token"),
   avoided("account", "workspace", "also never a member"),
-  pending("act", "action", "action", "action", "one sense"),
+  {
+    word: "act",
+    use: ACTION,
+    entry: ACTION,
+    sweep: ACTION,
+    state: "landed",
+    reach: "one sense",
+    permitted: ACT_SENSES,
+    carvedOut: ACTION_CARVED_OUT,
+  },
   avoided("action bar", "toolbar"),
   avoided("action name", "audit action"),
   avoided("activity log", "Activity (of a person)"),
   avoided("activity record", "record family", "the draft's word"),
   pending("actor id", "the person's name", "actor id", "Audit log", "reader text"),
+  {
+    word: "acts",
+    use: "actions",
+    entry: ACTION,
+    sweep: ACTION,
+    state: "landed",
+    reach: "everywhere",
+    why: "the plural and every compound name, which the one-sense act row reads whole",
+    permitted: ACTS_SENSES,
+    carvedOut: ACTION_CARVED_OUT,
+  },
   avoided("admin panel", "console"),
   pending("Agent Operations", "Models", "Control Centre", "model choice", "everywhere"),
   {
@@ -1238,7 +1330,15 @@ export const OLD_WORDS: readonly OldWord[] = [
       { holds: under("packages/design-system/"), why: NO_TIER_SENSE },
     ],
   },
-  pending("audit act", "audit action", "audit action", "action", "everywhere"),
+  {
+    word: "audit act",
+    use: "audit action",
+    entry: "audit action",
+    sweep: ACTION,
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: ACTION_CARVED_OUT,
+  },
   avoided("audit line", "log line"),
   avoided("authenticator app", "authenticator"),
   avoided("authorisation", "admission", "the sign-in server's word"),
@@ -1287,7 +1387,15 @@ export const OLD_WORDS: readonly OldWord[] = [
     carvedOut: CONNECTED_SOURCE_ROWS_CARVED_OUT,
   },
   avoided("budget cap", "spending limit"),
-  pending("bulk act", "bulk action", "bulk action", "action", "everywhere"),
+  {
+    word: "bulk act",
+    use: "bulk action",
+    entry: "bulk action",
+    sweep: ACTION,
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: ACTION_CARVED_OUT,
+  },
   {
     word: "bundle",
     use: "knowledge base",

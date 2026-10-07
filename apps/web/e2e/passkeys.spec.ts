@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 
 import {
   ACCOUNT_HEADING,
-  ACT_LANDED,
+  ACTION_LANDED,
   PASSKEY_WORDS,
   passkeyNameFor,
   RECOVERY_CODE_WORDS,
@@ -90,7 +90,7 @@ test("a person adds a passkey, then signs in without email", async ({ page, requ
 
   const name = await passkeyAdded(page);
 
-  await expect(page.getByText(ACT_LANDED.passkeyAdded(name, person.email))).toBeVisible();
+  await expect(page.getByText(ACTION_LANDED.passkeyAdded(name, person.email))).toBeVisible();
   await expect(rowOf(page, name)).toBeFocused();
   await expect(rowOf(page, name)).toContainText(PASSKEY_WORDS.notUsed);
   const emailsBefore = await emailsSentTo(request, person.email);
@@ -140,7 +140,7 @@ test("a passkey removed stops signing in", async ({ page, request }) => {
   const dialog = page.getByRole("dialog", { name: removePasskeyTitle(name) });
   await dialog.getByRole("button", { name: PASSKEY_WORDS.removeCommit }).click();
 
-  await expect(page.getByText(ACT_LANDED.passkeyRemoved(name, person.email))).toBeVisible();
+  await expect(page.getByText(ACTION_LANDED.passkeyRemoved(name, person.email))).toBeVisible();
   await expect(rowOf(page, name)).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 3, name: PASSKEY_WORDS.heading })).toBeFocused();
   expect(await device.held(), "the device should still hold the removed passkey").toBe(1);

@@ -13,7 +13,7 @@ export type InvitationStatus = NonNullable<
   Exclude<inferInput<Api["members"]["invitations"]>, void | undefined>["status"]
 >;
 
-/** One invitation and whether its email went, as every act that sends one answers it. */
+/** One invitation and whether its email went, as every action that sends one answers it. */
 export type SentInvitation = inferOutput<Api["members"]["resendInvitation"]>;
 
 /** What inviting answers for each address: its invitation, and whether it replaced one waiting. */
@@ -38,7 +38,7 @@ type Snapshot = {
   readonly before: readonly (readonly [QueryKey, ListedInvitation[] | undefined])[];
 };
 
-/** Every settled act reads each status and the counts again; an act is a line of its Admin's Activity. */
+/** Every settled action reads each status and the counts again; an action is a line of its Admin's Activity. */
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -50,7 +50,7 @@ const useReconcile = () => {
   };
 };
 
-/** The rows an act moves leave before the api answers, so it lands within 100 ms; a refusal puts them back. */
+/** The rows an action moves leave before the api answers, so it lands within 100 ms; a refusal puts them back. */
 const useMoving = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

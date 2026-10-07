@@ -87,7 +87,7 @@ const ops = async (argv: readonly string[]): Promise<Run> => {
 
 const operatorRowsOf = async (personId: string) => {
   const found = await app().database.superuser.query(
-    `SELECT action AS act, actor, subject_id, detail FROM identity_audit_event
+    `SELECT action, actor, subject_id, detail FROM identity_audit_event
       WHERE subject_id = $1 AND action LIKE 'people.operator.%' ORDER BY at, id`,
     [personId],
   );
@@ -156,7 +156,7 @@ describe("operator — the mark an ops command sets and clears", () => {
     expect(await markHeldBy(person.id)).toBe(true);
     expect(await operatorRowsOf(person.id)).toEqual([
       {
-        act: "people.operator.granted",
+        action: "people.operator.granted",
         actor: IDENTITY_ACTOR,
         subject_id: person.id,
         detail: {},
@@ -175,7 +175,7 @@ describe("operator — the mark an ops command sets and clears", () => {
       lines: [`operator: done — ${person.email.toUpperCase()} is no longer the operator`],
     });
     expect(await markHeldBy(person.id)).toBe(false);
-    expect((await operatorRowsOf(person.id)).map((row) => [row.act, row.actor])).toEqual([
+    expect((await operatorRowsOf(person.id)).map((row) => [row.action, row.actor])).toEqual([
       ["people.operator.granted", IDENTITY_ACTOR],
       ["people.operator.revoked", IDENTITY_ACTOR],
     ]);
@@ -388,7 +388,7 @@ describe("the console, the operator's alone", () => {
 describe("ending every sign-in and token everywhere, from the console", () => {
   const revocationRowsOf = async (personId: string) => {
     const found = await app().database.superuser.query(
-      `SELECT action AS act, actor, subject_id, detail FROM identity_audit_event
+      `SELECT action, actor, subject_id, detail FROM identity_audit_event
         WHERE subject_id = $1 AND action = 'people.person.credentials_revoked'`,
       [personId],
     );
@@ -439,7 +439,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
     ]).toEqual([401, 401, 400, 400]);
     expect(await revocationRowsOf(person.id)).toEqual([
       {
-        act: "people.person.credentials_revoked",
+        action: "people.person.credentials_revoked",
         actor: `human:${operators.admin.id}`,
         subject_id: person.id,
         detail: {
@@ -572,7 +572,7 @@ describe("correcting a flagged display name, from the console", () => {
 
   const correctionRowsOf = async (personId: string) => {
     const found = await app().database.superuser.query(
-      `SELECT action AS act, actor, subject_id, detail FROM identity_audit_event
+      `SELECT action, actor, subject_id, detail FROM identity_audit_event
         WHERE subject_id = $1 AND action = 'people.person.renamed'`,
       [personId],
     );
@@ -620,7 +620,7 @@ describe("correcting a flagged display name, from the console", () => {
     expect(await waitingFor(api, person.id)).toEqual([]);
     expect(await correctionRowsOf(person.id)).toEqual([
       {
-        act: "people.person.renamed",
+        action: "people.person.renamed",
         actor: `human:${workspace.admin.id}`,
         subject_id: person.id,
         detail: {},

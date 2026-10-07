@@ -4,10 +4,10 @@ import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
 import {
-  ACCOUNT_ACTS,
+  ACCOUNT_ACTIONS,
   ACCOUNT_HEADING,
   ACCOUNT_WORDS,
-  ACT_LANDED,
+  ACTION_LANDED,
   AUTHENTICATOR_WORDS,
   codesLeft,
   RECOVERY_CODE_WORDS,
@@ -39,7 +39,7 @@ import {
   saysItsSentenceNotItsWord,
   signIn,
   signedInAtHome,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 /** A recovery code as the api mints it: four groups of four, none of them easy to misread. */
@@ -141,7 +141,7 @@ test("an Editor sets up an authenticator from the avatar menu", async ({ page, r
     "a code is not one the api mints",
   ).toBe(true);
   await expect(page.getByRole("status").filter({ hasText: AUTHENTICATOR_WORDS.held })).toHaveText(
-    ACT_LANDED.setUp(email),
+    ACTION_LANDED.setUp(email),
   );
   await expect(
     codesBlock(page).getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading }),
@@ -171,7 +171,7 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
     reads: CODES_NOT_TICKED.why,
   });
   await page.keyboard.press("Enter");
-  await theActLandedWithinItsBudget(page, "unticked done");
+  await theActionLandedWithinItsBudget(page, "unticked done");
   await expect(codesBlock(page).getByRole("alert")).toHaveText(sentenceOf(CODES_NOT_TICKED));
   await expect(savedBox(page)).toBeFocused();
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
@@ -232,8 +232,8 @@ test("the keystroke list drops Set up once the setup opens", async ({ page, requ
   await setupOpened(page);
 
   const listed = await keystrokesListed(page, ACCOUNT_HEADING);
-  await expect(listed).toContainText(ACCOUNT_ACTS.copyKey);
-  await expect(listed).not.toContainText(ACCOUNT_ACTS.setUp);
+  await expect(listed).toContainText(ACCOUNT_ACTIONS.copyKey);
+  await expect(listed).not.toContainText(ACCOUNT_ACTIONS.setUp);
   await keystrokesDismissed(page, listed);
 });
 
@@ -273,7 +273,7 @@ test("a member removes their authenticator through its dialog", async ({ page, r
   await dialog.getByRole("button", { name: AUTHENTICATOR_WORDS.removeCommit }).click();
 
   await expect(page.getByRole("status").filter({ hasText: email })).toHaveText(
-    ACT_LANDED.removed(email),
+    ACTION_LANDED.removed(email),
   );
   await expect(authenticatorPart(page)).toContainText(AUTHENTICATOR_WORDS.none);
   await expect(setUpButton(page)).toBeFocused();
@@ -292,7 +292,7 @@ test("replacing the recovery codes shows a new set", async ({ page, request }) =
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
   await expect(codesBlock(page)).toContainText(RECOVERY_CODE_WORDS.replacedLine);
   await expect(page.getByRole("status").filter({ hasText: email })).toHaveText(
-    ACT_LANDED.replaced(email),
+    ACTION_LANDED.replaced(email),
   );
   const second = await codesListed(page).allInnerTexts();
   expect(

@@ -58,7 +58,7 @@ const features = tableFeatures({});
 
 const column = createColumnHelper<typeof features, GroupRow>();
 
-type GroupActs = {
+type GroupActions = {
   readonly open: (groupId: string) => void;
   readonly focusedOn: (groupId: string) => void;
   /** The group just created: its button takes focus as it arrives. */
@@ -69,22 +69,22 @@ const focusOnArrival = (button: HTMLButtonElement | null) => {
   button?.focus();
 };
 
-function GroupCell(properties: { readonly row: GroupRow; readonly acts: GroupActs }) {
-  const { row, acts } = properties;
+function GroupCell(properties: { readonly row: GroupRow; readonly actions: GroupActions }) {
+  const { row, actions } = properties;
   if (row.group === undefined) return <span className="font-medium">{row.name}</span>;
   const groupId = row.group.id;
   return (
     <Button
-      ref={groupId === acts.landOn ? focusOnArrival : undefined}
+      ref={groupId === actions.landOn ? focusOnArrival : undefined}
       id={groupButtonId(groupId)}
       variant="link"
       aria-haspopup="dialog"
       className="h-auto p-0 text-left font-medium whitespace-normal text-foreground"
       onFocus={() => {
-        acts.focusedOn(groupId);
+        actions.focusedOn(groupId);
       }}
       onClick={() => {
-        acts.open(groupId);
+        actions.open(groupId);
       }}
     >
       {row.name}
@@ -92,12 +92,12 @@ function GroupCell(properties: { readonly row: GroupRow; readonly acts: GroupAct
   );
 }
 
-/** The group's own cell opens it, so its acts ride into the columns. */
-const columnsFor = (acts: GroupActs) =>
+/** The group's own cell opens it, so its actions ride into the columns. */
+const columnsFor = (actions: GroupActions) =>
   column.columns([
     column.accessor("name", {
       header: "Group",
-      cell: ({ row }) => <GroupCell row={row.original} acts={acts} />,
+      cell: ({ row }) => <GroupCell row={row.original} actions={actions} />,
     }),
     column.accessor("memberCount", {
       header: "Members",
@@ -138,7 +138,7 @@ function CreateGroupForm(properties: {
 
   return (
     <form
-      aria-label={CREATE_KEYSTROKE.act}
+      aria-label={CREATE_KEYSTROKE.action}
       onSubmit={submit}
       className="flex flex-wrap items-end gap-2 border-b border-border p-3"
     >

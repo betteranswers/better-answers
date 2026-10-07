@@ -2,10 +2,10 @@ import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareActs, record } from "../audit/index.ts";
+import { action, declareActions, record } from "../audit/index.ts";
 import {
   admit,
-  declareAct,
+  declareAction,
   err,
   ok,
   type AdminUserPrincipal,
@@ -24,18 +24,18 @@ import { leavesNoAdmin, withMemberHeld, type HeldRefusal } from "./last-admin.ts
 import { memberKeyed } from "./member-list.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-const ROLE_ACTS = declareActs("people", {
-  roleChanged: act("people.member.role_changed", { previousRole: "role", role: "role" }),
+const ROLE_ACTIONS = declareActions("people", {
+  roleChanged: action("people.member.role_changed", { previousRole: "role", role: "role" }),
 });
 
 const ROLE = boundarySchemas.member.select.shape.role;
 
-/** The role is any text, so a role outside the three reaches the act and is refused in its word. */
+/** The role is any text, so a role outside the three reaches the action and is refused in its word. */
 export const changeRoleInput = memberKeyed.extend({ role: z.string() });
 
 export type ChangeRoleInput = z.output<typeof changeRoleInput>;
 
-const changeRoleAct = declareAct({
+const changeRoleAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: changeRoleInput,
   refuses: ["role-forbids", "no-such-role", "no-such-member", "last-admin", "changed-meanwhile"],
@@ -74,7 +74,7 @@ const roleWrittenBy = async (
   ]);
   await record(actor, tx, {
     id: ulid(),
-    act: ROLE_ACTS.roleChanged,
+    action: ROLE_ACTIONS.roleChanged,
     subjectId: changed.personId,
     detail: { previousRole: changed.previousRole, role: changed.role },
     batchId,
@@ -83,7 +83,7 @@ const roleWrittenBy = async (
 };
 
 /**
- * A step on a member row its act holds: the role moves, and its audit event lands in `batchId`.
+ * A step on a member row its action holds: the role moves, and its audit event lands in `batchId`.
  * True when the move made the person hold a second factor for the first time.
  */
 export const roleWritten = (
@@ -116,7 +116,7 @@ export const roleWrittenByPlatform = async (
 };
 
 const roleSetUnderTheLock = (
-  admin: AdmittedOf<typeof changeRoleAct>,
+  admin: AdmittedOf<typeof changeRoleAction>,
   tx: Tx,
   asked: Asked,
 ): Promise<Result<RoleMoved, MemberRefusal<"last-admin"> | HeldRefusal | Error>> =>
@@ -138,7 +138,7 @@ export const changeRole = async (
   tx: Tx,
   input: ChangeRoleInput,
 ): Promise<Result<RoleMoved, ChangeRoleRefusal>> => {
-  const admitted = admit(changeRoleAct, principal, input);
+  const admitted = admit(changeRoleAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const role = ROLE.safeParse(input.role);
   if (!role.success) return err("no-such-role");

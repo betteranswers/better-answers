@@ -6,7 +6,7 @@ import {
   INVITATION_WAITING_STATUS,
 } from "@better-answers/schema";
 
-import { act, declareActs, recordFor } from "../audit/index.ts";
+import { action, declareActions, recordFor } from "../audit/index.ts";
 import {
   actorIdOfPerson,
   attempt,
@@ -29,8 +29,8 @@ import {
 import { hasNoDisplayName, promoting, type WORKSPACE_REFUSALS } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-const JOINING_ACTS = declareActs("people", {
-  joined: act("people.member.joined", { invitationId: "id", role: "role" }),
+const JOINING_ACTIONS = declareActions("people", {
+  joined: action("people.member.joined", { invitationId: "id", role: "role" }),
 });
 
 /** Borrowed from the workspaces slice, whose words they are: adding a member refuses them too. */
@@ -310,7 +310,7 @@ const join = async (
   await recordFor(platform, tx, {
     id: ulid(),
     actor: actorIdOfPerson(joining.personId),
-    act: JOINING_ACTS.joined,
+    action: JOINING_ACTIONS.joined,
     subjectId: joining.personId,
     detail: { invitationId: joining.invitationId, role },
   });

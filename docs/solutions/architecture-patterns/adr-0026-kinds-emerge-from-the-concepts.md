@@ -52,7 +52,7 @@ A kind is an indexed property on the one `Concept` label, never a label of its o
 - A per-tenant vocabulary file, authoritative and checked closed-world (ADR 0001): a list restating the concept files, and an Admin tending a registry.
 - An optional `types:`-only file for definitions: a definition is knowledge, and a `Term` concept holds it.
 - Typed relations from a relations list with sentence matching: silently wrong on shared kind pairs, and a registry someone maintains.
-- Closed-world tags with a platform-written tier tag: a rule with no act.
+- Closed-world tags with a platform-written tier tag: a rule with no action.
 - A concept alias as a `concept_identity` row only: the alias leaves with nothing on export.
 - The two bookkeeping edges as properties: a supersession or lineage walk becomes a property scan.
 

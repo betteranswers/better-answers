@@ -32,7 +32,7 @@ imports `radix-ui` as this directory's other primitives do, so the table names t
 digests were taken that day and its arrival edits are listed below with the others.
 
 T-406 added `alert-dialog` on **26 September 2026** with the same CLI, `shadcn@4.20.1`, for the
-confirmation before a group is deleted: deleting cannot be undone, which is the one act the
+confirmation before a group is deleted: deleting cannot be undone, which is the one action the
 register gives a modal to. The CLI served it from the `new-york-v4` style, as it did the radio
 group. Its two digests were taken that day and its arrival edits are listed below with the others.
 
@@ -280,8 +280,8 @@ The arrival edits on the four Kibo UI patterns, which are demonstrations rather 
 - `empty-action.tsx` is the one shape `empty-actions-1`, `empty-search-2` and `empty-standard-6`
   share (a title, an optional description and an optional action), set left-aligned at the table's
   density instead of centred at `md:p-12`; the media slot was dropped.
-- `row-actions.tsx` takes its acts as a list, puts a separator before the first destructive one,
-  and names its trigger through a prop, so every row's trigger says whose acts it holds.
+- `row-actions.tsx` takes its actions as a list, puts a separator before the first destructive one,
+  and names its trigger through a prop, so every row's trigger says whose actions it holds.
 - `counted-switch.tsx` keeps `tabs-advanced-1`'s look (a segment and its count) on the installed
   `radio-group` rather than `tabs`: the owner chose a switch over status tabs, and a tab list with
   no panels leaves each trigger's `aria-controls` pointing nowhere. The count is Kibo's `Pill`, not
@@ -299,8 +299,8 @@ The edits made on 1 October 2026, after review, on five of the files above:
 - `kibo-ui/counted-switch.tsx`: the focus ring stays on the segment's span and the checked
   elevation moved to a span inside it. Two shadow utilities on one element set one property, so a
   checked segment could lose its focus ring.
-- `kibo-ui/row-actions.tsx`: the destructive acts are drawn after the rest, below one separator,
-  each group in the order the caller gave. A separator placed before the first destructive act
+- `kibo-ui/row-actions.tsx`: the destructive actions are drawn after the rest, below one separator,
+  each group in the order the caller gave. A separator placed before the first destructive action
   left a leading or interleaved one among the others.
 
 The arrival edits on `qr-code`:

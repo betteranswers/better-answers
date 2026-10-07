@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { DECLARED_ACTS } from "@/features/people/audit-acts.ts";
+import { DECLARED_ACTIONS } from "@/features/people/audit-actions.ts";
 import { detailLinesOf } from "@/features/people/audit-details.ts";
 import {
-  ACTS_HEADED,
-  ACTS_SAID,
+  ACTIONS_HEADED,
+  ACTIONS_SAID,
   headlineOf,
   sentenceOf,
   type SaidEvent,
@@ -22,7 +22,9 @@ const PRIYA = {
   address: "priya@example.invalid",
 } as const;
 
-const byHannah = (event: Pick<SaidEvent, "act" | "subject"> & Partial<SaidEvent>): SaidEvent => ({
+const byHannah = (
+  event: Pick<SaidEvent, "action" | "subject"> & Partial<SaidEvent>,
+): SaidEvent => ({
   by: HANNAH,
   detail: {},
   named: {},
@@ -32,7 +34,7 @@ const byHannah = (event: Pick<SaidEvent, "act" | "subject"> & Partial<SaidEvent>
 describe("an audit event's sentence", () => {
   it("says a role change with both people named", () => {
     const changed = byHannah({
-      act: "people.member.role_changed",
+      action: "people.member.role_changed",
       subject: PRIYA,
       detail: { previousRole: "Viewer", role: "Editor" },
     });
@@ -42,7 +44,7 @@ describe("an audit event's sentence", () => {
 
   it("says a deleted group for a group since deleted", () => {
     const added = byHannah({
-      act: "people.group.member_added",
+      action: "people.group.member_added",
       subject: { kind: "deleted-group" },
       detail: { userId: "01J6AAAAAAAAAAAAAAAAAAAAAA" },
       named: { userId: PRIYA },
@@ -53,7 +55,7 @@ describe("an audit event's sentence", () => {
 
   it("names a group as it stands now", () => {
     const renamed = byHannah({
-      act: "people.group.renamed",
+      action: "people.group.renamed",
       subject: { kind: "group", name: "Bid team" },
     });
 
@@ -62,7 +64,7 @@ describe("an audit event's sentence", () => {
 
   it("names an erased person a former member", () => {
     const removed = byHannah({
-      act: "people.member.removed",
+      action: "people.member.removed",
       subject: { kind: "former-member" },
       detail: { role: "Editor", grants: [] },
     });
@@ -72,7 +74,7 @@ describe("an audit event's sentence", () => {
 
   it("names an invitation by its address", () => {
     const invited = byHannah({
-      act: "people.invitation.created",
+      action: "people.invitation.created",
       subject: { kind: "invitation", address: "jo.bloggs@example.invalid" },
       detail: { role: "Viewer" },
     });
@@ -84,7 +86,7 @@ describe("an audit event's sentence", () => {
 
   it("says an invitation erasure deleted without an address", () => {
     const invited = byHannah({
-      act: "people.invitation.created",
+      action: "people.invitation.created",
       subject: { kind: "erased-invitation" },
       detail: { role: "Viewer" },
     });
@@ -94,7 +96,7 @@ describe("an audit event's sentence", () => {
 
   it("says a replaced invitation was replaced, not cancelled", () => {
     const replaced = byHannah({
-      act: "people.invitation.cancelled",
+      action: "people.invitation.cancelled",
       subject: { kind: "invitation", address: "jo.bloggs@example.invalid" },
       detail: { replacedByInvitationId: "01J6BBBBBBBBBBBBBBBBBBBBBB" },
     });
@@ -106,14 +108,14 @@ describe("an audit event's sentence", () => {
 
   it("capitalises the platform or a former member as the actor", () => {
     const provisioned: SaidEvent = {
-      act: "platform.workspace.provisioned",
+      action: "platform.workspace.provisioned",
       by: { kind: "platform" },
       subject: null,
       detail: { role: "Admin" },
       named: {},
     };
     const created: SaidEvent = {
-      act: "people.group.created",
+      action: "people.group.created",
       by: { kind: "former-member" },
       subject: { kind: "group", name: "Bid writers" },
       detail: {},
@@ -126,7 +128,7 @@ describe("an audit event's sentence", () => {
 
   it("never changes the case of a person's display name", () => {
     const signedIn: SaidEvent = {
-      act: "people.person.signed_in",
+      action: "people.person.signed_in",
       by: { kind: "person", displayName: "dj okoro", address: "dj@example.invalid" },
       subject: { kind: "person", displayName: "dj okoro", address: "dj@example.invalid" },
       detail: {},
@@ -137,15 +139,15 @@ describe("an audit event's sentence", () => {
   });
 
   it("reads an unknown action by its stored name in words", () => {
-    const unknown = byHannah({ act: "people.probe.unheard_of", subject: null });
+    const unknown = byHannah({ action: "people.probe.unheard_of", subject: null });
 
     expect(sentenceOf(unknown)).toBe("Probe unheard of");
   });
 });
 
 describe("a second factor's audit sentence", () => {
-  const ofHerself = (act: SaidEvent["act"], detail: SaidEvent["detail"] = {}): SaidEvent =>
-    byHannah({ act, subject: HANNAH, detail });
+  const ofHerself = (action: SaidEvent["action"], detail: SaidEvent["detail"] = {}): SaidEvent =>
+    byHannah({ action, subject: HANNAH, detail });
 
   it("names the factor a confirmation used", () => {
     expect(
@@ -176,7 +178,7 @@ describe("a second factor's audit sentence", () => {
 
   it("says the platform restored a person's sign-in", () => {
     const restored: SaidEvent = {
-      act: "people.person.sign_in_restored",
+      action: "people.person.sign_in_restored",
       by: { kind: "platform" },
       subject: PRIYA,
       detail: {},
@@ -190,9 +192,9 @@ describe("a second factor's audit sentence", () => {
 describe("an audit event in today's words", () => {
   const HANDBOOK = { kind: "connected-source", name: "Staff handbook" } as const;
 
-  it("says a connected source published, whatever its stored act name", () => {
+  it("says a connected source published, whatever its stored action name", () => {
     const published = byHannah({
-      act: "sources.binding.published",
+      action: "sources.binding.published",
       subject: HANDBOOK,
       detail: { bindingId: "01J6CCCCCCCCCCCCCCCCCCCCCC" },
       named: { bindingId: HANDBOOK },
@@ -201,12 +203,12 @@ describe("an audit event in today's words", () => {
     expect(sentenceOf(published)).toBe(
       "Hannah Wright published the connected source Staff handbook",
     );
-    expect(headlineOf(published.act)).toBe("Connected source published");
+    expect(headlineOf(published.action)).toBe("Connected source published");
   });
 
   it("says a connected source since removed by its kind", () => {
     const widened = byHannah({
-      act: "sources.binding.widened",
+      action: "sources.binding.widened",
       subject: { kind: "removed", of: "connected-source" },
     });
 
@@ -215,7 +217,7 @@ describe("an audit event in today's words", () => {
 
   it("says the platform for an action no person took", () => {
     const swept: SaidEvent = {
-      act: "platform.graph.swept",
+      action: "platform.graph.swept",
       by: { kind: "platform" },
       subject: null,
       detail: { generation: 3, nodes: 10, edges: 4 },
@@ -227,7 +229,7 @@ describe("an audit event in today's words", () => {
 
   it("names a person with no display name by their address", () => {
     const signedIn = byHannah({
-      act: "people.person.signed_in",
+      action: "people.person.signed_in",
       by: { kind: "person", displayName: "", address: "new.starter@example.invalid" },
       subject: null,
     });
@@ -237,10 +239,10 @@ describe("an audit event in today's words", () => {
 
   it("says no stored action name, actor id or person id", () => {
     const actorId = `human:${"01J6DDDDDDDDDDDDDDDDDDDDDD"}`;
-    const said = DECLARED_ACTS.map((act) =>
+    const said = DECLARED_ACTIONS.map((action) =>
       sentenceOf(
         byHannah({
-          act,
+          action,
           subject: PRIYA,
           detail: { userId: "01J6DDDDDDDDDDDDDDDDDDDDDD", role: "Editor" },
           named: { userId: PRIYA },
@@ -325,20 +327,22 @@ describe("an audit event's detail in today's words", () => {
 
 describe("the sentences against the actions core declares", () => {
   it("says every action declared across the four families", () => {
-    const unsaid = DECLARED_ACTS.filter((act) => !ACTS_SAID.includes(act));
+    const unsaid = DECLARED_ACTIONS.filter((action) => !ACTIONS_SAID.includes(action));
 
     expect(unsaid, "declared actions with no sentence").toEqual([]);
   });
 
   it("heads every action declared across the four families", () => {
-    const unheaded = DECLARED_ACTS.filter((act) => !ACTS_HEADED.includes(act));
+    const unheaded = DECLARED_ACTIONS.filter((action) => !ACTIONS_HEADED.includes(action));
 
     expect(unheaded, "declared actions with no headline").toEqual([]);
   });
 
   it("says no action core never declared", () => {
-    const declared: readonly string[] = DECLARED_ACTS;
-    const undeclared = [...ACTS_SAID, ...ACTS_HEADED].filter((act) => !declared.includes(act));
+    const declared: readonly string[] = DECLARED_ACTIONS;
+    const undeclared = [...ACTIONS_SAID, ...ACTIONS_HEADED].filter(
+      (action) => !declared.includes(action),
+    );
 
     expect(undeclared, "words for actions no slice declares").toEqual([]);
   });

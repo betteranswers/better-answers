@@ -91,7 +91,7 @@ upper-case is the micro-label at 11px with 0.06em tracking). Proper nouns keep t
 Control Centre, Admin, Editor, Viewer, Answer (the concept kind), Restricted, Internal, Public.
 
 **Consequence before the click.** Every action states its effect in its label or the line
-beside it, in view before the reader acts: "Accept 12 concepts", "Save as an Answer", "One
+beside it, in view before the reader clicks: "Accept 12 concepts", "Save as an Answer", "One
 governed write."
 
 **Dates and numbers.** UK long form — 3 March 2026; with time, 09:41 · 30 August 2026.
@@ -244,7 +244,7 @@ cards, no translucent panels.
 
 **Disclosure, not layers.** First view shows what is needed to judge, one
 disclosure reveals more, the action sits beside it. Two levels for a Viewer, never three.
-A modal exists only for an irreversible act.
+A modal exists only for an irreversible action.
 
 **Imagery.** None. The product ships no photography or illustration; a page with nothing
 to show says so in words.

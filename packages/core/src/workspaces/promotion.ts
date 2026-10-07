@@ -5,7 +5,7 @@ import { ADMIN, mustHoldOneOf } from "./second-factor.ts";
 const REQUIRED = `SELECT ${mustHoldOneOf("u")} AS required FROM "user" u WHERE u.id = $1`;
 
 /**
- * Called inside the act making the person an Admin or the operator, before its own write. One
+ * Called inside the action making the person an Admin or the operator, before its own write. One
  * who needed no second factor until now has every session's confirmation and pending hour
  * cleared, and is marked promoted until they first confirm. True when so.
  */

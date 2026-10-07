@@ -94,7 +94,7 @@
     "anti-slop/no-unsafe-dictionary-type": "warn",
     "anti-slop/no-runtime-typeof": "off",
     "anti-slop/no-shape-in-symbol-names": "off",
-    "better-answers/act-admits-before-await": "error",
+    "better-answers/action-admits-before-await": "error",
     "better-answers/comment-only-the-why": "error",
     "better-answers/declaration-doc-block": "error",
     "better-answers/string-cites-nothing": "error",
@@ -215,7 +215,7 @@
               {
                 "name": "../e2e/harness.ts",
                 "allowImportNames": ["codeSentTo"],
-                "message": "The journeys run against production, where the harness does not exist: they take no harness act. `codeSentTo` alone is allowed, as the code source for a run by hand against the browser suite's api."
+                "message": "The journeys run against production, where the harness does not exist: they take no harness action. `codeSentTo` alone is allowed, as the code source for a run by hand against the browser suite's api."
               }
             ],
             "patterns": [

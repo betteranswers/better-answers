@@ -6,7 +6,7 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { sentenceOf } from "./audit-sentences.ts";
 import { EventDays, useLanding } from "./event-days.tsx";
-import { ACTIVITY_WORDS as WORDS } from "./member-act-words.ts";
+import { ACTIVITY_WORDS as WORDS } from "./member-action-words.ts";
 import { useActivity, type ActivityEvent, type ListedMember } from "./people-api.ts";
 import { MEMBER_PAGE_KEYSTROKES as KEY } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
@@ -23,7 +23,7 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
   );
 
   if (events.length === 0) {
-    return <ListState state={{ kind: "empty", words: WORDS.none(name), act: undefined }} />;
+    return <ListState state={{ kind: "empty", words: WORDS.none(name), action: undefined }} />;
   }
 
   const showOlder = () => {
@@ -67,7 +67,7 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
 const streamStands = (activity: Activity): boolean =>
   activity.error === null || activity.data?.pages.some((page) => page.events.length > 0) === true;
 
-/** The acts the member took and the acts done to them, in one stream, read a page at a time. */
+/** The actions the member took and the actions done to them, in one stream, read a page at a time. */
 export function MemberActivity(properties: {
   readonly member: ListedMember;
   readonly heading: RefObject<HTMLHeadingElement | null>;

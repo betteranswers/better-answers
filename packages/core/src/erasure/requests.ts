@@ -6,7 +6,7 @@ import {
   SUBJECT_IDENTIFIER_KINDS,
 } from "@better-answers/schema";
 
-import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
+import { action, declareActions, record, type DetailOf } from "../audit/index.ts";
 import {
   attempt,
   err,
@@ -21,14 +21,14 @@ import type { Tx } from "../store/postgres/index.ts";
 import { floorNotCleared } from "./identifiers.ts";
 import { IDENTIFIER_TOO_BROAD, type ErasureRefusal } from "./vocabulary.ts";
 
-const SUBJECT_REQUEST_ACTS = declareActs("people", {
-  received: act("people.subject_request.received", {
+const SUBJECT_REQUEST_ACTIONS = declareActions("people", {
+  received: action("people.subject_request.received", {
     personId: "id?",
     identifierCount: "count",
   }),
 });
 
-type ReceivedDetail = DetailOf<(typeof SUBJECT_REQUEST_ACTS)["received"]["detail"]>;
+type ReceivedDetail = DetailOf<(typeof SUBJECT_REQUEST_ACTIONS)["received"]["detail"]>;
 
 export type SubjectRequest = z.infer<typeof boundarySchemas.subjectRequest.select>;
 
@@ -175,7 +175,7 @@ export const recordSubjectRequest = async (
 
   await record(admin.value, tx, {
     id: auditEventId,
-    act: SUBJECT_REQUEST_ACTS.received,
+    action: SUBJECT_REQUEST_ACTIONS.received,
     subjectId: requestId,
     detail,
   });

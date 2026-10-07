@@ -11,7 +11,12 @@ import { RowMenu } from "@/shared/row-menu.tsx";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
 import { useHiddenColumns } from "@/shared/wide-layout.ts";
 
-import { InvitationBulkActs, NONE, useInvitationActs, type Ticked } from "./invitation-acts.tsx";
+import {
+  InvitationBulkActions,
+  NONE,
+  useInvitationActions,
+  type Ticked,
+} from "./invitation-actions.tsx";
 import {
   columnsUnder,
   INVITATION_COLUMNS,
@@ -128,7 +133,7 @@ function NoneShown(properties: {
   if (narrowed.search === "") {
     return (
       <ListState
-        state={{ kind: "empty", words: WORDS.noneIn[narrowed.state.status], act: undefined }}
+        state={{ kind: "empty", words: WORDS.noneIn[narrowed.state.status], action: undefined }}
       />
     );
   }
@@ -181,28 +186,28 @@ const useInFocusKeystrokes = (properties: {
   readonly nothingInFocus: () => void;
 }) => {
   const { inFocus, nothingInFocus } = properties;
-  const onTheRowInFocus = (act: (invitation: ListedInvitation) => void) => () => {
+  const onTheRowInFocus = (action: (invitation: ListedInvitation) => void) => () => {
     if (inFocus === undefined) nothingInFocus();
-    else act(inFocus);
+    else action(inFocus);
   };
   useKeystroke(KEY.resend, onTheRowInFocus(properties.resend));
   useKeystroke(KEY.cancel, onTheRowInFocus(properties.cancel));
   useKeystroke(KEY.tickInvitation, onTheRowInFocus(properties.tick));
 };
 
-/** An act that takes its row away hands focus to the list once the menu has shut. */
+/** An action that takes its row away hands focus to the list once the menu has shut. */
 const rowMenuOf =
-  (acts: ReturnType<typeof useInvitationActs>, heading: RefObject<HTMLElement | null>) =>
+  (actions: ReturnType<typeof useInvitationActions>, heading: RefObject<HTMLElement | null>) =>
   (invitation: ListedInvitation) => {
     const toTheList = () => heading.current;
     return (
       <RowMenu
         name={invitation.address}
-        acts={[
+        actions={[
           {
             label: WORDS.resend,
             onSelect: () => {
-              acts.resendOne(invitation);
+              actions.resendOne(invitation);
             },
             focusAfter: invitation.status === "expired" ? toTheList : undefined,
           },
@@ -210,7 +215,7 @@ const rowMenuOf =
             label: WORDS.cancel,
             destructive: true,
             onSelect: () => {
-              acts.cancelOne(invitation);
+              actions.cancelOne(invitation);
             },
             focusAfter: toTheList,
           },
@@ -219,13 +224,13 @@ const rowMenuOf =
     );
   };
 
-/** Ticks and an act's outcome are the page's; what narrows the rows is the address's. */
+/** Ticks and an action's outcome are the page's; what narrows the rows is the address's. */
 function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingElement | null> }) {
   const { heading } = properties;
   const narrowed = useNarrowedInvitations();
   const { read, listed, state } = narrowed;
   const actable = isActable(state.status);
-  // A tick outlives its row and its status, so the next act refuses or skips it and says so.
+  // A tick outlives its row and its status, so the next action refuses or skips it and says so.
   const [ticked, setTicked] = useState<Ticked>(NONE);
   const [inFocusId, setInFocusId] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
@@ -245,7 +250,7 @@ function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingEle
   const tickedIds = new Set(ticked.keys());
   const tick = tickedFrom(ticked, listed);
 
-  const acts = useInvitationActs({
+  const actions = useInvitationActions({
     readable: read.isSuccess,
     ticked,
     tick: setTicked,
@@ -256,8 +261,8 @@ function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingEle
 
   useInFocusKeystrokes({
     inFocus: listed.find((invitation) => invitation.invitationId === inFocusId),
-    resend: acts.resendOne,
-    cancel: acts.cancelOne,
+    resend: actions.resendOne,
+    cancel: actions.cancelOne,
     tick: (invitation) => {
       const next = new Set(tickedIds);
       if (!next.delete(invitation.invitationId)) next.add(invitation.invitationId);
@@ -300,7 +305,7 @@ function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingEle
             }}
             focusAfterClear={heading}
           >
-            <InvitationBulkActs acts={acts} />
+            <InvitationBulkActions actions={actions} />
           </SelectionBar>
           <GridTable
             table={table}
@@ -318,7 +323,7 @@ function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingEle
                 : undefined
             }
             hidden={columnsUnder(state.status, hidden).hidden}
-            rowMenu={actable ? rowMenuOf(acts, heading) : undefined}
+            rowMenu={actable ? rowMenuOf(actions, heading) : undefined}
             onRowFocus={(invitation) => {
               setInFocusId(invitation?.invitationId);
             }}
@@ -350,7 +355,7 @@ export function InvitationsTab() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      {/* Focusable, so focus lands here when an act takes the row it was in. */}
+      {/* Focusable, so focus lands here when an action takes the row it was in. */}
       <h2 id={headingId} ref={heading} tabIndex={-1}>
         Invitations
       </h2>

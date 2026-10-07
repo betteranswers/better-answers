@@ -19,18 +19,18 @@ const PERSON_ID = boundarySchemas.user.select.shape.id;
 
 const ADMIN = "Admin" satisfies Role;
 
-/** What an Admin-only act's admission hands on, so the step judges no one. */
+/** What an Admin-only action's admission hands on, so the step judges no one. */
 type AnAdmin = UserPrincipal & { readonly role: typeof ADMIN };
 
 export type HeldMember = {
   readonly role: Role;
 
-  /** Counted under the same lock, so it cannot move before the act commits. */
+  /** Counted under the same lock, so it cannot move before the action commits. */
   readonly admins: number;
 };
 
 /**
- * Held until commit, so of two acts that would each leave one Admin, the second counts what the
+ * Held until commit, so of two actions that would each leave one Admin, the second counts what the
  * first left.
  */
 const HELD_ADMINS = `SELECT user_id FROM member WHERE workspace_id = $1 AND role = $2
@@ -83,7 +83,7 @@ type HeldSet = {
   readonly admins: readonly UserId[];
 };
 
-/** One statement, in person id order, so two acts holding overlapping sets take them alike. */
+/** One statement, in person id order, so two actions holding overlapping sets take them alike. */
 const HELD_MEMBERS = `SELECT user_id, role FROM member
                        WHERE workspace_id = $1 AND user_id = ANY($2::text[])
                        ORDER BY user_id FOR UPDATE`;

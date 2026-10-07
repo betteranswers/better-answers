@@ -1,6 +1,6 @@
 import { eslintCompatPlugin } from "@oxlint/plugins";
 
-import { actAdmitsBeforeAwaitRule } from "./rules/act-admits-before-await.ts";
+import { actionAdmitsBeforeAwaitRule } from "./rules/action-admits-before-await.ts";
 import { commentOnlyTheWhyRule } from "./rules/comment-only-the-why.ts";
 import { declarationDocBlockRule } from "./rules/declaration-doc-block.ts";
 import { importDirectionRule } from "./rules/import-direction.ts";
@@ -11,7 +11,7 @@ import { stringCitesNothingRule } from "./rules/string-cites-nothing.ts";
 const betterAnswersPlugin = eslintCompatPlugin({
   meta: { name: "better-answers" },
   rules: {
-    "act-admits-before-await": actAdmitsBeforeAwaitRule,
+    "action-admits-before-await": actionAdmitsBeforeAwaitRule,
     "comment-only-the-why": commentOnlyTheWhyRule,
     "declaration-doc-block": declarationDocBlockRule,
     "import-direction": importDirectionRule,

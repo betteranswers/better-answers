@@ -178,7 +178,7 @@ const FIRST_PART = new TextEncoder().encode("The handbook says ");
 const LAST_PART = new TextEncoder().encode("what the company decided.");
 
 /**
- * Each read of this body past its first part waits for the test, so the act can be caught
+ * Each read of this body past its first part waits for the test, so the action can be caught
  * mid-stream.
  */
 const heldOpenBody = () => {
@@ -360,7 +360,7 @@ describe("the upload, one mutation over the split link", () => {
   });
 });
 
-describe("ten concurrent uploads, whose act opens its own transaction", () => {
+describe("ten concurrent uploads, whose action opens its own transaction", () => {
   it("holds at most one pooled connection each, none while streaming", async () => {
     const { client } = await anAdmin();
     const { pool } = app.doors.postgres;

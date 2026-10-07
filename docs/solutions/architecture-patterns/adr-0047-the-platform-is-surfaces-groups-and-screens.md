@@ -37,9 +37,9 @@ The platform's navigation has four levels, and the code names them the same way:
 
 A page may also declare a **detail address**, one segment beneath its own, naming one of its rows. Members declares the first: a **member page** at `/people/members/<person>`. A detail address is the page's place, not a fifth level:
 
-- Nothing lists it. It is not in the rail, the menu, or jump-to's pages and acts. Jump-to's member results lead to it.
+- Nothing lists it. It is not in the rail, the menu, or jump-to's pages and actions. Jump-to's member results lead to it.
 - It is seen exactly where its page is seen, so a role that may not see Members gets the not-found page at a member page.
-- The frame draws it as its page: the same first heading, the same keystroke scope, and the page's entry in the menu marked current. It draws no toolbar, because the page's tabs and acts belong to the list.
+- The frame draws it as its page: the same first heading, the same keystroke scope, and the page's entry in the menu marked current. It draws no toolbar, because the page's tabs and actions belong to the list.
 - The breadcrumb's last part is the row's name, which the page gives from what it has read. It is never read from the address.
 - Only one segment is declared. Anything deeper names no place and shows the not-found page. A segment that is not a valid id, or an id the page holds no row for, draws a state inside the page that names no one and leads back to the page. A malformed id is asked about nowhere.
 - A detail page's sections have no address. They are regions of one page, reached by in-page links and keystrokes, so Back leaves the page and returns to the list as it was.
@@ -88,14 +88,14 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 **Who sees what.**
 
 - A person sees a page by their role, or by owning a collection the page serves. A group or an area with no page the person may see is hidden whole.
-- Owning a collection grants acts, so a Viewer may own one. Ownership lands with S3. Until then, visibility reads roles alone.
+- Owning a collection grants actions, so a Viewer may own one. Ownership lands with S3. Until then, visibility reads roles alone.
 - Waiting suggestions are decided in Control Centre › Suggestions › To decide. A person's Inbox holds their own items and points into it.
 - Control Centre is for Admins alone, so an Editor sees no Questions page there. An Editor who owns the `Answer` collection reaches its promotions through their Inbox. An Editor who owns nothing sees neither.
 - An area, group or page that is not built appears nowhere: not in the rail, the menu or jump-to.
 - A role's home always shows. Until it is built, it says plainly that it is on its way. Today that is Ask, for Editors and Viewers. An Admin's home is People › Members until Control Centre › Overview is built.
 - An address that is not built, or that the person may not see, shows the same not-found page as an address that never existed, and offers the person's home.
-- Whether a page is hidden is decided when the person arrives at it. A role that changes while they are on it takes effect at their next move, so an Admin who demotes themself still sees the act confirmed. While the role cannot be read, a page draws its own loading or failed state. A page reached in that state is decided when the role arrives, as though the person arrived then. From that point it keeps its verdict until their next move, like any other.
-- Hiding is navigation only. The api still refuses every act by role.
+- Whether a page is hidden is decided when the person arrives at it. A role that changes while they are on it takes effect at their next move, so an Admin who demotes themself still sees the action confirmed. While the role cannot be read, a page draws its own loading or failed state. A page reached in that state is decided when the role arrives, as though the person arrived then. From that point it keeps its verdict until their next move, like any other.
+- Hiding is navigation only. The api still refuses every action by role.
 
 **The console** stays the operator's separate area. It is reached from the workspace switcher, which lists it to the operator alone. It is a place, not an account setting.
 
@@ -103,7 +103,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 
 - **Overview**: Control Centre › Overview. The idea is taken, not the form: one line for each thing that needs attention, with its action, and no cards of counts.
 - **Runs**: a later Runs page in Agent Operations, for the producer's runs and the by-run revert.
-- **Approvals**: Control Centre › Suggestions in v0.1, because nothing platform-prepared lands without acceptance (ADR 0012). At Then, an Approvals page in Agent Operations holds the acts an agent asks to take in a connected system.
+- **Approvals**: Control Centre › Suggestions in v0.1, because nothing platform-prepared lands without acceptance (ADR 0012). At Then, an Approvals page in Agent Operations holds the actions an agent asks to take in a connected system.
 - **Evals**: Questions › Answer tests. *Eval* is never a page word.
 - **Flags**: no counterpart. A *flag* is a reader's feedback on an answer (ADR 0017).
 - **Memory**: no counterpart. The agents' only memory is the map, read and curated in Knowledge (ADR 0016).
@@ -120,7 +120,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 | Knowledge | none | Search (S2). Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
-| Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of acts an agent takes as the person |
+| Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of actions an agent takes as the person |
 | Control Centre | Connected sources. Models and spend. Members, Groups. Audit log | Overview, which no block names. To decide (S5). Cost estimates (S4). Publishing rules, Backlogs, Removed at source. Spending limit (S7). Questions asked, Answer tests (S2). Personal tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Share agents, with the share agent. Runs, Connected assistants, Settings. Then: feeds and systems read live in Sources, Approvals in Agent Operations |
 | Console | Everyone, Names waiting, Every workspace | none | The identity-set audit log |
 

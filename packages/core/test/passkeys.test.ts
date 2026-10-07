@@ -71,7 +71,7 @@ describe("recording a passkey added", () => {
     expect(recorded).toEqual({ ok: true, value: { passkeyId, stamped: true, issued: undefined } });
     expect(await confirmedAt(sessionId)).toEqual(AT);
     expect(await identitySetRowsFor(personId)).toEqual([
-      { act: "people.person.passkey_added", detail: { passkeyId } },
+      { action: "people.person.passkey_added", detail: { passkeyId } },
     ]);
   });
 
@@ -96,7 +96,7 @@ describe("recording a passkey added", () => {
     });
     expect(recorded.ok && recorded.value.issued?.recoveryCodes).toHaveLength(10);
     expect(await recoveryCodesHeldBy(adminUserId)).toBe(10);
-    expect((await identitySetRowsFor(adminUserId)).map((row) => row.act)).toEqual([
+    expect((await identitySetRowsFor(adminUserId)).map((row) => row.action)).toEqual([
       "people.person.passkey_added",
       "people.person.recovery_codes_issued",
     ]);
@@ -173,7 +173,7 @@ describe("renaming a passkey", () => {
     expect(renamed).toEqual({ ok: true, value: { passkeyId, name: "Work laptop" } });
     expect(await passkeysHeldBy(personId)).toEqual([{ id: passkeyId, name: "Work laptop" }]);
     expect(await identitySetRowsFor(personId)).toEqual([
-      { act: "people.person.passkey_renamed", detail: { passkeyId } },
+      { action: "people.person.passkey_renamed", detail: { passkeyId } },
     ]);
   });
 
@@ -232,7 +232,7 @@ describe("removing a passkey", () => {
     expect(await passkeysHeldBy(personId)).toEqual([]);
     expect(await lastUseOf(passkeyId)).toBeUndefined();
     expect(await identitySetRowsFor(personId)).toEqual([
-      { act: "people.person.passkey_removed", detail: { passkeyId } },
+      { action: "people.person.passkey_removed", detail: { passkeyId } },
     ]);
   });
 

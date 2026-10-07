@@ -466,14 +466,14 @@ describe("the migration separating an Admin's narrowing from the seam's verdict"
         await seed.auditEvent({
           workspaceId,
           id,
-          act: "sources.document.narrowed",
+          action: "sources.document.narrowed",
           subjectId: documentId,
           detail: { documentId, sensitivity },
         });
       }
       await seed.auditEvent({
         workspaceId: WORKSPACE,
-        act: "sources.binding.narrowed",
+        action: "sources.binding.narrowed",
         subjectId: seamNarrowed.id,
         detail: { sensitivity: "Restricted" },
       });

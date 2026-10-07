@@ -28,7 +28,7 @@ import {
   postgresForSuite,
   seedingWith,
   until,
-  whileActsWaitAt,
+  whileActionsWaitAt,
   whileWritesAreRefused,
 } from "./suite-postgres.ts";
 
@@ -94,7 +94,7 @@ describe("inviting a person by address", () => {
     ]);
     expect(await invitationEvents(workspace)).toEqual([
       {
-        act: "people.invitation.created",
+        action: "people.invitation.created",
         actor: `human:${workspace.adminUserId}`,
         subject_id: invitationId,
         detail: { role: "Editor" },
@@ -179,27 +179,27 @@ describe("inviting a person by address", () => {
     const batch = events.find((event) => event.batch_id !== null)?.batch_id;
     expect(batch).toEqual(expect.stringMatching(ULID));
     expect(
-      events.map(({ act, subject_id, detail, batch_id }) => ({
-        act,
+      events.map(({ action, subject_id, detail, batch_id }) => ({
+        action,
         subject_id,
         detail,
         batch_id,
       })),
     ).toEqual([
       {
-        act: "people.invitation.created",
+        action: "people.invitation.created",
         subject_id: first.invitationId,
         detail: { role: "Viewer" },
         batch_id: null,
       },
       {
-        act: "people.invitation.created",
+        action: "people.invitation.created",
         subject_id: second.invitationId,
         detail: { role: "Editor" },
         batch_id: batch,
       },
       {
-        act: "people.invitation.cancelled",
+        action: "people.invitation.cancelled",
         subject_id: first.invitationId,
         detail: { replacedByInvitationId: second.invitationId },
         batch_id: batch,
@@ -211,7 +211,7 @@ describe("inviting a person by address", () => {
     const workspace = await provisionedWorkspace(db(), "Concurrent");
     const address = addressOf("priya");
 
-    const [first, second] = await whileActsWaitAt(
+    const [first, second] = await whileActionsWaitAt(
       db().pool,
       "invitation",
       "INSERT",
@@ -229,7 +229,7 @@ describe("inviting a person by address", () => {
     expect(await invitationsOf(workspace)).toHaveLength(2);
   });
 
-  it("cancels nothing when the act's event cannot be written", async () => {
+  it("cancels nothing when the action's event cannot be written", async () => {
     const workspace = await provisionedWorkspace(db(), "Unwritten");
     const address = addressOf("priya");
     const standing = answeredValue(await invite(workspace, address, "Viewer"));
@@ -311,13 +311,13 @@ describe("an approved access request's invitation", () => {
     expect(batch).toEqual(expect.stringMatching(ULID));
     expect(events.slice(1)).toEqual([
       expect.objectContaining({
-        act: "people.invitation.created",
+        action: "people.invitation.created",
         subject_id: approved.invitationId,
         detail: { role: "Editor" },
         batch_id: batch,
       }),
       expect.objectContaining({
-        act: "people.invitation.cancelled",
+        action: "people.invitation.cancelled",
         subject_id: direct.invitationId,
         detail: { replacedByInvitationId: approved.invitationId },
         batch_id: batch,
@@ -446,9 +446,9 @@ describe("resending an invitation", () => {
       },
     });
     expect(await invitationEvents(workspace)).toEqual([
-      expect.objectContaining({ act: "people.invitation.created", detail: { role: "Editor" } }),
+      expect.objectContaining({ action: "people.invitation.created", detail: { role: "Editor" } }),
       expect.objectContaining({
-        act: "people.invitation.resent",
+        action: "people.invitation.resent",
         subject_id: invited.invitationId,
         detail: {},
         batch_id: null,
@@ -470,7 +470,7 @@ describe("resending an invitation", () => {
 
     expect(ceilingOf(refused)).toBe(1);
     expect(await invitationsOf(workspace)).toEqual(lastAllowed);
-    expect((await invitationEvents(workspace)).map((event) => event.act)).toEqual([
+    expect((await invitationEvents(workspace)).map((event) => event.action)).toEqual([
       "people.invitation.created",
       "people.invitation.resent",
       "people.invitation.resent",
@@ -540,7 +540,7 @@ describe("cancelling an invitation", () => {
     expect(cancelled).toEqual({ ok: true, value: { invitationId: invited.invitationId } });
     expect(await invitationsOf(workspace)).toMatchObject([{ status: "canceled" }]);
     expect((await invitationEvents(workspace)).at(-1)).toEqual({
-      act: "people.invitation.cancelled",
+      action: "people.invitation.cancelled",
       actor: `human:${workspace.adminUserId}`,
       subject_id: invited.invitationId,
       detail: {},
@@ -563,20 +563,20 @@ describe("what resending and cancelling refuse", () => {
     ],
   ] as const;
 
-  it.each(VERBS)("refuses %s an invitation no longer waiting", async (_verb, act) => {
+  it.each(VERBS)("refuses %s an invitation no longer waiting", async (_verb, action) => {
     const workspace = await provisionedWorkspace(db(), "Decided");
     const invited = await cancelledInvitation(workspace, addressOf("priya"));
     const eventsBefore = await invitationEvents(workspace);
 
     const refused = await as(workspace, workspace.adminUserId, (principal, tx) =>
-      act(principal, tx, invited.invitationId),
+      action(principal, tx, invited.invitationId),
     );
 
     expect(refused).toEqual({ ok: false, error: "no-such-invitation" });
     expect(await invitationEvents(workspace)).toEqual(eventsBefore);
   });
 
-  it.each(VERBS)("refuses %s an accepted invitation", async (_verb, act) => {
+  it.each(VERBS)("refuses %s an accepted invitation", async (_verb, action) => {
     const workspace = await provisionedWorkspace(db(), "Accepted");
     const accepted = await invitationLeft(workspace, {
       email: addressOf("priya"),
@@ -584,30 +584,30 @@ describe("what resending and cancelling refuse", () => {
     });
 
     const refused = await as(workspace, workspace.adminUserId, (principal, tx) =>
-      act(principal, tx, accepted.id),
+      action(principal, tx, accepted.id),
     );
 
     expect(refused).toEqual({ ok: false, error: "no-such-invitation" });
     expect(await invitationsOf(workspace)).toMatchObject([{ status: "accepted" }]);
   });
 
-  it.each(VERBS)("refuses %s an id of no known form", async (_verb, act) => {
+  it.each(VERBS)("refuses %s an id of no known form", async (_verb, action) => {
     const workspace = await provisionedWorkspace(db(), "Shapeless");
 
     const refused = await as(workspace, workspace.adminUserId, (principal, tx) =>
-      act(principal, tx, "' OR true --"),
+      action(principal, tx, "' OR true --"),
     );
 
     expect(refused).toEqual({ ok: false, error: "malformed" });
   });
 
-  it.each(VERBS)("keeps an Admin elsewhere from %s this one's", async (_verb, act) => {
+  it.each(VERBS)("keeps an Admin elsewhere from %s this one's", async (_verb, action) => {
     const workspace = await provisionedWorkspace(db(), "Held");
     const elsewhere = await provisionedWorkspace(db(), "Reaching");
     const invited = answeredValue(await invite(workspace, addressOf("priya"), "Viewer"));
 
     const reached = await as(elsewhere, elsewhere.adminUserId, (principal, tx) =>
-      act(principal, tx, invited.invitationId),
+      action(principal, tx, invited.invitationId),
     );
 
     expect(reached).toEqual({ ok: false, error: "no-such-invitation" });

@@ -16,7 +16,7 @@ export type InGroup = inferInput<Api["members"]["addToGroup"]>;
 
 type HeldGroup = ListedMember["groups"][number];
 
-/** The one origin an Admin's own act gives a group; the wire's type holds it to the api's word. */
+/** The one origin an Admin's own action gives a group; the wire's type holds it to the api's word. */
 const CURATED: ListedGroup["origin"] = "admin-curated";
 
 export const useGroups = () => {
@@ -31,7 +31,7 @@ const undoingEach = (undos: readonly Undo[]): Undo => ({
 });
 
 /**
- * A group's count and each member's groups say the same thing twice, so every settled act reads
+ * A group's count and each member's groups say the same thing twice, so every settled action reads
  * both again.
  */
 const useReconcile = () => {

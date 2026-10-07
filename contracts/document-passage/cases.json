@@ -34,7 +34,7 @@
         "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
         "ordinal": 999999,
         "id": "01M2Q3R4S5T6V7W8X9YZAB0001#999999",
-        "why": "The widest ordinal the padding holds. A document with a million passages is orders of magnitude past the connect act's per-file cap, so the width is a ceiling nothing reaches rather than a limit anyone has to think about."
+        "why": "The widest ordinal the padding holds. A document with a million passages is orders of magnitude past the connect action's per-file cap, so the width is a ceiling nothing reaches rather than a limit anyone has to think about."
       },
       {
         "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0002",

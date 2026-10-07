@@ -3,7 +3,7 @@ import { z } from "zod";
 import { boundarySchemas, CURATED_ORIGIN } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-import { act, declareActs, record, recordEach } from "../audit/index.ts";
+import { action, declareActions, record, recordEach } from "../audit/index.ts";
 import { attempt, err, ok, requireAdmin, ulid } from "../kernel/index.ts";
 import type {
   AdminUserPrincipal,
@@ -26,12 +26,12 @@ export type GroupSummary = {
   readonly memberCount: number;
 };
 
-const GROUP_ACTS = declareActs("people", {
-  created: act("people.group.created", {}),
-  renamed: act("people.group.renamed", {}),
-  deleted: act("people.group.deleted", {}),
-  memberAdded: act("people.group.member_added", { userId: "id" }),
-  memberRemoved: act("people.group.member_removed", { userId: "id" }),
+const GROUP_ACTIONS = declareActions("people", {
+  created: action("people.group.created", {}),
+  renamed: action("people.group.renamed", {}),
+  deleted: action("people.group.deleted", {}),
+  memberAdded: action("people.group.member_added", { userId: "id" }),
+  memberRemoved: action("people.group.member_removed", { userId: "id" }),
 });
 
 const GROUP_ID = boundarySchemas.group.select.shape.id;
@@ -46,7 +46,7 @@ type GuardRefusal = AdminRefusal | MemberRefusal<"malformed">;
 type TargetRefusal = GuardRefusal | MemberRefusal<"no-such-group">;
 
 /**
- * Each field is any text, so a name or an id the act cannot take reaches it and is refused in its
+ * Each field is any text, so a name or an id the action cannot take reaches it and is refused in its
  * own word, `malformed`.
  */
 export const createGroupInput = z.object({ name: z.string() });
@@ -131,7 +131,7 @@ export const createGroup = async (
 
   await record(admin.value, tx, {
     id: ulid(),
-    act: GROUP_ACTS.created,
+    action: GROUP_ACTIONS.created,
     subjectId: row.data.id,
     detail: {},
   });
@@ -166,7 +166,7 @@ export const renameGroup = async (
 
   await record(admin, tx, {
     id: ulid(),
-    act: GROUP_ACTS.renamed,
+    action: GROUP_ACTIONS.renamed,
     subjectId: groupId,
     detail: {},
   });
@@ -193,7 +193,7 @@ export const deleteGroup = async (
 
   await record(admin, tx, {
     id: ulid(),
-    act: GROUP_ACTS.deleted,
+    action: GROUP_ACTIONS.deleted,
     subjectId: groupId,
     detail: {},
   });
@@ -214,7 +214,7 @@ const memberTarget = (
 };
 
 /**
- * A step on rows its act holds: each person into the group, in person id order, so two such steps
+ * A step on rows its action holds: each person into the group, in person id order, so two such steps
  * over one group never wait on each other in a cycle. Answers those the insert landed, in that
  * order, one audit event each; one already in lands nothing.
  */
@@ -235,7 +235,7 @@ export const addedToGroup = async (
   await recordEach(
     admin,
     tx,
-    GROUP_ACTS.memberAdded,
+    GROUP_ACTIONS.memberAdded,
     added.map((userId) => ({ subjectId: asked.groupId, detail: { userId } })),
   );
   return added;
@@ -292,7 +292,7 @@ export const removeFromGroup = async (
 
   await record(admin, tx, {
     id: ulid(),
-    act: GROUP_ACTS.memberRemoved,
+    action: GROUP_ACTIONS.memberRemoved,
     subjectId: groupId,
     detail: { userId },
   });

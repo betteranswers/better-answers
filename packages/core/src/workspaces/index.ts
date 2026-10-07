@@ -2,7 +2,13 @@ import { z } from "zod";
 
 import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
-import { act, declareActs, type EndedGrant, record, STORED_DETAIL_KEYS } from "../audit/index.ts";
+import {
+  action,
+  declareActions,
+  type EndedGrant,
+  record,
+  STORED_DETAIL_KEYS,
+} from "../audit/index.ts";
 import {
   attempt,
   err,
@@ -127,16 +133,16 @@ export type BootstrapPrincipal = PlatformPrincipal & {
 
 export const BOOTSTRAP: BootstrapPrincipal = { kind: "platform", actorId: BOOTSTRAP_ACTOR };
 
-const WORKSPACE_ACTS = declareActs("platform", {
-  provisioned: act("platform.workspace.provisioned", { adminUserId: "id", role: "role" }),
-  renamed: act("platform.workspace.renamed", {
+const WORKSPACE_ACTIONS = declareActions("platform", {
+  provisioned: action("platform.workspace.provisioned", { adminUserId: "id", role: "role" }),
+  renamed: action("platform.workspace.renamed", {
     nameChanged: "flag",
     [STORED_DETAIL_KEYS.shortNameChanged]: "flag",
   }),
 });
 
-const MEMBER_ACTS = declareActs("people", {
-  added: act("people.member.added", { userId: "id", role: "role" }),
+const MEMBER_ACTIONS = declareActions("people", {
+  added: action("people.member.added", { userId: "id", role: "role" }),
 });
 
 const insertMember = async (
@@ -216,7 +222,7 @@ export const provisionWorkspace = async (
   const admin = boundarySchemas.user.select.shape.id.safeParse(input.adminUserId);
   if (!row.success || !admin.success) return err("malformed");
 
-  const act = await attempt(() =>
+  const action = await attempt(() =>
     withScope(platform, door, row.data.id, async (tx): Promise<Credited> => {
       const person = credited(await personById(tx, admin.data));
       if (!person.ok) return person;
@@ -229,7 +235,7 @@ export const provisionWorkspace = async (
 
       await record(platform, tx, {
         id: ulid(),
-        act: WORKSPACE_ACTS.provisioned,
+        action: WORKSPACE_ACTIONS.provisioned,
         subjectId: row.data.id,
         detail: { adminUserId: admin.data, role: CREATOR_ROLE },
       });
@@ -244,8 +250,8 @@ export const provisionWorkspace = async (
     }),
   );
 
-  if (!act.ok) return err(refusalFor(act.error, PROVISION_CONSTRAINTS));
-  if (!act.value.ok) return err(act.value.error);
+  if (!action.ok) return err(refusalFor(action.error, PROVISION_CONSTRAINTS));
+  if (!action.value.ok) return err(action.value.error);
   return ok({ workspaceId: row.data.id, actorId: platform.actorId });
 };
 
@@ -310,7 +316,7 @@ export const renameWorkspace = async (
         ]);
         await record(platform, tx, {
           id: ulid(),
-          act: WORKSPACE_ACTS.renamed,
+          action: WORKSPACE_ACTIONS.renamed,
           subjectId: workspaceId.data,
           detail: { nameChanged, [STORED_DETAIL_KEYS.shortNameChanged]: shortNameChanged },
         });
@@ -401,7 +407,7 @@ export const addMember = async (
         await insertMember(tx, workspaceId.data, userId, input.role);
         await record(platform, tx, {
           id: ulid(),
-          act: MEMBER_ACTS.added,
+          action: MEMBER_ACTIONS.added,
           subjectId: userId,
           detail: { userId, role: input.role },
         });
@@ -425,7 +431,7 @@ export const endEverySignInAndTokenInput = z.object({
 });
 
 type EndEverySignInAndTokenInput = z.output<typeof endEverySignInAndTokenInput> & {
-  /** When the act happens: the sign-in's age is judged against it, and it is the revocation's. */
+  /** When the action happens: the sign-in's age is judged against it, and it is the revocation's. */
   readonly at: Date;
 };
 
@@ -459,7 +465,7 @@ const endingCredentials = async (
 
 /**
  * Ends every session and OAuth token the person was issued before the revocation instant, in every
- * workspace, and records the act under the operator. The instant only moves forward: an `at`
+ * workspace, and records the action under the operator. The instant only moves forward: an `at`
  * before the one held keeps the held one.
  */
 export const endEverySignInAndToken = async (
@@ -477,7 +483,7 @@ export const endEverySignInAndToken = async (
 
   await record(fresh.value, tx, {
     id: ulid(),
-    act: REVOKED_EVERYWHERE,
+    action: REVOKED_EVERYWHERE,
     subjectId: personId,
     detail: { grants: ended.value.grants },
   });
@@ -492,8 +498,8 @@ export type RevokeWorkspaceTokensInput = {
 };
 
 /**
- * The step inside an act's own transaction: the tokens whose consented workspace is this one. It
- * takes the principal its act admitted, and judges none.
+ * The step inside an action's own transaction: the tokens whose consented workspace is this one. It
+ * takes the principal its action admitted, and judges none.
  */
 export const endWorkspaceTokens = (
   _admitted: PlatformPrincipal | UserPrincipal,

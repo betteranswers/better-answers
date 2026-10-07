@@ -59,8 +59,8 @@ describe("recording an authenticator's setup", () => {
     expect(await confirmedAt(sessionId)).toEqual({ confirmed: AT, pending: null });
     expect(await recoveryCodesHeldBy(personId)).toBe(10);
     expect(await identitySetRowsFor(personId)).toEqual([
-      { act: "people.person.authenticator_added", detail: { authenticatorId } },
-      { act: "people.person.recovery_codes_issued", detail: { replaced: false } },
+      { action: "people.person.authenticator_added", detail: { authenticatorId } },
+      { action: "people.person.recovery_codes_issued", detail: { replaced: false } },
     ]);
   });
 
@@ -88,8 +88,8 @@ describe("recording an authenticator's setup", () => {
       expect(await confirmedAt(sessionId)).toEqual({ confirmed: AT, pending: null });
     }
     expect(await identitySetRowsFor(personId)).toEqual([
-      { act: "people.person.authenticator_added", detail: { authenticatorId } },
-      { act: "people.person.recovery_codes_issued", detail: { replaced: false } },
+      { action: "people.person.authenticator_added", detail: { authenticatorId } },
+      { action: "people.person.recovery_codes_issued", detail: { replaced: false } },
     ]);
   });
 
@@ -107,7 +107,7 @@ describe("recording an authenticator's setup", () => {
 
     expect(recorded).toMatchObject({ ok: true, value: { issued: undefined } });
     expect(await recoveryCodesHeldBy(personId)).toBe(1);
-    expect((await identitySetRowsFor(personId)).map((row) => row.act)).toEqual([
+    expect((await identitySetRowsFor(personId)).map((row) => row.action)).toEqual([
       "people.person.authenticator_added",
     ]);
   });
@@ -197,7 +197,7 @@ describe("removing an authenticator", () => {
     expect(removed).toEqual({ ok: true, value: { authenticatorId } });
     expect(await authenticatorsHeldBy(personId)).toEqual([{ id: null, enabled: false }]);
     expect(await identitySetRowsFor(personId)).toEqual([
-      { act: "people.person.authenticator_removed", detail: { authenticatorId } },
+      { action: "people.person.authenticator_removed", detail: { authenticatorId } },
     ]);
   });
 

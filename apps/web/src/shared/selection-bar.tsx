@@ -17,8 +17,8 @@ function ClearOn(properties: { readonly keystroke: Keystroke; readonly onClear: 
   return null;
 }
 
-/** A bulk act the arrow keys reach with the bar's others; a plain button would be a tab stop alone. */
-export function SelectionAct(properties: ComponentProps<typeof Button>) {
+/** A bulk action the arrow keys reach with the bar's others; a plain button would be a tab stop alone. */
+export function SelectionAction(properties: ComponentProps<typeof Button>) {
   return (
     <ToolbarPrimitive.Button asChild>
       <Button variant="outline" size="sm" {...properties} />

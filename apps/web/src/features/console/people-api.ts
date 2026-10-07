@@ -43,7 +43,7 @@ export const useInspected = (personId: string) => {
 };
 
 /**
- * In the api's order, newest act first. A grant the server ended leaves, since the act deletes the
+ * In the api's order, newest action first. A grant the server ended leaves, since the action deletes the
  * tokens its end is read from.
  */
 const endedEverywhere = (held: PersonInspected, at: string, by: DoneBy): PersonInspected => ({
@@ -102,7 +102,7 @@ const undoEach = (undos: readonly Undo[] | undefined) => {
   for (const each of undos ?? []) each.undo();
 };
 
-/** Everything reads ended before the api answers, so the act lands within 100 ms. */
+/** Everything reads ended before the api answers, so the action lands within 100 ms. */
 export const useEndEverySignInEverywhere = (personId: string) => {
   const api = useTRPC();
   const queryClient = useQueryClient();

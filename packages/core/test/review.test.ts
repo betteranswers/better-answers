@@ -92,7 +92,7 @@ const dismissAs = (
     ),
   );
 
-const DISMISSED_ACT = "sources.document.special_category_dismissed";
+const DISMISSED_ACTION = "sources.document.special_category_dismissed";
 
 const narrowedToOf = async (workspaceId: string, documentId: string) => {
   const found = await db().pool.query<{ sensitivity: string | null; narrowed_to: string | null }>(
@@ -235,7 +235,7 @@ const passageSensitivitiesOf = async (workspaceId: string, documentId: string) =
   return found.rows.map((row) => row.sensitivity);
 };
 
-const batchedRowsOf = async (pool: pg.Pool, workspaceId: string, act: string) => {
+const batchedRowsOf = async (pool: pg.Pool, workspaceId: string, action: string) => {
   const found = await pool.query<{
     subject_id: string;
     batch_id: string | null;
@@ -243,7 +243,7 @@ const batchedRowsOf = async (pool: pg.Pool, workspaceId: string, act: string) =>
   }>(
     `SELECT subject_id, batch_id, detail FROM audit_event
       WHERE workspace_id = $1 AND action = $2 ORDER BY id`,
-    [workspaceId, act],
+    [workspaceId, action],
   );
   return found.rows;
 };
@@ -1293,7 +1293,7 @@ describe("an Admin dismissing groups of findings as not special category", () =>
     const batchId = outcome.ok ? outcome.value.batchId : undefined;
     expect(outcome).toMatchObject({ ok: true, value: { connectedSourceId, documentIds } });
     expect(typeof batchId).toBe("string");
-    expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACT)).toEqual(
+    expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACTION)).toEqual(
       documentIds.map((documentId) => ({
         subject_id: documentId,
         batch_id: batchId,
@@ -1330,7 +1330,7 @@ describe("an Admin dismissing groups of findings as not special category", () =>
     ]);
 
     expect(outcome).toMatchObject({ ok: true, value: { batchId: undefined } });
-    expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACT)).toEqual([
+    expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACTION)).toEqual([
       {
         subject_id: first.documentId,
         batch_id: null,
@@ -1365,13 +1365,13 @@ describe("an Admin dismissing groups of findings as not special category", () =>
   it.each([
     ["dismissed, then kept-in-text", ["dismiss", "keep"]],
     ["kept-in-text, then dismissed", ["keep", "dismiss"]],
-  ] as const)("leaves a span %s, both dismissed and restored", async (_order, acts) => {
+  ] as const)("leaves a span %s, both dismissed and restored", async (_order, actions) => {
     const scenario = await arrange();
     const { connectedSourceId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
     const group = [groupOfFindingsIn(first.documentId, HEALTH)];
 
-    for (const taken of acts) {
+    for (const taken of actions) {
       await (taken === "dismiss" ? dismissAs : keepAs)(scenario.admin, connectedSourceId, group);
     }
 
@@ -1400,7 +1400,7 @@ describe("an Admin dismissing groups of findings as not special category", () =>
     ).rejects.toThrow(new RegExp(`refused a write to ${table}`));
 
     expect(await reviewOf(scenario.workspaceId, named)).toEqual(UNREVIEWED);
-    expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACT)).toEqual([]);
+    expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACTION)).toEqual([]);
     expect(await jobsOf(scenario.workspaceId)).toEqual([]);
   });
 
@@ -1480,7 +1480,7 @@ const reprocessAsAdmin = (
     ),
   );
 
-describe("a bulk act handed no group of findings at all", () => {
+describe("a bulk action handed no group of findings at all", () => {
   const A_CONNECTED_SOURCE = "01J6NNNNNNNNNNNNNNNNNNNNN1";
 
   const EMPTY_LIST = {

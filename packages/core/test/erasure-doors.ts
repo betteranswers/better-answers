@@ -3,7 +3,7 @@ import type { ObjectDoor } from "../src/store/objects/index.ts";
 import type { Scenario } from "./workspace-with-bundle.ts";
 
 /**
- * The doors every erasure act takes, the clock stopped at `at`. The log drops each line unless
+ * The doors every erasure action takes, the clock stopped at `at`. The log drops each line unless
  * one is given.
  */
 export const erasureDoorsFor = (

@@ -272,7 +272,7 @@ function WorkspaceList(properties: {
   );
 }
 
-function NextAct(properties: {
+function NextAction(properties: {
   readonly standing: Standing;
   readonly onRetry: () => void;
   readonly onCarryOn: () => void;
@@ -310,7 +310,11 @@ function WorkspaceChoice(properties: {
         <WorkspaceList held={properties.held} busy={properties.busy} onPick={properties.onPick} />
       ) : null}
       <OutcomeLine outcome={outcomeOf(standing)} className="mt-4" />
-      <NextAct standing={standing} onRetry={properties.onRetry} onCarryOn={properties.onCarryOn} />
+      <NextAction
+        standing={standing}
+        onRetry={properties.onRetry}
+        onCarryOn={properties.onCarryOn}
+      />
       {listing ? (
         <div className="mt-8">
           <AccountLink />

@@ -160,7 +160,7 @@ describe("the refusal-word walk", () => {
   });
 
   it.skipIf(sourceTreeIsInstrumented())(
-    "matches the register and the acts' union words both ways",
+    "matches the register and the actions' union words both ways",
     async () => {
       await loadEveryEntryPoint();
       const held = new Set(Object.keys(registerAsRead()));
@@ -194,7 +194,7 @@ describe("the refusal-word walk", () => {
     expectTypeOf<SourceRefusal<"no-bucket">>().toBeString();
   });
 
-  it("answers an act's union in registered words alone", () => {
+  it("answers an action's union in registered words alone", () => {
     expectTypeOf<ConnectUploadRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<ProvisionRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<AddMemberRefusal>().toExtend<EveryRegisteredWord>();
@@ -233,7 +233,7 @@ describe("the refusal-word walk", () => {
     expectTypeOf<RefusedItems<MemberRefusal<"no-such-thing">>>().toBeObject();
   });
 
-  it("answers a bulk act's items in registered words alone", () => {
+  it("answers a bulk action's items in registered words alone", () => {
     type Answered = EveryRegisteredWord | RefusedItems<EveryRegisteredWord> | Error;
     expectTypeOf<BulkChangeRoleRefusal>().toExtend<Answered>();
     expectTypeOf<BulkRemoveMembersRefusal>().toExtend<Answered>();

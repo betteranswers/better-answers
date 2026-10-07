@@ -1,6 +1,6 @@
-// Generated, never edited: pnpm --filter @better-answers/core run generate:audit-acts
+// Generated, never edited: pnpm --filter @better-answers/core run generate:audit-actions
 
-export const DECLARED_ACTS = [
+export const DECLARED_ACTIONS = [
   "knowledge.check.imported",
   "knowledge.concept.class_overridden",
   "knowledge.concept.committed",
@@ -130,4 +130,4 @@ export const HEADLINES = {
   "sources.document.special_category_dismissed": "Findings dismissed",
   "sources.finding.restored": "Finding kept in text",
   "sources.upload.swept": "Unused upload deleted",
-} as const satisfies Readonly<Record<(typeof DECLARED_ACTS)[number], string>>;
+} as const satisfies Readonly<Record<(typeof DECLARED_ACTIONS)[number], string>>;

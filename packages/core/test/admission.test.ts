@@ -5,7 +5,7 @@ import { boundarySchemas } from "@better-answers/schema";
 
 import {
   admit,
-  declareAct,
+  declareAction,
   EVERY_PURPOSE,
   OPERATOR_ALONE,
   refusalRegister,
@@ -20,9 +20,9 @@ import {
   type Role,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
-import { enqueueJobAct, enqueueJobInput } from "../src/runs/index.ts";
+import { enqueueJobAction, enqueueJobInput } from "../src/runs/index.ts";
 import {
-  reprocessConnectedSourceAct,
+  reprocessConnectedSourceAction,
   reprocessConnectedSourceInput,
   type adminOnConnectedSource,
   type dpiaInputFor,
@@ -55,28 +55,28 @@ const theOperator = (): OperatorPrincipal => ({
 
 const nothing = z.object({});
 
-const adminsOnly = declareAct({
+const adminsOnly = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: nothing,
   refuses: ["role-forbids"],
   effect: "write",
 });
 
-const everyone = declareAct({
+const everyone = declareAction({
   admits: { role: "Viewer", purposes: EVERY_PURPOSE },
   input: nothing,
   refuses: ["role-forbids"],
   effect: "read",
 });
 
-const erasureOnly = declareAct({
+const erasureOnly = declareAction({
   admits: { role: "Admin", purposes: ["erasure"] },
   input: nothing,
   refuses: ["role-forbids"],
   effect: "write",
 });
 
-const operatorsOnly = declareAct({
+const operatorsOnly = declareAction({
   admits: OPERATOR_ALONE,
   input: nothing,
   refuses: ["not-the-operator"],
@@ -86,7 +86,7 @@ const operatorsOnly = declareAct({
 const classOf = (word: string): string | undefined =>
   refusalRegister().find((entry) => entry.word === word)?.class;
 
-describe("what an act admits, from the principal and input alone", () => {
+describe("what an action admits, from the principal and input alone", () => {
   it("admits only an Admin where the level is Admin", () => {
     const answered = (["Admin", "Editor", "Viewer"] as const).map(
       (role) => admit(adminsOnly, person(role), {}).ok,
@@ -111,7 +111,7 @@ describe("what an act admits, from the principal and input alone", () => {
     ]).toEqual([true, false, true]);
   });
 
-  it("refuses a platform principal where an act names no purpose", () => {
+  it("refuses a platform principal where an action names no purpose", () => {
     expect(admit(adminsOnly, processActor("erasure"), {}).ok).toBe(false);
   });
 
@@ -141,8 +141,8 @@ describe("what an act admits, from the principal and input alone", () => {
   });
 });
 
-describe("what an act admits of the operator", () => {
-  it("admits the operator alone to an operator's act", () => {
+describe("what an action admits of the operator", () => {
+  it("admits the operator alone to an operator's action", () => {
     const operator = theOperator();
 
     expect([
@@ -156,7 +156,7 @@ describe("what an act admits of the operator", () => {
     ]);
   });
 
-  it("refuses the operator every act a role or purpose admits", () => {
+  it("refuses the operator every action a role or purpose admits", () => {
     expect([
       admit(everyone, theOperator(), {}),
       admit(adminsOnly, theOperator(), {}),
@@ -204,10 +204,10 @@ describe("how fresh a sign-in the operator's writes ask for", () => {
   });
 });
 
-describe("what a declaration will not let an act say", () => {
-  it("refuses an act declaring one word twice", () => {
+describe("what a declaration will not let an action say", () => {
+  it("refuses an action declaring one word twice", () => {
     expect(() =>
-      declareAct({
+      declareAction({
         admits: { role: "Admin", purposes: [] },
         input: nothing,
         refuses: ["role-forbids", "role-forbids"],
@@ -217,12 +217,12 @@ describe("what a declaration will not let an act say", () => {
   });
 });
 
-describe("the two acts that carry a declaration today", () => {
+describe("the two actions that carry a declaration today", () => {
   it("states what reprocessing a source admits, takes, answers and does", () => {
     expect({
-      admits: reprocessConnectedSourceAct.admits,
-      refuses: reprocessConnectedSourceAct.refuses,
-      effect: reprocessConnectedSourceAct.effect,
+      admits: reprocessConnectedSourceAction.admits,
+      refuses: reprocessConnectedSourceAction.refuses,
+      effect: reprocessConnectedSourceAction.effect,
     }).toEqual({
       admits: { role: "Admin", purposes: ["erasure", "reindex"] },
       refuses: ["role-forbids", "no-such-binding"],
@@ -246,8 +246,8 @@ describe("the two acts that carry a declaration today", () => {
         person("Admin"),
         person("Editor"),
         person("Viewer"),
-      ].map((principal) => admit(reprocessConnectedSourceAct, principal, wipe).ok),
-      refused: admit(reprocessConnectedSourceAct, processActor("reconciler"), wipe),
+      ].map((principal) => admit(reprocessConnectedSourceAction, principal, wipe).ok),
+      refused: admit(reprocessConnectedSourceAction, processActor("reconciler"), wipe),
       itsClass: classOf("role-forbids"),
     }).toEqual({
       admitted: [true, true, false, false, true, false, false],
@@ -256,18 +256,18 @@ describe("the two acts that carry a declaration today", () => {
     });
   });
 
-  it("derives the act's input and refusal types from its declaration", () => {
+  it("derives the action's input and refusal types from its declaration", () => {
     expectTypeOf<
-      InputOf<typeof reprocessConnectedSourceAct>
+      InputOf<typeof reprocessConnectedSourceAction>
     >().toEqualTypeOf<ReprocessConnectedSourceInput>();
-    expectTypeOf<RefusalOf<typeof reprocessConnectedSourceAct>>().toEqualTypeOf<
+    expectTypeOf<RefusalOf<typeof reprocessConnectedSourceAction>>().toEqualTypeOf<
       "role-forbids" | "no-such-binding"
     >();
     expectTypeOf<"no-such-binding">().toExtend<ReprocessConnectedSourceRefusal>();
-    expectTypeOf<AdmittedOf<typeof reprocessConnectedSourceAct>>().toExtend<
+    expectTypeOf<AdmittedOf<typeof reprocessConnectedSourceAction>>().toExtend<
       UserPrincipal | PlatformPrincipal
     >();
-    expectTypeOf<PlatformPrincipal>().toExtend<AdmittedOf<typeof reprocessConnectedSourceAct>>();
+    expectTypeOf<PlatformPrincipal>().toExtend<AdmittedOf<typeof reprocessConnectedSourceAction>>();
   });
 
   it("lets the platform reprocess but not publish, preview or administer", () => {
@@ -283,7 +283,7 @@ describe("the two acts that carry a declaration today", () => {
       workspaceId: "01JQ0000000000000000000WSP",
       kind: "nightly-audit",
     });
-    const asked = enqueueJobAct.admits;
+    const asked = enqueueJobAction.admits;
 
     expect(typeof asked === "function" ? asked(audit) : asked).toEqual({
       role: "Admin",
@@ -298,13 +298,16 @@ describe("the two acts that carry a declaration today", () => {
     });
 
     expect([
-      admit(enqueueJobAct, processActor("reconciler"), audit).ok,
-      admit(enqueueJobAct, person("Admin"), audit).ok,
-      admit(enqueueJobAct, person("Editor"), audit).ok,
+      admit(enqueueJobAction, processActor("reconciler"), audit).ok,
+      admit(enqueueJobAction, person("Admin"), audit).ok,
+      admit(enqueueJobAction, person("Editor"), audit).ok,
     ]).toEqual([true, true, false]);
   });
 
   it("declares both the enqueue and reprocessing as writes", () => {
-    expect([enqueueJobAct.effect, reprocessConnectedSourceAct.effect]).toEqual(["write", "write"]);
+    expect([enqueueJobAction.effect, reprocessConnectedSourceAction.effect]).toEqual([
+      "write",
+      "write",
+    ]);
   });
 });

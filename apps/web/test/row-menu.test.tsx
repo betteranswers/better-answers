@@ -9,13 +9,17 @@ placedWithoutMeasuring();
 
 const NOTHING = () => undefined;
 
-const act = (label: string, destructive?: boolean) => ({ label, destructive, onSelect: NOTHING });
+const action = (label: string, destructive?: boolean) => ({
+  label,
+  destructive,
+  onSelect: NOTHING,
+});
 
 /** The menu's items in the order a reader meets them, a separator drawn as a rule. */
-const menuOf = (acts: readonly ReturnType<typeof act>[]) => {
-  render(<RowMenu name="Ada Lovelace" acts={acts} />);
+const menuOf = (actions: readonly ReturnType<typeof action>[]) => {
+  render(<RowMenu name="Ada Lovelace" actions={actions} />);
   // The registry's menus open on a key or a press, never on a click.
-  fireEvent.keyDown(screen.getByRole("button", { name: "Acts for Ada Lovelace" }), {
+  fireEvent.keyDown(screen.getByRole("button", { name: "Actions for Ada Lovelace" }), {
     key: "Enter",
   });
   return [
@@ -24,32 +28,34 @@ const menuOf = (acts: readonly ReturnType<typeof act>[]) => {
 };
 
 describe("a row's menu", () => {
-  it("draws a leading destructive act last, below a separator", () => {
-    expect(menuOf([act("Remove from workspace", true), act("Open"), act("Change role")])).toEqual([
-      "Open",
-      "Change role",
-      "—",
-      "Remove from workspace",
-    ]);
+  it("draws a leading destructive action last, below a separator", () => {
+    expect(
+      menuOf([action("Remove from workspace", true), action("Open"), action("Change role")]),
+    ).toEqual(["Open", "Change role", "—", "Remove from workspace"]);
   });
 
-  it("gathers interleaved destructive acts below one separator, in order", () => {
-    const acts = [act("Open"), act("Remove", true), act("Change role"), act("Revoke", true)];
+  it("gathers interleaved destructive actions below one separator, in order", () => {
+    const actions = [
+      action("Open"),
+      action("Remove", true),
+      action("Change role"),
+      action("Revoke", true),
+    ];
 
-    expect(menuOf(acts)).toEqual(["Open", "Change role", "—", "Remove", "Revoke"]);
+    expect(menuOf(actions)).toEqual(["Open", "Change role", "—", "Remove", "Revoke"]);
   });
 
-  it("draws no separator when every act is destructive", () => {
-    expect(menuOf([act("Remove", true), act("Revoke", true)])).toEqual(["Remove", "Revoke"]);
+  it("draws no separator when every action is destructive", () => {
+    expect(menuOf([action("Remove", true), action("Revoke", true)])).toEqual(["Remove", "Revoke"]);
   });
 
-  it("lands focus where an act that took its row asks", async () => {
+  it("lands focus where an action that took its row asks", async () => {
     render(
       <>
         <h2 tabIndex={-1}>Invitations</h2>
         <RowMenu
           name="Ada Lovelace"
-          acts={[
+          actions={[
             { label: "Resend", onSelect: NOTHING },
             {
               label: "Cancel",
@@ -61,7 +67,7 @@ describe("a row's menu", () => {
         />
       </>,
     );
-    const trigger = screen.getByRole("button", { name: "Acts for Ada Lovelace" });
+    const trigger = screen.getByRole("button", { name: "Actions for Ada Lovelace" });
     fireEvent.keyDown(trigger, { key: "Enter" });
     fireEvent.click(screen.getByRole("menuitem", { name: "Cancel" }));
 
@@ -70,9 +76,9 @@ describe("a row's menu", () => {
     });
   });
 
-  it("hands focus back to its trigger after any other act", async () => {
-    render(<RowMenu name="Ada Lovelace" acts={[act("Resend")]} />);
-    const trigger = screen.getByRole("button", { name: "Acts for Ada Lovelace" });
+  it("hands focus back to its trigger after any other action", async () => {
+    render(<RowMenu name="Ada Lovelace" actions={[action("Resend")]} />);
+    const trigger = screen.getByRole("button", { name: "Actions for Ada Lovelace" });
     fireEvent.keyDown(trigger, { key: "Enter" });
     fireEvent.click(screen.getByRole("menuitem", { name: "Resend" }));
 

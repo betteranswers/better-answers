@@ -47,7 +47,7 @@ const asTheAdmin = async (seeded: Seeded): Promise<Api> =>
   (await webSignedIn(app, seeded.workspace.admin.email)).api;
 
 type GroupEvent = {
-  readonly act: string;
+  readonly action: string;
   readonly actor: string;
   readonly subject_id: string;
   readonly detail: Readonly<Record<string, string>>;
@@ -65,7 +65,7 @@ const standing = async (workspaceId: string) => {
     [workspaceId],
   );
   const events = await superuser.query<GroupEvent>(
-    `SELECT action AS act, actor, subject_id, detail FROM audit_event
+    `SELECT action, actor, subject_id, detail FROM audit_event
       WHERE workspace_id = $1 AND action LIKE 'people.group.%' ORDER BY id`,
     [workspaceId],
   );
@@ -87,7 +87,7 @@ const refusedChangingNothing = async (
 ): Promise<unknown> => {
   const before = await standing(workspaceId);
   const refused = await refusalOfCall(call());
-  expect(await standing(workspaceId), "a refused group act changed something").toEqual(before);
+  expect(await standing(workspaceId), "a refused group action changed something").toEqual(before);
   return refused;
 };
 
@@ -115,7 +115,7 @@ describe("the groups list over tRPC", () => {
   });
 });
 
-describe("the group acts over tRPC", () => {
+describe("the group actions over tRPC", () => {
   it("creates a group and records it under the Admin", async () => {
     const seeded = await aWorkspaceWithGroups();
     const api = await asTheAdmin(seeded);
@@ -126,7 +126,7 @@ describe("the group acts over tRPC", () => {
     expect(now.groups).toContainEqual({ id: groupId, name: "Site leads" });
     expect(now.events).toEqual([
       {
-        act: "people.group.created",
+        action: "people.group.created",
         actor: `human:${seeded.workspace.admin.id}`,
         subject_id: groupId,
         detail: {},
@@ -176,7 +176,7 @@ describe("the group acts over tRPC", () => {
       { id: seeded.bids, name: "Bid writers" },
       { id: seeded.hr, name: "People team" },
     ]);
-    expect(now.events.map((event) => [event.act, event.subject_id])).toEqual([
+    expect(now.events.map((event) => [event.action, event.subject_id])).toEqual([
       ["people.group.renamed", seeded.hr],
     ]);
   });
@@ -201,7 +201,7 @@ describe("the group acts over tRPC", () => {
     const now = await standing(seeded.workspace.workspaceId);
     expect(now.groups).toEqual([{ id: seeded.bids, name: "Bid writers" }]);
     expect(now.groupMembers).toEqual([]);
-    expect(now.events.map((event) => [event.act, event.subject_id])).toEqual([
+    expect(now.events.map((event) => [event.action, event.subject_id])).toEqual([
       ["people.group.deleted", seeded.hr],
     ]);
     const listed = await api.members.list.query();
@@ -217,7 +217,7 @@ describe("the group acts over tRPC", () => {
     expect(await membersOf(seeded.workspace.workspaceId, seeded.bids)).toEqual([seeded.sam.id]);
     expect(await eventsIn(seeded.workspace.workspaceId)).toEqual([
       {
-        act: "people.group.member_added",
+        action: "people.group.member_added",
         actor: `human:${seeded.workspace.admin.id}`,
         subject_id: seeded.bids,
         detail: { userId: seeded.sam.id },
@@ -241,7 +241,7 @@ describe("the group acts over tRPC", () => {
     expect(await membersOf(seeded.workspace.workspaceId, seeded.hr)).toEqual([seeded.priya.id]);
     expect(await eventsIn(seeded.workspace.workspaceId)).toEqual([
       {
-        act: "people.group.member_removed",
+        action: "people.group.member_removed",
         actor: `human:${seeded.workspace.admin.id}`,
         subject_id: seeded.hr,
         detail: { userId: seeded.sam.id },
@@ -252,7 +252,7 @@ describe("the group acts over tRPC", () => {
   it.each([
     {
       what: "putting in a member already there",
-      act: "addToGroup",
+      action: "addToGroup",
       group: "hr",
       word: "already-in-group",
       status: 409,
@@ -260,7 +260,7 @@ describe("the group acts over tRPC", () => {
     },
     {
       what: "taking out a member not there",
-      act: "removeFromGroup",
+      action: "removeFromGroup",
       group: "bids",
       word: "not-in-group",
       status: 404,
@@ -271,20 +271,20 @@ describe("the group acts over tRPC", () => {
     const api = await asTheAdmin(seeded);
 
     const refused = await refusedChangingNothing(seeded.workspace.workspaceId, () =>
-      api.members[asked.act].mutate({ groupId: seeded[asked.group], userId: seeded.sam.id }),
+      api.members[asked.action].mutate({ groupId: seeded[asked.group], userId: seeded.sam.id }),
     );
 
     expect(refused).toMatchObject(refusedAs(asked.status, asked.word, asked.class));
   });
 });
 
-type GroupAct = {
-  /** What the act does, in the words a title reads. */
+type GroupAction = {
+  /** What the action does, in the words a title reads. */
   readonly does: string;
   readonly call: (api: Api, seeded: Seeded) => Promise<unknown>;
 };
 
-const EVERY_GROUP_ACT: readonly GroupAct[] = [
+const EVERY_GROUP_ACTION: readonly GroupAction[] = [
   { does: "list the groups", call: (api) => api.members.groups.query() },
   {
     does: "create a group",
@@ -311,45 +311,45 @@ const EVERY_GROUP_ACT: readonly GroupAct[] = [
 ];
 
 /** A group named by one of these can belong to another workspace. */
-const ACTS_NAMING_A_GROUP = EVERY_GROUP_ACT.slice(2);
+const ACTIONS_NAMING_A_GROUP = EVERY_GROUP_ACTION.slice(2);
 
 describe("who may see and change groups", () => {
   it.each(
-    EVERY_GROUP_ACT.flatMap((act) => [
-      { ...act, role: "Editor" as const },
-      { ...act, role: "Viewer" as const },
+    EVERY_GROUP_ACTION.flatMap((action) => [
+      { ...action, role: "Editor" as const },
+      { ...action, role: "Viewer" as const },
     ]),
-  )("refuses to let $role members $does", async (act) => {
+  )("refuses to let $role members $does", async (action) => {
     const seeded = await aWorkspaceWithGroups();
     const actor = await app.person();
-    await app.addMember(seeded.workspace.workspaceId, actor.id, act.role);
+    await app.addMember(seeded.workspace.workspaceId, actor.id, action.role);
     const { api } = await webSignedIn(app, actor.email);
 
     const refused = await refusedChangingNothing(seeded.workspace.workspaceId, () =>
-      act.call(api, seeded),
+      action.call(api, seeded),
     );
 
     expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
   });
 
-  it.each(EVERY_GROUP_ACT)("refuses to let another workspace's Admin $does", async (act) => {
+  it.each(EVERY_GROUP_ACTION)("refuses to let another workspace's Admin $does", async (action) => {
     const seeded = await aWorkspaceWithGroups();
     const api = await anAdminOfElsewherePointedAt(app, seeded.workspace.workspaceId);
 
     const refused = await refusedChangingNothing(seeded.workspace.workspaceId, () =>
-      act.call(api, seeded),
+      action.call(api, seeded),
     );
 
     expect(refused).toMatchObject(NOT_A_MEMBER_ANSWERED);
   });
 
-  it.each(ACTS_NAMING_A_GROUP)("finds no such group to $does elsewhere", async (act) => {
+  it.each(ACTIONS_NAMING_A_GROUP)("finds no such group to $does elsewhere", async (action) => {
     const theirs = await aWorkspaceWithGroups();
     const mine = await app.provision();
     const { api } = await webSignedIn(app, mine.admin.email);
 
     const refused = await refusedChangingNothing(theirs.workspace.workspaceId, () =>
-      act.call(api, theirs),
+      action.call(api, theirs),
     );
 
     expect(refused).toMatchObject(refusedAs(404, "no-such-group", "absent"));

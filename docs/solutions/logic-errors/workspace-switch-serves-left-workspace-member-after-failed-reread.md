@@ -8,7 +8,7 @@ component: web
 severity: high
 symptoms:
   - "After a switch whose member re-read failed, the shell kept showing the left workspace's band name, role and page key"
-  - "Reads and acts went to the new workspace while the band still named the old one"
+  - "Reads and actions went to the new workspace while the band still named the old one"
   - "With the switch waiting offline (fetchStatus paused), refetchQueries resolved at once and the old member stayed"
   - "After removeQueries alone, the home redirect bounced the person back to the old workspace's home within 8 ms"
   - "After All workspaces picked another, the left workspace's members.list stayed in the cache for up to 5 minutes (gcTime) and was drawn until the new list arrived"
@@ -35,7 +35,7 @@ retire_when: "a released @tanstack/query-core makes refetchQueries report a fail
 
 The shell showed one workspace and talked to another.
 
-A person switches workspace. Better Auth's `organization.setActive` succeeds, so the session now points at workspace B. The web app then reads the session's member again, in place, so the band does not blank between the two answers. That member holds the band's workspace name, the person's role and the key the page is drawn under. If the re-read failed, or waited offline, the cache kept workspace A's member. The shell went on drawing A's name and A's role while every read and act went to B.
+A person switches workspace. Better Auth's `organization.setActive` succeeds, so the session now points at workspace B. The web app then reads the session's member again, in place, so the band does not blank between the two answers. That member holds the band's workspace name, the person's role and the key the page is drawn under. If the re-read failed, or waited offline, the cache kept workspace A's member. The shell went on drawing A's name and A's role while every read and action went to B.
 
 The switch is `useSwitchWorkspace` (`apps/web/src/features/auth/auth-hooks.ts:334-350`). Its re-read is `rereadMember` (`apps/web/src/features/auth/member.ts:53-65`).
 

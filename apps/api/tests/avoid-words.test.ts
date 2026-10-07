@@ -617,7 +617,7 @@ describe("a word that lands with its sweep", () => {
 
   it("keeps a stored act name the generated list has lost", () => {
     const tree = plantedTree({
-      "apps/web/src/features/people/audit-acts.ts": `export const DECLARED_ACTS = ["sources.connected_source.bound"] as const;`,
+      "apps/web/src/features/people/audit-actions.ts": `export const DECLARED_ACTIONS = ["sources.connected_source.bound"] as const;`,
       "apps/web/src/shared/navigation.ts": `movedFrom: ["/sources"],`,
       "apps/api/tests/better-auth-endpoints.txt": "/sign-in/email",
     });
@@ -628,7 +628,7 @@ describe("a word that lands with its sweep", () => {
 
   it("keeps every older address a page lists", () => {
     const tree = plantedTree({
-      "apps/web/src/features/people/audit-acts.ts": `export const DECLARED_ACTS = [] as const;`,
+      "apps/web/src/features/people/audit-actions.ts": `export const DECLARED_ACTIONS = [] as const;`,
       "apps/web/src/shared/navigation.ts": [
         `movedFrom: ["/system/old-name"],`,
         `movedFrom: [`,
@@ -698,21 +698,50 @@ describe("a word that lands with its sweep", () => {
     ]);
   });
 
-  it("passes React's act in tests, and refuses it on pages", () => {
-    const act = landedNow(rowOf("act"), {
-      permitted: [{ sense: "React's and Testing Library's act", written: /\bact\(/g }],
-    });
-    const findings = linesOver(
-      {
-        "apps/web/test/planted.test.tsx": `await act(async () => render(<Members />));`,
-        "apps/web/src/features/people/planted-words.ts": `export const TAKEN = "Each act lands at once.";`,
-      },
-      [act],
-    );
+  it("refuses an act, passing React's act and the verb", () => {
+    const act = ["a", "ct"].join("");
+    const refused = {
+      "apps/web/src/features/people/planted-words.ts": `export const TAKEN = "Each ${act} lands at once.";`,
+      "packages/core/src/members/planted.ts": `/** An ${act} on the person names them by person id. */`,
+      "docs/operations/planted.md": `A role change is the Admin's ${act} on the People page.`,
+      "apps/web/test/planted.test.tsx": `// The ${act} the row menu opened has landed.`,
+    };
+    const passed = {
+      "apps/web/test/planted-react.test.tsx": `await ${act}(async () => render(<Members />));`,
+      "apps/web/test/planted-import.test.tsx": `import { ${act}, cleanup } from "@testing-library/react";`,
+      "apps/api/src/auth/planted.ts": `/** A session that must confirm first holds no claims to ${act} on. */`,
+      "apps/web/src/shared/planted.tsx": `/** Only \`forbidden\` names who can ${act}, because the reader can't. */`,
+      "apps/web/src/shared/address-ask.ts": `const ASKED_BEFORE = { action: "${act}", search: undefined };`,
+      "packages/schema/test/before-the-action.ts": `ALTER TABLE "audit_event" RENAME COLUMN "action" TO "${act}"`,
+    };
 
-    expect(findings).toEqual([
-      `apps/web/src/features/people/planted-words.ts:1: export const TAKEN = "Each act lands at once.";`,
-    ]);
+    expect([...linesOver({ ...refused, ...passed }, [rowOf(act)])].toSorted()).toEqual(
+      Object.entries(refused)
+        .map(([file, text]) => `${file}:1: ${text}`)
+        .toSorted(),
+    );
+  });
+
+  it("refuses an action's plural and compounds, passing the verb", () => {
+    const acts = ["a", "cts"].join("");
+    const Acts = `A${acts.slice(1)}`;
+    const refused = {
+      "packages/core/src/members/planted.ts": `const GROUP_${acts.toUpperCase()} = declare${Acts}("people", {});`,
+      "apps/web/src/shared/planted-menu.tsx": `<RowActions label={\`${Acts} for \${name}\`} />`,
+      "apps/web/src/features/sources/planted.tsx": `import { Review } from "./review-${acts}.tsx";`,
+      "docs/architecture/planted.md": `The three bulk ${acts} take groups of findings.`,
+    };
+    const passed = {
+      "apps/api/src/mcp/planted.ts": `// the set's word alone, which is what an agent ${acts} on.`,
+      "CODING_STANDARDS.md": `- the purposes a platform principal ${acts} for;`,
+      ".claude/skills/planted/SKILL.md": `Name who ${acts}, what they do, and why it matters.`,
+    };
+
+    expect([...linesOver({ ...refused, ...passed }, [rowOf(acts)])].toSorted()).toEqual(
+      Object.entries(refused)
+        .map(([file, text]) => `${file}:1: ${text}`)
+        .toSorted(),
+    );
   });
 
   it("refuses a sync written as a run, passing other runs", () => {

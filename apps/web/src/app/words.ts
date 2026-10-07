@@ -34,8 +34,8 @@ export const JUMP_TO = {
   name: "Jump to",
   said: "Type to narrow the list, then choose one.",
   list: "Matches",
-  groups: { areas: "Areas", pages: "Pages", acts: "Acts", members: "Members" },
-  kinds: { page: "a page", member: "a member", act: "an act" },
+  groups: { areas: "Areas", pages: "Pages", actions: "Actions", members: "Members" },
+  kinds: { page: "a page", member: "a member", action: "an action" },
   membersLoading: "The members are still loading.",
   membersUnread:
     "The members didn't load, so none are listed. Close this and open it again to retry.",

@@ -115,16 +115,16 @@ const markOf = async (workspaceId: string) =>
 
 const eventsIn = async (workspaceId: string) =>
   (
-    await db().pool.query<{ act: string; actor: string; subject_id: string; detail: unknown }>(
-      "SELECT action AS act, actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
+    await db().pool.query<{ action: string; actor: string; subject_id: string; detail: unknown }>(
+      "SELECT action, actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
       [workspaceId],
     )
   ).rows;
 
 const identityEventsAbout = async (fixture: Fixture) =>
   (
-    await db().pool.query<{ act: string }>(
-      `SELECT e.action AS act FROM identity_audit_event e JOIN "user" u ON u.id = e.subject_id
+    await db().pool.query<{ action: string }>(
+      `SELECT e.action FROM identity_audit_event e JOIN "user" u ON u.id = e.subject_id
         WHERE lower(u.email) LIKE $1 ORDER BY e.action`,
       [`%@${fixture.testingDomain}`],
     )
@@ -142,7 +142,7 @@ const isWaitingOnTheRoleRead = async (): Promise<boolean> => {
   return (found.rowCount ?? 0) > 0;
 };
 
-/** As the page acts: the test Admin, holding their own member row. */
+/** As the page does it: the test Admin, holding their own member row. */
 const asTheAdmin = async <T>(
   fixture: Fixture,
   workspaceId: WorkspaceId,
@@ -216,7 +216,9 @@ describe("ensuring the test workspace", () => {
 
     expect((await peopleOn(fixture)).filter((one) => one.operator)).toEqual([]);
     expect(
-      (await identityEventsAbout(fixture)).filter((one) => one.act.startsWith("people.operator.")),
+      (await identityEventsAbout(fixture)).filter((one) =>
+        one.action.startsWith("people.operator."),
+      ),
     ).toEqual([]);
   });
 
@@ -265,7 +267,7 @@ describe("ensuring the test workspace", () => {
     expect(repaired).toMatchObject({ rolesReset: 1, membersAdded: 0, peopleAdded: 0 });
     expect((await eventsIn(workspaceId)).slice(before.length)).toEqual([
       {
-        act: "people.member.role_changed",
+        action: "people.member.role_changed",
         actor: BOOTSTRAP_ACTOR,
         subject_id: invented,
         detail: { previousRole: "Editor", role: "Viewer" },
@@ -401,11 +403,11 @@ describe("ensuring the test workspace", () => {
     ]);
     expect(
       (await eventsIn(workspace.workspaceId)).filter(
-        (one) => one.act === "platform.workspace.marked",
+        (one) => one.action === "platform.workspace.marked",
       ),
     ).toEqual([
       {
-        act: "platform.workspace.marked",
+        action: "platform.workspace.marked",
         actor: BOOTSTRAP_ACTOR,
         subject_id: workspace.workspaceId,
         detail: { corrected: true },

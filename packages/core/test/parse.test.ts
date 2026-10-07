@@ -179,7 +179,7 @@ describe("what a kernel parse answers", () => {
   });
 });
 
-describe("the shapes the Sources acts are handed", () => {
+describe("the shapes the Sources actions are handed", () => {
   it("defaults a connect's class, audience and groups to the narrowest", () => {
     const read = parse(connectUploadFields, {
       connectedSourceId: A_CONNECTED_SOURCE,
@@ -304,7 +304,7 @@ describe("the shapes the Sources acts are handed", () => {
     }
   });
 
-  it("brands the ids an act is handed", () => {
+  it("brands the ids an action is handed", () => {
     const kept = parse(keepInTextInput, {
       connectedSourceId: A_CONNECTED_SOURCE,
       groupsOfFindings: [ALWAYS_GROUP],

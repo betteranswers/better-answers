@@ -18,7 +18,7 @@ import {
   type Sensitivity,
   type Visibility,
 } from "../access/index.ts";
-import { act, batchIdFor, declareActs, record } from "../audit/index.ts";
+import { action, batchIdFor, declareActions, record } from "../audit/index.ts";
 import {
   actorIdOf,
   actorIdOfPerson,
@@ -163,14 +163,14 @@ export {
 } from "./map-maintenance.ts";
 export type { SweptGeneration } from "../store/map/index.ts";
 
-const CONCEPT_ACTS = declareActs("knowledge", {
-  committed: act("knowledge.concept.committed", {
+const CONCEPT_ACTIONS = declareActions("knowledge", {
+  committed: action("knowledge.concept.committed", {
     iri: "iri",
     commitSha: "gitSha",
     contentHash: "contentHash",
     evidenceCount: "count",
   }),
-  accepted: act("knowledge.suggestion.accepted", {
+  accepted: action("knowledge.suggestion.accepted", {
     iri: "iri",
     commitSha: "gitSha",
     contentHash: "contentHash",
@@ -493,7 +493,7 @@ const landWrite = async (
       if (acceptance === undefined) {
         await record(fresh, tx, {
           id: write.auditEventId,
-          act: CONCEPT_ACTS.committed,
+          action: CONCEPT_ACTIONS.committed,
           subjectId: row.iri,
           detail: {
             iri: row.iri,
@@ -505,7 +505,7 @@ const landWrite = async (
       } else {
         await record(fresh, tx, {
           id: write.auditEventId,
-          act: CONCEPT_ACTS.accepted,
+          action: CONCEPT_ACTIONS.accepted,
           subjectId: acceptance.suggestionId,
           batchId: acceptance.batchId,
           detail: {

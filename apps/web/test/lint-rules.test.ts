@@ -130,8 +130,8 @@ describe("better-auth is named in the identity feature and nowhere else", () => 
   });
 });
 
-describe("the journeys take no act from the harness", () => {
-  it("refuses a harness act, allows the harness's code reader", () => {
+describe("the journeys take no action from the harness", () => {
+  it("refuses a harness action, allows the harness's code reader", () => {
     const refused = flagged({
       "apps/web/journeys/provisions.ts": namedProbe("provision", "../e2e/harness.ts"),
       "apps/web/journeys/takes-the-harness.ts": probe("../e2e/harness.ts"),

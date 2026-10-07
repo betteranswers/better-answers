@@ -46,10 +46,10 @@ const WRONG = {
   value: { granted: false, refusal: "recovery-code-wrong", waitSeconds: 0, noticeDue: false },
 };
 
-const actsOn = async (personId: string) =>
+const actionsOn = async (personId: string) =>
   (
-    await db().pool.query<{ act: string; detail: unknown }>(
-      "SELECT action AS act, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
+    await db().pool.query<{ action: string; detail: unknown }>(
+      "SELECT action, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
       [personId],
     )
   ).rows;
@@ -73,9 +73,9 @@ describe("replacing recovery codes", () => {
     for (const code of later) expect(code).toMatch(RECOVERY_CODE);
     expect(later.filter((code) => earlier.includes(code))).toEqual([]);
     expect(await spending(personId, firstOf(earlier))).toEqual(WRONG);
-    expect(await actsOn(personId)).toEqual([
-      { act: "people.person.recovery_codes_issued", detail: { replaced: false } },
-      { act: "people.person.recovery_codes_issued", detail: { replaced: true } },
+    expect(await actionsOn(personId)).toEqual([
+      { action: "people.person.recovery_codes_issued", detail: { replaced: false } },
+      { action: "people.person.recovery_codes_issued", detail: { replaced: true } },
     ]);
   });
 
@@ -131,8 +131,8 @@ describe("replacing recovery codes", () => {
     });
 
     expect(again).toEqual({ ok: false, error: "recovery-codes-held" });
-    expect(await actsOn(personId)).toEqual([
-      { act: "people.person.recovery_codes_issued", detail: { replaced: false } },
+    expect(await actionsOn(personId)).toEqual([
+      { action: "people.person.recovery_codes_issued", detail: { replaced: false } },
     ]);
     expect(await spending(personId, firstOf(held))).toEqual(NINE_LEFT);
   });
@@ -157,11 +157,11 @@ describe("replacing recovery codes", () => {
     });
 
     expect(made).toEqual({ ok: false, error: "restore-code-needed" });
-    expect(await actsOn(personId)).toEqual([]);
+    expect(await actionsOn(personId)).toEqual([]);
   });
 });
 
-describe("each recovery-code act", () => {
+describe("each recovery-code action", () => {
   it.each([
     [
       "replacing",
@@ -190,7 +190,7 @@ describe("each recovery-code act", () => {
           madeAt: "2026-10-02T12:00:00.000Z",
         }),
     ],
-  ])("refuses a malformed person id when %s", async (_act, asked) => {
+  ])("refuses a malformed person id when %s", async (_action, asked) => {
     expect(await asked()).toEqual({ ok: false, error: "malformed" });
   });
 
@@ -237,7 +237,7 @@ describe("spending a recovery code", () => {
 
     expect(spent).toEqual(NINE_LEFT);
     expect(again).toEqual(WRONG);
-    expect((await actsOn(personId)).map((row) => row.act)).toEqual([
+    expect((await actionsOn(personId)).map((row) => row.action)).toEqual([
       "people.person.recovery_codes_issued",
       "people.person.recovery_code_used",
     ]);
@@ -271,7 +271,7 @@ describe("spending a recovery code", () => {
     const spent = await spending(personId, strangersCode);
 
     expect(spent).toEqual(WRONG);
-    expect((await actsOn(personId)).map((row) => row.act)).toEqual([
+    expect((await actionsOn(personId)).map((row) => row.action)).toEqual([
       "people.person.recovery_codes_issued",
     ]);
   });

@@ -18,11 +18,15 @@ import {
   MEMBERS_LOADING,
   NO_LONGER_LISTED,
   SELECTED_MEMBERS,
-} from "./member-act-words.ts";
-import { MemberBulkActs, MemberBulkDialogs, useMemberBulkActs } from "./member-bulk-acts.tsx";
+} from "./member-action-words.ts";
+import {
+  MemberBulkActions,
+  MemberBulkDialogs,
+  useMemberBulkActions,
+} from "./member-bulk-actions.tsx";
 import {
   HIDEABLE,
-  MemberActsContext,
+  MemberActionsContext,
   memberColumns,
   memberFeatures,
   NO_MARKS,
@@ -170,8 +174,8 @@ const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>): Outcom
   return removalSaid(name, removal);
 };
 
-/** Each of the row's acts opens the member's page at that act's control. */
-const ROW_ACTS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
+/** Each of the row's actions opens the member's page at that action's control. */
+const ROW_ACTIONS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
   { label: "Open", at: "member" },
   { label: "Change role", at: "role" },
   { label: "Add to group", at: "groups" },
@@ -181,7 +185,7 @@ const ROW_ACTS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
 const rowMenuOf = (open: (personId: string, at: OpenedAt) => void) => (member: ListedMember) => (
   <RowMenu
     name={nameOf(member)}
-    acts={ROW_ACTS.map(({ label, at }) => ({
+    actions={ROW_ACTIONS.map(({ label, at }) => ({
       label,
       destructive: at === "removal",
       onSelect: () => {
@@ -314,7 +318,7 @@ const usePageTurns = (narrowed: Narrowed) => {
   return turn;
 };
 
-/** A ticked person the list has since lost is still named by the act that refused them. */
+/** A ticked person the list has since lost is still named by the action that refused them. */
 const namedIn =
   (listed: readonly ListedMember[]) =>
   (personId: string): string => {
@@ -322,7 +326,7 @@ const namedIn =
     return member === undefined ? NO_LONGER_LISTED : nameOf(member);
   };
 
-/** Ticks and an act's outcome are the page's; what narrows the rows is the address's. */
+/** Ticks and an action's outcome are the page's; what narrows the rows is the address's. */
 function MemberList(properties: {
   readonly read: ReturnType<typeof useMembers>;
   readonly heading: RefObject<HTMLHeadingElement | null>;
@@ -330,7 +334,7 @@ function MemberList(properties: {
   const { read, heading } = properties;
   const listed = read.data ?? NO_ONE;
   const narrowed = useNarrowedMembers(listed);
-  // A tick outlives its row, so the next act refuses or skips that person and says so.
+  // A tick outlives its row, so the next action refuses or skips that person and says so.
   const [ticked, setTicked] = useState<ReadonlySet<string>>(NONE);
   const [inFocus, setInFocus] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
@@ -356,7 +360,7 @@ function MemberList(properties: {
   });
   const shownIds = () => table.getRowModel().rows.map((row) => row.id);
 
-  const acts = useMemberBulkActs({
+  const actions = useMemberBulkActions({
     readable: read.isSuccess,
     ticked,
     tick: setTicked,
@@ -401,9 +405,9 @@ function MemberList(properties: {
             }}
             focusAfterClear={heading}
           >
-            <MemberBulkActs acts={acts} />
+            <MemberBulkActions actions={actions} />
           </SelectionBar>
-          <MemberActsContext
+          <MemberActionsContext
             value={{
               open: (personId) => {
                 openMember(personId, "member");
@@ -413,7 +417,7 @@ function MemberList(properties: {
           >
             <GridTable
               table={table}
-              caption="Members of this workspace, each with their address, role, groups and the day they joined. A member's name opens them; a tick selects them for an act on every member selected."
+              caption="Members of this workspace, each with their address, role, groups and the day they joined. A member's name opens them; a tick selects them for an action on every member selected."
               ticking={{
                 ticked,
                 onTickedChange: setTicked,
@@ -431,7 +435,7 @@ function MemberList(properties: {
               rowMenu={rowMenuOf(openMember)}
               empty={<NoOneMatches narrowed={narrowed} focusAfterClear={searchRef} />}
             />
-          </MemberActsContext>
+          </MemberActionsContext>
           <ListPages
             pages={{
               kind: "pages",
@@ -446,7 +450,7 @@ function MemberList(properties: {
         </MembersRead>
       </div>
 
-      <MemberBulkDialogs acts={acts} />
+      <MemberBulkDialogs actions={actions} />
     </>
   );
 }
@@ -459,9 +463,9 @@ function useInFocusKeystrokes(properties: {
   readonly nothingInFocus: () => void;
 }) {
   const { inFocus, nothingInFocus } = properties;
-  const onTheMemberInFocus = (act: (personId: string) => void) => () => {
+  const onTheMemberInFocus = (action: (personId: string) => void) => () => {
     if (inFocus === undefined) nothingInFocus();
-    else act(inFocus.personId);
+    else action(inFocus.personId);
   };
   const opening = (at: OpenedAt) =>
     onTheMemberInFocus((personId) => {

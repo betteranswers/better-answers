@@ -33,7 +33,7 @@ The MCP surface is built on MCP SDK v2, `@modelcontextprotocol/server`, in `apps
 - An MCP App, when built, adds views over three of the entries and no further entry. It uses `@modelcontextprotocol/ext-apps` directly, with `apps/web`'s Vite React toolchain. `okf://` identifies a concept and `ui://` a view; both live on the wire and never in a file.
 - No concept is served as an MCP resource in v0.1. A `ui://` view resource is not a concept.
 
-The **acting** credential class is for acts on our own estate and for the ingestion side. It is never a credential for writing into a customer's other systems. The list of classes it belongs to is ADR 0041's. `docs/operations/SECRETS.md` glosses *acting* incompatibly, as writing back into a connected system as the user, and ADR 0041 records that conflict unsettled.
+The **acting** credential class is for actions on our own estate and for the ingestion side. It is never a credential for writing into a customer's other systems. The list of classes it belongs to is ADR 0041's. `docs/operations/SECRETS.md` glosses *acting* incompatibly, as writing back into a connected system as the user, and ADR 0041 records that conflict unsettled.
 
 The platform builds no outbound connectors to third-party SaaS, no outbound OAuth client, no field mapping or sync engine, no outbound scheduler or webhook fan-out, no per-destination rendering and no connector directory of its own. A person who wants our knowledge in Notion or Asana reaches those systems through their own MCP servers, under their own consent. A nightly sync with no person in the loop would be a new ADR and a new deployable.
 

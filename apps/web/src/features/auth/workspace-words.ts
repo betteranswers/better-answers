@@ -23,7 +23,7 @@ export const NO_WORKSPACE_WORDS = {
   readingAgain: "Reading",
 } as const;
 
-export const NO_WORKSPACE_ACTS = {
+export const NO_WORKSPACE_ACTIONS = {
   toInvitations: "Go to your invitations",
   readAgain: "Read your invitations again",
 } as const;

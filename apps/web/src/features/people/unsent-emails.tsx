@@ -4,7 +4,7 @@ import { flushSync } from "react-dom";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
-import { useOneAtATime } from "./invitation-acts.tsx";
+import { useOneAtATime } from "./invitation-actions.tsx";
 import { INVITATIONS_WORDS, resentOutcome } from "./invitation-words.ts";
 import { useResendInvitation, type SentInvitation } from "./invitations-api.ts";
 import { outcomeOfSendingFailure } from "./refusal.tsx";
@@ -14,7 +14,7 @@ const NONE_WENT: ReadonlySet<SentInvitation> = new Set();
 /** A Resend whose email goes takes its row, and focus goes to the heading; one that fails stays. */
 export function UnsentEmails(properties: { readonly unsent: readonly SentInvitation[] }) {
   const [outcome, setOutcome] = useState<Outcome>();
-  // The rows themselves, not their ids: a later act's answer brings fresh rows, shown whole.
+  // The rows themselves, not their ids: a later action's answer brings fresh rows, shown whole.
   const [went, setWent] = useState(NONE_WENT);
   const { acting, begin, settled } = useOneAtATime(setOutcome);
   const resend = useResendInvitation();

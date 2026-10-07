@@ -14,7 +14,13 @@ import {
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { narrower, type Sensitivity } from "../access/index.ts";
-import { act, batchIdFor, declareActs, recordEach, STORED_DETAIL_KEYS } from "../audit/index.ts";
+import {
+  action,
+  batchIdFor,
+  declareActions,
+  recordEach,
+  STORED_DETAIL_KEYS,
+} from "../audit/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import { actorIdOf, attempt, err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { enqueueJobIn, syncRefused, latestIndexOutcomeIn, type JobOutcome } from "../runs/index.ts";
@@ -385,13 +391,13 @@ export const keepInText = async (
   return ok({ connectedSourceId, documentIds: documentsHolding(spans), batchId, jobId });
 };
 
-const REVIEW_ACTS = declareActs("sources", {
-  narrowed: act("sources.document.narrowed", {
+const REVIEW_ACTIONS = declareActions("sources", {
+  narrowed: action("sources.document.narrowed", {
     documentId: "id",
     [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     sensitivity: "sensitivity",
   }),
-  dismissed: act("sources.document.special_category_dismissed", {
+  dismissed: action("sources.document.special_category_dismissed", {
     documentId: "id",
     [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     findingCount: "count",
@@ -518,7 +524,7 @@ export const narrowDocuments = async (
   const batchId = await recordEach(
     admin,
     tx,
-    REVIEW_ACTS.narrowed,
+    REVIEW_ACTIONS.narrowed,
     documentIds.map((documentId) => ({
       subjectId: documentId,
       detail: {
@@ -597,7 +603,7 @@ export const dismissAsNotSpecialCategory = async (
   const batchId = await recordEach(
     admin,
     tx,
-    REVIEW_ACTS.dismissed,
+    REVIEW_ACTIONS.dismissed,
     documentIds.map((documentId) => ({
       subjectId: documentId,
       detail: {

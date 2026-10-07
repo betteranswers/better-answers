@@ -4,7 +4,7 @@ import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { INVITATIONS_UNANSWERED } from "@/features/auth/refusal-words.ts";
 import {
-  NO_WORKSPACE_ACTS,
+  NO_WORKSPACE_ACTIONS,
   NO_WORKSPACE_HEADING,
   NO_WORKSPACE_WORDS,
 } from "@/features/auth/workspace-words.ts";
@@ -180,7 +180,7 @@ test("lists a waiting invitation within a second, then joins it", async ({
   await passesTheAccessibilityGate();
 
   const keystrokes = await keystrokesListed(page, "this page");
-  await expect(keystrokes).toContainText(NO_WORKSPACE_ACTS.toInvitations);
+  await expect(keystrokes).toContainText(NO_WORKSPACE_ACTIONS.toInvitations);
   await keystrokesDismissed(page, keystrokes);
   await page.keyboard.press("i");
   await expect(invitationTo(page, workspace.name)).toBeFocused();
@@ -216,7 +216,7 @@ test("offers to read the invitations again when no answer came", async ({
 
   await page.unroute(INVITATIONS_READ_ROUTE);
   const keystrokes = await keystrokesListed(page, "this page");
-  await expect(keystrokes).toContainText(NO_WORKSPACE_ACTS.readAgain);
+  await expect(keystrokes).toContainText(NO_WORKSPACE_ACTIONS.readAgain);
   await keystrokesDismissed(page, keystrokes);
   await page.keyboard.press("r");
 

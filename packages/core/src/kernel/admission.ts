@@ -23,7 +23,7 @@ type RoleOrPurpose = {
   readonly purposes: readonly string[] | typeof EVERY_PURPOSE;
 };
 
-/** No role and no purpose reaches an act that admits this. */
+/** No role and no purpose reaches an action that admits this. */
 export const OPERATOR_ALONE = { operator: true } as const;
 
 export type Admits = RoleOrPurpose | typeof OPERATOR_ALONE;
@@ -59,7 +59,7 @@ type Refused<A extends Admits> = A extends RoleOrPurpose
   ? typeof ROLE_FORBIDS
   : typeof NOT_THE_OPERATOR;
 
-export type ActDeclaration<
+export type ActionDeclaration<
   Schema extends z.ZodType = z.ZodType,
   A extends Admits = Admits,
   Word extends string = string,
@@ -74,19 +74,19 @@ export type ActDeclaration<
   readonly effect: E;
 };
 
-export type InputOf<D extends ActDeclaration> = z.output<D["input"]>;
+export type InputOf<D extends ActionDeclaration> = z.output<D["input"]>;
 
-export type RefusalOf<D extends ActDeclaration> = D["refuses"][number];
+export type RefusalOf<D extends ActionDeclaration> = D["refuses"][number];
 
 type ReadsAdmits = (input: never) => Admits;
 
-type AdmitsOf<D extends ActDeclaration> = [Extract<D["admits"], ReadsAdmits>] extends [never]
+type AdmitsOf<D extends ActionDeclaration> = [Extract<D["admits"], ReadsAdmits>] extends [never]
   ? Extract<D["admits"], Admits>
   : ReturnType<Extract<D["admits"], ReadsAdmits>>;
 
-export type AdmittedOf<D extends ActDeclaration> = Admitted<AdmitsOf<D>>;
+export type AdmittedOf<D extends ActionDeclaration> = Admitted<AdmitsOf<D>>;
 
-type AdmissionRefusedOf<D extends ActDeclaration> = Refused<AdmitsOf<D>>;
+type AdmissionRefusedOf<D extends ActionDeclaration> = Refused<AdmitsOf<D>>;
 
 /**
  * Hands the declaration back unchanged. A word stated twice counts once in the union it builds,
@@ -94,14 +94,14 @@ type AdmissionRefusedOf<D extends ActDeclaration> = Refused<AdmitsOf<D>>;
  *
  * @throws when `refuses` lists one word twice.
  */
-export const declareAct = <
+export const declareAction = <
   Schema extends z.ZodType,
   const A extends Admits,
   const Word extends string,
   const E extends Effect,
 >(
-  declaration: ActDeclaration<Schema, A, Word, E>,
-): ActDeclaration<Schema, A, Word, E> => {
+  declaration: ActionDeclaration<Schema, A, Word, E>,
+): ActionDeclaration<Schema, A, Word, E> => {
   const { refuses } = declaration;
   const twice = refuses.find((word) => refuses.indexOf(word) !== refuses.lastIndexOf(word));
   if (twice !== undefined) throw new Error(`admission: ${twice} is listed twice`);
@@ -122,11 +122,11 @@ const opens = (wanted: Admits, principal: Principal | OperatorPrincipal): boolea
 
 /**
  * Admits a person whose role is the declared one or above, the platform acting for a declared
- * purpose, or the operator where the act admits them alone. An `admits` written as a function is
+ * purpose, or the operator where the action admits them alone. An `admits` written as a function is
  * read from `input`. Anyone else is refused `role-forbids`, or `not-the-operator` by an operator's
- * act.
+ * action.
  */
-export const admit = <D extends ActDeclaration>(
+export const admit = <D extends ActionDeclaration>(
   declaration: D,
   principal: Principal | OperatorPrincipal,
   input: InputOf<D>,

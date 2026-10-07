@@ -2,7 +2,7 @@ import { useId, useState, type FormEvent } from "react";
 
 import { ulid } from "@better-answers/schema/ulid";
 
-import { ActDialog } from "@/shared/act-dialog.tsx";
+import { ActionDialog } from "@/shared/action-dialog.tsx";
 import { watchUpload, type UploadProgress } from "@/shared/api/upload-progress.ts";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -63,7 +63,7 @@ const textOf = (form: FormData, field: string): string => {
   return typeof value === "string" ? value.trim() : "";
 };
 
-export function ConnectAct() {
+export function ConnectAction() {
   const [open, setOpen] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>();
   const [uploading, setUploading] = useState<Uploading>();
@@ -145,7 +145,7 @@ export function ConnectAct() {
       <Button size="sm" aria-keyshortcuts={SOURCES_KEYSTROKES.connect.key} onClick={show}>
         Connect a document
       </Button>
-      <ActDialog
+      <ActionDialog
         open={open}
         onOpenChange={setOpen}
         title="Connect a document"
@@ -226,7 +226,7 @@ export function ConnectAct() {
 
           <OutcomeLine outcome={outcome} className="text-sm" />
         </form>
-      </ActDialog>
+      </ActionDialog>
     </>
   );
 }

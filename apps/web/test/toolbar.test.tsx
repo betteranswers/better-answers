@@ -25,7 +25,7 @@ const A_TABBED_PAGE: PageToolbar = {
     { id: "connected-sources-all", name: "All" },
     { id: "connected-sources-gone", name: "Gone at source" },
   ],
-  acts: (
+  actions: (
     <button type="button" className="border border-border px-3">
       Add a connected source
     </button>
@@ -40,17 +40,17 @@ const ANOTHER_TABBED_PAGE: PageToolbar = {
 };
 
 /**
- * One helper of the feature's own, called by its content and by its acts: the shared slot
+ * One helper of the feature's own, called by its content and by its actions: the shared slot
  * never learns the type.
  */
 const useTickedGroups = viewStateOf<number>("/connected-sources/review");
 
 const useAnotherPagesTickedGroups = viewStateOf<number>("/connected-sources/all");
 
-function NarrowAct() {
+function NarrowAction() {
   const [ticked] = useTickedGroups();
 
-  // Inert on an empty slot, which is the act's own property and what makes a thrown page safe.
+  // Inert on an empty slot, which is the action's own property and what makes a thrown page safe.
   return (
     <button type="button" disabled={ticked === undefined}>
       {ticked === undefined ? "Narrow these documents" : `Narrow ${ticked} documents`}
@@ -58,7 +58,7 @@ function NarrowAct() {
   );
 }
 
-function AnotherPagesAct() {
+function AnotherPagesAction() {
   const [ticked] = useAnotherPagesTickedGroups();
 
   return (
@@ -85,10 +85,10 @@ const A_REVIEW_VIEW: PageToolbar = {
     { id: "review-done", name: "Done" },
   ],
   /** Built once, the way a route's static data is, and live on every render all the same. */
-  acts: (
+  actions: (
     <>
-      <NarrowAct />
-      <AnotherPagesAct />
+      <NarrowAction />
+      <AnotherPagesAction />
     </>
   ),
 };
@@ -108,9 +108,9 @@ const drawReview = (throwsOnATick: boolean) =>
     </PageTabsRoot>,
   );
 
-const narrowAct = () => screen.getByRole("button", { name: /^Narrow (these|\d)/ });
+const narrowAction = () => screen.getByRole("button", { name: /^Narrow (these|\d)/ });
 
-const anotherPagesAct = () =>
+const anotherPagesAction = () =>
   screen.getByRole("button", { name: "Narrow another page's documents" });
 
 const reviewTab = (name: string) =>
@@ -165,14 +165,14 @@ describe("the toolbar the open page fills", () => {
     expect(within(panel).getByRole("region", { name: "Model choices" })).toBeDefined();
   });
 
-  it("draws no toolbar or panel without tabs or acts", async () => {
+  it("draws no toolbar or panel without tabs or actions", async () => {
     await shellAt("/ask");
 
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("tabpanel")).toBeNull();
   });
 
-  it("draws a page's tabs before its acts in the toolbar", () => {
+  it("draws a page's tabs before its actions in the toolbar", () => {
     render(
       <PageTabsRoot tabs={A_TABBED_PAGE.tabs}>
         <Toolbar name="Connected sources" toolbar={A_TABBED_PAGE} />
@@ -183,31 +183,31 @@ describe("the toolbar the open page fills", () => {
     );
 
     const list = screen.getByRole("tablist", { name: "Connected sources" });
-    const act = screen.getByRole("button", { name: "Add a connected source" });
+    const action = screen.getByRole("button", { name: "Add a connected source" });
 
-    expect(list.compareDocumentPosition(act) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(list.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
-  it("draws only the acts for a page without tabs", () => {
-    render(<Toolbar name="Connected sources" toolbar={{ acts: A_TABBED_PAGE.acts }} />);
+  it("draws only the actions for a page without tabs", () => {
+    render(<Toolbar name="Connected sources" toolbar={{ actions: A_TABBED_PAGE.actions }} />);
 
     expect(screen.getByRole("button", { name: "Add a connected source" })).toBeDefined();
     expect(screen.queryByRole("tablist")).toBeNull();
   });
 });
 
-describe("the slot a page writes and its acts read", () => {
-  it("gives an act what its own page wrote, not another's", () => {
+describe("the slot a page writes and its actions read", () => {
+  it("gives an action what its own page wrote, not another's", () => {
     drawReview(false);
 
-    expect(narrowAct().textContent).toBe("Narrow these documents");
-    expect(narrowAct().hasAttribute("disabled")).toBe(true);
+    expect(narrowAction().textContent).toBe("Narrow these documents");
+    expect(narrowAction().hasAttribute("disabled")).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "Tick two groups" }));
 
-    expect(narrowAct().textContent).toBe("Narrow 2 documents");
-    expect(narrowAct().hasAttribute("disabled")).toBe(false);
-    expect(anotherPagesAct().hasAttribute("disabled")).toBe(true);
+    expect(narrowAction().textContent).toBe("Narrow 2 documents");
+    expect(narrowAction().hasAttribute("disabled")).toBe(false);
+    expect(anotherPagesAction().hasAttribute("disabled")).toBe(true);
   });
 
   it("empties the slot when a page that threw is reopened", () => {
@@ -222,7 +222,7 @@ describe("the slot a page writes and its acts read", () => {
     reviewTab("Open");
 
     expect(screen.getByRole("button", { name: "Tick two groups" })).toBeDefined();
-    expect(narrowAct().textContent).toBe("Narrow these documents");
-    expect(narrowAct().hasAttribute("disabled")).toBe(true);
+    expect(narrowAction().textContent).toBe("Narrow these documents");
+    expect(narrowAction().hasAttribute("disabled")).toBe(true);
   });
 });

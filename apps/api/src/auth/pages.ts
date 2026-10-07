@@ -15,8 +15,7 @@ const strong = (value: string): string => `<strong>${escaped(value)}</strong>`;
 /** The consent page's words. The page's body passes each value in escaped and marked up. */
 export const CONSENT_WORDS = {
   title: (assistant: string) => `Connect ${assistant}`,
-  actsAs: (assistant: string, workspace: string) =>
-    `${assistant} will act as you, at ${workspace}.`,
+  asYou: (assistant: string, workspace: string) => `${assistant} will act as you, at ${workspace}.`,
   hostedAt: (assistant: string, host: string) =>
     `This app calls itself “${assistant}” and is hosted at ${host}.`,
   goesNext: (host: string) => `If you did not expect Connect to take you to ${host}, cancel.`,
@@ -101,7 +100,7 @@ export const consentPage = (
   return shell(
     CONSENT_WORDS.title(params.clientName),
     `<h1>${CONSENT_WORDS.title(assistant)}</h1>
-<p>${CONSENT_WORDS.actsAs(assistant, strong(params.workspace))}</p>
+<p>${CONSENT_WORDS.asYou(assistant, strong(params.workspace))}</p>
 <p>${CONSENT_WORDS.hostedAt(assistant, strong(params.hostedAt))}</p>
 <p>${CONSENT_WORDS.goesNext(strong(params.sendsCodeTo))}</p>
 <ul>

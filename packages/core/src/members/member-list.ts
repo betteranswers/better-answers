@@ -5,7 +5,7 @@ import { boundarySchemas } from "@better-answers/schema";
 import {
   admit,
   attempt,
-  declareAct,
+  declareAction,
   err,
   ok,
   type RefusalOf,
@@ -15,17 +15,17 @@ import {
 import type { Tx } from "../store/postgres/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-/** Every act on one member names them by person id, as the list does. */
+/** Every action on one member names them by person id, as the list does. */
 export const memberKeyed = z.object({ personId: boundarySchemas.user.select.shape.id });
 
-const listMembersAct = declareAct({
+const listMembersAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: z.object({}),
   refuses: ["role-forbids"],
   effect: "read",
 });
 
-export type ListMembersRefusal = MemberRefusal<RefusalOf<typeof listMembersAct>> | Error;
+export type ListMembersRefusal = MemberRefusal<RefusalOf<typeof listMembersAction>> | Error;
 
 const LISTED_ROW = z.object({
   personId: boundarySchemas.user.select.shape.id,
@@ -75,7 +75,7 @@ export const listMembers = async (
   principal: UserPrincipal,
   tx: Tx,
 ): Promise<Result<readonly ListedMember[], ListMembersRefusal>> => {
-  const admitted = admit(listMembersAct, principal, {});
+  const admitted = admit(listMembersAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
 
   // The parse brands the ids; a row it throws on fails the read like the query would.

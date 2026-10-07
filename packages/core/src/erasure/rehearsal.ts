@@ -1,6 +1,6 @@
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
+import { action, declareActions, record, type DetailOf } from "../audit/index.ts";
 import { ERASURE_REHEARSAL_PATH, writeConcept } from "../concepts/index.ts";
 import {
   attempt,
@@ -23,8 +23,8 @@ import {
 import { recordSubjectRequest, type RecordSubjectRequestRefusal } from "./requests.ts";
 import { runErasure, type ErasureDoors, type ErasurePrincipal } from "./routine.ts";
 
-const REHEARSAL_ACTS = declareActs("platform", {
-  rehearsed: act("platform.erasure.rehearsed", {
+const REHEARSAL_ACTIONS = declareActions("platform", {
+  rehearsed: action("platform.erasure.rehearsed", {
     erasureRequestId: "id",
     subjectRequestId: "id",
     personId: "id",
@@ -32,7 +32,7 @@ const REHEARSAL_ACTS = declareActs("platform", {
   }),
 });
 
-type RehearsedDetail = DetailOf<(typeof REHEARSAL_ACTS)["rehearsed"]["detail"]>;
+type RehearsedDetail = DetailOf<(typeof REHEARSAL_ACTIONS)["rehearsed"]["detail"]>;
 
 export type RehearsalRefusal = "malformed" | "not-seeded";
 
@@ -301,7 +301,7 @@ const recordTheRehearsal = async (
   await withScope(platform, door, workspaceId, (tx) =>
     record(platform, tx, {
       id: auditEventId,
-      act: REHEARSAL_ACTS.rehearsed,
+      action: REHEARSAL_ACTIONS.rehearsed,
       subjectId: detail.erasureRequestId,
       detail,
     }),

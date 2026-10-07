@@ -22,7 +22,7 @@ import {
 import { authenticatorFor, passkeyFor, restoreCodeFor } from "./identity-rows.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
 import { AT, secondFactorSuite } from "./second-factor-suite.ts";
-import { addressOf, countWaitingOnLocks, until, whileActsWaitAt } from "./suite-postgres.ts";
+import { addressOf, countWaitingOnLocks, until, whileActionsWaitAt } from "./suite-postgres.ts";
 
 const { db, door, aSession, identitySetRowsFor, confirmedAt, recoveryCodesHeldBy } =
   secondFactorSuite();
@@ -40,8 +40,8 @@ const RESTORE_CODE = "7k3m-9pqr-x2v4-h8tw";
 /** The SHA-256 of the restore code as typed bare: lower case, no spaces, no dashes. */
 const RESTORE_HASH = createHash("sha256").update("7k3m9pqrx2v4h8tw").digest("hex");
 
-const actsOn = async (personId: string) =>
-  (await identitySetRowsFor(personId)).map((row) => row.act);
+const actionsOn = async (personId: string) =>
+  (await identitySetRowsFor(personId)).map((row) => row.action);
 
 const passkeyRowOf = async (passkeyId: string) =>
   (
@@ -180,7 +180,7 @@ describe("confirming by passkey", () => {
     const sessions = await db().pool.query("SELECT id FROM session WHERE user_id = $1", [personId]);
     expect(sessions.rows).toEqual([{ id: sessionId }]);
     expect(await identitySetRowsFor(personId)).toEqual([
-      { act: "people.person.second_factor_confirmed", detail: { method: "passkey" } },
+      { action: "people.person.second_factor_confirmed", detail: { method: "passkey" } },
     ]);
   });
 
@@ -215,7 +215,7 @@ describe("confirming by passkey", () => {
     const passkeyId = await passkeyFor(db().pool, personId);
     const sessionId = await aSession(personId);
 
-    const confirmed = await whileActsWaitAt(
+    const confirmed = await whileActionsWaitAt(
       db().pool,
       "identity_audit_event",
       "INSERT",
@@ -232,7 +232,7 @@ describe("confirming by passkey", () => {
 
     expect(confirmed).toEqual({ ok: false, error: "passkey-not-yours" });
     expect(await confirmedAt(sessionId)).toEqual(UNCONFIRMED);
-    expect(await actsOn(personId)).toEqual(["people.person.passkey_removed"]);
+    expect(await actionsOn(personId)).toEqual(["people.person.passkey_removed"]);
   });
 });
 
@@ -253,7 +253,7 @@ describe("confirming by authenticator", () => {
     expect(await confirmedAt(sessionId)).toEqual({ confirmed: AT, pending: null });
     expect(await failuresOf(personId)).toEqual([]);
     expect(await identitySetRowsFor(personId)).toEqual([
-      { act: "people.person.second_factor_confirmed", detail: { method: "authenticator" } },
+      { action: "people.person.second_factor_confirmed", detail: { method: "authenticator" } },
     ]);
   });
 
@@ -403,7 +403,7 @@ describe("spending a recovery code", () => {
     expect(spent).toEqual({ ok: true, value: { granted: true, unused: 9 } });
     expect([await grantOf(spender), await grantOf(other)]).toEqual([AT, null]);
     expect(await confirmedAt(spender)).toEqual(UNCONFIRMED);
-    expect(await actsOn(personId)).toEqual([
+    expect(await actionsOn(personId)).toEqual([
       "people.person.recovery_codes_issued",
       "people.person.recovery_code_used",
     ]);
@@ -544,8 +544,8 @@ describe("replacing the factors", () => {
     expect(await grantOf(sessionId)).toBeNull();
     expect(await confirmedAt(sessionId)).toEqual({ confirmed: after(60), pending: null });
     expect((await identitySetRowsFor(personId)).slice(-2)).toEqual([
-      { act: "people.person.recovery_codes_issued", detail: { replaced: true } },
-      { act: "people.person.factors_replaced", detail: { by: "passkey" } },
+      { action: "people.person.recovery_codes_issued", detail: { replaced: true } },
+      { action: "people.person.factors_replaced", detail: { by: "passkey" } },
     ]);
     expect(await spending(personId, sessionId, left[0] ?? "")).toMatchObject({
       ok: true,
@@ -590,7 +590,7 @@ describe("replacing the factors", () => {
       await readParkedAuthenticatorSecret(bootstrap, door(), { sessionId, now: after(60) }),
     ).toEqual({ ok: true, value: undefined });
     expect((await identitySetRowsFor(personId)).at(-1)).toEqual({
-      act: "people.person.factors_replaced",
+      action: "people.person.factors_replaced",
       detail: { by: "authenticator" },
     });
   });
@@ -775,7 +775,7 @@ describe("accepting a restore code", () => {
     expect(again).toMatchObject({ ok: true, value: { granted: false } });
     expect(await grantOf(sessionId)).toEqual(AT);
     expect(await identitySetRowsFor(personId)).toEqual([
-      { act: "people.person.restore_code_accepted", detail: {} },
+      { action: "people.person.restore_code_accepted", detail: {} },
     ]);
   });
 

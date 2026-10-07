@@ -8,7 +8,7 @@ import { NO_SESSION_ANSWERED, refusalOfCall, webSignedIn } from "./web-client.ts
 
 const EIGHT_DAYS_MS = 8 * 24 * 60 * 60 * 1000;
 
-/** The act reads its instant from this clock, so an invitation can be read after its week is up. */
+/** The action reads its instant from this clock, so an invitation can be read after its week is up. */
 const clockShift = { ms: 0 };
 
 const app = appForSuite({ clock: { now: () => new Date(Date.now() + clockShift.ms) } });
@@ -49,7 +49,7 @@ const anInvitee = async (role: "Admin" | "Editor" | "Viewer" = "Editor") => {
   return { admin, address, invitationId: linkedInvitationId(address), ...invitee };
 };
 
-/** Written as the harness writes it, since the invite act lower-cases every address it is given. */
+/** Written as the harness writes it, since the invite action lower-cases every address it is given. */
 const anUpperCaseInvitation = async () => {
   const { workspace } = await anAdmin();
   const address = anAddress("una");
@@ -83,12 +83,12 @@ const membersOf = async (workspaceId: string, personId: string) =>
 const joinedEventsOf = async (personId: string) =>
   (
     await app().database.superuser.query<{
-      act: string;
+      action: string;
       actor: string;
       workspace_id: string;
       detail: Record<string, string>;
     }>(
-      `SELECT action AS act, actor, workspace_id, detail FROM audit_event
+      `SELECT action, actor, workspace_id, detail FROM audit_event
         WHERE subject_id = $1 AND action = 'people.member.joined' ORDER BY id`,
       [personId],
     )
@@ -151,7 +151,7 @@ describe("accepting an invitation over tRPC", () => {
     });
     expect(await joinedEventsOf(personId)).toEqual([
       {
-        act: "people.member.joined",
+        action: "people.member.joined",
         actor: `human:${personId}`,
         workspace_id: workspaceId,
         detail: { invitationId, role: "Editor" },

@@ -6,7 +6,7 @@ import { batchIdFor } from "../audit/index.ts";
 import {
   admit,
   attempt,
-  declareAct,
+  declareAction,
   err,
   ok,
   type AdminUserPrincipal,
@@ -33,7 +33,7 @@ import type { MemberRefusal } from "./vocabulary.ts";
 
 export type { BulkOutcome } from "./sets.ts";
 
-/** One act holds at most this many member rows until it commits. */
+/** One action holds at most this many member rows until it commits. */
 const MOST_TICKED = 200;
 
 const PERSON_ID = boundarySchemas.user.select.shape.id;
@@ -42,12 +42,12 @@ const TICKED = z.array(PERSON_ID).min(1).max(MOST_TICKED);
 
 const ROLE = boundarySchemas.member.select.shape.role;
 
-/** The role is any text, so a role outside the three reaches the act and is refused in its word. */
+/** The role is any text, so a role outside the three reaches the action and is refused in its word. */
 export const bulkChangeRoleInput = z.object({ personIds: TICKED, role: z.string() });
 
 export type BulkChangeRoleInput = z.output<typeof bulkChangeRoleInput>;
 
-const bulkChangeRoleAct = declareAct({
+const bulkChangeRoleAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: bulkChangeRoleInput,
   refuses: ["role-forbids", "no-such-role", "no-such-member", "last-admin", "changed-meanwhile"],
@@ -72,7 +72,7 @@ export const bulkChangeRole = async (
   tx: Tx,
   input: BulkChangeRoleInput,
 ): Promise<Result<BulkOutcome & BulkPromoted, BulkChangeRoleRefusal>> => {
-  const admitted = admit(bulkChangeRoleAct, principal, input);
+  const admitted = admit(bulkChangeRoleAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const role = ROLE.safeParse(input.role);
   if (!role.success) return err("no-such-role");
@@ -113,11 +113,11 @@ export const bulkChangeRole = async (
 export const bulkRemoveMembersInput = z.object({ personIds: TICKED });
 
 export type BulkRemoveMembersInput = z.output<typeof bulkRemoveMembersInput> & {
-  /** When the act happens: each person's tokens for this workspace issued before it end. */
+  /** When the action happens: each person's tokens for this workspace issued before it end. */
   readonly at: Date;
 };
 
-const bulkRemoveMembersAct = declareAct({
+const bulkRemoveMembersAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: bulkRemoveMembersInput,
   refuses: ["role-forbids", "last-admin", "changed-meanwhile"],
@@ -138,7 +138,7 @@ export const bulkRemoveMembers = async (
   tx: Tx,
   input: BulkRemoveMembersInput,
 ): Promise<Result<BulkOutcome, BulkRemoveMembersRefusal>> => {
-  const admitted = admit(bulkRemoveMembersAct, principal, input);
+  const admitted = admit(bulkRemoveMembersAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const admin = admitted.value;
   const personIds = distinct(input.personIds);
@@ -165,7 +165,7 @@ export const bulkAddToGroupInput = z.object({
 
 export type BulkAddToGroupInput = z.output<typeof bulkAddToGroupInput>;
 
-const bulkAddToGroupAct = declareAct({
+const bulkAddToGroupAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: bulkAddToGroupInput,
   refuses: ["role-forbids", "no-such-group", "no-such-member", "changed-meanwhile"],
@@ -214,7 +214,7 @@ export const bulkAddToGroup = async (
   tx: Tx,
   input: BulkAddToGroupInput,
 ): Promise<Result<BulkOutcome, BulkAddToGroupRefusal>> => {
-  const admitted = admit(bulkAddToGroupAct, principal, input);
+  const admitted = admit(bulkAddToGroupAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const asked = { groupId: input.groupId, personIds: distinct(input.personIds) };
 

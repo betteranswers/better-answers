@@ -84,9 +84,9 @@ const CODE_OF_CLASS = {
   precondition: "PRECONDITION_FAILED",
 } as const satisfies Readonly<Record<RefusalClass, TRPCError["code"]>>;
 
-const refused = (log: Logger, act: string, answered: RefusalAnswer): TRPCError => {
+const refused = (log: Logger, action: string, answered: RefusalAnswer): TRPCError => {
   const refusal = refusalOf(answered);
-  log.info({ event: "trpc.refused", act, ...refusalLogged(refusal) }, "refused");
+  log.info({ event: "trpc.refused", action, ...refusalLogged(refusal) }, "refused");
   return new TRPCError({
     code: CODE_OF_CLASS[refusal.class],
     message: refusal.word,
@@ -94,14 +94,14 @@ const refused = (log: Logger, act: string, answered: RefusalAnswer): TRPCError =
   });
 };
 
-const failed = (log: Logger, act: string, cause: Error): TRPCError => {
-  log.error({ event: "trpc.failed", act, err: cause }, "failed");
-  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${act} failed`, cause });
+const failed = (log: Logger, action: string, cause: Error): TRPCError => {
+  log.error({ event: "trpc.failed", action, err: cause }, "failed");
+  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${action} failed`, cause });
 };
 
-const throttled = (log: Logger, act: string, met: CeilingMet): TRPCError => {
+const throttled = (log: Logger, action: string, met: CeilingMet): TRPCError => {
   const { retryAfterSeconds } = met;
-  log.info({ event: "trpc.throttled", act, retryAfterSeconds }, "throttled");
+  log.info({ event: "trpc.throttled", action, retryAfterSeconds }, "throttled");
   return new TRPCError({
     code: "TOO_MANY_REQUESTS",
     message: `Too many calls; ask again in ${retryAfterSeconds} seconds.`,
@@ -115,15 +115,15 @@ const throttled = (log: Logger, act: string, met: CeilingMet): TRPCError => {
  */
 export const crossing = async <Value>(
   ctx: { readonly log: Logger },
-  act: string,
+  action: string,
   running: Promise<Result<Value, RefusalAnswer | Error>>,
 ): Promise<Value> => {
   const answered = await attemptResult(() => running);
 
   if (answered.ok) return answered.value;
-  if (answered.error instanceof CeilingMet) throw throttled(ctx.log, act, answered.error);
-  if (answered.error instanceof Error) throw failed(ctx.log, act, answered.error);
-  throw refused(ctx.log, act, answered.error);
+  if (answered.error instanceof CeilingMet) throw throttled(ctx.log, action, answered.error);
+  if (answered.error instanceof Error) throw failed(ctx.log, action, answered.error);
+  throw refused(ctx.log, action, answered.error);
 };
 
 type InTheTransaction = {
@@ -133,12 +133,12 @@ type InTheTransaction = {
 };
 
 /**
- * Answers a procedure with one act, as the resolved member in its transaction. The act's function
+ * Answers a procedure with one action, as the resolved member in its transaction. The action's function
  * name labels its logs; never pass an anonymous one.
  */
 export const answeredBy =
   <Input, Value>(
-    act: (
+    action: (
       principal: UserPrincipal,
       tx: Tx,
       input: Input,
@@ -153,8 +153,8 @@ export const answeredBy =
   }): Promise<Value> =>
     crossing(
       ctx,
-      act.name,
-      given(input, (asked) => act(ctx.principal, ctx.tx, asked)),
+      action.name,
+      given(input, (asked) => action(ctx.principal, ctx.tx, asked)),
     );
 
 const trpc = initTRPC.context<TrpcContext>().create({
@@ -241,7 +241,7 @@ export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
 
 /**
  * A Principal outlives the transaction that resolved it only here; never the request, and the
- * act's own door re-judges it.
+ * action's own door re-judges it.
  */
 export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, path, next }) => {
   const claims = await claimsOf(ctx, path);
@@ -255,15 +255,15 @@ export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, path, ne
   return next({ ctx: { principal: resolved.value.value, doors: ctx.doors } });
 });
 
-/** Answers only once the act committed, so a follow-up such as an email never outruns the write. */
+/** Answers only once the action committed, so a follow-up such as an email never outruns the write. */
 export const committedAs = async <Value, Refused>(
   ctx: { readonly principal: UserPrincipal; readonly doors: Doors },
-  act: (principal: UserPrincipal, tx: Tx) => Promise<Result<Value, Refused>>,
+  action: (principal: UserPrincipal, tx: Tx) => Promise<Result<Value, Refused>>,
 ): Promise<Folded<Result<Value, Refused>>> =>
-  folded<Result<Value, Refused>>(await withMember(ctx.principal, ctx.doors.postgres, act));
+  folded<Result<Value, Refused>>(await withMember(ctx.principal, ctx.doors.postgres, action));
 
 /**
- * An act on the person themselves needs no workspace; the person is the session's, never a
+ * An action on the person themselves needs no workspace; the person is the session's, never a
  * value the request names.
  */
 export const personProcedure = trpc.procedure.use(async ({ ctx, path, next }) => {
@@ -301,7 +301,7 @@ export const personCeiling = (rule: CounterRule) =>
     return next();
   });
 
-/** As personCeiling, for an act on the own-transaction road. */
+/** As personCeiling, for an action on the own-transaction road. */
 export const ownTransactionCeiling = (rule: CounterRule) =>
   ownTransactionProcedure.use(async ({ ctx, path, next }) => {
     await consumeCeiling(ctx, path, ctx.principal.userId, rule);

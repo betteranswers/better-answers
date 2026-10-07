@@ -9,6 +9,6 @@ export const inputOf = <Schema extends z.ZodType>(
   const read = parse(schema, raw);
   if (read.ok) return read.value;
   throw new Error(
-    `the arranged input is not the act's shape: ${JSON.stringify(read.error.fields)}`,
+    `the arranged input is not the action's shape: ${JSON.stringify(read.error.fields)}`,
   );
 };

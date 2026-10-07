@@ -22,8 +22,8 @@ export function normalizeError(cause: unknown): Error {
 
 /**
  * What `operation` resolves to, or its rejection as a normalised Error; it never rejects itself.
- * After an act's first write, anything the act calls rejects: a word it might not read commits the
- * act without its step.
+ * After an action's first write, anything the action calls rejects: a word it might not read commits the
+ * action without its step.
  */
 export async function attempt<T>(operation: () => Promise<T>): Promise<Result<T>> {
   try {

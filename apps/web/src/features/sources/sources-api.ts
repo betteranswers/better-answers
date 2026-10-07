@@ -70,7 +70,7 @@ export const usePreview = (connectedSourceId: string, enabled: boolean) => {
 };
 
 /**
- * The one act whose input is bytes: its descriptor rides beside them, so it goes through the
+ * The one action whose input is bytes: its descriptor rides beside them, so it goes through the
  * tRPC client, not an options factory built once.
  */
 export const useConnect = () => {
@@ -84,7 +84,7 @@ export const useConnect = () => {
   });
 };
 
-/** Every settled act reads again what it changed, so the cache ends as the api left it. */
+/** Every settled action reads again what it changed, so the cache ends as the api left it. */
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

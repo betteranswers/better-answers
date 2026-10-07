@@ -618,7 +618,7 @@ describe("the Admin's check of the test workspace, through its reads", () => {
   }, 120_000);
 });
 
-/** As the api answers a refused act: its word as the message, and the word again in `data`. */
+/** As the api answers a refused action: its word as the message, and the word again in `data`. */
 const refusedWith = (word: string, status: number): Reply => ({
   status,
   headers: { "content-type": "application/json" },

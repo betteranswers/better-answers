@@ -4,7 +4,7 @@ import { useEffect, useEffectEvent, useRef, useState, type FormEvent, type React
 import { flushSync } from "react-dom";
 
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { KeystrokesAct, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import type { Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -24,7 +24,7 @@ import { carriedOnTo, leavingFor, pageQuery } from "./carried-flow.ts";
 import { codeSpent, digitsOf, selectTheCode, triesLeft, worthSending } from "./code-entry.ts";
 import { passkeysHere, usePasskeySignIn } from "./passkey-hooks.ts";
 import {
-  PasskeyAct,
+  PasskeyAction,
   saidOfAPasskeySignIn,
   saidWhileSigningInWithAPasskey,
 } from "./passkey-sign-in.tsx";
@@ -46,9 +46,9 @@ import {
   type Arrival,
 } from "./sign-in-words.ts";
 
-const SEND_A_NEW_CODE: Keystroke = { key: "n", act: SIGN_IN_WORDS.sendAgain };
+const SEND_A_NEW_CODE: Keystroke = { key: "n", action: SIGN_IN_WORDS.sendAgain };
 
-const CHANGE_ADDRESS: Keystroke = { key: "e", act: SIGN_IN_WORDS.otherAddress };
+const CHANGE_ADDRESS: Keystroke = { key: "e", action: SIGN_IN_WORDS.otherAddress };
 
 const EMAIL_FIELD = "email";
 
@@ -60,26 +60,26 @@ const REFUSED = "sign-in-refused";
 
 const TOO_MANY_REQUESTS = 429;
 
-/** What each act's failure says: past a ceiling, refused otherwise, or never answered. */
-type SaidOfAnAct = {
+/** What each action's failure says: past a ceiling, refused otherwise, or never answered. */
+type SaidOfAnAction = {
   readonly tooMany: (waitSeconds: number | undefined) => Said;
   readonly refused: Said;
   readonly unanswered: Said;
 };
 
-const SAID_OF_SENDING: SaidOfAnAct = {
+const SAID_OF_SENDING: SaidOfAnAction = {
   tooMany: tooManyCodesAskedFor,
   refused: CODE_NOT_SENT,
   unanswered: CODE_UNANSWERED,
 };
 
-const saidOfSigningIn = (left: number): SaidOfAnAct => ({
+const saidOfSigningIn = (left: number): SaidOfAnAction => ({
   tooMany: tooManyCodesTried,
   refused: codeWrong(left),
   unanswered: SIGN_IN_UNANSWERED,
 });
 
-/** One reading of a failed act, which the page's words, tries count and styling all follow. */
+/** One reading of a failed action, which the page's words, tries count and styling all follow. */
 type Failed =
   | { readonly kind: "unanswered" }
   | { readonly kind: "too-many"; readonly waitSeconds: number | undefined }
@@ -93,13 +93,13 @@ const failedAs = (failure: Error): Failed => {
   return { kind: "refused", spent: codeSpent(failure) };
 };
 
-const saidOf = (act: SaidOfAnAct, failure: Error): Said => {
+const saidOf = (action: SaidOfAnAction, failure: Error): Said => {
   const failed = failedAs(failure);
-  if (failed.kind === "too-many") return act.tooMany(failed.waitSeconds);
-  return failed.kind === "refused" ? act.refused : act.unanswered;
+  if (failed.kind === "too-many") return action.tooMany(failed.waitSeconds);
+  return failed.kind === "refused" ? action.refused : action.unanswered;
 };
 
-/** Each act clears the other as it starts, so at most one has failed. */
+/** Each action clears the other as it starts, so at most one has failed. */
 const failureSaid = (
   sendFailure: Error | null,
   signInFailure: Error | null,
@@ -200,7 +200,7 @@ function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, follow: ()
   }, []);
 }
 
-function CodeStepActs(properties: {
+function CodeStepActions(properties: {
   readonly sending: boolean;
   readonly waiting: boolean;
   readonly sentTo: string;
@@ -234,7 +234,7 @@ function CodeStepActs(properties: {
       >
         {SIGN_IN_WORDS.otherAddress}
       </Button>
-      <KeystrokesAct
+      <KeystrokesAction
         page={KEYSTROKE_WORDS.thisPage}
         keystrokes={[SEND_A_NEW_CODE, CHANGE_ADDRESS]}
       />
@@ -247,7 +247,7 @@ type Step = {
   readonly said: string | null;
   readonly hint: ReactNode;
   readonly form: ReactNode;
-  readonly acts: ReactNode;
+  readonly actions: ReactNode;
 };
 
 type EmailStep = {
@@ -258,7 +258,7 @@ type EmailStep = {
   readonly described: string | undefined;
   readonly onAddress: (address: string) => void;
   readonly onAsk: (event: FormEvent) => void;
-  readonly acts: ReactNode;
+  readonly actions: ReactNode;
 };
 
 const emailStepOf = (step: EmailStep): Step => ({
@@ -286,7 +286,7 @@ const emailStepOf = (step: EmailStep): Step => ({
       </Button>
     </form>
   ),
-  acts: step.acts,
+  actions: step.actions,
 });
 
 type CodeStep = {
@@ -297,7 +297,7 @@ type CodeStep = {
   readonly described: string | undefined;
   readonly onCode: (entered: string) => void;
   readonly onSubmit: (event: FormEvent) => void;
-  readonly acts: ReactNode;
+  readonly actions: ReactNode;
 };
 
 /** No `maxLength`: a browser would cut a pasted `123-456` to `123-45` before it is read. */
@@ -329,7 +329,7 @@ const codeStepOf = (step: CodeStep): Step => ({
       </Button>
     </form>
   ),
-  acts: step.acts,
+  actions: step.actions,
 });
 
 export function SignInPage() {
@@ -460,8 +460,8 @@ export function SignInPage() {
           described,
           onAddress: setAddress,
           onAsk: askForCode,
-          acts: offersAPasskey ? (
-            <PasskeyAct pending={passkey.pending} onSignIn={passkey.signIn} />
+          actions: offersAPasskey ? (
+            <PasskeyAction pending={passkey.pending} onSignIn={passkey.signIn} />
           ) : null,
         })
       : codeStepOf({
@@ -472,8 +472,8 @@ export function SignInPage() {
           described,
           onCode: enterCode,
           onSubmit: submitCode,
-          acts: (
-            <CodeStepActs
+          actions: (
+            <CodeStepActions
               sending={sendCode.isPending}
               waiting={!signingIn}
               sentTo={sentTo}
@@ -499,7 +499,7 @@ export function SignInPage() {
       <Outcome tone="refused" id={REFUSED}>
         {failure === undefined ? null : <RefusalLine said={failure} />}
       </Outcome>
-      {step.acts}
+      {step.actions}
     </AuthPage>
   );
 }

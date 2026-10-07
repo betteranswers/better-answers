@@ -1,9 +1,9 @@
 import { boundarySchemas } from "@better-answers/schema";
 
 import {
-  act,
-  declareActs,
-  declareIdentitySetActs,
+  action,
+  declareActions,
+  declareIdentitySetActions,
   recordFor,
   type SignInMethod,
 } from "../audit/index.ts";
@@ -20,8 +20,8 @@ import { type PostgresDoor, withIdentityWrite, withScope } from "../store/postgr
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 /** The method word alone: an address, an IP or a user agent here would need rewriting on erasure. */
-export const SIGN_IN_ACTS = declareIdentitySetActs("people", {
-  signedIn: act("people.person.signed_in", { method: "signInMethod" }),
+export const SIGN_IN_ACTIONS = declareIdentitySetActions("people", {
+  signedIn: action("people.person.signed_in", { method: "signInMethod" }),
 });
 
 /** Better Auth keys a sign-in code's verification row by this and the lowercased address. */
@@ -57,8 +57,8 @@ export const SESSION_VERIFICATION_PREFIXES = [
   PASSKEY_CHALLENGE_PREFIX,
 ] as const;
 
-const CONSENT_ACTS = declareActs("people", {
-  consented: act("people.client.consented", {}),
+const CONSENT_ACTIONS = declareActions("people", {
+  consented: action("people.client.consented", {}),
 });
 
 type RecordRefusal = WorkspaceRefusal<"malformed">;
@@ -81,7 +81,7 @@ export const recordSignIn = async (
       recordFor(platform, tx, {
         id: ulid(),
         actor: actorIdOfPerson(person.data),
-        act: SIGN_IN_ACTS.signedIn,
+        action: SIGN_IN_ACTIONS.signedIn,
         subjectId: person.data,
         detail: { method },
       }),
@@ -112,7 +112,7 @@ export const recordConsent = async (
       recordFor(platform, tx, {
         id: ulid(),
         actor: actorIdOfPerson(person.data),
-        act: CONSENT_ACTS.consented,
+        action: CONSENT_ACTIONS.consented,
         subjectId: input.clientId,
         detail: {},
       }),

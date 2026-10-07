@@ -5,8 +5,8 @@ export * from "./audit-log.ts";
 export * from "./bulk.ts";
 export * from "./credentials.ts";
 /**
- * Here and below, acts are named one by one: a step that writes on a row its act holds would
- * skip that act's checks.
+ * Here and below, actions are named one by one: a step that writes on a row its action holds would
+ * skip that action's checks.
  */
 export type * from "./groups.ts";
 export {

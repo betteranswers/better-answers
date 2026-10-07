@@ -212,12 +212,12 @@ describe("jump to, while no role is held", () => {
     await openWithNoRoleAt("/people/members");
 
     fireEvent.keyDown(document.body, { key: "?" });
-    const acts = [...screen.getByRole("dialog").querySelectorAll("dd")].map(
+    const actions = [...screen.getByRole("dialog").querySelectorAll("dd")].map(
       (each) => each.textContent,
     );
 
-    expect(acts).toContain(KEYSTROKE_WORDS.showTheList);
-    expect(acts).not.toContain(JUMP_TO.name);
+    expect(actions).toContain(KEYSTROKE_WORDS.showTheList);
+    expect(actions).not.toContain(JUMP_TO.name);
   });
 });
 

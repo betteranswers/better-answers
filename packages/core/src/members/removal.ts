@@ -1,7 +1,7 @@
 import type { z } from "zod";
 
-import { act, declareActs, record } from "../audit/index.ts";
-import { admit, declareAct, err, ok, ulid } from "../kernel/index.ts";
+import { action, declareActions, record } from "../audit/index.ts";
+import { admit, declareAction, err, ok, ulid } from "../kernel/index.ts";
 import type {
   AdminUserPrincipal,
   AdmittedOf,
@@ -16,18 +16,18 @@ import { leavesNoAdmin, withMemberHeld, type HeldRefusal } from "./last-admin.ts
 import { memberKeyed } from "./member-list.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-const REMOVAL_ACTS = declareActs("people", {
-  removed: act("people.member.removed", { role: "role", grants: "grants" }),
+const REMOVAL_ACTIONS = declareActions("people", {
+  removed: action("people.member.removed", { role: "role", grants: "grants" }),
 });
 
 export const removeMemberInput = memberKeyed;
 
 export type RemoveMemberInput = z.output<typeof removeMemberInput> & {
-  /** When the act happens: the person's tokens for this workspace issued before it end. */
+  /** When the action happens: the person's tokens for this workspace issued before it end. */
   readonly at: Date;
 };
 
-const removeMemberAct = declareAct({
+const removeMemberAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: removeMemberInput,
   refuses: ["role-forbids", "no-such-member", "last-admin", "changed-meanwhile"],
@@ -49,7 +49,7 @@ export type MemberRemoved = {
 type RemovedAt = { readonly at: Date; readonly batchId: string | undefined };
 
 /**
- * A step on a member row its act holds: the member and the person's tokens here issued before
+ * A step on a member row its action holds: the member and the person's tokens here issued before
  * `at` end, and the removal's audit events land.
  */
 export const memberRemovedHere = async (
@@ -70,7 +70,7 @@ export const memberRemovedHere = async (
   });
   await record(admin, tx, {
     id: ulid(),
-    act: REMOVAL_ACTS.removed,
+    action: REMOVAL_ACTIONS.removed,
     subjectId: removed.personId,
     detail: { role: removed.role, grants },
     batchId,
@@ -79,7 +79,7 @@ export const memberRemovedHere = async (
 };
 
 const removedUnderTheLock = (
-  admin: AdmittedOf<typeof removeMemberAct>,
+  admin: AdmittedOf<typeof removeMemberAction>,
   tx: Tx,
   input: RemoveMemberInput,
 ): Promise<Result<MemberRemoved, MemberRefusal<"last-admin"> | HeldRefusal | Error>> =>
@@ -101,7 +101,7 @@ export const removeMember = async (
   tx: Tx,
   input: RemoveMemberInput,
 ): Promise<Result<MemberRemoved, RemoveMemberRefusal>> => {
-  const admitted = admit(removeMemberAct, principal, input);
+  const admitted = admit(removeMemberAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   return removedUnderTheLock(admitted.value, tx, input);
 };

@@ -175,7 +175,7 @@ describe("flagging a display name over tRPC", () => {
   });
 });
 
-describe("what no Admin act does", () => {
+describe("what no Admin action does", () => {
   it("leaves the flagged display name as the person gave it", async () => {
     const { person, api } = await aWorkspaceWithAFlaggable();
 
@@ -184,7 +184,7 @@ describe("what no Admin act does", () => {
     expect(await displayNameHeldBy(app, person.id)).toBe(RUDE_NAME);
   });
 
-  it("renames only the calling Admin, whoever the display-name act names", async () => {
+  it("renames only the calling Admin, whoever the display-name action names", async () => {
     const { workspace, person, client } = await aWorkspaceWithAFlaggable();
 
     const given = await client.json("/trpc/person.setDisplayName", {

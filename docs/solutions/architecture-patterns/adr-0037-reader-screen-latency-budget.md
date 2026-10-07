@@ -40,7 +40,7 @@ The web tier's rule *Give every common action a keystroke*, in `apps/web/CODING_
 
 ## Why
 
-- The numbers are the usual thresholds, taken as decisions. A tenth of a second reads as the reader's own act, a second keeps their flow, and past it they look away.
+- The numbers are the usual thresholds, taken as decisions. A tenth of a second reads as the reader's own action, a second keeps their flow, and past it they look away.
 - The buyers are UK SMBs and public bodies whose readers open the map between other work. What is needed first, then more, then the action, is the bar they arrive with.
 - An answer is judged by its first sentence, which is where the verdict sits (ADR 0016). Streaming is the shape of the answer contract.
 - The estate is two 4 GB boxes (ADR 0024), so the budget is a discipline on query shape: one query per page, rows joined once and never fetched per row, as ADR 0015's footnote join chose.

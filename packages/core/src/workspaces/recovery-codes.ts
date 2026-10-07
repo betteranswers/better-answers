@@ -5,7 +5,7 @@ import { z } from "zod";
 import { boundarySchemas } from "@better-answers/schema";
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 
-import { act, declareIdentitySetActs, recordFor } from "../audit/index.ts";
+import { action, declareIdentitySetActions, recordFor } from "../audit/index.ts";
 import {
   actorIdOfPerson,
   attempt,
@@ -20,9 +20,9 @@ import { type PostgresDoor, type Tx, withIdentityWrite } from "../store/postgres
 import { holdThePerson } from "./person-lock.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-const RECOVERY_CODE_ACTS = declareIdentitySetActs("people", {
-  issued: act("people.person.recovery_codes_issued", { replaced: "flag" }),
-  used: act("people.person.recovery_code_used", {}),
+const RECOVERY_CODE_ACTIONS = declareIdentitySetActions("people", {
+  issued: action("people.person.recovery_codes_issued", { replaced: "flag" }),
+  used: action("people.person.recovery_code_used", {}),
 });
 
 /** Crockford's base32, without the letters a reader takes for a digit. */
@@ -85,7 +85,7 @@ export const issuingRecoveryCodes = async (
   await recordFor(platform, tx, {
     id: ulid(),
     actor: actorIdOfPerson(personId),
-    act: RECOVERY_CODE_ACTS.issued,
+    action: RECOVERY_CODE_ACTIONS.issued,
     subjectId: personId,
     detail: { replaced },
   });
@@ -168,7 +168,7 @@ export const spendingARecoveryCode = async (
   await recordFor(platform, tx, {
     id: ulid(),
     actor: actorIdOfPerson(personId),
-    act: RECOVERY_CODE_ACTS.used,
+    action: RECOVERY_CODE_ACTIONS.used,
     subjectId: personId,
     detail: {},
   });

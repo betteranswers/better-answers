@@ -17,7 +17,7 @@ import { EMPTY_LINES } from "./empty-lines.ts";
 import { GroupChecklist } from "./group-checklist.tsx";
 import { useGroups } from "./groups-api.ts";
 import { GroupsReadSaid } from "./groups-read.tsx";
-import { INCLUDES_YOU, RECORDED } from "./member-act-words.ts";
+import { INCLUDES_YOU, RECORDED } from "./member-action-words.ts";
 import { MemberRemoval } from "./member-removal.tsx";
 import { GROUPS_PATH } from "./members-address.ts";
 import {
@@ -32,10 +32,10 @@ import {
 } from "./people-api.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
 import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
-import { useSelfActHome } from "./self-act.tsx";
+import { useSelfActionHome } from "./self-action.tsx";
 import { CredentialsHere, Day, GroupPills, nameOf } from "./words.tsx";
 
-/** The control each of the page's acts lands focus on, so a keystroke can reach any of them. */
+/** The control each of the page's actions lands focus on, so a keystroke can reach any of them. */
 export type Landings = {
   readonly role: RefObject<HTMLDivElement | null>;
   readonly groups: RefObject<HTMLDivElement | null>;
@@ -72,7 +72,7 @@ function AccessSummary(properties: { readonly member: ListedMember }) {
   );
 }
 
-/** The hint beside the commit, which says so when the act is on the reader themself. */
+/** The hint beside the commit, which says so when the action is on the reader themself. */
 const roleHint = (name: string, held: Role, unchanged: boolean, yourself: boolean): string => {
   if (unchanged) return `${name} is ${aRole(held)}. Pick another role to change it.`;
   return yourself
@@ -89,7 +89,7 @@ function RolePicker(properties: {
   const [outcome, setOutcome] = useState<Outcome>();
   const changeRole = useChangeRole();
   const yourself = useReaderId() === member.personId;
-  const { goHome } = useSelfActHome();
+  const { goHome } = useSelfActionHome();
   const headingId = useId();
   const hintId = useId();
   const itemId = useId();
@@ -211,7 +211,7 @@ function CredentialsRevoker(properties: {
           ref={revokeRef}
           variant="outline"
           aria-describedby={hintId}
-          // Not `disabled`: a disabled button drops the focus the act leaves on it.
+          // Not `disabled`: a disabled button drops the focus the action leaves on it.
           aria-disabled={revoke.isPending}
           onClick={commit}
         >
@@ -337,7 +337,7 @@ function GroupsPicker(properties: {
   );
 }
 
-/** Who the member is and what they may reach here, with each act that changes it. */
+/** Who the member is and what they may reach here, with each action that changes it. */
 export function Access(properties: { readonly member: ListedMember; readonly landings: Landings }) {
   const { member, landings } = properties;
 
@@ -351,7 +351,7 @@ export function Access(properties: { readonly member: ListedMember; readonly lan
   );
 }
 
-/** The two acts that end the person's access here, set apart from the rest. */
+/** The two actions that end the person's access here, set apart from the rest. */
 export function RemoveAndEndEverySignIn(properties: {
   readonly member: ListedMember;
   readonly landings: Landings;

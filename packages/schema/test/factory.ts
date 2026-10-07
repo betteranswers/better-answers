@@ -415,7 +415,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     return insertRow(client, "auditEvent", {
       id: ulid(),
-      act: "platform.probe.seeded",
+      action: "platform.probe.seeded",
       actor: "process:better-answers-test",
       subjectId: ulid(),
       detail: {},
@@ -428,7 +428,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const identityAuditEvent: TestData["identityAuditEvent"] = (overrides = {}) =>
     insertRow(client, "identityAuditEvent", {
       id: ulid(),
-      act: "platform.probe.seeded",
+      action: "platform.probe.seeded",
       actor: "process:better-answers-test",
       subjectId: ulid(),
       detail: {},

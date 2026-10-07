@@ -9,8 +9,13 @@ import { Input } from "@/shared/ui/input.tsx";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/shared/ui/item.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
-import { ActButton, RemoveKeepingTheLast, type LandsAt } from "./account-sections.tsx";
-import { ACCOUNT_ACTS, PASSKEY_WORDS, passkeyDates, removePasskeyTitle } from "./account-words.ts";
+import { ActionButton, RemoveKeepingTheLast, type LandsAt } from "./account-sections.tsx";
+import {
+  ACCOUNT_ACTIONS,
+  PASSKEY_WORDS,
+  passkeyDates,
+  removePasskeyTitle,
+} from "./account-words.ts";
 import { CodeRefused, SIGNED_OUT, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
 import { Outcome } from "./auth-page.tsx";
 import {
@@ -34,7 +39,7 @@ import {
 } from "./refusal-words.ts";
 import type { SecondFactor } from "./second-factor-hooks.ts";
 
-export const ADD_A_PASSKEY: Keystroke = { key: "a", act: ACCOUNT_ACTS.addPasskey };
+export const ADD_A_PASSKEY: Keystroke = { key: "a", action: ACCOUNT_ACTIONS.addPasskey };
 
 const PASSKEYS_HEADING = "passkeys-heading";
 
@@ -275,11 +280,11 @@ function PasskeyRow(properties: {
         </ItemContent>
         <ItemActions className="flex-wrap">
           {renaming ? null : (
-            <ActButton
-              actRef={renameMounted}
+            <ActionButton
+              actionRef={renameMounted}
               unavailable={false}
               label={PASSKEY_WORDS.rename}
-              onAct={() => {
+              onAction={() => {
                 setRenaming(true);
               }}
             />
@@ -347,16 +352,16 @@ function AddingHere(properties: PasskeysProperties) {
   if (!properties.here) return <p className="mt-3">{PASSKEY_WORDS.noWebAuthn}</p>;
   return (
     <>
-      <ActButton
+      <ActionButton
         id={ADD_A_PASSKEY_BUTTON}
-        actRef={properties.landsAt("add-a-passkey")}
+        actionRef={properties.landsAt("add-a-passkey")}
         unavailable={false}
         label={PASSKEY_WORDS.add}
         className="mt-3"
         expanded={properties.addOpen}
         controls={properties.addOpen ? formId : undefined}
         keystroke={ADD_A_PASSKEY}
-        onAct={properties.onAddOpen}
+        onAction={properties.onAddOpen}
       />
       {properties.addOpen ? (
         <AddAPasskey

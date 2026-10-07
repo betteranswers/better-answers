@@ -4,12 +4,12 @@ import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-const RULE = "better-answers/act-admits-before-await";
-const FILE = "act.ts";
+const RULE = "better-answers/action-admits-before-await";
+const FILE = "action.ts";
 
 const CONFIG = pluginConfigFor({ [RULE]: "error" });
 
-const DECLARATION = `const reprocessAct = declareAct({
+const DECLARATION = `const reprocessAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: schema,
   refuses: ["role-forbids"],
@@ -20,7 +20,7 @@ const DECLARATION = `const reprocessAct = declareAct({
 const holding = (body: string): Tree => ({ [FILE]: `${DECLARATION}\n${body}` });
 
 const ADMITS_FIRST = `export const reprocess = async (principal, tx, input) => {
-  const admitted = admit(reprocessAct, principal, input);
+  const admitted = admit(reprocessAction, principal, input);
   if (!admitted.ok) return admitted;
   const row = await tx.query("SELECT 1");
   return row;
@@ -29,7 +29,7 @@ const ADMITS_FIRST = `export const reprocess = async (principal, tx, input) => {
 
 const AWAITS_FIRST = `export const reprocess = async (principal, tx, input) => {
   const row = await tx.query("SELECT 1");
-  const admitted = admit(reprocessAct, principal, input);
+  const admitted = admit(reprocessAction, principal, input);
   if (!admitted.ok) return admitted;
   return row;
 };
@@ -37,16 +37,16 @@ const AWAITS_FIRST = `export const reprocess = async (principal, tx, input) => {
 
 const lint = oxlintOver(CONFIG, { tree: holding(AWAITS_FIRST), flagged: [FILE] });
 
-describe("the rule that a declared act admits before it awaits", () => {
-  it("refuses an act reading before admitting, naming its rules file", () => {
+describe("the rule that a declared action admits before it awaits", () => {
+  it("refuses an action reading before admitting, naming its rules file", () => {
     const output = lint.output(holding(AWAITS_FIRST));
 
     expect(output).toContain("awaits before it admits");
     expect(output).toContain("the root `CODING_STANDARDS.md`");
-    expect(output).toContain("better-answers(act-admits-before-await)");
+    expect(output).toContain("better-answers(action-admits-before-await)");
   });
 
-  it("stays silent on an act that admits, then awaits", () => {
+  it("stays silent on an action that admits, then awaits", () => {
     expect(lint.flagged(holding(ADMITS_FIRST))).toEqual([]);
   });
 
@@ -54,7 +54,7 @@ describe("the rule that a declared act admits before it awaits", () => {
     const unused = `export const reprocess = async (principal, tx) => tx.query("SELECT 1");\n`;
     const output = lint.output(holding(unused));
 
-    expect(output).toContain("`reprocessAct`");
+    expect(output).toContain("`reprocessAction`");
     expect(output).toContain("states a gate nothing runs");
   });
 
@@ -72,11 +72,11 @@ describe("the rule that a declared act admits before it awaits", () => {
 
   it("fires on an inner callback that awaits before it admits", () => {
     const nested = `export const reprocess = async (principal, tx, input) => {
-  const admitted = admit(reprocessAct, principal, input);
+  const admitted = admit(reprocessAction, principal, input);
   if (!admitted.ok) return admitted;
   return tx.run(async (inner) => {
     await inner.query("SELECT 1");
-    return admit(reprocessAct, principal, input);
+    return admit(reprocessAction, principal, input);
   });
 };
 `;

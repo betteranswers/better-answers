@@ -229,7 +229,7 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json(await moveTheSync(app, asked));
   });
 
-  // The ops command's own act under its own principal, so the mark lands as the owner's would.
+  // The ops command's own action under its own principal, so the mark lands as the owner's would.
   control.post(`${HARNESS_PREFIX}/operators`, async (context) => {
     const asked = await readBody(context.req.raw, marking);
     const marked = await setOperatorMark(IDENTITY_PRINCIPAL, app.doors.postgres, asked);
@@ -237,7 +237,7 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json({ marked: true });
   });
 
-  // The fixture command's own act, so the journeys run by hand meet the workspace it makes.
+  // The fixture command's own action, so the journeys run by hand meet the workspace it makes.
   control.post(`${HARNESS_PREFIX}/test-workspaces`, async (context) => {
     const asked = await readBody(context.req.raw, testWorkspace);
     const ensured = await ensureTestWorkspace(BOOTSTRAP, app.doors.postgres, asked);

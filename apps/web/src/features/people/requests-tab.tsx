@@ -28,7 +28,7 @@ import {
   WaitingTable,
 } from "./waiting-list.tsx";
 
-const COLUMNS = ["Person", "Reason", "State", "Asked", "Acts"] as const;
+const COLUMNS = ["Person", "Reason", "State", "Asked", "Actions"] as const;
 
 const NOTHING_HELD = selectFirst("request");
 
@@ -49,7 +49,7 @@ function Requester(properties: { readonly request: WaitingRequest }) {
   );
 }
 
-type RequestActs = {
+type RequestActions = {
   readonly onHeld: (request: WaitingRequest | undefined) => void;
   readonly onApprove: (request: WaitingRequest) => void;
   readonly onDecline: (request: WaitingRequest) => void;
@@ -57,14 +57,14 @@ type RequestActs = {
 
 function RequestRow(properties: {
   readonly request: WaitingRequest;
-  readonly acts: RequestActs;
+  readonly actions: RequestActions;
   readonly consequenceId: string;
 }) {
-  const { request, acts, consequenceId } = properties;
+  const { request, actions, consequenceId } = properties;
   const name = requesterName(request);
 
   return (
-    <WaitingRow item={request} onHeld={acts.onHeld}>
+    <WaitingRow item={request} onHeld={actions.onHeld}>
       <TableCell className="whitespace-normal">
         <Requester request={request} />
       </TableCell>
@@ -85,7 +85,7 @@ function RequestRow(properties: {
             aria-describedby={consequenceId}
             aria-keyshortcuts={PEOPLE_KEYSTROKES.approve.key}
             onClick={() => {
-              acts.onApprove(request);
+              actions.onApprove(request);
             }}
           >
             Approve
@@ -97,7 +97,7 @@ function RequestRow(properties: {
             aria-describedby={consequenceId}
             aria-keyshortcuts={PEOPLE_KEYSTROKES.decline.key}
             onClick={() => {
-              acts.onDecline(request);
+              actions.onDecline(request);
             }}
           >
             Decline
@@ -142,7 +142,7 @@ function RequestList(properties: {
   useKeystrokeOnHeld(PEOPLE_KEYSTROKES.approve, held, onApprove, nothingHeld);
   useKeystrokeOnHeld(PEOPLE_KEYSTROKES.decline, held, declined, nothingHeld);
 
-  const acts: RequestActs = { onHeld: setHeld, onApprove, onDecline: declined };
+  const actions: RequestActions = { onHeld: setHeld, onApprove, onDecline: declined };
 
   return (
     <>
@@ -165,7 +165,7 @@ function RequestList(properties: {
               <RequestRow
                 key={request.id}
                 request={request}
-                acts={acts}
+                actions={actions}
                 consequenceId={consequenceId}
               />
             ))}
@@ -187,7 +187,7 @@ export function RequestsTab() {
   const heading = useRef<HTMLHeadingElement>(null);
   const openedFrom = useRef<HTMLElement | null>(null);
 
-  // Read when the dialog opens, by a click or a key, since either leaves focus where the act began.
+  // Read when the dialog opens, by a click or a key, since either leaves focus where the action began.
   const toApprove = (request: WaitingRequest) => {
     const { activeElement } = document;
     openedFrom.current = activeElement instanceof HTMLElement ? activeElement : null;

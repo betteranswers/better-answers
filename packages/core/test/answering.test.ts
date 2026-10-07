@@ -420,7 +420,7 @@ describe("open's and feedback's renderings", () => {
   });
 });
 
-describe("what the slice's four acts answer", () => {
+describe("what the slice's four actions answer", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
 
   it("hands every caller an outcome to read, not to catch", () => {

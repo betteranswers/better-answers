@@ -19,22 +19,22 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 import {
-  type ActName,
+  type ActionName,
   DETAIL_KINDS,
   type DetailKind,
   type DetailOf,
   type DetailShape,
   type DetailValue,
   isDeclared,
-  isIdentitySetAct,
+  isIdentitySetAction,
   isOptionalKind,
-  type AuditAct,
+  type AuditAction,
 } from "./vocabulary.ts";
 
 export {
-  act,
-  declareActs,
-  declareIdentitySetActs,
+  action,
+  declareActions,
+  declareIdentitySetActions,
   declarations,
   endedGrant,
   matchedList,
@@ -42,8 +42,8 @@ export {
 export { ACTION_HEADLINES } from "./headlines.ts";
 export { STORED_ACT_NAMES, STORED_DETAIL_KEYS } from "./stored-names.ts";
 export type {
-  ActName,
-  AuditAct,
+  ActionName,
+  AuditAction,
   DetailOf,
   EndedGrant,
   Matched,
@@ -51,9 +51,9 @@ export type {
   SignInMethod,
 } from "./vocabulary.ts";
 
-export type AuditEvent<A extends AuditAct> = {
+export type AuditEvent<A extends AuditAction> = {
   readonly id: string;
-  readonly act: A;
+  readonly action: A;
   readonly subjectId: string;
   readonly detail: DetailOf<A["detail"]>;
 
@@ -73,14 +73,14 @@ export type Recorded = {
 
 export type AuditEventRow = z.infer<typeof boundarySchemas.auditEvent.select>;
 
-const AUDIT_EVENT_ROW = `id, workspace_id AS "workspaceId", action AS act, family, actor, subject_kind AS "subjectKind",
+const AUDIT_EVENT_ROW = `id, workspace_id AS "workspaceId", action, family, actor, subject_kind AS "subjectKind",
             subject_id AS "subjectId", at, detail, batch_id AS "batchId"`;
 
 /** Oldest first; `since` is inclusive. */
-export const eventsOfAct = async (
+export const eventsOfAction = async (
   principal: Principal,
   tx: Tx,
-  act: AuditAct,
+  action: AuditAction,
   since?: Date,
 ): Promise<readonly AuditEventRow[]> => {
   const found = await tx.query(
@@ -90,27 +90,27 @@ export const eventsOfAct = async (
         AND action = $2
         AND ($3::timestamptz IS NULL OR at >= $3)
       ORDER BY at, id`,
-    [scopeParameter(principal), act.name, since ?? null],
+    [scopeParameter(principal), action.name, since ?? null],
   );
 
   return found.rows.map((row) => boundarySchemas.auditEvent.select.parse(row));
 };
 
 /**
- * The latest instant each subject met `act` on the identity-set audit log; a subject that never
+ * The latest instant each subject met `action` on the identity-set audit log; a subject that never
  * did is left out. Naming the subject kind reaches the log's index on kind and subject.
  */
 export const latestOnIdentitySet = async (
   _operator: OperatorPrincipal,
   tx: Tx,
-  act: AuditAct,
+  action: AuditAction,
   subjectIds: readonly string[],
 ): Promise<ReadonlyMap<string, Date>> => {
   const found = await tx.query<{ subject_id: string; at: Date }>(
     `SELECT subject_id, max(at) AS at FROM identity_audit_event
       WHERE subject_kind = split_part($1, '.', 2) AND subject_id = ANY($2::text[]) AND action = $1
       GROUP BY subject_id`,
-    [act.name, subjectIds],
+    [action.name, subjectIds],
   );
   return new Map(found.rows.map((row) => [row.subject_id, row.at]));
 };
@@ -171,19 +171,19 @@ type SoughtSubjects = {
   readonly ids: readonly string[];
 };
 
-/** Where a person's id may stand in an event's detail: under `key`, in the listed acts alone. */
+/** Where a person's id may stand in an event's detail: under `key`, in the listed actions alone. */
 export type DetailNaming = {
   readonly key: string;
-  /** Every kind the acts' subjects take, so the arm reaches the subject index. */
+  /** Every kind the actions' subjects take, so the arm reaches the subject index. */
   readonly subjectKinds: readonly string[];
-  readonly acts: readonly ActName[];
+  readonly actions: readonly ActionName[];
 };
 
 /** What a read looks for, each list read as its own arm; an empty list adds no arm. */
 export type EventsSought = {
   readonly people: readonly UserId[];
   readonly subjects: readonly SoughtSubjects[];
-  readonly acts: readonly string[];
+  readonly actions: readonly string[];
   /** The keys a person's id stands under in detail, matched against `people`. */
   readonly detail: readonly DetailNaming[];
 };
@@ -222,10 +222,10 @@ const predicatesOf = (sought: EventsSought, bind: Bind): readonly string[] => {
       ({ kinds, ids }) =>
         `subject_kind = ANY($${bind(kinds)}::text[]) AND subject_id ${oneOf(ids, bind)}`,
     ),
-    ...(sought.acts.length === 0 ? [] : [`action = ANY($${bind(sought.acts)}::text[])`]),
+    ...(sought.actions.length === 0 ? [] : [`action = ANY($${bind(sought.actions)}::text[])`]),
     ...detail.map(
-      ({ key, subjectKinds, acts }) =>
-        `subject_kind = ANY($${bind(subjectKinds)}::text[]) AND action = ANY($${bind(acts)}::text[])
+      ({ key, subjectKinds, actions }) =>
+        `subject_kind = ANY($${bind(subjectKinds)}::text[]) AND action = ANY($${bind(actions)}::text[])
          AND detail ->> $${bind(key)}::text ${personMatch}`,
     ),
   ];
@@ -233,7 +233,7 @@ const predicatesOf = (sought: EventsSought, bind: Bind): readonly string[] => {
 
 /**
  * Newest first, from the row after `cursor`, within `family` when one is asked for: the events
- * whose actor or detail names one of the people, whose subject is one sought, or whose act is.
+ * whose actor or detail names one of the people, whose subject is one sought, or whose action is.
  * An event two arms reach is answered once, and nothing sought reads nothing.
  */
 export const eventsSoughtNewestFirst = async (
@@ -287,7 +287,7 @@ const detailRefusal = (
   detail: Readonly<Record<string, DetailValue | undefined>>,
 ) => {
   for (const field of Object.keys(detail)) {
-    if (!Object.hasOwn(shape, field)) return `detail names a field the act does not: ${field}`;
+    if (!Object.hasOwn(shape, field)) return `detail names a field the action does not: ${field}`;
   }
   for (const [field, kind] of Object.entries(shape)) {
     const value = detail[field];
@@ -301,37 +301,38 @@ const detailRefusal = (
   return undefined;
 };
 
-const rowToInsert = <A extends AuditAct>(
+const rowToInsert = <A extends AuditAction>(
   auditLog: typeof eventInsert | typeof identitySetInsert,
   actor: ActorId,
   event: AuditEvent<A>,
 ) => {
-  if (!isDeclared(event.act.name)) throw new Error(`audit: ${event.act.name} was never declared`);
+  if (!isDeclared(event.action.name))
+    throw new Error(`audit: ${event.action.name} was never declared`);
   const row = auditLog.safeParse({
     id: event.id,
-    act: event.act.name,
+    action: event.action.name,
     actor,
     subjectId: event.subjectId,
     detail: event.detail,
     batchId: event.batchId ?? null,
   });
   if (!row.success) {
-    throw new Error(`audit: ${event.act.name} refused at the boundary`, { cause: row.error });
+    throw new Error(`audit: ${event.action.name} refused at the boundary`, { cause: row.error });
   }
-  const refusal = detailRefusal(event.act.detail, event.detail);
-  if (refusal !== undefined) throw new Error(`audit: ${event.act.name} ${refusal}`);
+  const refusal = detailRefusal(event.action.detail, event.detail);
+  if (refusal !== undefined) throw new Error(`audit: ${event.action.name} ${refusal}`);
   return row.data;
 };
 
-const write = async <A extends AuditAct>(
+const write = async <A extends AuditAction>(
   tx: Tx,
   workspaceId: string | null,
   actor: ActorId,
   event: AuditEvent<A>,
 ): Promise<Recorded> => {
-  const identitySet = isIdentitySetAct(event.act.name);
+  const identitySet = isIdentitySetAction(event.action.name);
   const data = rowToInsert(identitySet ? identitySetInsert : eventInsert, actor, event);
-  const values = [data.id, data.act, data.actor, data.subjectId, data.detail, data.batchId];
+  const values = [data.id, data.action, data.actor, data.subjectId, data.detail, data.batchId];
   const stamp = event.stampedAsWritten === true ? "clock_timestamp()" : "now()";
   const inserted = await tx.query<{ id: string }>(
     identitySet
@@ -343,16 +344,16 @@ const write = async <A extends AuditAct>(
   );
 
   const id = inserted.rows[0]?.id;
-  if (id === undefined) throw new Error(`audit: ${event.act.name} landed no row`);
+  if (id === undefined) throw new Error(`audit: ${event.action.name} landed no row`);
   return { id: boundarySchemas.auditEvent.select.shape.id.parse(id), actorId: actor };
 };
 
 /**
- * Writes the event to the audit log its act was declared for. Rejects when the act was never
- * declared, or the event does not fit the audit log's row or its act's detail shape; under the
- * operator, who stands in no workspace, when the act is not the identity set's.
+ * Writes the event to the audit log its action was declared for. Rejects when the action was never
+ * declared, or the event does not fit the audit log's row or its action's detail shape; under the
+ * operator, who stands in no workspace, when the action is not the identity set's.
  */
-export const record = <A extends AuditAct>(
+export const record = <A extends AuditAction>(
   principal: Principal | OperatorPrincipal,
   tx: Tx,
   event: AuditEvent<A>,
@@ -362,21 +363,21 @@ export const record = <A extends AuditAct>(
 export const batchIdFor = (count: number): string | undefined => (count > 1 ? ulid() : undefined);
 
 /** Answers the batch the events share, or undefined for a lone one, which stands in none. */
-export const recordEach = async <A extends AuditAct>(
+export const recordEach = async <A extends AuditAction>(
   principal: Principal | OperatorPrincipal,
   tx: Tx,
-  act: A,
+  action: A,
   events: readonly Pick<AuditEvent<A>, "subjectId" | "detail">[],
 ): Promise<string | undefined> => {
   const batchId = batchIdFor(events.length);
   for (const { subjectId, detail } of events) {
-    await record(principal, tx, { id: ulid(), act, subjectId, detail, batchId });
+    await record(principal, tx, { id: ulid(), action, subjectId, detail, batchId });
   }
   return batchId;
 };
 
 /** As `record`, but the event's own `actor` is recorded rather than the platform. */
-export const recordFor = <A extends AuditAct>(
+export const recordFor = <A extends AuditAction>(
   platform: PlatformPrincipal,
   tx: Tx,
   event: AuditEvent<A> & { readonly actor: ActorId },

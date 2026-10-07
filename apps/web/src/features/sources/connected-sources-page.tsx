@@ -9,7 +9,7 @@ import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import type { PageToolbar } from "@/shared/page-toolbar.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
 
-import { ConnectAct } from "./connect-act.tsx";
+import { ConnectAction } from "./connect-action.tsx";
 import {
   sensitivityAndAudienceWords,
   movedWords,
@@ -38,11 +38,11 @@ import { AUDIENCE_WORDS, NOTHING_CONNECTED } from "./words.ts";
 const sources = menuGroupIn(CONTROL_CENTRE, "sources");
 
 /**
- * The three bulk acts sit beside the findings they command, in the review: five acts in the band
+ * The three bulk actions sit beside the findings they command, in the review: five actions in the band
  * scroll a 320px page sideways.
  */
 export const CONNECTED_SOURCES_TOOLBAR: PageToolbar = {
-  acts: <ConnectAct />,
+  actions: <ConnectAction />,
 };
 
 const LISTED = Object.values(SOURCES_KEYSTROKES);
@@ -91,9 +91,9 @@ export function ConnectedSourcesPage() {
   const [narrowing, setNarrowing] = useState<string>();
   const [widening, setWidening] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
-  const publishAct = usePublish();
-  const narrowAct = useNarrowConnectedSource();
-  const widenAct = useWidenConnectedSource();
+  const publishAction = usePublish();
+  const narrowAction = useNarrowConnectedSource();
+  const widenAction = useWidenConnectedSource();
 
   const listed = connectedSources.data ?? [];
   const connectedSourceOf = (connectedSourceId: string | undefined) =>
@@ -176,7 +176,7 @@ export function ConnectedSourcesPage() {
         {listed.length === 0 ? null : (
           <ConnectedSourceList
             connectedSources={listed}
-            acts={{
+            actions={{
               onFocusConnectedSource: setInFocus,
               onReview: review,
               onPublish: publish,
@@ -200,7 +200,7 @@ export function ConnectedSourcesPage() {
           }}
           onConfirm={(confirmations) => {
             setPublishing(undefined);
-            publishAct.mutate(
+            publishAction.mutate(
               { connectedSourceId: toPublish.connectedSourceId, confirmations },
               settledSaying(
                 () =>
@@ -219,7 +219,7 @@ export function ConnectedSourcesPage() {
           }}
           onConfirm={(sensitivity) => {
             setNarrowing(undefined);
-            narrowAct.mutate(
+            narrowAction.mutate(
               {
                 connectedSourceId: toNarrow.connectedSourceId,
                 sensitivity,
@@ -245,7 +245,7 @@ export function ConnectedSourcesPage() {
           }}
           onConfirm={(asked) => {
             setWidening(undefined);
-            widenAct.mutate(
+            widenAction.mutate(
               {
                 connectedSourceId: toWiden.connectedSourceId,
                 ...asked,

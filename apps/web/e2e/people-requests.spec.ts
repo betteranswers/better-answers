@@ -21,7 +21,7 @@ import {
   signIn,
   tabOpenedByKeyboard,
   tabUntilFocused,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -172,11 +172,12 @@ test.describe("the People page's Requests tab", () => {
         - heading "Requests" [level=2]
         - paragraph: ${EMPTY_LINES.requests}
     `);
-    await expect(invitingButtons(page), "the toolbar's act is the one way to invite").toHaveCount(
-      1,
-    );
     await expect(
-      page.getByRole("button", { name: PEOPLE_KEYSTROKES.invite.act, exact: true }),
+      invitingButtons(page),
+      "the toolbar's action is the one way to invite",
+    ).toHaveCount(1);
+    await expect(
+      page.getByRole("button", { name: PEOPLE_KEYSTROKES.invite.action, exact: true }),
     ).toBeVisible();
   });
 
@@ -204,7 +205,7 @@ test.describe("the People page's Requests tab", () => {
     });
     await page.keyboard.press("d");
     await expect(rowOf(page, "Dropped Ray")).toHaveCount(0);
-    await theActLandedWithinItsBudget(page, "decline");
+    await theActionLandedWithinItsBudget(page, "decline");
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
     await expect(requestsRegion(page).getByRole("status").first()).toHaveText(
       "Declined the request from Dropped Ray. They may ask again.",
@@ -244,7 +245,7 @@ test.describe("the People page's Requests tab", () => {
     });
     await page.keyboard.press("Enter");
     await expect(approving).toHaveCount(0);
-    await theActLandedWithinItsBudget(page, "approve");
+    await theActionLandedWithinItsBudget(page, "approve");
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
     await expect(requestsRegion(page).getByRole("status").first()).toContainText(
       `Approved. The invitation went to ${kay} as an Editor`,
@@ -260,12 +261,12 @@ test.describe("the People page's Requests tab", () => {
         - table:
           - caption: /Requests to join this workspace/
           - rowgroup:
-            - row "Person Reason State Asked Acts":
+            - row "Person Reason State Asked Actions":
               - columnheader "Person"
               - columnheader "Reason"
               - columnheader "State"
               - columnheader "Asked"
-              - columnheader "Acts"
+              - columnheader "Actions"
           - rowgroup:
             - row /Kept Lee/:
               - cell /Kept Lee/

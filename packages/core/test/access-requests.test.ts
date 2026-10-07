@@ -86,12 +86,12 @@ const requestRows = async (workspaceId: string) => {
 
 const eventsAbout = async (subjectId: string) => {
   const rows = await db().pool.query<{
-    act: string;
+    action: string;
     actor: string;
     subject_kind: string;
     detail: Record<string, string | number | boolean>;
   }>(
-    "SELECT action AS act, actor, subject_kind, detail FROM audit_event WHERE subject_id = $1 ORDER BY at",
+    "SELECT action, actor, subject_kind, detail FROM audit_event WHERE subject_id = $1 ORDER BY at",
     [subjectId],
   );
   return rows.rows;
@@ -138,7 +138,7 @@ describe("asking to join a workspace", () => {
 
     expect(await eventsAbout(rows[0]?.id ?? "")).toEqual([
       {
-        act: "people.request.asked",
+        action: "people.request.asked",
         actor: `human:${requester}`,
         subject_kind: "request",
         detail: { requesterId: requester },
@@ -295,13 +295,13 @@ describe("approving a request", () => {
 
     expect(await eventsAbout(requestId)).toEqual([
       {
-        act: "people.request.asked",
+        action: "people.request.asked",
         actor: `human:${requester}`,
         subject_kind: "request",
         detail: { requesterId: requester },
       },
       {
-        act: "people.request.approved",
+        action: "people.request.approved",
         actor: `human:${workspace.adminUserId}`,
         subject_kind: "request",
         detail: {
@@ -423,7 +423,7 @@ describe("what a decision refuses and what it passes on", () => {
 
       expect(decided).toEqual({ ok: false, error: expect.any(Error) });
       expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
-      expect((await eventsAbout(requestId)).map((event) => event.act)).toEqual([
+      expect((await eventsAbout(requestId)).map((event) => event.action)).toEqual([
         "people.request.asked",
       ]);
     },
@@ -443,9 +443,9 @@ describe("declining a request", () => {
       { status: "declined", decided_by: workspace.adminUserId, invitation_id: null },
     ]);
     expect(await eventsAbout(requestId)).toMatchObject([
-      { act: "people.request.asked" },
+      { action: "people.request.asked" },
       {
-        act: "people.request.declined",
+        action: "people.request.declined",
         actor: `human:${workspace.adminUserId}`,
         detail: { requesterId: requester },
       },
@@ -624,12 +624,12 @@ describe("who may decide", () => {
 
 describe("the actor-naming door", () => {
   it.skipIf(sourceTreeIsInstrumented())(
-    "is called only by the auth-boundary acts the ADRs name",
+    "is called only by the auth-boundary actions the ADRs name",
     async () => {
       const call = /\brecordFor\(/;
 
       expect(call.test("await recordFor(platform, tx, event);")).toBe(true);
-      expect(call.test("export const recordFor = <A extends AuditAct>(")).toBe(false);
+      expect(call.test("export const recordFor = <A extends AuditAction>(")).toBe(false);
       expect(call.test("import { record } from '../audit/index.ts';")).toBe(false);
 
       const callers = coreSourceFiles().filter((file) => call.test(readFileSync(file, "utf8")));

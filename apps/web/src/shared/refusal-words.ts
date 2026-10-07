@@ -32,7 +32,7 @@ export const SAID_OF_CLASS = {
   precondition: { why: "Something else has to happen first.", next: "Try again once it has." },
 } satisfies Record<RefusalClass, Said>;
 
-/** An act the api sent no word with: the network's failure, or an answer nothing could read. */
+/** An action the api sent no word with: the network's failure, or an answer nothing could read. */
 export const NO_RESPONSE: Said = {
   why: "No response, so nothing was saved.",
   next: "Try again in a moment.",

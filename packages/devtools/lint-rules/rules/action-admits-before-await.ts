@@ -1,7 +1,7 @@
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
-const DECLARE = "declareAct";
+const DECLARE = "declareAction";
 
 const ADMIT = "admit";
 
@@ -19,17 +19,17 @@ const namedFirstArgument = (node: ESTree.CallExpression): string | undefined => 
   return first !== undefined && first.type === "Identifier" ? first.name : undefined;
 };
 
-export const actAdmitsBeforeAwaitRule = defineRule({
+export const actionAdmitsBeforeAwaitRule = defineRule({
   meta: {
     type: "problem",
     docs: {
       description:
-        "A function that admits does so before it awaits, and a declared act is admitted by one.",
+        "A function that admits does so before it awaits, and a declared action is admitted by one.",
     },
     messages: {
-      late: "This function awaits before it admits: run `admit` first, so nothing is opened, read or written for a principal the act was never going to serve (the root `CODING_STANDARDS.md`).",
+      late: "This function awaits before it admits: run `admit` first, so nothing is opened, read or written for a principal the action was never going to serve (the root `CODING_STANDARDS.md`).",
       unadmitted:
-        "`{{name}}` declares what an act admits and no function here passes it to `admit`, so the declaration states a gate nothing runs (the root `CODING_STANDARDS.md`).",
+        "`{{name}}` declares what an action admits and no function here passes it to `admit`, so the declaration states a gate nothing runs (the root `CODING_STANDARDS.md`).",
     },
   },
   createOnce(context) {

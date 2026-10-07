@@ -4,7 +4,7 @@ import { ceilingLiftsIn, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { setRefusalOutcome } from "@/shared/refusal-outcome.tsx";
-import { SelectionAct } from "@/shared/selection-bar.tsx";
+import { SelectionAction } from "@/shared/selection-bar.tsx";
 
 import { bulkResentOutcome, INVITATIONS_WORDS, resentOutcome } from "./invitation-words.ts";
 import {
@@ -18,7 +18,7 @@ import {
   type SentInvitation,
 } from "./invitations-api.ts";
 import { MOST_AT_ONCE } from "./invite-addresses.ts";
-import { BULK_WORDS } from "./member-act-words.ts";
+import { BULK_WORDS } from "./member-action-words.ts";
 import { PEOPLE_KEYSTROKES as KEY, shortcutOf } from "./people-state.ts";
 import { SAID_OF_TICKED_INVITATIONS } from "./refusal-words.ts";
 import { outcomeOfInvitationFailure, outcomeOfSendingFailure } from "./refusal.tsx";
@@ -28,7 +28,7 @@ export type Ticked = ReadonlyMap<string, string>;
 
 export const NONE: Ticked = new Map();
 
-/** What the list hands its acts: the ticks, and where an act's outcome and its unsent emails land. */
+/** What the list hands its actions: the ticks, and where an action's outcome and its unsent emails land. */
 type ActedList = {
   /** False while the list's read waits or has failed, when its rows are not there to act on. */
   readonly readable: boolean;
@@ -58,7 +58,7 @@ const refusalOf = (failure: Failure, names: Ticked): Outcome =>
       })
     : outcomeOfSendingFailure(failure);
 
-/** One act at a time: a second call on a mutation takes over the first's callbacks. */
+/** One action at a time: a second call on a mutation takes over the first's callbacks. */
 export const useOneAtATime = (say: (outcome: Outcome) => void) => {
   const [acting, setActing] = useState(false);
   const resend = useResendInvitation();
@@ -100,13 +100,13 @@ export const useOneAtATime = (say: (outcome: Outcome) => void) => {
   return { acting, begin, settled, resendOne };
 };
 
-export const useInvitationActs = (list: ActedList) => {
+export const useInvitationActions = (list: ActedList) => {
   const { acting, begin, settled, resendOne: resend } = useOneAtATime(list.say);
   const cancel = useCancelInvitation();
   const bulkResend = useBulkResendInvitations();
   const bulkCancel = useBulkCancelInvitations();
 
-  /** Said at the press, so the act reads as taken within a tenth of a second. */
+  /** Said at the press, so the action reads as taken within a tenth of a second. */
   const begun = (pending: string): boolean => {
     if (!begin()) {
       list.say(STILL_GOING);
@@ -215,28 +215,28 @@ export const useInvitationActs = (list: ActedList) => {
   return { acting, resendOne, cancelOne, resendTicked, cancelTicked };
 };
 
-type Acts = ReturnType<typeof useInvitationActs>;
+type Actions = ReturnType<typeof useInvitationActions>;
 
-export function InvitationBulkActs(properties: { readonly acts: Acts }) {
-  const { acts } = properties;
+export function InvitationBulkActions(properties: { readonly actions: Actions }) {
+  const { actions } = properties;
   return (
     <>
-      <SelectionAct
+      <SelectionAction
         aria-keyshortcuts={shortcutOf(KEY.resendSelected)}
-        aria-disabled={acts.acting}
+        aria-disabled={actions.acting}
         className="aria-disabled:opacity-50"
-        onClick={acts.resendTicked}
+        onClick={actions.resendTicked}
       >
         {INVITATIONS_WORDS.resend}
-      </SelectionAct>
-      <SelectionAct
+      </SelectionAction>
+      <SelectionAction
         aria-keyshortcuts={shortcutOf(KEY.cancelSelected)}
-        aria-disabled={acts.acting}
+        aria-disabled={actions.acting}
         className="aria-disabled:opacity-50"
-        onClick={acts.cancelTicked}
+        onClick={actions.cancelTicked}
       >
         {INVITATIONS_WORDS.cancel}
-      </SelectionAct>
+      </SelectionAction>
     </>
   );
 }

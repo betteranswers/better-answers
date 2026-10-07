@@ -52,7 +52,7 @@ export function DisplayNamePage() {
           name="displayName"
           autoComplete="name"
           required
-          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the code step's field is gone, and this field is the reader's next act
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the code step's field is gone, and this field is the reader's next action
           autoFocus
           aria-describedby={failure === null ? HINT : `${HINT} ${REFUSED}`}
           aria-invalid={refusedAs === "malformed"}

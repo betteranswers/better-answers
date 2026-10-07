@@ -18,7 +18,7 @@ import {
   provision,
   saysItsSentenceNotItsWord,
   signIn,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 const displayNameHeading = (page: Page) =>
@@ -68,7 +68,7 @@ test("asks a first-time person for a display name before anything", async ({
   await page.keyboard.type("Priya Shah");
   await clockTheNextKey(page, { at: "//main//button[@type='submit']", reads: "Saving" });
   await page.keyboard.press("Enter");
-  await theActLandedWithinItsBudget(page, "display name save");
+  await theActionLandedWithinItsBudget(page, "display name save");
 
   await expect(noWorkspaceHeading(page)).toBeVisible();
 });

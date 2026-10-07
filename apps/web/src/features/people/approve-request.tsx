@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 
-import { MountedActDialog } from "@/shared/act-dialog.tsx";
+import { MountedActionDialog } from "@/shared/action-dialog.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
 import type { Role } from "./people-api.ts";
@@ -22,7 +22,7 @@ export function ApproveRequest(properties: {
   const sent = useRef(false);
 
   return (
-    <MountedActDialog
+    <MountedActionDialog
       onClose={properties.onClose}
       onFocusBack={() => {
         properties.onFocusBack(sent.current);
@@ -41,6 +41,6 @@ export function ApproveRequest(properties: {
       }
     >
       <RoleChoice role={role} onChoose={setRole} />
-    </MountedActDialog>
+    </MountedActionDialog>
   );
 }

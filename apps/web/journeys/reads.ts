@@ -28,7 +28,7 @@ const readThroughTheSession = async <T>(
   data: z.ZodType<T>,
 ): Promise<T> => readFrom(await asked(page, procedure), procedure, data);
 
-/** The api's refusal of an act: its word, alone, as the message. An edge or a failure says none. */
+/** The api's refusal of an action: its word, alone, as the message. An edge or a failure says none. */
 const REFUSED = z.object({
   error: z.object({ message: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) }),
 });

@@ -18,7 +18,7 @@ export const KERNEL_REFUSALS = declareRefusals("kernel", {
   // Signing in again would only meet it again: the remedy is confirming the second factor.
   "second-factor-pending": "precondition",
 
-  // The act Postgres aborted to end a deadlock did nothing wrong: reading again and deciding
+  // The action Postgres aborted to end a deadlock did nothing wrong: reading again and deciding
   // again is the whole remedy.
   "changed-meanwhile": "conflict",
 

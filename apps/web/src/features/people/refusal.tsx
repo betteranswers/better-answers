@@ -18,7 +18,7 @@ export const outcomeOfInvitationFailure = (
   failedIn?: FailedIn,
 ): Outcome => failureOutcome(SAID_OF_AN_INVITATION, failure, failedIn);
 
-/** An act that emails meets its ceiling with no word, so the wait is what it says. */
+/** An action that emails meets its ceiling with no word, so the wait is what it says. */
 export const outcomeOfSendingFailure = (failure: Error | ApiError): Outcome => {
   const liftsInSeconds = ceilingLiftsIn(failure);
   return liftsInSeconds === undefined

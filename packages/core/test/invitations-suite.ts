@@ -33,11 +33,11 @@ export type InvitationRow = {
 };
 
 export const answeredValue = <T>(answer: Result<T, unknown>): T => {
-  if (!answer.ok) throw new Error(`the act answered ${String(answer.error)}`);
+  if (!answer.ok) throw new Error(`the action answered ${String(answer.error)}`);
   return answer.value;
 };
 
-/** When to ask again, if the act answered a ceiling met. */
+/** When to ask again, if the action answered a ceiling met. */
 export const ceilingOf = (answer: Result<unknown, unknown>): number | undefined =>
   !answer.ok && answer.error instanceof CeilingMet ? answer.error.retryAfterSeconds : undefined;
 
@@ -62,7 +62,7 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
       }),
     );
 
-  /** One address, answering its one invitation as the act answered it. */
+  /** One address, answering its one invitation as the action answered it. */
   const invite = async (
     workspace: ProvisionedWorkspace,
     address: string,
@@ -121,7 +121,7 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
       return person;
     });
 
-  /** A row as an accept or a past send left it, written beside the act. */
+  /** A row as an accept or a past send left it, written beside the action. */
   const invitationLeft = (
     workspace: ProvisionedWorkspace,
     row: { readonly email: string; readonly status: string; readonly expiresAt?: Date },
@@ -150,13 +150,13 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
   const invitationEvents = async (workspace: ProvisionedWorkspace) =>
     (
       await db().pool.query<{
-        act: string;
+        action: string;
         actor: string;
         subject_id: string;
         detail: Record<string, string>;
         batch_id: string | null;
       }>(
-        `SELECT action AS act, actor, subject_id, detail, batch_id FROM audit_event
+        `SELECT action, actor, subject_id, detail, batch_id FROM audit_event
           WHERE workspace_id = $1 AND action LIKE 'people.invitation.%' ORDER BY id`,
         [workspace.workspaceId],
       )

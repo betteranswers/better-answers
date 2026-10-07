@@ -1,6 +1,6 @@
 import { BUNDLE_MANIFEST_PATH, bundleManifest, type BundleManifest } from "@better-answers/schema";
 
-import { act, declareActs, record } from "../audit/index.ts";
+import { action, declareActions, record } from "../audit/index.ts";
 import {
   actorIdOf,
   attempt,
@@ -26,8 +26,8 @@ import { withMember, type PostgresDoor } from "../store/postgres/index.ts";
 import { scalarPairOf, type FrontmatterSource } from "./file.ts";
 import { landBundleCommit } from "./landing.ts";
 
-const MANIFEST_ACTS = declareActs("knowledge", {
-  written: act("knowledge.manifest.written", { bundleId: "id", commitSha: "gitSha" }),
+const MANIFEST_ACTIONS = declareActions("knowledge", {
+  written: action("knowledge.manifest.written", { bundleId: "id", commitSha: "gitSha" }),
 });
 
 const renderBundleManifest = (manifest: BundleManifest): string =>
@@ -118,7 +118,7 @@ export const writeManifest = async (
       withMember(principal, doors.postgres, async (fresh, tx) => {
         await record(fresh, tx, {
           id: auditEventId,
-          act: MANIFEST_ACTS.written,
+          action: MANIFEST_ACTIONS.written,
           subjectId: manifest.data.id,
           detail: { bundleId: manifest.data.id, commitSha: committed.value.sha },
         });

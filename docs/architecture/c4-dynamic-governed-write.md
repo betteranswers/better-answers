@@ -1,16 +1,16 @@
 # Dynamic — the governed write and its reconciler
 
-One act that changes the bundle — a concept typed on Knowledge, an acceptance in Suggestions, a verification, a conflict's resolution — lands as **one commit and one transaction, in that order, under one lock** (ADR 0012). Every records block on the route goes through this flow; S2 adds the `tsvector`, S3 the owner arm and the unresolved-reference row, S5 the by-run revert. The tRPC procedures in steps 1 and 2 arrive with those blocks — S3's Knowledge, S5's Suggestions, V1's verification. Today the same `writeConcept` is reached by `pnpm ops import-bundle`, the operator acting as a named member (T-307), and by the erasure rehearsal's synthetic concept.
+One action that changes the bundle — a concept typed on Knowledge, an acceptance in Suggestions, a verification, a conflict's resolution — lands as **one commit and one transaction, in that order, under one lock** (ADR 0012). Every records block on the route goes through this flow; S2 adds the `tsvector`, S3 the owner arm and the unresolved-reference row, S5 the by-run revert. The tRPC procedures in steps 1 and 2 arrive with those blocks — S3's Knowledge, S5's Suggestions, V1's verification. Today the same `writeConcept` is reached by `pnpm ops import-bundle`, the operator acting as a named member (T-307), and by the erasure rehearsal's synthetic concept.
 
 ```mermaid
 C4Dynamic
   title Dynamic diagram — one governed write, then the reconciler's tick
 
-  Person(person, "Editor or Admin", "The git author of the act")
+  Person(person, "Editor or Admin", "The git author of the action")
   Container(trpc, "tRPC procedure", "mutationProcedure; planned S3, S5, V1", "Resolves the Principal under the held read, opens the transaction, calls the slice")
 
   Container_Boundary(core, "packages/core") {
-    Component(concepts, "concepts slice", "the act", "Authoring, acceptance, verification, revert; owns the transaction and the lock")
+    Component(concepts, "concepts slice", "the action", "Authoring, acceptance, verification, revert; owns the transaction and the lock")
     Component(audit, "audit", "audit log", "Mints the event id before the commit")
     Component(gitdoor, "store/git", "git binary", "Lock, precondition, commit with the Audit trailer")
     Component(pgdoor, "store/postgres", "pg", "The one transaction the rows land in")
@@ -21,8 +21,8 @@ C4Dynamic
   ContainerDb(git, "Git store", "bare repository", "One per workspace")
   ContainerDb(postgres, "Postgres", "RLS", "concept_index, concept_identity, evidence, bundle_commit, the map, audit_event")
 
-  Rel(person, trpc, "1. Submits the act", "tRPC")
-  Rel(trpc, concepts, "2. Calls the act with the Principal and a Tx")
+  Rel(person, trpc, "1. Submits the action", "tRPC")
+  Rel(trpc, concepts, "2. Calls the action with the Principal and a Tx")
   Rel(concepts, gitdoor, "3. Takes the per-repository lock; checks the hash precondition against the ref")
   Rel(concepts, audit, "4. Mints the audit_event id for the trailer")
   Rel(gitdoor, git, "5. Writes one commit: the person as author, the platform bot as committer, the Audit trailer", "git")
@@ -38,7 +38,7 @@ C4Dynamic
 
 ## What the flow guarantees
 
-- **Authorization is judged at time of act**, against the instant the acting credential was issued at, under a shared lock on the member and person rows — so rows after a revocation are impossible by construction, and a bare commit inside the window is the replay case (ADR 0012, T-052).
+- **Authorization is judged at time of action**, against the instant the acting credential was issued at, under a shared lock on the member and person rows — so rows after a revocation are impossible by construction, and a bare commit inside the window is the replay case (ADR 0012, T-052).
 - **The map is never behind for an edit.** The delta joins the commit transaction; a full rebuild writes beside the live generation and flips in one row update. The reader's two phrases are *map as of* and *map unavailable since*; the third is retired (ADR 0023, `CONCEPTS.md` *map*).
 - **A replay is fail-closed on what a commit does not carry.** The merge key, sensitivity and evidence are recovered; a file whose `sources[]` are not the standing citations lands Restricted with an audit event saying so; the replay's audit event is the reconciler's under the commit's `Audit:` id (ADR 0012, amendments of 2026-09-07 and 2026-09-08).
 - **Unwanted content is undone by a forward revert, never a history rewrite.** The one rewrite the platform performs is the erasure routine's, on author lines, to the erasure pseudonym (ADRs 0012, 0035).

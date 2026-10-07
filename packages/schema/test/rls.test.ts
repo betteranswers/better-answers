@@ -431,21 +431,21 @@ describe("the audit log under app_rt", () => {
     });
   });
 
-  it("refuses an act outside the four families or family.subject.verb", async () => {
+  it("refuses an action outside the four families or family.subject.verb", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
-      for (const act of ["billing.invoice.sent", "people.member", "People.Member.Added"]) {
-        await client.query("SAVEPOINT act");
+      for (const action of ["billing.invoice.sent", "people.member", "People.Member.Added"]) {
+        await client.query("SAVEPOINT action");
         await expect(
           client.query(AN_AUDIT_EVENT_ROW, [
             ulid(),
             WS_A,
-            act,
+            action,
             "process:better-answers-test",
             ulid(),
           ]),
         ).rejects.toThrow(/audit_event_action_check|audit_event_family_check/);
-        await client.query("ROLLBACK TO SAVEPOINT act");
+        await client.query("ROLLBACK TO SAVEPOINT action");
       }
     });
   });
@@ -468,7 +468,7 @@ describe("the audit log under app_rt", () => {
 describe("the identity-set audit log", () => {
   const PERSON_NAMED = "people.person.named";
 
-  it("lets the api record and read unscoped acts, nothing more", async () => {
+  it("lets the api record and read unscoped actions, nothing more", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query("SET LOCAL ROLE app_rt");
       const id = ulid();
@@ -485,7 +485,7 @@ describe("the identity-set audit log", () => {
       await refusesEach(client, [
         [
           "UPDATE identity_audit_event SET actor = 'process:better-answers-test'",
-          "a row the api could rewrite could book a person's act to someone else",
+          "a row the api could rewrite could book a person's action to someone else",
         ],
         [
           `${AN_IDENTITY_SET_AUDIT_EVENT_ROW} ${THE_DETAIL_EDITED}`,
@@ -494,12 +494,12 @@ describe("the identity-set audit log", () => {
         ],
         [
           "DELETE FROM identity_audit_event",
-          "and one it could remove could make an act look as if it never happened",
+          "and one it could remove could make an action look as if it never happened",
         ],
         ["TRUNCATE identity_audit_event", "nor empty the whole record at once"],
         [
           AN_IDENTITY_SET_AUDIT_EVENT_ROW_WITH_ITS_FAMILY,
-          "nor write the family the act already names",
+          "nor write the family the action already names",
           [ulid(), PERSON_NAMED, "platform", `human:${personId}`, personId],
           /generated|non-DEFAULT/,
         ],
@@ -507,7 +507,7 @@ describe("the identity-set audit log", () => {
     });
   });
 
-  it("refuses the worker reading or recording a person's act", async () => {
+  it("refuses the worker reading or recording a person's action", async () => {
     await withRollback(db.pool, async (client) => {
       const personId = ulid();
       await client.query(AN_IDENTITY_SET_AUDIT_EVENT_ROW, [
@@ -522,10 +522,10 @@ describe("the identity-set audit log", () => {
       await client.query("SET LOCAL ROLE worker_rt");
 
       await refusesEach(client, [
-        ["SELECT id FROM identity_audit_event", "the worker acts on no person's identity"],
+        ["SELECT id FROM identity_audit_event", "the worker touches no person's identity"],
         [
           AN_IDENTITY_SET_AUDIT_EVENT_ROW,
-          "so it has no act of one to record",
+          "so it has no action of one to record",
           [ulid(), PERSON_NAMED, "process:better-answers-worker", personId],
         ],
         ["UPDATE identity_audit_event SET detail = '{}'", "or rewrite"],
@@ -534,7 +534,7 @@ describe("the identity-set audit log", () => {
     });
   });
 
-  it("takes only acts of the four families in family.subject.verb shape", async () => {
+  it("takes only actions of the four families in family.subject.verb shape", async () => {
     await withRollback(db.pool, async (client) => {
       const personId = ulid();
       const landed = await client.query(AN_IDENTITY_SET_AUDIT_EVENT_ROW, [
@@ -547,10 +547,10 @@ describe("the identity-set audit log", () => {
 
       await refusesEach(
         client,
-        ["billing.person.named", "people.person", "People.Person.Named"].map((act) => [
+        ["billing.person.named", "people.person", "People.Person.Named"].map((action) => [
           AN_IDENTITY_SET_AUDIT_EVENT_ROW,
-          `${act} is no act the audit logs name`,
-          [ulid(), act, "process:better-answers-test", ulid()],
+          `${action} is no action the audit logs name`,
+          [ulid(), action, "process:better-answers-test", ulid()],
           /identity_audit_event_action_check|identity_audit_event_family_check/,
         ]),
       );
@@ -970,7 +970,7 @@ describe("the concept write path under app_rt", () => {
         ],
         [
           "DELETE FROM concept_index",
-          "a concept leaves the bundle by an act, never by a reader of it",
+          "a concept leaves the bundle by an action, never by a reader of it",
         ],
       ]);
     });
@@ -2309,7 +2309,7 @@ describe("the derivation's tables under app_rt", () => {
       await refusesEach(client, [
         [
           "UPDATE source_document SET narrowed_to = NULL",
-          "an Admin's narrowing is an act with an audit event, and a sync that could clear it could widen a document at nobody's word",
+          "an Admin's narrowing is an action with an audit event, and a sync that could clear it could widen a document at nobody's word",
         ],
         [
           "UPDATE source_document SET title = 'Retitled by a sync'",
@@ -2335,7 +2335,7 @@ describe("the derivation's tables under app_rt", () => {
         ],
         [
           "DELETE FROM source_document",
-          "the withdrawal of a document is an act with an audit event, so the sync marks one gone and never removes it",
+          "the withdrawal of a document is an action with an audit event, so the sync marks one gone and never removes it",
         ],
       ]);
     });
@@ -2529,7 +2529,7 @@ describe("the finding under both runtime roles", () => {
         ],
         [
           "UPDATE finding SET review_state = 'narrowed'",
-          "the review is an Admin's act, and a worker that could stamp one could mark a special-category span reviewed",
+          "the review is an Admin's action, and a worker that could stamp one could mark a special-category span reviewed",
         ],
         [
           "UPDATE finding SET review_state = 'dismissed'",
@@ -2547,7 +2547,7 @@ describe("the finding under both runtime roles", () => {
         ],
         [
           A_FINDING_BORN_RESTORED,
-          "the restore is an Admin's act as well, and a span born restored is one the seam withheld and nobody put back",
+          "the restore is an Admin's action as well, and a span born restored is one the seam withheld and nobody put back",
           [WS_A, ulid(), document.id],
         ],
       ]);
@@ -2971,7 +2971,7 @@ describe("the subject request under both runtime roles", () => {
         ],
         [
           A_SUBJECT_REQUEST,
-          "recording a request is an Admin's act, so a worker that could insert one could start a clock nobody set",
+          "recording a request is an Admin's action, so a worker that could insert one could start a clock nobody set",
           [WS_A, ulid()],
         ],
         [

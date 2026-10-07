@@ -33,7 +33,7 @@ const countersOf = (
   { key: WORKSPACE_KEY, rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
 ];
 
-/** In key order, the workspace's last, so two acts sharing a counter queue rather than deadlock; past either ceiling the act fails whole. */
+/** In key order, the workspace's last, so two actions sharing a counter queue rather than deadlock; past either ceiling the action fails whole. */
 export const emailsCounted = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -53,7 +53,7 @@ export const emailsCounted = async (
 const ADDRESSES_WAITING = `SELECT lower(email) AS address FROM invitation
                             WHERE workspace_id = $1 AND id = ANY($2::text[]) AND status = $3`;
 
-/** Read unlocked, so every act takes its counters before any invitation row it holds. */
+/** Read unlocked, so every action takes its counters before any invitation row it holds. */
 export const waitingCounted = async (
   admin: AdminUserPrincipal,
   tx: Tx,

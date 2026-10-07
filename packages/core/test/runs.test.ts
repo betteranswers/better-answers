@@ -196,7 +196,7 @@ const ANOTHER_CONNECTED_SOURCE = "01K4Q9F3V8YXP7R2M6ZKWC3TDT";
 const boundJob = (workspaceId: WorkspaceId) =>
   ({ workspaceId, kind: "index", subjectId: CONNECTED_SOURCE, reason: "connected" }) as const;
 
-const actOf = <T>(scenario: Scenario, work: (tx: Tx) => Promise<T>): Promise<T> =>
+const actionOf = <T>(scenario: Scenario, work: (tx: Tx) => Promise<T>): Promise<T> =>
   withScope(mapMaintenance, scenario.postgres, scenario.workspaceId, (tx) => work(tx));
 
 const jobsIn = async (workspaceId: string) =>
@@ -208,7 +208,7 @@ const jobsIn = async (workspaceId: string) =>
   ).rows;
 
 const queuedBound = async (scenario: Scenario): Promise<string> => {
-  const first = await actOf(scenario, (tx) =>
+  const first = await actionOf(scenario, (tx) =>
     enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId)),
   );
   if (!first.ok) throw new Error(`the job was not queued: ${String(first.error)}`);
@@ -218,26 +218,26 @@ const queuedBound = async (scenario: Scenario): Promise<string> => {
 const reasonsIn = async (workspaceId: string): Promise<readonly string[]> =>
   (await jobsIn(workspaceId)).map((row: { reason: string }) => row.reason);
 
-describe("an act landing its rows and job in one transaction", () => {
-  it("rolls back with the act it rode in, queuing nothing", async () => {
+describe("an action landing its rows and job in one transaction", () => {
+  it("rolls back with the action it rode in, queuing nothing", async () => {
     const scenario = await arrange();
 
-    const act = actOf(scenario, async (tx) => {
+    const action = actionOf(scenario, async (tx) => {
       const enqueued = await enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId));
 
       await abortTheTransaction(tx);
       return enqueued;
     });
 
-    await expect(act).rejects.toThrow("the transaction did not commit");
+    await expect(action).rejects.toThrow("the transaction did not commit");
     expect(await jobsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("answers an already-queued source's job id, and the act commits", async () => {
+  it("answers an already-queued source's job id, and the action commits", async () => {
     const scenario = await arrange();
     const firstJobId = await queuedBound(scenario);
 
-    const second = await actOf(scenario, async (tx) => {
+    const second = await actionOf(scenario, async (tx) => {
       const answered = await enqueueJobIn(mapMaintenance, tx, {
         ...boundJob(scenario.workspaceId),
         reason: "restored",
@@ -268,14 +268,14 @@ describe("an act landing its rows and job in one transaction", () => {
       const scenario = await arrange();
       const firstJobId = await queuedBound(scenario);
 
-      const taken = await actOf(scenario, (tx) =>
+      const taken = await actionOf(scenario, (tx) =>
         enqueueJobIn(mapMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: emptying }),
       );
       expect(taken).toEqual({ ok: true, value: { jobId: firstJobId } });
       expect(await reasonsIn(scenario.workspaceId)).toEqual([emptying]);
 
       for (const reason of ["restored", alsoEmptying] as const) {
-        const later = await actOf(scenario, (tx) =>
+        const later = await actionOf(scenario, (tx) =>
           enqueueJobIn(mapMaintenance, tx, { ...boundJob(scenario.workspaceId), reason }),
         );
         expect(later).toEqual({ ok: true, value: { jobId: firstJobId } });
@@ -284,11 +284,11 @@ describe("an act landing its rows and job in one transaction", () => {
     },
   );
 
-  it("rejects an enqueue that another act's commit overtook", async () => {
+  it("rejects an enqueue that another action's commit overtook", async () => {
     const scenario = await arrange();
     const firstLanded = Promise.withResolvers<undefined>();
     const held = Promise.withResolvers<undefined>();
-    const first = actOf(scenario, async (tx) => {
+    const first = actionOf(scenario, async (tx) => {
       const queued = await enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId));
       firstLanded.resolve(undefined);
       await held.promise;
@@ -296,7 +296,7 @@ describe("an act landing its rows and job in one transaction", () => {
     });
     await firstLanded.promise;
 
-    const second = actOf(scenario, (tx) =>
+    const second = actionOf(scenario, (tx) =>
       enqueueJobIn(mapMaintenance, tx, boundJob(scenario.workspaceId)),
     ).then(
       () => "committed",
@@ -310,7 +310,7 @@ describe("an act landing its rows and job in one transaction", () => {
 
     expect(await first).toEqual({ ok: true, value: { jobId: expect.any(String) } });
     expect(await second).toEqual(
-      new Error("another act queued this subject while this one was enqueueing it"),
+      new Error("another action queued this subject while this one was enqueueing it"),
     );
     expect(await jobsIn(scenario.workspaceId)).toHaveLength(1);
   });
@@ -319,7 +319,7 @@ describe("an act landing its rows and job in one transaction", () => {
     const scenario = await arrange();
 
     const firstJobId = await queuedBound(scenario);
-    const other = await actOf(scenario, (tx) =>
+    const other = await actionOf(scenario, (tx) =>
       enqueueJobIn(mapMaintenance, tx, {
         ...boundJob(scenario.workspaceId),
         subjectId: ANOTHER_CONNECTED_SOURCE,
@@ -358,7 +358,7 @@ describe("an act landing its rows and job in one transaction", () => {
   ])("refuses %s as malformed", async (_what, asked) => {
     const scenario = await arrange();
 
-    const refused = await actOf(scenario, (tx) =>
+    const refused = await actionOf(scenario, (tx) =>
       // @ts-expect-error each row is outside the queue's input, on purpose
       enqueueJobIn(mapMaintenance, tx, {
         workspaceId: scenario.workspaceId,
@@ -366,7 +366,7 @@ describe("an act landing its rows and job in one transaction", () => {
       }),
     );
 
-    expect(refused, "refused, rather than aborting the act's transaction").toEqual({
+    expect(refused, "refused, rather than aborting the action's transaction").toEqual({
       ok: false,
       error: "malformed",
     });

@@ -19,7 +19,7 @@ export const groupsMaking = z.object({
 });
 
 /**
- * The slice's own acts record the member as actor; a transaction each gives each event its own
+ * The slice's own actions record the member as actor; a transaction each gives each event its own
  * instant.
  */
 export const makeGroups = async (
@@ -47,7 +47,7 @@ export const accessAsking = z.object({
 });
 
 /**
- * The slice's own act under the principal the ask-to-join procedure uses, without the sign-in and
+ * The slice's own action under the principal the ask-to-join procedure uses, without the sign-in and
  * the answer's floor that procedure puts in front of it.
  */
 export const askToJoin = async (
@@ -65,7 +65,7 @@ export const nameFlagging = flagDisplayNameInput.extend({
 });
 
 /**
- * The slice's own act under the flagging Admin, less the operator's email the procedure sends once
+ * The slice's own action under the flagging Admin, less the operator's email the procedure sends once
  * it commits.
  */
 export const flagTheName = async (

@@ -7,7 +7,7 @@ component: records
 severity: high
 applies_when:
   - "Adding a record family or a table that refers to a concept"
-  - "Writing an act that must leave an audit event"
+  - "Writing an action that must leave an audit event"
   - "Adding a version table for text a person edits"
   - "Removing a member or erasing a person on the identity set"
 tags:
@@ -24,7 +24,7 @@ tags:
 
 ## The decision
 
-Records attach to a concept by IRI and never restate it. A record keys to the concept index row by `(workspace_id, iri)`, a composite foreign key. Records keep versions only where a person edits text. Every act is audited in one audit log per workspace.
+Records attach to a concept by IRI and never restate it. A record keys to the concept index row by `(workspace_id, iri)`, a composite foreign key. Records keep versions only where a person edits text. Every action is audited in one audit log per workspace.
 
 - A write-up's includes, a guide definition's sections and a question set's questions are rows, never saved lists.
 - A context wording is a named section of its concept's body, never a record.
@@ -33,7 +33,7 @@ The audit log, `audit_event`:
 
 - is an ordinary tenant table, not partitioned until a row-count trigger reopens it;
 - is insert-only, by revoked privilege;
-- has a caller-minted id, and its family and subject kind are derived from the act;
+- has a caller-minted id, and its family and subject kind are derived from the action;
 - is unique on `(workspace_id, id)`, so a record may key to the audit row it was written with;
 - is never rewritten.
 
@@ -68,7 +68,7 @@ Decided for the S3 block and not yet in the tree:
 - A parties family now: a second home for facts the bundle already states, and personal data for a use case not in v0.1.
 - Two write-up families, or a response as an audit row only: the same columns twice, or no version to export.
 - No question-set record, or an upload connected source as the question set: no title, order or re-run, or a buyer's document treated as company knowledge.
-- Per-act audit tables, or audit in the application's own log: a union across tables, or nothing queryable by target.
+- Per-action audit tables, or audit in the application's own log: a union across tables, or nothing queryable by target.
 - One generic JSON version table, or before and after in audit payloads: no types, and a history a UI cannot list, diff or restore.
 - Verification as columns on the row: a second reviewer overwrites the first.
 - Evidence derived by the worker after the commit: a second writer of derived rows, and a window with no evidence.

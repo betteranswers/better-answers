@@ -268,7 +268,7 @@ export const sessionPointedAt = async (
 };
 
 /**
- * Every write an act makes lands, and its commit is what fails, so anything sent before the
+ * Every write an action makes lands, and its commit is what fails, so anything sent before the
  * commit would already have gone.
  */
 export const whileCommitsAreRefused = async <T>(

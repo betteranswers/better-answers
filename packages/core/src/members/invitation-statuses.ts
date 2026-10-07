@@ -10,7 +10,7 @@ import {
 import {
   admit,
   attempt,
-  declareAct,
+  declareAction,
   err,
   ok,
   type AdminUserPrincipal,
@@ -31,14 +31,14 @@ export const listInvitationsInput = z
   .object({ status: z.enum(INVITATION_STATUSES).default("waiting") })
   .default({ status: "waiting" });
 
-const listInvitationsAct = declareAct({
+const listInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: listInvitationsInput,
   refuses: ["role-forbids"],
   effect: "read",
 });
 
-const countInvitationsAct = declareAct({
+const countInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: z.object({}),
   refuses: ["role-forbids"],
@@ -46,7 +46,7 @@ const countInvitationsAct = declareAct({
 });
 
 export type ListInvitationsRefusal =
-  | MemberRefusal<RefusalOf<typeof listInvitationsAct | typeof countInvitationsAct>>
+  | MemberRefusal<RefusalOf<typeof listInvitationsAction | typeof countInvitationsAction>>
   | Error;
 
 /** The inviter by display name, read from their person row, so it stands after they leave. */
@@ -92,7 +92,7 @@ export const listInvitations = async (
   tx: Tx,
   input: ListInvitationsInput,
 ): Promise<Result<readonly ListedInvitation[], ListInvitationsRefusal>> => {
-  const admitted = admit(listInvitationsAct, principal, input);
+  const admitted = admit(listInvitationsAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
   const { text, values } = listedQuery(admitted.value, input);
@@ -122,7 +122,7 @@ export const countInvitations = async (
   tx: Tx,
   input: { readonly at: Date },
 ): Promise<Result<InvitationCounts, ListInvitationsRefusal>> => {
-  const admitted = admit(countInvitationsAct, principal, {});
+  const admitted = admit(countInvitationsAction, principal, {});
   if (!admitted.ok) return err(admitted.error);
 
   const { text, values } = countedQuery(admitted.value, input.at);

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import {
-  ACT,
+  ACTION,
   AUDIENCES,
   boundarySchemas,
   CONTENT_HASH,
@@ -19,7 +19,10 @@ type AuditEventRow = z.infer<typeof boundarySchemas.auditEvent.select>;
 
 export type Family = AuditEventRow["family"];
 
-export type ActName<F extends Family = Family> = Extract<AuditEventRow["act"], `${F}.${string}`>;
+export type ActionName<F extends Family = Family> = Extract<
+  AuditEventRow["action"],
+  `${F}.${string}`
+>;
 
 /** Ids alone: the assistant's and the workspace's names are read when the grant is shown. */
 export const endedGrant = z.strictObject({
@@ -123,15 +126,18 @@ export type DetailOf<Shape extends DetailShape> = {
   ]?: DetailValueOf<Shape[Field]>;
 };
 
-export type AuditAct<Name extends ActName = ActName, Shape extends DetailShape = DetailShape> = {
+export type AuditAction<
+  Name extends ActionName = ActionName,
+  Shape extends DetailShape = DetailShape,
+> = {
   readonly name: Name;
   readonly detail: Shape;
 };
 
-export const act = <Name extends ActName, const Shape extends DetailShape>(
+export const action = <Name extends ActionName, const Shape extends DetailShape>(
   name: Name,
   detail: Shape,
-): AuditAct<Name, Shape> => ({ name, detail });
+): AuditAction<Name, Shape> => ({ name, detail });
 
 const NEVER_A_SUBJECT: ReadonlySet<string> = new Set([
   "run",
@@ -147,7 +153,7 @@ const NEVER_A_SUBJECT: ReadonlySet<string> = new Set([
 
 export type Declaration = {
   readonly family: Family;
-  readonly acts: readonly ActName[];
+  readonly actions: readonly ActionName[];
   readonly detailKeys: readonly string[];
 };
 
@@ -160,8 +166,8 @@ const declarationRefusal = (
   earlierInCall: ReadonlySet<string>,
 ): string | undefined => {
   const [prefix, subject] = name.split(".");
-  if (!ACT.test(name) || prefix !== family) {
-    return `${name} is not a ${family} act of the form family.subject.verb`;
+  if (!ACTION.test(name) || prefix !== family) {
+    return `${name} is not a ${family} action of the form family.subject.verb`;
   }
   if (subject !== undefined && NEVER_A_SUBJECT.has(subject)) {
     return `${name} names a record that is never an audit event`;
@@ -171,17 +177,17 @@ const declarationRefusal = (
 };
 
 /**
- * Declares every act or none: throws when a name is not of the family's form, names a record never
+ * Declares every action or none: throws when a name is not of the family's form, names a record never
  * kept as an audit event, or is declared already or earlier in the same call.
  */
-export const declareActs = <
+export const declareActions = <
   F extends Family,
-  const Acts extends Record<string, AuditAct<ActName<F>>>,
+  const Actions extends Record<string, AuditAction<ActionName<F>>>,
 >(
   family: F,
-  acts: Acts,
-): Acts => {
-  const names = Object.values(acts).map(({ name }) => name);
+  actions: Actions,
+): Actions => {
+  const names = Object.values(actions).map(({ name }) => name);
   const earlierInCall = new Set<string>();
   for (const name of names) {
     const refusal = declarationRefusal(family, name, earlierInCall);
@@ -189,26 +195,26 @@ export const declareActs = <
     earlierInCall.add(name);
   }
   for (const name of names) declaredNames.add(name);
-  const detailKeys = new Set(Object.values(acts).flatMap(({ detail }) => Object.keys(detail)));
-  declared.push({ family, acts: names, detailKeys: [...detailKeys] });
-  return acts;
+  const detailKeys = new Set(Object.values(actions).flatMap(({ detail }) => Object.keys(detail)));
+  declared.push({ family, actions: names, detailKeys: [...detailKeys] });
+  return actions;
 };
 
 const identitySetNames = new Set<string>();
 
 /**
- * Which audit log keeps an act is fixed where it is declared, so no caller can file a person's own
- * act in a workspace.
+ * Which audit log keeps an action is fixed where it is declared, so no caller can file a person's own
+ * action in a workspace.
  */
-export const declareIdentitySetActs = <
+export const declareIdentitySetActions = <
   F extends Family,
-  const Acts extends Record<string, AuditAct<ActName<F>>>,
+  const Actions extends Record<string, AuditAction<ActionName<F>>>,
 >(
   family: F,
-  acts: Acts,
-): Acts => {
-  const registered = declareActs(family, acts);
-  for (const { name } of Object.values(acts)) identitySetNames.add(name);
+  actions: Actions,
+): Actions => {
+  const registered = declareActions(family, actions);
+  for (const { name } of Object.values(actions)) identitySetNames.add(name);
   return registered;
 };
 
@@ -216,4 +222,4 @@ export const declarations = (): readonly Declaration[] => [...declared];
 
 export const isDeclared = (name: string): boolean => declaredNames.has(name);
 
-export const isIdentitySetAct = (name: string): boolean => identitySetNames.has(name);
+export const isIdentitySetAction = (name: string): boolean => identitySetNames.has(name);

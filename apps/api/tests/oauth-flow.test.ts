@@ -422,7 +422,7 @@ describe("the pages, as a person walks them", () => {
     const page = readOf(await (await client.fetch(`${consent.pathname}${consent.search}`)).text());
 
     for (const scope of OAUTH_SCOPES) expect(page).toContain(CONSENT_WORDS.scopes[scope]);
-    expect(page).toContain(CONSENT_WORDS.actsAs("Claude", "Acme"));
+    expect(page).toContain(CONSENT_WORDS.asYou("Claude", "Acme"));
   });
 
   it("shows the assistant's real address and where Connect goes", async () => {

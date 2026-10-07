@@ -7,15 +7,15 @@ import { workspace } from "./workspace-table.ts";
 
 export const FAMILIES = ["people", "knowledge", "sources", "platform"] as const;
 
-export const ACT_PATTERN = `^(${FAMILIES.join("|")})\\.[a-z][a-z_]*\\.[a-z][a-z_]*$`;
+export const ACTION_PATTERN = `^(${FAMILIES.join("|")})\\.[a-z][a-z_]*\\.[a-z][a-z_]*$`;
 
-export const ACT = new RegExp(ACT_PATTERN);
+export const ACTION = new RegExp(ACTION_PATTERN);
 
 const familyList = listed(FAMILIES);
 
-/** Both audit logs name an act the same way and carry the same row after the key. */
+/** Both audit logs name an action the same way and carry the same row after the key. */
 const auditLogColumns = () => ({
-  act: text("action").notNull(),
+  action: text("action").notNull(),
 
   family: text("family")
     .notNull()
@@ -35,7 +35,7 @@ const auditLogColumns = () => ({
 });
 
 const auditLogChecks = (table: string) => [
-  check(`${table}_action_check`, sql.raw(`action ~ '${ACT_PATTERN}'`)),
+  check(`${table}_action_check`, sql.raw(`action ~ '${ACTION_PATTERN}'`)),
   check(`${table}_family_check`, sql.raw(`family IN (${familyList})`)),
 ];
 
@@ -62,7 +62,7 @@ export const auditEvent = withRLS(
 );
 
 /**
- * An act on the identity set belongs to no workspace, so no workspace's scope can hold its row.
+ * An action on the identity set belongs to no workspace, so no workspace's scope can hold its row.
  */
 export const identityAuditEvent = pgTable(
   "identity_audit_event",

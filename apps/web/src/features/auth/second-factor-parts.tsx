@@ -11,14 +11,14 @@ import {
 } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
-import { KeystrokesAct, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { NO_RESPONSE_TO_A_READ, SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
-import { ACCOUNT_ACTS, ACCOUNT_WORDS } from "./account-words.ts";
+import { ACCOUNT_ACTIONS, ACCOUNT_WORDS } from "./account-words.ts";
 import { CodeRefused, isTooMany, SIGNED_OUT } from "./auth-hooks.ts";
 import { AuthPage, Outcome, ReadAgain, Refused } from "./auth-page.tsx";
 import { isAWrongCode } from "./authenticator-code.tsx";
@@ -31,7 +31,7 @@ import { rememberTheStanding } from "./second-factor-steps.ts";
 import { CODE_AGAIN, USE_CODE } from "./second-factor-words.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
 
-export const READ_AGAIN: Keystroke = { key: "r", act: ACCOUNT_ACTS.readAgain };
+export const READ_AGAIN: Keystroke = { key: "r", action: ACCOUNT_ACTIONS.readAgain };
 
 const MS_PER_SECOND = 1000;
 
@@ -49,7 +49,7 @@ export const sessionOf = (held: SecondFactor) =>
 export const readUnanswered = (read: SecondFactorRead): boolean =>
   read.data === undefined && read.error !== null && refusalOf(read.error) === undefined;
 
-/** What a failed read or act says, with Read again when the read went unanswered. */
+/** What a failed read or action says, with Read again when the read went unanswered. */
 export function SecondFactorRefused(properties: {
   readonly id: string;
   readonly read: SecondFactorRead;
@@ -193,14 +193,14 @@ export function StepLink(properties: {
             go();
           }}
         >
-          {keystroke.act}
+          {keystroke.action}
         </a>
       </Button>
     </div>
   );
 }
 
-/** Before the read lands, Read again is the one act with a key, once the read went unanswered. */
+/** Before the read lands, Read again is the one action with a key, once the read went unanswered. */
 const listedKeystrokes = (
   read: SecondFactorRead,
   keystrokes: readonly Keystroke[],
@@ -238,7 +238,7 @@ export function PendingFrame(properties: {
       />
       <div className="mt-10 flex flex-wrap items-center gap-2">
         {listed === undefined ? null : (
-          <KeystrokesAct page={properties.title} keystrokes={listed} />
+          <KeystrokesAction page={properties.title} keystrokes={listed} />
         )}
         <SignOutButton />
       </div>

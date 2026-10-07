@@ -16,7 +16,7 @@ import { dayWords } from "@/shared/words.ts";
 /** The table and its empty state stand in the same card, so the tab keeps its shape. */
 const CARD = "mt-4 border border-border bg-card";
 
-/** What waits on an Admin, a row each with its acts: invitations not yet accepted, requests. */
+/** What waits on an Admin, a row each with its actions: invitations not yet accepted, requests. */
 export function WaitingTable(properties: {
   readonly caption: string;
   readonly columns: readonly string[];
@@ -76,11 +76,11 @@ export function DayCell(properties: { readonly instant: string }) {
 export function useKeystrokeOnHeld<Item>(
   keystroke: Keystroke,
   held: Item | undefined,
-  act: (item: Item) => void,
+  action: (item: Item) => void,
   nothingHeld: () => void,
 ) {
   useKeystroke(keystroke, () => {
     if (held === undefined) nothingHeld();
-    else act(held);
+    else action(held);
   });
 }

@@ -28,7 +28,7 @@ Every answer the platform gives is one retained, correctable record in *Question
 - Its skeleton (citations with their trust at the time, the predicate that applied, reuse and the judge's verdict, feedback, corrections) is kept for good.
 - Its content (the question, the answer, who asked) is kept twelve months by default, then thinned to the skeleton.
 - Feedback is *helpful*, or a flag with one reason: *wrong*, *out of date*, *incomplete* or *should not have shown*. The reason becomes a record in someone's queue.
-- A correction is an Admin's or owner's act that records the level the answer went wrong at (concept, source or retrieval) and links the act that fixed it.
+- A correction is an Admin's or owner's action that records the level the answer went wrong at (concept, source or retrieval) and links the action that fixed it.
 - A retrieval correction is kept as an answer test, replayed retrieval-only when the answer path changes and weekly.
 
 An `Answer` concept is minted or updated only at a gate a person runs, the promotion gate.

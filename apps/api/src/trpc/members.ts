@@ -89,17 +89,19 @@ type Minting<Asked, Minted> = (
   input: Asked & { readonly now: Date },
 ) => Promise<Result<Minted, RefusalAnswer | Error>>;
 
-/** The moment is the server's, and the act answers only once it committed. */
+/** The moment is the server's, and the action answers only once it committed. */
 const committedNow = <Asked, Minted>(
   ctx: Emailing,
-  act: Minting<Asked, Minted>,
+  action: Minting<Asked, Minted>,
   input: Result<Asked, Malformed>,
 ): Promise<Minted> =>
   crossing(
     ctx,
-    act.name,
+    action.name,
     given(input, (asked) =>
-      committedAs(ctx, (principal, tx) => act(principal, tx, { ...asked, now: ctx.clock.now() })),
+      committedAs(ctx, (principal, tx) =>
+        action(principal, tx, { ...asked, now: ctx.clock.now() }),
+      ),
     ),
   );
 
@@ -113,13 +115,13 @@ const answerOf = (invitation: InvitationToSend, emailSent: boolean) => ({
 });
 
 /**
- * Runs an act that mints or renews an invitation, then emails it once the act committed, and
+ * Runs an action that mints or renews an invitation, then emails it once the action committed, and
  * answers the invitation with whether its email went.
  */
 const committedThenEmailed =
-  <Asked>(act: Minting<Asked, InvitationToSend>) =>
+  <Asked>(action: Minting<Asked, InvitationToSend>) =>
   async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
-    const invitation = await committedNow(ctx, act, input);
+    const invitation = await committedNow(ctx, action, input);
     return answerOf(invitation, await sentInvitation(ctx, invitation));
   };
 
@@ -139,14 +141,14 @@ const emailedEach = async (
   return sent;
 };
 
-/** As `committedThenEmailed`, for an act on many: each email goes, or fails, on its own. */
+/** As `committedThenEmailed`, for an action on many: each email goes, or fails, on its own. */
 const committedThenEmailedEach =
   <Asked, Minted extends InvitationToSend, Answer>(
-    act: Minting<Asked, readonly Minted[]>,
+    action: Minting<Asked, readonly Minted[]>,
     answer: (minted: Minted, emailSent: boolean) => Answer,
   ) =>
   async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
-    const minted = await committedNow(ctx, act, input);
+    const minted = await committedNow(ctx, action, input);
     const sent = await emailedEach(ctx, minted);
     return { invitations: minted.map((one, at) => answer(one, sent[at] === true)) };
   };
@@ -160,14 +162,14 @@ type Moving<Asked, Moved> = (
 /** Once the move committed, tells each person it promoted what can confirm their sign-in. */
 const movedThenTold =
   <Asked, Moved extends object, Answer>(
-    act: Moving<Asked, Moved>,
+    action: Moving<Asked, Moved>,
     told: (moved: Moved) => { readonly promoted: readonly string[]; readonly answer: Answer },
   ) =>
   async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
     const moved = await crossing(
       ctx,
-      act.name,
-      given(input, (asked) => committedAs(ctx, (principal, tx) => act(principal, tx, asked))),
+      action.name,
+      given(input, (asked) => committedAs(ctx, (principal, tx) => action(principal, tx, asked))),
     );
     const { promoted, answer } = told(moved);
     for (const personId of promoted) void sendPromotionNotice(ctx, personId);
@@ -186,10 +188,10 @@ type AtTheClock = {
   readonly clock: Clock;
 };
 
-/** The moment is the server's, read as the act runs. The act's function name labels its logs. */
+/** The moment is the server's, read as the action runs. The action's function name labels its logs. */
 const answeredAt =
   <Asked, Value>(
-    act: (
+    action: (
       principal: UserPrincipal,
       tx: Tx,
       input: Asked & { readonly at: Date },
@@ -198,8 +200,8 @@ const answeredAt =
   ({ ctx, input }: { readonly ctx: AtTheClock; readonly input: Result<Asked, Malformed> }) =>
     crossing(
       ctx,
-      act.name,
-      given(input, (asked) => act(ctx.principal, ctx.tx, { ...asked, at: ctx.clock.now() })),
+      action.name,
+      given(input, (asked) => action(ctx.principal, ctx.tx, { ...asked, at: ctx.clock.now() })),
     );
 
 export const membersRouter = router({

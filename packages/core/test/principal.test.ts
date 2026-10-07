@@ -4,7 +4,13 @@ import { NIGHTLY_AUDIT_KIND, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 
-import { act, declareActs, declareIdentitySetActs, record, recordFor } from "../src/audit/index.ts";
+import {
+  action,
+  declareActions,
+  declareIdentitySetActions,
+  record,
+  recordFor,
+} from "../src/audit/index.ts";
 import {
   actorIdOfPerson,
   attempt,
@@ -107,14 +113,14 @@ const claimsFor = (seeded: Seeded, overrides: Partial<Claims> = {}): Claims => (
   ...overrides,
 });
 
-const PROBE_ACTS = declareActs("platform", {
-  rolledBack: act("platform.probe.rolled_back", { confirmed: "flag" }),
+const PROBE_ACTIONS = declareActions("platform", {
+  rolledBack: action("platform.probe.rolled_back", { confirmed: "flag" }),
 });
 
 const PROVOKED = "provoked" as const;
 
-const IDENTITY_PROBE = declareIdentitySetActs("people", {
-  written: act("people.probe.written", {}),
+const IDENTITY_PROBE = declareIdentitySetActions("people", {
+  written: action("people.probe.written", {}),
 });
 
 const answeringAfterThreeWrites =
@@ -123,7 +129,7 @@ const answeringAfterThreeWrites =
     await configProbeWritten(tx, workspaceId, key);
     await record(principal, tx, {
       id: ulid(),
-      act: PROBE_ACTS.rolledBack,
+      action: PROBE_ACTIONS.rolledBack,
       subjectId: workspaceId,
       detail: { confirmed: true },
     });
@@ -141,7 +147,7 @@ const leftBehindIn = async (workspaceId: string, key: string) => {
     `SELECT (SELECT count(*)::int FROM workspace_config WHERE workspace_id = $1 AND key = $2) AS rows,
             (SELECT count(*)::int FROM audit_event WHERE workspace_id = $1 AND action = $3) AS "auditEvents",
             (SELECT count(*)::int FROM job WHERE workspace_id = $1) AS jobs`,
-    [workspaceId, key, PROBE_ACTS.rolledBack.name],
+    [workspaceId, key, PROBE_ACTIONS.rolledBack.name],
   );
   return counted.rows[0];
 };
@@ -734,7 +740,7 @@ describe("the operator resolver", () => {
           await recordFor(bootstrap, tx, {
             id: ulid(),
             actor: actorIdOfPerson(person.id),
-            act: IDENTITY_PROBE.written,
+            action: IDENTITY_PROBE.written,
             subjectId: person.id,
             detail: {},
           });

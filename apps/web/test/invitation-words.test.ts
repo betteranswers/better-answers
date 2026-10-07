@@ -65,7 +65,7 @@ describe("what an invite's outcome says", () => {
   });
 });
 
-describe("what a bulk act's outcome says", () => {
+describe("what a bulk action's outcome says", () => {
   it("says each resent invitation's expiry", () => {
     expect(bulkResentOutcome([invited("a@example.com"), invited("b@example.com")])).toEqual({
       tone: "said",

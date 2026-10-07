@@ -1,6 +1,6 @@
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareIdentitySetActs, record } from "../audit/index.ts";
+import { action, declareIdentitySetActions, record } from "../audit/index.ts";
 import {
   attempt,
   emailAddressOf,
@@ -17,8 +17,8 @@ import { applyDisplayNameRule, type DisplayNameRefusal } from "./display-name.ts
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 /** The detail holds no name: its one copy is the `user` row, where erasure blanks it. */
-const PERSON_ADDED = declareIdentitySetActs("people", {
-  added: act("people.person.added", {}),
+const PERSON_ADDED = declareIdentitySetActions("people", {
+  added: action("people.person.added", {}),
 }).added;
 
 type AddPersonInput = {
@@ -57,7 +57,7 @@ const adding = async (
   );
   await record(platform, tx, {
     id: ulid(),
-    act: PERSON_ADDED,
+    action: PERSON_ADDED,
     subjectId: person.personId,
     detail: {},
   });

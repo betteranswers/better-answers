@@ -152,7 +152,7 @@ export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void
   await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
 };
 
-const ACT_BUDGET_MS = 100;
+const ACTION_BUDGET_MS = 100;
 
 /**
  * Timed in the page, from the next key to the node at the XPath `at` reading `reads`: a matcher's
@@ -182,15 +182,15 @@ export const clockTheNextKey = (
         { capture: true, once: true },
       );
     });
-    Reflect.set(window, "actClocked", clocked);
+    Reflect.set(window, "actionClocked", clocked);
   }, landed);
 
 /** Reads the clock `clockTheNextKey` started, so that call comes before the key it times. */
-export const theActLandedWithinItsBudget = async (page: Page, act: string): Promise<void> => {
-  const elapsed = await page.evaluate(() => Reflect.get(window, "actClocked"));
-  test.info().annotations.push({ type: `${act} act`, description: `${elapsed} ms` });
-  expect(elapsed, `the ${act} did not read as landed within its budget`).toBeLessThan(
-    ACT_BUDGET_MS,
+export const theActionLandedWithinItsBudget = async (page: Page, action: string): Promise<void> => {
+  const elapsed = await page.evaluate(() => Reflect.get(window, "actionClocked"));
+  test.info().annotations.push({ type: `${action} action`, description: `${elapsed} ms` });
+  expect(elapsed, `the ${action} did not read as landed within its budget`).toBeLessThan(
+    ACTION_BUDGET_MS,
   );
 };
 

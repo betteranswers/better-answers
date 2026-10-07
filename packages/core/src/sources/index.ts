@@ -2,12 +2,12 @@ import { z } from "zod";
 
 import { visibilityAgreed, visibilityOf, widens, type Visibility } from "../access/index.ts";
 import {
-  act,
-  declareActs,
+  action,
+  declareActions,
   record,
   STORED_DETAIL_KEYS,
   type AuditEvent,
-  type AuditAct,
+  type AuditAction,
 } from "../audit/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import { attempt, err, ok, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
@@ -34,7 +34,7 @@ export {
   publishConnectedSource,
   publishConnectedSourceInput,
   reprocessConnectedSource,
-  reprocessConnectedSourceAct,
+  reprocessConnectedSourceAction,
   reprocessConnectedSourceInput,
   UPLOAD_BYTE_CAP,
   UPLOAD_MEDIA_TYPES,
@@ -88,14 +88,14 @@ export {
 export { listConnectedSources } from "./listing.ts";
 export { SOURCE_REFUSALS, type SourceRefusal } from "./vocabulary.ts";
 
-const SOURCE_ACTS = declareActs("sources", {
-  narrowed: act("sources.binding.narrowed", {
+const SOURCE_ACTIONS = declareActions("sources", {
+  narrowed: action("sources.binding.narrowed", {
     [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     sensitivity: "sensitivity",
     audience: "audience",
   }),
 
-  widened: act("sources.binding.widened", {
+  widened: action("sources.binding.widened", {
     [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     fromSensitivity: "sensitivity",
     fromAudience: "audience",
@@ -197,11 +197,11 @@ const sensitivityAskedOf = async (
   return ok({ acting: acting.value, from: visibilityOf(current.value), next });
 };
 
-const sensitivitySet = async <A extends AuditAct>(
+const sensitivitySet = async <A extends AuditAction>(
   acting: ActingOnConnectedSource,
   tx: Tx,
   next: Visibility,
-  auditEvent: Pick<AuditEvent<A>, "act" | "detail">,
+  auditEvent: Pick<AuditEvent<A>, "action" | "detail">,
 ): Promise<Result<ConnectedSourceSensitivitySet, Error>> => {
   const { admin, workspaceId, connectedSourceId } = acting;
   const written = await attempt(() =>
@@ -235,7 +235,7 @@ export const narrowConnectedSource = async (
   if (widens(from, next)) return err("widening-refused");
 
   return sensitivitySet(acting, tx, next, {
-    act: SOURCE_ACTS.narrowed,
+    action: SOURCE_ACTIONS.narrowed,
     detail: {
       [STORED_DETAIL_KEYS.connectedSourceId]: acting.connectedSourceId,
       sensitivity: next.sensitivity,
@@ -263,7 +263,7 @@ export const widenConnectedSource = async (
   if (unreviewed.value) return err("special-category-unreviewed");
 
   return sensitivitySet(acting, tx, next, {
-    act: SOURCE_ACTS.widened,
+    action: SOURCE_ACTIONS.widened,
     detail: {
       [STORED_DETAIL_KEYS.connectedSourceId]: acting.connectedSourceId,
       fromSensitivity: from.sensitivity,

@@ -39,7 +39,7 @@ The read predicate (published · sensitivity · audience) lives once, as `readab
 A sensitivity is derived:
 
 - Most restrictive among the connected sources of the evidence a concept cites, and among a write-up's includes.
-- Re-derived synchronously inside the narrowing act, two levels down: connected source, then concept, then write-up.
+- Re-derived synchronously inside the narrowing action, two levels down: connected source, then concept, then write-up.
 - Audiences combine by intersection, with *everyone* the identity. An empty intersection forces Restricted (ADR 0039).
 - A unit resting on nothing takes its fallback: the writer's word on a creation, what the row holds on anything else.
 

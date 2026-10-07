@@ -27,13 +27,13 @@ export const heldAs = async <T>(
   );
 
 /**
- * Each acts on the other once both hold their own member row, so each waits on the other's: a
+ * Each writes to the other once both hold their own member row, so each waits on the other's: a
  * deadlock Postgres ends by aborting one.
  */
 export const bothHoldingTheirOwnRow = <T>(
   workspace: ProvisionedWorkspace,
   callers: readonly [string, string],
-  act: (principal: UserPrincipal, tx: Tx, other: string) => Promise<Foldable<T>>,
+  action: (principal: UserPrincipal, tx: Tx, other: string) => Promise<Foldable<T>>,
 ): Promise<readonly [Folded<T>, Folded<T>]> => {
   const bothHold = Promise.withResolvers<undefined>();
   let holding = 0;
@@ -42,7 +42,7 @@ export const bothHoldingTheirOwnRow = <T>(
       holding += 1;
       if (holding === 2) bothHold.resolve(undefined);
       await bothHold.promise;
-      return act(principal, tx, other);
+      return action(principal, tx, other);
     });
   const [first, second] = callers;
   return Promise.all([actingOn(first, second), actingOn(second, first)]);
@@ -73,29 +73,29 @@ export const membersSuite = (db: () => MigratedPostgres) => {
       .filter(([, role]) => role === "Admin")
       .map(([userId]) => userId);
 
-  /** The workspace's audit rows for `act`, in the order they were written. */
-  const auditRowsOf = async (workspace: ProvisionedWorkspace, act: string) => {
+  /** The workspace's audit rows for `action`, in the order they were written. */
+  const auditRowsOf = async (workspace: ProvisionedWorkspace, action: string) => {
     const rows = await db().pool.query<{
       actor: string;
       subject_id: string;
       detail: Readonly<Record<string, unknown>>;
     }>(
       "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
-      [workspace.workspaceId, act],
+      [workspace.workspaceId, action],
     );
     return rows.rows;
   };
 
-  /** The batch each of the workspace's `act` events stands in, in the order they were written. */
-  const batchesOf = async (workspace: ProvisionedWorkspace, act: string) => {
+  /** The batch each of the workspace's `action` events stands in, in the order they were written. */
+  const batchesOf = async (workspace: ProvisionedWorkspace, action: string) => {
     const rows = await db().pool.query<{ batch_id: string | null }>(
       "SELECT batch_id FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
-      [workspace.workspaceId, act],
+      [workspace.workspaceId, action],
     );
     return rows.rows.map((row) => row.batch_id);
   };
 
-  /** The person's ended grants an Admin's act filed on the identity-set audit log. */
+  /** The person's ended grants an Admin's action filed on the identity-set audit log. */
   const grantsEndedAbout = async (personId: string) => {
     const rows = await db().pool.query<{
       actor: string;

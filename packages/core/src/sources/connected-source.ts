@@ -13,12 +13,18 @@ import {
 } from "@better-answers/schema";
 
 import { visibilityAgreed } from "../access/index.ts";
-import { act, declareActs, record, STORED_DETAIL_KEYS, type DetailOf } from "../audit/index.ts";
+import {
+  action,
+  declareActions,
+  record,
+  STORED_DETAIL_KEYS,
+  type DetailOf,
+} from "../audit/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import {
   admit,
   attempt,
-  declareAct,
+  declareAction,
   err,
   ok,
   requireAdmin,
@@ -117,15 +123,15 @@ const countsOf = (found: ReadonlyMap<string, number>): FindingCounts => ({
   findingsJobTitle: countOf(found, "job-title"),
 });
 
-const CONNECTED_SOURCE_ACTS = declareActs("sources", {
-  bound: act("sources.binding.bound", {
+const CONNECTED_SOURCE_ACTIONS = declareActions("sources", {
+  bound: action("sources.binding.bound", {
     [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     documentId: "id",
     sensitivity: "sensitivity",
     audience: "audience",
   }),
 
-  published: act("sources.binding.published", {
+  published: action("sources.binding.published", {
     [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     lawfulBasisRecorded: "flag",
     privacyInformationUpdated: "flag",
@@ -253,7 +259,7 @@ const firstOutcomeOf = async (
   }>(FIRST_OUTCOME, [
     workspaceId,
     connectedSourceId,
-    CONNECTED_SOURCE_ACTS.bound.name,
+    CONNECTED_SOURCE_ACTIONS.bound.name,
     INDEX_KIND,
     CONNECTED_REASON,
   ]);
@@ -379,7 +385,7 @@ export const connectUpload = async (
     ]);
     await record(fresh, tx, {
       id: auditEventId,
-      act: CONNECTED_SOURCE_ACTS.bound,
+      action: CONNECTED_SOURCE_ACTIONS.bound,
       subjectId: connectedSourceId,
       detail: {
         [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId,
@@ -502,7 +508,7 @@ const dpiaAndFindingCounts = async (
   return ok({ dpiaHash: dpia.value.hash, counts: countsOf(found) });
 };
 
-type PublishedDetail = DetailOf<(typeof CONNECTED_SOURCE_ACTS)["published"]["detail"]>;
+type PublishedDetail = DetailOf<(typeof CONNECTED_SOURCE_ACTIONS)["published"]["detail"]>;
 
 const publishAndCascade = async (
   acting: ActingOnConnectedSource,
@@ -522,7 +528,7 @@ const publishAndCascade = async (
 
   await record(admin, tx, {
     id: auditEventId,
-    act: CONNECTED_SOURCE_ACTS.published,
+    action: CONNECTED_SOURCE_ACTIONS.published,
     subjectId: connectedSourceId,
     detail,
   });
@@ -579,17 +585,17 @@ export const reprocessConnectedSourceInput = z.object({
   reason: z.enum(REASONS_EMPTYING_THE_CONNECTED_SOURCE),
 });
 
-export const reprocessConnectedSourceAct = declareAct({
+export const reprocessConnectedSourceAction = declareAction({
   admits: { role: "Admin", purposes: ["erasure", "reindex"] },
   input: reprocessConnectedSourceInput,
   refuses: ["role-forbids", "no-such-binding"],
   effect: "write",
 });
 
-export type ReprocessConnectedSourceInput = InputOf<typeof reprocessConnectedSourceAct>;
+export type ReprocessConnectedSourceInput = InputOf<typeof reprocessConnectedSourceAction>;
 
 export type ReprocessConnectedSourceRefusal =
-  | SourceRefusal<RefusalOf<typeof reprocessConnectedSourceAct>>
+  | SourceRefusal<RefusalOf<typeof reprocessConnectedSourceAction>>
   | Error;
 
 export type ConnectedSourceReprocessed = {
@@ -603,7 +609,7 @@ export type ConnectedSourceReprocessed = {
 };
 
 const actingOn = (
-  admittedAs: AdmittedOf<typeof reprocessConnectedSourceAct>,
+  admittedAs: AdmittedOf<typeof reprocessConnectedSourceAction>,
   input: ReprocessConnectedSourceInput,
 ): Result<
   ActingOnConnectedSource | PlatformOnConnectedSource,
@@ -614,7 +620,7 @@ const actingOn = (
     admittedAs.kind === "user"
       ? { admin: admittedAs, workspaceId: admittedAs.workspaceId, connectedSourceId }
       : { platform: admittedAs, workspaceId: input.workspaceId, connectedSourceId };
-  // A person acts where it was proved a member, so a workspace it names otherwise holds none of
+  // A person may act only where it was proved a member, so a workspace it names otherwise holds none of
   // its connected sources.
   if (acting.workspaceId !== input.workspaceId) return err("no-such-binding");
   return ok(acting);
@@ -651,7 +657,7 @@ const emptyTheConnectedSource = async (
 
 /**
  * Queues a sync, then deletes the connected source's passages and its unreviewed, unrestored findings;
- * `passages` and `findings` count the rows deleted. A person acts only in its own workspace, and any
+ * `passages` and `findings` count the rows deleted. A person reaches only its own workspace, and any
  * other is `no-such-binding`.
  */
 export const reprocessConnectedSource = async (
@@ -659,7 +665,7 @@ export const reprocessConnectedSource = async (
   tx: Tx,
   input: ReprocessConnectedSourceInput,
 ): Promise<Result<ConnectedSourceReprocessed, ReprocessConnectedSourceRefusal>> => {
-  const admitted = admit(reprocessConnectedSourceAct, principal, input);
+  const admitted = admit(reprocessConnectedSourceAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const acting = actingOn(admitted.value, input);
   if (!acting.ok) return err(acting.error);

@@ -4,7 +4,7 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 
-import { INCLUDES_YOU, RECORDED } from "./member-act-words.ts";
+import { INCLUDES_YOU, RECORDED } from "./member-action-words.ts";
 import { useReaderId, useRemovalOf, type ListedMember } from "./people-api.ts";
 import { nameOf } from "./words.tsx";
 
@@ -13,7 +13,7 @@ const focusOnArrival = (node: HTMLElement | null) => {
   node?.focus();
 };
 
-/** Removal waits on a second, deliberate act, whose question takes focus rather than its button. */
+/** Removal waits on a second, deliberate action, whose question takes focus rather than its button. */
 export function MemberRemoval(properties: {
   readonly member: ListedMember;
   readonly askRef: RefObject<HTMLButtonElement | null>;
@@ -67,11 +67,11 @@ export function MemberRemoval(properties: {
               <Button
                 variant="destructive"
                 aria-describedby={recordId}
-                // Not `disabled`: a disabled button drops the focus the act leaves on it.
+                // Not `disabled`: a disabled button drops the focus the action leaves on it.
                 aria-disabled={!offered}
                 className="aria-disabled:opacity-50"
                 onClick={() => {
-                  // A page drawn again mid-removal has an idle act of its own, so this is the guard.
+                  // A page drawn again mid-removal has an idle action of its own, so this is the guard.
                   if (offered) onRemove(member);
                 }}
               >

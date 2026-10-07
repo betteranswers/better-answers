@@ -12,20 +12,20 @@ C4Component
     Component(kernel, "kernel", "types and pure functions", "Principal — a user or the platform — branded ids, admission, the refusal vocabulary, Result, Clock; imports nothing else")
     Component(access, "access", "the read predicate as data", "published, sensitivity, audience by intersection; rendered to SQL once")
     Component(pgdoor, "store/postgres", "pg", "The handle, the transaction helpers, SET LOCAL app.workspace_id from the Principal, session locks, the rate-limit counters")
-    Component(gitdoor, "store/git", "git binary", "The governed write: per-repository lock, hash precondition, one commit per act, the Audit trailer; checks GIT_STORE_DIR once at open")
+    Component(gitdoor, "store/git", "git binary", "The governed write: per-repository lock, hash precondition, one commit per action, the Audit trailer; checks GIT_STORE_DIR once at open")
     Component(mapdoor, "store/map", "recursive CTEs", "The delta builder and the walk templates; the one door that imports access, so no traversal exists without the predicate")
     Component(objdoor, "store/objects", "S3", "put, get, list and remove under the per-workspace prefix; the platform prefix for erasure replay copies")
     Component(llm, "llm", "model choice rows", "listModelChoices over model_choice; the llm_call ledger and the fetch-shaped model client planned S2")
     Component(audit, "audit", "insert-only audit log", "The one append-only audit log: the typed event vocabulary, two doors, four families")
 
-    Component(sources, "sources", "slice", "Connect, publish, narrow, widen; the review acts; reprocess; the DPIA input; passages; the upload sweep")
+    Component(sources, "sources", "slice", "Connect, publish, narrow, widen; the review actions; reprocess; the DPIA input; passages; the upload sweep")
     Component(concepts, "concepts", "slice", "The write path, the suggestions, the loader, the reconciler, visibility and the cascade's first level, map maintenance")
     Component(answering, "answering", "slice", "find, ask, open, give_feedback; S2 re-seams ask as plan, draft, record")
     Component(guides, "guides", "slice", "Write-ups and includes, recomputed as the cascade's second level; definitions and sections at S3")
     Component(erasure, "erasure", "slice", "Subject requests, the erasure map, suppressions, the routine, replay on restore, the rehearsal; the top of the slice graph")
-    Component(runs, "runs", "slice", "enqueueJobIn in the act's transaction, one queued index job per connected source; the job views")
+    Component(runs, "runs", "slice", "enqueueJobIn in the action's transaction, one queued index job per connected source; the job views")
     Component(workspaces, "workspaces", "slice", "Provisioning and first member under the platform principal, the picker's read, the workspace list")
-    Component(members, "members", "slice", "Groups and their members, access requests; the People acts at P1")
+    Component(members, "members", "slice", "Groups and their members, access requests; the People actions at P1")
     Component(sweeps, "sweeps", "slice", "The daily sweep pass over every workspace under session lock 42; one sweep_pass row a pass")
   }
 
@@ -47,7 +47,7 @@ C4Component
   Rel(sweeps, concepts, "Sweeps old map generations through")
 
   Rel(sources, objdoor, "Lands originals through")
-  Rel(sources, runs, "Queues syncs through, in the act's transaction")
+  Rel(sources, runs, "Queues syncs through, in the action's transaction")
   Rel(sources, concepts, "Runs the cascade through")
   Rel(concepts, guides, "Recomputes write-ups through")
   Rel(answering, concepts, "Finds and opens concepts through")
@@ -109,5 +109,5 @@ The map is the TypeScript tier's. The worker is in no row: it writes `finding` r
 
 - **S2 splits `ask` into three functions**: `planAnswer(principal, tx, question)` in the resolving transaction, `draftAnswer(plan, model)` an async generator holding no transaction, `recordAnswer(principal, tx, plan, drafted)` in a second short transaction — the review's one blocking finding. The map door's `walkFrom` takes a set with one shared cap and a per-statement timeout (ADR 0023, amended 2026-09-10).
 - **S3 makes `concept_owner` a table on `concepts`**, keyed against `concept_identity` with a per-collection default; exports `attachedByIri()` and `versionColumns()` from `packages/schema`; declares `WRITE_UP_HOMES = ["section", "response"]` so S6 adds a writer and never a migration (ADR 0014, amended 2026-09-10).
-- **The sensitivity at publish (T-370) and the widen act (T-371)**, as the owner ruled on 24/09/2026. The connected source stores the sensitivity the Admin typed at connect (Restricted and everyone when none is typed); every derivation counts an unpublished connected source as Restricted, so the concepts citing it land Restricted; `publishConnectedSource` records the sensitivity and audience it releases on its audit event and cascades that sensitivity to the citing concepts and their write-ups, keeping a concept the reconciler pinned Restricted where it is (T-370). `widenConnectedSource` moves a connected source, published or not, to a wider sensitivity, audience or both: it records the pair it moved from and to on its audit event, runs the same cascade, refuses `not-wider` and, while a special-category finding the last sync raised is unreviewed, `special-category-unreviewed`, and never moves a document's own narrower sensitivity (T-371).
+- **The sensitivity at publish (T-370) and the widen action (T-371)**, as the owner ruled on 24/09/2026. The connected source stores the sensitivity the Admin typed at connect (Restricted and everyone when none is typed); every derivation counts an unpublished connected source as Restricted, so the concepts citing it land Restricted; `publishConnectedSource` records the sensitivity and audience it releases on its audit event and cascades that sensitivity to the citing concepts and their write-ups, keeping a concept the reconciler pinned Restricted where it is (T-370). `widenConnectedSource` moves a connected source, published or not, to a wider sensitivity, audience or both: it records the pair it moved from and to on its audit event, runs the same cascade, refuses `not-wider` and, while a special-category finding the last sync raised is unreviewed, `special-category-unreviewed`, and never moves a document's own narrower sensitivity (T-371).
 - **T-366 gives `erasure` its documents.** Since T-375 a suppression is the workspace's, one row per request holding the request's identifiers and the person's sign-in addresses, and recording refuses an identifier too broad to withhold (`identifier-too-broad`). Since T-376 the seam withholds every exact, case-folded occurrence of a suppression's identifiers, and recording measures an identifier against the floor by the `erasure-match` agreement both tiers read. Since T-377 the erasure map's `source-document` finder names the live documents whose indexed text holds one of the identifiers the suppression holds, probing the full-text index and checking each candidate under that agreement, so the routine wipes and re-indexes their connected sources now.

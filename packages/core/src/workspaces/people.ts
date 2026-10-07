@@ -17,7 +17,7 @@ import { containing, type Tx } from "../store/postgres/index.ts";
 import { actorOf, type AuditEventActor, namesOfActors, type PeopleNames } from "./actors.ts";
 import { grantNamed, type GrantNamed, type GrantNames, namesOfGrants } from "./grant-names.ts";
 import { GRANTS_ENDED_HERE, REVOKED_EVERYWHERE } from "./grants.ts";
-import { SIGN_IN_ACTS } from "./sign-in-and-consent.ts";
+import { SIGN_IN_ACTIONS } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 const PAGE_LIMIT_DEFAULT = 50;
@@ -137,7 +137,7 @@ export const listPeople = (
     const ids = page.rows.map((row) => row.id);
     const held: HeldBy = {
       workspaces: await workspacesOf(tx, ids),
-      signIns: await latestOnIdentitySet(operator, tx, SIGN_IN_ACTS.signedIn, ids),
+      signIns: await latestOnIdentitySet(operator, tx, SIGN_IN_ACTIONS.signedIn, ids),
     };
     return {
       people: page.rows.map((row) => personOf(row, held)),
@@ -195,7 +195,7 @@ const endedByOf = (actor: string, names: PeopleNames): EndedBy => {
 type PersonInspected = {
   readonly sessions: readonly SessionHeld[];
   readonly grants: readonly GrantHeld[];
-  /** Newest first: each act's, as its audit event recorded it, and each the server ended. */
+  /** Newest first: each action's, as its audit event recorded it, and each the server ended. */
   readonly ended: readonly EndedGrantInspected[];
 };
 
@@ -240,20 +240,20 @@ const GRANTS_OF_PERSON = `SELECT client_id, client_name, workspace_id, workspace
                  WHERE standing = 1 AND revoked IS NULL
                  ORDER BY last_used_at DESC, issued_at DESC`;
 
-/** An unrotated row's mark ends its grant; once an act or a replay deletes the rows, it is gone. */
+/** An unrotated row's mark ends its grant; once an action or a replay deletes the rows, it is gone. */
 const ENDED_BY_THE_SERVER = `SELECT client_id, reference_id AS workspace_id, issued_at,
                                     revoked AS ended_at
                                FROM (${FAMILIES_OF_PERSON}) grants
                               WHERE standing = 1 AND revoked IS NOT NULL AND rotated_at IS NULL
                               ORDER BY revoked DESC, issued_at DESC`;
 
-/** Both acts are the identity set's, so the read never enters a workspace's audit log. */
-const ENDINGS_OF_PERSON = `SELECT id, action AS act, at, actor, detail FROM identity_audit_event
+/** Both actions are the identity set's, so the read never enters a workspace's audit log. */
+const ENDINGS_OF_PERSON = `SELECT id, action, at, actor, detail FROM identity_audit_event
                             WHERE subject_kind = 'person' AND subject_id = $1
                               AND action = ANY($2::text[])
                             ORDER BY at DESC, id DESC`;
 
-const ENDING_ACT_NAMES = [REVOKED_EVERYWHERE.name, GRANTS_ENDED_HERE.name];
+const ENDING_ACTION_NAMES = [REVOKED_EVERYWHERE.name, GRANTS_ENDED_HERE.name];
 
 const sessionOf = (row: SessionRow): SessionHeld => ({
   createdAt: row.created_at.toISOString(),
@@ -272,12 +272,12 @@ const grantOf = (row: GrantRow): GrantHeld => ({
   expiresAt: row.expires_at.toISOString(),
 });
 
-/** An event from before its act kept its grants reads none. */
+/** An event from before its action kept its grants reads none. */
 const grantsRecorded = z.object({ grants: z.array(endedGrant).default([]) });
 
-/** The identity-set audit event of an act that ended a person's grants, newest first. */
+/** The identity-set audit event of an action that ended a person's grants, newest first. */
 type Ending = {
-  readonly act: string;
+  readonly action: string;
   readonly at: Date;
   readonly actor: string;
   readonly grants: z.output<typeof grantsRecorded>["grants"];
@@ -286,10 +286,10 @@ type Ending = {
 const endingEventsOf = async (tx: Tx, personId: UserId): Promise<readonly Ending[]> => {
   const found = await tx.query<Omit<Ending, "grants"> & { readonly detail: unknown }>(
     ENDINGS_OF_PERSON,
-    [personId, ENDING_ACT_NAMES],
+    [personId, ENDING_ACTION_NAMES],
   );
-  return found.rows.map(({ act, at, actor, detail }) => ({
-    act,
+  return found.rows.map(({ action, at, actor, detail }) => ({
+    action,
     at,
     actor,
     grants: grantsRecorded.parse(detail).grants,
@@ -332,13 +332,13 @@ const grantsOfEnding = (ending: Ending, names: Names): readonly EndedGrantInspec
     .map((grant) => ({
       ...grantNamed(grant, names.grants),
       endedAt: ending.at.toISOString(),
-      scope: ending.act === REVOKED_EVERYWHERE.name ? "everywhere" : "workspace",
+      scope: ending.action === REVOKED_EVERYWHERE.name ? "everywhere" : "workspace",
       endedBy: endedByOf(ending.actor, names.actors),
     }));
 
 /**
- * No workspace's audit log is the operator's, so acts' endings come from the identity set's alone.
- * The stable sort keeps each act's own order.
+ * No workspace's audit log is the operator's, so actions' endings come from the identity set's alone.
+ * The stable sort keeps each action's own order.
  */
 const endedGrantsOf = async (tx: Tx, personId: UserId): Promise<readonly EndedGrantInspected[]> => {
   const endings = await endingEventsOf(tx, personId);
@@ -360,7 +360,7 @@ const endedGrantsOf = async (tx: Tx, personId: UserId): Promise<readonly EndedGr
 };
 
 /**
- * The person's sessions by last use, each assistant's access they hold, and each an act or the
+ * The person's sessions by last use, each assistant's access they hold, and each an action or the
  * authorization server ended. A grant is a refresh token's line: an assistant that asked for none
  * holds only an access token no row keeps, which lapses within the hour.
  */

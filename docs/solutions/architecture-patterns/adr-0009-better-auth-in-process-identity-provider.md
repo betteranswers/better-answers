@@ -7,7 +7,7 @@ component: identity
 severity: high
 applies_when:
   - "Importing better-auth, or reading a Better Auth table, anywhere outside the auth modules"
-  - "Adding a People act, an invitation step or anything that writes a member"
+  - "Adding a People action, an invitation step or anything that writes a member"
   - "Giving the operator a new read or write, or recording a sign-in, consent or token event"
   - "Adding a table that carries no workspace_id or has no row-level security"
   - "Registering a Better Auth plugin, or calling an endpoint that disabledPaths closes"
@@ -43,13 +43,13 @@ The `organization` plugin:
 
 - It keeps its tables, its reads and the picker's `/organization/set-active`.
 - Its other writes and `/organization/check-slug` are in `disabledPaths`, each proven refused for every role.
-- Every People act, accepting an invitation included, is the members slice's over tRPC, keyed by workspace and person id, with its audit event in its own transaction.
+- Every People action, accepting an invitation included, is the members slice's over tRPC, keyed by workspace and person id, with its audit event in its own transaction.
 
 The passkey and authenticator plugins:
 
 - Every path they mount is in `disabledPaths`, and so are `/update-session`, `/list-sessions`, the three `/revoke-*` paths and `/unlink-account`. `apps/api/tests/second-factor-foundation.test.ts` holds each refused to a signed-in person.
 - `disabledPaths` refuses over HTTP only. The api's own routes call a closed endpoint as a server function, which also skips the library's rate limiter and origin check, so each such route carries its own (`docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md`).
-- A passkey is added and used through the api's routes under `/passkeys/` (`apps/api/src/auth/passkeys.ts`). The plugin's verification hooks refuse a passkey made or used without user verification, before it is kept or a session made. A passkey sign-in's session is confirmed as the library creates it, and that passkey's last use is kept. Renaming and removing a passkey are core's own acts, never the plugin's.
+- A passkey is added and used through the api's routes under `/passkeys/` (`apps/api/src/auth/passkeys.ts`). The plugin's verification hooks refuse a passkey made or used without user verification, before it is kept or a session made. A passkey sign-in's session is confirmed as the library creates it, and that passkey's last use is kept. Renaming and removing a passkey are core's own actions, never the plugin's.
 - A session confirms its second factor through the api's routes under `/second-factor/` (`apps/api/src/auth/confirm.ts`), which stamp it and mint none:
   - **Passkey:** our own challenge and `@simplewebauthn/server` verification, because the plugin's verify always mints a session and never checks the credential is this person's.
   - **Authenticator:** the plugin's `verifyTOTP`, which with a full session only verifies.
@@ -65,15 +65,15 @@ The operator:
 - The operator is a third principal kind, beside a user and the platform: a mark on the person's `user` row that only an ops command sets or clears, and that erasure clears.
 - It is built only from a signed-in session, never from an OAuth or personal token. Revoke everywhere and a display-name correction need a session created within the hour.
 - It has one cross-workspace read: people, with the workspaces and role each holds, and workspaces with their member counts, over the identity set alone.
-- A person who has lost every factor and every recovery code is restored by `pnpm ops restore-sign-in`, never from a page, once the operator has checked who they are by a route other than their email. Under the person's lock it ends their factors, codes and sessions, keeps a one-time restore code's hash for 24 hours, records the act and sends the notice. It prints the code, which the operator hands over by that same route.
+- A person who has lost every factor and every recovery code is restored by `pnpm ops restore-sign-in`, never from a page, once the operator has checked who they are by a route other than their email. Under the person's lock it ends their factors, codes and sessions, keeps a one-time restore code's hash for 24 hours, records the action and sends the notice. It prints the code, which the operator hands over by that same route.
 
-A person exists from their first email-code sign-in, or earlier when `pnpm ops add-person` adds them by name. That act writes the `user` row itself, past the library's create hook, which would blank the name.
+A person exists from their first email-code sign-in, or earlier when `pnpm ops add-person` adds them by name. That action writes the `user` row itself, past the library's create hook, which would blank the name.
 
 The identity-set audit log holds:
 
-- a person's own display-name act, and the platform's adding of a person or restoring their sign-in;
-- a person's own second-factor acts: a passkey added, renamed or removed, an authenticator added or removed, recovery codes issued or used, each confirm, a restore code accepted, and their factors replaced after a recovery or restore code;
-- with the console, each sign-in, every operator write and an Admin's act that ends a person's grants.
+- a person's own display-name action, and the platform's adding of a person or restoring their sign-in;
+- a person's own second-factor actions: a passkey added, renamed or removed, an authenticator added or removed, recovery codes issued or used, each confirm, a restore code accepted, and their factors replaced after a recovery or restore code;
+- with the console, each sign-in, every operator write and an Admin's action that ends a person's grants.
 
 A token's issue, refusal and refresh, and the workspace pick, stay log lines.
 

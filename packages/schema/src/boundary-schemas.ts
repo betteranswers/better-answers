@@ -7,7 +7,7 @@ import {
   ACCESS_REQUEST_STATUSES,
 } from "./access-request-tables.ts";
 import { ACTOR_ID as ACTOR_ID_REGEX } from "./actor-id.ts";
-import { ACT, auditEvent, FAMILIES, identityAuditEvent } from "./audit-tables.ts";
+import { ACTION, auditEvent, FAMILIES, identityAuditEvent } from "./audit-tables.ts";
 import {
   bundleCommit,
   CONCEPT_FRONTMATTER_MAX,
@@ -355,8 +355,10 @@ const detail = z.union([
 /** One id space across both audit logs: an audit event's id, whichever audit log holds its row. */
 const auditLogRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID).brand<"AuditEventId">(),
-  act: (schema: z.ZodString) =>
-    schema.regex(ACT).pipe(z.templateLiteral([z.enum(FAMILIES), ".", z.string(), ".", z.string()])),
+  action: (schema: z.ZodString) =>
+    schema
+      .regex(ACTION)
+      .pipe(z.templateLiteral([z.enum(FAMILIES), ".", z.string(), ".", z.string()])),
   actor: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
   subjectId: (schema: z.ZodString) => schema.trim().min(1),
   detail: (schema: z.ZodType) => schema.pipe(detail),

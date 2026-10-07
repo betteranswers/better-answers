@@ -1,6 +1,6 @@
 import { boundarySchemas, ULID } from "@better-answers/schema";
 
-import { act, declareActs, recordEach, STORED_DETAIL_KEYS } from "../audit/index.ts";
+import { action, declareActions, recordEach, STORED_DETAIL_KEYS } from "../audit/index.ts";
 import { attempt, err, ok, type PlatformPrincipal, type Result } from "../kernel/index.ts";
 import {
   listWorkspaceObjects,
@@ -22,8 +22,8 @@ export const UPLOAD_SWEEP: UploadSweepPrincipal = {
   actorId: UPLOAD_SWEEP_ACTOR,
 };
 
-const SWEEP_ACTS = declareActs("sources", {
-  swept: act("sources.upload.swept", {
+const SWEEP_ACTIONS = declareActions("sources", {
+  swept: action("sources.upload.swept", {
     [STORED_DETAIL_KEYS.connectedSourceId]: "id",
     documentId: "id?",
   }),
@@ -95,7 +95,7 @@ const recordTheSweep = async (
       recordEach(
         platform,
         tx,
-        SWEEP_ACTS.swept,
+        SWEEP_ACTIONS.swept,
         swept.map(({ connectedSourceId, ...document }) => ({
           subjectId: connectedSourceId,
           detail: { [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId, ...document },

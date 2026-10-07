@@ -41,12 +41,12 @@ A passage carries no pair of its own. It reads its connected source's through `i
 
 - A recorded Admin override outranks everything, then the combination. A unit resting on nothing takes its fallback. The per-kind floor narrows the sensitivity and never widens it.
 - It runs at write time: the governed write derives the row it lands.
-- A narrowing re-derives synchronously two levels down, in the narrowing act's own transaction: every concept citing the connected source's documents, then every write-up including them.
+- A narrowing re-derives synchronously two levels down, in the narrowing action's own transaction: every concept citing the connected source's documents, then every write-up including them.
 - The map's copies of the columns are rewritten in that same transaction.
 
 **An empty intersection forces the unit Restricted, and is never stored.** It becomes *Restricted* for *everyone*, which the predicate reads as Admins alone. It is never stored as *groups* over an empty list.
 
-**A Restricted connected source's named people are a `group` row** of ADR 0038's implicit origin, whose id `audience_groups` names. Nothing here mints one. Minting it is an act of connected source management.
+**A Restricted connected source's named people are a `group` row** of ADR 0038's implicit origin, whose id `audience_groups` names. Nothing here mints one. Minting it is an action of connected source management.
 
 ## Why
 

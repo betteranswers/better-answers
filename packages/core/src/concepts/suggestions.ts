@@ -11,7 +11,7 @@ import {
 } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../access/index.ts";
-import { act, declareActs, record, type AuditAct } from "../audit/index.ts";
+import { action, declareActions, record, type AuditAction } from "../audit/index.ts";
 import {
   actorIdOf,
   attempt,
@@ -38,9 +38,9 @@ import {
 } from "../store/postgres/index.ts";
 import type { Frontmatter } from "./index.ts";
 
-const SUGGESTION_ACTS = declareActs("knowledge", {
-  declined: act("knowledge.suggestion.declined", { setId: "id" }),
-  returned: act("knowledge.suggestion.returned", { setId: "id" }),
+const SUGGESTION_ACTIONS = declareActions("knowledge", {
+  declined: action("knowledge.suggestion.declined", { setId: "id" }),
+  returned: action("knowledge.suggestion.returned", { setId: "id" }),
 });
 
 type SuggestionRow = z.infer<typeof boundarySchemas.suggestion.select>;
@@ -257,7 +257,7 @@ const decide = async (
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: DecideSuggestionInput,
-  decision: { readonly status: SuggestionStatus; readonly act: AuditAct },
+  decision: { readonly status: SuggestionStatus; readonly action: AuditAction },
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
@@ -277,7 +277,7 @@ const decide = async (
 
         await record(fresh, tx, {
           id: ulid(),
-          act: decision.act,
+          action: decision.action,
           subjectId: input.suggestionId,
           detail: { setId: row.set_id },
         });
@@ -315,7 +315,7 @@ export const declineSuggestion = (
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> =>
   decide(principal, doors, input, {
     status: SUGGESTION_DECLINED_STATUS,
-    act: SUGGESTION_ACTS.declined,
+    action: SUGGESTION_ACTIONS.declined,
   });
 
 export const returnToProposer = (
@@ -325,7 +325,7 @@ export const returnToProposer = (
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> =>
   decide(principal, doors, input, {
     status: SUGGESTION_RETURNED_STATUS,
-    act: SUGGESTION_ACTS.returned,
+    action: SUGGESTION_ACTIONS.returned,
   });
 
 export type SuggestionPayload = {

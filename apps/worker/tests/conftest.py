@@ -6,7 +6,7 @@ import pytest
 OWN_PACKAGE = "better_answers_worker"
 
 REFUSAL = (
-    "Our own code is never mocked (the root `CODING_STANDARDS.md`), and `{act}` "
+    "Our own code is never mocked (the root `CODING_STANDARDS.md`), and `{action}` "
     "targets {where}. Exercise the module through its entry point, or replace the "
     "external service behind its adapter with an in-memory implementation."
 )
@@ -15,7 +15,7 @@ REFUSAL = (
 type Replace = Callable[..., None]
 
 
-GUARDED_ACTS = ("setattr", "setitem", "delattr")
+GUARDED_ACTIONS = ("setattr", "setitem", "delattr")
 
 
 def _owner_of(target: object) -> str | None:
@@ -49,20 +49,22 @@ def _is_a_table_of_this_tier(container: object) -> bool:
     return False
 
 
-def _refuse_if_ours(act: str, target: object) -> None:
-    if act == "setitem":
+def _refuse_if_ours(action: str, target: object) -> None:
+    if action == "setitem":
         if _is_a_table_of_this_tier(target):
-            raise RuntimeError(REFUSAL.format(act=act, where="a table this tier owns"))
+            raise RuntimeError(
+                REFUSAL.format(action=action, where="a table this tier owns")
+            )
         return
     module = _owner_of(target)
     if _belongs_to_this_tier(module):
-        raise RuntimeError(REFUSAL.format(act=act, where=f"`{module}`"))
+        raise RuntimeError(REFUSAL.format(action=action, where=f"`{module}`"))
 
 
-def _guarded(act: str, replaced: Replace) -> Replace:
+def _guarded(action: str, replaced: Replace) -> Replace:
     def guard(*args: object, **kwargs: object) -> None:
         target = args[0] if args else kwargs.get("target")
-        _refuse_if_ours(act, target)
+        _refuse_if_ours(action, target)
         replaced(*args, **kwargs)
 
     return guard
@@ -71,8 +73,8 @@ def _guarded(act: str, replaced: Replace) -> Replace:
 @pytest.fixture(name="monkeypatch")
 def guarded_monkeypatch() -> Iterator[pytest.MonkeyPatch]:
     with pytest.MonkeyPatch.context() as patcher:
-        for act in GUARDED_ACTS:
-            setattr(patcher, act, _guarded(act, getattr(patcher, act)))
+        for action in GUARDED_ACTIONS:
+            setattr(patcher, action, _guarded(action, getattr(patcher, action)))
         yield patcher
 
 

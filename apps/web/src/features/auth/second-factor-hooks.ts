@@ -46,7 +46,7 @@ export const useSecondFactor = () => {
   return useQuery(api.person.secondFactor.queryOptions());
 };
 
-/** Every frame reads it, so never again on a window's focus; an Account page act still rereads it. */
+/** Every frame reads it, so never again on a window's focus; an Account page action still rereads it. */
 export const useSecondFactorOnce = () => {
   const api = useTRPC();
   return useQuery({
@@ -60,7 +60,7 @@ export type SecondFactorRead = ReturnType<typeof useSecondFactor>;
 
 export type SecondFactor = NonNullable<SecondFactorRead["data"]>;
 
-/** Awaited by each act, so the act stays pending until the page can show what it changed. */
+/** Awaited by each action, so the action stays pending until the page can show what it changed. */
 export const useRereadTheSecondFactor = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

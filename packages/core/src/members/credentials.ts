@@ -2,11 +2,11 @@ import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareActs, record } from "../audit/index.ts";
+import { action, declareActions, record } from "../audit/index.ts";
 import {
   admit,
   attempt,
-  declareAct,
+  declareAction,
   err,
   ok,
   type AdmittedOf,
@@ -20,8 +20,8 @@ import { refusalOfDeadlock, type Tx } from "../store/postgres/index.ts";
 import { endWorkspaceTokens, recordGrantsEndedHere } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-const REVOCATION_ACTS = declareActs("people", {
-  credentialsRevoked: act("people.member.credentials_revoked", { grants: "grants" }),
+const REVOCATION_ACTIONS = declareActions("people", {
+  credentialsRevoked: action("people.member.credentials_revoked", { grants: "grants" }),
 });
 
 export const endEverySignInAndTokenHereInput = z.object({
@@ -29,11 +29,11 @@ export const endEverySignInAndTokenHereInput = z.object({
 });
 
 export type EndEverySignInAndTokenHereInput = z.output<typeof endEverySignInAndTokenHereInput> & {
-  /** When the act happens: every credential the member was issued before it is refused here. */
+  /** When the action happens: every credential the member was issued before it is refused here. */
   readonly at: Date;
 };
 
-const endEverySignInAndTokenHereAct = declareAct({
+const endEverySignInAndTokenHereAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: endEverySignInAndTokenHereInput,
   refuses: ["role-forbids", "no-such-member", "changed-meanwhile"],
@@ -41,7 +41,7 @@ const endEverySignInAndTokenHereAct = declareAct({
 });
 
 export type EndEverySignInAndTokenHereRefusal =
-  | MemberRefusal<RefusalOf<typeof endEverySignInAndTokenHereAct>>
+  | MemberRefusal<RefusalOf<typeof endEverySignInAndTokenHereAction>>
   | Error;
 
 export type CredentialsRevokedHere = {
@@ -57,7 +57,7 @@ const HELD_INSTANT = `UPDATE member
                    RETURNING credentials_revoked_at AS at`;
 
 const revokedHere = async (
-  admin: AdmittedOf<typeof endEverySignInAndTokenHereAct>,
+  admin: AdmittedOf<typeof endEverySignInAndTokenHereAction>,
   tx: Tx,
   asked: EndEverySignInAndTokenHereInput,
 ): Promise<Result<CredentialsRevokedHere, MemberRefusal<"no-such-member">>> => {
@@ -76,7 +76,7 @@ const revokedHere = async (
   });
   await record(admin, tx, {
     id: ulid(),
-    act: REVOCATION_ACTS.credentialsRevoked,
+    action: REVOCATION_ACTIONS.credentialsRevoked,
     subjectId: asked.personId,
     detail: { grants },
   });
@@ -94,7 +94,7 @@ export const endEverySignInAndTokenHere = async (
   tx: Tx,
   input: EndEverySignInAndTokenHereInput,
 ): Promise<Result<CredentialsRevokedHere, EndEverySignInAndTokenHereRefusal>> => {
-  const admitted = admit(endEverySignInAndTokenHereAct, principal, input);
+  const admitted = admit(endEverySignInAndTokenHereAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
   const revoked = await attempt(() => revokedHere(admitted.value, tx, input));

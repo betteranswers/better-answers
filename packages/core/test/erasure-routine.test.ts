@@ -57,7 +57,7 @@ import {
   readingAs,
   seedingWith,
   until,
-  whileActsWaitAt,
+  whileActionsWaitAt,
   whileWritesAreRefused,
 } from "./suite-postgres.ts";
 import {
@@ -848,14 +848,19 @@ describe("the lock the hourly dump waits behind", () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
     const tried: boolean[] = [];
 
-    const done = await whileActsWaitAt(db().pool, "erasure_request", "INSERT", async (release) => {
-      const routine = runningTheRoutine(scenario, subjectRequestId);
+    const done = await whileActionsWaitAt(
+      db().pool,
+      "erasure_request",
+      "INSERT",
+      async (release) => {
+        const routine = runningTheRoutine(scenario, subjectRequestId);
 
-      await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
-      tried.push(await theDumpCouldTakeItsLock());
-      await release();
-      return routine;
-    });
+        await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
+        tried.push(await theDumpCouldTakeItsLock());
+        await release();
+        return routine;
+      },
+    );
     tried.push(await theDumpCouldTakeItsLock());
 
     expect(done.ok).toBe(true);

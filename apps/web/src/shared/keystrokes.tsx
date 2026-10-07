@@ -21,10 +21,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip.tsx
 
 export type Keystroke = {
   readonly key: string;
-  readonly act: string;
+  readonly action: string;
 };
 
-const LIST_THE_KEYSTROKES: Keystroke = { key: "?", act: KEYSTROKE_WORDS.showTheList };
+const LIST_THE_KEYSTROKES: Keystroke = { key: "?", action: KEYSTROKE_WORDS.showTheList };
 
 const KEPT_UNDER = "better-answers.keystrokes";
 
@@ -50,14 +50,14 @@ const isThePages = (event: KeyboardEvent): boolean => {
 };
 
 /**
- * Runs `act` on the bare key from anywhere but a field, dialog or menu, unless the reader turned
+ * Runs `action` on the bare key from anywhere but a field, dialog or menu, unless the reader turned
  * single-key keystrokes off.
  */
-export function useKeystroke(keystroke: Keystroke, act: () => void) {
+export function useKeystroke(keystroke: Keystroke, action: () => void) {
   const pressed = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== keystroke.key || !isThePages(event) || !keystrokesAreOn()) return;
     event.preventDefault();
-    if (!event.repeat) act();
+    if (!event.repeat) action();
   });
 
   // The document is the one listener every region shares, so a keystroke works from wherever
@@ -135,7 +135,7 @@ function KeystrokesList(properties: {
                   {keystroke.key}
                 </kbd>
               </dt>
-              <dd>{keystroke.act}</dd>
+              <dd>{keystroke.action}</dd>
             </div>
           ))}
         </dl>
@@ -148,7 +148,7 @@ function KeystrokesList(properties: {
  * For a page outside the shell. It binds `?` itself and lists it, so the caller leaves `?`
  * out.
  */
-export function KeystrokesAct(properties: {
+export function KeystrokesAction(properties: {
   readonly page: string;
   readonly keystrokes: readonly Keystroke[];
 }) {
@@ -246,7 +246,7 @@ export function usePageKeystrokes(keystrokes: readonly Keystroke[]) {
 }
 
 /** The way to the list besides `?`: in the rail's foot when wide, in the band when narrow. */
-export function ShellKeystrokesAct(properties: { readonly at: "rail" | "band" }) {
+export function ShellKeystrokesAction(properties: { readonly at: "rail" | "band" }) {
   const listing = useContext(ListingContext);
   if (listing === undefined) return null;
 

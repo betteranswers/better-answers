@@ -4,9 +4,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import {
-  KeystrokesAct,
+  KeystrokesAction,
   ShellKeystrokes,
-  ShellKeystrokesAct,
+  ShellKeystrokesAction,
   usePageKeystrokes,
   type Keystroke,
 } from "@/shared/keystrokes.tsx";
@@ -21,7 +21,7 @@ const SEARCH = "Search";
 function APage() {
   return (
     <>
-      <KeystrokesAct page="People" keystrokes={[{ key: "/", act: SEARCH }]} />
+      <KeystrokesAction page="People" keystrokes={[{ key: "/", action: SEARCH }]} />
       <input aria-label={SEARCH} />
     </>
   );
@@ -55,7 +55,7 @@ describe("the keystrokes list", () => {
   it("leaves focus where a sooner key moved it", async () => {
     render(<APage />);
     listDismissedByEscape();
-    // The next key's act, in the task the list left in, before focus is handed back.
+    // The next key's action, in the task the list left in, before focus is handed back.
     screen.getByRole("textbox", { name: SEARCH }).focus();
 
     await aTaskLater();
@@ -64,14 +64,14 @@ describe("the keystrokes list", () => {
   });
 });
 
-const JUMP_TO: Keystroke = { key: "Ctrl K", act: "Jump to" };
+const JUMP_TO: Keystroke = { key: "Ctrl K", action: "Jump to" };
 
 const MEMBERS_KEYSTROKES: readonly Keystroke[] = [
-  { key: "/", act: "Search the members" },
-  { key: "o", act: "Open the member in focus" },
+  { key: "/", action: "Search the members" },
+  { key: "o", action: "Open the member in focus" },
 ];
 
-const GROUPS_KEYSTROKES: readonly Keystroke[] = [{ key: "n", act: "Create a group" }];
+const GROUPS_KEYSTROKES: readonly Keystroke[] = [{ key: "n", action: "Create a group" }];
 
 function Registering(properties: { readonly keystrokes: readonly Keystroke[] }) {
   usePageKeystrokes(properties.keystrokes);
@@ -82,7 +82,7 @@ function Registering(properties: { readonly keystrokes: readonly Keystroke[] }) 
 function AShell(properties: { readonly page: string | undefined; readonly children?: ReactNode }) {
   return (
     <ShellKeystrokes page={properties.page} shell={[JUMP_TO]}>
-      <ShellKeystrokesAct at="band" />
+      <ShellKeystrokesAction at="band" />
       {properties.children}
     </ShellKeystrokes>
   );
@@ -93,7 +93,7 @@ const listedOnQuestionMark = (heading: string) => {
   return screen.getByRole("dialog", { name: heading });
 };
 
-const actsIn = (listed: HTMLElement) =>
+const actionsIn = (listed: HTMLElement) =>
   [...listed.querySelectorAll("dd")].map((definition) => definition.textContent);
 
 describe("the shell's keystrokes list", () => {
@@ -106,7 +106,7 @@ describe("the shell's keystrokes list", () => {
 
     const listed = listedOnQuestionMark(keystrokesOn("Members"));
 
-    expect(actsIn(listed)).toStrictEqual([
+    expect(actionsIn(listed)).toStrictEqual([
       "Search the members",
       "Open the member in focus",
       KEYSTROKE_WORDS.showTheList,
@@ -129,7 +129,7 @@ describe("the shell's keystrokes list", () => {
 
     const listed = listedOnQuestionMark(keystrokesOn("Groups"));
 
-    expect(actsIn(listed)).toStrictEqual([
+    expect(actionsIn(listed)).toStrictEqual([
       "Create a group",
       KEYSTROKE_WORDS.showTheList,
       "Jump to",
@@ -142,7 +142,7 @@ describe("the shell's keystrokes list", () => {
     const listed = listedOnQuestionMark(keystrokesOn(KEYSTROKE_WORDS.thisPage));
 
     expect(listed.textContent).toContain(KEYSTROKE_WORDS.noneOfItsOwn);
-    expect(actsIn(listed)).toStrictEqual([KEYSTROKE_WORDS.showTheList, "Jump to"]);
+    expect(actionsIn(listed)).toStrictEqual([KEYSTROKE_WORDS.showTheList, "Jump to"]);
   });
 
   it("opens from its trigger, which names `?` as its keystroke", () => {

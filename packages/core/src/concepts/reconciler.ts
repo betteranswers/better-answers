@@ -6,7 +6,7 @@ import {
   ULID,
 } from "@better-answers/schema";
 
-import { batchIdFor, eventsOfAct, record } from "../audit/index.ts";
+import { batchIdFor, eventsOfAction, record } from "../audit/index.ts";
 import {
   attempt,
   attemptResult,
@@ -48,7 +48,7 @@ import {
   type Held,
 } from "./landing.ts";
 import { parseBundleManifest } from "./manifest.ts";
-import { RECONCILER_ACTS, restsAlsoOnWhenReplayed } from "./reconciler-hit.ts";
+import { RECONCILER_ACTIONS, restsAlsoOnWhenReplayed } from "./reconciler-hit.ts";
 import { payloadFor, targetOfMergeKey } from "./suggestions.ts";
 
 const RECONCILER_ACTOR = "process:better-answers-reconciler";
@@ -152,7 +152,7 @@ const replayManifestCommit = async (
       if (await alreadyLanded(platform, tx, trailers)) return "skipped";
       await record(platform, tx, {
         id: trailers.auditEventId,
-        act: RECONCILER_ACTS.replayed,
+        action: RECONCILER_ACTIONS.replayed,
         subjectId: trailers.sha,
         batchId,
         detail: { commitSha: trailers.sha, bundleId: manifest.value.id },
@@ -316,7 +316,7 @@ const replayCommit = async (
 
         await record(platform, tx, {
           id: facts.auditEventId,
-          act: RECONCILER_ACTS.replayed,
+          action: RECONCILER_ACTIONS.replayed,
           subjectId: facts.sha,
           batchId,
           detail: {
@@ -413,7 +413,7 @@ export const reconcilerHits = async (
   if (!workspace.success) return err("malformed");
   const read = await attempt(() =>
     withScope(platform, door, workspace.data, (tx) =>
-      eventsOfAct(platform, tx, RECONCILER_ACTS.replayed, input.since),
+      eventsOfAction(platform, tx, RECONCILER_ACTIONS.replayed, input.since),
     ),
   );
   if (!read.ok) return err(read.error);

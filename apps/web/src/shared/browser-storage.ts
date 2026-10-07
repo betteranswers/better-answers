@@ -11,12 +11,12 @@ const reached = (store: (browser: Window) => Storage): Storage | undefined => {
   }
 };
 
-/** A full or refusing store throws on a write; the choice is then not kept, and the act goes on. */
+/** A full or refusing store throws on a write; the choice is then not kept, and the action goes on. */
 const kept = (store: Storage | undefined, key: string, value: string): void => {
   try {
     store?.setItem(key, value);
   } catch {
-    // Losing a kept choice costs the reader one click next time; failing the act would cost more.
+    // Losing a kept choice costs the reader one click next time; failing the action would cost more.
   }
 };
 

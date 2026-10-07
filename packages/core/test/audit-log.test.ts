@@ -90,13 +90,13 @@ const pageOf = (read: Result<SearchedAuditLogPage, unknown>): SearchedAuditLogPa
 const subjectsOf = (page: SearchedAuditLogPage) => page.events.map((event) => event.subjectId);
 
 const namedSubjectsOf = async (workspace: ProvisionedWorkspace) =>
-  pageOf(await readAs(workspace, workspace.adminUserId)).events.map(({ act, subject }) => [
-    act,
+  pageOf(await readAs(workspace, workspace.adminUserId)).events.map(({ action, subject }) => [
+    action,
     subject,
   ]);
 
 const done = <T>(answered: Result<T, unknown>): T => {
-  if (!answered.ok) throw new Error(`the act was refused: ${String(answered.error)}`);
+  if (!answered.ok) throw new Error(`the action was refused: ${String(answered.error)}`);
   return answered.value;
 };
 
@@ -119,17 +119,17 @@ const invitedBy = async (workspace: ProvisionedWorkspace, address: string): Prom
 /** An event in `workspace` whose subject is a row `elsewhere` holds under the same id. */
 const eventAboutTheirs = async (
   workspace: ProvisionedWorkspace,
-  act: "people.invitation.created" | "people.group.created",
+  action: "people.invitation.created" | "people.group.created",
   seedTheirs: (seed: ReturnType<typeof testData>) => Promise<{ readonly id: string }>,
 ): Promise<void> => {
   await seedingWith(db().pool, async (seed) => {
     const theirs = await seedTheirs(seed);
     await seed.auditEvent({
       workspaceId: workspace.workspaceId,
-      act,
+      action,
       actor: `human:${workspace.adminUserId}`,
       subjectId: theirs.id,
-      detail: act === "people.invitation.created" ? { role: "Editor" } : {},
+      detail: action === "people.invitation.created" ? { role: "Editor" } : {},
     });
   });
 };
@@ -149,7 +149,7 @@ describe("the audit log", () => {
       events: [
         {
           id: expect.any(String),
-          act: "people.group.created",
+          action: "people.group.created",
           family: "people",
           subjectKind: "group",
           subjectId: bidWriters,
@@ -162,7 +162,7 @@ describe("the audit log", () => {
         },
         {
           id: expect.any(String),
-          act: "platform.workspace.provisioned",
+          action: "platform.workspace.provisioned",
           family: "platform",
           subjectKind: "workspace",
           subjectId: workspace.workspaceId,
@@ -231,7 +231,7 @@ describe("the audit log", () => {
       const client = await seed.oauthClient({ name: "Claude" });
       await seed.auditEvent({
         workspaceId: workspace.workspaceId,
-        act: "people.member.credentials_revoked",
+        action: "people.member.credentials_revoked",
         actor: `human:${workspace.adminUserId}`,
         detail: {
           grants: [
@@ -270,8 +270,10 @@ describe("the audit log", () => {
       await readAs(workspace, workspace.adminUserId, { family: "knowledge" }),
     );
 
-    expect(people.events.map((event) => event.act)).toEqual(["people.group.created"]);
-    expect(platform.events.map((event) => event.act)).toEqual(["platform.workspace.provisioned"]);
+    expect(people.events.map((event) => event.action)).toEqual(["people.group.created"]);
+    expect(platform.events.map((event) => event.action)).toEqual([
+      "platform.workspace.provisioned",
+    ]);
     expect(knowledge).toEqual({ events: [], nextCursor: null, searchTooBroad: false });
   });
 
@@ -355,7 +357,7 @@ describe("the audit log", () => {
 
     const page = pageOf(await readAs(workspace, workspace.adminUserId));
 
-    expect(page.events.map((event) => event.act)).toEqual(["platform.workspace.provisioned"]);
+    expect(page.events.map((event) => event.action)).toEqual(["platform.workspace.provisioned"]);
   });
 
   it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
@@ -417,7 +419,7 @@ const crewsSeeded = (workspace: ProvisionedWorkspace, count: number) =>
       const group = await seed.group({ workspaceId: workspace.workspaceId, name });
       await seed.auditEvent({
         workspaceId: workspace.workspaceId,
-        act: "people.group.created",
+        action: "people.group.created",
         actor: `human:${workspace.adminUserId}`,
         subjectId: group.id,
         detail: {},
@@ -427,7 +429,7 @@ const crewsSeeded = (workspace: ProvisionedWorkspace, count: number) =>
     return ids.toSorted();
   });
 
-const actsOf = (page: SearchedAuditLogPage) => page.events.map((event) => event.act);
+const actionsOf = (page: SearchedAuditLogPage) => page.events.map((event) => event.action);
 
 describe("searching the audit log", () => {
   it("finds a person as actor, subject or group member, paged", async () => {
@@ -447,7 +449,7 @@ describe("searching the audit log", () => {
     );
 
     expect([...subjectsOf(first), ...subjectsOf(second)]).toEqual([priya, bidWriters, estimators]);
-    expect(actsOf(first)).toEqual(["people.member.role_changed", "people.group.member_added"]);
+    expect(actionsOf(first)).toEqual(["people.member.role_changed", "people.group.member_added"]);
     expect(first.nextCursor).toBe(first.events[1]?.id);
     expect(second.nextCursor).toBeNull();
   });
@@ -472,28 +474,28 @@ describe("searching the audit log", () => {
 
     const page = pageOf(await readAs(workspace, workspace.adminUserId, { search: "bid writ" }));
 
-    expect(actsOf(page)).toEqual(["people.group.member_added", "people.group.created"]);
+    expect(actionsOf(page)).toEqual(["people.group.member_added", "people.group.created"]);
     expect(new Set(subjectsOf(page))).toEqual(new Set([bidWriters]));
   });
 
-  it("finds events by the words of their act", async () => {
-    const workspace = await provisionedWorkspace(db(), "SearchedByAct");
+  it("finds events by the words of their action", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedByAction");
     await priyaOf(workspace);
 
     const page = pageOf(
       await readAs(workspace, workspace.adminUserId, { search: "  Role   changed " }),
     );
 
-    expect(actsOf(page)).toEqual(["people.member.role_changed"]);
+    expect(actionsOf(page)).toEqual(["people.member.role_changed"]);
   });
 
   it("finds an action by the words the page shows", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedByHeadline");
     await seedingWith(db().pool, async (seed) => {
-      for (const act of ["sources.binding.bound", "people.client.consented"]) {
+      for (const action of ["sources.binding.bound", "people.client.consented"]) {
         await seed.auditEvent({
           workspaceId: workspace.workspaceId,
-          act,
+          action,
           actor: `human:${workspace.adminUserId}`,
           detail: {},
         });
@@ -507,7 +509,7 @@ describe("searching the audit log", () => {
       await readAs(workspace, workspace.adminUserId, { search: "assistant given" }),
     );
 
-    expect([actsOf(sourced), actsOf(consented)]).toEqual([
+    expect([actionsOf(sourced), actionsOf(consented)]).toEqual([
       ["sources.binding.bound"],
       ["people.client.consented"],
     ]);
@@ -524,7 +526,7 @@ describe("searching the audit log", () => {
     );
 
     expect(people).toEqual({ events: [], nextCursor: null, searchTooBroad: false });
-    expect(actsOf(platform)).toEqual(["platform.workspace.provisioned"]);
+    expect(actionsOf(platform)).toEqual(["platform.workspace.provisioned"]);
   });
 
   it("answers an empty last page when nothing matches", async () => {
@@ -566,7 +568,7 @@ describe("searching the audit log", () => {
     });
   });
 
-  it("finds a removed member by the acts they took", async () => {
+  it("finds a removed member by the actions they took", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedLeaverActor");
     const leaver = await memberAt(workspace, "Admin", "Sam Okoro");
     const [estimators] = await groupsMadeBy(workspace, leaver, ["Estimators"]);
@@ -577,7 +579,7 @@ describe("searching the audit log", () => {
     expect(subjectsOf(page)).toEqual([estimators]);
   });
 
-  it("finds a removed member by the acts done to them", async () => {
+  it("finds a removed member by the actions done to them", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedLeaverSubject");
     const leaver = await memberAt(workspace, "Viewer", "Sam Okoro");
     await roleChangedOf(workspace, leaver);
@@ -585,7 +587,7 @@ describe("searching the audit log", () => {
 
     const page = pageOf(await readAs(workspace, workspace.adminUserId, { search: "Sam" }));
 
-    expect(actsOf(page)).toEqual(["people.member.role_changed"]);
+    expect(actionsOf(page)).toEqual(["people.member.role_changed"]);
   });
 
   it("finds a person named only in an event's detail", async () => {
@@ -595,7 +597,7 @@ describe("searching the audit log", () => {
     await seedingWith(db().pool, (seed) =>
       seed.auditEvent({
         workspaceId: workspace.workspaceId,
-        act: "people.group.member_added",
+        action: "people.group.member_added",
         actor: `human:${workspace.adminUserId}`,
         subjectId: crew,
         detail: { userId: leaver },
@@ -604,7 +606,7 @@ describe("searching the audit log", () => {
 
     const page = pageOf(await readAs(workspace, workspace.adminUserId, { search: "Sam" }));
 
-    expect(actsOf(page)).toEqual(["people.group.member_added"]);
+    expect(actionsOf(page)).toEqual(["people.group.member_added"]);
   });
 
   it("reads a search naming 100 groups whole", async () => {
@@ -692,14 +694,14 @@ describe("the audit log's subjects", () => {
       const concept = await seed.conceptIndex({ workspaceId, title: "Annual leave" });
       await seed.auditEvent({
         workspaceId,
-        act: "sources.binding.published",
+        action: "sources.binding.published",
         actor,
         subjectId: connectedSource.id,
         detail: { [STORED_DETAIL_KEYS.connectedSourceId]: connectedSource.id },
       });
       await seed.auditEvent({
         workspaceId,
-        act: "sources.document.narrowed",
+        action: "sources.document.narrowed",
         actor,
         subjectId: document.id,
         detail: {
@@ -710,7 +712,7 @@ describe("the audit log's subjects", () => {
       });
       await seed.auditEvent({
         workspaceId,
-        act: "knowledge.concept.committed",
+        action: "knowledge.concept.committed",
         actor,
         subjectId: concept.iri,
         detail: { iri: concept.iri },
@@ -742,7 +744,7 @@ describe("the audit log's subjects", () => {
     await seedingWith(db().pool, (seed) =>
       seed.auditEvent({
         workspaceId: workspace.workspaceId,
-        act: "sources.binding.published",
+        action: "sources.binding.published",
         actor: `human:${workspace.adminUserId}`,
         subjectId: gone,
         detail: { [STORED_DETAIL_KEYS.connectedSourceId]: gone },
@@ -800,7 +802,7 @@ describe("the audit log's subjects", () => {
     await seedingWith(db().pool, (seed) =>
       seed.auditEvent({
         workspaceId: workspace.workspaceId,
-        act: "platform.audit_log.exported",
+        action: "platform.audit_log.exported",
         actor: `human:${workspace.adminUserId}`,
         subjectId: workspace.workspaceId,
         detail: {
