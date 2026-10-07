@@ -16,7 +16,7 @@ const ROLES = ["Admin", "Editor", "Viewer"] as const;
 
 type Scene = {
   readonly workspaceId: string;
-  readonly slug: string;
+  readonly shortName: string;
   readonly viewerEmail: string;
   readonly viewerMemberId: string;
   readonly invitationId: string;
@@ -62,7 +62,7 @@ const CLOSED: readonly Row<Scene>[] = [
     ({ workspaceId }) => ({ body: { organizationId: workspaceId, data: { name: "Renamed" } } }),
   ],
   ["/organization/delete", ({ workspaceId }) => ({ body: { organizationId: workspaceId } })],
-  ["/organization/check-slug", ({ slug }) => ({ body: { slug } })],
+  ["/organization/check-slug", ({ shortName }) => ({ body: { slug: shortName } })],
 ];
 
 type KeptScene = {
@@ -102,7 +102,7 @@ const aScene = async (): Promise<Scene> => {
   });
   return {
     workspaceId: acme.workspaceId,
-    slug: acme.slug,
+    shortName: acme.shortName,
     viewerEmail: viewer.email,
     viewerMemberId: viewerMember.id,
     invitationId: invited.id,
@@ -133,7 +133,7 @@ const aKeptScene = async (): Promise<KeptScene> => {
 const identityRows = async () => {
   const read = async (sql: string) => (await app().database.superuser.query(sql)).rows;
   return {
-    workspaces: await read("SELECT id, name, slug FROM workspace ORDER BY id"),
+    workspaces: await read("SELECT id, name, short_name FROM workspace ORDER BY id"),
     members: await read("SELECT workspace_id, user_id, role FROM member ORDER BY id"),
     invitations: await read("SELECT id, status FROM invitation ORDER BY id"),
     emails: app().emails.length,
@@ -156,7 +156,7 @@ describe("the organisation plugin's mounted paths", () => {
   });
 });
 
-describe("the organisation plugin's writes and slug check", () => {
+describe("the organisation plugin's writes and short name check", () => {
   it.each(CLOSED)("refuses %s for Admin, Editor and Viewer", async (where, callOf) => {
     const scene = await aScene();
     const before = await identityRows();

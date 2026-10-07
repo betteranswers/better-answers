@@ -290,7 +290,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "members",
     access: "read",
     reason:
-      "An invitation's email names the workspace it joins, and the test workspace's fixture finds its workspace by slug before it provisions one.",
+      "An invitation's email names the workspace it joins, and the test workspace's fixture finds its workspace by short name before it provisions one.",
   },
   {
     table: "public.user",

@@ -86,7 +86,7 @@ const provisioned = async () => {
       {
         id: workspaceId,
         name: "Acme",
-        slug: `acme-${workspaceId.toLowerCase()}`,
+        shortName: `acme-${workspaceId.toLowerCase()}`,
         adminUserId: admin.id,
       },
     );

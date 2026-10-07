@@ -214,7 +214,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     return insertRow(client, "workspace", {
       id,
       name: "Test workspace",
-      slug: `ws-${id.toLowerCase()}`,
+      shortName: `ws-${id.toLowerCase()}`,
       ...overrides,
     });
   };

@@ -919,9 +919,9 @@ to it by IRI and never restates it (ADR 0014).
 - **access request** — a signed-in person's recorded ask to join one workspace, with a reason;
   decided by an Admin — approved (which mints the invitation) or declined — each decision on the
   *audit log*. Not a *subject request*.
-- **short name** — _Code rename pending._ a workspace's unique short name, given when the platform
-  provisions it: how a person names a workspace they do not belong to when they ask to join it.
-  Never its id. Better Auth's API keeps its own word for it.
+- **short name** — a workspace's unique short name, given when the platform provisions it: how a
+  person names a workspace they do not belong to when they ask to join it. Never its id. Better
+  Auth's API keeps its own word for it.
 - **member** — a person's place in one workspace: the one *role* they hold
   there, the *groups* they belong to in it, and the instant every sign-in and token they held there
   was last ended. It begins when the person accepts an *invitation*, or when the platform provisions

@@ -426,7 +426,7 @@ export const CONSOLE = {
       id: "workspaces",
       name: "Workspaces",
       summary:
-        "Every workspace on the platform, with its slug, its member count and the day it was provisioned. Provisioning and renaming are ops commands, so this list is read-only.",
+        "Every workspace on the platform, with its short name, its member count and the day it was provisioned. Provisioning and renaming are ops commands, so this list is read-only.",
       movedFrom: ["/console/workspaces"],
       pages: [
         {

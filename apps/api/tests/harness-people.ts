@@ -41,7 +41,7 @@ export const makeGroups = async (
 };
 
 export const accessAsking = z.object({
-  slug: z.string().min(1),
+  shortName: z.string().min(1),
   requesterId: z.string().min(1),
   reason: z.string().min(1),
 });

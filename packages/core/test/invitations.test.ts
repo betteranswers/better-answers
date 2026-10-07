@@ -275,7 +275,7 @@ describe("an approved access request's invitation", () => {
     const direct = answeredValue(await invite(workspace, requester.email, "Viewer"));
     expect(
       await requestAccess(bootstrap, workspace.door, {
-        slug: workspace.slug,
+        shortName: workspace.shortName,
         requesterId: requester.id,
         reason: "I have joined the bids team.",
       }),

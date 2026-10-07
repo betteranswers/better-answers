@@ -256,7 +256,7 @@ const anAdminAtPeople = async (
   readonly workspaceId: string;
   readonly joined: readonly (Joined & { readonly id: string })[];
   readonly stranger: string;
-  readonly slug: string;
+  readonly shortName: string;
 }> => {
   const admin = anAddress("admin");
   const workspace = await provision(api, { name: workspaceName, adminEmail: admin });
@@ -294,7 +294,7 @@ const anAdminAtPeople = async (
     workspaceId: workspace.workspaceId,
     joined,
     stranger,
-    slug: workspace.slug,
+    shortName: workspace.shortName,
   };
 };
 
@@ -1005,9 +1005,13 @@ test.describe("a member's Activity", () => {
   });
 
   test("keeps the access request they made before joining", async ({ page, request }) => {
-    const { workspaceId, slug } = await anAdminAtPeople(page, request, "Swale Wheelwrights");
+    const { workspaceId, shortName } = await anAdminAtPeople(page, request, "Swale Wheelwrights");
     const asker = await person(request, anAddress("asker"), { displayName: "Ola Asker" });
-    await askToJoin(request, { slug, requesterId: asker.id, reason: "I run the night shift." });
+    await askToJoin(request, {
+      shortName,
+      requesterId: asker.id,
+      reason: "I run the night shift.",
+    });
     await addMember(request, { workspaceId, userId: asker.id, role: "Viewer" });
 
     await page.goto(memberPageAt(asker.id));
@@ -1461,7 +1465,7 @@ test.describe("a member's display name, flagged to better-answers support", () =
 test.describe("the People page's words", () => {
   // Every People area joins this test as it is built: the product's word is workspace.
   test("says workspace, never organisation, on every People page", async ({ page, request }) => {
-    const { admin, slug } = await anAdminAtPeople(page, request, "Ryedale Metalwork");
+    const { admin, shortName } = await anAdminAtPeople(page, request, "Ryedale Metalwork");
     const organisation = /organi[sz]ation/i;
 
     const said = async (where: string) => {
@@ -1531,7 +1535,11 @@ test.describe("the People page's words", () => {
     await said("the Invitations tab with an invitation waiting");
 
     const asker = await person(request, anAddress("asker"), { displayName: "Ola Asker" });
-    await askToJoin(request, { slug, requesterId: asker.id, reason: "I bid for the rail work." });
+    await askToJoin(request, {
+      shortName,
+      requesterId: asker.id,
+      reason: "I bid for the rail work.",
+    });
     await page.getByRole("tab", { name: "Requests" }).click();
     await expect(page.getByRole("region", { name: "Requests" }).getByRole("row")).toHaveCount(2);
     await said("the Requests tab with a request waiting");

@@ -29,20 +29,20 @@ import { abortTheTransaction, postgresForSuite, whileWritesAreRefused } from "./
 
 const db = postgresForSuite();
 
-type Workspace = { readonly id: string; readonly slug: string; readonly adminUserId: string };
+type Workspace = { readonly id: string; readonly shortName: string; readonly adminUserId: string };
 
 const provision = async (name: string): Promise<Workspace> => {
   const adminUserId = await seedPerson(db().pool);
   const id = ulid();
-  const slug = `${name.toLowerCase()}-${id.toLowerCase()}`;
+  const shortName = `${name.toLowerCase()}-${id.toLowerCase()}`;
   const provisioned = await provisionWorkspace(bootstrap, openPostgres(db().runtimePool), {
     id,
     name,
-    slug,
+    shortName,
     adminUserId,
   });
   expect(provisioned.ok).toBe(true);
-  return { id, slug, adminUserId };
+  return { id, shortName, adminUserId };
 };
 
 const door = () => openPostgres(db().runtimePool);
@@ -100,7 +100,7 @@ const withOneWaitingRequest = async (name: string, asker?: { readonly email: str
   const workspace = await provision(name);
   const requester = await seedPerson(db().pool, asker);
   const asked = await requestAccess(bootstrap, door(), {
-    slug: workspace.slug,
+    shortName: workspace.shortName,
     requesterId: requester,
     reason: "I have joined the bids team and need the answer library.",
   });
@@ -116,7 +116,7 @@ describe("asking to join a workspace", () => {
     const requester = await outsider();
 
     const asked = await requestAccess(bootstrap, door(), {
-      slug: workspace.slug,
+      shortName: workspace.shortName,
       requesterId: requester,
       reason: "I have joined the bids team and need the answer library.",
     });
@@ -145,16 +145,16 @@ describe("asking to join a workspace", () => {
     ]);
   });
 
-  it("acknowledges a real slug, unknown slug, member and repeat alike", async () => {
+  it("acknowledges real and unknown short names, members and repeats alike", async () => {
     const workspace = await provision("Neutral");
     const requester = await outsider();
-    const ask = (slug: string, requesterId: string) =>
-      requestAccess(bootstrap, door(), { slug, requesterId, reason: "Please let me in." });
+    const ask = (shortName: string, requesterId: string) =>
+      requestAccess(bootstrap, door(), { shortName, requesterId, reason: "Please let me in." });
 
-    const real = await ask(workspace.slug, requester);
+    const real = await ask(workspace.shortName, requester);
     const unknown = await ask(`no-such-workspace-${ulid().toLowerCase()}`, await outsider());
-    const alreadyMember = await ask(workspace.slug, workspace.adminUserId);
-    const secondAsk = await ask(workspace.slug, requester);
+    const alreadyMember = await ask(workspace.shortName, workspace.adminUserId);
+    const secondAsk = await ask(workspace.shortName, requester);
 
     const answers = [real, unknown, alreadyMember, secondAsk];
     expect(answers).toEqual(answers.map(() => ({ ok: true, value: { acknowledged: true } })));
@@ -168,7 +168,7 @@ describe("asking to join a workspace", () => {
   it("refuses a blank reason and a malformed requester, writing nothing", async () => {
     const workspace = await provision("Malformed");
     const ask = (requesterId: string, reason: string) =>
-      requestAccess(bootstrap, door(), { slug: workspace.slug, requesterId, reason });
+      requestAccess(bootstrap, door(), { shortName: workspace.shortName, requesterId, reason });
 
     expect(await ask(await outsider(), "   ")).toEqual({ ok: false, error: "malformed" });
     expect(await ask("' OR true --", "Please let me in.")).toEqual({
@@ -181,14 +181,14 @@ describe("asking to join a workspace", () => {
   it("leaves nothing for an asker with no identity row, silently", async () => {
     const workspace = await provision("Ghost");
     const nobody = ulid();
-    const ask = (slug: string) =>
+    const ask = (shortName: string) =>
       requestAccess(bootstrap, door(), {
-        slug,
+        shortName,
         requesterId: nobody,
         reason: "I am nobody at all.",
       });
 
-    const asked = await ask(workspace.slug);
+    const asked = await ask(workspace.shortName);
 
     expect(asked).toEqual({ ok: true, value: { acknowledged: true } });
     expect(asked).toEqual(await ask(`no-such-workspace-${ulid().toLowerCase()}`));
@@ -205,7 +205,7 @@ describe("asking to join a workspace", () => {
     await gone.end();
 
     const asked = await requestAccess(bootstrap, openPostgres(gone), {
-      slug: "acme",
+      shortName: "acme",
       requesterId: await outsider(),
       reason: "Please let me in.",
     });
@@ -221,7 +221,7 @@ describe("asking to join a workspace", () => {
 
     const asked = await whileWritesAreRefused(db().pool, "access_request", () =>
       requestAccess(bootstrap, door(), {
-        slug: workspace.slug,
+        shortName: workspace.shortName,
         requesterId: requester,
         reason: "I have joined the bids team and need the answer library.",
       }),
@@ -451,7 +451,7 @@ describe("declining a request", () => {
     ]);
 
     const again = await requestAccess(bootstrap, door(), {
-      slug: workspace.slug,
+      shortName: workspace.shortName,
       requesterId: requester,
       reason: "Asking again now that I am on the account.",
     });
@@ -503,7 +503,13 @@ describe("the Admin's queue", () => {
       [second, "I run the framework renewals."],
     ] as const) {
       expect(
-        (await requestAccess(bootstrap, door(), { slug: workspace.slug, requesterId, reason })).ok,
+        (
+          await requestAccess(bootstrap, door(), {
+            shortName: workspace.shortName,
+            requesterId,
+            reason,
+          })
+        ).ok,
       ).toBe(true);
     }
     const rows = await requestRows(workspace.id);

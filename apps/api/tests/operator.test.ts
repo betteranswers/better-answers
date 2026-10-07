@@ -304,7 +304,7 @@ describe("the console, the operator's alone", () => {
     expectTypeOf<OperatorPrincipal>().not.toExtend<Principal>();
   });
 
-  it("lists each workspace with its slug, members and creation", async () => {
+  it("lists each workspace with its short name, members and creation", async () => {
     const { api } = await theOperatorOnTheWeb();
     const acme = await app().provision({ name: "Acme Holdings" });
     const colleague = await app().person();
@@ -315,7 +315,7 @@ describe("the console, the operator's alone", () => {
     expect(listed.find((workspace) => workspace.id === acme.workspaceId)).toEqual({
       id: acme.workspaceId,
       name: "Acme Holdings",
-      slug: `ws-${acme.workspaceId.toLowerCase()}`,
+      shortName: `ws-${acme.workspaceId.toLowerCase()}`,
       memberCount: 2,
       createdAt: expect.stringMatching(ISO_INSTANT),
     });

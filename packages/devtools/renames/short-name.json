@@ -1,0 +1,71 @@
+{
+  "noun": "slug",
+  "readerWord": "short name",
+  "sweep": "U16. People words: short name",
+  "collisions": [],
+  "words": [
+    {
+      "from": "slug",
+      "to": "short name"
+    },
+    {
+      "from": "slugs",
+      "to": "short names"
+    }
+  ],
+  "symbols": {
+    "paths": [
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/web/journeys/**"
+    ]
+  },
+  "text": {
+    "paths": [
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/web/journeys/**"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "the words test's own planted fixtures and ratchet",
+      "paths": ["apps/api/tests/avoid-words.test.ts", "apps/api/tests/old-words-ratchet.json"]
+    },
+    {
+      "sense": "the refusal word a taken short name answers, on the wire to every caller (R21)",
+      "matches": ["slug-taken"]
+    },
+    {
+      "sense": "the detail key a workspace's renamed event stores (R22), written through the stored-names register",
+      "matches": ["^slugChanged$"]
+    },
+    {
+      "sense": "Better Auth's own name for the field and its endpoint, which its API keeps (R21)",
+      "matches": ["check-slug"]
+    },
+    {
+      "sense": "Better Auth's organization field, in the plugin's field option, its request bodies and its organization object (R21)",
+      "paths": [
+        "apps/api/src/auth/auth.ts",
+        "apps/api/tests/organisation-plugin.test.ts",
+        "apps/web/test/workspace-switcher.test.tsx"
+      ],
+      "matches": ["^slug$"]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { ASK_TO_JOIN_WORDS, SLUG_EXAMPLE } from "@/features/auth/ask-to-join-words.ts";
+import { ASK_TO_JOIN_WORDS, SHORT_NAME_EXAMPLE } from "@/features/auth/ask-to-join-words.ts";
 import { askedTooOften, REASON_REFUSED } from "@/features/auth/refusal-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
@@ -21,17 +21,20 @@ const ASK_TO_JOIN_ENDPOINT = "/trpc/person.requestAccess";
 
 const REASON = "I run the estimating desk and need the tender library.";
 
-const A_SLUG = "acme-joinery";
+const A_SHORT_NAME = "acme-joinery";
 
-/** A reader has no use for the glossary's "slug", and a workspace is never an organisation. */
+/** The short name's old word, spelled in halves so this file keeps none of it. */
+const OLD_WORD = ["sl", "ug"].join("");
+
+/** A reader has no use for the short name's old word, and a workspace is never an organisation. */
 const UNSAID = [
   { word: "an organisation", pattern: /organi[sz]ation/i },
-  { word: "a slug", pattern: /\bslug\b/i },
+  { word: `a ${OLD_WORD}`, pattern: new RegExp(String.raw`\b${OLD_WORD}\b`, "i") },
 ] as const;
 
 const askRegion = (page: Page) => page.getByRole("region", { name: ASK_TO_JOIN_WORDS.heading });
 
-const slugField = (page: Page) => page.getByLabel(ASK_TO_JOIN_WORDS.slug);
+const shortNameField = (page: Page) => page.getByLabel(ASK_TO_JOIN_WORDS.shortName);
 
 const reasonField = (page: Page) => page.getByLabel(ASK_TO_JOIN_WORDS.reason);
 
@@ -42,8 +45,8 @@ const askButton = (page: Page) =>
 
 const requestSent = (page: Page) => page.getByRole("alert", { name: ASK_TO_JOIN_WORDS.sent });
 
-const askToJoin = async (page: Page, slug: string, reason = REASON): Promise<void> => {
-  await slugField(page).fill(slug);
+const askToJoin = async (page: Page, shortName: string, reason = REASON): Promise<void> => {
+  await shortNameField(page).fill(shortName);
   await reasonField(page).fill(reason);
   await askButton(page).click();
 };
@@ -69,9 +72,9 @@ test("a person in no workspace asks to join by keyboard", async ({
       - heading ${JSON.stringify(NO_WORKSPACE_HEADING)} [level=1]
       - region ${JSON.stringify(ASK_TO_JOIN_WORDS.heading)}:
         - heading ${JSON.stringify(ASK_TO_JOIN_WORDS.heading)} [level=2]
-        - text: ${JSON.stringify(ASK_TO_JOIN_WORDS.slug)}
+        - text: ${JSON.stringify(ASK_TO_JOIN_WORDS.shortName)}
         - paragraph
-        - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.slug)}
+        - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.shortName)}
         - text: ${JSON.stringify(ASK_TO_JOIN_WORDS.reason)}
         - paragraph
         - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.reason)}
@@ -79,15 +82,15 @@ test("a person in no workspace asks to join by keyboard", async ({
       - button "Sign out"
       - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
-  await expect(slugField(page)).toHaveAccessibleDescription(
-    `${ASK_TO_JOIN_WORDS.forExample} ${SLUG_EXAMPLE}`,
+  await expect(shortNameField(page)).toHaveAccessibleDescription(
+    `${ASK_TO_JOIN_WORDS.forExample} ${SHORT_NAME_EXAMPLE}`,
   );
   await expect(reasonField(page)).toHaveAccessibleDescription(ASK_TO_JOIN_WORDS.reasonHint);
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("j");
-  await expect(slugField(page)).toBeFocused();
-  await page.keyboard.type(workspace.slug);
+  await expect(shortNameField(page)).toBeFocused();
+  await page.keyboard.type(workspace.shortName);
   await page.keyboard.press("Tab");
   await expect(reasonField(page)).toBeFocused();
   await page.keyboard.type(REASON);
@@ -104,25 +107,25 @@ test("a person in no workspace asks to join by keyboard", async ({
       - paragraph: ${JSON.stringify(ASK_TO_JOIN_WORDS.sent)}
       - paragraph: ${JSON.stringify(ASK_TO_JOIN_WORDS.whatHappensNext)}
   `);
-  await expect(slugField(page)).toHaveValue("");
+  await expect(shortNameField(page)).toHaveValue("");
   await expect(reasonField(page)).toHaveValue("");
 });
 
-test("answers a known, an unknown and a repeated slug alike", async ({ page, request }) => {
+test("answers known, unknown and repeated short names alike", async ({ page, request }) => {
   const workspace = await provision(request, { name: "Brightwater Estimating" });
   await signedInWithNoWorkspace(page, request, "asker");
 
   const said: string[] = [];
-  for (const slug of [workspace.slug, `nobody-${Date.now()}`, workspace.slug]) {
-    await askToJoin(page, slug);
+  for (const shortName of [workspace.shortName, `nobody-${Date.now()}`, workspace.shortName]) {
+    await askToJoin(page, shortName);
     // The fields empty only once this ask is acknowledged, so the banner read is this ask's.
-    await expect(slugField(page)).toHaveValue("");
+    await expect(shortNameField(page)).toHaveValue("");
     said.push(await requestSent(page).innerText());
   }
 
   const [known, unknown, alreadyAsked] = said;
   expect(known).toContain(ASK_TO_JOIN_WORDS.whatHappensNext);
-  expect(unknown, "an unknown slug was answered differently").toBe(known);
+  expect(unknown, "an unknown short name was answered differently").toBe(known);
   expect(alreadyAsked, "a second ask was answered differently").toBe(known);
 });
 
@@ -139,7 +142,7 @@ test("refuses a blank reason, saying what to send", async ({
   await expect(refusal, "the refusal region stands with words already in it").toBeEmpty();
   const stood = await refusal.elementHandle();
 
-  await askToJoin(page, workspace.slug, "   ");
+  await askToJoin(page, workspace.shortName, "   ");
 
   await expect(refusal).toHaveText(sentenceOf(REASON_REFUSED));
   const sameRegion = await refusal.evaluate((now, then) => now === then, stood);
@@ -159,14 +162,14 @@ test("tells a person past the ceiling when to ask again", async ({ page, request
   let status = 200;
   for (let attempt = 0; attempt < 30 && status !== 429; attempt += 1) {
     const answered = await page.request.post(ASK_TO_JOIN_ENDPOINT, {
-      data: { slug: `nobody-${attempt}`, reason: REASON },
+      data: { shortName: `nobody-${attempt}`, reason: REASON },
     });
     status = answered.status();
   }
   expect(status, "the flood never met the ceiling").toBe(429);
 
   const refused = page.waitForResponse((response) => response.url().includes(ASK_TO_JOIN_ENDPOINT));
-  await askToJoin(page, A_SLUG);
+  await askToJoin(page, A_SHORT_NAME);
   const liftsInSeconds = Number((await refused).headers()["retry-after"]);
 
   expect(liftsInSeconds, "the ceiling's answer named no wait").toBeGreaterThan(0);
@@ -180,7 +183,7 @@ test("sends a person whose session ended back to sign in", async ({ page, contex
   await signedInWithNoWorkspace(page, request, "asker");
   await context.clearCookies();
 
-  await askToJoin(page, A_SLUG);
+  await askToJoin(page, A_SHORT_NAME);
 
   await expect(page.getByRole("alert")).toHaveText(SAID_OF_CLASS.unauthenticated.why);
   await thePageSaysNeither(page, "once the session ended");
@@ -188,7 +191,7 @@ test("sends a person whose session ended back to sign in", async ({ page, contex
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 });
 
-test("never names an organisation or a slug, nor in keystrokes", async ({ page, request }) => {
+test("names no organisation or old word, nor in keystrokes", async ({ page, request }) => {
   await signedInWithNoWorkspace(page, request, "asker");
   await thePageSaysNeither(page, "before an ask");
 

@@ -46,7 +46,7 @@ def seed_workspace(
     identifier = workspace_id or ulid()
 
     cursor.execute(
-        "INSERT INTO workspace (id, name, slug) VALUES (%s, %s, %s) RETURNING *",
+        "INSERT INTO workspace (id, name, short_name) VALUES (%s, %s, %s) RETURNING *",
         (identifier, name, f"ws-{identifier.lower()}"),
     )
     return _returning_row(cursor)

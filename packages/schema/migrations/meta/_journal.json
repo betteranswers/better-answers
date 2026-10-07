@@ -498,6 +498,13 @@
       "when": 1791369080008,
       "tag": "0070_the-verification",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1791379631649,
+      "tag": "0071_the-short-name",
+      "breakpoints": true
     }
   ]
 }

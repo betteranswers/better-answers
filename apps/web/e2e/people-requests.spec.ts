@@ -58,14 +58,18 @@ type Asked = { readonly displayName: string; readonly email: string };
 
 type AtRequests = {
   readonly workspaceId: string;
-  readonly slug: string;
+  readonly shortName: string;
   readonly asked: readonly Asked[];
 };
 
-const asksToJoin = async (api: APIRequestContext, slug: string, asking: Asking): Promise<Asked> => {
+const asksToJoin = async (
+  api: APIRequestContext,
+  shortName: string,
+  asking: Asking,
+): Promise<Asked> => {
   const email = anAddress(asking.displayName.split(" ")[0]?.toLowerCase() ?? "asker");
   const made = await person(api, email, { displayName: asking.displayName });
-  await askToJoin(api, { slug, requesterId: made.id, reason: asking.reason ?? REASON });
+  await askToJoin(api, { shortName, requesterId: made.id, reason: asking.reason ?? REASON });
   return { displayName: asking.displayName, email };
 };
 
@@ -79,12 +83,12 @@ const anAdminAtRequests = async (
   const adminEmail = anAddress("admin");
   const workspace = await provision(api, { name: workspaceName, adminEmail });
   const asked: Asked[] = [];
-  for (const one of asking) asked.push(await asksToJoin(api, workspace.slug, one));
+  for (const one of asking) asked.push(await asksToJoin(api, workspace.shortName, one));
 
   await page.goto(MEMBERS_PAGE);
   await signIn(page, api, adminEmail);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
-  return { workspaceId: workspace.workspaceId, slug: workspace.slug, asked };
+  return { workspaceId: workspace.workspaceId, shortName: workspace.shortName, asked };
 };
 
 const openRequests = async (page: Page): Promise<void> => {
@@ -309,7 +313,7 @@ test.describe("the People page's Requests tab", () => {
 
   test("shows an Admin only their own workspace's requests", async ({ page, request }) => {
     const other = await provision(request, { name: "Wharfe Fabrication" });
-    await asksToJoin(request, other.slug, { displayName: "Other Asker" });
+    await asksToJoin(request, other.shortName, { displayName: "Other Asker" });
 
     await anAdminAtRequests(page, request, "Ryedale Metalwork", [{ displayName: "Own Asker" }]);
     await openRequests(page);
@@ -327,7 +331,7 @@ test.describe("the People page's Requests tab", () => {
         provision(request, { name: `Wharfe ${role}s` }),
       ]);
       await addMember(request, { role, userId: member.id, workspaceId: workspace.workspaceId });
-      await asksToJoin(request, workspace.slug, { displayName: "Priya Shah" });
+      await asksToJoin(request, workspace.shortName, { displayName: "Priya Shah" });
       await page.goto(MEMBERS_PAGE);
       await signIn(page, request, email);
 

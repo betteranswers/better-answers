@@ -45,7 +45,7 @@ const TEST_WORKSPACE_NAME = "Test workspace";
 export { INVENTED_MEMBERS };
 
 const TESTING_DOMAIN = boundarySchemas.testWorkspaceMark.insert.shape.testingDomain;
-const SLUG = boundarySchemas.workspace.insert.shape.slug;
+const SHORT_NAME = boundarySchemas.workspace.insert.shape.shortName;
 const WORKSPACE_ID = boundarySchemas.workspace.select.shape.id;
 const USER_ID = boundarySchemas.user.select.shape.id;
 const ROLE = boundarySchemas.member.select.shape.role;
@@ -54,7 +54,7 @@ const MALFORMED = "malformed" satisfies MemberRefusal<"malformed">;
 
 export type TestWorkspaceInput = {
   readonly testingDomain: string;
-  readonly slug: string;
+  readonly shortName: string;
   readonly admin: string;
   readonly editor: string;
   readonly viewer: string;
@@ -65,12 +65,12 @@ type AddressWord = MemberRefusal<"off-testing-domain" | "operator-marked" | "mem
 /** Names the address, which only the operator running the fixture reads. */
 type AddressRefused = { readonly word: AddressWord; readonly address: string };
 
-type SlugTaken = Extract<keyof typeof WORKSPACE_REFUSALS, "slug-taken">;
+type ShortNameTaken = Extract<keyof typeof WORKSPACE_REFUSALS, "slug-taken">;
 
 export type TestWorkspaceRefusal =
   | AddressRefused
   | MemberRefusal<"malformed">
-  | SlugTaken
+  | ShortNameTaken
   | AddPersonRefusal
   | ProvisionRefusal
   | AddMemberRefusal
@@ -90,11 +90,11 @@ export type TestWorkspaceStanding = MembersEnsured & {
   readonly workspaceId: WorkspaceId;
 
   /**
-   * As stored: the domain trimmed and lower-cased, the slug trimmed, so either may differ from
+   * As stored: the domain trimmed and lower-cased, the short name trimmed, so either may differ from
    * what was asked.
    */
   readonly testingDomain: string;
-  readonly slug: string;
+  readonly shortName: string;
   readonly provisioned: boolean;
   readonly mark: MarkStanding;
   readonly peopleAdded: number;
@@ -104,7 +104,7 @@ type FixturePerson = { readonly address: string; readonly name: string; readonly
 
 type Fixture = {
   readonly testingDomain: string;
-  readonly slug: string;
+  readonly shortName: string;
   readonly admin: FixturePerson;
   readonly others: readonly FixturePerson[];
 };
@@ -147,8 +147,8 @@ const inventedOn = (testingDomain: string): readonly FixturePerson[] =>
 
 const fixtureOf = (input: TestWorkspaceInput): Parsed<Fixture> => {
   const testingDomain = TESTING_DOMAIN.safeParse(input.testingDomain.trim().toLowerCase());
-  const slug = SLUG.safeParse(input.slug);
-  if (!testingDomain.success || !slug.success) return err(MALFORMED);
+  const shortName = SHORT_NAME.safeParse(input.shortName);
+  if (!testingDomain.success || !shortName.success) return err(MALFORMED);
   const people = testPeopleOf(input, testingDomain.data);
   if (!people.ok) return err(people.error);
 
@@ -160,7 +160,7 @@ const fixtureOf = (input: TestWorkspaceInput): Parsed<Fixture> => {
   if (!wellFormed || addresses.size !== everyone.length) return err(MALFORMED);
   return ok({
     testingDomain: testingDomain.data,
-    slug: slug.data,
+    shortName: shortName.data,
     admin: people.value.admin,
     others,
   });
@@ -191,7 +191,7 @@ type Standing = {
   readonly invited: readonly string[];
 };
 
-const WORKSPACE_BY_SLUG = "SELECT id FROM workspace WHERE slug = $1";
+const WORKSPACE_BY_SHORT_NAME = "SELECT id FROM workspace WHERE short_name = $1";
 
 const PEOPLE_STANDING = `SELECT u.id, lower(u.email) AS address, u.operator,
                                 coalesce(array_agg(m.workspace_id ORDER BY m.workspace_id)
@@ -233,7 +233,7 @@ const standingOf = (
   fixture: Fixture,
 ): Promise<Standing> =>
   withIdentityRead(platform, door, async (tx) => {
-    const found = await tx.query<{ id: string }>(WORKSPACE_BY_SLUG, [fixture.slug]);
+    const found = await tx.query<{ id: string }>(WORKSPACE_BY_SHORT_NAME, [fixture.shortName]);
     const held = found.rows[0];
     const workspaceId = held === undefined ? undefined : WORKSPACE_ID.parse(held.id);
     const addresses = everyoneIn(fixture).map((one) => one.address);
@@ -250,7 +250,7 @@ const standingOf = (
 const refusalOf = (
   fixture: Fixture,
   standing: Standing,
-): AddressRefused | SlugTaken | undefined => {
+): AddressRefused | ShortNameTaken | undefined => {
   const people = everyoneIn(fixture).flatMap((one) => standing.people.get(one.address) ?? []);
   const operator = people.find((person) => person.operator);
   if (operator !== undefined) return { word: "operator-marked", address: operator.address };
@@ -298,7 +298,7 @@ type WorkspaceEnsured = { readonly workspaceId: WorkspaceId; readonly provisione
 const workspaceEnsured = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  slug: string,
+  shortName: string,
   admin: Held,
   standing: Standing,
 ): Promise<Result<WorkspaceEnsured, ProvisionRefusal | Error>> => {
@@ -308,7 +308,7 @@ const workspaceEnsured = async (
   const provisioned = await provisionWorkspace(platform, door, {
     id: ulid(),
     name: TEST_WORKSPACE_NAME,
-    slug,
+    shortName,
     adminUserId: admin.id,
   });
   if (!provisioned.ok) return err(provisioned.error);
@@ -428,7 +428,13 @@ const fixtureWritten = async (
   if (!admin.ok) return err(admin.error);
   const others = await peopleEnsured(platform, door, standing, fixture.others);
   if (!others.ok) return err(others.error);
-  const workspace = await workspaceEnsured(platform, door, fixture.slug, admin.value, standing);
+  const workspace = await workspaceEnsured(
+    platform,
+    door,
+    fixture.shortName,
+    admin.value,
+    standing,
+  );
   if (!workspace.ok) return err(workspace.error);
   const { workspaceId, provisioned } = workspace.value;
 
@@ -438,15 +444,22 @@ const fixtureWritten = async (
   const members = await membersEnsured(platform, door, workspaceId, everyone);
   if (!members.ok) return err(members.error);
   const peopleAdded = everyone.filter((one) => one.added).length;
-  const { testingDomain, slug } = fixture;
-  const written = { workspaceId, testingDomain, slug, provisioned, mark: mark.value, peopleAdded };
+  const { testingDomain, shortName } = fixture;
+  const written = {
+    workspaceId,
+    testingDomain,
+    shortName,
+    provisioned,
+    mark: mark.value,
+    peopleAdded,
+  };
   return ok({ ...written, ...members.value });
 };
 
 /**
  * Creates or repairs the test workspace, its mark, three test people and 51 invented Viewers.
  * Before writing anything it refuses an address off the testing domain, the operator's or a
- * member's elsewhere, and a slug whose workspace holds a member or waiting invitation off it.
+ * member's elsewhere, and a short name whose workspace holds a member or waiting invitation off it.
  * It removes nobody.
  */
 export const ensureTestWorkspace = async (

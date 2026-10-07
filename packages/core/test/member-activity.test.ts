@@ -132,7 +132,7 @@ const asked = async (workspace: ProvisionedWorkspace) => {
   const priya = await aPerson("Priya Shah");
   answered(
     await requestAccess(bootstrap, openPostgres(db().runtimePool), {
-      slug: workspace.slug,
+      shortName: workspace.shortName,
       requesterId: priya,
       reason: "I have joined the bids team and need the answer library.",
     }),

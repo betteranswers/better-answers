@@ -141,11 +141,11 @@ describe("attemptResult, for an operation that answers a Result", () => {
 });
 
 describe("reading a store's constraint names into a slice's words", () => {
-  const named = { workspace_slug_unique: "slug-taken" } as const;
+  const named = { workspace_short_name_unique: "slug-taken" } as const;
 
   it("answers the mapped refusal word for a named constraint", () => {
     const violation = Object.assign(new Error("duplicate key value violates unique constraint"), {
-      constraint: "workspace_slug_unique",
+      constraint: "workspace_short_name_unique",
     });
 
     expect(refusalFor(violation, named)).toBe("slug-taken");
@@ -153,7 +153,7 @@ describe("reading a store's constraint names into a slice's words", () => {
 
   it("falls back to the constraint named in the message", () => {
     const violation = new Error(
-      'duplicate key value violates unique constraint "workspace_slug_unique"',
+      'duplicate key value violates unique constraint "workspace_short_name_unique"',
     );
 
     expect(refusalFor(violation, named)).toBe("slug-taken");

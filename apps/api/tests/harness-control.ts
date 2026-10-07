@@ -109,7 +109,7 @@ const enrolments = (app: TestApp) => {
 };
 const testWorkspace = z.object({
   testingDomain: z.string().min(1),
-  slug: z.string().min(1),
+  shortName: z.string().min(1),
   admin: z.string().min(1),
   editor: z.string().min(1),
   viewer: z.string().min(1),
