@@ -5,7 +5,10 @@ export const PEOPLE_KEYSTROKES = {
   search: { key: "/", act: "Search the members by name or address" },
   open: { key: "o", act: "Open the member in focus" },
   changeRole: { key: "c", act: "Change the role of the member in focus" },
-  revokeCredentials: { key: "v", act: "Revoke the credentials here of the member in focus" },
+  endEverySignInAndToken: {
+    key: "v",
+    act: "End every sign-in and token here of the member in focus",
+  },
   changeGroups: { key: "g", act: "Change the groups of the member in focus" },
   remove: { key: "d", act: "Remove the member in focus" },
   flagName: { key: "f", act: "Flag the display name of the member in focus" },
@@ -40,7 +43,7 @@ export const MEMBER_PAGE_KEYSTROKES = {
   changeRole: { key: "c", act: "Change this member's role" },
   changeGroups: { key: "g", act: "Change this member's groups" },
   flagName: { key: "f", act: "Flag this member's display name" },
-  revokeCredentials: { key: "v", act: "Revoke this member's credentials here" },
+  endEverySignInAndToken: { key: "v", act: "End every sign-in and token this member holds here" },
   remove: { key: "d", act: "Remove this member" },
   olderActivity: { key: "o", act: "Show this member's older activity" },
 } as const satisfies Readonly<Record<string, Keystroke>>;

@@ -895,7 +895,7 @@ to it by IRI and never restates it (ADR 0014).
   or by an address's position in what was sent — never by an address or a name. Nothing of the set
   lands. The refusal's own word is the first refused item's word in id order. Only tRPC carries the
   items, to the web client; MCP and `pnpm ops` answer the set's word alone.
-- **end every sign-in and token** — _Code rename pending._ the one action that ends what a person
+- **end every sign-in and token** — the one action that ends what a person
   was issued, in two scopes. *In a workspace*: a workspace Admin ends every session and token a
   person holds there, by an instant on their member row the resolver refuses against; nothing
   outside that workspace changes, and the Admin never learns whether others exist. *Everywhere*: the

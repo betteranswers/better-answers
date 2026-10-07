@@ -47,8 +47,8 @@ import {
   renameGroup,
   renameGroupInput,
   resendInvitation,
-  revokeCredentialsHere,
-  revokeCredentialsHereInput,
+  endEverySignInAndTokenHere,
+  endEverySignInAndTokenHereInput,
   type InvitationMinted,
   type InvitationToSend,
 } from "@better-answers/core/members";
@@ -248,9 +248,9 @@ export const membersRouter = router({
   bulkCancelInvitations: mutationProcedure
     .input(parsedBy(bulkInvitationsInput))
     .mutation(answeredBy(bulkCancelInvitations)),
-  revokeCredentials: mutationProcedure
-    .input(parsedBy(revokeCredentialsHereInput))
-    .mutation(answeredAt(revokeCredentialsHere)),
+  endEverySignInAndToken: mutationProcedure
+    .input(parsedBy(endEverySignInAndTokenHereInput))
+    .mutation(answeredAt(endEverySignInAndTokenHere)),
   remove: mutationProcedure.input(parsedBy(removeMemberInput)).mutation(answeredAt(removeMember)),
   bulkChangeRole: ownTransactionProcedure
     .input(parsedBy(bulkChangeRoleInput))

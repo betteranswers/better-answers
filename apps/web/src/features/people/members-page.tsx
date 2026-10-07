@@ -28,7 +28,7 @@ const MEMBERS: Tab = {
     KEY.search,
     KEY.open,
     KEY.changeRole,
-    KEY.revokeCredentials,
+    KEY.endEverySignInAndToken,
     KEY.changeGroups,
     KEY.remove,
     KEY.flagName,

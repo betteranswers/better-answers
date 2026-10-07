@@ -7,17 +7,17 @@ import { Button } from "@/shared/ui/button.tsx";
 import { instantWords } from "@/shared/words.ts";
 
 import { backTo } from "./people-address.ts";
-import { useRevokeEverywhere, type ListedPerson } from "./people-api.ts";
+import { useEndEverySignInEverywhere, type ListedPerson } from "./people-api.ts";
 import { nameOf } from "./person-words.tsx";
 import { SheetActButton } from "./sheet-act.tsx";
 import { SignInAgain } from "./sign-in-again.tsx";
 import { refusedAsStale, revocationRefused } from "./words.ts";
 
-type Revocation = ReturnType<typeof useRevokeEverywhere>;
+type Revocation = ReturnType<typeof useEndEverySignInEverywhere>;
 
 const outcomeOf = (revocation: Revocation, name: string): Outcome | undefined => {
   if (revocation.isPending) {
-    return { tone: "said", words: `Revoking ${name}'s credentials everywhere.` };
+    return { tone: "said", words: `Ending every sign-in and token ${name} holds, everywhere.` };
   }
   if (revocation.isSuccess) {
     return {
@@ -28,13 +28,13 @@ const outcomeOf = (revocation: Revocation, name: string): Outcome | undefined =>
   return revocation.isError ? revocationRefused(revocation.error) : undefined;
 };
 
-export function RevokeEverywhere(properties: {
+export function EndEverySignInEverywhere(properties: {
   readonly person: ListedPerson;
   readonly actRef: RefObject<HTMLButtonElement | null>;
 }) {
   const { person, actRef } = properties;
   const [confirming, setConfirming] = useState(false);
-  const revocation = useRevokeEverywhere(person.id);
+  const revocation = useEndEverySignInEverywhere(person.id);
   const consequenceId = useId();
   const name = nameOf(person);
 
@@ -45,7 +45,7 @@ export function RevokeEverywhere(properties: {
   };
 
   return (
-    <SheetPart title="Revoke everywhere">
+    <SheetPart title="End every sign-in everywhere">
       <p id={consequenceId} className="text-muted-foreground">
         Ends every session and client grant {name} holds, in every workspace, at once. They can sign
         in again afterwards. Recorded on the identity-set audit log under your name.
@@ -58,7 +58,7 @@ export function RevokeEverywhere(properties: {
           setConfirming(true);
         }}
       >
-        Revoke {name}'s credentials everywhere
+        End every sign-in and token {name} holds
       </SheetActButton>
       <OutcomeLine outcome={outcomeOf(revocation, name)} />
       {refusedAsStale(revocation.error) ? <SignInAgain back={backTo(person, "revoke")} /> : null}
@@ -72,11 +72,11 @@ export function RevokeEverywhere(properties: {
             actRef.current?.focus();
           },
         }}
-        title={`Revoke ${name}'s credentials everywhere`}
+        title={`End every sign-in and token ${name} holds`}
         consequence={`Every session and client grant ${name} holds ends now, in every workspace they belong to. They can sign in and connect a client again afterwards; this page cannot undo it.`}
         commit={
           <Button variant="destructive" onClick={commit}>
-            Revoke everywhere
+            End every sign-in everywhere
           </Button>
         }
       />

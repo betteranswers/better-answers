@@ -15,7 +15,7 @@ tags:
   - person-id
   - minter
   - actor-id
-  - revoke-credentials
+  - end-every-sign-in-and-token
   - erasure-pseudonym
   - audit-log
 ---

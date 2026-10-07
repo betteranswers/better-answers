@@ -67,7 +67,7 @@ export const removeMember = async (
   expect(answered.ok(), `removing a member answered ${answered.status()}`).toBe(true);
 };
 
-export const revokeCredentials = (api: APIRequestContext, userId: string) =>
+export const endEverySignInAndToken = (api: APIRequestContext, userId: string) =>
   ask(api, "/revocations", { userId }, credentialsRevoked);
 
 const operatorMarked = z.object({ marked: z.boolean() });

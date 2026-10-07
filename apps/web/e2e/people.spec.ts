@@ -589,7 +589,7 @@ test.describe("a member's own page", () => {
             - listitem:
               - link "${MEMBER_PAGE_WORDS.activity}"
             - listitem:
-              - link "${MEMBER_PAGE_WORDS.removeAndRevoke}"
+              - link "${MEMBER_PAGE_WORDS.removeAndEndEverySignIn}"
         - region "${MEMBER_PAGE_WORDS.access}":
           - heading "${MEMBER_PAGE_WORDS.access}" [level=2]
           - term: Role
@@ -598,8 +598,8 @@ test.describe("a member's own page", () => {
           - definition: No group
           - term: Joined
           - definition: /\\d{4}/
-          - term: Credentials here
-          - definition: Never revoked
+          - term: Sign-ins and tokens here
+          - definition: Never ended
           - region "Role":
             - heading "Role" [level=3]
             - radiogroup "Role":
@@ -623,11 +623,11 @@ test.describe("a member's own page", () => {
         - region "${MEMBER_PAGE_WORDS.activity}":
           - heading "${MEMBER_PAGE_WORDS.activity}" [level=2]
           - text: ${quoted(ACTIVITY_WORDS.none("Priya Shah"))}
-        - region "${MEMBER_PAGE_WORDS.removeAndRevoke}":
-          - heading "${MEMBER_PAGE_WORDS.removeAndRevoke}" [level=2]
-          - region "Credentials":
-            - heading "Credentials" [level=3]
-            - button "Revoke Priya Shah's credentials here"
+        - region "${MEMBER_PAGE_WORDS.removeAndEndEverySignIn}":
+          - heading "${MEMBER_PAGE_WORDS.removeAndEndEverySignIn}" [level=2]
+          - region "Sign-ins and tokens":
+            - heading "Sign-ins and tokens" [level=3]
+            - button "End every sign-in and token here"
             - paragraph: Every session and token Priya Shah holds for this workspace is refused at once, and a fresh sign-in works. Recorded on the audit log under your name.
           - region "Removal":
             - heading "Removal" [level=3]
@@ -636,9 +636,14 @@ test.describe("a member's own page", () => {
     `);
     await passesTheAccessibilityGate();
 
-    await thePage(page).getByRole("link", { name: MEMBER_PAGE_WORDS.removeAndRevoke }).click();
+    await thePage(page)
+      .getByRole("link", { name: MEMBER_PAGE_WORDS.removeAndEndEverySignIn })
+      .click();
     await expect(
-      thePage(page).getByRole("heading", { level: 2, name: MEMBER_PAGE_WORDS.removeAndRevoke }),
+      thePage(page).getByRole("heading", {
+        level: 2,
+        name: MEMBER_PAGE_WORDS.removeAndEndEverySignIn,
+      }),
     ).toBeFocused();
     await expect(page, "a section took an address of its own").toHaveURL(
       new RegExp(`${memberPageAt(priya.id)}$`),
@@ -865,7 +870,9 @@ test.describe("a member's own page", () => {
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText("Open the member in focus");
     await expect(keystrokes).toContainText("Change the role of the member in focus");
-    await expect(keystrokes).toContainText("Revoke the credentials here of the member in focus");
+    await expect(keystrokes).toContainText(
+      "End every sign-in and token here of the member in focus",
+    );
     await expect(keystrokes).toContainText("Remove the member in focus");
     await expect(keystrokes, "d declines a request on the Requests tab alone").not.toContainText(
       "Decline the request in focus",
@@ -1070,8 +1077,8 @@ test.describe("a member's Activity", () => {
     );
     await expect(accessOf(page), "a failed Activity took Access with it").toBeVisible();
     await expect(
-      thePage(page).getByRole("region", { name: MEMBER_PAGE_WORDS.removeAndRevoke }),
-      "a failed Activity took Remove and revoke with it",
+      thePage(page).getByRole("region", { name: MEMBER_PAGE_WORDS.removeAndEndEverySignIn }),
+      "a failed Activity took Remove and end every sign-in with it",
     ).toBeVisible();
 
     await page.unroute(ACTIVITY_READ);
@@ -1084,13 +1091,13 @@ test.describe("a member's Activity", () => {
   });
 });
 
-const REVOKED_AT = /Revoked\s*\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
+const ENDED_AT = /Ended\s*\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
 
-const revokeButton = (page: Page, name: string): Locator =>
-  thePage(page).getByRole("button", { name: `Revoke ${name}'s credentials here` });
+const endButton = (page: Page): Locator =>
+  thePage(page).getByRole("button", { name: "End every sign-in and token here" });
 
 const credentialsRegion = (page: Page): Locator =>
-  thePage(page).getByRole("region", { name: "Credentials" });
+  thePage(page).getByRole("region", { name: "Sign-ins and tokens" });
 
 /** Priya is a member of a second workspace too, so a page that told of it would name it. */
 const anAdminWithAMemberOfTwo = async (page: Page, api: APIRequestContext) => {
@@ -1106,8 +1113,8 @@ const anAdminWithAMemberOfTwo = async (page: Page, api: APIRequestContext) => {
   return { elsewhere };
 };
 
-test.describe("revoking a member's credentials here", () => {
-  test("revokes a member's credentials within its budget, and it holds", async ({
+test.describe("ending every sign-in and token a member holds here", () => {
+  test("ends a member's sign-ins within budget, and it holds", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -1115,30 +1122,27 @@ test.describe("revoking a member's credentials here", () => {
     const { elsewhere } = await anAdminWithAMemberOfTwo(page, request);
 
     await openedByName(page, "Priya Shah");
-    await expect(accessOf(page)).toContainText("Never revoked");
-    const revoke = revokeButton(page, "Priya Shah");
+    await expect(accessOf(page)).toContainText("Never ended");
+    const revoke = endButton(page);
     await revoke.focus();
-    await clockTheNextKey(page, { at: accessLine("Credentials here"), reads: "Revoked" });
+    await clockTheNextKey(page, { at: accessLine("Sign-ins and tokens here"), reads: "Ended" });
     await page.keyboard.press("Enter");
 
     await expect(credentialsRegion(page).getByRole("status")).toContainText(
-      "Priya Shah's credentials here are revoked.",
+      "Every sign-in and token Priya Shah held here has ended.",
     );
     await theActLandedWithinItsBudget(page, "revocation");
     await expect(revoke).toBeFocused();
-    await expect(accessOf(page)).toContainText(REVOKED_AT);
+    await expect(accessOf(page)).toContainText(ENDED_AT);
     await passesTheAccessibilityGate();
     await expect(page.locator("body")).not.toContainText(elsewhere.name);
     expect(await thePage(page).ariaSnapshot()).not.toContain(elsewhere.name);
 
     await page.reload();
-    await expect(accessOf(page)).toContainText(REVOKED_AT);
+    await expect(accessOf(page)).toContainText(ENDED_AT);
   });
 
-  test("revokes the Admin's own credentials, then admits a fresh sign-in", async ({
-    page,
-    request,
-  }) => {
+  test("ends the Admin's own sign-ins, then admits a fresh one", async ({ page, request }) => {
     const admin = anAddress("admin");
     await provision(request, { name: "Esk Rolling", adminEmail: admin });
     await page.goto(MEMBERS_PAGE);
@@ -1148,7 +1152,7 @@ test.describe("revoking a member's credentials here", () => {
     await openedByName(page, "Test person");
     const ownPage = page.url();
     await expect(credentialsRegion(page)).toContainText("Your own session here ends with it.");
-    await revokeButton(page, "Test person").click();
+    await endButton(page).click();
 
     await expect(thePage(page).getByRole("alert")).toHaveText(
       sentenceOf(SAID_OF_CLASS.unauthenticated),
@@ -1157,25 +1161,22 @@ test.describe("revoking a member's credentials here", () => {
     await signIn(page, request, admin);
     await expect(page).toHaveURL(ownPage);
     await expect(personHeading(page, "Test person")).toBeVisible();
-    await expect(accessOf(page)).toContainText(REVOKED_AT);
+    await expect(accessOf(page)).toContainText(ENDED_AT);
   });
 
-  test("opens a member's credentials and revokes them by keyboard alone", async ({
-    page,
-    request,
-  }) => {
+  test("opens a member's sign-ins and ends them by keyboard", async ({ page, request }) => {
     await skippedToMembers(page, request, "Nidd Presswork");
 
-    await page.keyboard.press(PEOPLE_KEYSTROKES.revokeCredentials.key);
+    await page.keyboard.press(PEOPLE_KEYSTROKES.endEverySignInAndToken.key);
     await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
 
     await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
-    await page.keyboard.press(PEOPLE_KEYSTROKES.revokeCredentials.key);
-    const revoke = revokeButton(page, "Sam Okoro");
+    await page.keyboard.press(PEOPLE_KEYSTROKES.endEverySignInAndToken.key);
+    const revoke = endButton(page);
     await expect(revoke).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(credentialsRegion(page).getByRole("status")).toContainText(
-      "Sam Okoro's credentials here are revoked.",
+      "Every sign-in and token Sam Okoro held here has ended.",
     );
     await expect(revoke).toBeFocused();
   });
@@ -1498,10 +1499,8 @@ test.describe("the People page's words", () => {
 
     await page.goto(MEMBERS_PAGE);
     await openedByName(page, "Priya Shah");
-    await revokeButton(page, "Priya Shah").click();
-    await expect(credentialsRegion(page).getByRole("status")).toContainText(
-      "credentials here are revoked",
-    );
+    await endButton(page).click();
+    await expect(credentialsRegion(page).getByRole("status")).toContainText("held here has ended");
     await said("a revocation");
 
     await page.goto(AUDIT_LOG_PAGE);

@@ -8,7 +8,7 @@ import {
   anAddress,
   landedAtHome,
   provision,
-  revokeCredentials,
+  endEverySignInAndToken,
   signIn,
   signInHeading,
   signOutFromTheShell,
@@ -68,7 +68,7 @@ test("refuses revoked credentials on the next request", async ({ page, request }
   await signIn(page, request, email);
   await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
 
-  await revokeCredentials(request, workspace.admin.id);
+  await endEverySignInAndToken(request, workspace.admin.id);
 
   await page.getByRole("link", { name: "Groups" }).click();
   await page.reload();

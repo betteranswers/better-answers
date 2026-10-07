@@ -24,24 +24,24 @@ const REVOCATION_ACTS = declareActs("people", {
   credentialsRevoked: act("people.member.credentials_revoked", { grants: "grants" }),
 });
 
-export const revokeCredentialsHereInput = z.object({
+export const endEverySignInAndTokenHereInput = z.object({
   personId: boundarySchemas.user.select.shape.id,
 });
 
-export type RevokeCredentialsHereInput = z.output<typeof revokeCredentialsHereInput> & {
+export type EndEverySignInAndTokenHereInput = z.output<typeof endEverySignInAndTokenHereInput> & {
   /** When the act happens: every credential the member was issued before it is refused here. */
   readonly at: Date;
 };
 
-const revokeCredentialsHereAct = declareAct({
+const endEverySignInAndTokenHereAct = declareAct({
   admits: { role: "Admin", purposes: [] },
-  input: revokeCredentialsHereInput,
+  input: endEverySignInAndTokenHereInput,
   refuses: ["role-forbids", "no-such-member", "changed-meanwhile"],
   effect: "write",
 });
 
-export type RevokeCredentialsHereRefusal =
-  | MemberRefusal<RefusalOf<typeof revokeCredentialsHereAct>>
+export type EndEverySignInAndTokenHereRefusal =
+  | MemberRefusal<RefusalOf<typeof endEverySignInAndTokenHereAct>>
   | Error;
 
 export type CredentialsRevokedHere = {
@@ -57,9 +57,9 @@ const HELD_INSTANT = `UPDATE member
                    RETURNING credentials_revoked_at AS at`;
 
 const revokedHere = async (
-  admin: AdmittedOf<typeof revokeCredentialsHereAct>,
+  admin: AdmittedOf<typeof endEverySignInAndTokenHereAct>,
   tx: Tx,
-  asked: RevokeCredentialsHereInput,
+  asked: EndEverySignInAndTokenHereInput,
 ): Promise<Result<CredentialsRevokedHere, MemberRefusal<"no-such-member">>> => {
   const held = await tx.query<{ at: Date }>(HELD_INSTANT, [
     admin.workspaceId,
@@ -89,12 +89,12 @@ const revokedHere = async (
  * and nowhere else, and a fresh sign-in is admitted. The answer is the same whether or not the
  * person belongs to another workspace. Revoking the last Admin, themself included, is allowed.
  */
-export const revokeCredentialsHere = async (
+export const endEverySignInAndTokenHere = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: RevokeCredentialsHereInput,
-): Promise<Result<CredentialsRevokedHere, RevokeCredentialsHereRefusal>> => {
-  const admitted = admit(revokeCredentialsHereAct, principal, input);
+  input: EndEverySignInAndTokenHereInput,
+): Promise<Result<CredentialsRevokedHere, EndEverySignInAndTokenHereRefusal>> => {
+  const admitted = admit(endEverySignInAndTokenHereAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
   const revoked = await attempt(() => revokedHere(admitted.value, tx, input));

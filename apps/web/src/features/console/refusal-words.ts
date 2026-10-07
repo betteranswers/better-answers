@@ -33,11 +33,11 @@ const NO_SUCH_PERSON: Said = {
 
 export const SAID_OF_A_REVOCATION = {
   [SIGN_IN_TOO_OLD]: {
-    why: "Your sign-in is more than an hour old, and revoking needs one from the last hour.",
+    why: "Your sign-in is more than an hour old, and ending every sign-in and token needs one from the last hour.",
     next: "Once you have signed in, you come back to this person.",
   },
   [NOT_THE_OPERATOR]: {
-    why: "Only the operator may revoke credentials everywhere.",
+    why: "Only the operator may end every sign-in and token everywhere.",
     next: ONLY_THE_OPERATOR.next,
   },
   "no-such-user": NO_SUCH_PERSON,

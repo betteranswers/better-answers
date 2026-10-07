@@ -33,7 +33,7 @@ import {
   type RunErasureRefusal,
 } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result, type UserPrincipal } from "../src/kernel/index.ts";
-import { revokeCredentialsHere } from "../src/members/index.ts";
+import { endEverySignInAndTokenHere } from "../src/members/index.ts";
 import { setDisplayName, setOperatorMark } from "../src/workspaces/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
@@ -924,7 +924,7 @@ describe("the audit log an erasure never rewrites", () => {
       return client.clientId;
     });
     const revoked = await withScope(bootstrap, scenario.postgres, scenario.workspaceId, (tx) =>
-      revokeCredentialsHere(scenario.admin, tx, { personId: person.id, at: new Date() }),
+      endEverySignInAndTokenHere(scenario.admin, tx, { personId: person.id, at: new Date() }),
     );
     expect(revoked.ok).toBe(true);
     const before = await rowTextIn("audit_event", scenario.workspaceId);

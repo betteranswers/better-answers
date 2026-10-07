@@ -22,7 +22,7 @@ export const MEMBER_PAGE_WORDS = {
   sections: "On this page",
   access: "Access",
   activity: "Activity",
-  removeAndRevoke: "Remove and revoke",
+  removeAndEndEverySignIn: "Remove and end every sign-in",
   loading: "The member is still loading.",
   noSuchMember: "This page names no member of this workspace.",
   toMembers: "Go to Members",

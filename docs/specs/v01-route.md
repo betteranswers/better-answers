@@ -27,7 +27,7 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 9. As an Admin, I want a poisoned run's suggestion set reversed by run in one governed write, so that a bad producer stays out of a history that is permanent.
 10. As an Admin, I want the Kinds list on Knowledge with counts per kind and per domain, and to rename or merge a kind by one bulk commit, so that my company's language is read off its concepts and corrected by me, never declared in a file.
 11. As an Admin, I want the review table over every concept and composition, with conflicts and verification requests as saved filters and exports on its toolbar, so that the state of the map is one page.
-12. As an Admin, I want to invite a person by email, change their role, remove them, and revoke their credentials in this workspace, so that access follows the people my company has today.
+12. As an Admin, I want to invite a person by email, change their role, remove them, and end every sign-in and token they hold in this workspace, so that access follows the people my company has today.
 13. As an Admin, I want groups, flat and Entra-aligned, as the one thing an audience names, so that who may see a connected source's content is one membership lookup.
 14. As an Admin, I want to name a concept's owner per domain, with a per-concept override, so that *edit* suggestions and verification requests land in a named person's queue and not only mine.
 15. As an Admin, I want System's eight cards over real rows — boxes, backups, sources and the worker, the map, knowledge, questions, connected clients, personal data — each line with an action, so that I find out about a missed backup or a ceiling at 80 % before a client does.
@@ -77,7 +77,7 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 ### The operator and the owner
 
 46. As the operator, I want to provision a workspace and its first membership by one command under the platform principal, so that a client exists before anyone signs in and the product is dogfoodable.
-47. As the operator, I want to revoke a person's credentials everywhere, list users across workspaces and inspect sessions, with Better Auth's admin plugin reduced to what ADR 0009 permits, so that the one cross-workspace area is small and audited.
+47. As the operator, I want to end every sign-in and token a person holds, everywhere, list users across workspaces and inspect sessions, with Better Auth's admin plugin reduced to what ADR 0009 permits, so that the one cross-workspace area is small and audited.
 48. As the operator, I want `pnpm ops replay-erasures` and `erasure-rehearsal` to answer *done*, and the monthly restore drill to go fully green with a `backup` row written to production, so that the drill proves the thing it exists to prove.
 49. ~~As the operator, I want a stuck workspace — a replay stopped at a commit the index refuses — put right by one ops command that answers truthfully and books its audit event, so that a workspace never falls silently behind its bundle.~~ — T-108 closed 19/09/2026, #73: ADR 0012's amendment of that date says why no `pnpm ops` command rewinds a stuck ref, and the runbook carries the procedure.
 50. As the owner, I want the model choice per purpose — extraction, enrichment, answering, judging, embedding — chosen per workspace, local or hosted, with the embedding model choice fixed once vectors exist and every model call a row, so that spend, residency and the ceiling are facts.
@@ -295,9 +295,9 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 
 #### P1 · People — the People page and Microsoft sign-in
 
-**Destination.** A workspace Admin lists members, changes roles, invites, removes and revokes in this workspace; groups with counts; a person on Microsoft 365 signs in with Microsoft on an exact invited-email match; a person mints a personal token on their Account page, reached from the avatar menu.
+**Destination.** A workspace Admin lists members, changes roles, invites, removes and ends every sign-in and token in this workspace; groups with counts; a person on Microsoft 365 signs in with Microsoft on an exact invited-email match; a person mints a personal token on their Account page, reached from the avatar menu.
 
-**Rests on.** ADR 0009 (workspace Admins manage people through the organisation plugin alone; the identity seam lint-enforced); ADR 0034 (one origin; sign-in is an email code or Microsoft, never a password; the `sso` shape a written trigger); ADR 0035 (one person id; revocation per membership by an instant; a fresh sign-in mints anew); ADR 0038 (groups flat and Entra-aligned; access requests); ADR 0039 (groups as what an audience names); ADR 0018 (the personal token on an Account page); ADR 0047 (the Account page reached from the avatar menu); ADR 0022 (the ingress fences). Words: *role*, *group*, *access request*, *revoke credentials*, *sign-in*, *person id*, *Account page*, *personal token*, *client (connected)*, *avatar menu*.
+**Rests on.** ADR 0009 (workspace Admins manage people through the organisation plugin alone; the identity seam lint-enforced); ADR 0034 (one origin; sign-in is an email code or Microsoft, never a password; the `sso` shape a written trigger); ADR 0035 (one person id; revocation per membership by an instant; a fresh sign-in mints anew); ADR 0038 (groups flat and Entra-aligned; access requests); ADR 0039 (groups as what an audience names); ADR 0018 (the personal token on an Account page); ADR 0047 (the Account page reached from the avatar menu); ADR 0022 (the ingress fences). Words: *role*, *group*, *access request*, *end every sign-in and token*, *sign-in*, *person id*, *Account page*, *personal token*, *client (connected)*, *avatar menu*.
 
 **Builds on.** Groups and access requests (T-060, T-061); the audit log (T-059); revocation per membership (T-075); the members slice; the platform's own auth hooks (T-046); the shell and the picker (T-022, T-037); the consent page and the authorization server (T-004, T-045); the People blocks, seven built outside the tree from `.scratch/t-027-arena/prompt.md` and ported into `apps/web/src/features/people/` and `features/console/` by T-027 and T-028, so the external folder is no longer needed (26/09/2026); and the workspace shell's three regions (T-225 to T-228, done 22/09/2026).
 
@@ -313,11 +313,11 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 
 #### P2 · The platform console
 
-**Destination.** The operator provisions a workspace and its first membership by one command, lists users across workspaces, revokes credentials everywhere and inspects sessions, with Better Auth's admin plugin reduced to what ADR 0009 permits; workspace-less acts leave the log for an identity-set audit log, or ADR 0009 says by date why not yet.
+**Destination.** The operator provisions a workspace and its first membership by one command, lists users across workspaces, ends every sign-in and token everywhere and inspects sessions, with Better Auth's admin plugin reduced to what ADR 0009 permits; workspace-less acts leave the log for an identity-set audit log, or ADR 0009 says by date why not yet.
 
-**Rests on.** ADR 0009 (the admin plugin refused as shipped; one cross-workspace read kept; the operator a third principal kind); ADR 0035 (revoke everywhere by an instant on the person); ADR 0038 (workspace-less acts stay log lines until the identity-set audit log; provisioning is a platform act in the workspace it creates); ADR 0020 (remove-user hard-deletes, so it is disabled); ADR 0014. Words: *operator*, *revoke credentials* (everywhere), *workspace* (provisioned by the platform, never a person), *platform principal*.
+**Rests on.** ADR 0009 (the admin plugin refused as shipped; one cross-workspace read kept; the operator a third principal kind); ADR 0035 (ending everywhere by an instant on the person); ADR 0038 (workspace-less acts stay log lines until the identity-set audit log; provisioning is a platform act in the workspace it creates); ADR 0020 (remove-user hard-deletes, so it is disabled); ADR 0014. Words: *operator*, *end every sign-in and token* (everywhere), *workspace* (provisioned by the platform, never a person), *platform principal*.
 
-**Builds on.** `provisionWorkspace` under the platform principal; `revokeCredentials`; the `runOps` seam; the audit log; the shell.
+**Builds on.** `provisionWorkspace` under the platform principal; `endEverySignInAndToken`; the `runOps` seam; the audit log; the shell.
 
 **Must carry.** T-028's eight lines as written — `provision-workspace` at the `runOps` seam beside `replay-erasures`; first membership as an owned act; the disabled paths proven refused; the identity-set audit log or a dated deferral. §2.4's platform-actor-id row **(placed here)**.
 

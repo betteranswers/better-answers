@@ -22,7 +22,7 @@ import {
 import { removeBundleRoot } from "@better-answers/core/testing/bundle-root";
 import {
   provisionWorkspace,
-  revokeCredentials as revokeCredentials_,
+  endEverySignInAndToken as endEverySignInAndToken_,
   setOperatorMark,
 } from "@better-answers/core/workspaces";
 import { boundarySchemas, ulid } from "@better-answers/schema";
@@ -179,7 +179,7 @@ export type TestApp = {
 
   setEmailVerified(email: string, verified: boolean): Promise<void>;
 
-  revokeCredentials(userId: string, at: Date): Promise<void>;
+  endEverySignInAndToken(userId: string, at: Date): Promise<void>;
 
   /**
    * Grants or clears the operator mark of the person holding `email`, as the ops command does.
@@ -457,18 +457,18 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     return operatorMade;
   };
 
-  const revokeCredentials: TestApp["revokeCredentials"] = async (userId, at) => {
+  const endEverySignInAndToken: TestApp["endEverySignInAndToken"] = async (userId, at) => {
     const opened = await withOperator(
       door,
       { userId: await operatorsId(), issuedAt: at },
       (operator, tx) =>
-        revokeCredentials_(operator, tx, {
+        endEverySignInAndToken_(operator, tx, {
           personId: boundarySchemas.user.select.shape.id.parse(userId),
           at,
         }),
     );
     const revoked = opened.ok ? opened.value : opened;
-    if (!revoked.ok) throw new Error(`revokeCredentials failed: ${String(revoked.error)}`);
+    if (!revoked.ok) throw new Error(`endEverySignInAndToken failed: ${String(revoked.error)}`);
   };
 
   const markOperator: TestApp["markOperator"] = async (email, change) => {
@@ -577,7 +577,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     addMember,
     invite,
     setEmailVerified,
-    revokeCredentials,
+    endEverySignInAndToken,
     markOperator,
     removeMember,
     setWorkspaceConfig,

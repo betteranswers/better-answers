@@ -177,7 +177,7 @@ describe("setting up an authenticator", () => {
     await app().addMember(workspace.workspaceId, person.id, "Editor");
     const { client, api } = await webSignedIn(app(), person.email);
     const { api: admin } = await webSignedIn(app(), workspace.admin.email);
-    await admin.members.revokeCredentials.mutate({ personId: person.id });
+    await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
 
     const { answered } = await setUpOn(client);
 
@@ -199,7 +199,7 @@ describe("setting up an authenticator", () => {
 
     expect(answered.status).toBe(200);
     expect(
-      await refusalOf(api.console.people.revokeCredentials.mutate({ personId: person.id })),
+      await refusalOf(api.console.people.endEverySignInAndToken.mutate({ personId: person.id })),
     ).toMatchObject({
       data: { httpStatus: 401, refusal: { word: "sign-in-too-old", class: "unauthenticated" } },
     });

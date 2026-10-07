@@ -15,8 +15,7 @@
     "client": 1
   },
   "apps/web/src/features/console/refusal-words.ts": {
-    "operator": 3,
-    "revoke credentials": 1
+    "operator": 3
   },
   "apps/web/src/features/console/words.ts": {
     "operator": 1
@@ -27,8 +26,7 @@
   },
   "apps/web/src/features/people/member-act-words.ts": {
     "act": 3,
-    "client": 1,
-    "Remove and revoke": 1
+    "client": 1
   },
   "apps/web/src/features/people/refusal-words.ts": {
     "check": 1,

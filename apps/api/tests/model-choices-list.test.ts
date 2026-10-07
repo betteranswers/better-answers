@@ -141,7 +141,7 @@ describe("what the model choices list refuses", () => {
   it("refuses a session issued before the person's credentials were revoked", async () => {
     const workspace = await app.provision();
 
-    await app.revokeCredentials(workspace.admin.id, new Date(Date.now() + 60_000));
+    await app.endEverySignInAndToken(workspace.admin.id, new Date(Date.now() + 60_000));
     const client = await signedInClient(app, workspace.admin.email);
 
     const response = await listModelChoices(client);

@@ -334,7 +334,7 @@ describe("era-independent", () => {
     const { workspace, client, token } = await connect();
     expect((await modern(client, token, "tools/list")).status).toBe(200);
 
-    await app.revokeCredentials(workspace.admin.id, new Date(Date.now() + 1_000));
+    await app.endEverySignInAndToken(workspace.admin.id, new Date(Date.now() + 1_000));
     const before = app.logs.length;
 
     const refused = await modern(client, token, "tools/list");

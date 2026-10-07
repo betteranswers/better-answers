@@ -14,7 +14,7 @@ import {
   landedAtHome,
   person,
   provision,
-  revokeCredentials,
+  endEverySignInAndToken,
   signIn,
   signInHeading,
 } from "./harness.ts";
@@ -145,7 +145,7 @@ test("refuses consent after credentials are revoked, sending no code", async ({
   await expect(consentHeading(page)).toBeVisible();
   /* jscpd:ignore-end */
 
-  await revokeCredentials(request, workspace.admin.id);
+  await endEverySignInAndToken(request, workspace.admin.id);
   await page.getByRole("button", { name: "Connect" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();

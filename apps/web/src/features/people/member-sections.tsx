@@ -24,7 +24,7 @@ import {
   useChangeRole,
   useFlagDisplayName,
   useReaderId,
-  useRevokeCredentials,
+  useEndEverySignInAndToken,
   type CredentialsRevokedHere,
   type ListedMember,
   type Role,
@@ -65,7 +65,7 @@ function AccessSummary(properties: { readonly member: ListedMember }) {
       <SummaryRow term="Joined">
         <Day instant={member.joinedAt} />
       </SummaryRow>
-      <SummaryRow term="Credentials here">
+      <SummaryRow term="Sign-ins and tokens here">
         <CredentialsHere revokedAt={member.credentialsRevokedAt} />
       </SummaryRow>
     </dl>
@@ -180,7 +180,7 @@ function CredentialsRevoker(properties: {
 }) {
   const { member, revokeRef } = properties;
   const [outcome, setOutcome] = useState<Outcome>();
-  const revoke = useRevokeCredentials();
+  const revoke = useEndEverySignInAndToken();
   const readerId = useReaderId();
   const hintId = useId();
   const name = nameOf(member);
@@ -194,7 +194,7 @@ function CredentialsRevoker(properties: {
         onSuccess: (revoked: CredentialsRevokedHere) => {
           setOutcome({
             tone: "said",
-            words: `${name}'s credentials here are revoked. Every session and token issued before ${instantWords(revoked.revokedAt)} is refused here; a fresh sign-in works.`,
+            words: `Every sign-in and token ${name} held here has ended. Anything issued before ${instantWords(revoked.revokedAt)} is refused here; a fresh sign-in works.`,
           });
         },
         onError: (failure: Error | ApiError) => {
@@ -205,7 +205,7 @@ function CredentialsRevoker(properties: {
   };
 
   return (
-    <SheetPart title="Credentials">
+    <SheetPart title="Sign-ins and tokens">
       <div className="flex flex-col items-start gap-2">
         <Button
           ref={revokeRef}
@@ -215,7 +215,7 @@ function CredentialsRevoker(properties: {
           aria-disabled={revoke.isPending}
           onClick={commit}
         >
-          Revoke {name}'s credentials here
+          End every sign-in and token here
         </Button>
         <p id={hintId} className="text-sm text-muted-foreground">
           Every session and token {name} holds for this workspace is refused at once, and a fresh
@@ -352,7 +352,7 @@ export function Access(properties: { readonly member: ListedMember; readonly lan
 }
 
 /** The two acts that end the person's access here, set apart from the rest. */
-export function RemoveAndRevoke(properties: {
+export function RemoveAndEndEverySignIn(properties: {
   readonly member: ListedMember;
   readonly landings: Landings;
   readonly removal: Removal;

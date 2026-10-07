@@ -105,7 +105,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `person` | A person with no membership, for the refused page and the picker |
 | `addMember` | A second membership at a named role — Admin, Editor or Viewer |
 | `removeMember` | Ends a membership, as the People page will |
-| `revokeCredentials` | Revokes a person's credentials, so the next request is refused |
+| `endEverySignInAndToken` | Ends every sign-in and token a person holds, so the next request is refused |
 | `markTheOperator` | Grants the operator mark to the person holding an address, or clears it with `"revoke"`, through the ops command's own act and principal — the console's door, and a mark cleared under an open page |
 | `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent; or one accepted or cancelled, or with its expiry moved into the past |
 | `ageTheSignIn` | Moves every session a person holds to a sign-in 61 minutes ago, behind the api's back — how a spec meets `sign-in-too-old` without waiting an hour |

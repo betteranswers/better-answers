@@ -29,7 +29,7 @@ import {
   readMembership,
   renameWorkspace,
   restoreSignIn,
-  revokeCredentials,
+  endEverySignInAndToken,
   revokeWorkspaceTokens,
   setOperatorMark,
   TOOLS_LIST_TTL_CONFIG_KEY,
@@ -334,12 +334,12 @@ describe("provisioning a workspace", () => {
   });
 });
 
-describe("revoking a person's credentials everywhere, as the operator", () => {
+describe("ending every sign-in and token everywhere, as the operator", () => {
   const AT = new Date("2026-09-02T12:00:00.000Z");
 
   const revoking = (input: { personId: string; at: Date }, signedInAt = input.at) =>
     asANewOperator(db(), signedInAt, (operator, tx) =>
-      revokeCredentials(operator, tx, { personId: personIdOf(input.personId), at: input.at }),
+      endEverySignInAndToken(operator, tx, { personId: personIdOf(input.personId), at: input.at }),
     );
 
   const revokedAtOf = async (personId: string) =>
@@ -529,7 +529,7 @@ describe("revoking a person's credentials everywhere, as the operator", () => {
   });
 
   it("admits the operator alone, never an Admin or the platform", () => {
-    type Revoker = Parameters<typeof revokeCredentials>[0];
+    type Revoker = Parameters<typeof endEverySignInAndToken>[0];
 
     expectTypeOf<OperatorPrincipal>().toExtend<Revoker>();
     expectTypeOf<UserPrincipal>().not.toExtend<Revoker>();
@@ -927,7 +927,7 @@ describe("what the slice answers when the store cannot be reached", () => {
 
     expect([
       await listWorkspaces(operator, closed),
-      await revokeCredentials(operator, closed, { personId: personIdOf(ulid()), at }),
+      await endEverySignInAndToken(operator, closed, { personId: personIdOf(ulid()), at }),
       await correctDisplayName(operator, closed, {
         personId: personIdOf(ulid()),
         displayName: "Sam",

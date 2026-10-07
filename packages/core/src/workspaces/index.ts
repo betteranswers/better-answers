@@ -414,9 +414,11 @@ export const addMember = async (
   });
 };
 
-export const revokeCredentialsInput = z.object({ personId: boundarySchemas.user.select.shape.id });
+export const endEverySignInAndTokenInput = z.object({
+  personId: boundarySchemas.user.select.shape.id,
+});
 
-type RevokeCredentialsInput = z.output<typeof revokeCredentialsInput> & {
+type EndEverySignInAndTokenInput = z.output<typeof endEverySignInAndTokenInput> & {
   /** When the act happens: the sign-in's age is judged against it, and it is the revocation's. */
   readonly at: Date;
 };
@@ -428,7 +430,7 @@ type CredentialsRevoked = {
   readonly revokedAt: string;
 };
 
-export type RevokeCredentialsRefusal = WorkspaceRefusal<"no-such-user" | "sign-in-too-old">;
+export type EndEverySignInAndTokenRefusal = WorkspaceRefusal<"no-such-user" | "sign-in-too-old">;
 
 type CredentialsEnded = { readonly held: Date; readonly grants: readonly EndedGrant[] };
 
@@ -454,11 +456,11 @@ const endingCredentials = async (
  * workspace, and records the act under the operator. The instant only moves forward: an `at`
  * before the one held keeps the held one.
  */
-export const revokeCredentials = async (
+export const endEverySignInAndToken = async (
   operator: OperatorPrincipal,
   tx: Tx,
-  input: RevokeCredentialsInput,
-): Promise<Result<CredentialsRevoked, RevokeCredentialsRefusal | Error>> => {
+  input: EndEverySignInAndTokenInput,
+): Promise<Result<CredentialsRevoked, EndEverySignInAndTokenRefusal | Error>> => {
   const fresh = requireFreshSignIn(operator, input.at);
   if (!fresh.ok) return err(fresh.error);
   const { personId } = input;
