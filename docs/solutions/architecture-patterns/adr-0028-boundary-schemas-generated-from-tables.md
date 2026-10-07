@@ -31,7 +31,7 @@ Every zod schema over a table is generated from that table by `drizzle-zod`, in 
 - `drizzle-zod` is imported only by `packages/schema/src/drizzle-zod.ts`. A `no-restricted-imports` ban in `.oxlintrc.json` refuses it everywhere else.
 - The boundary schema, not the Drizzle table, is the source of application-level types. A brand survives `z.infer` and reaches the tRPC router, the OpenAPI document and the MCP tool schemas.
 
-A `customType` column, such as `index.chunk`'s vector, is the one exception. It takes a plain schema, because a callback there compiles and then throws at module evaluation. That plain schema is built and tested per shape: select and insert take it as it is, and update takes it wrapped in `.optional()`. Each shape has its own test in `packages/schema/test/boundary-schemas.test.ts`.
+A `customType` column, such as `index.passage`'s vector, is the one exception. It takes a plain schema, because a callback there compiles and then throws at module evaluation. That plain schema is built and tested per shape: select and insert take it as it is, and update takes it wrapped in `.optional()`. Each shape has its own test in `packages/schema/test/boundary-schemas.test.ts`.
 
 The parity test makes five assertions over the registry, against a real Postgres. Each compares an entry with the unrefined generation of the same table.
 
@@ -46,7 +46,7 @@ The parity test makes five assertions over the registry, against a real Postgres
 - A column and a hand-written zod schema over it would drift in silence.
 - A plain-schema refinement replaces the column wholesale. It drops nullability and optionality at runtime, so a select schema rejects a row Postgres legitimately returned. The callback keeps both, and turns a column's type change into a type error.
 - The types never check a refinement against its column. `z.number()` over a `text` column compiles, and `z.infer` follows the refinement. A dropped column fails `check`; a retyped column or a widened `pgEnum` fails nothing. Assertion 4 catches widening and assertion 5 catches a retype, and neither can do the other's job.
-- A plain schema reused across shapes loses the update schema's `.optional()`. The chunk update schema demanded the embedding on every update until review caught it.
+- A plain schema reused across shapes loses the update schema's `.optional()`. The passage update schema demanded the embedding on every update until review caught it.
 - drizzle-orm v1 moves the package to a `drizzle-orm/zod` export, so one importing module makes that upgrade one edit.
 
 ## Rejected
@@ -56,7 +56,7 @@ The parity test makes five assertions over the registry, against a real Postgres
 - The plain-schema form throughout: it drops nullability at runtime. Kept for `customType` columns only.
 - A type-level drift check alone: blind to widening.
 - A runtime parity check alone: blind to a retyped column.
-- `drizzle-kit`'s snapshot diff: it watches the migration, not the boundary, and cannot model `index.chunk`'s partitioning.
+- `drizzle-kit`'s snapshot diff: it watches the migration, not the boundary, and cannot model `index.passage`'s partitioning.
 - `createSchemaFactory({ coerce })`: a boundary parses and never coerces.
 
 ## History

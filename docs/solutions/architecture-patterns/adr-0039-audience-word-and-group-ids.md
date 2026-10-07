@@ -30,7 +30,7 @@ tags:
 - `audience_groups text[]` holds ADR 0038's group ids.
 - One CHECK ties them, `AUDIENCE_CHECK` in `packages/schema/src/readable-columns.ts`. *Everyone* holds no array. *Groups* holds a non-empty array with no NULL element.
 
-A chunk carries no pair of its own. It reads its connected source's through `index.readable_chunk` (ADR 0044).
+A passage carries no pair of its own. It reads its connected source's through `index.readable_passage` (ADR 0044).
 
 **The predicate's third term** is `audience = 'everyone' OR audience_groups && $groups`. The caller's group ids are resolved on each call by the Principal resolver.
 

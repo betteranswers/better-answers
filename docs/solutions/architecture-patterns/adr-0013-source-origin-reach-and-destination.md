@@ -7,7 +7,7 @@ component: knowledge-layer
 severity: high
 applies_when:
   - "Adding a connector, a connected source field or a media type's converter"
-  - "Writing a read of chunks, source entities or concepts that must apply the permission predicate"
+  - "Writing a read of passages, source entities or concepts that must apply the permission predicate"
   - "Changing how a connected source's or a document's class is narrowed, widened or published"
 tags:
   - adr-0013
@@ -23,7 +23,7 @@ tags:
 
 ## The decision
 
-A connected source is defined by **origin** (company or external; platform origin is an evidence kind with no connected source), **reach** (copied or read live) and **destination** (the chunk index, the bundle, the map; at least one).
+A connected source is defined by **origin** (company or external; platform origin is an evidence kind with no connected source), **reach** (copied or read live) and **destination** (the passage index, the bundle, the map; at least one).
 
 It is gated by three permission fields:
 
@@ -33,7 +33,7 @@ It is gated by three permission fields:
 
 The three are applied as one server-side predicate on every read.
 
-- Its destination feeds the chunk index alone until S7.
+- Its destination feeds the passage index alone until S7.
 - A media type has one converter, inside the worker, with no model.
 - Its credential class is ADR 0041's.
 

@@ -51,7 +51,7 @@ The three dates are computed **from the timestamp of the last dump before the re
 
 `restore-drill.sh` replays exactly this into staging on VPC 2 on the first of every month, records RTO and RPO, and ends by wiping staging. **`restore-production.sh` replays it into production** (`RUNBOOK.md` page 1): the same order, step 1's replay mandatory, no trap, and no wipe beyond the database it replaces in one transaction. Every `pnpm ops` command takes its table names from the schema, so a "not built" answer after `migrate` means the restored copy lost a table, and the drill fails on it (03/10/2026). Production records no run of the map's counts, so step 7 records staging's counts rather than comparing them. A restore anywhere is an `audit_event` (*restore*: by whom, from which copy) on the System page.
 
-**The workspace the drill works on** (24/09/2026): steps 6 to 10 rebuild, count, smoke and rehearse on one workspace, `DRILL_WORKSPACE` in `/etc/better-answers/drill.env`. Every `pnpm ops` command refuses a workspace id that is not a ULID, so the drill refuses one before step 0. No production dump holds the synthetic fixture's workspace, `01M2SYNTHET1CAAAAAAAAAAAAA` (`deploy/seed-synthetic.sh --workspace-id`), so step 5b seeds it into every restored copy, with its chunk partition and an empty repository. `drill.env` names it until production holds a workspace the drill should rebuild instead.
+**The workspace the drill works on** (24/09/2026): steps 6 to 10 rebuild, count, smoke and rehearse on one workspace, `DRILL_WORKSPACE` in `/etc/better-answers/drill.env`. Every `pnpm ops` command refuses a workspace id that is not a ULID, so the drill refuses one before step 0. No production dump holds the synthetic fixture's workspace, `01M2SYNTHET1CAAAAAAAAAAAAA` (`deploy/seed-synthetic.sh --workspace-id`), so step 5b seeds it into every restored copy, with its passage partition and an empty repository. `drill.env` names it until production holds a workspace the drill should rebuild instead.
 
 ## The drill's erasure rehearsal — step 10, every third month (ADR 0020, 0022)
 
@@ -59,7 +59,7 @@ A backup that restores proves the platform comes back. It does not prove that an
 
 1. **Seed** the synthetic subject — a person, an Admin membership, one concept file naming them in one commit, and one bound document naming them by their work address and by name. The command waits for the worker to index the document, and refuses if the index job ends in anything but done or has not ended when the wait the drill gives it runs out. It prints the subject's tokens (email, address, display name) on its last line.
 2. **`pg_dump`** the whole staging database to plain SQL, on the host.
-3. **`dump-grep`** that dump for the tokens and **find them, the index's chunk table among the tables that hold them**. If they are not there the seed did not do what it says, and every step below would prove nothing; if no chunk holds them, step 6 would prove nothing about the index.
+3. **`dump-grep`** that dump for the tokens and **find them, the index's passage table among the tables that hold them**. If they are not there the seed did not do what it says, and every step below would prove nothing; if no passage holds them, step 6 would prove nothing about the index.
 4. **Run the routine**, under the platform principal, writing the report the drill keeps.
 5. **`pg_dump` again**, the same database, whole.
 6. **`dump-grep` again** and find them gone — **from every table but two**.

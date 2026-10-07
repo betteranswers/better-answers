@@ -8,14 +8,14 @@ severity: high
 applies_when:
   - "Adding or changing a table, index, partition or constraint, in public, index or the map"
   - "Letting the worker or cocoindex create, drop or alter anything in the database"
-  - "Changing how a workspace's chunk partition is made at provisioning"
+  - "Changing how a workspace's passage partition is made at provisioning"
   - "Proposing Supabase, Neon or another database host"
 tags:
   - adr-0007
   - postgres
   - migrations
   - ddl
-  - chunk-partition
+  - passage-partition
   - provisioning
   - managed-by-user
 ---
@@ -32,10 +32,10 @@ The database is one plain, self-hosted Postgres 18 with pgvector. The api owns e
 - The deploy order is `migrate`, then `api`, then `worker` (`deploy/platform.compose.yaml`).
 - The graph engine and the database image are ADR 0032's.
 
-A workspace's chunk partition is attached, never created as a partition.
+A workspace's passage partition is attached, never created as a partition.
 
-- Provisioning makes the partition as a table of its own, `LIKE "index".chunk` with what a partition inherits, revoked, its GIN index built. It then runs `ALTER TABLE "index".chunk ATTACH PARTITION`. It never runs `CREATE TABLE … PARTITION OF`.
-- So provisioning holds the shared `index.chunk` in no mode a read or a write waits on, and no writer needs a lock order.
+- Provisioning makes the partition as a table of its own, `LIKE "index".passage` with what a partition inherits, revoked, its GIN index built. It then runs `ALTER TABLE "index".passage ATTACH PARTITION`. It never runs `CREATE TABLE … PARTITION OF`.
+- So provisioning holds the shared `index.passage` in no mode a read or a write waits on, and no writer needs a lock order.
 - No `lock_timeout` bounds provisioning's ATTACH wait.
 
 A migration that takes a lock writers wait on bounds its own wait.
@@ -47,10 +47,10 @@ A migration that takes a lock writers wait on bounds its own wait.
 
 - The api owns every endpoint a caller reaches and every policy decision (ADR 0005). Eight of Supabase's ten services would idle while inviting dependence on Supabase-only features. The predecessor's 274 role-keyed RLS policies on a Supabase helper are the cautionary case.
 - Two tiers writing one schema with two migration tools is the failure the data-not-code contract must prevent. The schema is the contract, so it has one author.
-- With one cocoindex environment per connected source, the engine's default `managed_by="system"` would let one connected source's deletion drop `index.chunk` and its index under every other connected source.
-- `PARTITION OF` holds `index.chunk` in ACCESS EXCLUSIVE, then waits for SHARE ROW EXCLUSIVE on `source_document` to clone the parent's foreign key. A transaction holding a write on `source_document` that then touches `index.chunk` closes a cycle, and Postgres aborts one side with 40P01. Meanwhile every workspace's reads of `index.chunk` queue behind it.
-- ATTACH holds `index.chunk` in SHARE UPDATE EXCLUSIVE and ACCESS SHARE, and the parent's indexes in SHARE UPDATE EXCLUSIVE. Neither conflicts with a read's ACCESS SHARE or a write's ROW EXCLUSIVE. The one mode it contends for with a writer is SHARE ROW EXCLUSIVE on `source_document`, and while it waits for that it holds nothing a chunk read or write waits on. Two provisions queue one behind the other and form no cycle. The modes were read from `pg_locks` on the pinned image, Postgres 18.6.
-- A `lock_timeout` would turn the wait into a refused sign-up that nothing retries. The wait holds up other writes of documents, never a read of them or a chunk's key check.
+- With one cocoindex environment per connected source, the engine's default `managed_by="system"` would let one connected source's deletion drop `index.passage` and its index under every other connected source.
+- `PARTITION OF` holds `index.passage` in ACCESS EXCLUSIVE, then waits for SHARE ROW EXCLUSIVE on `source_document` to clone the parent's foreign key. A transaction holding a write on `source_document` that then touches `index.passage` closes a cycle, and Postgres aborts one side with 40P01. Meanwhile every workspace's reads of `index.passage` queue behind it.
+- ATTACH holds `index.passage` in SHARE UPDATE EXCLUSIVE and ACCESS SHARE, and the parent's indexes in SHARE UPDATE EXCLUSIVE. Neither conflicts with a read's ACCESS SHARE or a write's ROW EXCLUSIVE. The one mode it contends for with a writer is SHARE ROW EXCLUSIVE on `source_document`, and while it waits for that it holds nothing a passage read or write waits on. Two provisions queue one behind the other and form no cycle. The modes were read from `pg_locks` on the pinned image, Postgres 18.6.
+- A `lock_timeout` would turn the wait into a refused sign-up that nothing retries. The wait holds up other writes of documents, never a read of them or a passage's key check.
 - A plain `CREATE INDEX` that waits for its lock queues every later write to the table behind it. A migration has someone to retry it, so a bounded wait costs a re-run release, not a refused person.
 - Drizzle runs every pending migration in one transaction, so a `SET LOCAL` in one would still bind the migrations after it. The reset ends the bound with its own migration.
 - Nothing depends on a vendor helper, so a hosted Postgres stays a connection-string change away.
@@ -60,7 +60,7 @@ A migration that takes a lock writers wait on bounds its own wait.
 - Supabase self-hosted through Coolify: most of its services would idle, and it invites Supabase-only features. It would matter only if identity had gone to Supabase Auth.
 - Hosted Neon or Supabase in London: residency, cost and the worker's state volume stay on one private network when self-hosted.
 - The worker owning its own tables with Alembic: two pipelines and two migration stamps, the shape the predecessor ended in.
-- `CREATE TABLE … PARTITION OF` for a workspace's partition: it deadlocks with document writers and queues every chunk read.
+- `CREATE TABLE … PARTITION OF` for a workspace's partition: it deadlocks with document writers and queues every passage read.
 
 ## History
 

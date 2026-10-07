@@ -78,7 +78,7 @@ def _opened_once_let_go(run, store, open_store, wait_seconds):
     return open_store()
 ```
 
-- The log line carries `binding_id`, `store` and `wait_seconds`. In production it reaches the worker's logs. In CI it usually does not: pytest captures a passing test's stdout, so a wait absorbed during a green test never reaches the log, and only a failing test prints what it captured. A green `full-worker` log without the line says nothing about whether the race fired.
+- The log line carries `connected_source_id`, `store` and `wait_seconds`. In production it reaches the worker's logs. In CI it usually does not: pytest captures a passing test's stdout, so a wait absorbed during a green test never reaches the log, and only a failing test prints what it captured. A green `full-worker` log without the line says nothing about whether the race fired.
 - `gc.collect()` runs once.
 - `_pauses_within` yields pauses doubling from 0.05 s to a 0.5 s ceiling that sum to the cap: 13 pauses for the default. The last open is not caught, so a store that stays held raises heed's own error.
 - `RELEASE_WAIT_SECONDS = 5.0` is the default for the `Host` keyword `release_wait_seconds`. It is sized for a starved runner (pytest `-n 4` beside Docker Postgres), not the moment a release usually takes. Only the bug path pays it.
@@ -101,7 +101,7 @@ Which survivor outlived the first `Host` on the CI runner is not pinned. A probe
   ```python
   holder = threading.Thread(
       target=hold_until_waited_on,
-      args=(first.app_config(run, CHUNKS_APP), written),
+      args=(first.app_config(run, PASSAGES_APP), written),
   )
   ```
 
@@ -113,7 +113,7 @@ Which survivor outlived the first `Host` on the CI runner is not pinned. A probe
   gc.disable()
   try:
       with Host(bootstrap) as first:
-          cycle: list[object] = [first.app_config(run, CHUNKS_APP)]
+          cycle: list[object] = [first.app_config(run, PASSAGES_APP)]
           cycle.append(cycle)
       del cycle
       ...
