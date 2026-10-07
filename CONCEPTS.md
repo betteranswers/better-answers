@@ -123,7 +123,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   alternate phrasings of the question in the body, its sources the entry it came from and the
   concepts the answer rests on. Knowledge a company keeps with no platform — the first customer's
   bid libraries are Q&A pairs today. Usage, submissions and outcomes are records attached to it.
-- **suggested concept** — _Code rename pending._ a concept the worker suggests (from extraction or
+- **suggested concept** — a concept the worker suggests (from extraction or
   enrichment) and the platform has not yet written to the knowledge base; it becomes a concept only
   when an Admin accepts the suggestion and the governed write commits it.
 - **governed write** — _Internal._ the platform's only way of changing a bundle: an actor, a
@@ -177,7 +177,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   without acceptance; every kind but *edit* is an Admin's to decide, in Control Centre. A suggestion
   the platform refused mid-acceptance is **returned**: handed back to its proposer with the
   reason, recording who was deciding it, because what it was written against moved.
-- **To decide** — _Code rename pending._ the page on Control Centre › Suggestions listing every
+- **To decide** — the page on Control Centre › Suggestions listing every
   suggestion waiting to be decided, promotions included, with its payload; an Admin decides from
   it. What holds the waiting suggestions is platform state in no knowledge layer, its code word
   *suggestions*: nothing reads a payload but the acceptance path, and no extraction reads another's
@@ -185,7 +185,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
 - **concept write request** — _Internal._ a suggestion's payload: the concept file it would write
   and the merge key it means it for, committed on acceptance and never on validation. It carries no
   IRI, because identity is the acceptance's to resolve.
-- **citation fix** — _Code rename pending._ the platform's own fix for a source that moved on: a new
+- **citation fix** — the platform's own fix for a source that moved on: a new
   locator into the same document, raised as a suggestion of its own kind, which nobody but the
   platform may raise, and decided like any other. Its acceptance re-points every standing
   verification at the content it wrote, so fixing a citation never turns *Verified by* into
@@ -338,7 +338,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
 - **converter** — _Internal._ what turns a landed copy's bytes into the document's normalised text,
   before the redaction seam sees a word of it. One per media type, chosen once (ADR 0013), because
   the text it writes is the address space every locator and every content hash is read against.
-- **unreadable** — _Code rename pending._ how a sync left a source document it reached and could not
+- **unreadable** — how a sync left a source document it reached and could not
   read: no normalised copy, no passages, and the word on its catalogue row beside its **reason**. A
   scan with no text layer, an encrypted file, a truncated upload and a conversion that ran past its
   own ceiling are all this one outcome; it is never a failed sync, and the sync takes in the
@@ -438,7 +438,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   sets off inside the same action: first every concept citing the evidence that moved, then every
   write-up including one of those concepts — two levels, the second reading what the first wrote,
   never a third — so a guide never reaches a reader its includes would not.
-- **sensitivity override** — _Code rename pending._ an Admin's recorded action that sets a concept's
+- **sensitivity override** — an Admin's recorded action that sets a concept's
   sensitivity and audience, whatever its evidence and its kind's floor derive: one row per concept,
   the latest standing, one audit event, and the *cascade* run inside the same action. The one action
   that may widen a concept's sensitivity past what its evidence derives (a connected source's widens
@@ -549,7 +549,7 @@ from concepts elsewhere; the prose stays a platform record.
   concepts' own words — its Detail). A reader switches layers; the definition says which a
   section renders and which a role opens on.
 - **prompt** — what a section or a Q&A pair answers: a heading or a question.
-- **write-up** — _Code rename pending._ the written prose in a guide section or a tender response:
+- **write-up** — the written prose in a guide section or a tender response:
   assembled prose plus the ordered concepts it includes or cites, with its own provenance and
   verification. A guide section and a response are its two homes. Its shown trust is the weaker of
   its own and its cited concepts'.

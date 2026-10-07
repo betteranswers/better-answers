@@ -1084,6 +1084,92 @@ const TYPE_VOCABULARY_SENSES: readonly Sense[] = [
   },
 ];
 
+const KNOWLEDGE_STORED_WORDS_CARVED_OUT: readonly CarveOut[] = [
+  ...KNOWLEDGE_WORDS_CARVED_OUT,
+  ...SWEEPS_OWN_WORDS,
+];
+
+/**
+ * Where *candidate* and *repair* named a suggestion's kind. Elsewhere a candidate is the one under
+ * test and a repair mends a workspace or a path.
+ */
+const SUGGESTION_KIND_FILES = [
+  "packages/core/src/concepts/",
+  "packages/schema/src/suggestion-tables.ts",
+  "packages/schema/src/concept-tables.ts",
+  "contracts/suggestions/",
+  "packages/core/test/suggestions.test.ts",
+  "packages/core/test/suggestions.contract.test.ts",
+];
+
+/** Where *inbox* named the suggestions' store, beside the Inbox area and the test inbox. */
+const SUGGESTIONS_STORE_FILES = [
+  "packages/core/src/concepts/",
+  "packages/schema/src/suggestion-tables.ts",
+  "packages/schema/src/definer-reach.ts",
+  "contracts/suggestions/",
+];
+
+/**
+ * Where *class* named a sensitivity. Elsewhere it is a refusal's class, a credential class, CSS
+ * and the language keyword.
+ */
+const SENSITIVITY_FILES = [
+  "packages/schema/src/concept-tables.ts",
+  "packages/schema/src/table-ownership.ts",
+  "packages/core/src/concepts/visibility.ts",
+  "packages/core/src/sources/index.ts",
+  "packages/core/src/sources/review.ts",
+  "packages/core/src/sources/passages.ts",
+  "packages/core/src/guides/",
+  "apps/web/src/features/sources/",
+  "apps/web/e2e/sources.spec.ts",
+];
+
+const SENSITIVITY_SENSES: readonly Sense[] = [
+  {
+    sense: "the internal effective class, the narrower of a document's own and its source's",
+    written: /\beffective class\b/gi,
+  },
+  {
+    sense: "a refusal's class, which sorts a word by what its caller can do (R21)",
+    written: /\brefusal'?s? class\b|\bits class\b(?=[^.]*\bword)/gi,
+  },
+];
+
+/** The stored names migration 0072 renamed, which a test seeds or refuses as stored. */
+const STORED_BEFORE_0072: readonly Sense[] = [
+  {
+    sense: "the old stored values a replay of migration 0072 seeds",
+    within: "packages/schema/test/knowledge-words.test.ts",
+    written: /'(?:quarantined|Composition)'|quarantine_error_check/g,
+  },
+  {
+    sense: "the old names the catalogue test refuses in any name",
+    within: "packages/schema/test/renamed-names.test.ts",
+    written: /"(?:composition|concept_class_override|class_override)"/g,
+  },
+];
+
+const COMPOSITION_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  ...STORED_BEFORE_0072,
+  {
+    sense: "a composition root, the one place that wires a program's parts together",
+    written: /\bcomposition (?:root|roads)\b/gi,
+  },
+];
+
+const QUARANTINE_SENSES: readonly Sense[] = [
+  MIGRATION_TAG,
+  ...STORED_BEFORE_0072,
+  {
+    sense: "a DMARC policy's word, which mail servers read",
+    within: "apps/api/.claude/skills/email-best-practices/",
+    written: /\bp=quarantine\b/g,
+  },
+];
+
 export const OLD_WORDS: readonly OldWord[] = [
   avoided("2FA", "second factor"),
   avoided("access token", "personal token"),
@@ -1193,7 +1279,16 @@ export const OLD_WORDS: readonly OldWord[] = [
     reach: "reader text",
   },
   avoided("burger", "navigation control"),
-  pending("candidate", "suggested", "suggested concept", "suggested concept", "one sense"),
+  {
+    word: "candidate",
+    use: "suggested",
+    entry: "suggested concept",
+    sweep: "suggested concept",
+    state: "landed",
+    reach: "one sense",
+    why: "a suggestion's kind; a candidate under test keeps its sense",
+    reads: (file) => SUGGESTION_KIND_FILES.some((prefix) => file.startsWith(prefix)),
+  },
   {
     word: "Changed since checked",
     use: "Changed since verified",
@@ -1267,14 +1362,27 @@ export const OLD_WORDS: readonly OldWord[] = [
     carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
   },
   avoided("citations list", "evidence pane"),
-  pending("class", "sensitivity", "sensitivity", "sensitivity", "one sense"),
-  pending(
-    "class override",
-    "sensitivity override",
-    "sensitivity override",
-    "sensitivity",
-    "everywhere",
-  ),
+  {
+    word: "class",
+    use: "sensitivity",
+    entry: "sensitivity",
+    sweep: "sensitivity",
+    state: "landed",
+    reach: "one sense",
+    why: "a sensitivity; a refusal's, a credential's, CSS's and the language's class stand",
+    permitted: SENSITIVITY_SENSES,
+    reads: (file) => SENSITIVITY_FILES.some((prefix) => file.startsWith(prefix)),
+  },
+  {
+    word: "class override",
+    use: "sensitivity override",
+    entry: "sensitivity override",
+    sweep: "sensitivity",
+    state: "landed",
+    reach: "everywhere",
+    permitted: STORED_BEFORE_0072,
+    carvedOut: KNOWLEDGE_STORED_WORDS_CARVED_OUT,
+  },
   avoided("cleanup", "sweep pass"),
   avoided("clear", "emptying a connected source"),
   {
@@ -1299,7 +1407,16 @@ export const OLD_WORDS: readonly OldWord[] = [
   },
   avoided("command", "action"),
   avoided("command palette", "Jump to"),
-  pending("composition", "write-up", "write-up", "write-up", "everywhere"),
+  {
+    word: "composition",
+    use: "write-up",
+    entry: "write-up",
+    sweep: "write-up",
+    state: "landed",
+    reach: "everywhere",
+    permitted: COMPOSITION_SENSES,
+    carvedOut: KNOWLEDGE_STORED_WORDS_CARVED_OUT,
+  },
   avoided("connection", "connected source"),
   {
     word: "connector run",
@@ -1424,6 +1541,16 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("id generator", "minter"),
   avoided("idempotency key", "run key", "cocoindex's word for its stable data ids"),
   avoided("identity key", "merge key"),
+  {
+    word: "inbox",
+    use: "suggestions",
+    entry: "To decide",
+    sweep: "To decide",
+    state: "landed",
+    reach: "one sense",
+    why: "the suggestions' store; the Inbox area and the test inbox keep the word",
+    reads: (file) => SUGGESTIONS_STORE_FILES.some((prefix) => file.startsWith(prefix)),
+  },
   avoided("infrastructure", "estate"),
   avoided("ingest trace", "source document", "the draft's word"),
   avoided("inner act", "step (of an action)"),
@@ -1587,9 +1714,34 @@ export const OLD_WORDS: readonly OldWord[] = [
     reach: "reader text",
   },
   avoided("purge", "emptying a connected source"),
-  pending("quarantine", "unreadable", "unreadable", "unreadable", "everywhere"),
-  pending("quarantined", "unreadable", "unreadable", "unreadable", "everywhere"),
-  pending("Queue", "To decide", "To decide", "To decide", "reader text"),
+  {
+    word: "quarantine",
+    use: "unreadable",
+    entry: "unreadable",
+    sweep: "unreadable",
+    state: "landed",
+    reach: "everywhere",
+    permitted: QUARANTINE_SENSES,
+    carvedOut: KNOWLEDGE_STORED_WORDS_CARVED_OUT,
+  },
+  {
+    word: "quarantined",
+    use: "unreadable",
+    entry: "unreadable",
+    sweep: "unreadable",
+    state: "landed",
+    reach: "everywhere",
+    permitted: STORED_BEFORE_0072,
+    carvedOut: KNOWLEDGE_STORED_WORDS_CARVED_OUT,
+  },
+  {
+    word: "Queue",
+    use: "To decide",
+    entry: "To decide",
+    sweep: "To decide",
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("quota", "spending limit"),
   avoided("RAG answer", "answer"),
   avoided("re-authenticate", "re-confirm"),
@@ -1619,7 +1771,16 @@ export const OLD_WORDS: readonly OldWord[] = [
     state: "landed",
     reach: "reader text",
   },
-  pending("repair", "fix", "citation fix", "citation fix", "one sense"),
+  {
+    word: "repair",
+    use: "fix",
+    entry: "citation fix",
+    sweep: "citation fix",
+    state: "landed",
+    reach: "one sense",
+    why: "a suggestion's kind; mending a workspace or a path keeps the word",
+    reads: (file) => SUGGESTION_KIND_FILES.some((prefix) => file.startsWith(prefix)),
+  },
   avoided("replay count", "reconciler hit"),
   avoided("report", "feedback"),
   avoided("repository server", "git store"),

@@ -482,5 +482,5 @@ export const renderFeedback = (receipt: FeedbackReceipt): string => {
     feedback.verdict === "helpful"
       ? `helpful`
       : `flagged as ${REASON_WORDS[feedback.reason]}${feedback.detail === undefined ? "" : ` — "${feedback.detail}"`}`;
-  return `Received: ${feedback.iri} marked ${what}. It reaches the owner's queue when the Suggestions page ships.`;
+  return `Received: ${feedback.iri} marked ${what}. It reaches the owner when the Suggestions page ships.`;
 };

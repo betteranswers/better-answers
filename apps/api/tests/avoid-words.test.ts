@@ -805,6 +805,42 @@ describe("a word that lands with its sweep", () => {
         .toSorted(),
     );
   });
+
+  it.each([
+    {
+      word: "candidate",
+      refused: ["packages/core/src/concepts/planted.ts", "contracts/suggestions/cases.json"],
+      passed: ["apps/api/src/refusal.ts", "packages/core/src/erasure/documents.ts"],
+    },
+    {
+      word: "repair",
+      refused: [
+        "packages/schema/src/suggestion-tables.ts",
+        "packages/core/test/suggestions.test.ts",
+      ],
+      passed: ["apps/web/journeys/test-workspace.ts", "docs/operations/RUNBOOK.md"],
+    },
+    {
+      word: "inbox",
+      refused: ["packages/core/src/concepts/planted.ts", "packages/schema/src/definer-reach.ts"],
+      passed: ["apps/web/journeys/inbox.ts", "packages/schema/src/test-inbox.ts"],
+    },
+    {
+      word: "class",
+      refused: [
+        "apps/web/src/features/sources/planted-words.ts",
+        "packages/core/src/sources/review.ts",
+      ],
+      passed: ["apps/api/src/refusal.ts", "docs/operations/SECRETS.md"],
+    },
+  ])("refuses $word only where it writes the renamed sense", ({ word, refused, passed }) => {
+    const line = `// the ${word} it names`;
+    const files = Object.fromEntries([...refused, ...passed].map((file) => [file, line]));
+
+    expect([...linesOver(files, [rowOf(word)])].toSorted()).toEqual(
+      refused.map((file) => `${file}:1: ${line}`).toSorted(),
+    );
+  });
 });
 
 describe("the product's name in a planted tree", () => {

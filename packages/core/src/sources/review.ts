@@ -471,9 +471,9 @@ const documentsToNarrow = async (
 };
 
 /**
- * Sets each named document's sensitivity, marks the groups' unreviewed findings narrowed, and recomputes
- * the visibility of what those documents source. A sensitivity wider than one document's effective
- * class, the narrower of its own and its connected source's, refuses the whole command.
+ * Sets each named document's sensitivity, marks the groups' unreviewed findings narrowed, and
+ * recomputes the visibility of what those documents source. A sensitivity wider than any
+ * document's effective class, the narrower of its own and its source's, refuses the whole command.
  */
 export const narrowDocuments = async (
   principal: UserPrincipal,
