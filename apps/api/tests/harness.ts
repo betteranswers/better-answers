@@ -335,8 +335,8 @@ export type TestAppOptions = {
 };
 
 /**
- * A TestApp over a fresh migrated database and git root; `stop` removes both.
- * @throws when `publicUrl`'s host is not `hostnames.app`.
+ * A healthy TestApp over a fresh migrated database and git root; `stop` removes both.
+ * @throws when `publicUrl`'s host is not `hostnames.app`, or it starts unhealthy.
  */
 export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> => {
   const hostnames = options.hostnames ?? HOSTNAMES;
@@ -379,6 +379,21 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     logger,
     webRoot: options.webRoot,
   });
+  const stop = async () => {
+    if (pool !== database.pool) await pool.end();
+    await database.stop();
+
+    await removeBundleRoot(gitStoreDir);
+  };
+
+  // Its authorization server seeds a resource row on start; an `authOver` seeding beside it
+  // loses the unique insert and never starts.
+  const health = await server.request(new URL("/health", publicUrl));
+  if (health.status !== 200) {
+    const answered = await health.text();
+    await stop();
+    throw new Error(`the TestApp's api did not start healthy: ${answered}`);
+  }
   const door = doors.postgres;
 
   const person: TestApp["person"] = async (email, name) => {
@@ -582,11 +597,6 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     removeMember,
     setWorkspaceConfig,
     client,
-    stop: async () => {
-      if (pool !== database.pool) await pool.end();
-      await database.stop();
-
-      await removeBundleRoot(gitStoreDir);
-    },
+    stop,
   };
 };
