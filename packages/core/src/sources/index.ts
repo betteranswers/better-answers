@@ -50,6 +50,7 @@ export {
   type SweepUploadsRefusal,
   type SweptUploads,
 } from "./orphans.ts";
+export { reindexEveryConnectedSource, REINDEX } from "./reindex.ts";
 export { restoreFinding, restoreFindingInput } from "./findings.ts";
 export {
   dismissAsNotSpecialCategory,

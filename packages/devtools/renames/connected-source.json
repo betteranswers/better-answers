@@ -158,6 +158,10 @@
         "apps/worker/tests/test_pipeline_index.py"
       ],
       "matches": ["^binding$"]
+    },
+    {
+      "sense": "the names migration 0069 found, which a test puts back to run it again",
+      "paths": ["packages/schema/test/before-the-passage.ts"]
     }
   ]
 }

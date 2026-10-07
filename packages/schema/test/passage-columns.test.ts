@@ -2,10 +2,15 @@ import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { EMBEDDING_DIMENSIONS, ulid } from "../src/index.ts";
+import {
+  NAMES_BEFORE_THE_PASSAGE,
+  thePartitionBeforeThePassage,
+  WORDS_RETIRED_FROM_THE_INDEX,
+} from "./before-the-passage.ts";
 import { passageWrittenThroughTheParent } from "./catalogue-statements.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
-import { migrationStatementSaying } from "./journal-statements.ts";
+import { migrationStatementSaying, migrationStatements } from "./journal-statements.ts";
 import {
   ADMITTED,
   attemptPassageEmbeddedBy,
@@ -338,3 +343,49 @@ const migrationStatementMatching = (word: string): string =>
     "parent.relname = 'chunk'",
     "parent.relname = 'passage'",
   );
+
+const THE_PASSAGE_MIGRATION = "0069_the-passage.sql";
+
+const namesInTheIndexSchema = async (client: pg.PoolClient): Promise<string[]> => {
+  const rows = await client.query<{ name: string }>(
+    `SELECT conname AS name FROM pg_constraint WHERE connamespace = 'index'::regnamespace
+     UNION ALL SELECT relname FROM pg_class WHERE relnamespace = 'index'::regnamespace
+     UNION ALL SELECT polname FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+                WHERE c.relnamespace = 'index'::regnamespace`,
+  );
+  return rows.rows.map((row) => row.name);
+};
+
+describe("migration 0069 over a partition made before it", () => {
+  it("renames the old function's partition, its indexes and constraints", async () => {
+    await withRollback(db().pool, async (client) => {
+      for (const statement of NAMES_BEFORE_THE_PASSAGE) await client.query(statement);
+      await testData(client).workspace({ id: WS_A, name: "A" });
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      await client.query("SELECT create_workspace_partition($1)", [WS_A]);
+      const before = await namesInTheIndexSchema(client);
+
+      for (const statement of migrationStatements(THE_PASSAGE_MIGRATION)) {
+        await client.query(statement);
+      }
+
+      expect(before).toContain(thePartitionBeforeThePassage(WS_A));
+      expect(
+        (await namesInTheIndexSchema(client)).filter((name) =>
+          WORDS_RETIRED_FROM_THE_INDEX.some((word) => name.includes(word)),
+        ),
+      ).toEqual([]);
+      expect(
+        (await namesInTheIndexSchema(client)).filter((name) => name.startsWith(`passage_${WS_A}`)),
+      ).toEqual(
+        expect.arrayContaining([
+          `passage_${WS_A}`,
+          `passage_${WS_A}_pkey`,
+          `passage_${WS_A}_search_gin`,
+          `passage_${WS_A}_connected_source_idx`,
+          `passage_${WS_A}_locator_uidx`,
+        ]),
+      );
+    });
+  });
+});

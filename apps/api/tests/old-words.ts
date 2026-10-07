@@ -277,6 +277,11 @@ const ROUTE_SENSES: readonly Sense[] = [
     written: /"route"/g,
   },
   {
+    sense: "the names migration 0069 found, which a test puts back to run it again",
+    within: "packages/schema/test/before-the-passage.ts",
+    written: /\bembedding_route_id\b|"route"/g,
+  },
+  {
     sense: "the rename runner's examples, which name the first map's words",
     within: "packages/devtools/src/rename/words.ts",
     written: /`(?:llm route|route|SELECT route_id|no route set)`/g,
@@ -435,6 +440,11 @@ const BINDING_SENSES: readonly Sense[] = [
     written: /"binding"/g,
   })),
   {
+    sense: "the names migration 0069 found, which a test puts back to run it again",
+    within: "packages/schema/test/before-the-passage.ts",
+    written: /\w*binding\w*|"binding"/g,
+  },
+  {
     sense: "the store's name before the passage sweep, as the release removes it",
     within: "docs/operations/RUNBOOK.md",
     written: /`binding\/`|-name binding\b/g,
@@ -568,6 +578,11 @@ const PASSAGE_SENSES: readonly Sense[] = [
     sense: "the value and the error an api before migration 0069 has, quoted as they read",
     within: "docs/operations/RUNBOOK.md",
     written: /`chunk-index`|relation "index\.chunk" does not exist/g,
+  },
+  {
+    sense: "the names migration 0069 found, which a test puts back to run it again",
+    within: "packages/schema/test/before-the-passage.ts",
+    written: /\w*chunk\w*/g,
   },
   {
     sense: "the table's name before migration 0069, as a replayed older statement names it",

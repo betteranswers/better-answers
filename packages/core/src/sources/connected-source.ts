@@ -580,7 +580,7 @@ export const reprocessConnectedSourceInput = z.object({
 });
 
 export const reprocessConnectedSourceAct = declareAct({
-  admits: { role: "Admin", purposes: ["erasure"] },
+  admits: { role: "Admin", purposes: ["erasure", "reindex"] },
   input: reprocessConnectedSourceInput,
   refuses: ["role-forbids", "no-such-binding"],
   effect: "write",

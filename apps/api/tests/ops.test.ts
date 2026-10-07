@@ -42,6 +42,7 @@ import {
   bundleCommit,
   conceptIndex,
   conceptVerification,
+  connectedSource,
   erasureRequest,
   mapEdge,
   mapGeneration,
@@ -201,6 +202,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "map-counts": [mapGeneration, mapNode, mapEdge],
   "reconcile-watermark": [conceptIndex, bundleCommit],
   "object-store-orphans": [sourceDocument],
+  "reindex-connected-sources": [connectedSource, job],
   "erasure-rehearsal": [erasureRequest, suppression],
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
 };
@@ -1447,6 +1449,40 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("answers usage to a non-id workspace before deleting anything", async () => {
       const run = await ops(app(), ["map-sweep", "--workspace", "ws_synthetic"]);
+
+      expect(run.exitCode).toBe(2);
+    });
+  });
+
+  describe("reindex-connected-sources — every source wiped and queued again", () => {
+    it("wipes an indexed source and queues its wiped run", async () => {
+      const { workspaceId, admin } = await app().provision();
+      await boundAndIndexed(app(), workspaceId, admin.id, "Expense claims are paid monthly.\n");
+
+      const run = await ops(app(), ["reindex-connected-sources", "--workspace", workspaceId]);
+      const after = await whatAReplayActsOn(app(), workspaceId);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        "reindex-connected-sources: done — 1 connected source wiped (1 passage) and queued to index again",
+      ]);
+      expect(after.passages).toEqual([]);
+      expect(after.jobs.at(-1)).toEqual({ kind: "index", reason: "wiped", status: "queued" });
+    });
+
+    it("says so when the workspace holds no connected source", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await ops(app(), ["reindex-connected-sources", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        "reindex-connected-sources: done — no connected source to reindex",
+      ]);
+    });
+
+    it("answers usage to a non-id workspace before wiping anything", async () => {
+      const run = await ops(app(), ["reindex-connected-sources", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });

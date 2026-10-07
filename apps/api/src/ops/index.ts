@@ -49,6 +49,8 @@ import {
 } from "@better-answers/core/runs";
 import {
   ORPHANED_UPLOAD_GRACE_HOURS,
+  REINDEX,
+  reindexEveryConnectedSource,
   sweepOrphanedUploads,
   UPLOAD_SWEEP,
 } from "@better-answers/core/sources";
@@ -75,6 +77,7 @@ import {
   bundleCommit,
   conceptIndex,
   conceptVerification,
+  connectedSource,
   erasureRequest,
   mapEdge,
   mapGeneration,
@@ -174,6 +177,7 @@ const NEEDS = {
   "map-counts": MAP_TABLES,
   "reconcile-watermark": [conceptIndex, bundleCommit],
   "object-store-orphans": [sourceDocument],
+  "reindex-connected-sources": [connectedSource, job],
   "erasure-rehearsal": [erasureRequest, suppression],
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
 };
@@ -200,6 +204,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed
   object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed connect or a lost race left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
     --list         say how many there are, removing none
+  reindex-connected-sources --workspace <id>                every connected source wiped and queued to index again, as a release that renames the engine's target needs
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
   erasure-rehearsal --workspace <id> --synthetic --seed [--wait-seconds <n>]
                                                             phase one: the synthetic subject and a document naming them, waited on until indexed; its tokens on the last line
@@ -597,6 +602,24 @@ const mapSweepCommand = async (doors: Doors, workspaceId: string, io: OpsIo): Pr
   const edges = swept.value.reduce((total, generation) => total + generation.edges, 0);
   io.say(
     `map-sweep: done — swept ${plural(swept.value.length, "generation")} ${generations} (${counted(nodes, "node")}, ${counted(edges, "edge")})`,
+  );
+  return DONE;
+};
+
+const reindexConnectedSources = async (
+  doors: Doors,
+  workspaceId: string,
+  io: OpsIo,
+): Promise<number> => {
+  const reindexed = await reindexEveryConnectedSource(REINDEX, doors.postgres, { workspaceId });
+  if (!reindexed.ok) return refused("reindex-connected-sources", workspaceId, reindexed.error, io);
+  if (reindexed.value.length === 0) {
+    io.say("reindex-connected-sources: done — no connected source to reindex");
+    return DONE;
+  }
+  const passages = reindexed.value.reduce((total, source) => total + source.passages, 0);
+  io.say(
+    `reindex-connected-sources: done — ${counted(reindexed.value.length, "connected source")} wiped (${counted(passages, "passage")}) and queued to index again`,
   );
   return DONE;
 };
@@ -1357,6 +1380,8 @@ const SLICE_RUNNERS = {
   "reconcile-watermark": (doors, workspaceId, _flags, io) =>
     reconcileWatermark(doors, workspaceId, io),
   "object-store-orphans": objectStoreOrphans,
+  "reindex-connected-sources": (doors, workspaceId, _flags, io) =>
+    reindexConnectedSources(doors, workspaceId, io),
   "erasure-rehearsal": erasureRehearsal,
   "import-bundle": importBundleCommand,
 } satisfies Readonly<

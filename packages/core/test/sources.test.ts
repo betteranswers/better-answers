@@ -24,6 +24,8 @@ import {
   publishConnectedSourceInput,
   reprocessConnectedSource,
   reprocessConnectedSourceInput,
+  REINDEX,
+  reindexEveryConnectedSource,
   sweepOrphanedUploads,
   UPLOAD_BYTE_CAP,
   UPLOAD_SWEEP,
@@ -1404,6 +1406,45 @@ describe("an Admin reprocesses a connected source", () => {
   });
 });
 
+/** A source a wipe emptied, its `wiped` run queued behind the run that first indexed it. */
+const WIPED_AND_QUEUED = {
+  passages: [],
+  runs: [
+    { kind: "index", reason: "wiped", status: "queued" },
+    { kind: "index", reason: "connected", status: "done" },
+  ],
+};
+
+describe("the operator's reindex of a workspace's connected sources", () => {
+  it("wipes every source and queues its run, deleting its passages", async () => {
+    const scenario = await arrange();
+    const { connectedSourceId, documentId } = await indexedHandbook(scenario);
+
+    const reindexed = await reindexEveryConnectedSource(REINDEX, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+    });
+    if (!reindexed.ok) throw new Error(`the reindex was refused: ${String(reindexed.error)}`);
+
+    expect(reindexed.value.map((source) => [source.connectedSourceId, source.passages])).toEqual([
+      [connectedSourceId, 2],
+    ]);
+    expect(await passagesReadableBy(scenario.admin, documentId)).toEqual([]);
+    expect(await connectedSourceHolds(scenario.workspaceId, connectedSourceId)).toEqual(
+      WIPED_AND_QUEUED,
+    );
+  });
+
+  it("refuses a workspace id of the wrong shape", async () => {
+    const scenario = await arrange();
+
+    expect(
+      await reindexEveryConnectedSource(REINDEX, scenario.postgres, {
+        workspaceId: "ws_synthetic",
+      }),
+    ).toEqual({ ok: false, error: "malformed" });
+  });
+});
+
 const reprocessingAs = (
   scenario: Scenario,
   platform: PlatformPrincipal,
@@ -1427,16 +1468,12 @@ describe("the erasure reprocesses a connected source as the platform", () => {
 
     expect(wiped.value.passages).toEqual(2);
     expect(await passagesReadableBy(scenario.admin, documentId)).toEqual([]);
-    expect(await connectedSourceHolds(scenario.workspaceId, connectedSourceId)).toEqual({
-      passages: [],
-      runs: [
-        { kind: "index", reason: "wiped", status: "queued" },
-        { kind: "index", reason: "connected", status: "done" },
-      ],
-    });
+    expect(await connectedSourceHolds(scenario.workspaceId, connectedSourceId)).toEqual(
+      WIPED_AND_QUEUED,
+    );
   });
 
-  it("refuses the platform any purpose but erasure, keeping the passages", async () => {
+  it("refuses a platform purpose it does not admit, keeping passages", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 
