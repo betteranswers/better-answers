@@ -174,7 +174,7 @@ const namedInDetail = (scope: number, bind: Bind): string =>
       `OR EXISTS (SELECT 1 FROM audit_event e
                    WHERE e.workspace_id = $${scope}
                      AND e.subject_kind = ANY($${bind(subjectKinds)}::text[])
-                     AND e.act = ANY($${bind(acts)}::text[])
+                     AND e.action = ANY($${bind(acts)}::text[])
                      AND e.detail ->> $${bind(key)}::text = u.id)`,
   ).join("\n");
 

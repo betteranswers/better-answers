@@ -14,7 +14,7 @@ const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const identitySetRowsFor = async (personId: string) =>
   (
     await db().pool.query(
-      `SELECT id, act, family, actor, subject_kind, subject_id, detail, batch_id
+      `SELECT id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id
          FROM identity_audit_event WHERE subject_id = $1`,
       [personId],
     )
@@ -23,7 +23,7 @@ const identitySetRowsFor = async (personId: string) =>
 const consentRowsBy = async (personId: string) =>
   (
     await db().pool.query(
-      `SELECT workspace_id, act, family, actor, subject_kind, subject_id, detail
+      `SELECT workspace_id, action AS act, family, actor, subject_kind, subject_id, detail
          FROM audit_event WHERE actor = $1`,
       [`human:${personId}`],
     )

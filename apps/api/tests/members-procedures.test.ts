@@ -145,7 +145,7 @@ const eventsIn = async (workspaceId: string, act: string) => {
     subject_id: string;
     detail: Readonly<Record<string, string>>;
   }>(
-    "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
+    "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
     [workspaceId, act],
   );
   return rows.rows;

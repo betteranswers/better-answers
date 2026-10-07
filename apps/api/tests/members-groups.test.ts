@@ -65,8 +65,8 @@ const standing = async (workspaceId: string) => {
     [workspaceId],
   );
   const events = await superuser.query<GroupEvent>(
-    `SELECT act, actor, subject_id, detail FROM audit_event
-      WHERE workspace_id = $1 AND act LIKE 'people.group.%' ORDER BY id`,
+    `SELECT action AS act, actor, subject_id, detail FROM audit_event
+      WHERE workspace_id = $1 AND action LIKE 'people.group.%' ORDER BY id`,
     [workspaceId],
   );
   return { groups: groups.rows, groupMembers: groupMembers.rows, events: events.rows };

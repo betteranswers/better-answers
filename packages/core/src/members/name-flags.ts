@@ -36,10 +36,10 @@ const RAISED_ACTS = declareIdentitySetActs("people", {
  * Over the rows aliased `raised`. It takes `$1` and `$2` from `WAITING_ACTS`, so a query using it
  * numbers its own parameters from `$3`.
  */
-const STILL_WAITING = `raised.subject_kind = split_part($1, '.', 2) AND raised.act = $1
+const STILL_WAITING = `raised.subject_kind = split_part($1, '.', 2) AND raised.action = $1
     AND raised.at > COALESCE(
       (SELECT max(corrected.at) FROM identity_audit_event corrected
-        WHERE corrected.subject_kind = split_part($2, '.', 2) AND corrected.act = $2
+        WHERE corrected.subject_kind = split_part($2, '.', 2) AND corrected.action = $2
           AND corrected.subject_id = raised.subject_id),
       '-infinity')`;
 

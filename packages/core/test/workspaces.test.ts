@@ -91,7 +91,7 @@ const tokenState = async (
 
 const identityRowsAbout = async (personId: string) => {
   const found = await db().pool.query(
-    "SELECT act, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
+    "SELECT action AS act, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
     [personId],
   );
   return found.rows;
@@ -164,7 +164,7 @@ describe("provisioning a workspace", () => {
     expect(beside.rows[0]?.rows).toBe("3");
     expect(await partitionExists(id)).toBe(true);
     const events = await db().pool.query<{ id: string }>(
-      "SELECT id, act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1",
+      "SELECT id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1",
       [id],
     );
 
@@ -988,7 +988,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
 
   const addedRowsOf = async (workspaceId: string) => {
     const found = await db().pool.query(
-      "SELECT id, act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND act = 'people.member.added' ORDER BY at, id",
+      "SELECT id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND action = 'people.member.added' ORDER BY at, id",
       [workspaceId],
     );
     return found.rows;
@@ -1143,7 +1143,7 @@ describe("renaming a workspace — the platform's act", () => {
 
   const renamedRowsOf = async (workspaceId: string) => {
     const found = await db().pool.query(
-      "SELECT id, act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND act = 'platform.workspace.renamed' ORDER BY at, id",
+      "SELECT id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND action = 'platform.workspace.renamed' ORDER BY at, id",
       [workspaceId],
     );
     return found.rows;
@@ -1298,7 +1298,7 @@ describe("adding a person before their first sign-in, the platform's act", () =>
 
   const addedRowCount = async (): Promise<number> => {
     const found = await db().pool.query<{ rows: number }>(
-      "SELECT count(*)::int AS rows FROM identity_audit_event WHERE act = 'people.person.added'",
+      "SELECT count(*)::int AS rows FROM identity_audit_event WHERE action = 'people.person.added'",
     );
     return found.rows[0]?.rows ?? 0;
   };

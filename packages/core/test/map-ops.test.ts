@@ -55,7 +55,7 @@ const sweptEvents = async (
     batch_id: string | null;
   }>(
     `SELECT subject_id, detail, batch_id FROM audit_event
-      WHERE workspace_id = $1 AND act = 'platform.graph.swept' ORDER BY subject_id`,
+      WHERE workspace_id = $1 AND action = 'platform.graph.swept' ORDER BY subject_id`,
     [workspaceId],
   );
   return found.rows;

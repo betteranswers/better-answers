@@ -247,7 +247,7 @@ const workspacesWithShortName = async (app: TestApp, shortName: string): Promise
 
 const rowsOfAct = async (app: TestApp, workspaceId: string, act: string) => {
   const found = await app.database.superuser.query<Record<string, unknown>>(
-    "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY at, id",
+    "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY at, id",
     [workspaceId, act],
   );
   return found.rows;
@@ -289,7 +289,7 @@ type AuditEventRow = { act: string; actor: string; subject_id: string };
 
 const auditLogOf = async (app: TestApp, workspaceId: string): Promise<readonly AuditEventRow[]> => {
   const found = await app.database.superuser.query<AuditEventRow>(
-    "SELECT act, actor, subject_id FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
+    "SELECT action AS act, actor, subject_id FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
     [workspaceId],
   );
   return found.rows;
@@ -1626,7 +1626,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
 
       const rows = await app().database.superuser.query<Record<string, unknown>>(
-        `SELECT c.sha, c.parent_sha, c.actor, e.act, e.detail,
+        `SELECT c.sha, c.parent_sha, c.actor, e.action AS act, e.detail,
                 (SELECT count(*)::int FROM concept_index i WHERE i.workspace_id = c.workspace_id) AS concepts
            FROM bundle_commit c
            JOIN audit_event e ON e.workspace_id = c.workspace_id AND e.id = c.audit_event_id
@@ -2137,7 +2137,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const addedRowsAbout = async (app: TestApp, personId: string) => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
         `SELECT actor, subject_id, detail FROM identity_audit_event
-          WHERE subject_id = $1 AND act = 'people.person.added'`,
+          WHERE subject_id = $1 AND action = 'people.person.added'`,
         [personId],
       );
       return found.rows;
@@ -2145,7 +2145,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const addedRowCount = async (app: TestApp): Promise<number> => {
       const found = await app.database.superuser.query<{ rows: number }>(
-        "SELECT count(*)::int AS rows FROM identity_audit_event WHERE act = 'people.person.added'",
+        "SELECT count(*)::int AS rows FROM identity_audit_event WHERE action = 'people.person.added'",
       );
       return found.rows[0]?.rows ?? 0;
     };
@@ -2790,7 +2790,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const identityRowsOf = async (personId: string) =>
       (
         await app().database.superuser.query(
-          "SELECT act, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
+          "SELECT action AS act, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
           [personId],
         )
       ).rows;
@@ -3107,7 +3107,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const commitsOf = async (app: TestApp, workspaceId: string) => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
-        `SELECT c.sha, c.parent_sha, e.act
+        `SELECT c.sha, c.parent_sha, e.action AS act
            FROM bundle_commit c
            JOIN audit_event e ON e.workspace_id = c.workspace_id AND e.id = c.audit_event_id
           WHERE c.workspace_id = $1
@@ -3161,9 +3161,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const actsOf = async (app: TestApp, workspaceId: string) => {
       const found = await app.database.superuser.query<{ act: string; events: number }>(
-        `SELECT act, count(*)::int AS events FROM audit_event
-          WHERE workspace_id = $1 AND act LIKE 'knowledge.%'
-          GROUP BY act ORDER BY act`,
+        `SELECT action AS act, count(*)::int AS events FROM audit_event
+          WHERE workspace_id = $1 AND action LIKE 'knowledge.%'
+          GROUP BY action ORDER BY action`,
         [workspaceId],
       );
       return found.rows;

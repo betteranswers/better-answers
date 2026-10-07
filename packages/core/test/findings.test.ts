@@ -54,7 +54,7 @@ const restoreEventsOf = async (pool: pg.Pool, workspaceId: string) => {
     subject_id: string;
     detail: Record<string, unknown>;
   }>(
-    `SELECT id, act, family, actor, subject_kind, subject_id, detail
+    `SELECT id, action AS act, family, actor, subject_kind, subject_id, detail
        FROM audit_event WHERE workspace_id = $1 ORDER BY at, id`,
     [workspaceId],
   );

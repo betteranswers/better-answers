@@ -242,7 +242,7 @@ const batchedRowsOf = async (pool: pg.Pool, workspaceId: string, act: string) =>
     detail: Record<string, unknown>;
   }>(
     `SELECT subject_id, batch_id, detail FROM audit_event
-      WHERE workspace_id = $1 AND act = $2 ORDER BY id`,
+      WHERE workspace_id = $1 AND action = $2 ORDER BY id`,
     [workspaceId, act],
   );
   return found.rows;

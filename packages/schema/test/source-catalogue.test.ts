@@ -10,6 +10,7 @@ import {
   SENSITIVITIES,
   ulid,
 } from "../src/index.ts";
+import { NAMES_BEFORE_THE_ACTION } from "./before-the-action.ts";
 import {
   type CataloguedItem,
   type CataloguePlace,
@@ -476,6 +477,8 @@ describe("the migration separating an Admin's narrowing from the seam's verdict"
         subjectId: seamNarrowed.id,
         detail: { sensitivity: "Restricted" },
       });
+      // 0052 reads the column by the name it had before 0073.
+      for (const statement of NAMES_BEFORE_THE_ACTION) await client.query(statement);
 
       await asTheMigrationOwnerOf(
         client,

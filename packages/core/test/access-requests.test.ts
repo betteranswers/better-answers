@@ -90,9 +90,10 @@ const eventsAbout = async (subjectId: string) => {
     actor: string;
     subject_kind: string;
     detail: Record<string, string | number | boolean>;
-  }>("SELECT act, actor, subject_kind, detail FROM audit_event WHERE subject_id = $1 ORDER BY at", [
-    subjectId,
-  ]);
+  }>(
+    "SELECT action AS act, actor, subject_kind, detail FROM audit_event WHERE subject_id = $1 ORDER BY at",
+    [subjectId],
+  );
   return rows.rows;
 };
 

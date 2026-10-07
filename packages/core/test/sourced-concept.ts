@@ -364,7 +364,7 @@ export const auditEventRowsOf = async (
     subject_id: string;
     detail: Record<string, unknown>;
   }>(
-    "SELECT id, actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
+    "SELECT id, actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
     [workspaceId, act],
   );
   return read.rows;

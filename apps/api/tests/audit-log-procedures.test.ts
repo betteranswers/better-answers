@@ -31,7 +31,7 @@ afterAll(async () => {
 const signInsOf = async (personId: string): Promise<number> => {
   const found = await app.database.superuser.query<{ held: number }>(
     `SELECT count(*)::int AS held FROM identity_audit_event
-      WHERE act = 'people.person.signed_in' AND subject_id = $1`,
+      WHERE action = 'people.person.signed_in' AND subject_id = $1`,
     [personId],
   );
   return found.rows[0]?.held ?? 0;
@@ -117,7 +117,7 @@ describe("the audit log over tRPC", () => {
 const exportsIn = async (workspaceId: string): Promise<number> => {
   const found = await app.database.superuser.query<{ held: number }>(
     `SELECT count(*)::int AS held FROM audit_event
-      WHERE workspace_id = $1 AND act = 'platform.audit_log.exported'`,
+      WHERE workspace_id = $1 AND action = 'platform.audit_log.exported'`,
     [workspaceId],
   );
   return found.rows[0]?.held ?? 0;

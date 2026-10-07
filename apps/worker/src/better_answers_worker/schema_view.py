@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0072_the-knowledge-words"
+MIGRATION_ID = "0073_the-action"
 
-MIGRATION_WHEN = 1791394474112
+MIGRATION_WHEN = 1791407037889
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -48,7 +48,7 @@ TABLES: dict[str, dict[str, str]] = {
     "public.audit_event": {
         "id": "text NOT NULL",
         "workspace_id": "text NOT NULL",
-        "act": "text NOT NULL",
+        "action": "text NOT NULL",
         "family": "text NOT NULL",
         "actor": "text NOT NULL",
         "subject_kind": "text NOT NULL",
@@ -211,7 +211,7 @@ TABLES: dict[str, dict[str, str]] = {
     },
     "public.identity_audit_event": {
         "id": "text NOT NULL",
-        "act": "text NOT NULL",
+        "action": "text NOT NULL",
         "family": "text NOT NULL",
         "actor": "text NOT NULL",
         "subject_kind": "text NOT NULL",

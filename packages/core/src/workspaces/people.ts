@@ -248,9 +248,9 @@ const ENDED_BY_THE_SERVER = `SELECT client_id, reference_id AS workspace_id, iss
                               ORDER BY revoked DESC, issued_at DESC`;
 
 /** Both acts are the identity set's, so the read never enters a workspace's audit log. */
-const ENDINGS_OF_PERSON = `SELECT id, act, at, actor, detail FROM identity_audit_event
+const ENDINGS_OF_PERSON = `SELECT id, action AS act, at, actor, detail FROM identity_audit_event
                             WHERE subject_kind = 'person' AND subject_id = $1
-                              AND act = ANY($2::text[])
+                              AND action = ANY($2::text[])
                             ORDER BY at DESC, id DESC`;
 
 const ENDING_ACT_NAMES = [REVOKED_EVERYWHERE.name, GRANTS_ENDED_HERE.name];

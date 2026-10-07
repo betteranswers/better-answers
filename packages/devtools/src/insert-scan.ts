@@ -31,6 +31,7 @@ export const FACTORY_MODULES = [
   "apps/worker/tests/factories.py",
   "apps/worker/tests/pg_harness.py",
   "packages/core/test/identity-rows.ts",
+  "packages/schema/test/before-the-action.ts",
   "packages/schema/test/before-the-knowledge-words.ts",
   "packages/schema/test/catalogue-statements.ts",
   "packages/schema/test/probes.ts",

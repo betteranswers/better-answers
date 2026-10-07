@@ -25,7 +25,7 @@ describe("a platform where no person carries the operator mark", () => {
 
     expect(answered).toEqual({ personId: flagged.id, sentToTheOperator: true });
     const raised = await app.database.superuser.query(
-      "SELECT 1 FROM identity_audit_event WHERE subject_id = $1 AND act = 'people.name_flag.raised'",
+      "SELECT 1 FROM identity_audit_event WHERE subject_id = $1 AND action = 'people.name_flag.raised'",
       [flagged.id],
     );
     expect(raised.rowCount).toBe(1);

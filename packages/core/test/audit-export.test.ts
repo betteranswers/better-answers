@@ -65,7 +65,7 @@ const exportEvents = async (workspace: ProvisionedWorkspace) =>
   (
     await db().pool.query<{ actor: string; subject_id: string; detail: Record<string, unknown> }>(
       `SELECT actor, subject_id, detail FROM audit_event
-        WHERE workspace_id = $1 AND act = 'platform.audit_log.exported'`,
+        WHERE workspace_id = $1 AND action = 'platform.audit_log.exported'`,
       [workspace.workspaceId],
     )
   ).rows;

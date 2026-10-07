@@ -194,7 +194,7 @@ const FIRST_OUTCOME = `SELECT d.id AS document_id, d.original_key AS original_ke
           e.id AS audit_event_id, j.id AS job_id
      FROM source_document d
      JOIN audit_event e
-       ON e.workspace_id = d.workspace_id AND e.subject_id = d.connected_source_id AND e.act = $3
+       ON e.workspace_id = d.workspace_id AND e.subject_id = d.connected_source_id AND e.action = $3
      JOIN job j
        ON j.workspace_id = d.workspace_id AND j.subject_id = d.connected_source_id
       AND j.kind = $4 AND j.reason = $5

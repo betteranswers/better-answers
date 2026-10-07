@@ -139,7 +139,7 @@ const answeringAfterThreeWrites =
 const leftBehindIn = async (workspaceId: string, key: string) => {
   const counted = await db().pool.query<{ rows: number; auditEvents: number; jobs: number }>(
     `SELECT (SELECT count(*)::int FROM workspace_config WHERE workspace_id = $1 AND key = $2) AS rows,
-            (SELECT count(*)::int FROM audit_event WHERE workspace_id = $1 AND act = $3) AS "auditEvents",
+            (SELECT count(*)::int FROM audit_event WHERE workspace_id = $1 AND action = $3) AS "auditEvents",
             (SELECT count(*)::int FROM job WHERE workspace_id = $1) AS jobs`,
     [workspaceId, key, PROBE_ACTS.rolledBack.name],
   );
@@ -745,7 +745,7 @@ describe("the operator resolver", () => {
     const answers = [await writingThen(err(PROVOKED)), await writingThen(ok("landed"))];
 
     const written = await db().pool.query(
-      "SELECT 1 FROM identity_audit_event WHERE subject_id = $1 AND act = $2",
+      "SELECT 1 FROM identity_audit_event WHERE subject_id = $1 AND action = $2",
       [person.id, IDENTITY_PROBE.written.name],
     );
     expect(written.rowCount).toBe(1);

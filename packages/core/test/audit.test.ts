@@ -64,7 +64,7 @@ const rowById = async (id: string) => {
     detail: Record<string, string | number | boolean>;
     batch_id: string | null;
   }>(
-    "SELECT workspace_id, act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE id = $1",
+    "SELECT workspace_id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE id = $1",
     [id],
   );
   return found.rows[0];
@@ -562,7 +562,7 @@ const IDENTITY_PROBE = declareIdentitySetActs("platform", {
 
 const identityRowById = async (id: string) => {
   const found = await db().pool.query(
-    "SELECT act, family, actor, subject_kind, subject_id, detail, batch_id FROM identity_audit_event WHERE id = $1",
+    "SELECT action AS act, family, actor, subject_kind, subject_id, detail, batch_id FROM identity_audit_event WHERE id = $1",
     [id],
   );
   return found.rows[0];

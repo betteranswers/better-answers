@@ -73,7 +73,7 @@ export type Recorded = {
 
 export type AuditEventRow = z.infer<typeof boundarySchemas.auditEvent.select>;
 
-const AUDIT_EVENT_ROW = `id, workspace_id AS "workspaceId", act, family, actor, subject_kind AS "subjectKind",
+const AUDIT_EVENT_ROW = `id, workspace_id AS "workspaceId", action AS act, family, actor, subject_kind AS "subjectKind",
             subject_id AS "subjectId", at, detail, batch_id AS "batchId"`;
 
 /** Oldest first; `since` is inclusive. */
@@ -87,7 +87,7 @@ export const eventsOfAct = async (
     `SELECT ${AUDIT_EVENT_ROW}
        FROM audit_event
       WHERE workspace_id = ${scopeClause(1)}
-        AND act = $2
+        AND action = $2
         AND ($3::timestamptz IS NULL OR at >= $3)
       ORDER BY at, id`,
     [scopeParameter(principal), act.name, since ?? null],
@@ -108,7 +108,7 @@ export const latestOnIdentitySet = async (
 ): Promise<ReadonlyMap<string, Date>> => {
   const found = await tx.query<{ subject_id: string; at: Date }>(
     `SELECT subject_id, max(at) AS at FROM identity_audit_event
-      WHERE subject_kind = split_part($1, '.', 2) AND subject_id = ANY($2::text[]) AND act = $1
+      WHERE subject_kind = split_part($1, '.', 2) AND subject_id = ANY($2::text[]) AND action = $1
       GROUP BY subject_id`,
     [act.name, subjectIds],
   );
@@ -222,10 +222,10 @@ const predicatesOf = (sought: EventsSought, bind: Bind): readonly string[] => {
       ({ kinds, ids }) =>
         `subject_kind = ANY($${bind(kinds)}::text[]) AND subject_id ${oneOf(ids, bind)}`,
     ),
-    ...(sought.acts.length === 0 ? [] : [`act = ANY($${bind(sought.acts)}::text[])`]),
+    ...(sought.acts.length === 0 ? [] : [`action = ANY($${bind(sought.acts)}::text[])`]),
     ...detail.map(
       ({ key, subjectKinds, acts }) =>
-        `subject_kind = ANY($${bind(subjectKinds)}::text[]) AND act = ANY($${bind(acts)}::text[])
+        `subject_kind = ANY($${bind(subjectKinds)}::text[]) AND action = ANY($${bind(acts)}::text[])
          AND detail ->> $${bind(key)}::text ${personMatch}`,
     ),
   ];
@@ -270,7 +270,7 @@ const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true }
 const identitySetInsert = boundarySchemas.identityAuditEvent.insert;
 
 /** Both audit logs take the same row; only a workspace's audit log adds the workspace it belongs to. */
-const ROW_COLUMNS = "id, act, actor, subject_id, detail, batch_id";
+const ROW_COLUMNS = "id, action, actor, subject_id, detail, batch_id";
 
 const AN_KINDS: ReadonlySet<string> = new Set(["id", "iri", "audience"]);
 

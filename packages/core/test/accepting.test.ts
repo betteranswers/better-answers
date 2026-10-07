@@ -57,7 +57,7 @@ const membersOf = async (workspaceId: string, personId: string) =>
 const joinedEvents = async (personId: string) =>
   (
     await db().pool.query<{ act: string }>(
-      "SELECT act FROM audit_event WHERE subject_id = $1 AND act = 'people.member.joined'",
+      "SELECT action AS act FROM audit_event WHERE subject_id = $1 AND action = 'people.member.joined'",
       [personId],
     )
   ).rows;

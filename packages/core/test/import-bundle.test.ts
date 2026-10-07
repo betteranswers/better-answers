@@ -189,7 +189,7 @@ const rowsFor = async (workspaceId: string) => {
     counts[name] = counted.rows[0]?.n ?? "";
   }
   const events = await db().pool.query<{ n: string }>(
-    "SELECT count(*) AS n FROM audit_event WHERE workspace_id = $1 AND act LIKE 'knowledge.%'",
+    "SELECT count(*) AS n FROM audit_event WHERE workspace_id = $1 AND action LIKE 'knowledge.%'",
     [workspaceId],
   );
   return { ...counts, events: events.rows[0]?.n ?? "" };
@@ -232,8 +232,8 @@ const verificationRows = async (workspaceId: string) => {
 
 const knowledgeEventsOf = async (workspaceId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
-    `SELECT act, actor, subject_kind, batch_id
-       FROM audit_event WHERE workspace_id = $1 AND act LIKE 'knowledge.%'
+    `SELECT action AS act, actor, subject_kind, batch_id
+       FROM audit_event WHERE workspace_id = $1 AND action LIKE 'knowledge.%'
       ORDER BY at, id`,
     [workspaceId],
   );

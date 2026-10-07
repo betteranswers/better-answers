@@ -1,7 +1,12 @@
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { type MigratedPostgres, withRollback } from "./harness.ts";
+import {
+  type MigratedPostgres,
+  whileAnAuditWriteIsOpen,
+  withCommit,
+  withRollback,
+} from "./harness.ts";
 import { migrationStatements } from "./journal-statements.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
@@ -40,31 +45,6 @@ const migratedFromBefore = async <T>(client: pg.PoolClient, read: () => Promise<
   return read();
 };
 
-/** Puts the index back for the cases after, as `migrate` would have left it. */
-const migratedAndCommitted = async (): Promise<void> => {
-  const client = await db.pool.connect();
-  try {
-    await client.query("BEGIN");
-    await migrated(client);
-    await client.query("COMMIT");
-  } finally {
-    client.release();
-  }
-};
-
-/** An act's transaction that has written to the audit log and not yet committed. */
-const whileAnAuditWriteIsOpen = async <T>(work: () => Promise<T>): Promise<T> => {
-  const writer = await db.pool.connect();
-  try {
-    await writer.query("BEGIN");
-    await writer.query("LOCK TABLE audit_event IN ROW EXCLUSIVE MODE");
-    return await work();
-  } finally {
-    await writer.query("ROLLBACK");
-    writer.release();
-  }
-};
-
 describe("the migration that indexes the audit log by actor", () => {
   it("builds the index on workspace, actor, time and id", async () => {
     const built = await withRollback(db.pool, (client) =>
@@ -90,7 +70,7 @@ describe("the migration that indexes the audit log by actor", () => {
   it("fails rather than waits behind an open audit write", async () => {
     await db.pool.query(`DROP INDEX "${THE_INDEX}"`);
     try {
-      const blocked = whileAnAuditWriteIsOpen(() =>
+      const blocked = whileAnAuditWriteIsOpen(db.pool, () =>
         withRollback(db.pool, async (client) => {
           await migrated(client);
         }),
@@ -99,7 +79,8 @@ describe("the migration that indexes the audit log by actor", () => {
       await expect(blocked).rejects.toThrow(/canceling statement due to lock timeout/);
       expect(await withRollback(db.pool, indexesNamed)).toEqual([]);
     } finally {
-      await migratedAndCommitted();
+      // Puts the index back for the cases after, as `migrate` would have left it.
+      await withCommit(db.pool, migrated);
     }
   });
 });

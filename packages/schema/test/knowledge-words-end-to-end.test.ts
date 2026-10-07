@@ -257,10 +257,11 @@ const SEEDED_IN_EACH: Standing = {
 };
 
 describe("migration 0072 over a populated 0071 database, as its owner", () => {
-  it("is the one migration the real journal applies after 0071", async () => {
-    const journal = journalMigrationFiles().length;
+  it("applies 0072 and each later migration through the real journal", async () => {
+    const journal = journalMigrationFiles();
+    const the0072 = journal.findIndex((file) => file.endsWith("0072_the-knowledge-words.sql"));
 
-    expect([appliedBefore, (await migrationRows()).length]).toEqual([journal - 1, journal]);
+    expect([appliedBefore, (await migrationRows()).length]).toEqual([the0072, journal.length]);
   });
 
   it("finds every old word seeded, in both workspaces", () => {

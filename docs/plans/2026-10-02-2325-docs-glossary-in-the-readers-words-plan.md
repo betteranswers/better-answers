@@ -200,7 +200,7 @@ Planning Contract preservation: changed on 06/10/2026, after U11 released. The s
   6. never accepts a DROP that drizzle-kit generates for a renamed or generated column.
 
   After the migration, regenerate the snapshot, `roles-surface.json`, the worker's schema view and both contract stamps. A second `generate` shows no diff (`packages/schema/test/migration-ownership.test.ts`), and a sweep only adds files under `migrations/`. The regenerated `roles-surface.json`, once the rename map is applied, differs from the committed one only in names.
-- KTD5. **One noun per pull request, each a codemod with a committed rename map.** The owner allowed U16 and U15 to group their nouns into three pull requests each, merged in order (07/10/2026); every noun still has its own map and commit. ts-morph renames symbols through its bundled compiler, and TypeScript 7's `tsc` proves the result. ast-grep renames strings, object keys, JSON, SQL and Python under the map's allowlist of senses. Each sweep:
+- KTD5. **One noun per pull request, each a codemod with a committed rename map.** The owner allowed U16 and U15 to group their nouns into three pull requests each, merged in order (07/10/2026); every noun still has its own map and commit. U17 splits its one noun into two pull requests, migration first (owner, 07/10/2026; see U17). ts-morph renames symbols through its bundled compiler, and TypeScript 7's `tsc` proves the result. ast-grep renames strings, object keys, JSON, SQL and Python under the map's allowlist of senses. Each sweep:
   1. inventories the noun's occurrences by sense;
   2. runs the symbol pass, then the text pass;
   3. updates live docs, skills and ADR docs for the noun;
@@ -236,7 +236,7 @@ Planning Contract preservation: changed on 06/10/2026, after U11 released. The s
      The evidence is the remaining sweeps' old words searched over the tree on 06/10/2026, after U11 merged. It is a search, not the dry-run maps the BA-29 comment of 06/10/2026 suggested. The search leaves out the senses Appendix G keeps: bare *client* (tRPC, pg, S3) and *domain* as an email domain. The remaining shared code files between lanes are 6 to 44 per pair: test harnesses, fixtures, `navigation.ts`, `boundary-schemas.ts`, `table-ownership.ts` and `rls.test.ts`. A rebase pays for those (Operational Notes). Lanes shorten the building, and the releases stay one at a time.
 
   Governs R14, R20.
-- KTD11. **Every renamed page address redirects.** `movedFrom` on a page or group becomes a list. Every old address stays in it, including the earlier `/system/routes-and-spend`. Governs R14, R22.
+- KTD11. **Every renamed address of a built page redirects.** `movedFrom` on a page or group becomes a list. Every old address stays in it, including the earlier `/system/routes-and-spend`. An unbuilt page gets no `movedFrom` and no MOVED entry, because the frame test (`apps/web/test/frame.test.tsx`) refuses a redirect that leads only to unbuilt pages. Governs R14, R22.
 - KTD12. **Stored values change by kind.** Governs R14, R16, R22.
   - **Mutable rows, queued jobs included:** every tenant table forces row-level security, and the migration owner cannot bypass it, so a bare `UPDATE` reaches no row. The migration drops the CHECK, updates inside each workspace's scope as migration 0048 does, then adds the CHECK back. Re-adding the CHECK checks every row, which is the proof. A renamed value with no CHECK gains one.
   - **Derived rows** (map labels, index rows): rebuilt with the existing rebuild reasons.
@@ -896,6 +896,10 @@ sequenceDiagram
 **Requirements:** R1, R11, R14, R22. KTD8, KTD14.
 
 **Dependencies:** U13, U15 and U16: the end of all three lanes.
+
+**Pull requests (owner, 07/10/2026):** two, merged in order (KTD5).
+- (a) Migration 0073 renames the `act` column on both audit logs to `action`, with `audit_event_action_check`, `identity_audit_event_action_check`, `audit_event_action_not_null` and `identity_audit_event_action_not_null`, and changes every file that names the column in SQL. It releases under watch (KTD4). The TypeScript key stays `act`, so a raw read selects `action AS act` until (b).
+- (b) The rest of this unit: the identifiers, files, lint rule, web app and docs, the words test's rows, and the aliases (a) left. The words test's *act* row permits the senses found across the tree: React's and Testing Library's `act`, the plain verb through an anchored sense, and the places R22 keeps. A second row holds *acts*. The query key `?act=` becomes `?action=`, and the old key is still read. The audit export's CSV header "Act" and the other loose items become *action*.
 
 **Files:**
 - Modify: `packages/core/src/kernel/`, `packages/core/src/audit/`, every slice declaring acts, `packages/schema/src/audit-tables.ts` with a new migration, `packages/devtools/lint-rules/rules/act-admits-before-await.ts` and its test, `.oxlintrc.json`, `apps/web/src/` files named for *act*, the five `CODING_STANDARDS.md` files, ADR 0043 doc, `docs/agents/`

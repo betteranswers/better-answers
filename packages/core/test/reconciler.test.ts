@@ -161,7 +161,7 @@ const rowsOf = async (workspaceId: string) => {
      SELECT 'commit', sha, concat_ws(' ', parent_sha, audit_event_id, actor)
        FROM bundle_commit WHERE workspace_id = $1
      UNION ALL
-     SELECT 'event', id, concat_ws(' ', act, actor, subject_id, detail::text)
+     SELECT 'event', id, concat_ws(' ', action, actor, subject_id, detail::text)
        FROM audit_event WHERE workspace_id = $1
      UNION ALL
      SELECT 'node', uid, concat_ws(' ', kind, gen::text) FROM map_node WHERE workspace_id = $1
@@ -181,7 +181,7 @@ const replayDetail = z.object({ evidenceAgrees: z.boolean().optional() });
 
 const replayedEvents = async (workspaceId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
-    "SELECT id, actor, subject_id, subject_kind, batch_id, detail FROM audit_event WHERE workspace_id = $1 AND act = 'platform.reconciler.replayed' ORDER BY id",
+    "SELECT id, actor, subject_id, subject_kind, batch_id, detail FROM audit_event WHERE workspace_id = $1 AND action = 'platform.reconciler.replayed' ORDER BY id",
     [workspaceId],
   );
   return found.rows;
@@ -309,7 +309,7 @@ describe("a commit whose rows were lost", () => {
       },
     ]);
     const joined = await db().pool.query<{ act: string; actor: string }>(
-      `SELECT e.act, e.actor FROM bundle_commit c
+      `SELECT e.action AS act, e.actor FROM bundle_commit c
          JOIN audit_event e ON e.workspace_id = c.workspace_id AND e.id = c.audit_event_id
         WHERE c.workspace_id = $1 AND c.sha = $2`,
       [scenario.workspaceId, sha],
@@ -318,7 +318,7 @@ describe("a commit whose rows were lost", () => {
       { act: "platform.reconciler.replayed", actor: "process:better-answers-reconciler" },
     ]);
     const booked = await db().pool.query(
-      "SELECT 1 FROM audit_event WHERE workspace_id = $1 AND actor = $2 AND act LIKE 'knowledge.%'",
+      "SELECT 1 FROM audit_event WHERE workspace_id = $1 AND actor = $2 AND action LIKE 'knowledge.%'",
       [scenario.workspaceId, actorIdOf(scenario.editor)],
     );
     expect(booked.rowCount).toBe(0);
@@ -767,7 +767,7 @@ describe("an acceptance whose rows were lost", () => {
 
     expect(await replayedEvents(scenario.workspaceId)).toHaveLength(1);
     const accepted = await db().pool.query(
-      "SELECT 1 FROM audit_event WHERE workspace_id = $1 AND act = 'knowledge.suggestion.accepted'",
+      "SELECT 1 FROM audit_event WHERE workspace_id = $1 AND action = 'knowledge.suggestion.accepted'",
       [scenario.workspaceId],
     );
     expect(accepted.rowCount).toBe(0);

@@ -87,8 +87,8 @@ const ops = async (argv: readonly string[]): Promise<Run> => {
 
 const operatorRowsOf = async (personId: string) => {
   const found = await app().database.superuser.query(
-    `SELECT act, actor, subject_id, detail FROM identity_audit_event
-      WHERE subject_id = $1 AND act LIKE 'people.operator.%' ORDER BY at, id`,
+    `SELECT action AS act, actor, subject_id, detail FROM identity_audit_event
+      WHERE subject_id = $1 AND action LIKE 'people.operator.%' ORDER BY at, id`,
     [personId],
   );
   return found.rows;
@@ -96,7 +96,7 @@ const operatorRowsOf = async (personId: string) => {
 
 const operatorRowCount = async (): Promise<number> => {
   const found = await app().database.superuser.query<{ rows: number }>(
-    "SELECT count(*)::int AS rows FROM identity_audit_event WHERE act LIKE 'people.operator.%'",
+    "SELECT count(*)::int AS rows FROM identity_audit_event WHERE action LIKE 'people.operator.%'",
   );
   return found.rows[0]?.rows ?? 0;
 };
@@ -388,8 +388,8 @@ describe("the console, the operator's alone", () => {
 describe("ending every sign-in and token everywhere, from the console", () => {
   const revocationRowsOf = async (personId: string) => {
     const found = await app().database.superuser.query(
-      `SELECT act, actor, subject_id, detail FROM identity_audit_event
-        WHERE subject_id = $1 AND act = 'people.person.credentials_revoked'`,
+      `SELECT action AS act, actor, subject_id, detail FROM identity_audit_event
+        WHERE subject_id = $1 AND action = 'people.person.credentials_revoked'`,
       [personId],
     );
     return found.rows;
@@ -572,8 +572,8 @@ describe("correcting a flagged display name, from the console", () => {
 
   const correctionRowsOf = async (personId: string) => {
     const found = await app().database.superuser.query(
-      `SELECT act, actor, subject_id, detail FROM identity_audit_event
-        WHERE subject_id = $1 AND act = 'people.person.renamed'`,
+      `SELECT action AS act, actor, subject_id, detail FROM identity_audit_event
+        WHERE subject_id = $1 AND action = 'people.person.renamed'`,
       [personId],
     );
     return found.rows;
@@ -743,7 +743,7 @@ describe("the console's list and inspection of people", () => {
   const signInsOf = async (personId: string): Promise<readonly string[]> => {
     const found = await app().database.superuser.query<{ at: Date }>(
       `SELECT at FROM identity_audit_event
-        WHERE act = 'people.person.signed_in' AND subject_id = $1 ORDER BY at`,
+        WHERE action = 'people.person.signed_in' AND subject_id = $1 ORDER BY at`,
       [personId],
     );
     return found.rows.map((row) => row.at.toISOString());
@@ -941,7 +941,7 @@ describe("the console's list and inspection of people", () => {
 
     const recorded = await app().database.superuser.query(
       `SELECT detail FROM identity_audit_event
-        WHERE subject_id = $1 AND act = 'people.person.credentials_revoked'`,
+        WHERE subject_id = $1 AND action = 'people.person.credentials_revoked'`,
       [acme.admin.id],
     );
     expect(recorded.rows).toEqual([{ detail: { grants: [] } }]);
