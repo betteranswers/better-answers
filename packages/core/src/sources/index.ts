@@ -55,7 +55,7 @@ export { restoreFinding, restoreFindingInput } from "./findings.ts";
 export {
   dismissAsNotSpecialCategory,
   dismissAsNotSpecialCategoryInput,
-  findingGroupKey,
+  groupOfFindingsKey,
   findingsOf,
   findingsOfInput,
   keepInText,

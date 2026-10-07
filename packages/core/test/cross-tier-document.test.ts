@@ -8,7 +8,7 @@ import { ERASURE, recordSubjectRequest, runErasure } from "../src/erasure/index.
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
 import {
-  findingsOf as findingGroupsOf,
+  findingsOf as groupsOfFindingsFor,
   findingsOfInput,
   keepInText,
   keepInTextInput,
@@ -374,7 +374,7 @@ describe("one uploaded document, read back through both tiers", () => {
             tx,
             inputOf(keepInTextInput, {
               connectedSourceId: bound.connectedSourceId,
-              findingGroups: [bankDetailsGroupOf(bound.documentId)],
+              groupsOfFindings: [bankDetailsGroupOf(bound.documentId)],
               reason: "The depot's own account, printed on the company's own page.",
             }),
           ),
@@ -413,7 +413,7 @@ describe("one uploaded document, read back through both tiers", () => {
       const runs = await syncsOf(scenario.workspaceId, bound.connectedSourceId);
       const reviewed = answered(
         await acting(scenario.admin, (admin, tx) =>
-          findingGroupsOf(
+          groupsOfFindingsFor(
             admin,
             tx,
             inputOf(findingsOfInput, { connectedSourceId: bound.connectedSourceId }),

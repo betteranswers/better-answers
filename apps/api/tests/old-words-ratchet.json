@@ -12,8 +12,7 @@
     "domain": 4
   },
   "apps/web/src/features/sources/refusal-words.ts": {
-    "class": 3,
-    "finding group": 5
+    "class": 3
   },
   "apps/web/src/features/sources/words.ts": {
     "act": 1

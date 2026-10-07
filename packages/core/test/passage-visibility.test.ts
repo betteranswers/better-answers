@@ -285,7 +285,7 @@ const narrowingTheDocument = (scenario: Scenario, connectedSourceId: string, doc
       tx,
       inputOf(narrowDocumentsInput, {
         connectedSourceId,
-        findingGroups: [
+        groupsOfFindings: [
           {
             documentId,
             category: "bank-details",

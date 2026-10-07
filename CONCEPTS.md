@@ -231,7 +231,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   withheld at on its connected source now: its rule's, raised to *always* by the officer-block rule
   or by an erasure request that names it. A finding the last sync did not raise, because the rules
   moved on, is no longer shown to a reviewer, acted on or counted at a publish.
-- **group of findings** — _Code rename pending._ the unit of the review: one document's *findings*
+- **group of findings** — the unit of the review: one document's *findings*
   of one category, raised by one rule at one tier, with how many there are. It is what the review
   lists and what the three bulk actions below are taken over; it names no span and carries no
   value, so a reviewer acts on what was found without ever being shown it. Not a *group*, which is

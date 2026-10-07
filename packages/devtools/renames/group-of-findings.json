@@ -1,0 +1,63 @@
+{
+  "noun": "finding group",
+  "readerWord": "group of findings",
+  "sweep": "U15. Knowledge words: group of findings",
+  "collisions": [
+    {
+      "with": "a member group, which *group* alone names: the code word keeps the findings in every name, as GroupOfFindings and groupsOfFindings",
+      "codeWord": "group of findings"
+    }
+  ],
+  "words": [
+    {
+      "from": "finding group",
+      "to": "group of findings"
+    },
+    {
+      "from": "finding groups",
+      "to": "groups of findings"
+    }
+  ],
+  "symbols": {
+    "paths": [
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/web/journeys/**",
+      "apps/worker/src/**",
+      "apps/worker/tests/**"
+    ]
+  },
+  "text": {
+    "paths": [
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/web/journeys/**",
+      "apps/worker/src/**",
+      "apps/worker/tests/**"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "the words test's own planted fixtures and ratchet",
+      "paths": ["apps/api/tests/avoid-words.test.ts", "apps/api/tests/old-words-ratchet.json"]
+    },
+    {
+      "sense": "TypeScript's type keyword before the refusal vocabulary's type, a set of refusal words",
+      "matches": ["^Vocabulary$"]
+    }
+  ]
+}

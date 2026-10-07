@@ -41,14 +41,14 @@ export const THE_RESTORED_SPAN: Span = { start: 0, end: 149 };
 export const locatorOf = (documentId: string, span: Span): string =>
   `${documentId}/chars:${String(span.start)}-${String(span.end)}`;
 
-export type FindingGroupKey = {
+export type GroupOfFindingsKey = {
   readonly documentId: string;
   readonly category: string;
   readonly ruleId: string;
   readonly tier: string;
 };
 
-export const bankDetailsGroupOf = (documentId: string): FindingGroupKey => ({
+export const bankDetailsGroupOf = (documentId: string): GroupOfFindingsKey => ({
   documentId,
   category: "bank-details",
   ruleId: "UK_BANK_ACCOUNT",

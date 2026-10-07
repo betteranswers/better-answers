@@ -12,11 +12,11 @@ export const SAID_OF_A_CONNECTED_SOURCE = {
     next: "Read the list again.",
   },
   "no-such-document": {
-    why: "A document those finding groups sit in is not under this connected source.",
+    why: "A document those groups of findings sit in is not under this connected source.",
     next: "Review the connected source again.",
   },
   "no-such-finding": {
-    why: "This connected source holds no span of one of the ticked finding groups.",
+    why: "This connected source holds no span of one of the ticked groups of findings.",
     next: "Review the connected source again; its last sync may have moved on.",
   },
   "already-published": {
@@ -33,7 +33,7 @@ export const SAID_OF_A_CONNECTED_SOURCE = {
   },
   "special-category-unreviewed": {
     why: "A special category finding in this connected source is still unreviewed, and a connected source holding one cannot widen.",
-    next: "Review the connected source, narrow or dismiss that finding group, then widen it.",
+    next: "Review the connected source, narrow or dismiss that group of findings, then widen it.",
   },
   "media-type-refused": {
     why: "The platform converts markdown, plain text, Word (.docx) and PDF, and this file is none of them.",
@@ -44,11 +44,11 @@ export const SAID_OF_A_CONNECTED_SOURCE = {
     next: "Connect a smaller file, or split this one.",
   },
   "not-the-always-set": {
-    why: "Only a finding group of the always set can be kept in text.",
+    why: "Only a group of findings in the always set can be kept in text.",
     next: "Untick the groups at another tier.",
   },
   "not-special-category": {
-    why: "Only a special category finding group can be dismissed as not special category.",
+    why: "Only a special category group of findings can be dismissed as not special category.",
     next: "Untick the groups of another category.",
   },
   "widening-refused": {

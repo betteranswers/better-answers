@@ -1518,7 +1518,7 @@ describe("narrowing documents", () => {
           tx,
           inputOf(narrowDocumentsInput, {
             connectedSourceId: narrowed.connectedSourceId,
-            findingGroups: [
+            groupsOfFindings: [
               {
                 documentId: narrowed.documentId,
                 category: "bank-details",
