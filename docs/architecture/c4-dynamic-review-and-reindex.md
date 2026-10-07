@@ -13,7 +13,7 @@ C4Dynamic
   Container_Boundary(core, "packages/core") {
     Component(review, "sources — review.ts and findings.ts", "the review acts", "findingsOf, keepInText over restoreFinding, dismissAsNotSpecialCategory, narrowDocuments")
     Component(connectedSource, "sources — narrowConnectedSource, reprocessConnectedSource", "connected source acts", "Narrow a connected source's class; empty a connected source and queue its sync")
-    Component(cascade, "cascade", "concepts, then guides", "Concepts citing the moved evidence, then compositions including them; two levels")
+    Component(cascade, "cascade", "concepts, then guides", "Concepts citing the moved evidence, then write-ups including them; two levels")
     Component(runs, "runs — enqueueJobIn", "the act's transaction", "One queued index job per connected source; an emptying reason takes it over")
   }
 
@@ -27,7 +27,7 @@ C4Dynamic
   Rel(trpc, review, "5. dismissAsNotSpecialCategory over special-category groups with one reason")
   Rel(review, runs, "6. Reviewed dismissed, an audit event per document; queues reason dismissed, so the verdict can lift")
   Rel(trpc, review, "7. narrowDocuments: each named document takes a class of its own, only narrower")
-  Rel(review, cascade, "8. Re-derives the concepts citing those documents, then their compositions; queues no sync")
+  Rel(review, cascade, "8. Re-derives the concepts citing those documents, then their write-ups; queues no sync")
   Rel(trpc, connectedSource, "9. narrow: the connected source's class and audience, only narrower; the same cascade; queues no sync")
   Rel(erasure, connectedSource, "10. reprocessConnectedSource with reason wiped, per connected source holding a document the map found")
   Rel(connectedSource, postgres, "11. Deletes the connected source's index.passage rows and its unreviewed, unrestored findings")
@@ -52,6 +52,6 @@ C4Dynamic
 
 - **The review names no span.** A group of findings is one document's findings of one category, raised by one rule at one tier; the three bulk acts take groups, and a finding the last sync did not raise is not shown, acted on or counted at a publish (`CONCEPTS.md`, *group of findings*).
 - **Only a dismissal widens a document, and never past the Admin.** `narrowDocuments` and `narrow` refuse `widening-refused`; a keep lets a span back into the text and lifts no class. A connected source widens by `widenConnectedSource` alone, over the cascade a narrowing or a publish starts, and never moves a document's own narrower class (T-371; `c4-dynamic-document-to-passage.md`). The review decides when it may: a special-category finding the last sync raised and nobody reviewed refuses it as `special-category-unreviewed`, and any review of that group (a keep, a narrowing or a dismissal) lets it through.
-- **A narrowing is a write to the source row.** The passage's class is read through `index.readable_passage`, so a narrowing queues no sync and takes effect at its commit; the cascade re-derives the concepts citing the evidence and then the compositions including them, inside the same act (ADR 0044; `CONCEPTS.md`, *cascade*).
+- **A narrowing is a write to the source row.** The passage's class is read through `index.readable_passage`, so a narrowing queues no sync and takes effect at its commit; the cascade re-derives the concepts citing the evidence and then the write-ups including them, inside the same act (ADR 0044; `CONCEPTS.md`, *cascade*).
 - **The two halves of emptying go together.** `reprocessConnectedSource` deletes the passage rows in the act's transaction and queues a reason the worker empties `connected_source/` on; the `emptying-a-connected-source` agreement holds both tiers to the same two reasons.
 - **An erasure re-indexes now the documents its map finds.** The `source-document` finder names the live documents whose indexed text holds one of the identifiers the suppression holds (T-377), and the routine wipes their connected sources, so step 10 runs for each of them now. Every other document loses the identifiers on its connected source's next sync: the suppression is the workspace's (T-375), and the seam withholds every exact occurrence of its identifiers (T-376).

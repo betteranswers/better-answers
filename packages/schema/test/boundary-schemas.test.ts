@@ -45,7 +45,7 @@ const SUGGESTION_ID = "01J6SSSSSSSSSSSSSSSSSSSSSS";
 const CONNECTED_SOURCE_ID = "01J6VVVVVVVVVVVVVVVVVVVVVV";
 
 const DOCUMENT_ID = "01J6NNNNNNNNNNNNNNNNNNNNNN";
-const COMPOSITION_ID = "01J6WWWWWWWWWWWWWWWWWWWWWW";
+const WRITE_UP_ID = "01J6WWWWWWWWWWWWWWWWWWWWWW";
 
 const FINDING_ID = "01J6XXXXXXXXXXXXXXXXXXXXXX";
 
@@ -501,17 +501,17 @@ const acceptedRows = {
       auditEventId: AUDIT_EVENT_ID,
     },
   ],
-  composition: [
+  writeUp: [
     {
       workspaceId: WS_ID,
-      id: COMPOSITION_ID,
+      id: WRITE_UP_ID,
       publishedAt: NOW,
       sensitivity: "Internal",
       audience: "everyone",
     },
   ],
-  compositionInclude: [
-    { workspaceId: WS_ID, compositionId: COMPOSITION_ID, id: "i1", ordinal: 0, iri: CONCEPT_IRI },
+  writeUpInclude: [
+    { workspaceId: WS_ID, writeUpId: WRITE_UP_ID, id: "i1", ordinal: 0, iri: CONCEPT_IRI },
   ],
   conceptIdentity: [{ workspaceId: WS_ID, iri: CONCEPT_IRI, mergeKey: "policy:expenses" }],
   conceptIndex: [
@@ -855,8 +855,8 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "suppression",
         "conceptEvidence",
         "conceptClassOverride",
-        "composition",
-        "compositionInclude",
+        "writeUp",
+        "writeUpInclude",
         "passage",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());

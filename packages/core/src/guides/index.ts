@@ -23,7 +23,7 @@ export type Footnote = {
   readonly title: string;
 };
 
-type CompositionRow = VisibilityRow & { readonly workspace_id: string; readonly id: string };
+type WriteUpRow = VisibilityRow & { readonly workspace_id: string; readonly id: string };
 
 type IncludeRow = {
   readonly sensitivity: string | null;
@@ -41,69 +41,69 @@ const visibilityOfInclude = (include: IncludeRow): Visibility =>
       });
 
 /**
- * Locks and re-derives each composition including one of `iris`; an include whose concept is gone
+ * Locks and re-derives each write-up including one of `iris`; an include whose concept is gone
  * counts as admins-only. Answers the id of each one recomputed, changed or not, in id order.
  */
-export const recomputeCompositionsIncluding = async (
+export const recomputeWriteUpsIncluding = async (
   principal: Principal,
   tx: Tx,
   input: { readonly iris: readonly string[] },
 ): Promise<readonly string[]> => {
   if (input.iris.length === 0) return [];
-  const including = await tx.query<CompositionRow>(
+  const including = await tx.query<WriteUpRow>(
     `SELECT p.workspace_id, p.id, p.sensitivity, p.audience, p.audience_groups
-       FROM composition p
+       FROM write_up p
       WHERE p.workspace_id = ${scopeClause(1)}
-        AND p.id IN (SELECT i.composition_id FROM composition_include i
+        AND p.id IN (SELECT i.write_up_id FROM write_up_include i
                       WHERE i.workspace_id = p.workspace_id AND i.iri = ANY($2::text[]))
       ORDER BY p.id
       FOR UPDATE`,
     [scopeParameter(principal), [...new Set(input.iris)]],
   );
   const moved: string[] = [];
-  for (const composition of including.rows) {
+  for (const writeUp of including.rows) {
     const includes = await tx.query<IncludeRow>(
       `SELECT c.sensitivity, c.audience, c.audience_groups
-         FROM composition_include i
+         FROM write_up_include i
          LEFT JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
-        WHERE i.workspace_id = $1 AND i.composition_id = $2`,
-      [composition.workspace_id, composition.id],
+        WHERE i.workspace_id = $1 AND i.write_up_id = $2`,
+      [writeUp.workspace_id, writeUp.id],
     );
     const derived = derivedVisibility({
       from: includes.rows.map(visibilityOfInclude),
-      fallback: visibilityOf(composition),
+      fallback: visibilityOf(writeUp),
     });
     await tx.query(
-      `UPDATE composition SET sensitivity = $3, audience = $4, audience_groups = $5
+      `UPDATE write_up SET sensitivity = $3, audience = $4, audience_groups = $5
         WHERE workspace_id = $1 AND id = $2`,
       [
-        composition.workspace_id,
-        composition.id,
+        writeUp.workspace_id,
+        writeUp.id,
         derived.sensitivity,
         derived.audience,
         derived.audienceGroups,
       ],
     );
-    moved.push(composition.id);
+    moved.push(writeUp.id);
   }
   return moved;
 };
 
 /**
- * Undefined when the composition is absent or the principal cannot read it. Otherwise only the
- * includes whose concept the principal reads, in the composition's order.
+ * Undefined when the write-up is absent or the principal cannot read it. Otherwise only the
+ * includes whose concept the principal reads, in the write-up's order.
  */
 export const footnotesOf = async (
   principal: UserPrincipal,
   tx: Tx,
-  compositionId: string,
+  writeUpId: string,
 ): Promise<Result<readonly Footnote[] | undefined, Error>> => {
   const parameters = readableParameters(principal);
   const page = await attempt(() =>
     tx.query(
-      `SELECT 1 FROM composition p
+      `SELECT 1 FROM write_up p
         WHERE p.workspace_id = $1 AND p.id = $2 AND ${readableClause("p", 3)}`,
-      [principal.workspaceId, compositionId, ...parameters],
+      [principal.workspaceId, writeUpId, ...parameters],
     ),
   );
   if (!page.ok) return err(page.error);
@@ -112,11 +112,11 @@ export const footnotesOf = async (
   const footnotes = await attempt(() =>
     tx.query<Footnote>(
       `SELECT i.id AS label, i.iri, c.title
-         FROM composition_include i
+         FROM write_up_include i
          JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
-        WHERE i.workspace_id = $1 AND i.composition_id = $2 AND ${readableClause("c", 3)}
+        WHERE i.workspace_id = $1 AND i.write_up_id = $2 AND ${readableClause("c", 3)}
         ORDER BY i.ordinal, i.id`,
-      [principal.workspaceId, compositionId, ...parameters],
+      [principal.workspaceId, writeUpId, ...parameters],
     ),
   );
   if (!footnotes.ok) return err(footnotes.error);

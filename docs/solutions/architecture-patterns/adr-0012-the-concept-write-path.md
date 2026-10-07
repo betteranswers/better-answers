@@ -50,7 +50,7 @@ Moving a ref back to its watermark is the operator's plumbing, written down on a
 
 - The bundle is the company's asset, and the promise is trust per fact. A single committer makes every change attributable and revertible.
 - Acceptance before landing keeps a bad producer run out of a history that is permanent.
-- The row written at commit time is what makes a changed atom flag its compositions now, not after a worker job.
+- The row written at commit time is what makes a changed atom flag its write-ups now, not after a worker job.
 - The id is minted first for the reconciler alone. An id minted after the commit would leave the trailer empty exactly when the row was never written, the one case the reconciler exists for.
 - The lock spanning both stores gives the prefix invariant, so the replay reads from a watermark and never hunts for holes.
 - The transport's own transaction is not used: a transaction held open across a git commit waits on a subprocess.

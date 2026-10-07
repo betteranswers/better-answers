@@ -146,7 +146,7 @@ type ConnectedSourceClassSet = {
 
   readonly concepts: readonly string[];
 
-  readonly compositions: readonly string[];
+  readonly writeUps: readonly string[];
 };
 
 export type ConnectedSourceNarrowed = ConnectedSourceClassSet;

@@ -147,11 +147,11 @@ export type TestData = {
 
   job(overrides?: Partial<InsertInput<"job">>): Promise<Row<"job">>;
 
-  composition(overrides?: Partial<InsertInput<"composition">>): Promise<Row<"composition">>;
+  writeUp(overrides?: Partial<InsertInput<"writeUp">>): Promise<Row<"writeUp">>;
 
-  compositionInclude(
-    overrides?: Partial<InsertInput<"compositionInclude">>,
-  ): Promise<Row<"compositionInclude">>;
+  writeUpInclude(
+    overrides?: Partial<InsertInput<"writeUpInclude">>,
+  ): Promise<Row<"writeUpInclude">>;
 };
 
 const hexOfLength = (length: number): string =>
@@ -876,9 +876,9 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  const composition: TestData["composition"] = async (overrides = {}) => {
+  const writeUp: TestData["writeUp"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    return insertRow(client, "composition", {
+    return insertRow(client, "writeUp", {
       id: ulid(),
       publishedAt: new Date(),
       sensitivity: "Internal",
@@ -889,16 +889,16 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  const compositionInclude: TestData["compositionInclude"] = async (overrides = {}) => {
+  const writeUpInclude: TestData["writeUpInclude"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    const compositionId = overrides.compositionId ?? (await composition({ workspaceId })).id;
+    const writeUpId = overrides.writeUpId ?? (await writeUp({ workspaceId })).id;
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
-    return insertRow(client, "compositionInclude", {
+    return insertRow(client, "writeUpInclude", {
       id: `i${ulid().toLowerCase()}`,
       ordinal: 0,
       ...overrides,
       workspaceId,
-      compositionId,
+      writeUpId,
       iri,
     });
   };
@@ -943,7 +943,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     suppression,
     conceptEvidence,
     conceptClassOverride,
-    composition,
-    compositionInclude,
+    writeUp,
+    writeUpInclude,
   };
 };

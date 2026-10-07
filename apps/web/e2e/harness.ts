@@ -264,7 +264,7 @@ const seededConnectedSources = z.object({
         z.object({
           documentId: z.string(),
           title: z.string(),
-          citedBy: z.object({ iri: z.string(), compositionId: z.string() }).nullable(),
+          citedBy: z.object({ iri: z.string(), writeUpId: z.string() }).nullable(),
         }),
       ),
     }),

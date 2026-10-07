@@ -1,0 +1,56 @@
+{
+  "noun": "composition",
+  "readerWord": "write-up",
+  "sweep": "U15. Knowledge words: write-up",
+  "collisions": [],
+  "words": [
+    {
+      "from": "compositions",
+      "to": "write ups"
+    },
+    {
+      "from": "composition",
+      "to": "write up"
+    }
+  ],
+  "symbols": {
+    "paths": [
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "packages/schema/scripts/**",
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**"
+    ]
+  },
+  "text": {
+    "paths": [
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "packages/schema/scripts/**",
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/worker/src/better_answers_worker/**",
+      "apps/worker/tests/**"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "the words test's own planted fixtures and ratchet",
+      "paths": ["apps/api/tests/avoid-words.test.ts", "apps/api/tests/old-words-ratchet.json"]
+    },
+    {
+      "sense": "a composition root, the one place that wires a program's parts together",
+      "matches": ["composition root"]
+    }
+  ]
+}

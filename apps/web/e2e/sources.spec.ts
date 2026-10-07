@@ -520,7 +520,7 @@ test.describe("reviewing a connected source's findings", () => {
 
     await expect(
       page.getByText(
-        "Narrowed 1 document to Restricted; 0 concepts and 0 compositions moved with them.",
+        "Narrowed 1 document to Restricted; 0 concepts and 0 write-ups moved with them.",
       ),
     ).toBeVisible();
     await expect(
@@ -838,7 +838,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(page.getByRole("heading", { level: 3, name: "Staff handbook" })).toBeFocused();
   });
 
-  test("narrows a published source with its citing concepts and compositions", async ({
+  test("narrows a published source with its citing concepts and write-ups", async ({
     page,
     request,
   }) => {
@@ -866,7 +866,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(classOf(page, "Supplier payments")).toHaveText("Restricted");
     await expect(
       page.getByText(
-        "Narrowed “Supplier payments” to Restricted. 1 concept and 1 composition moved with it.",
+        "Narrowed “Supplier payments” to Restricted. 1 concept and 1 write-up moved with it.",
       ),
     ).toBeVisible();
     await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
@@ -896,7 +896,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await page.keyboard.press("w");
     const dialog = page.getByRole("dialog", { name: "Widen Tender answers" });
     await expect(dialog).toHaveAccessibleDescription(
-      "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every composition including one, moves with it in the same act. A document with a narrower class of its own keeps it.",
+      "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every write-up including one, moves with it in the same act. A document with a narrower class of its own keeps it.",
     );
     const classPicked = dialog.getByRole("combobox", { name: "Class" });
     await expect(classPicked).toBeFocused();
@@ -952,7 +952,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await theActLandedWithinItsBudget(page, "widen");
 
     await expect(connectedSourcesRegion(page).getByRole("status")).toContainText(
-      "Widened “Tender answers” to Internal for everyone in the workspace. 1 concept and 1 composition moved with it.",
+      "Widened “Tender answers” to Internal for everyone in the workspace. 1 concept and 1 write-up moved with it.",
     );
     await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
     await expect(classOf(page, "Tender answers")).toHaveText("Internal");
@@ -1009,7 +1009,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     // The row reads widened before the api answers, and a late answer overwrites the next
     // `w`'s sentence.
     await expect(connectedSourcesRegion(page).getByRole("status")).toHaveText(
-      "Widened “Price book” to Public for everyone in the workspace. 0 concepts and 0 compositions moved with it.",
+      "Widened “Price book” to Public for everyone in the workspace. 0 concepts and 0 write-ups moved with it.",
     );
     await expect(audienceOf).toHaveText("Everyone in the workspace");
     await expect(

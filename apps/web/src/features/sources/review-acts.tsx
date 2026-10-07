@@ -253,7 +253,7 @@ export function NarrowDocumentsAct(properties: { readonly connectedSourceId: str
     act.command<DocumentsNarrowed>({
       pending: `Narrowing ${named} to ${NARROWEST}.`,
       done: (narrowed) =>
-        `Narrowed ${counted(narrowed.documentIds.length, "document", "documents")} to ${NARROWEST}; ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.compositions.length, "composition", "compositions")} moved with them.`,
+        `Narrowed ${counted(narrowed.documentIds.length, "document", "documents")} to ${NARROWEST}; ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.writeUps.length, "write-up", "write-ups")} moved with them.`,
       run: (ready, settled) => {
         narrow.mutate(askOf(ready), settled);
       },

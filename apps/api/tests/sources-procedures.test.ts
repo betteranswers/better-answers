@@ -736,7 +736,7 @@ describe("the Sources procedures over the wire", () => {
       documentIds: [documentId],
       sensitivity: "Restricted",
       concepts: [],
-      compositions: [],
+      writeUps: [],
     });
   });
 
@@ -774,7 +774,7 @@ describe("the Sources procedures over the wire", () => {
       auditEventId: expect.any(String),
       visibility: { sensitivity: "Restricted", audience: "everyone", audienceGroups: null },
       concepts: [],
-      compositions: [],
+      writeUps: [],
     });
   });
 
@@ -800,7 +800,7 @@ describe("the Sources procedures over the wire", () => {
       auditEventId: expect.any(String),
       visibility: { sensitivity: "Public", audience: "everyone", audienceGroups: null },
       concepts: [],
-      compositions: [],
+      writeUps: [],
     });
     expect(refused).toMatchObject({
       data: { httpStatus: 422, refusal: { word: "not-wider", class: "inapplicable" } },

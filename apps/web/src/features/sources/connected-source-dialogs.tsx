@@ -184,11 +184,11 @@ const narrowerThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
 
 export const movedWords = (moved: {
   readonly concepts: readonly string[];
-  readonly compositions: readonly string[];
+  readonly writeUps: readonly string[];
 }): ReactNode => (
   <>
     {counted(moved.concepts.length, "concept", "concepts")} and{" "}
-    {counted(moved.compositions.length, "composition", "compositions")} moved with it.
+    {counted(moved.writeUps.length, "write-up", "write-ups")} moved with it.
     {moved.concepts.length === 0 ? null : (
       <span className="block">
         Concepts:{" "}
@@ -249,7 +249,7 @@ export function NarrowDialog(properties: DialogProperties<Sensitivity>) {
       onOpenChange={closedBy(onClose)}
       content={{ onCloseAutoFocus: toTheConnectedSource(connectedSource.connectedSourceId) }}
       title={`Narrow ${connectedSource.name}`}
-      consequence="Every concept citing its documents, and every composition including one of those concepts, moves with it in the same act. A narrowing never widens; widening it back is an act of its own."
+      consequence="Every concept citing its documents, and every write-up including one of those concepts, moves with it in the same act. A narrowing never widens; widening it back is an act of its own."
       commit={
         <Button
           onClick={() => {
@@ -294,7 +294,7 @@ const asksWider = (connectedSource: ListedConnectedSource, asked: Widening): boo
 
 const WIDENING_CONSEQUENCE = {
   published:
-    "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every composition including one, moves with it in the same act.",
+    "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every write-up including one, moves with it in the same act.",
   unpublished:
     "Nobody but an Admin reads it until you publish it, and the publish then releases the class you choose here.",
 };

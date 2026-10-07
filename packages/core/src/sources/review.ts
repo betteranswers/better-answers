@@ -422,7 +422,7 @@ export type DocumentsNarrowed = {
 
   readonly concepts: readonly string[];
 
-  readonly compositions: readonly string[];
+  readonly writeUps: readonly string[];
 };
 
 const DOCUMENTS_UNDER = `SELECT id, sensitivity FROM source_document

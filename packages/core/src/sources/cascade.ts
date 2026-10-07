@@ -1,10 +1,10 @@
 import { recomputeVisibilitySourcedFrom } from "../concepts/index.ts";
-import { recomputeCompositionsIncluding } from "../guides/index.ts";
+import { recomputeWriteUpsIncluding } from "../guides/index.ts";
 import type { AdminUserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /**
- * Returns every indexed concept citing the documents, each recomputed, and the compositions
+ * Returns every indexed concept citing the documents, each recomputed, and the write-ups
  * recomputed over them. Without `documentIds`, every document in the connected source counts.
  */
 export const cascadeOverEvidence = async (
@@ -16,9 +16,9 @@ export const cascadeOverEvidence = async (
   },
 ): Promise<{
   readonly concepts: readonly string[];
-  readonly compositions: readonly string[];
+  readonly writeUps: readonly string[];
 }> => {
   const concepts = await recomputeVisibilitySourcedFrom(admin, tx, input);
-  const compositions = await recomputeCompositionsIncluding(admin, tx, { iris: concepts });
-  return { concepts, compositions };
+  const writeUps = await recomputeWriteUpsIncluding(admin, tx, { iris: concepts });
+  return { concepts, writeUps };
 };

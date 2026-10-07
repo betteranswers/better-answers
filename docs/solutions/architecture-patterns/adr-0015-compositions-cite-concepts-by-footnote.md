@@ -1,5 +1,5 @@
 ---
-title: "A composition cites its concept by a footnote labelled by the include"
+title: "A write-up cites its concept by a footnote labelled by the include"
 date: 2026-08-30
 module: packages/core
 problem_type: architecture_pattern
@@ -7,29 +7,29 @@ component: records
 severity: medium
 applies_when:
   - "Storing, rendering or copying a guide section's Brief or a response"
-  - "Building the composition editor or its markdown round trip"
+  - "Building the write-up editor or its markdown round trip"
   - "Minting an `Answer` concept from a response at the promotion gate"
 tags:
   - adr-0015
-  - composition
+  - write-up
   - include
   - footnote
   - markdown
   - renderer
 ---
 
-# A composition cites its concept by a footnote labelled by the include
+# A write-up cites its concept by a footnote labelled by the include
 
 ## The decision
 
-A composition's prose (a guide section's Brief, a response) is stored as markdown. Every claim in it that rests on a concept carries a footnote: a markdown footnote reference labelled by the include's id (`…within 30 days[^i7].`).
+A write-up's prose (a guide section's Brief, a response) is stored as markdown. Every claim in it that rests on a concept carries a footnote: a markdown footnote reference labelled by the include's id (`…within 30 days[^i7].`).
 
 - The include row carries the concept's IRI, the context wording chosen (its heading and the hash of that section's text), the concept's content hash at generation and the cited span.
 - Footnote definitions are never stored. They are rendered from the include rows every time the prose is shown, exported or copied.
 - Rows own what is included and markers own placement, reconciled at save. A marker whose label has no include row is refused before a version is written. An include with no marker is allowed and shown "not placed". Deleting a marker never deletes its row.
-- Two footnote kinds share one syntax, and the page always says which. An OKF source footnote in a concept body has its definition in the file. An include marker in a composition has none.
+- Two footnote kinds share one syntax, and the page always says which. An OKF source footnote in a concept body has its definition in the file. An include marker in a write-up has none.
 
-There is one stored form, markdown, for compositions and concept bodies alike. There is one renderer: a pure function in `packages/` from prose, include rows and trust state to markdown. It has two profiles, one with trust words as text tags for the labelled export and one with none for the clipboard.
+There is one stored form, markdown, for write-ups and concept bodies alike. There is one renderer: a pure function in `packages/` from prose, include rows and trust state to markdown. It has two profiles, one with trust words as text tags for the labelled export and one with none for the clipboard.
 
 The editor is a view over that form.
 
@@ -53,8 +53,8 @@ The gate that treats uncited text as below threshold is the Editor's.
 - Footnote definitions stored in the prose: a stale title and source on every rename.
 - A rich-text editor storing JSON or HTML: two formats for one text.
 - Markdown source only: every Viewer becomes a markdown author, which fails the UX bar.
-- Autosave of compositions: a version per pause in an append-only table. An explicit save instead.
+- Autosave of write-ups: a version per pause in an append-only table. An explicit save instead.
 
 ## History
 
-The full record, with its one amendment (ticket 79, applied by T-001, making roles levels): `docs/archive/adr/0015-compositions-cite-concepts-by-footnote.md`.
+The full record, with its one amendment (ticket 79, applied by T-001, making roles levels): `docs/archive/adr/0015-write-ups-cite-concepts-by-footnote.md`.

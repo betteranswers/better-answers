@@ -74,7 +74,7 @@ TABLES: dict[str, dict[str, str]] = {
         "actor": "text NOT NULL",
         "committed_at": "timestamp with time zone NOT NULL",
     },
-    "public.composition": {
+    "public.write_up": {
         "workspace_id": "text NOT NULL",
         "id": "text NOT NULL",
         "published_at": "timestamp with time zone",
@@ -83,9 +83,9 @@ TABLES: dict[str, dict[str, str]] = {
         "audience_groups": "text[]",
         "created_at": "timestamp with time zone NOT NULL",
     },
-    "public.composition_include": {
+    "public.write_up_include": {
         "workspace_id": "text NOT NULL",
-        "composition_id": "text NOT NULL",
+        "write_up_id": "text NOT NULL",
         "id": "text NOT NULL",
         "ordinal": "integer NOT NULL",
         "iri": "text NOT NULL",

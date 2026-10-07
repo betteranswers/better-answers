@@ -19,7 +19,7 @@ import {
   visibilityOf,
   type Visibility,
 } from "../access/index.ts";
-import { recomputeCompositionsIncluding } from "../guides/index.ts";
+import { recomputeWriteUpsIncluding } from "../guides/index.ts";
 import type { ActorId, PlatformPrincipal, Principal } from "../kernel/index.ts";
 import { fileAt, type Committed, type GitDoor } from "../store/git/index.ts";
 import { writeConceptDelta } from "../store/map/index.ts";
@@ -287,7 +287,7 @@ const landEvidence = async (
 
 /**
  * Writes the concept's identity, evidence, citations, index row, bundle commit and map delta,
- * recomputes compositions when its visibility moved, and decides an accepted suggestion.
+ * recomputes write-ups when its visibility moved, and decides an accepted suggestion.
  * @throws when somebody else decided that suggestion first.
  */
 export const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<void> => {
@@ -356,7 +356,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
   });
 
   if (!sameVisibility(held, visibility)) {
-    await recomputeCompositionsIncluding(principal, tx, { iris: [index.iri] });
+    await recomputeWriteUpsIncluding(principal, tx, { iris: [index.iri] });
   }
   if (index.acceptance !== undefined) {
     await landAcceptance(tx, index, index.acceptance);

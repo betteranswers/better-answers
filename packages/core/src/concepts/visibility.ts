@@ -11,7 +11,7 @@ import {
   type VisibilityRow,
 } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
-import { recomputeCompositionsIncluding } from "../guides/index.ts";
+import { recomputeWriteUpsIncluding } from "../guides/index.ts";
 import {
   actorIdOf,
   attempt,
@@ -278,12 +278,12 @@ export type ConceptClassOverridden = {
 
   readonly visibility: Visibility;
 
-  readonly compositions: readonly string[];
+  readonly writeUps: readonly string[];
 };
 
 const OVERRIDE_IRI = boundarySchemas.conceptClassOverride.insert.shape.iri;
 
-/** Admin only. `compositions` names every composition including the concept, each recomputed. */
+/** Admin only. `writeUps` names every write-up including the concept, each recomputed. */
 export const overrideConceptClass = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -357,10 +357,10 @@ const writeOverride = async (
   });
   const cascaded = await attempt(async () => {
     await recomputeConceptVisibility(admin, tx, iri);
-    return recomputeCompositionsIncluding(admin, tx, { iris: [iri] });
+    return recomputeWriteUpsIncluding(admin, tx, { iris: [iri] });
   });
   if (!cascaded.ok) return err(cascaded.error);
-  return ok({ iri, auditEventId, visibility, compositions: cascaded.value });
+  return ok({ iri, auditEventId, visibility, writeUps: cascaded.value });
 };
 
 type ReadableEvidence = {

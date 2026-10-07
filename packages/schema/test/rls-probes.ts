@@ -106,7 +106,7 @@ export const A_SOURCE_DOCUMENT = `INSERT INTO source_document
          (workspace_id, id, connected_source_id, source_system_id, title, media_type, byte_size, original_key)
        VALUES ($1, $2, $3, $4, $5, 'text/markdown', $6, 'documents/x/original')`;
 
-export const A_COMPOSITION_INCLUDE = `INSERT INTO composition_include (workspace_id, composition_id, id, ordinal, iri)
+export const A_WRITE_UP_INCLUDE = `INSERT INTO write_up_include (workspace_id, write_up_id, id, ordinal, iri)
        VALUES ($1, $2, 'i9', 9, $3)`;
 
 export const A_CONCEPT_CLASS_OVERRIDE = `INSERT INTO concept_class_override

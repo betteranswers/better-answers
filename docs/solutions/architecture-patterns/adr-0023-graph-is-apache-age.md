@@ -6,9 +6,9 @@ problem_type: architecture_pattern
 component: map
 severity: high
 applies_when:
-  - "Writing a query that walks the map or reads a concept, a composition or a passage"
+  - "Writing a query that walks the map or reads a concept, a write-up or a passage"
   - "Adding a node, an edge or a column to the map tables"
-  - "Changing how a concept's or a composition's sensitivity and audience are derived"
+  - "Changing how a concept's or a write-up's sensitivity and audience are derived"
   - "Adding a citation path to the governed write"
 tags:
   - adr-0023
@@ -29,17 +29,17 @@ The engine is ADR 0032's: plain Postgres tables under RLS. This record holds the
 - Every node and edge carries `workspace_id` and the three visibility terms. `workspace_id` is a term of the `WHERE` on every element of every path, beside the read predicate.
 - The bundle-and-record delta lands in the api's commit transaction, beside the concept index row, the `bundle_commit` and the audit event. The map is never behind for an edit.
 - Generations survive only for full rebuilds. A rebuild writes the next generation beside the live one and swaps with one row update.
-- Keys are never text: concepts by IRI, sections by `(IRI, slug)`, source entities by `(document, type, normalised-text hash)`, actors by `(workspace, actor id)`, compositions by `(record id, version)`.
+- Keys are never text: concepts by IRI, sections by `(IRI, slug)`, source entities by `(document, type, normalised-text hash)`, actors by `(workspace, actor id)`, write-ups by `(record id, version)`.
 - A confirmed alias merge makes a canonical entity, each contribution hanging off it by `SAME_AS` under its own connected source, class and audience.
 - The label set is closed and owned by the migrations. A concept's kind is a property, never a label.
 - A `Person` concept starts Restricted whatever its evidence says. Only a recorded Admin override widens it.
 
-The read predicate (published · sensitivity · audience) lives once, as `readableClause` in `packages/core/src/access/index.ts`. It is tested against columns: `published_at`, `sensitivity`, `audience` and `audience_groups` on `concept_index`, `composition`, `map_node` and `map_edge`. For a passage it is tested against `index.readable_passage`'s columns, because a passage's visibility is read from its connected source and document and not carried (ADR 0044). The map door, `packages/core/src/store/map/index.ts`, applies it to every node and edge of a walk, and the template caps depth at 4.
+The read predicate (published · sensitivity · audience) lives once, as `readableClause` in `packages/core/src/access/index.ts`. It is tested against columns: `published_at`, `sensitivity`, `audience` and `audience_groups` on `concept_index`, `write_up`, `map_node` and `map_edge`. For a passage it is tested against `index.readable_passage`'s columns, because a passage's visibility is read from its connected source and document and not carried (ADR 0044). The map door, `packages/core/src/store/map/index.ts`, applies it to every node and edge of a walk, and the template caps depth at 4.
 
 A class is derived:
 
-- Most restrictive among the connected sources of the evidence a concept cites, and among a composition's includes.
-- Re-derived synchronously inside the narrowing act, two levels down: connected source, then concept, then composition.
+- Most restrictive among the connected sources of the evidence a concept cites, and among a write-up's includes.
+- Re-derived synchronously inside the narrowing act, two levels down: connected source, then concept, then write-up.
 - Audiences combine by intersection, with *everyone* the identity. An empty intersection forces Restricted (ADR 0039).
 - A unit resting on nothing takes its fallback: the writer's word on a creation, what the row holds on anything else.
 

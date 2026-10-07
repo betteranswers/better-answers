@@ -86,8 +86,8 @@ export const TABLE_OWNERS = {
   "public.concept_evidence": "concepts",
   "public.concept_class_override": "concepts",
 
-  "public.composition": "guides",
-  "public.composition_include": "guides",
+  "public.write_up": "guides",
+  "public.write_up_include": "guides",
 } satisfies Record<string, string>;
 
 export type OwnedTable = keyof typeof TABLE_OWNERS;
@@ -367,6 +367,6 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "guides",
     access: "read",
     reason:
-      "A composition's class is the most restrictive among its includes, read off the concepts' rows; the footnote read applies the concept's own predicate to every include, so a composition's citation is never a side door to a concept its reader may not see.",
+      "A write-up's class is the most restrictive among its includes, read off the concepts' rows; the footnote read applies the concept's own predicate to every include, so a write-up's citation is never a side door to a concept its reader may not see.",
   },
 ] as const satisfies readonly CrossOwnerAccess[];

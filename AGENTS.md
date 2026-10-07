@@ -2,7 +2,7 @@
 
 `AGENTS.md` is the canonical repo instruction file. Root `CLAUDE.md` is a file of its own that imports it: its first line is `@AGENTS.md`, and below that sits only the block GitNexus keeps.
 
-A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts, curated) → the **map** (derived). Over them the platform keeps **records** (guides, compositions, usage, connected sources, audit), which cite concepts. The destination this repo builds towards is `VISION.md`. Two runtime tiers share four stores: Postgres, an object store, a git repository per workspace, and the map as Postgres tables under RLS. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`. The map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
+A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts, curated) → the **map** (derived). Over them the platform keeps **records** (guides, write-ups, usage, connected sources, audit), which cite concepts. The destination this repo builds towards is `VISION.md`. Two runtime tiers share four stores: Postgres, an object store, a git repository per workspace, and the map as Postgres tables under RLS. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`. The map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
 
 ## Read first
 

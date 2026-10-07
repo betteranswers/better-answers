@@ -18,7 +18,7 @@ Three knowledge layers, and the platform's records over them:
 2. **Bundles** — the OKF concepts: the curated body of what the company knows, one trust-bearing unit per file, written to the spec and readable without the platform. OKF's structure is explicit, graph-shaped by default, providing rich queryable, traversable context, able to be reasoned over even before any extraction has taken place. Each concept file holds its own trust and credibility signals; portable; the company's asset.
 3. **Map** — derived from the bundles and the records: It keeps the shape of what the company knows standing as knowledge grows, and grows itself — from what each bundle already holds (people, teams, products, datasets, systems, policies) to the edges between them. 
 
-**Records** are what the platform keeps because it runs use cases: guides and their compositions, usage and outcomes, opportunities and responses, connected sources, audit, review. They cite concepts by IRI and never restate them. Where a unit lives is decided by the minting rule: a concept when a company with no platform would keep it as knowledge — the customer's Q&A pairs are concepts — a record when it exists only because the platform runs a use case.
+**Records** are what the platform keeps because it runs use cases: guides and their write-ups, usage and outcomes, opportunities and responses, connected sources, audit, review. They cite concepts by IRI and never restate them. Where a unit lives is decided by the minting rule: a concept when a company with no platform would keep it as knowledge — the customer's Q&A pairs are concepts — a record when it exists only because the platform runs a use case.
 
 Every layer answers questions; the path depends on the question — search over documents, traversal over concepts and the map as a tool that extends the bundles - "What breaks if this policy changes?" a recursive grep over files becomes one prepared map traversal.
 
@@ -40,8 +40,8 @@ Use cases, in the order they land:
 
 | Stage | Use case | What it needs from the knowledge system |
 | --- | --- | --- |
-| **v0.1 — single source of truth** (this map) | Product, service and sector guides; the bid libraries as `Answer` concepts; search and cited Q&A; answering a question set (a bid pack or proposal document) from the knowledge with citations; a read-only MCP surface; Control Centre (one Admin area; its sections are named in ticket 37); sensitivity, roles, coverage | The three layers; concepts-only bundle; compositions as records; trust and sensitivity; the concept write path |
-| **Next — bids and proposals** | Opportunities, versioned packs, extracted question sets with constraints, responses, submissions, outcomes; the outcome loop | The composition primitive with prompt = question; Q&A trust and provenance; the promotion gate |
+| **v0.1 — single source of truth** (this map) | Product, service and sector guides; the bid libraries as `Answer` concepts; search and cited Q&A; answering a question set (a bid pack or proposal document) from the knowledge with citations; a read-only MCP surface; Control Centre (one Admin area; its sections are named in ticket 37); sensitivity, roles, coverage | The three layers; concepts-only bundle; write-ups as records; trust and sensitivity; the concept write path |
+| **Next — bids and proposals** | Opportunities, versioned packs, extracted question sets with constraints, responses, submissions, outcomes; the outcome loop | The write-up primitive with prompt = question; Q&A trust and provenance; the promotion gate |
 | **Then** | Renewal packs; intelligence feeds as sources; take-action in connected systems as the user, approval-gated; proposals and prospecting | Acting credentials and the approval layer; feed entries as sources |
 | **Later** | Meeting notes, support-ticket sentiment, marketing campaigns, development documentation; customer-hosted deployment | Broader connectors; the customer-hosted worker |
 

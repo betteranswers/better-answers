@@ -228,13 +228,13 @@ const besideAnOpenNarrowing = async <T>(
   }
 };
 
-const compositionIncluding = (
+const writeUpIncluding = (
   workspaceId: string,
   iris: readonly string[],
   held: { readonly sensitivity?: string; readonly audienceGroups?: readonly string[] } = {},
 ): Promise<string> =>
   seededBy(db(), async (seed) => {
-    const composition = await seed.composition({
+    const writeUp = await seed.writeUp({
       workspaceId,
       ...(held.sensitivity === undefined ? {} : { sensitivity: held.sensitivity }),
       ...(held.audienceGroups === undefined
@@ -242,9 +242,9 @@ const compositionIncluding = (
         : { audience: "groups", audienceGroups: [...held.audienceGroups] }),
     });
     for (const [ordinal, iri] of iris.entries()) {
-      await seed.compositionInclude({ workspaceId, compositionId: composition.id, iri, ordinal });
+      await seed.writeUpInclude({ workspaceId, writeUpId: writeUp.id, iri, ordinal });
     }
-    return composition.id;
+    return writeUp.id;
   });
 
 describe("what a governed write derives from its cited connected sources", () => {
@@ -554,13 +554,13 @@ describe("what a re-write may not do to a concept's class", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
   });
 
-  it("takes the compositions along when a re-write narrows a concept", async () => {
+  it("takes the write-ups along when a re-write narrows a concept", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
-    const composition = await compositionIncluding(scenario.workspaceId, [written.iri]);
+    const writeUp = await writeUpIncluding(scenario.workspaceId, [written.iri]);
     const footnotes = () =>
-      reading(scenario.viewer, (viewer, tx) => footnotesOf(viewer, tx, composition));
+      reading(scenario.viewer, (viewer, tx) => footnotesOf(viewer, tx, writeUp));
     expect(await footnotes()).toEqual({
       ok: true,
       value: [{ label: expect.any(String), iri: written.iri, title: written.title }],
@@ -576,9 +576,10 @@ describe("what a re-write may not do to a concept's class", () => {
       sensitivity: "Restricted",
       ...EVERYONE,
     });
-    expect(
-      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
-    ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
+    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp)).toEqual({
+      sensitivity: "Restricted",
+      ...EVERYONE,
+    });
     expect(await footnotes()).toEqual({ ok: true, value: undefined });
   });
 });
@@ -591,7 +592,7 @@ const workspaceWithHrConnectedSource = async () => {
 };
 
 describe("narrowing a connected source", () => {
-  it("cascades to citing concepts and compositions, writing one audit event", async () => {
+  it("cascades to citing concepts and write-ups, writing one audit event", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const other = await connectedSourceHolding(db(), scenario.workspaceId);
@@ -600,10 +601,7 @@ describe("narrowing a connected source", () => {
       body: `See [the first note](/${cited.path}).`,
     });
     const untouched = await conceptCiting(scenario, scenario.editor, [other.documentId]);
-    const composition = await compositionIncluding(scenario.workspaceId, [
-      cited.iri,
-      untouched.iri,
-    ]);
+    const writeUp = await writeUpIncluding(scenario.workspaceId, [cited.iri, untouched.iri]);
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
@@ -618,7 +616,7 @@ describe("narrowing a connected source", () => {
       value: {
         connectedSourceId: connectedSource.connectedSourceId,
         concepts: [cited.iri, linked.iri].toSorted(),
-        compositions: [composition],
+        writeUps: [writeUp],
       },
     });
 
@@ -630,9 +628,7 @@ describe("narrowing a connected source", () => {
     expect(await edgeVisibilityHeld(db().pool, scenario.workspaceId, linked.iri)).toEqual([
       { sensitivity: "Restricted", ...EVERYONE },
     ]);
-    expect(
-      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
-    ).toEqual({
+    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp)).toEqual({
       sensitivity: "Restricted",
       ...EVERYONE,
     });
@@ -771,7 +767,7 @@ describe("narrowing a connected source", () => {
   it("narrows to named groups; an outside Viewer loses the concept", async () => {
     const { scenario, hr, connectedSource } = await workspaceWithHrConnectedSource();
     const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
-    const composition = await compositionIncluding(scenario.workspaceId, [written.iri]);
+    const writeUp = await writeUpIncluding(scenario.workspaceId, [written.iri]);
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
@@ -793,9 +789,9 @@ describe("narrowing a connected source", () => {
       ),
     ).toEqual(named);
     expect(await heldRow(scenario.workspaceId, written.iri)).toEqual(named);
-    expect(
-      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
-    ).toEqual(named);
+    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp)).toEqual(
+      named,
+    );
     const [viewer, editor] = await Promise.all(
       [scenario.viewer, scenario.editor].map((person) =>
         reading(person, (reader, tx) => open(reader, tx, { iri: written.iri }, now)),
@@ -957,17 +953,17 @@ describe("narrowing a connected source", () => {
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
 
-    const composition = await seededBy(db(), async (seed) => {
-      const page = await seed.composition({ workspaceId: scenario.workspaceId });
-      await seed.compositionInclude({
+    const writeUp = await seededBy(db(), async (seed) => {
+      const page = await seed.writeUp({ workspaceId: scenario.workspaceId });
+      await seed.writeUpInclude({
         workspaceId: scenario.workspaceId,
-        compositionId: page.id,
+        writeUpId: page.id,
         iri: written.iri,
         ordinal: 0,
       });
-      await seed.compositionInclude({
+      await seed.writeUpInclude({
         workspaceId: scenario.workspaceId,
-        compositionId: page.id,
+        writeUpId: page.id,
         ordinal: 1,
       });
       return page.id;
@@ -981,11 +977,12 @@ describe("narrowing a connected source", () => {
       }),
     );
 
-    expect(narrowed).toMatchObject({ ok: true, value: { compositions: [composition] } });
+    expect(narrowed).toMatchObject({ ok: true, value: { writeUps: [writeUp] } });
 
-    expect(
-      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
-    ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
+    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp)).toEqual({
+      sensitivity: "Restricted",
+      ...EVERYONE,
+    });
   });
 
   const narrowingBesideAParkedWrite = async (
@@ -1029,7 +1026,7 @@ describe("narrowing a connected source", () => {
     );
   });
 
-  it("recomputes a composition two acts reach, intersecting audiences to nobody", async () => {
+  it("recomputes a write-up two acts reach, intersecting audiences to nobody", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
     const sales = await groupNamed(db(), scenario, "Sales", [scenario.viewer]);
@@ -1038,14 +1035,11 @@ describe("narrowing a connected source", () => {
     const other = await connectedSourceHolding(db(), scenario.workspaceId);
     const narrowing = await conceptCiting(scenario, scenario.editor, [other.documentId]);
     const cited = await conceptCiting(scenario, scenario.editor, [open.documentId]);
-    const composition = await compositionIncluding(scenario.workspaceId, [
-      narrowing.iri,
-      cited.iri,
-    ]);
+    const writeUp = await writeUpIncluding(scenario.workspaceId, [narrowing.iri, cited.iri]);
 
     await narrowingBesideAParkedWrite(
       scenario,
-      "composition",
+      "write_up",
       "UPDATE",
       () => rewriteCiting(scenario, scenario.editor, narrowing, [forHr.documentId]),
       {
@@ -1056,9 +1050,10 @@ describe("narrowing a connected source", () => {
       },
     );
 
-    expect(
-      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
-    ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
+    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp)).toEqual({
+      sensitivity: "Restricted",
+      ...EVERYONE,
+    });
   });
 
   it("serialises narrowings of two sources one concept cites, never deadlocking", async () => {
@@ -1145,7 +1140,7 @@ describe("narrowing a connected source", () => {
 });
 
 describe("publishing a connected source", () => {
-  it("releases its recorded class to citing concepts and compositions only", async () => {
+  it("releases its recorded class to citing concepts and write-ups only", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const unpublishedForHr = {
@@ -1162,7 +1157,7 @@ describe("publishing a connected source", () => {
     const other = await connectedSourceHolding(db(), scenario.workspaceId, unpublishedForHr);
     const cited = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
     const untouched = await conceptCiting(scenario, scenario.editor, [other.documentId]);
-    const composition = await compositionIncluding(scenario.workspaceId, [cited.iri], {
+    const writeUp = await writeUpIncluding(scenario.workspaceId, [cited.iri], {
       sensitivity: "Restricted",
       audienceGroups: [hr],
     });
@@ -1178,9 +1173,9 @@ describe("publishing a connected source", () => {
     expect(published.ok).toBe(true);
     const internalToHr = { sensitivity: "Internal", audience: "groups", audience_groups: [hr] };
     expect(await rowAndNode(scenario.workspaceId, cited.iri)).toEqual(bothAt(internalToHr));
-    expect(
-      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
-    ).toEqual(internalToHr);
+    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp)).toEqual(
+      internalToHr,
+    );
     expect(await heldRow(scenario.workspaceId, untouched.iri)).toEqual(restrictedToHr);
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
@@ -1238,7 +1233,7 @@ describe("widening a connected source", () => {
     const other = await connectedSourceForGroups(db(), scenario.workspaceId, [hr], "Restricted");
     const cited = await conceptCiting(scenario, scenario.admin, [connectedSource.documentId]);
     const untouched = await conceptCiting(scenario, scenario.admin, [other.documentId]);
-    const composition = await compositionIncluding(scenario.workspaceId, [cited.iri], {
+    const writeUp = await writeUpIncluding(scenario.workspaceId, [cited.iri], {
       sensitivity: "Restricted",
       audienceGroups: [hr],
     });
@@ -1259,7 +1254,7 @@ describe("widening a connected source", () => {
         connectedSourceId: connectedSource.connectedSourceId,
         visibility: { sensitivity: "Internal", audience: "everyone", audienceGroups: null },
         concepts: [cited.iri],
-        compositions: [composition],
+        writeUps: [writeUp],
       },
     });
     const internal = { sensitivity: "Internal", ...EVERYONE };
@@ -1272,9 +1267,9 @@ describe("widening a connected source", () => {
       ),
     ).toEqual(internal);
     expect(await rowAndNode(scenario.workspaceId, cited.iri)).toEqual(bothAt(internal));
-    expect(
-      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
-    ).toEqual(internal);
+    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp)).toEqual(
+      internal,
+    );
     expect(await passageVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
       internal,
     ]);
@@ -1610,25 +1605,23 @@ describe("an Admin's recorded override", () => {
       kind: "Person",
       frontmatter: { title: "Ada Lovelace", type: "Person" },
     });
-    const composition = await compositionIncluding(scenario.workspaceId, [person.iri]);
+    const writeUp = await writeUpIncluding(scenario.workspaceId, [person.iri]);
 
     await db().pool.query(
-      "UPDATE composition SET sensitivity = 'Restricted' WHERE workspace_id = $1 AND id = $2",
-      [scenario.workspaceId, composition],
+      "UPDATE write_up SET sensitivity = 'Restricted' WHERE workspace_id = $1 AND id = $2",
+      [scenario.workspaceId, writeUp],
     );
 
     const overridden = await overriddenTo(scenario, person.iri, "Internal");
 
     expect(overridden).toMatchObject({
       ok: true,
-      value: { iri: person.iri, compositions: [composition] },
+      value: { iri: person.iri, writeUps: [writeUp] },
     });
     expect(await rowAndNode(scenario.workspaceId, person.iri)).toEqual(
       bothAt({ sensitivity: "Internal", ...EVERYONE }),
     );
-    expect(
-      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
-    ).toEqual({
+    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp)).toEqual({
       sensitivity: "Internal",
       ...EVERYONE,
     });

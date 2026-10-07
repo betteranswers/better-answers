@@ -32,7 +32,7 @@ tags:
 
 Better Auth 1.7.5 deletes every expired row in its `verification` table each time `findVerificationValue` runs, unless `verification.disableCleanup` is set (`apps/api/node_modules/better-auth/dist/db/internal-adapter.mjs:753-757`). So any person's sign-in deleted every other person's sign-in code once it had expired. A person who then typed their own just-expired code was told it was wrong, with tries left, instead of that it was spent.
 
-That table is the library's store of short-lived tokens: sign-in codes and links, OAuth state, trusted devices and locks. It is not the glossary's _verification_, which is the platform's check of a concept or a composition.
+That table is the library's store of short-lived tokens: sign-in codes and links, OAuth state, trusted devices and locks. It is not the glossary's _verification_, which is the platform's check of a concept or a write-up.
 
 ## Symptoms
 

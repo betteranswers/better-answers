@@ -8,7 +8,6 @@ import {
 } from "./access-request-tables.ts";
 import { ACTOR_ID as ACTOR_ID_REGEX } from "./actor-id.ts";
 import { ACT, auditEvent, FAMILIES, identityAuditEvent } from "./audit-tables.ts";
-import { composition, compositionInclude } from "./composition-tables.ts";
 import {
   bundleCommit,
   CONCEPT_FRONTMATTER_MAX,
@@ -111,6 +110,7 @@ import {
 import { testWorkspaceMark } from "./test-workspace-tables.ts";
 import { ULID } from "./ulid.ts";
 import { workspace } from "./workspace-table.ts";
+import { writeUp, writeUpInclude } from "./write-up-tables.ts";
 
 const workspaceId = (schema: z.ZodString) => schema.regex(ULID).brand<"WorkspaceId">();
 const userId = (schema: z.ZodString) => schema.regex(ULID).brand<"UserId">();
@@ -119,7 +119,7 @@ const groupId = (schema: z.ZodString) => schema.regex(ULID).brand<"GroupId">();
 
 const connectedSourceId = (schema: z.ZodString) => schema.regex(ULID).brand<"ConnectedSourceId">();
 
-const compositionId = (schema: z.ZodString) => schema.regex(ULID).brand<"CompositionId">();
+const writeUpId = (schema: z.ZodString) => schema.regex(ULID).brand<"WriteUpId">();
 
 const identityId = (schema: z.ZodString) => schema.regex(ULID);
 
@@ -714,36 +714,27 @@ export const suppressionSelect = createSelectSchema(suppression, suppressionRefi
 export const suppressionInsert = createInsertSchema(suppression, suppressionRefinements);
 export const suppressionUpdate = createUpdateSchema(suppression, suppressionRefinements);
 
-const compositionRefinements = {
+const writeUpRefinements = {
   workspaceId,
-  id: compositionId,
+  id: writeUpId,
   ...readableUnit,
 };
 
-export const compositionSelect = createSelectSchema(composition, compositionRefinements);
-export const compositionInsert = createInsertSchema(composition, compositionRefinements);
-export const compositionUpdate = createUpdateSchema(composition, compositionRefinements);
+export const writeUpSelect = createSelectSchema(writeUp, writeUpRefinements);
+export const writeUpInsert = createInsertSchema(writeUp, writeUpRefinements);
+export const writeUpUpdate = createUpdateSchema(writeUp, writeUpRefinements);
 
-const compositionIncludeRefinements = {
+const writeUpIncludeRefinements = {
   workspaceId,
-  compositionId,
+  writeUpId,
   id: (schema: z.ZodString) => schema.trim().min(1),
   ordinal: (schema: z.ZodNumber) => schema.int().nonnegative(),
   iri: conceptIri,
 };
 
-export const compositionIncludeSelect = createSelectSchema(
-  compositionInclude,
-  compositionIncludeRefinements,
-);
-export const compositionIncludeInsert = createInsertSchema(
-  compositionInclude,
-  compositionIncludeRefinements,
-);
-export const compositionIncludeUpdate = createUpdateSchema(
-  compositionInclude,
-  compositionIncludeRefinements,
-);
+export const writeUpIncludeSelect = createSelectSchema(writeUpInclude, writeUpIncludeRefinements);
+export const writeUpIncludeInsert = createInsertSchema(writeUpInclude, writeUpIncludeRefinements);
+export const writeUpIncludeUpdate = createUpdateSchema(writeUpInclude, writeUpIncludeRefinements);
 
 const mapLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
   schema.refine(
@@ -1102,16 +1093,16 @@ export const boundarySchemas = {
     insert: suppressionInsert,
     update: suppressionUpdate,
   },
-  composition: {
-    table: composition,
-    select: compositionSelect,
-    insert: compositionInsert,
-    update: compositionUpdate,
+  writeUp: {
+    table: writeUp,
+    select: writeUpSelect,
+    insert: writeUpInsert,
+    update: writeUpUpdate,
   },
-  compositionInclude: {
-    table: compositionInclude,
-    select: compositionIncludeSelect,
-    insert: compositionIncludeInsert,
-    update: compositionIncludeUpdate,
+  writeUpInclude: {
+    table: writeUpInclude,
+    select: writeUpIncludeSelect,
+    insert: writeUpIncludeInsert,
+    update: writeUpIncludeUpdate,
   },
 } as const;

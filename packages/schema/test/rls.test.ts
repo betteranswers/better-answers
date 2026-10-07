@@ -26,7 +26,7 @@ import {
   A_BUNDLE_COMMIT,
   A_BUNDLE_COMMIT_WITH_A_PARENT,
   A_CITATION,
-  A_COMPOSITION_INCLUDE,
+  A_WRITE_UP_INCLUDE,
   A_CONCEPT_CLASS_OVERRIDE,
   A_CONCEPT_IDENTITY,
   A_CONCEPT_INDEX_ROW,
@@ -2097,11 +2097,7 @@ describe("the audience pair on every readable unit", () => {
       "connected_source_audience_check",
       (seed) => seed.connectedSource({ workspaceId: WS_A }),
     ],
-    [
-      "composition",
-      "composition_audience_check",
-      (seed) => seed.composition({ workspaceId: WS_A }),
-    ],
+    ["write_up", "write_up_audience_check", (seed) => seed.writeUp({ workspaceId: WS_A })],
     [
       "concept_class_override",
       "concept_class_override_audience_check",
@@ -2209,8 +2205,8 @@ describe("the derivation's tables under app_rt", () => {
     "source_document",
     "concept_evidence",
     "concept_class_override",
-    "composition",
-    "composition_include",
+    "write_up",
+    "write_up_include",
   ] as const;
 
   const seedOneOfEach = async (seed: TestData, workspaceId: string) => {
@@ -2226,8 +2222,8 @@ describe("the derivation's tables under app_rt", () => {
       sourceDocumentId: document.id,
     });
     await seed.conceptClassOverride({ workspaceId, iri: identity.iri });
-    const composed = await seed.composition({ workspaceId });
-    await seed.compositionInclude({ workspaceId, compositionId: composed.id, iri: identity.iri });
+    const composed = await seed.writeUp({ workspaceId });
+    await seed.writeUpInclude({ workspaceId, writeUpId: composed.id, iri: identity.iri });
     return { connectedSource, document, identity, cited, composed };
   };
 
@@ -2251,8 +2247,8 @@ describe("the derivation's tables under app_rt", () => {
   const REFUSED_TO_THE_WORKER = [
     "concept_evidence",
     "concept_class_override",
-    "composition",
-    "composition_include",
+    "write_up",
+    "write_up_include",
   ] as const;
 
   it("limits the worker to reading and reconciling sources and documents", async () => {
@@ -2360,9 +2356,9 @@ describe("the derivation's tables under app_rt", () => {
           "source_document_connected_source_fk",
         ],
         [
-          A_COMPOSITION_INCLUDE,
+          A_WRITE_UP_INCLUDE,
           [WS_A, ours.composed.id, theirs.identity.iri],
-          "composition_include_identity_fk",
+          "write_up_include_identity_fk",
         ],
         [
           A_CONCEPT_CLASS_OVERRIDE,
@@ -2431,12 +2427,12 @@ describe("the derivation's tables under app_rt", () => {
         await countedRows(client, [
           "concept_evidence",
           "concept_class_override",
-          "composition_include",
+          "write_up_include",
         ]),
       ).toEqual([
         { table: "concept_evidence", rows: 0 },
         { table: "concept_class_override", rows: 0 },
-        { table: "composition_include", rows: 0 },
+        { table: "write_up_include", rows: 0 },
       ]);
     });
   });

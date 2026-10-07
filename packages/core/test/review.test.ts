@@ -284,8 +284,8 @@ const documentHeldAboveItsConnectedSource = async (workspaceId: string) => {
 
 const pageIncluding = (workspaceId: string, iri: string): Promise<string> =>
   seededBy(db(), async (seed) => {
-    const page = await seed.composition({ workspaceId });
-    await seed.compositionInclude({ workspaceId, compositionId: page.id, iri, ordinal: 0 });
+    const page = await seed.writeUp({ workspaceId });
+    await seed.writeUpInclude({ workspaceId, writeUpId: page.id, iri, ordinal: 0 });
     return page.id;
   });
 
@@ -1121,7 +1121,7 @@ describe("an Admin narrowing named documents", () => {
 
     expect(outcome).toMatchObject({
       ok: true,
-      value: { concepts: [citing.iri], compositions: [page] },
+      value: { concepts: [citing.iri], writeUps: [page] },
     });
     expect(
       await visibilityHeld(db().pool, "concept_index", scenario.workspaceId, citing.iri),
@@ -1130,9 +1130,9 @@ describe("an Admin narrowing named documents", () => {
       await visibilityHeld(db().pool, "concept_index", scenario.workspaceId, untouched.iri),
     ).toMatchObject({ sensitivity: "Internal" });
 
-    expect(
-      await visibilityHeld(db().pool, "composition", scenario.workspaceId, page),
-    ).toMatchObject({ sensitivity: "Restricted" });
+    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, page)).toMatchObject({
+      sensitivity: "Restricted",
+    });
   });
 
   it("hides a narrowed document from a Viewer, not its sibling", async () => {

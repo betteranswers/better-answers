@@ -66,7 +66,7 @@ export const syncMoving = z.object({
 type SeededDocument = {
   readonly documentId: string;
   readonly title: string;
-  readonly citedBy: { readonly iri: string; readonly compositionId: string } | null;
+  readonly citedBy: { readonly iri: string; readonly writeUpId: string } | null;
 };
 
 type SeededConnectedSource = {
@@ -178,14 +178,14 @@ const seedPassages = async (
 const citationOf = async (seed: TestData, workspaceId: string, documentId: string) => {
   const concept = await seed.conceptIndex({ workspaceId, title: "Supplier payments" });
   await seed.conceptEvidence({ workspaceId, iri: concept.iri, sourceDocumentId: documentId });
-  const composition = await seed.composition({ workspaceId });
-  await seed.compositionInclude({
+  const writeUp = await seed.writeUp({ workspaceId });
+  await seed.writeUpInclude({
     workspaceId,
-    compositionId: composition.id,
+    writeUpId: writeUp.id,
     iri: concept.iri,
     ordinal: 0,
   });
-  return { iri: concept.iri, compositionId: composition.id };
+  return { iri: concept.iri, writeUpId: writeUp.id };
 };
 
 const syncColumns = (
