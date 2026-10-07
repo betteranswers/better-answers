@@ -28,13 +28,11 @@
   "apps/web/src/features/sources/refusal-words.ts": {
     "check": 1,
     "class": 3,
-    "finding group": 5,
-    "run": 2
+    "finding group": 5
   },
   "apps/web/src/features/sources/words.ts": {
     "act": 1,
-    "bundle": 2,
-    "run": 4
+    "bundle": 2
   },
   "apps/web/src/shared/navigation.ts": {
     "act": 1,
@@ -44,14 +42,12 @@
     "domain": 2,
     "priced plan": 1,
     "Queue": 1,
-    "run": 1,
     "slug": 1
   },
   "apps/web/src/shared/refusal-words.ts": {
     "check": 1
   },
   "apps/web/src/shared/role-words.ts": {
-    "check": 3,
-    "run": 1
+    "check": 3
   }
 }

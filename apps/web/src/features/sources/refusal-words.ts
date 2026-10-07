@@ -17,14 +17,14 @@ export const SAID_OF_A_CONNECTED_SOURCE = {
   },
   "no-such-finding": {
     why: "This connected source holds no span of one of the ticked finding groups.",
-    next: "Review the connected source again; its last run may have moved on.",
+    next: "Review the connected source again; its last sync may have moved on.",
   },
   "already-published": {
     why: "This connected source is already published.",
     next: "Narrow it if it reaches too far.",
   },
   "not-indexed": {
-    why: "The connected source's index run has not finished.",
+    why: "The connected source's sync has not finished.",
     next: "Publish once its state reads indexed.",
   },
   "confirmation-missing": {

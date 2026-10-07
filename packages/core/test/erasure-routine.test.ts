@@ -2027,7 +2027,7 @@ const everyConnectedSourceWiped = (
 });
 
 describe("the wipe of every connected source the map found", () => {
-  it("deletes each source's passages, queueing its index run as wiped", async () => {
+  it("deletes each source's passages, queueing its sync as wiped", async () => {
     const arranged = await aMapOverTwoOfThreeConnectedSources();
 
     const rederived = await rederivingOver(arranged.scenario, arranged.found, null);
@@ -2062,7 +2062,7 @@ describe("the wipe of every connected source the map found", () => {
     );
   });
 
-  it("wipes restored rows on a replay, queueing no second run", async () => {
+  it("wipes restored rows on a replay, queueing no second sync", async () => {
     const arranged = await aMapOverTwoOfThreeConnectedSources();
 
     await rederivingOver(arranged.scenario, arranged.found, null);

@@ -44,7 +44,7 @@ A document's own class only narrows its connected source's.
 
 An unpublished connected source derives as Restricted until its publish.
 
-- The publish is let through only once the connected source's latest index run is done.
+- The publish is let through only once the connected source's latest sync is done.
 - The publish releases the connected source's class down the cascade.
 
 An Admin's recorded widen act (`widenConnectedSource`, in the `sources` slice) is the one road by which a connected source widens.
@@ -60,7 +60,7 @@ An Admin's recorded widen act (`widenConnectedSource`, in the `sources` slice) i
 - A live read through a credential is the only honest way to cite a system the company has chosen not to copy.
 - Publishing is a legal act with confirmations: lawful basis recorded, privacy information updated, a DPIA reference. Sensitivity alone cannot say "not yet" or "for one group only".
 - A concept's citation must survive the document it rests on, or trust is a lie.
-- The publish reads the latest index job, because publishing says somebody reviewed what the run found.
+- The publish reads the latest index job, because publishing says somebody reviewed what the sync found.
 - A converter's normalised text is the address space every span and every content hash is read against. Swapping a converter's output reprocesses every document of that type and sends every citation into them to citation repair.
 - Conversion runs before the redaction seam, so its input is unredacted. A hosted parser is refused.
 - A document has no audience of its own, because an audience is a decision about people and a connected source is where that decision is made.

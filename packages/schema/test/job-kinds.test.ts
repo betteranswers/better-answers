@@ -441,7 +441,7 @@ const withTheRetiredWordAdmitted = async (
   });
 };
 
-describe("the migration that retired a run reason", () => {
+describe("the migration that retired a sync reason", () => {
   it("deletes every row with the word, any status, any workspace", async () => {
     await withTheRetiredWordAdmitted(async (client) => {
       await seedQueuedJob(client, WS, { ...RETIRED, subjectId: CONNECTED_SOURCE });

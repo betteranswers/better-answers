@@ -132,7 +132,7 @@ const findingGroupIn = (
 
 const SORT_CODE_RULE = { rule_id: "sort-code-with-account-number" };
 
-const finishedIndexRun = (
+const finishedSync = (
   workspaceId: string,
   connectedSourceId: string,
   finishedAt: string,
@@ -492,7 +492,7 @@ describe("the review read of a connected source's findings", () => {
     expect(read.ok ? read.value.map((group) => group.sensitivity) : []).toEqual(["Restricted"]);
   });
 
-  it("omits spans and groups the last run no longer raises", async () => {
+  it("omits spans and groups the last sync no longer raises", async () => {
     const scenario = await arrange();
     const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
@@ -509,22 +509,22 @@ describe("the review read of a connected source's findings", () => {
     ).toEqual([{ ruleId: "sort-code-with-account-number", found: 1 }]);
   });
 
-  it("counts kept spans the last finished run withheld for erasure", async () => {
+  it("counts kept spans the last finished sync withheld for erasure", async () => {
     const scenario = await arrange();
     const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId, { charStart: 54, charEnd: 97 });
     await findingIn(scenario.workspaceId, first.documentId, { charStart: 120, charEnd: 128 });
     await findingIn(scenario.workspaceId, second.documentId, { charStart: 54, charEnd: 97 });
-    await finishedIndexRun(scenario.workspaceId, connectedSourceId, "2026-09-20T10:00:00.000Z", [
+    await finishedSync(scenario.workspaceId, connectedSourceId, "2026-09-20T10:00:00.000Z", [
       { ...SORT_CODE_RULE, document_id: second.documentId, char_start: 54, char_end: 97 },
     ]);
-    await finishedIndexRun(scenario.workspaceId, connectedSourceId, "2026-09-20T11:00:00.000Z", [
+    await finishedSync(scenario.workspaceId, connectedSourceId, "2026-09-20T11:00:00.000Z", [
       { ...SORT_CODE_RULE, document_id: first.documentId, char_start: 54, char_end: 97 },
     ]);
     const elsewhere = await connectedSourceHolding(db(), scenario.workspaceId, {
       sensitivity: "Internal",
     });
-    await finishedIndexRun(
+    await finishedSync(
       scenario.workspaceId,
       elsewhere.connectedSourceId,
       "2026-09-20T13:00:00.000Z",
@@ -590,7 +590,7 @@ describe("the review read of a connected source's findings", () => {
     expect(read.ok).toBe(false);
     expect(read.ok ? undefined : read.error).toEqual(
       new Error(
-        "the connected source's last index run names the kept spans an erasure overrode in a shape the review cannot read",
+        "the connected source's last sync names the kept spans an erasure overrode in a shape the review cannot read",
       ),
     );
   });
@@ -638,7 +638,7 @@ describe("the review read of a connected source's findings", () => {
     const scenario = await arrange();
     const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId, { charStart: 54, charEnd: 97 });
-    await finishedIndexRun(scenario.workspaceId, connectedSourceId, "2026-09-20T11:00:00.000Z", [
+    await finishedSync(scenario.workspaceId, connectedSourceId, "2026-09-20T11:00:00.000Z", [
       { ...SORT_CODE_RULE, document_id: first.documentId, char_start: 54, char_end: 97 },
     ]);
 
@@ -680,7 +680,7 @@ const keepingTwoGroupsOfThree = async (scenario: Scenario) => {
 };
 
 describe("an Admin keeping named finding groups in the text", () => {
-  it("restores every span in one batch, queueing one index run", async () => {
+  it("restores every span in one batch, queueing one sync", async () => {
     const scenario = await arrange();
 
     const { connectedSourceId, first, second, kept, keptBesideIt, alsoKept, left, spans, outcome } =
@@ -726,7 +726,7 @@ describe("an Admin keeping named finding groups in the text", () => {
     ]);
   });
 
-  it("rejects, keeping no span, when the queue refuses its run", async () => {
+  it("rejects, keeping no span, when the queue refuses its sync", async () => {
     const scenario = await arrange();
     const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const kept = await findingIn(scenario.workspaceId, first.documentId);
@@ -811,7 +811,7 @@ describe("an Admin keeping named finding groups in the text", () => {
   it.each([
     ["an Editor", (scenario: Scenario) => scenario.editor, "role-forbids"],
     ["a Viewer", (scenario: Scenario) => scenario.viewer, "role-forbids"],
-  ] as const)("refuses %s, moving neither a row nor a run", async (_who, personOf, refusal) => {
+  ] as const)("refuses %s, moving neither a row nor a sync", async (_who, personOf, refusal) => {
     const scenario = await arrange();
     const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId);
@@ -878,7 +878,7 @@ describe("an Admin keeping named finding groups in the text", () => {
     expect(await jobsOf(scenario.workspaceId)).toEqual([]);
   });
 
-  it("keeps only the spans the last run raised", async () => {
+  it("keeps only the spans the last sync raised", async () => {
     const scenario = await arrange();
     const { connectedSourceId, group, raised, dropped } = await aGroupHoldingADroppedSpan(scenario);
 
@@ -986,7 +986,7 @@ describe("an Admin narrowing named documents", () => {
     expect(await reviewOf(scenario.workspaceId, siblings)).toEqual(UNREVIEWED);
   });
 
-  it("reviews no span the last run no longer raises", async () => {
+  it("reviews no span the last sync no longer raises", async () => {
     const scenario = await arrange();
     const { connectedSourceId, group, raised, dropped } = await aGroupHoldingADroppedSpan(scenario);
 
@@ -1066,7 +1066,7 @@ describe("an Admin narrowing named documents", () => {
     );
   });
 
-  it("leaves a keep's queued run standing and queues none itself", async () => {
+  it("leaves a keep's queued sync standing and queues none itself", async () => {
     const scenario = await arrange();
     const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
@@ -1271,7 +1271,7 @@ describe("an Admin dismissing finding groups as not special category", () => {
     expect(await reviewOf(scenario.workspaceId, left)).toEqual(UNREVIEWED);
   });
 
-  it("writes a batched audit event per document, queueing one run", async () => {
+  it("writes a batched audit event per document, queueing one sync", async () => {
     const scenario = await arrange();
 
     const { connectedSourceId, first, second, outcome } =
@@ -1329,7 +1329,7 @@ describe("an Admin dismissing finding groups as not special category", () => {
     ]);
   });
 
-  it("dismisses only the spans the last run raised", async () => {
+  it("dismisses only the spans the last sync raised", async () => {
     const scenario = await arrange();
     const { connectedSourceId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const raised = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
@@ -1370,7 +1370,7 @@ describe("an Admin dismissing finding groups as not special category", () => {
   });
 
   it.each([
-    ["the queue refuses its run", "job"],
+    ["the queue refuses its sync", "job"],
     ["the audit log refuses", "audit_event"],
   ] as const)("rejects, dismissing no span, when %s", async (_when, table) => {
     const scenario = await arrange();
@@ -1391,7 +1391,7 @@ describe("an Admin dismissing finding groups as not special category", () => {
   it.each([
     ["an Editor", (scenario: Scenario) => scenario.editor],
     ["a Viewer", (scenario: Scenario) => scenario.viewer],
-  ] as const)("refuses %s, moving neither a row nor a run", async (_who, personOf) => {
+  ] as const)("refuses %s, moving neither a row nor a sync", async (_who, personOf) => {
     const scenario = await arrange();
     const { connectedSourceId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
@@ -1533,7 +1533,7 @@ describe("the reprocess that follows a review", () => {
   });
 
   it.each(REASONS_EMPTYING_THE_CONNECTED_SOURCE)(
-    "hands the keep's still-queued run the reason %s",
+    "hands the keep's still-queued sync the reason %s",
     async (reason) => {
       const scenario = await arrange();
       const { connectedSourceId } = await keepingTwoGroupsOfThree(scenario);

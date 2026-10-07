@@ -124,7 +124,7 @@ export function ConnectAct() {
           setOpen(false);
           setOutcome({
             tone: "said",
-            words: `Connected “${name}”: ${file.name} was received and its index run is queued.`,
+            words: `Connected “${name}”: ${file.name} was received and its sync is queued.`,
           });
         },
         onError: (failure) => {
@@ -149,7 +149,7 @@ export function ConnectAct() {
         open={open}
         onOpenChange={setOpen}
         title="Connect a document"
-        consequence="The connected source starts unpublished: nobody but an Admin reads a word of it until you publish it. Its index run starts once the file lands."
+        consequence="The connected source starts unpublished: nobody but an Admin reads a word of it until you publish it. Its sync starts once the file lands."
         commit={
           <Button type="submit" form={ids.form} disabled={connect.isPending}>
             {connect.isPending ? "Connecting the document" : "Connect the document"}

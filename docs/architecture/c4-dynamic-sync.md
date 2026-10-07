@@ -1,12 +1,12 @@
-# Dynamic — the worker's index run
+# Dynamic — the worker's sync
 
-One `index` job as `pipeline/run.py`'s `index_connected_source` runs it, for one connected source, whatever reason queued it. The order is the guarantee: **convert outside every memo, detect under the one memo, withhold, then write** — the normalised copy, the findings and the catalogue, and only then the passages. A document the run cannot read is quarantined and the run goes on. No model is called and nothing embeds. The acts that queue a run, and the reason each carries, are `c4-dynamic-review-and-reindex.md`.
+One `index` job as `pipeline/run.py`'s `index_connected_source` runs it, for one connected source, whatever reason queued it. The order is the guarantee: **convert outside every memo, detect under the one memo, withhold, then write** — the normalised copy, the findings and the catalogue, and only then the passages. A document the sync cannot read is quarantined and the sync goes on. No model is called and nothing embeds. The acts that queue a sync, and the reason each carries, are `c4-dynamic-review-and-reindex.md`.
 
 ```mermaid
 C4Dynamic
-  title Dynamic diagram — one index run, from the claim to the passages
+  title Dynamic diagram — one sync, from the claim to the passages
 
-  Container(loop, "loop.py and KINDS", "Python 3.13", "claim_job with the three kinds; the heartbeat beside the run")
+  Container(loop, "loop.py and KINDS", "Python 3.13", "claim_job with the three kinds; the heartbeat beside the sync")
 
   Container_Boundary(pipeline, "apps/worker — pipeline/ and redaction/") {
     Component(run, "run.py — index_connected_source", "the host", "Opens the connected source's two stores and the workspace's pool")
@@ -40,11 +40,11 @@ C4Dynamic
   UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
 
-## What the run guarantees
+## What the sync guarantees
 
 - **No memo holds text.** `detected(normalised_text, detection_key)` is the one memoised function, its value spans — rule id, offsets, score. The worker's suite holds both stores to holding neither the text nor a withheld span, nor an erased person's name after a wipe (ADR 0036, amended 2026-09-23).
-- **A fix reaches every document with no version to bump.** Conversion, the block rule, pseudonyms and the withholding run outside the memo on every run, and `CONVERTER_PIN` is in no memo key: a converter upgrade re-detects only the documents whose normalised text it changed. The memo moves with the *detection key* — the digest of what the detector reads: recognisers and pins, thresholds, context lemmas, the consumer-domain list, the window rule. The version a finding carries, `rule_version:detector_pin`, is the seam's output and never the memo's key (`CONCEPTS.md`, *detection key*).
+- **A fix reaches every document with no version to bump.** Conversion, the block rule, pseudonyms and the withholding take place outside the memo on every sync, and `CONVERTER_PIN` is in no memo key: a converter upgrade re-detects only the documents whose normalised text it changed. The memo moves with the *detection key* — the digest of what the detector reads: recognisers and pins, thresholds, context lemmas, the consumer-domain list, the window rule. The version a finding carries, `rule_version:detector_pin`, is the seam's output and never the memo's key (`CONCEPTS.md`, *detection key*).
 - **A document's class is on its row before any passage of it lands.** Step 12 commits before step 13: the seam's special-category verdict only narrows the document, through `narrower_class`, and a verdict every one of whose findings an Admin dismissed is lifted back to the Admin's own narrowing or the connected source's class (ADR 0044). No passage row carries visibility.
-- **Quarantine is an outcome, never a failure.** A page with no text layer, an encrypted file, a truncated upload, a type with no converter and a conversion past its ceiling — 6,453 ms a page plus 93 s — all land as *quarantined* with a *quarantine error* naming what refused it; the run lands the connected source's other documents and finishes (`CONCEPTS.md`, *quarantined*).
-- **Emptying a connected source is two halves.** The act that queued a `wiped` or `rule-change` run deleted the connected source's passage rows in its own transaction; step 3 removes `connected_source/`, the engine's record of what it landed, so step 13 lands every row again (the `emptying-a-connected-source` agreement).
+- **Quarantine is an outcome, never a failure.** A page with no text layer, an encrypted file, a truncated upload, a type with no converter and a conversion past its ceiling — 6,453 ms a page plus 93 s — all land as *quarantined* with a *quarantine error* naming what refused it; the sync lands the connected source's other documents and finishes (`CONCEPTS.md`, *quarantined*).
+- **Emptying a connected source is two halves.** The act that queued a `wiped` or `rule-change` sync deleted the connected source's passage rows in its own transaction; step 3 removes `connected_source/`, the engine's record of what it landed, so step 13 lands every row again (the `emptying-a-connected-source` agreement).
 - **An erasure outranks an Admin's keep.** A suppression names identifiers the seam withholds whatever the review said, and a kept span it names is *overridden by the erasure* and counted in the outcome. Since T-375 a suppression is the workspace's, one row per request, read for every document; since T-376 the seam withholds every exact, case-folded occurrence of its identifiers, detected or not, as an erasure match: always tier, no finding row, no review and no keep that releases it.

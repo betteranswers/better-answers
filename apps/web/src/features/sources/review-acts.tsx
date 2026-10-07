@@ -218,7 +218,7 @@ export function KeepInTextAct(properties: { readonly connectedSourceId: string }
     act.command({
       pending: `Keeping ${named} in text.`,
       done: () =>
-        `Kept ${named} in text: ${spans} restored, and the index run that lets them back in is queued.`,
+        `Kept ${named} in text: ${spans} restored, and the sync that lets them back in is queued.`,
       run: (ready, settled) => {
         keep.mutate(reasonedAsk(ready, reason), settled);
       },
@@ -234,7 +234,7 @@ export function KeepInTextAct(properties: { readonly connectedSourceId: string }
         <ReasonedDialog
           act={act}
           title={`Keep ${named} in text`}
-          consequence="Every span of each group goes back into its document's text on the next index run, restored under your name with this reason. An erasure request still outranks a keep."
+          consequence="Every span of each group goes back into its document's text on the next sync, restored under your name with this reason. An erasure request still outranks a keep."
           onReason={kept}
         />
       }
@@ -289,13 +289,15 @@ export function NarrowDocumentsAct(properties: { readonly connectedSourceId: str
   );
 }
 
-/** A ulid sorts by when it was minted, so a run at or past the act's own is one that reads it. */
-function RunStatus(properties: { readonly connectedSourceId: string; readonly jobId: string }) {
+/** A ulid sorts by when it was minted, so a sync at or past the act's own is one that reads it. */
+function SyncStatus(properties: { readonly connectedSourceId: string; readonly jobId: string }) {
   const connectedSources = useConnectedSources();
-  const run = connectedSources.data?.find(
+  const sync = connectedSources.data?.find(
     (connectedSource) => connectedSource.connectedSourceId === properties.connectedSourceId,
-  )?.lastRun;
-  return run === undefined || run === null || run.jobId < properties.jobId ? "queued" : run.status;
+  )?.lastSync;
+  return sync === undefined || sync === null || sync.jobId < properties.jobId
+    ? "queued"
+    : sync.status;
 }
 
 const isSpecialCategory = (group: FindingGroup): boolean => group.specialCategory;
@@ -311,9 +313,9 @@ export function DismissAsNotSpecialCategoryAct(properties: { readonly connectedS
       done: (answer) => (
         <>
           Dismissed {named} as not special category in{" "}
-          {counted(answer.documentIds.length, "document", "documents")}. The index run that reads
-          the dismissal:{" "}
-          <RunStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />.
+          {counted(answer.documentIds.length, "document", "documents")}. The sync that reads the
+          dismissal:{" "}
+          <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />.
         </>
       ),
       run: (ready, settled) => {
@@ -336,7 +338,7 @@ export function DismissAsNotSpecialCategoryAct(properties: { readonly connectedS
         <ReasonedDialog
           act={act}
           title={`Dismiss ${named} as not special category`}
-          consequence="Every span of each group is reviewed as dismissed under your name with this reason, and the index run that reads the dismissal is queued. On that run, a document whose every special category finding is dismissed goes back to the class an Admin narrowed it to, or to its connected source's class if none did. The spans stay withheld unless kept in text."
+          consequence="Every span of each group is reviewed as dismissed under your name with this reason, and the sync that reads the dismissal is queued. On that sync, a document whose every special category finding is dismissed goes back to the class an Admin narrowed it to, or to its connected source's class if none did. The spans stay withheld unless kept in text."
           onReason={dismissed}
         />
       }

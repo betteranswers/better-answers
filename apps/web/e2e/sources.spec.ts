@@ -13,7 +13,7 @@ import {
   anAddress,
   clockTheNextKey,
   keystrokesDismissed,
-  moveTheIndexRun,
+  moveTheSync,
   notFoundOfferingHome,
   person,
   provision,
@@ -52,7 +52,7 @@ const leadOf = (page: Page, name: string, term: string): Locator =>
 
 const stateOf = (page: Page, name: string) => leadOf(page, name, "State");
 
-const lastRunOf = (page: Page, name: string) => leadOf(page, name, "Last run");
+const lastSyncedOf = (page: Page, name: string) => leadOf(page, name, "Last synced");
 
 const classOf = (page: Page, name: string) => leadOf(page, name, "Class");
 
@@ -97,7 +97,7 @@ const indexed = (
 ): SeedConnectedSource => ({
   name,
   sensitivity: "Internal",
-  run: "done",
+  sync: "done",
   documents: [{ title: `${name}.md` }],
   ...overrides,
 });
@@ -107,12 +107,12 @@ test.describe("the Sources page's list of connected sources", () => {
     const ten: SeedConnectedSource[] = [
       indexed("Bid library"),
       indexed("Case studies", { published: true }),
-      indexed("Contracts", { run: "queued" }),
-      indexed("Framework returns", { run: "claimed" }),
+      indexed("Contracts", { sync: "queued" }),
+      indexed("Framework returns", { sync: "claimed" }),
       indexed("HR policies", { sensitivity: "Restricted" }),
       indexed("Method statements", { published: true, sensitivity: "Public" }),
       indexed("Quality manual"),
-      indexed("Safety records", { run: "none" }),
+      indexed("Safety records", { sync: "none" }),
       indexed("Staff handbook"),
       indexed("Tender archive", { published: true }),
     ];
@@ -135,7 +135,7 @@ test.describe("the Sources page's list of connected sources", () => {
     await expect(stateOf(page, "Contracts")).toHaveText("received");
     await expect(stateOf(page, "Framework returns")).toHaveText("indexing");
     await expect(stateOf(page, "Staff handbook")).toHaveText("indexed");
-    await expect(lastRunOf(page, "Safety records")).toHaveText("No run yet");
+    await expect(lastSyncedOf(page, "Safety records")).toHaveText("Not synced yet");
 
     const handbook = connectedSourceNamed(page, "Staff handbook");
     await expect(handbook).toMatchAriaSnapshot(`
@@ -153,8 +153,8 @@ test.describe("the Sources page's list of connected sources", () => {
         - definition: Everyone in the workspace
         - term: State
         - definition: indexed
-        - term: Last run
-        - definition: /Index run done · \\d{2}:\\d{2} · \\d{1,2} \\w+ \\d{4}/
+        - term: Last synced
+        - definition: /^\\d{2}:\\d{2} · \\d{1,2} \\w+ \\d{4}/
         - button "More about Staff handbook" [expanded=false]
     `);
 
@@ -302,16 +302,16 @@ test.describe("connecting a document on the Sources page", () => {
       page.getByText("Connected “The staff handbook”: handbook.md was received"),
     ).toBeVisible();
     await expect(stateOf(page, "The staff handbook")).toHaveText("received");
-    await expect(lastRunOf(page, "The staff handbook")).toContainText("Index run queued");
+    await expect(lastSyncedOf(page, "The staff handbook")).toContainText("Sync queued");
     await expect(classOf(page, "The staff handbook")).toHaveText("Restricted");
 
-    await moveTheIndexRun(request, { workspaceId: workspace.workspaceId, to: "claimed" });
+    await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "claimed" });
     await expect(stateOf(page, "The staff handbook")).toHaveText("indexing");
-    await expect(lastRunOf(page, "The staff handbook")).toContainText("Index run claimed");
+    await expect(lastSyncedOf(page, "The staff handbook")).toContainText("Syncing");
 
-    await moveTheIndexRun(request, { workspaceId: workspace.workspaceId, to: "done" });
+    await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "done" });
     await expect(stateOf(page, "The staff handbook")).toHaveText("indexed");
-    await expect(lastRunOf(page, "The staff handbook")).toContainText("Index run done");
+    await expect(lastSyncedOf(page, "The staff handbook")).toHaveText(/^\d{2}:\d{2} · /);
   });
 
   test("refuses an Admin's unconvertible file, naming the kinds that convert", async ({
@@ -361,7 +361,7 @@ const A_DISMISSED_SPAN =
   "Dismissed 1 span as not special category. The seam's verdict passes over a dismissed span, which stays withheld unless kept in text.";
 
 /**
- * Two documents as a run leaves them after a dismissal: one lifted to its connected source's class, one
+ * Two documents as a sync leaves them after a dismissal: one lifted to its connected source's class, one
  * still holding a span nobody dismissed.
  */
 const SERVICE_RECORDS: SeedConnectedSource = indexed("Service records", {
@@ -501,7 +501,7 @@ test.describe("reviewing a connected source's findings", () => {
 
     await expect(
       page.getByText(
-        "Kept 1 finding group in text: 2 spans restored, and the index run that lets them back in is queued.",
+        "Kept 1 finding group in text: 2 spans restored, and the sync that lets them back in is queued.",
       ),
     ).toBeVisible();
     await expect(
@@ -532,7 +532,7 @@ test.describe("reviewing a connected source's findings", () => {
     await expect(page.locator("body")).not.toContainText(AN_ID);
   });
 
-  test("dismisses a special category group, row and run saying so", async ({ page, request }) => {
+  test("dismisses a special category group, row and sync saying so", async ({ page, request }) => {
     const { workspace } = await anAdminAtSources(page, request, {
       workspace: "Ripponden Pumps",
       connectedSources: [SUPPLIER_FORMS],
@@ -582,18 +582,18 @@ test.describe("reviewing a connected source's findings", () => {
     await theActLandedWithinItsBudget(page, "dismissal");
 
     await expect(review).toContainText(
-      "Dismissed 1 finding group as not special category in 1 document. The index run that reads the dismissal: queued.",
+      "Dismissed 1 finding group as not special category in 1 document. The sync that reads the dismissal: queued.",
     );
     await expect(healthCue, "focus did not come back to the row the act left").toBeFocused();
     const row = findingRow(page, "Supplier forms", "Staff survey", "HEALTH_CUE");
     await expect(row).toContainText(A_DISMISSED_SPAN);
     await expect(row).not.toContainText("Already narrowed");
-    await expect(lastRunOf(page, "Supplier forms")).toContainText("Index run queued");
+    await expect(lastSyncedOf(page, "Supplier forms")).toContainText("Sync queued");
 
-    await moveTheIndexRun(request, { workspaceId: workspace.workspaceId, to: "claimed" });
-    await expect(review).toContainText("The index run that reads the dismissal: claimed.");
-    await moveTheIndexRun(request, { workspaceId: workspace.workspaceId, to: "done" });
-    await expect(review).toContainText("The index run that reads the dismissal: done.");
+    await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "claimed" });
+    await expect(review).toContainText("The sync that reads the dismissal: claimed.");
+    await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "done" });
+    await expect(review).toContainText("The sync that reads the dismissal: done.");
     await expect(page.locator("body")).not.toContainText(AN_ID);
 
     await page.reload();

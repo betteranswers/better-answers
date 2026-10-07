@@ -60,7 +60,7 @@ The envelope a credential is sealed in has a written format:
 - Both move at 500 to 1,400 commits a month, so a fork diverges within weeks.
 - Python is unavoidable (cocoindex has no TypeScript SDK) while the api's framework, the MCP SDK and tRPC are TypeScript.
 - A contract of data lets a worker run on another network with nothing but a database connection string, the shape a customer-hosted worker needs.
-- The api decrypts and hands a run its credentials, so the worker never holds the master key.
+- The api decrypts and hands a sync its credentials, so the worker never holds the master key.
 - AES-256-GCM is already in both tiers (Node's `node:crypto`, and `cryptography` in the worker's lock), is hardware-accelerated on every machine in the estate, and is what NIST SP 800-38D names, which matters to public-body buyers.
 - The version comes first so a reader refuses an unknown one before it decrypts a byte. As authenticated data it binds the tag to the layout, so a version 1 body re-framed as version 2 does not open.
 - Two processes share a key, so a counter would hand out one nonce twice, and under GCM a repeated nonce gives the plaintexts away.

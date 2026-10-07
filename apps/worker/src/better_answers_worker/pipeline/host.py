@@ -70,7 +70,7 @@ STORE_OF: Mapping[str, str] = MappingProxyType(
 
 
 @dataclass(frozen=True, slots=True)
-class IndexRun:
+class Sync:
     workspace_id: str
     connected_source_id: str
 
@@ -120,7 +120,7 @@ def _open_unless_held(
 
 
 def _opened_once_let_go(
-    run: IndexRun,
+    sync: Sync,
     store: str,
     open_store: Callable[[], coco.Environment],
     wait_seconds: float,
@@ -130,7 +130,7 @@ def _opened_once_let_go(
         return opened
     logger.info(
         "the engine still holds the store, so its open waits for it to let go",
-        connected_source_id=run.connected_source_id,
+        connected_source_id=sync.connected_source_id,
         store=store,
         wait_seconds=wait_seconds,
     )
@@ -210,33 +210,35 @@ class Host:
     ) -> None:
         self.close()
 
-    def connected_source_directory(self, run: IndexRun) -> Path:
-        return Path(self._engine.lmdb_dir) / run.workspace_id / run.connected_source_id
+    def connected_source_directory(self, sync: Sync) -> Path:
+        return (
+            Path(self._engine.lmdb_dir) / sync.workspace_id / sync.connected_source_id
+        )
 
-    def store_directory(self, run: IndexRun, store: str) -> Path:
-        return self.connected_source_directory(run) / store
+    def store_directory(self, sync: Sync, store: str) -> Path:
+        return self.connected_source_directory(sync) / store
 
     def store_map_bytes(self) -> int:
         # Split across the source's stores: a whole cap each would let a source hold
         # twice the operator's number.
         return self._engine.lmdb_map_bytes // len(STORES_A_CONNECTED_SOURCE_HOLDS)
 
-    def lmdb_bytes(self, run: IndexRun) -> int:
+    def lmdb_bytes(self, sync: Sync) -> int:
         # The whole directory, both stores: the operator sizes a volume against what a
         # connected source holds and the split must not halve the number.
-        directory = self.connected_source_directory(run)
+        directory = self.connected_source_directory(sync)
         if not directory.is_dir():
             return 0
         return sum(
             item.stat().st_size for item in directory.rglob("*") if item.is_file()
         )
 
-    def remove_connected_source_store(self, run: IndexRun) -> None:
+    def remove_connected_source_store(self, sync: Sync) -> None:
         # Evicted before the directory goes: removing it under an open handle would
         # leave the engine writing into a store nothing can read.
-        self._evict(run, CONNECTED_SOURCE_STORE)
+        self._evict(sync, CONNECTED_SOURCE_STORE)
         for store in (CONNECTED_SOURCE_STORE, *STORES_NAMED_BEFORE_THE_PASSAGE_SWEEP):
-            shutil.rmtree(self.store_directory(run, store), ignore_errors=True)
+            shutil.rmtree(self.store_directory(sync, store), ignore_errors=True)
 
     def pool(self, workspace_id: str) -> asyncpg.Pool:
         held = self._pools.get(workspace_id)
@@ -246,51 +248,51 @@ class Host:
         self._pools[workspace_id] = opened
         return opened
 
-    def open_connected_source(self, run: IndexRun) -> None:
+    def open_connected_source(self, sync: Sync) -> None:
         for store in STORES_A_CONNECTED_SOURCE_HOLDS:
-            self._environment(run, store)
+            self._environment(sync, store)
 
     def held_connected_sources(self) -> tuple[str, ...]:
         """Connected source ids with a store open, least recently used first."""
         return tuple(self._environments)
 
-    def _evict(self, run: IndexRun, store: str) -> None:
-        stores = self._environments.get(run.connected_source_id, {})
+    def _evict(self, sync: Sync, store: str) -> None:
+        stores = self._environments.get(sync.connected_source_id, {})
         stores.pop(store, None)
         if not stores:
-            self._environments.pop(run.connected_source_id, None)
+            self._environments.pop(sync.connected_source_id, None)
 
     def _handles(self) -> int:
         return sum(len(stores) for stores in self._environments.values())
 
-    def _environment(self, run: IndexRun, store: str) -> coco.Environment:
-        stores = self._environments.get(run.connected_source_id, {})
+    def _environment(self, sync: Sync, store: str) -> coco.Environment:
+        stores = self._environments.get(sync.connected_source_id, {})
         held = stores.get(store)
         if held is not None:
-            self._environments.move_to_end(run.connected_source_id)
+            self._environments.move_to_end(sync.connected_source_id)
             return held
 
-        directory = self.store_directory(run, store)
+        directory = self.store_directory(sync, store)
         directory.mkdir(parents=True, exist_ok=True)
         provider = coco.ContextProvider()
-        provider.provide(POOL, self.pool(run.workspace_id))
+        provider.provide(POOL, self.pool(sync.workspace_id))
         settings = coco.Settings(
             db_path=directory,
             db_settings=coco.LmdbSettings(map_size=self.store_map_bytes()),
         )
         opened = _opened_once_let_go(
-            run,
+            sync,
             store,
             lambda: coco.Environment(
                 settings,
-                name=f"connected_source:{run.connected_source_id}:{store}",
+                name=f"connected_source:{sync.connected_source_id}:{store}",
                 context_provider=provider,
                 event_loop=self._loop.loop,
             ),
             self._release_wait,
         )
-        self._environments.setdefault(run.connected_source_id, {})[store] = opened
-        self._environments.move_to_end(run.connected_source_id)
+        self._environments.setdefault(sync.connected_source_id, {})[store] = opened
+        self._environments.move_to_end(sync.connected_source_id)
         while self._handles() > self._held:
             oldest, closed = self._environments.popitem(last=False)
             logger.info(
@@ -301,31 +303,31 @@ class Host:
             )
         return opened
 
-    def app_config(self, run: IndexRun, name: str) -> coco.AppConfig:
+    def app_config(self, sync: Sync, name: str) -> coco.AppConfig:
         return coco.AppConfig(
             name=name,
-            environment=self._environment(run, STORE_OF[name]),
+            environment=self._environment(sync, STORE_OF[name]),
             max_inflight_components=self._engine.max_inflight_components,
         )
 
     def land_rows(
-        self, run: IndexRun, table: Table, rows: Sequence[Mapping[str, Any]]
+        self, sync: Sync, table: Table, rows: Sequence[Mapping[str, Any]]
     ) -> int:
         """A row the store tracks as landed is not written
         again, and one it tracked that `rows` omits is deleted."""
         declared = tuple(rows)
         app = coco.App(
-            self.app_config(run, PASSAGES_APP), declare_rows, table, declared
+            self.app_config(sync, PASSAGES_APP), declare_rows, table, declared
         )
         # From the caller's thread, never the host's loop: the blocking form of an
         # update never returns when it is called from inside that loop.
         landed = app.update_blocking()
         return int(landed) if isinstance(landed, int) else len(declared)
 
-    def drop_connected_source(self, run: IndexRun) -> None:
+    def drop_connected_source(self, sync: Sync) -> None:
         """Drops the engine's record of the connected source's passages,
         leaving the table, its indexes and every row it landed."""
-        coco.App(self.app_config(run, PASSAGES_APP), declare_nothing).drop_blocking()
+        coco.App(self.app_config(sync, PASSAGES_APP), declare_nothing).drop_blocking()
 
     def close(self) -> None:
         self._environments.clear()

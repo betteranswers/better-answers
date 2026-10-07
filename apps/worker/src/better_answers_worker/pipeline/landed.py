@@ -22,7 +22,7 @@ from .detected import (
     THE_MEMOS_VERSION,
     raised_by_the_detector,
 )
-from .host import FINDINGS_STORE, LANDED_APP, Host, IndexRun
+from .host import FINDINGS_STORE, LANDED_APP, Host, Sync
 from .objects import LandedCopies
 from .passages import PASSAGE_SIZE_BYTES, Passage, split_into_passages
 
@@ -116,7 +116,7 @@ class QuarantinedDocument:
 
 
 @dataclass(frozen=True, slots=True)
-class LandedRun:
+class LandedSync:
     documents: tuple[ReadDocument, ...]
     quarantined: tuple[QuarantinedDocument, ...] = ()
 
@@ -152,7 +152,7 @@ def landed(
     """Converts, detects and redacts one document. Raises `UnreadableError`
     when it cannot be converted; `seed` fixes the pseudonym letters."""
     # Unmemoised, so a fix to the conversion, the block rule or the withholding reaches
-    # every document on its next run with no version to remember.
+    # every document on its next sync with no version to remember.
     normalised = converted(body, media_type)
     raised = raised_by_the_detector(normalised, detection_key)
     answer = redact(
@@ -234,7 +234,7 @@ async def _one_document(
 
 
 def _fail_the_run(error: BaseException, _: coco.ExceptionContext) -> None:
-    # The engine's default logs and carries on, so the run would finish with the
+    # The engine's default logs and carries on, so the sync would finish with the
     # document neither read nor quarantined and land_rows would delete its passages.
     raise error
 
@@ -258,14 +258,14 @@ async def _every_document(
             refused,
             wave,
         )
-        # The handler's raise surfaces only here: unawaited, the run still finishes.
+        # The handler's raise surfaces only here: unawaited, the sync still finishes.
         await mounted.ready()
     return len(landings)
 
 
 def redact_landed_copies(
     host: Host,
-    run: IndexRun,
+    sync: Sync,
     documents: Sequence[LandedDocument],
     copies: LandedCopies,
     rules_in_force: Mapping[str, bool],
@@ -275,7 +275,7 @@ def redact_landed_copies(
     detection_key: str | None = None,
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
-) -> LandedRun:
+) -> LandedSync:
     """Writes each document's redacted text to its `normalised_key`; one that
     cannot be converted or runs past its time is quarantined rather than raised.
     `detection_key` defaults to the detector's own, which loads presidio."""
@@ -289,7 +289,7 @@ def redact_landed_copies(
     read: dict[str, ReadDocument] = {}
     refused: dict[str, str] = {}
     coco.App(
-        host.app_config(run, LANDED_APP),
+        host.app_config(sync, LANDED_APP),
         _every_document,
         with_bytes,
         read,
@@ -322,17 +322,17 @@ def redact_landed_copies(
         for document in documents
         if document.source_document_id in refused
     )
-    outcome = LandedRun(documents=answered, quarantined=quarantined)
+    outcome = LandedSync(documents=answered, quarantined=quarantined)
     for refusal in quarantined:
         logger.warning(
-            "the run could not read a document and quarantined it",
-            connected_source_id=run.connected_source_id,
+            "the sync could not read a document and quarantined it",
+            connected_source_id=sync.connected_source_id,
             source_document_id=refusal.source_document_id,
             error=refusal.error,
         )
     logger.info(
         "the connected source's landed copies were read",
-        connected_source_id=run.connected_source_id,
+        connected_source_id=sync.connected_source_id,
         documents=len(answered),
         detected_afresh=list(outcome.detected_afresh),
         quarantined=len(quarantined),

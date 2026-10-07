@@ -33,7 +33,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
-import { enqueueJobIn, indexRunRefused } from "../runs/index.ts";
+import { enqueueJobIn, syncRefused } from "../runs/index.ts";
 import { putObject, type ObjectDoor } from "../store/objects/index.ts";
 import {
   folded,
@@ -53,7 +53,7 @@ import {
 } from "./admin-connected-source.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import { dpiaInputFor, type REDACTION_CATEGORIES } from "./dpia.ts";
-import { raisedByTheLastRun } from "./findings.ts";
+import { raisedByTheLastSync } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
 export const UPLOAD_ORIGINALS_PREFIX = "uploads/";
@@ -395,7 +395,7 @@ export const connectUpload = async (
       reason: CONNECTED_REASON,
     });
     if (!queued.ok) {
-      throw indexRunRefused(queued.error);
+      throw syncRefused(queued.error);
     }
     return { connectedSourceId, documentId, jobId: queued.value.jobId, auditEventId, originalKey };
   });
@@ -437,7 +437,7 @@ export type ConnectedSourcePublished = {
  * The job row, not connected_source.state: the worker holds only SELECT on that table and cannot
  * write its progress there.
  */
-const LATEST_INDEX_RUN = `SELECT status FROM job
+const LATEST_SYNC = `SELECT status FROM job
     WHERE workspace_id = $1 AND kind = $2 AND subject_id = $3
     ORDER BY enqueued_at DESC, id DESC
     LIMIT 1`;
@@ -445,7 +445,7 @@ const LATEST_INDEX_RUN = `SELECT status FROM job
 const FINDINGS_BY_CATEGORY = `SELECT f.category, count(*)::int AS found
     FROM finding f
     JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
-   WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND ${raisedByTheLastRun("f", "d")}
+   WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND ${raisedByTheLastSync("f", "d")}
    GROUP BY f.category`;
 
 type ConnectedSourceToPublish = {
@@ -471,12 +471,12 @@ const connectedSourceToPublish = async (
   if (!connectedSource.ok) return err(connectedSource.error);
   if (connectedSource.value.published_at !== null) return err("already-published");
 
-  const run = await attempt(() =>
-    tx.query<{ status: string }>(LATEST_INDEX_RUN, [workspaceId, INDEX_KIND, connectedSourceId]),
+  const sync = await attempt(() =>
+    tx.query<{ status: string }>(LATEST_SYNC, [workspaceId, INDEX_KIND, connectedSourceId]),
   );
-  if (!run.ok) return err(run.error);
+  if (!sync.ok) return err(sync.error);
 
-  if (run.value.rows[0]?.status !== JOB_DONE_STATUS) return err("not-indexed");
+  if (sync.value.rows[0]?.status !== JOB_DONE_STATUS) return err("not-indexed");
   return ok(connectedSource.value);
 };
 
@@ -533,8 +533,8 @@ const publishAndCascade = async (
 
 /**
  * `confirmation-missing` unless all three confirmations are true, and `not-indexed` unless the
- * latest index run is done. Stamps the connected source published, writes an audit event with the DPIA hash
- * and the last run's finding count per category, and recomputes what cites its documents.
+ * latest sync is done. Stamps the connected source published, writes an audit event with the DPIA hash
+ * and the last sync's finding count per category, and recomputes what cites its documents.
  */
 export const publishConnectedSource = async (
   principal: UserPrincipal,
@@ -650,7 +650,7 @@ const emptyTheConnectedSource = async (
 };
 
 /**
- * Queues an index run, then deletes the connected source's passages and its unreviewed, unrestored findings;
+ * Queues a sync, then deletes the connected source's passages and its unreviewed, unrestored findings;
  * `passages` and `findings` count the rows deleted. A person acts only in its own workspace, and any
  * other is `no-such-binding`.
  */
@@ -678,7 +678,7 @@ export const reprocessConnectedSource = async (
     reason: input.reason,
   });
   if (!queued.ok) {
-    throw indexRunRefused(queued.error);
+    throw syncRefused(queued.error);
   }
   const emptied = await emptyTheConnectedSource(acting.value, tx);
   if (!emptied.ok) return err(emptied.error);

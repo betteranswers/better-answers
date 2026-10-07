@@ -29,8 +29,8 @@ The **redaction seam** withholds personal data in the worker's conversion step a
 - **Sensitivity** has three classes: Restricted (the default for every connected source and every `Person`), Internal and Public. Only *Restricted* is a reader word; the other two are Admin words.
 - **Redaction rules** have three tiers: *always* (special-category cues, financial account and government identifiers), *default on* and *default off* per connected source. No connected source switches the always set off. The officer-block rule always wins. Special-category data narrows its document to Restricted on landing.
 - One declared descriptor per category, in `apps/worker/src/better_answers_worker/redaction/descriptors.py`, feeds the recognisers, the category list and `rule_version`. A window begins where the document begins something: a heading, then a paragraph.
-- A **finding** is its document, its rule and its two offsets into the normalised text. Its category, tier, score and version pair are the last run's reading of it.
-- An Admin's restore, *keep in text* or special-category dismissal reaches the next run as an argument, never a change key. An erasure outranks all three.
+- A **finding** is its document, its rule and its two offsets into the normalised text. Its category, tier, score and version pair are the last sync's reading of it.
+- An Admin's restore, *keep in text* or special-category dismissal reaches the next sync as an argument, never a change key. An erasure outranks all three.
 - The seam answers one **withholding** per finding and never rewrites a finding.
 
 The erasure routine rewrites what the platform wrote; a person edits what the company wrote.

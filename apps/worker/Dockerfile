@@ -172,7 +172,7 @@ COPY --from=build --chown=worker:worker /data/worker/tldextract-cache /data/work
 # The two caches above, and one thing that is not a cache at all: the engine's call
 # home. cocoindex reaches `cocoindex.gateway.scarf.sh` when it starts, when an
 # Environment opens and on every update — an outbound request per document of every
-# index run, telling a third party the package, its version and this box's IP. What
+# sync, telling a third party the package, its version and this box's IP. What
 # makes it worth a line here rather than a firewall rule somebody has to remember is
 # that nothing fails when it goes out: the worker indexes either way, so the only place
 # the call is visible is the wire. The variable is the native core's, nothing in the

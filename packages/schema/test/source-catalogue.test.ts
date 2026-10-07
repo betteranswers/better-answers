@@ -206,8 +206,8 @@ describe("the four closed word sets a connected source carries", () => {
   });
 });
 
-describe("the catalogue a run reconciles", () => {
-  it("keeps every column given and leaves run columns empty", async () => {
+describe("the catalogue a sync reconciles", () => {
+  it("keeps every column given and leaves sync columns empty", async () => {
     await withConnectedSources(async (client) => {
       await seedCataloguedDocument(client, THE_HANDBOOK);
       const landed = await client.query(

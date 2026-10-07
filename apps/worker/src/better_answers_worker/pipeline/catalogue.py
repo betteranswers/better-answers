@@ -6,7 +6,7 @@ from psycopg import Cursor
 
 from ..ids import ulid
 from ..redaction import Dismissal, Restore
-from .host import IndexRun
+from .host import Sync
 from .landed import (
     LandedDocument,
     QuarantinedDocument,
@@ -28,15 +28,13 @@ class ConnectedSourceRun:
     documents: tuple[LandedDocument, ...]
 
 
-def read_connected_source(
-    cursor: Cursor[Any], run: IndexRun
-) -> ConnectedSourceRun | None:
+def read_connected_source(cursor: Cursor[Any], sync: Sync) -> ConnectedSourceRun | None:
     """None when the connected source is gone. Only live documents are read, each
     carrying the workspace's suppressions and its own restored and dismissed
     findings."""
     cursor.execute(
         "SELECT rules_in_force FROM connected_source WHERE id = %s",
-        (run.connected_source_id,),
+        (sync.connected_source_id,),
     )
     connected_source = cursor.fetchone()
     if connected_source is None:
@@ -46,11 +44,11 @@ def read_connected_source(
         "SELECT id, media_type, original_key, normalised_key"
         " FROM source_document WHERE connected_source_id = %s AND gone_at IS NULL"
         " ORDER BY id",
-        (run.connected_source_id,),
+        (sync.connected_source_id,),
     )
     catalogued = cursor.fetchall()
     document_ids = [str(row[0]) for row in catalogued]
-    suppressions = _suppressions_of_the_workspace(cursor, run.workspace_id)
+    suppressions = _suppressions_of_the_workspace(cursor, sync.workspace_id)
     restores = _spans_by_document(cursor, document_ids, _RESTORED, Restore)
     dismissals = _spans_by_document(cursor, document_ids, _DISMISSED, Dismissal)
 
@@ -127,7 +125,7 @@ def _spans_by_document[Marked](
 
 def record_findings(
     cursor: Cursor[Any],
-    run: IndexRun,
+    sync: Sync,
     documents: Sequence[ReadDocument],
     *,
     mint: Callable[[], str] = ulid,
@@ -136,7 +134,7 @@ def record_findings(
     a restored finding keeps its tier. `mint` makes each new row's id."""
     rows = [
         (
-            run.workspace_id,
+            sync.workspace_id,
             mint(),
             document.source_document_id,
             withholding.finding.category,

@@ -1,15 +1,33 @@
-export { instantWords } from "@/shared/words.ts";
+import { instantWords } from "@/shared/words.ts";
 
 import type { ListedConnectedSource } from "./sources-api.ts";
+
+export { instantWords };
 
 type Meaning = { readonly word: string; readonly means: string };
 
 export const STATE_MEANS = {
-  received: "Its documents have been received; no run has turned them into passages yet.",
-  indexing: "A run is turning its documents into passages.",
-  indexed: "The run has finished and there is something to review.",
+  received: "Its documents have been received; no sync has turned them into passages yet.",
+  indexing: "A sync is turning its documents into passages.",
+  indexed: "The sync has finished and there is something to review.",
   published: "Its passages reach the readers in its audience.",
 } satisfies Record<ListedConnectedSource["state"], string>;
+
+type Sync = NonNullable<ListedConnectedSource["lastSync"]>;
+
+const SYNC_SAYS = {
+  queued: "Sync queued",
+  claimed: "Syncing",
+  failed: "Sync failed",
+  poisoned: "Sync failed",
+} satisfies Record<Exclude<Sync["status"], "done">, string>;
+
+/** The Last synced row: a finished sync's time alone, and any other sync's state before its time. */
+export const lastSyncedWords = (lastSync: Sync | null): string => {
+  if (lastSync === null) return "Not synced yet";
+  const when = instantWords(lastSync.finishedAt ?? lastSync.enqueuedAt);
+  return lastSync.status === "done" ? when : `${SYNC_SAYS[lastSync.status]} · ${when}`;
+};
 
 export const AUDIENCE_WORDS = {
   everyone: "Everyone in the workspace",

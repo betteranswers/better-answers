@@ -25,7 +25,7 @@ import type { Scenario } from "./workspace-with-bundle.ts";
 const { db, arrange, reading } = visibilitySuite();
 
 const PUBLISHED = new Date("2026-09-11T09:00:00.000Z");
-const RUN_FINISHED_AT = new Date("2026-09-11T08:30:00.000Z");
+const SYNC_FINISHED_AT = new Date("2026-09-11T08:30:00.000Z");
 const NOW = new Date("2026-09-11T12:00:00.000Z");
 
 /**
@@ -123,7 +123,7 @@ const landedBeside = (
     });
   });
 
-const aFinishedRun = (workspaceId: string, connectedSourceId: string): Promise<void> =>
+const aFinishedSync = (workspaceId: string, connectedSourceId: string): Promise<void> =>
   seededBy(db(), async (seed) => {
     await seed.job({
       workspaceId,
@@ -131,11 +131,11 @@ const aFinishedRun = (workspaceId: string, connectedSourceId: string): Promise<v
       subjectId: connectedSourceId,
       reason: "connected",
       status: "done",
-      enqueuedAt: RUN_FINISHED_AT,
+      enqueuedAt: SYNC_FINISHED_AT,
       attempts: 1,
       claimedBy: "worker-1",
-      claimedAt: RUN_FINISHED_AT,
-      finishedAt: RUN_FINISHED_AT,
+      claimedAt: SYNC_FINISHED_AT,
+      finishedAt: SYNC_FINISHED_AT,
       outcome: { passages: 1 },
     });
   });
@@ -383,7 +383,7 @@ describe("a reader's answer as the Admin's acts move source rows", () => {
     });
     const { connectedSourceId } = where;
     await landed(scenario.workspaceId, where);
-    await aFinishedRun(scenario.workspaceId, connectedSourceId);
+    await aFinishedSync(scenario.workspaceId, connectedSourceId);
 
     const before = await reaches(scenario.viewer, where);
     answered(await publishingTheConnectedSource(scenario, connectedSourceId));
@@ -416,7 +416,7 @@ const jobsOf = async (workspaceId: string): Promise<readonly JobRow[]> =>
     )
   ).rows;
 
-describe("a narrowing queues no run", () => {
+describe("a narrowing queues no sync", () => {
   it("adds no job when an Admin narrows sources or documents", async () => {
     const scenario = await arrange();
     const theConnectedSource = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
@@ -429,9 +429,9 @@ describe("a narrowing queues no run", () => {
     });
     await landed(scenario.workspaceId, theConnectedSource);
     await landed(scenario.workspaceId, theOther);
-    // The run that had already been and gone, so an empty answer below is the act and not a
+    // The sync that had already been and gone, so an empty answer below is the act and not a
     // reader that sees nothing.
-    await aFinishedRun(scenario.workspaceId, theOther.connectedSourceId);
+    await aFinishedSync(scenario.workspaceId, theOther.connectedSourceId);
     const theRunThatRan = {
       kind: "index",
       reason: "connected",

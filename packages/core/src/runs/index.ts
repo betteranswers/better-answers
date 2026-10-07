@@ -163,8 +163,8 @@ const ENQUEUE = `WITH inserted AS (
    WHERE workspace_id = $1 AND kind = $3 AND subject_id = $4::text
      AND status = '${JOB_QUEUED_STATUS}' AND NOT EXISTS (SELECT 1 FROM inserted)`;
 
-export const indexRunRefused = (refusal: EnqueueJobRefusal): Error =>
-  new Error(`runs: the index run was refused (${refusal})`);
+export const syncRefused = (refusal: EnqueueJobRefusal): Error =>
+  new Error(`runs: the sync was refused (${refusal})`);
 
 const fitsTheKind = (
   descriptor: JobKindDescriptor,
@@ -279,7 +279,7 @@ export const jobById = async (
 
 type OutcomeRow = { readonly outcome: OutcomeColumn };
 
-/** The outcome of the connected source's newest `done` index run; null when there is none or it has none. */
+/** The outcome of the connected source's newest `done` sync; null when there is none or it has none. */
 export const latestIndexOutcomeIn = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -306,7 +306,7 @@ export const runsOfSubjectInput = z.object({ subjectId: SUBJECT_ID });
 export type RunsOfSubjectInput = z.output<typeof runsOfSubjectInput>;
 
 /**
- * Its outcome stays on the job row: an index run's outcome locates each overridden span, the
+ * Its outcome stays on the job row: a sync's outcome locates each overridden span, the
  * address of withheld text.
  */
 export type SubjectRun = {

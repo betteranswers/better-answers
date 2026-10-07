@@ -11,7 +11,7 @@ applies_when:
   - "Deleting a connected source's passage rows, for a wipe, an erasure or a rule change"
   - "Renaming or moving the detector's memoised function or the component it is mounted under"
   - "Renaming the passage table, one of its columns, the passages app or a connected source's store directory"
-  - "Deciding whether the worker builds a piece of run machinery or takes it from cocoindex"
+  - "Deciding whether the worker builds a piece of queue machinery or takes it from cocoindex"
 tags:
   - adr-0036
   - cocoindex
@@ -29,14 +29,14 @@ tags:
 
 The worker composes cocoindex's building blocks and never rebuilds them: per-component commit, memoisation, stable ids, target sync, `mount_each`, timeouts, handlers, stats, and one `Environment` per connected source.
 
-It writes only what the engine has no block for: the run key, claim, lease, heartbeat and reaper, attempts and poison, the catalogue, retention, priced-versus-actual, outcome rows, the landing, one run per connected source, and supervision.
+It writes only what the engine has no block for: the run key, claim, lease, heartbeat and reaper, attempts and poison, the catalogue, retention, priced-versus-actual, outcome rows, the landing, one sync per connected source, and supervision.
 
 - `use_state` is never called.
 - `use_mount` never fans documents onto the critical path.
 - `pipeline/` (`apps/worker/src/better_answers_worker/pipeline/`) is the one module that imports `cocoindex`.
 - Every target is `managed_by="user"`, and the api owns all DDL.
 
-**One memo, and no memo holds text.** The one memoised function is the detector's, `detected`, and it returns spans. Conversion and the withholding run on every run. Which documents were detected afresh is answered per document.
+**One memo, and no memo holds text.** The one memoised function is the detector's, `detected`, and it returns spans. Conversion and the withholding take place on every sync. Which documents were detected afresh is answered per document.
 
 **Two stores per connected source**, at sibling paths under the connected source's directory:
 
@@ -44,7 +44,7 @@ It writes only what the engine has no block for: the run key, claim, lease, hear
 - `findings/` holds the landed app and the memo.
 - The disk cap and `lmdb_bytes` are read from the directory above both.
 
-**Any deletion of a connected source's passage rows is paired with `connected_source/`'s removal.** A rule-change reprocess is paired as much as a wipe; together they are *emptying a connected source*. The rows are deleted in the api's transaction. The worker removes the store as the first statement of the run that deletion enqueued. `findings/` is spared.
+**Any deletion of a connected source's passage rows is paired with `connected_source/`'s removal.** A rule-change reprocess is paired as much as a wipe; together they are *emptying a connected source*. The rows are deleted in the api's transaction. The worker removes the store as the first statement of the sync that deletion enqueued. `findings/` is spared.
 
 **Renaming the engine's target empties every connected source.** The engine's target-state tracking holds to the names it landed rows under. So a release that renames the passage table or one of its columns, the passages app or the store's directory is followed by a wipe of every connected source. The wipe also removes the store under its old name, because that store may hold text redacted under a replaced rule.
 
@@ -66,11 +66,11 @@ A spike measured all of this on cocoindex 1.0.22. Conversion plus the withholdin
 
 ## Why
 
-- Rebuilding a block cocoindex provides is the failure this record exists to stop. The exit stays cheap: cocoindex types never cross a module seam, the catalogue and the run rows are the durable truth, and every LMDB is disposable.
+- Rebuilding a block cocoindex provides is the failure this record exists to stop. The exit stays cheap: cocoindex types never cross a module seam, the catalogue and the job rows are the durable truth, and every LMDB is disposable.
 - The engine's default `managed_by="system"` would let one connected source's deletion drop the shared `index.passage` and its index under every other connected source.
-- `connected_source/` is the target-state tracking. A run over a standing store re-upserts nothing it believes it has landed: the spike deleted ten rows, left the store, and got nought rows back. Without the pairing, a withdrawn document's passages would stand, which ADR 0020's erasure promises cannot happen.
-- Renaming the target breaks that tracking without a sign. A spike on cocoindex 1.0.24 renamed the table to `index.passage` and one of its columns, then landed one row fewer, once under the passages app's own name and once under a new one. Neither run deleted the omitted row, and neither raised an error. Only deleting the source's rows, removing its store and landing again restored the deletion. `test_a_wipe_leaves_no_old_store_and_tracks_removals_again` in `apps/worker/tests/test_pipeline_index.py` holds that path. The release's wipe step had no command until the BA-29 passage sweep's code review found the gap.
-- The store sits on the worker's own volume and no other process reaches it, so the removal is the worker's. A run that opened the store first would answer out of the memo it was enqueued to throw away.
+- `connected_source/` is the target-state tracking. A sync over a standing store re-upserts nothing it believes it has landed: the spike deleted ten rows, left the store, and got nought rows back. Without the pairing, a withdrawn document's passages would stand, which ADR 0020's erasure promises cannot happen.
+- Renaming the target breaks that tracking without a sign. A spike on cocoindex 1.0.24 renamed the table to `index.passage` and one of its columns, then landed one row fewer, once under the passages app's own name and once under a new one. Neither sync deleted the omitted row, and neither raised an error. Only deleting the source's rows, removing its store and landing again restored the deletion. `test_a_wipe_leaves_no_old_store_and_tracks_removals_again` in `apps/worker/tests/test_pipeline_index.py` holds that path. The release's wipe step had no command until the BA-29 passage sweep's code review found the gap.
+- The store sits on the worker's own volume and no other process reaches it, so the removal is the worker's. A sync that opened the store first would answer out of the memo it was enqueued to throw away.
 - A memo keyed on policy re-ran the detector on every keep, suppression or rule switch, and a cached withholding kept a fix from reaching standing entries. Keyed on the text alone, policy is part of no key, and a converter upgrade re-detects only a document whose normalised text moved.
 - The findings store holds neither text nor target-state tracking, so a wipe can spare it. Its home was fixed before the first client's documents, because moving it later costs a detection of every page held.
 - cocoindex derives a mount path from `fn.__name__`, so renaming an internal function would have been a silent detection of every page.
