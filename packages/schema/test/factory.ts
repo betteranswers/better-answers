@@ -717,7 +717,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       goneAt: null,
       outcome: DOCUMENT_CONVERTED_OUTCOME,
 
-      quarantineError: null,
+      unreadableReason: null,
 
       sensitivity: null,
       narrowedTo: null,

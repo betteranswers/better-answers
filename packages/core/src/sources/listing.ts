@@ -6,7 +6,7 @@ import {
   CONNECTED_SOURCE_RECEIVED_STATE,
   CONNECTED_SOURCE_PUBLISHED_STATE,
   boundarySchemas,
-  DOCUMENT_QUARANTINED_OUTCOME,
+  DOCUMENT_UNREADABLE_OUTCOME,
   JOB_CLAIMED_STATUS,
   JOB_DONE_STATUS,
   type CONNECTED_SOURCE_STATES,
@@ -26,11 +26,11 @@ import type { Tx } from "../store/postgres/index.ts";
 
 type ConnectedSourceState = (typeof CONNECTED_SOURCE_STATES)[number];
 
-type QuarantinedDocument = {
+type UnreadableDocument = {
   readonly documentId: string;
   readonly title: string;
 
-  readonly error: string;
+  readonly reason: string;
 };
 
 const LISTED_ROW = boundarySchemas.connectedSource.select
@@ -54,18 +54,18 @@ export type ListedConnectedSource = Omit<ListedRow, "id" | "publishedAt"> & {
   readonly state: ConnectedSourceState;
   readonly publishedAt: string | null;
   readonly lastSync: SubjectRun | null;
-  readonly quarantined: readonly QuarantinedDocument[];
+  readonly unreadable: readonly UnreadableDocument[];
 
-  readonly quarantinedByError: Readonly<Record<string, number>>;
+  readonly unreadableByReason: Readonly<Record<string, number>>;
 };
 
 export type ListConnectedSourcesRefusal = RoleRefusal | Error;
 
-type QuarantineRow = {
+type UnreadableRow = {
   readonly connected_source_id: string;
   readonly id: string;
   readonly title: string;
-  readonly quarantine_error: string;
+  readonly unreadable_reason: string;
 };
 
 const CONNECTED_SOURCES = `SELECT b.id, b.name, b.connector, b.sensitivity, b.audience,
@@ -80,10 +80,10 @@ const CONNECTED_SOURCES = `SELECT b.id, b.name, b.connector, b.sensitivity, b.au
       ORDER BY b.name, b.id`;
 
 /**
- * The error is the converter's own name for why, so an Admin is told without a log being read.
+ * The reason is the converter's own name for why, so an Admin is told without a log being read.
  */
-const QUARANTINED = `SELECT connected_source_id, id, title, quarantine_error FROM source_document
-      WHERE workspace_id = $1 AND outcome = $2 AND quarantine_error IS NOT NULL
+const UNREADABLE = `SELECT connected_source_id, id, title, unreadable_reason FROM source_document
+      WHERE workspace_id = $1 AND outcome = $2 AND unreadable_reason IS NOT NULL
       ORDER BY connected_source_id, title, id`;
 
 const UNREADABLE_CONNECTED_SOURCE = new Error(
@@ -101,9 +101,9 @@ const stateOf = (publishedAt: Date | null, lastSync: SubjectRun | null): Connect
   return CONNECTED_SOURCE_RECEIVED_STATE;
 };
 
-const countedByError = (quarantined: readonly QuarantinedDocument[]) => {
+const countedByReason = (unreadable: readonly UnreadableDocument[]) => {
   const counts = new Map<string, number>();
-  for (const { error } of quarantined) counts.set(error, (counts.get(error) ?? 0) + 1);
+  for (const { reason } of unreadable) counts.set(reason, (counts.get(reason) ?? 0) + 1);
   return Object.fromEntries(counts);
 };
 
@@ -117,8 +117,8 @@ export const listConnectedSources = async (
 
   const read = await attempt(async () => ({
     connectedSources: (await tx.query(CONNECTED_SOURCES, [workspaceId])).rows,
-    quarantined: (
-      await tx.query<QuarantineRow>(QUARANTINED, [workspaceId, DOCUMENT_QUARANTINED_OUTCOME])
+    unreadable: (
+      await tx.query<UnreadableRow>(UNREADABLE, [workspaceId, DOCUMENT_UNREADABLE_OUTCOME])
     ).rows,
   }));
   if (!read.ok) return err(read.error);
@@ -132,12 +132,12 @@ export const listConnectedSources = async (
   return ok(
     rows.map(({ id, publishedAt, ...row }) => {
       const lastSync = lastSyncs.value.get(id) ?? null;
-      const quarantined = read.value.quarantined
+      const unreadable = read.value.unreadable
         .filter((document) => document.connected_source_id === id)
         .map((document) => ({
           documentId: document.id,
           title: document.title,
-          error: document.quarantine_error,
+          reason: document.unreadable_reason,
         }));
       return {
         connectedSourceId: id,
@@ -145,8 +145,8 @@ export const listConnectedSources = async (
         state: stateOf(publishedAt, lastSync),
         publishedAt: publishedAt?.toISOString() ?? null,
         lastSync,
-        quarantined,
-        quarantinedByError: countedByError(quarantined),
+        unreadable,
+        unreadableByReason: countedByReason(unreadable),
       };
     }),
   );

@@ -169,7 +169,7 @@ test.describe("the Sources page's list of connected sources", () => {
     await expect(page.locator("main")).not.toContainText(AN_ID);
   });
 
-  test("tells an Admin why documents are quarantined, counting OCR ones", async ({
+  test("tells an Admin why documents are unreadable, counting OCR ones", async ({
     page,
     request,
   }) => {
@@ -178,10 +178,10 @@ test.describe("the Sources page's list of connected sources", () => {
       connectedSources: [
         indexed("Site archive", {
           documents: [
-            { title: "Floor plan", quarantineError: "NeedsOcrError" },
-            { title: "Site survey", quarantineError: "NeedsOcrError" },
-            { title: "Archive", quarantineError: "DeadlineExceededError" },
-            { title: "Old minutes", quarantineError: "UnicodeDecodeError" },
+            { title: "Floor plan", unreadableReason: "NeedsOcrError" },
+            { title: "Site survey", unreadableReason: "NeedsOcrError" },
+            { title: "Archive", unreadableReason: "DeadlineExceededError" },
+            { title: "Old minutes", unreadableReason: "UnicodeDecodeError" },
             { title: "Handover notes" },
           ],
         }),
@@ -191,7 +191,7 @@ test.describe("the Sources page's list of connected sources", () => {
     const archive = connectedSourceNamed(page, "Site archive");
     await archive.getByRole("button", { name: "More about Site archive" }).click();
 
-    await expect(archive).toContainText("4 documents quarantined, 2 want OCR.");
+    await expect(archive).toContainText("4 documents unreadable, 2 want OCR.");
     await expect(archive.getByRole("listitem")).toHaveText([
       "Archive: took too long",
       "Floor plan: needs OCR",

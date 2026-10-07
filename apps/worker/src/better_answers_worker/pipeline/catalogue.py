@@ -9,14 +9,14 @@ from ..redaction import Dismissal, Restore
 from .host import Sync
 from .landed import (
     LandedDocument,
-    QuarantinedDocument,
     ReadDocument,
     Suppression,
+    UnreadableDocument,
     suppression_of,
 )
 
 CONVERTED_OUTCOME = "converted"
-QUARANTINED_OUTCOME = "quarantined"
+UNREADABLE_OUTCOME = "unreadable"
 
 
 NORMALISED_KEY_SUFFIX = "normalised"
@@ -180,16 +180,16 @@ def _version_halves(version: str) -> tuple[str, str]:
     return rule_version, detector_pin
 
 
-def quarantine_catalogue(
-    cursor: Cursor[Any], documents: Sequence[QuarantinedDocument]
+def unreadable_catalogue(
+    cursor: Cursor[Any], documents: Sequence[UnreadableDocument]
 ) -> None:
     for document in documents:
         cursor.execute(
             "UPDATE source_document SET outcome = %(outcome)s,"
-            " quarantine_error = %(error)s, last_seen = now() WHERE id = %(id)s",
+            " unreadable_reason = %(reason)s, last_seen = now() WHERE id = %(id)s",
             {
-                "outcome": QUARANTINED_OUTCOME,
-                "error": document.error,
+                "outcome": UNREADABLE_OUTCOME,
+                "reason": document.reason,
                 "id": document.source_document_id,
             },
         )
@@ -204,7 +204,7 @@ def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) 
             "UPDATE source_document SET content_hash = %(content_hash)s,"
             " normalised_key = %(normalised_key)s,"
             " redaction_version = %(version)s, outcome = %(outcome)s,"
-            " quarantine_error = NULL,"
+            " unreadable_reason = NULL,"
             " last_seen = now(),"
             # A verdict only narrows, by the database's ranking; a lifted one keeps the
             # Admin's own word, which the seam never made.

@@ -94,7 +94,7 @@ import {
   CONNECTORS,
   DESTINATIONS,
   DOCUMENT_OUTCOMES,
-  QUARANTINE_ERROR,
+  UNREADABLE_REASON,
   RETENTION_CLASSES,
   type RULES_IN_FORCE_KEYS,
   connectedSource,
@@ -622,7 +622,7 @@ const sourceDocumentRefinements = {
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
   redactionVersion: (schema: z.ZodString) => schema.trim().min(1),
   outcome: (schema: z.ZodString) => schema.pipe(z.enum(DOCUMENT_OUTCOMES)),
-  quarantineError: (schema: z.ZodString) => schema.regex(QUARANTINE_ERROR),
+  unreadableReason: (schema: z.ZodString) => schema.regex(UNREADABLE_REASON),
   sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
   narrowedTo: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
 };

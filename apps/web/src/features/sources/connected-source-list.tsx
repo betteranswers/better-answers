@@ -12,7 +12,7 @@ import {
   instantWords,
   lastSyncedWords,
   NEEDS_OCR,
-  quarantineWordOf,
+  unreadableWordOf,
   retentionOf,
   STATE_MEANS,
 } from "./words.ts";
@@ -40,7 +40,7 @@ function MoreAbout(properties: {
   readonly onFocus: () => void;
 }) {
   const { connectedSource } = properties;
-  const wantingOcr = connectedSource.quarantinedByError[NEEDS_OCR] ?? 0;
+  const wantingOcr = connectedSource.unreadableByReason[NEEDS_OCR] ?? 0;
 
   return (
     <Collapsible className="mt-2">
@@ -78,19 +78,19 @@ function MoreAbout(properties: {
               ? "Not published"
               : instantWords(connectedSource.publishedAt)}
           </Row>
-          <Row term="Quarantined">
-            {connectedSource.quarantined.length === 0 ? (
+          <Row term="Unreadable">
+            {connectedSource.unreadable.length === 0 ? (
               "None"
             ) : (
               <>
                 <p>
-                  {counted(connectedSource.quarantined.length, "document", "documents")}{" "}
-                  quarantined, {counted(wantingOcr, "wants", "want")} OCR.
+                  {counted(connectedSource.unreadable.length, "document", "documents")} unreadable,{" "}
+                  {counted(wantingOcr, "wants", "want")} OCR.
                 </p>
                 <ul>
-                  {connectedSource.quarantined.map((document) => (
+                  {connectedSource.unreadable.map((document) => (
                     <li key={document.documentId}>
-                      {document.title}: {quarantineWordOf(document.error)}
+                      {document.title}: {unreadableWordOf(document.reason)}
                     </li>
                   ))}
                 </ul>

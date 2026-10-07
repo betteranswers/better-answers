@@ -20,10 +20,10 @@ C4Component
     Component(audit, "audit.py", "nightly-audit", "The parser audit over every concept file")
     Component(bundle, "bundle.py, concept_file.py, links.py, splitter.py", "dulwich", "Reads the bundle at a commit; the canonical text and hash the concept-file agreement pins; links; the concept splitter")
     Component(host, "pipeline/host.py, run.py, rows.py", "cocoindex host", "index_connected_source: a per-workspace asyncpg pool, Environments in a bounded LRU, each connected source's two stores, the passage rows; empties connected_source/ on wiped or rule-change")
-    Component(landed, "pipeline/landed.py, converter.py, passages.py", "coco.fn, unmemoised", "Per document under a ceiling by page count: convert — anydoc for docx, pdf-inspector for PDF, text passed through — or quarantine; then detect, redact and split into passages")
+    Component(landed, "pipeline/landed.py, converter.py, passages.py", "coco.fn, unmemoised", "Per document under a ceiling by page count: convert — anydoc for docx, pdf-inspector for PDF, text passed through — or mark it unreadable; then detect, redact and split into passages")
     Component(detected, "pipeline/detected.py", "coco.fn, memo=True", "detected(normalised_text, detection_key): the one memo, answering spans")
     Component(redaction, "redaction/", "Presidio, GLiNER, spaCy", "The detector's recognisers and detection key; redact: the block rule, erasure matches, pseudonyms, withholdings, written spans")
-    Component(catalogue, "pipeline/catalogue.py", "psycopg", "Reads the connected source, its workspace's suppressions and its documents' restores and dismissals; records findings, reconciles the catalogue, quarantines")
+    Component(catalogue, "pipeline/catalogue.py", "psycopg", "Reads the connected source, its workspace's suppressions and its documents' restores and dismissals; records findings, reconciles the catalogue, marks unreadable documents")
     Component(extraction, "extraction", "planned S7", "Suggested concepts within the plan and the ceiling, proposed as concept_write_request rows; credentials injected per sync")
     Component(substrate, "schema_view.py, contract_stamp.py, ids.py, envelope.py, health.py, log.py, config.py", "substrate", "The committed schema view and baked contract digest; the ULID minter; the credential envelope; the process probe; one JSON log shape; the box's limits")
   }

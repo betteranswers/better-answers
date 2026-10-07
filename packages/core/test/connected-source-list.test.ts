@@ -29,7 +29,7 @@ type Seeded = { readonly connectedSourceId: string; readonly documentIds: readon
 const connectedSourceOf = (
   scenario: Scenario,
   name: string,
-  documents: ReadonlyArray<{ readonly title: string; readonly quarantineError?: string }>,
+  documents: ReadonlyArray<{ readonly title: string; readonly unreadableReason?: string }>,
   publishedAt: Date | null = null,
 ): Promise<Seeded> =>
   seededBy(db(), async (seed) => {
@@ -39,14 +39,14 @@ const connectedSourceOf = (
       publishedAt,
     });
     const documentIds: string[] = [];
-    for (const { title, quarantineError } of documents) {
-      const quarantined =
-        quarantineError === undefined ? {} : { outcome: "quarantined", quarantineError };
+    for (const { title, unreadableReason } of documents) {
+      const unreadable =
+        unreadableReason === undefined ? {} : { outcome: "unreadable", unreadableReason };
       const document = await seed.sourceDocument({
         workspaceId: scenario.workspaceId,
         connectedSourceId: connectedSource.id,
         title,
-        ...quarantined,
+        ...unreadable,
       });
       documentIds.push(document.id);
     }
@@ -119,8 +119,8 @@ const AS_BOUND = {
   audienceGroups: null,
   destination: ["passage-index", "bundle"],
   retentionClass: "keep",
-  quarantined: [],
-  quarantinedByError: {},
+  unreadable: [],
+  unreadableByReason: {},
 };
 
 describe("the Sources list an Admin reads", () => {
@@ -260,25 +260,25 @@ describe("the Sources list an Admin reads", () => {
     ).toEqual([[minutes.connectedSourceId, "received", null]]);
   });
 
-  it("names each quarantined document's error and counts by error", async () => {
+  it("names each unreadable document's reason and counts by reason", async () => {
     const scenario = await arrange();
     const scans = await connectedSourceOf(scenario, "Scans", [
       { title: "Minutes" },
-      { title: "Floor plan", quarantineError: "NeedsOcrError" },
-      { title: "Site survey", quarantineError: "NeedsOcrError" },
-      { title: "Archive", quarantineError: "DeadlineExceededError" },
+      { title: "Floor plan", unreadableReason: "NeedsOcrError" },
+      { title: "Site survey", unreadableReason: "NeedsOcrError" },
+      { title: "Archive", unreadableReason: "DeadlineExceededError" },
     ]);
     const [, floorPlan, siteSurvey, archive] = scans.documentIds;
 
     const [listed] = answered(await listedFor(scenario.admin));
 
     expect(listed?.documentCount).toBe(4);
-    expect(listed?.quarantined).toEqual([
-      { documentId: archive, title: "Archive", error: "DeadlineExceededError" },
-      { documentId: floorPlan, title: "Floor plan", error: "NeedsOcrError" },
-      { documentId: siteSurvey, title: "Site survey", error: "NeedsOcrError" },
+    expect(listed?.unreadable).toEqual([
+      { documentId: archive, title: "Archive", reason: "DeadlineExceededError" },
+      { documentId: floorPlan, title: "Floor plan", reason: "NeedsOcrError" },
+      { documentId: siteSurvey, title: "Site survey", reason: "NeedsOcrError" },
     ]);
-    expect(listed?.quarantinedByError).toEqual({ NeedsOcrError: 2, DeadlineExceededError: 1 });
+    expect(listed?.unreadableByReason).toEqual({ NeedsOcrError: 2, DeadlineExceededError: 1 });
   });
 
   it("lists no connected source another workspace holds", async () => {

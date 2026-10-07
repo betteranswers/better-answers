@@ -47,8 +47,8 @@ const A_CONNECTED_SOURCE: ListedConnectedSource = {
   documentCount: 1,
   passageCount: 0,
   lastSync: null,
-  quarantined: [],
-  quarantinedByError: {},
+  unreadable: [],
+  unreadableByReason: {},
 };
 
 describe("a page's read, said after its region mounts (BA-31)", () => {

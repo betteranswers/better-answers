@@ -33,7 +33,7 @@ const aFinding = z
 const aDocument = z.object({
   title: z.string().min(1),
   sensitivity: z.enum(SENSITIVITIES).nullable().default(null),
-  quarantineError: z.string().min(1).nullable().default(null),
+  unreadableReason: z.string().min(1).nullable().default(null),
   passages: z.array(z.string().min(1)).default([]),
   findings: z.array(aFinding).default([]),
   cited: z.boolean().default(false),
@@ -217,14 +217,14 @@ const seedDocuments = async (
   const overridden: OverriddenSpan[] = [];
   let passageCount = 0;
   for (const document of asked) {
-    const quarantined = document.quarantineError !== null;
+    const unreadable = document.unreadableReason !== null;
     const landed = await seed.sourceDocument({
       workspaceId,
       connectedSourceId,
       title: document.title,
       sourceSystemId: document.title,
       sensitivity: document.sensitivity,
-      ...(quarantined ? { outcome: "quarantined", quarantineError: document.quarantineError } : {}),
+      ...(unreadable ? { outcome: "unreadable", unreadableReason: document.unreadableReason } : {}),
     });
     overridden.push(...(await seedFindings(seed, workspaceId, landed.id, document.findings)));
     await seedPassages(seed, workspaceId, connectedSourceId, landed.id, document.passages);

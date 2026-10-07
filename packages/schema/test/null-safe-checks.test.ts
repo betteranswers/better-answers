@@ -251,21 +251,21 @@ describe("every CHECK the migrated database holds", () => {
 });
 
 describe("the NULL-safety gate over the CHECKs", () => {
-  it("flags a quarantine CHECK reading its nullable outcome with =", async () => {
+  it("flags an unreadable CHECK reading its nullable outcome with =", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(
-        'ALTER TABLE "source_document" DROP CONSTRAINT "source_document_quarantine_error_check"',
+        'ALTER TABLE "source_document" DROP CONSTRAINT "source_document_unreadable_reason_check"',
       );
       await client.query(
-        `ALTER TABLE "source_document" ADD CONSTRAINT "source_document_quarantine_error_check"
-           CHECK (quarantine_error IS NULL OR outcome = 'quarantined')`,
+        `ALTER TABLE "source_document" ADD CONSTRAINT "source_document_unreadable_reason_check"
+           CHECK (unreadable_reason IS NULL OR outcome = 'unreadable')`,
       );
 
       expect(await unsafeChecks(client)).toEqual([
         {
-          check: "source_document_quarantine_error_check",
+          check: "source_document_unreadable_reason_check",
           on: "source_document",
-          definition: "CHECK (((quarantine_error IS NULL) OR (outcome = 'quarantined'::text)))",
+          definition: "CHECK (((unreadable_reason IS NULL) OR (outcome = 'unreadable'::text)))",
           reads: ["outcome"],
         },
       ]);

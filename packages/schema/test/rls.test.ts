@@ -2278,18 +2278,18 @@ describe("the derivation's tables under app_rt", () => {
 
       await client.query(
         `UPDATE source_document
-            SET outcome = 'quarantined', quarantine_error = 'NeedsOcrError'
+            SET outcome = 'unreadable', unreadable_reason = 'NeedsOcrError'
           WHERE id = $1`,
         [seeded.document.id],
       );
-      const quarantined = await client.query(
-        "SELECT outcome, quarantine_error FROM source_document WHERE id = $1",
+      const unreadable = await client.query(
+        "SELECT outcome, unreadable_reason FROM source_document WHERE id = $1",
         [seeded.document.id],
       );
       await client.query(
         `UPDATE source_document
             SET content_hash = $2, normalised_key = 'normalised/handbook.md',
-                redaction_version = '5:d1', outcome = 'converted', quarantine_error = NULL,
+                redaction_version = '5:d1', outcome = 'converted', unreadable_reason = NULL,
                 last_seen = now(), sensitivity = 'Restricted'
           WHERE id = $1`,
         [seeded.document.id, `sha256:${"a".repeat(64)}`],
@@ -2301,12 +2301,12 @@ describe("the derivation's tables under app_rt", () => {
       expect({
         connectedSource: connectedSource.rows,
         document: document.rows,
-        quarantined: quarantined.rows,
+        unreadable: unreadable.rows,
         reconciled: reconciled.rows,
       }).toEqual({
         connectedSource: [{ id: seeded.connectedSource.id }],
         document: [{ id: seeded.document.id }],
-        quarantined: [{ outcome: "quarantined", quarantine_error: "NeedsOcrError" }],
+        unreadable: [{ outcome: "unreadable", unreadable_reason: "NeedsOcrError" }],
         reconciled: [{ redaction_version: "5:d1", sensitivity: "Restricted" }],
       });
 

@@ -53,7 +53,7 @@ A **suppression** is the workspace's: one per erasure request, holding the reque
 - The first Admin is a bid writer, not a DPO, so the safe set must be what they get by doing nothing.
 - An actor id is a record, so the platform may rewrite it across history. A name in a concept body is knowledge the company asserts about itself (ADR 0011); rewriting it would make every export already issued diverge.
 - A pseudonym that is never the person id means two workspaces' rewritten histories cannot be joined on one person (ADR 0035).
-- A per-document suppression missed documents bound later, not yet indexed, quarantined, or withheld by a rule later switched off.
+- A per-document suppression missed documents bound later, not yet indexed, unreadable, or withheld by a rule later switched off.
 - One rule switch must never re-extract fifty thousand documents through a hosted model choice.
 
 ## Rejected

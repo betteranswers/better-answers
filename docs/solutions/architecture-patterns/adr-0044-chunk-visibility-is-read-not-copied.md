@@ -36,7 +36,7 @@ What follows from it:
 
 - The four columns are off `index.passage`. No tier writes a passage's visibility.
 - A narrowing or a publish is a write to the source row, and queues no sync.
-- A sync commits its catalogue writes (the verdict, the findings, the quarantine) before it lands its passages.
+- A sync commits its catalogue writes (the verdict, the findings, the unreadable documents) before it lands its passages.
 - A concept's class and a composition's stay columns, because they are derivations over many rows.
 
 The view takes two trade-offs:

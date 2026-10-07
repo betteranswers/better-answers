@@ -263,9 +263,9 @@ def read_the_copies(
         )
 
 
-def quarantine_of(answer: LandedSync) -> dict[str, str]:
+def unreadable_of(answer: LandedSync) -> dict[str, str]:
     return {
-        document.source_document_id: document.error for document in answer.quarantined
+        document.source_document_id: document.reason for document in answer.unreadable
     }
 
 
@@ -729,7 +729,7 @@ def test_a_pdf_converts_to_markdown_with_its_table(bootstrap: Bootstrap) -> None
     )
 
 
-def test_a_pdf_with_a_textless_page_is_quarantined_whole(
+def test_a_pdf_with_a_textless_page_is_unreadable_whole(
     bootstrap: Bootstrap,
 ) -> None:
     scan = a_landed_document(A_SCAN_ID, media_type=PDF_MEDIA_TYPE)
@@ -742,7 +742,7 @@ def test_a_pdf_with_a_textless_page_is_quarantined_whole(
 
     answer = read_the_copies(bootstrap, bucket, (scan, THE_DELIVERY_NOTE))
 
-    assert quarantine_of(answer) == {A_SCAN_ID: "NeedsOcrError"}
+    assert unreadable_of(answer) == {A_SCAN_ID: "NeedsOcrError"}
     assert [document.source_document_id for document in answer.documents] == [
         A_DELIVERY_NOTE_ID
     ]
@@ -762,13 +762,13 @@ def test_an_unreadable_document_takes_no_neighbour_with_it(
 
     answer = read_the_copies(bootstrap, bucket, (truncated, THE_DELIVERY_NOTE))
 
-    assert list(quarantine_of(answer)) == [A_TRUNCATED_ID]
-    assert quarantine_of(answer)[A_TRUNCATED_ID] != ""
+    assert list(unreadable_of(answer)) == [A_TRUNCATED_ID]
+    assert unreadable_of(answer)[A_TRUNCATED_ID] != ""
     assert text_of(answer, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE
     assert bucket.writes == [THE_DELIVERY_NOTE.normalised_key]
 
 
-def test_quarantines_an_unlisted_media_type_without_guessing(
+def test_marks_an_unlisted_media_type_unreadable_without_guessing(
     bootstrap: Bootstrap,
 ) -> None:
     spreadsheet = a_landed_document(A_TRUNCATED_ID, media_type="application/zip")
@@ -776,7 +776,7 @@ def test_quarantines_an_unlisted_media_type_without_guessing(
 
     answer = read_the_copies(bootstrap, bucket, (spreadsheet,))
 
-    assert quarantine_of(answer) == {A_TRUNCATED_ID: "UnsupportedMediaType"}
+    assert unreadable_of(answer) == {A_TRUNCATED_ID: "UnsupportedMediaType"}
     assert answer.documents == ()
 
 
@@ -836,7 +836,7 @@ def test_reads_pdf_pages_and_measures_other_types_by_s0s_page() -> None:
     assert pages_of(fixture_bytes("expenses-policy.docx"), DOCX_MEDIA_TYPE) == 12
 
 
-def test_quarantines_a_document_past_its_ceiling_and_finishes_the_sync(
+def test_marks_a_document_past_its_ceiling_unreadable_and_finishes(
     bootstrap: Bootstrap,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -845,7 +845,7 @@ def test_quarantines_a_document_past_its_ceiling_and_finishes_the_sync(
         bootstrap, bucket, (THE_INVOICE,), ms_per_page=0, margin_ms=0
     )
 
-    assert quarantine_of(answer) == {AN_INVOICE_ID: "DeadlineExceededError"}
+    assert unreadable_of(answer) == {AN_INVOICE_ID: "DeadlineExceededError"}
     assert answer.documents == ()
     assert bucket.writes == []
 
@@ -857,7 +857,7 @@ def test_the_same_document_under_the_shipped_ceiling_lands(
 
     answer = read_the_copies(bootstrap, bucket, (THE_INVOICE,))
 
-    assert answer.quarantined == ()
+    assert answer.unreadable == ()
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 

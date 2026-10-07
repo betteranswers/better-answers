@@ -167,13 +167,13 @@ const documentCarrying = (column: string, word: string): string =>
       original_key, ${column})
    VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original', '${word}')`;
 
-const documentReporting = (outcome: string | null, quarantineError: string | null): string =>
+const documentReporting = (outcome: string | null, unreadableReason: string | null): string =>
   `INSERT INTO source_document
      (workspace_id, id, connected_source_id, source_system_id, title, media_type, byte_size,
-      original_key, outcome, quarantine_error)
+      original_key, outcome, unreadable_reason)
    VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original',
            ${outcome === null ? "NULL" : `'${outcome}'`},
-           ${quarantineError === null ? "NULL" : `'${quarantineError}'`})`;
+           ${unreadableReason === null ? "NULL" : `'${unreadableReason}'`})`;
 
 const documentSized = (bytes: number): string =>
   `INSERT INTO source_document
@@ -210,14 +210,14 @@ export const attemptDocumentConcluded = (
     client.query(documentCarrying("outcome", outcome), [...anotherItemUnder(place)]),
   );
 
-export const attemptQuarantinePair = (
+export const attemptUnreadablePair = (
   client: pg.PoolClient,
   place: CataloguePlace,
   outcome: string | null,
-  quarantineError: string | null,
+  unreadableReason: string | null,
 ): Promise<string> =>
   refusalOf(client, () =>
-    client.query(documentReporting(outcome, quarantineError), [...anotherItemUnder(place)]),
+    client.query(documentReporting(outcome, unreadableReason), [...anotherItemUnder(place)]),
   );
 
 export const attemptDocumentSized = (

@@ -28,7 +28,7 @@ import {
   attemptDocumentConcluded,
   attemptDocumentSized,
   attemptAuditEventRowReusingAnId,
-  attemptQuarantinePair,
+  attemptUnreadablePair,
   attemptRowKeyedToTheAuditLog,
   type ConnectedSourceWords,
   postgresForSuite,
@@ -312,25 +312,25 @@ describe("the catalogue a sync reconciles", () => {
     });
   });
 
-  it("carries a quarantine error only on a quarantined document", async () => {
+  it("carries an unreadable reason only on an unreadable document", async () => {
     await withConnectedSources(async (client) => {
-      const quarantined = admitting(
-        await attemptQuarantinePair(client, UNDER_THE_UPLOAD, "quarantined", "NeedsOcrError"),
+      const unreadable = admitting(
+        await attemptUnreadablePair(client, UNDER_THE_UPLOAD, "unreadable", "NeedsOcrError"),
       );
 
       const refusals = [
-        await attemptQuarantinePair(client, UNDER_THE_UPLOAD, "converted", "NeedsOcrError"),
-        await attemptQuarantinePair(client, UNDER_THE_UPLOAD, null, "NeedsOcrError"),
+        await attemptUnreadablePair(client, UNDER_THE_UPLOAD, "converted", "NeedsOcrError"),
+        await attemptUnreadablePair(client, UNDER_THE_UPLOAD, null, "NeedsOcrError"),
       ];
 
       const wordAlone = admitting(
-        await attemptQuarantinePair(client, UNDER_THE_UPLOAD, "quarantined", null),
+        await attemptUnreadablePair(client, UNDER_THE_UPLOAD, "unreadable", null),
       );
-      expect({ quarantined, refusals, wordAlone }).toEqual({
-        quarantined: ADMITTED,
+      expect({ unreadable, refusals, wordAlone }).toEqual({
+        unreadable: ADMITTED,
         refusals: [
-          "source_document_quarantine_error_check",
-          "source_document_quarantine_error_check",
+          "source_document_unreadable_reason_check",
+          "source_document_unreadable_reason_check",
         ],
         wordAlone: ADMITTED,
       });

@@ -96,13 +96,13 @@ export const UPLOAD_CAP_MB = 64;
 
 export const NEEDS_OCR = "NeedsOcrError";
 
-const QUARANTINE_WORDS = new Map([
+const UNREADABLE_WORDS = new Map([
   [NEEDS_OCR, "needs OCR"],
   ["DeadlineExceededError", "took too long"],
 ]);
 
-export const quarantineWordOf = (error: string): string =>
-  QUARANTINE_WORDS.get(error) ?? "could not be read";
+export const unreadableWordOf = (error: string): string =>
+  UNREADABLE_WORDS.get(error) ?? "could not be read";
 
 /** The publish row carries one count per category the seam can raise, a zero included. */
 export const AUDITED_CATEGORIES = [
