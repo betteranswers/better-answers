@@ -20,7 +20,7 @@ import {
   type OpenResult,
   type Trust,
 } from "@better-answers/core/answering";
-import { parse, type Result } from "@better-answers/core/kernel";
+import { ok, parse, type Result } from "@better-answers/core/kernel";
 import { conceptFrontmatter } from "@better-answers/schema";
 
 import { defineEntry, type Entry } from "./define.ts";
@@ -90,7 +90,7 @@ const openedInCore = (opened: WireOpened): OpenResult => {
 const wired = <Value, Wired, Refused>(
   result: Result<Value, Refused>,
   wire: (value: Value) => Wired,
-): Result<Wired, Refused> => (result.ok ? { ok: true, value: wire(result.value) } : result);
+): Result<Wired, Refused> => (result.ok ? ok(wire(result.value)) : result);
 
 const passage = z.object({
   locator: z.string(),
