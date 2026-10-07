@@ -903,14 +903,14 @@ describe("the console's list and inspection of people", () => {
     return { api, acme, host, refreshToken: refreshToken ?? "" };
   };
 
-  const revokedByItsClient = async () => {
+  const revokedByItsAssistant = async () => {
     const { api, acme, host, refreshToken } = await acmeConnected();
     expect((await revokeAtEndpoint(host, refreshToken)).status).toBe(200);
     return { api, acme };
   };
 
   it("shows an assistant's own revocation as the authorization server's ending", async () => {
-    const { api, acme } = await revokedByItsClient();
+    const { api, acme } = await revokedByItsAssistant();
 
     const inspected = await api.console.people.inspect.query({ personId: acme.admin.id });
 
@@ -935,7 +935,7 @@ describe("the console's list and inspection of people", () => {
   });
 
   it("leaves a grant its assistant revoked out of revoking everywhere", async () => {
-    const { api, acme } = await revokedByItsClient();
+    const { api, acme } = await revokedByItsAssistant();
 
     await api.console.people.endEverySignInAndToken.mutate({ personId: acme.admin.id });
 

@@ -403,7 +403,7 @@ export const CONSOLE = {
       id: "people",
       name: "People",
       summary:
-        "Every person on the platform, the workspaces they belong to and their role in each, with the sessions and grants that can act as them.",
+        "Every person on the platform, the workspaces they belong to and their role in each, with the sessions and assistant access that can act as them.",
       movedFrom: ["/console/people"],
       pages: [
         {

@@ -311,6 +311,48 @@ describe("the sense a planted line is read in", () => {
     expect(findingsOver(planted, "apps/api/src/planted.ts")).toEqual([]);
     expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted.trim()}`]);
   });
+});
+
+const ASSISTANT_WORD = ["cli", "ent"].join("");
+const MEMBER_WORD = ["member", "ship"].join("");
+
+/** The trees whose code may hold a library's client object, which the row's senses leave be. */
+const CLIENT_OBJECT_TREES = ["apps/api/tests/", "packages/core/test/", "packages/schema/test/"];
+
+describe("the senses the people words keep", () => {
+  it.each(CLIENT_OBJECT_TREES)("refuses an assistant in prose under %s", (tree) => {
+    const planted = `// Connect a ${ASSISTANT_WORD} to the workspace; the ${ASSISTANT_WORD}'s access ends.`;
+    expect(linesOver({ [`${tree}planted.ts`]: planted }, [rowOf(ASSISTANT_WORD)])).toEqual([
+      `${tree}planted.ts:1: ${planted}`,
+    ]);
+  });
+
+  it.each([
+    `  const rows = await ${ASSISTANT_WORD}.query("SELECT 1");`,
+    `  await refusesEach(${ASSISTANT_WORD}, [["DELETE FROM job", "removing a job"]]);`,
+    `const s3 = new S3Client({ region }); // the S3 ${ASSISTANT_WORD} signing for one region`,
+    `// The tRPC ${ASSISTANT_WORD} batches its reads; the ${ASSISTANT_WORD}_id names the assistant.`,
+  ])("passes a library's client object or OAuth's name, case %$", (planted) => {
+    expect(linesOver({ "apps/api/tests/planted.ts": planted }, [rowOf(ASSISTANT_WORD)])).toEqual(
+      [],
+    );
+  });
+
+  it("keeps the stored count of members ended in core alone", () => {
+    const planted = `  ${MEMBER_WORD}sEnded: swept.membersEnded,`;
+    const row = rowOf(MEMBER_WORD);
+    expect(linesOver({ "packages/core/src/planted.ts": planted }, [row])).toEqual([]);
+    expect(linesOver({ "apps/web/src/planted.ts": planted }, [row])).toEqual([
+      `apps/web/src/planted.ts:1: ${planted.trim()}`,
+    ]);
+  });
+
+  it("refuses the old word for access in any form", () => {
+    const planted = `const ${ASSISTANT_WORD}Grants = await grantsOf(person);`;
+    expect(
+      linesOver({ "apps/web/src/planted.ts": planted }, [rowOf(`${ASSISTANT_WORD} grant`)]),
+    ).toEqual([`apps/web/src/planted.ts:1: ${planted}`]);
+  });
 
   it("reads an ordinary line as nothing", () => {
     expect(findingsOver("An ordinary line.")).toEqual([]);
