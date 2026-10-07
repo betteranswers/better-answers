@@ -33,7 +33,7 @@ const LIST_BUDGET_MS = 1000;
 
 const EVERY_WORKSPACE = HOMES.operator.path;
 
-const CLOSED = "The console is the operator's alone";
+const CLOSED = "The console is better-answers support's alone";
 
 const UK_DAY =
   /^\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;

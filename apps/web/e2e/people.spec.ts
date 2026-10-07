@@ -161,7 +161,7 @@ const displayNameRegion = (page: Page): Locator =>
   thePage(page).getByRole("region", { name: "Display name" });
 
 const flagButton = (page: Page): Locator =>
-  thePage(page).getByRole("button", { name: "Flag the name to the operator" });
+  thePage(page).getByRole("button", { name: "Flag the name to support" });
 
 const activityOf = (page: Page): Locator =>
   thePage(page).getByRole("region", { name: MEMBER_PAGE_WORDS.activity });
@@ -206,7 +206,8 @@ const backToMembers = async (page: Page): Promise<void> => {
   await expect(listHeading(page)).toBeVisible();
 };
 
-const SENT_TO_THE_OPERATOR = "Sent to the operator. The name stands until they correct it.";
+const SENT_TO_THE_OPERATOR =
+  "Sent to better-answers support. The name stands until they correct it.";
 
 const EACH_ROLE_MEANS = {
   Admin: "Manages people and sources, and does everything an Editor does.",
@@ -617,9 +618,9 @@ test.describe("a member's own page", () => {
             - link "Create one on the Groups page"
           - region "Display name":
             - heading "Display name" [level=3]
-            - paragraph: People give their own display name, and no Admin can change one. The operator corrects a name you flag as inappropriate.
-            - button "Flag the name to the operator"
-            - paragraph: The operator is emailed, and the flag is recorded on the audit log under your name. While a flag from this workspace waits, another adds nothing.
+            - paragraph: People give their own display name, and no Admin can change one. better-answers support corrects a name you flag as inappropriate.
+            - button "Flag the name to support"
+            - paragraph: better-answers support is emailed, and the flag is recorded on the audit log under your name. While a flag from this workspace waits, another adds nothing.
         - region "${MEMBER_PAGE_WORDS.activity}":
           - heading "${MEMBER_PAGE_WORDS.activity}" [level=2]
           - text: ${quoted(ACTIVITY_WORDS.none("Priya Shah"))}
@@ -1374,7 +1375,7 @@ test.describe("removing a member from their page", () => {
   });
 });
 
-test.describe("a member's display name, flagged to the operator", () => {
+test.describe("a member's display name, flagged to better-answers support", () => {
   test("flags a member's name within budget, and again answers alike", async ({
     page,
     request,

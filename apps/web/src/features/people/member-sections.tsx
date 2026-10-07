@@ -232,7 +232,7 @@ function CredentialsRevoker(properties: {
 /** Shown at the press, since the answer is this for every member; a refusal replaces it. */
 const SENT_TO_THE_OPERATOR: Outcome = {
   tone: "said",
-  words: "Sent to the operator. The name stands until they correct it.",
+  words: "Sent to better-answers support. The name stands until they correct it.",
 };
 
 function DisplayNameFlag(properties: {
@@ -265,17 +265,17 @@ function DisplayNameFlag(properties: {
       ) : (
         <>
           <p className="text-sm">
-            People give their own display name, and no Admin can change one. The operator corrects a
-            name you flag as inappropriate.
+            People give their own display name, and no Admin can change one. better-answers support
+            corrects a name you flag as inappropriate.
           </p>
           <div className="flex flex-col items-start gap-2">
             <Button ref={flagRef} variant="outline" aria-describedby={hintId} onClick={flag}>
               <Icon name="flag" />
-              Flag the name to the operator
+              Flag the name to support
             </Button>
             <p id={hintId} className="text-sm text-muted-foreground">
-              The operator is emailed, and the flag is recorded on the audit log under your name.
-              While a flag from this workspace waits, another adds nothing.
+              better-answers support is emailed, and the flag is recorded on the audit log under
+              your name. While a flag from this workspace waits, another adds nothing.
             </p>
           </div>
           <OutcomeLine outcome={outcome} />

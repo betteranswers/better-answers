@@ -14,15 +14,8 @@
   "apps/web/src/features/console/grant-words.ts": {
     "client": 1
   },
-  "apps/web/src/features/console/refusal-words.ts": {
-    "operator": 3
-  },
-  "apps/web/src/features/console/words.ts": {
-    "operator": 1
-  },
   "apps/web/src/features/people/invitation-words.ts": {
-    "act": 2,
-    "operator": 1
+    "act": 2
   },
   "apps/web/src/features/people/member-act-words.ts": {
     "act": 3,

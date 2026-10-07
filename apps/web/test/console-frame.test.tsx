@@ -79,7 +79,7 @@ describe("the console's shell", () => {
     await openApp("/console/workspaces/every-workspace");
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      "The console is the operator's alone",
+      "The console is better-answers support's alone",
     );
     const refused = screen.getByRole("alert").textContent;
     expect(refused).toBe(`${ONLY_THE_OPERATOR.why} ${ONLY_THE_OPERATOR.next}`);

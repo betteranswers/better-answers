@@ -26,8 +26,8 @@ export function NamesWaitingPage() {
           Names waiting
         </h2>
         <p className="mt-1 text-muted-foreground">
-          Display names an Admin flagged to the operator, the longest waiting first. Correcting a
-          name replaces it in every workspace and takes it off this list.
+          Display names an Admin flagged to better-answers support, the longest waiting first.
+          Correcting a name replaces it in every workspace and takes it off this list.
         </p>
         <NamesWaitingList headingRef={headingRef} />
       </section>
