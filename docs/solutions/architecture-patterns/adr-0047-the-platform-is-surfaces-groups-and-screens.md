@@ -69,7 +69,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | | Sources | **Connected sources** · Publishing rules · Priced plan · Backlogs · Removed at source · Share agents | Admin |
 | | Models | **Models and spend** · Spending limit | Admin |
 | | Questions | Answer audit · Answer tests | Admin |
-| | People | **Members** · **Groups** · Tokens | Admin |
+| | People | **Members** · **Groups** · Personal tokens | Admin |
 | | Personal data | Erasure and suppression | Admin |
 | | System | **Audit log** · Signals · Health · Backups | Admin |
 | Console (switcher) | People · Workspaces | **Everyone** · **Names waiting** · **Every workspace** | operator |
