@@ -11,7 +11,7 @@ export const MAP_NODE_LABELS = [
   "Section",
   "Source",
   "Actor",
-  "Composition",
+  "WriteUp",
   "Evidence",
   "CanonicalEntity",
 ] as const;

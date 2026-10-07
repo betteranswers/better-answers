@@ -26,8 +26,8 @@ import {
   A_BUNDLE_COMMIT,
   A_BUNDLE_COMMIT_WITH_A_PARENT,
   A_CITATION,
-  A_COMPOSITION_INCLUDE,
-  A_CONCEPT_CLASS_OVERRIDE,
+  A_WRITE_UP_INCLUDE,
+  A_CONCEPT_SENSITIVITY_OVERRIDE,
   A_CONCEPT_IDENTITY,
   A_CONCEPT_INDEX_ROW,
   A_CONCEPT_VERIFICATION,
@@ -1302,7 +1302,7 @@ describe("the map tables under app_rt", () => {
   });
 });
 
-const inboxAsApp = async (client: pg.PoolClient) => {
+const suggestionsAsApp = async (client: pg.PoolClient) => {
   const seed = await seedTwoWorkspaces(client);
   const here = await seed.suggestion({ workspaceId: WS_A });
   await seed.conceptWriteRequest({ workspaceId: WS_A, suggestionId: here.id });
@@ -1337,10 +1337,10 @@ const submitSet = (
     [ulid(), set.kind, set.proposer, JSON.stringify(set.requests)],
   );
 
-describe("the inbox under app_rt", () => {
+describe("the suggestions under app_rt", () => {
   it("returns none unscoped and only the scoped tenant's suggestions", async () => {
     await withRollback(db.pool, async (client) => {
-      const { here } = await inboxAsApp(client);
+      const { here } = await suggestionsAsApp(client);
 
       await client.query("SELECT set_config('app.workspace_id', '', true)");
       expect((await client.query("SELECT id FROM suggestion")).rows).toEqual([]);
@@ -1353,7 +1353,7 @@ describe("the inbox under app_rt", () => {
 
   it("refuses both roles the payload table, which the definer serves", async () => {
     await withRollback(db.pool, async (client) => {
-      const { here } = await inboxAsApp(client);
+      const { here } = await suggestionsAsApp(client);
 
       for (const statement of [
         "SELECT 1 FROM concept_write_request LIMIT 1",
@@ -1385,7 +1385,7 @@ describe("the inbox under app_rt", () => {
 
   it("withholds a decided suggestion's payload, and another tenant's always", async () => {
     await withRollback(db.pool, async (client) => {
-      const { here, there } = await inboxAsApp(client);
+      const { here, there } = await suggestionsAsApp(client);
 
       const foreign = await client.query("SELECT 1 FROM concept_write_request_for($1)", [there.id]);
       expect(foreign.rowCount).toBe(0);
@@ -1405,7 +1405,7 @@ describe("the inbox under app_rt", () => {
 
   it("refuses the api a DELETE of a suggestion", async () => {
     await withRollback(db.pool, async (client) => {
-      const { here } = await inboxAsApp(client);
+      const { here } = await suggestionsAsApp(client);
 
       await expect(
         client.query("DELETE FROM suggestion WHERE workspace_id = $1 AND id = $2", [WS_A, here.id]),
@@ -1469,7 +1469,7 @@ describe("the inbox under app_rt", () => {
 
   it("refuses a first decision a transaction never declared", async () => {
     await withRollback(db.pool, async (client) => {
-      const { here } = await inboxAsApp(client);
+      const { here } = await suggestionsAsApp(client);
       const decline = (id: string) =>
         client.query(
           `UPDATE suggestion SET status = 'declined', decider = 'process:better-answers-test',
@@ -1505,7 +1505,7 @@ describe("the inbox under app_rt", () => {
       await client.query("ROLLBACK TO SAVEPOINT queue");
 
       const submitted = await submitSet(client, {
-        kind: "candidate",
+        kind: "suggested-concept",
         proposer: "better-answers-extract/1.0",
         requests: [submitRequest({ merge_key: "policy:expenses", path: "knowledge/expenses.md" })],
       });
@@ -1631,15 +1631,15 @@ describe("the inbox under app_rt", () => {
         ],
         [
           A_SUGGESTION,
-          "a repair from a person",
-          [WS_A, ulid(), ulid(), "repair", "human:01J6CCCCCCCCCCCCCCCCCCCCCC"],
-          /suggestion_repair_proposer_check/,
+          "a citation fix from a person",
+          [WS_A, ulid(), ulid(), "citation-fix", "human:01J6CCCCCCCCCCCCCCCCCCCCCC"],
+          /suggestion_citation_fix_proposer_check/,
         ],
         [
           A_SUGGESTION,
-          "a repair from a versioned producer",
-          [WS_A, ulid(), ulid(), "repair", "better-answers-citation-repair/1.0"],
-          /suggestion_repair_proposer_check/,
+          "a citation fix from a versioned producer",
+          [WS_A, ulid(), ulid(), "citation-fix", "better-answers-citation-fix/1.0"],
+          /suggestion_citation_fix_proposer_check/,
         ],
       ]);
 
@@ -1647,8 +1647,8 @@ describe("the inbox under app_rt", () => {
         WS_A,
         ulid(),
         ulid(),
-        "repair",
-        "process:better-answers-citation-repair",
+        "citation-fix",
+        "process:better-answers-citation-fix",
       ]);
       expect(platform.rowCount).toBe(1);
     });
@@ -1672,7 +1672,7 @@ describe("the inbox under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const submit = (frontmatter: unknown) =>
         submitSet(client, {
-          kind: "candidate",
+          kind: "suggested-concept",
           proposer: "better-answers-extraction/1.2",
           requests: [submitRequest({ frontmatter })],
         });
@@ -1725,7 +1725,7 @@ describe("the inbox under app_rt", () => {
 const INSUFFICIENT_PRIVILEGE = "42501";
 
 /**
- * The one proposer form every kind's CHECK accepts, repair's platform-only one included, so
+ * The one proposer form every kind's CHECK accepts, a citation fix's platform-only one included, so
  * the pair under test is all the probe varies.
  */
 const A_PLATFORM_PROPOSER = "process:better-answers-test";
@@ -2097,15 +2097,11 @@ describe("the audience pair on every readable unit", () => {
       "connected_source_audience_check",
       (seed) => seed.connectedSource({ workspaceId: WS_A }),
     ],
+    ["write_up", "write_up_audience_check", (seed) => seed.writeUp({ workspaceId: WS_A })],
     [
-      "composition",
-      "composition_audience_check",
-      (seed) => seed.composition({ workspaceId: WS_A }),
-    ],
-    [
-      "concept_class_override",
-      "concept_class_override_audience_check",
-      (seed) => seed.conceptClassOverride({ workspaceId: WS_A }),
+      "concept_sensitivity_override",
+      "concept_sensitivity_override_audience_check",
+      (seed) => seed.conceptSensitivityOverride({ workspaceId: WS_A }),
     ],
   ];
 
@@ -2208,9 +2204,9 @@ describe("the derivation's tables under app_rt", () => {
     "connected_source",
     "source_document",
     "concept_evidence",
-    "concept_class_override",
-    "composition",
-    "composition_include",
+    "concept_sensitivity_override",
+    "write_up",
+    "write_up_include",
   ] as const;
 
   const seedOneOfEach = async (seed: TestData, workspaceId: string) => {
@@ -2225,9 +2221,9 @@ describe("the derivation's tables under app_rt", () => {
       iri: identity.iri,
       sourceDocumentId: document.id,
     });
-    await seed.conceptClassOverride({ workspaceId, iri: identity.iri });
-    const composed = await seed.composition({ workspaceId });
-    await seed.compositionInclude({ workspaceId, compositionId: composed.id, iri: identity.iri });
+    await seed.conceptSensitivityOverride({ workspaceId, iri: identity.iri });
+    const composed = await seed.writeUp({ workspaceId });
+    await seed.writeUpInclude({ workspaceId, writeUpId: composed.id, iri: identity.iri });
     return { connectedSource, document, identity, cited, composed };
   };
 
@@ -2250,9 +2246,9 @@ describe("the derivation's tables under app_rt", () => {
 
   const REFUSED_TO_THE_WORKER = [
     "concept_evidence",
-    "concept_class_override",
-    "composition",
-    "composition_include",
+    "concept_sensitivity_override",
+    "write_up",
+    "write_up_include",
   ] as const;
 
   it("limits the worker to reading and reconciling sources and documents", async () => {
@@ -2278,18 +2274,18 @@ describe("the derivation's tables under app_rt", () => {
 
       await client.query(
         `UPDATE source_document
-            SET outcome = 'quarantined', quarantine_error = 'NeedsOcrError'
+            SET outcome = 'unreadable', unreadable_reason = 'NeedsOcrError'
           WHERE id = $1`,
         [seeded.document.id],
       );
-      const quarantined = await client.query(
-        "SELECT outcome, quarantine_error FROM source_document WHERE id = $1",
+      const unreadable = await client.query(
+        "SELECT outcome, unreadable_reason FROM source_document WHERE id = $1",
         [seeded.document.id],
       );
       await client.query(
         `UPDATE source_document
             SET content_hash = $2, normalised_key = 'normalised/handbook.md',
-                redaction_version = '5:d1', outcome = 'converted', quarantine_error = NULL,
+                redaction_version = '5:d1', outcome = 'converted', unreadable_reason = NULL,
                 last_seen = now(), sensitivity = 'Restricted'
           WHERE id = $1`,
         [seeded.document.id, `sha256:${"a".repeat(64)}`],
@@ -2301,12 +2297,12 @@ describe("the derivation's tables under app_rt", () => {
       expect({
         connectedSource: connectedSource.rows,
         document: document.rows,
-        quarantined: quarantined.rows,
+        unreadable: unreadable.rows,
         reconciled: reconciled.rows,
       }).toEqual({
         connectedSource: [{ id: seeded.connectedSource.id }],
         document: [{ id: seeded.document.id }],
-        quarantined: [{ outcome: "quarantined", quarantine_error: "NeedsOcrError" }],
+        unreadable: [{ outcome: "unreadable", unreadable_reason: "NeedsOcrError" }],
         reconciled: [{ redaction_version: "5:d1", sensitivity: "Restricted" }],
       });
 
@@ -2360,14 +2356,14 @@ describe("the derivation's tables under app_rt", () => {
           "source_document_connected_source_fk",
         ],
         [
-          A_COMPOSITION_INCLUDE,
+          A_WRITE_UP_INCLUDE,
           [WS_A, ours.composed.id, theirs.identity.iri],
-          "composition_include_identity_fk",
+          "write_up_include_identity_fk",
         ],
         [
-          A_CONCEPT_CLASS_OVERRIDE,
+          A_CONCEPT_SENSITIVITY_OVERRIDE,
           [WS_A, theirs.identity.iri, "Internal", "process:better-answers-test", ulid()],
-          "concept_class_override_identity_fk",
+          "concept_sensitivity_override_identity_fk",
         ],
 
         [A_CITATION, [WS_A, ours.identity.iri, ours.document.id], "concept_evidence_evidence_fk"],
@@ -2382,25 +2378,31 @@ describe("the derivation's tables under app_rt", () => {
     });
   });
 
-  it("refuses an override with an unknown actor form or class", async () => {
+  it("refuses an override with an unknown actor form or sensitivity", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const override = (actor: string, sensitivity: string) =>
-        client.query(A_CONCEPT_CLASS_OVERRIDE, [WS_A, identity.iri, sensitivity, actor, ulid()]);
+        client.query(A_CONCEPT_SENSITIVITY_OVERRIDE, [
+          WS_A,
+          identity.iri,
+          sensitivity,
+          actor,
+          ulid(),
+        ]);
 
       await client.query("SAVEPOINT actor");
       await expect(override("Ada Admin", "Internal")).rejects.toThrow(
-        /concept_class_override_actor_check/,
+        /concept_sensitivity_override_actor_check/,
       );
       await client.query("ROLLBACK TO SAVEPOINT actor");
-      await client.query("SAVEPOINT class");
+      await client.query("SAVEPOINT sensitivity");
       await expect(override("human:01J6CCCCCCCCCCCCCCCCCCCCCC", "Secret")).rejects.toThrow(
-        /concept_class_override_sensitivity_check/,
+        /concept_sensitivity_override_sensitivity_check/,
       );
-      await client.query("ROLLBACK TO SAVEPOINT class");
+      await client.query("ROLLBACK TO SAVEPOINT sensitivity");
 
       const landed = await override("human:01J6CCCCCCCCCCCCCCCCCCCCCC", "Internal");
       expect(landed.rowCount).toBe(1);
@@ -2430,13 +2432,13 @@ describe("the derivation's tables under app_rt", () => {
       expect(
         await countedRows(client, [
           "concept_evidence",
-          "concept_class_override",
-          "composition_include",
+          "concept_sensitivity_override",
+          "write_up_include",
         ]),
       ).toEqual([
         { table: "concept_evidence", rows: 0 },
-        { table: "concept_class_override", rows: 0 },
-        { table: "composition_include", rows: 0 },
+        { table: "concept_sensitivity_override", rows: 0 },
+        { table: "write_up_include", rows: 0 },
       ]);
     });
   });
@@ -2669,7 +2671,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("keeps a document's class within an Admin's narrowing", async () => {
+  it("keeps a document's sensitivity within an Admin's narrowing", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const narrowed = await seed.sourceDocument({

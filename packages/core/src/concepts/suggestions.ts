@@ -38,7 +38,7 @@ import {
 } from "../store/postgres/index.ts";
 import type { Frontmatter } from "./index.ts";
 
-const INBOX_ACTS = declareActs("knowledge", {
+const SUGGESTION_ACTS = declareActs("knowledge", {
   declined: act("knowledge.suggestion.declined", { setId: "id" }),
   returned: act("knowledge.suggestion.returned", { setId: "id" }),
 });
@@ -80,7 +80,7 @@ type SummaryRow = {
 };
 
 const actorOf = (value: string): ActorId => {
-  if (!isActorId(value)) throw new Error(`the inbox holds an actor of no known form`);
+  if (!isActorId(value)) throw new Error(`a suggestion holds an actor of no known form`);
   return value;
 };
 
@@ -315,7 +315,7 @@ export const declineSuggestion = (
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> =>
   decide(principal, doors, input, {
     status: SUGGESTION_DECLINED_STATUS,
-    act: INBOX_ACTS.declined,
+    act: SUGGESTION_ACTS.declined,
   });
 
 export const returnToProposer = (
@@ -325,7 +325,7 @@ export const returnToProposer = (
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> =>
   decide(principal, doors, input, {
     status: SUGGESTION_RETURNED_STATUS,
-    act: INBOX_ACTS.returned,
+    act: SUGGESTION_ACTS.returned,
   });
 
 export type SuggestionPayload = {

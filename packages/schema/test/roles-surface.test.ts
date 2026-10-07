@@ -299,9 +299,9 @@ describe("what worker_rt reaches after the flip", () => {
           "last_seen",
           "normalised_key",
           "outcome",
-          "quarantine_error",
           "redaction_version",
           "sensitivity",
+          "unreadable_reason",
         ],
       });
     });

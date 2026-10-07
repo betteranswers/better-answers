@@ -107,18 +107,18 @@ class ReadDocument:
 
 
 @dataclass(frozen=True, slots=True)
-class QuarantinedDocument:
-    """`error` is the refusal's name, such as `NeedsOcrError`
+class UnreadableDocument:
+    """`reason` is the refusal's name, such as `NeedsOcrError`
     or `DeadlineExceededError`, never its message."""
 
     source_document_id: str
-    error: str
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
 class LandedSync:
     documents: tuple[ReadDocument, ...]
-    quarantined: tuple[QuarantinedDocument, ...] = ()
+    unreadable: tuple[UnreadableDocument, ...] = ()
 
     @property
     def detected_afresh(self) -> tuple[str, ...]:
@@ -235,7 +235,7 @@ async def _one_document(
 
 def _fail_the_sync(error: BaseException, _: coco.ExceptionContext) -> None:
     # The engine's default logs and carries on, so the sync would finish with the
-    # document neither read nor quarantined and land_rows would delete its passages.
+    # document neither read nor unreadable and land_rows would delete its passages.
     raise error
 
 
@@ -277,7 +277,7 @@ def redact_landed_copies(
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> LandedSync:
     """Writes each document's redacted text to its `normalised_key`; one that
-    cannot be converted or runs past its time is quarantined rather than raised.
+    cannot be converted or runs past its time is marked unreadable rather than raised.
     `detection_key` defaults to the detector's own, which loads presidio."""
     # Reading the key builds a recogniser of every rule, so presidio arrives with it. A
     # spawn that lands nothing must not pay that.
@@ -314,27 +314,27 @@ def redact_landed_copies(
         copies.write(
             document.normalised_key, document.redacted.text.encode(TEXT_ENCODING)
         )
-    quarantined = tuple(
-        QuarantinedDocument(
+    unreadable = tuple(
+        UnreadableDocument(
             source_document_id=document.source_document_id,
-            error=refused[document.source_document_id],
+            reason=refused[document.source_document_id],
         )
         for document in documents
         if document.source_document_id in refused
     )
-    outcome = LandedSync(documents=answered, quarantined=quarantined)
-    for refusal in quarantined:
+    outcome = LandedSync(documents=answered, unreadable=unreadable)
+    for refusal in unreadable:
         logger.warning(
-            "the sync could not read a document and quarantined it",
+            "the sync could not read a document and found it unreadable",
             connected_source_id=sync.connected_source_id,
             source_document_id=refusal.source_document_id,
-            error=refusal.error,
+            reason=refusal.reason,
         )
     logger.info(
         "the connected source's landed copies were read",
         connected_source_id=sync.connected_source_id,
         documents=len(answered),
         detected_afresh=list(outcome.detected_afresh),
-        quarantined=len(quarantined),
+        unreadable=len(unreadable),
     )
     return outcome

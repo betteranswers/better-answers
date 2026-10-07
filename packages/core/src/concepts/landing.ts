@@ -7,10 +7,10 @@ import {
   PUBLISHED_STATUSES,
   SENSITIVITY_DEFAULT,
   SUGGESTION_ACCEPTED_STATUS,
-  SUGGESTION_REPAIR_KIND,
+  SUGGESTION_CITATION_FIX_KIND,
   SUGGESTION_WAITING_STATUS,
   VERIFICATION_ERASURE_ORIGIN,
-  VERIFICATION_REPAIR_ORIGIN,
+  VERIFICATION_CITATION_FIX_ORIGIN,
 } from "@better-answers/schema";
 
 import {
@@ -19,14 +19,14 @@ import {
   visibilityOf,
   type Visibility,
 } from "../access/index.ts";
-import { recomputeCompositionsIncluding } from "../guides/index.ts";
+import { recomputeWriteUpsIncluding } from "../guides/index.ts";
 import type { ActorId, PlatformPrincipal, Principal } from "../kernel/index.ts";
 import { fileAt, type Committed, type GitDoor } from "../store/git/index.ts";
 import { writeConceptDelta } from "../store/map/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import { contentHashOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
-import { markDeciding } from "./inbox.ts";
 import type { Acceptance } from "./index.ts";
+import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
 
 /** Title-cases each word and drops a plural: `policies` and `Policy` both fold to `Policy`. */
@@ -287,7 +287,7 @@ const landEvidence = async (
 
 /**
  * Writes the concept's identity, evidence, citations, index row, bundle commit and map delta,
- * recomputes compositions when its visibility moved, and decides an accepted suggestion.
+ * recomputes write-ups when its visibility moved, and decides an accepted suggestion.
  * @throws when somebody else decided that suggestion first.
  */
 export const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<void> => {
@@ -356,7 +356,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
   });
 
   if (!sameVisibility(held, visibility)) {
-    await recomputeCompositionsIncluding(principal, tx, { iris: [index.iri] });
+    await recomputeWriteUpsIncluding(principal, tx, { iris: [index.iri] });
   }
   if (index.acceptance !== undefined) {
     await landAcceptance(tx, index, index.acceptance);
@@ -382,12 +382,12 @@ const landAcceptance = async (tx: Tx, index: Landing, acceptance: Acceptance): P
   if (decided.rows.length === 0) {
     throw new Error("the suggestion was decided by somebody else while this act was in flight");
   }
-  if (acceptance.kind !== SUGGESTION_REPAIR_KIND) return;
+  if (acceptance.kind !== SUGGESTION_CITATION_FIX_KIND) return;
 
   await tx.query(
     `UPDATE concept_verification SET content_hash = $3, origin = $4
       WHERE workspace_id = $1 AND iri = $2 AND content_hash IS NOT NULL`,
-    [index.workspaceId, index.iri, index.contentHash, VERIFICATION_REPAIR_ORIGIN],
+    [index.workspaceId, index.iri, index.contentHash, VERIFICATION_CITATION_FIX_ORIGIN],
   );
 };
 

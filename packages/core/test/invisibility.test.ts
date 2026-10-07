@@ -182,35 +182,35 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
     expect(admin.map((step) => step.uid).toSorted()).toEqual([entry.iri, withheld.iri].toSorted());
   });
 
-  it("leaves no gap in footnotes and hides its narrowed composition", async () => {
+  it("leaves no gap in footnotes and hides its narrowed write-up", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
     const visible = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
 
     const { behind, narrowed } = await seededBy(db(), async (seed) => {
-      const first = await seed.composition({ workspaceId: scenario.workspaceId });
-      await seed.compositionInclude({
+      const first = await seed.writeUp({ workspaceId: scenario.workspaceId });
+      await seed.writeUpInclude({
         workspaceId: scenario.workspaceId,
-        compositionId: first.id,
+        writeUpId: first.id,
         iri: withheld.iri,
         ordinal: 0,
         id: "i1",
       });
-      await seed.compositionInclude({
+      await seed.writeUpInclude({
         workspaceId: scenario.workspaceId,
-        compositionId: first.id,
+        writeUpId: first.id,
         iri: visible.iri,
         ordinal: 1,
         id: "i2",
       });
-      const second = await seed.composition({
+      const second = await seed.writeUp({
         workspaceId: scenario.workspaceId,
         sensitivity: "Restricted",
       });
-      await seed.compositionInclude({
+      await seed.writeUpInclude({
         workspaceId: scenario.workspaceId,
-        compositionId: second.id,
+        writeUpId: second.id,
         iri: withheld.iri,
         ordinal: 0,
         id: "i1",

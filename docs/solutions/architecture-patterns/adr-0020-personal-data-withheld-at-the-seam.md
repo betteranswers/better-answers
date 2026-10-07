@@ -47,13 +47,13 @@ A **suppression** is the workspace's: one per erasure request, holding the reque
 
 ## Why
 
-- The first corpus's most useful file is also the flagged one. Quarantine is the manual work the product exists to remove, and role-gating in place puts a sort code in four stores and at a processor.
+- The first corpus's most useful file is also the flagged one. Setting it aside is the manual work the product exists to remove, and role-gating in place puts a sort code in four stores and at a processor.
 - A placeholder written before splitting is the one control that holds whatever a predicate, a prompt or an assistant's context later does with the text.
 - No detector clears 0.6 F1 on independent benchmarks, so the design is detector plus review by category plus a Restricted default.
 - The first Admin is a bid writer, not a DPO, so the safe set must be what they get by doing nothing.
 - An actor id is a record, so the platform may rewrite it across history. A name in a concept body is knowledge the company asserts about itself (ADR 0011); rewriting it would make every export already issued diverge.
 - A pseudonym that is never the person id means two workspaces' rewritten histories cannot be joined on one person (ADR 0035).
-- A per-document suppression missed documents bound later, not yet indexed, quarantined, or withheld by a rule later switched off.
+- A per-document suppression missed documents bound later, not yet indexed, unreadable, or withheld by a rule later switched off.
 - One rule switch must never re-extract fifty thousand documents through a hosted model choice.
 
 ## Rejected

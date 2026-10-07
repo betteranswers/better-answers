@@ -115,7 +115,7 @@ reviews:
 
         Flag a function that reaches a table, a store door or the map and takes no `Principal` first, or takes one later in its parameter list, or takes a bare `workspaceId` string in place of one. Flag a transport that trusts a user-supplied workspace, organisation or account identifier instead of deriving it from the verified session or bearer token, and flag a request body accepted without runtime validation.
 
-        Flag a read that checks the workspace but skips the read predicate, and flag a read predicate tested against a connected source's fields rather than against the `published_at`, `sensitivity` and `audience` columns on the readable unit itself — a concept and a composition have no connected source (ADR 0023).
+        Flag a read that checks the workspace but skips the read predicate, and flag a read predicate tested against a connected source's fields rather than against the `published_at`, `sensitivity` and `audience` columns on the readable unit itself — a concept and a write-up have no connected source (ADR 0023).
 
         A `Principal` has three kinds — a user principal, the platform principal and the operator (ADR 0009, 2026-09-04) — and a deferred principal (a named person's authority carried into work that outlives their session, expiring with the authority it borrowed) is a glossary word with no type yet. Flag a background job, scheduled run or replay carrying a live user session, and flag a cross-workspace caller threaded through a user principal's role field.
 

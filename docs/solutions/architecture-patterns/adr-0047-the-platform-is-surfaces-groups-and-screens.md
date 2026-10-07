@@ -65,7 +65,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | Knowledge | Browse · Curation | Search · Guides · All knowledge · Due for verification · Conflicts · Kinds · Collections and owners · Exports | Browse: every role. Curation: Admins and owners |
 | Inbox | (none) | Waiting on you | Admins and owners |
 | Control Centre | Overview | Overview | Admin |
-| | Suggestions | Queue | Admin |
+| | Suggestions | To decide | Admin |
 | | Sources | **Connected sources** · Publishing rules · Cost estimates · Backlogs · Removed at source · Share agents | Admin |
 | | Models | **Models and spend** · Spending limit | Admin |
 | | Questions | Questions asked · Answer tests | Admin |
@@ -79,7 +79,7 @@ In Knowledge, Browse holds Search and Guides, and Curation holds the other six. 
 Today's pages that the table does not list moved:
 
 - Knowledge left Control Centre and became an area. Its review table is now All knowledge. Its conflicts and verification requests are now Conflicts and Due for verification.
-- Promotions left Questions. A promotion is a suggestion, so it waits in Suggestions' queue, and the owner of the `Answer` collection reaches it through their Inbox.
+- Promotions left Questions. A promotion is a suggestion, so it waits in Suggestions › To decide, and the owner of the `Answer` collection reaches it through their Inbox.
 - Owners left People for Knowledge's Collections and owners. Erasure and suppression moved to Personal data, and the audit log to System. Thresholds is not declared.
 - The ceiling left Sources, and routes and spend left System, both for Agent Operations.
 
@@ -89,7 +89,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 
 - A person sees a page by their role, or by owning a collection the page serves. A group or an area with no page the person may see is hidden whole.
 - Owning a collection grants acts, so a Viewer may own one. Ownership lands with S3. Until then, visibility reads roles alone.
-- The suggestion queue lives in Control Centre › Suggestions. A person's Inbox holds their own items and points into the queue.
+- Waiting suggestions are decided in Control Centre › Suggestions › To decide. A person's Inbox holds their own items and points into it.
 - Control Centre is for Admins alone, so an Editor sees no Questions page there. An Editor who owns the `Answer` collection reaches its promotions through their Inbox. An Editor who owns nothing sees neither.
 - An area, group or page that is not built appears nowhere: not in the rail, the menu or jump-to.
 - A role's home always shows. Until it is built, it says plainly that it is on its way. Today that is Ask, for Editors and Viewers. An Admin's home is People › Members until Control Centre › Overview is built.
@@ -121,7 +121,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of acts an agent takes as the person |
-| Control Centre | Connected sources. Models and spend. Members, Groups. Audit log | Overview, which no block names. Queue (S5). Cost estimates (S4). Publishing rules, Backlogs, Removed at source. Spending limit (S7). Questions asked, Answer tests (S2). Personal tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Share agents, with the share agent. Runs, Connected assistants, Settings. Then: feeds and systems read live in Sources, Approvals in Agent Operations |
+| Control Centre | Connected sources. Models and spend. Members, Groups. Audit log | Overview, which no block names. To decide (S5). Cost estimates (S4). Publishing rules, Backlogs, Removed at source. Spending limit (S7). Questions asked, Answer tests (S2). Personal tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Share agents, with the share agent. Runs, Connected assistants, Settings. Then: feeds and systems read live in Sources, Approvals in Agent Operations |
 | Console | Everyone, Names waiting, Every workspace | none | The identity-set audit log |
 
 Two things stay open:
@@ -133,7 +133,7 @@ Two things stay open:
 
 - People come to do one of a few things: ask, read the map, produce work, decide what waits on them, or run the workspace. One person often does several. A rail of areas lets each reach the job they came for in one move. A rail of Control Centre's parts showed every role pages it could not use.
 - Deciding is not only an Admin's job. An owner of any role decides edit suggestions and checks on their collection, and one of the personas is a Viewer who owns a specialism. So curation sits on Knowledge, what waits on a person sits in their Inbox, and ownership, not role alone, decides what they see.
-- Unpublished content is shown to Admins alone, in Control Centre. A suggestion's payload can come from an unpublished connected source, so the queue stays in Control Centre, and each Inbox points into it.
+- Unpublished content is shown to Admins alone, in Control Centre. A suggestion's payload can come from an unpublished connected source, so To decide stays in Control Centre, and each Inbox points into it.
 - A withheld concept must be indistinguishable from one that does not exist. An address that says "not for you" or "not built yet" tells a person what exists. Nobody should learn what exists by guessing addresses.
 - The infrequent reader forgets the tool between visits. A few plainly named areas, with nothing listed that cannot be opened, are what such a reader holds.
 - Control Centre's groups each hold their own pages, as Flux AgentOps' do. One noun per thing an Admin answers for is what a person holds without reading (ADR 0017). Questions stays apart from Agent Operations: what the platform answered is a matter of content, and what its agents did is a matter of operations and spend. Personal data stays apart from People: a subject request runs on its own one-month clock.

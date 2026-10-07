@@ -9,7 +9,13 @@ import { z } from "zod";
 
 import { foldSeparators } from "../scripts/fold-separators.ts";
 import { restoreFinalNewline } from "../scripts/journal-newline.ts";
-import { AUDIENCE_CHECK, CONCEPT_FRONTMATTER_MAX, SUGGESTION_SET_MAX } from "../src/index.ts";
+import {
+  AUDIENCE_CHECK,
+  CONCEPT_FRONTMATTER_MAX,
+  SUGGESTION_KINDS_FROM_A_RUN,
+  SUGGESTION_KINDS_FROM_THE_APP,
+  SUGGESTION_SET_MAX,
+} from "../src/index.ts";
 import {
   journalEntries,
   journalMetaFolder,
@@ -268,20 +274,33 @@ describe("the declarations and the DDL generated from them", () => {
   });
 });
 
-const inboxSubstrate = (): string => {
-  const file = journalMigrationFiles().find((name) => name.endsWith("the-inbox-substrate.sql"));
-  if (file === undefined) throw new Error("the inbox substrate is not in the journal");
-  return readFileSync(file, "utf8");
+/** The newest migration that writes `submit_suggestion_set`'s body, which the database runs. */
+const theSuggestionFunction = (): string => {
+  const sql = journalMigrationFiles()
+    .map((file) => readFileSync(file, "utf8"))
+    .findLast((text) => /FUNCTION (?:public\.)?submit_suggestion_set\(/u.test(text));
+  if (sql === undefined) throw new Error("no migration in the journal writes the function");
+  return sql;
 };
 
-describe("what the inbox substrate copies from the schema package", () => {
+const arrayOf = (kinds: readonly string[]): string =>
+  `ARRAY[${kinds.map((kind) => `'${kind}'`).join(", ")}]`;
+
+describe("what the suggestion function copies from the schema package", () => {
   it("bounds a set and a frontmatter at their constants", () => {
-    const sql = inboxSubstrate();
+    const sql = theSuggestionFunction();
 
     expect(sql).toContain(`BETWEEN 1 AND ${SUGGESTION_SET_MAX}`);
     expect(sql).toContain(`between one and ${SUGGESTION_SET_MAX} requests`);
     expect(sql).toContain(`> ${CONCEPT_FRONTMATTER_MAX}`);
     expect(sql).toContain(`of at most ${CONCEPT_FRONTMATTER_MAX} characters`);
+  });
+
+  it("lets each tier raise the kinds the schema package lists", () => {
+    const sql = theSuggestionFunction();
+
+    expect(sql).toContain(`WHEN 'app_rt' THEN ${arrayOf(SUGGESTION_KINDS_FROM_THE_APP)}`);
+    expect(sql).toContain(`WHEN 'worker_rt' THEN ${arrayOf(SUGGESTION_KINDS_FROM_A_RUN)}`);
   });
 });
 

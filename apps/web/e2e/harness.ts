@@ -240,7 +240,7 @@ type SeedFinding = {
 type SeedDocument = {
   readonly title: string;
   readonly sensitivity?: Sensitivity;
-  readonly quarantineError?: string;
+  readonly unreadableReason?: string;
   readonly passages?: readonly string[];
   readonly findings?: readonly SeedFinding[];
   readonly cited?: boolean;
@@ -264,7 +264,7 @@ const seededConnectedSources = z.object({
         z.object({
           documentId: z.string(),
           title: z.string(),
-          citedBy: z.object({ iri: z.string(), compositionId: z.string() }).nullable(),
+          citedBy: z.object({ iri: z.string(), writeUpId: z.string() }).nullable(),
         }),
       ),
     }),

@@ -8,14 +8,10 @@
   "apps/web/src/features/people/member-act-words.ts": {
     "act": 3
   },
-  "apps/web/src/features/sources/refusal-words.ts": {
-    "class": 3
-  },
   "apps/web/src/features/sources/words.ts": {
     "act": 1
   },
   "apps/web/src/shared/navigation.ts": {
-    "act": 1,
-    "Queue": 1
+    "act": 1
   }
 }

@@ -226,7 +226,7 @@ const UNREVIEWED = {
   review_reason: null,
 };
 
-const passageClassesOf = async (workspaceId: string, documentId: string) => {
+const passageSensitivitiesOf = async (workspaceId: string, documentId: string) => {
   const found = await db().pool.query<{ sensitivity: string }>(
     `SELECT sensitivity FROM "index".readable_passage
       WHERE workspace_id = $1 AND source_document_id = $2 ORDER BY ordinal`,
@@ -257,12 +257,12 @@ const jobsOf = async (workspaceId: string) => {
 };
 
 const narrowingLeftBehindIn = async (workspaceId: string, documentId: string) => ({
-  classes: await passageClassesOf(workspaceId, documentId),
+  sensitivities: await passageSensitivitiesOf(workspaceId, documentId),
   auditEvents: await batchedRowsOf(db().pool, workspaceId, "sources.document.narrowed"),
   jobs: await jobsOf(workspaceId),
 });
 
-const NOTHING_NARROWED = { classes: ["Internal"], auditEvents: [], jobs: [] };
+const NOTHING_NARROWED = { sensitivities: ["Internal"], auditEvents: [], jobs: [] };
 
 const findingsAs = (who: UserPrincipal, connectedSourceId: string) =>
   acting(who, (principal, tx) =>
@@ -284,8 +284,8 @@ const documentHeldAboveItsConnectedSource = async (workspaceId: string) => {
 
 const pageIncluding = (workspaceId: string, iri: string): Promise<string> =>
   seededBy(db(), async (seed) => {
-    const page = await seed.composition({ workspaceId });
-    await seed.compositionInclude({ workspaceId, compositionId: page.id, iri, ordinal: 0 });
+    const page = await seed.writeUp({ workspaceId });
+    await seed.writeUpInclude({ workspaceId, writeUpId: page.id, iri, ordinal: 0 });
     return page.id;
   });
 
@@ -482,7 +482,7 @@ describe("the review read of a connected source's findings", () => {
     ]);
   });
 
-  it("reads a document above its source at the source's class", async () => {
+  it("reads a document above its source at the source's sensitivity", async () => {
     const scenario = await arrange();
     const { connectedSourceId, held } = await documentHeldAboveItsConnectedSource(
       scenario.workspaceId,
@@ -946,9 +946,13 @@ describe("an Admin narrowing named documents", () => {
       value: { connectedSourceId, documentIds: [first.documentId], sensitivity: "Restricted" },
     });
     expect(await passageVersionsOf(db(), scenario.workspaceId, connectedSourceId)).toEqual(stoodAt);
-    expect(await passageClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Restricted"]);
+    expect(await passageSensitivitiesOf(scenario.workspaceId, first.documentId)).toEqual([
+      "Restricted",
+    ]);
 
-    expect(await passageClassesOf(scenario.workspaceId, second.documentId)).toEqual(["Internal"]);
+    expect(await passageSensitivitiesOf(scenario.workspaceId, second.documentId)).toEqual([
+      "Internal",
+    ]);
     expect(
       await batchedRowsOf(db().pool, scenario.workspaceId, "sources.document.narrowed"),
     ).toEqual([
@@ -1022,7 +1026,7 @@ describe("an Admin narrowing named documents", () => {
     });
   });
 
-  it("records the narrowed class beside the document's read class", async () => {
+  it("records the narrowed sensitivity beside the document's read sensitivity", async () => {
     const scenario = await arrange();
     const { connectedSourceId, first, second } = await connectedSourceWithTwoDocuments(scenario);
 
@@ -1121,7 +1125,7 @@ describe("an Admin narrowing named documents", () => {
 
     expect(outcome).toMatchObject({
       ok: true,
-      value: { concepts: [citing.iri], compositions: [page] },
+      value: { concepts: [citing.iri], writeUps: [page] },
     });
     expect(
       await visibilityHeld(db().pool, "concept_index", scenario.workspaceId, citing.iri),
@@ -1130,9 +1134,9 @@ describe("an Admin narrowing named documents", () => {
       await visibilityHeld(db().pool, "concept_index", scenario.workspaceId, untouched.iri),
     ).toMatchObject({ sensitivity: "Internal" });
 
-    expect(
-      await visibilityHeld(db().pool, "composition", scenario.workspaceId, page),
-    ).toMatchObject({ sensitivity: "Restricted" });
+    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, page)).toMatchObject({
+      sensitivity: "Restricted",
+    });
   });
 
   it("hides a narrowed document from a Viewer, not its sibling", async () => {
@@ -1152,7 +1156,7 @@ describe("an Admin narrowing named documents", () => {
     expect(sibling).toMatchObject({ ok: true, value: { text: "12-34-56" } });
   });
 
-  it("refuses a class wider than the document's, and nothing moves", async () => {
+  it("refuses a sensitivity wider than the document's, and nothing moves", async () => {
     const scenario = await arrange();
     const { connectedSourceId, first } = await connectedSourceWithTwoDocuments(scenario);
 
@@ -1171,7 +1175,7 @@ describe("an Admin narrowing named documents", () => {
     );
   });
 
-  it("refuses widening past the source's class over a wider document", async () => {
+  it("refuses widening past the source's sensitivity over a wider document", async () => {
     const scenario = await arrange();
     const { connectedSourceId, held } = await documentHeldAboveItsConnectedSource(
       scenario.workspaceId,
@@ -1193,7 +1197,9 @@ describe("an Admin narrowing named documents", () => {
     );
 
     expect(outcome).toEqual({ ok: false, error: "widening-refused" });
-    expect(await passageClassesOf(scenario.workspaceId, held.documentId)).toEqual(["Restricted"]);
+    expect(await passageSensitivitiesOf(scenario.workspaceId, held.documentId)).toEqual([
+      "Restricted",
+    ]);
   });
 
   it("refuses another connected source's document, failing the whole batch", async () => {
@@ -1209,7 +1215,9 @@ describe("an Admin narrowing named documents", () => {
     ]);
 
     expect(outcome).toEqual({ ok: false, error: "no-such-document" });
-    expect(await passageClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
+    expect(await passageSensitivitiesOf(scenario.workspaceId, first.documentId)).toEqual([
+      "Internal",
+    ]);
   });
 
   it.each([
@@ -1224,7 +1232,9 @@ describe("an Admin narrowing named documents", () => {
     ]);
 
     expect(outcome).toEqual({ ok: false, error: "role-forbids" });
-    expect(await passageClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
+    expect(await passageSensitivitiesOf(scenario.workspaceId, first.documentId)).toEqual([
+      "Internal",
+    ]);
   });
 });
 
@@ -1305,7 +1315,9 @@ describe("an Admin dismissing groups of findings as not special category", () =>
     const { first, dismissed } = await dismissingTwoGroupsOfThree(scenario);
 
     expect(await restoreOf(scenario.workspaceId, dismissed)).toMatchObject({ restored: false });
-    expect(await passageClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Restricted"]);
+    expect(await passageSensitivitiesOf(scenario.workspaceId, first.documentId)).toEqual([
+      "Restricted",
+    ]);
   });
 
   it("writes one unbatched row for one document's group", async () => {

@@ -167,13 +167,13 @@ const documentCarrying = (column: string, word: string): string =>
       original_key, ${column})
    VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original', '${word}')`;
 
-const documentReporting = (outcome: string | null, quarantineError: string | null): string =>
+const documentReporting = (outcome: string | null, unreadableReason: string | null): string =>
   `INSERT INTO source_document
      (workspace_id, id, connected_source_id, source_system_id, title, media_type, byte_size,
-      original_key, outcome, quarantine_error)
+      original_key, outcome, unreadable_reason)
    VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original',
            ${outcome === null ? "NULL" : `'${outcome}'`},
-           ${quarantineError === null ? "NULL" : `'${quarantineError}'`})`;
+           ${unreadableReason === null ? "NULL" : `'${unreadableReason}'`})`;
 
 const documentSized = (bytes: number): string =>
   `INSERT INTO source_document
@@ -210,14 +210,41 @@ export const attemptDocumentConcluded = (
     client.query(documentCarrying("outcome", outcome), [...anotherItemUnder(place)]),
   );
 
-export const attemptQuarantinePair = (
+export const attemptUnreadablePair = (
   client: pg.PoolClient,
   place: CataloguePlace,
   outcome: string | null,
-  quarantineError: string | null,
+  unreadableReason: string | null,
 ): Promise<string> =>
   refusalOf(client, () =>
-    client.query(documentReporting(outcome, quarantineError), [...anotherItemUnder(place)]),
+    client.query(documentReporting(outcome, unreadableReason), [...anotherItemUnder(place)]),
+  );
+
+export type SuggestionRow = {
+  readonly workspaceId: string;
+  readonly id: string;
+  readonly setId: string;
+  readonly kind: string;
+  readonly proposer: string;
+  readonly decided?: { readonly targetIri: string; readonly decider: string };
+};
+
+/** Past the boundary schema, so a kind the package no longer declares can still be written. */
+export const suggestionWritten = (client: Writer, row: SuggestionRow): Promise<unknown> =>
+  client.query(
+    `INSERT INTO suggestion
+       (workspace_id, id, set_id, kind, status, proposer, target_iri, decider, decided_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $8::text IS NULL THEN NULL ELSE now() END)`,
+    [
+      row.workspaceId,
+      row.id,
+      row.setId,
+      row.kind,
+      row.decided === undefined ? "waiting" : "accepted",
+      row.proposer,
+      row.decided?.targetIri ?? null,
+      row.decided?.decider ?? null,
+    ],
   );
 
 export const attemptDocumentSized = (

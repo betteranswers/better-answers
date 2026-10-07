@@ -20,11 +20,11 @@ C4Component
     Component(audit, "audit.py", "nightly-audit", "The parser audit over every concept file")
     Component(bundle, "bundle.py, concept_file.py, links.py, splitter.py", "dulwich", "Reads the bundle at a commit; the canonical text and hash the concept-file agreement pins; links; the concept splitter")
     Component(host, "pipeline/host.py, run.py, rows.py", "cocoindex host", "index_connected_source: a per-workspace asyncpg pool, Environments in a bounded LRU, each connected source's two stores, the passage rows; empties connected_source/ on wiped or rule-change")
-    Component(landed, "pipeline/landed.py, converter.py, passages.py", "coco.fn, unmemoised", "Per document under a ceiling by page count: convert — anydoc for docx, pdf-inspector for PDF, text passed through — or quarantine; then detect, redact and split into passages")
+    Component(landed, "pipeline/landed.py, converter.py, passages.py", "coco.fn, unmemoised", "Per document under a ceiling by page count: convert — anydoc for docx, pdf-inspector for PDF, text passed through — or mark it unreadable; then detect, redact and split into passages")
     Component(detected, "pipeline/detected.py", "coco.fn, memo=True", "detected(normalised_text, detection_key): the one memo, answering spans")
     Component(redaction, "redaction/", "Presidio, GLiNER, spaCy", "The detector's recognisers and detection key; redact: the block rule, erasure matches, pseudonyms, withholdings, written spans")
-    Component(catalogue, "pipeline/catalogue.py", "psycopg", "Reads the connected source, its workspace's suppressions and its documents' restores and dismissals; records findings, reconciles the catalogue, quarantines")
-    Component(extraction, "extraction", "planned S7", "Candidate concepts within the plan and the ceiling, proposed as concept_write_request rows; credentials injected per sync")
+    Component(catalogue, "pipeline/catalogue.py", "psycopg", "Reads the connected source, its workspace's suppressions and its documents' restores and dismissals; records findings, reconciles the catalogue, marks unreadable documents")
+    Component(extraction, "extraction", "planned S7", "Suggested concepts within the plan and the ceiling, proposed as concept_write_request rows; credentials injected per sync")
     Component(substrate, "schema_view.py, contract_stamp.py, ids.py, envelope.py, health.py, log.py, config.py", "substrate", "The committed schema view and baked contract digest; the ULID minter; the credential envelope; the process probe; one JSON log shape; the box's limits")
   }
 
@@ -51,7 +51,7 @@ C4Component
   Rel(catalogue, postgres, "Reads the connected source; writes finding and source_document", "psycopg")
   Rel(host, postgres, "Lands index.passage rows, after the catalogue commits, through the passages app", "asyncpg")
   Rel(extraction, models, "Calls per document within the ceiling", "fetch-shaped fake in tests")
-  Rel(extraction, postgres, "Proposes concept_write_request rows into", "the concept-inbox agreement")
+  Rel(extraction, postgres, "Proposes concept_write_request rows into", "the suggestions agreement")
 
   UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
@@ -63,7 +63,7 @@ C4Component
 - **One package imports cocoindex.** `pipeline/` is the one importer, a ruff `TID251` entry refusing the import elsewhere; `redaction/` and the converter's libraries are plain Python the pipeline calls. The worker composes the engine's blocks — memoisation, stable ids, target sync, `mount_each`, timeouts — and writes only what the engine has no block for: the run key, claim and lease, attempts and poison, the catalogue, retention, outcome rows, the landing (ADR 0036).
 - **One memo, and it holds no text.** `detected(normalised_text, detection_key)` is the only memoised function; its value is spans — rule id, offsets, score. Conversion, the block rule, pseudonyms and the withholding take place outside it on every sync, so a fix to any of them reaches every document with no version to bump, and `CONVERTER_PIN` is in no memo key. The *detection key* is the digest of what the detector reads; the finding's version, `rule_version:detector_pin`, is what the seam writes on a finding, never the memo's key (ADR 0036, amended 2026-09-23; `CONCEPTS.md`, *detection key*).
 - **Two stores per connected source.** `connected_source/` holds the passages app and its target-state tracking; `findings/` holds the landed app and the memo. Emptying a connected source — reason `wiped` or `rule-change` — removes `connected_source/` as the sync's first statement and spares `findings/`, so the next sync re-lands every passage without detecting a page afresh (the `emptying-a-connected-source` agreement).
-- **The sync's rows land outside the job's transaction.** The catalogue writes commit first over psycopg, so a document's class is on its row before any passage of it can be read (ADR 0044); the passage rows land through the engine over asyncpg, on a per-workspace pool whose `setup` hook runs `set_config('app.workspace_id', …)` on every acquisition, `min_size=0, max_size=2` (`pipeline/host.py`'s `open_pool`). No passage row carries visibility: the four columns left `index.passage` (T-282, T-283).
+- **The sync's rows land outside the job's transaction.** The catalogue writes commit first over psycopg, so a document's sensitivity is on its row before any passage of it can be read (ADR 0044); the passage rows land through the engine over asyncpg, on a per-workspace pool whose `setup` hook runs `set_config('app.workspace_id', …)` on every acquisition, `min_size=0, max_size=2` (`pipeline/host.py`'s `open_pool`). No passage row carries visibility: the four columns left `index.passage` (T-282, T-283).
 
 ## What each block adds
 
@@ -72,6 +72,6 @@ C4Component
 | S0 | Landed — `redaction/`: the category descriptors, the recognisers over Presidio and GLiNER, the officer-block rule, pseudonyms, withholdings and written spans; the pytest harness asserting every fixture span back against the text by offset |
 | S1 | Landed — `KINDS`, `pipeline/`, the converter, the per-workspace pool, the Environment LRU with the LMDB size as a signal, `RUST_LOG=warn` bridged into one log shape, the cross-tier document test with the worker as a real process |
 | T-366 | The suppression is the workspace's since T-375, read for every document; since T-376 the seam withholds every exact, case-folded occurrence of its identifiers, detected or not, as an erasure match with no finding. Core's documents finder has each document naming the subject re-indexed now (T-377) |
-| S4 | A connector per provider beside the converter, the estate-size probe, `MAX_CONCURRENT_RUNS=1` measured, citation repair on a gone document, what becomes of findings when a `content_hash` moves |
+| S4 | A connector per provider beside the converter, the estate-size probe, `MAX_CONCURRENT_RUNS=1` measured, citation fix on a gone document, what becomes of findings when a `content_hash` moves |
 | S7 | Extraction over the accepted plan and the ceiling, the template per document kind, conflicts raised never resolved |
 | S8 | *reserve* — the concept unit: the `concept-catch-up` kind, embedding on the fixed model choice with an `llm_call` per call |

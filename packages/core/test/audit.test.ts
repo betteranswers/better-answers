@@ -151,7 +151,7 @@ describe("the declared-acts walk", () => {
       "llm_call",
       "backup",
       "health_check",
-      "inbox",
+      "suggestions",
     ];
     for (const subject of neverASubject) {
       expect(() =>

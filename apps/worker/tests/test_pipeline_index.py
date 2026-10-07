@@ -319,7 +319,7 @@ def catalogue_rows_of(
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT id, content_hash, normalised_key, redaction_version, outcome,"
-            " quarantine_error, sensitivity, last_seen > first_seen AS seen_again"
+            " unreadable_reason, sensitivity, last_seen > first_seen AS seen_again"
             " FROM source_document WHERE workspace_id = %s ORDER BY id",
             (workspace_id,),
         )
@@ -470,7 +470,7 @@ def test_reconciles_the_catalogue_and_lands_the_copy_beside_the_original(
             "normalised_key": normalised_key_of(AN_INVOICE_ID),
             "redaction_version": THE_VERSION,
             "outcome": "converted",
-            "quarantine_error": None,
+            "unreadable_reason": None,
             "sensitivity": None,
             "seen_again": True,
         }
@@ -590,7 +590,7 @@ def test_a_document_without_a_verdict_keeps_its_standing_class(
     assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Restricted"
 
 
-def test_quarantines_an_unreadable_document_on_its_own_catalogue_row(
+def test_marks_an_unreadable_document_on_its_own_catalogue_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -612,8 +612,8 @@ def test_quarantines_an_unreadable_document_on_its_own_catalogue_row(
         "content_hash": None,
         "normalised_key": None,
         "redaction_version": None,
-        "outcome": "quarantined",
-        "quarantine_error": "ValueError",
+        "outcome": "unreadable",
+        "unreadable_reason": "ValueError",
         "sensitivity": None,
         "seen_again": True,
     }
@@ -639,9 +639,9 @@ def test_a_textless_pdf_names_ocr_on_its_row(
     )
 
     assert outcome.documents == 1
-    quarantined = catalogue_rows_of(connection, workspace_id)[1]
-    assert (quarantined["outcome"], quarantined["quarantine_error"]) == (
-        "quarantined",
+    unreadable = catalogue_rows_of(connection, workspace_id)[1]
+    assert (unreadable["outcome"], unreadable["unreadable_reason"]) == (
+        "unreadable",
         "NeedsOcrError",
     )
     assert [
@@ -653,7 +653,7 @@ def test_a_textless_pdf_names_ocr_on_its_row(
     "media_type",
     [outside["media_type"] for outside in read_upload_media_types()["outside"]],
 )
-def test_quarantines_an_unlisted_media_type_on_its_row(
+def test_marks_an_unlisted_media_type_unreadable_on_its_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path, media_type: str
 ) -> None:
     connection, dsn = database
@@ -672,12 +672,12 @@ def test_quarantines_an_unlisted_media_type_on_its_row(
     assert {
         "documents": outcome.documents,
         "outcome": unconverted["outcome"],
-        "quarantine_error": unconverted["quarantine_error"],
+        "unreadable_reason": unconverted["unreadable_reason"],
         "normalised_key": unconverted["normalised_key"],
     } == {
         "documents": 1,
-        "outcome": "quarantined",
-        "quarantine_error": "UnsupportedMediaType",
+        "outcome": "unreadable",
+        "unreadable_reason": "UnsupportedMediaType",
         "normalised_key": None,
     }
     assert {
@@ -701,17 +701,17 @@ def test_lands_the_deadline_on_an_overrunning_documents_row(
     )
 
     assert (outcome.documents, outcome.passages) == (0, 0)
-    quarantined = catalogue_rows_of(connection, workspace_id)[0]
-    assert (quarantined["outcome"], quarantined["quarantine_error"]) == (
-        "quarantined",
+    unreadable = catalogue_rows_of(connection, workspace_id)[0]
+    assert (unreadable["outcome"], unreadable["unreadable_reason"]) == (
+        "unreadable",
         "DeadlineExceededError",
     )
-    assert quarantined["normalised_key"] is None
+    assert unreadable["normalised_key"] is None
     assert bucket.writes == []
     assert passage_rows_of(connection, workspace_id) == []
 
 
-def test_a_quarantined_document_read_next_sync_loses_its_error(
+def test_an_unreadable_document_read_next_sync_loses_its_reason(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -724,18 +724,18 @@ def test_a_quarantined_document_read_next_sync_loses_its_error(
     bucket = a_bucket_holding_the_three()
 
     index_connected_source(bootstrap, sync_for(workspace_id), copies=bucket)
-    quarantined = catalogue_rows_of(connection, workspace_id)[0]
+    unreadable = catalogue_rows_of(connection, workspace_id)[0]
 
     bucket.objects[original_key_of(AN_INVOICE_ID)] = A_RATE_CARD_PDF
     outcome = index_connected_source(bootstrap, sync_for(workspace_id), copies=bucket)
 
-    assert (quarantined["outcome"], quarantined["quarantine_error"]) == (
-        "quarantined",
+    assert (unreadable["outcome"], unreadable["unreadable_reason"]) == (
+        "unreadable",
         "ValueError",
     )
     assert outcome.documents == 1
     reconciled = catalogue_rows_of(connection, workspace_id)[0]
-    assert (reconciled["outcome"], reconciled["quarantine_error"]) == (
+    assert (reconciled["outcome"], reconciled["unreadable_reason"]) == (
         "converted",
         None,
     )

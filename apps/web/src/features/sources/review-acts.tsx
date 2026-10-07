@@ -253,7 +253,7 @@ export function NarrowDocumentsAct(properties: { readonly connectedSourceId: str
     act.command<DocumentsNarrowed>({
       pending: `Narrowing ${named} to ${NARROWEST}.`,
       done: (narrowed) =>
-        `Narrowed ${counted(narrowed.documentIds.length, "document", "documents")} to ${NARROWEST}; ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.compositions.length, "composition", "compositions")} moved with them.`,
+        `Narrowed ${counted(narrowed.documentIds.length, "document", "documents")} to ${NARROWEST}; ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.writeUps.length, "write-up", "write-ups")} moved with them.`,
       run: (ready, settled) => {
         narrow.mutate(askOf(ready), settled);
       },
@@ -271,7 +271,7 @@ export function NarrowDocumentsAct(properties: { readonly connectedSourceId: str
           onOpenChange={act.setOpen}
           content={{ onCloseAutoFocus: act.returnFocus }}
           title={`Narrow ${named} to ${NARROWEST}`}
-          consequence={`Each document takes the class ${NARROWEST}. The ticked groups' unreviewed findings are reviewed as narrowed, and every concept citing the documents moves with them. A narrowing never widens, and this page cannot undo it.`}
+          consequence={`Each document takes the sensitivity ${NARROWEST}. The ticked groups' unreviewed findings are reviewed as narrowed, and every concept citing the documents moves with them. A narrowing never widens, and this page cannot undo it.`}
           commit={
             <Button onClick={confirm}>
               Narrow {named} to {NARROWEST}
@@ -338,7 +338,7 @@ export function DismissAsNotSpecialCategoryAct(properties: { readonly connectedS
         <ReasonedDialog
           act={act}
           title={`Dismiss ${named} as not special category`}
-          consequence="Every span of each group is reviewed as dismissed under your name with this reason, and the sync that reads the dismissal is queued. On that sync, a document whose every special category finding is dismissed goes back to the class an Admin narrowed it to, or to its connected source's class if none did. The spans stay withheld unless kept in text."
+          consequence="Every span of each group is reviewed as dismissed under your name with this reason, and the sync that reads the dismissal is queued. On that sync, a document whose every special category finding is dismissed goes back to the sensitivity an Admin narrowed it to, or to its connected source's sensitivity if none did. The spans stay withheld unless kept in text."
           onReason={dismissed}
         />
       }

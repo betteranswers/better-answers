@@ -1,0 +1,87 @@
+{
+  "noun": "quarantined",
+  "readerWord": "unreadable",
+  "sweep": "U15. Knowledge words: unreadable",
+  "collisions": [],
+  "words": [
+    {
+      "from": "quarantined by error",
+      "to": "unreadable by reason"
+    },
+    {
+      "from": "quarantine errors",
+      "to": "unreadable reasons"
+    },
+    {
+      "from": "quarantine error",
+      "to": "unreadable reason"
+    },
+    {
+      "from": "quarantine words",
+      "to": "unreadable words"
+    },
+    {
+      "from": "quarantine word",
+      "to": "unreadable word"
+    },
+    {
+      "from": "quarantine catalogue",
+      "to": "unreadable catalogue"
+    },
+    {
+      "from": "quarantine row",
+      "to": "unreadable row"
+    },
+    {
+      "from": "quarantine of",
+      "to": "unreadable of"
+    },
+    {
+      "from": "quarantined",
+      "to": "unreadable"
+    }
+  ],
+  "symbols": {
+    "paths": [
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "packages/core/src/sources/**",
+      "packages/core/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**"
+    ]
+  },
+  "text": {
+    "paths": [
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "packages/core/src/sources/**",
+      "packages/core/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/worker/src/better_answers_worker/pipeline/**",
+      "apps/worker/tests/**"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "the old stored names a test seeds or refuses as stored (R22)",
+      "paths": [
+        "packages/schema/test/knowledge-words.test.ts",
+        "packages/schema/test/before-the-knowledge-words.ts",
+        "packages/schema/test/knowledge-words-end-to-end.test.ts",
+        "packages/schema/test/renamed-names.test.ts"
+      ]
+    },
+    {
+      "sense": "the words test's own planted fixtures and ratchet",
+      "paths": ["apps/api/tests/avoid-words.test.ts", "apps/api/tests/old-words-ratchet.json"]
+    }
+  ]
+}

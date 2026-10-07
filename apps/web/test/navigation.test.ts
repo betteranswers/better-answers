@@ -84,7 +84,7 @@ describe("the one navigation list", () => {
         "Control Centre",
         [
           ["Overview", ["Overview"]],
-          ["Suggestions", ["Queue"]],
+          ["Suggestions", ["To decide"]],
           [
             "Sources",
             [
@@ -480,7 +480,7 @@ describe("an address the person may not see", () => {
     expect(asked.filter((path) => path.includes("members."))).toEqual([]);
   });
 
-  for (const path of ["/people/thresholds", "/suggestions/queue", "/knowledge/search"]) {
+  for (const path of ["/people/thresholds", "/suggestions/to-decide", "/knowledge/search"]) {
     it(`shows an Admin the unbuilt ${path} as not found`, async () => {
       vi.stubGlobal("fetch", answeringAs("Admin"));
 

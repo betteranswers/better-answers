@@ -142,7 +142,7 @@ const NEVER_A_SUBJECT: ReadonlySet<string> = new Set([
   "llm_call",
   "backup",
   "health_check",
-  "inbox",
+  "suggestions",
 ]);
 
 export type Declaration = {

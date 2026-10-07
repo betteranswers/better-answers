@@ -316,7 +316,7 @@ export type HeldVisibility = {
 const KEY_COLUMN = {
   concept_index: "iri",
   map_node: "uid",
-  composition: "id",
+  write_up: "id",
   connected_source: "id",
 } as const;
 

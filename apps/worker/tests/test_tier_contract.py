@@ -12,7 +12,7 @@ from psycopg import Cursor
 SPOKEN_AGREEMENTS = {
     "citation": "fixtured",
     "concept-file": "fixtured",
-    "concept-inbox": "sql-function",
+    "suggestions": "sql-function",
     "cost-ledger": "generated",
     "document-passage": "fixtured",
     "emptying-a-connected-source": "fixtured",
@@ -407,12 +407,12 @@ def test_model_choice_resolves_every_fixtured_call() -> None:
         connection.rollback()
 
 
-def read_concept_inbox() -> dict[str, Any]:
-    raw = (CONTRACTS_DIR / "concept-inbox" / "cases.json").read_text(encoding="utf-8")
+def read_suggestions() -> dict[str, Any]:
+    raw = (CONTRACTS_DIR / "suggestions" / "cases.json").read_text(encoding="utf-8")
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def _seed_inbox_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
+def _seed_suggestions_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
     from factories import seed_concept_identity, seed_concept_index, seed_workspace
 
     for workspace in fixture["workspaces"]:
@@ -456,10 +456,10 @@ def _submit_fixture_set(cursor: Cursor[Any], fixture: dict[str, Any]) -> int:
 def test_one_call_submits_a_set_and_re_renders_its_summary() -> None:
     from pg_harness import migrated_postgres
 
-    fixture = read_concept_inbox()
+    fixture = read_suggestions()
 
     with migrated_postgres() as connection, connection.cursor() as cursor:
-        _seed_inbox_fixture(cursor, fixture)
+        _seed_suggestions_fixture(cursor, fixture)
         assert _submit_fixture_set(cursor, fixture) == len(fixture["set"]["requests"])
 
         cursor.execute("SET LOCAL ROLE app_rt")
@@ -483,13 +483,13 @@ def test_one_call_submits_a_set_and_re_renders_its_summary() -> None:
         connection.rollback()
 
 
-def test_the_inbox_refuses_every_road_the_fixture_says_is_closed() -> None:
+def test_suggestions_refuse_every_road_the_fixture_says_is_closed() -> None:
     from pg_harness import migrated_postgres
 
-    fixture = read_concept_inbox()
+    fixture = read_suggestions()
 
     with migrated_postgres() as connection, connection.cursor() as cursor:
-        _seed_inbox_fixture(cursor, fixture)
+        _seed_suggestions_fixture(cursor, fixture)
         _submit_fixture_set(cursor, fixture)
 
         for refusal in fixture["refusals"]:

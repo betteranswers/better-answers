@@ -453,7 +453,7 @@ const anAdminWhoseConnectedSourceHoldsAHealthCue = async () => {
 };
 
 describe("the Sources procedures over the wire", () => {
-  it("lists an upload's state, counts, last sync and quarantine reason", async () => {
+  it("lists an upload's state, counts, last sync and unreadable reason", async () => {
     const { workspace, api } = await anAdmin();
     const described = handbookDescribed();
     const bound = await api.sources.connect.mutate(new Blob([HANDBOOK]), uploadOptions(described));
@@ -467,8 +467,8 @@ describe("the Sources procedures over the wire", () => {
         workspaceId: workspace.workspaceId,
         connectedSourceId: connectedSource.id,
         title: "Floor plan",
-        outcome: "quarantined",
-        quarantineError: "NeedsOcrError",
+        outcome: "unreadable",
+        unreadableReason: "NeedsOcrError",
       });
       return { connectedSourceId: connectedSource.id, documentId: document.id };
     });
@@ -490,10 +490,10 @@ describe("the Sources procedures over the wire", () => {
         documentCount: 1,
         passageCount: 0,
         lastSync: null,
-        quarantined: [
-          { documentId: scans.documentId, title: "Floor plan", error: "NeedsOcrError" },
+        unreadable: [
+          { documentId: scans.documentId, title: "Floor plan", reason: "NeedsOcrError" },
         ],
-        quarantinedByError: { NeedsOcrError: 1 },
+        unreadableByReason: { NeedsOcrError: 1 },
       },
       {
         connectedSourceId: described.connectedSourceId,
@@ -517,8 +517,8 @@ describe("the Sources procedures over the wire", () => {
           enqueuedAt: expect.stringMatching(ISO_INSTANT),
           finishedAt: null,
         },
-        quarantined: [],
-        quarantinedByError: {},
+        unreadable: [],
+        unreadableByReason: {},
       },
     ]);
   });
@@ -736,7 +736,7 @@ describe("the Sources procedures over the wire", () => {
       documentIds: [documentId],
       sensitivity: "Restricted",
       concepts: [],
-      compositions: [],
+      writeUps: [],
     });
   });
 
@@ -759,7 +759,7 @@ describe("the Sources procedures over the wire", () => {
     expect([listed?.state, listed?.publishedAt]).toEqual(["published", "2026-09-23T09:00:00.000Z"]);
   });
 
-  it("narrows a connected source's class", async () => {
+  it("narrows a connected source's sensitivity", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
 
@@ -774,11 +774,11 @@ describe("the Sources procedures over the wire", () => {
       auditEventId: expect.any(String),
       visibility: { sensitivity: "Restricted", audience: "everyone", audienceGroups: null },
       concepts: [],
-      compositions: [],
+      writeUps: [],
     });
   });
 
-  it("widens a connected source's class, refusing a non-wider one", async () => {
+  it("widens a connected source's sensitivity, refusing a non-wider one", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
 
@@ -800,7 +800,7 @@ describe("the Sources procedures over the wire", () => {
       auditEventId: expect.any(String),
       visibility: { sensitivity: "Public", audience: "everyone", audienceGroups: null },
       concepts: [],
-      compositions: [],
+      writeUps: [],
     });
     expect(refused).toMatchObject({
       data: { httpStatus: 422, refusal: { word: "not-wider", class: "inapplicable" } },

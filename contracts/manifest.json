@@ -1,7 +1,7 @@
 {
   "agreements": {
     "queue": { "form": "sql-function" },
-    "concept-inbox": { "form": "sql-function" },
+    "suggestions": { "form": "sql-function" },
     "credential-envelope": { "form": "fixtured" },
     "model-choice": { "form": "sql-function" },
     "cost-ledger": { "form": "generated" },
@@ -17,7 +17,7 @@
   "fixtures": [
     { "agreement": "model-choice", "path": "model-choice/cases.json" },
     { "agreement": "id-shape", "path": "id-shape/cases.json" },
-    { "agreement": "concept-inbox", "path": "concept-inbox/cases.json" },
+    { "agreement": "suggestions", "path": "suggestions/cases.json" },
     { "agreement": "queue", "path": "queue/cases.json" },
     { "agreement": "concept-file", "path": "concept-file/cases.json" },
     { "agreement": "credential-envelope", "path": "credential-envelope/cases.json" },

@@ -19,7 +19,7 @@ export * from "./suggestion-tables.ts";
 export * from "./source-tables.ts";
 export * from "./finding-tables.ts";
 export * from "./erasure-tables.ts";
-export * from "./composition-tables.ts";
+export * from "./write-up-tables.ts";
 export * from "./job-tables.ts";
 export * from "./platform-tables.ts";
 

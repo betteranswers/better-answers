@@ -36,7 +36,6 @@ import {
 } from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
 import { hashedFileOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
-import { payloadFor, targetOfMergeKey } from "./inbox.ts";
 import type { Acceptance } from "./index.ts";
 import {
   heldByIri,
@@ -50,6 +49,7 @@ import {
 } from "./landing.ts";
 import { parseBundleManifest } from "./manifest.ts";
 import { RECONCILER_ACTS, restsAlsoOnWhenReplayed } from "./reconciler-hit.ts";
+import { payloadFor, targetOfMergeKey } from "./suggestions.ts";
 
 const RECONCILER_ACTOR = "process:better-answers-reconciler";
 

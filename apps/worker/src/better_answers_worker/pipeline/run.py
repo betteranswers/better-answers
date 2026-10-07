@@ -6,10 +6,10 @@ from ..config import Bootstrap
 from ..log import logger
 from ..redaction.withholdings import overridden_in
 from .catalogue import (
-    quarantine_catalogue,
     read_connected_source,
     reconcile_catalogue,
     record_findings,
+    unreadable_catalogue,
 )
 from .host import Host, Sync
 from .landed import SEAM_MS_PER_PAGE, TIMEOUT_MARGIN_MS, redact_landed_copies
@@ -99,11 +99,12 @@ def index_connected_source(
                 ms_per_page=ms_per_page,
                 margin_ms=margin_ms,
             )
-            # A document's class must be on its row before any of its passages is read.
+            # A document's sensitivity is on its row before any passage of it
+            # is read.
             with queue.scoped(connection, sync.workspace_id) as cursor:
                 record_findings(cursor, sync, landed.documents)
                 reconcile_catalogue(cursor, landed.documents)
-                quarantine_catalogue(cursor, landed.quarantined)
+                unreadable_catalogue(cursor, landed.unreadable)
 
             passages = host.land_rows(
                 sync, PASSAGE_TABLE, rows_of(sync, landed.documents)

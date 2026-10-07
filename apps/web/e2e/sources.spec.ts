@@ -54,7 +54,7 @@ const stateOf = (page: Page, name: string) => leadOf(page, name, "State");
 
 const lastSyncedOf = (page: Page, name: string) => leadOf(page, name, "Last synced");
 
-const classOf = (page: Page, name: string) => leadOf(page, name, "Class");
+const sensitivityOf = (page: Page, name: string) => leadOf(page, name, "Sensitivity");
 
 /** An Admin of a fresh workspace, signed in on the product's own page and standing on Sources. */
 const anAdminAtSources = async (
@@ -147,7 +147,7 @@ test.describe("the Sources page's list of connected sources", () => {
         - button "Widen Staff handbook"
         - term: Connector
         - definition: upload
-        - term: Class
+        - term: Sensitivity
         - definition: Internal
         - term: Audience
         - definition: Everyone in the workspace
@@ -169,7 +169,7 @@ test.describe("the Sources page's list of connected sources", () => {
     await expect(page.locator("main")).not.toContainText(AN_ID);
   });
 
-  test("tells an Admin why documents are quarantined, counting OCR ones", async ({
+  test("tells an Admin why documents are unreadable, counting OCR ones", async ({
     page,
     request,
   }) => {
@@ -178,10 +178,10 @@ test.describe("the Sources page's list of connected sources", () => {
       connectedSources: [
         indexed("Site archive", {
           documents: [
-            { title: "Floor plan", quarantineError: "NeedsOcrError" },
-            { title: "Site survey", quarantineError: "NeedsOcrError" },
-            { title: "Archive", quarantineError: "DeadlineExceededError" },
-            { title: "Old minutes", quarantineError: "UnicodeDecodeError" },
+            { title: "Floor plan", unreadableReason: "NeedsOcrError" },
+            { title: "Site survey", unreadableReason: "NeedsOcrError" },
+            { title: "Archive", unreadableReason: "DeadlineExceededError" },
+            { title: "Old minutes", unreadableReason: "UnicodeDecodeError" },
             { title: "Handover notes" },
           ],
         }),
@@ -191,7 +191,7 @@ test.describe("the Sources page's list of connected sources", () => {
     const archive = connectedSourceNamed(page, "Site archive");
     await archive.getByRole("button", { name: "More about Site archive" }).click();
 
-    await expect(archive).toContainText("4 documents quarantined, 2 want OCR.");
+    await expect(archive).toContainText("4 documents unreadable, 2 want OCR.");
     await expect(archive.getByRole("listitem")).toHaveText([
       "Archive: took too long",
       "Floor plan: needs OCR",
@@ -260,7 +260,7 @@ test.describe("connecting a document on the Sources page", () => {
     await expect(dialog.getByLabel("Name")).toBeFocused();
     await page.keyboard.type("The staff handbook");
     await page.keyboard.press("Tab");
-    await expect(dialog.getByRole("combobox", { name: "Class" })).toHaveText("Restricted");
+    await expect(dialog.getByRole("combobox", { name: "Sensitivity" })).toHaveText("Restricted");
     await page.keyboard.press("Tab");
     await expect(dialog.getByRole("combobox", { name: "Audience" })).toBeFocused();
     await page.keyboard.press("Tab");
@@ -303,7 +303,7 @@ test.describe("connecting a document on the Sources page", () => {
     ).toBeVisible();
     await expect(stateOf(page, "The staff handbook")).toHaveText("received");
     await expect(lastSyncedOf(page, "The staff handbook")).toContainText("Sync queued");
-    await expect(classOf(page, "The staff handbook")).toHaveText("Restricted");
+    await expect(sensitivityOf(page, "The staff handbook")).toHaveText("Restricted");
 
     await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "claimed" });
     await expect(stateOf(page, "The staff handbook")).toHaveText("indexing");
@@ -361,7 +361,7 @@ const A_DISMISSED_SPAN =
   "Dismissed 1 span as not special category. The seam's verdict passes over a dismissed span, which stays withheld unless kept in text.";
 
 /**
- * Two documents as a sync leaves them after a dismissal: one lifted to its connected source's class, one
+ * Two documents as a sync leaves them after a dismissal: one lifted to its connected source's sensitivity, one
  * still holding a span nobody dismissed.
  */
 const SERVICE_RECORDS: SeedConnectedSource = indexed("Service records", {
@@ -419,13 +419,13 @@ test.describe("reviewing a connected source's findings", () => {
       - table:
         - caption: 0 groups of findings selected. Select a group with x, then keep it in text, narrow its document or dismiss it as not special category with the acts above.
         - rowgroup:
-          - row "Selected Category Rule Document Found Class":
+          - row "Selected Category Rule Document Found Sensitivity":
             - columnheader "Selected"
             - columnheader "Category"
             - columnheader "Rule"
             - columnheader "Document"
             - columnheader "Found"
-            - columnheader "Class"
+            - columnheader "Sensitivity"
         - rowgroup:
           - row:
             - cell:
@@ -520,7 +520,7 @@ test.describe("reviewing a connected source's findings", () => {
 
     await expect(
       page.getByText(
-        "Narrowed 1 document to Restricted; 0 concepts and 0 compositions moved with them.",
+        "Narrowed 1 document to Restricted; 0 concepts and 0 write-ups moved with them.",
       ),
     ).toBeVisible();
     await expect(
@@ -776,7 +776,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
         - definition: Staff handbook
         - term: By
         - definition: You, at the instant the platform records it
-        - term: Class
+        - term: Sensitivity
         - definition: Internal
         - term: Audience
         - definition: Everyone in the workspace
@@ -838,7 +838,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(page.getByRole("heading", { level: 3, name: "Staff handbook" })).toBeFocused();
   });
 
-  test("narrows a published source with its citing concepts and compositions", async ({
+  test("narrows a published source with its citing concepts and write-ups", async ({
     page,
     request,
   }) => {
@@ -859,14 +859,14 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       .focus();
     await page.keyboard.press("n");
     const dialog = page.getByRole("dialog", { name: "Narrow Supplier payments" });
-    await expect(dialog.getByRole("combobox", { name: "Class" })).toHaveText("Restricted");
+    await expect(dialog.getByRole("combobox", { name: "Sensitivity" })).toHaveText("Restricted");
     await dialog.getByRole("button", { name: "Narrow Supplier payments to Restricted" }).focus();
     await page.keyboard.press("Enter");
 
-    await expect(classOf(page, "Supplier payments")).toHaveText("Restricted");
+    await expect(sensitivityOf(page, "Supplier payments")).toHaveText("Restricted");
     await expect(
       page.getByText(
-        "Narrowed “Supplier payments” to Restricted. 1 concept and 1 composition moved with it.",
+        "Narrowed “Supplier payments” to Restricted. 1 concept and 1 write-up moved with it.",
       ),
     ).toBeVisible();
     await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
@@ -896,11 +896,11 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await page.keyboard.press("w");
     const dialog = page.getByRole("dialog", { name: "Widen Tender answers" });
     await expect(dialog).toHaveAccessibleDescription(
-      "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every composition including one, moves with it in the same act. A document with a narrower class of its own keeps it.",
+      "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every write-up including one, moves with it in the same act. A document with a narrower sensitivity of its own keeps it.",
     );
-    const classPicked = dialog.getByRole("combobox", { name: "Class" });
-    await expect(classPicked).toBeFocused();
-    await expect(classPicked).toHaveText("Internal");
+    const sensitivityPicked = dialog.getByRole("combobox", { name: "Sensitivity" });
+    await expect(sensitivityPicked).toBeFocused();
+    await expect(sensitivityPicked).toHaveText("Internal");
     await expect(dialog.getByRole("region", { name: "What the audit row will carry" }))
       .toMatchAriaSnapshot(`
       - region "What the audit row will carry":
@@ -911,9 +911,9 @@ test.describe("publishing, narrowing and widening a connected source", () => {
         - definition: Tender answers
         - term: By
         - definition: You, at the instant the platform records it
-        - term: Class, from
+        - term: Sensitivity, from
         - definition: Restricted
-        - term: Class, to
+        - term: Sensitivity, to
         - definition: Internal
         - term: Audience, from
         - definition: Everyone in the workspace
@@ -924,18 +924,24 @@ test.describe("publishing, narrowing and widening a connected source", () => {
 
     await page.keyboard.press("Enter");
     await page.getByRole("option", { name: "Restricted" }).press("Enter");
-    await expect(classPicked).toHaveText("Restricted");
-    await expect(classPicked, "the list of classes did not hand focus back").toBeFocused();
+    await expect(sensitivityPicked).toHaveText("Restricted");
+    await expect(
+      sensitivityPicked,
+      "the list of sensitivities did not hand focus back",
+    ).toBeFocused();
     const commit = dialog.getByRole("button", { name: /^Widen Tender answers to / });
     await expect(commit).toBeDisabled();
     await expect(commit).toHaveAccessibleDescription(
       sentenceOf(SAID_OF_A_CONNECTED_SOURCE["not-wider"]),
     );
 
-    await classPicked.press("Enter");
+    await sensitivityPicked.press("Enter");
     await page.getByRole("option", { name: "Internal" }).press("Enter");
-    await expect(classPicked).toHaveText("Internal");
-    await expect(classPicked, "the list of classes did not hand focus back").toBeFocused();
+    await expect(sensitivityPicked).toHaveText("Internal");
+    await expect(
+      sensitivityPicked,
+      "the list of sensitivities did not hand focus back",
+    ).toBeFocused();
     await page.keyboard.press("Tab");
     await page.keyboard.press("Tab");
     await expect(
@@ -945,17 +951,17 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     ).toBeFocused();
 
     await clockTheNextKey(page, {
-      at: "//li[.//h3[.='Tender answers']]//dt[.='Class']/following-sibling::dd[1]",
+      at: "//li[.//h3[.='Tender answers']]//dt[.='Sensitivity']/following-sibling::dd[1]",
       reads: "Internal",
     });
     await page.keyboard.press("Enter");
     await theActLandedWithinItsBudget(page, "widen");
 
     await expect(connectedSourcesRegion(page).getByRole("status")).toContainText(
-      "Widened “Tender answers” to Internal for everyone in the workspace. 1 concept and 1 composition moved with it.",
+      "Widened “Tender answers” to Internal for everyone in the workspace. 1 concept and 1 write-up moved with it.",
     );
     await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
-    await expect(classOf(page, "Tender answers")).toHaveText("Internal");
+    await expect(sensitivityOf(page, "Tender answers")).toHaveText("Internal");
     await expect(page.getByRole("heading", { level: 3, name: "Tender answers" })).toBeFocused();
   });
 
@@ -991,9 +997,9 @@ test.describe("publishing, narrowing and widening a connected source", () => {
         - definition: Price book
         - term: By
         - definition: You, at the instant the platform records it
-        - term: Class, from
+        - term: Sensitivity, from
         - definition: Public
-        - term: Class, to
+        - term: Sensitivity, to
         - definition: Public
         - term: Audience, from
         - definition: Named groups
@@ -1009,7 +1015,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     // The row reads widened before the api answers, and a late answer overwrites the next
     // `w`'s sentence.
     await expect(connectedSourcesRegion(page).getByRole("status")).toHaveText(
-      "Widened “Price book” to Public for everyone in the workspace. 0 concepts and 0 compositions moved with it.",
+      "Widened “Price book” to Public for everyone in the workspace. 0 concepts and 0 write-ups moved with it.",
     );
     await expect(audienceOf).toHaveText("Everyone in the workspace");
     await expect(
@@ -1020,7 +1026,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       .focus();
     await page.keyboard.press("w");
     await expect(connectedSourcesRegion(page).getByRole("status")).toHaveText(
-      "“Price book” is Public for everyone in the workspace, and no class or audience is wider.",
+      "“Price book” is Public for everyone in the workspace, and no sensitivity or audience is wider.",
     );
   });
 
@@ -1043,7 +1049,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(connectedSourcesRegion(page).getByRole("alert")).toHaveText(
       sentenceOf(SAID_OF_A_CONNECTED_SOURCE["special-category-unreviewed"]),
     );
-    await expect(classOf(page, "Service records")).toHaveText("Restricted");
+    await expect(sensitivityOf(page, "Service records")).toHaveText("Restricted");
   });
 });
 

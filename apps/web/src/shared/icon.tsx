@@ -88,7 +88,7 @@ export type IconName =
   | "price"
   | "pulse"
   | "question"
-  | "queue"
+  | "to-decide"
   | "remove"
   | "models"
   | "search"
@@ -143,7 +143,7 @@ const GLYPHS = {
   price: CurrencyGbp,
   pulse: Pulse,
   question: Question,
-  queue: ListChecks,
+  "to-decide": ListChecks,
   remove: X,
   models: Path,
   search: MagnifyingGlass,

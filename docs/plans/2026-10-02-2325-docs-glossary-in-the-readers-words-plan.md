@@ -1051,7 +1051,10 @@ These old words stay in code in the senses listed, after their sweep lands (KTD8
 | check | CI's `check`; CHECK constraints; `knowledge.check.imported` (R22) |
 | domain | an email, web or DNS domain; SQL's and launchd's domains; a subject area, in fixed phrases such as *domain word*; *consumer-domain list*. Widened from the email domain by the owner, 07/10/2026 |
 | bundle | OKF's bundle and the `bundle` wire key (R15, R21) |
-| class | `className`; retention class |
+| class | `className`; retention class; a refusal's class and the refusal words `class-unreadable` and `reclassification-refused` (R21); a credential class (ADR 0041); the internal *effective class*; the stored act `knowledge.concept.class_overridden` and the DPIA input's `class` key, which its hash covers (R22). The row is read only in the files that write a sensitivity (owner, 07/10/2026) |
+| candidate | the one under test, wherever it is not a suggestion's kind. The row is read only in the files that write the kind (owner, 07/10/2026) |
+| repair | mending a workspace or a path, wherever it is not a suggestion's kind. The row is read only in the files that write the kind (owner, 07/10/2026) |
+| inbox | the Inbox area, the journeys' test inbox and an email inbox. The row is read only in the files that write the suggestions' store (owner, 07/10/2026) |
 | graph | GitNexus's call graph; `platform.graph.swept` (R22) |
 | surface | *MCP surface*; `roles-surface.json` |
 | operator | the operator principal; refusal words (R21) |

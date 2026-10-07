@@ -23,7 +23,7 @@ tags:
 
 ## The decision
 
-The platform has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts, curated) → the **map** (derived). Records are not a layer. They are what the platform keeps because it runs use cases: guides and their compositions, usage and outcomes, connected sources, audit, review. A record cites concepts by IRI and never restates them.
+The platform has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts, curated) → the **map** (derived). Records are not a layer. They are what the platform keeps because it runs use cases: guides and their write-ups, usage and outcomes, connected sources, audit, review. A record cites concepts by IRI and never restates them.
 
 Where a unit lives follows one minting rule:
 
@@ -41,7 +41,7 @@ A relation is a `LINKS_TO` edge between two concepts, carrying its two endpoint 
 What follows from the rule:
 
 - Every new kind of unit is classified by the rule in the ticket that introduces it, and `CONCEPTS.md` names the layer it lives in. Nothing is registered anywhere else.
-- Q&A pairs are `Answer` concepts. A composition has two homes, a guide section and a response.
+- Q&A pairs are `Answer` concepts. A write-up has two homes, a guide section and a response.
 - The kinds in use are derived from the concept index, never a file in the bundle.
 
 ## Why

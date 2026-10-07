@@ -55,8 +55,8 @@ const seenBy = async (
 
 type Arrangement = {
   readonly workspaceId?: string;
-  readonly connectedSourceClass?: string | undefined;
-  readonly documentClass?: string | null | undefined;
+  readonly connectedSourceSensitivity?: string | undefined;
+  readonly documentSensitivity?: string | null | undefined;
   readonly audience?: string | undefined;
   readonly audienceGroups?: readonly string[] | undefined;
   readonly publishedAt?: Date | null | undefined;
@@ -65,7 +65,7 @@ type Arrangement = {
 
 const connectedSourceArranged = (workspaceId: string, arrangement: Arrangement) => ({
   workspaceId,
-  sensitivity: arrangement.connectedSourceClass ?? "Internal",
+  sensitivity: arrangement.connectedSourceSensitivity ?? "Internal",
   audience: arrangement.audience ?? AUDIENCE_EVERYONE,
   audienceGroups: arrangement.audienceGroups ? [...arrangement.audienceGroups] : null,
   publishedAt: arrangement.publishedAt === undefined ? new Date() : arrangement.publishedAt,
@@ -85,7 +85,7 @@ const aPassageUnderAConnectedSource = async (
     : await seed.sourceDocument({
         workspaceId,
         connectedSourceId: connectedSource.id,
-        sensitivity: arrangement.documentClass ?? null,
+        sensitivity: arrangement.documentSensitivity ?? null,
       });
   const passage = await seed.passage({
     workspaceId,
@@ -127,7 +127,7 @@ const THE_FOLD = [
   { connectedSource: "Public", document: "Public", narrower: "Public", viewer: true },
 ] as const;
 
-const THE_DOCUMENT_NAMES_NO_CLASS = [
+const THE_DOCUMENT_NAMES_NO_SENSITIVITY = [
   { connectedSource: "Restricted", document: null, narrower: "Restricted", viewer: false },
   { connectedSource: "Internal", document: null, narrower: "Internal", viewer: true },
   { connectedSource: "Public", document: null, narrower: "Public", viewer: true },
@@ -141,14 +141,14 @@ const A_WORD_OUTSIDE_THE_SET = [
   { connectedSource: null, document: null, narrower: null },
 ] as const;
 
-const THE_FOLD_AT_ITS_EDGES = [...THE_DOCUMENT_NAMES_NO_CLASS, ...A_WORD_OUTSIDE_THE_SET];
+const THE_FOLD_AT_ITS_EDGES = [...THE_DOCUMENT_NAMES_NO_SENSITIVITY, ...A_WORD_OUTSIDE_THE_SET];
 
 const folded = async (
   client: pg.PoolClient,
   pairs: readonly { readonly connectedSource: string | null; readonly document: string | null }[],
 ): Promise<readonly (string | null)[]> => {
   const answered = await client.query<{ narrower: string | null }>(
-    `SELECT narrower_class(pair.a, pair.b) AS narrower
+    `SELECT narrower_sensitivity(pair.a, pair.b) AS narrower
        FROM unnest($1::text[], $2::text[]) WITH ORDINALITY AS pair(a, b, at)
       ORDER BY pair.at`,
     [pairs.map((pair) => pair.connectedSource), pairs.map((pair) => pair.document)],
@@ -156,14 +156,14 @@ const folded = async (
   return answered.rows.map((row) => row.narrower);
 };
 
-describe("the one SQL statement of the class ranking", () => {
-  it("answers the narrower class for every ranked pair, both orders", async () => {
+describe("the one SQL statement of the sensitivity ranking", () => {
+  it("answers the narrower sensitivity for every ranked pair, both orders", async () => {
     await withRollback(db().pool, async (client) => {
       expect(await folded(client, THE_FOLD)).toEqual(THE_FOLD.map((pair) => pair.narrower));
     });
   });
 
-  it("answers the source's class alone, and null for unknown words", async () => {
+  it("answers the source's sensitivity alone, and null for unknown words", async () => {
     await withRollback(db().pool, async (client) => {
       expect(await folded(client, THE_FOLD_AT_ITS_EDGES)).toEqual(
         THE_FOLD_AT_ITS_EDGES.map((pair) => pair.narrower),
@@ -171,7 +171,7 @@ describe("the one SQL statement of the class ranking", () => {
     });
   });
 
-  it("ranks the three classes this package declares and no fourth", () => {
+  it("ranks the three sensitivities this package declares and no fourth", () => {
     const ranked = new Set(THE_FOLD.flatMap((pair) => [pair.connectedSource, pair.document]));
 
     expect([...ranked].toSorted()).toEqual([...SENSITIVITIES].toSorted());
@@ -181,7 +181,7 @@ describe("the one SQL statement of the class ranking", () => {
     const read = await db().pool.query<{ volatile: string; settings: string[] | null }>(
       `SELECT p.provolatile AS volatile, p.proconfig AS settings
          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public' AND p.proname = 'narrower_class'`,
+        WHERE n.nspname = 'public' AND p.proname = 'narrower_sensitivity'`,
     );
 
     expect(read.rows).toEqual([{ volatile: "i", settings: ["search_path=pg_catalog, pg_temp"] }]);
@@ -190,15 +190,15 @@ describe("the one SQL statement of the class ranking", () => {
   it("serves the worker, which still cannot read the view", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      await aPassageUnderAConnectedSource(client, { connectedSourceClass: "Public" });
+      await aPassageUnderAConnectedSource(client, { connectedSourceSensitivity: "Public" });
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const served = await client.query<{ narrower: string }>(
-        "SELECT narrower_class('Public', 'Internal') AS narrower",
+        "SELECT narrower_sensitivity('Public', 'Internal') AS narrower",
       );
       await refusesEach(client, [
-        [THE_VIEW, "worker_rt reading the view the fold answers a class for"],
+        [THE_VIEW, "worker_rt reading the view the fold answers a sensitivity for"],
       ]);
 
       expect(served.rows).toEqual([{ narrower: "Internal" }]);
@@ -207,12 +207,12 @@ describe("the one SQL statement of the class ranking", () => {
 
   it("is executable by both runtime roles and not by PUBLIC", async () => {
     const read = await db().pool.query<{ role: string; held: boolean }>(
-      `SELECT role, has_function_privilege(role, 'public.narrower_class(text, text)', 'EXECUTE') AS held
+      `SELECT role, has_function_privilege(role, 'public.narrower_sensitivity(text, text)', 'EXECUTE') AS held
          FROM unnest(ARRAY['app_rt', 'worker_rt']) AS role`,
     );
     const toPublic = await db().pool.query(
       `SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) AS a
-        WHERE p.proname = 'narrower_class' AND a.grantee = 0 AND a.privilege_type = 'EXECUTE'`,
+        WHERE p.proname = 'narrower_sensitivity' AND a.grantee = 0 AND a.privilege_type = 'EXECUTE'`,
     );
 
     expect({ held: read.rows, toPublic: toPublic.rowCount }).toEqual({
@@ -273,15 +273,15 @@ describe("the shape the view presents", () => {
 });
 
 describe("what the view reports for a passage, as app_rt", () => {
-  it("reports the narrower class and shows permitted readers the row", async () => {
+  it("reports the narrower sensitivity and shows permitted readers the row", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const landed: { readonly id: string; readonly expected: string; readonly viewer: boolean }[] =
         [];
-      for (const pair of [...THE_FOLD, ...THE_DOCUMENT_NAMES_NO_CLASS]) {
+      for (const pair of [...THE_FOLD, ...THE_DOCUMENT_NAMES_NO_SENSITIVITY]) {
         const { passage } = await aPassageUnderAConnectedSource(client, {
-          connectedSourceClass: pair.connectedSource,
-          documentClass: pair.document,
+          connectedSourceSensitivity: pair.connectedSource,
+          documentSensitivity: pair.document,
         });
         landed.push({ id: passage.id, expected: pair.narrower, viewer: pair.viewer });
       }
@@ -356,7 +356,7 @@ describe("what the view reports for a passage, as app_rt", () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const { connectedSource, passage } = await aPassageUnderAConnectedSource(client, {
-        connectedSourceClass: "Public",
+        connectedSourceSensitivity: "Public",
       });
       await asAppRt(client, WS_A);
       const before = await client.query<{ sensitivity: string }>(THE_VIEW);
@@ -388,10 +388,12 @@ describe("what the view withholds", () => {
   it("shows a reader scoped to one workspace nothing of another's", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const mine = await aPassageUnderAConnectedSource(client, { connectedSourceClass: "Public" });
+      const mine = await aPassageUnderAConnectedSource(client, {
+        connectedSourceSensitivity: "Public",
+      });
       const theirs = await aPassageUnderAConnectedSource(client, {
         workspaceId: WS_B,
-        connectedSourceClass: "Public",
+        connectedSourceSensitivity: "Public",
       });
       await asAppRt(client, WS_A);
 
@@ -415,11 +417,11 @@ describe("what the view withholds", () => {
       // A passage naming a document cascades away with the connected source; one naming none outlives
       // it, and the inner join is what withholds it.
       const orphaned = await aPassageUnderAConnectedSource(client, {
-        connectedSourceClass: "Public",
+        connectedSourceSensitivity: "Public",
         withoutADocument: true,
       });
       const neighbour = await aPassageUnderAConnectedSource(client, {
-        connectedSourceClass: "Public",
+        connectedSourceSensitivity: "Public",
       });
       await client.query("DELETE FROM connected_source WHERE id = $1", [
         orphaned.connectedSource.id,
@@ -441,11 +443,11 @@ describe("what the view withholds", () => {
     });
   });
 
-  it("keeps a passage naming no document, at its source's class", async () => {
+  it("keeps a passage naming no document, at its source's sensitivity", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const { passage } = await aPassageUnderAConnectedSource(client, {
-        connectedSourceClass: "Public",
+        connectedSourceSensitivity: "Public",
         withoutADocument: true,
       });
       await asAppRt(client, WS_A);
@@ -465,7 +467,7 @@ describe("who may read the view", () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const { passage } = await aPassageUnderAConnectedSource(client, {
-        connectedSourceClass: "Public",
+        connectedSourceSensitivity: "Public",
       });
 
       const forTheApp = await privilegesHeld(client, "app_rt", '"index".readable_passage');
@@ -512,14 +514,16 @@ describe("a partition attached after the view was made", () => {
   it("reads through it as through the first partition", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const first = await aPassageUnderAConnectedSource(client, { connectedSourceClass: "Public" });
+      const first = await aPassageUnderAConnectedSource(client, {
+        connectedSourceSensitivity: "Public",
+      });
       await asAppRt(client, WS_A);
       const before = await seenBy(client, VIEWER);
 
       await client.query("RESET ROLE");
       const later = await aPassageUnderAConnectedSource(client, {
         workspaceId: WS_B,
-        connectedSourceClass: "Public",
+        connectedSourceSensitivity: "Public",
       });
       await asAppRt(client, WS_B);
 

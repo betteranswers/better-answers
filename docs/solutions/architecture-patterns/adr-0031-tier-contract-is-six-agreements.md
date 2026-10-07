@@ -33,7 +33,7 @@ Every answer the api and the worker must hold alike is an agreement in the tier 
 The agreements live in top-level `contracts/`, listed in `contracts/manifest.json`. Nothing imports the directory and nothing deploys it. There are thirteen:
 
 - `queue` (SQL functions): claim, lease, heartbeat, reaper, attempt count and poison threshold; the kinds a claimant runs, a job's subject and the run key.
-- `concept-inbox` (SQL function): submitting a suggestion set; what acceptance promises is fixtured.
+- `suggestions` (SQL function): submitting a suggestion set; what acceptance promises is fixtured.
 - `model-choice` (SQL function): one model choice per workspace per purpose, resolved by the database.
 - `cost-ledger` (generated): the `llm_call` row, its golden rows held to the purpose vocabulary both tiers speak.
 - `credential-envelope`: the envelope's sealed vectors and the words an opener refuses with.

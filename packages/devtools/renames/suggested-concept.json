@@ -1,0 +1,50 @@
+{
+  "noun": "candidate concept",
+  "readerWord": "suggested concept",
+  "sweep": "U15. Knowledge words: suggested concept",
+  "collisions": [],
+  "words": [
+    {
+      "from": "candidate concepts",
+      "to": "suggested concepts"
+    },
+    {
+      "from": "candidate concept",
+      "to": "suggested concept"
+    },
+    {
+      "from": "candidates",
+      "to": "suggested concepts"
+    },
+    {
+      "from": "candidate",
+      "to": "suggested concept"
+    }
+  ],
+  "symbols": {
+    "paths": [
+      "packages/schema/src/suggestion-tables.ts",
+      "packages/schema/test/boundary-schemas.test.ts",
+      "packages/schema/test/rls.test.ts",
+      "packages/core/src/concepts/**",
+      "packages/core/test/suggestions.test.ts"
+    ]
+  },
+  "text": {
+    "paths": [
+      "packages/schema/src/suggestion-tables.ts",
+      "packages/schema/test/boundary-schemas.test.ts",
+      "packages/schema/test/rls.test.ts",
+      "packages/core/src/concepts/**",
+      "packages/core/test/suggestions.test.ts",
+      "contracts/concept-inbox/**",
+      "contracts/suggestions/**"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "the words test's own planted fixtures and ratchet",
+      "paths": ["apps/api/tests/avoid-words.test.ts", "apps/api/tests/old-words-ratchet.json"]
+    }
+  ]
+}

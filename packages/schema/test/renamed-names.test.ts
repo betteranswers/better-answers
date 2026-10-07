@@ -8,10 +8,28 @@ import { postgresForSuite } from "./probes.ts";
 const db = postgresForSuite();
 
 /** A table rename leaves behind every name Postgres derived from the old one unless each is renamed too. */
-const RENAMED_TABLE_PREFIXES = ["llm_route", "graph", "source_binding"];
+const RENAMED_TABLE_PREFIXES = [
+  "llm_route",
+  "graph",
+  "source_binding",
+  "composition",
+  "concept_class_override",
+];
 
 /** Matched mid-name, as an index names its columns and a partition its parent. */
-const RENAMED_WORDS = ["binding", "checked", "chunk", "route", "slug"];
+const RENAMED_WORDS = [
+  "binding",
+  "candidate",
+  "checked",
+  "chunk",
+  "class_override",
+  "composition",
+  "quarantin",
+  "repair",
+  "route",
+  "slug",
+  "narrower_class",
+];
 
 const NAMES = `
   SELECT 'constraint' AS kind, conname AS name FROM pg_constraint

@@ -34,7 +34,7 @@ ALWAYS_PLACEHOLDER = next(
 
 @dataclass(frozen=True, slots=True)
 class Redaction:
-    """`verdict` is the class the document narrows to, None when nothing
+    """`verdict` is the sensitivity the document narrows to, None when nothing
     narrows it; `lifted` is True when every narrowing finding was dismissed."""
 
     text: str

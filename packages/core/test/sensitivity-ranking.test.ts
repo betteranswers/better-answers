@@ -17,10 +17,10 @@ const THE_RANKING = [
   { one: "Public", other: "Public", narrower: "Public" },
 ] as const;
 
-describe("the class ranking, in the TypeScript tier and the database", () => {
-  it("both answer the ranking's narrower class for every ordered pair", async () => {
+describe("the sensitivity ranking, in the TypeScript tier and the database", () => {
+  it("both answer the ranking's narrower sensitivity for every ordered pair", async () => {
     const answered = await db().runtimePool.query<{ narrower: string }>(
-      `SELECT narrower_class(pair.a, pair.b) AS narrower
+      `SELECT narrower_sensitivity(pair.a, pair.b) AS narrower
          FROM unnest($1::text[], $2::text[]) WITH ORDINALITY AS pair(a, b, at)
         ORDER BY pair.at`,
       [THE_RANKING.map((pair) => pair.one), THE_RANKING.map((pair) => pair.other)],

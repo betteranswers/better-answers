@@ -24,7 +24,12 @@ export const CONCEPT_DRAFT_STATUS = "draft" satisfies (typeof CONCEPT_STATUSES)[
 
 export const CONCEPT_DEPRECATED_STATUS = "deprecated" satisfies (typeof CONCEPT_STATUSES)[number];
 
-export const VERIFICATION_ORIGINS = ["platform", "imported", "erasure-rewrite", "repair"] as const;
+export const VERIFICATION_ORIGINS = [
+  "platform",
+  "imported",
+  "erasure-rewrite",
+  "citation-fix",
+] as const;
 
 export const VERIFICATION_PLATFORM_ORIGIN =
   "platform" satisfies (typeof VERIFICATION_ORIGINS)[number];
@@ -32,7 +37,8 @@ export const VERIFICATION_PLATFORM_ORIGIN =
 export const VERIFICATION_IMPORTED_ORIGIN =
   "imported" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
-export const VERIFICATION_REPAIR_ORIGIN = "repair" satisfies (typeof VERIFICATION_ORIGINS)[number];
+export const VERIFICATION_CITATION_FIX_ORIGIN =
+  "citation-fix" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
 export const VERIFICATION_ERASURE_ORIGIN =
   "erasure-rewrite" satisfies (typeof VERIFICATION_ORIGINS)[number];
@@ -324,8 +330,8 @@ export const conceptEvidence = withRLS(
   ],
 );
 
-export const conceptClassOverride = withRLS(
-  "concept_class_override",
+export const conceptSensitivityOverride = withRLS(
+  "concept_sensitivity_override",
   {
     workspaceId: text("workspace_id").notNull(),
     iri: text("iri").notNull(),
@@ -340,12 +346,12 @@ export const conceptClassOverride = withRLS(
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.iri] }),
-    identityKey(table, "concept_class_override_identity_fk"),
+    identityKey(table, "concept_sensitivity_override_identity_fk"),
     check(
-      "concept_class_override_sensitivity_check",
+      "concept_sensitivity_override_sensitivity_check",
       sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`),
     ),
-    check("concept_class_override_audience_check", sql.raw(AUDIENCE_CHECK)),
-    check("concept_class_override_actor_check", sql.raw(`actor ~ '^${ACTOR_ID_PATTERN}$'`)),
+    check("concept_sensitivity_override_audience_check", sql.raw(AUDIENCE_CHECK)),
+    check("concept_sensitivity_override_actor_check", sql.raw(`actor ~ '^${ACTOR_ID_PATTERN}$'`)),
   ],
 );

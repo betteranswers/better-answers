@@ -40,14 +40,14 @@ export const CONNECTED_SOURCE_INDEXED_STATE =
 export const CONNECTED_SOURCE_PUBLISHED_STATE =
   "published" satisfies (typeof CONNECTED_SOURCE_STATES)[number];
 
-export const DOCUMENT_OUTCOMES = ["converted", "quarantined"] as const;
+export const DOCUMENT_OUTCOMES = ["converted", "unreadable"] as const;
 
 export const DOCUMENT_CONVERTED_OUTCOME = "converted" satisfies (typeof DOCUMENT_OUTCOMES)[number];
 
-export const DOCUMENT_QUARANTINED_OUTCOME =
-  "quarantined" satisfies (typeof DOCUMENT_OUTCOMES)[number];
+export const DOCUMENT_UNREADABLE_OUTCOME =
+  "unreadable" satisfies (typeof DOCUMENT_OUTCOMES)[number];
 
-export const QUARANTINE_ERROR = /^\S+$/u;
+export const UNREADABLE_REASON = /^\S+$/u;
 
 export const RULES_IN_FORCE_KEYS = ["default_on", "default_off"] as const;
 
@@ -134,7 +134,7 @@ export const sourceDocument = withRLS(
 
     outcome: text("outcome"),
 
-    quarantineError: text("quarantine_error"),
+    unreadableReason: text("unreadable_reason"),
 
     sensitivity: text("sensitivity"),
 
@@ -177,15 +177,15 @@ export const sourceDocument = withRLS(
         `narrowed_to IS NULL
          OR (sensitivity IS NOT NULL
              AND narrowed_to IN (${listed(SENSITIVITIES)})
-             AND public.narrower_class(sensitivity, narrowed_to) = sensitivity)`,
+             AND public.narrower_sensitivity(sensitivity, narrowed_to) = sensitivity)`,
       ),
     ),
 
     check(
-      "source_document_quarantine_error_check",
+      "source_document_unreadable_reason_check",
       sql.raw(
-        "quarantine_error IS NULL OR outcome IS NOT DISTINCT FROM" +
-          ` '${DOCUMENT_QUARANTINED_OUTCOME}'`,
+        "unreadable_reason IS NULL OR outcome IS NOT DISTINCT FROM" +
+          ` '${DOCUMENT_UNREADABLE_OUTCOME}'`,
       ),
     ),
 
