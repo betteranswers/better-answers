@@ -68,7 +68,14 @@ describe("the one navigation list", () => {
           ["Browse", ["Search", "Guides"]],
           [
             "Curation",
-            ["All knowledge", "Checks due", "Conflicts", "Kinds", "Domains and owners", "Exports"],
+            [
+              "All knowledge",
+              "Due for verification",
+              "Conflicts",
+              "Kinds",
+              "Domains and owners",
+              "Exports",
+            ],
           ],
         ],
       ],

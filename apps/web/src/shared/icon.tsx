@@ -60,7 +60,6 @@ export type IconName =
   | "caret-down"
   | "caret-right"
   | "spending-limit"
-  | "checks"
   | "columns"
   | "conflicts"
   | "console"
@@ -102,6 +101,7 @@ export type IconName =
   | "token"
   | "tray"
   | "unsorted"
+  | "verification"
   | "workspaces";
 
 /**
@@ -115,7 +115,6 @@ const GLYPHS = {
   "caret-down": CaretDown,
   "caret-right": CaretRight,
   "spending-limit": Gauge,
-  checks: CalendarCheck,
   columns: Columns,
   conflicts: Warning,
   console: Globe,
@@ -157,6 +156,7 @@ const GLYPHS = {
   token: Key,
   tray: Tray,
   unsorted: CaretUpDown,
+  verification: CalendarCheck,
   workspaces: Buildings,
 } satisfies Readonly<Record<IconName, PhosphorGlyph>>;
 

@@ -51,9 +51,9 @@
   --trust-checked-bg: var(--green-50);
   --trust-checked-fg: var(--green-700);
   --trust-checked-border: var(--green-200);
-  --trust-unchecked-bg: var(--grey-100);
-  --trust-unchecked-fg: var(--grey-600);
-  --trust-unchecked-border: var(--grey-200);
+  --trust-unverified-bg: var(--grey-100);
+  --trust-unverified-fg: var(--grey-600);
+  --trust-unverified-border: var(--grey-200);
   --trust-stale-bg: var(--amber-50);
   --trust-stale-fg: var(--amber-700);
   --trust-stale-border: var(--amber-200);
@@ -115,9 +115,9 @@
   --trust-checked-bg: rgba(19, 122, 82, 0.16);
   --trust-checked-fg: #5fc79b;
   --trust-checked-border: rgba(19, 122, 82, 0.4);
-  --trust-unchecked-bg: #1b1e22;
-  --trust-unchecked-fg: #a3a8b0;
-  --trust-unchecked-border: #2a2e34;
+  --trust-unverified-bg: #1b1e22;
+  --trust-unverified-fg: #a3a8b0;
+  --trust-unverified-border: #2a2e34;
   --trust-stale-bg: rgba(165, 93, 9, 0.18);
   --trust-stale-fg: #e0a860;
   --trust-stale-border: rgba(165, 93, 9, 0.42);
