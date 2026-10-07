@@ -744,6 +744,34 @@ describe("a word that lands with its sweep", () => {
     );
   });
 
+  it("refuses the old group name, passing ADR 0047's Flux comparison", () => {
+    const group = ["Agent", "Operations"].join(" ");
+    const adr =
+      "docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md";
+    const files = {
+      "packages/design-system/readme.md": `  Sources, ${group}, Questions, People.`,
+      [adr]: `- Questions stays apart from ${group}.\n**${group} against Flux AgentOps.**`,
+      "apps/web/src/shared/navigation.ts": `movedFrom: ["/agent-operations/routes-and-spend"],`,
+    };
+    const kept = ["/agent-operations/routes-and-spend"];
+
+    expect([...linesOver(files, [rowOf(group)], kept)].toSorted()).toEqual([
+      `${adr}:1: - Questions stays apart from ${group}.`,
+      `packages/design-system/readme.md:1: Sources, ${group}, Questions, People.`,
+    ]);
+  });
+
+  it("refuses the old People page name where pages are named", () => {
+    const tokens = ["Tok", "ens"].join("");
+    const navigation = "apps/web/src/shared/navigation.ts";
+    const files = {
+      [navigation]: `name: "${tokens}",\nname: "Personal ${tokens.toLowerCase()}",`,
+      "apps/web/src/features/people/audit-details.ts": `${tokens.toLowerCase()}: "${tokens}",`,
+    };
+
+    expect(linesOver(files, [rowOf(tokens)])).toEqual([`${navigation}:1: name: "${tokens}",`]);
+  });
+
   it("refuses a sync written as a run, passing other runs", () => {
     const run = ["r", "un"].join("");
     const refused = {

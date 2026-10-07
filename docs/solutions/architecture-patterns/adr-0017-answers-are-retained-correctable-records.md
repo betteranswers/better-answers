@@ -37,7 +37,7 @@ An `Answer` concept is minted or updated only at a gate a person runs, the promo
 - The `Answer` collection's owner or an Admin decides it one at a time, never in bulk: update the existing, add as new, or decline.
 - Accepting is one governed write with the decider as author. A trim makes the decider the generator.
 
-Control Centre is one area of eight groups: Overview, Suggestions, Sources, Agent Operations, Questions, People, Personal data and System. ADR 0047 lists each group's pages.
+Control Centre is one area of eight groups: Overview, Suggestions, Sources, Models, Questions, People, Personal data and System. ADR 0047 lists each group's pages.
 
 - Questions holds *Questions asked* and the answer tests. A promotion waits in Suggestions' queue with every other suggestion.
 - People's pages are members, groups and tokens.

@@ -81,9 +81,9 @@ Today's pages that the table does not list moved:
 - Knowledge left Control Centre and became an area. Its review table is now All knowledge. Its conflicts and verification requests are now Conflicts and Due for verification.
 - Promotions left Questions. A promotion is a suggestion, so it waits in Suggestions › To decide, and the owner of the `Answer` collection reaches it through their Inbox.
 - Owners left People for Knowledge's Collections and owners. Erasure and suppression moved to Personal data, and the audit log to System. Thresholds is not declared.
-- The ceiling left Sources, and routes and spend left System, both for Agent Operations.
+- The ceiling left Sources, and routes and spend left System, both for Models, as Spending limit and Models and spend.
 
-Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addresses under `/people` and `/sources` still work. Two pages move: the audit log to `/system/audit-log`, and routes and spend to `/agent-operations/routes-and-spend`. For a person who may see a moved page, its old address leads to the new one. A page or group keeps every address it has had, so a page moved twice leads from both (glossary plan, KTD11).
+Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addresses under `/people` and `/sources` still work. Two pages move: the audit log to `/system/audit-log`, and routes and spend to `/models/models-and-spend` by way of `/agent-operations/routes-and-spend`. For a person who may see a moved page, its old address leads to the new one. A page or group keeps every address it has had, so a page moved twice leads from both (glossary plan, KTD11).
 
 **Who sees what.**
 
@@ -136,7 +136,7 @@ Two things stay open:
 - Unpublished content is shown to Admins alone, in Control Centre. A suggestion's payload can come from an unpublished connected source, so To decide stays in Control Centre, and each Inbox points into it.
 - A withheld concept must be indistinguishable from one that does not exist. An address that says "not for you" or "not built yet" tells a person what exists. Nobody should learn what exists by guessing addresses.
 - The infrequent reader forgets the tool between visits. A few plainly named areas, with nothing listed that cannot be opened, are what such a reader holds.
-- Control Centre's groups each hold their own pages, as Flux AgentOps' do. One noun per thing an Admin answers for is what a person holds without reading (ADR 0017). Questions stays apart from Agent Operations: what the platform answered is a matter of content, and what its agents did is a matter of operations and spend. Personal data stays apart from People: a subject request runs on its own one-month clock.
+- Control Centre's groups each hold their own pages, as Flux AgentOps' do. One noun per thing an Admin answers for is what a person holds without reading (ADR 0017). Questions stays apart from Models: what the platform answered is a matter of content, and what its agents did is a matter of operations and spend. Personal data stays apart from People: a subject request runs on its own one-month clock.
 - The v0.1 route planned only what v0.1 builds, so nothing recorded the wider structure. Declaring it now means the shell built for v0.1 needs no restructuring after it.
 
 ## Rejected

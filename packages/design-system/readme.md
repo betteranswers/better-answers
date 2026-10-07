@@ -44,7 +44,7 @@ The areas the rail lists, each holding groups of pages (§4, *The shell*):
 - **Inbox** — what waits on a person who decides something: Admins, and the owners of a
   collection.
 - **Control Centre** — the one Admin area, in eight groups: Overview, Suggestions,
-  Sources, Agent Operations, Questions, People, Personal data and System.
+  Sources, Models, Questions, People, Personal data and System.
 
 The avatar menu in the band holds the person's name, their role and "Sign out".
 

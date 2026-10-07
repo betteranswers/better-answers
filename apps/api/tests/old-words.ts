@@ -66,14 +66,6 @@ const avoided = (word: string, entry: string, why?: string, use = entry): Avoide
   ...(why === undefined ? {} : { why }),
 });
 
-const pending = (
-  word: string,
-  use: string,
-  entry: string,
-  sweep: string,
-  reach: Reach,
-): Renamed => ({ word, use, entry, sweep, state: "pending", reach });
-
 const APP_SENSES: readonly Sense[] = [
   { sense: "the whole product", written: /\b(?:an app|better-answers app)\b/gi },
   { sense: "the SPA", written: /\b(?:single-page|web) app\b/gi },
@@ -206,6 +198,17 @@ const PAGE_AREA_MENU_CARVED_OUT: readonly CarveOut[] = [
 const MODEL_CHOICE = "model choice";
 
 const MODEL_CHOICE_LANDED = "2026-10-05";
+
+const AGENT_OPERATIONS_SENSES: readonly Sense[] = [
+  {
+    sense:
+      "the Flux AgentOps comparison and its history, which keep the group's old name until a later page lands",
+    within:
+      "docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md",
+    written:
+      /\bAgent Operations against Flux AgentOps\b|\b(?:page|Approvals) in Agent Operations\b|\bfolded into Agent Operations\b|\bAgent Operations group is now\b/g,
+  },
+];
 
 /** Trees where every route is one the api, the SPA's sign-in or a fake server answers over HTTP. */
 const HTTP_ROUTE_TREES = [
@@ -1278,7 +1281,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("action name", "audit action"),
   avoided("activity log", "Activity (of a person)"),
   avoided("activity record", "record family", "the draft's word"),
-  pending("actor id", "the person's name", "actor id", "Audit log", "reader text"),
+  {
+    word: "actor id",
+    use: "the person's name",
+    entry: "actor id",
+    sweep: "Audit log",
+    state: "landed",
+    reach: "reader text",
+  },
   {
     word: "acts",
     use: "actions",
@@ -1291,7 +1301,16 @@ export const OLD_WORDS: readonly OldWord[] = [
     carvedOut: ACTION_CARVED_OUT,
   },
   avoided("admin panel", "console"),
-  pending("Agent Operations", "Models", "Control Centre", "model choice", "everywhere"),
+  {
+    word: "Agent Operations",
+    use: "Models",
+    entry: "Control Centre",
+    sweep: MODEL_CHOICE,
+    state: "landed",
+    reach: "everywhere",
+    permitted: AGENT_OPERATIONS_SENSES,
+    carvedOut: [writtenBefore(MODEL_CHOICE_LANDED)],
+  },
   {
     word: "agent token",
     use: "share agent token",
@@ -1810,7 +1829,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("pending", "invitation", "the value Better Auth stores", "waiting"),
   avoided("pending concept", "concept write request"),
   avoided("permission check", "admission"),
-  pending("person id", "the person's name", "person id", "Audit log", "reader text"),
+  {
+    word: "person id",
+    use: "the person's name",
+    entry: "person id",
+    sweep: "Audit log",
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("person's name", "display name"),
   avoided("phase", "block"),
   avoided("phrasing variant", "context wording", "the record it was until 27/08/2026"),
@@ -2032,6 +2058,22 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("the server", "api"),
   avoided("ticket", "job"),
   avoided("timeline", "Activity (of a person)"),
+  {
+    word: "Tokens",
+    use: "Personal tokens",
+    entry: "personal token",
+    sweep: "Personal tokens",
+    state: "landed",
+    reach: "one sense",
+    why: "the People page's name; a token, a design token and a detail's label keep the word",
+    permitted: [
+      {
+        sense: "the page's name now, which holds the old one",
+        written: /\b[Pp]ersonal[ -]tokens\b/g,
+      },
+    ],
+    reads: (file) => file === "apps/web/src/shared/navigation.ts",
+  },
   avoided("top bar", "top band", "the word until 30/09/2026"),
   avoided("TOTP", "authenticator"),
   avoided("track", "strand"),
