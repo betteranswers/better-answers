@@ -62,6 +62,8 @@
       "sense": "the old stored names a test seeds or refuses as stored (R22)",
       "paths": [
         "packages/schema/test/knowledge-words.test.ts",
+        "packages/schema/test/before-the-knowledge-words.ts",
+        "packages/schema/test/knowledge-words-end-to-end.test.ts",
         "packages/schema/test/renamed-names.test.ts"
       ]
     },

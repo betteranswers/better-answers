@@ -1084,9 +1084,19 @@ const TYPE_VOCABULARY_SENSES: readonly Sense[] = [
   },
 ];
 
+/** The database as 0071 stored it, seeded so migration 0072 can be run whole over it. */
+const THE_DATABASE_BEFORE_0072 = [
+  "packages/schema/test/before-the-knowledge-words.ts",
+  "packages/schema/test/knowledge-words-end-to-end.test.ts",
+];
+
 const KNOWLEDGE_STORED_WORDS_CARVED_OUT: readonly CarveOut[] = [
   ...KNOWLEDGE_WORDS_CARVED_OUT,
   ...SWEEPS_OWN_WORDS,
+  {
+    holds: (file) => THE_DATABASE_BEFORE_0072.includes(file),
+    why: "the stored names before migration 0072, which its end-to-end run seeds (R22)",
+  },
 ];
 
 /**
