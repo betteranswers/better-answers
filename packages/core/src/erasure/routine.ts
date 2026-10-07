@@ -1,7 +1,7 @@
 import { boundarySchemas } from "@better-answers/schema";
 
 import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
-import { carryChecksOntoRewrite, moveBundleCommits } from "../concepts/index.ts";
+import { carryVerificationsOntoRewrite, moveBundleCommits } from "../concepts/index.ts";
 import {
   attempt,
   err,
@@ -254,13 +254,13 @@ const withTheGitStep = (
 
 const CONCEPT_VERIFICATION: ErasureFamily = "concept-verification";
 
-const withTheChecksMoved = (
+const withTheVerificationsMoved = (
   actions: ErasureActions,
-  carried: { readonly concepts: number; readonly checks: number },
+  carried: { readonly concepts: number; readonly verifications: number },
 ): ErasureActions => ({
   ...actions,
   [CONCEPT_FILE]: { ...actions[CONCEPT_FILE], reindexed: carried.concepts },
-  [CONCEPT_VERIFICATION]: { ...actions[CONCEPT_VERIFICATION], rehashed: carried.checks },
+  [CONCEPT_VERIFICATION]: { ...actions[CONCEPT_VERIFICATION], rehashed: carried.verifications },
 });
 
 /**
@@ -516,7 +516,7 @@ export const runErasure = async (
 
         const rows = await withScope(platform, doors.postgres, workspaceId, async (tx) => ({
           moved: await moveBundleCommits(platform, tx, moved),
-          carried: await carryChecksOntoRewrite(platform, tx, doors.git, {
+          carried: await carryVerificationsOntoRewrite(platform, tx, doors.git, {
             workspaceId,
             paths: pathsNaming(map),
           }),
@@ -566,7 +566,7 @@ export const runErasure = async (
 
     const actions = withTheDocumentsStep(
       withTheIdentityStep(
-        withTheChecksMoved(
+        withTheVerificationsMoved(
           withTheGitStep(foundPerFamily(map), rewritten.value),
           rewritten.value.carried,
         ),

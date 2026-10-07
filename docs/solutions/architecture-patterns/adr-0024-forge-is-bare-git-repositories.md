@@ -47,7 +47,7 @@ The worker holds the detector's weights once, mapped from the file. On VPC 1 it 
 - A 3–5 GB CPU embedding server does not fit on a 4 GB box beside production.
 - A swap file lets a first index that outgrows the cap run slower rather than fail.
 - A push that replaces refs leaves the old objects on VPC 2, so the mirror kept what production had erased. The verb sits on the key, not in a cron there, because only the push knows a rewrite happened.
-- An unchecked relative root once wrote a repository into the process's working directory.
+- An unvalidated relative root once wrote a repository into the process's working directory.
 - The default load held the 1.16 GB weights twice and used 85–98 % of the spill at every start. Mapped weights are file-backed, so the kernel drops them rather than swapping.
 
 ## Rejected

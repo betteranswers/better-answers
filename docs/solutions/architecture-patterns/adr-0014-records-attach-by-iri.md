@@ -56,7 +56,7 @@ Decided for the S3 block and not yet in the tree:
 
 - A saved list inside a column cannot be a foreign key, so a changed atom would reach its compositions by a scan or not at all.
 - A version table with a mutable flag is not append-only.
-- A wording kept as a record wears the concept's badge without ever being checked.
+- A wording kept as a record wears the concept's badge without ever being verified.
 - Every one of these is a line now and a migration with user-visible churn later. Two reviewers reached the same verdicts independently.
 - Partitioning a table that carries a policy changes the catalogue assertion the RLS suite proves. A retention delete would need a role that is not the api's.
 - `audit_event.id` is a global key, so without the unique index no family could carry a composite key to the audit row it was written with.

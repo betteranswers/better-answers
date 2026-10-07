@@ -62,7 +62,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | Area | Group | Pages (built today in bold) | Seen by |
 |---|---|---|---|
 | Ask | (none) | New question · Your questions | every role (home of Editor and Viewer) |
-| Knowledge | Browse · Curation | Search · Guides · All knowledge · Checks due · Conflicts · Kinds · Domains and owners · Exports | Browse: every role. Curation: Admins and owners |
+| Knowledge | Browse · Curation | Search · Guides · All knowledge · Due for verification · Conflicts · Kinds · Domains and owners · Exports | Browse: every role. Curation: Admins and owners |
 | Inbox | (none) | Waiting on you | Admins and owners |
 | Control Centre | Overview | Overview | Admin |
 | | Suggestions | Queue | Admin |
@@ -78,7 +78,7 @@ In Knowledge, Browse holds Search and Guides, and Curation holds the other six. 
 
 Today's pages that the table does not list moved:
 
-- Knowledge left Control Centre and became an area. Its review table is now All knowledge. Its conflicts and verification requests are now Conflicts and Checks due.
+- Knowledge left Control Centre and became an area. Its review table is now All knowledge. Its conflicts and verification requests are now Conflicts and Due for verification.
 - Promotions left Questions. A promotion is a suggestion, so it waits in Suggestions' queue, and the owner of the `Answer` domain reaches it through their Inbox.
 - Owners left People for Knowledge's Domains and owners. Erasure and suppression moved to Personal data, and the audit log to System. Thresholds is not declared.
 - The ceiling left Sources, and routes and spend left System, both for Agent Operations.
@@ -117,7 +117,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
 | Ask | none; the home says it is on its way | New question, Your questions, and the concept page a hit or a citation opens (S2) | none yet |
-| Knowledge | none | Search (S2). Guides, All knowledge, Kinds, Domains and owners (S3; S7 renames kinds). Checks due, Conflicts (V1). Exports | What changed in your domains since your last visit. A map explorer. Imported bundles |
+| Knowledge | none | Search (S2). Guides, All knowledge, Kinds, Domains and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your domains since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of acts an agent takes as the person |

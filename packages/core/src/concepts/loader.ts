@@ -31,7 +31,7 @@ import type { Frontmatter, FrontmatterSource } from "./file.ts";
 import { foldKind, mergeKeyOf } from "./landing.ts";
 
 const IMPORT_ACTS = declareActs("knowledge", {
-  checkImported: act("knowledge.check.imported", { iri: "iri", verificationId: "id" }),
+  verificationImported: act("knowledge.check.imported", { iri: "iri", verificationId: "id" }),
 });
 
 export const IMPORT_SENSITIVITY_DEFAULT = "Internal" satisfies (typeof SENSITIVITIES)[number];
@@ -412,84 +412,86 @@ export const standingAt = async (
   );
 };
 
-export type ImportedCheck = {
+export type ImportedVerification = {
   readonly actor: ActorId;
   readonly at: Date;
 };
 
-const checkKey = (iri: string, check: ImportedCheck): string =>
-  `${iri} ${check.actor} ${check.at.toISOString()}`;
+const verificationKey = (iri: string, verification: ImportedVerification): string =>
+  `${iri} ${verification.actor} ${verification.at.toISOString()}`;
 
-/** The checks already recorded on `iris`, as opaque keys for `countChecks`. */
-export const presentChecks = async (
+/** The verifications already recorded on `iris`, as opaque keys for `countVerifications`. */
+export const presentVerifications = async (
   principal: Principal,
   tx: Tx,
   iris: readonly string[],
 ): Promise<ReadonlySet<string>> => {
   if (iris.length === 0) return new Set();
-  const found = await tx.query<{ iri: string; actor: ActorId; checked_at: Date }>(
-    `SELECT iri, actor, checked_at FROM concept_verification
+  const found = await tx.query<{ iri: string; actor: ActorId; verified_at: Date }>(
+    `SELECT iri, actor, verified_at FROM concept_verification
       WHERE workspace_id = ${scopeClause(1)} AND iri = ANY($2::text[])`,
     [scopeParameter(principal), [...iris]],
   );
   return new Set(
-    found.rows.map((row) => checkKey(row.iri, { actor: row.actor, at: row.checked_at })),
+    found.rows.map((row) => verificationKey(row.iri, { actor: row.actor, at: row.verified_at })),
   );
 };
 
-export type ChecksRecorded = {
+export type VerificationsRecorded = {
   readonly recorded: number;
   readonly present: number;
 };
 
-/** An `undefined` IRI is a concept not held yet, so every check counts as recorded. */
-export const countChecks = (
+/** An `undefined` IRI is a concept not held yet, so every verification counts as recorded. */
+export const countVerifications = (
   iri: string | undefined,
-  checks: readonly ImportedCheck[],
+  verifications: readonly ImportedVerification[],
   present: ReadonlySet<string>,
-): ChecksRecorded => {
+): VerificationsRecorded => {
   const missing =
-    iri === undefined ? checks : checks.filter((check) => !present.has(checkKey(iri, check)));
-  return { recorded: missing.length, present: checks.length - missing.length };
+    iri === undefined
+      ? verifications
+      : verifications.filter((verification) => !present.has(verificationKey(iri, verification)));
+  return { recorded: missing.length, present: verifications.length - missing.length };
 };
 
-/** Records each check not already there, with an audit event each; `present` counts the rest. */
-export const recordImportedChecks = async (
+/** Records each verification not already there, with an audit event each; `present` counts the rest. */
+export const recordImportedVerifications = async (
   principal: Principal,
   tx: Tx,
   input: {
     readonly iri: string;
-    readonly checks: readonly ImportedCheck[];
+    readonly verifications: readonly ImportedVerification[];
     readonly batchId: string;
   },
-): Promise<ChecksRecorded> => {
-  const present = new Set(await presentChecks(principal, tx, [input.iri]));
+): Promise<VerificationsRecorded> => {
+  const present = new Set(await presentVerifications(principal, tx, [input.iri]));
   let recorded = 0;
-  for (const check of input.checks) {
-    const key = checkKey(input.iri, check);
+  for (const verification of input.verifications) {
+    const key = verificationKey(input.iri, verification);
     if (present.has(key)) continue;
     present.add(key);
     const verificationId = ulid();
     await tx.query(
-      `INSERT INTO concept_verification (id, workspace_id, iri, actor, checked_at, content_hash, origin)
+      `INSERT INTO concept_verification (id, workspace_id, iri, actor, verified_at, content_hash, origin)
        VALUES ($2, ${scopeClause(1)}, $3, $4, $5, NULL, $6)`,
       [
         scopeParameter(principal),
         verificationId,
         input.iri,
-        check.actor,
-        check.at,
+        verification.actor,
+        verification.at,
         VERIFICATION_IMPORTED_ORIGIN,
       ],
     );
     await record(principal, tx, {
       id: ulid(),
-      act: IMPORT_ACTS.checkImported,
+      act: IMPORT_ACTS.verificationImported,
       subjectId: verificationId,
       batchId: input.batchId,
       detail: { iri: input.iri, verificationId },
     });
     recorded += 1;
   }
-  return { recorded, present: input.checks.length - recorded };
+  return { recorded, present: input.verifications.length - recorded };
 };

@@ -313,7 +313,7 @@ const bundleNamingThePerson = async (named: { readonly byIdAlone?: boolean } = {
         iri: indexed.iri,
         actor: actorIdOfPerson(principal.userId),
         contentHash: indexed.contentHash,
-        checkedAt: new Date("2026-04-05T09:00:00.000Z"),
+        verifiedAt: new Date("2026-04-05T09:00:00.000Z"),
       });
       rows.push({ path: file.path, iri: indexed.iri });
     }
@@ -333,15 +333,15 @@ const bundleNamingThePerson = async (named: { readonly byIdAlone?: boolean } = {
   };
 };
 
-const checksIn = async (workspaceId: string) => {
+const verificationsIn = async (workspaceId: string) => {
   const read = await db().pool.query<{
     iri: string;
     actor: string;
-    checked_at: Date;
+    verified_at: Date;
     content_hash: string | null;
     origin: string;
   }>(
-    `SELECT iri, actor, checked_at, content_hash, origin
+    `SELECT iri, actor, verified_at, content_hash, origin
        FROM concept_verification WHERE workspace_id = $1 ORDER BY iri`,
     [workspaceId],
   );
@@ -390,7 +390,7 @@ const rewritingTheBundleOnce = async () => {
   const arranged = await bundleNamingThePerson();
   const { scenario, subjectRequestId } = arranged;
   const before = await readingTheBundle(scenario.workspaceId, scenario.git);
-  const checksBefore = await checksIn(scenario.workspaceId);
+  const verificationsBefore = await verificationsIn(scenario.workspaceId);
   const indexedBefore = await indexedIn(scenario.workspaceId);
   const trustBefore = [
     await trustOf(scenario, arranged.iri),
@@ -406,8 +406,8 @@ const rewritingTheBundleOnce = async () => {
     before,
     after,
     done,
-    checksBefore,
-    checksAfter: await checksIn(scenario.workspaceId),
+    verificationsBefore,
+    verificationsAfter: await verificationsIn(scenario.workspaceId),
     indexedBefore,
     indexedAfter: await indexedIn(scenario.workspaceId),
     trustBefore,
@@ -1162,17 +1162,20 @@ describe("the bundle_commit rows the rewrite moves", () => {
   });
 });
 
-const checkOn = (checks: Awaited<ReturnType<typeof checksIn>>, iri: string) => {
-  const check = checks.find((one) => one.iri === iri);
+const verificationOn = (
+  verifications: Awaited<ReturnType<typeof verificationsIn>>,
+  iri: string,
+) => {
+  const verification = verifications.find((one) => one.iri === iri);
   return {
-    hash: check?.content_hash,
-    origin: check?.origin,
-    actor: check?.actor,
-    at: check?.checked_at.toISOString(),
+    hash: verification?.content_hash,
+    origin: verification?.origin,
+    actor: verification?.actor,
+    at: verification?.verified_at.toISOString(),
   };
 };
 
-describe("the checks the rewrite moved", () => {
+describe("the verifications the rewrite moved", () => {
   beforeAll(async () => {
     await theBundleRewritten();
   });
@@ -1182,14 +1185,14 @@ describe("the checks the rewrite moved", () => {
       email,
       person,
       iri,
-      checksBefore,
-      checksAfter,
+      verificationsBefore,
+      verificationsAfter,
       indexedBefore,
       indexedAfter,
       trustBefore,
       trustAfter,
     } = await theBundleRewritten();
-    const before = checkOn(checksBefore, iri);
+    const before = verificationOn(verificationsBefore, iri);
     const indexBefore = indexedBefore.find((row) => row.iri === iri);
 
     expect(before.hash).toEqual(indexBefore?.content_hash);
@@ -1200,7 +1203,7 @@ describe("the checks the rewrite moved", () => {
     expect(indexBefore?.body).toContain(email);
     expect(indexAfter?.content_hash).not.toEqual(indexBefore?.content_hash);
     expect(indexAfter?.body).not.toContain(email);
-    expect(checkOn(checksAfter, iri)).toEqual({
+    expect(verificationOn(verificationsAfter, iri)).toEqual({
       hash: indexAfter?.content_hash,
 
       origin: "erasure-rewrite",
@@ -1208,12 +1211,12 @@ describe("the checks the rewrite moved", () => {
       at: before.at,
     });
 
-    expect(trustBefore[0]).toMatchObject({ checkedBy: "Priya Anand" });
+    expect(trustBefore[0]).toMatchObject({ verifiedBy: "Priya Anand" });
     expect(trustAfter[0]).toEqual({
       tier: "human-reviewed",
       status: "current",
-      checkedBy: actorIdOfPerson(person.id),
-      checkedAt: "2026-04-05T09:00:00.000Z",
+      verifiedBy: actorIdOfPerson(person.id),
+      verifiedAt: "2026-04-05T09:00:00.000Z",
       rider: null,
     });
     expect(trustAfter[0] && trustWords(trustAfter[0])).toBe(
@@ -1221,19 +1224,19 @@ describe("the checks the rewrite moved", () => {
     );
   });
 
-  it("leaves a check alone when only unhashed keys were rewritten", async () => {
-    const { person, steadyIri, checksBefore, checksAfter, trustBefore, trustAfter } =
+  it("leaves a verification alone when only unhashed keys were rewritten", async () => {
+    const { person, steadyIri, verificationsBefore, verificationsAfter, trustBefore, trustAfter } =
       await theBundleRewritten();
 
-    expect(checksAfter.find((check) => check.iri === steadyIri)).toEqual(
-      checksBefore.find((check) => check.iri === steadyIri),
+    expect(verificationsAfter.find((verification) => verification.iri === steadyIri)).toEqual(
+      verificationsBefore.find((verification) => verification.iri === steadyIri),
     );
-    expect(trustBefore[1]).toMatchObject({ checkedBy: "Priya Anand" });
+    expect(trustBefore[1]).toMatchObject({ verifiedBy: "Priya Anand" });
     expect(trustAfter[1]).toEqual({
       tier: "human-reviewed",
       status: "current",
-      checkedBy: actorIdOfPerson(person.id),
-      checkedAt: "2026-04-05T09:00:00.000Z",
+      verifiedBy: actorIdOfPerson(person.id),
+      verifiedAt: "2026-04-05T09:00:00.000Z",
       rider: null,
     });
   });

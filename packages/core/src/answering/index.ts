@@ -31,9 +31,9 @@ export type Trust = {
   readonly tier: TrustTier;
   readonly status: TrustStatus;
 
-  readonly checkedBy: string | null;
+  readonly verifiedBy: string | null;
 
-  readonly checkedAt: string | null;
+  readonly verifiedAt: string | null;
 
   readonly rider: TrustRider | null;
 };
@@ -51,13 +51,13 @@ const STATUS_WORDS = {
 } satisfies Record<Exclude<TrustStatus, "current">, string>;
 
 export const trustWords = (trust: Trust): string =>
-  trust.status === "current" ? checkWords(trust) : STATUS_WORDS[trust.status];
+  trust.status === "current" ? verificationWords(trust) : STATUS_WORDS[trust.status];
 
-const checkWords = (trust: Trust): string => {
+const verificationWords = (trust: Trust): string => {
   const rider = trust.rider === null ? "" : RIDER_WORDS[trust.rider];
   switch (trust.tier) {
     case "human-reviewed":
-      return `Verified by ${verifierWords(trust.checkedBy)}${trust.checkedAt === null ? "" : ` · ${ukLongDate(trust.checkedAt)}`}${rider}`;
+      return `Verified by ${verifierWords(trust.verifiedBy)}${trust.verifiedAt === null ? "" : ` · ${ukLongDate(trust.verifiedAt)}`}${rider}`;
     case "machine-confirmed":
       return `Verified automatically${rider}`;
     case "unverified":
@@ -65,10 +65,10 @@ const checkWords = (trust: Trust): string => {
   }
 };
 
-/** `checkedBy` falls back to the person's actor id once erasure has cleared their name. */
-const verifierWords = (checkedBy: string | null): string => {
-  if (checkedBy === null) return "a person";
-  return isActorId(checkedBy) && isPersonActor(checkedBy) ? "a former member" : checkedBy;
+/** `verifiedBy` falls back to the person's actor id once erasure has cleared their name. */
+const verifierWords = (verifiedBy: string | null): string => {
+  if (verifiedBy === null) return "a person";
+  return isActorId(verifiedBy) && isPersonActor(verifiedBy) ? "a former member" : verifiedBy;
 };
 
 const ukLongDate = (iso: string): string => {
@@ -241,25 +241,25 @@ export const find = async (
 };
 
 const trustOf = (concept: OpenedConcept, now: Date): Trust => {
-  const { tier, checkedBy, checkedAt, rider } = trustOfCheck(concept.check);
-  return { tier, status: trustStatusOf(concept, now), checkedBy, checkedAt, rider };
+  const { tier, verifiedBy, verifiedAt, rider } = trustOfVerification(concept.verification);
+  return { tier, status: trustStatusOf(concept, now), verifiedBy, verifiedAt, rider };
 };
 
-const trustOfCheck = (check: OpenedConcept["check"]): Omit<Trust, "status"> =>
-  check === undefined
-    ? { tier: "unverified", checkedBy: null, checkedAt: null, rider: null }
+const trustOfVerification = (verification: OpenedConcept["verification"]): Omit<Trust, "status"> =>
+  verification === undefined
+    ? { tier: "unverified", verifiedBy: null, verifiedAt: null, rider: null }
     : {
-        tier: isPersonActor(check.actor) ? "human-reviewed" : "machine-confirmed",
-        checkedBy: check.checkerName ?? check.actor,
-        checkedAt: check.at.toISOString(),
-        rider: check.contentHash === null ? "imported" : null,
+        tier: isPersonActor(verification.actor) ? "human-reviewed" : "machine-confirmed",
+        verifiedBy: verification.verifierName ?? verification.actor,
+        verifiedAt: verification.at.toISOString(),
+        rider: verification.contentHash === null ? "imported" : null,
       };
 
 const trustStatusOf = (concept: OpenedConcept, now: Date): TrustStatus => {
   if (concept.status === "deprecated") return "deprecated";
   if (pastShelfLife(concept.frontmatter["stale_after"], now)) return "out-of-date";
-  const checkedHash = concept.check?.contentHash;
-  return checkedHash != null && checkedHash !== concept.contentHash
+  const verifiedHash = concept.verification?.contentHash;
+  return verifiedHash != null && verifiedHash !== concept.contentHash
     ? "changed-since-checked"
     : "current";
 };

@@ -598,16 +598,16 @@ to it by IRI and never restates it (ADR 0014).
 
 - **record family** — _Internal._ one kind of record the platform keeps: one shape, one reason to
   exist (the use case or the derived view it serves). Records are never a knowledge layer.
-- **verification** — _Code rename pending._ the platform's record of one person or agent confirming
-  a concept or a write-up against its sources: who, when, and the content confirmed. A concept
-  file's `verified` event is its projection.
+- **verification** — the platform's record of one person or agent confirming a concept or a
+  write-up against its sources: who, when, and the content confirmed. A concept file's `verified`
+  event is its projection.
 - **verification request** — a reader's or the platform's ask that a concept or a write-up be
   verified, with a reason — a reader's flag, *due for verification*, *shelf life ending*, *source
   changed*, *source gone*, *cited concept deprecated*, *verifier left*, *verifier erased*; one open
   per concept and reason; lands in its owner's queue, the interval ones batched into the weekly
   digest, and listed on Knowledge › Due for verification.
-- **verification interval** — _Code rename pending._ how long after its latest matching verification
-  a concept of a kind is *due for verification*: a per-kind workspace setting with platform defaults
+- **verification interval** — how long after its latest matching verification a concept of a
+  kind is *due for verification*: a per-kind workspace setting with platform defaults
   (Certification, Insurance, Rate: twelve months; most kinds none); never written into a file.
 - **shelf life** — the reader's word for `stale_after`: the date after which a concept is *Out of
   date*; absent means none.

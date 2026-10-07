@@ -78,17 +78,17 @@ import {
 } from "./landing.ts";
 import {
   authorOf,
-  countChecks,
+  countVerifications,
   IMPORT_SENSITIVITY_DEFAULT,
   personIdsByEmail,
-  presentChecks,
+  presentVerifications,
   readBundle,
-  recordImportedChecks,
+  recordImportedVerifications,
   rewriteLinks,
   standingAt,
   type BundleTree,
-  type ChecksRecorded,
-  type ImportedCheck,
+  type VerificationsRecorded,
+  type ImportedVerification,
   type LoadedConcept,
   type StandingConcept,
   type Unsound,
@@ -104,7 +104,7 @@ export {
   type Frontmatter,
   type FrontmatterValue,
 } from "./file.ts";
-export { carryChecksOntoRewrite, foldKind, moveBundleCommits } from "./landing.ts";
+export { carryVerificationsOntoRewrite, foldKind, moveBundleCommits } from "./landing.ts";
 export {
   ERASURE_REHEARSAL_PATH,
   IMPORT_SENSITIVITY_DEFAULT,
@@ -719,7 +719,7 @@ export type ConceptRewritten = {
 export type ImportProgress = {
   readonly landed: readonly string[];
   readonly skipped: readonly string[];
-  readonly checks: ChecksRecorded;
+  readonly verifications: VerificationsRecorded;
   readonly rewritten: readonly ConceptRewritten[];
 };
 
@@ -744,13 +744,13 @@ export type ImportBundleRefusal =
       readonly progress: ImportProgress;
     };
 
-type ResolvedConcept = LoadedConcept & { readonly checks: readonly ImportedCheck[] };
+type ResolvedConcept = LoadedConcept & { readonly verifications: readonly ImportedVerification[] };
 
 const withPersonsAsVerifiers = (
   concept: LoadedConcept,
   personOf: ReadonlyMap<string, UserId>,
 ): Result<ResolvedConcept, Unsound> => {
-  const checks: ImportedCheck[] = [];
+  const verifications: ImportedVerification[] = [];
   const verified: FrontmatterSource[] = [];
   for (const event of concept.verified) {
     const personId = personOf.get(event.email.toLowerCase());
@@ -758,15 +758,15 @@ const withPersonsAsVerifiers = (
       return err({ file: concept.file, reason: "verifier-not-a-member", about: event.email });
     }
     const actor = actorIdOfPerson(personId);
-    checks.push({ actor, at: event.at });
+    verifications.push({ actor, at: event.at });
     verified.push({ ...event.entry, by: actor });
   }
   const frontmatter =
     concept.verified.length === 0 ? concept.frontmatter : { ...concept.frontmatter, verified };
-  return ok({ ...concept, checks, frontmatter });
+  return ok({ ...concept, verifications, frontmatter });
 };
 
-const plus = (sum: ChecksRecorded, more: ChecksRecorded): ChecksRecorded => ({
+const plus = (sum: VerificationsRecorded, more: VerificationsRecorded): VerificationsRecorded => ({
   recorded: sum.recorded + more.recorded,
   present: sum.present + more.present,
 });
@@ -795,13 +795,16 @@ const dryRunOf = (
 ): BundleImported => {
   const landed: string[] = [];
   const skipped: string[] = [];
-  let checks: ChecksRecorded = { recorded: 0, present: 0 };
+  let verifications: VerificationsRecorded = { recorded: 0, present: 0 };
   const paths = new Set(concepts.map((concept) => concept.path));
   const rewritten: ConceptRewritten[] = [];
   for (const concept of concepts) {
     const held = standing.get(concept.path);
     (held === undefined ? landed : skipped).push(concept.path);
-    checks = plus(checks, countChecks(held?.iri, concept.checks, present));
+    verifications = plus(
+      verifications,
+      countVerifications(held?.iri, concept.verifications, present),
+    );
 
     /** No iri is minted on a dry run, so the target's path stands in and only the count is read. */
     const { links } = rewriteLinks(held?.body ?? concept.body, concept.path, (target) =>
@@ -814,7 +817,7 @@ const dryRunOf = (
     manifest,
     landed,
     skipped,
-    checks,
+    verifications,
     rewritten,
     concepts: concepts.length,
     dryRun: true,
@@ -852,7 +855,7 @@ const importContextOf = (
         author: await authorOf(fresh, tx, fresh.userId),
         present:
           input.dryRun === true
-            ? await presentChecks(
+            ? await presentVerifications(
                 fresh,
                 tx,
                 [...standing.values()].map((held) => held.iri),
@@ -953,13 +956,15 @@ const landOne = async (
   });
 };
 
-const checksRecordedOn = async (
+const verificationsRecordedOn = async (
   principal: UserPrincipal,
   postgres: PostgresDoor,
-  input: Parameters<typeof recordImportedChecks>[2],
-): Promise<Result<ChecksRecorded, WriteConceptRefusal | Error>> => {
+  input: Parameters<typeof recordImportedVerifications>[2],
+): Promise<Result<VerificationsRecorded, WriteConceptRefusal | Error>> => {
   const recorded = await attempt(() =>
-    withMembership(principal, postgres, (fresh, tx) => recordImportedChecks(fresh, tx, input)),
+    withMembership(principal, postgres, (fresh, tx) =>
+      recordImportedVerifications(fresh, tx, input),
+    ),
   );
   if (!recorded.ok) return err(recorded.error);
   return recorded.value;
@@ -973,9 +978,9 @@ const landEach = async (
 ): Promise<Result<Landing, ImportBundleRefusal>> => {
   const landed: string[] = [];
   const skipped: string[] = [];
-  let checks: ChecksRecorded = { recorded: 0, present: 0 };
+  let verifications: VerificationsRecorded = { recorded: 0, present: 0 };
   const stop = (file: string, reason: WriteConceptRefusal | Error) =>
-    stoppedAt(file, reason, { landed, skipped, checks, rewritten: [] });
+    stoppedAt(file, reason, { landed, skipped, verifications, rewritten: [] });
   const known = new Map<string, StandingConcept>(opened.standing);
   const holdings: Holding[] = [];
   for (const concept of opened.resolved) {
@@ -989,16 +994,16 @@ const landEach = async (
     } else {
       skipped.push(concept.path);
     }
-    const recorded = await checksRecordedOn(principal, doors.postgres, {
+    const recorded = await verificationsRecordedOn(principal, doors.postgres, {
       iri: held.iri,
-      checks: concept.checks,
+      verifications: concept.verifications,
       batchId: run.batchId,
     });
     if (!recorded.ok) return stop(concept.file, recorded.error);
-    checks = plus(checks, recorded.value);
+    verifications = plus(verifications, recorded.value);
     holdings.push([concept, held]);
   }
-  return ok({ progress: { landed, skipped, checks }, known, holdings });
+  return ok({ progress: { landed, skipped, verifications }, known, holdings });
 };
 
 const rewriteEach = async (
@@ -1081,14 +1086,14 @@ export const importBundle = async (
     : runImport(principal, doors, opened.value, sensitivity);
 };
 
-type ConceptCheck = {
+type ConceptVerification = {
   readonly actor: ActorId;
   readonly at: Date;
 
   readonly contentHash: string | null;
 
   /** Read by person id, so it outlives the membership; null once erasure clears the name. */
-  readonly checkerName: string | null;
+  readonly verifierName: string | null;
 };
 
 export type OpenedConcept = {
@@ -1101,7 +1106,7 @@ export type OpenedConcept = {
   readonly status: string;
   readonly contentHash: string;
   readonly commitSha: string;
-  readonly check: ConceptCheck | undefined;
+  readonly verification: ConceptVerification | undefined;
 };
 
 type ConceptRow = {
@@ -1114,27 +1119,27 @@ type ConceptRow = {
   readonly status: string;
   readonly content_hash: string;
   readonly commit_sha: string;
-  readonly checked_by: string | null;
-  readonly checked_at: Date | null;
-  readonly checked_hash: string | null;
-  readonly checked_by_name: string | null;
+  readonly verified_by: string | null;
+  readonly verified_at: Date | null;
+  readonly verified_hash: string | null;
+  readonly verified_by_name: string | null;
 };
 
 const CONCEPT_SELECT = `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.body, c.status,
               c.content_hash, c.commit_sha,
-              v.actor AS checked_by, v.checked_at, v.content_hash AS checked_hash,
-              NULLIF(checker.name, '') AS checked_by_name
+              v.actor AS verified_by, v.verified_at, v.content_hash AS verified_hash,
+              NULLIF(verifier.name, '') AS verified_by_name
          FROM concept_index c
          LEFT JOIN LATERAL (
-                SELECT actor, checked_at, content_hash
+                SELECT actor, verified_at, content_hash
                   FROM concept_verification
                  WHERE workspace_id = c.workspace_id AND iri = c.iri
-                 ORDER BY checked_at DESC, id DESC
+                 ORDER BY verified_at DESC, id DESC
                  LIMIT 1
               ) v ON true
-         LEFT JOIN "user" checker
+         LEFT JOIN "user" verifier
                 ON starts_with(v.actor, '${PERSON_PREFIX}')
-               AND checker.id = substr(v.actor, ${PERSON_PREFIX.length + 1})
+               AND verifier.id = substr(v.actor, ${PERSON_PREFIX.length + 1})
         WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
 
 const openedOf = (row: ConceptRow): OpenedConcept => ({
@@ -1147,7 +1152,7 @@ const openedOf = (row: ConceptRow): OpenedConcept => ({
   status: row.status,
   contentHash: row.content_hash,
   commitSha: row.commit_sha,
-  check: checkOf(row),
+  verification: verificationOf(row),
 });
 
 /** `undefined` both when no concept holds the iri and when this principal may not read it. */
@@ -1190,14 +1195,14 @@ export const findConcepts = async (
   return ok(found.value.rows.map(openedOf));
 };
 
-const checkOf = (row: ConceptRow): ConceptCheck | undefined => {
-  if (row.checked_by === null || row.checked_at === null || !isActorId(row.checked_by)) {
+const verificationOf = (row: ConceptRow): ConceptVerification | undefined => {
+  if (row.verified_by === null || row.verified_at === null || !isActorId(row.verified_by)) {
     return undefined;
   }
   return {
-    actor: row.checked_by,
-    at: row.checked_at,
-    contentHash: row.checked_hash,
-    checkerName: row.checked_by_name,
+    actor: row.verified_by,
+    at: row.verified_at,
+    contentHash: row.verified_hash,
+    verifierName: row.verified_by_name,
   };
 };

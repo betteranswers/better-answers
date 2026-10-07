@@ -11,7 +11,7 @@ const db = postgresForSuite();
 const RENAMED_TABLE_PREFIXES = ["llm_route", "graph", "source_binding"];
 
 /** Matched mid-name, as an index names its columns and a partition its parent. */
-const RENAMED_WORDS = ["binding", "chunk", "route"];
+const RENAMED_WORDS = ["binding", "checked", "chunk", "route"];
 
 const NAMES = `
   SELECT 'constraint' AS kind, conname AS name FROM pg_constraint

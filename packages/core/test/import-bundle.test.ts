@@ -29,7 +29,7 @@ owner: Acme Software Ltd
 content_version: 2026-09-22
 `;
 
-const CHECKED_AT = "2026-04-16T00:00:00Z";
+const VERIFIED_AT = "2026-04-16T00:00:00Z";
 const CHECKED_AGAIN_AT = "2026-06-01T09:30:00Z";
 
 type Event = { readonly by: string; readonly at: string };
@@ -79,7 +79,7 @@ type Verifiers = { readonly mona: string; readonly theo: string };
 const humanOf = (email: string): string => `human:${email}`;
 
 const soundBundle = (verifiers: Verifiers): BundleTree => {
-  const byMona = { by: humanOf(verifiers.mona), at: CHECKED_AT };
+  const byMona = { by: humanOf(verifiers.mona), at: VERIFIED_AT };
   const byTheo = { by: humanOf(verifiers.theo), at: CHECKED_AGAIN_AT };
   return treeOf({
     "manifest.yaml": MANIFEST,
@@ -176,7 +176,7 @@ const imported = async (
 const COUNTED_TABLES = {
   concepts: "concept_index",
   commits: "bundle_commit",
-  checks: "concept_verification",
+  verifications: "concept_verification",
 } as const;
 
 const rowsFor = async (workspaceId: string) => {
@@ -204,7 +204,7 @@ const nothingWritten = async (scenario: Scenario) => {
     head: null,
     concepts: "0",
     commits: "0",
-    checks: "0",
+    verifications: "0",
     events: "0",
   });
 };
@@ -218,13 +218,13 @@ const indexRows = async (workspaceId: string) => {
   return found.rows;
 };
 
-const checkRows = async (workspaceId: string) => {
+const verificationRows = async (workspaceId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
-    `SELECT c.path, v.actor, v.checked_at, v.content_hash, v.origin
+    `SELECT c.path, v.actor, v.verified_at, v.content_hash, v.origin
        FROM concept_verification v
        JOIN concept_index c ON c.workspace_id = v.workspace_id AND c.iri = v.iri
       WHERE v.workspace_id = $1
-      ORDER BY c.path, v.checked_at`,
+      ORDER BY c.path, v.verified_at`,
     [workspaceId],
   );
   return found.rows;
@@ -283,7 +283,7 @@ const REWRITTEN_IN_ORDER = [
 
 /**
  * Stands in for another writer's commit between the passes: the row's hash moves when the
- * concept's first check lands, before pass two reads it.
+ * concept's first verification lands, before pass two reads it.
  */
 const movedBetweenThePasses = async <T>(path: string, work: () => Promise<T>): Promise<T> => {
   const pool = db().pool;
@@ -370,7 +370,7 @@ describe("importing the bundle", () => {
       manifest: "written",
       landed: PATHS_IN_ORDER,
       skipped: [],
-      checks: { recorded: 7, present: 0 },
+      verifications: { recorded: 7, present: 0 },
       rewritten: REWRITTEN_IN_ORDER,
       concepts: 6,
       dryRun: false,
@@ -487,25 +487,25 @@ describe("importing the bundle", () => {
     expect(file).not.toContain("@");
   });
 
-  it("records verified events as imported checks under the run's batch", async () => {
+  it("records verified events as imported verifications under the run's batch", async () => {
     const { scenario, verifiers, people } = await arranged();
 
     await imported(scenario, soundBundle(verifiers));
 
-    const checks = await checkRows(scenario.workspaceId);
-    expect(checks).toHaveLength(7);
-    expect(checks.slice(0, 2)).toEqual([
+    const verifications = await verificationRows(scenario.workspaceId);
+    expect(verifications).toHaveLength(7);
+    expect(verifications.slice(0, 2)).toEqual([
       {
         path: "knowledge/company/answers/data-retention-period.md",
         actor: `human:${people.mona}`,
-        checked_at: new Date("2026-04-16T00:00:00.000Z"),
+        verified_at: new Date("2026-04-16T00:00:00.000Z"),
         content_hash: null,
         origin: "imported",
       },
       {
         path: "knowledge/company/answers/data-retention-period.md",
         actor: `human:${people.theo}`,
-        checked_at: new Date("2026-06-01T09:30:00.000Z"),
+        verified_at: new Date("2026-06-01T09:30:00.000Z"),
         content_hash: null,
         origin: "imported",
       },
@@ -549,7 +549,7 @@ describe("importing the bundle", () => {
       manifest: "standing",
       landed: [],
       skipped: PATHS_IN_ORDER,
-      checks: { recorded: 0, present: 7 },
+      verifications: { recorded: 0, present: 7 },
       rewritten: [],
       concepts: 6,
       dryRun: false,
@@ -560,7 +560,7 @@ describe("importing the bundle", () => {
     expect(await rowsFor(scenario.workspaceId)).toEqual({
       concepts: "6",
       commits: "10",
-      checks: "7",
+      verifications: "7",
       events: "17",
     });
   });
@@ -586,7 +586,7 @@ describe("importing the bundle", () => {
             "knowledge/company/answers/support-hours.md",
           ],
           skipped: [],
-          checks: { recorded: 3, present: 0 },
+          verifications: { recorded: 3, present: 0 },
           rewritten: [],
         },
       ),
@@ -594,7 +594,7 @@ describe("importing the bundle", () => {
     expect(await rowsFor(scenario.workspaceId)).toEqual({
       concepts: "3",
       commits: "4",
-      checks: "3",
+      verifications: "3",
       events: "7",
     });
 
@@ -626,12 +626,12 @@ describe("importing the bundle", () => {
         "knowledge/company/answers/data-retention-period.md",
         "knowledge/company/answers/support-hours.md",
       ],
-      checks: { recorded: 4, present: 3 },
+      verifications: { recorded: 4, present: 3 },
       rewritten: REWRITTEN_IN_ORDER,
       concepts: 6,
       dryRun: false,
     });
-    expect(await checkRows(scenario.workspaceId)).toHaveLength(7);
+    expect(await verificationRows(scenario.workspaceId)).toHaveLength(7);
   });
 
   it("stops at a path another writer took mid-run, naming it", async () => {
@@ -647,7 +647,7 @@ describe("importing the bundle", () => {
       stoppedAt("company/answers/support-hours.md", "path-taken", {
         landed: ["knowledge/company/answers/data-retention-period.md"],
         skipped: [],
-        checks: { recorded: 2, present: 0 },
+        verifications: { recorded: 2, present: 0 },
         rewritten: [],
       }),
     );
@@ -658,7 +658,7 @@ describe("importing the bundle", () => {
     expect(await rowsFor(scenario.workspaceId)).toEqual({
       concepts: "2",
       commits: "3",
-      checks: "2",
+      verifications: "2",
       events: "5",
     });
 
@@ -685,7 +685,7 @@ describe("importing the bundle", () => {
       manifest: "would-write",
       landed: PATHS_IN_ORDER,
       skipped: [],
-      checks: { recorded: 7, present: 0 },
+      verifications: { recorded: 7, present: 0 },
       rewritten: REWRITTEN_IN_ORDER,
       concepts: 6,
       dryRun: true,
@@ -780,7 +780,7 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
       stoppedAt("company/answers/support-hours.md", "stale-precondition", {
         landed: PATHS_IN_ORDER,
         skipped: [],
-        checks: { recorded: 7, present: 0 },
+        verifications: { recorded: 7, present: 0 },
         rewritten: [],
       }),
     );
@@ -820,7 +820,7 @@ describe("an imported concept, opened", () => {
         "manifest.yaml": MANIFEST,
         "company/answers/support-hours.md": conceptFile({
           title: "Support hours",
-          verified: [{ by: humanOf(verifiers.mona), at: CHECKED_AT }],
+          verified: [{ by: humanOf(verifiers.mona), at: VERIFIED_AT }],
           sources,
           body,
         }),
@@ -893,7 +893,7 @@ describe("an imported concept, opened", () => {
 describe("what the import refuses before it writes anything", () => {
   const withMona = (verifiers: Verifiers): Event => ({
     by: humanOf(verifiers.mona),
-    at: CHECKED_AT,
+    at: VERIFIED_AT,
   });
 
   const oneConcept = (verifiers: Verifiers, file: string, concept: Concept): BundleTree =>
@@ -944,7 +944,7 @@ describe("what the import refuses before it writes anything", () => {
       (verifiers: Verifiers) =>
         treeOf({
           "manifest.yaml": MANIFEST,
-          "company/answers/untitled.md": `---\ntype: Answer\nverified:\n  - { by: ${humanOf(verifiers.mona)}, at: ${CHECKED_AT} }\n---\n\nText.\n`,
+          "company/answers/untitled.md": `---\ntype: Answer\nverified:\n  - { by: ${humanOf(verifiers.mona)}, at: ${VERIFIED_AT} }\n---\n\nText.\n`,
         }),
       { file: "company/answers/untitled.md", reason: "type-or-title-missing", about: "title" },
     ],
@@ -967,7 +967,7 @@ describe("what the import refuses before it writes anything", () => {
         oneConcept({ mona: "", theo: "" }, "company/answers/stranger.md", {
           title: "Stranger",
           body: "Text.",
-          verified: [{ by: "human:nobody@elsewhere.invalid", at: CHECKED_AT }],
+          verified: [{ by: "human:nobody@elsewhere.invalid", at: VERIFIED_AT }],
         }),
       {
         file: "company/answers/stranger.md",
@@ -981,7 +981,7 @@ describe("what the import refuses before it writes anything", () => {
         oneConcept({ mona: "", theo: "" }, "company/answers/machine.md", {
           title: "Machine",
           body: "Text.",
-          verified: [{ by: "better-answers-judge/1", at: CHECKED_AT }],
+          verified: [{ by: "better-answers-judge/1", at: VERIFIED_AT }],
         }),
       {
         file: "company/answers/machine.md",
@@ -1102,7 +1102,7 @@ describe("what the import refuses before it writes anything", () => {
     expect(await rowsFor(scenario.workspaceId)).toEqual({
       concepts: "0",
       commits: "1",
-      checks: "0",
+      verifications: "0",
       events: "1",
     });
   });

@@ -214,7 +214,7 @@ const platformRepair = (scenario: Scenario, request: SuggestionRequest) =>
     proposer: "process:better-answers-citation-repair",
   });
 
-const checkedBy = async (
+const verifiedBy = async (
   scenario: Scenario,
   principal: UserPrincipal,
   written: { readonly iri: string; readonly contentHash: string },
@@ -776,7 +776,7 @@ describe("an acceptance at a path another concept holds", () => {
 });
 
 describe("the platform's citation repair", () => {
-  it("re-hashes moved checks, so Verified never becomes Changed since verified", async () => {
+  it("re-hashes moved verifications, so Verified never becomes Changed since verified", async () => {
     const scenario = await arrange();
 
     const cite = (locator: string) => ({
@@ -785,7 +785,7 @@ describe("the platform's citation repair", () => {
       sources: [{ resource: "/sources/handbook.pdf", title: "Handbook", locator }],
     });
     const { input, written } = await editorWrote(scenario, { frontmatter: cite("p.4") });
-    await checkedBy(scenario, scenario.editor, written);
+    await verifiedBy(scenario, scenario.editor, written);
     expect(await trustOf(scenario, written.iri)).toMatchObject({
       tier: "human-reviewed",
       status: "current",
@@ -813,7 +813,7 @@ describe("the platform's citation repair", () => {
     expect(await trustOf(scenario, written.iri)).toMatchObject({
       tier: "human-reviewed",
       status: "current",
-      checkedBy: "Test person",
+      verifiedBy: "Test person",
     });
 
     const verification = await db().pool.query<{ origin: string; content_hash: string }>(
@@ -823,7 +823,7 @@ describe("the platform's citation repair", () => {
     expect(verification.rows).toEqual([{ origin: "repair", content_hash: repaired.contentHash }]);
   });
 
-  it("leaves every other kind's checks exactly where they were", async () => {
+  it("leaves every other kind's verifications exactly where they were", async () => {
     const scenario = await arrange();
     const { written, set } = await proposedAgainst(
       scenario,
@@ -831,7 +831,7 @@ describe("the platform's citation repair", () => {
       {},
       { body: "Expenses are claimed within ninety days." },
     );
-    await checkedBy(scenario, scenario.editor, written);
+    await verifiedBy(scenario, scenario.editor, written);
 
     await acceptAll(scenario, set.setId);
 

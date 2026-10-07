@@ -1,5 +1,5 @@
 ---
-title: "Trust is derived from the file, told in fixed words, and moved only by a check"
+title: "Trust is derived from the file, told in fixed words, and moved only by a verification"
 date: 2026-09-05
 module: packages/core
 problem_type: architecture_pattern
@@ -19,7 +19,7 @@ tags:
   - deprecated
 ---
 
-# Trust is derived from the file, told in fixed words, and moved only by a check
+# Trust is derived from the file, told in fixed words, and moved only by a verification
 
 ## The decision
 
@@ -42,23 +42,23 @@ A person in a file is `human:<email>`.
 - The file is the substrate any OKF consumer reads. A word the platform shows that another consumer of the same file could not derive would make the platform disagree with the bundle it exports.
 - The words follow OKF's own. A concept file records `verified` events, so a reader of the raw file and a reader of a page meet one word.
 - A hash two parsers must agree on has to be a specification, not a description.
-- A check must mean a second pair of eyes wherever the word appears, or it means less than it says.
+- A verification must mean a second pair of eyes wherever the word appears, or it means less than it says.
 - Any citation of a deprecated concept is a derivation, and only a same-type one is a succession. Without that rule *use the successor* repoints a Brief at the wrong concept.
 - The email in `human:<email>` is itself a credibility signal a reader of the raw file wants, as in Google's samples.
 - The pseudonym is per workspace so that two workspaces' rewritten histories cannot be joined on one person. The `human:` prefix survives the rewrite, so the tier derived from it does too.
 
 ## Rejected
 
-- The platform writing `stale_after` on every check: policy dressed as knowledge.
+- The platform writing `stale_after` on every verification: policy dressed as knowledge.
 - An absent `stale_after` read as a computed shelf life: contradicts every other consumer of the same file.
 - A workspace-wide twelve-month cadence: treats a company address like an insurance certificate.
 - Owner-only checking, or checking by any role: one person's queue, or a thumbs-up.
-- Hashing the body only, or every source key: a swapped source keeps its check, or a title fix un-checks.
+- Hashing the body only, or every source key: a swapped source keeps its verification, or a title fix unverifies.
 - Opaque per-member ULIDs in the file: the email is the signal a reader wants, and the erasure map carries the cost.
-- Imported checks earning no tier, counting for actions, or a platform-origin threshold by default.
+- Imported verifications earning no tier, counting for actions, or a platform-origin threshold by default.
 - Parsing the `Supersedes:` body line, a `superseded_by` key, or any link into a deprecated concept counting as succession.
 - Two reader words for a source that moved on, or folding it into *Changed since verified*.
-- A check as the only road from draft to stable: a second person before any typed Answer is usable.
+- A verification as the only road from draft to stable: a second person before any typed Answer is usable.
 - File-relative links on emit: they break when a file moves directories.
 
 ## History

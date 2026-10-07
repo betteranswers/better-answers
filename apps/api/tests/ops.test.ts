@@ -3114,13 +3114,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       "import-bundle: rewrote knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md — 1 link",
     ];
 
-    const checkRowsOf = async (app: TestApp, workspaceId: string) => {
+    const verificationRowsOf = async (app: TestApp, workspaceId: string) => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
-        `SELECT c.path, v.actor, v.checked_at, v.content_hash, v.origin
+        `SELECT c.path, v.actor, v.verified_at, v.content_hash, v.origin
            FROM concept_verification v
            JOIN concept_index c ON c.workspace_id = v.workspace_id AND c.iri = v.iri
           WHERE v.workspace_id = $1
-          ORDER BY c.path, v.checked_at`,
+          ORDER BY c.path, v.verified_at`,
         [workspaceId],
       );
       return found.rows;
@@ -3156,7 +3156,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         `import-bundle: manifest ${BUNDLE_ID} written as the bundle's first commit`,
         ...IMPORTED_PATHS.map((file) => `import-bundle: landed ${file}`),
         ...REWRITTEN_LINES,
-        "import-bundle: done — landed 6, skipped 0, 7 checks recorded (0 already present), 4 links rewritten, 0.0 seconds",
+        "import-bundle: done — landed 6, skipped 0, 7 verifications recorded (0 already present), 4 links rewritten, 0.0 seconds",
       ]);
     });
 
@@ -3245,27 +3245,27 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       await importing(app(), workspaceId, admin.email);
 
-      const checks = await checkRowsOf(app(), workspaceId);
-      expect(checks).toHaveLength(7);
-      expect(checks.slice(0, 3)).toEqual([
+      const verifications = await verificationRowsOf(app(), workspaceId);
+      expect(verifications).toHaveLength(7);
+      expect(verifications.slice(0, 3)).toEqual([
         {
           path: "knowledge/company/answers/data-retention-period.md",
           actor: `human:${mona}`,
-          checked_at: new Date("2026-04-16T00:00:00.000Z"),
+          verified_at: new Date("2026-04-16T00:00:00.000Z"),
           content_hash: null,
           origin: "imported",
         },
         {
           path: "knowledge/company/answers/data-retention-period.md",
           actor: `human:${theo}`,
-          checked_at: new Date("2026-06-01T09:30:00.000Z"),
+          verified_at: new Date("2026-06-01T09:30:00.000Z"),
           content_hash: null,
           origin: "imported",
         },
         {
           path: "knowledge/company/answers/support-hours.md",
           actor: `human:${mona}`,
-          checked_at: new Date("2026-04-16T00:00:00.000Z"),
+          verified_at: new Date("2026-04-16T00:00:00.000Z"),
           content_hash: null,
           origin: "imported",
         },
@@ -3301,8 +3301,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(opened.concept?.trust).toEqual({
         tier: "human-reviewed",
         status: "current",
-        checkedBy: "Theo Approver",
-        checkedAt: "2026-06-01T09:30:00.000Z",
+        verifiedBy: "Theo Approver",
+        verifiedAt: "2026-06-01T09:30:00.000Z",
         rider: "imported",
       });
       expect(opened.concept?.frontmatter["verified"]).toEqual([
@@ -3411,10 +3411,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(again.lines).toEqual([
         `import-bundle: manifest ${BUNDLE_ID} already stands`,
         ...IMPORTED_PATHS.map((file) => `import-bundle: skipped ${file} — already landed`),
-        "import-bundle: done — landed 0, skipped 6, 0 checks recorded (7 already present), 0 links rewritten, 0.0 seconds",
+        "import-bundle: done — landed 0, skipped 6, 0 verifications recorded (7 already present), 0 links rewritten, 0.0 seconds",
       ]);
       expect(await commitsOf(app(), workspaceId)).toHaveLength(10);
-      expect(await checkRowsOf(app(), workspaceId)).toHaveLength(7);
+      expect(await verificationRowsOf(app(), workspaceId)).toHaveLength(7);
     });
 
     it("leaves the watermark at the head, with nothing to replay", async () => {
@@ -3437,7 +3437,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
-        `import-bundle: dry run — the tree is sound: 6 concepts, of which 6 would land and 0 already stand; 7 checks would be recorded (0 already present); 4 links in 3 concepts would be rewritten; manifest ${BUNDLE_ID} would be written first; nothing was written`,
+        `import-bundle: dry run — the tree is sound: 6 concepts, of which 6 would land and 0 already stand; 7 verifications would be recorded (0 already present); 4 links in 3 concepts would be rewritten; manifest ${BUNDLE_ID} would be written first; nothing was written`,
       ]);
       expect(await commitsOf(app(), workspaceId)).toEqual([]);
       expect(await indexRowsOf(app(), workspaceId)).toEqual([]);
@@ -3561,7 +3561,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines.at(-1)).toBe(
-        "import-bundle: done — landed 6, skipped 0, 7 checks recorded (0 already present), 4 links rewritten, 0.0 seconds",
+        "import-bundle: done — landed 6, skipped 0, 7 verifications recorded (0 already present), 4 links rewritten, 0.0 seconds",
       );
       const found = await reading(app(), workspaceId, owner.id, (principal, tx) =>
         find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),

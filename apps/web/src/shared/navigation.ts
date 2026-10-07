@@ -123,7 +123,7 @@ const KNOWLEDGE = {
     {
       id: "curation",
       name: "Curation",
-      summary: "Everything this workspace knows, what needs checking, and who owns each domain.",
+      summary: "Everything this workspace knows, what needs verifying, and who owns each domain.",
       pages: [
         {
           name: "All knowledge",
@@ -134,9 +134,9 @@ const KNOWLEDGE = {
           owners: true,
         },
         {
-          name: "Checks due",
-          path: "/knowledge/checks-due",
-          icon: "checks",
+          name: "Due for verification",
+          path: "/knowledge/due-for-verification",
+          icon: "verification",
           built: false,
           seenBy: ADMINS,
           owners: true,

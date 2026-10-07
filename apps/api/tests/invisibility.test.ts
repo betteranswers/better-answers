@@ -320,3 +320,48 @@ describe("the document layer through the MCP entries", () => {
     });
   });
 });
+
+const VERIFIED_TITLE = "Heron policy";
+const VERIFIED_AT = "2026-06-01T09:30:00.000Z";
+
+describe("a verified concept through the MCP entries", () => {
+  it("carries its verifier and date under the wire's keys", async () => {
+    const workspace = await app.provision();
+    const iri = await conceptWrittenIn(workspace, {
+      mergeKey: "note:heron-policy",
+      path: "knowledge/heron-policy.md",
+      title: VERIFIED_TITLE,
+      frontmatter: { title: VERIFIED_TITLE, type: "Note" },
+      body: "The heron rule is stated here.",
+      message: "Record the heron policy",
+    });
+    const client = await app.database.superuser.connect();
+    try {
+      await testData(client).conceptVerification({
+        workspaceId: workspace.workspaceId,
+        iri,
+        actor: `human:${workspace.admin.id}`,
+        origin: "imported",
+        contentHash: null,
+        verifiedAt: new Date(VERIFIED_AT),
+      });
+    } finally {
+      client.release();
+    }
+    const reader = await clientAndTokenFor(workspace.admin);
+    const trust = {
+      tier: "human-reviewed",
+      status: "current",
+      checkedBy: workspace.admin.name,
+      checkedAt: VERIFIED_AT,
+      rider: "imported",
+    };
+
+    const found = await called(reader.client, reader.token, "find", { query: "heron" });
+    const opened = await called(reader.client, reader.token, "open", { iri });
+
+    expect(rpcOf(rpcListOf(structured(found)["hits"])[0])["trust"]).toEqual(trust);
+    expect(rpcOf(structured(opened)["concept"])["trust"]).toEqual(trust);
+    expect(rendered(opened)).toContain(`Verified by ${workspace.admin.name} · 1 June 2026`);
+  });
+});

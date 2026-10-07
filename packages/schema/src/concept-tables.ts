@@ -270,7 +270,7 @@ export const conceptVerification = withRLS(
     iri: text("iri").notNull(),
 
     actor: text("actor").notNull(),
-    checkedAt: stamp("checked_at").notNull().defaultNow(),
+    verifiedAt: stamp("verified_at").notNull().defaultNow(),
 
     contentHash: text("content_hash"),
     origin: text("origin").notNull().default(VERIFICATION_PLATFORM_ORIGIN),
@@ -280,10 +280,10 @@ export const conceptVerification = withRLS(
     primaryKey({ columns: [table.workspaceId, table.id] }),
     identityKey(table, "concept_verification_identity_fk"),
 
-    index("concept_verification_workspace_id_iri_checked_at_idx").on(
+    index("concept_verification_workspace_id_iri_verified_at_idx").on(
       table.workspaceId,
       table.iri,
-      table.checkedAt,
+      table.verifiedAt,
     ),
     check(
       "concept_verification_origin_check",

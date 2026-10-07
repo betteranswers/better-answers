@@ -347,8 +347,7 @@ const CONNECTED_SOURCE = "connected source";
 const CONNECTED_SOURCE_LANDED = "2026-10-07";
 
 /** The sweeps' learnings quote the words they teach later sweeps to remove. */
-const CONNECTED_SOURCE_CARVED_OUT: readonly CarveOut[] = [
-  writtenBefore(CONNECTED_SOURCE_LANDED),
+const SWEEPS_OWN_WORDS: readonly CarveOut[] = [
   {
     holds: (file) =>
       [
@@ -366,6 +365,11 @@ const CONNECTED_SOURCE_CARVED_OUT: readonly CarveOut[] = [
     holds: (file) => file.startsWith("packages/devtools/lifts/"),
     why: "lifted code keeps the words of the source it was lifted from",
   },
+];
+
+const CONNECTED_SOURCE_CARVED_OUT: readonly CarveOut[] = [
+  writtenBefore(CONNECTED_SOURCE_LANDED),
+  ...SWEEPS_OWN_WORDS,
 ];
 
 /** Where `bind` sets a SQL statement's parameter, as the store door's helper names it. */
@@ -768,6 +772,66 @@ const RUN_SENSES: readonly Sense[] = [
   },
 ];
 
+const VERIFICATION = "verification";
+
+const VERIFICATION_LANDED = "2026-10-07";
+
+const VERIFICATION_CARVED_OUT: readonly CarveOut[] = [
+  writtenBefore(VERIFICATION_LANDED),
+  ...SWEEPS_OWN_WORDS,
+];
+
+/**
+ * Where *check* named the trust event. Everywhere else the word keeps its other senses: CI's
+ * `check`, a test's assertion, a health check, the verb.
+ */
+const TRUST_EVENT_FILES = [
+  "packages/core/src/concepts/",
+  "packages/core/src/answering/",
+  "apps/api/src/mcp/",
+  "packages/core/test/answering.test.ts",
+  "packages/core/test/concepts.test.ts",
+  "packages/core/test/erasure-map.test.ts",
+  "packages/core/test/erasure-routine.test.ts",
+  "packages/core/test/import-bundle.test.ts",
+  "packages/core/test/suggestions.test.ts",
+  "packages/core/test/visibility.test.ts",
+];
+
+const CHECK_SENSES: readonly Sense[] = [
+  { sense: "a CHECK constraint, by its keyword or its name", written: /\bCHECK\b|\w+_check\b/g },
+  {
+    sense: "the stored act name, which audit rows keep (R22)",
+    written: /\bknowledge\.check\.imported\b/g,
+  },
+  {
+    sense: "the subject kind an audit row takes from that act name (R22)",
+    within: "packages/core/test/import-bundle.test.ts",
+    written: /"manifest concept check[\w ]*"|\bon a check\b/g,
+  },
+];
+
+const CHECKER_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  MIGRATION_TAG,
+  { sense: "a type checker", written: /\btype[- ]checker\b|\bTHE_TYPE_CHECKER_S_OWN\b/gi },
+  { sense: "a link checker, which follows an IRI", written: /\blink checkers?\b/g },
+  { sense: "a bundle's own checker, which the bundle ships", written: /\bbundle's own checker\b/g },
+  ...[
+    "packages/devtools/src/root-commands.ts",
+    "packages/devtools/test/comment-gate-hook.test.ts",
+  ].map((within) => ({
+    sense: "the script the Python comment gate runs",
+    within,
+    written: /\bchecker(?:Path)?\b/g,
+  })),
+];
+
+const UNCHECKED_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  { sense: "TypeScript's own compiler option", written: /\bnoUncheckedIndexedAccess\b/g },
+];
+
 export const OLD_WORDS: readonly OldWord[] = [
   avoided("2FA", "second factor"),
   avoided("access token", "personal token"),
@@ -872,7 +936,17 @@ export const OLD_WORDS: readonly OldWord[] = [
     reach: "reader text",
   },
   avoided("changed since last verified", "Changed since verified"),
-  pending("check", "verification", "verification", "verification", "one sense"),
+  {
+    word: "check",
+    use: "verification",
+    entry: "verification",
+    sweep: VERIFICATION,
+    state: "landed",
+    reach: "one sense",
+    why: "the trust event; every other sense of the word stands",
+    permitted: CHECK_SENSES,
+    reads: (file) => TRUST_EVENT_FILES.some((prefix) => file.startsWith(prefix)),
+  },
   {
     word: "Checked by",
     use: "Verified by",
@@ -882,15 +956,25 @@ export const OLD_WORDS: readonly OldWord[] = [
     reach: "reader text",
     why: "and Verified automatically where the platform verified it",
   },
-  pending("checker", "verifier", "verification request", "verification", "everywhere"),
+  {
+    word: "checker",
+    use: "verifier",
+    entry: "verification request",
+    sweep: VERIFICATION,
+    state: "landed",
+    reach: "everywhere",
+    permitted: CHECKER_SENSES,
+    carvedOut: VERIFICATION_CARVED_OUT,
+  },
   avoided("checkpoint", "watermark", "a sync's per-batch mark"),
-  pending(
-    "Checks due",
-    "Due for verification",
-    "verification request",
-    "verification",
-    "reader text",
-  ),
+  {
+    word: "Checks due",
+    use: "Due for verification",
+    entry: "verification request",
+    sweep: VERIFICATION,
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("child route", "detail address"),
   {
     word: "chunk",
@@ -1185,13 +1269,15 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("reset", "emptying a connected source"),
   avoided("reset code", "restore code"),
   avoided("result", "match", "the Result type every action returns"),
-  pending(
-    "review cadence",
-    "verification interval",
-    "verification interval",
-    "verification",
-    "everywhere",
-  ),
+  {
+    word: "review cadence",
+    use: "verification interval",
+    entry: "verification interval",
+    sweep: VERIFICATION,
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: VERIFICATION_CARVED_OUT,
+  },
   avoided("review queue", "To decide"),
   avoided("revision", "suggestion"),
   {
@@ -1306,7 +1392,10 @@ export const OLD_WORDS: readonly OldWord[] = [
     entry: "Unverified",
     sweep: "trust words",
     state: "landed",
-    reach: "reader text",
+    reach: "everywhere",
+    why: "read everywhere since the verification sweep renamed its colour tokens",
+    permitted: UNCHECKED_SENSES,
+    carvedOut: VERIFICATION_CARVED_OUT,
   },
   avoided("unrestrict", "widen (a connected source)"),
   avoided("user", "member", "on a page"),
