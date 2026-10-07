@@ -1180,7 +1180,15 @@ export const OLD_WORDS: readonly OldWord[] = [
       ...VENDORED,
     ],
   },
-  pending("citation marker", "footnote", "footnote", "footnote", "everywhere"),
+  {
+    word: "citation marker",
+    use: "footnote",
+    entry: "footnote",
+    sweep: "footnote",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   avoided("citations list", "evidence pane"),
   pending("class", "sensitivity", "sensitivity", "sensitivity", "one sense"),
   pending(

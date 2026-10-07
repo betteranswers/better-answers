@@ -565,7 +565,7 @@ from concepts elsewhere; the prose stays a platform record.
 - **citation** — the unit a reader follows back to the source: a concept, the source and locator it
   rests on, and the cited passage, shown beside the claim it supports. In a search match, the same
   unit shown as the match.
-- **footnote** — _Code rename pending._ the mark in a write-up's prose that ties one claim to one
+- **footnote** — the mark in a write-up's prose that ties one claim to one
   include: a footnote reference labelled by the include (ADR 0015). What the reader sees as the
   passage beside the claim, and what the copied text carries as a numbered footnote; its text is
   never stored, always rendered from the include.
