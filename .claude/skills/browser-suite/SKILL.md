@@ -161,7 +161,7 @@ holding one. `emailsSentTo` counts the emails the capture holds for an address, 
 api delivers nothing to `@unreachable.example`, so a spec can meet an invitation whose email did
 not go.
 
-Five more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/consent.spec.ts` for the consent page, `apps/web/e2e/console-people.spec.ts` for a person holding a client grant:
+Five more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/consent.spec.ts` for the consent page, `apps/web/e2e/console-people.spec.ts` for a person who has given an assistant access:
 
 | Helper | What it does |
 | --- | --- |

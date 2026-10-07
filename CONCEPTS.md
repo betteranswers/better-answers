@@ -1125,7 +1125,7 @@ to it by IRI and never restates it (ADR 0014).
   with the scopes it may request, refreshed from the document on a schedule (ADR 0009): the System
   card lists the distinct `client_id` URLs seen on issued access, each named from its own metadata
   document, with who has connected through it. OAuth's own names for it stay.
-- **access (of an assistant)** — _Code rename pending._ what a person's consent gives an assistant:
+- **access (of an assistant)** — what a person's consent gives an assistant:
   the MCP surface in one workspace, or in none, lasting through the assistant's refreshes. It is
   open until it lapses or an action ends it: ending every sign-in and token, here or everywhere, or
   removing a member. That action's audit event records each access it ended, so ended access stays

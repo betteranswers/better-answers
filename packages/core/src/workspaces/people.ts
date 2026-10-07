@@ -360,7 +360,7 @@ const endedGrantsOf = async (tx: Tx, personId: UserId): Promise<readonly EndedGr
 };
 
 /**
- * The person's sessions by last use, each client grant they hold, and each an act or the
+ * The person's sessions by last use, each assistant's access they hold, and each an act or the
  * authorization server ended. A grant is a refresh token's line: a client that asked for none
  * holds only an access token no row keeps, which lapses within the hour.
  */

@@ -156,7 +156,7 @@ function Grants(properties: {
   const { grants, ended } = properties;
   const [openedAtMs] = useState(Date.now);
   return (
-    <SheetPart title="Client grants">
+    <SheetPart title="Assistant access">
       {grants.length === 0 && ended.length === 0 ? (
         <p>No client has been connected as {properties.name}.</p>
       ) : (
@@ -192,10 +192,10 @@ function HeldCredentials(properties: { readonly person: ListedPerson }) {
     );
   }
   return (
-    <SheetPart title="Sessions and client grants">
+    <SheetPart title="Sessions and assistant access">
       <p>
         {inspected.error === null ? (
-          "Reading the sessions and client grants."
+          "Reading the sessions and assistant access."
         ) : (
           <RefusalLine said={readRefused(inspected.error)} />
         )}
