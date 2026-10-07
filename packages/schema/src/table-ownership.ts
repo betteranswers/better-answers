@@ -109,21 +109,21 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "workspaces",
     access: "read and write",
     reason:
-      "Provisioning inserts the row and its config in one transaction, and the membership read looks up the workspace's name, as the operator's lists of people and workspaces do; Better Auth owns the table as its organisation model, the workspaces slice owns the tenant's lifecycle over it.",
+      "Provisioning inserts the row and its config in one transaction, and the member read looks up the workspace's name, as the operator's lists of people and workspaces do; Better Auth owns the table as its organisation model, the workspaces slice owns the tenant's lifecycle over it.",
   },
   {
     table: "public.member",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Provisioning writes the first Admin membership in the same transaction as the workspace, and the slice reads the workspaces one person holds by their person id — the picker's cross-workspace read, which runs before any workspace is known. The operator's lists read every membership: the one cross-workspace read after authentication, admitted to the operator alone.",
+      "Provisioning writes the first Admin member in the same transaction as the workspace, and the slice reads the workspaces one person holds by their person id — the picker's cross-workspace read, which runs before any workspace is known. The operator's lists read every workspace's members: the one cross-workspace read after authentication, admitted to the operator alone.",
   },
   {
     table: "public.user",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Ending every sign-in and token a person holds writes the instant every later claim is refused against; the platform writes a person it names before their first sign-in, unverified, and that sign-in finds the row; the person's own act writes their display name under its one rule, and adding a member or provisioning reads it to refuse a person with none; and the membership read looks up the person's name and address for the shell, as the operator's list of people does for every person, with their revocation instant.",
+      "Ending every sign-in and token a person holds writes the instant every later claim is refused against; the platform writes a person it names before their first sign-in, unverified, and that sign-in finds the row; the person's own act writes their display name under its one rule, and adding a member or provisioning reads it to refuse a person with none; and the member read looks up the person's name and address for the shell, as the operator's list of people does for every person, with their revocation instant.",
   },
   {
     table: "public.session",
@@ -157,21 +157,21 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "read and write",
     reason:
-      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every row of a workspace's audit log and of the identity-set audit log names it — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere.",
+      "The routine's step 5 pseudonymises the row on the person's last workspace — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every row of a workspace's audit log and of the identity-set audit log names it — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere.",
   },
   {
     table: "public.member",
     by: "erasure",
     access: "write",
     reason:
-      "Every erasure request ends this workspace's membership, which is the whole of what the arm for a person who holds another does; the judgement between the two arms is the platform's and is never shown to an Admin. The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above. The erasure rehearsal's seed writes the one membership it later ends, so the drill's subject is held where a real member is.",
+      "Every erasure request ends the person as a member here, which is the whole of what the arm for a person who holds another workspace does; the judgement between the two arms is the platform's and is never shown to an Admin. The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above. The erasure rehearsal's seed writes the one member it later ends, so the drill's subject is held where a real member is.",
   },
   {
     table: "public.session",
     by: "erasure",
     access: "write",
     reason:
-      "A sign-in carries the address it came from and the agent that made it, so the person's sessions go with the identity set on the last membership.",
+      "A sign-in carries the address it came from and the agent that made it, so the person's sessions go with the identity set on the last workspace.",
   },
   {
     table: "public.verification",
@@ -192,14 +192,14 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "write",
     reason:
-      "A linked account is the external identity a sign-in came through — a name for this person at another provider — so it goes with the identity set on the last membership.",
+      "A linked account is the external identity a sign-in came through — a name for this person at another provider — so it goes with the identity set on the last workspace.",
   },
   {
     table: "public.passkey",
     by: "erasure",
     access: "write",
     reason:
-      "A passkey is the person's own credential, named by them and held for every workspace they belong to, so it goes with the identity set on the last membership and stays while another membership needs it. Its last-use row goes with it by the foreign key's cascade.",
+      "A passkey is the person's own credential, named by them and held for every workspace they belong to, so it goes with the identity set on the last workspace and stays while another workspace needs it. Its last-use row goes with it by the foreign key's cascade.",
   },
   {
     table: "public.passkey_last_use",
@@ -213,21 +213,21 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "write",
     reason:
-      "An authenticator is the person's own second factor, across every workspace, so it goes with the identity set on the last membership and stays while another membership needs it; the user row's flag for it is cleared in the same step.",
+      "An authenticator is the person's own second factor, across every workspace, so it goes with the identity set on the last workspace and stays while another workspace needs it; the user row's flag for it is cleared in the same step.",
   },
   {
     table: "public.recovery_code",
     by: "erasure",
     access: "write",
     reason:
-      "The recovery codes stand in for the person's second factor, so they go with it on the last membership and stay with it otherwise.",
+      "The recovery codes stand in for the person's second factor, so they go with it on the last workspace and stay with it otherwise.",
   },
   {
     table: "public.second_factor_throttle",
     by: "erasure",
     access: "write",
     reason:
-      "A person's failed confirms are a record of their sign-in, kept across every workspace, so they go with the second factor on the last membership and stay with it otherwise.",
+      "A person's failed confirms are a record of their sign-in, kept across every workspace, so they go with the second factor on the last workspace and stay with it otherwise.",
   },
   {
     table: "public.workspace_last_active",
@@ -255,7 +255,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: POSTGRES_DOOR,
     access: "read",
     reason:
-      "The Principal resolver reads the member row for (workspace, person) and the membership's revocation instant, in the transaction that sets the scope — so the role is resolved in the same transaction as the read it authorises, which is what makes the door a door.",
+      "The Principal resolver reads the member row for (workspace, person) and the member's revocation instant, in the transaction that sets the scope — so the role is resolved in the same transaction as the read it authorises, which is what makes the door a door.",
   },
   {
     table: "public.user",
@@ -269,14 +269,14 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: POSTGRES_DOOR,
     access: "read",
     reason:
-      "The same one resolve query aggregates the caller's group ids into the Principal, because groups are re-read per call rather than carried on a credential: every visibility check then pays one membership lookup it already has.",
+      "The same one resolve query aggregates the caller's group ids into the Principal, because groups are re-read per call rather than carried on a credential: every visibility check then pays one member lookup it already has.",
   },
   {
     table: "public.member",
     by: "members",
     access: "read and write",
     reason:
-      "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; the request act reads the same row to answer already-a-member neutrally. An Admin's acts on a member write the row itself — a role change, a removal and the membership's revocation instant — and a role change or a removal first holds every Admin row of the workspace, so it never loses its last. The test workspace's fixture reads every membership its people hold, to refuse one held anywhere else, and sets back a role that drifted under the platform's own actor.",
+      "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; the request act reads the same row to answer already-a-member neutrally. An Admin's acts on a member write the row itself — a role change, a removal and the member's revocation instant — and a role change or a removal first holds every Admin row of the workspace, so it never loses its last. The test workspace's fixture reads every workspace its people hold, to refuse one held anywhere else, and sets back a role that drifted under the platform's own actor.",
   },
   {
     table: "public.user",
@@ -304,7 +304,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "concepts",
     access: "read",
     reason:
-      "The same read joins the membership: a proposer is a string a producer wrote and `user` is global by design, so a lookup by id alone would let a compromised producer put any person on the platform into another tenant's commit. Only a member of this workspace can be named as an author.",
+      "The same read joins the member row: a proposer is a string a producer wrote and `user` is global by design, so a lookup by id alone would let a compromised producer put any person on the platform into another tenant's commit. Only a member of this workspace can be named as an author.",
   },
   {
     table: "public.invitation",

@@ -19,7 +19,7 @@ import {
   consumeIngress,
   folded,
   withHeldPrincipal,
-  withMembership,
+  withMember,
   withOperator,
   withPrincipal,
   type CounterRule,
@@ -260,7 +260,7 @@ export const committedAs = async <Value, Refused>(
   ctx: { readonly principal: UserPrincipal; readonly doors: Doors },
   act: (principal: UserPrincipal, tx: Tx) => Promise<Result<Value, Refused>>,
 ): Promise<Folded<Result<Value, Refused>>> =>
-  folded<Result<Value, Refused>>(await withMembership(ctx.principal, ctx.doors.postgres, act));
+  folded<Result<Value, Refused>>(await withMember(ctx.principal, ctx.doors.postgres, act));
 
 /**
  * An act on the person themselves needs no workspace; the person is the session's, never a

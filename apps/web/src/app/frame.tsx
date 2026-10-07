@@ -2,7 +2,7 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
-import { useMembership } from "@/features/auth/membership.ts";
+import { useMember } from "@/features/auth/member.ts";
 import { PasskeyOffer } from "@/features/auth/passkey-offer.tsx";
 import { useUnsavedChangeSaid } from "@/features/auth/unsaved-change.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
@@ -175,9 +175,9 @@ export function Frame(properties: {
 
 /** One frame for every workspace area, so moving between them keeps the pressed menu button. */
 export function WorkspaceFrame() {
-  const membership = useMembership();
+  const member = useMember();
   const standing = useOperatorStanding();
-  const held = membership.data;
+  const held = member.data;
   const role = held?.role;
   const visible = useMemo(() => visibleTo(readerOf(role), AREAS), [role]);
 

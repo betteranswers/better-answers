@@ -35,7 +35,7 @@ const readOf =
   (url: URL): boolean =>
     url.pathname.includes(procedure);
 
-const MEMBERSHIP_READ = readOf("session.membership");
+const MEMBER_READ = readOf("session.member");
 
 const MEMBERS_READ = readOf("members.list");
 
@@ -408,15 +408,12 @@ test("keeps the rail and nav below the band's refusal", async ({ page, request }
   }
 });
 
-test("drops the left workspace's name when the membership read fails", async ({
-  page,
-  request,
-}) => {
+test("drops the left workspace's name when the member read fails", async ({ page, request }) => {
   const { first, second } = await inTwoWorkspaces(page, request, {
     first: "Calder Wireworks",
     second: "Spen Wireworks",
   });
-  await page.route(MEMBERSHIP_READ, (route) => route.abort());
+  await page.route(MEMBER_READ, (route) => route.abort());
 
   await switched(page, first.name, second.name);
 
@@ -430,7 +427,7 @@ test("drops the left workspace's name when the membership read fails", async ({
   });
   await expect(page.getByRole("main").getByRole("alert")).toContainText(ROLE_UNREAD);
 
-  await page.unroute(MEMBERSHIP_READ);
+  await page.unroute(MEMBER_READ);
   await page.getByRole("button", { name: FAILED_PAGE.retry }).click();
   await landedAtHome(page, "Admin");
   await expect(switcherOf(page, second.name)).toBeVisible();
@@ -445,7 +442,7 @@ test("drops the left workspace's name while the switch waits offline", async ({
     first: "Hebden Wireworks",
     second: "Ryburn Wireworks",
   });
-  // Offline once the pick has landed, so the membership read is the one that waits.
+  // Offline once the pick has landed, so the member read is the one that waits.
   await page.route("**/organization/set-active", async (route) => {
     const answered = await route.fetch();
     await context.setOffline(true);

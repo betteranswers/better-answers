@@ -208,14 +208,14 @@ describe("changing a member's role over tRPC", () => {
     ]);
   });
 
-  it("holds from the member's next request, as their membership says", async () => {
+  it("holds from the member's next request, as their row says", async () => {
     const { second, api: mine } = await aWorkspaceOfTwoAdmins();
     const { api: theirs } = await webSignedIn(app, second.email);
-    expect((await theirs.session.membership.query()).role).toBe("Admin");
+    expect((await theirs.session.member.query()).role).toBe("Admin");
 
     await mine.members.changeRole.mutate({ personId: second.id, role: "Viewer" });
 
-    expect((await theirs.session.membership.query()).role).toBe("Viewer");
+    expect((await theirs.session.member.query()).role).toBe("Viewer");
     expect(await refusalOfCall(theirs.members.list.query())).toMatchObject({
       data: { httpStatus: 403, refusal: { word: "role-forbids", class: "forbidden" } },
     });
@@ -311,7 +311,7 @@ const whatLanded = async (workspaceId: string, personId: string) => ({
   changes: await roleChangesIn(workspaceId),
 });
 
-/** `meanwhile` runs while the Admin's change waits to read their membership, held under a lock. */
+/** `meanwhile` runs while the Admin's change waits to read their member row, held under a lock. */
 const aChangeWaitingOnARevocation = async (
   meanwhile: (revocation: HeldRevocation) => Promise<unknown>,
 ) => {
@@ -347,7 +347,7 @@ describe("a role change that fails partway", () => {
     expect(await whatLanded(workspace.workspaceId, viewer.id)).toEqual(NOTHING_LANDED);
   });
 
-  it("answers a failed held membership read as failure, not signed-out", async () => {
+  it("answers a failed held member read as failure, not signed-out", async () => {
     const { answered, workspaceId, viewerId } = await aChangeWaitingOnARevocation(async () => {
       await app.database.superuser.query(
         `SELECT pg_cancel_backend(pid) FROM pg_stat_activity
@@ -355,7 +355,7 @@ describe("a role change that fails partway", () => {
       );
     });
 
-    // The act holds the membership itself, so its own name labels the failure.
+    // The act holds the member row itself, so its own name labels the failure.
     expect(failureOf(answered)).toEqual({
       message: "changeRole failed",
       httpStatus: 500,
@@ -407,7 +407,7 @@ const aMemberOfTwoOnFourClients = async () => {
   const phone = await webSignedIn(app, person.email);
   for (const browser of [laptop, phone]) {
     expect((await setActiveWorkspace(browser.client, acme.workspaceId)).status).toBe(200);
-    expect((await browser.api.session.membership.query()).role).toBe("Editor");
+    expect((await browser.api.session.member.query()).role).toBe("Editor");
   }
   const acmeHost = app.client();
   const betaHost = app.client();
@@ -438,11 +438,11 @@ describe("removing a member over tRPC", () => {
     expect(removed).toEqual({ personId: person.id, role: "Editor" });
     expect(await roleHeldBy(acme.workspaceId, person.id)).toBeUndefined();
     for (const session of sessionsInAcme) {
-      expect(await refusalOfCall(session.session.membership.query())).toMatchObject(
+      expect(await refusalOfCall(session.session.member.query())).toMatchObject(
         NOT_A_MEMBER_ANSWERED,
       );
     }
-    expect(await sessionInBeta.session.membership.query()).toMatchObject({
+    expect(await sessionInBeta.session.member.query()).toMatchObject({
       workspace: { id: beta.workspaceId },
       role: "Viewer",
     });
@@ -472,7 +472,7 @@ describe("removing a member over tRPC", () => {
     ]);
 
     expect((await setActiveWorkspace(laptop.client, beta.workspaceId)).status).toBe(200);
-    expect(await laptop.api.session.membership.query()).toMatchObject({
+    expect(await laptop.api.session.member.query()).toMatchObject({
       workspace: { id: beta.workspaceId },
       role: "Viewer",
     });
@@ -573,7 +573,7 @@ describe("what a person's activity refuses", () => {
 });
 
 describe("a removal that fails partway", () => {
-  it("keeps the membership and tokens when no audit row lands", async () => {
+  it("keeps the member and tokens when no audit row lands", async () => {
     const workspace = await app.provision();
     const person = await app.person();
     await app.addMember(workspace.workspaceId, person.id, "Viewer");
@@ -711,7 +711,7 @@ describe("bulk acts on members over tRPC", () => {
     });
     const rejoined = await webSignedIn(app, viewer.email);
     await rejoined.api.person.acceptInvitation.mutate({ invitationId: invited.id });
-    expect((await rejoined.api.session.membership.query()).role).toBe("Viewer");
+    expect((await rejoined.api.session.member.query()).role).toBe("Viewer");
 
     const answered = await refresh(app.client(), oldToken);
 

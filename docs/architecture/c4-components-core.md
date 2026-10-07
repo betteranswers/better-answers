@@ -24,8 +24,8 @@ C4Component
     Component(guides, "guides", "slice", "Compositions and includes, recomputed as the cascade's second level; definitions and sections at S3")
     Component(erasure, "erasure", "slice", "Subject requests, the erasure map, suppressions, the routine, replay on restore, the rehearsal; the top of the slice graph")
     Component(runs, "runs", "slice", "enqueueJobIn in the act's transaction, one queued index job per connected source; the job views")
-    Component(workspaces, "workspaces", "slice", "Provisioning and first membership under the platform principal, the picker's read, the workspace list")
-    Component(members, "members", "slice", "Groups and their memberships, access requests; the People acts at P1")
+    Component(workspaces, "workspaces", "slice", "Provisioning and first member under the platform principal, the picker's read, the workspace list")
+    Component(members, "members", "slice", "Groups and their members, access requests; the People acts at P1")
     Component(sweeps, "sweeps", "slice", "The daily sweep pass over every workspace under session lock 42; one sweep_pass row a pass")
   }
 

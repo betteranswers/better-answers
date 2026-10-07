@@ -127,7 +127,7 @@ describe("what the model choices list refuses", () => {
     expect(await messageOf(response)).toBe("no-active-workspace");
   });
 
-  it("refuses a person whose membership ended mid-session", async () => {
+  it("refuses a person who stopped being a member mid-session", async () => {
     const workspace = await app.provision();
     const client = await signedInClient(app, workspace.admin.email);
     await app.removeMember(workspace.workspaceId, workspace.admin.id);

@@ -1169,7 +1169,22 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("masthead", "top band"),
   avoided("member id", "person id", "retired 05/09/2026: the member row's key names nothing"),
   avoided("member sheet", "member page", "the word until 02/10/2026"),
-  pending("membership", "member", "member", "member", "everywhere"),
+  {
+    word: "membership",
+    use: "member",
+    entry: "member",
+    sweep: "member",
+    state: "landed",
+    reach: "everywhere",
+    permitted: [
+      {
+        sense: "the count an erasure stores on its request's row and prints in its report (R22)",
+        within: "packages/core/",
+        written: /\bmembershipsEnded\b/g,
+      },
+    ],
+    carvedOut: PEOPLE_WORDS_CARVED_OUT,
+  },
   avoided("menu toggle", "navigation control"),
   avoided("message", "issue word"),
   avoided("metric", "signal"),

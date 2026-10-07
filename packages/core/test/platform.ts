@@ -99,7 +99,7 @@ export const asTheOperator = async <T>(
   return answered.value;
 };
 
-/** The person row as an erasure on their last membership leaves it, that membership ended. */
+/** The person row as an erasure on their last workspace leaves it, that member ended. */
 export const erasedFromTheSet = async (
   db: MigratedPostgres,
   workspaceId: string,

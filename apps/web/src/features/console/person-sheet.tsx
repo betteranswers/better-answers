@@ -22,7 +22,7 @@ import {
   type HeldSession,
   type ListedPerson,
 } from "./people-api.ts";
-import { At, grantStateOf, Instant, Memberships, nameOf } from "./person-words.tsx";
+import { At, grantStateOf, Instant, WorkspacesAndRoles, nameOf } from "./person-words.tsx";
 import { readRefused } from "./words.ts";
 
 /** Where focus lands when the sheet opens: on the person, or straight on one of their acts. */
@@ -240,7 +240,7 @@ export function PersonSheet(properties: {
       </SheetHeader>
       <div className="grid gap-4 px-4 pb-4">
         <SheetPart title="Workspaces">
-          <Memberships person={person} />
+          <WorkspacesAndRoles person={person} />
         </SheetPart>
         <SheetPart title="Sign-in">
           <Facts>

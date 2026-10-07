@@ -68,7 +68,7 @@ const AUDIT_LOG_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit l
 const GROUPS_PAGE = pageNamed(people, "Groups").path;
 
 /** Matched by name anywhere in the path, because the client batches its reads. */
-const MEMBERSHIP_READ = (url: URL): boolean => url.pathname.includes("session.membership");
+const MEMBER_READ = (url: URL): boolean => url.pathname.includes("session.member");
 
 const MEMBERS_READ = (url: URL): boolean => url.pathname.includes("members.list");
 
@@ -815,7 +815,7 @@ test.describe("a member's own page", () => {
     await anAdminBesideAnotherAtPeople(page, request, "Ure Presswork");
     await openedByName(page, "Test person");
     let dropped = false;
-    await page.route(MEMBERSHIP_READ, (route) => {
+    await page.route(MEMBER_READ, (route) => {
       if (dropped) return route.continue();
       dropped = true;
       return route.abort();
@@ -1213,7 +1213,7 @@ test.describe("removing a member from their page", () => {
     await asked.click();
     const confirm = removal.getByRole("button", { name: "Remove Priya Shah from this workspace" });
     await expect(confirm).toHaveAccessibleDescription(
-      "Recorded on the audit log under your name. Their groups here end with the membership.",
+      "Recorded on the audit log under your name. They leave their groups here too.",
     );
     await expect(removal).toMatchAriaSnapshot(`
       - region "Removal":

@@ -13,7 +13,7 @@ import type {
 import type { Tx } from "../store/postgres/index.ts";
 import { endWorkspaceTokens, recordGrantsEndedHere } from "../workspaces/index.ts";
 import { leavesNoAdmin, withMemberHeld, type HeldRefusal } from "./last-admin.ts";
-import { memberKeyed } from "./memberships.ts";
+import { memberKeyed } from "./member-list.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const REMOVAL_ACTS = declareActs("people", {
@@ -41,7 +41,7 @@ export type RemoveMemberRefusal =
 export type MemberRemoved = {
   readonly personId: UserId;
 
-  /** The role the membership held when it ended. */
+  /** The role the member held when it ended. */
   readonly role: Role;
 };
 
@@ -49,7 +49,7 @@ export type MemberRemoved = {
 type RemovedAt = { readonly at: Date; readonly batchId: string | undefined };
 
 /**
- * A step on a member row its act holds: the membership and the person's tokens here issued before
+ * A step on a member row its act holds: the member and the person's tokens here issued before
  * `at` end, and the removal's audit events land.
  */
 export const memberRemovedHere = async (
@@ -58,7 +58,7 @@ export const memberRemovedHere = async (
   removed: MemberRemoved,
   { at, batchId }: RemovedAt,
 ): Promise<void> => {
-  // The composite foreign key takes the person's group memberships here with the row.
+  // The composite foreign key takes the person's group_member rows here with the row.
   await tx.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
     admin.workspaceId,
     removed.personId,
@@ -92,7 +92,7 @@ const removedUnderTheLock = (
   });
 
 /**
- * Ends the person's membership here and their tokens for this workspace; their sessions stand for
+ * Ends the person as a member here, and their tokens for this workspace; their sessions stand for
  * any other workspace and are refused here. Refuses `last-admin` for the workspace's one Admin; an
  * Admin may remove themself while another remains.
  */

@@ -60,7 +60,7 @@ const resolvedIn = async (workspace: ProvisionedWorkspace, userId: string, issue
 };
 
 describe("ending a member's sign-ins and tokens in this workspace", () => {
-  it("writes the membership's instant and records the Admin revoking", async () => {
+  it("writes the member's instant and records the Admin revoking", async () => {
     const workspace = await provisionedWorkspace(db(), "Revoked");
     const viewer = await joining(workspace, "Viewer");
 

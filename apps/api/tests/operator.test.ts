@@ -498,10 +498,10 @@ describe("ending every sign-in and token everywhere, from the console", () => {
 
     const again = await webSignedIn(app(), acme.admin.email);
 
-    expect(await refusalOfCall(before.api.session.membership.query())).toMatchObject({
+    expect(await refusalOfCall(before.api.session.member.query())).toMatchObject({
       data: { refusal: { word: "no-session" } },
     });
-    expect(await again.api.session.membership.query()).toMatchObject({
+    expect(await again.api.session.member.query()).toMatchObject({
       workspace: { id: acme.workspaceId },
       person: { id: acme.admin.id },
       role: "Admin",
@@ -766,7 +766,7 @@ describe("the console's list and inspection of people", () => {
           id: person.id,
           displayName: "Robin Hart",
           email: person.email,
-          memberships: [
+          workspaces: [
             { workspace: { id: acme.workspaceId, name: "Acme" }, role: "Editor" },
             { workspace: { id: zenith.workspaceId, name: "Zenith" }, role: "Viewer" },
           ],

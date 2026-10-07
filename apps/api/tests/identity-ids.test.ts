@@ -39,7 +39,7 @@ describe("the id a person gets", () => {
     /* jscpd:ignore-end */
   });
 
-  it("gives a workspace's first Admin membership the same id shape", async () => {
+  it("gives a workspace's first Admin member the same id shape", async () => {
     const workspace = await app().provision({ name: "Acme" });
 
     const row = await app().database.superuser.query<{ id: string }>(

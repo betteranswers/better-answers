@@ -871,7 +871,7 @@ const seedingToBeDumped = async (
     return REFUSED;
   }
   io.say(
-    `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin membership, one concept file and one indexed document naming them); take the dump, then run phase two`,
+    `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin member, one concept file and one indexed document naming them); take the dump, then run phase two`,
   );
   io.say(seeded.value.tokens.join(","));
   return DONE;

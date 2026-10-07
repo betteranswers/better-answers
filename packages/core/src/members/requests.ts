@@ -82,11 +82,11 @@ export const requestAccess = async (
 
   const asked = await attempt(() =>
     withScope(platform, door, workspaceId, async (tx) => {
-      const membership = await tx.query(
+      const member = await tx.query(
         "SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2",
         [workspaceId, requester.data],
       );
-      if ((membership.rowCount ?? 0) > 0) return;
+      if ((member.rowCount ?? 0) > 0) return;
 
       const id = ulid();
       await recordFor(platform, tx, {

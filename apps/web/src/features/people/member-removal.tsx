@@ -17,7 +17,7 @@ const focusOnArrival = (node: HTMLElement | null) => {
 export function MemberRemoval(properties: {
   readonly member: ListedMember;
   readonly askRef: RefObject<HTMLButtonElement | null>;
-  /** None until the reader's own membership is read, which says whose removal this is. */
+  /** None until the reader's own member read answers, which says whose removal this is. */
   readonly onRemove: ((member: ListedMember) => void) | undefined;
   /** A refusal of removing yourself, which is answered here before you leave. */
   readonly outcome: Outcome | undefined;
@@ -60,8 +60,8 @@ export function MemberRemoval(properties: {
             </legend>
             <p id={recordId} className="text-sm text-muted-foreground">
               {yourself
-                ? `${INCLUDES_YOU} ${RECORDED} Your groups here end with the membership.`
-                : `${RECORDED} Their groups here end with the membership.`}
+                ? `${INCLUDES_YOU} ${RECORDED} You leave your groups here too.`
+                : `${RECORDED} They leave their groups here too.`}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button

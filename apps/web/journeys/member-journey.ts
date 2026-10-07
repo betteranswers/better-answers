@@ -11,7 +11,7 @@ import {
 } from "../e2e/locators.ts";
 import { theConsoleIsRefused, theSwitcherListsOneWorkspace, type Gate } from "./every-role.ts";
 import { expect, test } from "./fixtures.ts";
-import { membershipOf } from "./reads.ts";
+import { sessionMemberOf } from "./reads.ts";
 
 /** An Editor or a Viewer: they reach their home, and an Admin's page says it was never there. */
 export const aMembersJourney = async (
@@ -21,9 +21,9 @@ export const aMembersJourney = async (
 ): Promise<void> => {
   const { workspace, person } = await test.step("Home", async () => {
     await landedAtHome(page, role);
-    const membership = await membershipOf(page);
+    const member = await sessionMemberOf(page);
     await gate();
-    return membership;
+    return member;
   });
 
   await test.step("The workspace switcher", () =>

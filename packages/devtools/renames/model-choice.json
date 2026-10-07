@@ -154,7 +154,7 @@
         "apps/web/src/app/router.tsx",
         "apps/web/test/address-router.tsx",
         "apps/web/test/band-drawn-height.test.tsx",
-        "apps/web/test/membership-redirect.test.tsx",
+        "apps/web/test/member-redirect.test.tsx",
         "apps/web/test/sign-in-again.test.tsx",
         "apps/web/test/two-areas.test.tsx",
         "apps/web/test/workspace-switcher.test.tsx"

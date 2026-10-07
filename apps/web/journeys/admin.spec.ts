@@ -9,7 +9,7 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navi
 
 import { theConsoleIsRefused, theSwitcherListsOneWorkspace, type Gate } from "./every-role.ts";
 import { expect, test, theTestPeople } from "./fixtures.ts";
-import { groupNamesOf, membershipOf } from "./reads.ts";
+import { groupNamesOf, sessionMemberOf } from "./reads.ts";
 import { theFixtureHolds, type RepairMembers } from "./test-workspace.ts";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
@@ -231,7 +231,7 @@ test("an Admin walks the Control Centre and leaves it unchanged", async ({
   await readOnlyPagesRead(page, gate);
 
   await test.step("The workspace switcher", async () => {
-    const { workspace } = await membershipOf(page);
+    const { workspace } = await sessionMemberOf(page);
     await theSwitcherListsOneWorkspace(page, workspace.name);
     await gate();
   });

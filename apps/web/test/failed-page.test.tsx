@@ -16,7 +16,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const A_MEMBERSHIP = {
+const A_MEMBER = {
   workspace: { id: "w", name: "Northern Tooling" },
   person: { id: "p", name: "Ada", email: "ada@example.test" },
   role: "Admin",
@@ -33,7 +33,7 @@ const answerTrpc = (input: string | URL | Request): Promise<Response> => {
     .replace("/trpc/", "")
     .split(",")
     .map((procedure) => ({
-      result: { data: procedure === "modelChoices.list" ? NOT_A_LIST : A_MEMBERSHIP },
+      result: { data: procedure === "modelChoices.list" ? NOT_A_LIST : A_MEMBER },
     }));
   return Promise.resolve(
     new Response(JSON.stringify(answers), {
@@ -58,7 +58,7 @@ describe("a page that throws", () => {
 
     const band = screen.getByRole("banner");
     expect(within(band).getByRole("link", { name: PRODUCT_NAME })).toBeDefined();
-    expect(within(band).getByText(A_MEMBERSHIP.workspace.name)).toBeDefined();
+    expect(within(band).getByText(A_MEMBER.workspace.name)).toBeDefined();
     expect(within(band).getByRole("button", { name: "Hide the menu" })).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
     const rail = screen.getByRole("navigation", { name: "Areas" });

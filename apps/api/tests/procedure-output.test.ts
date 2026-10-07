@@ -98,7 +98,7 @@ describe("what a procedure may answer the wire", () => {
       "person.secondFactor",
       "person.setDisplayName",
       "runs.ofSubject",
-      "session.membership",
+      "session.member",
       "session.operator",
       "sources.connect",
       "sources.dismissAsNotSpecialCategory",
@@ -112,7 +112,7 @@ describe("what a procedure may answer the wire", () => {
       "sources.widen",
     ]);
     expectTypeOf<EveryProcedure["path"]>().toEqualTypeOf<
-      | "session.membership"
+      | "session.member"
       | "session.operator"
       | "person.setDisplayName"
       | "person.requestAccess"

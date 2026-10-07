@@ -44,7 +44,7 @@ import {
   A_MAP_NODE_CLASSED,
   A_MAP_NODE_OF_KIND,
   A_GROUP,
-  A_GROUP_MEMBERSHIP,
+  A_GROUP_MEMBER,
   AN_AUDIT_EVENT_ROW,
   AN_AUDIT_EVENT_ROW_WITH_ITS_FAMILY,
   A_MEMBER,
@@ -601,7 +601,7 @@ describe("the group tables under app_rt", () => {
     });
   });
 
-  it("refuses a group or membership reaching into another tenant", async () => {
+  it("refuses a group or group member reaching into another tenant", async () => {
     await withRollback(db.pool, async (client) => {
       const { theirs, person } = await groupsAsApp(client);
 
@@ -611,19 +611,19 @@ describe("the group tables under app_rt", () => {
       );
       await client.query("ROLLBACK TO SAVEPOINT other_group");
 
-      await client.query("SAVEPOINT other_membership");
-      await expect(client.query(A_GROUP_MEMBERSHIP, [WS_B, theirs.id, person.id])).rejects.toThrow(
+      await client.query("SAVEPOINT other_member");
+      await expect(client.query(A_GROUP_MEMBER, [WS_B, theirs.id, person.id])).rejects.toThrow(
         /row-level security/,
       );
-      await client.query("ROLLBACK TO SAVEPOINT other_membership");
+      await client.query("ROLLBACK TO SAVEPOINT other_member");
 
-      await expect(client.query(A_GROUP_MEMBERSHIP, [WS_A, theirs.id, person.id])).rejects.toThrow(
+      await expect(client.query(A_GROUP_MEMBER, [WS_A, theirs.id, person.id])).rejects.toThrow(
         /group_member_group_fk/,
       );
     });
   });
 
-  it("drops a person from every group when their membership ends", async () => {
+  it("drops a person from every group once they leave", async () => {
     await withRollback(db.pool, async (client) => {
       const { person, hr, sales } = await groupsAsApp(client);
       expect(await groupIdsHeldBy(client, person.id)).toEqual([hr.id, sales.id].toSorted());
@@ -640,7 +640,7 @@ describe("the group tables under app_rt", () => {
     });
   });
 
-  it("deletes a group's memberships with it, and no other group's", async () => {
+  it("deletes a group's members with it, and no other group's", async () => {
     await withRollback(db.pool, async (client) => {
       const { person, hr, sales } = await groupsAsApp(client);
 
@@ -661,7 +661,7 @@ describe("the group tables under app_rt", () => {
         [`SELECT 1 FROM "group" LIMIT 1`, []],
         ["SELECT 1 FROM group_member LIMIT 1", []],
         [A_GROUP, [ulid(), WS_A, "Worker"]],
-        [A_GROUP_MEMBERSHIP, [WS_A, ulid(), ulid()]],
+        [A_GROUP_MEMBER, [WS_A, ulid(), ulid()]],
       ];
       for (const [statement, values] of refused) {
         await client.query("SAVEPOINT worker_probe");

@@ -71,7 +71,7 @@ export const useMembers = () => {
 
 /**
  * The list takes the act before the api answers, so it lands within 100 ms. The act may touch the
- * reader's own membership.
+ * reader's own member row.
  */
 const useReconciledList = <Asked>(
   reshape: (listed: readonly ListedMember[], asked: Asked) => readonly ListedMember[],
@@ -100,7 +100,7 @@ const useReconciledList = <Asked>(
       activityReadAgain();
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: listKey }),
-        queryClient.invalidateQueries({ queryKey: api.session.membership.queryKey() }),
+        queryClient.invalidateQueries({ queryKey: api.session.member.queryKey() }),
       ]);
     },
   };
@@ -132,23 +132,23 @@ export const useEndEverySignInAndToken = () => {
 };
 
 /** The shell's own read of who is signed in, and where, shared rather than asked again. */
-const useHeldMembership = () => {
+const useHeldMember = () => {
   const api = useTRPC();
-  return useQuery(api.session.membership.queryOptions(undefined, { refetchOnMount: false })).data;
+  return useQuery(api.session.member.queryOptions(undefined, { refetchOnMount: false })).data;
 };
 
-export const useReaderId = (): string | undefined => useHeldMembership()?.person.id;
+export const useReaderId = (): string | undefined => useHeldMember()?.person.id;
 
 /** A switch keeps a removal's state, and the same person may be a member of both workspaces. */
 const ASKED_IN = z.object({ workspaceId: z.string() });
 
 /**
- * None until the reader's membership is read, which names the workspace a removal is matched by and
+ * None until the reader's member read answers, which names the workspace a removal is matched by and
  * whether it removes the reader.
  */
 export const useRemoveMember = () => {
   const api = useTRPC();
-  const workspaceId = useHeldMembership()?.workspace.id;
+  const workspaceId = useHeldMember()?.workspace.id;
   const reconciled = useReconciledList((listed, asked: { readonly personId: string }) =>
     listed.filter((member) => member.personId !== asked.personId),
   );
@@ -167,7 +167,7 @@ const ASKED_OF_ONE = z.object({ personId: z.string() });
  */
 export const useRemovalOf = (personId: string | undefined) => {
   const api = useTRPC();
-  const workspaceId = useHeldMembership()?.workspace.id;
+  const workspaceId = useHeldMember()?.workspace.id;
   return useMutationState({
     filters: {
       mutationKey: api.members.remove.mutationKey(),

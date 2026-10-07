@@ -218,7 +218,7 @@ test("scopes everything to the workspace a two-workspace member picks", async ({
   await expect(await personMenuOpened(page, first.admin.name)).toContainText("Viewer");
 });
 
-test("offers one way on to a person with no membership", async ({ page, request }) => {
+test("offers one way on to a person in no workspace", async ({ page, request }) => {
   await signedInWithNoWorkspace(page, request, "nobody");
 
   await expect(page.getByRole("region", { name: ASK_TO_JOIN_WORDS.heading })).toBeVisible();
@@ -633,7 +633,7 @@ test("a shown tab waits for a sign-in of its own", async ({ page, request }) => 
   expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
 });
 
-/** A session begun with no membership names no workspace, so the picker opens the one joined since. */
+/** A session begun before the person joined names no workspace, so the picker opens the one joined since. */
 const joinedAfterSigningIn = async (page: Page, request: APIRequestContext, name: string) => {
   const who = await signedInWithNoWorkspace(page, request, "later");
   const workspace = await provision(request, { name });
@@ -641,7 +641,7 @@ const joinedAfterSigningIn = async (page: Page, request: APIRequestContext, name
   return workspace;
 };
 
-test("skips the picker when the membership postdates the session", async ({ page, request }) => {
+test("skips the picker for a workspace joined after sign-in", async ({ page, request }) => {
   const workspace = await joinedAfterSigningIn(page, request, "Arrived Late");
   await page.goto("/choose-workspace");
 
@@ -720,7 +720,7 @@ test("sends a non-member from the picker to the refused page", async ({ page, re
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 });
 
-test("separates an unread workspace list from no membership, offering retry", async ({
+test("separates an unread workspace list from no workspace, offering retry", async ({
   page,
   request,
 }) => {

@@ -104,12 +104,12 @@ const COMPLETED = "people.erasure.completed";
 
 const INVITATIONS_WHEREVER_SENT =
   "Invitations sent to the address a person signs in with are deleted wherever they were sent, " +
-  "by the request that ends their last membership; the invitation line above counts this " +
+  "by the request that erases them from their last workspace; the invitation line above counts this " +
   "workspace's alone.";
 
 const SIGN_IN_IDENTITY_REMOVED =
-  "A person's sign-in identity is removed from the platform by the request that ends their " +
-  "last membership.";
+  "A person's sign-in identity is removed from the platform by the request that erases " +
+  "them from their last workspace.";
 
 const DOCUMENTS_WITHHELD =
   "The original files in the object store are untouched; the identifiers named in this request " +
@@ -216,8 +216,8 @@ const erasedOnEachArm = async (): Promise<{
     completing(scenario, await erasureRequestAbout(scenario.workspaceId, personId, email));
   return {
     runs: {
-      "last-membership": await erased(lastMember.id, onlyHere),
-      "membership-ended": await erased(stillMember.id, heldElsewhere),
+      "last-workspace": await erased(lastMember.id, onlyHere),
+      "held-elsewhere": await erased(stillMember.id, heldElsewhere),
       "no-person": await erased(null, addressOf("a-contact")),
     },
     elsewhereId: elsewhere.workspaceId,
@@ -554,7 +554,7 @@ const memberHereAndElsewhere = async () => {
   return { scenario, elsewhere, email, person };
 };
 
-/** The identity-set tables naming a person by `user_id` that the last membership's sweep empties. */
+/** The identity-set tables naming a person by `user_id` that the last workspace's sweep empties. */
 const SWEPT_BY_PERSON = [
   "public.account",
   "public.authenticator",
@@ -804,8 +804,8 @@ describe("the report", () => {
 
   it("says on every arm the identifiers are withheld from documents", async () => {
     expect(await armsWhoseReportSays(DOCUMENTS_WITHHELD)).toEqual([
-      "last-membership",
-      "membership-ended",
+      "last-workspace",
+      "held-elsewhere",
       "no-person",
     ]);
     expect(await armsWhoseReportSays("The object store is untouched")).toEqual([]);
@@ -813,16 +813,16 @@ describe("the report", () => {
 
   it("says on every arm that invitations are deleted wherever sent", async () => {
     expect(await armsWhoseReportSays(INVITATIONS_WHEREVER_SENT)).toEqual([
-      "last-membership",
-      "membership-ended",
+      "last-workspace",
+      "held-elsewhere",
       "no-person",
     ]);
   });
 
   it("says on every arm when a sign-in identity is removed", async () => {
     expect(await armsWhoseReportSays(SIGN_IN_IDENTITY_REMOVED)).toEqual([
-      "last-membership",
-      "membership-ended",
+      "last-workspace",
+      "held-elsewhere",
       "no-person",
     ]);
   });
@@ -1265,7 +1265,7 @@ describe("the verifications the rewrite moved", () => {
   });
 });
 
-describe("the identity set on the person's last membership", () => {
+describe("the identity set on the person's last workspace", () => {
   it("pseudonymises the user row, keeping its id for audit events", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const acted = await seedingWith(db().pool, (seed) =>
@@ -1415,7 +1415,7 @@ describe("the identity set on the person's last membership", () => {
     expect(await lastActiveWorkspacesOf(person.id)).toEqual([elsewhere.workspaceId]);
     expect(operatorLinesAbout(done.erasureRequestId)).toEqual([
       expect.objectContaining({
-        arm: "membership-ended",
+        arm: "held-elsewhere",
         passkeys_deleted: 0,
         last_active_deleted: 1,
       }),
@@ -1458,7 +1458,7 @@ describe("the identity set on the person's last membership", () => {
     expect(await verificationsFor(stranger)).toBe(1);
   });
 
-  it("ends this membership alone while the person holds another", async () => {
+  it("ends only this member while the person holds another workspace", async () => {
     const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
     await identityRowsFor(db().pool, { userId: person.id, email });
     await theOperator(scenario, email);
@@ -1477,7 +1477,7 @@ describe("the identity set on the person's last membership", () => {
     expect(await workspacesMemberOf(person.id)).toEqual([elsewhere.workspaceId]);
   });
 
-  it("keeps restore codes and parked secrets for another membership", async () => {
+  it("keeps restore codes and parked secrets for another workspace", async () => {
     const { scenario, email, person } = await memberHereAndElsewhere();
     const { sessionId } = await identityRowsFor(db().pool, { userId: person.id, email });
     const kept = [
@@ -1549,7 +1549,7 @@ describe("the identity set on the person's last membership", () => {
       {
         actor: ERASURE_ACTOR,
         erasure_request_id: done.erasureRequestId,
-        arm: "last-membership",
+        arm: "last-workspace",
         pseudonymised: 1,
         sessions_deleted: 0,
         verifications_deleted: 0,
@@ -1569,14 +1569,14 @@ describe("the identity set on the person's last membership", () => {
     });
 
     expect({
-      "last-membership": operatorLinesAbout(runs["last-membership"].erasureRequestId),
-      "membership-ended": operatorLinesAbout(runs["membership-ended"].erasureRequestId),
+      "last-workspace": operatorLinesAbout(runs["last-workspace"].erasureRequestId),
+      "held-elsewhere": operatorLinesAbout(runs["held-elsewhere"].erasureRequestId),
       "no-person": operatorLinesAbout(runs["no-person"].erasureRequestId),
     }).toEqual({
-      "last-membership": [
+      "last-workspace": [
         {
-          ...namingTheRequest(runs["last-membership"]),
-          arm: "last-membership",
+          ...namingTheRequest(runs["last-workspace"]),
+          arm: "last-workspace",
           pseudonymised: 1,
           sessions_deleted: 1,
           verifications_deleted: 1,
@@ -1590,10 +1590,10 @@ describe("the identity set on the person's last membership", () => {
           last_active_deleted: 1,
         },
       ],
-      "membership-ended": [
+      "held-elsewhere": [
         {
-          ...namingTheRequest(runs["membership-ended"]),
-          arm: "membership-ended",
+          ...namingTheRequest(runs["held-elsewhere"]),
+          arm: "held-elsewhere",
           pseudonymised: 0,
           sessions_deleted: 0,
           verifications_deleted: 0,
@@ -1620,7 +1620,7 @@ describe("the identity set on the person's last membership", () => {
     });
   });
 
-  it("leaves every invitation standing while another membership stands", async () => {
+  it("leaves every invitation standing while the person holds another workspace", async () => {
     const staying = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
@@ -1684,11 +1684,11 @@ describe("the identity set on the person's last membership", () => {
       ],
     };
     expect({
-      "last-membership": await identityLinesOf(runs["last-membership"]),
-      "membership-ended": await identityLinesOf(runs["membership-ended"]),
-    }).toEqual({ "last-membership": theSameLines, "membership-ended": theSameLines });
+      "last-workspace": await identityLinesOf(runs["last-workspace"]),
+      "held-elsewhere": await identityLinesOf(runs["held-elsewhere"]),
+    }).toEqual({ "last-workspace": theSameLines, "held-elsewhere": theSameLines });
 
-    expect(runs["membership-ended"].report).not.toContain(elsewhereId);
+    expect(runs["held-elsewhere"].report).not.toContain(elsewhereId);
   });
 });
 

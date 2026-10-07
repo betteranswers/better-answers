@@ -9,7 +9,7 @@ applies_when:
   - "Adding a record family or a table that refers to a concept"
   - "Writing an act that must leave an audit event"
   - "Adding a version table for text a person edits"
-  - "Ending a membership or erasing a person on the identity set"
+  - "Removing a member or erasing a person on the identity set"
 tags:
   - adr-0014
   - record-family
@@ -43,7 +43,7 @@ People on records:
 
 - A person is `human:<person id>` on every record. The member row carries no id of ours.
 - The user row is what erasure pseudonymises. It is never deleted.
-- A membership ends by an Admin's removal or by an erasure. Its row is deleted, and its audit event is the record of it.
+- A member ends by an Admin's removal or by an erasure. Its row is deleted, and its audit event is the record of it.
 - The identity set keeps no team record. A group may carry a team's name (ADR 0038).
 
 Decided for the S3 block and not yet in the tree:

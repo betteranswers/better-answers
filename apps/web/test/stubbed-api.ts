@@ -49,7 +49,7 @@ export const answeringAs =
     if (!pathname.startsWith("/trpc/")) return answered(A_SESSION);
 
     const known: Readonly<Record<string, unknown>> = {
-      "session.membership": {
+      "session.member": {
         workspace: { id: "w", name: "Northern Tooling" },
         person: { id: "p", name: "Ada", email: "ada@example.test" },
         role,
@@ -62,7 +62,7 @@ export const answeringAs =
     );
   };
 
-/** No role held: the membership read fails, and is not retried onto the next test's stub. */
+/** No role held: the member read fails, and is not retried onto the next test's stub. */
 export const withTheApiDown = () => {
   vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
   const clients = createAppClients();

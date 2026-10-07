@@ -446,7 +446,7 @@ describe("what ensuring the test workspace refuses", () => {
     expect((await peopleOn(fixture)).map((one) => one.address)).toEqual([fixture.editor]);
   });
 
-  it("refuses an operator-marked address, whatever its memberships", async () => {
+  it("refuses an operator-marked address, whatever workspaces it holds", async () => {
     const fixture = aFixture();
     const elsewhere = await provisionedWorkspace(db(), "OperatorElsewhere");
     await seedingWith(db().pool, async (seed) => {

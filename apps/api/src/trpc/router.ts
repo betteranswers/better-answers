@@ -23,7 +23,7 @@ import {
   widenConnectedSource,
   widenConnectedSourceInput,
 } from "@better-answers/core/sources";
-import { readMembership, standingAsOperator } from "@better-answers/core/workspaces";
+import { readMember, standingAsOperator } from "@better-answers/core/workspaces";
 
 import {
   answeredBy,
@@ -43,8 +43,8 @@ import { descriptorOf, uploadDoorsOf } from "./upload.ts";
 
 export const appRouter = router({
   session: router({
-    membership: queryProcedure.query(({ ctx }) =>
-      crossing(ctx, readMembership.name, readMembership(ctx.principal, ctx.tx)),
+    member: queryProcedure.query(({ ctx }) =>
+      crossing(ctx, readMember.name, readMember(ctx.principal, ctx.tx)),
     ),
     operator: personProcedure.query(({ ctx }) =>
       crossing(

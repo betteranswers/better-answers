@@ -200,12 +200,12 @@ export const deleteGroup = async (
   return ok({ groupId });
 };
 
-type MembershipTarget = GroupTarget & { readonly userId: UserId };
+type MemberTarget = GroupTarget & { readonly userId: UserId };
 
-const membershipTarget = (
+const memberTarget = (
   principal: UserPrincipal,
   input: GroupMemberInput,
-): Result<MembershipTarget, TargetRefusal> => {
+): Result<MemberTarget, TargetRefusal> => {
   const target = groupTarget(principal, input.groupId);
   if (!target.ok) return err(target.error);
   const person = PERSON_ID.safeParse(input.userId);
@@ -246,7 +246,7 @@ export const addToGroup = async (
   tx: Tx,
   input: GroupMemberInput,
 ): Promise<Result<{ groupId: GroupId; userId: UserId }, AddToGroupRefusal>> => {
-  const target = membershipTarget(principal, input);
+  const target = memberTarget(principal, input);
   if (!target.ok) return err(target.error);
   const { admin, groupId, userId } = target.value;
 
@@ -274,7 +274,7 @@ export const removeFromGroup = async (
   tx: Tx,
   input: GroupMemberInput,
 ): Promise<Result<{ groupId: GroupId; userId: UserId }, RemoveFromGroupRefusal>> => {
-  const target = membershipTarget(principal, input);
+  const target = memberTarget(principal, input);
   if (!target.ok) return err(target.error);
   const { admin, groupId, userId } = target.value;
 

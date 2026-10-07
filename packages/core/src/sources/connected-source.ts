@@ -37,7 +37,7 @@ import { enqueueJobIn, syncRefused } from "../runs/index.ts";
 import { putObject, type ObjectDoor } from "../store/objects/index.ts";
 import {
   folded,
-  withMembership,
+  withMember,
   type Foldable,
   type Folded,
   type PostgresDoor,
@@ -209,7 +209,7 @@ const inTransaction = async <T>(
   door: PostgresDoor,
   work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
 ): Promise<Folded<T, Error>> => {
-  const ran = await attempt(() => withMembership(principal, door, work));
+  const ran = await attempt(() => withMember(principal, door, work));
   return ran.ok ? folded<T>(ran.value) : err(ran.error);
 };
 
@@ -614,7 +614,7 @@ const actingOn = (
     admittedAs.kind === "user"
       ? { admin: admittedAs, workspaceId: admittedAs.workspaceId, connectedSourceId }
       : { platform: admittedAs, workspaceId: input.workspaceId, connectedSourceId };
-  // A person acts where its membership was proved, so a workspace it names otherwise holds none of
+  // A person acts where it was proved a member, so a workspace it names otherwise holds none of
   // its connected sources.
   if (acting.workspaceId !== input.workspaceId) return err("no-such-binding");
   return ok(acting);

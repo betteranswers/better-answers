@@ -269,7 +269,8 @@ const withTheVerificationsMoved = (
  */
 const withTheIdentityStep = (actions: ErasureActions, swept: IdentitySwept): ErasureActions => ({
   ...actions,
-  "identity-user": { ...actions["identity-user"], membershipsEnded: swept.membershipsEnded },
+  // Stored on the request's row and printed in its report, so the key keeps its first name (R22).
+  "identity-user": { ...actions["identity-user"], membershipsEnded: swept.membersEnded },
 });
 
 const identityStepLineOf = (

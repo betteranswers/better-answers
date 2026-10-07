@@ -47,7 +47,7 @@ export {
   type InviteMembersRefusal,
   type ResendInvitationRefusal,
 } from "./invitations.ts";
-export * from "./memberships.ts";
+export * from "./member-list.ts";
 export * from "./name-flags.ts";
 export type * from "./removal.ts";
 export { removeMember, removeMemberInput } from "./removal.ts";

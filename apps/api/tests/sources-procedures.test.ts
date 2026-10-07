@@ -299,11 +299,11 @@ describe("the upload, one mutation over the split link", () => {
   it("batches every call that is not bytes, as one request", async () => {
     const { api, sent } = await anAdmin();
 
-    await Promise.all([api.sources.list.query(), api.session.membership.query()]);
+    await Promise.all([api.sources.list.query(), api.session.member.query()]);
 
     expect(sent).toEqual([
       {
-        path: "/trpc/sources.list,session.membership",
+        path: "/trpc/sources.list,session.member",
         batched: true,
         contentType: null,
       },
@@ -397,7 +397,7 @@ describe("ten concurrent uploads, whose act opens its own transaction", () => {
 });
 
 describe("a revocation landed while a mutation runs", () => {
-  it("refuses the mutation, whose membership read waits on it", async () => {
+  it("refuses the mutation, whose member read waits on it", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
     const revocation = await revocationHeldOpen(app, workspace.admin.id);
@@ -427,7 +427,7 @@ describe("a revocation landed while a mutation runs", () => {
     expect(connectedSource.rows).toEqual([{ sensitivity: "Internal" }]);
   });
 
-  it("does not hold up a read, which resolves membership unheld", async () => {
+  it("never holds up a read, which resolves its member unheld", async () => {
     const { workspace, api } = await anAdmin();
     await unpublishedConnectedSource(workspace.workspaceId);
     const revocation = await revocationHeldOpen(app, workspace.admin.id);

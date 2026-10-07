@@ -6,7 +6,7 @@ problem_type: architecture_pattern
 component: identity
 severity: high
 applies_when:
-  - "Adding a group, a membership or a People page field"
+  - "Adding a group, a member or a People page field"
   - "Writing an act that lands an audit event, or an act that belongs to no workspace"
   - "Changing how a non-member asks to join a workspace, or how an Admin answers"
   - "Porting a page whose fields assume teams, several roles or access that expires"
@@ -26,7 +26,7 @@ tags:
 
 **Groups are flat and Entra-aligned, and they are the one grouping shape.** A group is a named set of members of one workspace: a platform-minted ULID id, a name unique per workspace, and no parent.
 
-- A person may sit in several groups. Membership changes what a person may see, through audiences, never what they may do. `group_member` carries no role and no permission column.
+- A person may sit in several groups. Belonging to a group changes what a person may see, through audiences, never what they may do. `group_member` carries no role and no permission column.
 - A member removed from the workspace cascades out of every group.
 - A group carries an origin, Admin-curated or audience-minted, so a Restricted connected source's named people will be a row of this same table (ADR 0039).
 - Deleting a group is allowed and fail-closed. An audience holds group ids with no foreign key, and a dangling id matches no caller, so content narrows.
@@ -72,7 +72,7 @@ The sign-in and the consent are written after Better Auth's own write, and a fai
 - A second table for a connected source's named people: two grouping shapes an audience could name.
 - A role or permission column on a group: a back door to a role.
 - Refusing to delete a group an audience still names: the predicate is fail-closed, and a warning is the page's.
-- The request under a user principal with a synthetic membership, or under no principal: the first invents a membership, the second a core function with no Principal.
+- The request under a user principal with a synthetic member, or under no principal: the first invents a member, the second a core function with no Principal.
 - Different answers for an unknown slug and an existing member: an enumeration oracle.
 - Approving through Better Auth's invitation endpoint: it would import the identity provider into core.
 - Month partitioning, as ADR 0014 said: see above.

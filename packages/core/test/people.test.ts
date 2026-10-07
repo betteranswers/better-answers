@@ -95,7 +95,7 @@ describe("the operator's list of people", () => {
             id: personId,
             displayName: name,
             email,
-            memberships: [
+            workspaces: [
               { workspace: { id: acme.workspaceId, name: "Acme" }, role: "Editor" },
               { workspace: { id: zenith.workspaceId, name: "Zenith" }, role: "Viewer" },
             ],
@@ -120,7 +120,7 @@ describe("the operator's list of people", () => {
             id: personId,
             displayName: "Test person",
             email,
-            memberships: [],
+            workspaces: [],
             lastSignedInAt: null,
             credentialsRevokedAt: null,
           },

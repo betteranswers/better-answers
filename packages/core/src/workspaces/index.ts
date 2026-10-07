@@ -136,7 +136,7 @@ const MEMBER_ACTS = declareActs("people", {
   added: act("people.member.added", { userId: "id", role: "role" }),
 });
 
-const insertMembership = async (
+const insertMember = async (
   tx: Tx,
   workspaceId: WorkspaceId,
   userId: UserId,
@@ -192,7 +192,7 @@ const credited = (person: NamedPerson | undefined): Credited => {
 };
 
 /**
- * Creates the workspace with its partition, its default config and the admin's membership at
+ * Creates the workspace with its partition, its default config and the admin's member row at
  * `CREATOR_ROLE`. The admin must already exist and have a display name.
  */
 export const provisionWorkspace = async (
@@ -232,7 +232,7 @@ export const provisionWorkspace = async (
       });
       await tx.query("SELECT create_workspace_partition($1)", [row.data.id]);
 
-      await insertMembership(tx, row.data.id, admin.data, CREATOR_ROLE);
+      await insertMember(tx, row.data.id, admin.data, CREATOR_ROLE);
       await tx.query(
         "INSERT INTO workspace_config (workspace_id, key, value) VALUES ($1, $2, $3)",
         [row.data.id, TOOLS_LIST_TTL_CONFIG_KEY, String(TOOLS_LIST_TTL_MS_DEFAULT)],
@@ -359,7 +359,7 @@ const holdsARow = async (tx: Tx, statement: string, ...parameters: string[]): Pr
   return (found.rowCount ?? 0) > 0;
 };
 
-type MembershipRefusal = WorkspaceRefusal<
+type AddingRefusal = WorkspaceRefusal<
   "no-such-workspace" | "no-such-user" | "no-display-name" | "already-a-member"
 >;
 
@@ -377,7 +377,7 @@ export const addMember = async (
       platform,
       door,
       workspaceId.data,
-      async (tx): Promise<Result<UserId, MembershipRefusal>> => {
+      async (tx): Promise<Result<UserId, AddingRefusal>> => {
         if (!(await holdsARow(tx, "SELECT 1 FROM workspace WHERE id = $1", workspaceId.data))) {
           return err("no-such-workspace");
         }
@@ -392,7 +392,7 @@ export const addMember = async (
         );
         if (held) return err("already-a-member");
 
-        await insertMembership(tx, workspaceId.data, userId, input.role);
+        await insertMember(tx, workspaceId.data, userId, input.role);
         await record(platform, tx, {
           id: ulid(),
           act: MEMBER_ACTS.added,
@@ -552,12 +552,12 @@ export const workspacesHeldBy = async (
 
   const held = await attempt(() =>
     withIdentityRead(platform, door, async (tx) => {
-      const memberships = await tx.query<{ workspace_id: string }>(
+      const members = await tx.query<{ workspace_id: string }>(
         "SELECT workspace_id FROM member WHERE user_id = $1 ORDER BY workspace_id",
         [person.data],
       );
 
-      return memberships.rows.map((row) =>
+      return members.rows.map((row) =>
         boundarySchemas.workspace.select.shape.id.parse(row.workspace_id),
       );
     }),
@@ -604,18 +604,18 @@ export const workspaceIdBySlug = async (
   return ok(found.value);
 };
 
-export type Membership = {
+export type Member = {
   readonly workspace: { readonly id: WorkspaceId; readonly name: string };
   readonly person: { readonly id: UserId; readonly name: string; readonly email: string };
   readonly role: Role;
 };
 
-export type MembershipReadRefusal = WorkspaceRefusal<"workspace-gone" | "person-gone">;
+export type MemberReadRefusal = WorkspaceRefusal<"workspace-gone" | "person-gone">;
 
-export const readMembership = async (
+export const readMember = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<Membership, MembershipReadRefusal | Error>> => {
+): Promise<Result<Member, MemberReadRefusal | Error>> => {
   const workspace = await attempt(() =>
     tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [principal.workspaceId]),
   );

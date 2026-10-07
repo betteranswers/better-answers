@@ -15,7 +15,7 @@ import { arrival, EVERYONE_PATH, type Arrival } from "./people-address.ts";
 import { usePeople, type Asked, type ListedPerson } from "./people-api.ts";
 import { NO_PERSON_IN_FOCUS, PEOPLE_KEYSTROKES } from "./people-keystrokes.ts";
 import { PersonSheet, personButtonId, type OpenedAt } from "./person-sheet.tsx";
-import { Instant, Memberships } from "./person-words.tsx";
+import { Instant, WorkspacesAndRoles } from "./person-words.tsx";
 import { readRefused } from "./words.ts";
 
 const features = tableFeatures({});
@@ -65,9 +65,9 @@ const columnsFor = (acts: PersonActs) =>
       cell: ({ row }) => <PersonCell person={row.original} acts={acts} />,
     }),
     column.display({
-      id: "memberships",
+      id: "workspaces",
       header: "Workspaces and roles",
-      cell: ({ row }) => <Memberships person={row.original} />,
+      cell: ({ row }) => <WorkspacesAndRoles person={row.original} />,
     }),
     column.accessor("lastSignedInAt", {
       header: "Last sign-in",

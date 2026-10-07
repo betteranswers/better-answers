@@ -291,7 +291,7 @@ export const serverFor = (
 
 /**
  * Runs `work` in one transaction as the member `who` names.
- * @throws when the membership or `work` answers a refusal.
+ * @throws when the member read or `work` answers a refusal.
  */
 export const actingIn = async <T>(
   app: TestApp,

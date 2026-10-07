@@ -27,7 +27,7 @@ A composition's prose (a guide section's Brief, a response) is stored as markdow
 
 - The include row carries the concept's IRI, the context wording chosen (its heading and the hash of that section's text), the concept's content hash at generation and the cited span.
 - Footnote definitions are never stored. They are rendered from the include rows every time the prose is shown, exported or copied.
-- Rows own membership and markers own placement, reconciled at save. A marker whose label has no include row is refused before a version is written. An include with no marker is allowed and shown "not placed". Deleting a marker never deletes its row.
+- Rows own what is included and markers own placement, reconciled at save. A marker whose label has no include row is refused before a version is written. An include with no marker is allowed and shown "not placed". Deleting a marker never deletes its row.
 - Two footnote kinds share one syntax, and the page always says which. An OKF source footnote in a concept body has its definition in the file. An include marker in a composition has none.
 
 There is one stored form, markdown, for compositions and concept bodies alike. There is one renderer: a pure function in `packages/` from prose, include rows and trust state to markdown. It has two profiles, one with trust words as text tags for the labelled export and one with none for the clipboard.

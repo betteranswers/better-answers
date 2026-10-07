@@ -502,7 +502,7 @@ describe("the pages, as a person walks them", () => {
     expectRefusalPage(await failed.text(), REFUSAL_PAGES.notCompleted);
   });
 
-  it("mints no code when membership ends before the person consents", async () => {
+  it("mints no code when the member ends before consenting", async () => {
     const decided = await consentPostedAfter((acme) =>
       app.removeMember(acme.workspaceId, acme.admin.id),
     );

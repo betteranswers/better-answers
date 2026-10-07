@@ -32,7 +32,7 @@ import {
   folded,
   scopeClause,
   scopeParameter,
-  withMembership,
+  withMember,
   type PostgresDoor,
   type Tx,
 } from "../store/postgres/index.ts";
@@ -196,7 +196,7 @@ export const submitSuggestionSet = async (
   if (!payloads.success) return err("malformed");
 
   const submitted = await attempt(() =>
-    withMembership(principal, doors.postgres, async (fresh, tx) => {
+    withMember(principal, doors.postgres, async (fresh, tx) => {
       const landed = await tx.query<{ suggestion_id: string }>(
         "SELECT submitted AS suggestion_id FROM submit_suggestion_set($1, $2, $3, $4::jsonb) AS submitted",
         [
@@ -266,7 +266,7 @@ const decide = async (
 
   const decided = await withRepositoryLock(principal, doors.git, () =>
     attempt(() =>
-      withMembership(principal, doors.postgres, async (fresh, tx) => {
+      withMember(principal, doors.postgres, async (fresh, tx) => {
         const waiting = await tx.query<{ set_id: string; status: string }>(
           "SELECT set_id, status FROM suggestion WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
           [fresh.workspaceId, input.suggestionId],

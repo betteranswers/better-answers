@@ -34,13 +34,13 @@ type ListPeopleInput = z.output<typeof listPeopleInput>;
 
 type WorkspaceNamed = { readonly id: WorkspaceId; readonly name: string };
 
-type PersonMembership = { readonly workspace: WorkspaceNamed; readonly role: Role };
+type WorkspaceHeld = { readonly workspace: WorkspaceNamed; readonly role: Role };
 
 type PersonListed = {
   readonly id: UserId;
   readonly displayName: string;
   readonly email: string;
-  readonly memberships: readonly PersonMembership[];
+  readonly workspaces: readonly WorkspaceHeld[];
   readonly lastSignedInAt: string | null;
   readonly credentialsRevokedAt: string | null;
 };
@@ -58,7 +58,7 @@ type PersonRow = {
   readonly credentials_revoked_at: Date | null;
 };
 
-type MembershipRow = {
+type MemberRow = {
   readonly user_id: string;
   readonly role: string;
   readonly workspace_id: string;
@@ -81,30 +81,30 @@ const pageOf = (tx: Tx, pattern: string, input: ListPeopleInput) =>
     [pattern, input.limit, input.offset],
   );
 
-const membershipsOf = async (
+const workspacesOf = async (
   tx: Tx,
   personIds: readonly string[],
-): Promise<ReadonlyMap<string, readonly PersonMembership[]>> => {
-  const found = await tx.query<MembershipRow>(
+): Promise<ReadonlyMap<string, readonly WorkspaceHeld[]>> => {
+  const found = await tx.query<MemberRow>(
     `SELECT m.user_id, m.role, w.id AS workspace_id, w.name AS workspace_name
        FROM member m JOIN workspace w ON w.id = m.workspace_id
       WHERE m.user_id = ANY($1::text[])
       ORDER BY w.name, w.id`,
     [personIds],
   );
-  const held = new Map<string, readonly PersonMembership[]>();
+  const held = new Map<string, readonly WorkspaceHeld[]>();
   for (const row of found.rows) {
-    const membership: PersonMembership = {
+    const entry: WorkspaceHeld = {
       workspace: { id: workspaceIdOf(row.workspace_id), name: row.workspace_name },
       role: boundarySchemas.member.select.shape.role.parse(row.role),
     };
-    held.set(row.user_id, [...(held.get(row.user_id) ?? []), membership]);
+    held.set(row.user_id, [...(held.get(row.user_id) ?? []), entry]);
   }
   return held;
 };
 
 type HeldBy = {
-  readonly memberships: ReadonlyMap<string, readonly PersonMembership[]>;
+  readonly workspaces: ReadonlyMap<string, readonly WorkspaceHeld[]>;
   readonly signIns: ReadonlyMap<string, Date>;
 };
 
@@ -112,7 +112,7 @@ const personOf = (row: PersonRow, held: HeldBy): PersonListed => ({
   id: boundarySchemas.user.select.shape.id.parse(row.id),
   displayName: row.name,
   email: row.email,
-  memberships: held.memberships.get(row.id) ?? [],
+  workspaces: held.workspaces.get(row.id) ?? [],
   lastSignedInAt: isoOf(held.signIns.get(row.id) ?? null),
   credentialsRevokedAt: isoOf(row.credentials_revoked_at),
 });
@@ -136,7 +136,7 @@ export const listPeople = (
     const page = await pageOf(tx, pattern, input);
     const ids = page.rows.map((row) => row.id);
     const held: HeldBy = {
-      memberships: await membershipsOf(tx, ids),
+      workspaces: await workspacesOf(tx, ids),
       signIns: await latestOnIdentitySet(operator, tx, SIGN_IN_ACTS.signedIn, ids),
     };
     return {

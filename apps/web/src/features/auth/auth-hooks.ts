@@ -27,7 +27,7 @@ import {
   nextAfterSignIn,
   pageQuery,
 } from "./carried-flow.ts";
-import { forgetMembership, rereadMembership } from "./membership.ts";
+import { forgetMember, rereadMember } from "./member.ts";
 import { factorStepDue } from "./second-factor-steps.ts";
 import {
   announceTheSignIn,
@@ -371,7 +371,7 @@ export const useAcceptInvitation = () => {
   return useMutation(
     api.person.acceptInvitation.mutationOptions({
       onSuccess: () => {
-        forgetMembership(queryClient, api);
+        forgetMember(queryClient, api);
         forgetTheWorkspaceLeft(queryClient, api);
         queryClient.removeQueries({ queryKey: AUTH_KEYS.session });
         queryClient.removeQueries({ queryKey: AUTH_KEYS.workspaces });
@@ -416,8 +416,8 @@ export const useSignOut = (returnTo?: string) => {
   };
 };
 
-/** Better Auth's code for a pick of a workspace the person holds no membership in. */
-const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
+/** Better Auth's code for a pick of a workspace the person is not a member of. */
+const notAMember = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
 
 const libraryCode = z.object({ code: z.string() });
 
@@ -439,7 +439,7 @@ export class SwitchRefused extends Error {
 const setActiveWorkspace = (organizationId: string) =>
   unwrap(authClient.organization.setActive({ organizationId })).catch(
     (refused: BetterFetchError) => {
-      const { success: noLongerAMember } = noMembership.safeParse(refused);
+      const { success: noLongerAMember } = notAMember.safeParse(refused);
       throw new SwitchRefused(noLongerAMember, libraryCode.safeParse(refused).data?.code);
     },
   );
@@ -471,7 +471,7 @@ const forgetTheWorkspaceLeft = (queryClient: QueryClient, api: ApiProxy) => {
 };
 
 /**
- * A pick drops the held membership and every read of the workspace left, and marks the held
+ * A pick drops the member read held and every read of the workspace left, and marks the held
  * session and workspace list stale.
  */
 export const useSetActiveOrganization = () => {
@@ -480,7 +480,7 @@ export const useSetActiveOrganization = () => {
   return useMutation({
     ...setActiveOrganizationOptions(),
     onSuccess: () => {
-      forgetMembership(queryClient, api);
+      forgetMember(queryClient, api);
       forgetTheWorkspaceLeft(queryClient, api);
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session }),
@@ -493,7 +493,7 @@ export const useSetActiveOrganization = () => {
 export type SwitchedTo = { readonly id: string; readonly name: string };
 
 /**
- * The membership is read again in place, not dropped, so the band blanks between the two only
+ * The member is read again in place, not dropped, so the band blanks between the two only
  * when that read fails or waits.
  */
 export const useSwitchWorkspace = () => {
@@ -504,7 +504,7 @@ export const useSwitchWorkspace = () => {
     mutationFn: (workspace) => setActiveWorkspace(workspace.id),
     onSuccess: async () => {
       forgetTheWorkspaceLeft(queryClient, api);
-      await rereadMembership(queryClient, api);
+      await rereadMember(queryClient, api);
       void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
       await navigate({ href: "/", replace: true });
     },

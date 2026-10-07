@@ -78,5 +78,5 @@ The callbacks are lost only when a second `mutate()` reaches the same observer b
 
 ## Related Issues
 
-- `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-membership-after-failed-reread.md`: another TanStack Query behaviour (a failed `refetchQueries` resolving quietly) that this web client relies on knowing.
+- `docs/solutions/logic-errors/workspace-switch-serves-left-workspace-member-after-failed-reread.md`: another TanStack Query behaviour (a failed `refetchQueries` resolving quietly) that this web client relies on knowing.
 - The Invitations stream (U11, U12) builds bulk Resend and Cancel on the same selection-bar shape, and inherits this guard.

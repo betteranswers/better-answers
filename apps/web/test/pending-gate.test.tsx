@@ -41,7 +41,7 @@ afterEach(() => {
   globalThis.history.replaceState(null, "", "/");
 });
 
-const A_MEMBERSHIP = {
+const A_MEMBER = {
   workspace: { id: "w", name: "Northern Tooling" },
   person: { id: "p", name: "Ada", email: "ada@example.test" },
   role: "Admin",
@@ -53,7 +53,7 @@ const CONFIRMED = { ...BOTH_HELD, thisSession: sessionStanding("confirmed", { co
 
 /** The shell's two reads of its own, answered; every other procedure is pending's. */
 const SHELL_READS = new Map<string, () => unknown>([
-  ["session.membership", () => A_MEMBERSHIP],
+  ["session.member", () => A_MEMBER],
   ["session.operator", () => ({ operator: false, name: "Ada" })],
 ]);
 

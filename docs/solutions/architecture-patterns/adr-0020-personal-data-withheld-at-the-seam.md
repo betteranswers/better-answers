@@ -36,7 +36,7 @@ The **redaction seam** withholds personal data in the worker's conversion step a
 The erasure routine rewrites what the platform wrote; a person edits what the company wrote.
 
 - Every actor id the platform wrote (files, history, `bundle_commit` rows, verification rows, git author lines by mailmap) becomes `human:<erasure pseudonym>`, one pseudonym per workspace. The audit log is never rewritten: it names a person by person id.
-- On the person's last membership it pseudonymises the user row (email to a tombstone, name cleared, id kept) and deletes their sessions, verification rows, invitations and linked accounts. It ends this workspace's membership on every arm.
+- When this is the person's last workspace, it pseudonymises the user row (email to a tombstone, name cleared, id kept) and deletes their sessions, verification rows, invitations and linked accounts. It ends the person as a member here on every arm.
 - Erasure alone may leave a workspace with no Admin. The operator repairs it with `pnpm ops add-member`.
 - It clears the operator's mark where the person carries one.
 - It writes its replay copy to the object store, under `erasures/<workspace id>/`, before the completion commits.

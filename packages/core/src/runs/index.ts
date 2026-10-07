@@ -39,7 +39,7 @@ import {
 } from "../kernel/index.ts";
 import {
   folded,
-  withMembership,
+  withMember,
   withScope,
   type Foldable,
   type Folded,
@@ -101,7 +101,7 @@ const inWorkspace = async <T>(
     const ran = await attempt(() => withScope(principal, door, workspaceId, (tx) => work(tx)));
     return ran.ok ? folded<T>(ok(ran.value)) : err(ran.error);
   }
-  const held = await attempt(() => withMembership(principal, door, (_fresh, tx) => work(tx)));
+  const held = await attempt(() => withMember(principal, door, (_fresh, tx) => work(tx)));
   return held.ok ? folded<T>(held.value) : err(held.error);
 };
 
@@ -395,7 +395,7 @@ export const bundleHealth = async (
   if (!admin.ok) return err(admin.error);
 
   const read = await attempt(() =>
-    withMembership(principal, door, async (fresh, tx) =>
+    withMember(principal, door, async (fresh, tx) =>
       tx.query<OutcomeRow>(
         `SELECT outcome FROM job
           WHERE workspace_id = $1 AND kind = $2 AND status = 'done'
