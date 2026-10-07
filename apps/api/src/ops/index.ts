@@ -224,7 +224,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
   restore-sign-in --email <email>                           a person who lost every factor and code, once you have checked who they are another way: their factors and sessions ended, a notice sent, a one-time restore code printed
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <class>] [--dry-run]
-                                                            the company's bundle landed through the governed write, its checks imported, its links rewritten to iris
+                                                            the company's bundle landed through the governed write, its verifications imported, its links rewritten to iris
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
     --dry-run      validate the tree and say what a run would do, writing nothing
 exit codes: ${DONE} done · ${REFUSED} refused in no registered word, stop · ${USAGE} usage, or a malformed argument · ${NOT_BUILT} the slice this needs has no tables yet
@@ -721,8 +721,8 @@ const importReason = (refusal: ImportBundleRefusal | Error, email: string): stri
   if (refusal.kind === "unsound") {
     return `${refusal.file}: ${UNSOUND_WORDS[refusal.reason](refusal.about)}; nothing was written`;
   }
-  const { landed, skipped, checks, rewritten } = refusal.progress;
-  return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, checks ${checks.recorded} recorded, ${counted(linksOf(rewritten), "link")} rewritten; what landed stays, and a rerun continues from there`;
+  const { landed, skipped, verifications, rewritten } = refusal.progress;
+  return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, verifications ${verifications.recorded} recorded, ${counted(linksOf(rewritten), "link")} rewritten; what landed stays, and a rerun continues from there`;
 };
 
 type ImportAsked = {
@@ -762,8 +762,8 @@ const treeUnder = async (io: OpsIo, from: string): Promise<Result<BundleTree, st
 };
 
 const sayImported = (io: OpsIo, imported: BundleImported, seconds: string): void => {
-  const { bundleId, manifest, landed, skipped, checks, rewritten, concepts } = imported;
-  const recorded = `${counted(checks.recorded, "check")} recorded (${checks.present} already present)`;
+  const { bundleId, manifest, landed, skipped, verifications, rewritten, concepts } = imported;
+  const recorded = `${counted(verifications.recorded, "verification")} recorded (${verifications.present} already present)`;
   const links = counted(linksOf(rewritten), "link");
   if (imported.dryRun) {
     const standing = manifest === "standing" ? "already stands" : "would be written first";

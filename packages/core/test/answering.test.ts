@@ -64,22 +64,22 @@ const answer = (overrides: Partial<AnswerResult>): AnswerResult => ({
   ...overrides,
 });
 
-const unchecked: Trust = {
+const unverified: Trust = {
   tier: "unverified",
   status: "current",
-  checkedBy: null,
-  checkedAt: null,
+  verifiedBy: null,
+  verifiedAt: null,
   rider: null,
 };
 
 describe("the trust words", () => {
-  it("names a current unit's tier, checker, date and any rider", () => {
+  it("names a current unit's tier, verifier, date and any rider", () => {
     expect(
       trustWords({
         tier: "human-reviewed",
         status: "current",
-        checkedBy: "Priya Shah",
-        checkedAt: "2026-03-03",
+        verifiedBy: "Priya Shah",
+        verifiedAt: "2026-03-03",
         rider: null,
       }),
     ).toBe("Verified by Priya Shah · 3 March 2026");
@@ -87,8 +87,8 @@ describe("the trust words", () => {
       trustWords({
         tier: "human-reviewed",
         status: "current",
-        checkedBy: "Priya Shah",
-        checkedAt: "2026-03-03",
+        verifiedBy: "Priya Shah",
+        verifiedAt: "2026-03-03",
         rider: "imported",
       }),
     ).toBe("Verified by Priya Shah · 3 March 2026 · imported");
@@ -96,8 +96,8 @@ describe("the trust words", () => {
       trustWords({
         tier: "machine-confirmed",
         status: "current",
-        checkedBy: null,
-        checkedAt: null,
+        verifiedBy: null,
+        verifiedAt: null,
         rider: "source-moved-on",
       }),
     ).toBe("Verified automatically · source moved on");
@@ -105,12 +105,12 @@ describe("the trust words", () => {
       trustWords({
         tier: "machine-confirmed",
         status: "current",
-        checkedBy: "process:better-answers-importer",
-        checkedAt: "2026-03-03",
+        verifiedBy: "process:better-answers-importer",
+        verifiedAt: "2026-03-03",
         rider: null,
       }),
     ).toBe("Verified automatically");
-    expect(trustWords(unchecked)).toBe("Unverified");
+    expect(trustWords(unverified)).toBe("Unverified");
   });
 
   it("says a person verified, omitting a missing name or date", () => {
@@ -118,8 +118,8 @@ describe("the trust words", () => {
       trustWords({
         tier: "human-reviewed",
         status: "current",
-        checkedBy: "Priya Shah",
-        checkedAt: null,
+        verifiedBy: "Priya Shah",
+        verifiedAt: null,
         rider: null,
       }),
     ).toBe("Verified by Priya Shah");
@@ -127,8 +127,8 @@ describe("the trust words", () => {
       trustWords({
         tier: "human-reviewed",
         status: "current",
-        checkedBy: null,
-        checkedAt: null,
+        verifiedBy: null,
+        verifiedAt: null,
         rider: null,
       }),
     ).toBe("Verified by a person");
@@ -139,8 +139,8 @@ describe("the trust words", () => {
       trustWords({
         tier: "human-reviewed",
         status: "current",
-        checkedBy: "human:01J8ZQ4M7V3K9T2R5N6P8W1XYD",
-        checkedAt: "2026-04-05T09:00:00.000Z",
+        verifiedBy: "human:01J8ZQ4M7V3K9T2R5N6P8W1XYD",
+        verifiedAt: "2026-04-05T09:00:00.000Z",
         rider: null,
       }),
     ).toBe("Verified by a former member · 5 April 2026");
@@ -151,8 +151,8 @@ describe("the trust words", () => {
       trustWords({
         tier: "human-reviewed",
         status: "current",
-        checkedBy: "Priya Shah",
-        checkedAt: "when the contract ends",
+        verifiedBy: "Priya Shah",
+        verifiedAt: "when the contract ends",
         rider: null,
       }),
     ).toBe("Verified by Priya Shah · when the contract ends");
@@ -164,8 +164,8 @@ describe("the trust words", () => {
   it("names any status but current, whatever the tier", () => {
     const base = {
       tier: "human-reviewed" as const,
-      checkedBy: "A",
-      checkedAt: "2026-01-01",
+      verifiedBy: "A",
+      verifiedAt: "2026-01-01",
       rider: null,
     };
     expect(trustWords({ ...base, status: "changed-since-checked" })).toBe("Changed since verified");
@@ -280,7 +280,7 @@ describe("the preview's rendering", () => {
             iri: "https://better-answers.com/c/01A",
             kind: "Policy",
             title: "Expenses",
-            trust: unchecked,
+            trust: unverified,
             bundle: "acme",
             tags: [],
           },
@@ -292,8 +292,8 @@ describe("the preview's rendering", () => {
             trust: {
               tier: "human-reviewed",
               status: "current",
-              checkedBy: "Priya Shah",
-              checkedAt: "2026-03-03",
+              verifiedBy: "Priya Shah",
+              verifiedAt: "2026-03-03",
               rider: null,
             },
             bundle: "acme",
@@ -335,7 +335,7 @@ describe("open's and feedback's renderings", () => {
           frontmatter: { title: "Expenses", type: "Policy" },
           body: "Expenses are claimed within thirty days.",
           relations: [],
-          trust: unchecked,
+          trust: unverified,
           evidence: [
             { locator: "p.4", source: "Handbook" },
             { locator: "p.9", source: "Travel policy" },
@@ -369,8 +369,8 @@ describe("open's and feedback's renderings", () => {
           trust: {
             tier: "human-reviewed",
             status: "current",
-            checkedBy: "Priya Shah",
-            checkedAt: "2026-03-03",
+            verifiedBy: "Priya Shah",
+            verifiedAt: "2026-03-03",
             rider: null,
           },
           evidence: [],
@@ -584,7 +584,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
             iri,
             kind: "Policy",
             title: CONCEPT_TITLE,
-            trust: unchecked,
+            trust: unverified,
             bundle: "knowledge",
             tags: [],
           },

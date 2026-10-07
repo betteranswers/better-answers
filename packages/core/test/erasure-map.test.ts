@@ -115,7 +115,7 @@ const workspaceHoldingAMember = async () => {
 
   const seeded = await seedingWith(db().pool, async (seed) => ({
     commit: await seed.bundleCommit({ workspaceId: scenario.workspaceId, sha, actor }),
-    check: await seed.conceptVerification({ workspaceId: scenario.workspaceId, actor }),
+    verification: await seed.conceptVerification({ workspaceId: scenario.workspaceId, actor }),
     invite: await seed.invitation({
       workspaceId: scenario.workspaceId,
       email,
@@ -189,7 +189,7 @@ describe("the erasure map's union", () => {
 });
 
 describe("the erasure map for a member", () => {
-  it("names their concept file, commit, check and identity-set rows", async () => {
+  it("names their concept file, commit, verification and identity-set rows", async () => {
     const held = await workspaceHoldingAMember();
 
     const map = await mapOf(held.scenario, held.request);
@@ -201,7 +201,11 @@ describe("the erasure map for a member", () => {
         locations: [`${held.sha} (author line)`, `${held.sha}:${CONCEPT_PATH}`],
       },
       { family: "bundle-commit", categories: ["actor-id"], locations: [held.sha] },
-      { family: "concept-verification", categories: ["actor-id"], locations: [held.check.id] },
+      {
+        family: "concept-verification",
+        categories: ["actor-id"],
+        locations: [held.verification.id],
+      },
       {
         family: "identity-user",
         categories: ["name", "email-address"],
@@ -316,7 +320,7 @@ describe("the erasure map in one workspace's scope", () => {
 
     const mine = await seedingWith(db().pool, async (seed) => ({
       commit: await seed.bundleCommit({ workspaceId: here.workspaceId, actor }),
-      check: await seed.conceptVerification({ workspaceId: here.workspaceId, actor }),
+      verification: await seed.conceptVerification({ workspaceId: here.workspaceId, actor }),
       invite: await seed.invitation({
         workspaceId: here.workspaceId,
         email,
@@ -325,7 +329,7 @@ describe("the erasure map in one workspace's scope", () => {
     }));
     const theirs = await seedingWith(db().pool, async (seed) => ({
       commit: await seed.bundleCommit({ workspaceId: elsewhere.workspaceId, actor }),
-      check: await seed.conceptVerification({ workspaceId: elsewhere.workspaceId, actor }),
+      verification: await seed.conceptVerification({ workspaceId: elsewhere.workspaceId, actor }),
       invite: await seed.invitation({
         workspaceId: elsewhere.workspaceId,
         email,
@@ -349,7 +353,7 @@ describe("the erasure map in one workspace's scope", () => {
     expect(locationsOf(map)).toEqual([
       ["concept-file", []],
       ["bundle-commit", [mine.commit.sha]],
-      ["concept-verification", [mine.check.id]],
+      ["concept-verification", [mine.verification.id]],
       ["identity-user", [person.id]],
       ["identity-session", []],
       ["identity-verification", []],
@@ -365,7 +369,7 @@ describe("the erasure map in one workspace's scope", () => {
     const named = map.flatMap((entry) => entry.locations);
     for (const theirsOwn of [
       theirs.commit.sha,
-      theirs.check.id,
+      theirs.verification.id,
       theirs.invite.id,
       shaElsewhere,
       elsewhere.workspaceId,
@@ -616,7 +620,11 @@ describe("the access answer", () => {
           location: `${held.sha}:${CONCEPT_PATH}`,
         },
         { family: "bundle-commit", categories: ["actor-id"], location: held.sha },
-        { family: "concept-verification", categories: ["actor-id"], location: held.check.id },
+        {
+          family: "concept-verification",
+          categories: ["actor-id"],
+          location: held.verification.id,
+        },
         {
           family: "identity-user",
           categories: ["name", "email-address"],

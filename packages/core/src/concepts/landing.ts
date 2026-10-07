@@ -426,10 +426,10 @@ export const moveBundleCommits = async (
   return rows.rowCount ?? 0;
 };
 
-export type ChecksCarried = {
+export type VerificationsCarried = {
   readonly concepts: number;
 
-  readonly checks: number;
+  readonly verifications: number;
 };
 
 type RewrittenRow = {
@@ -441,16 +441,16 @@ type RewrittenRow = {
 
 /**
  * Re-reads each rewritten path at its indexed commit, refreshes the index row, and moves the
- * concept's checks onto a changed hash.
+ * concept's verifications onto a changed hash.
  * @throws when the bundle holds a file the platform cannot read.
  */
-export const carryChecksOntoRewrite = async (
+export const carryVerificationsOntoRewrite = async (
   platform: PlatformPrincipal,
   tx: Tx,
   door: GitDoor,
   input: { readonly workspaceId: string; readonly paths: readonly string[] },
-): Promise<ChecksCarried> => {
-  if (input.paths.length === 0) return { concepts: 0, checks: 0 };
+): Promise<VerificationsCarried> => {
+  if (input.paths.length === 0) return { concepts: 0, verifications: 0 };
   const indexed = await tx.query<RewrittenRow>(
     `SELECT iri, path, commit_sha, content_hash
        FROM concept_index
@@ -459,7 +459,7 @@ export const carryChecksOntoRewrite = async (
   );
 
   let concepts = 0;
-  let checks = 0;
+  let verifications = 0;
   for (const row of indexed.rows) {
     const content = await fileAt(platform, door, input.workspaceId, row.commit_sha, row.path);
 
@@ -471,7 +471,7 @@ export const carryChecksOntoRewrite = async (
     const contentHash = contentHashOf(read.value.frontmatter, read.value.body, row.path);
 
     // The hash leaves out keys a rewrite touches, `verified` among them, so the stored copy is
-    // compared whole; checks move only with the hash.
+    // compared whole; verifications move only with the hash.
     const reindexed = await tx.query(
       `UPDATE concept_index SET frontmatter = $3, body = $4, content_hash = $5
         WHERE workspace_id = ${scopeClause(1)} AND iri = $2
@@ -486,7 +486,7 @@ export const carryChecksOntoRewrite = async (
         WHERE workspace_id = ${scopeClause(1)} AND iri = $2 AND content_hash IS NOT NULL`,
       [scopeParameter(platform), row.iri, contentHash, VERIFICATION_ERASURE_ORIGIN],
     );
-    checks += moved.rowCount ?? 0;
+    verifications += moved.rowCount ?? 0;
   }
-  return { concepts, checks };
+  return { concepts, verifications };
 };

@@ -1551,7 +1551,7 @@ describe("narrowing documents", () => {
     );
   });
 
-  it("holds a re-write's check so it weighs the narrowed class", async () => {
+  it("holds a re-write's verification so it weighs the narrowed class", async () => {
     const scenario = await arrange();
     const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
@@ -2025,8 +2025,8 @@ describe("find", () => {
             trust: {
               tier: "unverified",
               status: "current",
-              checkedBy: null,
-              checkedAt: null,
+              verifiedBy: null,
+              verifiedAt: null,
               rider: null,
             },
             bundle: "knowledge",

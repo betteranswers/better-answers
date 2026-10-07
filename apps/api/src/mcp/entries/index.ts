@@ -15,8 +15,12 @@ import {
   TRUST_RIDERS,
   TRUST_STATUSES,
   TRUST_TIERS,
+  type FindHit,
+  type FindResult,
+  type OpenResult,
+  type Trust,
 } from "@better-answers/core/answering";
-import { parse } from "@better-answers/core/kernel";
+import { parse, type Result } from "@better-answers/core/kernel";
 import { conceptFrontmatter } from "@better-answers/schema";
 
 import { defineEntry, type Entry } from "./define.ts";
@@ -28,6 +32,65 @@ const trust = z.object({
   checkedAt: z.string().nullable(),
   rider: z.enum(TRUST_RIDERS).nullable(),
 });
+
+type WireTrust = z.infer<typeof trust>;
+
+/** Core says who verified a concept and when; the wire keeps the keys its clients read (R21). */
+const wireTrust = ({ tier, status, verifiedBy, verifiedAt, rider }: Trust): WireTrust => ({
+  tier,
+  status,
+  checkedBy: verifiedBy,
+  checkedAt: verifiedAt,
+  rider,
+});
+
+const coreTrust = ({ tier, status, checkedBy, checkedAt, rider }: WireTrust): Trust => ({
+  tier,
+  status,
+  verifiedBy: checkedBy,
+  verifiedAt: checkedAt,
+  rider,
+});
+
+type WireHit<Hit> = Hit extends { readonly trust: Trust }
+  ? Omit<Hit, "trust"> & { readonly trust: WireTrust }
+  : Hit;
+
+type WireFound = { readonly query: string; readonly hits: readonly WireHit<FindHit>[] };
+
+const foundOnTheWire = (found: FindResult): WireFound => ({
+  query: found.query,
+  hits: found.hits.map((hit) =>
+    hit.layer === "bundles" ? { ...hit, trust: wireTrust(hit.trust) } : hit,
+  ),
+});
+
+const foundInCore = (found: WireFound): FindResult => ({
+  query: found.query,
+  hits: found.hits.map((hit) =>
+    hit.layer === "bundles" ? { ...hit, trust: coreTrust(hit.trust) } : hit,
+  ),
+});
+
+const openedOnTheWire = (opened: OpenResult) => {
+  if (!opened.found) return opened;
+  const { concept, ...rest } = opened;
+  return concept === undefined
+    ? rest
+    : { ...rest, concept: { ...concept, trust: wireTrust(concept.trust) } };
+};
+
+type WireOpened = ReturnType<typeof openedOnTheWire>;
+
+const openedInCore = (opened: WireOpened): OpenResult => {
+  if (!opened.found || !("concept" in opened)) return opened;
+  return { ...opened, concept: { ...opened.concept, trust: coreTrust(opened.concept.trust) } };
+};
+
+const wired = <Value, Wired, Refused>(
+  result: Result<Value, Refused>,
+  wire: (value: Value) => Wired,
+): Result<Wired, Refused> => (result.ok ? { ok: true, value: wire(result.value) } : result);
 
 const passage = z.object({
   locator: z.string(),
@@ -75,8 +138,9 @@ const findEntry = defineEntry({
     idempotentHint: true,
     openWorldHint: false,
   },
-  run: async (principal, tx, args, now) => find(principal, tx, args, now),
-  render: renderFind,
+  run: async (principal, tx, args, now) =>
+    wired(await find(principal, tx, args, now), foundOnTheWire),
+  render: (found) => renderFind(foundInCore(found)),
 });
 
 const askEntry = defineEntry({
@@ -179,13 +243,16 @@ const openEntry = defineEntry({
     openWorldHint: false,
   },
   run: async (principal, tx, args, now) =>
-    open(
-      principal,
-      tx,
-      args.iri === undefined ? { locator: args.locator ?? "" } : { iri: args.iri },
-      now,
+    wired(
+      await open(
+        principal,
+        tx,
+        args.iri === undefined ? { locator: args.locator ?? "" } : { iri: args.iri },
+        now,
+      ),
+      openedOnTheWire,
     ),
-  render: renderOpen,
+  render: (opened) => renderOpen(openedInCore(opened)),
 });
 
 const feedbackIri = z.string().min(1).describe("The concept or answer the feedback is about.");

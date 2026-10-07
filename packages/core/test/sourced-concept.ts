@@ -80,7 +80,7 @@ export const connectedSourceHolding = (
 const INDEXED_AT = new Date("2026-09-24T09:00:00.000Z");
 const PUBLISHED_AT = new Date("2026-09-24T10:00:00.000Z");
 
-/** Seeds a finished sync, then publishes as `admin`; the act's answer comes back unchecked. */
+/** Seeds a finished sync, then publishes as `admin`; the act's answer comes back unverified. */
 export const publishedOnceIndexed = async (
   db: MigratedPostgres,
   admin: UserPrincipal,

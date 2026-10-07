@@ -1333,7 +1333,7 @@ describe("authority that moved while the act was in flight", () => {
 });
 
 describe("the read a concept's trust is derived from", () => {
-  it("reads no check off a concept nobody has checked", async () => {
+  it("reads no verification off a concept nobody has verified", async () => {
     const scenario = await arrange();
     const written = await landed(scenario, writeFor({ status: "stable" }));
 
@@ -1343,7 +1343,7 @@ describe("the read a concept's trust is derived from", () => {
 
     expect(opened.ok).toBe(true);
     if (!opened.ok) return;
-    expect(opened.value?.check).toBeUndefined();
+    expect(opened.value?.verification).toBeUndefined();
     expect(opened.value?.contentHash).toBe(written.contentHash);
   });
 
@@ -1458,7 +1458,7 @@ describe("the per-repository lock", () => {
 describe("opening a concept by IRI", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
 
-  it("hands back the committed concept, unchecked until somebody checks it", async () => {
+  it("hands back the committed concept, unverified until somebody verifies it", async () => {
     const scenario = await arrange();
     const input = writeFor({ status: "stable" });
     const written = await landed(scenario, input);
@@ -1478,8 +1478,8 @@ describe("opening a concept by IRI", () => {
       trust: {
         tier: "unverified",
         status: "current",
-        checkedBy: null,
-        checkedAt: null,
+        verifiedBy: null,
+        verifiedAt: null,
         rider: null,
       },
       evidence: [{ locator: "p.4", source: "Handbook" }],
@@ -1506,7 +1506,7 @@ describe("opening a concept by IRI", () => {
     expect(stored.rows).toEqual([{ published_at: null }]);
   });
 
-  it("reads a person's check, and says when the content moved", async () => {
+  it("reads a person's verification, and says when the content moved", async () => {
     const scenario = await arrange();
     const input = writeFor({ status: "stable" });
     const written = await landed(scenario, input);
@@ -1522,17 +1522,17 @@ describe("opening a concept by IRI", () => {
       client.release();
     }
 
-    const checked = await reading(scenario.viewer, (principal, tx) =>
+    const read = await reading(scenario.viewer, (principal, tx) =>
       conceptByIri(principal, tx, written.iri),
     );
-    expect(checked).toMatchObject({ ok: true });
+    expect(read).toMatchObject({ ok: true });
     const opened = await reading(scenario.viewer, (principal, tx) =>
       open(principal, tx, { iri: written.iri }, now),
     );
     expect(opened.ok && opened.value.found && opened.value.concept?.trust).toMatchObject({
       tier: "human-reviewed",
       status: "current",
-      checkedBy: "Test person",
+      verifiedBy: "Test person",
     });
 
     await landed(
@@ -1547,7 +1547,7 @@ describe("opening a concept by IRI", () => {
     );
   });
 
-  it("names the checker from their person row, after removal too", async () => {
+  it("names the verifier from their person row, after removal too", async () => {
     const scenario = await arrange();
     const written = await landed(scenario, writeFor({ status: "stable" }));
     const priya = await memberOf(db().pool, scenario.workspaceId, "priya.anand@acme.invalid");
@@ -1562,21 +1562,21 @@ describe("opening a concept by IRI", () => {
     } finally {
       client.release();
     }
-    const checkedBy = async () => {
+    const verifiedBy = async () => {
       const opened = await reading(scenario.viewer, (principal, tx) =>
         open(principal, tx, { iri: written.iri }, now),
       );
-      return opened.ok && opened.value.found ? opened.value.concept?.trust.checkedBy : undefined;
+      return opened.ok && opened.value.found ? opened.value.concept?.trust.verifiedBy : undefined;
     };
 
-    expect(await checkedBy()).toBe("Priya Anand");
+    expect(await verifiedBy()).toBe("Priya Anand");
 
     const removed = await reading(scenario.admin, (principal, tx) =>
       removeMember(principal, tx, { personId: priya.id, at: new Date() }),
     );
 
     expect(removed).toMatchObject({ ok: true });
-    expect(await checkedBy()).toBe("Priya Anand");
+    expect(await verifiedBy()).toBe("Priya Anand");
   });
 
   it("shows a deprecated concept to every reader as deprecated", async () => {
@@ -1593,7 +1593,7 @@ describe("opening a concept by IRI", () => {
     );
   });
 
-  it("names a platform check by its process and its rider", async () => {
+  it("names a platform verification by its process and its rider", async () => {
     const scenario = await arrange();
     const written = await landed(scenario, writeFor({ status: "stable" }));
     const client = await db().pool.connect();
@@ -1604,7 +1604,7 @@ describe("opening a concept by IRI", () => {
         actor: "process:better-answers-importer",
         origin: "imported",
         contentHash: null,
-        checkedAt: new Date("2026-03-03T09:00:00.000Z"),
+        verifiedAt: new Date("2026-03-03T09:00:00.000Z"),
       });
     } finally {
       client.release();
@@ -1617,8 +1617,8 @@ describe("opening a concept by IRI", () => {
     expect(opened.ok && opened.value.found && opened.value.concept?.trust).toEqual({
       tier: "machine-confirmed",
       status: "current",
-      checkedBy: "process:better-answers-importer",
-      checkedAt: "2026-03-03T09:00:00.000Z",
+      verifiedBy: "process:better-answers-importer",
+      verifiedAt: "2026-03-03T09:00:00.000Z",
       rider: "imported",
     });
   });

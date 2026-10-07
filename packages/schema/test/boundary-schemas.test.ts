@@ -564,7 +564,7 @@ const acceptedRows = {
       workspaceId: WS_ID,
       iri: CONCEPT_IRI,
       actor: `human:${USER_ID}`,
-      checkedAt: NOW,
+      verifiedAt: NOW,
       contentHash: CONTENT_SHA256,
       origin: "platform",
     },
