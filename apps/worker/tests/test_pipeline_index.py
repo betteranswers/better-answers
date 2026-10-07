@@ -1588,10 +1588,7 @@ def test_a_wipe_leaves_no_old_store_and_tracks_removals_again(
     )
     bootstrap = bootstrap_for(dsn, tmp_path)
     old_store = (
-        tmp_path
-        / workspace_id
-        / CONNECTED_SOURCE
-        / (THE_STORE_AN_EARLIER_RELEASE_NAMED)
+        tmp_path / workspace_id / CONNECTED_SOURCE / THE_STORE_AN_EARLIER_RELEASE_NAMED
     )
     old_store.mkdir(parents=True)
     (old_store / "data.mdb").write_bytes(b"an earlier release's tracking")

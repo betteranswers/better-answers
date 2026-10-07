@@ -48,8 +48,8 @@ PASSAGES_APP = "passages"
 CONNECTED_SOURCE_STORE = "connected_source"
 
 
-# The store's name before the passage sweep. It may hold text redacted under a replaced
-# rule, so a wipe removes it too.
+# Names an earlier release gave the store. Such a store may hold text redacted under a
+# replaced rule, so a wipe removes it too.
 STORES_NAMED_BEFORE_THE_PASSAGE_SWEEP: tuple[str, ...] = ("binding",)
 
 
