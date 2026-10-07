@@ -805,13 +805,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("full name", "display name"),
   avoided("garbage collection", "sweep pass"),
   avoided("git host", "git store"),
-  pending(
-    "Gone-at-source impact",
-    "Removed at source",
-    "Control Centre",
-    "Removed at source",
-    "reader text",
-  ),
+  {
+    word: "Gone-at-source impact",
+    use: "Removed at source",
+    entry: "Control Centre",
+    sweep: "Removed at source",
+    state: "landed",
+    reach: "reader text",
+  },
   {
     word: "graph",
     use: "map",

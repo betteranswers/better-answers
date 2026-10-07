@@ -262,8 +262,8 @@ export const CONTROL_CENTRE = {
           seenBy: ADMINS,
         },
         {
-          name: "Gone-at-source impact",
-          path: "/sources/gone-at-source-impact",
+          name: "Removed at source",
+          path: "/sources/removed-at-source",
           icon: "gone",
           built: false,
           seenBy: ADMINS,

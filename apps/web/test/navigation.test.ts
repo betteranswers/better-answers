@@ -85,7 +85,7 @@ describe("the one navigation list", () => {
               "Publishing rules",
               "Priced plan",
               "Backlogs",
-              "Gone-at-source impact",
+              "Removed at source",
               "Share agents",
             ],
           ],
