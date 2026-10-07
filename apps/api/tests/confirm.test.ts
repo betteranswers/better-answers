@@ -19,10 +19,12 @@ import {
   setUpOn,
   signedInClient,
 } from "./provoke.ts";
-import { appForSuite } from "./suite-app.ts";
+import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import { refusalOfCall, webClientOf } from "./web-client.ts";
 
-const app = appForSuite();
+const { clock, stopTheClock } = aStoppableClock();
+
+const app = appForSuite({ clock });
 
 const PASSKEY_OPTIONS = "/second-factor/confirm/passkey-options";
 const PASSKEY = "/second-factor/confirm/passkey";
@@ -582,6 +584,7 @@ describe("the confirm and recovery routes", () => {
     const { client } = await aPersonSignedIn(app());
     const statuses: number[] = [];
 
+    stopTheClock();
     for (let asked = 0; asked < 11; asked += 1) {
       statuses.push((await client.json(path, {})).status);
     }
