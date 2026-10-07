@@ -1,6 +1,7 @@
 ---
 title: "How a rename sweep lands a word in the words test"
 date: 2026-10-03
+last_updated: 2026-10-07
 category: best-practices
 module: apps/api
 problem_type: best_practice
@@ -12,6 +13,7 @@ applies_when:
   - "Removing a _Code rename pending._ mark from CONCEPTS.md"
   - "Refreshing apps/api/tests/old-words-ratchet.json"
   - "Reviewing a sweep pull request's diff of old-words.ts, CONCEPTS.md or the ratchet baseline"
+  - "Landing a one-sense row for a shared word, such as run, check or act, whose first scan finds thousands of lines in other senses"
 symptoms:
   - "KTD5 step 5 says only that a sweep marks its rows landed, but landing a row also needs senses, a plans carve-out, a glossary edit and a baseline refresh"
   - "Several mistakes in a landed row pass the words test without a finding: a sense regex without the g flag, a carve-out on a reader-text row, a row flipped back to pending, a plural under a one-sense row"
@@ -100,6 +102,16 @@ The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull re
 3. **A one-sense row matches the whole word alone.** `findsIn` without `anyForm` is `(?<!\w)word(?!\w)` (`words-scan.ts:124`), so a plural or a compound passes once the row lands ("reads a word held to senses whole, never in compounds", `avoid-words.test.ts:450-452`). While the row was pending the ratchet counted every form (`countIn`, 131-132), but only in page words (`PAGE_WORDS`, 249-252, read at 473), and it stops counting at the flip (471).
 4. **A lone lowercase word is read only in a words module.** `isRead` reads it only when the file matches `WORDS_MODULE` (`words-scan.ts:310-312`, 245; planted at `avoid-words.test.ts:861-869`). A string such as `"binding"` in `navigation.ts`, an MCP entry, the answer renderer or an email is invisible to the reader-text, internal-word and ratchet checks. The line scan still sees it for an everywhere or one-sense row, but for a reader-text row nothing does. A sweep that renames a words module out of the `*words.ts` pattern drops it from those checks too, and passes. The test fails loudly only when a whole source of reader text yields no string (`readerStringsPerSource`, `words-scan.ts:386-393`; the test at `avoid-words.test.ts:112-119`) or a reader-text file does not parse (the throw at `words-scan.ts:360`; planted at `avoid-words.test.ts:871-875`). Losing one words module among several trips neither.
 5. **Landing a row can wake the internal-word check.** `watchedInternals` leaves an `_Internal._` head unwatched while a pending row names its word (`words-scan.ts:422-436`; planted at `avoid-words.test.ts:763-778`). U8's `actor id` and `person id` are pending reader-text rows (`old-words.ts:143`, `397`) and internal heads (`CONCEPTS.md:613`, `620`), so landing them sets both `readerFindings` and `internalFindings` reading the same strings. If such a head is ordinary English, add it to `NOT_WATCHED_ON_PAGES` (`old-words.ts:527-554`). `unwatchedStrays` refuses an unwatched head that heads no internal entry (`words-scan.ts:86-91`).
+
+### Landing a shared word that is mostly other senses
+
+U13 landed *run*, held to one sense, when it renamed a connected source's run to a sync. The first scan after the flip found about 3,000 lines. Nearly all of them were a CI, test, release or backup run, the plain verb, a code identifier or a command a tool runs. U14's *check* and U17's *act* have the same shape. What worked, in order:
+
+1. **Fit the senses to the test's own findings, not to a guess.** Save the failing run's finding lines, then use a throwaway script that imports `OLD_WORDS`, takes the row's `permitted` senses (honouring `within`), blanks each finding line with them and reports what is left. Each edit to the senses then costs a second, not a full test run. Re-run the real test after each round, because the saved findings only cover lines the earlier senses missed. Tightening a sense can expose lines the old one hid.
+2. **Scope by tree, and name the renamed thing's own trees file by file.** Most hits sat in trees that never write a sync: `.github/`, `deploy/`, `packages/devtools/`, `docs/operations/` and the journeys. A bare `\brun\b` sense, `within` each of those prefixes, cleared them (`OTHER_RUN_TREES`, `apps/api/tests/old-words.ts:605`). Where a tree also writes the renamed thing (the sources slice, the worker's pipeline, `CONCEPTS.md`, the C4 docs), list only the files whose runs are a tool's. Code review caught `apps/web/src/shared/` listed whole, which would have hidden a "Last run" in `navigation.ts`.
+3. **Keep the renamed thing's natural phrases out of every sense.** A sense listing run kinds by their lead word let "first run" and "failed run" through. Those are the commonest ways to write a sync, so both came out after review, and the one tool-run "first run" left was exempted by file. A code sense that matched `run` before any punctuation also blanked prose ("On that run, a document…"). Code shapes have to be code-only: `run(`, `run.x`, `run =`, `run:` with a callable after it, a declaration keyword before it.
+4. **Prove the row with a planted case, and watch it fail.** "refuses a sync written as a run, passing other runs" (`apps/api/tests/avoid-words.test.ts:640`) plants sync-shaped lines in a words module, the sources slice and a C4 doc, and plants other runs in their own trees. Only the first set may be found. Adding the sources tree to `OTHER_RUN_TREES`, or "first" back to the kinds, turns it red. The whole-tree scan alone cannot catch a sense that is too broad: it only fails when a sense is too narrow.
+5. **Grep the compounds by hand.** Trap 3 above cuts both ways. A one-sense row cannot see `run` inside an identifier, because `findsIn` is `(?<!\w)word(?!\w)` (`apps/api/tests/words-scan.ts:146`) and `_` is a word character. After the green test, the cross-model review still found the worker's `_fail_the_run`. A grep it prompted found `ConnectedSourceRun`, eleven worker test names such as `..._reads_always_next_run`, and five test helpers such as `theRunThatRan`. Search the word's own trees for `[a-z]Run`, `Run[A-Z]`, `_run` and `run_` before calling the sweep done.
 
 ## Why This Matters
 
