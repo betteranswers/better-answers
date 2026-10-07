@@ -292,7 +292,8 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   transaction and removing its store in the job the same action enqueues. The two go together,
   whatever asked for them: the store is the engine's target-state tracking, so rows deleted beside a
   store left standing are re-upserted by nothing (ADR 0036). A *wipe* empties a connected source,
-  and so does a rule change.
+  and so does a rule change. Renaming what the engine lands into empties every connected source,
+  because the tracking keeps the old names and stops deleting without an error.
 - **relation** — a link from one concept to another as the map holds it: the two kinds, the
   section and the sentence around the link (`LINKS_TO`); the kind of a relation is read from
   the sentence, never from a predicate list (ADR 0026). *Supersedes*, a write-up's citation
