@@ -266,7 +266,9 @@ describe("era-independent", () => {
     );
 
     expect(described.get("find")).toContain("Not company knowledge");
+    expect(described.get("find")).toContain("`iri`");
     expect(described.get("find")).toContain("locator");
+    expect(described.get("open")).toContain("`iri`");
     expect(described.get("open")).toContain("locator");
     expect(described.get("open")).toContain(
       "carries the `locator` that opens it only where the source gives one",

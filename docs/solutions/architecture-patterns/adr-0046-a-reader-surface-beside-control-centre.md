@@ -53,3 +53,5 @@ One thing stays open: an Editor's home once question sets land. It is Ask, or th
 The full record as first written, with no amendments: `docs/archive/adr/0046-a-reader-surface-beside-control-centre.md`.
 
 Edited 30/09/2026 with ADR 0047, after the archived record was frozen: the reader area became the Ask area in one rail, the filtered Control Centre it had set aside became the decision, and two of its three open questions were answered, who reads *Questions asked* and where an owning Editor decides. The filename keeps the old words so references still resolve.
+
+Edited 07/10/2026 with BA-29's knowledge words: the Questions page that holds every answer given is named *Questions asked*, in the reader's words, at a new address. The decision to keep its name and address gave way to the glossary; who reads it is unchanged. The rejected rename to *Answers* stays rejected.
