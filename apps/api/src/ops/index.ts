@@ -211,16 +211,16 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
     --wait-seconds <n>  how long to wait for the document's index job (default ${WAIT_SECONDS})
   erasure-rehearsal --workspace <id> --synthetic --run --report <file>   phase two: erase them, write the report, print the tokens again
   dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; per token, which COPY section holds it and in how many lines — never a line
-  provision-workspace --name <name> --slug <slug> --admin <email>
+  provision-workspace --name <name> --short-name <short name> --admin <email>
                                                             a customer's workspace with its first Admin, a person who has signed in; the id it minted is first on the done line
   add-person --email <address> --name <display name>
                                                             a person named before their first sign-in, so add-member can take them; the id it minted is first on the done line
   add-member --workspace <id> --email <email> --role <${ROLES.join("|")}>
                                                             a signed-in person made a member of the workspace; a repeat is refused and never changes a role
-  test-workspace --domain <testing domain> --slug <slug> --admin <email> --editor <email> --viewer <email>
+  test-workspace --domain <testing domain> --short-name <short name> --admin <email> --editor <email> --viewer <email>
                                                             the journeys' test workspace, marked to invite its testing domain alone, its three test people and ${String(INVENTED_MEMBERS)} invented Viewers, made or set back; its id first on the done line
-  rename-workspace --workspace <id> [--name <name>] [--slug <slug>]
-                                                            the workspace's name, its slug, or both; at least one is named, and the other kept
+  rename-workspace --workspace <id> [--name <name>] [--short-name <short name>]
+                                                            the workspace's name, its short name, or both; at least one is named, and the other kept
   operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
   restore-sign-in --email <email>                           a person who lost every factor and code, once you have checked who they are another way: their factors and sessions ended, a notice sent, a one-time restore code printed
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <class>] [--dry-run]
@@ -984,7 +984,7 @@ const noSuchWorkspace = (workspaceId: string): string =>
 
 const provisionReason = (
   refusal: ProvisionRefusal | Error,
-  slug: string,
+  shortName: string,
   email: string,
 ): string => {
   if (refusal instanceof Error) return refusal.message;
@@ -994,9 +994,9 @@ const provisionReason = (
     case "no-display-name":
       return noDisplayName(email);
     case "slug-taken":
-      return `slug-taken: another workspace already holds the slug ${slug}`;
+      return `slug-taken: another workspace already holds the short name ${shortName}`;
     case "malformed":
-      return "malformed: the name and the slug must each carry at least one character";
+      return "malformed: the name and the short name must each carry at least one character";
     default:
       return refusal;
   }
@@ -1013,11 +1013,11 @@ const signedInPerson = async (
 
 const provisionRefused = (
   refusal: ProvisionRefusal | Error,
-  slug: string,
+  shortName: string,
   email: string,
   io: OpsIo,
 ): number => {
-  io.say(`provision-workspace: REFUSED — ${provisionReason(refusal, slug, email)}`);
+  io.say(`provision-workspace: REFUSED — ${provisionReason(refusal, shortName, email)}`);
   return exitOf(refusal);
 };
 
@@ -1031,10 +1031,12 @@ const provisionWorkspaceCommand = async (
   io: OpsIo,
 ): Promise<number> => {
   const name = flagValue(flags, "name");
-  const slug = flagValue(flags, "slug");
+  const shortName = flagValue(flags, "short-name");
   const email = flagValue(flags, "admin");
-  if (name === undefined || slug === undefined || email === undefined) {
-    io.say("provision-workspace: --name <name>, --slug <slug> and --admin <email> are required");
+  if (name === undefined || shortName === undefined || email === undefined) {
+    io.say(
+      "provision-workspace: --name <name>, --short-name <short name> and --admin <email> are required",
+    );
     return USAGE;
   }
   const git = bundleStore(doors, "the workspace's bundle repository cannot be created");
@@ -1044,15 +1046,15 @@ const provisionWorkspaceCommand = async (
   }
   const postgres = doors.postgres;
   const admin = await signedInPerson(postgres, email);
-  if (!admin.ok) return provisionRefused(admin.error, slug, email, io);
+  if (!admin.ok) return provisionRefused(admin.error, shortName, email, io);
   const id = ulid();
   const provisioned = await provisionWorkspace(BOOTSTRAP, postgres, {
     id,
     name,
-    slug,
+    shortName,
     adminUserId: admin.value,
   });
-  if (!provisioned.ok) return provisionRefused(provisioned.error, slug, email, io);
+  if (!provisioned.ok) return provisionRefused(provisioned.error, shortName, email, io);
   const repository = await attempt(() => initRepository(git.value, id));
   if (!repository.ok) {
     io.say(
@@ -1060,7 +1062,7 @@ const provisionWorkspaceCommand = async (
     );
     return REFUSED;
   }
-  io.say(`provision-workspace: done — ${id}, slug ${slug}, Admin ${email}`);
+  io.say(`provision-workspace: done — ${id}, short name ${shortName}, Admin ${email}`);
   return DONE;
 };
 
@@ -1147,24 +1149,24 @@ const addPersonCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<
 };
 
 const TEST_WORKSPACE_USAGE =
-  "test-workspace: --domain <testing domain>, --slug <slug>, --admin <email>, --editor <email> and --viewer <email> are required";
+  "test-workspace: --domain <testing domain>, --short-name <short name>, --admin <email>, --editor <email> and --viewer <email> are required";
 
-const TEST_WORKSPACE_FLAGS = ["domain", "slug", "admin", "editor", "viewer"] as const;
+const TEST_WORKSPACE_FLAGS = ["domain", "short-name", "admin", "editor", "viewer"] as const;
 
 const testWorkspaceAskedOf = (flags: Flags): TestWorkspaceInput | undefined => {
-  const [testingDomain, slug, admin, editor, viewer] = TEST_WORKSPACE_FLAGS.map((name) =>
+  const [testingDomain, shortName, admin, editor, viewer] = TEST_WORKSPACE_FLAGS.map((name) =>
     flagValue(flags, name),
   );
   if (
     testingDomain === undefined ||
-    slug === undefined ||
+    shortName === undefined ||
     admin === undefined ||
     editor === undefined ||
     viewer === undefined
   ) {
     return undefined;
   }
-  return { testingDomain, slug, admin, editor, viewer };
+  return { testingDomain, shortName, admin, editor, viewer };
 };
 
 type AddressRefused = Extract<TestWorkspaceRefusal, { readonly address: string }>;
@@ -1186,9 +1188,9 @@ const testWorkspaceReason = (
 ): string => {
   switch (refusal) {
     case "malformed":
-      return "malformed: --domain is a domain every test and invented address can carry, --slug is not blank, and the three addresses are three different addresses";
+      return "malformed: --domain is a domain every test and invented address can carry, --short-name is not blank, and the three addresses are three different addresses";
     case "slug-taken":
-      return `slug-taken: the workspace holding the slug ${asked.slug} has a member or a waiting invitation off ${asked.testingDomain}, so it is not the test workspace; it is left as it is`;
+      return `slug-taken: the workspace holding the short name ${asked.shortName} has a member or a waiting invitation off ${asked.testingDomain}, so it is not the test workspace; it is left as it is`;
     case "no-display-name":
       return "no-display-name: a test person signed in and gave no display name; have them give one, then run this again";
     default:
@@ -1229,7 +1231,7 @@ const changesOf = (standing: TestWorkspaceStanding): readonly string[] => {
 const doneSaid = (standing: TestWorkspaceStanding): string => {
   const changes = changesOf(standing);
   const said = changes.length === 0 ? "nothing to do" : changes.join(", ");
-  return `test-workspace: done — ${standing.workspaceId}, slug ${standing.slug}, testing domain ${standing.testingDomain}; ${said}`;
+  return `test-workspace: done — ${standing.workspaceId}, short name ${standing.shortName}, testing domain ${standing.testingDomain}; ${said}`;
 };
 
 const unexpectedSaid = (member: TestWorkspaceStanding["unexpected"][number]): string => {
@@ -1268,11 +1270,11 @@ const renameReason = (refusal: RenameRefusal | Error, workspaceId: string): stri
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
     case "malformed":
-      return "malformed: give --workspace a workspace id, and --name, --slug or both a value that is not blank";
+      return "malformed: give --workspace a workspace id, and --name, --short-name or both a value that is not blank";
     case "no-such-workspace":
       return noSuchWorkspace(workspaceId);
     case "slug-taken":
-      return "slug-taken: another workspace already holds that slug";
+      return "slug-taken: another workspace already holds that short name";
   }
 };
 
@@ -1280,21 +1282,23 @@ const renameWorkspaceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Pr
   const workspaceId = flagValue(flags, "workspace");
   if (workspaceId === undefined) {
     io.say(
-      "rename-workspace: --workspace <id> is required, with --name <name>, --slug <slug> or both",
+      "rename-workspace: --workspace <id> is required, with --name <name>, --short-name <short name> or both",
     );
     return USAGE;
   }
   const renamed = await renameWorkspace(BOOTSTRAP, doors.postgres, {
     workspaceId,
     name: flagValue(flags, "name"),
-    slug: flagValue(flags, "slug"),
+    shortName: flagValue(flags, "short-name"),
   });
   if (!renamed.ok) {
     io.say(`rename-workspace: REFUSED — ${renameReason(renamed.error, workspaceId)}`);
     return exitOf(renamed.error);
   }
-  const { name, slug } = renamed.value;
-  io.say(`rename-workspace: done — workspace ${workspaceId} is named ${name}, slug ${slug}`);
+  const { name, shortName } = renamed.value;
+  io.say(
+    `rename-workspace: done — workspace ${workspaceId} is named ${name}, short name ${shortName}`,
+  );
   return DONE;
 };
 

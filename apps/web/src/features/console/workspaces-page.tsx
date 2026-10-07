@@ -44,9 +44,9 @@ function WorkspaceItem(properties: { readonly workspace: ListedWorkspace }) {
       </div>
 
       <Facts>
-        <dt className={TERM}>Slug</dt>
+        <dt className={TERM}>Short name</dt>
         <dd>
-          <code className="font-mono break-all">{workspace.slug}</code>
+          <code className="font-mono break-all">{workspace.shortName}</code>
         </dd>
         <dt className={TERM}>Provisioned</dt>
         <dd>{dayWords(workspace.createdAt)}</dd>

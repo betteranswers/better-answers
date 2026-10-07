@@ -15,9 +15,9 @@ cases="$(cat "$(dirname "$0")/../contracts/document-passage/cases.json")"
 # Staging must never hold an invented person, nor the sort code this redacted case withholds: that is the seam's input, which no row holds.
 PGCLIENTENCODING=UTF8 psql "${dsn}" -v ON_ERROR_STOP=1 -qAt -v cases="${cases}" -v workspace="${workspace}" <<'SQL'
 BEGIN;
-INSERT INTO workspace (id, name, slug)
+INSERT INTO workspace (id, name, short_name)
   VALUES (:'workspace', 'Synthetic fixture', 'synthetic')
-  ON CONFLICT (slug) DO NOTHING;
+  ON CONFLICT (short_name) DO NOTHING;
 SELECT set_config('app.workspace_id', :'workspace', true) \g /dev/null
 -- Quoted by format: a ULID is upper case, so the partition's name is too.
 SELECT create_workspace_partition(:'workspace')
@@ -43,7 +43,7 @@ INSERT INTO "index".passage
          c ->> 'locator', c ->> 'content'
     FROM fixture, jsonb_array_elements(d -> 'passages') AS c
   ON CONFLICT DO NOTHING;
-SELECT format('synthetic fixture present: workspace %s, slug synthetic, %s connected source, %s document, %s passages',
+SELECT format('synthetic fixture present: workspace %s, short name synthetic, %s connected source, %s document, %s passages',
               :'workspace',
               (SELECT count(*) FROM connected_source WHERE workspace_id = :'workspace'),
               (SELECT count(*) FROM source_document WHERE workspace_id = :'workspace'),

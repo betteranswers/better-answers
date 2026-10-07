@@ -4,6 +4,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { boundarySchemas, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
+import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import {
   attempt,
   type Claims,
@@ -34,7 +35,7 @@ import {
   setOperatorMark,
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
-  workspaceIdBySlug,
+  workspaceIdByShortName,
   workspacesHeldBy,
 } from "../src/workspaces/index.ts";
 import { endedGrants, issuedCredentialsFor, OAUTH_CLIENT_ID } from "./identity-rows.ts";
@@ -105,7 +106,7 @@ describe("provisioning a workspace", () => {
     const provisioned = await provisionWorkspace(bootstrap, door, {
       id,
       name: "Acme",
-      slug: `acme-${id.toLowerCase()}`,
+      shortName: `acme-${id.toLowerCase()}`,
       adminUserId,
     });
 
@@ -148,7 +149,7 @@ describe("provisioning a workspace", () => {
     const provisioned = await provisionWorkspace(bootstrap, door, {
       id,
       name: "Audited",
-      slug: `audited-${id.toLowerCase()}`,
+      shortName: `audited-${id.toLowerCase()}`,
       adminUserId,
     });
 
@@ -189,7 +190,7 @@ describe("provisioning a workspace", () => {
     await provisionWorkspace(bootstrap, door, {
       id,
       name: "Minted",
-      slug: `minted-${id.toLowerCase()}`,
+      shortName: `minted-${id.toLowerCase()}`,
       adminUserId,
     });
 
@@ -211,7 +212,7 @@ describe("provisioning a workspace", () => {
     const provisioned = await provisionWorkspace(bootstrap, door, {
       id,
       name: "Ghost",
-      slug: `ghost-${id.toLowerCase()}`,
+      shortName: `ghost-${id.toLowerCase()}`,
 
       adminUserId: ulid(),
     });
@@ -238,7 +239,7 @@ describe("provisioning a workspace", () => {
       const provisioned = await provisionWorkspace(bootstrap, door, {
         id,
         name: "Unnamed",
-        slug: `unnamed-${id.toLowerCase()}`,
+        shortName: `unnamed-${id.toLowerCase()}`,
         adminUserId,
       });
 
@@ -257,22 +258,22 @@ describe("provisioning a workspace", () => {
     },
   );
 
-  it("refuses a slug another workspace already holds", async () => {
+  it("refuses a short name another workspace already holds", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db().runtimePool);
-    const slug = `taken-${ulid().toLowerCase()}`;
+    const shortName = `taken-${ulid().toLowerCase()}`;
 
     const first = await provisionWorkspace(bootstrap, door, {
       id: ulid(),
       name: "One",
-      slug,
+      shortName,
       adminUserId,
     });
     const secondId = ulid();
     const second = await provisionWorkspace(bootstrap, door, {
       id: secondId,
       name: "Two",
-      slug,
+      shortName,
       adminUserId,
     });
 
@@ -293,13 +294,13 @@ describe("provisioning a workspace", () => {
     const first = await provisionWorkspace(bootstrap, door, {
       id,
       name: "One",
-      slug: `first-${id.toLowerCase()}`,
+      shortName: `first-${id.toLowerCase()}`,
       adminUserId,
     });
     const second = await provisionWorkspace(bootstrap, door, {
       id,
       name: "Again",
-      slug: `again-${ulid().toLowerCase()}`,
+      shortName: `again-${ulid().toLowerCase()}`,
       adminUserId,
     });
 
@@ -313,7 +314,7 @@ describe("provisioning a workspace", () => {
     const provisioned = await provisionWorkspace(bootstrap, door, {
       id: "not-a-ulid",
       name: "Bad",
-      slug: "bad",
+      shortName: "bad",
       adminUserId: await seedUser(),
     });
 
@@ -324,7 +325,7 @@ describe("provisioning a workspace", () => {
     const provisioned = await provisionWorkspace(bootstrap, await unreachableDoor(), {
       id: ulid(),
       name: "Unreachable",
-      slug: `unreachable-${ulid().toLowerCase()}`,
+      shortName: `unreachable-${ulid().toLowerCase()}`,
       adminUserId: await seedUser(),
     });
 
@@ -621,7 +622,7 @@ describe("reading the session's member", () => {
     const provisioned = await provisionWorkspace(bootstrap, door, {
       id,
       name: "Shell",
-      slug: `shell-${id.toLowerCase()}`,
+      shortName: `shell-${id.toLowerCase()}`,
       adminUserId,
     });
     expect(provisioned.ok).toBe(true);
@@ -821,7 +822,7 @@ describe("the workspaces a person holds", () => {
       const provisioned = await provisionWorkspace(bootstrap, door, {
         id,
         name,
-        slug: `${name.toLowerCase()}-${id.toLowerCase()}`,
+        shortName: `${name.toLowerCase()}-${id.toLowerCase()}`,
         adminUserId: person,
       });
       expect(provisioned.ok).toBe(true);
@@ -833,7 +834,7 @@ describe("the workspaces a person holds", () => {
         await provisionWorkspace(bootstrap, door, {
           id: theirs,
           name: "Gamma",
-          slug: `gamma-${theirs.toLowerCase()}`,
+          shortName: `gamma-${theirs.toLowerCase()}`,
           adminUserId: colleague,
         })
       ).ok,
@@ -876,7 +877,7 @@ describe("what the slice answers when the store cannot be reached", () => {
         await revokeWorkspaceTokens(bootstrap, door, { workspaceId: ulid(), userId, at }),
       ],
       ["workspacesHeldBy", await workspacesHeldBy(bootstrap, door, userId)],
-      ["workspaceIdBySlug", await workspaceIdBySlug(bootstrap, door, "acme")],
+      ["workspaceIdByShortName", await workspaceIdByShortName(bootstrap, door, "acme")],
       ["personIdByEmail", await personIdByEmail(bootstrap, door, "acme@example.invalid")],
       [
         "addMember",
@@ -960,7 +961,7 @@ describe("what the slice answers when the store cannot be reached", () => {
     for (const input of [
       { workspaceId: "not-a-ulid", name: "Acme" },
       { workspaceId: ulid(), name: "   " },
-      { workspaceId: ulid(), slug: "" },
+      { workspaceId: ulid(), shortName: "" },
       { workspaceId: ulid() },
     ]) {
       expect({ input, answered: await renameWorkspace(bootstrap, door, input) }).toEqual({
@@ -969,7 +970,10 @@ describe("what the slice answers when the store cannot be reached", () => {
       });
     }
 
-    expect(await workspaceIdBySlug(bootstrap, door, "   ")).toEqual({ ok: true, value: undefined });
+    expect(await workspaceIdByShortName(bootstrap, door, "   ")).toEqual({
+      ok: true,
+      value: undefined,
+    });
   });
 });
 
@@ -1130,8 +1134,8 @@ describe("adding a signed-in person as a member, the platform's act", () => {
 
 describe("renaming a workspace — the platform's act", () => {
   const standingOf = async (workspaceId: string) => {
-    const found = await db().pool.query<{ name: string; slug: string }>(
-      "SELECT name, slug FROM workspace WHERE id = $1",
+    const found = await db().pool.query<{ name: string; shortName: string }>(
+      'SELECT name, short_name AS "shortName" FROM workspace WHERE id = $1',
       [workspaceId],
     );
     return found.rows;
@@ -1147,12 +1151,12 @@ describe("renaming a workspace — the platform's act", () => {
 
   it("sets both, answering the standing and recording one row", async () => {
     const { door, workspaceId } = await provisionedWorkspace(db(), "Acme");
-    const slug = `group-${workspaceId.toLowerCase()}`;
+    const shortName = `group-${workspaceId.toLowerCase()}`;
 
     const renamed = await renameWorkspace(bootstrap, door, {
       workspaceId,
       name: "  Acme Group ",
-      slug,
+      shortName,
     });
 
     expect(renamed).toEqual({
@@ -1160,11 +1164,11 @@ describe("renaming a workspace — the platform's act", () => {
       value: {
         workspaceId,
         name: "Acme Group",
-        slug,
+        shortName,
         actorId: "process:better-answers-bootstrap",
       },
     });
-    expect(await standingOf(workspaceId)).toEqual([{ name: "Acme Group", slug }]);
+    expect(await standingOf(workspaceId)).toEqual([{ name: "Acme Group", shortName }]);
     expect(await renamedRowsOf(workspaceId)).toEqual([
       {
         id: expect.stringMatching(ULID_SHAPE),
@@ -1173,7 +1177,7 @@ describe("renaming a workspace — the platform's act", () => {
         actor: "process:better-answers-bootstrap",
         subject_kind: "workspace",
         subject_id: workspaceId,
-        detail: { nameChanged: true, slugChanged: true },
+        detail: { nameChanged: true, [STORED_DETAIL_KEYS.shortNameChanged]: true },
         batch_id: null,
       },
     ]);
@@ -1181,55 +1185,59 @@ describe("renaming a workspace — the platform's act", () => {
 
   it("keeps an omitted field, recording only the other as changed", async () => {
     const named = await provisionedWorkspace(db(), "Named");
-    const slugged = await provisionedWorkspace(db(), "Slugged");
-    const newSlug = `moved-${slugged.workspaceId.toLowerCase()}`;
+    const moved = await provisionedWorkspace(db(), "Moved");
+    const newShortName = `elsewhere-${moved.workspaceId.toLowerCase()}`;
 
     await renameWorkspace(bootstrap, named.door, {
       workspaceId: named.workspaceId,
       name: "Named Again",
     });
-    await renameWorkspace(bootstrap, slugged.door, {
-      workspaceId: slugged.workspaceId,
-      slug: newSlug,
+    await renameWorkspace(bootstrap, moved.door, {
+      workspaceId: moved.workspaceId,
+      shortName: newShortName,
     });
 
     expect({
       named: await standingOf(named.workspaceId),
-      slugged: await standingOf(slugged.workspaceId),
+      moved: await standingOf(moved.workspaceId),
     }).toEqual({
-      named: [{ name: "Named Again", slug: named.slug }],
-      slugged: [{ name: "Slugged", slug: newSlug }],
+      named: [{ name: "Named Again", shortName: named.shortName }],
+      moved: [{ name: "Moved", shortName: newShortName }],
     });
     expect({
       named: (await renamedRowsOf(named.workspaceId)).map((row) => row.detail),
-      slugged: (await renamedRowsOf(slugged.workspaceId)).map((row) => row.detail),
+      moved: (await renamedRowsOf(moved.workspaceId)).map((row) => row.detail),
     }).toEqual({
-      named: [{ nameChanged: true, slugChanged: false }],
-      slugged: [{ nameChanged: false, slugChanged: true }],
+      named: [{ nameChanged: true, [STORED_DETAIL_KEYS.shortNameChanged]: false }],
+      moved: [{ nameChanged: false, [STORED_DETAIL_KEYS.shortNameChanged]: true }],
     });
   });
 
   it("writes nothing when the input changes neither field", async () => {
-    const { door, workspaceId, slug } = await provisionedWorkspace(db(), "Same");
+    const { door, workspaceId, shortName } = await provisionedWorkspace(db(), "Same");
 
-    const renamed = await renameWorkspace(bootstrap, door, { workspaceId, name: "Same", slug });
+    const renamed = await renameWorkspace(bootstrap, door, {
+      workspaceId,
+      name: "Same",
+      shortName,
+    });
 
     expect(renamed).toEqual({
       ok: true,
-      value: { workspaceId, name: "Same", slug, actorId: "process:better-answers-bootstrap" },
+      value: { workspaceId, name: "Same", shortName, actorId: "process:better-answers-bootstrap" },
     });
     expect(await renamedRowsOf(workspaceId)).toEqual([]);
   });
 
   it("refuses slug-taken and no-such-workspace, writing nothing", async () => {
     const holder = await provisionedWorkspace(db(), "Holder");
-    const { door, workspaceId, slug } = await provisionedWorkspace(db(), "Taker");
+    const { door, workspaceId, shortName } = await provisionedWorkspace(db(), "Taker");
 
     const refusals = [
       await renameWorkspace(bootstrap, door, {
         workspaceId,
         name: "Taker Again",
-        slug: holder.slug,
+        shortName: holder.shortName,
       }),
       await renameWorkspace(bootstrap, door, { workspaceId: ulid(), name: "Nowhere" }),
     ];
@@ -1238,19 +1246,19 @@ describe("renaming a workspace — the platform's act", () => {
       { ok: false, error: "slug-taken" },
       { ok: false, error: "no-such-workspace" },
     ]);
-    expect(await standingOf(workspaceId)).toEqual([{ name: "Taker", slug }]);
+    expect(await standingOf(workspaceId)).toEqual([{ name: "Taker", shortName }]);
     expect(await renamedRowsOf(workspaceId)).toEqual([]);
   });
 
   it("renames and records together, or neither", async () => {
-    const { door, workspaceId, slug } = await provisionedWorkspace(db(), "Atomic");
+    const { door, workspaceId, shortName } = await provisionedWorkspace(db(), "Atomic");
 
     const renamed = await whileWritesAreRefused(db().pool, "audit_event", () =>
       renameWorkspace(bootstrap, door, { workspaceId, name: "Atomic Again" }),
     );
 
     expect(renamed).toMatchObject({ ok: false, error: expect.any(Error) });
-    expect(await standingOf(workspaceId)).toEqual([{ name: "Atomic", slug }]);
+    expect(await standingOf(workspaceId)).toEqual([{ name: "Atomic", shortName }]);
   });
 });
 
@@ -1489,7 +1497,7 @@ describe("the operator mark, set and cleared by the platform", () => {
 });
 
 describe("the operator's list of every workspace", () => {
-  it("names each workspace with its slug, members and creation", async () => {
+  it("names each workspace with its short name, members and creation", async () => {
     const acme = await provisionedWorkspace(db(), "Acme");
     const second = addressOf("second");
     await seedPerson(db().pool, { email: second });
@@ -1510,7 +1518,7 @@ describe("the operator's list of every workspace", () => {
     expect(workspaces.find((workspace) => workspace.id === acme.workspaceId)).toEqual({
       id: acme.workspaceId,
       name: "Acme",
-      slug: `acme-${acme.workspaceId.toLowerCase()}`,
+      shortName: `acme-${acme.workspaceId.toLowerCase()}`,
       memberCount: 2,
       createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
     });

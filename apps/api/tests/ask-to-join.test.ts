@@ -13,7 +13,7 @@ const REASON = "I run the estimating desk and need the tender library.";
 
 const ACKNOWLEDGED = { acknowledged: true };
 
-const unknownSlug = (): string => `nobody-${Math.random().toString(36).slice(2)}`;
+const unknownShortName = (): string => `nobody-${Math.random().toString(36).slice(2)}`;
 
 const aSignedInPerson = async () => {
   const person = await app().person();
@@ -34,12 +34,12 @@ const asksBy = async (personId: string) => {
 };
 
 describe("a signed-in person asking to join a workspace over tRPC", () => {
-  it("records the ask against a known slug, booked to them", async () => {
+  it("books the ask for a known short name to them", async () => {
     const workspace = await app().provision();
     const { person, api } = await aSignedInPerson();
 
     const answered = await api.person.requestAccess.mutate({
-      slug: workspace.slug,
+      shortName: workspace.shortName,
       reason: REASON,
     });
 
@@ -54,20 +54,21 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     expect(booked.rows).toEqual([{ act: "people.request.asked", actor: `human:${person.id}` }]);
   });
 
-  it("answers alike for unknown, joined and already-waiting slugs", async () => {
+  it("answers alike for unknown, joined and already-waiting short names", async () => {
     const joined = await app().provision();
     const waitedOn = await app().provision();
     const fresh = await app().provision();
     const { person, api } = await aSignedInPerson();
     await app().addMember(joined.workspaceId, person.id, "Viewer");
-    const ask = (slug: string) => api.person.requestAccess.mutate({ slug, reason: REASON });
-    await ask(waitedOn.slug);
+    const ask = (shortName: string) =>
+      api.person.requestAccess.mutate({ shortName, reason: REASON });
+    await ask(waitedOn.shortName);
 
     const answers = [
-      await ask(fresh.slug),
-      await ask(unknownSlug()),
-      await ask(joined.slug),
-      await ask(waitedOn.slug),
+      await ask(fresh.shortName),
+      await ask(unknownShortName()),
+      await ask(joined.shortName),
+      await ask(waitedOn.shortName),
     ];
 
     expect(answers).toEqual([ACKNOWLEDGED, ACKNOWLEDGED, ACKNOWLEDGED, ACKNOWLEDGED]);
@@ -82,7 +83,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     const { person, api } = await aSignedInPerson();
 
     const refused = await refusalOfCall(
-      api.person.requestAccess.mutate({ slug: workspace.slug, reason: "   " }),
+      api.person.requestAccess.mutate({ shortName: workspace.shortName, reason: "   " }),
     );
 
     expect(refused).toMatchObject({
@@ -97,7 +98,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     const other = await app().person();
 
     const response = await client.json(REQUEST_ACCESS, {
-      slug: workspace.slug,
+      shortName: workspace.shortName,
       reason: REASON,
       requesterId: other.id,
     });
@@ -112,7 +113,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
 
     const response = await app()
       .client()
-      .json(REQUEST_ACCESS, { slug: workspace.slug, reason: REASON });
+      .json(REQUEST_ACCESS, { shortName: workspace.shortName, reason: REASON });
 
     expect(response.status).toBe(401);
     expect(await response.json()).toMatchObject(NO_SESSION_ANSWERED);
@@ -127,12 +128,15 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     // again: ask until refused, not a fixed number.
     for (let attempt = 0; attempt <= ASK_TO_JOIN_PERSON_RULE.max * 2 + 1; attempt += 1) {
       const status = await statusOf(
-        api.person.requestAccess.mutate({ slug: unknownSlug(), reason: REASON }),
+        api.person.requestAccess.mutate({ shortName: unknownShortName(), reason: REASON }),
       );
       statuses.push(status);
       if (status === 429) break;
     }
-    const known = await client.json(REQUEST_ACCESS, { slug: workspace.slug, reason: REASON });
+    const known = await client.json(REQUEST_ACCESS, {
+      shortName: workspace.shortName,
+      reason: REASON,
+    });
     const someoneElse = await aSignedInPerson();
 
     expect(statuses.at(-1)).toBe(429);
@@ -146,20 +150,23 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     });
     expect(await asksBy(person.id)).toEqual([]);
     expect(
-      await someoneElse.api.person.requestAccess.mutate({ slug: workspace.slug, reason: REASON }),
+      await someoneElse.api.person.requestAccess.mutate({
+        shortName: workspace.shortName,
+        reason: REASON,
+      }),
     ).toEqual(ACKNOWLEDGED);
   });
 
-  it("answers known and unknown slugs no sooner than 250 ms", async () => {
+  it("answers known and unknown short names no sooner than 250ms", async () => {
     const workspace = await app().provision();
     const { api } = await aSignedInPerson();
-    const timed = async (slug: string): Promise<number> => {
+    const timed = async (shortName: string): Promise<number> => {
       const started = performance.now();
-      await api.person.requestAccess.mutate({ slug, reason: REASON });
+      await api.person.requestAccess.mutate({ shortName, reason: REASON });
       return performance.now() - started;
     };
 
-    expect(await timed(unknownSlug())).toBeGreaterThanOrEqual(250);
-    expect(await timed(workspace.slug)).toBeGreaterThanOrEqual(250);
+    expect(await timed(unknownShortName())).toBeGreaterThanOrEqual(250);
+    expect(await timed(workspace.shortName)).toBeGreaterThanOrEqual(250);
   });
 });

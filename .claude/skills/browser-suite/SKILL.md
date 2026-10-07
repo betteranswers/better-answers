@@ -101,7 +101,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 
 | Act | What it does |
 | --- | --- |
-| `provision` | A workspace with its first Admin — the platform-provisioned act; the product offers no way to make one. It answers the workspace's id, name and slug, and the Admin |
+| `provision` | A workspace with its first Admin — the platform-provisioned act; the product offers no way to make one. It answers the workspace's id, name and short name, and the Admin |
 | `person` | A person in no workspace, for the refused page and the picker |
 | `addMember` | A second member at a named role — Admin, Editor or Viewer |
 | `removeMember` | Removes a member, as the People page will |
@@ -117,7 +117,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `seedConnectedSources` | Connected sources as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, passages, a sync at any status, a concept and composition citing a document — answering each connected source's and document's id |
 | `moveTheSync` | The worker's two steps over the workspace's one sync, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
 | `makeGroups` | Groups made by a named member through the members slice's own acts, one transaction each, every group holding the members `memberIds` names — the member's own acts on the audit log, and the groups the `Groups` page and a member's page start from |
-| `askToJoin` | A person's ask to join a workspace by its slug, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
+| `askToJoin` | A person's ask to join a workspace by its short name, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* page |
 
 Thirty-one more helpers in the same module drive the browser rather than the harness:
@@ -347,7 +347,7 @@ Both read the test people's addresses from `JOURNEYS_ADMIN_EMAIL`, `JOURNEYS_EDI
 `JOURNEYS_VIEWER_EMAIL`. By hand, build first, start the api with
 `pnpm --filter @better-answers/api run serve:e2e <port>`, and make the test workspace through
 `POST /__harness/test-workspaces`, the fixture command's own act, which
-`apps/api/tests/harness-control.ts` mounts and no spec calls. It takes a testing domain, a slug and
+`apps/api/tests/harness-control.ts` mounts and no spec calls. It takes a testing domain, a short name and
 the three addresses. Then:
 
 ```bash

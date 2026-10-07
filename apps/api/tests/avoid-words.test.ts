@@ -315,6 +315,7 @@ describe("the sense a planted line is read in", () => {
 
 const ASSISTANT_WORD = ["cli", "ent"].join("");
 const MEMBER_WORD = ["member", "ship"].join("");
+const SHORT_NAME_WORD = ["sl", "ug"].join("");
 
 /** The trees whose code may hold a library's client object, which the row's senses leave be. */
 const CLIENT_OBJECT_TREES = ["apps/api/tests/", "packages/core/test/", "packages/schema/test/"];
@@ -344,6 +345,31 @@ describe("the senses the people words keep", () => {
     expect(linesOver({ "packages/core/src/planted.ts": planted }, [row])).toEqual([]);
     expect(linesOver({ "apps/web/src/planted.ts": planted }, [row])).toEqual([
       `apps/web/src/planted.ts:1: ${planted.trim()}`,
+    ]);
+  });
+
+  it("refuses the short name's old word in any form", () => {
+    const planted = `const ${SHORT_NAME_WORD}Taken = await held(${SHORT_NAME_WORD}s);`;
+    expect(linesOver({ "apps/web/src/planted.ts": planted }, [rowOf(SHORT_NAME_WORD)])).toEqual([
+      `apps/web/src/planted.ts:1: ${planted}`,
+    ]);
+  });
+
+  it("keeps Better Auth's short name field in its files", () => {
+    const planted = `  organization: { modelName: "workspace", fields: { ${SHORT_NAME_WORD}: "shortName" } },`;
+    const row = rowOf(SHORT_NAME_WORD);
+    expect(linesOver({ "apps/api/src/auth/auth.ts": planted }, [row])).toEqual([]);
+    expect(linesOver({ "apps/api/src/planted.ts": planted }, [row])).toEqual([
+      `apps/api/src/planted.ts:1: ${planted.trim()}`,
+    ]);
+  });
+
+  it("keeps the short name's stored detail key in the web", () => {
+    const planted = `  ${SHORT_NAME_WORD}Changed: "Short name changed",`;
+    const row = rowOf(SHORT_NAME_WORD);
+    expect(linesOver({ "apps/web/src/planted.ts": planted }, [row])).toEqual([]);
+    expect(linesOver({ "packages/core/src/planted.ts": planted }, [row])).toEqual([
+      `packages/core/src/planted.ts:1: ${planted.trim()}`,
     ]);
   });
 

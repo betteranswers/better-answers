@@ -149,7 +149,7 @@ const AUDITED_PATHS: ReadonlyMap<string, AuditEvent> = new Map([
 const auditedEvent = (path: string): AuditEvent | undefined => AUDITED_PATHS.get(path);
 
 /**
- * Their writes change a member or a workspace with no audit event; the slug check tells
+ * Their writes change a member or a workspace with no audit event; the short name check tells
  * anyone whether a company is a customer.
  */
 const CLOSED_ORGANISATION_PATHS = [
@@ -651,7 +651,7 @@ export const createAuth = (deps: AuthDependencies) => {
         invitationExpiresIn: INVITATION_EXPIRY_SECONDS,
 
         schema: {
-          organization: { modelName: "workspace" },
+          organization: { modelName: "workspace", fields: { slug: "shortName" } },
           member: {
             fields: { organizationId: "workspaceId" },
             additionalFields: {

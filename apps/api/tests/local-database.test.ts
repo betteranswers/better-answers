@@ -112,7 +112,7 @@ describe("the local database", () => {
 
   it("names the synthetic workspace's id as it seeds it", () => {
     expect(upFirst.stdout).toContain(
-      `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic`,
+      `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, short name synthetic`,
     );
   });
 
@@ -229,7 +229,7 @@ describe("the local database", () => {
       );
       expect({ status: seeded.status, stderr: seeded.stderr }).toEqual({ status: 0, stderr: "" });
       expect(seeded.stdout).toContain(
-        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic, 1 connected source, 1 document, 3 passages`,
+        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, short name synthetic, 1 connected source, 1 document, 3 passages`,
       );
     });
   });
@@ -290,10 +290,10 @@ describe("the local database", () => {
     const client = await owner.connect();
     let earlier: string;
     try {
-      await client.query("UPDATE workspace SET slug = 'synthetic-now' WHERE id = $1", [
+      await client.query("UPDATE workspace SET short_name = 'synthetic-now' WHERE id = $1", [
         SYNTHETIC_WORKSPACE,
       ]);
-      earlier = (await testData(client).workspace({ slug: "synthetic" })).id;
+      earlier = (await testData(client).workspace({ shortName: "synthetic" })).id;
     } finally {
       client.release();
       await owner.end();

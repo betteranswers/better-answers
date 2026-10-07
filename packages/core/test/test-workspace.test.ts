@@ -35,7 +35,7 @@ const aFixture = () => {
   const testingDomain = `${ulid().toLowerCase()}.testing.invalid`;
   return {
     testingDomain,
-    slug: `journeys-${ulid().toLowerCase()}`,
+    shortName: `journeys-${ulid().toLowerCase()}`,
     admin: `admin@${testingDomain}`,
     editor: `editor@${testingDomain}`,
     viewer: `viewer@${testingDomain}`,
@@ -102,8 +102,8 @@ const invitationsLeftIn = (
     }
   });
 
-const workspacesWithSlug = async (slug: string) =>
-  (await db().pool.query("SELECT id FROM workspace WHERE slug = $1", [slug])).rows;
+const workspacesWithShortName = async (shortName: string) =>
+  (await db().pool.query("SELECT id FROM workspace WHERE short_name = $1", [shortName])).rows;
 
 const markOf = async (workspaceId: string) =>
   (
@@ -153,7 +153,7 @@ const asTheAdmin = async <T>(
     door: openPostgres(db().runtimePool),
     workspaceId,
     name: "Test workspace",
-    slug: fixture.slug,
+    shortName: fixture.shortName,
     adminUserId,
   };
   return heldAs(workspace, adminUserId, work);
@@ -168,7 +168,7 @@ describe("ensuring the test workspace", () => {
     expect(made).toEqual({
       workspaceId: expect.stringMatching(ULID),
       testingDomain: fixture.testingDomain,
-      slug: fixture.slug,
+      shortName: fixture.shortName,
       provisioned: true,
       mark: "written",
       peopleAdded: 54,
@@ -234,7 +234,7 @@ describe("ensuring the test workspace", () => {
       value: {
         workspaceId,
         testingDomain: fixture.testingDomain,
-        slug: fixture.slug,
+        shortName: fixture.shortName,
         provisioned: false,
         mark: "kept",
         peopleAdded: 0,
@@ -363,7 +363,7 @@ describe("ensuring the test workspace", () => {
     const halfWritten = await provisionedWorkspace(db(), "HalfWritten", { email: fixture.admin });
     const workspaceId = halfWritten.workspaceId;
 
-    const finished = answeredValue(await ensured({ ...fixture, slug: halfWritten.slug }));
+    const finished = answeredValue(await ensured({ ...fixture, shortName: halfWritten.shortName }));
 
     expect(finished).toMatchObject({
       workspaceId,
@@ -393,7 +393,7 @@ describe("ensuring the test workspace", () => {
       }),
     );
 
-    const remarked = answeredValue(await ensured({ ...fixture, slug: workspace.slug }));
+    const remarked = answeredValue(await ensured({ ...fixture, shortName: workspace.shortName }));
 
     expect(remarked).toMatchObject({ provisioned: false, mark: "corrected" });
     expect(await markOf(workspace.workspaceId)).toEqual([
@@ -424,7 +424,7 @@ describe("what ensuring the test workspace refuses", () => {
       ok: false,
       error: { word: "off-testing-domain", address: "viewer@elsewhere.invalid" },
     });
-    expect(await workspacesWithSlug(fixture.slug)).toEqual([]);
+    expect(await workspacesWithShortName(fixture.shortName)).toEqual([]);
     expect(await peopleOn(fixture)).toEqual([]);
   });
 
@@ -442,7 +442,7 @@ describe("what ensuring the test workspace refuses", () => {
       ok: false,
       error: { word: "member-elsewhere", address: fixture.editor },
     });
-    expect(await workspacesWithSlug(fixture.slug)).toEqual([]);
+    expect(await workspacesWithShortName(fixture.shortName)).toEqual([]);
     expect((await peopleOn(fixture)).map((one) => one.address)).toEqual([fixture.editor]);
   });
 
@@ -461,16 +461,16 @@ describe("what ensuring the test workspace refuses", () => {
       ok: false,
       error: { word: "operator-marked", address: fixture.admin },
     });
-    expect(await workspacesWithSlug(fixture.slug)).toEqual([]);
+    expect(await workspacesWithShortName(fixture.shortName)).toEqual([]);
     expect((await peopleOn(fixture)).map((one) => one.operator)).toEqual([true, true]);
   });
 
-  it("refuses, never adopts, a slug held with an off-domain member", async () => {
+  it("refuses, never adopts, a short name held off-domain", async () => {
     const fixture = aFixture();
     const held = await provisionedWorkspace(db(), "Held");
     const members = await membersOf(held.workspaceId);
 
-    const refused = await ensured({ ...fixture, slug: held.slug });
+    const refused = await ensured({ ...fixture, shortName: held.shortName });
 
     expect(refused).toEqual({ ok: false, error: "slug-taken" });
     expect(await membersOf(held.workspaceId)).toEqual(members);
@@ -478,7 +478,7 @@ describe("what ensuring the test workspace refuses", () => {
     expect(await peopleOn(fixture)).toEqual([]);
   });
 
-  it("refuses, never adopts, a slug with an off-domain invitation waiting", async () => {
+  it("refuses, never adopts, a short name whose off-domain invitation waits", async () => {
     const fixture = aFixture();
     const held = await provisionedWorkspace(db(), "Inviting", { email: fixture.admin });
     await invitationsLeftIn(held, [
@@ -487,7 +487,7 @@ describe("what ensuring the test workspace refuses", () => {
     ]);
     const events = await eventsIn(held.workspaceId);
 
-    const refused = await ensured({ ...fixture, slug: held.slug });
+    const refused = await ensured({ ...fixture, shortName: held.shortName });
 
     expect(refused).toEqual({ ok: false, error: "slug-taken" });
     expect(await markOf(held.workspaceId)).toEqual([]);
@@ -495,14 +495,14 @@ describe("what ensuring the test workspace refuses", () => {
     expect((await peopleOn(fixture)).map((one) => one.address)).toEqual([fixture.admin]);
   });
 
-  it("adopts a slug whose off-domain invitations no longer wait", async () => {
+  it("adopts a short name whose off-domain invitations no longer wait", async () => {
     const fixture = aFixture();
     const held = await provisionedWorkspace(db(), "InvitedOnce", { email: fixture.admin });
     await invitationsLeftIn(held, [
       { email: "ben@elsewhere.invalid", status: INVITATION_CANCELLED_STATUS },
     ]);
 
-    const adopted = await ensured({ ...fixture, slug: held.slug });
+    const adopted = await ensured({ ...fixture, shortName: held.shortName });
 
     expect(adopted).toMatchObject({ ok: true, value: { provisioned: false, mark: "written" } });
   });
@@ -522,7 +522,7 @@ describe("what ensuring the test workspace refuses", () => {
     const refused = await ensured({ ...fixture, testingDomain: "journeys" });
 
     expect(refused).toEqual({ ok: false, error: "malformed" });
-    expect(await workspacesWithSlug(fixture.slug)).toEqual([]);
+    expect(await workspacesWithShortName(fixture.shortName)).toEqual([]);
   });
 
   it("refuses a testing domain the invented addresses cannot carry", async () => {
@@ -539,7 +539,7 @@ describe("what ensuring the test workspace refuses", () => {
     const refused = await ensured(fixture);
 
     expect(refused).toEqual({ ok: false, error: "malformed" });
-    expect(await workspacesWithSlug(fixture.slug)).toEqual([]);
+    expect(await workspacesWithShortName(fixture.shortName)).toEqual([]);
     expect(await peopleOn(fixture)).toEqual([]);
   });
 

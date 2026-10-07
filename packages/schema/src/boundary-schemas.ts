@@ -134,7 +134,7 @@ const plain = <TTable extends PgTable>(table: TTable) =>
 const workspaceRefinements = {
   id: workspaceId,
   name: (schema: z.ZodString) => schema.trim().min(1),
-  slug: (schema: z.ZodString) => schema.trim().min(1),
+  shortName: (schema: z.ZodString) => schema.trim().min(1),
 };
 
 export const workspaceSelect = createSelectSchema(workspace, workspaceRefinements);

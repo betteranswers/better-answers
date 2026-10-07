@@ -15,7 +15,11 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
-import { ASK_TO_JOIN_WORDS, REASON_MAX_CHARACTERS, SLUG_EXAMPLE } from "./ask-to-join-words.ts";
+import {
+  ASK_TO_JOIN_WORDS,
+  REASON_MAX_CHARACTERS,
+  SHORT_NAME_EXAMPLE,
+} from "./ask-to-join-words.ts";
 import { focusOn, Refused } from "./auth-page.tsx";
 import { ASK_REFUSED, ASK_UNANSWERED, askedTooOften, REASON_REFUSED } from "./refusal-words.ts";
 
@@ -23,9 +27,9 @@ export const ASK_TO_JOIN: Keystroke = { key: "j", act: ASK_TO_JOIN_WORDS.heading
 
 const HEADING = "ask-to-join-heading";
 
-const SLUG_FIELD = "ask-to-join-slug";
+const SHORT_NAME_FIELD = "ask-to-join-short-name";
 
-const SLUG_HINT = "ask-to-join-slug-hint";
+const SHORT_NAME_HINT = "ask-to-join-short-name-hint";
 
 const REASON_FIELD = "ask-to-join-reason";
 
@@ -85,12 +89,12 @@ function AskOutcome(properties: {
 export function AskToJoin() {
   const api = useTRPC();
   const requestAccess = useMutation(api.person.requestAccess.mutationOptions());
-  const [slug, setSlug] = useState("");
+  const [shortName, setShortName] = useState("");
   const [reason, setReason] = useState("");
   const [sent, setSent] = useState(false);
 
   useKeystroke(ASK_TO_JOIN, () => {
-    focusOn(SLUG_FIELD);
+    focusOn(SHORT_NAME_FIELD);
   });
 
   const failure = requestAccess.error;
@@ -102,11 +106,11 @@ export function AskToJoin() {
     if (requestAccess.isPending) return;
     setSent(false);
     requestAccess.mutate(
-      { slug, reason },
+      { shortName, reason },
       {
         onSuccess: () => {
           flushSync(() => {
-            setSlug("");
+            setShortName("");
             setReason("");
             setSent(true);
           });
@@ -124,22 +128,22 @@ export function AskToJoin() {
       <h2 id={HEADING}>{ASK_TO_JOIN_WORDS.heading}</h2>
 
       <form onSubmit={ask} className="mt-4">
-        <Label htmlFor={SLUG_FIELD}>{ASK_TO_JOIN_WORDS.slug}</Label>
-        <p id={SLUG_HINT} className="mt-1 text-muted-foreground">
-          {ASK_TO_JOIN_WORDS.forExample} <code className="font-mono">{SLUG_EXAMPLE}</code>
+        <Label htmlFor={SHORT_NAME_FIELD}>{ASK_TO_JOIN_WORDS.shortName}</Label>
+        <p id={SHORT_NAME_HINT} className="mt-1 text-muted-foreground">
+          {ASK_TO_JOIN_WORDS.forExample} <code className="font-mono">{SHORT_NAME_EXAMPLE}</code>
         </p>
         <Input
-          id={SLUG_FIELD}
-          name="slug"
+          id={SHORT_NAME_FIELD}
+          name="short-name"
           autoComplete="off"
           autoCapitalize="none"
           spellCheck={false}
           required
           aria-keyshortcuts={ASK_TO_JOIN.key}
-          aria-describedby={SLUG_HINT}
+          aria-describedby={SHORT_NAME_HINT}
           className="mt-2 font-mono"
-          value={slug}
-          onChange={(event) => setSlug(event.target.value)}
+          value={shortName}
+          onChange={(event) => setShortName(event.target.value)}
         />
 
         <Label htmlFor={REASON_FIELD} className="mt-4">

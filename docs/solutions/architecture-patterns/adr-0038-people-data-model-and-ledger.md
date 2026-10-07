@@ -35,7 +35,7 @@ tags:
 **An access request is a signed-in non-member's ask, answered neutrally and approved by a direct invitation.**
 
 - It names one workspace and carries a required reason. Its status is waiting, approved or declined, with one open request per workspace and requester.
-- The act answers one neutral acknowledgement whether the slug resolves, does not resolve, names a workspace the person belongs to, or one they are already waiting on. Only the first case writes a row.
+- The act answers one neutral acknowledgement whether the short name resolves, does not resolve, names a workspace the person belongs to, or one they are already waiting on. Only the first case writes a row.
 - It runs under the platform principal with the person as the actor.
 - Approve mints the invitation row directly, in the same transaction, and never through Better Auth's endpoint. Decline records who said no.
 
@@ -73,7 +73,7 @@ The sign-in and the consent are written after Better Auth's own write, and a fai
 - A role or permission column on a group: a back door to a role.
 - Refusing to delete a group an audience still names: the predicate is fail-closed, and a warning is the page's.
 - The request under a user principal with a synthetic member, or under no principal: the first invents a member, the second a core function with no Principal.
-- Different answers for an unknown slug and an existing member: an enumeration oracle.
+- Different answers for an unknown short name and an existing member: an enumeration oracle.
 - Approving through Better Auth's invitation endpoint: it would import the identity provider into core.
 - Month partitioning, as ADR 0014 said: see above.
 - Doors that return a `Result`: a value the act might not read would let its rows commit without their event.

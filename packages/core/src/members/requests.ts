@@ -22,7 +22,7 @@ import {
   ulid,
 } from "../kernel/index.ts";
 import { type PostgresDoor, type Tx, withScope } from "../store/postgres/index.ts";
-import { workspaceIdBySlug } from "../workspaces/index.ts";
+import { workspaceIdByShortName } from "../workspaces/index.ts";
 import { mintInvitation, type InvitationToSend } from "./invitations.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
@@ -44,10 +44,10 @@ export type Acknowledgement = { readonly acknowledged: true };
 const ACKNOWLEDGED: Acknowledgement = { acknowledged: true };
 
 /** What a person sends: the requester is the session's own person, never a field they fill. */
-export const requestAccessInput = z.object({ slug: z.string(), reason: z.string() });
+export const requestAccessInput = z.object({ shortName: z.string(), reason: z.string() });
 
 export type RequestAccessInput = {
-  readonly slug: string;
+  readonly shortName: string;
 
   readonly requesterId: string;
 
@@ -63,7 +63,7 @@ const NEUTRAL_CONSTRAINTS = {
 
 /**
  * Acknowledges alike whether a request was written, one already waits, the requester is a member
- * or unknown, or no workspace has the slug, so the answer reveals none of these. Only a malformed
+ * or unknown, or no workspace has the short name, so the answer reveals none of these. Only a malformed
  * requester or reason is refused.
  */
 export const requestAccess = async (
@@ -75,7 +75,7 @@ export const requestAccess = async (
   const reason = boundarySchemas.accessRequest.insert.shape.reason.safeParse(input.reason);
   if (!requester.success || !reason.success) return err("malformed");
 
-  const workspace = await workspaceIdBySlug(platform, door, input.slug);
+  const workspace = await workspaceIdByShortName(platform, door, input.shortName);
   if (!workspace.ok) return err(workspace.error);
   const workspaceId = workspace.value;
   if (workspaceId === undefined) return ok(ACKNOWLEDGED);

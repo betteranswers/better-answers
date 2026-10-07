@@ -51,12 +51,12 @@ export const eventsOn = async (app: TestApp, subjectId: string): Promise<string[
 
 export const asksToJoin = async (
   app: TestApp,
-  workspace: { readonly slug: string },
+  workspace: { readonly shortName: string },
   displayName: string,
   reason: string,
 ) => {
   const requester = await app.person(anAddress(displayName.toLowerCase()), displayName);
-  await askToJoin(app, { slug: workspace.slug, requesterId: requester.id, reason });
+  await askToJoin(app, { shortName: workspace.shortName, requesterId: requester.id, reason });
   return requester;
 };
 

@@ -193,7 +193,7 @@ test.describe("the way into the console", () => {
 });
 
 test.describe("the console's Workspaces page", () => {
-  test("lists each workspace with its slug, members and provisioning day", async ({
+  test("lists each workspace's short name, members and provisioning day", async ({
     page,
     request,
   }) => {
@@ -210,7 +210,7 @@ test.describe("the console's Workspaces page", () => {
 
     const theirs = itemOf(page, acme.name);
     await expect(theirs.getByText("2 members", { exact: true })).toBeVisible();
-    await expect(theirs.getByRole("definition").first()).toHaveText(acme.slug);
+    await expect(theirs.getByRole("definition").first()).toHaveText(acme.shortName);
     await expect(theirs.getByRole("definition").nth(1)).toHaveText(UK_DAY);
     await expect(itemOf(page, workspace.name).getByText("1 member", { exact: true })).toBeVisible();
 
@@ -359,9 +359,9 @@ test.describe("the console's Workspaces page", () => {
       - listitem "${workspace.name}":
         - heading "${workspace.name}" [level=3]
         - text: 1 member
-        - term: Slug
+        - term: Short name
         - definition:
-          - code: ${workspace.slug}
+          - code: ${workspace.shortName}
         - term: Provisioned
         - definition: /\\d{1,2} [A-Z][a-z]+ \\d{4}/
         - button "More about ${workspace.name}"

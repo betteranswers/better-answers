@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
-import { act, declareActs, type EndedGrant, record } from "../audit/index.ts";
+import { act, declareActs, type EndedGrant, record, STORED_DETAIL_KEYS } from "../audit/index.ts";
 import {
   attempt,
   err,
@@ -129,7 +129,10 @@ export const BOOTSTRAP: BootstrapPrincipal = { kind: "platform", actorId: BOOTST
 
 const WORKSPACE_ACTS = declareActs("platform", {
   provisioned: act("platform.workspace.provisioned", { adminUserId: "id", role: "role" }),
-  renamed: act("platform.workspace.renamed", { nameChanged: "flag", slugChanged: "flag" }),
+  renamed: act("platform.workspace.renamed", {
+    nameChanged: "flag",
+    [STORED_DETAIL_KEYS.shortNameChanged]: "flag",
+  }),
 });
 
 const MEMBER_ACTS = declareActs("people", {
@@ -152,7 +155,7 @@ const insertMember = async (
 export type ProvisionWorkspaceInput = {
   readonly id: string;
   readonly name: string;
-  readonly slug: string;
+  readonly shortName: string;
 
   readonly adminUserId: string;
 };
@@ -162,7 +165,7 @@ export type ProvisionRefusal = WorkspaceRefusal<
 >;
 
 const PROVISION_CONSTRAINTS = {
-  workspace_slug_unique: "slug-taken",
+  workspace_short_name_unique: "slug-taken",
   workspace_pkey: "workspace-exists",
   member_user_id_user_id_fk: "no-such-user",
 } as const satisfies Record<string, ProvisionRefusal>;
@@ -208,7 +211,7 @@ export const provisionWorkspace = async (
   const row = boundarySchemas.workspace.insert.safeParse({
     id: input.id,
     name: input.name,
-    slug: input.slug,
+    shortName: input.shortName,
   });
   const admin = boundarySchemas.user.select.shape.id.safeParse(input.adminUserId);
   if (!row.success || !admin.success) return err("malformed");
@@ -218,10 +221,10 @@ export const provisionWorkspace = async (
       const person = credited(await personById(tx, admin.data));
       if (!person.ok) return person;
 
-      await tx.query("INSERT INTO workspace (id, name, slug) VALUES ($1, $2, $3)", [
+      await tx.query("INSERT INTO workspace (id, name, short_name) VALUES ($1, $2, $3)", [
         row.data.id,
         row.data.name,
-        row.data.slug,
+        row.data.shortName,
       ]);
 
       await record(platform, tx, {
@@ -249,12 +252,12 @@ export const provisionWorkspace = async (
 export type RenameWorkspaceInput = {
   readonly workspaceId: string;
   readonly name?: string | undefined;
-  readonly slug?: string | undefined;
+  readonly shortName?: string | undefined;
 };
 
 export type RenameRefusal = WorkspaceRefusal<"malformed" | "no-such-workspace" | "slug-taken">;
 
-type WorkspaceNames = { readonly name: string; readonly slug: string };
+type WorkspaceNames = { readonly name: string; readonly shortName: string };
 
 type WorkspaceRenamed = WorkspaceNames & {
   readonly workspaceId: WorkspaceId;
@@ -262,7 +265,7 @@ type WorkspaceRenamed = WorkspaceNames & {
 };
 
 const RENAME_CONSTRAINTS = {
-  workspace_slug_unique: "slug-taken",
+  workspace_short_name_unique: "slug-taken",
 } as const satisfies Record<string, RenameRefusal>;
 
 /**
@@ -275,10 +278,13 @@ export const renameWorkspace = async (
   input: RenameWorkspaceInput,
 ): Promise<Result<WorkspaceRenamed, RenameRefusal | Error>> => {
   const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
-  const asked = boundarySchemas.workspace.update.safeParse({ name: input.name, slug: input.slug });
+  const asked = boundarySchemas.workspace.update.safeParse({
+    name: input.name,
+    shortName: input.shortName,
+  });
   if (!workspaceId.success || !asked.success) return err("malformed");
-  const { name, slug } = asked.data;
-  if (name === undefined && slug === undefined) return err("malformed");
+  const { name, shortName } = asked.data;
+  if (name === undefined && shortName === undefined) return err("malformed");
 
   const renamed = await attempt(() =>
     withScope(
@@ -287,26 +293,26 @@ export const renameWorkspace = async (
       workspaceId.data,
       async (tx): Promise<Result<WorkspaceNames, WorkspaceRefusal<"no-such-workspace">>> => {
         const held = await tx.query<WorkspaceNames>(
-          "SELECT name, slug FROM workspace WHERE id = $1 FOR UPDATE",
+          'SELECT name, short_name AS "shortName" FROM workspace WHERE id = $1 FOR UPDATE',
           [workspaceId.data],
         );
         const was = held.rows[0];
         if (was === undefined) return err("no-such-workspace");
-        const next = { name: name ?? was.name, slug: slug ?? was.slug };
+        const next = { name: name ?? was.name, shortName: shortName ?? was.shortName };
         const nameChanged = next.name !== was.name;
-        const slugChanged = next.slug !== was.slug;
-        if (!nameChanged && !slugChanged) return ok(next);
+        const shortNameChanged = next.shortName !== was.shortName;
+        if (!nameChanged && !shortNameChanged) return ok(next);
 
-        await tx.query("UPDATE workspace SET name = $2, slug = $3 WHERE id = $1", [
+        await tx.query("UPDATE workspace SET name = $2, short_name = $3 WHERE id = $1", [
           workspaceId.data,
           next.name,
-          next.slug,
+          next.shortName,
         ]);
         await record(platform, tx, {
           id: ulid(),
           act: WORKSPACE_ACTS.renamed,
           subjectId: workspaceId.data,
-          detail: { nameChanged, slugChanged },
+          detail: { nameChanged, [STORED_DETAIL_KEYS.shortNameChanged]: shortNameChanged },
         });
         return ok(next);
       },
@@ -581,20 +587,21 @@ export const workspaceIds = async (
   return ok(listed.value);
 };
 
-/** Undefined for a malformed slug, as for one no workspace holds. */
-export const workspaceIdBySlug = async (
+/** Undefined for a malformed short name, as for one no workspace holds. */
+export const workspaceIdByShortName = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  slug: string,
+  shortName: string,
 ): Promise<Result<WorkspaceId | undefined, Error>> => {
-  const wanted = boundarySchemas.workspace.select.shape.slug.safeParse(slug);
+  const wanted = boundarySchemas.workspace.select.shape.shortName.safeParse(shortName);
   if (!wanted.success) return ok(undefined);
 
   const found = await attempt(() =>
     withIdentityRead(platform, door, async (tx) => {
-      const rows = await tx.query<{ id: string }>("SELECT id FROM workspace WHERE slug = $1", [
-        wanted.data,
-      ]);
+      const rows = await tx.query<{ id: string }>(
+        "SELECT id FROM workspace WHERE short_name = $1",
+        [wanted.data],
+      );
       const id = rows.rows[0]?.id;
 
       return id === undefined ? undefined : boundarySchemas.workspace.select.shape.id.parse(id);

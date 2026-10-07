@@ -68,7 +68,7 @@ const BEYOND_USE = {
 };
 
 const acceptedRows = {
-  workspace: [{ id: WS_ID, name: "Workspace A", slug: "workspace-a" }],
+  workspace: [{ id: WS_ID, name: "Workspace A", shortName: "workspace-a" }],
   user: [{ id: USER_ID, name: "A person", email: "person@example.invalid" }],
   modelChoice: [
     {
@@ -880,8 +880,8 @@ describe("4 — a refinement only narrows, proved against the column", () => {
 describe("the rejection half: a violated refinement never reaches Postgres", () => {
   const rejectedRows = {
     workspace: [
-      { id: "not-a-ulid", name: "Workspace A", slug: "a" },
-      { id: WS_ID, name: "   ", slug: "a" },
+      { id: "not-a-ulid", name: "Workspace A", shortName: "a" },
+      { id: WS_ID, name: "   ", shortName: "a" },
     ],
 
     modelChoice: [
@@ -1265,7 +1265,7 @@ describe("5 — the inferred type is pinned", () => {
       {
         id: WorkspaceId;
         name: string;
-        slug: string;
+        shortName: string;
         logo: string | null;
         createdAt: Date;
         metadata: string | null;

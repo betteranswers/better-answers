@@ -515,6 +515,68 @@ const PEOPLE_WORDS_LANDED = "2026-10-07";
 
 const PEOPLE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(PEOPLE_WORDS_LANDED)];
 
+/** Where the dead-man service's API names a check by its slug: the release's freshness gate. */
+const DEAD_MAN_CHECK_FILES = [
+  "deploy/backup-fresh.sh",
+  "packages/devtools/test/ci/release-job.test.ts",
+];
+
+/** Where Better Auth's organization field keeps its own name: its option, its bodies, its object. */
+const BETTER_AUTH_SLUG_FILES = [
+  "apps/api/src/auth/auth.ts",
+  "apps/api/tests/organisation-plugin.test.ts",
+  "apps/web/test/workspace-switcher.test.tsx",
+];
+
+const SHORT_NAME_SENSES: readonly Sense[] = [
+  ...BETTER_AUTH_SLUG_FILES.map((within) => ({
+    sense: "Better Auth's organization field, which its API keeps (R21)",
+    within,
+    written: /\bslug(?=: )/g,
+  })),
+  {
+    sense: "Better Auth's endpoint that answers whether a short name is free (R21)",
+    written: /\bcheck-slug\b/g,
+  },
+  {
+    sense: "the stored detail key, which the web reads as audit rows keep it (R22)",
+    within: "apps/web/",
+    written: /\bslugChanged\b/g,
+  },
+  ...DEAD_MAN_CHECK_FILES.map((within) => ({
+    sense: "the dead-man service's name for a check, on its API",
+    within,
+    written: /\bslug\b/g,
+  })),
+  {
+    sense: "a project folder's name, as Claude Code writes it",
+    within: ".claude/skills/session-retro/scripts/session.py",
+    written: /\bslug\b/g,
+  },
+  {
+    sense: "a GitHub App's own name for itself",
+    within: ".github/workflows/",
+    written: /\bapp\.slug\b/g,
+  },
+  { sense: "Renovate's group key", within: "renovate.json", written: /\bgroupSlug\b/g },
+  { sense: "a file name's words, after its number or block", written: /-<slug>\.md\b/g },
+  {
+    sense: "the error an api before migration 0070 answers, quoted as it reads",
+    within: "docs/operations/RUNBOOK.md",
+    written: /column "slug" does not exist/g,
+  },
+  {
+    sense: "the old column word the catalogue test refuses",
+    within: "packages/schema/test/renamed-names.test.ts",
+    written: /"slug"/g,
+  },
+  {
+    sense: "a concept section's key, its heading's own words",
+    within: "docs/solutions/architecture-patterns/adr-0023-graph-is-apache-age.md",
+    written: /\(IRI, slug\)/g,
+  },
+];
+
 /** Where `client` is a library's object in code: a pg or pool client, the harness's, S3's, tRPC's. */
 const CLIENT_OBJECT_TREES = [
   "apps/api/src/migrate.ts",
@@ -1478,7 +1540,16 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("shared context", "view-state slot"),
   avoided("sidebar", "menu"),
   avoided("site", "workspace"),
-  pending("slug", "short name", "short name", "short name", "everywhere"),
+  {
+    word: "slug",
+    use: "short name",
+    entry: "short name",
+    sweep: "short name",
+    state: "landed",
+    reach: "everywhere",
+    permitted: SHORT_NAME_SENSES,
+    carvedOut: PEOPLE_WORDS_CARVED_OUT,
+  },
   avoided("social login", "sign-in"),
   avoided("SSO", "sign-in", "only for the per-client shape, a client's own tenant"),
   avoided("start page", "home (of a role)"),

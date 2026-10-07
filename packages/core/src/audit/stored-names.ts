@@ -81,7 +81,7 @@ export const STORED_DETAIL_KEYS = {
   adminUserId: "adminUserId",
   role: "role",
   nameChanged: "nameChanged",
-  slugChanged: "slugChanged",
+  shortNameChanged: "slugChanged",
   userId: "userId",
   invitationId: "invitationId",
   previousRole: "previousRole",

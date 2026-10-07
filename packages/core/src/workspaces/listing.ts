@@ -13,7 +13,7 @@ import type { Tx } from "../store/postgres/index.ts";
 type WorkspaceListed = {
   readonly id: WorkspaceId;
   readonly name: string;
-  readonly slug: string;
+  readonly shortName: string;
   readonly memberCount: number;
   readonly createdAt: string;
 };
@@ -21,7 +21,7 @@ type WorkspaceListed = {
 type WorkspaceRow = {
   readonly id: string;
   readonly name: string;
-  readonly slug: string;
+  readonly shortName: string;
   readonly members: number;
   readonly created_at: Date;
 };
@@ -33,7 +33,7 @@ export const listWorkspaces = async (
 ): Promise<Result<readonly WorkspaceListed[], Error>> => {
   const listed = await attempt(() =>
     tx.query<WorkspaceRow>(
-      `SELECT w.id, w.name, w.slug, w.created_at,
+      `SELECT w.id, w.name, w.short_name AS "shortName", w.created_at,
               (SELECT count(*)::int FROM member m WHERE m.workspace_id = w.id) AS members
          FROM workspace w
         ORDER BY w.name, w.id`,
@@ -45,7 +45,7 @@ export const listWorkspaces = async (
     listed.value.rows.map((row) => ({
       id: boundarySchemas.workspace.select.shape.id.parse(row.id),
       name: row.name,
-      slug: row.slug,
+      shortName: row.shortName,
       memberCount: row.members,
       createdAt: row.created_at.toISOString(),
     })),

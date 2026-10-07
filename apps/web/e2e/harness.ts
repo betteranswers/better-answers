@@ -21,7 +21,7 @@ const aPerson = z.object({ id: z.string(), email: z.string(), name: z.string() }
 const aProvisionedWorkspace = z.object({
   workspaceId: z.string(),
   name: z.string(),
-  slug: z.string(),
+  shortName: z.string(),
   admin: aPerson,
 });
 
@@ -305,12 +305,12 @@ export const makeGroups = (
 const accessAsked = z.object({ asked: z.literal(true) });
 
 /**
- * A person's ask to join a workspace by its slug, as the ask-to-join form leaves it, without the
+ * A person's ask to join a workspace by its short name, as the ask-to-join form leaves it, without the
  * sign-in the form needs.
  */
 export const askToJoin = (
   api: APIRequestContext,
-  input: { slug: string; requesterId: string; reason: string },
+  input: { shortName: string; requesterId: string; reason: string },
 ) => ask(api, "/access-requests", input, accessAsked);
 
 const nameFlagged = z.object({ flagged: z.literal(true) });

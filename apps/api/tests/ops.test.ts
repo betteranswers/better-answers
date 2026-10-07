@@ -10,6 +10,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { find, open, trustWords } from "@better-answers/core/answering";
+import { STORED_DETAIL_KEYS } from "@better-answers/core/audit";
 import { writeConcept, writeManifest } from "@better-answers/core/concepts";
 import {
   ERASURE,
@@ -213,7 +214,7 @@ const idOnTheDoneLine = (run: Run): string => {
   return id;
 };
 
-const aSlug = (): string => `acme-${ulid().toLowerCase()}`;
+const aShortName = (): string => `acme-${ulid().toLowerCase()}`;
 
 const provisioning = (app: TestApp, flags: readonly string[]): Promise<Run> =>
   opsWith(app, ["provision-workspace", ...flags], {});
@@ -236,10 +237,11 @@ const workspaceCountOf = async (app: TestApp, userId: string): Promise<number> =
   return found.rowCount ?? 0;
 };
 
-const workspacesWithSlug = async (app: TestApp, slug: string): Promise<number> => {
-  const found = await app.database.superuser.query("SELECT 1 FROM workspace WHERE slug = $1", [
-    slug,
-  ]);
+const workspacesWithShortName = async (app: TestApp, shortName: string): Promise<number> => {
+  const found = await app.database.superuser.query(
+    "SELECT 1 FROM workspace WHERE short_name = $1",
+    [shortName],
+  );
   return found.rowCount ?? 0;
 };
 
@@ -1786,7 +1788,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   describe("provision-workspace — a customer's workspace and its first Admin", () => {
     const standingOf = async (app: TestApp, id: string) => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
-        `SELECT w.name, w.slug,
+        `SELECT w.name, w.short_name AS "shortName",
                 EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
                          WHERE n.nspname = 'index' AND c.relname = 'passage_' || w.id) AS partition,
                 (SELECT value FROM workspace_config
@@ -1799,13 +1801,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("stands up workspace, partition, member, config, audit log and repository", async () => {
       const admin = await app().person(undefined, "Priya Shah");
-      const slug = aSlug();
+      const shortName = aShortName();
 
       const run = await provisioning(app(), [
         "--name",
         "Acme",
-        "--slug",
-        slug,
+        "--short-name",
+        shortName,
         "--admin",
         admin.email,
       ]);
@@ -1813,10 +1815,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.exitCode).toBe(0);
       const id = idOnTheDoneLine(run);
       expect(run.lines).toEqual([
-        `provision-workspace: done — ${id}, slug ${slug}, Admin ${admin.email}`,
+        `provision-workspace: done — ${id}, short name ${shortName}, Admin ${admin.email}`,
       ]);
       expect(await standingOf(app(), id)).toEqual([
-        { name: "Acme", slug, partition: true, ttl: "300000" },
+        { name: "Acme", shortName, partition: true, ttl: "300000" },
       ]);
       expect(await membersOf(app(), id, admin.id)).toEqual([
         { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
@@ -1840,8 +1842,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await provisioning(app(), [
         "--name",
         "Acme",
-        "--slug",
-        aSlug(),
+        "--short-name",
+        aShortName(),
         "--admin",
         "priya.shah@acme.invalid",
       ]);
@@ -1853,13 +1855,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses no-such-user, says what to do next, writes nothing", async () => {
-      const slug = aSlug();
+      const shortName = aShortName();
 
       const run = await provisioning(app(), [
         "--name",
         "Acme",
-        "--slug",
-        slug,
+        "--short-name",
+        shortName,
         "--admin",
         "nobody@acme.invalid",
       ]);
@@ -1868,18 +1870,18 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         "provision-workspace: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
       ]);
-      expect(await workspacesWithSlug(app(), slug)).toBe(0);
+      expect(await workspacesWithShortName(app(), shortName)).toBe(0);
     });
 
     it("refuses no-display-name, says what to do next, writes nothing", async () => {
       const admin = await app().person(undefined, "");
-      const slug = aSlug();
+      const shortName = aShortName();
 
       const run = await provisioning(app(), [
         "--name",
         "Acme",
-        "--slug",
-        slug,
+        "--short-name",
+        shortName,
         "--admin",
         admin.email,
       ]);
@@ -1888,19 +1890,19 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         `provision-workspace: REFUSED — no-display-name: ${admin.email} has given no display name; have them sign in and give one, then run this again`,
       ]);
-      expect(await workspacesWithSlug(app(), slug)).toBe(0);
+      expect(await workspacesWithShortName(app(), shortName)).toBe(0);
       expect(await workspaceCountOf(app(), admin.id)).toBe(0);
     });
 
-    it("refuses slug-taken for a held slug, and writes nothing", async () => {
+    it("refuses slug-taken for a held short name, writing nothing", async () => {
       const first = await app().person();
       const second = await app().person();
-      const slug = aSlug();
+      const shortName = aShortName();
       const held = await provisioning(app(), [
         "--name",
         "One",
-        "--slug",
-        slug,
+        "--short-name",
+        shortName,
         "--admin",
         first.email,
       ]);
@@ -1909,65 +1911,73 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await provisioning(app(), [
         "--name",
         "Two",
-        "--slug",
-        slug,
+        "--short-name",
+        shortName,
         "--admin",
         second.email,
       ]);
 
       expect(run.exitCode).toBe(8);
       expect(run.lines).toEqual([
-        `provision-workspace: REFUSED — slug-taken: another workspace already holds the slug ${slug}`,
+        `provision-workspace: REFUSED — slug-taken: another workspace already holds the short name ${shortName}`,
       ]);
-      expect(await workspacesWithSlug(app(), slug)).toBe(1);
+      expect(await workspacesWithShortName(app(), shortName)).toBe(1);
       expect(await workspaceCountOf(app(), second.id)).toBe(0);
     });
 
-    it("refuses malformed for a blank name or slug, writing nothing", async () => {
+    it("refuses malformed for a blank name or short name", async () => {
       const admin = await app().person();
 
       const run = await provisioning(app(), [
         "--name",
         "   ",
-        "--slug",
-        aSlug(),
+        "--short-name",
+        aShortName(),
         "--admin",
         admin.email,
       ]);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
-        "provision-workspace: REFUSED — malformed: the name and the slug must each carry at least one character",
+        "provision-workspace: REFUSED — malformed: the name and the short name must each carry at least one character",
       ]);
       expect(await workspaceCountOf(app(), admin.id)).toBe(0);
     });
 
     it("refuses without a repositories' root, before writing anything", async () => {
       const admin = await app().person();
-      const slug = aSlug();
+      const shortName = aShortName();
 
       const run = await opsWith(
         app(),
-        ["provision-workspace", "--name", "Acme", "--slug", slug, "--admin", admin.email],
+        [
+          "provision-workspace",
+          "--name",
+          "Acme",
+          "--short-name",
+          shortName,
+          "--admin",
+          admin.email,
+        ],
         { doors: { git: undefined } },
       );
 
       expect(run.exitCode).toBe(1);
       expect(run.lines.join("\n")).toContain("GIT_STORE_DIR");
-      expect(await workspacesWithSlug(app(), slug)).toBe(0);
+      expect(await workspacesWithShortName(app(), shortName)).toBe(0);
     });
 
     it.each([
       ["no flags at all", []],
-      ["no --admin", ["--name", "Acme", "--slug", "acme"]],
-      ["no --slug", ["--name", "Acme", "--admin", "a@b.c"]],
-      ["no --name", ["--slug", "acme", "--admin", "a@b.c"]],
+      ["no --admin", ["--name", "Acme", "--short-name", "acme"]],
+      ["no --short-name", ["--name", "Acme", "--admin", "a@b.c"]],
+      ["no --name", ["--short-name", "acme", "--admin", "a@b.c"]],
     ])("answers usage to %s, reading nothing", async (_shape, flags) => {
       const run = await ops(app(), ["provision-workspace", ...flags]);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
-        "provision-workspace: --name <name>, --slug <slug> and --admin <email> are required",
+        "provision-workspace: --name <name>, --short-name <short name> and --admin <email> are required",
       ]);
     });
 
@@ -1975,7 +1985,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await ops(app(), ["help"]);
 
       expect(run.lines.join("\n")).toContain(
-        "provision-workspace --name <name> --slug <slug> --admin <email>",
+        "provision-workspace --name <name> --short-name <short name> --admin <email>",
       );
       expect(run.lines.join("\n")).toContain(
         "add-member --workspace <id> --email <email> --role <Admin|Editor|Viewer>",
@@ -2280,7 +2290,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const domain = `${ulid().toLowerCase()}.testing.invalid`;
       return {
         domain,
-        slug: `journeys-${ulid().toLowerCase()}`,
+        shortName: `journeys-${ulid().toLowerCase()}`,
         admin: `admin@${domain}`,
         editor: `editor@${domain}`,
         viewer: `viewer@${domain}`,
@@ -2292,8 +2302,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const flagsOf = (fixture: Fixture): readonly string[] => [
       "--domain",
       fixture.domain,
-      "--slug",
-      fixture.slug,
+      "--short-name",
+      fixture.shortName,
       "--admin",
       fixture.admin,
       "--editor",
@@ -2337,7 +2347,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.exitCode).toBe(0);
       const id = idOnTheDoneLine(run);
       expect(run.lines).toEqual([
-        `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; provisioned, mark written, 54 people added, 53 members added`,
+        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.domain}; provisioned, mark written, 54 people added, 53 members added`,
       ]);
       expect(await rolesIn(app(), id)).toEqual([
         { role: "Admin", members: 1 },
@@ -2360,25 +2370,25 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 0,
         lines: [
-          `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; nothing to do`,
+          `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.domain}; nothing to do`,
         ],
       });
       expect(await auditRowsIn(app(), id)).toBe(recorded);
     });
 
-    it("prints the stored domain and slug, not the padded input", async () => {
+    it("prints the stored domain and short name, not the input", async () => {
       const fixture = aFixture();
       const padded = {
         ...fixture,
         domain: ` ${fixture.domain.toUpperCase()} `,
-        slug: ` ${fixture.slug} `,
+        shortName: ` ${fixture.shortName} `,
       };
 
       const run = await fixing(app(), padded);
 
       const id = idOnTheDoneLine(run);
       expect(run.lines).toEqual([
-        `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; provisioned, mark written, 54 people added, 53 members added`,
+        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.domain}; provisioned, mark written, 54 people added, 53 members added`,
       ]);
     });
 
@@ -2393,7 +2403,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 0,
         lines: [
-          `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; nothing to do`,
+          `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.domain}; nothing to do`,
           `test-workspace: stranger@${fixture.domain}, an Editor, is no part of the fixture; left in place`,
         ],
       });
@@ -2413,7 +2423,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `test-workspace: REFUSED — off-testing-domain: viewer@elsewhere.invalid is not on ${fixture.domain}, where every test person's address is`,
         ],
       });
-      expect(await workspacesWithSlug(app(), fixture.slug)).toBe(0);
+      expect(await workspacesWithShortName(app(), fixture.shortName)).toBe(0);
       expect(await peopleOn(app(), fixture)).toBe(0);
     });
 
@@ -2430,7 +2440,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `test-workspace: REFUSED — operator-marked: ${fixture.admin} carries the operator mark, which no test person may; give another address`,
         ],
       });
-      expect(await workspacesWithSlug(app(), fixture.slug)).toBe(0);
+      expect(await workspacesWithShortName(app(), fixture.shortName)).toBe(0);
       expect(await peopleOn(app(), fixture)).toBe(1);
     });
 
@@ -2448,17 +2458,17 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `test-workspace: REFUSED — member-elsewhere: ${fixture.editor} is a member of another workspace, and a test person belongs to the test workspace alone; give another address`,
         ],
       });
-      expect(await workspacesWithSlug(app(), fixture.slug)).toBe(0);
+      expect(await workspacesWithShortName(app(), fixture.shortName)).toBe(0);
     });
 
-    it("refuses a slug held by a workspace it cannot adopt", async () => {
+    it("refuses a short name whose workspace it cannot adopt", async () => {
       const fixture = aFixture();
       const admin = await app().person();
       const held = await provisioning(app(), [
         "--name",
         "Held",
-        "--slug",
-        fixture.slug,
+        "--short-name",
+        fixture.shortName,
         "--admin",
         admin.email,
       ]);
@@ -2470,7 +2480,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 8,
         lines: [
-          `test-workspace: REFUSED — slug-taken: the workspace holding the slug ${fixture.slug} has a member or a waiting invitation off ${fixture.domain}, so it is not the test workspace; it is left as it is`,
+          `test-workspace: REFUSED — slug-taken: the workspace holding the short name ${fixture.shortName} has a member or a waiting invitation off ${fixture.domain}, so it is not the test workspace; it is left as it is`,
         ],
       });
       expect(await auditRowsIn(app(), id)).toBe(recorded);
@@ -2502,8 +2512,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(1);
       const held = await app().database.superuser.query<{ id: string }>(
-        "SELECT id FROM workspace WHERE slug = $1",
-        [fixture.slug],
+        "SELECT id FROM workspace WHERE short_name = $1",
+        [fixture.shortName],
       );
       const id = held.rows[0]?.id ?? "";
       expect(run.lines).toEqual([
@@ -2516,7 +2526,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
       const again = await fixing(app(), fixture);
       expect(again.lines).toEqual([
-        `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; nothing to do`,
+        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.domain}; nothing to do`,
       ]);
     });
 
@@ -2529,12 +2539,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines.join("\n")).toContain("GIT_STORE_DIR");
-      expect(await workspacesWithSlug(app(), fixture.slug)).toBe(0);
+      expect(await workspacesWithShortName(app(), fixture.shortName)).toBe(0);
     });
 
     it.each([
       ["no --domain", 0],
-      ["no --slug", 2],
+      ["no --short-name", 2],
       ["no --admin", 4],
       ["no --editor", 6],
       ["no --viewer", 8],
@@ -2547,17 +2557,17 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 2,
         lines: [
-          "test-workspace: --domain <testing domain>, --slug <slug>, --admin <email>, --editor <email> and --viewer <email> are required",
+          "test-workspace: --domain <testing domain>, --short-name <short name>, --admin <email>, --editor <email> and --viewer <email> are required",
         ],
       });
-      expect(await workspacesWithSlug(app(), fixture.slug)).toBe(0);
+      expect(await workspacesWithShortName(app(), fixture.shortName)).toBe(0);
     });
 
     it("names the command in the usage", async () => {
       const run = await ops(app(), ["help"]);
 
       expect(run.lines.join("\n")).toContain(
-        "test-workspace --domain <testing domain> --slug <slug> --admin <email> --editor <email> --viewer <email>",
+        "test-workspace --domain <testing domain> --short-name <short name> --admin <email> --editor <email> --viewer <email>",
       );
     });
   });
@@ -2567,8 +2577,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       opsWith(app, ["rename-workspace", "--workspace", workspaceId, ...flags], {});
 
     const outcomeOf = async (app: TestApp, workspaceId: string) => {
-      const standing = await app.database.superuser.query<{ name: string; slug: string }>(
-        "SELECT name, slug FROM workspace WHERE id = $1",
+      const standing = await app.database.superuser.query<{ name: string; shortName: string }>(
+        'SELECT name, short_name AS "shortName" FROM workspace WHERE id = $1',
         [workspaceId],
       );
       return {
@@ -2579,65 +2589,88 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const renamedEvent = (
       workspaceId: string,
-      detail: { readonly nameChanged: boolean; readonly slugChanged: boolean },
+      detail: {
+        readonly nameChanged: boolean;
+        readonly [STORED_DETAIL_KEYS.shortNameChanged]: boolean;
+      },
     ) => ({ actor: BOOTSTRAP_ACTOR, subject_id: workspaceId, detail });
 
     const MALFORMED =
-      "rename-workspace: REFUSED — malformed: give --workspace a workspace id, and --name, --slug or both a value that is not blank";
+      "rename-workspace: REFUSED — malformed: give --workspace a workspace id, and --name, --short-name or both a value that is not blank";
 
-    it("renames the name, the slug or both, recording each change", async () => {
-      const { workspaceId, slug } = await app().provision({ name: "Acme" });
-      const [first, second] = [aSlug(), aSlug()];
+    it("renames the name, short name or both, recording each change", async () => {
+      const { workspaceId, shortName } = await app().provision({ name: "Acme" });
+      const [first, second] = [aShortName(), aShortName()];
 
       const runs = [
         await renaming(app(), workspaceId, ["--name", "Acme Group"]),
-        await renaming(app(), workspaceId, ["--slug", first]),
-        await renaming(app(), workspaceId, ["--name", "Acme Ltd", "--slug", second]),
+        await renaming(app(), workspaceId, ["--short-name", first]),
+        await renaming(app(), workspaceId, ["--name", "Acme Ltd", "--short-name", second]),
       ];
 
       expect(runs.map((run) => run.exitCode)).toEqual([0, 0, 0]);
       expect(runs.map((run) => run.lines)).toEqual([
-        [`rename-workspace: done — workspace ${workspaceId} is named Acme Group, slug ${slug}`],
-        [`rename-workspace: done — workspace ${workspaceId} is named Acme Group, slug ${first}`],
-        [`rename-workspace: done — workspace ${workspaceId} is named Acme Ltd, slug ${second}`],
+        [
+          `rename-workspace: done — workspace ${workspaceId} is named Acme Group, short name ${shortName}`,
+        ],
+        [
+          `rename-workspace: done — workspace ${workspaceId} is named Acme Group, short name ${first}`,
+        ],
+        [
+          `rename-workspace: done — workspace ${workspaceId} is named Acme Ltd, short name ${second}`,
+        ],
       ]);
       expect(await outcomeOf(app(), workspaceId)).toEqual({
-        standing: [{ name: "Acme Ltd", slug: second }],
+        standing: [{ name: "Acme Ltd", shortName: second }],
         renamed: [
-          renamedEvent(workspaceId, { nameChanged: true, slugChanged: false }),
-          renamedEvent(workspaceId, { nameChanged: false, slugChanged: true }),
-          renamedEvent(workspaceId, { nameChanged: true, slugChanged: true }),
+          renamedEvent(workspaceId, {
+            nameChanged: true,
+            [STORED_DETAIL_KEYS.shortNameChanged]: false,
+          }),
+          renamedEvent(workspaceId, {
+            nameChanged: false,
+            [STORED_DETAIL_KEYS.shortNameChanged]: true,
+          }),
+          renamedEvent(workspaceId, {
+            nameChanged: true,
+            [STORED_DETAIL_KEYS.shortNameChanged]: true,
+          }),
         ],
       });
     });
 
-    it("takes back its own slug without refusing, writing nothing", async () => {
-      const { workspaceId, slug } = await app().provision({ name: "Acme" });
+    it("takes back its own short name without refusing, writing nothing", async () => {
+      const { workspaceId, shortName } = await app().provision({ name: "Acme" });
 
-      const run = await renaming(app(), workspaceId, ["--name", "Acme", "--slug", slug]);
+      const run = await renaming(app(), workspaceId, ["--name", "Acme", "--short-name", shortName]);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
-        `rename-workspace: done — workspace ${workspaceId} is named Acme, slug ${slug}`,
+        `rename-workspace: done — workspace ${workspaceId} is named Acme, short name ${shortName}`,
       ]);
       expect(await outcomeOf(app(), workspaceId)).toEqual({
-        standing: [{ name: "Acme", slug }],
+        standing: [{ name: "Acme", shortName }],
         renamed: [],
       });
     });
 
-    it("refuses slug-taken for another workspace's slug, changing nothing", async () => {
-      const taken = (await app().provision()).slug;
-      const { workspaceId, slug } = await app().provision({ name: "Acme" });
+    it("refuses slug-taken for another workspace's short name", async () => {
+      const taken = (await app().provision()).shortName;
+      const { workspaceId, shortName } = await app().provision({ name: "Acme" });
 
-      const run = await renaming(app(), workspaceId, ["--name", "Acme Group", "--slug", taken]);
+      const run = await renaming(app(), workspaceId, [
+        "--name",
+        "Acme Group",
+        "--short-name",
+        taken,
+      ]);
 
       expect(run.exitCode).toBe(8);
       expect(run.lines).toEqual([
-        "rename-workspace: REFUSED — slug-taken: another workspace already holds that slug",
+        "rename-workspace: REFUSED — slug-taken: another workspace already holds that short name",
       ]);
       expect(await outcomeOf(app(), workspaceId)).toEqual({
-        standing: [{ name: "Acme", slug }],
+        standing: [{ name: "Acme", shortName }],
         renamed: [],
       });
     });
@@ -2656,10 +2689,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it.each([
       ["a blank name", ["--name", "   "]],
-      ["a good name, blank slug", ["--name", "Acme Group", "--slug", " "]],
-      ["neither --name nor --slug", []],
+      ["a blank short name", ["--name", "Acme Group", "--short-name", " "]],
+      ["neither --name nor --short-name", []],
     ])("refuses malformed for %s, changing nothing", async (_shape, flags) => {
-      const { workspaceId, slug } = await app().provision({ name: "Acme" });
+      const { workspaceId, shortName } = await app().provision({ name: "Acme" });
 
       const run = await renaming(app(), workspaceId, flags);
 
@@ -2668,7 +2701,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         lines: [MALFORMED],
       });
       expect(await outcomeOf(app(), workspaceId)).toEqual({
-        standing: [{ name: "Acme", slug }],
+        standing: [{ name: "Acme", shortName }],
         renamed: [],
       });
     });
@@ -2684,13 +2717,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it.each([
       ["no flags at all", []],
-      ["no --workspace", ["--name", "Acme Group", "--slug", "acme"]],
+      ["no --workspace", ["--name", "Acme Group", "--short-name", "acme"]],
     ])("answers usage to %s, reading nothing", async (_shape, flags) => {
       const run = await ops(app(), ["rename-workspace", ...flags]);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
-        "rename-workspace: --workspace <id> is required, with --name <name>, --slug <slug> or both",
+        "rename-workspace: --workspace <id> is required, with --name <name>, --short-name <short name> or both",
       ]);
     });
 
@@ -2698,7 +2731,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await ops(app(), ["help"]);
 
       expect(run.lines.join("\n")).toContain(
-        "rename-workspace --workspace <id> [--name <name>] [--slug <slug>]",
+        "rename-workspace --workspace <id> [--name <name>] [--short-name <short name>]",
       );
     });
   });
@@ -3541,8 +3574,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const provisioned = await provisioning(app(), [
         "--name",
         "Acme",
-        "--slug",
-        aSlug(),
+        "--short-name",
+        aShortName(),
         "--admin",
         owner.email,
       ]);
