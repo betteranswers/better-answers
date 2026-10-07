@@ -506,6 +506,11 @@ const PASSAGE = "passage";
 
 const PASSAGE_LANDED = "2026-10-07";
 
+/** The people words land one noun at a time, each on the day of its sweep. */
+const PEOPLE_WORDS_LANDED = "2026-10-07";
+
+const PEOPLE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(PEOPLE_WORDS_LANDED)];
+
 /** Where `chunk` is a piece of a byte stream, as Node's streams name it. */
 const BYTE_STREAM_TREES = [
   "apps/api/src/ops.ts",
@@ -603,13 +608,18 @@ export const OLD_WORDS: readonly OldWord[] = [
   pending("actor id", "the person's name", "actor id", "Audit log", "reader text"),
   avoided("admin panel", "console"),
   pending("Agent Operations", "Models", "Control Centre", "model choice", "everywhere"),
-  pending(
-    "agent token",
-    "share agent token",
-    "share agent token",
-    "share agent token",
-    "one sense",
-  ),
+  {
+    word: "agent token",
+    use: "share agent token",
+    entry: "share agent token",
+    sweep: "share agent token",
+    state: "landed",
+    reach: "one sense",
+    permitted: [
+      { sense: "the reader word, which holds the old one", written: /\bshare agent tokens?\b/gi },
+    ],
+    carvedOut: PEOPLE_WORDS_CARVED_OUT,
+  },
   avoided("allow-list", "sensitivity override"),
   pending("answer audit", "Questions asked", "Questions asked", "Questions asked", "everywhere"),
   avoided("api key", "share agent token"),
@@ -634,7 +644,15 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("authorisation", "admission", "the sign-in server's word"),
   avoided("back office", "console"),
   avoided("backup code", "recovery code"),
-  pending("backup run", "backup", "backup", "backup", "everywhere"),
+  {
+    word: "backup run",
+    use: "backup",
+    entry: "backup",
+    sweep: "backup",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: PEOPLE_WORDS_CARVED_OUT,
+  },
   avoided("ban", "end every sign-in and token"),
   avoided("batch action", "bulk action"),
   {
@@ -787,13 +805,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("full name", "display name"),
   avoided("garbage collection", "sweep pass"),
   avoided("git host", "git store"),
-  pending(
-    "Gone-at-source impact",
-    "Removed at source",
-    "Control Centre",
-    "Removed at source",
-    "reader text",
-  ),
+  {
+    word: "Gone-at-source impact",
+    use: "Removed at source",
+    entry: "Control Centre",
+    sweep: "Removed at source",
+    state: "landed",
+    reach: "reader text",
+  },
   {
     word: "graph",
     use: "map",
@@ -907,13 +926,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("offered change", "suggestion"),
   avoided("one-time password", "authenticator"),
   avoided("operation", "action"),
-  pending(
-    "operator",
-    "better-answers support",
-    "better-answers support",
-    "better-answers support",
-    "reader text",
-  ),
+  {
+    word: "operator",
+    use: "better-answers support",
+    entry: "better-answers support",
+    sweep: "better-answers support",
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("organisation", "workspace", "Better Auth's word for the same thing"),
   avoided("organisation member", "member"),
   avoided("organisation switcher", "workspace switcher"),
@@ -937,13 +957,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("promote", "promotion", "as a reader's verb: a marketing word"),
   avoided("propagation", "cascade"),
   avoided("proposal", "suggestion", "the bid document a company completes"),
-  pending(
-    "Publish and accept gates",
-    "Publishing rules",
-    "Control Centre",
-    "Publishing rules",
-    "reader text",
-  ),
+  {
+    word: "Publish and accept gates",
+    use: "Publishing rules",
+    entry: "Control Centre",
+    sweep: "Publishing rules",
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("purge", "emptying a connected source"),
   pending("quarantine", "unreadable", "unreadable", "unreadable", "everywhere"),
   pending("quarantined", "unreadable", "unreadable", "unreadable", "everywhere"),
@@ -969,13 +990,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("registered client", "assistant"),
   avoided("rejection", "refusal"),
   avoided("relink", "citation fix"),
-  pending(
-    "Remove and revoke",
-    "Remove and end every sign-in",
-    "end every sign-in and token",
-    "end every sign-in and token",
-    "reader text",
-  ),
+  {
+    word: "Remove and revoke",
+    use: "Remove and end every sign-in",
+    entry: "end every sign-in and token",
+    sweep: "end every sign-in and token",
+    state: "landed",
+    reach: "reader text",
+  },
   pending("repair", "fix", "citation fix", "citation fix", "one sense"),
   avoided("replay count", "reconciler hit"),
   avoided("report", "feedback"),
@@ -992,13 +1014,15 @@ export const OLD_WORDS: readonly OldWord[] = [
   ),
   avoided("review queue", "To decide"),
   avoided("revision", "suggestion"),
-  pending(
-    "revoke credentials",
-    "end every sign-in and token",
-    "end every sign-in and token",
-    "end every sign-in and token",
-    "everywhere",
-  ),
+  {
+    word: "revoke credentials",
+    use: "end every sign-in and token",
+    entry: "end every sign-in and token",
+    sweep: "end every sign-in and token",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: PEOPLE_WORDS_CARVED_OUT,
+  },
   avoided("roadmap", "route spec"),
   {
     word: "route",

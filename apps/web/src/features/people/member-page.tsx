@@ -22,7 +22,12 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { MEMBER_PAGE_WORDS as WORDS } from "./member-act-words.ts";
 import { MemberActivity } from "./member-activity.tsx";
-import { Access, RemoveAndRevoke, type Landings, type Removal } from "./member-sections.tsx";
+import {
+  Access,
+  RemoveAndEndEverySignIn,
+  type Landings,
+  type Removal,
+} from "./member-sections.tsx";
 import {
   MEMBERS_PAGE,
   membersAt,
@@ -60,7 +65,12 @@ type Section = {
 const SECTIONS: readonly Section[] = [
   { id: "access", title: WORDS.access, draw: Access },
   { id: "activity", title: WORDS.activity, draw: MemberActivity },
-  { id: "remove-and-revoke", title: WORDS.removeAndRevoke, draw: RemoveAndRevoke, apart: true },
+  {
+    id: "remove-and-end-every-sign-in",
+    title: WORDS.removeAndEndEverySignIn,
+    draw: RemoveAndEndEverySignIn,
+    apart: true,
+  },
 ];
 
 const headingIdOf = (section: Section): string => `member-${section.id}`;
@@ -173,7 +183,7 @@ function SectionNav() {
           <li key={section.id}>
             <a
               href={`#${headingIdOf(section)}`}
-              className="text-brand underline-offset-4 hover:underline"
+              className="inline-flex min-h-6 items-center text-brand underline-offset-4 hover:underline"
               onClick={(event) => {
                 toSection(event, section);
               }}
@@ -256,7 +266,7 @@ function MemberShown(properties: {
   useKeystroke(KEY.flagName, () => {
     landOn("flag");
   });
-  useKeystroke(KEY.revokeCredentials, () => {
+  useKeystroke(KEY.endEverySignInAndToken, () => {
     landOn("credentials");
   });
   useKeystroke(KEY.remove, () => {

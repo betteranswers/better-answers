@@ -34,7 +34,7 @@ What each class is for and where it is read is the table in `docs/operations/SEC
 **Two conflicts are recorded unsettled.**
 
 1. What *acting* means. `SECRETS.md` glosses it as writing back into a connected system as the user, approval-gated. ADR 0030 says it is never a credential for writing into a customer's other systems.
-2. Whether all six below bootstrap are rows under the envelope. `SECRETS.md`'s *where it is read* column disagrees for three: the object store's write-and-list pair comes from the environment and its admin credential from escrow, the repository's keys are mounted read-only from the host, and the agent token is checked in the api.
+2. Whether all six below bootstrap are rows under the envelope. `SECRETS.md`'s *where it is read* column disagrees for three: the object store's write-and-list pair comes from the environment and its admin credential from escrow, the repository's keys are mounted read-only from the host, and the share agent token is checked in the api.
 
 Settling either is a new decision, an amendment to this record and to the record that loses.
 

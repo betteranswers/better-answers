@@ -1,0 +1,35 @@
+{
+  "noun": "operator",
+  "readerWord": "better-answers support",
+  "sweep": "U16. People words: better-answers support",
+  "collisions": [
+    {
+      "with": "the operator principal and its mark, which stay internal in code",
+      "codeWord": "better answers support"
+    }
+  ],
+  "words": [
+    {
+      "from": "the operator",
+      "to": "better answers support"
+    }
+  ],
+  "symbols": {
+    "paths": []
+  },
+  "text": {
+    "paths": [
+      "apps/web/src/features/console/refusal-words.ts",
+      "apps/web/src/features/console/words.ts",
+      "apps/web/src/features/console/names-waiting-page.tsx",
+      "apps/web/src/features/people/invitation-words.ts",
+      "apps/web/src/features/people/member-sections.tsx"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "the refusal word, a name on the wire (R21)",
+      "matches": ["not-the-operator"]
+    }
+  ]
+}

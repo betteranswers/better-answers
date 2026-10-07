@@ -98,7 +98,7 @@ const tokenAnswers = async (
   refresh: (await refresh(host, tokens.refreshToken ?? "")).status,
 });
 
-describe("revoking a member's credentials in this workspace over tRPC", () => {
+describe("ending a member's sign-ins and tokens here, over tRPC", () => {
   it("refuses every session the member holds here, admitting one elsewhere", async () => {
     const { here, elsewhere, person, admin } = await aMemberOfTwoWorkspaces();
     const first = await signedInHere(person.email, here.workspaceId);
@@ -107,7 +107,7 @@ describe("revoking a member's credentials in this workspace over tRPC", () => {
       expect((await api.session.membership.query()).workspace.id).toBe(here.workspaceId);
     }
 
-    const revoked = await admin.members.revokeCredentials.mutate({ personId: person.id });
+    const revoked = await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
 
     expect(revoked).toEqual({ personId: person.id, revokedAt: expect.stringMatching(ISO_INSTANT) });
     expect(await refusalOfCall(first.api.session.membership.query())).toMatchObject(REVOKED_HERE);
@@ -126,7 +126,7 @@ describe("revoking a member's credentials in this workspace over tRPC", () => {
   it("admits the member's fresh sign-in once the revocation lands", async () => {
     const { here, person, admin } = await aMemberOfTwoWorkspaces();
     const before = await signedInHere(person.email, here.workspaceId);
-    await admin.members.revokeCredentials.mutate({ personId: person.id });
+    await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
 
     const again = await signedInHere(person.email, here.workspaceId);
 
@@ -141,7 +141,7 @@ describe("revoking a member's credentials in this workspace over tRPC", () => {
   it("ends the member's tokens for this workspace, not another's", async () => {
     const { elsewhere, person, admin, inHere, inElsewhere, host } = await connectedInBoth();
 
-    await admin.members.revokeCredentials.mutate({ personId: person.id });
+    await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
 
     expect(await refreshTokensOf(person.id)).toEqual([
       { workspace_id: elsewhere.workspaceId, revoked: false },
@@ -155,7 +155,7 @@ describe("revoking a member's credentials in this workspace over tRPC", () => {
 
   it("keeps elsewhere's tokens when this one's is presented to revoke", async () => {
     const { person, admin, inHere, inElsewhere, host } = await connectedInBoth();
-    await admin.members.revokeCredentials.mutate({ personId: person.id });
+    await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
 
     const revoking = await revokeAtEndpoint(host, inHere.refreshToken ?? "");
 
@@ -169,8 +169,8 @@ describe("revoking a member's credentials in this workspace over tRPC", () => {
     await app().addMember(here.workspaceId, onlyHere.id, "Viewer");
 
     const answers = [
-      await admin.members.revokeCredentials.mutate({ personId: person.id }),
-      await admin.members.revokeCredentials.mutate({ personId: onlyHere.id }),
+      await admin.members.endEverySignInAndToken.mutate({ personId: person.id }),
+      await admin.members.endEverySignInAndToken.mutate({ personId: onlyHere.id }),
     ];
 
     expect(answers).toEqual([
@@ -188,7 +188,9 @@ describe("revoking a member's credentials in this workspace over tRPC", () => {
     const { person, admin } = await aMemberOfTwoWorkspaces();
     const before = Date.now();
 
-    const { revokedAt } = await admin.members.revokeCredentials.mutate({ personId: person.id });
+    const { revokedAt } = await admin.members.endEverySignInAndToken.mutate({
+      personId: person.id,
+    });
 
     const after = Date.now();
     expect(Date.parse(revokedAt)).toBeGreaterThanOrEqual(before);
@@ -203,7 +205,9 @@ describe("revoking a member's credentials in this workspace over tRPC", () => {
     const workspace = await app().provision();
     const { api } = await webSignedIn(app(), workspace.admin.email);
 
-    const revoked = await api.members.revokeCredentials.mutate({ personId: workspace.admin.id });
+    const revoked = await api.members.endEverySignInAndToken.mutate({
+      personId: workspace.admin.id,
+    });
 
     expect(revoked).toMatchObject({ personId: workspace.admin.id });
     expect(await refusalOfCall(api.members.list.query())).toMatchObject(REVOKED_HERE);
@@ -217,7 +221,7 @@ describe("a revoked Admin on the People procedures", () => {
     await app().addMember(workspace.workspaceId, second.id, "Admin");
     const { api: theirs } = await webSignedIn(app(), second.email);
     const { api: mine } = await webSignedIn(app(), workspace.admin.email);
-    await mine.members.revokeCredentials.mutate({ personId: second.id });
+    await mine.members.endEverySignInAndToken.mutate({ personId: second.id });
 
     const refused = [
       await refusalOfCall(theirs.members.list.query()),
@@ -225,7 +229,7 @@ describe("a revoked Admin on the People procedures", () => {
         theirs.members.changeRole.mutate({ personId: workspace.admin.id, role: "Viewer" }),
       ),
       await refusalOfCall(
-        theirs.members.revokeCredentials.mutate({ personId: workspace.admin.id }),
+        theirs.members.endEverySignInAndToken.mutate({ personId: workspace.admin.id }),
       ),
     ];
 
@@ -240,7 +244,7 @@ describe("a revoked Admin on the People procedures", () => {
   });
 });
 
-describe("who may revoke a member's credentials", () => {
+describe("who may end a member's sign-ins and tokens", () => {
   it.each(["Editor", "Viewer"] as const)(
     "refuses a member at %s, role-forbids, recording nothing",
     async (role) => {
@@ -250,7 +254,7 @@ describe("who may revoke a member's credentials", () => {
       const { api } = await webSignedIn(app(), actor.email);
 
       const refused = await refusalOfCall(
-        api.members.revokeCredentials.mutate({ personId: workspace.admin.id }),
+        api.members.endEverySignInAndToken.mutate({ personId: workspace.admin.id }),
       );
 
       expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
@@ -263,7 +267,7 @@ describe("who may revoke a member's credentials", () => {
     const api = await anAdminOfElsewherePointedAt(app(), workspace.workspaceId);
 
     const refused = await refusalOfCall(
-      api.members.revokeCredentials.mutate({ personId: workspace.admin.id }),
+      api.members.endEverySignInAndToken.mutate({ personId: workspace.admin.id }),
     );
 
     expect(refused).toMatchObject(NOT_A_MEMBER_ANSWERED);
@@ -278,7 +282,7 @@ describe("who may revoke a member's credentials", () => {
     const { api } = await webSignedIn(app(), mine.admin.email);
 
     const refused = await refusalOfCall(
-      api.members.revokeCredentials.mutate({ personId: stranger.id }),
+      api.members.endEverySignInAndToken.mutate({ personId: stranger.id }),
     );
 
     expect(refused).toMatchObject({
@@ -295,11 +299,11 @@ describe("a revocation that fails partway", () => {
     await connectAsHost(app(), app().client(), person, { pick: here.workspaceId });
 
     const failed = await whileAuditRowsVanish(app(), () =>
-      refusalOfCall(admin.members.revokeCredentials.mutate({ personId: person.id })),
+      refusalOfCall(admin.members.endEverySignInAndToken.mutate({ personId: person.id })),
     );
 
     expect(failureOf(failed)).toEqual({
-      message: "revokeCredentialsHere failed",
+      message: "endEverySignInAndTokenHere failed",
       httpStatus: 500,
       refusal: undefined,
     });

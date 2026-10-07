@@ -1,0 +1,19 @@
+{
+  "noun": "gone at source impact",
+  "readerWord": "removed at source",
+  "sweep": "U16. People words: Removed at source",
+  "collisions": [],
+  "words": [
+    {
+      "from": "gone at source impact",
+      "to": "removed at source"
+    }
+  ],
+  "symbols": {
+    "paths": ["apps/web/src/shared/navigation.ts", "apps/web/test/navigation.test.ts"]
+  },
+  "text": {
+    "paths": ["apps/web/src/shared/navigation.ts", "apps/web/test/navigation.test.ts"]
+  },
+  "senses": []
+}

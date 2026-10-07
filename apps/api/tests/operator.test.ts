@@ -36,8 +36,8 @@ const CONSOLE_CALLS: readonly (readonly [
   ["console.people.list", (api) => api.console.people.list.query({})],
   ["console.people.inspect", (api, personId) => api.console.people.inspect.query({ personId })],
   [
-    "console.people.revokeCredentials",
-    (api, personId) => api.console.people.revokeCredentials.mutate({ personId }),
+    "console.people.endEverySignInAndToken",
+    (api, personId) => api.console.people.endEverySignInAndToken.mutate({ personId }),
   ],
   ["console.people.namesWaiting", (api) => api.console.people.namesWaiting.query()],
   [
@@ -53,7 +53,7 @@ const BEARER_ASKS: readonly (readonly [string, RequestInit])[] = [
   ["console.people.list", {}],
   ["console.people.inspect", {}],
   [
-    "console.people.revokeCredentials",
+    "console.people.endEverySignInAndToken",
     { method: "POST", body: JSON.stringify({ personId: ulid() }) },
   ],
   ["console.people.namesWaiting", {}],
@@ -385,7 +385,7 @@ describe("the console, the operator's alone", () => {
   });
 });
 
-describe("revoking a person's credentials everywhere, from the console", () => {
+describe("ending every sign-in and token everywhere, from the console", () => {
   const revocationRowsOf = async (personId: string) => {
     const found = await app().database.superuser.query(
       `SELECT act, actor, subject_id, detail FROM identity_audit_event
@@ -426,7 +426,7 @@ describe("revoking a person's credentials everywhere, from the console", () => {
       (await callMcp(host, inBeta.accessToken, "tools/list")).status,
     ]).toEqual([200, 200]);
 
-    const revoked = await api.console.people.revokeCredentials.mutate({ personId: person.id });
+    const revoked = await api.console.people.endEverySignInAndToken.mutate({ personId: person.id });
 
     expect(revoked).toEqual({ personId: person.id, revokedAt: expect.stringMatching(ISO_INSTANT) });
     expect(await sessionsHeldBy(person.id)).toBe(0);
@@ -464,7 +464,7 @@ describe("revoking a person's credentials everywhere, from the console", () => {
     const { api } = await theOperatorOnTheWeb();
     const { admin: person } = await app().provision();
     const before = await connectAsHost(app(), app().client(), person);
-    await api.console.people.revokeCredentials.mutate({ personId: person.id });
+    await api.console.people.endEverySignInAndToken.mutate({ personId: person.id });
     const after = await connectAsHost(app(), app().client(), person);
     const [earlier, later] = [before.refreshToken, after.refreshToken];
     if (earlier === undefined || later === undefined)
@@ -494,7 +494,7 @@ describe("revoking a person's credentials everywhere, from the console", () => {
     const { api } = await theOperatorOnTheWeb();
     const acme = await app().provision();
     const before = await webSignedIn(app(), acme.admin.email);
-    await api.console.people.revokeCredentials.mutate({ personId: acme.admin.id });
+    await api.console.people.endEverySignInAndToken.mutate({ personId: acme.admin.id });
 
     const again = await webSignedIn(app(), acme.admin.email);
 
@@ -514,7 +514,7 @@ describe("revoking a person's credentials everywhere, from the console", () => {
     await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
 
     const refused = await refusalOfCall(
-      api.console.people.revokeCredentials.mutate({ personId: person.id }),
+      api.console.people.endEverySignInAndToken.mutate({ personId: person.id }),
     );
 
     expect(refused).toMatchObject({
@@ -530,7 +530,7 @@ describe("revoking a person's credentials everywhere, from the console", () => {
     await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
 
     const { api } = await webSignedIn(app(), workspace.admin.email);
-    const revoked = await api.console.people.revokeCredentials.mutate({ personId: person.id });
+    const revoked = await api.console.people.endEverySignInAndToken.mutate({ personId: person.id });
 
     expect(revoked.personId).toBe(person.id);
     expect(await revocationRowsOf(person.id)).toHaveLength(1);
@@ -541,7 +541,7 @@ describe("revoking a person's credentials everywhere, from the console", () => {
     const nobody = ulid();
 
     const refused = await refusalOfCall(
-      api.console.people.revokeCredentials.mutate({ personId: nobody }),
+      api.console.people.endEverySignInAndToken.mutate({ personId: nobody }),
     );
 
     expect(refused).toMatchObject({
@@ -554,7 +554,7 @@ describe("revoking a person's credentials everywhere, from the console", () => {
     const { api } = await theOperatorOnTheWeb();
 
     const refused = await refusalOfCall(
-      api.console.people.revokeCredentials.mutate({ personId: "not-a-person" }),
+      api.console.people.endEverySignInAndToken.mutate({ personId: "not-a-person" }),
     );
 
     expect(refused).toMatchObject({
@@ -783,7 +783,7 @@ describe("the console's list and inspection of people", () => {
     const person = await app().person();
     await signIn(app(), app().client(), person.email);
     const revokedAt = new Date(Date.now() + 1);
-    await app().revokeCredentials(person.id, revokedAt);
+    await app().endEverySignInAndToken(person.id, revokedAt);
     expect(await sessionsHeldBy(person.id)).toBe(0);
 
     const listed = await api.console.people.list.query({ search: person.email });
@@ -847,8 +847,8 @@ describe("the console's list and inspection of people", () => {
       await connectAsHost(app(), app().client(), person, { pick: workspaceId });
     }
     const acmeAdmin = await webSignedIn(app(), acme.admin.email);
-    await acmeAdmin.api.members.revokeCredentials.mutate({ personId: person.id });
-    await api.console.people.revokeCredentials.mutate({ personId: person.id });
+    await acmeAdmin.api.members.endEverySignInAndToken.mutate({ personId: person.id });
+    await api.console.people.endEverySignInAndToken.mutate({ personId: person.id });
 
     const inspected = await api.console.people.inspect.query({ personId: person.id });
 
@@ -937,7 +937,7 @@ describe("the console's list and inspection of people", () => {
   it("leaves a grant its client revoked out of revoking everywhere", async () => {
     const { api, acme } = await revokedByItsClient();
 
-    await api.console.people.revokeCredentials.mutate({ personId: acme.admin.id });
+    await api.console.people.endEverySignInAndToken.mutate({ personId: acme.admin.id });
 
     const recorded = await app().database.superuser.query(
       `SELECT detail FROM identity_audit_event

@@ -4,7 +4,7 @@ import { selectFirst } from "@/shared/outcome.tsx";
 export const PEOPLE_KEYSTROKES = {
   search: { key: "/", act: "Search everyone by name or address" },
   open: { key: "o", act: "Open the person in focus" },
-  revoke: { key: "r", act: "Revoke the credentials of the person in focus" },
+  revoke: { key: "r", act: "End every sign-in and token of the person in focus" },
   correct: { key: "c", act: "Correct the display name of the person in focus" },
   previous: { key: "p", act: "Show the previous page of people" },
   next: { key: "n", act: "Show the next page of people" },

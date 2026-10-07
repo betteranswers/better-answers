@@ -20,7 +20,7 @@ export type Role = ListedMember["role"];
 
 export type RoleChanged = inferOutput<Api["members"]["changeRole"]>;
 
-export type CredentialsRevokedHere = inferOutput<Api["members"]["revokeCredentials"]>;
+export type CredentialsRevokedHere = inferOutput<Api["members"]["endEverySignInAndToken"]>;
 
 export type ActivityEvent = inferOutput<Api["members"]["activity"]>["events"][number];
 
@@ -120,7 +120,7 @@ export const useChangeRole = () => {
 };
 
 /** The instant shown at once is the browser's; the list read after the answer holds the api's. */
-export const useRevokeCredentials = () => {
+export const useEndEverySignInAndToken = () => {
   const api = useTRPC();
   const reconciled = useReconciledList((listed, asked: { readonly personId: string }) => {
     const credentialsRevokedAt = new Date().toISOString();
@@ -128,7 +128,7 @@ export const useRevokeCredentials = () => {
       member.personId === asked.personId ? { ...member, credentialsRevokedAt } : member,
     );
   });
-  return useMutation(api.members.revokeCredentials.mutationOptions(reconciled));
+  return useMutation(api.members.endEverySignInAndToken.mutationOptions(reconciled));
 };
 
 /** The shell's own read of who is signed in, and where, shared rather than asked again. */

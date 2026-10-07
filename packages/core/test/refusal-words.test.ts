@@ -25,7 +25,7 @@ import type {
   RemoveMemberRefusal,
   RequestAccessRefusal,
   ResendInvitationRefusal,
-  RevokeCredentialsHereRefusal,
+  EndEverySignInAndTokenHereRefusal,
   TestWorkspaceRefusal,
 } from "../src/members/index.ts";
 import type { ConnectUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
@@ -207,7 +207,7 @@ describe("the refusal-word walk", () => {
     expectTypeOf<ResendInvitationRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<CancelInvitationRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<ListInvitationsRefusal>().toExtend<EveryRegisteredWord | Error>();
-    expectTypeOf<RevokeCredentialsHereRefusal>().toExtend<EveryRegisteredWord | Error>();
+    expectTypeOf<EndEverySignInAndTokenHereRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<RemoveMemberRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<AcceptInvitationRefusal>().toExtend<EveryRegisteredWord>();
     type AddressRefused = Extract<TestWorkspaceRefusal, { readonly address: string }>;

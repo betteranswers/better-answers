@@ -52,10 +52,10 @@ describe("what a procedure may answer the wire", () => {
   it("reaches every router procedure by the path its caller names", () => {
     expect(Object.keys(appRouter._def.procedures).sort()).toEqual([
       "console.people.correctDisplayName",
+      "console.people.endEverySignInAndToken",
       "console.people.inspect",
       "console.people.list",
       "console.people.namesWaiting",
-      "console.people.revokeCredentials",
       "console.workspaces.list",
       "members.activity",
       "members.addToGroup",
@@ -71,6 +71,7 @@ describe("what a procedure may answer the wire", () => {
       "members.createGroup",
       "members.declineRequest",
       "members.deleteGroup",
+      "members.endEverySignInAndToken",
       "members.exportAuditLog",
       "members.flagDisplayName",
       "members.groups",
@@ -83,7 +84,6 @@ describe("what a procedure may answer the wire", () => {
       "members.renameGroup",
       "members.requests",
       "members.resendInvitation",
-      "members.revokeCredentials",
       "modelChoices.list",
       "person.acceptInvitation",
       "person.acknowledgeRecoveryCodes",
@@ -130,7 +130,7 @@ describe("what a procedure may answer the wire", () => {
       | "console.people.inspect"
       | "console.people.namesWaiting"
       | "console.people.correctDisplayName"
-      | "console.people.revokeCredentials"
+      | "console.people.endEverySignInAndToken"
       | "console.workspaces.list"
       | "members.list"
       | "members.changeRole"
@@ -144,7 +144,7 @@ describe("what a procedure may answer the wire", () => {
       | "members.bulkResendInvitations"
       | "members.cancelInvitation"
       | "members.bulkCancelInvitations"
-      | "members.revokeCredentials"
+      | "members.endEverySignInAndToken"
       | "members.remove"
       | "members.bulkChangeRole"
       | "members.bulkRemove"

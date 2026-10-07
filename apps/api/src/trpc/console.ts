@@ -11,8 +11,8 @@ import {
   listPeople,
   listPeopleInput,
   listWorkspaces,
-  revokeCredentials,
-  revokeCredentialsInput,
+  endEverySignInAndToken,
+  endEverySignInAndTokenInput,
 } from "@better-answers/core/workspaces";
 
 import type { RefusalAnswer } from "../refusal.ts";
@@ -66,9 +66,9 @@ export const consoleRouter = router({
         given(input, (asked) => inspectPerson(ctx.operator, ctx.tx, asked)),
       ),
     ),
-    revokeCredentials: operatorProcedure
-      .input(parsedBy(revokeCredentialsInput))
-      .mutation(writtenNow(revokeCredentials)),
+    endEverySignInAndToken: operatorProcedure
+      .input(parsedBy(endEverySignInAndTokenInput))
+      .mutation(writtenNow(endEverySignInAndToken)),
     namesWaiting: operatorProcedure.query(({ ctx }) =>
       crossing(ctx, listNamesWaiting.name, listNamesWaiting(ctx.operator, ctx.tx)),
     ),

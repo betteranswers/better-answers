@@ -12,7 +12,7 @@ import {
   SIGN_IN_TOO_OLD,
 } from "./refusal-words.ts";
 
-export const CONSOLE_CLOSED = "The console is the operator's alone";
+export const CONSOLE_CLOSED = "The console is better-answers support's alone";
 
 export const saidOf = (refusal: Refusal): Said => {
   if (refusal.word === NOT_THE_OPERATOR) return ONLY_THE_OPERATOR;

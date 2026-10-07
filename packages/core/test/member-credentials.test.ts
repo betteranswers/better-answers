@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { Role, UserPrincipal } from "../src/kernel/index.ts";
-import { revokeCredentialsHere, revokeCredentialsHereInput } from "../src/members/index.ts";
+import {
+  endEverySignInAndTokenHere,
+  endEverySignInAndTokenHereInput,
+} from "../src/members/index.ts";
 import { type Tx, withPrincipal } from "../src/store/postgres/index.ts";
 import { endedGrants } from "./identity-rows.ts";
 import { bothHoldingTheirOwnRow, heldAs, membersSuite } from "./members-suite.ts";
@@ -27,8 +30,8 @@ const alsoJoining = (workspace: ProvisionedWorkspace, role: Role, userId: string
   );
 
 const revoking = (principal: UserPrincipal, tx: Tx, personId: string, at = AT) =>
-  revokeCredentialsHere(principal, tx, {
-    ...inputOf(revokeCredentialsHereInput, { personId }),
+  endEverySignInAndTokenHere(principal, tx, {
+    ...inputOf(endEverySignInAndTokenHereInput, { personId }),
     at,
   });
 
@@ -56,7 +59,7 @@ const resolvedIn = async (workspace: ProvisionedWorkspace, userId: string, issue
   return resolved.ok ? "admitted" : resolved.error;
 };
 
-describe("revoking a member's credentials in this workspace", () => {
+describe("ending a member's sign-ins and tokens in this workspace", () => {
   it("writes the membership's instant and records the Admin revoking", async () => {
     const workspace = await provisionedWorkspace(db(), "Revoked");
     const viewer = await joining(workspace, "Viewer");
@@ -170,7 +173,7 @@ describe("revoking a member's credentials in this workspace", () => {
   });
 });
 
-describe("what revoking a member's credentials refuses", () => {
+describe("what ending a member's sign-ins and tokens refuses", () => {
   it.each(["Editor", "Viewer"] as const)("refuses a revoker at %s, role-forbids", async (role) => {
     const workspace = await provisionedWorkspace(db(), `Unrevoked${role}`);
     const revoker = await joining(workspace, role);

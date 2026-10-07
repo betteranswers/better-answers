@@ -1,0 +1,28 @@
+{
+  "noun": "agent token",
+  "readerWord": "share agent token",
+  "sweep": "U16. People words: share agent token",
+  "collisions": [],
+  "words": [
+    {
+      "from": "agent token",
+      "to": "share agent token"
+    },
+    {
+      "from": "agent tokens",
+      "to": "share agent tokens"
+    }
+  ],
+  "symbols": {
+    "paths": ["apps/api/src/ingress/hostnames.ts", "apps/web/src/shared/navigation.ts"]
+  },
+  "text": {
+    "paths": ["apps/api/src/ingress/hostnames.ts", "apps/web/src/shared/navigation.ts"]
+  },
+  "senses": [
+    {
+      "sense": "the reader word itself",
+      "matches": ["[Ss]hare agent tokens?"]
+    }
+  ]
+}

@@ -28,7 +28,7 @@ export const approvedOutcome = (sent: SentInvitation): Outcome =>
 export const resentOutcome = (sent: SentInvitation): Outcome =>
   outcomeOfSending(sent, {
     went: `Sent the invitation to ${sent.address} again. It lasts until ${dayWords(sent.expiresAt)}.`,
-    didNotGo: `The invitation to ${sent.address} stands, but its email did not go again. Resend it later; if it keeps failing, the platform's operator can see why.`,
+    didNotGo: `The invitation to ${sent.address} stands, but its email did not go again. Resend it later; if it keeps failing, better-answers support can see why.`,
   });
 
 const addressesOf = (sent: readonly SentInvitation[]): string =>

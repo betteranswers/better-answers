@@ -11,6 +11,7 @@ import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx
 import { counted } from "@/shared/words.ts";
 
 import { CorrectDisplayName } from "./correct-display-name.tsx";
+import { EndEverySignInEverywhere } from "./end-every-sign-in-everywhere.tsx";
 import { Facts } from "./facts.tsx";
 import { endedByWords } from "./grant-words.ts";
 import type { FreshAct } from "./people-address.ts";
@@ -22,7 +23,6 @@ import {
   type ListedPerson,
 } from "./people-api.ts";
 import { At, grantStateOf, Instant, Memberships, nameOf } from "./person-words.tsx";
-import { RevokeEverywhere } from "./revoke-everywhere.tsx";
 import { readRefused } from "./words.ts";
 
 /** Where focus lands when the sheet opens: on the person, or straight on one of their acts. */
@@ -37,7 +37,7 @@ function Sessions(properties: { readonly sessions: readonly HeldSession[] }) {
       <p>
         {sessions.length === 0
           ? "No session is open."
-          : `${counted(sessions.length, "session", "sessions")} open. Revoking credentials ends every one at once.`}
+          : `${counted(sessions.length, "session", "sessions")} open. Ending every sign-in and token closes every one at once.`}
       </p>
       {sessions.length === 0 ? null : (
         <ul className="grid gap-3">
@@ -247,14 +247,14 @@ export function PersonSheet(properties: {
             <SummaryRow term="Last sign-in">
               <Instant at={person.lastSignedInAt} none="None on record" />
             </SummaryRow>
-            <SummaryRow term="Credentials revoked">
+            <SummaryRow term="Every sign-in and token ended">
               <Instant at={person.credentialsRevokedAt} none="Never" />
             </SummaryRow>
           </Facts>
         </SheetPart>
         <HeldCredentials person={person} />
         <CorrectDisplayName person={person} actRef={correctRef} />
-        <RevokeEverywhere person={person} actRef={revokeRef} />
+        <EndEverySignInEverywhere person={person} actRef={revokeRef} />
       </div>
     </RowSheet>
   );

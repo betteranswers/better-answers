@@ -103,7 +103,7 @@ const undoEach = (undos: readonly Undo[] | undefined) => {
 };
 
 /** Everything reads ended before the api answers, so the act lands within 100 ms. */
-export const useRevokeEverywhere = (personId: string) => {
+export const useEndEverySignInEverywhere = (personId: string) => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   const optimistic = useOptimistic();
@@ -112,7 +112,7 @@ export const useRevokeEverywhere = (personId: string) => {
   const inspectedKey = api.console.people.inspect.queryKey({ personId });
   // The callbacks go to the hook itself: the React lint takes one passed through `mutationOptions` as run during render.
   return useMutation({
-    ...api.console.people.revokeCredentials.mutationOptions<readonly Undo[]>(),
+    ...api.console.people.endEverySignInAndToken.mutationOptions<readonly Undo[]>(),
     onMutate: () => {
       const at = new Date().toISOString();
       return Promise.all([

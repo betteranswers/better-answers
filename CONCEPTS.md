@@ -731,7 +731,7 @@ to it by IRI and never restates it (ADR 0014).
 - **version (of a record)** — one state of a write-up or a guide definition, kept for good with
   who changed it and why; the current state is the latest version. Concepts have git instead.
 
-- **backup** — _Code rename pending._ one scheduled copy of one store, or one restore drill, as a
+- **backup** — one scheduled copy of one store, or one restore drill, as a
   row: what, when, outcome, size, where it went, whether it holds personal data, when it expires,
   and — for a drill — how long the restore took.
 - **tier (of a backup)** — _Internal._ where a database dump is filed by when it was taken, which
@@ -895,14 +895,14 @@ to it by IRI and never restates it (ADR 0014).
   or by an address's position in what was sent — never by an address or a name. Nothing of the set
   lands. The refusal's own word is the first refused item's word in id order. Only tRPC carries the
   items, to the web client; MCP and `pnpm ops` answer the set's word alone.
-- **end every sign-in and token** — _Code rename pending._ the one action that ends what a person
+- **end every sign-in and token** — the one action that ends what a person
   was issued, in two scopes. *In a workspace*: a workspace Admin ends every session and token a
   person holds there, by an instant on their member row the resolver refuses against; nothing
   outside that workspace changes, and the Admin never learns whether others exist. *Everywhere*: the
   operator ends every session and token the person holds, by an instant on the person. Both end
   what was issued; a fresh sign-in mints anew. The member page's last section reads *Remove and end
   every sign-in*.
-- **share agent token** — _Code rename pending._ a **share agent's** credential: scoped to one
+- **share agent token** — a **share agent's** credential: scoped to one
   connected source, minted and ended by an Admin, validated in the api before any request body is
   read, and good only for the `/agent/v1` routes a share agent uses to push documents in from a
   company's own network (ADR 0008 amendment, ADR 0041's *agent* class). Listed on Control Centre ›

@@ -6,8 +6,8 @@ import type { OperatorPrincipal } from "../src/kernel/index.ts";
 import {
   removeMember,
   removeMemberInput,
-  revokeCredentialsHere,
-  revokeCredentialsHereInput,
+  endEverySignInAndTokenHere,
+  endEverySignInAndTokenHereInput,
 } from "../src/members/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import {
@@ -15,7 +15,7 @@ import {
   inspectPerson,
   listPeople,
   recordSignIn,
-  revokeCredentials,
+  endEverySignInAndToken,
   setDisplayName,
 } from "../src/workspaces/index.ts";
 import { sessionFor } from "./identity-rows.ts";
@@ -142,7 +142,7 @@ describe("the operator's list of people", () => {
     });
     const revokedAt = new Date();
     const revoked = await asTheOperator(db(), (operator, tx) =>
-      revokeCredentials(operator, tx, { personId: personIdOf(personId), at: revokedAt }),
+      endEverySignInAndToken(operator, tx, { personId: personIdOf(personId), at: revokedAt }),
     );
     expect(revoked.ok).toBe(true);
 
@@ -408,8 +408,8 @@ describe("inspecting a person's ended grants", () => {
     const acme = await provisionedWorkspace(db(), "Acme", { name: "Ada Okafor" });
     const { personId } = await connectedIn(acme);
     const revoked = await heldAs(acme, acme.adminUserId, (principal, tx) =>
-      revokeCredentialsHere(principal, tx, {
-        ...inputOf(revokeCredentialsHereInput, { personId }),
+      endEverySignInAndTokenHere(principal, tx, {
+        ...inputOf(endEverySignInAndTokenHereInput, { personId }),
         at: new Date(),
       }),
     );
@@ -419,7 +419,7 @@ describe("inspecting a person's ended grants", () => {
 
   const revokedEverywhere = async (personId: string) => {
     const everywhere = await asANewOperator(db(), new Date(), (operator, tx) =>
-      revokeCredentials(operator, tx, { personId: personIdOf(personId), at: new Date() }),
+      endEverySignInAndToken(operator, tx, { personId: personIdOf(personId), at: new Date() }),
     );
     expect(everywhere.answered).toMatchObject({ ok: true, value: { ok: true } });
   };
@@ -432,8 +432,8 @@ describe("inspecting a person's ended grants", () => {
 
     for (const each of [personId, bystander.personId]) {
       const revoked = await heldAs(acme, acme.adminUserId, (principal, tx) =>
-        revokeCredentialsHere(principal, tx, {
-          ...inputOf(revokeCredentialsHereInput, { personId: each }),
+        endEverySignInAndTokenHere(principal, tx, {
+          ...inputOf(endEverySignInAndTokenHereInput, { personId: each }),
           at: new Date(),
         }),
       );

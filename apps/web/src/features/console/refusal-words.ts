@@ -11,7 +11,7 @@ export const NOT_THE_OPERATOR = "not-the-operator" satisfies RefusalWord;
 export const SIGN_IN_TOO_OLD = "sign-in-too-old" satisfies RefusalWord;
 
 export const ONLY_THE_OPERATOR: Said = {
-  why: "Only the operator may open the console.",
+  why: "Only better-answers support may open the console.",
   next: "Go back to your workspaces.",
 };
 
@@ -33,11 +33,11 @@ const NO_SUCH_PERSON: Said = {
 
 export const SAID_OF_A_REVOCATION = {
   [SIGN_IN_TOO_OLD]: {
-    why: "Your sign-in is more than an hour old, and revoking needs one from the last hour.",
+    why: "Your sign-in is more than an hour old, and ending every sign-in and token needs one from the last hour.",
     next: "Once you have signed in, you come back to this person.",
   },
   [NOT_THE_OPERATOR]: {
-    why: "Only the operator may revoke credentials everywhere.",
+    why: "Only better-answers support may end every sign-in and token everywhere.",
     next: ONLY_THE_OPERATOR.next,
   },
   "no-such-user": NO_SUCH_PERSON,
@@ -55,7 +55,7 @@ export const SAID_OF_CORRECTING = {
     next: "Once you have signed in, you come back here.",
   },
   [NOT_THE_OPERATOR]: {
-    why: "Only the operator may correct a display name.",
+    why: "Only better-answers support may correct a display name.",
     next: ONLY_THE_OPERATOR.next,
   },
   "no-such-user": NO_SUCH_PERSON,

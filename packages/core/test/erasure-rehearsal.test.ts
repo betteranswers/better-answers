@@ -8,7 +8,7 @@ import {
   type ErasureRehearsed,
 } from "../src/erasure/index.ts";
 import { getObject } from "../src/store/objects/index.ts";
-import { revokeCredentials, revokeCredentialsInput } from "../src/workspaces/index.ts";
+import { endEverySignInAndToken, endEverySignInAndTokenInput } from "../src/workspaces/index.ts";
 import { bundleHistory, everyObjectOf, fileAtCommit } from "./bundle.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
 import { asANewOperator } from "./platform.ts";
@@ -225,9 +225,9 @@ describe("the rehearsal", () => {
   it("names a refused principal as the subject's, not the request's", async () => {
     const scenario = await arrange();
     const subject = await seeding(scenario);
-    const { personId } = inputOf(revokeCredentialsInput, { personId: subject.personId });
+    const { personId } = inputOf(endEverySignInAndTokenInput, { personId: subject.personId });
     const { answered } = await asANewOperator(db(), REVOKED_AFTER_THE_SEED, (operator, tx) =>
-      revokeCredentials(operator, tx, { personId, at: REVOKED_AFTER_THE_SEED }),
+      endEverySignInAndToken(operator, tx, { personId, at: REVOKED_AFTER_THE_SEED }),
     );
     const revoked = answered.ok ? answered.value : answered;
     if (!revoked.ok) throw new Error(`the revocation refused: ${String(revoked.error)}`);

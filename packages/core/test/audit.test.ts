@@ -149,7 +149,7 @@ describe("the declared-acts walk", () => {
       "alert",
       "spend",
       "llm_call",
-      "backup_run",
+      "backup",
       "health_check",
       "inbox",
     ];

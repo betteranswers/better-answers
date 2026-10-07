@@ -438,7 +438,7 @@ describe("the pages, as a person walks them", () => {
 
   it("refuses consent after credentials are revoked, minting no code", async () => {
     const decided = await consentPostedAfter((acme) =>
-      app.revokeCredentials(acme.admin.id, new Date(Date.now() + 1_000)),
+      app.endEverySignInAndToken(acme.admin.id, new Date(Date.now() + 1_000)),
     );
 
     expect(decided.status).toBe(401);
@@ -719,7 +719,7 @@ describe("the cookie session, through the same resolver", () => {
 
     await connectAsHost(app, client, acme.admin);
     expect((await client.fetch("/me")).status).toBe(200);
-    await app.revokeCredentials(acme.admin.id, new Date(Date.now() + 1_000));
+    await app.endEverySignInAndToken(acme.admin.id, new Date(Date.now() + 1_000));
 
     const refused = await client.fetch("/me");
 

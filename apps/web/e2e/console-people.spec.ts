@@ -54,7 +54,7 @@ const INSTANT_WORDS = String.raw`\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}`;
 
 const INSTANT = new RegExp(`^${INSTANT_WORDS}$`);
 
-const REVOKE = "Revoke Priya Shah's credentials everywhere";
+const REVOKE = "End every sign-in and token Priya Shah holds";
 
 /** Everyone the run makes is on this list, so a test finds its own by a tag in their address. */
 const aTag = (): string => `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
@@ -413,7 +413,7 @@ test.describe("the console's Everyone page", () => {
     await expect(listed).toHaveText([
       "Search everyone by name or address",
       "Open the person in focus",
-      "Revoke the credentials of the person in focus",
+      "End every sign-in and token of the person in focus",
       "Correct the display name of the person in focus",
       "Show the previous page of people",
       "Show the next page of people",
@@ -474,11 +474,11 @@ test.describe("a person, opened from Everyone as a sheet", () => {
           - heading "Sign-in" [level=3]
           - term: Last sign-in
           - definition: /\\d{2}:\\d{2} · \\d{1,2} [A-Z][a-z]+ \\d{4}/
-          - term: Credentials revoked
+          - term: Every sign-in and token ended
           - definition: Never
         - region "Sessions":
           - heading "Sessions" [level=3]
-          - paragraph: 1 session open. Revoking credentials ends every one at once.
+          - paragraph: 1 session open. Ending every sign-in and token closes every one at once.
           - list:
             - listitem:
               - term: Began
@@ -504,8 +504,8 @@ test.describe("a person, opened from Everyone as a sheet", () => {
           - heading "Display name" [level=3]
           - paragraph: /Replaces Priya Shah's display name in every workspace they belong to/
           - button "Correct Priya Shah's display name"
-        - region "Revoke everywhere":
-          - heading "Revoke everywhere" [level=3]
+        - region "End every sign-in everywhere":
+          - heading "End every sign-in everywhere" [level=3]
           - paragraph: /Ends every session and client grant Priya Shah holds/
           - button "${REVOKE}"
         - button "Close"
@@ -550,7 +550,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     `);
   });
 
-  test("revokes everywhere behind a confirmation, within its budget", async ({
+  test("ends every sign-in everywhere behind a confirmation, within its budget", async ({
     page,
     request,
     baseURL,
@@ -575,7 +575,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
 
     await revoke.click();
-    await confirmation.getByRole("button", { name: "Revoke everywhere" }).focus();
+    await confirmation.getByRole("button", { name: "End every sign-in everywhere" }).focus();
     await clockTheNextKey(page, {
       at: "//section[h3[normalize-space(.)='Sessions']]",
       reads: "No session is open.",
@@ -583,8 +583,8 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await page.keyboard.press("Enter");
 
     await expect(regionOf(sheet, "Sessions")).toContainText("No session is open.");
-    await theActLandedWithinItsBudget(page, "revoke everywhere");
-    await expect(regionOf(sheet, "Revoke everywhere").getByRole("status")).toHaveText(
+    await theActLandedWithinItsBudget(page, "end every sign-in everywhere");
+    await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("status")).toHaveText(
       /^Priya Shah's sessions and client grants ended at \d{2}:\d{2} · .+\. They can sign in again\.$/,
     );
     await expect(revoke).toBeFocused();
@@ -620,9 +620,11 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     const sheet = await openPriya(page, tag);
 
     await sheet.getByRole("button", { name: REVOKE }).click();
-    await confirmationOf(page).getByRole("button", { name: "Revoke everywhere" }).click();
+    await confirmationOf(page)
+      .getByRole("button", { name: "End every sign-in everywhere" })
+      .click();
 
-    await expect(regionOf(sheet, "Revoke everywhere").getByRole("alert")).toHaveText(
+    await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("alert")).toHaveText(
       sentenceOf(SAID_OF_A_REVOCATION[SIGN_IN_TOO_OLD]),
     );
     await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
@@ -636,8 +638,10 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     const revoke = again.getByRole("button", { name: REVOKE });
     await expect(revoke).toBeFocused();
     await revoke.press("Enter");
-    await confirmationOf(page).getByRole("button", { name: "Revoke everywhere" }).click();
-    await expect(regionOf(again, "Revoke everywhere").getByRole("status")).toContainText(
+    await confirmationOf(page)
+      .getByRole("button", { name: "End every sign-in everywhere" })
+      .click();
+    await expect(regionOf(again, "End every sign-in everywhere").getByRole("status")).toContainText(
       "sessions and client grants ended",
     );
     await expect(regionOf(again, "Sessions")).toContainText("No session is open.");
@@ -648,7 +652,11 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(personButton(page, "Priya Shah")).toBeFocused();
   });
 
-  test("revokes the person in focus by keyboard alone", async ({ page, request, baseURL }) => {
+  test("ends the focused person's sign-ins by keyboard alone", async ({
+    page,
+    request,
+    baseURL,
+  }) => {
     const tag = aTag();
     await priyaConnected(page, request, baseURL, tag);
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
@@ -663,10 +671,12 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     const confirmation = confirmationOf(page);
     await expect(confirmation.getByRole("button", { name: "Cancel" })).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(confirmation.getByRole("button", { name: "Revoke everywhere" })).toBeFocused();
+    await expect(
+      confirmation.getByRole("button", { name: "End every sign-in everywhere" }),
+    ).toBeFocused();
     await page.keyboard.press("Enter");
 
-    await expect(regionOf(sheet, "Revoke everywhere").getByRole("status")).toContainText(
+    await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("status")).toContainText(
       "sessions and client grants ended",
     );
     await page.keyboard.press("Escape");

@@ -117,4 +117,4 @@ say "## 8 start the backup service — its next hourly run dumps the restored da
 stores start backup
 
 rto=$(( ( $(date +%s) - T0 ) / 60 ))
-say "## done — RTO ${rto} min. Record it: RUNBOOK.md page 1 names the row (a *restore* audit_event and a backup_run row land with the signals task; until then this log is the record). Delete the age identity from this box now."
+say "## done — RTO ${rto} min. Record it: RUNBOOK.md page 1 names the row (a *restore* audit_event and a backup row land with the signals task; until then this log is the record). Delete the age identity from this box now."

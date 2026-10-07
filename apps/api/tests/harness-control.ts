@@ -160,7 +160,7 @@ export const harnessControl = (app: TestApp): Hono => {
   control.post(`${HARNESS_PREFIX}/revocations`, async (context) => {
     const asked = await readBody(context.req.raw, revocation);
 
-    await app.revokeCredentials(asked.userId, new Date(Date.now() + 1_000));
+    await app.endEverySignInAndToken(asked.userId, new Date(Date.now() + 1_000));
     return context.json({ revoked: true });
   });
 

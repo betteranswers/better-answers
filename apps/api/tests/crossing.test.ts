@@ -218,7 +218,7 @@ describe("a refusal crossing tRPC", () => {
       "credentials-revoked",
       async () => {
         const workspace = await app.provision();
-        await app.revokeCredentials(workspace.admin.id, new Date(Date.now() + 60_000));
+        await app.endEverySignInAndToken(workspace.admin.id, new Date(Date.now() + 60_000));
         return membership(await signedInClient(app, workspace.admin.email));
       },
     ],
