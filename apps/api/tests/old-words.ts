@@ -677,7 +677,6 @@ const OTHER_RUN_TREES = [
   "packages/core/src/concepts/",
   "packages/core/src/erasure/",
   "packages/core/src/members/",
-  "packages/core/src/runs/",
   "packages/core/src/sweeps/",
   "packages/core/src/workspaces/",
   "packages/core/stryker.config.mjs",

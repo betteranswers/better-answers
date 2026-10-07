@@ -363,10 +363,10 @@ export const runsOfSubject = async (
     ),
   );
   if (!read.ok) return err(read.error);
-  return ok(subjectRunsOf(read.value.rows).map(([, run]) => run));
+  return ok(subjectRunsOf(read.value.rows).map(([, subjectRun]) => subjectRun));
 };
 
-/** Each subject's newest run; a subject with no run is absent from the map. */
+/** Each subject's newest job; a subject with no job is absent from the map. */
 export const latestRunsOf = async (
   admin: AdminUserPrincipal,
   tx: Tx,
