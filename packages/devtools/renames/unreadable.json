@@ -71,6 +71,13 @@
   },
   "senses": [
     {
+      "sense": "the old stored names a test seeds or refuses as stored (R22)",
+      "paths": [
+        "packages/schema/test/knowledge-words.test.ts",
+        "packages/schema/test/renamed-names.test.ts"
+      ]
+    },
+    {
       "sense": "the words test's own planted fixtures and ratchet",
       "paths": ["apps/api/tests/avoid-words.test.ts", "apps/api/tests/old-words-ratchet.json"]
     }
