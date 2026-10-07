@@ -343,7 +343,7 @@ sequenceDiagram
   7. For the passage sweep, run every connected source through the `wiped` reason and remove every old-named store directory (KTD3).
   8. Set `RELEASE_MODE` back to `nightly`.
 - Cubic reviews nothing until 1 November 2026. `ce-code-review` still runs on every pull request, and the owner arms each merge by hand.
-- After the passage sweep, run the restore drill once to prove AE13.
+- After U17, run the restore drill once to prove AE13. The owner moved it from after the passage sweep on 07/10/2026, so the renames finish first.
 - **Running the lanes (KTD10, item 7).** Each lane runs in its own session and worktree, one unit per `ce-work` run. What lanes do not change:
   - **One watched release at a time.** While one lane's sweep is in its watched release, with `RELEASE_MODE` at `drill`, every other lane holds its merge. "Nothing else waiting" in step 2 above includes the other lanes.
   - **Migration numbers.** U12, U15 and U17 each add a migration. U14 (Deferred to Implementation) and U16's *slug* add one if they rename a column. The branch that merges second renumbers its migration's file name and its journal `idx` and `tag`. It also sets the journal's `when` later than the landed migration's, because drizzle's migrator applies by `when`, not by number, and skips a migration whose `when` is earlier than the last one applied. Then it rewrites its snapshot against the new predecessor and regenerates the worker's schema view, whose `MIGRATION_WHEN` follows the last entry. A second `generate` must find no diff.
@@ -811,7 +811,10 @@ sequenceDiagram
 
 ### U15. Knowledge words
 
-**Goal:** the knowledge and sources nouns in Appendix A and B are renamed, one pull request per noun.
+**Goal:** the knowledge and sources nouns in Appendix A and B are renamed, in three pull requests merged in order (owner, 07/10/2026, as U16 did). Each noun keeps its own map and commit:
+- (a) the page words: *answer audit*, *extraction plan*, and *link* and *knowledge base* on pages;
+- (b) the code words with no stored change: *domain*, *type vocabulary*, *citation marker*, *hit* and *finding group*;
+- (c) one migration and one watched release: the suggestion kinds, the *repair* origin, *quarantined*, the inbox store with the "Queue" page, *composition* and *class*.
 
 **Requirements:** R1, R14, R15, R21, R22. KTD8, KTD12.
 
@@ -836,7 +839,7 @@ sequenceDiagram
    - *extraction plan* to *cost estimate*;
    - *answer audit* to *Questions asked*;
    - the inbox store's code word to *suggestions*, moved from U16 because it lives in `packages/core/src/concepts/inbox.ts` and `contracts/concept-inbox/`, beside the suggestion kinds this unit renames.
-2. Stored values change by migration (KTD12): *candidate* and *repair* as suggestion kinds, *repair* as a verification origin, and *quarantined*. `contracts/concept-inbox/cases.json` holds *candidate*, so that sweep moves the contract digest. The kind rename also replaces `submit_suggestion_set`, whose definer body lists the kinds each role may raise, and `suggestion_repair_proposer_check` (KTD4). The map's *Composition* label is rebuilt.
+2. Stored values change by migration (KTD12): *candidate* and *repair* as suggestion kinds, *repair* as a verification origin, and *quarantined*. `contracts/concept-inbox/cases.json` holds *candidate*, so that sweep moves the contract digest. The kind rename also replaces `submit_suggestion_set`, whose definer body lists the kinds each role may raise, and `suggestion_repair_proposer_check` (KTD4). The map's *Composition* label is rebuilt. The same migration renames three stored names the owner added on 07/10/2026: the `composition` and `composition_include` tables to *write-up*, `concept_class_override` to `concept_sensitivity_override`, and `source_document.quarantine_error` to an *unreadable* name, each with its constraints and indexes. `retention_class` stays (Appendix G).
 3. *Link* and *knowledge base* are page words only. `iri`, `locator` and OKF's *bundle* stay in code (R15). The wire key `hits` stays (R21).
 
 **Patterns to follow:** migration 0048 for the value swaps; `packages/core/test/suggestions.test.ts`, `packages/core/test/import-bundle.test.ts` and `packages/schema/test/migration-ownership.test.ts` as the suites to extend.
@@ -928,7 +931,7 @@ sequenceDiagram
 | `generate:worker-view`, `generate:roles-surface`, `generate:contract-stamp` (schema) and `generate:audit-acts` (core) | Generated files in step, drift-checked | Every schema sweep, U17 |
 | `pnpm run check:gates` | Lint, comment and format gates, including the renamed lint rule | U6, U17 |
 | `pnpm run check` | Everything; CI's arbiter | Every pull request |
-| `deploy/restore-drill.sh` | Renamed tables restore and count | After U10 and U12 |
+| `deploy/restore-drill.sh` | Renamed tables restore and count | After U17 |
 | Mutation run per `docs/agents/mutation-triage.md` | The words test's new matching code is held by tests | U2 |
 
 ---
@@ -938,7 +941,7 @@ sequenceDiagram
 - Every requirement holds, and BA-29's acceptance criteria are ticked.
 - The words test's list holds every Appendix A and B old word as landed, and old words appear only where R15, R21, R22 or Appendix G keep them.
 - `CONCEPTS.md` has no pending mark.
-- Each table-renaming release has its release note and RUNBOOK entry, and the restore drill has passed after the passage sweep.
+- Each table-renaming release has its release note and RUNBOOK entry, and the restore drill has passed after U17.
 - No codemod output, spike code or abandoned attempt remains in the tree.
 - Per unit: its verification is met, its rename map is committed, and its pull request has merged through the queue.
 
