@@ -183,15 +183,15 @@ const insertRow = async <TName extends keyof Registry>(
   );
 
   const row: Readonly<Record<string, unknown>> = returned.rows[0] ?? {};
-  const domain: Record<string, unknown> = {};
+  const fields: Record<string, unknown> = {};
   for (const [key, column] of Object.entries(columns)) {
     const value = row[column.name];
 
-    domain[key] = typeof value === "string" && value.startsWith("[") ? JSON.parse(value) : value;
+    fields[key] = typeof value === "string" && value.startsWith("[") ? JSON.parse(value) : value;
   }
 
   // oxlint-disable-next-line typescript/consistent-type-assertions -- TypeScript cannot correlate `select` with `TName` through a generic indexed access
-  return select.parse(domain) as Row<TName>;
+  return select.parse(fields) as Row<TName>;
 };
 
 const partitionExists = async (client: pg.PoolClient, workspaceId: string): Promise<boolean> => {

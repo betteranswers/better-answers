@@ -737,6 +737,31 @@ describe("a word that lands with its sweep", () => {
         .toSorted(),
     );
   });
+
+  it("refuses a collection written as a domain, passing other domains", () => {
+    const domain = ["dom", "ain"].join("");
+    const refused = {
+      [WORDS]: `export const SAID = "Who owns each ${domain}.";`,
+      "docs/solutions/architecture-patterns/adr-0047-planted.md": `- An owner per ${domain} decides.`,
+      "docs/specs/v01-route.md": `the ${domain}'s owner, with a per-${domain} default`,
+      "packages/core/src/concepts/planted.ts": `// A ${domain} is never a file key.`,
+      "CONCEPTS.md": `listed with its owners, ${domain} by ${domain}.`,
+    };
+    const passed = {
+      "packages/core/src/members/planted.ts": `const ${domain} = await testingDomainOf(admin, tx);`,
+      "docs/operations/RUNBOOK.md": `an address on that ${domain}, or on the testing ${domain}`,
+      "docs/solutions/architecture-patterns/adr-0008-planted.md": `at \`app.<${domain}>/mcp\``,
+      "packages/schema/test/planted.test.ts": `CREATE ${domain.toUpperCase()} probe AS text`,
+      "AGENTS.md": `### ${domain} docs: each ${domain} word is defined first.`,
+      "apps/web/playwright.config.ts": `/** A relying party must be a ${domain}, never an IP. */`,
+    };
+
+    expect([...linesOver({ ...refused, ...passed }, [rowOf(domain)])].toSorted()).toEqual(
+      Object.entries(refused)
+        .map(([file, text]) => `${file}:1: ${text}`)
+        .toSorted(),
+    );
+  });
 });
 
 describe("the product's name in a planted tree", () => {

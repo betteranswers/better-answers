@@ -18,7 +18,7 @@ Of the 285 critical, high and medium alerts open that day:
 - 240 medium alerts are dismissed on the assessments below: 112 in `image-api`, 109 in `image-backup` and 19 in `image-worker`.
 - 33 in `image-backup` are OpenSSL's, and have a fix: `3.5.7-1~deb13u3`, from DSA-6531-1. `deploy/backup.Dockerfile` takes it.
 - 11 in `image-worker` are OpenSSL's too. The worker's `libssl3t64` is Distroless's, so they close when the `cc-debian13` digest moves to a build that carries the fix.
-- 5 of the 240 are glibc's CVE-2026-8674: `image-api` #707 and #729, `image-backup` #112 and #134, `image-worker` #1327. The flaw aborts a process whose resolver reads a `search` domain of about 200 characters, and a container copies its host's `search` line. Read on both hosts on 30/09/2026: `/etc/resolv.conf` is systemd-resolved's stub with `search .`, no domain at all, and every running container carries the same line. Netplan's DHCP leaves `UseDomains` at its default, off, so the provider's DHCP cannot add a domain either.
+- 5 of the 240 are glibc's CVE-2026-8674: `image-api` #707 and #729, `image-backup` #112 and #134, `image-worker` #1327. The flaw aborts a process whose resolver reads a `search` domain of about 200 characters, and a container copies its host's `search` line. Read on both hosts on 30/09/2026: `/etc/resolv.conf` is systemd-resolved's stub with `search .`, no search domain at all, and every running container carries the same line. Netplan's DHCP leaves `UseDomains` at its default, off, so the provider's DHCP cannot add a search domain either.
 - 1 critical alert is held open, above.
 
 ### `image-api`

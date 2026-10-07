@@ -38,11 +38,11 @@ The areas the rail lists, each holding groups of pages (§4, *The shell*):
 
 - **Ask** — a question, a cited answer, and what it could not answer. Every role.
 - **Knowledge** — search, guides and the map's concepts for every role; its curation
-  pages for Admins and the owners of a domain. A search match is typed by knowledge layer
+  pages for Admins and the owners of a collection. A search match is typed by knowledge layer
   and wears its trust or sensitivity word. A guide is assembled *Brief* and quoted
   *Detail* layers over the concepts, with coverage.
 - **Inbox** — what waits on a person who decides something: Admins, and the owners of a
-  domain.
+  collection.
 - **Control Centre** — the one Admin area, in eight groups: Overview, Suggestions,
   Sources, Agent Operations, Questions, People, Personal data and System.
 
@@ -287,7 +287,7 @@ tab icon, 24 or 32px in the band. Its accessible name is `better-answers`.
 **Name.** The product's name is `better-answers` everywhere a person reads it: a page,
 the tab title, the api's pages, an email and its sender name. Lower-case and hyphenated,
 at the start of a sentence as anywhere else. Beside the logo it is set in Geist Mono 500;
-in running text it takes the text's own face. The domain is `better-answers.com`. Never
+in running text it takes the text's own face. The domain name is `better-answers.com`. Never
 "BetterAnswers", never "Better-Answers", never "BA", and never two capitalised words.
 
 ## 6. What is in this repository

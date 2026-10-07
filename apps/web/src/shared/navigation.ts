@@ -33,7 +33,7 @@ export type Page = {
   readonly icon: IconName;
   readonly built: boolean;
   readonly seenBy: readonly RoleOrOperator[];
-  /** Shown as well to anyone owning a domain, whatever their role. */
+  /** Shown as well to anyone owning a collection, whatever their role. */
   readonly owners?: true;
   /** Every older address, each leading here only for a person who may see the page. */
   readonly movedFrom?: readonly string[];
@@ -123,7 +123,8 @@ const KNOWLEDGE = {
     {
       id: "curation",
       name: "Curation",
-      summary: "Everything this workspace knows, what needs verifying, and who owns each domain.",
+      summary:
+        "Everything this workspace knows, what needs verifying, and who owns each collection.",
       pages: [
         {
           name: "All knowledge",
@@ -158,8 +159,8 @@ const KNOWLEDGE = {
           owners: true,
         },
         {
-          name: "Domains and owners",
-          path: "/knowledge/domains-and-owners",
+          name: "Collections and owners",
+          path: "/knowledge/collections-and-owners",
           icon: "owners",
           built: false,
           seenBy: ADMINS,
@@ -496,7 +497,7 @@ export type Reader = {
   readonly owns: readonly string[];
 };
 
-/** Nothing records who owns a domain, so a page marked for owners shows by role alone. */
+/** Nothing records who owns a collection, so a page marked for owners shows by role alone. */
 export const readerOf = (role: RoleOrOperator | undefined): Reader => ({ role, owns: [] });
 
 export const OPERATOR_READER: Reader = readerOf("operator");

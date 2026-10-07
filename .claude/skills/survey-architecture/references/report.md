@@ -24,7 +24,7 @@ Caller counts are lower bounds; say so wherever one appears.
 
 ## One card per opportunity
 
-Use the words in `CONCEPTS.md` for the domain, and the slice and door words of ADR 0029 for structure. Write "the concepts slice's face", not "the ConceptsService".
+Use the words in `CONCEPTS.md` for the product's concepts, and the slice and door words of ADR 0029 for structure. Write "the concepts slice's face", not "the ConceptsService".
 
 - **Files:** the files and modules involved.
 - **Problem:** the friction, in terms of what is hard to change or to test.

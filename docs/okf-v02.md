@@ -30,7 +30,7 @@ Read before proposing any key, writing convention or feature that touches a conc
 | Taxonomy of `type` | Non-goal; free string | Honoured: kinds emerge with the concepts, folded for case and plural at write; the kinds in use are a derived Kinds list with counts; rename/merge is one bulk commit; no file, no closed-world check | ADR 0026 (supersedes 0001) |
 | Access control | "not access control" | **Sensitivity** on connected source, document, passage and concept row; trust never gates viewing | Ticket 38 D1; ticket 24 |
 | Storage, serving, query | Non-goal | Concept index rows, passages, embeddings and the map — all derived from the bundle, none a source of truth; the bundle is written only by the api, one commit per act, platform-prepared changes waiting as suggestions | ADR 0012 (ticket 15) |
-| Multi-bundle, tenancy, bundle identity | None | One bundle per tenant; domain directories as future bundle boundaries; in-bundle manifest | ADR 0002, 0003; research 35 |
+| Multi-bundle, tenancy, bundle identity | None | One bundle per tenant; collection directories as future bundle boundaries; in-bundle manifest | ADR 0002, 0003; research 35 |
 | History | Git plus prose `log.md` | Git history for the bundle; append-only versions on compositions and guide definitions; `log.md` generated at export from the commit log | ADR 0004, 0014 |
 
 ## The platform's stance (Liam, 26/08/2026)

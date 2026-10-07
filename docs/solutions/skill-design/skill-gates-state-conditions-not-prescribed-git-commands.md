@@ -88,7 +88,7 @@ Stating the condition also puts the decision where the information is. The agent
 
 ## When to Apply
 
-- A skill hands its real work to another skill or tool that already owns that domain — git/PR mechanics, package management, deploys, migrations. State what must be true; let the callee own how.
+- A skill hands its real work to another skill or tool that already owns that work — git/PR mechanics, package management, deploys, migrations. State what must be true; let the callee own how.
 - A gate is about *safety* (do not publish unoffered work) rather than *procedure*. Safety conditions are stable; the commands that establish them are configuration-dependent.
 - A skill section has absorbed three or more rounds of "add a case" fixes, each fixing the last one's regression. Stop adding; ask whether the section should be stating a condition instead of a procedure.
 - A prescribed command in skill prose interpolates a repo-derived value (branch name, remote name, path) into a shell string. Either quote it rigorously or replace the command with the condition it was checking.

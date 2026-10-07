@@ -48,7 +48,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   set (ADR 0026).
 - **Also known as** — a conventional body line naming a concept's other names; a confirmed alias
   lands there through an edit suggestion, and the merge key derives its names from it.
-- **collection** — _Code rename pending._ a top-level division of a company's knowledge by
+- **collection** — a top-level division of a company's knowledge by
   ownership: the company itself, one product or service, one sector, listed with its owners on
   Knowledge › Collections and owners. The knowledge base is organised collection-first, and a
   collection is a future bundle boundary. Not an email domain.
@@ -792,7 +792,7 @@ to it by IRI and never restates it (ADR 0014).
   harness.
 - **test inbox** — _Internal._ named in full, because *Inbox* alone is a person's *area*, which
   points into *To decide*: the Cloudflare Email Worker `apps/test-inbox`, on the *testing domain*,
-  a domain apart from the product's. It keeps what reaches that domain for a day and judges
+  an email domain apart from the product's. It keeps what reaches that domain for a day and judges
   nothing. The *journeys* read each sign-in code from it through its API, with a key that reads it
   and does nothing else, and verify each email's DKIM signature themselves. Outside the *estate*:
   the owner deploys it by hand, and nothing in CI can change it.

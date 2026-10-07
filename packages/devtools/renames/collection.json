@@ -1,0 +1,33 @@
+{
+  "noun": "domain",
+  "readerWord": "collection",
+  "sweep": "U15. Knowledge words: collection",
+  "collisions": [
+    {
+      "with": "Python's collections module and its abstract base classes, which the worker imports and no declaration here names",
+      "codeWord": "collection"
+    }
+  ],
+  "words": [
+    {
+      "from": "domain",
+      "to": "collection"
+    },
+    {
+      "from": "domains",
+      "to": "collections"
+    }
+  ],
+  "symbols": {
+    "paths": ["apps/web/src/shared/navigation.ts", "apps/web/test/navigation.test.ts"]
+  },
+  "text": {
+    "paths": ["apps/web/src/shared/navigation.ts", "apps/web/test/navigation.test.ts"]
+  },
+  "senses": [
+    {
+      "sense": "an email, web or DNS domain, SQL's and launchd's domains, and a subject area: every other tree, where the collection sense is written by hand in prose (the members slice's testingDomain, the ops command's --domain, the consumer-domain list)",
+      "matches": ["[Tt]esting[-_ ]?[Dd]omain", "--domain", "consumer[-_ ]domain"]
+    }
+  ]
+}

@@ -25,10 +25,10 @@ tags:
 
 A concept's `type`, its kind, is the short string its producer chose, folded at write for case and plural only (*customer*, *Customers* → *Customer*). There is no vocabulary file.
 
-- The Kinds list is the set of kinds in use, derived from the concept index with counts per kind and per domain. It is never a file in the bundle, never a table an Admin curates, and never checked closed-world.
+- The Kinds list is the set of kinds in use, derived from the concept index with counts per kind and per collection. It is never a file in the bundle, never a table an Admin curates, and never checked closed-world.
 - A new kind arrives with the concepts that carry it. The suggestion set's summary names it, and accepting the concepts accepts the kind.
 - An Admin renames or merges a kind from the Kinds list on Knowledge. That is one bulk commit that rewrites every affected `type` and re-keys `concept_identity` in the same transaction, because `type` is inside the merge key.
-- A kind's definition is a `Term` concept in a glossary domain. Tags stay free strings.
+- A kind's definition is a `Term` concept in a glossary collection. Tags stay free strings.
 - An alias is knowledge: a confirmed alias lands as an *Also known as* line in the concept body, and `concept_identity` derives its merge-key names from that line and the `title`.
 
 A relation between concepts is the link, and it is never named. Every markdown link between concepts is a `LINKS_TO` edge carrying the two endpoint kinds, the section and the sentence around it. There is no relations list, no predicate matcher and no `RELATES_TO` matrix. An agent that wants the predicate reads the sentence.

@@ -8,7 +8,7 @@ severity: medium
 applies_when:
   - "Adding an area, a group or a page, or deciding where a page belongs"
   - "Giving one of a page's rows a page of its own at an address beneath the page"
-  - "Deciding who sees a page, by role or by owning a domain"
+  - "Deciding who sees a page, by role or by owning a collection"
   - "Changing a role's home, or what an unbuilt, hidden or moved address shows"
   - "Naming a level of the navigation in code, tests or docs"
 tags:
@@ -51,7 +51,7 @@ One navigation list in `apps/web/src/shared/` declares every area, group and pag
 - **Ask**: asking, and the cited answers a person got. Every role sees it. It is the home of an Editor and a Viewer.
 - **Knowledge**: the curated map. Its Browse group is every role's. Its Curation group is for Admins and owners.
 - **The work area**: work produced from the knowledge for someone outside, question sets first. Its name waits for S6, which builds its first page.
-- **Inbox**: what waits on the person. It is for Admins, and for the owner of any domain.
+- **Inbox**: what waits on the person. It is for Admins, and for the owner of any collection.
 - **Control Centre**: the Admin's one area, in eight groups: Overview, Suggestions, Sources, Models, Questions, People, Personal data and System.
 - **Briefings** joins at Then: what the platform tells a person unasked, such as sector and account signals, each cited.
 
@@ -62,7 +62,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | Area | Group | Pages (built today in bold) | Seen by |
 |---|---|---|---|
 | Ask | (none) | New question · Your questions | every role (home of Editor and Viewer) |
-| Knowledge | Browse · Curation | Search · Guides · All knowledge · Due for verification · Conflicts · Kinds · Domains and owners · Exports | Browse: every role. Curation: Admins and owners |
+| Knowledge | Browse · Curation | Search · Guides · All knowledge · Due for verification · Conflicts · Kinds · Collections and owners · Exports | Browse: every role. Curation: Admins and owners |
 | Inbox | (none) | Waiting on you | Admins and owners |
 | Control Centre | Overview | Overview | Admin |
 | | Suggestions | Queue | Admin |
@@ -79,18 +79,18 @@ In Knowledge, Browse holds Search and Guides, and Curation holds the other six. 
 Today's pages that the table does not list moved:
 
 - Knowledge left Control Centre and became an area. Its review table is now All knowledge. Its conflicts and verification requests are now Conflicts and Due for verification.
-- Promotions left Questions. A promotion is a suggestion, so it waits in Suggestions' queue, and the owner of the `Answer` domain reaches it through their Inbox.
-- Owners left People for Knowledge's Domains and owners. Erasure and suppression moved to Personal data, and the audit log to System. Thresholds is not declared.
+- Promotions left Questions. A promotion is a suggestion, so it waits in Suggestions' queue, and the owner of the `Answer` collection reaches it through their Inbox.
+- Owners left People for Knowledge's Collections and owners. Erasure and suppression moved to Personal data, and the audit log to System. Thresholds is not declared.
 - The ceiling left Sources, and routes and spend left System, both for Agent Operations.
 
 Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addresses under `/people` and `/sources` still work. Two pages move: the audit log to `/system/audit-log`, and routes and spend to `/agent-operations/routes-and-spend`. For a person who may see a moved page, its old address leads to the new one. A page or group keeps every address it has had, so a page moved twice leads from both (glossary plan, KTD11).
 
 **Who sees what.**
 
-- A person sees a page by their role, or by owning a domain the page serves. A group or an area with no page the person may see is hidden whole.
-- Owning a domain grants acts, so a Viewer may own one. Ownership lands with S3. Until then, visibility reads roles alone.
+- A person sees a page by their role, or by owning a collection the page serves. A group or an area with no page the person may see is hidden whole.
+- Owning a collection grants acts, so a Viewer may own one. Ownership lands with S3. Until then, visibility reads roles alone.
 - The suggestion queue lives in Control Centre › Suggestions. A person's Inbox holds their own items and points into the queue.
-- Control Centre is for Admins alone, so an Editor sees no Questions page there. An Editor who owns the `Answer` domain reaches its promotions through their Inbox. An Editor who owns nothing sees neither.
+- Control Centre is for Admins alone, so an Editor sees no Questions page there. An Editor who owns the `Answer` collection reaches its promotions through their Inbox. An Editor who owns nothing sees neither.
 - An area, group or page that is not built appears nowhere: not in the rail, the menu or jump-to.
 - A role's home always shows. Until it is built, it says plainly that it is on its way. Today that is Ask, for Editors and Viewers. An Admin's home is People › Members until Control Centre › Overview is built.
 - An address that is not built, or that the person may not see, shows the same not-found page as an address that never existed, and offers the person's home.
@@ -117,7 +117,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
 | Ask | none; the home says it is on its way | New question, Your questions, and the concept page a match or a citation opens (S2) | none yet |
-| Knowledge | none | Search (S2). Guides, All knowledge, Kinds, Domains and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your domains since your last visit. A map explorer. Imported bundles |
+| Knowledge | none | Search (S2). Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of acts an agent takes as the person |
@@ -132,7 +132,7 @@ Two things stay open:
 ## Why
 
 - People come to do one of a few things: ask, read the map, produce work, decide what waits on them, or run the workspace. One person often does several. A rail of areas lets each reach the job they came for in one move. A rail of Control Centre's parts showed every role pages it could not use.
-- Deciding is not only an Admin's job. An owner of any role decides edit suggestions and checks on their domain, and one of the personas is a Viewer who owns a specialism. So curation sits on Knowledge, what waits on a person sits in their Inbox, and ownership, not role alone, decides what they see.
+- Deciding is not only an Admin's job. An owner of any role decides edit suggestions and checks on their collection, and one of the personas is a Viewer who owns a specialism. So curation sits on Knowledge, what waits on a person sits in their Inbox, and ownership, not role alone, decides what they see.
 - Unpublished content is shown to Admins alone, in Control Centre. A suggestion's payload can come from an unpublished connected source, so the queue stays in Control Centre, and each Inbox points into it.
 - A withheld concept must be indistinguishable from one that does not exist. An address that says "not for you" or "not built yet" tells a person what exists. Nobody should learn what exists by guessing addresses.
 - The infrequent reader forgets the tool between visits. A few plainly named areas, with nothing listed that cannot be opened, are what such a reader holds.
