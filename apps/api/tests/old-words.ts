@@ -624,6 +624,7 @@ const OTHER_RUN_TREES = [
   "apps/api/tests/better-auth-endpoints.",
   "apps/api/tests/browse-",
   "apps/api/tests/fixtures/",
+  "apps/api/tests/image.test.ts",
   "apps/api/tests/local-database.test.ts",
   "apps/api/tests/operator.test.ts",
   "apps/api/tests/ops.test.ts",
@@ -754,7 +755,7 @@ const RUN_SENSES: readonly Sense[] = [
   {
     sense: "a CI, test, mutation, release or drill run, or a run whose kind its sentence names",
     written:
-      /\b(?:CI|workflow|job|test|suite|mutation|Stryker|stryker|dry|release|drill|journeys?|browser|e2e|nightly|audit|rehearsal|probe|replay|rebase|baseline|scheduled|local|green|red|failed|clean|full|whole|single|real|one-off|merge-group|merge queue|queue|Renovate|lint|check|CodeQL|deploy|backup|restore|sweep|reconciler|rebuild|cron|survey|session|agent|review|benchmark|tick|forced|fresh|catch-up|first)\s+run\b/gi,
+      /\b(?:CI|workflow|job|test|suite|mutation|Stryker|stryker|dry|release|drill|journeys?|browser|e2e|nightly|audit|rehearsal|probe|replay|rebase|baseline|scheduled|local|green|red|clean|full|whole|single|real|one-off|merge-group|merge queue|queue|Renovate|lint|check|CodeQL|deploy|backup|restore|sweep|reconciler|rebuild|cron|survey|session|agent|review|benchmark|tick|forced|fresh|catch-up)\s+run\b/gi,
   },
   {
     sense: "a code identifier: a runner, a step's callback, a process's result",
