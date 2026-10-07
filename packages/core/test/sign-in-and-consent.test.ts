@@ -74,7 +74,7 @@ describe("recording a sign-in", () => {
 });
 
 describe("recording a consent", () => {
-  it("writes one row to the workspace, the client its subject", async () => {
+  it("writes one row to the workspace, the assistant its subject", async () => {
     const named = await provisionedWorkspace(db(), "Consented");
     const personId = await seedPerson(db().pool);
 

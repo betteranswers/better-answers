@@ -183,7 +183,7 @@ const discardIfBuiltHere = async (image: ImageToRun): Promise<void> => {
 type Environment = Readonly<Record<string, string>>;
 
 /**
- * Names on the command line and values through the client's environment, so no value is in the
+ * Names on the command line and values through the docker client's environment, so no value is in the
  * argv a process listing shows.
  */
 const docker = async (

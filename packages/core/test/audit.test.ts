@@ -756,7 +756,7 @@ describe("a detail's list of ended grants", () => {
 
   it.each([
     ["a field no grant has", { email: "priya@example.invalid" }],
-    ["its client's name", { clientName: "Claude" }],
+    ["its assistant's name", { clientName: "Claude" }],
     ["its workspace's name", { workspaceName: "Acme" }],
     ["no client id", { clientId: null }],
     ["an empty client id", { clientId: "" }],

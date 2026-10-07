@@ -62,7 +62,7 @@ function Sessions(properties: { readonly sessions: readonly HeldSession[] }) {
   );
 }
 
-/** An open grant and an ended one share the client, the state, the facts and the client id. */
+/** An open grant and an ended one share the assistant, the state, the facts and the client id. */
 function GrantItem(properties: {
   readonly grant: HeldGrant | EndedGrant;
   readonly state: string;
@@ -71,13 +71,13 @@ function GrantItem(properties: {
 }) {
   const { grant } = properties;
   const headingId = useId();
-  const client = grant.client.name ?? grant.client.id;
+  const assistant = grant.assistant.name ?? grant.assistant.id;
 
   return (
     <li aria-labelledby={headingId}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <h4 id={headingId} className="font-medium wrap-anywhere">
-          {client}
+          {assistant}
         </h4>
         <Pill>{properties.state}</Pill>
       </div>
@@ -91,13 +91,13 @@ function GrantItem(properties: {
       <Collapsible className="mt-1">
         <CollapsibleTrigger asChild>
           <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-            More about {client}'s grant
+            More about {assistant}'s grant
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <Facts>
             <SummaryRow term="Client id">
-              <code className="font-mono break-all">{grant.client.id}</code>
+              <code className="font-mono break-all">{grant.assistant.id}</code>
             </SummaryRow>
             {properties.more}
           </Facts>
@@ -158,18 +158,18 @@ function Grants(properties: {
   return (
     <SheetPart title="Assistant access">
       {grants.length === 0 && ended.length === 0 ? (
-        <p>No client has been connected as {properties.name}.</p>
+        <p>No assistant has been connected as {properties.name}.</p>
       ) : (
         <ul className="grid gap-4">
           {grants.map((grant) => (
             <OpenGrant
-              key={`${grant.client.id} ${grant.issuedAt}`}
+              key={`${grant.assistant.id} ${grant.issuedAt}`}
               grant={grant}
               nowMs={openedAtMs}
             />
           ))}
           {ended.map((grant) => (
-            <Ended key={`${grant.client.id} ${grant.issuedAt} ${grant.endedAt}`} grant={grant} />
+            <Ended key={`${grant.assistant.id} ${grant.issuedAt} ${grant.endedAt}`} grant={grant} />
           ))}
         </ul>
       )}

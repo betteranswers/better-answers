@@ -23,7 +23,7 @@ export const pkce = (): Pkce => {
   return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") };
 };
 
-/** A path on the public origin; the client defaults to Claude, the resource to the MCP surface. */
+/** A path on the public origin; the assistant defaults to Claude, the resource to the MCP surface. */
 export const authorizeUrl = (params: {
   readonly challenge: string;
   readonly scope: string;

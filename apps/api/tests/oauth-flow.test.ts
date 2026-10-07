@@ -328,7 +328,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(registered.rowCount).toBe(0);
   });
 
-  it("refuses a claude.ai metadata document naming no client", async () => {
+  it("refuses a claude.ai metadata document with no `client_name`", async () => {
     const { challenge } = pkce();
 
     const response = await app
@@ -425,7 +425,7 @@ describe("the pages, as a person walks them", () => {
     expect(page).toContain(CONSENT_WORDS.actsAs("Claude", "Acme"));
   });
 
-  it("shows the client's real address and where Connect goes", async () => {
+  it("shows the assistant's real address and where Connect goes", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
@@ -837,7 +837,7 @@ describe("the audit logs", () => {
     return held.rows[0]?.held;
   };
 
-  /** One person each, because a refused replay ends every token its person holds for the client. */
+  /** One person each, because a refused replay ends every token its person holds for the assistant. */
   const aConnectedMember = async (workspaceId: string) => {
     const person = await app.person();
     await app.addMember(workspaceId, person.id, "Viewer");

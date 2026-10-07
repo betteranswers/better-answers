@@ -1783,7 +1783,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("provision-workspace — a client's workspace and its first Admin", () => {
+  describe("provision-workspace — a customer's workspace and its first Admin", () => {
     const standingOf = async (app: TestApp, id: string) => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
         `SELECT w.name, w.slug,

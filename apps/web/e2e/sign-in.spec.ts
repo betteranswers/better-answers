@@ -567,7 +567,7 @@ test("a tab waiting on one address ignores another's sign-in", async ({
   await landedAtHome(page, "Admin");
 });
 
-/** The client asks a failed read three times before it gives up. */
+/** The query client asks a failed read three times before it gives up. */
 const READ_ATTEMPTS = 3;
 
 test("a tab whose first read failed still follows a sign-in", async ({

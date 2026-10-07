@@ -56,7 +56,7 @@ The audit slice, `packages/core/src/audit/`, has two doors. `record` takes a Pri
 - One id shape means one boundary refinement, an audit log whose id order agrees with its timestamps, and one fixture both tiers pin, `contracts/id-shape/`.
 - A workspace Admin ending a person's sessions elsewhere is one company's decision reaching another's. Any rule that counts the workspaces a person holds is an oracle over them.
 - An erasure target shared across workspaces lets two exported histories be joined on the person the request was meant to unlink.
-- A marked token, presented again, reaches the OAuth provider's replay path. That path deletes every refresh token the person holds for the client, with no workspace filter and no check of when each was issued. It ended grants in other workspaces, and a new grant taken after revoking everywhere. A deleted token answers "not found".
+- A marked token, presented again, reaches the OAuth provider's replay path. That path deletes every refresh token the person holds for the assistant, with no workspace filter and no check of when each was issued. It ended grants in other workspaces, and a new grant taken after revoking everywhere. A deleted token answers "not found".
 - Deleting a grant's rows left nothing to inspect, so each act records the grants it ended.
 - A factor held per member would let one company's Admin decide how another's member signs in. Held per person, it follows the strongest role they hold anywhere.
 

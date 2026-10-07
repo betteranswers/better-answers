@@ -60,7 +60,7 @@ const endedGrantOf = (row: DeletedGrantRow): EndedGrant => ({
 /**
  * Deletes the person's OAuth tokens issued before the instant, answering the grants they held.
  * Deleted rather than marked: a marked refresh token presented later makes the provider delete
- * every grant the person holds for that client, a later one included.
+ * every grant the person holds for that assistant, a later one included.
  */
 export const endTokens = async (tx: Tx, asked: TokensToEnd): Promise<TokensEnded> => {
   const parameters = [asked.personId, asked.before, asked.workspaceId];

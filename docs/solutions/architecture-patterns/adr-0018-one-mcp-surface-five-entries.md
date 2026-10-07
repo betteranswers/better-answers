@@ -44,7 +44,7 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 
 - The predecessor's fifty-eight-tool MCP surface showed what accretion does: tools built for curation under outcomes built on consumption.
 - Long and scheduled work (question sets, briefings, exposure sweeps) belongs to headless agents reading through these same entries and proposing into Suggestions.
-- `describe_estate`, the fifth entry, was dropped. All four others answered through the real claude.ai client with no orienting call first, and its budget could not be measured with no estate. `find` is the preview step an agent orients by.
+- `describe_estate`, the fifth entry, was dropped. All four others answered through the real claude.ai assistant with no orienting call first, and its budget could not be measured with no estate. `find` is the preview step an agent orients by.
 - The token from claude.ai carries no role, so the role is read per call, in the same transaction as the read it authorises.
 - A reader asking for five hits is asking to be handed five things. Running both arms to five would hand them ten.
 - A concept is the company's answer, and a raw passage is what there was no answer for. So concepts come first.

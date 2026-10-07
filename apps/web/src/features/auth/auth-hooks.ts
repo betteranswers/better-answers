@@ -124,7 +124,7 @@ export const isTooMany = (failure: Error | null): failure is CodeRefused =>
 type WaitReading = { readonly onError: (context: { readonly response: Response }) => void };
 
 /**
- * The client's error drops the response's headers, so the wait is read as the response lands. A
+ * The Better Auth client's error drops the response's headers, so the wait is read as the response lands. A
  * server's failure is no refusal.
  */
 const unwrapWithTheWait = async <TData>(
@@ -511,7 +511,7 @@ export const useSwitchWorkspace = () => {
   });
 };
 
-/** The client plugin types this answer as `any`, so its shape is read where it lands. */
+/** The Better Auth client plugin types this answer as `any`, so its shape is read where it lands. */
 const resumeAnswer = z.object({ redirect: z.boolean().optional(), url: z.string().optional() });
 export type ResumeAnswer = z.infer<typeof resumeAnswer>;
 

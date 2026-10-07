@@ -77,12 +77,12 @@ describe("the migration that holds one waiting invitation per address", () => {
     await withRollback(db.pool, async (client) => {
       const [here, there] = await twoWorkspaces(client);
       await withoutTheIndex(client);
-      const oldest = await invited(client, here, "priya@client.invalid", { minute: 1 });
-      const older = await invited(client, here, "Priya@Client.invalid", { minute: 2 });
-      const newest = await invited(client, here, "PRIYA@client.invalid", { minute: 3 });
-      const someoneElse = await invited(client, here, "sam@client.invalid", { minute: 1 });
-      const elsewhere = await invited(client, there, "priya@client.invalid", { minute: 1 });
-      const accepted = await invited(client, here, "priya@client.invalid", {
+      const oldest = await invited(client, here, "priya@customer.invalid", { minute: 1 });
+      const older = await invited(client, here, "Priya@Customer.invalid", { minute: 2 });
+      const newest = await invited(client, here, "PRIYA@customer.invalid", { minute: 3 });
+      const someoneElse = await invited(client, here, "sam@customer.invalid", { minute: 1 });
+      const elsewhere = await invited(client, there, "priya@customer.invalid", { minute: 1 });
+      const accepted = await invited(client, here, "priya@customer.invalid", {
         minute: 4,
         status: "accepted",
       });
@@ -108,8 +108,8 @@ describe("the index over waiting invitations", () => {
     await expect(
       withRollback(db.pool, async (client) => {
         const [here] = await twoWorkspaces(client);
-        await invited(client, here, "priya@client.invalid", { minute: 1 });
-        await invited(client, here, "Priya@Client.INVALID", { minute: 2 });
+        await invited(client, here, "priya@customer.invalid", { minute: 1 });
+        await invited(client, here, "Priya@Customer.INVALID", { minute: 2 });
       }),
     ).rejects.toThrow(/invitation_waiting_uidx/);
   });
@@ -118,11 +118,11 @@ describe("the index over waiting invitations", () => {
     const standing = await withRollback(db.pool, async (client) => {
       const [here, there] = await twoWorkspaces(client);
       const ids = [
-        await invited(client, here, "priya@client.invalid", { minute: 1 }),
-        await invited(client, there, "priya@client.invalid", { minute: 1 }),
-        await invited(client, here, "priya@client.invalid", { minute: 2, status: "canceled" }),
-        await invited(client, here, "priya@client.invalid", { minute: 3, status: "canceled" }),
-        await invited(client, here, "priya@client.invalid", { minute: 4, status: "accepted" }),
+        await invited(client, here, "priya@customer.invalid", { minute: 1 }),
+        await invited(client, there, "priya@customer.invalid", { minute: 1 }),
+        await invited(client, here, "priya@customer.invalid", { minute: 2, status: "canceled" }),
+        await invited(client, here, "priya@customer.invalid", { minute: 3, status: "canceled" }),
+        await invited(client, here, "priya@customer.invalid", { minute: 4, status: "accepted" }),
       ];
       return Object.keys(await statusOf(client, ids)).length;
     });

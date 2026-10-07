@@ -396,7 +396,7 @@ const sessionsHeldBy = async (personId: string): Promise<number | undefined> => 
   return found.rows[0]?.held;
 };
 
-/** Each client signs in on its own, so the person holds a session per client. */
+/** Each assistant signs in on its own, so the person holds a session per assistant. */
 const aMemberOfTwoOnFourClients = async () => {
   const acme = await app.provision({ name: "Acme" });
   const beta = await app.provision({ name: "Beta" });

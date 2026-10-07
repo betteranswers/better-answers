@@ -97,7 +97,7 @@ type RecordConsentInput = {
   readonly clientId: string;
 };
 
-/** As `recordSignIn`, once the library's consent has landed; the client is the row's subject. */
+/** As `recordSignIn`, once the library's consent has landed; the assistant is the row's subject. */
 export const recordConsent = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

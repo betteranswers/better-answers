@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { refusedTheRun } from "./sign-in.ts";
 
-/** Named, not imported: the SPA's client module brings React's own with it. */
+/** Named, not imported: the SPA's tRPC client module brings React's own with it. */
 const TRPC = "/trpc";
 
 const asked = async (page: Page, procedure: string): Promise<APIResponse> => {

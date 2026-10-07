@@ -301,7 +301,7 @@ describe("inspecting a person", () => {
         sessions: [],
         grants: [
           {
-            client: { id: clientId, name: "Claude" },
+            assistant: { id: clientId, name: "Claude" },
             workspace: { id: acme.workspaceId, name: "Acme" },
             issuedAt: "2026-09-20T09:00:00.000Z",
             lastUsedAt: "2026-09-21T09:00:00.000Z",
@@ -310,7 +310,7 @@ describe("inspecting a person", () => {
         ],
         ended: [
           {
-            client: { id: clientId, name: "Claude" },
+            assistant: { id: clientId, name: "Claude" },
             workspace: { id: zenith.workspaceId, name: "Zenith" },
             issuedAt: "2026-09-22T09:00:00.000Z",
             endedAt: "2026-09-23T09:00:00.000Z",
@@ -455,7 +455,7 @@ describe("inspecting a person's ended grants", () => {
         grants: [],
         ended: [
           {
-            client: claude,
+            assistant: claude,
             workspace: null,
             issuedAt,
             endedAt: (await endedAtOf("people.person.credentials_revoked", personId))[0],
@@ -463,7 +463,7 @@ describe("inspecting a person's ended grants", () => {
             endedBy: { kind: "person", displayName: "Test person" },
           },
           {
-            client: claude,
+            assistant: claude,
             workspace: { id: zenith.workspaceId, name: "Zenith" },
             issuedAt,
             endedAt: removedAt,
@@ -471,7 +471,7 @@ describe("inspecting a person's ended grants", () => {
             endedBy: { kind: "person", displayName: "Zoe Lin" },
           },
           {
-            client: claude,
+            assistant: claude,
             workspace: { id: acme.workspaceId, name: "Acme" },
             issuedAt,
             endedAt: revokedHereAt,
@@ -524,7 +524,7 @@ describe("inspecting a person's ended grants", () => {
       ["2026-09-24T10:00:00.000Z", "2026-08-01T09:00:00.000Z"],
     ]);
     expect(read.ok ? read.value.ended[0] : undefined).toMatchObject({
-      client: {
+      assistant: {
         id: "https://gone.example.invalid/metadata",
         name: "https://gone.example.invalid/metadata",
       },
@@ -556,7 +556,7 @@ describe("inspecting a person's ended grants", () => {
       value: {
         ended: [
           {
-            client: { id: clientId, name: "Claude" },
+            assistant: { id: clientId, name: "Claude" },
             workspace: { id: gone, name: gone },
             scope: "everywhere",
             endedBy: { kind: "platform" },
@@ -649,15 +649,15 @@ describe("inspecting a person's ended grants", () => {
     const endedBy = { kind: "authorization-server" } as const;
     expect(await inspected(personId)).toMatchObject({
       ok: true,
-      value: { grants: [], ended: [{ client: { id: clientId }, scope: "grant", endedBy }] },
+      value: { grants: [], ended: [{ assistant: { id: clientId }, scope: "grant", endedBy }] },
     });
 
     await revokedEverywhere(personId);
 
     const read = await inspected(personId);
-    expect(read.ok ? read.value.ended.filter((each) => each.client.id === clientId) : []).toEqual(
-      [],
-    );
+    expect(
+      read.ok ? read.value.ended.filter((each) => each.assistant.id === clientId) : [],
+    ).toEqual([]);
     const recorded = await db().pool.query<{ detail: unknown }>(
       "SELECT detail FROM identity_audit_event WHERE subject_id = $1 AND act = $2",
       [personId, "people.person.credentials_revoked"],

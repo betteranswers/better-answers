@@ -24,7 +24,7 @@ You are the implementor for a ticket that lands something a person looks at. The
 - **Budgets** are asserted in the spec: the list under a second, an act under 100 ms optimistically and reconciled, a long operation shown as a job with its state and never a spinner to the end.
 - **Accessibility gate**: the axe pass and an aria snapshot in the spec; semantic elements before ARIA; a name on every control; WCAG AA contrast; `prefers-reduced-motion` honoured; every interactive state present — default, hover, active, focus, disabled, loading, error, empty.
 - **A refusal word from the api is shown as itself**, in the glossary's words, with what the person can do next.
-- **Talks to the api over tRPC only**, through the client the web already has.
+- **Talks to the api over tRPC only**, through the tRPC client the web already has.
 
 ## Order of work
 

@@ -150,13 +150,13 @@ finish() {
 
 # STAGES — the steps only the owner can take. No secret is written here, only facts.
 TOTAL_STAGES=11
-banner "Better Answers — ticket 41 / T-005: accounts, boxes, edge, control plane, the object store, the first drill (stages 1, 4, 7, 8, 9 and the drill precede the first client's data; the rest may follow go-live)"
+banner "Better Answers — ticket 41 / T-005: accounts, boxes, edge, control plane, the object store, the first drill (stages 1, 4, 7, 8, 9 and the drill precede the first customer's data; the rest may follow go-live)"
 
 stage "Escrow vault"
 say "Four secrets must exist outside Coolify or a VPC 2 loss takes everything with it:"
 say "Coolify APP_KEY · KEK · the backup bucket's ADMIN credential · the tunnel token."
 step "In your password manager create a vault for this deployment's escrow."
-step "Share it with one other named person before the first client goes live (SECRETS.md)."
+step "Share it with one other named person before the first customer goes live (SECRETS.md)."
 ask ESCROW_VAULT "Name of the vault as created:"
 say "Six items will land here: APP_KEY · Coolify SSH keys · KEK · the backup age identity · the bucket ADMIN credential · the tunnel token (plus the ghcr pull token, the git-mirror deploy key and every account's recovery codes)."
 step "Name the SECOND holder (co-director, solicitor) and write the instruction under which they open it. One holder is the outage the backups exist for — RUNBOOK.md page 9 is the page they act on."
@@ -229,18 +229,18 @@ write_env APEX "$APEX"
 open_url "https://dash.cloudflare.com/"
 step "Add the zone $APEX (nameservers at the registrar)."
 say "Plans meter rate-limit RULES, not paths: Free 1 · Pro (~\$25/mo) 2 · Business (\$250/mo) 5. The four metered path groups below are combined with OR expressions to fit the plan's allowance."
-say "The Pro trigger (ticket 79 Q9) is a condition, not this stage: BEFORE the first client credential exists, the zone is on Pro. Until that day, Free's one combined rule ahead of the api's own counters is the accepted posture (Q9 b)."
+say "The Pro trigger (ticket 79 Q9) is a condition, not this stage: BEFORE the first assistant credential exists, the zone is on Pro. Until that day, Free's one combined rule ahead of the api's own counters is the accepted posture (Q9 b)."
 if confirm "Is the zone $APEX on the Pro plan (or higher)"; then
   write_env CF_PLAN "pro"; write_env CF_PRO_CONFIRMED "$(date -u +%F)"
 else
-  if ! confirm "Confirm: NO client credential exists yet, and none will be issued before this stage is re-run on Pro"; then
-    warn "Stopping here: a client credential may not precede Pro (coolify.md § Ingress, Q9). Upgrade the zone, then re-run this stage."
-    SKIPPED+=("Cloudflare Pro on $APEX — must precede the first client credential (Q9); re-run stage 5")
+  if ! confirm "Confirm: NO assistant credential exists yet, and none will be issued before this stage is re-run on Pro"; then
+    warn "Stopping here: an assistant credential may not precede Pro (coolify.md § Ingress, Q9). Upgrade the zone, then re-run this stage."
+    SKIPPED+=("Cloudflare Pro on $APEX — must precede the first assistant credential (Q9); re-run stage 5")
     finish; exit 1
   fi
   write_env CF_PLAN "free"
   warn "Free posture recorded: ONE combined rate-limit rule, and the VPC 2 uptime probe below instead of Cloudflare Health Checks."
-  SKIPPED+=("Cloudflare Pro on $APEX — before the first client credential exists (Q9); re-run stage 5 to upgrade")
+  SKIPPED+=("Cloudflare Pro on $APEX — before the first assistant credential exists (Q9); re-run stage 5 to upgrade")
 fi
 open_url "https://one.dash.cloudflare.com/"
 step "Zero Trust → Networks → Tunnels → create tunnel 'better-answers' (remotely managed). Copy the TUNNEL TOKEN into Coolify env later (TUNNEL_TOKEN, stores resource) and escrow it."
@@ -311,7 +311,7 @@ stage "healthchecks.io — the dead-man's switch, the second channel, the weekly
 open_url "https://healthchecks.io/"
 step "Create a project 'Better Answers'. Checks (period · grace): scheduler 1 min · 3 min; sweeps 24 h · 1 h; pg-hourly 1 h · 15 min; nightly 24 h · 2 h; coolify-backup 24 h · 4 h; drill 35 d · 2 d; staging-wiped 35 d · 2 d; and — only while stage 5 took the Free path — uptime 5 min · 5 min."
 step "Ping URLs → Coolify env: HEALTHCHECKS_PING_URL_SCHEDULER and _SWEEPS (platform resource; staging.env takes a sweeps URL of its own, never production's), _PG_HOURLY and _NIGHTLY (stores resource); _DRILL and _STAGING_WIPED → /etc/better-answers/drill.env on VPC 2; the uptime check's URL → /etc/better-answers/uptime.env (stage 5, Free path). Ping bodies carry an outcome word and sizes only."
-step "Integrations: email to you, AND a SECOND channel (SMS or a chat app) assigned to scheduler, pg-hourly, nightly, drill AND — on the Free path — uptime; a missed backup is not an email to read on Monday. On Pro the same channel takes the Cloudflare health-check notifications instead (stage 5). STILL OWED as of 04/09/2026 (T-005 closed with this carried here): the second channel must exist BEFORE THE FIRST CLIENT GOES LIVE — the same day as, and beside, stage 5's Pro upgrade (before the first client credential)."
+step "Integrations: email to you, AND a SECOND channel (SMS or a chat app) assigned to scheduler, pg-hourly, nightly, drill AND — on the Free path — uptime; a missed backup is not an email to read on Monday. On Pro the same channel takes the Cloudflare health-check notifications instead (stage 5). STILL OWED as of 04/09/2026 (T-005 closed with this carried here): the second channel must exist BEFORE THE FIRST CUSTOMER GOES LIVE — the same day as, and beside, stage 5's Pro upgrade (before the first assistant credential)."
 step "Account → Reports: the WEEKLY report ON, to you — an all-green digest every week, so silence is distinguishable from health."
 ask SECOND_CHANNEL "Second channel (kind only, e.g. SMS / Signal / Slack — no number here):"
 write_env SECOND_CHANNEL "$SECOND_CHANNEL"
@@ -327,16 +327,16 @@ else
   SKIPPED+=("first deploy / probes — re-run this stage")
 fi
 
-stage "The first restore drill — by hand, before any client's data exists (ADR 0022)"
-say "This is the task's finish line. Nothing of a client's goes on the box until this has run green once."
+stage "The first restore drill — by hand, before any customer's data exists (ADR 0022)"
+say "This is the task's finish line. Nothing of a customer's goes on the box until this has run green once."
 step "On VPC 2, as root:  set -a; . /etc/better-answers/drill.env; set +a; /opt/better-answers/deploy/restore-drill.sh"
 step "Read the report in the bucket under drills/. Every step must pass: a line marked FAILED, a not-built answer included, is a failure. The 'drill' and 'staging-wiped' checks both pinged."
 step "Then rehearse 'Coolify lost' once (RUNBOOK.md page 5), and have the second holder open the vault once."
-step "Record the drill's date and RTO in the private RUNBOOK.md. Releases follow the repository variable RELEASE_MODE (page 6): unset, every green build releases itself; the day the first client's bundle lands, gh variable set RELEASE_MODE --body nightly, after adding the dead-man service's read-only key as HEALTHCHECKS_READ_KEY; the day the platform goes live, gh variable set RELEASE_MODE --body drill, and from then on 'release' insists on a drill-day or a hotfix reason."
+step "Record the drill's date and RTO in the private RUNBOOK.md. Releases follow the repository variable RELEASE_MODE (page 6): unset, every green build releases itself; the day the first customer's bundle lands, gh variable set RELEASE_MODE --body nightly, after adding the dead-man service's read-only key as HEALTHCHECKS_READ_KEY; the day the platform goes live, gh variable set RELEASE_MODE --body drill, and from then on 'release' insists on a drill-day or a hotfix reason."
 if confirm "Did the first drill run green, with its report in drills/ and both pings received"; then
   write_env FIRST_DRILL_DONE "$(date -u +%F)"
 else
-  SKIPPED+=("the first restore drill — must precede any client data; re-run this stage")
+  SKIPPED+=("the first restore drill — must precede any customer data; re-run this stage")
 fi
 
 finish

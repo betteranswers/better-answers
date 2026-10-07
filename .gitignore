@@ -48,7 +48,7 @@ playwright-report/
 # wizard facts file (URLs, names, UUIDs — no secrets, but local)
 deploy/wizard-41.env
 
-# `.planning` (client material and the local planning map — never in the repository) and
+# `.planning` (customer material and the local planning map — never in the repository) and
 # `.scratch` carry no trailing slash because a worktree's is a symlink into the primary
 # checkout's (.claude/hooks/provision-worktree.sh), and git reads a symlink as a file: the
 # pattern `.scratch/` would match the primary's directory and leave every worktree's link

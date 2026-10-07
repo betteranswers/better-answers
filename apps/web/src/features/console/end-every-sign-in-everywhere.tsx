@@ -73,7 +73,7 @@ export function EndEverySignInEverywhere(properties: {
           },
         }}
         title={`End every sign-in and token ${name} holds`}
-        consequence={`Every session and every assistant's access ${name} holds ends now, in every workspace they belong to. They can sign in and connect a client again afterwards; this page cannot undo it.`}
+        consequence={`Every session and every assistant's access ${name} holds ends now, in every workspace they belong to. They can sign in and connect an assistant again afterwards; this page cannot undo it.`}
         commit={
           <Button variant="destructive" onClick={commit}>
             End every sign-in everywhere

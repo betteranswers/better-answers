@@ -21,7 +21,7 @@ export type Family = AuditEventRow["family"];
 
 export type ActName<F extends Family = Family> = Extract<AuditEventRow["act"], `${F}.${string}`>;
 
-/** Ids alone: the client's and the workspace's names are read when the grant is shown. */
+/** Ids alone: the assistant's and the workspace's names are read when the grant is shown. */
 export const endedGrant = z.strictObject({
   clientId: z.string().min(1),
   workspaceId: boundarySchemas.workspace.select.shape.id.nullable(),

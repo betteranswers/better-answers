@@ -411,7 +411,7 @@ export const eventsNamed = async (
 
 /**
  * The workspace's own audit log, newest first; the identity-set audit log is never read. A grant
- * an act ended is named from its client and workspace as they stand now.
+ * an act ended is named from its assistant and workspace as they stand now.
  */
 export const readAuditLog = async (
   principal: UserPrincipal,

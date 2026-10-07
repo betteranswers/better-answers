@@ -47,7 +47,7 @@ const CONSOLE_CALLS: readonly (readonly [
   ],
 ];
 
-/** The same procedures as a client holding only a bearer asks for them. */
+/** The same procedures as an assistant holding only a bearer asks for them. */
 const BEARER_ASKS: readonly (readonly [string, RequestInit])[] = [
   ["console.workspaces.list", {}],
   ["console.people.list", {}],
@@ -452,7 +452,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
       },
     ]);
 
-    // Consent resolves the person in the workspace picked, so reaching the code at the client's
+    // Consent resolves the person in the workspace picked, so reaching the code at the assistant's
     // redirect is a fresh sign-in admitted there.
     for (const workspaceId of [acme.workspaceId, beta.workspaceId]) {
       await connectAsHost(app(), app().client(), person, { pick: workspaceId });
@@ -811,7 +811,7 @@ describe("the console's list and inspection of people", () => {
     });
   });
 
-  it("shows a person's session and their client's standing grant", async () => {
+  it("shows a person's session and their assistant's standing grant", async () => {
     const { api } = await theOperatorOnTheWeb();
     const workspace = await app().provision({ name: "Acme" });
     const connected = await connectAsHost(app(), app().client(), workspace.admin);
@@ -825,7 +825,7 @@ describe("the console's list and inspection of people", () => {
       sessions: [{ createdAt: instant, lastUsedAt: instant, expiresAt: instant }],
       grants: [
         {
-          client: { id: CLAUDE_CLIENT_ID, name: "Claude" },
+          assistant: { id: CLAUDE_CLIENT_ID, name: "Claude" },
           workspace: { id: workspace.workspaceId, name: "Acme" },
           issuedAt: instant,
           lastUsedAt: instant,
@@ -859,7 +859,7 @@ describe("the console's list and inspection of people", () => {
       grants: [],
       ended: [
         {
-          client: claude,
+          assistant: claude,
           workspace: { id: zenith.workspaceId, name: "Zenith" },
           issuedAt: instant,
           endedAt: instant,
@@ -867,7 +867,7 @@ describe("the console's list and inspection of people", () => {
           endedBy: { kind: "person", displayName: operators.admin.name },
         },
         {
-          client: claude,
+          assistant: claude,
           workspace: { id: acme.workspaceId, name: "Acme" },
           issuedAt: instant,
           endedAt: instant,
@@ -885,7 +885,7 @@ describe("the console's list and inspection of people", () => {
   /** The one grant Claude holds for Acme's Admin, ended by the authorization server alone. */
   const endedByTheServer = (workspaceId: string) => [
     {
-      client: { id: CLAUDE_CLIENT_ID, name: "Claude" },
+      assistant: { id: CLAUDE_CLIENT_ID, name: "Claude" },
       workspace: { id: workspaceId, name: "Acme" },
       issuedAt: expect.stringMatching(ISO_INSTANT),
       endedAt: expect.stringMatching(ISO_INSTANT),
@@ -909,7 +909,7 @@ describe("the console's list and inspection of people", () => {
     return { api, acme };
   };
 
-  it("shows a client's own revocation as the authorization server's ending", async () => {
+  it("shows an assistant's own revocation as the authorization server's ending", async () => {
     const { api, acme } = await revokedByItsClient();
 
     const inspected = await api.console.people.inspect.query({ personId: acme.admin.id });
@@ -934,7 +934,7 @@ describe("the console's list and inspection of people", () => {
     });
   });
 
-  it("leaves a grant its client revoked out of revoking everywhere", async () => {
+  it("leaves a grant its assistant revoked out of revoking everywhere", async () => {
     const { api, acme } = await revokedByItsClient();
 
     await api.console.people.endEverySignInAndToken.mutate({ personId: acme.admin.id });

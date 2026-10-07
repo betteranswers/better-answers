@@ -4,7 +4,7 @@ import { vi } from "vitest";
 import { createAppClients } from "@/app/providers.tsx";
 import type { Role } from "@/shared/navigation.ts";
 
-/** A failed call as the client hands it over, with whatever `data` the api's formatter sent. */
+/** A failed call as the tRPC client hands it over, with whatever `data` the api's formatter sent. */
 export const carrying = (data: unknown): Error =>
   Object.assign(new TRPCClientError("refused"), { data });
 

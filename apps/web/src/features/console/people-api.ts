@@ -51,8 +51,8 @@ const endedEverywhere = (held: PersonInspected, at: string, by: DoneBy): PersonI
   grants: [],
   ended: [
     ...held.grants
-      .map(({ client, workspace, issuedAt }) => ({
-        client: { id: client.id, name: client.name ?? client.id },
+      .map(({ assistant, workspace, issuedAt }) => ({
+        assistant: { id: assistant.id, name: assistant.name ?? assistant.id },
         workspace,
         issuedAt,
         endedAt: at,

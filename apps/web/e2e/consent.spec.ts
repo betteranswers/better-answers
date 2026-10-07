@@ -105,7 +105,7 @@ test("asks consent again only when the host asks for it", async ({
   await expect(consentHeading(page)).toHaveCount(0);
 });
 
-test("cancelling consent sends the client a refusal and no code", async ({
+test("cancelling consent sends the assistant a refusal and no code", async ({
   page,
   request,
   baseURL,

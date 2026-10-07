@@ -42,10 +42,10 @@ These shapes live here, not in the rules. The rule *Log through the tier's one s
 
 - Two 4 GB boxes (ADR 0024) have nothing to spare for a metrics store.
 - Every signal a sync emits is already a row or a count over rows, with no instrumentation added.
-- The first client's first index is expected to tune most thresholds, and a threshold in code makes every tune a release.
+- The first customer's first index is expected to tune most thresholds, and a threshold in code makes every tune a release.
 - Silence is watched from outside because the api may be what is down.
 - Without the api's own alerts, the statutory case (erasure) and the spend case (the ceiling) go unseen unless someone looks.
-- `llm_call` feeds the ceiling, price drift, replay spend, per-client spend and the onboarding estimate, and ADR 0017's replay reads it.
+- `llm_call` feeds the ceiling, price drift, replay spend, per-customer spend and the onboarding estimate, and ADR 0017's replay reads it.
 - A column list in a rule was a specification dressed as a coding rule. A rule keeps only what a diff can check.
 
 ## Rejected
@@ -54,7 +54,7 @@ These shapes live here, not in the rules. The rule *Log through the tier's one s
 - An ops dashboard outside the api: two logins, and it needs the metrics store.
 - node-exporter or Coolify's server metrics as the host source: the first needs the store, and the second is neither queryable by the api nor restored with the database.
 - The api never sending alerts: the erasure and spend cases go unseen.
-- A webhook channel in v0.1: no client has asked for one.
+- A webhook channel in v0.1: no customer has asked for one.
 - Spend derived from the answer audit and the syncs' job rows: it loses enrichment and embedding calls and cannot price a sync mid-flight.
 - Thresholds in code: every tune a release.
 

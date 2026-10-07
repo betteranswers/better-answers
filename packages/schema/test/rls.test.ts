@@ -2919,7 +2919,7 @@ describe("the finding under both runtime roles", () => {
         ],
         [
           `UPDATE finding SET restored_at = now(), restored_by = 'human:${WS_B}',
-                              restore_reason = 'the client asked for the officer block back'
+                              restore_reason = 'the customer asked for the officer block back'
              WHERE id = $1`,
           [defaultOn.id],
           "finding_restore_check",

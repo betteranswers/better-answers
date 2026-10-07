@@ -49,7 +49,7 @@ The atom-boundary rule:
 
 ## Rejected
 
-- A concept per guide subsection (one-to-one with the first client's requirements, about 100 files): a page hides per-fact trust, and a guide cannot be the unit when every company defines its own.
+- A concept per guide subsection (one-to-one with the first customer's requirements, about 100 files): a page hides per-fact trust, and a guide cannot be the unit when every company defines its own.
 - A bundle per domain (ownership for free): every cross-domain reference would need a platform extension, since OKF has no cross-bundle link.
 
 ## History

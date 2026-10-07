@@ -70,7 +70,7 @@ export const BULK_WORDS = {
   remove: {
     act: "Remove",
     title: (count: number) => `Remove ${members(count)}`,
-    consequence: `They lose access to this workspace on every session and client they hold. Any other workspace they belong to is untouched, and they stay named on what they checked. ${RECORDED}`,
+    consequence: `They lose access to this workspace on every session and assistant they hold. Any other workspace they belong to is untouched, and they stay named on what they checked. ${RECORDED}`,
     commit: (count: number) => `Remove ${members(count)} from this workspace`,
     pending: (count: number) => `Removing ${members(count)} from this workspace.`,
     done: (changed: number, skipped: number) =>

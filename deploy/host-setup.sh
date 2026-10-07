@@ -68,7 +68,7 @@ vpc2() {
   [ -n "${pubkey}" ] && [ -n "${repo}" ] || usage
   need_root
   apt-get install -y --no-install-recommends git rclone age postgresql-common jq >/dev/null
-  # The client must match the dump's major: pg_restore 16 refuses a pg18 archive.
+  # The PostgreSQL client must match the dump's major: pg_restore 16 refuses a pg18 archive.
   YES=yes /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
   apt-get install -y --no-install-recommends postgresql-client-18 >/dev/null
   id mirror >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash mirror

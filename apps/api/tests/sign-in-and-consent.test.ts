@@ -39,7 +39,7 @@ const linesSince = (before: number, event: string) =>
     .logs.slice(before)
     .filter((line) => line["event"] === event);
 
-/** A client of its own, and the code just sent to `email` for it. */
+/** A test client of its own, and the code just sent to `email` for it. */
 const codeAskedFor = async (email: string) => {
   const client = app().client();
   await client.json("/email-otp/send-verification-otp", { email, type: "sign-in" });
@@ -160,7 +160,7 @@ describe("an expired sign-in code", () => {
 });
 
 describe("a consent, recorded on the consented workspace's audit log", () => {
-  it("records the client under the person in the picked workspace", async () => {
+  it("records the assistant under the person in the picked workspace", async () => {
     const { person, second } = await memberOfTwo(app());
 
     await connectAsHost(app(), app().client(), person, { pick: second });
@@ -220,7 +220,7 @@ describe("a consent, recorded on the consented workspace's audit log", () => {
     ]);
   });
 
-  it("connects the client though its record fails, logging it", async () => {
+  it("connects the assistant though its record fails, logging it", async () => {
     const { person, second } = await memberOfTwo(app());
     const before = unrecorded().length;
 

@@ -35,7 +35,7 @@ retire_when: "a released @tanstack/query-core makes refetchQueries report a fail
 
 The shell showed one workspace and talked to another.
 
-A person switches workspace. Better Auth's `organization.setActive` succeeds, so the session now points at workspace B. The web client then reads the session's member again, in place, so the band does not blank between the two answers. That member holds the band's workspace name, the person's role and the key the page is drawn under. If the re-read failed, or waited offline, the cache kept workspace A's member. The shell went on drawing A's name and A's role while every read and act went to B.
+A person switches workspace. Better Auth's `organization.setActive` succeeds, so the session now points at workspace B. The web app then reads the session's member again, in place, so the band does not blank between the two answers. That member holds the band's workspace name, the person's role and the key the page is drawn under. If the re-read failed, or waited offline, the cache kept workspace A's member. The shell went on drawing A's name and A's role while every read and act went to B.
 
 The switch is `useSwitchWorkspace` (`apps/web/src/features/auth/auth-hooks.ts:334-350`). Its re-read is `rereadMember` (`apps/web/src/features/auth/member.ts:53-65`).
 
@@ -50,7 +50,7 @@ Library lines below are from `@tanstack/query-core` 5.103.2, installed at `node_
 - The role stayed A's. The frame derives the visible areas and the person's role from the one member it holds (`apps/web/src/app/frame.tsx:171-183`), so A's role was applied over B's data.
 - The frame draws the page under `key={here?.workspaceId}` so that a switch redraws it afresh (`apps/web/src/app/frame.tsx:153-155`). With A's member held, that key never changed.
 - Navigation followed the stale answer. The index route redirects to the home of whatever role the cache holds (`apps/web/src/app/router.tsx:175-178`), and `roleHeld` reads the cache directly (`member.ts:20-21`).
-- A switch through All workspaces drew the left workspace's member rows on the Members page and in jump-to until the new list arrived. `members.list` is asked with no input, so its key names no workspace (`apps/web/src/features/people/people-api.ts:23-26`). The web client sets no `gcTime` (`apps/web/src/shared/api/query-client.ts:13-20`), so the query-core default of five minutes applies (`removable.ts:24-29`).
+- A switch through All workspaces drew the left workspace's member rows on the Members page and in jump-to until the new list arrived. `members.list` is asked with no input, so its key names no workspace (`apps/web/src/features/people/people-api.ts:23-26`). The web app sets no `gcTime` (`apps/web/src/shared/api/query-client.ts:13-20`), so the query-core default of five minutes applies (`removable.ts:24-29`).
 
 ## What Didn't Work
 
@@ -165,7 +165,7 @@ The reset is not awaited. Its promise settles with the refetch it starts (the do
 - **Choose the verb by who is watching.** `removeQueries` is for a query with no mounted observer. For a query a mounted `useQuery` is drawing, use `resetQueries`, or `invalidateQueries` when stale data may stay in view. A removal that must reach a mounted observer needs a re-render that the code does not control.
 - **Never take `await refetchQueries(...)` as proof of a fresh answer.** It resolves on error and on pause. Read `getQueryState` afterwards and check both `status` and `fetchStatus`. `throwOnError: true` closes only the error half.
 - **Treat data on an errored query as stale.** `status: 'error'` with `data` present is a normal state (`query.ts:865-879`). Anything scoped to a workspace must not be read through it.
-- **Put the scope in the key where the key can carry it.** `members.list` has no workspace in its key, which is why `forgetTheWorkspaceLeft` exists. Moving the id into the key would make that clearing unnecessary. This commit does not do that, and how the web client's tRPC keys are built was not checked here.
+- **Put the scope in the key where the key can carry it.** `members.list` has no workspace in its key, which is why `forgetTheWorkspaceLeft` exists. Moving the id into the key would make that clearing unnecessary. This commit does not do that, and how the web app's tRPC keys are built was not checked here.
 - **Send every new way of changing workspace through `forgetTheWorkspaceLeft`.** A new read that belongs to no workspace, as the console's do, must be added to `theirOwn` in `aboutTheWorkspace` (`auth-hooks.ts:274-281`) or it will be dropped on every switch.
 - **Test shape: a real browser with a mounted observer, asserting on what is drawn.** A unit test that asserts `getQueryData(key) === undefined` passes against the failed `removeQueries` fix, because `getQueryData` reads straight from the cache (`queryClient.ts:183-191`). The bug lived between the cache and the page. The three specs in `apps/web/e2e/workspace-switcher.spec.ts` have this shape:
   - Two workspaces, the person a member of both, signed in to the first (`inTwoWorkspaces`, `:64-81`), each with a name or member unique to it so a leftover is visible.
@@ -179,4 +179,4 @@ The reset is not awaited. Its promise settles with the refetch it starts (the do
 ## Related Issues
 
 - `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md` reads the member this note keeps fresh. Its "Who sees what" rules decide a page's visibility from the person's role, so a stale member makes that verdict come from the workspace the person left.
-- `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md` keeps Better Auth's `/organization/set-active` for the picker, and the switch calls the same endpoint. The ADR says nothing about the query cache. This note's reading is that a successful set-active tells the tRPC query cache nothing, which is why the web client clears workspace-scoped reads itself.
+- `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md` keeps Better Auth's `/organization/set-active` for the picker, and the switch calls the same endpoint. The ADR says nothing about the query cache. This note's reading is that a successful set-active tells the tRPC query cache nothing, which is why the web app clears workspace-scoped reads itself.

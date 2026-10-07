@@ -190,10 +190,10 @@ const consentQueryOf = (url: string) => {
 };
 
 const clientNameOf = async (auth: Auth, clientId: string, headers: Headers): Promise<string> => {
-  const client = await attempt(() =>
+  const assistant = await attempt(() =>
     auth.api.getOAuthClientPublic({ query: { client_id: clientId }, headers }),
   );
-  const named = client.ok ? clientShape.safeParse(client.value) : undefined;
+  const named = assistant.ok ? clientShape.safeParse(assistant.value) : undefined;
   return (named?.success ? (named.data.client_name ?? named.data.name) : undefined) ?? "This app";
 };
 

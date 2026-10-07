@@ -565,7 +565,7 @@ const SWEPT_BY_PERSON = [
   "public.session",
 ];
 
-/** A client's registration, and a grant's tokens and consent: the identity sweep reaches none. */
+/** An assistant's registration, and a grant's tokens and consent: the identity sweep reaches none. */
 const BEYOND_THE_SWEEP = [
   "public.oauth_access_token",
   "public.oauth_client",
@@ -1427,7 +1427,7 @@ describe("the identity set on the person's last workspace", () => {
     const email = addressOf("priya");
     const person = await memberOf(db().pool, scenario.workspaceId, email);
 
-    const notTheirs = addressOf("a-client-contact");
+    const notTheirs = addressOf("a-customer-contact");
     for (const address of [email, notTheirs]) {
       await verificationCodeFor(db().pool, address);
       await signInLinkFor(db().pool, address);
@@ -1504,7 +1504,7 @@ describe("the identity set on the person's last workspace", () => {
     const email = addressOf("priya");
     const person = await memberOf(db().pool, scenario.workspaceId, email);
 
-    const notTheirs = addressOf("a-client-contact");
+    const notTheirs = addressOf("a-customer-contact");
     for (const workspaceId of [scenario.workspaceId, elsewhere.workspaceId]) {
       await seedingWith(db().pool, (seed) => seed.invitation({ workspaceId, email }));
     }

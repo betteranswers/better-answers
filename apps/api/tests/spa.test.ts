@@ -62,7 +62,7 @@ describe("the api serves the shell on app.", () => {
     await expect(response.json()).resolves.toMatchObject({ status: "healthy" });
   });
 
-  it("does not shadow an endpoint a client reaches with fetch", async () => {
+  it("does not shadow an endpoint the web app fetches", async () => {
     const response = await app().client(undefined, APP_HOSTNAME).fetch("/get-session");
 
     expect(response.headers.get("content-type")).not.toContain("text/html");

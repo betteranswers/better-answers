@@ -157,16 +157,16 @@ type SessionHeld = {
 };
 
 type GrantHeld = {
-  /** The client's id is the address of its metadata document. */
-  readonly client: { readonly id: string; readonly name: string | null };
+  /** The assistant's id is the address of its metadata document. */
+  readonly assistant: { readonly id: string; readonly name: string | null };
   readonly workspace: WorkspaceNamed | null;
   readonly issuedAt: string;
-  /** When the client last refreshed; a call made on a live access token leaves no row. */
+  /** When the assistant last refreshed; a call made on a live access token leaves no row. */
   readonly lastUsedAt: string;
   readonly expiresAt: string;
 };
 
-/** Marked when a session ends or at the client's own revocation: the row never says which. */
+/** Marked when a session ends or at the assistant's own revocation: the row never says which. */
 type EndedByTheServer = { readonly kind: "authorization-server" };
 
 type EndedGrantInspected = GrantNamed & {
@@ -262,7 +262,7 @@ const sessionOf = (row: SessionRow): SessionHeld => ({
 });
 
 const grantOf = (row: GrantRow): GrantHeld => ({
-  client: { id: row.client_id, name: row.client_name },
+  assistant: { id: row.client_id, name: row.client_name },
   workspace:
     row.workspace_id === null
       ? null
@@ -361,7 +361,7 @@ const endedGrantsOf = async (tx: Tx, personId: UserId): Promise<readonly EndedGr
 
 /**
  * The person's sessions by last use, each assistant's access they hold, and each an act or the
- * authorization server ended. A grant is a refresh token's line: a client that asked for none
+ * authorization server ended. A grant is a refresh token's line: an assistant that asked for none
  * holds only an access token no row keeps, which lapses within the hour.
  */
 export const inspectPerson = async (

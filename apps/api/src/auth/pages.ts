@@ -14,18 +14,19 @@ const strong = (value: string): string => `<strong>${escaped(value)}</strong>`;
 
 /** The consent page's words. The page's body passes each value in escaped and marked up. */
 export const CONSENT_WORDS = {
-  title: (client: string) => `Connect ${client}`,
-  actsAs: (client: string, workspace: string) => `${client} will act as you, at ${workspace}.`,
-  hostedAt: (client: string, host: string) =>
-    `This app calls itself “${client}” and is hosted at ${host}.`,
+  title: (assistant: string) => `Connect ${assistant}`,
+  actsAs: (assistant: string, workspace: string) =>
+    `${assistant} will act as you, at ${workspace}.`,
+  hostedAt: (assistant: string, host: string) =>
+    `This app calls itself “${assistant}” and is hosted at ${host}.`,
   goesNext: (host: string) => `If you did not expect Connect to take you to ${host}, cancel.`,
   scopes: {
     "knowledge:read": "Read what you can see of the company's knowledge",
     "feedback:write": "Send your feedback on answers",
     offline_access: "Stay connected until you disconnect it, without signing in each time",
   } satisfies Record<OAuthScope, string>,
-  recorded: (client: string) =>
-    `Every question you ask through ${client} is recorded as asked by you.`,
+  recorded: (assistant: string) =>
+    `Every question you ask through ${assistant} is recorded as asked by you.`,
   connect: "Connect",
   cancel: "Cancel",
 } as const;
@@ -95,18 +96,18 @@ export const consentPage = (
     readonly scopes: readonly string[];
   },
 ): string => {
-  const client = escaped(params.clientName);
+  const assistant = escaped(params.clientName);
   const granted = OAUTH_SCOPES.filter((scope) => params.scopes.includes(scope));
   return shell(
     CONSENT_WORDS.title(params.clientName),
-    `<h1>${CONSENT_WORDS.title(client)}</h1>
-<p>${CONSENT_WORDS.actsAs(client, strong(params.workspace))}</p>
-<p>${CONSENT_WORDS.hostedAt(client, strong(params.hostedAt))}</p>
+    `<h1>${CONSENT_WORDS.title(assistant)}</h1>
+<p>${CONSENT_WORDS.actsAs(assistant, strong(params.workspace))}</p>
+<p>${CONSENT_WORDS.hostedAt(assistant, strong(params.hostedAt))}</p>
 <p>${CONSENT_WORDS.goesNext(strong(params.sendsCodeTo))}</p>
 <ul>
   ${granted.map((scope) => `<li>${escaped(CONSENT_WORDS.scopes[scope])}</li>`).join("\n  ")}
 </ul>
-<p>${CONSENT_WORDS.recorded(client)}</p>
+<p>${CONSENT_WORDS.recorded(assistant)}</p>
 <form method="post" action="/consent${escaped(query)}" class="inline">
   <input type="hidden" name="accept" value="true"><button type="submit">${CONSENT_WORDS.connect}</button>
 </form>

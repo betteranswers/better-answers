@@ -280,7 +280,7 @@ describe("the erasure map for a member", () => {
 describe("the erasure map for a subject with no user row", () => {
   it("says each git and identity family found nothing", async () => {
     const scenario = await arrange();
-    const stranger = addressOf("a-client-contact");
+    const stranger = addressOf("a-customer-contact");
     const request = await requestFor(scenario, {
       personId: null,
       identifiers: identifiersOf(stranger),
@@ -650,7 +650,7 @@ describe("the access answer", () => {
     const scenario = await arrange();
     const request = await requestFor(scenario, {
       personId: null,
-      identifiers: identifiersOf(addressOf("a-client-contact")),
+      identifiers: identifiersOf(addressOf("a-customer-contact")),
     });
     const map = await mapOf(scenario, request);
 

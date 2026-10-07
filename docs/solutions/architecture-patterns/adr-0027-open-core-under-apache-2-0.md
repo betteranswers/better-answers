@@ -23,7 +23,7 @@ tags:
 
 ## The decision
 
-The repository is public under the Apache License 2.0, one licence over the whole tree (`LICENSE`, `NOTICE`). There is no `ee/` directory and no paid gate in the code. What a client pays for is the hosted service: the running estate, support, the data-processor role and its DPIA, and any per-client purchase.
+The repository is public under the Apache License 2.0, one licence over the whole tree (`LICENSE`, `NOTICE`). There is no `ee/` directory and no paid gate in the code. What a customer pays for is the hosted service: the running estate, support, the data-processor role and its DPIA, and any per-customer purchase.
 
 - Copyleft is run-only. Third-party code is lifted or depended on only under MIT, BSD, ISC, Apache-2.0 or the PostgreSQL licence.
 - GPL and AGPL software, such as Garage, runs unmodified as a separate process over a network protocol, never linked, vendored or copied. Nothing under an enterprise-licensed directory is read, not even for its shape.
@@ -35,7 +35,7 @@ The repository is public under the Apache License 2.0, one licence over the whol
 
 ## Why
 
-- The product's one claim no competitor makes, *open format you own*, is whole only when the client can leave with the bundle and run the thing that reads it.
+- The product's one claim no competitor makes, *open format you own*, is whole only when the customer can leave with the bundle and run the thing that reads it.
 - The share agent and the customer-hosted worker are sold to people who will read the source first.
 - A public repository gets bigger runners, unlimited Actions minutes and code scanning for nothing, and the tree was clean before any product code, the cheapest moment for a one-way flip.
 - Apache-2.0 over MIT for §3's patent grant and §6's reservation of the name *Better Answers*, which has no registered trade mark.
@@ -45,7 +45,7 @@ The repository is public under the Apache License 2.0, one licence over the whol
 ## Rejected
 
 - Closed: it costs the tagline's claim, the share agent's buyers and the free CI and scanning.
-- Source-available (a Business or Functional Source Licence): it costs the word *open* and hands every client's legal team a bespoke licence. Reachable later as a re-licence, not the other way.
+- Source-available (a Business or Functional Source Licence): it costs the word *open* and hands every customer's legal team a bespoke licence. Reachable later as a re-licence, not the other way.
 - Open later: the cost of open without its benefits, and a date that drifts.
 - MIT: no patent grant and no trade-mark reservation.
 - AGPL-3.0: an IT manager refuses the share agent, to guard against a competitor that does not exist yet.

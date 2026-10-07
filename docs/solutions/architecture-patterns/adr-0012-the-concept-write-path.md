@@ -44,7 +44,7 @@ The reconciler replays the missed commits, oldest first, under `process:better-a
 
 A revocation inside the act's window does not stop the replay: the role is judged at time-of-act. Unwanted content is undone by a forward revert, never by a history rewrite.
 
-Moving a ref back to its watermark is the operator's plumbing, written down on a runbook page: `docs/operations/RUNBOOK.md`, page 10, *A workspace is stuck behind a commit*. It is not that rewrite, since it drops only commits no row recorded. It is not an ops command either. It is rehearsed on staging, against a made-up stuck bundle, before the first client's data is on the box.
+Moving a ref back to its watermark is the operator's plumbing, written down on a runbook page: `docs/operations/RUNBOOK.md`, page 10, *A workspace is stuck behind a commit*. It is not that rewrite, since it drops only commits no row recorded. It is not an ops command either. It is rehearsed on staging, against a made-up stuck bundle, before the first customer's data is on the box.
 
 ## Why
 
@@ -63,7 +63,7 @@ Moving a ref back to its watermark is the operator's plumbing, written down on a
 - Rows written only by the worker after the commit: flagging stops being synchronous.
 - No row at all: no filter for sensitivity or status, and no index.
 - Admins clone and push, checked on arrival: rules in two places and a history the platform did not make.
-- A read-only clone URL served by the api: a second authenticated endpoint before any client asked.
+- A read-only clone URL served by the api: a second authenticated endpoint before any customer asked.
 - Deprecate only, never remove: mistakes filed as history forever. A governed remove for any concept: real knowledge can leave the tree.
 - A `pnpm ops` command for the rewind: it could be run without the judgement the act turns on.
 

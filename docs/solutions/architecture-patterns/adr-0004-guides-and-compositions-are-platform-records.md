@@ -42,7 +42,7 @@ A guide definition and every composition are platform records in Postgres, with 
 - Generated prose stored as a file drifts by design. Prose that must stay current is a regenerated row with version and provenance.
 - Prose in git would tie OKF to one product feature, fill the interchange format with UI-shaped state and make every guide edit a git commit.
 - The skeleton keeps the promise that the map outlives the tool, for structure.
-- The bundle-alone test governs every key and convention in a concept file: a company with no platform and no guides must still want it there. Q&A pairs and context wordings pass it, since the first client keeps both today with no platform. Guide-shaped tags do not.
+- The bundle-alone test governs every key and convention in a concept file: a company with no platform and no guides must still want it there. Q&A pairs and context wordings pass it, since the first customer keeps both today with no platform. Guide-shaped tags do not.
 - Moving prose between git and the database later would re-key every composition's version history and edges.
 
 ## Rejected

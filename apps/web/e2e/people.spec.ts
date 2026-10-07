@@ -67,7 +67,7 @@ const AUDIT_LOG_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit l
 
 const GROUPS_PAGE = pageNamed(people, "Groups").path;
 
-/** Matched by name anywhere in the path, because the client batches its reads. */
+/** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const MEMBER_READ = (url: URL): boolean => url.pathname.includes("session.member");
 
 const MEMBERS_READ = (url: URL): boolean => url.pathname.includes("members.list");
@@ -75,7 +75,7 @@ const MEMBERS_READ = (url: URL): boolean => url.pathname.includes("members.list"
 const REMOVAL = (url: URL): boolean => url.pathname.includes("members.remove");
 
 /**
- * The api's refusal of an act racing another, as the client's batch carries it back, once `held`
+ * The api's refusal of an act racing another, as the tRPC client's batch carries it back, once `held`
  * lets it go.
  */
 const answeredChangedMeanwhile = (
@@ -1202,7 +1202,7 @@ test.describe("removing a member from their page", () => {
     const removal = removalOf(page);
     const asked = removal.getByRole("button", { name: "Remove Priya Shah", exact: true });
     await expect(asked).toHaveAccessibleDescription(
-      "Priya Shah loses access to this workspace on every session and client they hold. Any other workspace they belong to is untouched, and they stay named on what they checked.",
+      "Priya Shah loses access to this workspace on every session and assistant they hold. Any other workspace they belong to is untouched, and they stay named on what they checked.",
     );
     await asked.click();
     await expect(removal.getByText("Confirm the removal of Priya Shah")).toBeFocused();
@@ -1610,7 +1610,7 @@ const saidInTheList = (page: Page, words: string): Locator =>
 const refusedLine = (name: string, said: { readonly why: string; readonly next: string }) =>
   `${name}: ${sentenceOf(said)}`;
 
-/** Matched by name anywhere in the path, because the client batches its calls. */
+/** Matched by name anywhere in the path, because the tRPC client batches its calls. */
 const BULK_ROLE_CHANGE = (url: URL): boolean => url.pathname.includes("members.bulkChangeRole");
 
 /** More members than one page holds, named so the list's own order is their number's. */

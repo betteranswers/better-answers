@@ -75,7 +75,7 @@ const signedInHere = async (email: string, workspaceId: string) => {
   return signedIn;
 };
 
-/** The member's client holds a grant in each workspace, and a third client presents them. */
+/** The member's assistant holds a grant in each workspace, and a third host presents them. */
 const connectedInBoth = async () => {
   const members = await aMemberOfTwoWorkspaces();
   const { here, elsewhere, person } = members;

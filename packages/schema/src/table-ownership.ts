@@ -144,7 +144,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "workspaces",
     access: "read",
     reason:
-      "The operator's inspection of a person names the client each grant was issued to, by the name its metadata document gave.",
+      "The operator's inspection of a person names the assistant each grant was issued to, by the name its metadata document gave.",
   },
   {
     table: "public.oauth_access_token",

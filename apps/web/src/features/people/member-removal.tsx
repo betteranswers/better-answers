@@ -40,8 +40,8 @@ export function MemberRemoval(properties: {
       <Collapsible open={asking} onOpenChange={setAsking} className="grid gap-3 px-4 py-3">
         <p id={consequenceId} className="text-sm text-muted-foreground">
           {yourself
-            ? "You lose access to this workspace, People included, on every session and client you hold. Any other workspace you belong to is untouched, and you stay named on what you checked."
-            : `${name} loses access to this workspace on every session and client they hold. Any other workspace they belong to is untouched, and they stay named on what they checked.`}
+            ? "You lose access to this workspace, People included, on every session and assistant you hold. Any other workspace you belong to is untouched, and you stay named on what you checked."
+            : `${name} loses access to this workspace on every session and assistant they hold. Any other workspace they belong to is untouched, and they stay named on what they checked.`}
         </p>
         <CollapsibleTrigger asChild>
           <Button

@@ -29,7 +29,7 @@ const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
 
 const WORKSPACES_READ = "**/organization/list";
 
-/** Matched by name anywhere in the path, because the client batches its reads. */
+/** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const readOf =
   (procedure: string) =>
   (url: URL): boolean =>

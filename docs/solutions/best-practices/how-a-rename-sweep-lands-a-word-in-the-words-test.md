@@ -133,7 +133,7 @@ U14 renamed *check* to *verification* as the trust event (branch `feat/ba-29-u14
 
 ## Why This Matters
 
-The words test is the one gate on R12, which refuses an old word once it has landed, and on R22, which keeps stored history. Eleven sweeps each repeat this landing. Most mistakes here pass in silence: a missing `g`, a carve-out on a reader-text row, a flip back to pending, a plural under a one-sense row. The ones that fail loudly tempt the wrong fix. An old plan edited to pass breaks R22, a wire name renamed to pass breaks R21's clients, and a ratchet rise refreshed away hides new old words on pages.
+The words test is the one gate on R12, which refuses an old word once it has landed, and on R22, which keeps stored history. Eleven sweeps each repeat this landing. Most mistakes here pass in silence: a missing `g`, a carve-out on a reader-text row, a flip back to pending, a plural under a one-sense row. The ones that fail loudly tempt the wrong fix. An old plan edited to pass breaks R22, a wire name renamed to pass breaks the assistants R21 protects, and a ratchet rise refreshed away hides new old words on pages.
 
 ## When to Apply
 
