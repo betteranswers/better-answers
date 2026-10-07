@@ -19,15 +19,15 @@ const searchVector = customType<{ data: string; driverData: string }>({
   dataType: () => "tsvector",
 });
 
-export const chunk = indexSchema.table("chunk", {
+export const passage = indexSchema.table("passage", {
   id: text("id").notNull(),
   workspaceId: text("workspace_id").notNull(),
   content: text("content").notNull(),
 
   embedding: embeddingVector("embedding"),
-  embeddingRouteId: text("embedding_route_id"),
+  embeddingModelChoiceId: text("embedding_model_choice_id"),
 
-  connectedSourceId: text("binding_id").notNull(),
+  connectedSourceId: text("connected_source_id").notNull(),
 
   sourceDocumentId: text("source_document_id"),
   locator: text("locator"),

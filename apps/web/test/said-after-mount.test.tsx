@@ -40,12 +40,12 @@ const A_CONNECTED_SOURCE: ListedConnectedSource = {
   sensitivity: "Internal",
   audience: "everyone",
   audienceGroups: null,
-  destination: ["chunk-index", "bundle"],
+  destination: ["passage-index", "bundle"],
   retentionClass: "keep",
   state: "received",
   publishedAt: null,
   documentCount: 1,
-  chunkCount: 0,
+  passageCount: 0,
   lastRun: null,
   quarantined: [],
   quarantinedByError: {},
@@ -74,15 +74,15 @@ describe("a page's read, said after its region mounts (BA-31)", () => {
   });
 
   it("fills a disclosure's region a render after opening mounts it", () => {
-    const chunks = "[data-slot=collapsible-content] [aria-live=polite]";
-    const seen = mounted(chunks, <Review connectedSource={A_CONNECTED_SOURCE} />);
+    const passages = "[data-slot=collapsible-content] [aria-live=polite]";
+    const seen = mounted(passages, <Review connectedSource={A_CONNECTED_SOURCE} />);
     const closed = seen.length;
 
-    fireEvent.click(screen.getByRole("button", { name: /Preview the chunks/v }));
+    fireEvent.click(screen.getByRole("button", { name: /Preview the passages/v }));
 
     const opened = seen.slice(closed);
     expect(seen.slice(0, closed).every((text) => text === undefined)).toBe(true);
     expect(opened[0]).toBe("");
-    expect(opened.at(-1)).toBe("The chunks are still loading.");
+    expect(opened.at(-1)).toBe("The passages are still loading.");
   });
 });

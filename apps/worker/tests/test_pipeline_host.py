@@ -14,37 +14,37 @@ from structlog.testing import capture_logs
 
 from better_answers_worker.config import Bootstrap, Engine, ObjectStore
 from better_answers_worker.pipeline import (
-    BINDING_STORE,
-    CHUNK_TABLE,
-    CHUNKS_APP,
+    CONNECTED_SOURCE_STORE,
     ENVIRONMENTS_HELD,
     FINDINGS_STORE,
+    PASSAGE_TABLE,
+    PASSAGES_APP,
     STORES_A_CONNECTED_SOURCE_HOLDS,
     Host,
     IndexRun,
     index_connected_source,
     open_pool,
 )
-from factories import land_chunk, seed_workspace
+from factories import land_passage, seed_workspace
 from pg_harness import login_in_role, migrated_postgres_at
 
 WORKER_LOGIN = "worker_login_under_test"
 WORKER_PASSWORD = "worker-login-under-test"
 
 
-def chunk_row(
+def passage_row(
     *,
     workspace_id: str,
     connected_source_id: str,
-    chunk_id: str,
+    passage_id: str,
     content: str = "Expenses are claimed within sixty days.",
     ordinal: int = 0,
 ) -> dict[str, Any]:
     return {
-        "id": chunk_id,
+        "id": passage_id,
         "workspace_id": workspace_id,
         "content": content,
-        "binding_id": connected_source_id,
+        "connected_source_id": connected_source_id,
         "source_document_id": None,
         "locator": f"doc-{connected_source_id}/chars:0-{len(content)}",
         "ordinal": ordinal,
@@ -101,44 +101,44 @@ def bootstrap_for(dsn: str, lmdb_dir: Path) -> Bootstrap:
     )
 
 
-def chunk_ids(connection: psycopg.Connection, workspace_id: str) -> list[str]:
+def passage_ids(connection: psycopg.Connection, workspace_id: str) -> list[str]:
     with connection.cursor() as cursor:
         cursor.execute(
-            'SELECT id FROM "index".chunk WHERE workspace_id = %s ORDER BY id',
+            'SELECT id FROM "index".passage WHERE workspace_id = %s ORDER BY id',
             (workspace_id,),
         )
         return [str(row[0]) for row in cursor.fetchall()]
 
 
-def chunk_indexes(connection: psycopg.Connection, workspace_id: str) -> list[str]:
+def passage_indexes(connection: psycopg.Connection, workspace_id: str) -> list[str]:
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT indexname FROM pg_indexes"
             " WHERE schemaname = 'index' AND tablename = %s ORDER BY indexname",
-            (f"chunk_{workspace_id}",),
+            (f"passage_{workspace_id}",),
         )
         return [str(row[0]) for row in cursor.fetchall()]
 
 
-def test_lands_a_chunk_row_only_through_a_scoped_pool(
+def test_lands_a_passage_row_only_through_a_scoped_pool(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
     workspace_id = seed_partitioned_workspace(connection)
-    row = chunk_row(
+    row = passage_row(
         workspace_id=workspace_id,
         connected_source_id="connected-source-one",
-        chunk_id="chunk-one",
+        passage_id="passage-one",
     )
 
     async def served() -> None:
         pool = await open_pool(dsn, workspace_id, max_size=1)
         try:
             async with pool.acquire() as held:
-                await land_chunk(held, row)
+                await land_passage(held, row)
 
             async with pool.acquire() as again:
-                await land_chunk(again, {**row, "id": "chunk-two"})
+                await land_passage(again, {**row, "id": "passage-two"})
         finally:
             await pool.close()
 
@@ -147,12 +147,12 @@ def test_lands_a_chunk_row_only_through_a_scoped_pool(
         assert pool is not None
         try:
             async with pool.acquire() as held:
-                await land_chunk(held, row)
+                await land_passage(held, row)
         finally:
             await pool.close()
 
     asyncio.run(served())
-    assert chunk_ids(connection, workspace_id) == ["chunk-one", "chunk-two"]
+    assert passage_ids(connection, workspace_id) == ["passage-one", "passage-two"]
 
     with pytest.raises(asyncpg.InsufficientPrivilegeError):
         asyncio.run(refused())
@@ -177,28 +177,28 @@ def test_dropping_a_sources_state_keeps_the_table_indexes_and_rows(
         )
         host.land_rows(
             first,
-            CHUNK_TABLE,
+            PASSAGE_TABLE,
             [
-                chunk_row(
+                passage_row(
                     workspace_id=workspace_id,
                     connected_source_id=first.connected_source_id,
-                    chunk_id="chunk-one",
+                    passage_id="passage-one",
                 )
             ],
         )
         host.land_rows(
             second,
-            CHUNK_TABLE,
+            PASSAGE_TABLE,
             [
-                chunk_row(
+                passage_row(
                     workspace_id=workspace_id,
                     connected_source_id=second.connected_source_id,
-                    chunk_id="chunk-two",
+                    passage_id="passage-two",
                 )
             ],
         )
-        assert chunk_ids(connection, workspace_id) == ["chunk-one", "chunk-two"]
-        indexes_before = chunk_indexes(connection, workspace_id)
+        assert passage_ids(connection, workspace_id) == ["passage-one", "passage-two"]
+        indexes_before = passage_indexes(connection, workspace_id)
         assert indexes_before != []
 
     # Its own Host, as a run's would be: the engine can still hold the name the
@@ -206,8 +206,8 @@ def test_dropping_a_sources_state_keeps_the_table_indexes_and_rows(
     with Host(bootstrap_for(dsn, tmp_path)) as host:
         host.drop_connected_source(first)
 
-    assert chunk_ids(connection, workspace_id) == ["chunk-one", "chunk-two"]
-    assert chunk_indexes(connection, workspace_id) == indexes_before
+    assert passage_ids(connection, workspace_id) == ["passage-one", "passage-two"]
+    assert passage_indexes(connection, workspace_id) == indexes_before
 
 
 def a_run_on(connected_source_id: str) -> IndexRun:
@@ -248,13 +248,13 @@ def test_the_default_bound_holds_eight_handles_and_sheds_whole_sources(
     with Host(whole) as host:
         for n in range(1, 5):
             host.open_connected_source(a_run_on(f"connected-source-{n}"))
-        host.app_config(a_run_on("connected-source-5"), CHUNKS_APP)
+        host.app_config(a_run_on("connected-source-5"), PASSAGES_APP)
         held_whole = host.held_connected_sources()
 
     half_open = bootstrap_for("postgresql://unreached/unreached", tmp_path / "half")
     with Host(half_open) as host:
         for n in range(1, 10):
-            host.app_config(a_run_on(f"connected-source-{n}"), CHUNKS_APP)
+            host.app_config(a_run_on(f"connected-source-{n}"), PASSAGES_APP)
         held_half_open = host.held_connected_sources()
 
     assert ENVIRONMENTS_HELD == 8
@@ -292,7 +292,7 @@ def test_refuses_a_bound_below_one_connected_sources_two_handles(
         assert host.held_connected_sources() == ("connected-source-one",)
 
 
-def test_the_seam_answers_plain_numbers_and_opens_the_chunk_store(
+def test_the_seam_answers_plain_numbers_and_opens_the_passage_store(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -307,7 +307,7 @@ def test_the_seam_answers_plain_numbers_and_opens_the_chunk_store(
 
     assert outcome.as_row() == {
         "documents": 0,
-        "chunks": 0,
+        "passages": 0,
         "lmdb_bytes": outcome.lmdb_bytes,
         "restores_overridden_by_erasure": [],
     }
@@ -341,12 +341,14 @@ def test_a_sources_stores_sit_at_sibling_paths_in_its_directory(
     with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
         host.open_connected_source(run)
 
-        chunk_store = host.store_directory(run, BINDING_STORE)
+        passage_store = host.store_directory(run, CONNECTED_SOURCE_STORE)
         findings = host.store_directory(run, FINDINGS_STORE)
 
-    assert chunk_store.parent == findings.parent == host.connected_source_directory(run)
-    assert chunk_store != findings
-    assert chunk_store.is_dir() and findings.is_dir()
+    assert (
+        passage_store.parent == findings.parent == host.connected_source_directory(run)
+    )
+    assert passage_store != findings
+    assert passage_store.is_dir() and findings.is_dir()
 
 
 def test_a_connected_sources_lmdb_size_is_readable_after_its_run(
@@ -364,12 +366,12 @@ def test_a_connected_sources_lmdb_size_is_readable_after_its_run(
         assert host.lmdb_bytes(run) == 0
         host.land_rows(
             run,
-            CHUNK_TABLE,
+            PASSAGE_TABLE,
             [
-                chunk_row(
+                passage_row(
                     workspace_id=workspace_id,
                     connected_source_id=run.connected_source_id,
-                    chunk_id="chunk-one",
+                    passage_id="passage-one",
                 )
             ],
         )
@@ -409,12 +411,12 @@ def test_a_held_store_opens_once_the_engine_lets_go(tmp_path: Path) -> None:
         with Host(bootstrap) as first:
             holder = threading.Thread(
                 target=hold_until_waited_on,
-                args=(first.app_config(run, CHUNKS_APP), written),
+                args=(first.app_config(run, PASSAGES_APP), written),
             )
         holder.start()
         try:
             with Host(bootstrap) as second:
-                second.app_config(run, CHUNKS_APP)
+                second.app_config(run, PASSAGES_APP)
                 opened = second.held_connected_sources()
         finally:
             holder.join()
@@ -425,7 +427,7 @@ def test_a_held_store_opens_once_the_engine_lets_go(tmp_path: Path) -> None:
             "event": WAITS,
             "log_level": "info",
             "connected_source_id": "connected-source-one",
-            "store": "binding",
+            "store": "connected_source",
             "wait_seconds": 5.0,
         }
     ]
@@ -439,14 +441,14 @@ def test_a_store_held_in_a_cycle_opens_after_a_collection(tmp_path: Path) -> Non
     gc.disable()
     try:
         with Host(bootstrap) as first:
-            cycle: list[object] = [first.app_config(run, CHUNKS_APP)]
+            cycle: list[object] = [first.app_config(run, PASSAGES_APP)]
             cycle.append(cycle)
         del cycle
         with (
             capture_logs() as written,
             Host(bootstrap, release_wait_seconds=0.2) as second,
         ):
-            second.app_config(run, CHUNKS_APP)
+            second.app_config(run, PASSAGES_APP)
             opened = second.held_connected_sources()
     finally:
         gc.enable()
@@ -457,7 +459,7 @@ def test_a_store_held_in_a_cycle_opens_after_a_collection(tmp_path: Path) -> Non
             "event": WAITS,
             "log_level": "info",
             "connected_source_id": "connected-source-one",
-            "store": "binding",
+            "store": "connected_source",
             "wait_seconds": 0.2,
         }
     ]
@@ -468,13 +470,13 @@ def test_a_store_never_let_go_raises_after_the_wait(tmp_path: Path) -> None:
     run = a_run_on("connected-source-one")
 
     with Host(bootstrap) as first, capture_logs() as written:
-        first.app_config(run, CHUNKS_APP)
+        first.app_config(run, PASSAGES_APP)
         started = time.monotonic()
         with (
             pytest.raises(RuntimeError) as raised,
             Host(bootstrap, release_wait_seconds=0.2) as second,
         ):
-            second.app_config(run, CHUNKS_APP)
+            second.app_config(run, PASSAGES_APP)
         waited = time.monotonic() - started
 
     assert str(raised.value) == STILL_OPEN
@@ -484,7 +486,7 @@ def test_a_store_never_let_go_raises_after_the_wait(tmp_path: Path) -> None:
             "event": WAITS,
             "log_level": "info",
             "connected_source_id": "connected-source-one",
-            "store": "binding",
+            "store": "connected_source",
             "wait_seconds": 0.2,
         }
     ]
@@ -497,11 +499,11 @@ def test_an_unreadable_store_raises_without_waiting(tmp_path: Path) -> None:
         Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host,
         capture_logs() as written,
     ):
-        directory = host.store_directory(run, BINDING_STORE)
+        directory = host.store_directory(run, CONNECTED_SOURCE_STORE)
         directory.mkdir(parents=True)
         (directory / "data.mdb").write_bytes(b"not an lmdb file" * 1000)
         with pytest.raises(RuntimeError) as raised:
-            host.app_config(run, CHUNKS_APP)
+            host.app_config(run, PASSAGES_APP)
 
     assert str(raised.value) == "MDB_INVALID: File is not an LMDB file"
     assert waits_in(written) == []

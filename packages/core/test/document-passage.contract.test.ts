@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import { ULID } from "@better-answers/schema";
 
-import { chunkIdOf, parseLocator, spanText } from "../src/sources/index.ts";
-import { contractFixture, documentChunkRow, OPEN_OUTCOMES } from "./contract-fixture.ts";
+import { passageIdOf, parseLocator, spanText } from "../src/sources/index.ts";
+import { contractFixture, documentPassageRow, OPEN_OUTCOMES } from "./contract-fixture.ts";
 
 const REFUSERS = ["the parser", "the read"] as const;
 
@@ -21,7 +21,7 @@ const openCase = z.object({
 
 const fixtureSchema = z.object({
   description: z.string(),
-  chunk_id: z.object({
+  passage_id: z.object({
     shape: z.string().min(1),
     separator: z.string().min(1),
     ordinal_digits: z.int().positive(),
@@ -52,9 +52,9 @@ const fixtureSchema = z.object({
   }),
   document: z.object({
     source_document_id: z.string().min(1),
-    binding_id: z.string().min(1),
+    connected_source_id: z.string().min(1),
     media_type: z.string().min(1),
-    chunk_size: z.int().positive(),
+    passage_size: z.int().positive(),
     normalised_text: z.string().min(1),
     code_points: z.int().positive(),
     utf16_units: z.int().positive(),
@@ -65,40 +65,42 @@ const fixtureSchema = z.object({
       utf16_units: z.int().positive(),
       why: z.string().min(1),
     }),
-    chunks: z.array(documentChunkRow),
+    passages: z.array(documentPassageRow),
   }),
   open: z.array(openCase),
 });
 
-const fixture = contractFixture("document-chunk", fixtureSchema);
+const fixture = contractFixture("document-passage", fixtureSchema);
 const { document } = fixture;
 
-describe("the chunk id derived from a document and an ordinal", () => {
+describe("the passage id derived from a document and an ordinal", () => {
   it("derives the id the agreement names for each case", () => {
-    for (const { source_document_id, ordinal, id } of fixture.chunk_id.cases) {
-      expect({ ordinal, id: chunkIdOf(source_document_id, ordinal) }).toEqual({ ordinal, id });
+    for (const { source_document_id, ordinal, id } of fixture.passage_id.cases) {
+      expect({ ordinal, id: passageIdOf(source_document_id, ordinal) }).toEqual({ ordinal, id });
     }
   });
 
-  it("derives the id each of the document's chunk rows carries", () => {
-    for (const row of document.chunks) {
+  it("derives the id each of the document's passage rows carries", () => {
+    for (const row of document.passages) {
       expect({
         ordinal: row.ordinal,
-        id: chunkIdOf(document.source_document_id, row.ordinal),
+        id: passageIdOf(document.source_document_id, row.ordinal),
       }).toEqual({ ordinal: row.ordinal, id: row.id });
     }
   });
 
   it("pads the ordinal so ids sort in the splitter's order", () => {
-    const ids = document.chunks.map((row) => chunkIdOf(document.source_document_id, row.ordinal));
+    const ids = document.passages.map((row) =>
+      passageIdOf(document.source_document_id, row.ordinal),
+    );
 
     expect(ids).toEqual(ids.toSorted());
   });
 
   it("derives ids in the agreed shape, never a minted one", () => {
-    const pattern = new RegExp(fixture.chunk_id.pattern);
+    const pattern = new RegExp(fixture.passage_id.pattern);
 
-    for (const { source_document_id, id } of fixture.chunk_id.cases) {
+    for (const { source_document_id, id } of fixture.passage_id.cases) {
       expect({ id, shaped: pattern.test(id), minted: ULID.test(id) }).toEqual({
         id,
         shaped: true,
@@ -132,8 +134,8 @@ describe("the wire locator", () => {
     }
   });
 
-  it("reads each chunk row's locator back to the row's span", () => {
-    for (const row of document.chunks) {
+  it("reads each passage row's locator back to the row's span", () => {
+    for (const row of document.passages) {
       const parsed = parseLocator(row.locator);
 
       expect({ ordinal: row.ordinal, read: parsed.ok ? parsed.value : parsed.error }).toEqual({
@@ -164,9 +166,9 @@ describe("the normalised text the offsets are counted in", () => {
     expect(document.astral.character.length).toBe(document.astral.utf16_units);
   });
 
-  it("is partitioned by its chunk rows", () => {
+  it("is partitioned by its passage rows", () => {
     let at = 0;
-    for (const row of document.chunks) {
+    for (const row of document.passages) {
       expect({ ordinal: row.ordinal, start: row.char_start }).toEqual({
         ordinal: row.ordinal,
         start: at,
@@ -212,12 +214,12 @@ describe("the passage a locator opens", () => {
     }
   });
 
-  it("covers exactly the chunk rows its span overlaps", () => {
+  it("covers exactly the passage rows its span overlaps", () => {
     for (const answered of fixture.open.filter((each) => each.covers_ordinals !== undefined)) {
       const parsed = parseLocator(answered.wire);
 
       if (!parsed.ok) throw new Error(`the fixture's own locator did not parse: ${answered.wire}`);
-      const overlapping = document.chunks
+      const overlapping = document.passages
         .filter(
           (row) => row.char_start < parsed.value.charEnd && row.char_end > parsed.value.charStart,
         )

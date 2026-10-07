@@ -56,7 +56,7 @@ export type TestData = {
 
   modelChoice(overrides?: Partial<InsertInput<"modelChoice">>): Promise<Row<"modelChoice">>;
 
-  chunk(overrides?: Partial<InsertInput<"chunk">>): Promise<Row<"chunk">>;
+  passage(overrides?: Partial<InsertInput<"passage">>): Promise<Row<"passage">>;
 
   oauthClient(overrides?: Partial<InsertInput<"oauthClient">>): Promise<Row<"oauthClient">>;
 
@@ -197,7 +197,7 @@ const insertRow = async <TName extends keyof Registry>(
 const partitionExists = async (client: pg.PoolClient, workspaceId: string): Promise<boolean> => {
   const found = await client.query(
     "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'index' AND c.relname = $1",
-    [`chunk_${workspaceId}`],
+    [`passage_${workspaceId}`],
   );
   return found.rowCount === 1;
 };
@@ -206,7 +206,7 @@ const SEEDED_SPAN_LENGTH = 8;
 
 /**
  * Each method writes one row, filling what `overrides` leave out and seeding the parent rows its
- * keys need; `chunk` also makes the workspace's partition.
+ * keys need; `passage` also makes the workspace's partition.
  */
 export const testData = (client: pg.PoolClient): TestData => {
   const workspace: TestData["workspace"] = (overrides = {}) => {
@@ -318,7 +318,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  const chunk: TestData["chunk"] = async (overrides = {}) => {
+  const passage: TestData["passage"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     if (!(await partitionExists(client, workspaceId))) {
       // The lifecycle function refuses a workspace the transaction is not scoped to.
@@ -329,11 +329,11 @@ export const testData = (client: pg.PoolClient): TestData => {
         previous.rows[0]?.ws ?? "",
       ]);
     }
-    return insertRow(client, "chunk", {
-      id: `chunk-${ulid()}`,
+    return insertRow(client, "passage", {
+      id: `passage-${ulid()}`,
       content: "test content",
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0),
-      embeddingRouteId: `model-choice-${ulid()}`,
+      embeddingModelChoiceId: `model-choice-${ulid()}`,
       connectedSourceId: `connected-source-${ulid()}`,
 
       sourceDocumentId: null,
@@ -913,7 +913,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     groupMember,
     workspaceConfig,
     modelChoice,
-    chunk,
+    passage,
     oauthClient,
     oauthRefreshToken,
     oauthAccessToken,

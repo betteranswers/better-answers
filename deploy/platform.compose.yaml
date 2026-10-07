@@ -82,7 +82,7 @@ services:
       # The engine calls a tracking host per index run otherwise, and nothing needs it.
       COCOINDEX_DISABLE_USAGE_TRACKING: "1"
       MAX_CONCURRENT_RUNS: "1"
-      LMDB_MAX_BYTES_PER_BINDING: "4294967296"
+      LMDB_MAX_BYTES_PER_CONNECTED_SOURCE: "4294967296"
       LMDB_DIR: /data/worker/lmdb
       RUST_LOG: warn
     healthcheck:

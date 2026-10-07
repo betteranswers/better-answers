@@ -76,7 +76,7 @@ function MoreAbout(properties: {
             {retentionOf(connectedSource.retentionClass).means}
           </Row>
           <Row term="Documents">{connectedSource.documentCount}</Row>
-          <Row term="Chunks">{connectedSource.chunkCount}</Row>
+          <Row term="Passages">{connectedSource.passageCount}</Row>
           <Row term="Published">
             {connectedSource.publishedAt === null
               ? "Not published"

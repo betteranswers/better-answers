@@ -96,7 +96,7 @@ const APP_SENSES: readonly Sense[] = [
   {
     sense: "cocoindex's App: the class, a local or a memo's key holding one, one by its name",
     written:
-      /\bcoco\.App\b|\bapp(?:: coco\.App)? = coco\.App\b|["']app["']: (?:\w+_APP\b|["'](?:landed|chunks)["'])|\b(?:landed|chunks) app\b/gi,
+      /\bcoco\.App\b|\bapp(?:: coco\.App)? = coco\.App\b|["']app["']: (?:\w+_APP\b|["'](?:landed|chunks|passages)["'])|\b(?:landed|chunks|passages) app\b/gi,
   },
   {
     sense:
@@ -272,14 +272,14 @@ const ROUTE_SENSES: readonly Sense[] = [
     written: /[`"]route-change[`"]/g,
   },
   {
+    sense: "the old word the catalogue test refuses in any name",
+    within: "packages/schema/test/renamed-names.test.ts",
+    written: /"route"/g,
+  },
+  {
     sense: "the rename runner's examples, which name the first map's words",
     within: "packages/devtools/src/rename/words.ts",
     written: /`(?:llm route|route|SELECT route_id|no route set)`/g,
-  },
-  {
-    sense: "the embedding_route_id column on index.chunk",
-    written: /\bembedding_route_id\b|\bembeddingRouteId\b/g,
-    until: "passage",
   },
 ];
 
@@ -402,12 +402,6 @@ const BIND_SENSES: readonly Sense[] = [
     within: "docs/specs/v01-route.md",
     written: /~~`bind · index · reindex · prune`~~/g,
   },
-  {
-    sense: "the passage agreement's fixture, whose every edit moves the contract's digest",
-    within: "contracts/document-chunk/",
-    written: /\bbind act\b/g,
-    until: "passage",
-  },
 ];
 
 const BINDING_SENSES: readonly Sense[] = [
@@ -432,16 +426,18 @@ const BINDING_SENSES: readonly Sense[] = [
     sense: "an erasure report's action key, which erasure requests store (R22)",
     written: /\bbindingsReindexed\b/g,
   },
+  ...[
+    "apps/worker/src/better_answers_worker/pipeline/host.py",
+    "apps/worker/tests/test_pipeline_index.py",
+  ].map((within) => ({
+    sense: "the store's name before the passage sweep, which a wipe removes",
+    within,
+    written: /"binding"/g,
+  })),
   {
-    sense: "the binding_id column on index.chunk and its view, and the passage agreement's key",
-    written: /\b(?:chunk_)?binding_id(?:_not_null)?\b|\bchunk_workspace_id_binding_id\w*/g,
-    until: "passage",
-  },
-  {
-    sense: "the worker's store directory and its size key, which the passage sweep renames",
-    written:
-      /\bBINDING_STORE\b|\bLMDB_MAX_BYTES_PER_BINDING\b|\bbinding:\{|`binding\/`|\bbinding\/(?=[\s`,)])|(["'])binding\1/g,
-    until: "passage",
+    sense: "the store's name before the passage sweep, as the release removes it",
+    within: "docs/operations/RUNBOOK.md",
+    written: /`binding\/`|-name binding\b/g,
   },
   {
     sense: "the sign-in link's binding cookie, which ties a link to one browser",
@@ -494,6 +490,90 @@ const VENDORED: readonly CarveOut[] = [
 const CONNECTED_SOURCE_ROWS_CARVED_OUT: readonly CarveOut[] = [
   ...CONNECTED_SOURCE_CARVED_OUT,
   ...VENDORED,
+];
+
+const PASSAGE = "passage";
+
+const PASSAGE_LANDED = "2026-10-07";
+
+/** Where `chunk` is a piece of a byte stream, as Node's streams name it. */
+const BYTE_STREAM_TREES = [
+  "apps/api/src/ops.ts",
+  "apps/api/src/ops/http-fetch.ts",
+  "apps/api/tests/await-release.test.ts",
+  "apps/api/tests/harness.ts",
+  "apps/web/test/journeys-fixtures.test.ts",
+  "apps/web/test/playwright-tree.ts",
+  "packages/devtools/test/ci/script-stand-ins.ts",
+  "packages/devtools/test/held-containers.ts",
+  "packages/devtools/test/mutant-probe.test.ts",
+];
+
+/** Where `chunk` is Presidio's text window, whose names the detector's key hashes and stores. */
+const DETECTOR_WINDOW_TREES = [
+  "apps/worker/src/better_answers_worker/redaction/",
+  "apps/worker/tests/test_redaction_windows.py",
+  "apps/worker/tests/test_detection_key.py",
+];
+
+const PASSAGE_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  MIGRATION_TAG,
+  {
+    sense: "a migration file's name, which history keeps",
+    written:
+      /\b\d{4}_[\w-]*chunk[\w-]*\b|\bthe-chunk-substrate\b|\bchunk-and-functions\b|\bthe-readable-chunk\b/g,
+  },
+  ...BYTE_STREAM_TREES.map((within) => ({
+    sense: "a piece of a byte stream",
+    within,
+    written: /\bchunks?\b/g,
+  })),
+  ...DETECTOR_WINDOW_TREES.map((within) => ({
+    sense: "Presidio's text window",
+    within,
+    written: /\w*chunk\w*/gi,
+  })),
+  {
+    sense: "a file the bundler emits, as Vite's build output names it",
+    within: "apps/web/e2e/list-parts.spec.ts",
+    written: /\bchunk\b/g,
+  },
+  {
+    sense: "a slice of base64 the test inbox encodes at a time",
+    within: "apps/test-inbox/",
+    written: /\bBASE64_CHUNK_BYTES\b|\bchunks?\b/g,
+  },
+  {
+    sense: "an assertion that the old word is gone from the find tool's description",
+    within: "apps/api/tests/mcp-surface.test.ts",
+    written: /"chunk"/g,
+  },
+  {
+    sense: "the old word the catalogue test refuses in any name",
+    within: "packages/schema/test/renamed-names.test.ts",
+    written: /"chunk"/g,
+  },
+  {
+    sense:
+      "the locator form the span replaced, which the agreement keeps as a case the parser refuses",
+    written: /\/chunks:0-1\b/g,
+  },
+  {
+    sense: "the destination before migration 0069, as the migration tests seed it",
+    within: "packages/schema/test/job-kinds.test.ts",
+    written: /"chunk-index"|\bchunk-index destination\b/g,
+  },
+  {
+    sense: "the value and the error an api before migration 0069 has, quoted as they read",
+    within: "docs/operations/RUNBOOK.md",
+    written: /`chunk-index`|relation "index\.chunk" does not exist/g,
+  },
+  {
+    sense: "the table's name before migration 0069, as a replayed older statement names it",
+    within: "packages/schema/test/passage-columns.test.ts",
+    written: /relname = 'chunk'/g,
+  },
 ];
 
 export const OLD_WORDS: readonly OldWord[] = [
@@ -607,7 +687,20 @@ export const OLD_WORDS: readonly OldWord[] = [
     "reader text",
   ),
   avoided("child route", "detail address"),
-  pending("chunk", "passage", "passage", "passage", "everywhere"),
+  {
+    word: "chunk",
+    use: PASSAGE,
+    entry: PASSAGE,
+    sweep: PASSAGE,
+    state: "landed",
+    reach: "everywhere",
+    permitted: PASSAGE_SENSES,
+    carvedOut: [
+      writtenBefore(PASSAGE_LANDED),
+      ...CONNECTED_SOURCE_CARVED_OUT.slice(1),
+      ...VENDORED,
+    ],
+  },
   pending("citation marker", "footnote", "footnote", "footnote", "everywhere"),
   avoided("citations list", "evidence pane"),
   pending("class", "sensitivity", "sensitivity", "sensitivity", "one sense"),

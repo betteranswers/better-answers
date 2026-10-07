@@ -50,7 +50,7 @@ export const documentLanded = async (
       title: shape.title,
     });
     const charEnd = codePointsOf(shape.text);
-    await seed.chunk({
+    await seed.passage({
       workspaceId,
       connectedSourceId: connectedSource.id,
       sourceDocumentId: document.id,

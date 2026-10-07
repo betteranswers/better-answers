@@ -1,17 +1,17 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0068_the-connected-source"
+MIGRATION_ID = "0069_the-passage"
 
-MIGRATION_WHEN = 1791319467017
+MIGRATION_WHEN = 1791329808010
 
 TABLES: dict[str, dict[str, str]] = {
-    "index.chunk": {
+    "index.passage": {
         "id": "text NOT NULL",
         "workspace_id": "text NOT NULL",
         "content": "text NOT NULL",
         "embedding": "vector(1024)",
-        "embedding_route_id": "text",
-        "binding_id": "text NOT NULL",
+        "embedding_model_choice_id": "text",
+        "connected_source_id": "text NOT NULL",
         "source_document_id": "text",
         "locator": "text",
         "ordinal": "integer",

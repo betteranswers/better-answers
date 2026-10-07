@@ -330,7 +330,7 @@ const theIndexJobEnded = async (
   jobId: string,
   status: "done" | "failed",
 ): Promise<void> => {
-  const outcome = status === "done" ? { chunks: 1, lmdb_bytes: 0 } : { error: "ConversionError" };
+  const outcome = status === "done" ? { passages: 1, lmdb_bytes: 0 } : { error: "ConversionError" };
   await app.database.superuser.query(
     `UPDATE job SET status = $3, attempts = attempts + 1, finished_at = now(), outcome = $4
       WHERE workspace_id = $1 AND id = $2`,
@@ -340,7 +340,7 @@ const theIndexJobEnded = async (
 
 /**
  * This suite runs no worker, so it leaves the rows the worker's run would: each document's text in
- * one chunk, and the job done.
+ * one passage, and the job done.
  */
 const theIndexRunLanded = async (
   app: TestApp,
@@ -359,7 +359,7 @@ const theIndexRunLanded = async (
       const original = await getObject(reader, objects().door, document.original_key);
       if (!original.ok) throw new Error(`the original was not readable: ${original.error}`);
       const content = await textOf(original.value);
-      await testData(client).chunk({
+      await testData(client).passage({
         workspaceId,
         connectedSourceId: run.subject_id,
         sourceDocumentId: document.id,
@@ -438,9 +438,9 @@ const completedBeforeTheFinder = async (
 };
 
 const whatAReplayActsOn = async (app: TestApp, workspaceId: string) => ({
-  chunks: (
+  passages: (
     await app.database.superuser.query<{ id: string }>(
-      `SELECT id FROM "index".chunk WHERE workspace_id = $1 ORDER BY id`,
+      `SELECT id FROM "index".passage WHERE workspace_id = $1 ORDER BY id`,
       [workspaceId],
     )
   ).rows,
@@ -464,13 +464,13 @@ const whatAReplayActsOn = async (app: TestApp, workspaceId: string) => ({
   ).rows,
 });
 
-const tokensTheChunksHold = async (
+const tokensThePassagesHold = async (
   app: TestApp,
   workspaceId: string,
   tokens: readonly string[],
 ): Promise<readonly string[]> => {
   const found = await app.database.superuser.query<{ content: string }>(
-    `SELECT content FROM "index".chunk WHERE workspace_id = $1`,
+    `SELECT content FROM "index".passage WHERE workspace_id = $1`,
     [workspaceId],
   );
   return tokens.filter((token) => found.rows.some((row) => row.content.includes(token)));
@@ -719,10 +719,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "completed 2026-07-20T12:00:00.000Z, read from the restored rows",
         "replay-erasures: done — replayed 1 erasure since 2026-07-18T00:00:00.000Z",
       ];
-      expect(indexedBefore.chunks).toHaveLength(1);
+      expect(indexedBefore.passages).toHaveLength(1);
       expect([first.exitCode, first.lines]).toEqual([0, replayedOnce]);
       expect(afterTheFirst).toEqual({
-        chunks: [],
+        passages: [],
         jobs: [
           { kind: "index", reason: "connected", status: "done" },
           { kind: "index", reason: "wiped", status: "queued" },
@@ -1044,14 +1044,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(seededRow.rowCount).toBe(1);
     });
 
-    it("wipes the subject's chunks in phase two, requeueing the source", async () => {
+    it("wipes the subject's passages in phase two, requeueing the source", async () => {
       const { workspaceId, admin } = await aWorkspaceToDrillIn();
       const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
       const name = `Rehearsal subject ${workspaceId}`;
 
       const seed = await seeded(workspaceId, admin.id);
       const tokens = (seed.lines.at(-1) ?? "").split(",");
-      const indexedBefore = await tokensTheChunksHold(app(), workspaceId, tokens);
+      const indexedBefore = await tokensThePassagesHold(app(), workspaceId, tokens);
       const run = await opsWith(
         app(),
         [
@@ -1068,7 +1068,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(indexedBefore).toEqual([email, name]);
       expect(run.exitCode).toBe(0);
-      expect(await tokensTheChunksHold(app(), workspaceId, tokens)).toEqual([]);
+      expect(await tokensThePassagesHold(app(), workspaceId, tokens)).toEqual([]);
       expect(await indexJobsIn(app(), workspaceId)).toEqual([
         { reason: "connected", status: "done" },
         { reason: "wiped", status: "queued" },
@@ -1699,9 +1699,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual(["jane…st: present in 1 line(s) outside any COPY section"]);
     });
 
-    it("names a chunk partition as pg_dump heads its section", async () => {
+    it("names a passage partition as pg_dump heads its section", async () => {
       const partitioned = [
-        'COPY index."chunk_01K5ZQ8WJ6T3M4N7P9R2S0V1X" (id, workspace_id, content) FROM stdin;',
+        'COPY index."passage_01K5ZQ8WJ6T3M4N7P9R2S0V1X" (id, workspace_id, content) FROM stdin;',
         "c1\t01K5ZQ8WJ6T3M4N7P9R2S0V1X\tClaims go to jane@example.test by Friday.",
         "\\.",
         "",
@@ -1710,7 +1710,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await ops(app(), ["dump-grep", "--tokens", "jane@example.test"], partitioned);
 
       expect(run.lines).toEqual([
-        'jane…st: present in 1 line(s) of table index."chunk_01K5ZQ8WJ6T3M4N7P9R2S0V1X"',
+        'jane…st: present in 1 line(s) of table index."passage_01K5ZQ8WJ6T3M4N7P9R2S0V1X"',
       ]);
     });
 
@@ -1752,7 +1752,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
         `SELECT w.name, w.slug,
                 EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-                         WHERE n.nspname = 'index' AND c.relname = 'chunk_' || w.id) AS partition,
+                         WHERE n.nspname = 'index' AND c.relname = 'passage_' || w.id) AS partition,
                 (SELECT value FROM workspace_config
                   WHERE workspace_id = w.id AND key = 'mcp.tools_list_ttl_ms') AS ttl
            FROM workspace w WHERE w.id = $1`,

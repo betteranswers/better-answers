@@ -106,7 +106,7 @@ const aRunThatOverrodeAKeptSpan = async (workspaceId: string): Promise<RunOverri
   const kept = await seededIn(app, (seed) => seed.finding({ workspaceId, documentId }));
   const run = await finishedRun(workspaceId, connectedSourceId, {
     documents: 1,
-    chunks: 1,
+    passages: 1,
     [OVERRIDDEN_KEY]: [
       {
         document_id: documentId,
@@ -483,12 +483,12 @@ describe("the Sources procedures over the wire", () => {
         sensitivity: "Internal",
         audience: "everyone",
         audienceGroups: null,
-        destination: ["chunk-index", "bundle"],
+        destination: ["passage-index", "bundle"],
         retentionClass: "keep",
         state: "received",
         publishedAt: null,
         documentCount: 1,
-        chunkCount: 0,
+        passageCount: 0,
         lastRun: null,
         quarantined: [
           { documentId: scans.documentId, title: "Floor plan", error: "NeedsOcrError" },
@@ -502,12 +502,12 @@ describe("the Sources procedures over the wire", () => {
         sensitivity: "Restricted",
         audience: "everyone",
         audienceGroups: null,
-        destination: ["chunk-index", "bundle"],
+        destination: ["passage-index", "bundle"],
         retentionClass: "keep",
         state: "received",
         publishedAt: null,
         documentCount: 1,
-        chunkCount: 0,
+        passageCount: 0,
         lastRun: {
           jobId: bound.jobId,
           kind: "index",
@@ -590,7 +590,7 @@ describe("the Sources procedures over the wire", () => {
     });
     await finishedRun(workspace.workspaceId, connectedSourceId, {
       documents: 1,
-      chunks: 1,
+      passages: 1,
       [OVERRIDDEN_KEY]: [
         {
           document_id: documentId,
@@ -743,7 +743,7 @@ describe("the Sources procedures over the wire", () => {
   it("publishes an indexed source at the instant the Clock gives", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
-    await finishedRun(workspace.workspaceId, connectedSourceId, { documents: 1, chunks: 1 });
+    await finishedRun(workspace.workspaceId, connectedSourceId, { documents: 1, passages: 1 });
 
     const published = await api.sources.publish.mutate({
       connectedSourceId,
@@ -807,13 +807,13 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
-  it("previews an unpublished connected source's chunks to its Admin", async () => {
+  it("previews an unpublished connected source's passages to its Admin", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId, documentId } = await unpublishedConnectedSource(
       workspace.workspaceId,
     );
-    const chunk = await seededIn(app, (seed) =>
-      seed.chunk({
+    const passage = await seededIn(app, (seed) =>
+      seed.passage({
         workspaceId: workspace.workspaceId,
         connectedSourceId,
         sourceDocumentId: documentId,
@@ -829,7 +829,7 @@ describe("the Sources procedures over the wire", () => {
 
     expect(previewed).toEqual([
       {
-        id: chunk.id,
+        id: passage.id,
         sourceDocumentId: documentId,
         locator: `${documentId}/chars:0-43`,
         content: HANDBOOK,

@@ -32,8 +32,8 @@ import { bundleHistory } from "./bundle.ts";
 import {
   connectedSourceForGroups,
   connectedSourceHolding,
-  chunkUnder,
-  chunkVersionsOf,
+  passageUnder,
+  passageVersionsOf,
   conceptCiting,
   conceptForGroup,
   conceptOnBoth,
@@ -81,9 +81,9 @@ const now = new Date("2026-09-08T12:00:00.000Z");
 const heldRow = (workspaceId: string, iri: string) =>
   visibilityHeld(db().pool, "concept_index", workspaceId, iri);
 
-const chunkVisibilityOf = async (workspaceId: string, sourceDocumentId: string) => {
+const passageVisibilityOf = async (workspaceId: string, sourceDocumentId: string) => {
   const read = await db().pool.query(
-    `SELECT sensitivity, audience, audience_groups FROM "index".readable_chunk
+    `SELECT sensitivity, audience, audience_groups FROM "index".readable_passage
       WHERE workspace_id = $1 AND source_document_id = $2 ORDER BY ordinal`,
     [workspaceId, sourceDocumentId],
   );
@@ -94,7 +94,7 @@ const HOLIDAY = "Holiday is twenty-eight days including bank holidays.";
 
 const LOCK_NOT_AVAILABLE = "55P03";
 
-const chunkRowsAreHeld = async (
+const passageRowsAreHeld = async (
   workspaceId: string,
   connectedSourceId: string,
 ): Promise<boolean> => {
@@ -103,7 +103,7 @@ const chunkRowsAreHeld = async (
     await probe.query("BEGIN");
     await probe.query("SET LOCAL lock_timeout = '250ms'");
     await probe.query(
-      `UPDATE "index".chunk SET content = content WHERE workspace_id = $1 AND binding_id = $2`,
+      `UPDATE "index".passage SET content = content WHERE workspace_id = $1 AND connected_source_id = $2`,
       [workspaceId, connectedSourceId],
     );
     return false;
@@ -118,10 +118,10 @@ const chunkRowsAreHeld = async (
 };
 
 /**
- * No act under test holds a chunk row, so the probe's `true` branch needs this control to stay
+ * No act under test holds a passage row, so the probe's `true` branch needs this control to stay
  * honest.
  */
-const whileAChunkRowIsHeld = async <T>(
+const whileAPassageRowIsHeld = async <T>(
   workspaceId: string,
   connectedSourceId: string,
   work: () => Promise<T>,
@@ -130,7 +130,7 @@ const whileAChunkRowIsHeld = async <T>(
   try {
     await holder.query("BEGIN");
     await holder.query(
-      `SELECT 1 FROM "index".chunk WHERE workspace_id = $1 AND binding_id = $2 FOR UPDATE`,
+      `SELECT 1 FROM "index".passage WHERE workspace_id = $1 AND connected_source_id = $2 FOR UPDATE`,
       [workspaceId, connectedSourceId],
     );
     return await work();
@@ -657,7 +657,7 @@ describe("narrowing a connected source", () => {
     ]);
   });
 
-  it("touches no document's chunk row, whatever its own class", async () => {
+  it("touches no document's passage row, whatever its own class", async () => {
     const { scenario, hr, connectedSource } = await workspaceWithHrConnectedSource();
 
     const narrowed = await documentUnder(
@@ -673,14 +673,14 @@ describe("narrowing a connected source", () => {
       "Public",
     );
     for (const document of [connectedSource, narrowed, wider]) {
-      await chunkUnder(db(), scenario.workspaceId, document, {
+      await passageUnder(db(), scenario.workspaceId, document, {
         content: HOLIDAY,
         ordinal: 0,
         charStart: 0,
         charEnd: 53,
       });
     }
-    const stoodAt = await chunkVersionsOf(
+    const stoodAt = await passageVersionsOf(
       db(),
       scenario.workspaceId,
       connectedSource.connectedSourceId,
@@ -705,29 +705,29 @@ describe("narrowing a connected source", () => {
       ),
     ).toEqual({ sensitivity: "Internal", audience: "groups", audience_groups: [hr] });
     expect(
-      await chunkVersionsOf(db(), scenario.workspaceId, connectedSource.connectedSourceId),
+      await passageVersionsOf(db(), scenario.workspaceId, connectedSource.connectedSourceId),
     ).toEqual(stoodAt);
 
     const toTheGroup = { audience: "groups", audience_groups: [hr] };
-    expect(await chunkVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
+    expect(await passageVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
       { sensitivity: "Internal", ...toTheGroup },
     ]);
 
-    expect(await chunkVisibilityOf(scenario.workspaceId, narrowed.documentId)).toEqual([
+    expect(await passageVisibilityOf(scenario.workspaceId, narrowed.documentId)).toEqual([
       { sensitivity: "Restricted", ...toTheGroup },
     ]);
-    expect(await chunkVisibilityOf(scenario.workspaceId, wider.documentId)).toEqual([
+    expect(await passageVisibilityOf(scenario.workspaceId, wider.documentId)).toEqual([
       { sensitivity: "Internal", ...toTheGroup },
     ]);
   });
 
-  it("holds no chunk row while waiting on the concept index", async () => {
+  it("holds no passage row while waiting on the concept index", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const elsewhere = await connectedSourceHolding(db(), scenario.workspaceId);
     await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
     for (const document of [connectedSource, elsewhere]) {
-      await chunkUnder(db(), scenario.workspaceId, document, {
+      await passageUnder(db(), scenario.workspaceId, document, {
         content: HOLIDAY,
         ordinal: 0,
         charStart: 0,
@@ -736,8 +736,8 @@ describe("narrowing a connected source", () => {
     }
 
     expect(
-      await whileAChunkRowIsHeld(scenario.workspaceId, connectedSource.connectedSourceId, () =>
-        chunkRowsAreHeld(scenario.workspaceId, connectedSource.connectedSourceId),
+      await whileAPassageRowIsHeld(scenario.workspaceId, connectedSource.connectedSourceId, () =>
+        passageRowsAreHeld(scenario.workspaceId, connectedSource.connectedSourceId),
       ),
     ).toBe(true);
 
@@ -751,17 +751,19 @@ describe("narrowing a connected source", () => {
       );
       await until(async () => (await countWaitingOnLocks(db().pool)) >= 1);
 
-      expect(await chunkRowsAreHeld(scenario.workspaceId, connectedSource.connectedSourceId)).toBe(
+      expect(
+        await passageRowsAreHeld(scenario.workspaceId, connectedSource.connectedSourceId),
+      ).toBe(false);
+
+      expect(await passageRowsAreHeld(scenario.workspaceId, elsewhere.connectedSourceId)).toBe(
         false,
       );
-
-      expect(await chunkRowsAreHeld(scenario.workspaceId, elsewhere.connectedSourceId)).toBe(false);
 
       await release();
       expect(await narrowing).toMatchObject({ ok: true });
     });
 
-    expect(await chunkVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
+    expect(await passageVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
       { sensitivity: "Restricted", ...EVERYONE },
     ]);
   });
@@ -1098,11 +1100,11 @@ describe("narrowing a connected source", () => {
     ).toHaveLength(2);
   });
 
-  it("leaves nothing, chunks included, when the transaction fails after it", async () => {
+  it("leaves nothing, passages included, when the transaction fails after it", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
-    await chunkUnder(db(), scenario.workspaceId, connectedSource, {
+    await passageUnder(db(), scenario.workspaceId, connectedSource, {
       content: HOLIDAY,
       ordinal: 0,
       charStart: 0,
@@ -1133,7 +1135,7 @@ describe("narrowing a connected source", () => {
       ...EVERYONE,
     });
 
-    expect(await chunkVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
+    expect(await passageVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
       { sensitivity: "Internal", ...EVERYONE },
     ]);
     expect(
@@ -1240,7 +1242,7 @@ describe("widening a connected source", () => {
       sensitivity: "Restricted",
       audienceGroups: [hr],
     });
-    await chunkUnder(db(), scenario.workspaceId, connectedSource, {
+    await passageUnder(db(), scenario.workspaceId, connectedSource, {
       content: HOLIDAY,
       ordinal: 0,
       charStart: 0,
@@ -1273,7 +1275,7 @@ describe("widening a connected source", () => {
     expect(
       await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
     ).toEqual(internal);
-    expect(await chunkVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
+    expect(await passageVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
       internal,
     ]);
     expect(await heldRow(scenario.workspaceId, untouched.iri)).toEqual(restrictedToHr);
@@ -1321,7 +1323,7 @@ describe("widening a connected source", () => {
     const onTheVerdict = await conceptCiting(scenario, scenario.admin, [verdict.documentId]);
     const onTheNarrowing = await conceptCiting(scenario, scenario.admin, [narrowed.documentId]);
     for (const document of [connectedSource, verdict, narrowed]) {
-      await chunkUnder(db(), scenario.workspaceId, document, {
+      await passageUnder(db(), scenario.workspaceId, document, {
         content: HOLIDAY,
         ordinal: 0,
         charStart: 0,
@@ -1335,13 +1337,13 @@ describe("widening a connected source", () => {
     expect(await heldRow(scenario.workspaceId, onTheConnectedSource.iri)).toEqual(at("Public"));
     expect(await heldRow(scenario.workspaceId, onTheVerdict.iri)).toEqual(at("Restricted"));
     expect(await heldRow(scenario.workspaceId, onTheNarrowing.iri)).toEqual(at("Internal"));
-    expect(await chunkVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
+    expect(await passageVisibilityOf(scenario.workspaceId, connectedSource.documentId)).toEqual([
       at("Public"),
     ]);
-    expect(await chunkVisibilityOf(scenario.workspaceId, verdict.documentId)).toEqual([
+    expect(await passageVisibilityOf(scenario.workspaceId, verdict.documentId)).toEqual([
       at("Restricted"),
     ]);
-    expect(await chunkVisibilityOf(scenario.workspaceId, narrowed.documentId)).toEqual([
+    expect(await passageVisibilityOf(scenario.workspaceId, narrowed.documentId)).toEqual([
       at("Internal"),
     ]);
     expect(

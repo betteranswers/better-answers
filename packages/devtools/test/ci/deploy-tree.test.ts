@@ -565,7 +565,7 @@ describe("the deploy tree", () => {
     });
   });
 
-  it("fails the drill when no pre-erasure chunk holds the subject", () => {
+  it("fails the drill when no pre-erasure passage holds the subject", () => {
     const drill = read("deploy/restore-drill.sh");
 
     const check = fencedIn(drill, "found before");
@@ -582,18 +582,18 @@ describe("the deploy tree", () => {
         `${grepped.join("\n")}\n`,
       );
 
-    const inAChunk = ran([
+    const inAPassage = ran([
       "subj…st: present in 1 line(s) of table public.user",
-      'subj…st: present in 1 line(s) of table index."chunk_01K5ZQ8WJ6T3M4N7P9R2S0V1X"',
+      'subj…st: present in 1 line(s) of table index."passage_01K5ZQ8WJ6T3M4N7P9R2S0V1X"',
     ]);
-    const inNoChunk = ran(["subj…st: present in 1 line(s) of table public.user"]);
+    const inNoPassage = ran(["subj…st: present in 1 line(s) of table public.user"]);
     const inNoTable = ran(["subj…st: absent"]);
 
-    expect(inAChunk).toEqual({ code: 0, output: "the erasure ran\n" });
-    expect(inNoChunk).toEqual({
+    expect(inAPassage).toEqual({ code: 0, output: "the erasure ran\n" });
+    expect(inNoPassage).toEqual({
       code: 1,
       output:
-        "REHEARSAL FAILED: the seeded subject is in no chunk of the pre-erasure dump, so the dump grep after would prove nothing of the index\n",
+        "REHEARSAL FAILED: the seeded subject is in no passage of the pre-erasure dump, so the dump grep after would prove nothing of the index\n",
     });
     expect(inNoTable).toEqual({
       code: 1,

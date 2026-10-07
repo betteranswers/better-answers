@@ -35,7 +35,7 @@ const SPOKEN_AGREEMENTS = {
   "concept-file": "fixtured",
   "concept-inbox": "sql-function",
   "cost-ledger": "generated",
-  "document-chunk": "fixtured",
+  "document-passage": "fixtured",
   "emptying-a-connected-source": "fixtured",
   "erasure-match": "fixtured",
   "id-shape": "fixtured",

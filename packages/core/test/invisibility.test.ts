@@ -35,14 +35,14 @@ const reaches = async (person: UserPrincipal, iri: string): Promise<boolean> => 
 const asAdmin = <T>(scenario: Scenario, work: (admin: UserPrincipal, tx: Tx) => Promise<T>) =>
   reading(scenario.admin, work);
 
-const chunksReadableBy = async (
+const passagesReadableBy = async (
   person: UserPrincipal,
   sourceDocumentId: string,
 ): Promise<readonly string[]> =>
   answered(
     await reading(person, async (reader, tx) => {
       const read = await tx.query<{ id: string }>(
-        `SELECT c.id FROM "index".readable_chunk c
+        `SELECT c.id FROM "index".readable_passage c
         WHERE c.workspace_id = $1 AND c.source_document_id = $2 AND ${readableClause("c", 3)}
         ORDER BY c.id`,
         [reader.workspaceId, sourceDocumentId, ...readableParameters(reader)],
@@ -51,9 +51,9 @@ const chunksReadableBy = async (
     }),
   );
 
-const chunkOf = async (workspaceId: string, document: Sourced): Promise<string> => {
+const passageOf = async (workspaceId: string, document: Sourced): Promise<string> => {
   const row = await seededBy(db(), (seed) =>
-    seed.chunk({
+    seed.passage({
       workspaceId,
       connectedSourceId: document.connectedSourceId,
       sourceDocumentId: document.documentId,
@@ -275,26 +275,28 @@ describe("a document narrowed under a source its siblings stand under", () => {
     ]).toEqual([true, false, false, true, true, true]);
   });
 
-  it("withholds its chunks from a Viewer exactly as absent ones", async () => {
+  it("withholds its passages from a Viewer exactly as absent ones", async () => {
     const scenario = await arrange();
     const { internal, narrowedUnderInternal } = await restrictedAndInternal(
       db(),
       scenario.workspaceId,
     );
-    const narrowedChunk = await chunkOf(scenario.workspaceId, narrowedUnderInternal);
-    const siblingChunk = await chunkOf(scenario.workspaceId, internal);
+    const narrowedPassage = await passageOf(scenario.workspaceId, narrowedUnderInternal);
+    const siblingPassage = await passageOf(scenario.workspaceId, internal);
 
-    const absent = await chunksReadableBy(scenario.viewer, ulid());
-    expect(await chunksReadableBy(scenario.viewer, narrowedUnderInternal.documentId)).toEqual(
+    const absent = await passagesReadableBy(scenario.viewer, ulid());
+    expect(await passagesReadableBy(scenario.viewer, narrowedUnderInternal.documentId)).toEqual(
       absent,
     );
     expect(absent).toEqual([]);
-    expect(await chunksReadableBy(scenario.viewer, internal.documentId)).toEqual([siblingChunk]);
-
-    expect(await chunksReadableBy(scenario.admin, narrowedUnderInternal.documentId)).toEqual([
-      narrowedChunk,
+    expect(await passagesReadableBy(scenario.viewer, internal.documentId)).toEqual([
+      siblingPassage,
     ]);
-    expect(await chunksReadableBy(scenario.admin, internal.documentId)).toEqual([siblingChunk]);
+
+    expect(await passagesReadableBy(scenario.admin, narrowedUnderInternal.documentId)).toEqual([
+      narrowedPassage,
+    ]);
+    expect(await passagesReadableBy(scenario.admin, internal.documentId)).toEqual([siblingPassage]);
   });
 
   it("derives Restricted for its citing concept, Internal for its sibling's", async () => {

@@ -15,7 +15,7 @@ export type ColumnRow = {
 
 /**
  * Every live column of the `public` and `index` tables, in schema, table and column order. Any
- * table named `chunk_*` is skipped, partition or not.
+ * table named `passage_*` is skipped, partition or not.
  */
 export const introspect = async (client: pg.Pool | pg.PoolClient): Promise<ColumnRow[]> => {
   const result = await client.query(
@@ -25,7 +25,7 @@ export const introspect = async (client: pg.Pool | pg.PoolClient): Promise<Colum
        JOIN pg_class c ON c.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname IN ('public', 'index') AND c.relkind IN ('r', 'p')
-        AND a.attnum > 0 AND NOT a.attisdropped AND c.relname NOT LIKE 'chunk\_%'
+        AND a.attnum > 0 AND NOT a.attisdropped AND c.relname NOT LIKE 'passage\_%'
       ORDER BY n.nspname, c.relname, a.attnum`,
   );
   return result.rows.map((row) => ({

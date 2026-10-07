@@ -7,14 +7,14 @@ import { parse, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   findPassages,
   passageAt,
-  previewChunks,
-  previewChunksInput,
+  previewPassages,
+  previewPassagesInput,
   type LocatorRefusal,
   type Passage,
   type PassageHit,
-  type PreviewedChunk,
+  type PreviewedPassage,
 } from "../src/sources/index.ts";
-import { contractFixture, documentChunkRow, OPEN_OUTCOMES } from "./contract-fixture.ts";
+import { contractFixture, documentPassageRow, OPEN_OUTCOMES } from "./contract-fixture.ts";
 import {
   connectedSourceHolding,
   conceptCiting,
@@ -29,8 +29,8 @@ const fixtureSchema = z.object({
   locator: z.object({ not_found: z.string().min(1) }),
   document: z.object({
     source_document_id: z.string().min(1),
-    binding_id: z.string().min(1),
-    chunks: z.array(documentChunkRow),
+    connected_source_id: z.string().min(1),
+    passages: z.array(documentPassageRow),
   }),
   open: z.array(
     z.object({
@@ -42,7 +42,7 @@ const fixtureSchema = z.object({
   ),
 });
 
-const fixture = contractFixture("document-chunk", fixtureSchema);
+const fixture = contractFixture("document-passage", fixtureSchema);
 const { document } = fixture;
 const NOT_FOUND = fixture.locator.not_found;
 
@@ -56,7 +56,7 @@ const seedTheAgreementsDocument = (workspaceId: string): Promise<void> =>
   seededBy(db(), async (seed) => {
     const connectedSource = await seed.connectedSource({
       workspaceId,
-      id: document.binding_id,
+      id: document.connected_source_id,
       publishedAt: PUBLISHED,
       sensitivity: "Internal",
     });
@@ -66,8 +66,8 @@ const seedTheAgreementsDocument = (workspaceId: string): Promise<void> =>
       id: document.source_document_id,
       title: INVOICE_TITLE,
     });
-    for (const row of document.chunks) {
-      await seed.chunk({
+    for (const row of document.passages) {
+      await seed.passage({
         workspaceId,
         connectedSourceId: connectedSource.id,
         sourceDocumentId: document.source_document_id,
@@ -81,7 +81,7 @@ const seedTheAgreementsDocument = (workspaceId: string): Promise<void> =>
     }
   });
 
-const documentWithOneChunk = (
+const documentWithOnePassage = (
   workspaceId: string,
   what: {
     readonly title: string;
@@ -111,7 +111,7 @@ const documentWithOneChunk = (
       connectedSourceId: connectedSource.id,
       title: what.title,
     });
-    await seed.chunk({
+    await seed.passage({
       workspaceId,
       connectedSourceId: connectedSource.id,
       sourceDocumentId: held.id,
@@ -130,7 +130,7 @@ type StraddledRow = {
 };
 
 /** A straddle's two rows can only be narrowed from above, never one row and not the other. */
-const documentWithTwoChunks = (
+const documentWithTwoPassages = (
   workspaceId: string,
   what: {
     readonly title: string;
@@ -159,7 +159,7 @@ const documentWithTwoChunks = (
       { ...what.trailing, ordinal: 1, charStart: what.leading.charEnd },
     ];
     for (const row of rows) {
-      await seed.chunk({
+      await seed.passage({
         workspaceId,
         connectedSourceId: connectedSource.id,
         sourceDocumentId: held.id,
@@ -260,7 +260,7 @@ describe("the passage a wire locator opens", () => {
   it("serves a straddle as one passage at its effective class", async () => {
     const scenario = await arrange();
 
-    const documentId = await documentWithTwoChunks(scenario.workspaceId, {
+    const documentId = await documentWithTwoPassages(scenario.workspaceId, {
       title: STRADDLED_TITLE,
       leading: STRADDLED_LEADING,
       trailing: STRADDLED_TRAILING,
@@ -291,7 +291,7 @@ describe("the passage a wire locator opens", () => {
           char_end: number;
           locator: string;
         }>(
-          `SELECT source_document_id, char_start, char_end, locator FROM "index".chunk
+          `SELECT source_document_id, char_start, char_end, locator FROM "index".passage
           WHERE workspace_id = $1 AND source_document_id = $2 ORDER BY ordinal`,
           [admin.workspaceId, document.source_document_id],
         );
@@ -299,7 +299,7 @@ describe("the passage a wire locator opens", () => {
       }),
     );
 
-    expect(rows.length).toBe(document.chunks.length);
+    expect(rows.length).toBe(document.passages.length);
     expect(rows.map((row) => row.locator)).toEqual(
       rows.map((row) => `${row.source_document_id}/chars:${row.char_start}-${row.char_end}`),
     );
@@ -310,7 +310,7 @@ describe("what a passage read refuses", () => {
   it("answers withheld, absent, malformed and out-of-range locators alike", async () => {
     const scenario = await arrange();
     await seedTheAgreementsDocument(scenario.workspaceId);
-    const board = await documentWithOneChunk(scenario.workspaceId, {
+    const board = await documentWithOnePassage(scenario.workspaceId, {
       title: BOARD_TITLE,
       text: BOARD_TEXT,
       charEnd: BOARD_CHAR_END,
@@ -339,13 +339,13 @@ describe("what a passage read refuses", () => {
   it("refuses a narrowed straddle whole, yet serves it to Admins", async () => {
     const scenario = await arrange();
 
-    const narrowedConnectedSource = await documentWithTwoChunks(scenario.workspaceId, {
+    const narrowedConnectedSource = await documentWithTwoPassages(scenario.workspaceId, {
       title: STRADDLED_TITLE,
       leading: STRADDLED_LEADING,
       trailing: STRADDLED_TRAILING,
       connectedSourceClass: "Restricted",
     });
-    const narrowedDocument = await documentWithTwoChunks(scenario.workspaceId, {
+    const narrowedDocument = await documentWithTwoPassages(scenario.workspaceId, {
       title: STRADDLED_TITLE,
       leading: STRADDLED_LEADING,
       trailing: STRADDLED_TRAILING,
@@ -387,7 +387,7 @@ describe("what a passage read refuses", () => {
 
   it("serves an Admin the Restricted passage the Viewer is refused", async () => {
     const scenario = await arrange();
-    const board = await documentWithOneChunk(scenario.workspaceId, {
+    const board = await documentWithOnePassage(scenario.workspaceId, {
       title: BOARD_TITLE,
       text: BOARD_TEXT,
       charEnd: BOARD_CHAR_END,
@@ -407,15 +407,15 @@ describe("what a passage read refuses", () => {
 });
 
 describe("what a passage read fails on", () => {
-  it("errs on a chunk row whose content and span disagree", async () => {
+  it("errs on a passage row whose content and span disagree", async () => {
     const scenario = await arrange();
-    const runsPast = await documentWithOneChunk(scenario.workspaceId, {
+    const runsPast = await documentWithOnePassage(scenario.workspaceId, {
       title: BOARD_TITLE,
       text: BOARD_TEXT,
       charEnd: 16,
       sensitivity: "Internal",
     });
-    const fallsShort = await documentWithOneChunk(scenario.workspaceId, {
+    const fallsShort = await documentWithOnePassage(scenario.workspaceId, {
       title: BOARD_TITLE,
       text: BOARD_TEXT,
       charEnd: 40,
@@ -428,9 +428,9 @@ describe("what a passage read fails on", () => {
     };
 
     expect(answered).toEqual({
-      "past its span": new Error(`the chunk row at ${runsPast}/chars:0-16 holds 28 code points`),
+      "past its span": new Error(`the passage row at ${runsPast}/chars:0-16 holds 28 code points`),
       "short of its span": new Error(
-        `the chunk row at ${fallsShort}/chars:0-40 holds 28 code points`,
+        `the passage row at ${fallsShort}/chars:0-40 holds 28 code points`,
       ),
     });
   });
@@ -450,11 +450,11 @@ const searching = async (
 describe("the passages a search finds", () => {
   it("finds only passages no concept the reader sees rests on", async () => {
     const scenario = await arrange();
-    const handbook = await documentWithOneChunk(scenario.workspaceId, {
+    const handbook = await documentWithOnePassage(scenario.workspaceId, {
       ...HANDBOOK,
       sensitivity: "Internal",
     });
-    const manual = await documentWithOneChunk(scenario.workspaceId, {
+    const manual = await documentWithOnePassage(scenario.workspaceId, {
       ...MANUAL,
       sensitivity: "Internal",
     });
@@ -476,7 +476,7 @@ describe("the passages a search finds", () => {
   it("finds a passage only for readers in the source's audience", async () => {
     const scenario = await arrange();
     const board = await groupNamed(db(), scenario, "Board", [scenario.editor]);
-    const minutes = await documentWithOneChunk(scenario.workspaceId, {
+    const minutes = await documentWithOnePassage(scenario.workspaceId, {
       ...MINUTES,
       sensitivity: "Internal",
       audienceGroups: [board],
@@ -489,9 +489,9 @@ describe("the passages a search finds", () => {
     expect(inside).toEqual([hitOn(minutes, MINUTES)]);
   });
 
-  it("finds no chunk of a source under review for anyone", async () => {
+  it("finds no passage of a source under review for anyone", async () => {
     const scenario = await arrange();
-    await documentWithOneChunk(scenario.workspaceId, {
+    await documentWithOnePassage(scenario.workspaceId, {
       ...DRAFT,
       sensitivity: "Internal",
       publishedAt: null,
@@ -523,7 +523,7 @@ type ReviewedDocument = {
   readonly id: string;
   readonly title: string;
   readonly sensitivity?: string;
-  readonly chunks: readonly {
+  readonly passages: readonly {
     readonly id: string;
     readonly ordinal: number;
     readonly charStart: number;
@@ -559,8 +559,8 @@ const connectedSourceUnderReview = (
         title: held.title,
         sensitivity: held.sensitivity ?? null,
       });
-      for (const row of held.chunks) {
-        await seed.chunk({
+      for (const row of held.passages) {
+        await seed.passage({
           workspaceId,
           connectedSourceId: connectedSource.id,
           sourceDocumentId: held.id,
@@ -576,7 +576,7 @@ const connectedSourceUnderReview = (
   });
 
 /**
- * Both documents hold a chunk matching the search's words, so an empty search over them is the
+ * Both documents hold a passage matching the search's words, so an empty search over them is the
  * published arm at work, not an unmatched query.
  */
 const seedTheConnectedSourceUnderReview = (workspaceId: string): Promise<void> =>
@@ -584,7 +584,7 @@ const seedTheConnectedSourceUnderReview = (workspaceId: string): Promise<void> =
     {
       id: TERMS,
       title: "The draft terms",
-      chunks: [
+      passages: [
         {
           id: "01M2D0CREV13WAAAAAAAAAAAA1#000000",
           ordinal: 0,
@@ -604,7 +604,7 @@ const seedTheConnectedSourceUnderReview = (workspaceId: string): Promise<void> =
     {
       id: ANNEX,
       title: "The draft annex",
-      chunks: [
+      passages: [
         {
           id: "01M2D0CREV13WAAAAAAAAAAAA2#000000",
           ordinal: 0,
@@ -619,20 +619,20 @@ const seedTheConnectedSourceUnderReview = (workspaceId: string): Promise<void> =
 const previewing = async (
   person: UserPrincipal,
   connectedSourceId: string,
-): Promise<readonly PreviewedChunk[] | string | Error> =>
+): Promise<readonly PreviewedPassage[] | string | Error> =>
   answered(
     await reading(person, async (reader, tx) => {
-      const read = await previewChunks(
+      const read = await previewPassages(
         reader,
         tx,
-        inputOf(previewChunksInput, { connectedSourceId }),
+        inputOf(previewPassagesInput, { connectedSourceId }),
       );
       return read.ok ? read.value : read.error;
     }),
   );
 
 describe("the review list a connected source is previewed with", () => {
-  it("lists every chunk by document and ordinal, to Admins alone", async () => {
+  it("lists every passage by document and ordinal, to Admins alone", async () => {
     const scenario = await arrange();
     await seedTheConnectedSourceUnderReview(scenario.workspaceId);
 
@@ -664,10 +664,12 @@ describe("the review list a connected source is previewed with", () => {
     expect(viewer).toBe("role-forbids");
     expect(editor).toBe("role-forbids");
 
-    expect(parse(previewChunksInput, { connectedSourceId: "not-a-connected-source-id" })).toEqual({
-      ok: false,
-      error: { word: "malformed", fields: { connectedSourceId: "bad-format" } },
-    });
+    expect(parse(previewPassagesInput, { connectedSourceId: "not-a-connected-source-id" })).toEqual(
+      {
+        ok: false,
+        error: { word: "malformed", fields: { connectedSourceId: "bad-format" } },
+      },
+    );
   });
 
   it("alone reaches the rows; neither search nor open does", async () => {
@@ -691,7 +693,7 @@ describe("the review list a connected source is previewed with", () => {
         id: BOARD_DOC,
         title: "The board's draft",
         sensitivity: "Restricted",
-        chunks: [
+        passages: [
           {
             id: "01M2D0CARMSAAAAAAAAAAAAAA1#000000",
             ordinal: 0,
@@ -709,7 +711,7 @@ describe("the review list a connected source is previewed with", () => {
         {
           id: GROUP_DOC,
           title: "The Board group's draft",
-          chunks: [
+          passages: [
             {
               id: "01M2D0CARMSAAAAAAAAAAAAAA2#000000",
               ordinal: 0,

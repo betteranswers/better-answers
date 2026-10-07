@@ -74,15 +74,15 @@ export {
 /** @public C1 */
 export type { DpiaReadInput, DpiaInputRead, DpiaInputRefusal } from "./dpia.ts";
 
-export { chunkIdOf, parseLocator, spanText, type LocatorRefusal } from "./chunk-address.ts";
+export { passageIdOf, parseLocator, spanText, type LocatorRefusal } from "./passage-address.ts";
 export {
   findPassages,
   passageAt,
-  previewChunks,
-  previewChunksInput,
+  previewPassages,
+  previewPassagesInput,
   type Passage,
   type PassageHit,
-  type PreviewedChunk,
+  type PreviewedPassage,
 } from "./passages.ts";
 export { listConnectedSources } from "./listing.ts";
 export { SOURCE_REFUSALS, type SourceRefusal } from "./vocabulary.ts";

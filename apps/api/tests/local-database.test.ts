@@ -24,8 +24,8 @@ const fixture = z
   .object({
     document: z.object({
       source_document_id: z.string(),
-      binding_id: z.string(),
-      chunks: z.array(
+      connected_source_id: z.string(),
+      passages: z.array(
         z.object({
           id: z.string(),
           ordinal: z.number(),
@@ -37,7 +37,7 @@ const fixture = z
       ),
     }),
   })
-  .parse(readJson("contracts/document-chunk/cases.json"));
+  .parse(readJson("contracts/document-passage/cases.json"));
 
 const SYNTHETIC_WORKSPACE = "01M2SYNTHET1CAAAAAAAAAAAAA";
 
@@ -184,16 +184,16 @@ describe("the local database", () => {
       ]);
     });
 
-    it("holds the chunks the document-chunk agreement's redacted case cuts", async () => {
-      const chunks = await browse.query(
-        `SELECT id, binding_id, source_document_id, ordinal, char_start, char_end, locator, content
-           FROM "index".chunk WHERE workspace_id = $1 ORDER BY ordinal`,
+    it("holds the passages the document-passage agreement's redacted case cuts", async () => {
+      const passages = await browse.query(
+        `SELECT id, connected_source_id, source_document_id, ordinal, char_start, char_end, locator, content
+           FROM "index".passage WHERE workspace_id = $1 ORDER BY ordinal`,
         [SYNTHETIC_WORKSPACE],
       );
-      expect(chunks.rows).toEqual(
-        fixture.document.chunks.map((chunk) => ({
-          ...chunk,
-          binding_id: fixture.document.binding_id,
+      expect(passages.rows).toEqual(
+        fixture.document.passages.map((passage) => ({
+          ...passage,
+          connected_source_id: fixture.document.connected_source_id,
           source_document_id: fixture.document.source_document_id,
         })),
       );
@@ -201,7 +201,7 @@ describe("the local database", () => {
 
     it("holds the redaction's placeholder and no sort code anywhere", async () => {
       const held = await browse.query<{ text: string }>(
-        `SELECT content AS text FROM "index".chunk WHERE workspace_id = $1
+        `SELECT content AS text FROM "index".passage WHERE workspace_id = $1
          UNION ALL
          SELECT concat_ws(' ', title, source_system_id, original_key) FROM source_document
           WHERE workspace_id = $1`,
@@ -229,7 +229,7 @@ describe("the local database", () => {
       );
       expect({ status: seeded.status, stderr: seeded.stderr }).toEqual({ status: 0, stderr: "" });
       expect(seeded.stdout).toContain(
-        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic, 1 connected source, 1 document, 3 chunks`,
+        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic, 1 connected source, 1 document, 3 passages`,
       );
     });
   });
@@ -260,10 +260,10 @@ describe("the local database", () => {
                 (SELECT count(*)::int FROM connected_source WHERE workspace_id = $2)
                   AS "connectedSources",
                 (SELECT count(*)::int FROM source_document WHERE workspace_id = $2) AS documents,
-                (SELECT count(*)::int FROM "index".chunk WHERE workspace_id = $2) AS chunks`,
+                (SELECT count(*)::int FROM "index".passage WHERE workspace_id = $2) AS passages`,
         [marker, SYNTHETIC_WORKSPACE],
       );
-      expect(held.rows).toEqual([{ marker: 1, connectedSources: 1, documents: 1, chunks: 3 }]);
+      expect(held.rows).toEqual([{ marker: 1, connectedSources: 1, documents: 1, passages: 3 }]);
     } finally {
       await reopened.end();
     }

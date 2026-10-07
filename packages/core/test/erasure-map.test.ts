@@ -381,7 +381,7 @@ const GONE_AT = new Date("2026-09-01T09:00:00.000Z");
 
 const documentHolding = (
   workspaceId: string,
-  chunks: readonly string[],
+  passages: readonly string[],
   shape: { readonly goneAt?: Date } = {},
 ): Promise<string> =>
   seedingWith(db().pool, async (seed) => {
@@ -391,11 +391,11 @@ const documentHolding = (
       connectedSourceId: connectedSource.id,
       goneAt: shape.goneAt ?? null,
     });
-    const lengths = chunks.map((content) => Array.from(content).length);
-    for (const [ordinal, content] of chunks.entries()) {
+    const lengths = passages.map((content) => Array.from(content).length);
+    for (const [ordinal, content] of passages.entries()) {
       const charStart = lengths.slice(0, ordinal).reduce((sum, length) => sum + length, 0);
       const charEnd = charStart + (lengths[ordinal] ?? 0);
-      await seed.chunk({
+      await seed.passage({
         workspaceId,
         connectedSourceId: connectedSource.id,
         sourceDocumentId: document.id,
@@ -434,7 +434,7 @@ const documentsFoundFor = async (
 };
 
 describe("the erasure map's documents", () => {
-  it("names only live documents holding the subject, across chunks too", async () => {
+  it("names only live documents holding the subject, across passages too", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
     const byTheWorkAddress = await documentHolding(workspaceId, [

@@ -831,7 +831,7 @@ const seedingToBeDumped = async (
   if (!seeded.ok) {
     return refused("erasure-rehearsal", workspaceId, rehearsalReason(seeded.error), io);
   }
-  // A dump taken before the worker indexes the document holds no chunk naming the subject,
+  // A dump taken before the worker indexes the document holds no passage naming the subject,
   // and phase two would then prove nothing about the index.
   const { indexJobId } = seeded.value.document;
   const indexed = await jobAfterWaiting(

@@ -72,7 +72,7 @@ export const rederiveAfterErasure = async (
     connectedSourcesHolding(tx, input.workspaceId, documentsTheMapFound(input.map)),
   );
 
-  // A replay wipes too, since a restore from an older dump brings the chunk rows back.
+  // A replay wipes too, since a restore from an older dump brings the passage rows back.
   for (const connectedSourceId of connectedSourcesToReprocess) {
     await wipe(platform, door, input.workspaceId, connectedSourceId);
   }

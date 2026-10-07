@@ -9,10 +9,22 @@
     }
   ],
   "words": [
-    { "from": "llm route", "to": "model choice" },
-    { "from": "llm routes", "to": "model choices" },
-    { "from": "route", "to": "model choice" },
-    { "from": "routes", "to": "model choices" }
+    {
+      "from": "llm route",
+      "to": "model choice"
+    },
+    {
+      "from": "llm routes",
+      "to": "model choices"
+    },
+    {
+      "from": "route",
+      "to": "model choice"
+    },
+    {
+      "from": "routes",
+      "to": "model choices"
+    }
   ],
   "symbols": {
     "paths": [
@@ -98,15 +110,17 @@
       ]
     },
     {
-      "sense": "embedding_route_id on index.chunk, deferred to the passage sweep",
-      "matches": ["embedding_route_id", "embeddingRouteId"]
+      "sense": "old page addresses",
+      "matches": ["routes-and-spend"]
     },
-    { "sense": "old page addresses", "matches": ["routes-and-spend"] },
     {
       "sense": "page names the sweep writes by hand: Models and spend",
       "matches": ["Routes and spend"]
     },
-    { "sense": "route spec", "matches": ["route spec", "v01-route"] },
+    {
+      "sense": "route spec",
+      "matches": ["route spec", "v01-route"]
+    },
     {
       "sense": "URL and Hono routing",
       "paths": [
@@ -125,7 +139,10 @@
         "packages/devtools/test/ci/ghcr-cleanup.test.ts"
       ]
     },
-    { "sense": "tRPC routing", "paths": ["apps/api/src/trpc/mount.ts"] },
+    {
+      "sense": "tRPC routing",
+      "paths": ["apps/api/src/trpc/mount.ts"]
+    },
     {
       "sense": "Playwright's route",
       "paths": ["apps/web/e2e/**", "apps/web/journeys/**"],
@@ -152,6 +169,16 @@
         "^routes (every|nothing)",
         "^the routes and navigation"
       ]
+    },
+    {
+      "sense": "the rebuild reason the model choice's migration replaced, as its test seeds it",
+      "paths": ["packages/schema/test/job-kinds.test.ts"],
+      "matches": ["^route-change$"]
+    },
+    {
+      "sense": "the table's name before migration 0066, as the catalogue test refuses it",
+      "paths": ["packages/schema/test/renamed-names.test.ts"],
+      "matches": ["^llm_route$"]
     }
   ]
 }

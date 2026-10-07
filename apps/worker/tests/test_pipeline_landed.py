@@ -11,7 +11,7 @@ import pytest
 from better_answers_worker import pipeline
 from better_answers_worker.config import Bootstrap
 from better_answers_worker.pipeline import (
-    BINDING_STORE,
+    CONNECTED_SOURCE_STORE,
     CONVERTER_PIN,
     DOCX_MEDIA_TYPE,
     FINDINGS_STORE,
@@ -20,11 +20,11 @@ from better_answers_worker.pipeline import (
     SEAM_MS_PER_PAGE,
     THE_MEMOS_IDENTITY,
     TIMEOUT_MARGIN_MS,
-    Chunk,
     Host,
     IndexRun,
     LandedDocument,
     LandedRun,
+    Passage,
     Suppression,
     converted,
     converter_pin_of,
@@ -383,15 +383,15 @@ def test_neither_store_holds_any_text_the_seam_withheld(
     read_the_copies(bootstrap, bucket, (THE_INVOICE,))
     a_control_memo_over(A_SENTENCE_OF_THE_INVOICE, control)
 
-    findings, chunk_store = (
+    findings, passage_store = (
         bytes_of(bootstrap, FINDINGS_STORE),
-        bytes_of(bootstrap, BINDING_STORE),
+        bytes_of(bootstrap, CONNECTED_SOURCE_STORE),
     )
 
     # Both ways, so an absence below is the store's and never the scan's.
     assert THE_RULE_THE_MEMO_STORES in findings
     assert A_SENTENCE_OF_THE_INVOICE in bytes_under(control)
-    for held in (findings, chunk_store):
+    for held in (findings, passage_store):
         assert THE_ACCOUNT_NUMBER.encode() not in held
         assert b"00-00-00" not in held
         assert A_PLACEHOLDER_WORD not in held
@@ -415,12 +415,12 @@ def test_a_wipe_spares_the_memo_and_erases_the_named_person(
 
     assert answer.detected_afresh == ()
     assert text_of(answer, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE_SUPPRESSED
-    findings, chunk_store = (
+    findings, passage_store = (
         bytes_of(bootstrap, FINDINGS_STORE),
-        bytes_of(bootstrap, BINDING_STORE),
+        bytes_of(bootstrap, CONNECTED_SOURCE_STORE),
     )
     assert THE_RULE_THE_MEMO_STORES in findings
-    for held in (findings, chunk_store):
+    for held in (findings, passage_store):
         assert HER_NAME not in held
 
 
@@ -676,25 +676,25 @@ def test_markdown_and_plain_text_pass_through_as_the_normalised_text(
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_plain_text_lands_redacted_and_cut_into_several_chunks(
+def test_plain_text_lands_redacted_and_cut_into_several_passages(
     bootstrap: Bootstrap,
 ) -> None:
     terms = a_landed_document(A_TERMS_ID, media_type="text/plain")
     bucket = ABucket({terms.original_key: fixture_bytes("delivery-terms.txt")})
 
     answer = read_the_copies(bootstrap, bucket, (terms,))
-    chunks = answer.documents[0].chunks
+    passages = answer.documents[0].passages
 
     assert text_of(answer, A_TERMS_ID) == A_TERMS_REDACTED
     assert THE_ACCOUNT_NUMBER not in text_of(answer, A_TERMS_ID)
     assert bucket.objects[terms.normalised_key] == A_TERMS_REDACTED.encode()
-    assert len(chunks) == 2
-    assert "".join(chunk.content for chunk in chunks) == A_TERMS_REDACTED
-    assert [chunk.id for chunk in chunks] == [
+    assert len(passages) == 2
+    assert "".join(passage.content for passage in passages) == A_TERMS_REDACTED
+    assert [passage.id for passage in passages] == [
         f"{A_TERMS_ID}#000000",
         f"{A_TERMS_ID}#000001",
     ]
-    assert chunks[1].char_start == chunks[0].char_end
+    assert passages[1].char_start == passages[0].char_end
 
 
 def test_redacts_a_docx_converted_to_markdown_with_its_table(
@@ -710,10 +710,10 @@ def test_redacts_a_docx_converted_to_markdown_with_its_table(
     assert THE_ACCOUNT_NUMBER not in text_of(answer, A_POLICY_ID)
     assert bucket.objects[policy.normalised_key] == A_POLICY_REDACTED.encode()
 
-    assert "".join(chunk.content for chunk in answer.documents[0].chunks) == (
+    assert "".join(passage.content for passage in answer.documents[0].passages) == (
         A_POLICY_REDACTED
     )
-    assert answer.documents[0].chunks[0].id == f"{A_POLICY_ID}#000000"
+    assert answer.documents[0].passages[0].id == f"{A_POLICY_ID}#000000"
 
 
 def test_a_pdf_converts_to_markdown_with_its_table(bootstrap: Bootstrap) -> None:
@@ -724,7 +724,7 @@ def test_a_pdf_converts_to_markdown_with_its_table(bootstrap: Bootstrap) -> None
 
     assert text_of(answer, A_RATE_CARD_ID) == A_RATE_CARD_CONVERTED
     assert "|Survey|450|" in text_of(answer, A_RATE_CARD_ID)
-    assert "".join(chunk.content for chunk in answer.documents[0].chunks) == (
+    assert "".join(passage.content for passage in answer.documents[0].passages) == (
         A_RATE_CARD_CONVERTED
     )
 
@@ -861,18 +861,18 @@ def test_the_same_document_under_the_shipped_ceiling_lands(
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_cuts_chunks_from_the_redacted_text_never_the_original(
+def test_cuts_passages_from_the_redacted_text_never_the_original(
     bootstrap: Bootstrap,
 ) -> None:
     bucket = a_bucket_holding_both()
 
     answer = read_the_copies(bootstrap, bucket, (THE_INVOICE,))
-    chunks: tuple[Chunk, ...] = answer.documents[0].chunks
+    passages: tuple[Passage, ...] = answer.documents[0].passages
 
-    assert "".join(chunk.content for chunk in chunks) == AN_INVOICE_REDACTED
-    assert all(THE_ACCOUNT_NUMBER not in chunk.content for chunk in chunks)
-    assert chunks[0].id == f"{AN_INVOICE_ID}#000000"
-    assert chunks[0].locator.startswith(f"{AN_INVOICE_ID}/chars:0-")
+    assert "".join(passage.content for passage in passages) == AN_INVOICE_REDACTED
+    assert all(THE_ACCOUNT_NUMBER not in passage.content for passage in passages)
+    assert passages[0].id == f"{AN_INVOICE_ID}#000000"
+    assert passages[0].locator.startswith(f"{AN_INVOICE_ID}/chars:0-")
 
 
 def test_a_suppression_holds_sorted_pairs_giving_one_key_per_set() -> None:

@@ -4,7 +4,7 @@ import { err, NOT_FOUND, ok, type Result } from "../kernel/index.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
 const ORDINAL_DIGITS = 6;
-const CHUNK_ID_SEPARATOR = "#";
+const PASSAGE_ID_SEPARATOR = "#";
 const SPAN_PREFIX = "chars:";
 const SPAN_SEPARATOR = "-";
 const PATH_SEPARATOR = "/";
@@ -19,8 +19,8 @@ export type Locator = {
   readonly charEnd: number;
 };
 
-export const chunkIdOf = (sourceDocumentId: string, ordinal: number): string =>
-  `${sourceDocumentId}${CHUNK_ID_SEPARATOR}${String(ordinal).padStart(ORDINAL_DIGITS, "0")}`;
+export const passageIdOf = (sourceDocumentId: string, ordinal: number): string =>
+  `${sourceDocumentId}${PASSAGE_ID_SEPARATOR}${String(ordinal).padStart(ORDINAL_DIGITS, "0")}`;
 
 export const locatorOf = (sourceDocumentId: string, charStart: number, charEnd: number): string =>
   `${sourceDocumentId}${PATH_SEPARATOR}${SPAN_PREFIX}${charStart}${SPAN_SEPARATOR}${charEnd}`;

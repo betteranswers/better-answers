@@ -282,13 +282,13 @@ const acceptedRows = {
       invitationId: INVITATION_ID,
     },
   ],
-  chunk: [
+  passage: [
     {
-      id: "chunk-1",
+      id: "passage-1",
       workspaceId: WS_ID,
       content: "hello",
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.5),
-      embeddingRouteId: "model-choice-embed",
+      embeddingModelChoiceId: "model-choice-embed",
       connectedSourceId: "connected-source-1",
     },
   ],
@@ -302,7 +302,7 @@ const acceptedRows = {
       audience: "everyone",
       name: "The board minutes",
       connector: "upload",
-      destination: ["chunk-index", "bundle"],
+      destination: ["passage-index", "bundle"],
       retentionClass: "keep",
       state: "received",
     },
@@ -857,12 +857,12 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "conceptClassOverride",
         "composition",
         "compositionInclude",
-        "chunk",
+        "passage",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
 
       for (const name of insertOrder) {
-        if (name === "chunk") {
+        if (name === "passage") {
           await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_ID]);
           await client.query("SELECT create_workspace_partition($1)", [WS_ID]);
         }
@@ -959,12 +959,12 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.accessRequest[0], status: "expired" },
       { ...acceptedRows.accessRequest[0], requesterId: "priya@example.invalid" },
     ],
-    chunk: [
+    passage: [
       {
-        ...acceptedRows.chunk[0],
+        ...acceptedRows.passage[0],
         embedding: Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0.5),
       },
-      { ...acceptedRows.chunk[0], embeddingRouteId: "   " },
+      { ...acceptedRows.passage[0], embeddingModelChoiceId: "   " },
     ],
 
     mapGeneration: [{ ...acceptedRows.mapGeneration[0], liveGen: 0 }],
@@ -1010,7 +1010,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
 
       { ...acceptedRows.connectedSource[0], connector: "sharepoint" },
       { ...acceptedRows.connectedSource[0], name: "   " },
-      { ...acceptedRows.connectedSource[0], destination: ["chunk-index", "warehouse"] },
+      { ...acceptedRows.connectedSource[0], destination: ["passage-index", "warehouse"] },
       { ...acceptedRows.connectedSource[0], destination: [] },
       { ...acceptedRows.connectedSource[0], retentionClass: "forever" },
       { ...acceptedRows.connectedSource[0], state: "reviewing" },
@@ -1219,9 +1219,9 @@ describe("the frontmatter bound's unit", () => {
 describe("the customType exception, per shape", () => {
   const tooShort = Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0);
 
-  it("chunk.select requires an embedding of the model choice's width", () => {
+  it("passage.select requires an embedding of the model choice's width", () => {
     const row = {
-      ...acceptedRows.chunk[0],
+      ...acceptedRows.passage[0],
       publishedAt: null,
       audienceGroups: null,
       sourceDocumentId: null,
@@ -1230,22 +1230,22 @@ describe("the customType exception, per shape", () => {
       charStart: null,
       charEnd: null,
     };
-    const select = boundarySchemas.chunk.select;
+    const select = boundarySchemas.passage.select;
     expect(select.safeParse(row).success).toBe(true);
     expect(select.safeParse({ ...row, embedding: undefined }).success).toBe(false);
     expect(select.safeParse({ ...row, embedding: tooShort }).success).toBe(false);
   });
 
-  it("chunk.insert requires an embedding of the model choice's width", () => {
-    const row = acceptedRows.chunk[0];
-    const insert = boundarySchemas.chunk.insert;
+  it("passage.insert requires an embedding of the model choice's width", () => {
+    const row = acceptedRows.passage[0];
+    const insert = boundarySchemas.passage.insert;
     expect(insert.safeParse(row).success).toBe(true);
     expect(insert.safeParse({ ...row, embedding: undefined }).success).toBe(false);
     expect(insert.safeParse({ ...row, embedding: tooShort }).success).toBe(false);
   });
 
-  it("chunk.update skips an absent embedding and checks a present one", () => {
-    const update = boundarySchemas.chunk.update;
+  it("passage.update skips an absent embedding and checks a present one", () => {
+    const update = boundarySchemas.passage.update;
     expect(update.safeParse({ content: "edited" }).success).toBe(true);
     expect(update.safeParse({ embedding: tooShort }).success).toBe(false);
   });
@@ -1439,15 +1439,15 @@ describe("5 — the inferred type is pinned", () => {
       { scope: "ip" | "email" | "person" | "link"; key: string; windowStart: Date; count: number }
     >
   >;
-  type _chunkSelect = Expect<
+  type _passageSelect = Expect<
     Equal<
-      z.infer<typeof boundarySchemas.chunk.select>,
+      z.infer<typeof boundarySchemas.passage.select>,
       {
         id: string;
         workspaceId: WorkspaceId;
         content: string;
         embedding: number[] | null;
-        embeddingRouteId: string | null;
+        embeddingModelChoiceId: string | null;
         connectedSourceId: string;
         sourceDocumentId: string | null;
         locator: string | null;

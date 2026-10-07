@@ -252,15 +252,15 @@ export const attemptAuditEventRowReusingAnId = (
     ),
   );
 
-const CHUNK_AND_ITS_EMBEDDING = `INSERT INTO "index".chunk
-    (workspace_id, id, content, embedding, embedding_route_id, binding_id)
+const PASSAGE_AND_ITS_EMBEDDING = `INSERT INTO "index".passage
+    (workspace_id, id, content, embedding, embedding_model_choice_id, connected_source_id)
   VALUES ($1, $2, 'a paragraph of the handbook', $3, $4, $5)`;
 
-const CHUNK_CARRYING_ITS_OWN_FULL_TEXT = `INSERT INTO "index".chunk
-     (workspace_id, id, content, binding_id, search)
+const PASSAGE_CARRYING_ITS_OWN_FULL_TEXT = `INSERT INTO "index".passage
+     (workspace_id, id, content, connected_source_id, search)
    VALUES ($1, $2, 'a paragraph', 'connected-source-1', to_tsvector('english', 'something else'))`;
 
-export const attemptChunkEmbeddedBy = (
+export const attemptPassageEmbeddedBy = (
   client: pg.PoolClient,
   workspaceId: string,
   connectedSourceId: string,
@@ -268,23 +268,23 @@ export const attemptChunkEmbeddedBy = (
   modelChoice: string | null,
 ): Promise<string> =>
   refusalOf(client, () =>
-    client.query(CHUNK_AND_ITS_EMBEDDING, [
+    client.query(PASSAGE_AND_ITS_EMBEDDING, [
       workspaceId,
-      `chunk-${ulid()}`,
+      `passage-${ulid()}`,
       embedding,
       modelChoice,
       connectedSourceId,
     ]),
   );
 
-export const chunkWritingItsOwnFullText = (
+export const passageWritingItsOwnFullText = (
   role: string,
   workspaceId: string,
-  chunkId: string,
+  passageId: string,
 ): Refusal => [
-  CHUNK_CARRYING_ITS_OWN_FULL_TEXT,
+  PASSAGE_CARRYING_ITS_OWN_FULL_TEXT,
   `${role} writing a full-text vector of its own on a new row`,
-  [workspaceId, chunkId],
+  [workspaceId, passageId],
   /non-DEFAULT value/,
 ];
 

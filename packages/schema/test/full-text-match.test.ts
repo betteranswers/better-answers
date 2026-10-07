@@ -14,7 +14,7 @@ const leakproofFunctions = async (client: pg.PoolClient): Promise<readonly strin
   return read.rows.map((row) => row.signature);
 };
 
-describe("the full-text match `find` filters a chunk by", () => {
+describe("the full-text match `find` filters a passage by", () => {
   it("is leakproof once migrated as a deploy migrates", async () => {
     await withRollback(db().pool, async (client) => {
       expect(await matchIsLeakproof(client)).toBe(true);

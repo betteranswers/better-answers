@@ -224,14 +224,14 @@ const cappedAt = (body: ReadableStream<Uint8Array>): CappedBody => {
   return {
     body: body.pipeThrough(
       new TransformStream<Uint8Array, Uint8Array>({
-        transform: (chunk, controller) => {
-          counted.bytes += chunk.byteLength;
+        transform: (passage, controller) => {
+          counted.bytes += passage.byteLength;
           if (counted.bytes > UPLOAD_BYTE_CAP) {
             counted.passed = true;
             controller.error(new Error("sources: the upload passed the cap"));
             return;
           }
-          controller.enqueue(chunk);
+          controller.enqueue(passage);
         },
       }),
     ),
@@ -597,7 +597,7 @@ export type ConnectedSourceReprocessed = {
 
   readonly jobId: string;
 
-  readonly chunks: number;
+  readonly passages: number;
 
   readonly findings: number;
 };
@@ -620,7 +620,7 @@ const actingOn = (
   return ok(acting);
 };
 
-type Emptied = Pick<ConnectedSourceReprocessed, "chunks" | "findings">;
+type Emptied = Pick<ConnectedSourceReprocessed, "passages" | "findings">;
 
 const emptyTheConnectedSource = async (
   acting: ActingOnConnectedSource | PlatformOnConnectedSource,
@@ -628,7 +628,7 @@ const emptyTheConnectedSource = async (
 ): Promise<Result<Emptied, Error>> => {
   const { workspaceId, connectedSourceId } = acting;
   const wiped = await attempt(() =>
-    tx.query(`DELETE FROM "index".chunk WHERE workspace_id = $1 AND binding_id = $2`, [
+    tx.query(`DELETE FROM "index".passage WHERE workspace_id = $1 AND connected_source_id = $2`, [
       workspaceId,
       connectedSourceId,
     ]),
@@ -646,12 +646,12 @@ const emptyTheConnectedSource = async (
     ),
   );
   if (!raised.ok) return err(raised.error);
-  return ok({ chunks: wiped.value.rowCount ?? 0, findings: raised.value.rowCount ?? 0 });
+  return ok({ passages: wiped.value.rowCount ?? 0, findings: raised.value.rowCount ?? 0 });
 };
 
 /**
- * Queues an index run, then deletes the connected source's chunks and its unreviewed, unrestored findings;
- * `chunks` and `findings` count the rows deleted. A person acts only in its own workspace, and any
+ * Queues an index run, then deletes the connected source's passages and its unreviewed, unrestored findings;
+ * `passages` and `findings` count the rows deleted. A person acts only in its own workspace, and any
  * other is `no-such-binding`.
  */
 export const reprocessConnectedSource = async (

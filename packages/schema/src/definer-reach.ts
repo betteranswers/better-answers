@@ -18,9 +18,9 @@ export const SECURITY_DEFINER_REACH = [
   {
     fn: "public.create_workspace_partition",
     args: "p_workspace_id text",
-    reaches: ["index.chunk"],
+    reaches: ["index.passage"],
     reason:
-      "Past the caller's grants. `app_rt` holds USAGE on `index` and no CREATE, so making a partition of the chunk table is a thing it can do through this function and in no other way; the function revokes both runtime roles on the partition it makes, which is why a statement reaches a tenant's rows through the policied parent and never through the child.",
+      "Past the caller's grants. `app_rt` holds USAGE on `index` and no CREATE, so making a partition of the passage table is a thing it can do through this function and in no other way; the function revokes both runtime roles on the partition it makes, which is why a statement reaches a tenant's rows through the policied parent and never through the child.",
   },
   {
     fn: "public.submit_suggestion_set",

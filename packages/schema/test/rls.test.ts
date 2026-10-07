@@ -1905,7 +1905,7 @@ describe("a tenant table under app_rt", () => {
 });
 
 describe("the workspace-lifecycle function", () => {
-  it("creates the chunk partition and full-text index in one transaction", async () => {
+  it("creates the passage partition and full-text index in one transaction", async () => {
     await withRollback(db.pool, async (client) => {
       /* jscpd:ignore-start */
       await seedTwoWorkspaces(client);
@@ -1916,13 +1916,13 @@ describe("the workspace-lifecycle function", () => {
 
       const partition = await client.query(
         "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'index' AND c.relname = $1",
-        [`chunk_${WS_A}`],
+        [`passage_${WS_A}`],
       );
       expect(partition.rowCount).toBe(1);
 
       const index = await client.query(
         "SELECT indexdef FROM pg_indexes WHERE schemaname = 'index' AND tablename = $1",
-        [`chunk_${WS_A}`],
+        [`passage_${WS_A}`],
       );
       const definitions = index.rows.map((row) => String(row.indexdef)).join(" ");
       expect({
@@ -1933,7 +1933,7 @@ describe("the workspace-lifecycle function", () => {
 
     const afterRollback = await db.pool.query(
       "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'index' AND c.relname = $1",
-      [`chunk_${WS_A}`],
+      [`passage_${WS_A}`],
     );
     expect(afterRollback.rowCount).toBe(0);
   });
@@ -1976,7 +1976,7 @@ describe("the workspace-lifecycle function", () => {
     });
   });
 
-  it("scopes chunk rows through the parent, and denies the partition", async () => {
+  it("scopes passage rows through the parent, and denies the partition", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -1986,14 +1986,14 @@ describe("the workspace-lifecycle function", () => {
       await client.query("SELECT create_workspace_partition($1)", [WS_B]);
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      await seed.chunk({ workspaceId: WS_A, content: "hello" });
+      await seed.passage({ workspaceId: WS_A, content: "hello" });
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
-      const otherTenant = await client.query('SELECT id FROM "index".chunk');
+      const otherTenant = await client.query('SELECT id FROM "index".passage');
       expect(otherTenant.rows).toEqual([]);
 
       await client.query("SELECT set_config('app.workspace_id', '', true)");
-      const missingScope = await client.query('SELECT id FROM "index".chunk');
+      const missingScope = await client.query('SELECT id FROM "index".passage');
       expect(missingScope.rows).toEqual([]);
     });
   });
@@ -2005,25 +2005,25 @@ describe("the workspace-lifecycle function", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await client.query("SELECT create_workspace_partition($1)", [WS_A]);
-      await seed.chunk({ workspaceId: WS_A, content: "hello" });
+      await seed.passage({ workspaceId: WS_A, content: "hello" });
       /* jscpd:ignore-end */
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
       await client.query("SAVEPOINT direct_query");
-      await expect(client.query(`SELECT id FROM "index"."chunk_${WS_A}"`)).rejects.toThrow(
+      await expect(client.query(`SELECT id FROM "index"."passage_${WS_A}"`)).rejects.toThrow(
         /permission denied/,
       );
       await client.query("ROLLBACK TO SAVEPOINT direct_query");
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      await expect(client.query(`SELECT id FROM "index"."chunk_${WS_A}"`)).rejects.toThrow(
+      await expect(client.query(`SELECT id FROM "index"."passage_${WS_A}"`)).rejects.toThrow(
         /permission denied/,
       );
     });
   });
 });
 
-describe("the chunk index under worker_rt", () => {
+describe("the passage index under worker_rt", () => {
   it("holds only four verbs on the parent, nothing on partitions", async () => {
     await withRollback(db.pool, async (client) => {
       /* jscpd:ignore-start */
@@ -2035,7 +2035,7 @@ describe("the chunk index under worker_rt", () => {
 
       await client.query("RESET ROLE");
 
-      expect(await privilegesHeld(client, "worker_rt", '"index".chunk')).toEqual({
+      expect(await privilegesHeld(client, "worker_rt", '"index".passage')).toEqual({
         SELECT: true,
         INSERT: true,
         UPDATE: true,
@@ -2046,7 +2046,7 @@ describe("the chunk index under worker_rt", () => {
         MAINTAIN: false,
       });
 
-      expect(await privilegesHeld(client, "worker_rt", `"index"."chunk_${WS_A}"`)).toEqual({
+      expect(await privilegesHeld(client, "worker_rt", `"index"."passage_${WS_A}"`)).toEqual({
         SELECT: false,
         INSERT: false,
         UPDATE: false,
@@ -2059,20 +2059,20 @@ describe("the chunk index under worker_rt", () => {
     });
   });
 
-  it("reads only the scoped tenant's chunk rows, through the parent", async () => {
+  it("reads only the scoped tenant's passage rows, through the parent", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      const mine = await seed.chunk({ workspaceId: WS_A, content: "ours" });
+      const mine = await seed.passage({ workspaceId: WS_A, content: "ours" });
       await client.query("SET LOCAL ROLE worker_rt");
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      const scoped = await client.query('SELECT id FROM "index".chunk');
+      const scoped = await client.query('SELECT id FROM "index".passage');
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
-      const otherTenant = await client.query('SELECT id FROM "index".chunk');
+      const otherTenant = await client.query('SELECT id FROM "index".passage');
 
       await client.query("SELECT set_config('app.workspace_id', '', true)");
-      const missingScope = await client.query('SELECT id FROM "index".chunk');
+      const missingScope = await client.query('SELECT id FROM "index".passage');
 
       expect({
         scoped: scoped.rows,

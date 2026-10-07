@@ -26,7 +26,7 @@ import {
   reprocessConnectedSourceInput,
   type adminOnConnectedSource,
   type dpiaInputFor,
-  type previewChunks,
+  type previewPassages,
   type publishConnectedSource,
   type reprocessConnectedSource,
   type ReprocessConnectedSourceInput,
@@ -273,7 +273,7 @@ describe("the two acts that carry a declaration today", () => {
     expectTypeOf<PlatformPrincipal>().toExtend<Parameters<typeof reprocessConnectedSource>[0]>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof publishConnectedSource>[0]>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof dpiaInputFor>[0]>();
-    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof previewChunks>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof previewPassages>[0]>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof adminOnConnectedSource>[0]>();
   });
 

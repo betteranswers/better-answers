@@ -11,7 +11,7 @@ ALTER ROLE browse_ro SET default_transaction_read_only = on;
 
 GRANT USAGE ON SCHEMA public, "index" TO browse_ro;
 GRANT SELECT ON ALL TABLES IN SCHEMA public, "index" TO browse_ro;
--- The chunk view classes each row through it, and a view that refuses its reader is a dead end.
+-- The passage view classes each row through it, and a view that refuses its reader is a dead end.
 GRANT EXECUTE ON FUNCTION public.narrower_class(text, text) TO browse_ro;
 
 -- A login that reads a live token, code or key can act as its holder, which no read-only login may.

@@ -117,8 +117,8 @@ const inAShortWait = async (
   return outcome;
 };
 
-describe("provisioning beside a transaction writing documents and chunks", () => {
-  it("lets a document's writer add its chunk, aborting neither side", async () => {
+describe("provisioning beside a transaction writing documents and passages", () => {
+  it("lets a document's writer add its passage, aborting neither side", async () => {
     const { connectedSourceId } = await aTenantAtWork(WS_WRITING);
 
     const writer = await opened();
@@ -131,7 +131,7 @@ describe("provisioning beside a transaction writing documents and chunks", () =>
     const signUp = await provisionStarted(WS_SIGNING_UP);
 
     const written = await outcomeOf(
-      testData(writer).chunk({
+      testData(writer).passage({
         workspaceId: WS_WRITING,
         connectedSourceId,
         sourceDocumentId: document.id,
@@ -149,7 +149,7 @@ describe("provisioning beside a transaction writing documents and chunks", () =>
     expect({ written, provisioned }).toEqual({ written: "written", provisioned: "provisioned" });
   });
 
-  it("blocks no other tenant's chunk reads or writes while waiting", async () => {
+  it("blocks no other tenant's passage reads or writes while waiting", async () => {
     const { connectedSourceId, documentId } = await aTenantAtWork(WS_READ_BESIDE);
 
     const writer = await opened();
@@ -160,13 +160,13 @@ describe("provisioning beside a transaction writing documents and chunks", () =>
 
     const read = await inAShortWait(
       WS_READ_BESIDE,
-      (client) => client.query('SELECT count(*) FROM "index".chunk'),
+      (client) => client.query('SELECT count(*) FROM "index".passage'),
       "read",
     );
-    const chunkWritten = await inAShortWait(
+    const passageWritten = await inAShortWait(
       WS_READ_BESIDE,
       (client) =>
-        testData(client).chunk({
+        testData(client).passage({
           workspaceId: WS_READ_BESIDE,
           connectedSourceId,
           sourceDocumentId: documentId,
@@ -182,14 +182,14 @@ describe("provisioning beside a transaction writing documents and chunks", () =>
     const provisioned = await signUp.provisioned;
     await closed(signUp.client, { commit: provisioned === "provisioned" });
 
-    expect({ read, chunkWritten, provisioned }).toEqual({
+    expect({ read, passageWritten, provisioned }).toEqual({
       read: "read",
-      chunkWritten: "written",
+      passageWritten: "written",
       provisioned: "provisioned",
     });
   });
 
-  it("locks in modes blocking no chunk access or document read", async () => {
+  it("locks in modes blocking no passage access or document read", async () => {
     await withRollback(db().pool, async (client) => {
       await testData(client).workspace({ id: WS_WATCHED, name: "Watched" });
       await client.query("SET LOCAL ROLE app_rt");
@@ -200,13 +200,13 @@ describe("provisioning beside a transaction writing documents and chunks", () =>
         `SELECT relation::regclass::text AS relation, array_agg(mode ORDER BY mode) AS modes
            FROM pg_locks
           WHERE pid = pg_backend_pid() AND locktype = 'relation'
-            AND relation IN ('"index".chunk'::regclass, 'public.source_document'::regclass)
+            AND relation IN ('"index".passage'::regclass, 'public.source_document'::regclass)
           GROUP BY relation
           ORDER BY 1`,
       );
 
       expect(held.rows).toEqual([
-        { relation: "index.chunk", modes: ["AccessShareLock", "ShareUpdateExclusiveLock"] },
+        { relation: "index.passage", modes: ["AccessShareLock", "ShareUpdateExclusiveLock"] },
         {
           relation: "source_document",
           modes: ["AccessShareLock", "RowShareLock", "ShareRowExclusiveLock"],

@@ -45,7 +45,7 @@ const LISTED_ROW = boundarySchemas.connectedSource.select
     retentionClass: true,
     publishedAt: true,
   })
-  .extend({ documentCount: z.int().nonnegative(), chunkCount: z.int().nonnegative() });
+  .extend({ documentCount: z.int().nonnegative(), passageCount: z.int().nonnegative() });
 
 type ListedRow = z.output<typeof LISTED_ROW>;
 
@@ -73,8 +73,8 @@ const CONNECTED_SOURCES = `SELECT b.id, b.name, b.connector, b.sensitivity, b.au
             b.retention_class AS "retentionClass", b.published_at AS "publishedAt",
             (SELECT count(*)::int FROM source_document d
               WHERE d.workspace_id = b.workspace_id AND d.connected_source_id = b.id) AS "documentCount",
-            (SELECT count(*)::int FROM "index".chunk c
-              WHERE c.workspace_id = b.workspace_id AND c.binding_id = b.id) AS "chunkCount"
+            (SELECT count(*)::int FROM "index".passage c
+              WHERE c.workspace_id = b.workspace_id AND c.connected_source_id = b.id) AS "passageCount"
        FROM connected_source b
       WHERE b.workspace_id = $1
       ORDER BY b.name, b.id`;

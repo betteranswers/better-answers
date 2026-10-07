@@ -436,32 +436,32 @@ def hold_map_generation(cursor: Cursor[Any], *, workspace_id: str) -> int:
     return int(_returning_row(cursor)["live_gen"])
 
 
-def seed_chunk(
+def seed_passage(
     cursor: Cursor[Any],
     *,
     workspace_id: str,
     connected_source_id: str,
-    chunk_id: str,
+    passage_id: str,
     content: str = "body",
 ) -> dict[str, Any]:
     cursor.execute(
-        'INSERT INTO "index".chunk (id, workspace_id, content, binding_id)'
+        'INSERT INTO "index".passage (id, workspace_id, content, connected_source_id)'
         " VALUES (%s, %s, %s, %s)"
-        " RETURNING id, workspace_id, content, binding_id",
-        (chunk_id, workspace_id, content, connected_source_id),
+        " RETURNING id, workspace_id, content, connected_source_id",
+        (passage_id, workspace_id, content, connected_source_id),
     )
     return _returning_row(cursor)
 
 
-async def land_chunk(connection: asyncpg.Connection, row: dict[str, Any]) -> None:
+async def land_passage(connection: asyncpg.Connection, row: dict[str, Any]) -> None:
     # Placeholders are asyncpg's: the pools a row is landed through are asyncpg's.
     await connection.execute(
-        'INSERT INTO "index".chunk (id, workspace_id, content, binding_id)'
+        'INSERT INTO "index".passage (id, workspace_id, content, connected_source_id)'
         " VALUES ($1, $2, $3, $4)",
         row["id"],
         row["workspace_id"],
         row["content"],
-        row["binding_id"],
+        row["connected_source_id"],
     )
 
 

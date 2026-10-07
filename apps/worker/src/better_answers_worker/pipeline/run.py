@@ -14,7 +14,7 @@ from .catalogue import (
 from .host import Host, IndexRun
 from .landed import SEAM_MS_PER_PAGE, TIMEOUT_MARGIN_MS, redact_landed_copies
 from .objects import Bucket, LandedCopies
-from .rows import CHUNK_TABLE, rows_of
+from .rows import PASSAGE_TABLE, rows_of
 
 WIPED_REASON = "wiped"
 
@@ -39,7 +39,7 @@ class IndexOutcome:
     `restores_overridden_by_erasure` names restored spans an erasure withholds again."""
 
     documents: int
-    chunks: int
+    passages: int
     lmdb_bytes: int
 
     restores_overridden_by_erasure: tuple[OverriddenRestore, ...] = ()
@@ -47,7 +47,7 @@ class IndexOutcome:
     def as_row(self) -> dict[str, Any]:
         return {
             "documents": self.documents,
-            "chunks": self.chunks,
+            "passages": self.passages,
             "lmdb_bytes": self.lmdb_bytes,
             "restores_overridden_by_erasure": [
                 {
@@ -69,9 +69,10 @@ def index_connected_source(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> IndexOutcome:
-    """Redacts and chunks the connected source's live documents and lands their chunk
-    rows. A `wiped` or `rule-change` run first empties the source's store; a source that
-    is gone lands nothing. `copies` defaults to the workspace's bucket."""
+    """Redacts the connected source's live documents, splits them into passages and
+    lands the passage rows. A `wiped` or `rule-change` run first empties the source's
+    store; a source that is gone lands nothing. `copies` defaults to the workspace's
+    bucket."""
     with Host(bootstrap) as host:
         if run.reason in REASONS_EMPTYING_THE_CONNECTED_SOURCE:
             host.remove_connected_source_store(run)
@@ -98,17 +99,19 @@ def index_connected_source(
                 ms_per_page=ms_per_page,
                 margin_ms=margin_ms,
             )
-            # A document's class must be on its row before any chunk of it can be read.
+            # A document's class must be on its row before any of its passages is read.
             with queue.scoped(connection, run.workspace_id) as cursor:
                 record_findings(cursor, run, landed.documents)
                 reconcile_catalogue(cursor, landed.documents)
                 quarantine_catalogue(cursor, landed.quarantined)
 
-            chunks = host.land_rows(run, CHUNK_TABLE, rows_of(run, landed.documents))
+            passages = host.land_rows(
+                run, PASSAGE_TABLE, rows_of(run, landed.documents)
+            )
 
         outcome = IndexOutcome(
             documents=len(landed.documents),
-            chunks=chunks,
+            passages=passages,
             lmdb_bytes=host.lmdb_bytes(run),
             restores_overridden_by_erasure=tuple(
                 OverriddenRestore(

@@ -116,7 +116,7 @@ def read_bootstrap(environment: Mapping[str, str] | None = None) -> Bootstrap:
         engine=Engine(
             lmdb_dir=source["LMDB_DIR"],
             lmdb_map_bytes=_positive_bytes(
-                source, "LMDB_MAX_BYTES_PER_BINDING", LMDB_MAP_BYTES
+                source, "LMDB_MAX_BYTES_PER_CONNECTED_SOURCE", LMDB_MAP_BYTES
             ),
             concurrent_runs=_one_run_only(source),
         ),

@@ -3,7 +3,7 @@ import type { Tx } from "../store/postgres/index.ts";
 import { erasureMatchesIn, type SoughtIdentifier } from "./identifiers.ts";
 
 /**
- * Any one word makes a candidate, since a name split between two chunks leaves no chunk holding
+ * Any one word makes a candidate, since a name split between two passages leaves no passage holding
  * all its words.
  */
 const PROBE = `SELECT string_agg(probe::text, ' | ') AS probe
@@ -11,7 +11,7 @@ const PROBE = `SELECT string_agg(probe::text, ' | ') AS probe
              FROM unnest($1::text[]) AS word) AS words
     WHERE numnode(probe) > 0`;
 
-const LIVE = `FROM "index".chunk c
+const LIVE = `FROM "index".passage c
      JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id
     WHERE c.workspace_id = $1 AND d.gone_at IS NULL`;
 
@@ -20,9 +20,9 @@ const LIVE_DOCUMENTS_PROBED = `SELECT DISTINCT c.source_document_id AS id ${LIVE
 
 const EVERY_LIVE_DOCUMENT = `SELECT DISTINCT c.source_document_id AS id ${LIVE}`;
 
-/** Chunks are contiguous slices, so joined in order they are the document's indexed text. */
+/** Passages are contiguous slices, so joined in order they are the document's indexed text. */
 const INDEXED_TEXT = `SELECT string_agg(content, '' ORDER BY ordinal) AS text
-     FROM "index".chunk
+     FROM "index".passage
     WHERE workspace_id = $1 AND source_document_id = $2`;
 
 const candidatesFor = async (

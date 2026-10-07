@@ -23,7 +23,7 @@ class Table:
     primary_key: tuple[str, ...]
 
 
-POOL = coco.ContextKey[asyncpg.Pool]("better-answers/chunk-store")
+POOL = coco.ContextKey[asyncpg.Pool]("better-answers/passage-store")
 
 
 def _schema_of(table: Table) -> postgres.TableSchema[dict[str, Any]]:

@@ -2,14 +2,14 @@ import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { EMBEDDING_DIMENSIONS, ulid } from "../src/index.ts";
-import { chunkWrittenThroughTheParent } from "./catalogue-statements.ts";
+import { passageWrittenThroughTheParent } from "./catalogue-statements.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
 import { migrationStatementSaying } from "./journal-statements.ts";
 import {
   ADMITTED,
-  attemptChunkEmbeddedBy,
-  chunkWritingItsOwnFullText,
+  attemptPassageEmbeddedBy,
+  passageWritingItsOwnFullText,
   postgresForSuite,
   refusalOf,
   refusesEach,
@@ -76,19 +76,19 @@ const firstSpanOf = (documentId: string) => ({
   charEnd: 40,
 });
 
-describe("the chunk's columns, on the parent and on a partition", () => {
+describe("the passage's columns, on the parent and on a partition", () => {
   it("carries document, span and full text on a later partition", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
-      await seed.chunk({ workspaceId: WS_A });
+      await seed.passage({ workspaceId: WS_A });
 
-      expect(await attributesOf(client, "chunk")).toEqual([
+      expect(await attributesOf(client, "passage")).toEqual([
         { column: "id", notNull: true, generated: "" },
         { column: "workspace_id", notNull: true, generated: "" },
         { column: "content", notNull: true, generated: "" },
         { column: "embedding", notNull: false, generated: "" },
-        { column: "embedding_route_id", notNull: false, generated: "" },
-        { column: "binding_id", notNull: true, generated: "" },
+        { column: "embedding_model_choice_id", notNull: false, generated: "" },
+        { column: "connected_source_id", notNull: true, generated: "" },
         { column: "source_document_id", notNull: false, generated: "" },
         { column: "locator", notNull: false, generated: "" },
         { column: "ordinal", notNull: false, generated: "" },
@@ -97,8 +97,8 @@ describe("the chunk's columns, on the parent and on a partition", () => {
         { column: "search", notNull: true, generated: "s" },
       ]);
 
-      expect(await attributesOf(client, `chunk_${WS_A}`)).toEqual(
-        await attributesOf(client, "chunk"),
+      expect(await attributesOf(client, `passage_${WS_A}`)).toEqual(
+        await attributesOf(client, "passage"),
       );
     });
   });
@@ -106,22 +106,24 @@ describe("the chunk's columns, on the parent and on a partition", () => {
   it("propagates a parent ALTER to existing and later partitions", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
-      await seed.chunk({ workspaceId: WS_A });
+      await seed.passage({ workspaceId: WS_A });
 
-      await client.query('ALTER TABLE "index".chunk ADD COLUMN probe_note text');
+      await client.query('ALTER TABLE "index".passage ADD COLUMN probe_note text');
       await client.query(
-        `ALTER TABLE "index".chunk ADD CONSTRAINT chunk_probe_check
+        `ALTER TABLE "index".passage ADD CONSTRAINT passage_probe_check
            CHECK (probe_note IS NULL OR length(probe_note) > 0)`,
       );
       await client.query(
-        `ALTER TABLE "index".chunk ADD COLUMN probe_search tsvector
+        `ALTER TABLE "index".passage ADD COLUMN probe_search tsvector
            GENERATED ALWAYS AS (to_tsvector('english', content)) STORED`,
       );
-      await client.query('ALTER TABLE "index".chunk ALTER COLUMN binding_id DROP NOT NULL');
+      await client.query(
+        'ALTER TABLE "index".passage ALTER COLUMN connected_source_id DROP NOT NULL',
+      );
 
       await seed.workspace({ id: WS_B, name: "B" });
       const madeAfter = testData(client);
-      await madeAfter.chunk({ workspaceId: WS_B });
+      await madeAfter.passage({ workspaceId: WS_B });
 
       const shapeOf = async (relation: string) => {
         const attributes = await attributesOf(client, relation);
@@ -136,16 +138,17 @@ describe("the chunk's columns, on the parent and on a partition", () => {
         return {
           note: attributes.find((column) => column.column === "probe_note")?.generated,
           search: attributes.find((column) => column.column === "probe_search")?.generated,
-          connectedSourceIdNotNull: attributes.find((column) => column.column === "binding_id")
-            ?.notNull,
+          connectedSourceIdNotNull: attributes.find(
+            (column) => column.column === "connected_source_id",
+          )?.notNull,
           checks: constraint.rowCount,
         };
       };
 
       const propagated = { note: "", search: "s", connectedSourceIdNotNull: false, checks: 1 };
       expect({
-        existing: await shapeOf(`chunk_${WS_A}`),
-        madeAfter: await shapeOf(`chunk_${WS_B}`),
+        existing: await shapeOf(`passage_${WS_A}`),
+        madeAfter: await shapeOf(`passage_${WS_B}`),
       }).toEqual({ existing: propagated, madeAfter: propagated });
     });
   });
@@ -155,11 +158,11 @@ describe("the embedding and the model choice it came from", () => {
   it("refuses a vector or model choice without the other", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
-      await seed.chunk({ workspaceId: WS_A });
+      await seed.passage({ workspaceId: WS_A });
       const connectedSource = `connected-source-${ulid()}`;
 
       const probe = (embedding: string | null, modelChoice: string | null) =>
-        attemptChunkEmbeddedBy(client, WS_A, connectedSource, embedding, modelChoice);
+        attemptPassageEmbeddedBy(client, WS_A, connectedSource, embedding, modelChoice);
 
       expect({
         vectorWithoutItsModelChoice: await probe(VECTOR, null),
@@ -167,8 +170,8 @@ describe("the embedding and the model choice it came from", () => {
         neither: await probe(null, null),
         both: await probe(VECTOR, "model-choice-embed"),
       }).toEqual({
-        vectorWithoutItsModelChoice: "chunk_embedding_pair_check",
-        modelChoiceWithoutItsVector: "chunk_embedding_pair_check",
+        vectorWithoutItsModelChoice: "passage_embedding_pair_check",
+        modelChoiceWithoutItsVector: "passage_embedding_pair_check",
         neither: ADMITTED,
         both: ADMITTED,
       });
@@ -180,10 +183,10 @@ describe("the full-text column", () => {
   it("is computed by the database, refused to both runtime roles", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
-      await seed.chunk({ workspaceId: WS_A, content: "the handbook's holiday policy" });
+      await seed.passage({ workspaceId: WS_A, content: "the handbook's holiday policy" });
 
       const computed = await client.query(
-        `SELECT search @@ to_tsquery('english', 'holiday') AS matched FROM "index".chunk`,
+        `SELECT search @@ to_tsquery('english', 'holiday') AS matched FROM "index".passage`,
       );
       expect(computed.rows[0]?.matched).toBe(true);
 
@@ -192,9 +195,9 @@ describe("the full-text column", () => {
         await client.query(`SET LOCAL ROLE ${role}`);
         await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
         await refusesEach(client, [
-          chunkWritingItsOwnFullText(role, WS_A, `chunk-${ulid()}`),
+          passageWritingItsOwnFullText(role, WS_A, `passage-${ulid()}`),
           [
-            `UPDATE "index".chunk SET search = to_tsvector('english', 'something else')`,
+            `UPDATE "index".passage SET search = to_tsvector('english', 'something else')`,
             `${role} rewriting the full text over content it did not change`,
             [],
             /can only be updated to DEFAULT/,
@@ -206,12 +209,22 @@ describe("the full-text column", () => {
 });
 
 describe("a partition's indexes", () => {
+  it("makes partitions through a definer that pins its search path", async () => {
+    const read = await db().pool.query<{ definer: boolean; settings: string[] | null }>(
+      `SELECT p.prosecdef AS definer, p.proconfig AS settings
+         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public' AND p.proname = 'create_workspace_partition'`,
+    );
+
+    expect(read.rows).toEqual([{ definer: true, settings: ["search_path=pg_catalog, pg_temp"] }]);
+  });
+
   it("gives a new partition a full-text index, no vector index", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
-      await seed.chunk({ workspaceId: WS_A });
+      await seed.passage({ workspaceId: WS_A });
 
-      expect(await indexShapeOf(client, `chunk_${WS_A}`)).toEqual({
+      expect(await indexShapeOf(client, `passage_${WS_A}`)).toEqual({
         fullText: true,
         vector: false,
       });
@@ -221,17 +234,17 @@ describe("a partition's indexes", () => {
   it("gives an older partition the same pair through the migration", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(
-        `CREATE TABLE "index"."chunk_${WS_A}" PARTITION OF "index".chunk FOR VALUES IN ('${WS_A}')`,
+        `CREATE TABLE "index"."passage_${WS_A}" PARTITION OF "index".passage FOR VALUES IN ('${WS_A}')`,
       );
       await client.query(
-        `CREATE INDEX "chunk_${WS_A}_embedding_hnsw" ON "index"."chunk_${WS_A}"
+        `CREATE INDEX "passage_${WS_A}_embedding_hnsw" ON "index"."passage_${WS_A}"
            USING hnsw (embedding public.vector_cosine_ops)`,
       );
 
-      const before = await indexShapeOf(client, `chunk_${WS_A}`);
+      const before = await indexShapeOf(client, `passage_${WS_A}`);
       await client.query(migrationStatementMatching("pg_inherits"));
 
-      expect({ before, after: await indexShapeOf(client, `chunk_${WS_A}`) }).toEqual({
+      expect({ before, after: await indexShapeOf(client, `passage_${WS_A}`) }).toEqual({
         before: { fullText: false, vector: true },
         after: { fullText: true, vector: false },
       });
@@ -239,16 +252,16 @@ describe("a partition's indexes", () => {
   });
 });
 
-describe("the chunk and the document it locates into", () => {
-  it("goes with its document, leaving another document's chunks standing", async () => {
+describe("the passage and the document it locates into", () => {
+  it("goes with its document, leaving another document's passages standing", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed, connectedSource, document } = await seedOneDocument(client, WS_A);
       const sibling = await seed.sourceDocument({
         workspaceId: WS_A,
         connectedSourceId: connectedSource.id,
       });
-      await seed.chunk(firstSpanOf(document.id));
-      await seed.chunk(firstSpanOf(sibling.id));
+      await seed.passage(firstSpanOf(document.id));
+      await seed.passage(firstSpanOf(sibling.id));
 
       await client.query("DELETE FROM source_document WHERE workspace_id = $1 AND id = $2", [
         WS_A,
@@ -256,52 +269,54 @@ describe("the chunk and the document it locates into", () => {
       ]);
 
       const left = await client.query(
-        'SELECT source_document_id FROM "index".chunk ORDER BY source_document_id',
+        'SELECT source_document_id FROM "index".passage ORDER BY source_document_id',
       );
       expect(left.rows).toEqual([{ source_document_id: sibling.id }]);
     });
   });
 
-  it("refuses a second chunk at the same document and locator", async () => {
+  it("refuses a second passage at the same document and locator", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed, document } = await seedOneDocument(client, WS_A);
-      await seed.chunk(firstSpanOf(document.id));
+      await seed.passage(firstSpanOf(document.id));
 
-      const second = await refusalOf(client, () => seed.chunk(firstSpanOf(document.id)));
+      const second = await refusalOf(client, () => seed.passage(firstSpanOf(document.id)));
       const onTheParent = await client.query(
         `SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
           WHERE n.nspname = 'index' AND c.relname = $1`,
-        ["chunk_workspace_id_source_document_id_locator_uidx"],
+        ["passage_workspace_id_source_document_id_locator_uidx"],
       );
 
       expect({ refusedBy: second, declaredOnTheParent: onTheParent.rowCount }).toEqual({
-        refusedBy: "chunk_01J6EAAAAAAAAAAAAAAAAAA_workspace_id_source_document__idx",
+        refusedBy: `passage_${WS_A}_locator_uidx`,
         declaredOnTheParent: 1,
       });
     });
   });
 });
 
-describe("the worker on the chunk index", () => {
-  it("writes chunks through the parent and is refused the partition", async () => {
+describe("the worker on the passage index", () => {
+  it("writes passages through the parent and is refused the partition", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed, document } = await seedOneDocument(client, WS_A);
-      await seed.chunk({ workspaceId: WS_A });
+      await seed.passage({ workspaceId: WS_A });
 
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      const id = await chunkWrittenThroughTheParent(client, WS_A, document.id);
+      const id = await passageWrittenThroughTheParent(client, WS_A, document.id);
       await client.query(
-        `UPDATE "index".chunk SET content = 'the paragraph again' WHERE workspace_id = $1 AND id = $2`,
+        `UPDATE "index".passage SET content = 'the paragraph again' WHERE workspace_id = $1 AND id = $2`,
         [WS_A, id],
       );
-      const rewritten = await client.query(`SELECT content FROM "index".chunk WHERE id = $1`, [id]);
-      await client.query(`DELETE FROM "index".chunk WHERE workspace_id = $1 AND id = $2`, [
+      const rewritten = await client.query(`SELECT content FROM "index".passage WHERE id = $1`, [
+        id,
+      ]);
+      await client.query(`DELETE FROM "index".passage WHERE workspace_id = $1 AND id = $2`, [
         WS_A,
         id,
       ]);
-      const afterDelete = await client.query(`SELECT id FROM "index".chunk WHERE id = $1`, [id]);
+      const afterDelete = await client.query(`SELECT id FROM "index".passage WHERE id = $1`, [id]);
       expect({ rewritten: rewritten.rows, left: afterDelete.rows }).toEqual({
         rewritten: [{ content: "the paragraph again" }],
         left: [],
@@ -309,13 +324,17 @@ describe("the worker on the chunk index", () => {
 
       await refusesEach(client, [
         [
-          `SELECT id FROM "index"."chunk_${WS_A}"`,
-          "the worker reaches chunk rows through the policied parent, never through a partition",
+          `SELECT id FROM "index"."passage_${WS_A}"`,
+          "the worker reaches passage rows through the policied parent, never through a partition",
         ],
       ]);
     });
   });
 });
 
+/** Migration 0037 names the table as it stood then; migration 0069 renamed it. */
 const migrationStatementMatching = (word: string): string =>
-  migrationStatementSaying("the-chunk-substrate.sql", word);
+  migrationStatementSaying("the-chunk-substrate.sql", word).replace(
+    "parent.relname = 'chunk'",
+    "parent.relname = 'passage'",
+  );

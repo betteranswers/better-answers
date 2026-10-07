@@ -15,14 +15,14 @@ const WS_B = "01J6EBBBBBBBBBBBBBBBBBBBBB";
  * Spelled here, not imported: `packages/core` owns the builder and depends on this package,
  * so the arrow points one way.
  */
-const READABLE = `SELECT id FROM "index".readable_chunk AS v
+const READABLE = `SELECT id FROM "index".readable_passage AS v
      WHERE v.published_at IS NOT NULL
        AND (v.sensitivity <> 'Restricted' OR $1 = 'Admin')
        AND (v.audience = 'everyone' OR v.audience_groups && $2::text[])
      ORDER BY id`;
 
 const THE_VIEW = `SELECT id, sensitivity, published_at, audience, audience_groups
-     FROM "index".readable_chunk ORDER BY id`;
+     FROM "index".readable_passage ORDER BY id`;
 
 const byId = (one: { readonly id: string }, other: { readonly id: string }): number =>
   one.id < other.id ? -1 : 1;
@@ -71,7 +71,7 @@ const connectedSourceArranged = (workspaceId: string, arrangement: Arrangement) 
   publishedAt: arrangement.publishedAt === undefined ? new Date() : arrangement.publishedAt,
 });
 
-const aChunkUnderAConnectedSource = async (
+const aPassageUnderAConnectedSource = async (
   client: pg.PoolClient,
   arrangement: Arrangement = {},
 ) => {
@@ -87,12 +87,12 @@ const aChunkUnderAConnectedSource = async (
         connectedSourceId: connectedSource.id,
         sensitivity: arrangement.documentClass ?? null,
       });
-  const chunk = await seed.chunk({
+  const passage = await seed.passage({
     workspaceId,
     connectedSourceId: connectedSource.id,
     sourceDocumentId: document?.id ?? null,
   });
-  return { connectedSource, document, chunk };
+  return { connectedSource, document, passage };
 };
 
 const twoWorkspaces = async (client: pg.PoolClient): Promise<void> => {
@@ -190,7 +190,7 @@ describe("the one SQL statement of the class ranking", () => {
   it("serves the worker, which still cannot read the view", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      await aChunkUnderAConnectedSource(client, { connectedSourceClass: "Public" });
+      await aPassageUnderAConnectedSource(client, { connectedSourceClass: "Public" });
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
@@ -226,18 +226,18 @@ describe("the one SQL statement of the class ranking", () => {
 });
 
 describe("the shape the view presents", () => {
-  it("presents every chunk column plus the four visibility terms", async () => {
-    const [onTheChunk, onTheView] = await Promise.all([
-      columnsOf("chunk"),
-      columnsOf("readable_chunk"),
+  it("presents every passage column plus the four visibility terms", async () => {
+    const [onThePassage, onTheView] = await Promise.all([
+      columnsOf("passage"),
+      columnsOf("readable_passage"),
     ]);
 
     expect({
-      missing: onTheChunk.filter(
+      missing: onThePassage.filter(
         (column) => !THE_FOUR_TERMS.includes(column) && !onTheView.includes(column),
       ),
       unexpected: onTheView.filter(
-        (column) => !THE_FOUR_TERMS.includes(column) && !onTheChunk.includes(column),
+        (column) => !THE_FOUR_TERMS.includes(column) && !onThePassage.includes(column),
       ),
       terms: THE_FOUR_TERMS.filter((column) => onTheView.includes(column)),
     }).toEqual({ missing: [], unexpected: [], terms: THE_FOUR_TERMS });
@@ -247,13 +247,13 @@ describe("the shape the view presents", () => {
   // right plan whether or not the workspace id prunes.
   it("joins the source inner and the document left, by workspace", async () => {
     const read = await db().pool.query<{ definition: string }>(
-      `SELECT pg_get_viewdef('"index".readable_chunk'::regclass, true) AS definition`,
+      `SELECT pg_get_viewdef('"index".readable_passage'::regclass, true) AS definition`,
     );
     const written = (read.rows[0]?.definition ?? "").replaceAll(/\s+/gu, " ");
 
     expect({
       connectedSource: written.includes(
-        "JOIN connected_source b ON b.workspace_id = c.workspace_id AND b.id = c.binding_id",
+        "JOIN connected_source b ON b.workspace_id = c.workspace_id AND b.id = c.connected_source_id",
       ),
       document: written.includes(
         "LEFT JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id",
@@ -265,25 +265,25 @@ describe("the shape the view presents", () => {
     const read = await db().pool.query<{ options: string[] | null }>(
       `SELECT c.reloptions AS options FROM pg_class c
          JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname = 'index' AND c.relname = 'readable_chunk'`,
+        WHERE n.nspname = 'index' AND c.relname = 'readable_passage'`,
     );
 
     expect(read.rows).toEqual([{ options: ["security_invoker=true"] }]);
   });
 });
 
-describe("what the view reports for a chunk, as app_rt", () => {
+describe("what the view reports for a passage, as app_rt", () => {
   it("reports the narrower class and shows permitted readers the row", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const landed: { readonly id: string; readonly expected: string; readonly viewer: boolean }[] =
         [];
       for (const pair of [...THE_FOLD, ...THE_DOCUMENT_NAMES_NO_CLASS]) {
-        const { chunk } = await aChunkUnderAConnectedSource(client, {
+        const { passage } = await aPassageUnderAConnectedSource(client, {
           connectedSourceClass: pair.connectedSource,
           documentClass: pair.document,
         });
-        landed.push({ id: chunk.id, expected: pair.narrower, viewer: pair.viewer });
+        landed.push({ id: passage.id, expected: pair.narrower, viewer: pair.viewer });
       }
       await asAppRt(client, WS_A);
 
@@ -310,8 +310,8 @@ describe("what the view reports for a chunk, as app_rt", () => {
       await twoWorkspaces(client);
       const held = ulid();
       const unheld = ulid();
-      const everyone = await aChunkUnderAConnectedSource(client);
-      const toTheGroup = await aChunkUnderAConnectedSource(client, {
+      const everyone = await aPassageUnderAConnectedSource(client);
+      const toTheGroup = await aPassageUnderAConnectedSource(client, {
         audience: AUDIENCE_GROUPS,
         audienceGroups: [held],
       });
@@ -324,18 +324,18 @@ describe("what the view reports for a chunk, as app_rt", () => {
           (row) => row.audience,
         ),
       }).toEqual({
-        inTheGroup: [everyone.chunk.id, toTheGroup.chunk.id].toSorted(),
-        outsideIt: [everyone.chunk.id],
+        inTheGroup: [everyone.passage.id, toTheGroup.passage.id].toSorted(),
+        outsideIt: [everyone.passage.id],
         audience: expect.arrayContaining([AUDIENCE_EVERYONE, AUDIENCE_GROUPS]),
       });
     });
   });
 
-  it("carries the publish stamp, hiding an unpublished connected source's chunk", async () => {
+  it("carries the publish stamp, hiding an unpublished connected source's passage", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      await aChunkUnderAConnectedSource(client, { publishedAt: null });
-      const published = await aChunkUnderAConnectedSource(client);
+      await aPassageUnderAConnectedSource(client, { publishedAt: null });
+      const published = await aPassageUnderAConnectedSource(client);
       await asAppRt(client, WS_A);
 
       expect({
@@ -346,8 +346,8 @@ describe("what the view reports for a chunk, as app_rt", () => {
         viewer: await seenBy(client, VIEWER),
       }).toEqual({
         stamps: 1,
-        admin: [published.chunk.id],
-        viewer: [published.chunk.id],
+        admin: [published.passage.id],
+        viewer: [published.passage.id],
       });
     });
   });
@@ -355,7 +355,7 @@ describe("what the view reports for a chunk, as app_rt", () => {
   it("reads the source live, so later narrowing shows at once", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const { connectedSource, chunk } = await aChunkUnderAConnectedSource(client, {
+      const { connectedSource, passage } = await aPassageUnderAConnectedSource(client, {
         connectedSourceClass: "Public",
       });
       await asAppRt(client, WS_A);
@@ -378,7 +378,7 @@ describe("what the view reports for a chunk, as app_rt", () => {
         before: "Public",
         after: "Restricted",
         viewer: [],
-        admin: [chunk.id],
+        admin: [passage.id],
       });
     });
   });
@@ -388,8 +388,8 @@ describe("what the view withholds", () => {
   it("shows a reader scoped to one workspace nothing of another's", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const mine = await aChunkUnderAConnectedSource(client, { connectedSourceClass: "Public" });
-      const theirs = await aChunkUnderAConnectedSource(client, {
+      const mine = await aPassageUnderAConnectedSource(client, { connectedSourceClass: "Public" });
+      const theirs = await aPassageUnderAConnectedSource(client, {
         workspaceId: WS_B,
         connectedSourceClass: "Public",
       });
@@ -405,46 +405,46 @@ describe("what the view withholds", () => {
         scoped: scoped.rows.map((row) => row.id),
         theOther: theOther.rows.map((row) => row.id),
         unscoped: unscoped.rows.map((row) => row.id),
-      }).toEqual({ scoped: [mine.chunk.id], theOther: [theirs.chunk.id], unscoped: [] });
+      }).toEqual({ scoped: [mine.passage.id], theOther: [theirs.passage.id], unscoped: [] });
     });
   });
 
-  it("drops a chunk whose source has gone, keeping its neighbour", async () => {
+  it("drops a passage whose source has gone, keeping its neighbour", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      // A chunk naming a document cascades away with the connected source; one naming none outlives
+      // A passage naming a document cascades away with the connected source; one naming none outlives
       // it, and the inner join is what withholds it.
-      const orphaned = await aChunkUnderAConnectedSource(client, {
+      const orphaned = await aPassageUnderAConnectedSource(client, {
         connectedSourceClass: "Public",
         withoutADocument: true,
       });
-      const neighbour = await aChunkUnderAConnectedSource(client, {
+      const neighbour = await aPassageUnderAConnectedSource(client, {
         connectedSourceClass: "Public",
       });
       await client.query("DELETE FROM connected_source WHERE id = $1", [
         orphaned.connectedSource.id,
       ]);
-      const standing = await client.query('SELECT id FROM "index".chunk WHERE id = $1', [
-        orphaned.chunk.id,
+      const standing = await client.query('SELECT id FROM "index".passage WHERE id = $1', [
+        orphaned.passage.id,
       ]);
       await asAppRt(client, WS_A);
 
       expect({
-        chunkRowStands: standing.rowCount,
+        passageRowStands: standing.rowCount,
         throughTheView: (await client.query<{ id: string }>(THE_VIEW)).rows.map((row) => row.id),
         readable: await seenBy(client, ADMIN),
       }).toEqual({
-        chunkRowStands: 1,
-        throughTheView: [neighbour.chunk.id],
-        readable: [neighbour.chunk.id],
+        passageRowStands: 1,
+        throughTheView: [neighbour.passage.id],
+        readable: [neighbour.passage.id],
       });
     });
   });
 
-  it("keeps a chunk naming no document, at its source's class", async () => {
+  it("keeps a passage naming no document, at its source's class", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const { chunk } = await aChunkUnderAConnectedSource(client, {
+      const { passage } = await aPassageUnderAConnectedSource(client, {
         connectedSourceClass: "Public",
         withoutADocument: true,
       });
@@ -453,9 +453,9 @@ describe("what the view withholds", () => {
       const reported = await client.query<{ id: string; sensitivity: string }>(THE_VIEW);
 
       expect(reported.rows).toEqual(
-        [{ id: chunk.id, sensitivity: "Public" }].map(publishedToEveryone),
+        [{ id: passage.id, sensitivity: "Public" }].map(publishedToEveryone),
       );
-      expect(await seenBy(client, VIEWER)).toEqual([chunk.id]);
+      expect(await seenBy(client, VIEWER)).toEqual([passage.id]);
     });
   });
 });
@@ -464,17 +464,17 @@ describe("who may read the view", () => {
   it("is selected by app_rt, and worker_rt holds nothing on it", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const { chunk } = await aChunkUnderAConnectedSource(client, {
+      const { passage } = await aPassageUnderAConnectedSource(client, {
         connectedSourceClass: "Public",
       });
 
-      const forTheApp = await privilegesHeld(client, "app_rt", '"index".readable_chunk');
-      const forTheWorker = await privilegesHeld(client, "worker_rt", '"index".readable_chunk');
+      const forTheApp = await privilegesHeld(client, "app_rt", '"index".readable_passage');
+      const forTheWorker = await privilegesHeld(client, "worker_rt", '"index".readable_passage');
 
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await refusesEach(client, [
-        [THE_VIEW, "worker_rt selecting the view the api reads a chunk through"],
+        [THE_VIEW, "worker_rt selecting the view the api reads a passage through"],
       ]);
       await client.query("RESET ROLE");
 
@@ -502,7 +502,7 @@ describe("who may read the view", () => {
           TRIGGER: false,
           MAINTAIN: false,
         },
-        served: [chunk.id],
+        served: [passage.id],
       });
     });
   });
@@ -512,20 +512,20 @@ describe("a partition attached after the view was made", () => {
   it("reads through it as through the first partition", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const first = await aChunkUnderAConnectedSource(client, { connectedSourceClass: "Public" });
+      const first = await aPassageUnderAConnectedSource(client, { connectedSourceClass: "Public" });
       await asAppRt(client, WS_A);
       const before = await seenBy(client, VIEWER);
 
       await client.query("RESET ROLE");
-      const later = await aChunkUnderAConnectedSource(client, {
+      const later = await aPassageUnderAConnectedSource(client, {
         workspaceId: WS_B,
         connectedSourceClass: "Public",
       });
       await asAppRt(client, WS_B);
 
       expect({ before, after: await seenBy(client, VIEWER) }).toEqual({
-        before: [first.chunk.id],
-        after: [later.chunk.id],
+        before: [first.passage.id],
+        after: [later.passage.id],
       });
     });
   });

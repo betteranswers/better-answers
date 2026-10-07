@@ -27,7 +27,7 @@ three findings at the same offsets and the same scores:
 
 | File | What it holds | What it proves |
 | --- | --- | --- |
-| `delivery-terms.txt` | Seven paragraphs of a supplier's terms — 1,337 bytes, one of them a sort code beside an account number — and no markup at all | Plain text passes through: the bytes the reader uploaded *are* the normalised text, so a locator's offsets are offsets into the file. The one fixture long enough to be cut in two, so the chunk rows rejoin to the redacted text and the second row's offsets carry on from the first's |
+| `delivery-terms.txt` | Seven paragraphs of a supplier's terms — 1,337 bytes, one of them a sort code beside an account number — and no markup at all | Plain text passes through: the bytes the reader uploaded *are* the normalised text, so a locator's offsets are offsets into the file. The one fixture long enough to be cut in two, so the passage rows rejoin to the redacted text and the second row's offsets carry on from the first's |
 | `expenses-policy.docx` | A level-one heading, two paragraphs — one of them a sort code beside an account number — a bulleted list and a two-by-three table | `anydoc` keeps the heading, the list and the table as Markdown, and the seam writes the bank details out of the middle of them |
 | `rate-card.pdf` | A heading, a sentence and a three-row table, all with a text layer | `pdf-inspector` lands the table as a Markdown table rather than one cell a line, which is the difference a full-text search sees |
 | `scanned-invoice.pdf` | One page drawn as a bitmap and no text layer at all | `classify_pdf_bytes` answers a page needing OCR, and the document is quarantined whole under `NeedsOcrError` |

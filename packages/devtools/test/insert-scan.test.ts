@@ -85,7 +85,7 @@ describe("the territory the scan reads", () => {
     ["a lower-case statement", `await q("${insert("job").toLowerCase()}")`],
     ["a statement split across columns", `\`${insert("job").slice(0, 20)}\n  , name)\``],
     ["a long literal's line", `const q = \`\n       ${insert("job")}\`;`],
-    ["a quoted table name", `cur.execute('INSERT ${"INTO"} "index".chunk (id) VALUES (1)')`],
+    ["a quoted table name", `cur.execute('INSERT ${"INTO"} "index".passage (id) VALUES (1)')`],
   ])("reads %s as a raw insert", (_what, source) => {
     expect(rawInsertsIn("one.test.ts", source)).toHaveLength(1);
   });

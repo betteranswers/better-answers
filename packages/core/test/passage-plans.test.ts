@@ -5,7 +5,7 @@ import { MARK_THE_MATCH_LEAKPROOF } from "@better-answers/schema";
 import { UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
 import type { UserPrincipal } from "../src/kernel/index.ts";
-import { findPassages, previewChunks, previewChunksInput } from "../src/sources/index.ts";
+import { findPassages, previewPassages, previewPassagesInput } from "../src/sources/index.ts";
 import type { Answered, Tx } from "../src/store/postgres/index.ts";
 import { seededBy, visibilitySuite } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
@@ -89,7 +89,7 @@ const arrangedWithInvoices = async (): Promise<Arranged> => {
       connectedSourceId: handbookConnectedSource.id,
       title: HANDBOOK.title,
     });
-    await seed.chunk({
+    await seed.passage({
       workspaceId,
       connectedSourceId: handbookConnectedSource.id,
       sourceDocumentId: handbook.id,
@@ -111,7 +111,7 @@ const arrangedWithInvoices = async (): Promise<Arranged> => {
     });
     for (let line = 0; line < INVOICE_LINES; line += 1) {
       const text = `Invoice ${String(line)} was paid in full.`;
-      await seed.chunk({
+      await seed.passage({
         workspaceId,
         connectedSourceId: invoicesConnectedSource.id,
         sourceDocumentId: invoices.id,
@@ -150,21 +150,21 @@ const partitionCopyOf = async (parentIndex: string, workspaceId: string): Promis
        JOIN pg_catalog.pg_class parent ON parent.oid = attached.inhparent
        JOIN pg_catalog.pg_index copy ON copy.indexrelid = child.oid
       WHERE parent.relname = $1 AND copy.indrelid = $2::regclass`,
-    [parentIndex, `"index"."chunk_${workspaceId}"`],
+    [parentIndex, `"index"."passage_${workspaceId}"`],
   );
   const copy = read.rows[0]?.name;
   if (copy === undefined) throw new Error(`the partition holds no copy of ${parentIndex}`);
   return copy;
 };
 
-describe("find's plan, as the api and under the chunk's policy", () => {
+describe("find's plan, as the api and under the passage's policy", () => {
   it("matches through the partition's GIN index on the full-text column", async () => {
     const arranged = await arrangedWithInvoices();
 
     const found = await searching(arranged.admin);
 
     expect(found.answer).toEqual(theHandbookFound(arranged));
-    expect(found.indexes).toContain(`chunk_${arranged.workspaceId}_search_gin`);
+    expect(found.indexes).toContain(`passage_${arranged.workspaceId}_search_gin`);
   });
 
   it("cannot use the GIN index unless the match is leakproof", async () => {
@@ -176,26 +176,26 @@ describe("find's plan, as the api and under the chunk's policy", () => {
     );
 
     expect(found.answer).toEqual(theHandbookFound(arranged));
-    expect(found.indexes).not.toContain(`chunk_${arranged.workspaceId}_search_gin`);
+    expect(found.indexes).not.toContain(`passage_${arranged.workspaceId}_search_gin`);
   });
 });
 
-describe("previewChunks' plan, as the api and under the chunk's policy", () => {
-  it("lists a connected source's chunks through the connected-source-first index", async () => {
+describe("previewPassages' plan, as the api and under the passage's policy", () => {
+  it("lists a connected source's passages through the connected-source-first index", async () => {
     const arranged = await arrangedWithInvoices();
 
     const previewed = await planned(arranged.admin, (admin, tx) =>
-      previewChunks(
+      previewPassages(
         admin,
         tx,
-        inputOf(previewChunksInput, { connectedSourceId: arranged.handbookConnectedSource }),
+        inputOf(previewPassagesInput, { connectedSourceId: arranged.handbookConnectedSource }),
       ),
     );
 
-    expect(previewed.answer.map((chunk) => chunk.content)).toEqual([HANDBOOK.text]);
+    expect(previewed.answer.map((passage) => passage.content)).toEqual([HANDBOOK.text]);
     expect(previewed.indexes).toContain(
       await partitionCopyOf(
-        "chunk_workspace_id_binding_id_source_document_id_ordinal_idx",
+        "passage_workspace_connected_source_document_ordinal_idx",
         arranged.workspaceId,
       ),
     );

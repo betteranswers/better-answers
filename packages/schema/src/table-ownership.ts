@@ -55,7 +55,7 @@ export const TABLE_OWNERS = {
   "public.access_request": "members",
   "public.workspace_last_active": "members",
   "public.test_workspace_mark": "members",
-  "index.chunk": "sources",
+  "index.passage": "sources",
 
   "public.concept_identity": "concepts",
   "public.concept_index": "concepts",

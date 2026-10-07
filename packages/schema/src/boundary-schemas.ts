@@ -74,7 +74,7 @@ import {
   user,
   verification,
 } from "./identity-tables.ts";
-import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
+import { passage, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
 import { workspaceLastActive } from "./last-active-tables.ts";
 import {
@@ -179,12 +179,12 @@ const readableUnit = {
   audienceGroups: (schema: z.ZodArray<z.ZodString>) => z.array(groupId(schema.element)).min(1),
 };
 
-const chunkRefinements = {
+const passageRefinements = {
   id: (schema: z.ZodString) => schema.trim().min(1),
   workspaceId,
 
   embedding: z.array(z.number()).length(EMBEDDING_DIMENSIONS).nullable(),
-  embeddingRouteId: (schema: z.ZodString) => schema.trim().min(1),
+  embeddingModelChoiceId: (schema: z.ZodString) => schema.trim().min(1),
   connectedSourceId: (schema: z.ZodString) => schema.trim().min(1),
   sourceDocumentId: (schema: z.ZodString) => schema.trim().min(1),
   locator: (schema: z.ZodString) => schema.trim().min(1),
@@ -193,15 +193,15 @@ const chunkRefinements = {
   charEnd: (schema: z.ZodNumber) => schema.int().nonnegative(),
 };
 
-export const chunkSelect = createSelectSchema(chunk, {
-  ...chunkRefinements,
+export const passageSelect = createSelectSchema(passage, {
+  ...passageRefinements,
   search: z.string().optional(),
 });
-export const chunkInsert = createInsertSchema(chunk, chunkRefinements);
+export const passageInsert = createInsertSchema(passage, passageRefinements);
 
-export const chunkUpdate = createUpdateSchema(chunk, {
-  ...chunkRefinements,
-  embedding: chunkRefinements.embedding.optional(),
+export const passageUpdate = createUpdateSchema(passage, {
+  ...passageRefinements,
+  embedding: passageRefinements.embedding.optional(),
 });
 
 const userRefinements = {
@@ -899,7 +899,7 @@ export const boundarySchemas = {
     insert: workspaceConfigInsert,
     update: workspaceConfigUpdate,
   },
-  chunk: { table: chunk, select: chunkSelect, insert: chunkInsert, update: chunkUpdate },
+  passage: { table: passage, select: passageSelect, insert: passageInsert, update: passageUpdate },
   auditEvent: {
     table: auditEvent,
     select: auditEventSelect,

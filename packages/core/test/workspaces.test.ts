@@ -66,7 +66,7 @@ const seedUser = (): Promise<string> => seedPerson(db().pool);
 const partitionExists = async (workspaceId: string): Promise<boolean> => {
   const found = await db().pool.query(
     "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'index' AND c.relname = $1",
-    [`chunk_${workspaceId}`],
+    [`passage_${workspaceId}`],
   );
   return found.rowCount === 1;
 };
