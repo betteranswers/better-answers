@@ -141,9 +141,9 @@ export type TestData = {
     overrides?: Partial<InsertInput<"conceptEvidence">>,
   ): Promise<Row<"conceptEvidence">>;
 
-  conceptClassOverride(
-    overrides?: Partial<InsertInput<"conceptClassOverride">>,
-  ): Promise<Row<"conceptClassOverride">>;
+  conceptSensitivityOverride(
+    overrides?: Partial<InsertInput<"conceptSensitivityOverride">>,
+  ): Promise<Row<"conceptSensitivityOverride">>;
 
   job(overrides?: Partial<InsertInput<"job">>): Promise<Row<"job">>;
 
@@ -861,10 +861,12 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  const conceptClassOverride: TestData["conceptClassOverride"] = async (overrides = {}) => {
+  const conceptSensitivityOverride: TestData["conceptSensitivityOverride"] = async (
+    overrides = {},
+  ) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
-    return insertRow(client, "conceptClassOverride", {
+    return insertRow(client, "conceptSensitivityOverride", {
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
       audienceGroups: null,
@@ -942,7 +944,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     erasureRequest,
     suppression,
     conceptEvidence,
-    conceptClassOverride,
+    conceptSensitivityOverride,
     writeUp,
     writeUpInclude,
   };

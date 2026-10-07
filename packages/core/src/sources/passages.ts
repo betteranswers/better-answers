@@ -23,7 +23,7 @@ export type Passage = {
 };
 
 /**
- * The view's class is NULL only for a word both source columns' CHECKs refuse; the predicate's
+ * The view's sensitivity is NULL only for a word both source columns' CHECKs refuse; the predicate's
  * Admin arm passes it, and the parse fails it.
  */
 const PASSAGE_SENSITIVITY = z.enum(SENSITIVITIES);
@@ -47,7 +47,7 @@ type CoveringRow = {
 };
 
 /**
- * `not-found` unless passages the caller can read cover the whole span without a gap. The class is
+ * `not-found` unless passages the caller can read cover the whole span without a gap. The sensitivity is
  * the narrowest among them.
  */
 export const passageAt = async (

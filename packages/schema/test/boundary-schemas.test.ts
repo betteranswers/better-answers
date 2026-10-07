@@ -490,7 +490,7 @@ const acceptedRows = {
     { workspaceId: WS_ID, iri: CONCEPT_IRI, sourceDocumentId: DOCUMENT_ID, locator: "p.4#para-2" },
   ],
 
-  conceptClassOverride: [
+  conceptSensitivityOverride: [
     {
       workspaceId: WS_ID,
       iri: CONCEPT_IRI,
@@ -854,7 +854,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
 
         "suppression",
         "conceptEvidence",
-        "conceptClassOverride",
+        "conceptSensitivityOverride",
         "writeUp",
         "writeUpInclude",
         "passage",

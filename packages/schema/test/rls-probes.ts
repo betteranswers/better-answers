@@ -109,7 +109,7 @@ export const A_SOURCE_DOCUMENT = `INSERT INTO source_document
 export const A_WRITE_UP_INCLUDE = `INSERT INTO write_up_include (workspace_id, write_up_id, id, ordinal, iri)
        VALUES ($1, $2, 'i9', 9, $3)`;
 
-export const A_CONCEPT_CLASS_OVERRIDE = `INSERT INTO concept_class_override
+export const A_CONCEPT_SENSITIVITY_OVERRIDE = `INSERT INTO concept_sensitivity_override
          (workspace_id, iri, sensitivity, audience, actor, audit_event_id)
        VALUES ($1, $2, $3, 'everyone', $4, $5)`;
 

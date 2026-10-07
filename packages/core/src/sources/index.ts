@@ -108,7 +108,7 @@ const SOURCE_ACTS = declareActs("sources", {
  * A narrowing and a widening ask for the same pair; built twice, since one schema exported under
  * two names is a duplicate export.
  */
-const theClassAsked = () =>
+const theSensitivityAsked = () =>
   CONNECTED_SOURCE_VISIBILITY.extend({
     connectedSourceId: CONNECTED_SOURCE_ID,
     audienceGroups: CONNECTED_SOURCE_VISIBILITY.shape.audienceGroups.default(null),
@@ -117,11 +117,11 @@ const theClassAsked = () =>
     return visibility === undefined ? z.NEVER : { connectedSourceId, visibility };
   });
 
-export const narrowConnectedSourceInput = theClassAsked();
+export const narrowConnectedSourceInput = theSensitivityAsked();
 
 export type NarrowConnectedSourceInput = z.output<typeof narrowConnectedSourceInput>;
 
-export const widenConnectedSourceInput = theClassAsked();
+export const widenConnectedSourceInput = theSensitivityAsked();
 
 export type WidenConnectedSourceInput = z.output<typeof widenConnectedSourceInput>;
 
@@ -139,7 +139,7 @@ export type WidenConnectedSourceRefusal =
     >
   | Error;
 
-type ConnectedSourceClassSet = {
+type ConnectedSourceSensitivitySet = {
   readonly connectedSourceId: string;
   readonly auditEventId: string;
   readonly visibility: Visibility;
@@ -149,9 +149,9 @@ type ConnectedSourceClassSet = {
   readonly writeUps: readonly string[];
 };
 
-export type ConnectedSourceNarrowed = ConnectedSourceClassSet;
+export type ConnectedSourceNarrowed = ConnectedSourceSensitivitySet;
 
-export type ConnectedSourceWidened = ConnectedSourceClassSet;
+export type ConnectedSourceWidened = ConnectedSourceSensitivitySet;
 
 type ConnectedSourceRow = {
   readonly sensitivity: string;
@@ -159,9 +159,11 @@ type ConnectedSourceRow = {
   readonly audience_groups: readonly string[] | null;
 };
 
-type ClassHeldRefusal = SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-group"> | Error;
+type SensitivityHeldRefusal =
+  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-group">
+  | Error;
 
-type ClassAsked = {
+type SensitivityAsked = {
   readonly acting: ActingOnConnectedSource;
   readonly from: Visibility;
   readonly next: Visibility;
@@ -171,11 +173,11 @@ type ClassAsked = {
  * A narrowing and a widening both open the cascade before they lock the connected source, so the two queue
  * behind each other rather than deadlock.
  */
-const classAskedOf = async (
+const sensitivityAskedOf = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: z.output<ReturnType<typeof theClassAsked>>,
-): Promise<Result<ClassAsked, ClassHeldRefusal>> => {
+  input: z.output<ReturnType<typeof theSensitivityAsked>>,
+): Promise<Result<SensitivityAsked, SensitivityHeldRefusal>> => {
   const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
   const next = input.visibility;
@@ -195,12 +197,12 @@ const classAskedOf = async (
   return ok({ acting: acting.value, from: visibilityOf(current.value), next });
 };
 
-const classSet = async <A extends AuditAct>(
+const sensitivitySet = async <A extends AuditAct>(
   acting: ActingOnConnectedSource,
   tx: Tx,
   next: Visibility,
   auditEvent: Pick<AuditEvent<A>, "act" | "detail">,
-): Promise<Result<ConnectedSourceClassSet, Error>> => {
+): Promise<Result<ConnectedSourceSensitivitySet, Error>> => {
   const { admin, workspaceId, connectedSourceId } = acting;
   const written = await attempt(() =>
     tx.query(
@@ -219,7 +221,7 @@ const classSet = async <A extends AuditAct>(
 };
 
 /**
- * `widening-refused` if the class asked is wider in sensitivity or audience, even when it is
+ * `widening-refused` if the visibility asked is wider in sensitivity or audience, even when it is
  * narrower in the other.
  */
 export const narrowConnectedSource = async (
@@ -227,12 +229,12 @@ export const narrowConnectedSource = async (
   tx: Tx,
   input: NarrowConnectedSourceInput,
 ): Promise<Result<ConnectedSourceNarrowed, NarrowConnectedSourceRefusal>> => {
-  const asked = await classAskedOf(principal, tx, input);
+  const asked = await sensitivityAskedOf(principal, tx, input);
   if (!asked.ok) return err(asked.error);
   const { acting, from, next } = asked.value;
   if (widens(from, next)) return err("widening-refused");
 
-  return classSet(acting, tx, next, {
+  return sensitivitySet(acting, tx, next, {
     act: SOURCE_ACTS.narrowed,
     detail: {
       [STORED_DETAIL_KEYS.connectedSourceId]: acting.connectedSourceId,
@@ -243,15 +245,15 @@ export const narrowConnectedSource = async (
 };
 
 /**
- * `not-wider` unless the class asked is wider in sensitivity or audience and narrower in neither.
- * A document's own class is left alone: the derivation reads the narrower of it and the connected source's.
+ * `not-wider` unless the visibility asked is wider in sensitivity or audience and narrower in neither.
+ * A document's own sensitivity is left alone: the derivation reads the narrower of it and the connected source's.
  */
 export const widenConnectedSource = async (
   principal: UserPrincipal,
   tx: Tx,
   input: WidenConnectedSourceInput,
 ): Promise<Result<ConnectedSourceWidened, WidenConnectedSourceRefusal>> => {
-  const asked = await classAskedOf(principal, tx, input);
+  const asked = await sensitivityAskedOf(principal, tx, input);
   if (!asked.ok) return err(asked.error);
   const { acting, from, next } = asked.value;
   if (!widens(from, next) || widens(next, from)) return err("not-wider");
@@ -260,7 +262,7 @@ export const widenConnectedSource = async (
   if (!unreviewed.ok) return err(unreviewed.error);
   if (unreviewed.value) return err("special-category-unreviewed");
 
-  return classSet(acting, tx, next, {
+  return sensitivitySet(acting, tx, next, {
     act: SOURCE_ACTS.widened,
     detail: {
       [STORED_DETAIL_KEYS.connectedSourceId]: acting.connectedSourceId,

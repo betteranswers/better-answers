@@ -180,7 +180,7 @@ function ConnectedSourceItem(properties: {
 
       <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
         <Row term="Connector">{connectedSource.connector}</Row>
-        <Row term="Class">
+        <Row term="Sensitivity">
           <Badge variant="outline">{connectedSource.sensitivity}</Badge>
         </Row>
         <Row term="Audience">{audienceWords(connectedSource)}</Row>

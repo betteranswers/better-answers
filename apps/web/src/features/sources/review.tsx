@@ -182,7 +182,7 @@ function FindingsTable(properties: {
           <TableHead>Rule</TableHead>
           <TableHead>Document</TableHead>
           <TableHead className="text-right">Found</TableHead>
-          <TableHead>Class</TableHead>
+          <TableHead>Sensitivity</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

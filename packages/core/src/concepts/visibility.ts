@@ -34,7 +34,7 @@ import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts
 import { restsAlsoOnItsReconcilerHit } from "./reconciler-hit.ts";
 
 const VISIBILITY_ACTS = declareActs("knowledge", {
-  classOverridden: act("knowledge.concept.class_overridden", {
+  sensitivityOverridden: act("knowledge.concept.class_overridden", {
     iri: "iri",
     sensitivity: "sensitivity",
     audience: "audience",
@@ -46,7 +46,7 @@ export type Citation = {
   readonly locator: string;
 };
 
-/** Recomputes no class: the caller derives it once the citations stand. */
+/** Recomputes no sensitivity: the caller derives it once the citations stand. */
 export const replaceCitations = async (
   principal: Principal,
   tx: Tx,
@@ -75,7 +75,7 @@ const overrideOf = async (
 ): Promise<OverrideRow | undefined> => {
   const found = await tx.query<OverrideRow>(
     `SELECT sensitivity, audience, audience_groups, actor, recorded_at
-       FROM concept_class_override WHERE workspace_id = ${scopeClause(1)} AND iri = $2`,
+       FROM concept_sensitivity_override WHERE workspace_id = ${scopeClause(1)} AND iri = $2`,
     [scopeParameter(principal), iri],
   );
   return found.rows[0];
@@ -95,8 +95,8 @@ const restingOn = (row: SourcedVisibilityRow): readonly Visibility[] => [
 ];
 
 /**
- * Derives the class from the connected sources and documents the concept cites, or from `citing` in
- * place of its standing citations. `alsoOn` adds classes, `onTheRow` adds its index row locked
+ * Derives the sensitivity from the connected sources and documents the concept cites, or from `citing` in
+ * place of its standing citations. `alsoOn` adds sensitivities, `onTheRow` adds its index row locked
  * for update, and an override wins outright. Share-locks each connected source it reads.
  */
 export const conceptVisibilityFrom = async (
@@ -130,7 +130,7 @@ export const conceptVisibilityFrom = async (
           parameters: [scopeParameter(principal), [...new Set(concept.citing)]],
         };
   // A statement that waited on a lock still reads unlocked rows at its first snapshot, so the
-  // document's class is read in the next.
+  // document's sensitivity is read in the next.
   await tx.query(`SELECT 1 ${rowsCited.clause} FOR SHARE OF b`, rowsCited.parameters);
   const connectedSources = await tx.query<SourcedVisibilityRow>(
     `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity,
@@ -230,7 +230,7 @@ const recomputeConceptVisibility = async (
 
 /**
  * Recomputes each indexed concept citing the connected source's documents, or only those among
- * `documentIds`, and returns every one, whether or not its class moved.
+ * `documentIds`, and returns every one, whether or not its sensitivity moved.
  */
 export const recomputeVisibilitySourcedFrom = async (
   principal: Principal,
@@ -257,7 +257,7 @@ export const recomputeVisibilitySourcedFrom = async (
   return recomputed;
 };
 
-export type OverrideConceptClassInput = {
+export type OverrideConceptSensitivityInput = {
   readonly iri: string;
   readonly sensitivity: string;
   readonly audience: string;
@@ -265,14 +265,14 @@ export type OverrideConceptClassInput = {
   readonly audienceGroups?: readonly string[] | null | undefined;
 };
 
-export type OverrideConceptClassRefusal =
+export type OverrideConceptSensitivityRefusal =
   | RoleRefusal
   | "malformed"
   | "no-such-concept"
   | "no-such-group"
   | Error;
 
-export type ConceptClassOverridden = {
+export type ConceptSensitivityOverridden = {
   readonly iri: string;
   readonly auditEventId: string;
 
@@ -281,14 +281,14 @@ export type ConceptClassOverridden = {
   readonly writeUps: readonly string[];
 };
 
-const OVERRIDE_IRI = boundarySchemas.conceptClassOverride.insert.shape.iri;
+const OVERRIDE_IRI = boundarySchemas.conceptSensitivityOverride.insert.shape.iri;
 
 /** Admin only. `writeUps` names every write-up including the concept, each recomputed. */
-export const overrideConceptClass = async (
+export const overrideConceptSensitivity = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: OverrideConceptClassInput,
-): Promise<Result<ConceptClassOverridden, OverrideConceptClassRefusal>> => {
+  input: OverrideConceptSensitivityInput,
+): Promise<Result<ConceptSensitivityOverridden, OverrideConceptSensitivityRefusal>> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
   const iri = OVERRIDE_IRI.safeParse(input.iri);
@@ -305,7 +305,7 @@ const openingTheOverride = async (
   tx: Tx,
   iri: string,
   visibility: Visibility,
-): Promise<Result<undefined, OverrideConceptClassRefusal>> => {
+): Promise<Result<undefined, OverrideConceptSensitivityRefusal>> => {
   const groups = await openingACascadeOverHeldGroups(admin, tx, visibility.audienceGroups ?? []);
   if (!groups.ok) return err(groups.error);
   const known = await attempt(() =>
@@ -325,11 +325,11 @@ const writeOverride = async (
   tx: Tx,
   iri: string,
   visibility: Visibility,
-): Promise<Result<ConceptClassOverridden, Error>> => {
+): Promise<Result<ConceptSensitivityOverridden, Error>> => {
   const auditEventId = ulid();
   const recorded = await attempt(() =>
     tx.query(
-      `INSERT INTO concept_class_override
+      `INSERT INTO concept_sensitivity_override
          (workspace_id, iri, sensitivity, audience, audience_groups, actor, audit_event_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (workspace_id, iri) DO UPDATE
@@ -351,7 +351,7 @@ const writeOverride = async (
 
   await record(admin, tx, {
     id: auditEventId,
-    act: VISIBILITY_ACTS.classOverridden,
+    act: VISIBILITY_ACTS.sensitivityOverridden,
     subjectId: iri,
     detail: { iri, sensitivity: visibility.sensitivity, audience: visibility.audience },
   });
@@ -429,7 +429,7 @@ export const evidencePaneOf = async (
                 '[]') AS readable,
               o.actor, o.recorded_at
          FROM concept_index c
-         LEFT JOIN concept_class_override o ON o.workspace_id = c.workspace_id AND o.iri = c.iri
+         LEFT JOIN concept_sensitivity_override o ON o.workspace_id = c.workspace_id AND o.iri = c.iri
          LEFT JOIN concept_evidence ce ON ce.workspace_id = c.workspace_id AND ce.iri = c.iri
          LEFT JOIN (evidence e
                     JOIN source_document d

@@ -53,11 +53,11 @@ export const SAID_OF_A_CONNECTED_SOURCE = {
   },
   "widening-refused": {
     why: "That would widen who may read it, and a narrowing never widens.",
-    next: "Choose a class narrower than the one it has.",
+    next: "Choose a sensitivity narrower than the one it has.",
   },
   "not-wider": {
-    why: "That is no wider than the class and audience it has.",
-    next: "Choose a wider class, or everyone in the workspace for its audience.",
+    why: "That is no wider than the sensitivity and audience it has.",
+    next: "Choose a wider sensitivity, or everyone in the workspace for its audience.",
   },
   "no-such-group": {
     why: "A named group is not one this workspace holds.",

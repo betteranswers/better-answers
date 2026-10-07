@@ -19,7 +19,7 @@ import {
 } from "@/shared/ui/select.tsx";
 
 import { outcomeOfFailure, refusedFor } from "./refusal.tsx";
-import { CLASSES, EVERYONE, NARROWEST, useConnect } from "./sources-api.ts";
+import { SENSITIVITIES, EVERYONE, NARROWEST, useConnect } from "./sources-api.ts";
 import { SOURCES_KEYSTROKES } from "./sources-state.ts";
 import { AUDIENCE_WORDS, UPLOAD_CAP_MB } from "./words.ts";
 
@@ -163,13 +163,13 @@ export function ConnectAct() {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor={ids.sensitivity}>Class</Label>
+            <Label htmlFor={ids.sensitivity}>Sensitivity</Label>
             <Select name="sensitivity" defaultValue={NARROWEST}>
               <SelectTrigger id={ids.sensitivity}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {CLASSES.map((word) => (
+                {SENSITIVITIES.map((word) => (
                   <SelectItem key={word} value={word}>
                     {word}
                   </SelectItem>

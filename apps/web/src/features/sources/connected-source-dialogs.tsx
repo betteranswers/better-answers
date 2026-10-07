@@ -17,7 +17,7 @@ import { counted } from "@/shared/words.ts";
 import { connectedSourceHeadingId } from "./connected-source-list.tsx";
 import { outcomeOfFailure, whyAndNextOf } from "./refusal.tsx";
 import {
-  CLASSES,
+  SENSITIVITIES,
   EVERYONE,
   NARROWEST,
   useFindings,
@@ -92,7 +92,7 @@ function WhatTheRowCarries(properties: {
 
   return (
     <TheAuditRow action="published" connectedSource={properties.connectedSource}>
-      <SummaryRow term="Class">{properties.connectedSource.sensitivity}</SummaryRow>
+      <SummaryRow term="Sensitivity">{properties.connectedSource.sensitivity}</SummaryRow>
       <SummaryRow term="Audience">{AUDIENCE_WORDS[properties.connectedSource.audience]}</SummaryRow>
       {CONFIRMATIONS.map((confirmation) => (
         <SummaryRow key={confirmation.field} term={confirmation.said}>
@@ -142,7 +142,7 @@ export function PublishDialog(properties: DialogProperties<Confirmations>) {
         onCloseAutoFocus: toTheConnectedSource(connectedSource.connectedSourceId),
       }}
       title={`Publish ${connectedSource.name}`}
-      consequence={`Its passages reach ${AUDIENCE_WORDS[connectedSource.audience].toLowerCase()} at the class ${connectedSource.sensitivity} the moment you publish. This page cannot unpublish it.`}
+      consequence={`Its passages reach ${AUDIENCE_WORDS[connectedSource.audience].toLowerCase()} at the sensitivity ${connectedSource.sensitivity} the moment you publish. This page cannot unpublish it.`}
       commit={
         <Button disabled={!allConfirmed} aria-describedby={hintId} onClick={confirm}>
           Publish {connectedSource.name}
@@ -180,7 +180,7 @@ export function PublishDialog(properties: DialogProperties<Confirmations>) {
 }
 
 const narrowerThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
-  CLASSES.slice(0, CLASSES.indexOf(sensitivity));
+  SENSITIVITIES.slice(0, SENSITIVITIES.indexOf(sensitivity));
 
 export const movedWords = (moved: {
   readonly concepts: readonly string[];
@@ -260,7 +260,12 @@ export function NarrowDialog(properties: DialogProperties<Sensitivity>) {
         </Button>
       }
     >
-      <WordPicked label="Class" value={sensitivity} words={narrower} onPick={setSensitivity} />
+      <WordPicked
+        label="Sensitivity"
+        value={sensitivity}
+        words={narrower}
+        onPick={setSensitivity}
+      />
       <p className="text-sm text-muted-foreground">
         It is {connectedSource.sensitivity} now. Its audience stays{" "}
         {AUDIENCE_WORDS[connectedSource.audience].toLowerCase()}.
@@ -274,34 +279,34 @@ type Audience = ListedConnectedSource["audience"];
 export type Widening = { readonly sensitivity: Sensitivity; readonly audience: Audience };
 
 const asWideOrWiderThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
-  CLASSES.slice(CLASSES.indexOf(sensitivity));
+  SENSITIVITIES.slice(SENSITIVITIES.indexOf(sensitivity));
 
 /** The dialog opens on a widening, so the one click it asks for is never refused as not wider. */
 const firstWidening = (connectedSource: ListedConnectedSource): Widening => {
-  const wider = CLASSES[CLASSES.indexOf(connectedSource.sensitivity) + 1];
+  const wider = SENSITIVITIES[SENSITIVITIES.indexOf(connectedSource.sensitivity) + 1];
   return wider === undefined
     ? { sensitivity: connectedSource.sensitivity, audience: EVERYONE }
     : { sensitivity: wider, audience: connectedSource.audience };
 };
 
 /**
- * The dialog offers no narrower class and no other groups, so a wider term is the whole
+ * The dialog offers no narrower sensitivity and no other groups, so a wider term is the whole
  * question.
  */
 const asksWider = (connectedSource: ListedConnectedSource, asked: Widening): boolean =>
-  CLASSES.indexOf(asked.sensitivity) > CLASSES.indexOf(connectedSource.sensitivity) ||
+  SENSITIVITIES.indexOf(asked.sensitivity) > SENSITIVITIES.indexOf(connectedSource.sensitivity) ||
   (asked.audience === EVERYONE && connectedSource.audience !== EVERYONE);
 
 const WIDENING_CONSEQUENCE = {
   published:
     "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every write-up including one, moves with it in the same act.",
   unpublished:
-    "Nobody but an Admin reads it until you publish it, and the publish then releases the class you choose here.",
+    "Nobody but an Admin reads it until you publish it, and the publish then releases the sensitivity you choose here.",
 };
 
-const ITS_OWN_CLASS_STANDS = "A document with a narrower class of its own keeps it.";
+const ITS_OWN_SENSITIVITY_STANDS = "A document with a narrower sensitivity of its own keeps it.";
 
-export const classAndAudienceWords = (widening: Widening): string =>
+export const sensitivityAndAudienceWords = (widening: Widening): string =>
   `${widening.sensitivity} for ${AUDIENCE_WORDS[widening.audience].toLowerCase()}`;
 
 export function WidenDialog(properties: DialogProperties<Widening>) {
@@ -320,7 +325,7 @@ export function WidenDialog(properties: DialogProperties<Widening>) {
         onCloseAutoFocus: toTheConnectedSource(connectedSource.connectedSourceId),
       }}
       title={`Widen ${connectedSource.name}`}
-      consequence={`${WIDENING_CONSEQUENCE[publication]} ${ITS_OWN_CLASS_STANDS}`}
+      consequence={`${WIDENING_CONSEQUENCE[publication]} ${ITS_OWN_SENSITIVITY_STANDS}`}
       commit={
         <Button
           disabled={!wider}
@@ -329,12 +334,12 @@ export function WidenDialog(properties: DialogProperties<Widening>) {
             onConfirm(asked);
           }}
         >
-          Widen {connectedSource.name} to {classAndAudienceWords(asked)}
+          Widen {connectedSource.name} to {sensitivityAndAudienceWords(asked)}
         </Button>
       }
     >
       <WordPicked
-        label="Class"
+        label="Sensitivity"
         value={asked.sensitivity}
         words={asWideOrWiderThan(connectedSource.sensitivity)}
         onPick={(sensitivity) => {
@@ -355,13 +360,13 @@ export function WidenDialog(properties: DialogProperties<Widening>) {
       )}
 
       <p className="text-sm text-muted-foreground">
-        It is {classAndAudienceWords(connectedSource)} now
+        It is {sensitivityAndAudienceWords(connectedSource)} now
         {connectedSource.audience === EVERYONE ? ", and no audience is wider." : "."}
       </p>
 
       <TheAuditRow action="widened" connectedSource={connectedSource}>
-        <SummaryRow term="Class, from">{connectedSource.sensitivity}</SummaryRow>
-        <SummaryRow term="Class, to">{asked.sensitivity}</SummaryRow>
+        <SummaryRow term="Sensitivity, from">{connectedSource.sensitivity}</SummaryRow>
+        <SummaryRow term="Sensitivity, to">{asked.sensitivity}</SummaryRow>
         <SummaryRow term="Audience, from">{AUDIENCE_WORDS[connectedSource.audience]}</SummaryRow>
         <SummaryRow term="Audience, to">{AUDIENCE_WORDS[asked.audience]}</SummaryRow>
       </TheAuditRow>

@@ -324,7 +324,11 @@ describe("an Admin connects an upload", () => {
     ],
     ["a connected source nobody named", { name: "   " }, { name: "too-small" }],
     ["a blank file name", { fileName: "  " }, { fileName: "too-small" }],
-    ["a class outside the glossary", { sensitivity: "Secret" }, { sensitivity: "not-in-set" }],
+    [
+      "a sensitivity outside the glossary",
+      { sensitivity: "Secret" },
+      { sensitivity: "not-in-set" },
+    ],
     ["an audience outside the glossary", { audience: "the board" }, { audience: "not-in-set" }],
     [
       "groups under an audience taking none",
@@ -878,7 +882,7 @@ const dpiaHashOfTheHandbook = (connectedSourceId: string): string =>
     .digest("hex");
 
 describe("an Admin publishes a connected source", () => {
-  it("publishes, recording confirmations, counts, DPIA hash, class and audience", async () => {
+  it("publishes, recording confirmations, counts, DPIA hash, sensitivity and audience", async () => {
     const scenario = await arrange();
     const { connectedSourceId, documentId, jobId } = await boundHandbook(scenario, {
       sensitivity: "Internal",

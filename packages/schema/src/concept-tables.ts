@@ -330,8 +330,8 @@ export const conceptEvidence = withRLS(
   ],
 );
 
-export const conceptClassOverride = withRLS(
-  "concept_class_override",
+export const conceptSensitivityOverride = withRLS(
+  "concept_sensitivity_override",
   {
     workspaceId: text("workspace_id").notNull(),
     iri: text("iri").notNull(),
@@ -346,12 +346,12 @@ export const conceptClassOverride = withRLS(
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.iri] }),
-    identityKey(table, "concept_class_override_identity_fk"),
+    identityKey(table, "concept_sensitivity_override_identity_fk"),
     check(
-      "concept_class_override_sensitivity_check",
+      "concept_sensitivity_override_sensitivity_check",
       sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`),
     ),
-    check("concept_class_override_audience_check", sql.raw(AUDIENCE_CHECK)),
-    check("concept_class_override_actor_check", sql.raw(`actor ~ '^${ACTOR_ID_PATTERN}$'`)),
+    check("concept_sensitivity_override_audience_check", sql.raw(AUDIENCE_CHECK)),
+    check("concept_sensitivity_override_actor_check", sql.raw(`actor ~ '^${ACTOR_ID_PATTERN}$'`)),
   ],
 );

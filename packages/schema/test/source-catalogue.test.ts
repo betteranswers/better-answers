@@ -284,7 +284,7 @@ describe("the catalogue a sync reconciles", () => {
     );
   });
 
-  it("admits every declared class and outcome, and refuses others", async () => {
+  it("admits every declared sensitivity and outcome, and refuses others", async () => {
     await withConnectedSources(async (client) => {
       const landed: string[] = [];
       for (const sensitivity of SENSITIVITIES) {

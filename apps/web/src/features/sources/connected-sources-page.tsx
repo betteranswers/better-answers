@@ -11,7 +11,7 @@ import { useReadSaid } from "@/shared/read-said.ts";
 
 import { ConnectAct } from "./connect-act.tsx";
 import {
-  classAndAudienceWords,
+  sensitivityAndAudienceWords,
   movedWords,
   NarrowDialog,
   PublishDialog,
@@ -59,12 +59,12 @@ const waitsForItsSync = (connectedSource: ListedConnectedSource): Outcome => ({
 
 const narrowestAlready = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
-  words: `“${connectedSource.name}” is ${connectedSource.sensitivity}, and no class is narrower.`,
+  words: `“${connectedSource.name}” is ${connectedSource.sensitivity}, and no sensitivity is narrower.`,
 });
 
 const nothingWider = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
-  words: `“${connectedSource.name}” is ${classAndAudienceWords(connectedSource)}, and no class or audience is wider.`,
+  words: `“${connectedSource.name}” is ${sensitivityAndAudienceWords(connectedSource)}, and no sensitivity or audience is wider.`,
 });
 
 function ListStatus(properties: {
@@ -253,7 +253,7 @@ export function ConnectedSourcesPage() {
               },
               settledSaying((widened: ConnectedSourceWidened) => (
                 <>
-                  Widened “{toWiden.name}” to {classAndAudienceWords(widened.visibility)}.{" "}
+                  Widened “{toWiden.name}” to {sensitivityAndAudienceWords(widened.visibility)}.{" "}
                   {movedWords(widened)}
                 </>
               )),

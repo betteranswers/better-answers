@@ -27,7 +27,7 @@ import {
   A_BUNDLE_COMMIT_WITH_A_PARENT,
   A_CITATION,
   A_WRITE_UP_INCLUDE,
-  A_CONCEPT_CLASS_OVERRIDE,
+  A_CONCEPT_SENSITIVITY_OVERRIDE,
   A_CONCEPT_IDENTITY,
   A_CONCEPT_INDEX_ROW,
   A_CONCEPT_VERIFICATION,
@@ -2099,9 +2099,9 @@ describe("the audience pair on every readable unit", () => {
     ],
     ["write_up", "write_up_audience_check", (seed) => seed.writeUp({ workspaceId: WS_A })],
     [
-      "concept_class_override",
-      "concept_class_override_audience_check",
-      (seed) => seed.conceptClassOverride({ workspaceId: WS_A }),
+      "concept_sensitivity_override",
+      "concept_sensitivity_override_audience_check",
+      (seed) => seed.conceptSensitivityOverride({ workspaceId: WS_A }),
     ],
   ];
 
@@ -2204,7 +2204,7 @@ describe("the derivation's tables under app_rt", () => {
     "connected_source",
     "source_document",
     "concept_evidence",
-    "concept_class_override",
+    "concept_sensitivity_override",
     "write_up",
     "write_up_include",
   ] as const;
@@ -2221,7 +2221,7 @@ describe("the derivation's tables under app_rt", () => {
       iri: identity.iri,
       sourceDocumentId: document.id,
     });
-    await seed.conceptClassOverride({ workspaceId, iri: identity.iri });
+    await seed.conceptSensitivityOverride({ workspaceId, iri: identity.iri });
     const composed = await seed.writeUp({ workspaceId });
     await seed.writeUpInclude({ workspaceId, writeUpId: composed.id, iri: identity.iri });
     return { connectedSource, document, identity, cited, composed };
@@ -2246,7 +2246,7 @@ describe("the derivation's tables under app_rt", () => {
 
   const REFUSED_TO_THE_WORKER = [
     "concept_evidence",
-    "concept_class_override",
+    "concept_sensitivity_override",
     "write_up",
     "write_up_include",
   ] as const;
@@ -2361,9 +2361,9 @@ describe("the derivation's tables under app_rt", () => {
           "write_up_include_identity_fk",
         ],
         [
-          A_CONCEPT_CLASS_OVERRIDE,
+          A_CONCEPT_SENSITIVITY_OVERRIDE,
           [WS_A, theirs.identity.iri, "Internal", "process:better-answers-test", ulid()],
-          "concept_class_override_identity_fk",
+          "concept_sensitivity_override_identity_fk",
         ],
 
         [A_CITATION, [WS_A, ours.identity.iri, ours.document.id], "concept_evidence_evidence_fk"],
@@ -2378,25 +2378,31 @@ describe("the derivation's tables under app_rt", () => {
     });
   });
 
-  it("refuses an override with an unknown actor form or class", async () => {
+  it("refuses an override with an unknown actor form or sensitivity", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const override = (actor: string, sensitivity: string) =>
-        client.query(A_CONCEPT_CLASS_OVERRIDE, [WS_A, identity.iri, sensitivity, actor, ulid()]);
+        client.query(A_CONCEPT_SENSITIVITY_OVERRIDE, [
+          WS_A,
+          identity.iri,
+          sensitivity,
+          actor,
+          ulid(),
+        ]);
 
       await client.query("SAVEPOINT actor");
       await expect(override("Ada Admin", "Internal")).rejects.toThrow(
-        /concept_class_override_actor_check/,
+        /concept_sensitivity_override_actor_check/,
       );
       await client.query("ROLLBACK TO SAVEPOINT actor");
-      await client.query("SAVEPOINT class");
+      await client.query("SAVEPOINT sensitivity");
       await expect(override("human:01J6CCCCCCCCCCCCCCCCCCCCCC", "Secret")).rejects.toThrow(
-        /concept_class_override_sensitivity_check/,
+        /concept_sensitivity_override_sensitivity_check/,
       );
-      await client.query("ROLLBACK TO SAVEPOINT class");
+      await client.query("ROLLBACK TO SAVEPOINT sensitivity");
 
       const landed = await override("human:01J6CCCCCCCCCCCCCCCCCCCCCC", "Internal");
       expect(landed.rowCount).toBe(1);
@@ -2426,12 +2432,12 @@ describe("the derivation's tables under app_rt", () => {
       expect(
         await countedRows(client, [
           "concept_evidence",
-          "concept_class_override",
+          "concept_sensitivity_override",
           "write_up_include",
         ]),
       ).toEqual([
         { table: "concept_evidence", rows: 0 },
-        { table: "concept_class_override", rows: 0 },
+        { table: "concept_sensitivity_override", rows: 0 },
         { table: "write_up_include", rows: 0 },
       ]);
     });
@@ -2665,7 +2671,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("keeps a document's class within an Admin's narrowing", async () => {
+  it("keeps a document's sensitivity within an Admin's narrowing", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const narrowed = await seed.sourceDocument({

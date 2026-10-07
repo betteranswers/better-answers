@@ -99,7 +99,8 @@ def index_connected_source(
                 ms_per_page=ms_per_page,
                 margin_ms=margin_ms,
             )
-            # A document's class must be on its row before any of its passages is read.
+            # A document's sensitivity is on its row before any passage of it
+            # is read.
             with queue.scoped(connection, sync.workspace_id) as cursor:
                 record_findings(cursor, sync, landed.documents)
                 reconcile_catalogue(cursor, landed.documents)

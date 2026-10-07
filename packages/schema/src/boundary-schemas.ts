@@ -13,7 +13,7 @@ import {
   CONCEPT_FRONTMATTER_MAX,
   CONCEPT_PATH,
   CONCEPT_STATUSES,
-  conceptClassOverride,
+  conceptSensitivityOverride,
   conceptEvidence,
   conceptIdentity,
   conceptIndex,
@@ -552,7 +552,7 @@ export const conceptEvidenceUpdate = createUpdateSchema(
   conceptEvidenceRefinements,
 );
 
-const conceptClassOverrideRefinements = {
+const conceptSensitivityOverrideRefinements = {
   workspaceId,
   iri: conceptIri,
   ...readableUnit,
@@ -560,17 +560,17 @@ const conceptClassOverrideRefinements = {
   auditEventId: (schema: z.ZodString) => schema.regex(ULID),
 };
 
-export const conceptClassOverrideSelect = createSelectSchema(
-  conceptClassOverride,
-  conceptClassOverrideRefinements,
+export const conceptSensitivityOverrideSelect = createSelectSchema(
+  conceptSensitivityOverride,
+  conceptSensitivityOverrideRefinements,
 );
-export const conceptClassOverrideInsert = createInsertSchema(
-  conceptClassOverride,
-  conceptClassOverrideRefinements,
+export const conceptSensitivityOverrideInsert = createInsertSchema(
+  conceptSensitivityOverride,
+  conceptSensitivityOverrideRefinements,
 );
-export const conceptClassOverrideUpdate = createUpdateSchema(
-  conceptClassOverride,
-  conceptClassOverrideRefinements,
+export const conceptSensitivityOverrideUpdate = createUpdateSchema(
+  conceptSensitivityOverride,
+  conceptSensitivityOverrideRefinements,
 );
 
 const rulesInForce = z.union([
@@ -1051,11 +1051,11 @@ export const boundarySchemas = {
     insert: conceptEvidenceInsert,
     update: conceptEvidenceUpdate,
   },
-  conceptClassOverride: {
-    table: conceptClassOverride,
-    select: conceptClassOverrideSelect,
-    insert: conceptClassOverrideInsert,
-    update: conceptClassOverrideUpdate,
+  conceptSensitivityOverride: {
+    table: conceptSensitivityOverride,
+    select: conceptSensitivityOverrideSelect,
+    insert: conceptSensitivityOverrideInsert,
+    update: conceptSensitivityOverrideUpdate,
   },
   connectedSource: {
     table: connectedSource,

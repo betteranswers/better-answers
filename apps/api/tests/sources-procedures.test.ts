@@ -759,7 +759,7 @@ describe("the Sources procedures over the wire", () => {
     expect([listed?.state, listed?.publishedAt]).toEqual(["published", "2026-09-23T09:00:00.000Z"]);
   });
 
-  it("narrows a connected source's class", async () => {
+  it("narrows a connected source's sensitivity", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
 
@@ -778,7 +778,7 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
-  it("widens a connected source's class, refusing a non-wider one", async () => {
+  it("widens a connected source's sensitivity, refusing a non-wider one", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId } = await unpublishedConnectedSource(workspace.workspaceId);
 

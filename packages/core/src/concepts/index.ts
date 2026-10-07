@@ -142,15 +142,15 @@ export type {
 export type { SuggestionSummaryItem } from "./suggestions.ts";
 export {
   evidencePaneOf,
-  overrideConceptClass,
+  overrideConceptSensitivity,
   openingACascadeOverHeldGroups,
   recomputeVisibilitySourcedFrom,
 } from "./visibility.ts";
 /** @public S3 */
 export type {
-  ConceptClassOverridden,
-  OverrideConceptClassInput,
-  OverrideConceptClassRefusal,
+  ConceptSensitivityOverridden,
+  OverrideConceptSensitivityInput,
+  OverrideConceptSensitivityRefusal,
 } from "./visibility.ts";
 /** @public S2 */
 export type { EvidencePane } from "./visibility.ts";
@@ -705,7 +705,7 @@ const acceptOne = async (
 export type ImportBundleInput = {
   readonly tree: BundleTree;
 
-  /** The class every landed concept takes; `IMPORT_SENSITIVITY_DEFAULT` when absent. */
+  /** The sensitivity every landed concept takes; `IMPORT_SENSITIVITY_DEFAULT` when absent. */
   readonly sensitivity?: (typeof SENSITIVITIES)[number] | undefined;
 
   readonly dryRun?: boolean | undefined;
@@ -1074,7 +1074,7 @@ export const importBundle = async (
   if (!mayWrite(principal)) return err("role-forbids");
   const sensitivity = input.sensitivity ?? IMPORT_SENSITIVITY_DEFAULT;
 
-  // The second pass reads back what the first landed; a class the runner cannot read would stop
+  // The second pass reads back what the first landed; a sensitivity the runner cannot read would stop
   // the run after everything was written.
   if (!readsSensitivity(principal, sensitivity)) return err("class-unreadable");
   const opened = await openImport(principal, doors.postgres, input);

@@ -84,7 +84,7 @@ export const TABLE_OWNERS = {
   "public.suppression": "erasure",
 
   "public.concept_evidence": "concepts",
-  "public.concept_class_override": "concepts",
+  "public.concept_sensitivity_override": "concepts",
 
   "public.write_up": "guides",
   "public.write_up_include": "guides",
@@ -346,14 +346,14 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "concepts",
     access: "read",
     reason:
-      "The class derivation joins a concept's citations to the documents they locate, to reach the connected source each was yielded by — the platform-held fact a producer's citation cannot supply.",
+      "The sensitivity derivation joins a concept's citations to the documents they locate, to reach the connected source each was yielded by — the platform-held fact a producer's citation cannot supply.",
   },
   {
     table: "public.connected_source",
     by: "concepts",
     access: "read",
     reason:
-      "A concept's class is the most restrictive among the connected sources of the evidence it cites and its audience their intersection; the evidence pane applies the reader's predicate to the same rows to say which cited evidence they may reach.",
+      "A concept's sensitivity is the most restrictive among the connected sources of the evidence it cites and its audience their intersection; the evidence pane applies the reader's predicate to the same rows to say which cited evidence they may reach.",
   },
   {
     table: "public.job",
@@ -367,6 +367,6 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "guides",
     access: "read",
     reason:
-      "A write-up's class is the most restrictive among its includes, read off the concepts' rows; the footnote read applies the concept's own predicate to every include, so a write-up's citation is never a side door to a concept its reader may not see.",
+      "A write-up's sensitivity is the most restrictive among its includes, read off the concepts' rows; the footnote read applies the concept's own predicate to every include, so a write-up's citation is never a side door to a concept its reader may not see.",
   },
 ] as const satisfies readonly CrossOwnerAccess[];

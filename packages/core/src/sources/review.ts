@@ -81,17 +81,19 @@ export const holdsAnUnreviewedSpecialCategory = async (
   return ok(found.value.rows[0]?.held === true);
 };
 
-const classOf = (word: string): Sensitivity | undefined =>
+const sensitivityOf = (word: string): Sensitivity | undefined =>
   SENSITIVITIES.find((known) => known === word);
 
 const effectiveClass = (own: string | null, connectedSource: string): Sensitivity | undefined => {
-  const inherited = classOf(connectedSource);
+  const inherited = sensitivityOf(connectedSource);
   if (inherited === undefined || own === null) return inherited;
-  const held = classOf(own);
+  const held = sensitivityOf(own);
   return held === undefined ? undefined : narrower(held, inherited);
 };
 
-const BROKEN_CLASS = new Error("a source document's class is not one the visibility words hold");
+const BROKEN_SENSITIVITY = new Error(
+  "a source document's sensitivity is not one the visibility words hold",
+);
 
 const GROUPS_OF_FINDINGS = `SELECT d.id AS "documentId", d.title,
             d.sensitivity AS "documentSensitivity", b.sensitivity AS "connectedSourceSensitivity",
@@ -170,7 +172,7 @@ export const findingsOf = async (
   const groups: GroupOfFindings[] = [];
   for (const { documentSensitivity, connectedSourceSensitivity, ...row } of grouped.value.rows) {
     const sensitivity = effectiveClass(documentSensitivity, connectedSourceSensitivity);
-    if (sensitivity === undefined) return err(BROKEN_CLASS);
+    if (sensitivity === undefined) return err(BROKEN_SENSITIVITY);
     groups.push({ ...row, sensitivity, specialCategory: SPECIAL_CATEGORIES.has(row.category) });
   }
   return ok(groups);
@@ -462,15 +464,15 @@ const documentsToNarrow = async (
 
   for (const row of rows) {
     const effective = effectiveClass(row.sensitivity, connectedSource.value.sensitivity);
-    if (effective === undefined) return err(BROKEN_CLASS);
+    if (effective === undefined) return err(BROKEN_SENSITIVITY);
     if (narrower(next, effective) !== next) return err("widening-refused");
   }
   return ok(rows);
 };
 
 /**
- * Sets each named document's class, marks the groups' unreviewed findings narrowed, and recomputes
- * the visibility of what those documents source. A class wider than one document's effective
+ * Sets each named document's sensitivity, marks the groups' unreviewed findings narrowed, and recomputes
+ * the visibility of what those documents source. A sensitivity wider than one document's effective
  * class, the narrower of its own and its connected source's, refuses the whole command.
  */
 export const narrowDocuments = async (

@@ -29,7 +29,7 @@ export type DismissedAsNotSpecialCategory = inferOutput<
 export type Sensitivity = ListedConnectedSource["sensitivity"];
 
 /** Narrowest first, the order a narrowing moves in. */
-export const CLASSES: readonly Sensitivity[] = ["Restricted", "Internal", "Public"];
+export const SENSITIVITIES: readonly Sensitivity[] = ["Restricted", "Internal", "Public"];
 
 export const NARROWEST: Sensitivity = "Restricted";
 
@@ -133,45 +133,45 @@ export const usePublish = () => {
 };
 
 /**
- * Text until parsed: the input's class and audience are the api's words as the wire carries
+ * Text until parsed: the input's sensitivity and audience are the api's words as the wire carries
  * them.
  */
-type ClassAsked = inferInput<Api["sources"]["widen"]>;
+type SensitivityAsked = inferInput<Api["sources"]["widen"]>;
 
-const classSetAsAsked =
-  (asked: ClassAsked) =>
+const sensitivitySetAsAsked =
+  (asked: SensitivityAsked) =>
   (connectedSource: ListedConnectedSource): ListedConnectedSource => {
     const sensitivity =
-      CLASSES.find((word) => word === asked.sensitivity) ?? connectedSource.sensitivity;
+      SENSITIVITIES.find((word) => word === asked.sensitivity) ?? connectedSource.sensitivity;
     return asked.audience === EVERYONE
       ? { ...connectedSource, sensitivity, audience: EVERYONE, audienceGroups: null }
       : { ...connectedSource, sensitivity };
   };
 
-/** A narrowing and a widening draw the same class on the row, and undo it the same way. */
-const useClassSetOnTheRow = () => {
+/** A narrowing and a widening draw the same sensitivity on the row, and undo it the same way. */
+const useSensitivitySetOnTheRow = () => {
   const api = useTRPC();
   const optimistic = useOptimistic();
   const reconcile = useReconcile();
   return {
-    onMutate: (asked: ClassAsked) =>
+    onMutate: (asked: SensitivityAsked) =>
       optimistic(
         api.sources.list.queryKey(),
-        onTheConnectedSource(asked.connectedSourceId, classSetAsAsked(asked)),
+        onTheConnectedSource(asked.connectedSourceId, sensitivitySetAsAsked(asked)),
       ),
-    onError: (_refusal: ApiError, _asked: ClassAsked, held: Undo | undefined) => held?.undo(),
+    onError: (_refusal: ApiError, _asked: SensitivityAsked, held: Undo | undefined) => held?.undo(),
     onSettled: () => reconcile(),
   };
 };
 
 export const useNarrowConnectedSource = () => {
   const api = useTRPC();
-  return useMutation(api.sources.narrow.mutationOptions(useClassSetOnTheRow()));
+  return useMutation(api.sources.narrow.mutationOptions(useSensitivitySetOnTheRow()));
 };
 
 export const useWidenConnectedSource = () => {
   const api = useTRPC();
-  return useMutation(api.sources.widen.mutationOptions(useClassSetOnTheRow()));
+  return useMutation(api.sources.widen.mutationOptions(useSensitivitySetOnTheRow()));
 };
 
 const sameGroup = (left: GroupOfFindingsKey, right: GroupOfFindingsKey): boolean =>

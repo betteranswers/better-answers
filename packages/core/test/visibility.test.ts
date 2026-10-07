@@ -13,7 +13,7 @@ import { ask, find, open } from "../src/answering/index.ts";
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import {
   evidencePaneOf,
-  overrideConceptClass,
+  overrideConceptSensitivity,
   writeConcept,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
@@ -166,7 +166,7 @@ const widenedTo = (scenario: Scenario, connectedSourceId: string, sensitivity: s
 
 const overriddenTo = (scenario: Scenario, iri: string, sensitivity: string) =>
   reading(scenario.admin, (admin, tx) =>
-    overrideConceptClass(admin, tx, { iri, sensitivity, audience: "everyone" }),
+    overrideConceptSensitivity(admin, tx, { iri, sensitivity, audience: "everyone" }),
   );
 const EVERYONE = { audience: "everyone", audience_groups: null } as const;
 
@@ -248,7 +248,7 @@ const writeUpIncluding = (
   });
 
 describe("what a governed write derives from its cited connected sources", () => {
-  it("lands the most restrictive class on both row and map", async () => {
+  it("lands the most restrictive sensitivity on both row and map", async () => {
     const scenario = await arrange();
     const { written } = await conceptOnBoth(db(), scenario);
 
@@ -460,8 +460,8 @@ const rewriteCiting = async (
     ...overrides,
   });
 
-describe("what a re-write may not do to a concept's class", () => {
-  it("refuses citations that widen the class or audience, committing nothing", async () => {
+describe("what a re-write may not do to a concept's sensitivity", () => {
+  it("refuses citations that widen the sensitivity or audience, committing nothing", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
@@ -471,14 +471,14 @@ describe("what a re-write may not do to a concept's class", () => {
     const hrNote = await conceptCiting(scenario, scenario.editor, [forHr.documentId]);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
 
-    const widenedClass = await rewriteCiting(scenario, scenario.admin, restrictedNote, [
+    const widenedSensitivity = await rewriteCiting(scenario, scenario.admin, restrictedNote, [
       internal.documentId,
     ]);
     const widenedAudience = await rewriteCiting(scenario, scenario.editor, hrNote, [
       internal.documentId,
     ]);
 
-    expect(widenedClass).toEqual({ ok: false, error: "widening-refused" });
+    expect(widenedSensitivity).toEqual({ ok: false, error: "widening-refused" });
     expect(widenedAudience).toEqual({ ok: false, error: "widening-refused" });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
     expect(await heldRow(scenario.workspaceId, restrictedNote.iri)).toEqual({
@@ -501,7 +501,7 @@ describe("what a re-write may not do to a concept's class", () => {
     const boardNote = await conceptCiting(scenario, scenario.editor, [forBoard.documentId]);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
 
-    const byClass = await rewriteCiting(scenario, scenario.editor, restrictedNote, [
+    const bySensitivity = await rewriteCiting(scenario, scenario.editor, restrictedNote, [
       restricted.documentId,
     ]);
     const byAudience = await rewriteCiting(scenario, scenario.editor, boardNote, [
@@ -512,7 +512,7 @@ describe("what a re-write may not do to a concept's class", () => {
       restricted.documentId,
     ]);
 
-    expect(byClass).toEqual({ ok: false, error: "no-such-concept" });
+    expect(bySensitivity).toEqual({ ok: false, error: "no-such-concept" });
     expect(byAudience).toEqual({ ok: false, error: "no-such-concept" });
     expect(byAdmin.ok).toBe(true);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(before.length + 1);
@@ -653,7 +653,7 @@ describe("narrowing a connected source", () => {
     ]);
   });
 
-  it("touches no document's passage row, whatever its own class", async () => {
+  it("touches no document's passage row, whatever its own sensitivity", async () => {
     const { scenario, hr, connectedSource } = await workspaceWithHrConnectedSource();
 
     const narrowed = await documentUnder(
@@ -840,7 +840,7 @@ describe("narrowing a connected source", () => {
     });
   });
 
-  it("refuses a move widening the class, audience or group list", async () => {
+  it("refuses a move widening the sensitivity, audience or group list", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const sales = await groupNamed(db(), scenario, "Sales", []);
@@ -1140,7 +1140,7 @@ describe("narrowing a connected source", () => {
 });
 
 describe("publishing a connected source", () => {
-  it("releases its recorded class to citing concepts and write-ups only", async () => {
+  it("releases its recorded sensitivity to citing concepts and write-ups only", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const unpublishedForHr = {
@@ -1212,7 +1212,7 @@ const dismissedBy = (scenario: Scenario) => ({
   reviewReason: "Our engineers diagnose faults in pumps, never in people.",
 });
 
-const documentClassesUnder = async (workspaceId: string, connectedSourceId: string) => {
+const documentSensitivitiesUnder = async (workspaceId: string, connectedSourceId: string) => {
   const read = await db().pool.query<{ id: string; sensitivity: string | null }>(
     "SELECT id, sensitivity FROM source_document WHERE workspace_id = $1 AND connected_source_id = $2",
     [workspaceId, connectedSourceId],
@@ -1293,7 +1293,7 @@ describe("widening a connected source", () => {
     ]);
   });
 
-  it("never widens a document or concept past the document's class", async () => {
+  it("never widens a document or concept past the document's sensitivity", async () => {
     const scenario = await arrange();
     const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const verdict = await documentUnder(
@@ -1342,7 +1342,7 @@ describe("widening a connected source", () => {
       at("Internal"),
     ]);
     expect(
-      await documentClassesUnder(scenario.workspaceId, connectedSource.connectedSourceId),
+      await documentSensitivitiesUnder(scenario.workspaceId, connectedSource.connectedSourceId),
     ).toEqual({
       [connectedSource.documentId]: null,
       [verdict.documentId]: "Restricted",
@@ -1530,7 +1530,7 @@ describe("narrowing documents", () => {
     return beside.outcome;
   };
 
-  it("holds a concurrent concept, which lands at the narrowed class", async () => {
+  it("holds a concurrent concept, which lands at the narrowed sensitivity", async () => {
     const scenario = await arrange();
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
     // A shared evidence row: a new one's foreign key would wait on the narrowed document before
@@ -1546,7 +1546,7 @@ describe("narrowing documents", () => {
     );
   });
 
-  it("holds a re-write's verification so it weighs the narrowed class", async () => {
+  it("holds a re-write's verification so it weighs the narrowed sensitivity", async () => {
     const scenario = await arrange();
     const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
     const handbook = await connectedSourceHolding(db(), scenario.workspaceId);
@@ -1626,7 +1626,7 @@ describe("an Admin's recorded override", () => {
       ...EVERYONE,
     });
     const recorded = await db().pool.query<{ actor: string; audit_event_id: string }>(
-      "SELECT actor, audit_event_id FROM concept_class_override WHERE workspace_id = $1 AND iri = $2",
+      "SELECT actor, audit_event_id FROM concept_sensitivity_override WHERE workspace_id = $1 AND iri = $2",
       [scenario.workspaceId, person.iri],
     );
     const auditEventId = overridden.ok ? overridden.value.auditEventId : "";
@@ -1677,7 +1677,7 @@ describe("an Admin's recorded override", () => {
     const override = { iri: written.iri, sensitivity: "Internal", audience: "everyone" };
 
     const editor = await reading(scenario.editor, (person, tx) =>
-      overrideConceptClass(person, tx, override),
+      overrideConceptSensitivity(person, tx, override),
     );
     const refusals = await Promise.all(
       [
@@ -1686,7 +1686,7 @@ describe("an Admin's recorded override", () => {
         { ...override, audience: "groups", audienceGroups: null },
         { ...override, iri: "not-an-iri" },
       ].map((input) =>
-        reading(scenario.admin, (admin, tx) => overrideConceptClass(admin, tx, input)),
+        reading(scenario.admin, (admin, tx) => overrideConceptSensitivity(admin, tx, input)),
       ),
     );
 
@@ -1709,7 +1709,7 @@ describe("an Admin's recorded override", () => {
 
     await expect(
       reading(scenario.admin, async (admin, tx) => {
-        const overridden = await overrideConceptClass(admin, tx, {
+        const overridden = await overrideConceptSensitivity(admin, tx, {
           iri: written.iri,
           sensitivity: "Internal",
           audience: "everyone",
@@ -1721,7 +1721,7 @@ describe("an Admin's recorded override", () => {
     ).rejects.toThrow(/did not commit/);
 
     const survived = await db().pool.query(
-      "SELECT 1 FROM concept_class_override WHERE workspace_id = $1 AND iri = $2",
+      "SELECT 1 FROM concept_sensitivity_override WHERE workspace_id = $1 AND iri = $2",
       [scenario.workspaceId, written.iri],
     );
     expect(survived.rowCount).toBe(0);
@@ -1957,7 +1957,7 @@ describe("the evidence pane", () => {
     ]);
     await overriddenTo(scenario, written.iri, "Internal");
     const stood = await db().pool.query<{ recorded_at: Date }>(
-      "SELECT recorded_at FROM concept_class_override WHERE workspace_id = $1 AND iri = $2",
+      "SELECT recorded_at FROM concept_sensitivity_override WHERE workspace_id = $1 AND iri = $2",
       [scenario.workspaceId, written.iri],
     );
 
