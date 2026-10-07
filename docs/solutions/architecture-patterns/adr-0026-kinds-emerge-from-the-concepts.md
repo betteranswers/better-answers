@@ -13,7 +13,6 @@ applies_when:
 tags:
   - adr-0026
   - kind
-  - type-vocabulary
   - kinds-list
   - relation
   - links-to
@@ -26,7 +25,7 @@ tags:
 
 A concept's `type`, its kind, is the short string its producer chose, folded at write for case and plural only (*customer*, *Customers* → *Customer*). There is no vocabulary file.
 
-- The type vocabulary is the set of kinds in use, derived from the concept index with counts per kind and per domain. It is never a file in the bundle, never a table an Admin curates, and never checked closed-world.
+- The Kinds list is the set of kinds in use, derived from the concept index with counts per kind and per domain. It is never a file in the bundle, never a table an Admin curates, and never checked closed-world.
 - A new kind arrives with the concepts that carry it. The suggestion set's summary names it, and accepting the concepts accepts the kind.
 - An Admin renames or merges a kind from the Kinds list on Knowledge. That is one bulk commit that rewrites every affected `type` and re-keys `concept_identity` in the same transaction, because `type` is inside the merge key.
 - A kind's definition is a `Term` concept in a glossary domain. Tags stay free strings.

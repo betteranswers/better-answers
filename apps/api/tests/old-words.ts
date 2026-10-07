@@ -994,6 +994,19 @@ const UNCHECKED_SENSES: readonly Sense[] = [
   { sense: "TypeScript's own compiler option", written: /\bnoUncheckedIndexedAccess\b/g },
 ];
 
+/** The knowledge words that change no stored value land one noun at a time, each on this day. */
+const KNOWLEDGE_WORDS_LANDED = "2026-10-07";
+
+const KNOWLEDGE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(KNOWLEDGE_WORDS_LANDED)];
+
+const TYPE_VOCABULARY_SENSES: readonly Sense[] = [
+  {
+    sense: "TypeScript's type keyword before the refusal vocabulary's type, a set of refusal words",
+    within: "packages/core/src/kernel/",
+    written: /\btype Vocabulary\b/g,
+  },
+];
+
 export const OLD_WORDS: readonly OldWord[] = [
   avoided("2FA", "second factor"),
   avoided("access token", "personal token"),
@@ -1633,7 +1646,16 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("TTL", "verification interval"),
   avoided("two-factor", "second factor"),
   avoided("type definition", "Term"),
-  pending("type vocabulary", "kind", "kind", "kind", "everywhere"),
+  {
+    word: "type vocabulary",
+    use: "kind",
+    entry: "kind",
+    sweep: "kind",
+    state: "landed",
+    reach: "everywhere",
+    permitted: TYPE_VOCABULARY_SENSES,
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   {
     word: "Unchecked",
     use: "Unverified",
