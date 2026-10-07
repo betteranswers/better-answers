@@ -4,7 +4,7 @@ The answering act as T-113 re-seamed it — the review's one blocking finding: *
 
 ```mermaid
 C4Dynamic
-  title Dynamic diagram — ask, from the question to the answer audit
+  title Dynamic diagram — ask, from the question to Questions asked
 
   System_Ext(claude, "Claude, or the SPA", "The question, as the signed-in person")
   Container(transport, "MCP entry or tRPC subscription", "the MCP surface's withPrincipal; tRPC's queryProcedure", "Resolves the Principal; streams the answer, verdict first")
@@ -12,12 +12,12 @@ C4Dynamic
   Container_Boundary(core, "packages/core") {
     Component(plan, "planAnswer", "answering slice, in the resolving transaction", "The full-text hits, the walk from the set, the reuse decision; returns a plan holding no Tx")
     Component(draft, "draftAnswer", "answering slice, async generator", "Calls the model over the plan; holds no transaction")
-    Component(record, "recordAnswer", "answering slice, a second short transaction", "answer_audit, llm_call, the reached set and the cut depth")
+    Component(record, "recordAnswer", "answering slice, a second short transaction", "questions_asked, llm_call, the reached set and the cut depth")
     Component(mapdoor, "store/map", "walkFrom over a set", "Seeded ANY of the entry uids, one shared cap, statement_timeout per statement, the predicate on every element")
     Component(llm, "llm", "model choice and model client", "The model choice for answering and judging; the fetch-shaped model client; a row per call")
   }
 
-  ContainerDb(postgres, "Postgres", "RLS", "concept_index with its tsvector, the map tables, answer_audit, llm_call")
+  ContainerDb(postgres, "Postgres", "RLS", "concept_index with its tsvector, the map tables, questions_asked, llm_call")
   System_Ext(models, "Model provider", "Messages-API-shaped", "Local or hosted, one code path")
 
   Rel(claude, transport, "1. ask with the question", "MCP or tRPC")
@@ -31,7 +31,7 @@ C4Dynamic
   Rel(llm, models, "9. The judge over the candidate Answers, then the draft over the walk, or the reuse as it stands", "HTTPS, streamed")
   Rel(draft, transport, "10. Streams the contract: the verdict first, then the cited claims; depth 0 and the map phrase when the map is unavailable")
   Rel(transport, record, "11. On stream close, in a second transaction")
-  Rel(record, postgres, "12. answer_audit with the reached uids and the cut depth; one llm_call row per call; the spend reservation settled; a retry a second row")
+  Rel(record, postgres, "12. questions_asked with the reached uids and the cut depth; one llm_call row per call; the spend reservation settled; a retry a second row")
 
   UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```

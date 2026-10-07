@@ -29,7 +29,7 @@ A **signal** is a named query over rows the platform already keeps, with a thres
 - Thresholds are config rows an Admin changes on System, never code.
 - An **alert** is recorded once as a `platform_event(kind=alert)` and closed by a *cleared* event, so no condition fires twice.
 - Every model call writes one `llm_call` row: `workspace_id`, purpose, model choice, model, tokens in and out, seconds, priced cost, outcome, and the sync or answer it served. Never the prompt or the completion.
-- The answer audit is its own table, with a workspace id and a retention period (ADR 0017).
+- *Questions asked* is its own table, with a workspace id and a retention period (ADR 0017).
 - The worker's heartbeat row carries the box's figures once a minute: memory, `pswpin`, disk under `/data`, the git store's size per workspace and each LMDB volume's. That row is the whole host-metrics agent. Swap-in above 4 MB/s for five minutes during a first index is ADR 0024's step-A signal.
 - Three channels, each for the case only it can see: healthchecks.io for silence, Coolify through Resend for deploy and container failures, and the api's own email through `SMTP_URL` for the thresholds, immediately for a short list and in a daily digest for the rest.
 - Retention: `platform_event` 90 days; heartbeats one a minute for seven days, then one an hour for ninety; `llm_call` six months, then a monthly per-workspace aggregate.
@@ -55,7 +55,7 @@ These shapes live here, not in the rules. The rule *Log through the tier's one s
 - node-exporter or Coolify's server metrics as the host source: the first needs the store, and the second is neither queryable by the api nor restored with the database.
 - The api never sending alerts: the erasure and spend cases go unseen.
 - A webhook channel in v0.1: no customer has asked for one.
-- Spend derived from the answer audit and the syncs' job rows: it loses enrichment and embedding calls and cannot price a sync mid-flight.
+- Spend derived from *Questions asked* and the syncs' job rows: it loses enrichment and embedding calls and cannot price a sync mid-flight.
 - Thresholds in code: every tune a release.
 
 ## History

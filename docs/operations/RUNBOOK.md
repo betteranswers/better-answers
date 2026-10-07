@@ -32,7 +32,7 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 
 - **Fires:** page 2, a customer's report, a subject's report, a provider notice.
 - **Clock:** 72 hours to the ICO from *awareness*, if the breach is likely to risk people's rights; the customer (controller) is told without undue delay — the platform is the processor.
-- **Do:** contain (page 2); establish scope from `audit_event`, `answer_audit` and the `backup` rows — which copies exist and who could have read them (`SECRETS.md` § Who can read a backup bucket: a VPC 2 compromise means the copies' plaintext, because the identity is resident there); write the notification from those rows; tell the customer's named contact; record the decision either way.
+- **Do:** contain (page 2); establish scope from `audit_event`, `questions_asked` and the `backup` rows — which copies exist and who could have read them (`SECRETS.md` § Who can read a backup bucket: a VPC 2 compromise means the copies' plaintext, because the identity is resident there); write the notification from those rows; tell the customer's named contact; record the decision either way.
 - **Attach:** the rows above; the containment times from page 2; the notification sent or the reasoned decision not to.
 - **Escalate:** the customer's named contact within 24 hours of awareness; the technical contact for scope; a solicitor if the ICO question is not clear-cut.
 - **Rehearsed by:** the quarterly erasure rehearsal's report shape — the same rows answer both questions.
@@ -125,9 +125,9 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 ## 8. A customer reports wrong or lingering content
 
 - **Fires:** a customer's message: an answer is wrong, a concept says something false, a source they removed still answers, or a person's data is still visible.
-- **Do — wrong content:** find the answer's `answer_audit` row (the System page; by the person and the time) and the concept it asserts. The correction is a governed write: the Admin edits the concept forward as a new commit, or files a *finding* on it (ADR 0014, 0017); the answer's row is marked *corrected* so the record shows what was said and when it changed. Nothing is deleted.
+- **Do — wrong content:** find the answer's `questions_asked` row (the System page; by the person and the time) and the concept it asserts. The correction is a governed write: the Admin edits the concept forward as a new commit, or files a *finding* on it (ADR 0014, 0017); the answer's row is marked *corrected* so the record shows what was said and when it changed. Nothing is deleted.
 - **Do — lingering content:** a removed *source* stops answering at the connected source's next sync — read the connected source's last sync row; if no sync has happened, start one. Its object-store originals are deleted on that sync and the deletion reaches the mirror bucket that night; dumps holding it expire on the tiers (`BACKUPS.md` § The retention schedule) and are beyond use meanwhile. A *person's* data is page 4, and the report's dates are the answer to "when is it gone from every copy".
-- **Attach:** the `answer_audit` or `audit_event` row; the concept's `bundle_commit`; the connected source's last sync row; the `backup` rows that bound the retention dates; the customer's message.
+- **Attach:** the `questions_asked` or `audit_event` row; the concept's `bundle_commit`; the connected source's last sync row; the `backup` rows that bound the retention dates; the customer's message.
 - **Escalate:** the customer's named contact is answered within one working day with the row and the date; the technical contact if the next sync does not remove the content; page 3's contacts if personal data was served to someone who should not have seen it.
 - **Rehearsed by:** the quarterly erasure rehearsal (lingering); the first customer's onboarding, where a deliberately wrong concept is corrected end to end (wrong).
 

@@ -305,8 +305,8 @@ export const CONTROL_CENTRE = {
       summary: "The questions asked in this workspace, and the answers they got.",
       pages: [
         {
-          name: "Answer audit",
-          path: "/questions/answer-audit",
+          name: "Questions asked",
+          path: "/questions/questions-asked",
           icon: "question",
           built: false,
           seenBy: ADMINS,

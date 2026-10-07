@@ -645,7 +645,7 @@ to it by IRI and never restates it (ADR 0014).
   answer; extracted as a suggestion and confirmed by the person before any response is drafted;
   an input to a use case, never a source and never company knowledge. Not a pack, not an
   opportunity.
-- **Questions asked** — _Code rename pending._ the retained record of every answer the platform
+- **Questions asked** — the retained record of every answer the platform
   gave, and the page an Admin reads it on, flagged first: who asked, where, what was answered, what
   it cited and how trusted that was at the time, the predicate that applied and, on reuse, the
   matched `Answer` and the judge's verdict; with the feedback and corrections it received. Not part

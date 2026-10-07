@@ -1019,7 +1019,15 @@ export const OLD_WORDS: readonly OldWord[] = [
     carvedOut: PEOPLE_WORDS_CARVED_OUT,
   },
   avoided("allow-list", "sensitivity override"),
-  pending("answer audit", "Questions asked", "Questions asked", "Questions asked", "everywhere"),
+  {
+    word: "answer audit",
+    use: "Questions asked",
+    entry: "Questions asked",
+    sweep: "Questions asked",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   avoided("api key", "share agent token"),
   avoided("api token", "personal token"),
   {
