@@ -148,7 +148,7 @@ const folded = async (
   pairs: readonly { readonly connectedSource: string | null; readonly document: string | null }[],
 ): Promise<readonly (string | null)[]> => {
   const answered = await client.query<{ narrower: string | null }>(
-    `SELECT narrower_class(pair.a, pair.b) AS narrower
+    `SELECT narrower_sensitivity(pair.a, pair.b) AS narrower
        FROM unnest($1::text[], $2::text[]) WITH ORDINALITY AS pair(a, b, at)
       ORDER BY pair.at`,
     [pairs.map((pair) => pair.connectedSource), pairs.map((pair) => pair.document)],
@@ -181,7 +181,7 @@ describe("the one SQL statement of the sensitivity ranking", () => {
     const read = await db().pool.query<{ volatile: string; settings: string[] | null }>(
       `SELECT p.provolatile AS volatile, p.proconfig AS settings
          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public' AND p.proname = 'narrower_class'`,
+        WHERE n.nspname = 'public' AND p.proname = 'narrower_sensitivity'`,
     );
 
     expect(read.rows).toEqual([{ volatile: "i", settings: ["search_path=pg_catalog, pg_temp"] }]);
@@ -195,7 +195,7 @@ describe("the one SQL statement of the sensitivity ranking", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const served = await client.query<{ narrower: string }>(
-        "SELECT narrower_class('Public', 'Internal') AS narrower",
+        "SELECT narrower_sensitivity('Public', 'Internal') AS narrower",
       );
       await refusesEach(client, [
         [THE_VIEW, "worker_rt reading the view the fold answers a sensitivity for"],
@@ -207,12 +207,12 @@ describe("the one SQL statement of the sensitivity ranking", () => {
 
   it("is executable by both runtime roles and not by PUBLIC", async () => {
     const read = await db().pool.query<{ role: string; held: boolean }>(
-      `SELECT role, has_function_privilege(role, 'public.narrower_class(text, text)', 'EXECUTE') AS held
+      `SELECT role, has_function_privilege(role, 'public.narrower_sensitivity(text, text)', 'EXECUTE') AS held
          FROM unnest(ARRAY['app_rt', 'worker_rt']) AS role`,
     );
     const toPublic = await db().pool.query(
       `SELECT 1 FROM pg_proc p, LATERAL aclexplode(p.proacl) AS a
-        WHERE p.proname = 'narrower_class' AND a.grantee = 0 AND a.privilege_type = 'EXECUTE'`,
+        WHERE p.proname = 'narrower_sensitivity' AND a.grantee = 0 AND a.privilege_type = 'EXECUTE'`,
     );
 
     expect({ held: read.rows, toPublic: toPublic.rowCount }).toEqual({

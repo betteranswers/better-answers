@@ -505,6 +505,13 @@
       "when": 1791379631649,
       "tag": "0071_the-short-name",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1791394474112,
+      "tag": "0072_the-knowledge-words",
+      "breakpoints": true
     }
   ]
 }

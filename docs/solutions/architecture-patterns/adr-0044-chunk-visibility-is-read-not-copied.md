@@ -15,7 +15,7 @@ tags:
   - passage
   - readable-passage
   - effective-class
-  - narrower-class
+  - narrower-sensitivity
   - visibility
   - narrowing
 ---
@@ -27,8 +27,8 @@ tags:
 A passage's visibility is read, not carried. `index.readable_passage` is a `security_invoker` view that joins the passage to its connected source and its document (`packages/schema/migrations/0044_the-readable-chunk.sql`).
 
 - `published_at`, `audience` and `audience_groups` are the connected source's.
-- `sensitivity` is the narrower of the connected source's sensitivity and the document's, by `narrower_class`. That is the document's *effective class*.
-- `narrower_class` is the sensitivity ranking's one SQL statement.
+- `sensitivity` is the narrower of the connected source's sensitivity and the document's, by `narrower_sensitivity`. That is the document's *effective class*.
+- `narrower_sensitivity` is the sensitivity ranking's one SQL statement.
 - `passageAt`, `findPassages` and `previewPassages` (`packages/core/src/sources/passages.ts`) read the view.
 - A passage whose connected source row is gone is unreadable.
 
@@ -42,7 +42,7 @@ What follows from it:
 The view takes two trade-offs:
 
 - `security_barrier` is deliberately unset, so the planner keeps the GIN scan.
-- `narrower_class` pins its `search_path` at the cost of inlining: it stays one call per row of the join's output.
+- `narrower_sensitivity` pins its `search_path` at the cost of inlining: it stays one call per row of the join's output.
 
 Only S8 measuring a need for the filter columns on the indexed table reopens this.
 

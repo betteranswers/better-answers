@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0071_the-short-name"
+MIGRATION_ID = "0072_the-knowledge-words"
 
-MIGRATION_WHEN = 1791379631649
+MIGRATION_WHEN = 1791394474112
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -74,32 +74,6 @@ TABLES: dict[str, dict[str, str]] = {
         "actor": "text NOT NULL",
         "committed_at": "timestamp with time zone NOT NULL",
     },
-    "public.write_up": {
-        "workspace_id": "text NOT NULL",
-        "id": "text NOT NULL",
-        "published_at": "timestamp with time zone",
-        "sensitivity": "text NOT NULL",
-        "audience": "text NOT NULL",
-        "audience_groups": "text[]",
-        "created_at": "timestamp with time zone NOT NULL",
-    },
-    "public.write_up_include": {
-        "workspace_id": "text NOT NULL",
-        "write_up_id": "text NOT NULL",
-        "id": "text NOT NULL",
-        "ordinal": "integer NOT NULL",
-        "iri": "text NOT NULL",
-    },
-    "public.concept_class_override": {
-        "workspace_id": "text NOT NULL",
-        "iri": "text NOT NULL",
-        "sensitivity": "text NOT NULL",
-        "audience": "text NOT NULL",
-        "audience_groups": "text[]",
-        "actor": "text NOT NULL",
-        "audit_event_id": "text NOT NULL",
-        "recorded_at": "timestamp with time zone NOT NULL",
-    },
     "public.concept_evidence": {
         "workspace_id": "text NOT NULL",
         "iri": "text NOT NULL",
@@ -128,6 +102,16 @@ TABLES: dict[str, dict[str, str]] = {
         "audience": "text NOT NULL",
         "updated_at": "timestamp with time zone NOT NULL",
         "audience_groups": "text[]",
+    },
+    "public.concept_sensitivity_override": {
+        "workspace_id": "text NOT NULL",
+        "iri": "text NOT NULL",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
+        "audience_groups": "text[]",
+        "actor": "text NOT NULL",
+        "audit_event_id": "text NOT NULL",
+        "recorded_at": "timestamp with time zone NOT NULL",
     },
     "public.concept_verification": {
         "id": "text NOT NULL",
@@ -520,7 +504,7 @@ TABLES: dict[str, dict[str, str]] = {
         "gone_at": "timestamp with time zone",
         "outcome": "text",
         "sensitivity": "text",
-        "quarantine_error": "text",
+        "unreadable_reason": "text",
         "narrowed_to": "text",
     },
     "public.subject_request": {
@@ -610,5 +594,21 @@ TABLES: dict[str, dict[str, str]] = {
         "workspace_id": "text NOT NULL",
         "user_id": "text NOT NULL",
         "at": "timestamp with time zone NOT NULL",
+    },
+    "public.write_up": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "published_at": "timestamp with time zone",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
+        "audience_groups": "text[]",
+        "created_at": "timestamp with time zone NOT NULL",
+    },
+    "public.write_up_include": {
+        "workspace_id": "text NOT NULL",
+        "write_up_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "ordinal": "integer NOT NULL",
+        "iri": "text NOT NULL",
     },
 }

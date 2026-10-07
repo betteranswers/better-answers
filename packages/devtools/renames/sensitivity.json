@@ -84,7 +84,7 @@
     },
     {
       "sense": "the internal effective class, the narrower of a document's own and its connected source's",
-      "matches": ["[Ee]ffective[ _]?[Cc]lass", "narrower_class", "narrowerClass"]
+      "matches": ["[Ee]ffective[ _]?[Cc]lass"]
     },
     {
       "sense": "a retention class, what the platform keeps of a connected source (Appendix G)",

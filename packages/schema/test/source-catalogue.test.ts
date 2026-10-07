@@ -482,7 +482,7 @@ describe("the migration separating an Admin's narrowing from the seam's verdict"
         [
           "TABLE public.source_document",
           "TABLE public.audit_event",
-          "FUNCTION public.narrower_class(text, text)",
+          "FUNCTION public.narrower_sensitivity(text, text)",
         ],
         () => client.query(migrationStatementSaying(THE_DISMISSAL_READ, "DO $$")),
       );

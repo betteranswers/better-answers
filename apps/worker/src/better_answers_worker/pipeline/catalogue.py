@@ -211,7 +211,7 @@ def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) 
             " sensitivity = CASE"
             "   WHEN %(lifted)s THEN narrowed_to"
             "   WHEN sensitivity IS NULL THEN %(verdict)s::text"
-            "   ELSE public.narrower_class(sensitivity, %(verdict)s::text) END"
+            "   ELSE public.narrower_sensitivity(sensitivity, %(verdict)s::text) END"
             " WHERE id = %(id)s",
             {
                 "content_hash": document.redacted.content_hash,

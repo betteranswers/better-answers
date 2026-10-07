@@ -177,7 +177,7 @@ export const sourceDocument = withRLS(
         `narrowed_to IS NULL
          OR (sensitivity IS NOT NULL
              AND narrowed_to IN (${listed(SENSITIVITIES)})
-             AND public.narrower_class(sensitivity, narrowed_to) = sensitivity)`,
+             AND public.narrower_sensitivity(sensitivity, narrowed_to) = sensitivity)`,
       ),
     ),
 
