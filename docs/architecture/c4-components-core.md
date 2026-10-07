@@ -38,7 +38,7 @@ C4Component
   Rel(api, llm, "Lists model choices through")
   Rel(api, sweeps, "Runs the pass through")
 
-  Rel(erasure, concepts, "Moves bundle commits and checks through")
+  Rel(erasure, concepts, "Moves bundle commits and verifications through")
   Rel(erasure, sources, "Wipes the connected sources holding found documents through")
   Rel(erasure, runs, "Queues the map's full rebuild through")
   Rel(erasure, gitdoor, "Rewrites history through")

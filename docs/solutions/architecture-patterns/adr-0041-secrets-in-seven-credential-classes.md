@@ -42,7 +42,7 @@ The decision predates this record. It was moved out of the rule *Keep a secret t
 
 ## Why
 
-- The class list was unchecked, unbuilt and invisible to a diff. As rule text it read as if something ran it, and nothing did. So the list is recorded as a decision, and the rules keep only the sentences that bind a change: the seam, and that classes are never mixed.
+- The class list was unenforced, unbuilt and invisible to a diff. As rule text it read as if something ran it, and nothing did. So the list is recorded as a decision, and the rules keep only the sentences that bind a change: the seam, and that classes are never mixed.
 - Neither the credential-class rule, ADR 0013, ADR 0030 nor `SECRETS.md` argues for seven classes, or for never mixing them. A reason invented while moving a sentence would be a new decision, so none is given.
 - The two conflicts were found by the audit that moved the list. Moving a sentence is not the moment to take a decision, so each is named and left open.
 

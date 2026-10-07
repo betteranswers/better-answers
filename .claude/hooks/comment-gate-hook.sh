@@ -53,7 +53,7 @@ case "$FILE" in
 *.ts | *.tsx | *.mts | *.cts | *.js | *.jsx | *.mjs | *.cjs)
   TOOL="$ROOT/node_modules/.bin/oxlint"
   if [ ! -x "$TOOL" ]; then
-    echo "comment-gate-hook: $TOOL is not installed, so $RELATIVE went unchecked" >&2
+    echo "comment-gate-hook: $TOOL is not installed, so nothing read $RELATIVE" >&2
     exit 0
   fi
   OUTPUT="$(cd "$ROOT" && "$TOOL" --report-unused-disable-directives-severity=error --format=unix "$RELATIVE" 2>&1)"
@@ -64,7 +64,7 @@ case "$FILE" in
   ;;
 *.py)
   if ! command -v python3 >/dev/null 2>&1; then
-    echo "comment-gate-hook: python3 is absent, so $RELATIVE went unchecked" >&2
+    echo "comment-gate-hook: python3 is absent, so nothing read $RELATIVE" >&2
     exit 0
   fi
   FOUND="$(cd "$ROOT" && python3 packages/devtools/python/comment_gate.py "$RELATIVE" 2>&1)"

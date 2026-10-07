@@ -217,6 +217,16 @@ const BINDING = landedNow(rowOf(BOUND));
 
 const CHECKED = ["Un", "checked"].join("");
 
+/** The row as it read before the verification sweep widened it, for fixtures on reader text alone. */
+const CHECKED_IN_READER_TEXT: Renamed = (({ word, use, entry, sweep, state }: Renamed) => ({
+  word,
+  use,
+  entry,
+  sweep,
+  state,
+  reach: "reader text" as const,
+}))(rowOf(CHECKED));
+
 const WORDS = "apps/web/src/features/sources/words.ts";
 
 const scanOf = (rows: readonly OldWord[], kept: readonly string[] = []) => ({
@@ -841,7 +851,7 @@ describe("what a person reads, in a planted tree", () => {
         'export const M = "The watermark moved";',
       ].join("\n"),
     });
-    const scan = scanOf([rowOf(CHECKED)], [CHECKED, "watermark"]);
+    const scan = scanOf([CHECKED_IN_READER_TEXT], [CHECKED, "watermark"]);
 
     expect(readerFindings(tree, scan)).toEqual([]);
     expect(internalFindings(tree, PLANTED_GLOSSARY, scan, []).map(at)).toEqual([
@@ -901,8 +911,16 @@ describe("what a person reads, in a planted tree", () => {
       "packages/design-system/tokens.css": `--trust-${CHECKED.toLowerCase()}-ink: #444;`,
     });
 
-    expect(readerFindings(tree, scanOf([rowOf(CHECKED)])).map(at)).toEqual([
+    expect(readerFindings(tree, scanOf([CHECKED_IN_READER_TEXT])).map(at)).toEqual([
       `${WORDS}:1: ${CHECKED}`,
+    ]);
+  });
+
+  it("refuses the old trust token once its row reads everywhere", () => {
+    const token = `--trust-${CHECKED.toLowerCase()}-bg: #444;`;
+
+    expect(linesOver({ "packages/design-system/tokens.css": token }, [rowOf(CHECKED)])).toEqual([
+      `packages/design-system/tokens.css:1: ${token}`,
     ]);
   });
 
@@ -911,7 +929,7 @@ describe("what a person reads, in a planted tree", () => {
       "apps/api/src/mcp/entries/index.ts": 'const description = "Lists both IRIs here.";',
       "packages/core/src/answering/index.ts": `const unverified = (): string => "${CHECKED}";`,
     });
-    const rows = [landedNow(rowOf("IRI")), rowOf(CHECKED)];
+    const rows = [landedNow(rowOf("IRI")), CHECKED_IN_READER_TEXT];
 
     expect(readerFindings(tree, scanOf(rows)).map(at)).toEqual([
       "apps/api/src/mcp/entries/index.ts:1: Lists both IRIs here.",
