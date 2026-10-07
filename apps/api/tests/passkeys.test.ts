@@ -1,24 +1,15 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { TestClient } from "./harness.ts";
 import { aPasskeyDevice, type PasskeyDevice } from "./passkey-device.ts";
 import { aPersonSignedIn, anAdminSignedIn } from "./provoke.ts";
-import { appForSuite } from "./suite-app.ts";
+import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import { webClientOf } from "./web-client.ts";
 
-/** Held still while a test counts past a ceiling: on the wall clock its asks can straddle two fixed windows. */
-const stopped: { at: number | undefined } = { at: undefined };
+const { clock, stopTheClock } = aStoppableClock();
 
-const app = appForSuite({ clock: { now: () => new Date(stopped.at ?? Date.now()) } });
-
-const stopTheClock = (): void => {
-  stopped.at = Date.now();
-};
-
-afterEach(() => {
-  stopped.at = undefined;
-});
+const app = appForSuite({ clock });
 
 const ADD_OPTIONS = "/passkeys/add-options";
 const ADD = "/passkeys/add";
