@@ -241,8 +241,8 @@ export const CONTROL_CENTRE = {
           movedFrom: ["/sources/bindings"],
         },
         {
-          name: "Publish and accept gates",
-          path: "/sources/publish-and-accept-gates",
+          name: "Publishing rules",
+          path: "/sources/publishing-rules",
           icon: "gates",
           built: false,
           seenBy: ADMINS,
