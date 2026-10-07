@@ -711,7 +711,7 @@ def test_lands_the_deadline_on_an_overrunning_documents_row(
     assert passage_rows_of(connection, workspace_id) == []
 
 
-def test_a_quarantined_document_read_next_run_loses_its_error(
+def test_a_quarantined_document_read_next_sync_loses_its_error(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -748,7 +748,7 @@ class ConverterOutOfMemoryError(Exception):
     pass
 
 
-def test_an_unexpected_document_failure_fails_the_run_and_keeps_passages(
+def test_an_unexpected_document_failure_fails_the_sync_and_keeps_passages(
     database: tuple[psycopg.Connection, str],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -851,7 +851,7 @@ A_ROTA = "Rota changes go to priya.raman@meridianfenland.co.uk by Thursday.\n"
 A_ROTA_ERASED = "Rota changes go to [withheld] by Thursday.\n"
 
 
-def test_the_next_run_withholds_an_erased_address_without_a_finding(
+def test_the_next_sync_withholds_an_erased_address_without_a_finding(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -893,7 +893,7 @@ def marked_rows_of(
         return by_column(cursor)
 
 
-def test_a_second_run_adds_no_finding_row_and_moves_none(
+def test_a_second_sync_adds_no_finding_row_and_moves_none(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1041,7 +1041,7 @@ def test_a_restored_span_keeps_its_id_marks_and_restored_tier(
 
 
 # jscpd:ignore-start
-def test_a_name_a_later_erasure_raises_reads_always_next_run(
+def test_a_name_a_later_erasure_raises_reads_always_next_sync(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1166,7 +1166,7 @@ def test_a_rows_tier_is_the_withholdings_not_the_findings(
 
 
 # jscpd:ignore-start
-def test_the_next_run_puts_an_admin_restored_span_back(
+def test_the_next_sync_puts_an_admin_restored_span_back(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1271,7 +1271,7 @@ def classes_read_at(
     return {"own": own, "narrowed_to": narrowed_to, "passages": passages}
 
 
-class OneDocumentRun:
+class OneDocumentSync:
     def __init__(
         self,
         connection: psycopg.Connection,
@@ -1304,7 +1304,7 @@ def test_dismissing_the_only_health_finding_returns_the_connected_sources_class(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
-    sick_note = OneDocumentRun(connection, dsn, tmp_path, A_SICK_NOTE_ID)
+    sick_note = OneDocumentSync(connection, dsn, tmp_path, A_SICK_NOTE_ID)
     narrowed = sick_note.sync()
 
     sick_note.marked(seed_dismissal, THE_SICK_NOTES_HEALTH_SENTENCE)
@@ -1330,7 +1330,7 @@ def test_a_document_with_a_second_undismissed_health_finding_stays_restricted(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
-    service_note = OneDocumentRun(
+    service_note = OneDocumentSync(
         connection,
         dsn,
         tmp_path,
@@ -1352,7 +1352,7 @@ def test_dismissing_an_engineers_diagnosis_gives_its_document_back(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
-    engineers_note = OneDocumentRun(
+    engineers_note = OneDocumentSync(
         connection,
         dsn,
         tmp_path,
@@ -1372,7 +1372,7 @@ def test_a_kept_health_sentence_returns_and_its_document_stays_restricted(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
-    sick_note = OneDocumentRun(connection, dsn, tmp_path, A_SICK_NOTE_ID)
+    sick_note = OneDocumentSync(connection, dsn, tmp_path, A_SICK_NOTE_ID)
     sick_note.sync()
 
     sick_note.marked(seed_restore, THE_SICK_NOTES_HEALTH_SENTENCE)
@@ -1392,7 +1392,7 @@ def test_a_lifted_verdict_returns_to_the_admins_narrowing_only(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
-    sick_note = OneDocumentRun(
+    sick_note = OneDocumentSync(
         connection, dsn, tmp_path, A_SICK_NOTE_ID, sensitivity="Public"
     )
     with connection.cursor() as cursor:
@@ -1618,7 +1618,7 @@ def test_a_wipe_leaves_no_old_store_and_tracks_removals_again(
 A_REASON_NO_DESCRIPTOR_DECLARES = "a-word-no-descriptor-declares"
 
 
-def test_a_run_with_an_unknown_reason_indexes_like_any_other(
+def test_a_sync_with_an_unknown_reason_indexes_like_any_other(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1660,7 +1660,7 @@ def test_the_claimant_runs_an_unknown_reason_job_without_raising(
     assert outcome["lmdb_bytes"] > 0
 
 
-def test_a_run_dying_before_landing_leaves_only_the_verdict(
+def test_a_sync_dying_before_landing_leaves_only_the_verdict(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database

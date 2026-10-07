@@ -233,7 +233,7 @@ async def _one_document(
     )
 
 
-def _fail_the_run(error: BaseException, _: coco.ExceptionContext) -> None:
+def _fail_the_sync(error: BaseException, _: coco.ExceptionContext) -> None:
     # The engine's default logs and carries on, so the sync would finish with the
     # document neither read nor quarantined and land_rows would delete its passages.
     raise error
@@ -246,7 +246,7 @@ async def _every_document(
     refused: dict[str, str],
     wave: _Wave,
 ) -> int:
-    async with coco.exception_handler(_fail_the_run):
+    async with coco.exception_handler(_fail_the_sync):
         mounted = await coco.mount_each(
             coco.component_subpath(A_DOCUMENTS_COMPONENT),
             _one_document,

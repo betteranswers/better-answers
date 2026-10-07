@@ -424,7 +424,7 @@ def test_a_wipe_spares_the_memo_and_erases_the_named_person(
         assert HER_NAME not in held
 
 
-def test_a_second_run_over_an_unchanged_document_detects_nothing_afresh(
+def test_a_second_sync_over_an_unchanged_document_detects_nothing_afresh(
     bootstrap: Bootstrap,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -457,7 +457,7 @@ def test_a_suppression_withholds_the_name_without_rerunning_the_detector(
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_a_later_erasure_withholds_her_work_address_next_run(
+def test_a_later_erasure_withholds_her_work_address_next_sync(
     bootstrap: Bootstrap,
 ) -> None:
     rota = a_landed_document(A_ROTA_ID)
@@ -836,7 +836,7 @@ def test_reads_pdf_pages_and_measures_other_types_by_s0s_page() -> None:
     assert pages_of(fixture_bytes("expenses-policy.docx"), DOCX_MEDIA_TYPE) == 12
 
 
-def test_quarantines_a_document_past_its_ceiling_and_finishes_the_run(
+def test_quarantines_a_document_past_its_ceiling_and_finishes_the_sync(
     bootstrap: Bootstrap,
 ) -> None:
     bucket = a_bucket_holding_both()

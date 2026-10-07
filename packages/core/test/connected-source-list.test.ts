@@ -53,7 +53,7 @@ const connectedSourceOf = (
     return { connectedSourceId: connectedSource.id, documentIds };
   });
 
-type RunShape = {
+type SyncShape = {
   readonly reason: string;
   readonly status: "queued" | "claimed" | "done" | "failed";
   readonly enqueuedAt: Date;
@@ -65,7 +65,7 @@ const INDEXED = { documents: 2, passages: 3 };
 
 const TIMED_OUT = { error: "DeadlineExceededError" };
 
-const columnsOf = (run: RunShape) => {
+const columnsOf = (run: SyncShape) => {
   if (run.status === "queued") return {};
   const claimed = {
     attempts: 1,
@@ -77,7 +77,7 @@ const columnsOf = (run: RunShape) => {
   return { ...claimed, finishedAt: run.finishedAt ?? null, outcome: run.outcome ?? {} };
 };
 
-const syncOver = (scenario: Scenario, connectedSourceId: string, run: RunShape): Promise<string> =>
+const syncOver = (scenario: Scenario, connectedSourceId: string, run: SyncShape): Promise<string> =>
   seededBy(db(), async (seed) => {
     const row = await seed.job({
       workspaceId: scenario.workspaceId,

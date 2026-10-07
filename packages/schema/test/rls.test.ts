@@ -3460,7 +3460,7 @@ describe("the sweep pass", () => {
       await refusesEach(client, [
         [
           "UPDATE sweep_pass SET removed = 0",
-          "a pass the api could rewrite could say a last run removed nothing when it removed much",
+          "a pass the api could rewrite could say a last pass removed nothing when it removed much",
         ],
         [
           "DELETE FROM sweep_pass",
@@ -3482,7 +3482,7 @@ describe("the sweep pass", () => {
         ["SELECT id FROM sweep_pass", "the worker sweeps nothing, so it has no pass to read"],
         [A_SWEEP_PASS, "and a worker that could record one could stand in for a pass", [ulid()]],
         ["UPDATE sweep_pass SET removed = 0", "or rewrite what a pass removed"],
-        ["DELETE FROM sweep_pass", "or remove the last run an operator reads"],
+        ["DELETE FROM sweep_pass", "or remove the last pass an operator reads"],
       ]);
     });
   });

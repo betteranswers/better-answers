@@ -23,12 +23,14 @@ NORMALISED_KEY_SUFFIX = "normalised"
 
 
 @dataclass(frozen=True, slots=True)
-class ConnectedSourceRun:
+class ConnectedSourceSync:
     rules_in_force: Mapping[str, bool]
     documents: tuple[LandedDocument, ...]
 
 
-def read_connected_source(cursor: Cursor[Any], sync: Sync) -> ConnectedSourceRun | None:
+def read_connected_source(
+    cursor: Cursor[Any], sync: Sync
+) -> ConnectedSourceSync | None:
     """None when the connected source is gone. Only live documents are read, each
     carrying the workspace's suppressions and its own restored and dismissed
     findings."""
@@ -52,7 +54,7 @@ def read_connected_source(cursor: Cursor[Any], sync: Sync) -> ConnectedSourceRun
     restores = _spans_by_document(cursor, document_ids, _RESTORED, Restore)
     dismissals = _spans_by_document(cursor, document_ids, _DISMISSED, Dismissal)
 
-    return ConnectedSourceRun(
+    return ConnectedSourceSync(
         rules_in_force={
             str(tier): bool(state) for tier, state in connected_source[0].items()
         },

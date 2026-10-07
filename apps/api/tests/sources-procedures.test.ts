@@ -94,14 +94,14 @@ const finishedSync = (
 
 const OVERRIDDEN_KEY = "restores_overridden_by_erasure";
 
-type RunOverridingASpan = {
+type SyncOverridingASpan = {
   readonly connectedSourceId: string;
   readonly jobId: string;
   readonly documentId: string;
   readonly ruleId: string;
 };
 
-const aRunThatOverrodeAKeptSpan = async (workspaceId: string): Promise<RunOverridingASpan> => {
+const aSyncThatOverrodeAKeptSpan = async (workspaceId: string): Promise<SyncOverridingASpan> => {
   const { connectedSourceId, documentId } = await unpublishedConnectedSource(workspaceId);
   const kept = await seededIn(app, (seed) => seed.finding({ workspaceId, documentId }));
   const run = await finishedSync(workspaceId, connectedSourceId, {
@@ -119,7 +119,7 @@ const aRunThatOverrodeAKeptSpan = async (workspaceId: string): Promise<RunOverri
   return { connectedSourceId, jobId: run.id, documentId, ruleId: kept.ruleId };
 };
 
-const addressesIn = (answer: unknown, run: RunOverridingASpan): readonly string[] => {
+const addressesIn = (answer: unknown, run: SyncOverridingASpan): readonly string[] => {
   const answered = JSON.stringify(answer);
   return [OVERRIDDEN_KEY, run.documentId, run.ruleId, "char_start", "char_end"].filter((part) =>
     answered.includes(part),
@@ -545,7 +545,7 @@ describe("the Sources procedures over the wire", () => {
 
   it("lists a sync that overrode spans with no span's address", async () => {
     const { workspace, api } = await anAdmin();
-    const run = await aRunThatOverrodeAKeptSpan(workspace.workspaceId);
+    const run = await aSyncThatOverrodeAKeptSpan(workspace.workspaceId);
 
     const listed = await api.sources.list.query();
 
@@ -565,7 +565,7 @@ describe("the Sources procedures over the wire", () => {
 
   it("answers a subject's runs with no span's address in them", async () => {
     const { workspace, api } = await anAdmin();
-    const run = await aRunThatOverrodeAKeptSpan(workspace.workspaceId);
+    const run = await aSyncThatOverrodeAKeptSpan(workspace.workspaceId);
 
     const runs = await api.runs.ofSubject.query({ subjectId: run.connectedSourceId });
 

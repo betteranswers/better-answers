@@ -432,7 +432,7 @@ describe("a narrowing queues no sync", () => {
     // The sync that had already been and gone, so an empty answer below is the act and not a
     // reader that sees nothing.
     await aFinishedSync(scenario.workspaceId, theOther.connectedSourceId);
-    const theRunThatRan = {
+    const theSyncThatRan = {
       kind: "index",
       reason: "connected",
       subject_id: theOther.connectedSourceId,
@@ -452,9 +452,9 @@ describe("a narrowing queues no sync", () => {
     const afterTheDocuments = await jobsOf(scenario.workspaceId);
 
     expect({ before, afterTheConnectedSource, afterTheDocuments }).toEqual({
-      before: [theRunThatRan],
-      afterTheConnectedSource: [theRunThatRan],
-      afterTheDocuments: [theRunThatRan],
+      before: [theSyncThatRan],
+      afterTheConnectedSource: [theSyncThatRan],
+      afterTheDocuments: [theSyncThatRan],
     });
   });
 });
