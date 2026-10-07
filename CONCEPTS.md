@@ -731,7 +731,7 @@ to it by IRI and never restates it (ADR 0014).
 - **version (of a record)** — one state of a write-up or a guide definition, kept for good with
   who changed it and why; the current state is the latest version. Concepts have git instead.
 
-- **backup** — _Code rename pending._ one scheduled copy of one store, or one restore drill, as a
+- **backup** — one scheduled copy of one store, or one restore drill, as a
   row: what, when, outcome, size, where it went, whether it holds personal data, when it expires,
   and — for a drill — how long the restore took.
 - **tier (of a backup)** — _Internal._ where a database dump is filed by when it was taken, which

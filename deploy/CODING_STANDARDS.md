@@ -4,7 +4,7 @@ The whole of `CODING_STANDARDS.md` binds this directory. What follows is true of
 
 ## Own state on disk, prove every job, and wipe staging
 
-Nothing runs as root: a stateful service is a bind mount under `/data/<service>` owned by its uid. A scheduled job verifies its upload against the bucket, writes a `backup_run` row, then pings the dead-man check — an outcome word and sizes, never a path, key, workspace or error string. Staging holds synthetic data outside a restore drill, and the drill's end wipes it. An image deploys by digest; no compose file starts without one.
+Nothing runs as root: a stateful service is a bind mount under `/data/<service>` owned by its uid. A scheduled job verifies its upload against the bucket, writes a `backup` row, then pings the dead-man check — an outcome word and sizes, never a path, key, workspace or error string. Staging holds synthetic data outside a restore drill, and the drill's end wipes it. An image deploys by digest; no compose file starts without one.
 
 ## Keep a signal and an alert as rows
 

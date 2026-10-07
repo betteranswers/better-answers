@@ -44,7 +44,7 @@ const beyondUse = (anchor: string, erasure: ErasureRecord): string =>
 
 const ANCHOR_NAMED =
   "The anchor above is the instant this routine took the erasure lock, not the stamp of the " +
-  "last dump before it: no backup run is recorded, so the last dump precedes the anchor and " +
+  "last dump before it: no backup is recorded, so the last dump precedes the anchor and " +
   "every date above is the latest a copy can expire.";
 
 /**

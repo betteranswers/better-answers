@@ -140,7 +140,7 @@ const NEVER_A_SUBJECT: ReadonlySet<string> = new Set([
   "alert",
   "spend",
   "llm_call",
-  "backup_run",
+  "backup",
   "health_check",
   "inbox",
 ]);

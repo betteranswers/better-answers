@@ -9,8 +9,8 @@ JOB=${1:-}
 
 record() {
   psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -qc \
-    "insert into backup_run (kind, store, started_at, finished_at, outcome, bytes, location, contains_personal_data, expires_at) values ('$1', '$2', '$3', now(), '$4', $5, '$6', $7, $8)" \
-    || echo "backup_run row not written (schema not migrated yet?)" >&2
+    "insert into backup (kind, store, started_at, finished_at, outcome, bytes, location, contains_personal_data, expires_at) values ('$1', '$2', '$3', now(), '$4', $5, '$6', $7, $8)" \
+    || echo "backup row not written (schema not migrated yet?)" >&2
 }
 ping() {
   local url=$1 outcome=$2 body="$2 bytes=${3:-0} took=${4:-0}" suffix=""

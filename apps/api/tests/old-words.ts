@@ -506,6 +506,11 @@ const PASSAGE = "passage";
 
 const PASSAGE_LANDED = "2026-10-07";
 
+/** The people words land one noun at a time, each on the day of its sweep. */
+const PEOPLE_WORDS_LANDED = "2026-10-07";
+
+const PEOPLE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(PEOPLE_WORDS_LANDED)];
+
 /** Where `chunk` is a piece of a byte stream, as Node's streams name it. */
 const BYTE_STREAM_TREES = [
   "apps/api/src/ops.ts",
@@ -634,7 +639,15 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("authorisation", "admission", "the sign-in server's word"),
   avoided("back office", "console"),
   avoided("backup code", "recovery code"),
-  pending("backup run", "backup", "backup", "backup", "everywhere"),
+  {
+    word: "backup run",
+    use: "backup",
+    entry: "backup",
+    sweep: "backup",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: PEOPLE_WORDS_CARVED_OUT,
+  },
   avoided("ban", "end every sign-in and token"),
   avoided("batch action", "bulk action"),
   {
