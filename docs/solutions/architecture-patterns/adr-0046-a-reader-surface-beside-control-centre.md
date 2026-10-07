@@ -8,14 +8,14 @@ severity: medium
 applies_when:
   - "Adding a page for Editors or Viewers, or deciding which area a page belongs on"
   - "Changing where a role lands after signing in, or where a lost member is sent"
-  - "Changing who may read the answer audit, or where a person reads their own questions"
+  - "Changing who may read *Questions asked*, or where a person reads their own questions"
 tags:
   - adr-0046
   - area
   - ask
   - control-centre
   - home
-  - answer-audit
+  - questions-asked
 ---
 
 # Editors and Viewers land on Ask, an area in the one rail beside Control Centre
@@ -26,9 +26,9 @@ tags:
 - Ask has two pages, *New question* (the default) and *Your questions*, at `/ask`.
 - An Editor's and a Viewer's home is Ask. They land there after signing in, and the not-found page offers it back. Until Ask is built, it opens a page saying plainly that it is on its way.
 - An Admin lands on People › Members until Control Centre › Overview is built.
-- Control Centre stays the one Admin area, shown to Admins alone. Questions keeps the answer audit and the answer tests, their names and addresses too, *Answer audit* included.
+- Control Centre stays the one Admin area, shown to Admins alone. Questions keeps *Questions asked* and the answer tests. Their names and addresses stayed until BA-29 renamed the first in the reader's words, on 07/10/2026.
 - What this record first set aside as a filtered Control Centre is now the decision, one level up: one rail, filtered page by page by role or by ownership of a domain (ADR 0047). Control Centre itself stays Admin-only, so a reader's home is never in it.
-- The answer audit is read by Admins alone, in Control Centre › Questions. Each person reads their own questions in Ask › Your questions.
+- *Questions asked* is read by Admins alone, in Control Centre › Questions. Each person reads their own questions in Ask › Your questions.
 - An owner decides in their Inbox, whatever their role (ADR 0047).
 - The console is reached from the workspace switcher, which lists it to the operator alone.
 
@@ -43,7 +43,7 @@ One thing stays open: an Editor's home once question sets land. It is Ask, or th
 
 ## Rejected
 
-- Renaming *Answer audit* to *Answers*: ADR 0017 refused the word for this door.
+- Renaming *Questions asked* to *Answers*: ADR 0017 refused the word for this door.
 - Keeping readers on Questions and improving its unbuilt line: the page under it still audits everyone's answers.
 - Letting readers read everyone's answers in the audit, with or without who asked: they need their own, not the workspace's.
 - A *Your queue* on the reader area for an owning Editor: the Inbox serves every owner, whatever their role.
@@ -52,4 +52,6 @@ One thing stays open: an Editor's home once question sets land. It is Ask, or th
 
 The full record as first written, with no amendments: `docs/archive/adr/0046-a-reader-surface-beside-control-centre.md`.
 
-Edited 30/09/2026 with ADR 0047, after the archived record was frozen: the reader area became the Ask area in one rail, the filtered Control Centre it had set aside became the decision, and two of its three open questions were answered, who reads the answer audit and where an owning Editor decides. The filename keeps the old words so references still resolve.
+Edited 30/09/2026 with ADR 0047, after the archived record was frozen: the reader area became the Ask area in one rail, the filtered Control Centre it had set aside became the decision, and two of its three open questions were answered, who reads *Questions asked* and where an owning Editor decides. The filename keeps the old words so references still resolve.
+
+Edited 07/10/2026 with BA-29's knowledge words: the Questions page that holds every answer given is named *Questions asked*, in the reader's words, at a new address. The decision to keep its name and address gave way to the glossary; who reads it is unchanged. The rejected rename to *Answers* stays rejected.

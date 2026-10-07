@@ -101,7 +101,7 @@ Enforced by one plugin rule, `better-answers/import-direction` (`packages/devtoo
 | `erasure` | `subject_request`, `erasure_request`, `suppression` |
 | `runs` | `job` |
 | `sweeps` | `sweep_pass` |
-| `answering` | `usage`, `answer_audit`, `question_set`, `question` — from S2, S3 and S6 |
+| `answering` | `usage`, `questions_asked`, `question_set`, `question` — from S2, S3 and S6 |
 
 The map is the TypeScript tier's. The worker is in no row: it writes `finding` rows, the catalogue columns of `source_document` and `index.passage` rows under its own database role, and the `redaction` and `document-passage` agreements pin what both tiers read of them.
 

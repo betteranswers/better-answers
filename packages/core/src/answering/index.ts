@@ -408,7 +408,7 @@ export const renderFind = (result: FindResult): string =>
 export const renderOpen = (result: OpenResult): string => {
   if (!result.found) {
     return result.iri === undefined
-      ? `No passage at ${result.locator ?? "that locator"}.`
+      ? `No passage at ${result.locator ?? "that link"}.`
       : `No concept at ${result.iri}.`;
   }
   if (result.passage !== undefined) {

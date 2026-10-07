@@ -135,7 +135,7 @@ export const act = <Name extends ActName, const Shape extends DetailShape>(
 
 const NEVER_A_SUBJECT: ReadonlySet<string> = new Set([
   "run",
-  "answer_audit",
+  "questions_asked",
   "signal",
   "alert",
   "spend",

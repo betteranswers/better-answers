@@ -122,7 +122,7 @@ const findEntry = defineEntry({
   name: "find",
   title: "Find in the company's knowledge",
   description:
-    "Search the company's knowledge and return a preview of what matches: one line per hit. A concept carries its kind, title and trust state; a document nothing on the map covers carries its title, the class it is held under and the marker 'Not company knowledge'. Use `open` to read a hit in full — a concept by its IRI, a document by the locator on its line.",
+    "Search the company's knowledge and return a preview of what matches: one line per hit. A concept carries its kind, title and trust state; a document nothing on the map covers carries its title, the class it is held under and the marker 'Not company knowledge'. Use `open` to read a hit in full — a concept by its `iri`, a document by the `locator` on its line.",
   scopes: ["knowledge:read"],
   input: z.object({
     query: z.string().min(1).max(500).describe("What to look for, in the person's own words."),
@@ -184,19 +184,23 @@ const openEntry = defineEntry({
   name: "open",
   title: "Open a concept, or the passage a citation rests on",
   description:
-    "The verbatim fetch: a concept by its IRI (from a `find` hit or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by a locator, which a document hit and a citation both carry. Give one of the two. Each evidence item names its source, and carries the locator that opens it only where the source gives one: an imported concept's evidence often has none, and an item with no locator has no passage to open. Quote what comes back; do not summarise it.",
+    "The verbatim fetch: a concept by its `iri` (from a `find` hit or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by its `locator`, which a document hit and a citation both carry. Give one of the two. Each evidence item names its source, and carries the `locator` that opens it only where the source gives one: an imported concept's evidence often has none, and an item with no `locator` has no passage to open. Quote what comes back; do not summarise it.",
   scopes: ["knowledge:read"],
   input: z
     .object({
-      iri: z.string().min(1).optional().describe("A concept's IRI."),
+      iri: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("The concept's identity, as a `find` line or an `ask` citation gives it."),
       locator: z
         .string()
         .min(1)
         .optional()
-        .describe("A citation's locator, for the passage it rests on."),
+        .describe("The place of the passage a citation rests on, as the citation gives it."),
     })
     .refine((value) => (value.iri === undefined) !== (value.locator === undefined), {
-      message: "give an iri or a locator, not both and not neither",
+      message: "give an `iri` or a `locator`, not both and not neither",
     }),
   output: z.discriminatedUnion("found", [
     z
@@ -216,9 +220,7 @@ const openEntry = defineEntry({
                   .string()
                   .regex(/\S/)
                   .exactOptional()
-                  .describe(
-                    "The locator that opens the passage; absent where the source gives none.",
-                  ),
+                  .describe("What opens the passage; absent where the source gives none."),
                 source: z.string(),
               }),
             ),

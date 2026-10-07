@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ListedConnectedSource } from "@/features/sources/sources-api.ts";
-import { instantWords, lastSyncedWords } from "@/features/sources/words.ts";
+import { destinationOf, instantWords, lastSyncedWords } from "@/features/sources/words.ts";
 
 type Sync = NonNullable<ListedConnectedSource["lastSync"]>;
 
@@ -47,5 +47,12 @@ describe("what a connected source's last sync says", () => {
 
   it("says a claimed sync is syncing, since it was asked", () => {
     expect(lastSyncedWords(aSync("claimed", null))).toBe(`Syncing · ${instantWords(ENQUEUED)}`);
+  });
+});
+
+describe("what a destination says", () => {
+  // The words test cannot see this label: a reader string equal to the kept wire value is skipped.
+  it("names the bundle destination the knowledge base", () => {
+    expect(destinationOf("bundle").word).toBe("knowledge base");
   });
 });

@@ -16,14 +16,11 @@
     "finding group": 5
   },
   "apps/web/src/features/sources/words.ts": {
-    "act": 1,
-    "bundle": 2
+    "act": 1
   },
   "apps/web/src/shared/navigation.ts": {
     "act": 1,
-    "answer audit": 1,
     "domain": 2,
-    "priced plan": 1,
     "Queue": 1
   }
 }

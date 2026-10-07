@@ -11,7 +11,7 @@ applies_when:
   - "Adding a group or a page to Control Centre"
 tags:
   - adr-0017
-  - answer-audit
+  - questions-asked
   - feedback
   - correction
   - answer-test
@@ -23,7 +23,7 @@ tags:
 
 ## The decision
 
-Every answer the platform gives is one retained, correctable record in the answer audit.
+Every answer the platform gives is one retained, correctable record in *Questions asked*.
 
 - Its skeleton (citations with their trust at the time, the predicate that applied, reuse and the judge's verdict, feedback, corrections) is kept for good.
 - Its content (the question, the answer, who asked) is kept twelve months by default, then thinned to the skeleton.
@@ -39,7 +39,7 @@ An `Answer` concept is minted or updated only at a gate a person runs, the promo
 
 Control Centre is one area of eight groups: Overview, Suggestions, Sources, Agent Operations, Questions, People, Personal data and System. ADR 0047 lists each group's pages.
 
-- Questions holds the answer audit and the answer tests. A promotion waits in Suggestions' queue with every other suggestion.
+- Questions holds *Questions asked* and the answer tests. A promotion waits in Suggestions' queue with every other suggestion.
 - People's pages are members, groups and tokens.
 - The audit log, in System, is the workspace's own audit events, never the identity-set audit log.
 - The operator's console is an area of its own, outside Control Centre, reached from the workspace switcher.

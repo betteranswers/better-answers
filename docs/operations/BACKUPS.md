@@ -28,7 +28,7 @@ Everything in `dumps/` is **client-side encrypted with `age`** before upload; th
 
 | Store | Kind | Why not | Rebuilt by | Budget |
 | --- | --- | --- | --- | --- |
-| Worker LMDBs (`/data/worker/lmdb/<workspace>/<connected source id>`) | **personal data on disk** | memoised extraction output; disposable by design (ADR 0005); capped at 4 GB per connected source, wiped and reprocessed over it | reprocessing the connected source | priced by the extraction plan |
+| Worker LMDBs (`/data/worker/lmdb/<workspace>/<connected source id>`) | **personal data on disk** | memoised extraction output; disposable by design (ADR 0005); capped at 4 GB per connected source, wiped and reprocessed over it | reprocessing the connected source | priced by the cost estimate |
 | Worker trees (`/data/worker/trees`) | personal data on disk | checkouts of the bare repositories at a commit | `git clone` from `/data/git` (mounted read-only) | minutes |
 | `/data/backup/staging` | personal data on disk | the local copy before upload — deleted on verified upload; anything older than 24 h is deleted by the next job | — | — |
 | HF cache, embedding models | rebuildable | public model weights | re-download on first warm | minutes |

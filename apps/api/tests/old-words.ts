@@ -515,6 +515,11 @@ const PEOPLE_WORDS_LANDED = "2026-10-07";
 
 const PEOPLE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(PEOPLE_WORDS_LANDED)];
 
+/** The knowledge words land in three pull requests; the page words first, on the day of their sweep. */
+const KNOWLEDGE_WORDS_LANDED = "2026-10-07";
+
+const KNOWLEDGE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(KNOWLEDGE_WORDS_LANDED)];
+
 /** Where the dead-man service's API names a check by its slug: the release's freshness gate. */
 const DEAD_MAN_CHECK_FILES = [
   "deploy/backup-fresh.sh",
@@ -1014,7 +1019,15 @@ export const OLD_WORDS: readonly OldWord[] = [
     carvedOut: PEOPLE_WORDS_CARVED_OUT,
   },
   avoided("allow-list", "sensitivity override"),
-  pending("answer audit", "Questions asked", "Questions asked", "Questions asked", "everywhere"),
+  {
+    word: "answer audit",
+    use: "Questions asked",
+    entry: "Questions asked",
+    sweep: "Questions asked",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   avoided("api key", "share agent token"),
   avoided("api token", "personal token"),
   {
@@ -1081,7 +1094,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   },
   avoided("budget cap", "spending limit"),
   pending("bulk act", "bulk action", "bulk action", "action", "everywhere"),
-  pending("bundle", "knowledge base", "knowledge base", "knowledge base", "reader text"),
+  {
+    word: "bundle",
+    use: "knowledge base",
+    entry: "knowledge base",
+    sweep: "knowledge base",
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("burger", "navigation control"),
   pending("candidate", "suggested", "suggested concept", "suggested concept", "one sense"),
   {
@@ -1227,7 +1247,15 @@ export const OLD_WORDS: readonly OldWord[] = [
     reach: "everywhere",
     carvedOut: [writtenBefore(MODEL_CHOICE_LANDED)],
   },
-  pending("extraction plan", "cost estimate", "cost estimate", "cost estimate", "everywhere"),
+  {
+    word: "extraction plan",
+    use: "cost estimate",
+    entry: "cost estimate",
+    sweep: "cost estimate",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   avoided("FIDO", "passkey"),
   avoided("field error", "issue word"),
   pending(
@@ -1284,7 +1312,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("integration", "connected source"),
   avoided("interactive connector", "MCP App"),
   avoided("invite", "invitation", "as a noun"),
-  pending("IRI", "link", "link", "link", "reader text"),
+  {
+    word: "IRI",
+    use: "link",
+    entry: "link",
+    sweep: "link",
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("issue code", "issue word"),
   avoided("item error", "refused items"),
   avoided("join link", "invitation"),
@@ -1322,7 +1357,14 @@ export const OLD_WORDS: readonly OldWord[] = [
     state: "landed",
     reach: "everywhere",
   },
-  pending("locator", "link", "link", "link", "reader text"),
+  {
+    word: "locator",
+    use: "link",
+    entry: "link",
+    sweep: "link",
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("locator fix", "citation fix"),
   avoided("lock", "lease", "nothing waits on it"),
   avoided("log", "audit log", "alone"),
@@ -1404,7 +1446,15 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("platform console", "console"),
   avoided("poll", "head check"),
   avoided("portal", "area"),
-  pending("priced plan", "cost estimate", "cost estimate", "cost estimate", "everywhere"),
+  {
+    word: "priced plan",
+    use: "cost estimate",
+    entry: "cost estimate",
+    sweep: "cost estimate",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   avoided("profile", "member page"),
   avoided("projection", "skeleton projection", "alone"),
   avoided("promote", "promotion", "as a reader's verb: a marketing word"),

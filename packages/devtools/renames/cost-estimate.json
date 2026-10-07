@@ -1,0 +1,23 @@
+{
+  "noun": "extraction plan",
+  "readerWord": "cost estimate",
+  "sweep": "U15. Knowledge words: Cost estimates",
+  "collisions": [],
+  "words": [
+    {
+      "from": "extraction plan",
+      "to": "cost estimate"
+    },
+    {
+      "from": "priced plan",
+      "to": "cost estimates"
+    }
+  ],
+  "symbols": {
+    "paths": []
+  },
+  "text": {
+    "paths": ["apps/web/src/shared/navigation.ts", "apps/web/test/navigation.test.ts"]
+  },
+  "senses": []
+}

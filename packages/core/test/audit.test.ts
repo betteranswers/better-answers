@@ -144,7 +144,7 @@ describe("the declared-acts walk", () => {
   it("refuses an act whose subject is never an audit event", () => {
     const neverASubject = [
       "run",
-      "answer_audit",
+      "questions_asked",
       "signal",
       "alert",
       "spend",

@@ -398,7 +398,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   the ids or paths it counted them at, or the name of what went wrong — never content, never a
   person's name, so a record of what a job did is kept as it was written. A job that never ran has
   none.
-- **cost estimate** — _Code rename pending._ the priced scope of extraction for one connected
+- **cost estimate** — the priced scope of extraction for one connected
   source, accepted once by an Admin at review: the documents, the template per kind and the model
   choice, with hours and pounds from measured rates. Listed on Control Centre › Sources › Cost
   estimates. Once accepted, every sync extracts as it indexes; a sync that would reprocess more than
@@ -645,7 +645,7 @@ to it by IRI and never restates it (ADR 0014).
   answer; extracted as a suggestion and confirmed by the person before any response is drafted;
   an input to a use case, never a source and never company knowledge. Not a pack, not an
   opportunity.
-- **Questions asked** — _Code rename pending._ the retained record of every answer the platform
+- **Questions asked** — the retained record of every answer the platform
   gave, and the page an Admin reads it on, flagged first: who asked, where, what was answered, what
   it cited and how trusted that was at the time, the predicate that applied and, on reuse, the
   matched `Answer` and the judge's verdict; with the feedback and corrections it received. Not part

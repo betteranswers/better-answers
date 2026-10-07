@@ -392,7 +392,7 @@ describe("open's and feedback's renderings", () => {
       "No concept at https://better-answers.com/c/01C.",
     );
 
-    expect(renderOpen({ found: false })).toBe("No passage at that locator.");
+    expect(renderOpen({ found: false })).toBe("No passage at that link.");
     expect(renderOpen({ found: true })).toBe("Nothing to show.");
   });
 
