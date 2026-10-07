@@ -18,7 +18,7 @@ const THE_RANKING = [
 ] as const;
 
 describe("the sensitivity ranking, in the TypeScript tier and the database", () => {
-  it("both answer the ranking's narrower class for every ordered pair", async () => {
+  it("both answer the ranking's narrower sensitivity for every ordered pair", async () => {
     const answered = await db().runtimePool.query<{ narrower: string }>(
       `SELECT narrower_sensitivity(pair.a, pair.b) AS narrower
          FROM unnest($1::text[], $2::text[]) WITH ORDINALITY AS pair(a, b, at)

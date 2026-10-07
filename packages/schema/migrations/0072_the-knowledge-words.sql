@@ -1,10 +1,6 @@
 -- Custom migration (hand-written SQL; ADR 0032).
--- The knowledge words take the reader's names: a composition is a write-up, a class override is a
--- sensitivity override, a quarantined document is unreadable, a candidate concept is a suggested
--- concept and a citation repair is a citation fix. Three tables, a column, a function and five stored
--- values are renamed, and submit_suggestion_set is replaced for the kinds it names. A rename takes an
--- ACCESS EXCLUSIVE lock; five seconds bounds the wait behind a reader, and a failed release is
--- re-run by hand.
+-- A rename takes an ACCESS EXCLUSIVE lock; five seconds bounds the wait behind a reader, and a
+-- failed release is re-run by hand.
 SET LOCAL lock_timeout = '5s';--> statement-breakpoint
 ALTER TABLE "composition" RENAME TO "write_up";--> statement-breakpoint
 ALTER TABLE "write_up" RENAME CONSTRAINT "composition_workspace_id_id_pk" TO "write_up_workspace_id_id_pk";--> statement-breakpoint
@@ -48,11 +44,8 @@ ALTER TABLE "source_document" RENAME COLUMN "quarantine_error" TO "unreadable_re
 -- RENAME keeps its grants. The CHECK on source_document and index.readable_passage call it by its
 -- oid, so both read the new name with no rebuild, and the view keeps security_invoker.
 ALTER FUNCTION public.narrower_class(text, text) RENAME TO narrower_sensitivity;--> statement-breakpoint
--- Each CHECK naming an old value goes first so the value can be rewritten. Row-level security is
--- forced on every one of these tables and a migration runs as the owner, so the updates take each
--- row's workspace scope. A suggestion's kind is the proposer's and a trigger refuses any update to
--- it, so that trigger stands aside for this rewrite alone; the map's generation guard likewise, as
--- a relabelled row keeps whatever generation it had.
+-- Row-level security is forced, so the updates take each workspace's scope. The triggers that
+-- refuse a kind's or a stale generation's update stand aside for this rewrite alone.
 ALTER TABLE "suggestion" DROP CONSTRAINT "suggestion_kind_check";--> statement-breakpoint
 ALTER TABLE "suggestion" DROP CONSTRAINT "suggestion_repair_proposer_check";--> statement-breakpoint
 ALTER TABLE "concept_verification" DROP CONSTRAINT "concept_verification_origin_check";--> statement-breakpoint
@@ -94,19 +87,9 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   v_workspace text := nullif(current_setting('app.workspace_id', true), '');
-  -- **Which tier is calling**, read past SECURITY DEFINER, which replaces `current_user`
-  -- with this function's owner and so cannot answer it. The `role` GUC holds what the
-  -- caller last `SET ROLE`'d to and is *not* pushed aside by the definer context — it reads
-  -- `none` when nobody set one, and then the caller is whoever logged in, which is how the
-  -- estate connects (each tier logs in as its own runtime role).
+  -- The calling tier, read past SECURITY DEFINER; 0018 says why the role GUC answers it.
   v_caller text := coalesce(nullif(current_setting('role', true), 'none'), session_user);
-  -- The kinds each tier may raise (SUGGESTION_KINDS_FROM_THE_APP and
-  -- SUGGESTION_KINDS_FROM_A_RUN in src/suggestion-tables.ts, which say why each list is
-  -- what it is). Held here because `p_kind` and `p_proposer` are both the caller's words: a
-  -- compromised worker could otherwise submit an *edit* under a `human:` proposer — a form
-  -- the row's CHECK accepts — and put a change in a person's name into the suggestions an
-  -- Admin decides from, and a compromised app could raise a run's *suggested concept*
-  -- nobody ran.
+  -- SUGGESTION_KINDS_FROM_THE_APP and SUGGESTION_KINDS_FROM_A_RUN in src/suggestion-tables.ts.
   v_permitted text[] := CASE v_caller
     WHEN 'app_rt' THEN ARRAY['edit', 'promotion']
     WHEN 'worker_rt' THEN ARRAY['suggested-concept', 'promotion', 'citation-fix']
@@ -120,31 +103,13 @@ BEGIN
     RAISE EXCEPTION 'submit_suggestion_set: % may not raise a suggestion of kind %',
       v_caller, p_kind USING ERRCODE = 'insufficient_privilege';
   END IF;
-  -- A set is bounded by what an Admin could decide (SUGGESTION_SET_MAX in
-  -- src/suggestion-tables.ts): a producer chooses how much it sends, so somebody other
-  -- than the producer has to choose the ceiling.
+  -- SUGGESTION_SET_MAX in src/suggestion-tables.ts.
   IF jsonb_typeof(p_requests) IS DISTINCT FROM 'array'
      OR jsonb_array_length(p_requests) NOT BETWEEN 1 AND 500 THEN
     RAISE EXCEPTION 'submit_suggestion_set: a set carries between one and 500 requests'
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
-  -- **A frontmatter arrives as the producer's own JSON text, is a JSON object, and is bounded
-  -- as the producer wrote it** (CONCEPT_FRONTMATTER_MAX in src/concept-tables.ts). It is sent
-  -- as a string rather than as an object so that this function measures the same characters
-  -- the boundary measured: a `jsonb` value read back with `::text` is Postgres's rendering
-  -- of it, not the producer's, and the two are not within any multiplier of each other —
-  -- `{"a":1e-100}` is twelve characters sent and a hundred and nine read back, and a
-  -- number may carry a scale of sixteen thousand. A bound over the rendering would
-  -- therefore refuse payloads the boundary had already passed, which is the one thing a
-  -- backstop must never do. This is the *only* road to the row (both runtime roles hold
-  -- REVOKE ALL on the table), so one measurement here is the whole bound.
-  --
-  -- The object test is the same guard's third arm rather than a later surprise: a payload
-  -- is the file an acceptance would commit and the write path reads its keys, so a JSON
-  -- null, a list or a bare scalar casts and stores perfectly well and then fails at the
-  -- acceptance, where the refusal is somebody else's problem. The CASE is what keeps the
-  -- cast from being reached for text that is not JSON at all, which Postgres refuses in its
-  -- own words and code.
+  -- CONCEPT_FRONTMATTER_MAX in src/concept-tables.ts, measured on the producer's own text (0018).
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(p_requests) AS e
      WHERE jsonb_typeof(e -> 'frontmatter') IS DISTINCT FROM 'string'
@@ -156,9 +121,6 @@ BEGIN
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
 
-  -- The proposer's *form*, and the kind a form may raise, are the row's own CHECKs
-  -- (`suggestion_proposer_check`, `suggestion_citation_fix_proposer_check`): held where a
-  -- compromised producer calling this function cannot argue with them.
   INSERT INTO public.suggestion (workspace_id, id, set_id, kind, proposer)
   SELECT v_workspace, r.suggestion_id, p_set_id, p_kind, p_proposer
     FROM jsonb_to_recordset(p_requests) AS r(suggestion_id text);
@@ -167,7 +129,6 @@ BEGIN
   INSERT INTO public.concept_write_request
          (workspace_id, suggestion_id, merge_key, path, concept_kind, title, frontmatter,
           body, base_content_hash)
-  -- The cast is here and after the bound above, so what was measured is what is stored.
   SELECT v_workspace, r.suggestion_id, r.merge_key, r.path, r.concept_kind, r.title,
          r.frontmatter::jsonb, r.body, r.base_content_hash
     FROM jsonb_to_recordset(p_requests)

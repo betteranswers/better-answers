@@ -5,7 +5,7 @@ import { ulid } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
 import { asTheMigrationOwnerOf, migrationStatements } from "./journal-statements.ts";
-import { ADMITTED, postgresForSuite, refusalOf } from "./probes.ts";
+import { ADMITTED, postgresForSuite, refusalOf, suggestionWritten } from "./probes.ts";
 
 const db = postgresForSuite();
 
@@ -40,6 +40,8 @@ const OLD_PROPOSER = "process:better-answers-citation-repair";
 
 const A_PERSON = "human:01J6CCCCCCCCCCCCCCCCCCCCCC";
 
+const A_RUN = "better-answers-extraction/1.2";
+
 type Seeded = {
   readonly decided: string;
   readonly waiting: string;
@@ -54,13 +56,22 @@ const oldValuesIn = async (client: pg.PoolClient, workspaceId: string): Promise<
   const identity = await seed.conceptIdentity({ workspaceId });
   const decided = ulid();
   const waiting = ulid();
-  await client.query(
-    `INSERT INTO suggestion
-       (workspace_id, id, set_id, kind, status, proposer, target_iri, decider, decided_at)
-     VALUES ($1, $2, $3, 'candidate', 'accepted', 'better-answers-extraction/1.2', $4, $5, now()),
-            ($1, $6, $3, 'repair', 'waiting', $7, NULL, NULL, NULL)`,
-    [workspaceId, decided, ulid(), identity.iri, A_PERSON, waiting, OLD_PROPOSER],
-  );
+  const setId = ulid();
+  await suggestionWritten(client, {
+    workspaceId,
+    id: decided,
+    setId,
+    kind: "candidate",
+    proposer: A_RUN,
+    decided: { targetIri: identity.iri, decider: A_PERSON },
+  });
+  await suggestionWritten(client, {
+    workspaceId,
+    id: waiting,
+    setId,
+    kind: "repair",
+    proposer: OLD_PROPOSER,
+  });
   const verification = await seed.conceptVerification({ workspaceId, iri: identity.iri });
   await client.query("UPDATE concept_verification SET origin = 'repair' WHERE id = $1", [
     verification.id,
@@ -166,24 +177,12 @@ describe("migration 0072 over the knowledge words stored before it", () => {
 
       await replayingItsValueRewrites(client);
 
-      expect(
-        await refusalOf(client, () =>
-          client.query(
-            `INSERT INTO suggestion (workspace_id, id, set_id, kind, proposer)
-             VALUES ($1, $2, $3, 'candidate', 'better-answers-extraction/1.2')`,
-            [here, ulid(), ulid()],
-          ),
-        ),
-      ).toBe("suggestion_kind_check");
-      expect(
-        await refusalOf(client, () =>
-          client.query(
-            `INSERT INTO suggestion (workspace_id, id, set_id, kind, proposer)
-             VALUES ($1, $2, $3, 'citation-fix', $4)`,
-            [here, ulid(), ulid(), A_PERSON],
-          ),
-        ),
-      ).toBe("suggestion_citation_fix_proposer_check");
+      const raised = (kind: string, proposer: string) => () =>
+        suggestionWritten(client, { workspaceId: here, id: ulid(), setId: ulid(), kind, proposer });
+      expect(await refusalOf(client, raised("candidate", A_RUN))).toBe("suggestion_kind_check");
+      expect(await refusalOf(client, raised("citation-fix", A_PERSON))).toBe(
+        "suggestion_citation_fix_proposer_check",
+      );
       expect(
         await refusalOf(client, () =>
           client.query("UPDATE source_document SET outcome = 'quarantined' WHERE id = $1", [
@@ -196,6 +195,15 @@ describe("migration 0072 over the knowledge words stored before it", () => {
           client.query("UPDATE suggestion SET kind = 'edit' WHERE id = $1", [seeded.waiting]),
         ),
       ).not.toBe(ADMITTED);
+      const guards = await client.query<{ tgname: string; tgenabled: string }>(
+        `SELECT tgname, tgenabled FROM pg_trigger
+          WHERE tgname IN ('suggestion_decides_once_trigger', 'map_node_generation_guard')
+          ORDER BY tgname`,
+      );
+      expect(guards.rows).toEqual([
+        { tgname: "map_node_generation_guard", tgenabled: "O" },
+        { tgname: "suggestion_decides_once_trigger", tgenabled: "O" },
+      ]);
     });
   });
 });

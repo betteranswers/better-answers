@@ -220,6 +220,33 @@ export const attemptUnreadablePair = (
     client.query(documentReporting(outcome, unreadableReason), [...anotherItemUnder(place)]),
   );
 
+export type SuggestionRow = {
+  readonly workspaceId: string;
+  readonly id: string;
+  readonly setId: string;
+  readonly kind: string;
+  readonly proposer: string;
+  readonly decided?: { readonly targetIri: string; readonly decider: string };
+};
+
+/** Past the boundary schema, so a kind the package no longer declares can still be written. */
+export const suggestionWritten = (client: Writer, row: SuggestionRow): Promise<unknown> =>
+  client.query(
+    `INSERT INTO suggestion
+       (workspace_id, id, set_id, kind, status, proposer, target_iri, decider, decided_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $8::text IS NULL THEN NULL ELSE now() END)`,
+    [
+      row.workspaceId,
+      row.id,
+      row.setId,
+      row.kind,
+      row.decided === undefined ? "waiting" : "accepted",
+      row.proposer,
+      row.decided?.targetIri ?? null,
+      row.decided?.decider ?? null,
+    ],
+  );
+
 export const attemptDocumentSized = (
   client: pg.PoolClient,
   place: CataloguePlace,

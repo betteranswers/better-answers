@@ -223,7 +223,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             the workspace's name, its short name, or both; at least one is named, and the other kept
   operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
   restore-sign-in --email <email>                           a person who lost every factor and code, once you have checked who they are another way: their factors and sessions ended, a notice sent, a one-time restore code printed
-  import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <class>] [--dry-run]
+  import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <sensitivity>] [--dry-run]
                                                             the company's bundle landed through the governed write, its verifications imported, its links rewritten to iris
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
     --dry-run      validate the tree and say what a run would do, writing nothing

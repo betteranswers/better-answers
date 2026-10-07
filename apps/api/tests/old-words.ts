@@ -1122,6 +1122,9 @@ const SENSITIVITY_FILES = [
   "packages/core/src/sources/review.ts",
   "packages/core/src/sources/passages.ts",
   "packages/core/src/guides/",
+  "packages/core/test/sensitivity-ranking.test.ts",
+  "apps/api/src/ops/index.ts",
+  "apps/api/src/mcp/entries/",
   "apps/web/src/features/sources/",
   "apps/web/e2e/sources.spec.ts",
 ];
@@ -1133,7 +1136,12 @@ const SENSITIVITY_SENSES: readonly Sense[] = [
   },
   {
     sense: "a refusal's class, which sorts a word by what its caller can do (R21)",
-    written: /\brefusal'?s? class\b|\bits class\b(?=[^.]*\bword)/gi,
+    written:
+      /\brefusal'?s? class\b|\bits class\b(?=[^.]*\bword)|(?<=\bword\b[^.]*)\bits class\b|\brefusal\S*\.class\b/gi,
+  },
+  {
+    sense: "the refusal word for a sensitivity its reader may not read (R21)",
+    written: /\bclass-unreadable\b/g,
   },
 ];
 
