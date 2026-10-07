@@ -515,7 +515,7 @@ const PEOPLE_WORDS_LANDED = "2026-10-07";
 
 const PEOPLE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(PEOPLE_WORDS_LANDED)];
 
-/** The knowledge words land in three pull requests; the page words first, on the day of their sweep. */
+/** The knowledge words land in three pull requests, one noun at a time, each on the day of its sweep. */
 const KNOWLEDGE_WORDS_LANDED = "2026-10-07";
 
 const KNOWLEDGE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(KNOWLEDGE_WORDS_LANDED)];
@@ -993,11 +993,6 @@ const UNCHECKED_SENSES: readonly Sense[] = [
   ...FILED_NAMES,
   { sense: "TypeScript's own compiler option", written: /\bnoUncheckedIndexedAccess\b/g },
 ];
-
-/** The knowledge words that change no stored value land one noun at a time, each on this day. */
-const KNOWLEDGE_WORDS_LANDED = "2026-10-07";
-
-const KNOWLEDGE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(KNOWLEDGE_WORDS_LANDED)];
 
 const HIT_SENSES: readonly Sense[] = [
   { sense: "a cache hit", written: /\bcache[- ]hit\b/gi },
