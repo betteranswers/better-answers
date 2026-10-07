@@ -1302,7 +1302,7 @@ describe("the map tables under app_rt", () => {
   });
 });
 
-const inboxAsApp = async (client: pg.PoolClient) => {
+const suggestionsAsApp = async (client: pg.PoolClient) => {
   const seed = await seedTwoWorkspaces(client);
   const here = await seed.suggestion({ workspaceId: WS_A });
   await seed.conceptWriteRequest({ workspaceId: WS_A, suggestionId: here.id });
@@ -1337,10 +1337,10 @@ const submitSet = (
     [ulid(), set.kind, set.proposer, JSON.stringify(set.requests)],
   );
 
-describe("the inbox under app_rt", () => {
+describe("the suggestions under app_rt", () => {
   it("returns none unscoped and only the scoped tenant's suggestions", async () => {
     await withRollback(db.pool, async (client) => {
-      const { here } = await inboxAsApp(client);
+      const { here } = await suggestionsAsApp(client);
 
       await client.query("SELECT set_config('app.workspace_id', '', true)");
       expect((await client.query("SELECT id FROM suggestion")).rows).toEqual([]);
@@ -1353,7 +1353,7 @@ describe("the inbox under app_rt", () => {
 
   it("refuses both roles the payload table, which the definer serves", async () => {
     await withRollback(db.pool, async (client) => {
-      const { here } = await inboxAsApp(client);
+      const { here } = await suggestionsAsApp(client);
 
       for (const statement of [
         "SELECT 1 FROM concept_write_request LIMIT 1",
@@ -1385,7 +1385,7 @@ describe("the inbox under app_rt", () => {
 
   it("withholds a decided suggestion's payload, and another tenant's always", async () => {
     await withRollback(db.pool, async (client) => {
-      const { here, there } = await inboxAsApp(client);
+      const { here, there } = await suggestionsAsApp(client);
 
       const foreign = await client.query("SELECT 1 FROM concept_write_request_for($1)", [there.id]);
       expect(foreign.rowCount).toBe(0);
@@ -1405,7 +1405,7 @@ describe("the inbox under app_rt", () => {
 
   it("refuses the api a DELETE of a suggestion", async () => {
     await withRollback(db.pool, async (client) => {
-      const { here } = await inboxAsApp(client);
+      const { here } = await suggestionsAsApp(client);
 
       await expect(
         client.query("DELETE FROM suggestion WHERE workspace_id = $1 AND id = $2", [WS_A, here.id]),
@@ -1469,7 +1469,7 @@ describe("the inbox under app_rt", () => {
 
   it("refuses a first decision a transaction never declared", async () => {
     await withRollback(db.pool, async (client) => {
-      const { here } = await inboxAsApp(client);
+      const { here } = await suggestionsAsApp(client);
       const decline = (id: string) =>
         client.query(
           `UPDATE suggestion SET status = 'declined', decider = 'process:better-answers-test',

@@ -69,7 +69,7 @@ C4Container
 | Agreement | Form | What it pins |
 | --- | --- | --- |
 | queue | SQL function | claim, lease, heartbeat, finish, fail; the kinds a claimant runs, the job's subject and the run key; a lapsed lease revokes its claimant |
-| concept-inbox | SQL function | the `concept_write_request` handshake |
+| suggestions | SQL function | the `concept_write_request` handshake |
 | model-choice | SQL function | the model choice per workspace and purpose |
 | credential-envelope | fixtured | the encryption envelope both tiers decrypt |
 | id-shape | fixtured | the one ULID shape either tier mints |

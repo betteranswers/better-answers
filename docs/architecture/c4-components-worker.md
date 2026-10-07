@@ -51,7 +51,7 @@ C4Component
   Rel(catalogue, postgres, "Reads the connected source; writes finding and source_document", "psycopg")
   Rel(host, postgres, "Lands index.passage rows, after the catalogue commits, through the passages app", "asyncpg")
   Rel(extraction, models, "Calls per document within the ceiling", "fetch-shaped fake in tests")
-  Rel(extraction, postgres, "Proposes concept_write_request rows into", "the concept-inbox agreement")
+  Rel(extraction, postgres, "Proposes concept_write_request rows into", "the suggestions agreement")
 
   UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```

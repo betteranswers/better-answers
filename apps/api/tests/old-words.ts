@@ -183,7 +183,7 @@ const SURFACE_SENSES: readonly Sense[] = [
   },
   {
     sense: "what a person decides on, in a fixture whose every edit moves the contract's digest",
-    within: "contracts/concept-inbox/",
+    within: "contracts/suggestions/",
     written: /\bdecision surface\b/g,
   },
 ];

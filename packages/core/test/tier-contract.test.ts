@@ -33,7 +33,7 @@ import { ulid } from "../src/kernel/index.ts";
 const SPOKEN_AGREEMENTS = {
   citation: "fixtured",
   "concept-file": "fixtured",
-  "concept-inbox": "sql-function",
+  suggestions: "sql-function",
   "cost-ledger": "generated",
   "document-passage": "fixtured",
   "emptying-a-connected-source": "fixtured",

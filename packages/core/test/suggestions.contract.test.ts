@@ -47,7 +47,7 @@ const fixtureSchema = z.object({
   ),
 });
 
-const fixture = contractFixture("concept-inbox", fixtureSchema);
+const fixture = contractFixture("suggestions", fixtureSchema);
 
 const db = postgresForSuite();
 
@@ -85,7 +85,7 @@ const submitFixtureSet = async (client: Parameters<Parameters<typeof withRollbac
   return submitted;
 };
 
-describe("the concept-inbox agreement", () => {
+describe("the suggestions agreement", () => {
   it("submits a set in one call and re-renders its summary", async () => {
     await withRollback(db().pool, async (client) => {
       await seedFixture(client);

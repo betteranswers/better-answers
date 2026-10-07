@@ -57,14 +57,6 @@ import {
   type HashedSource,
 } from "./file.ts";
 import {
-  payloadFor,
-  returnToProposer,
-  suggestionIsWaiting,
-  targetOfMergeKey,
-  type SuggestionKind,
-  type SuggestionPayload,
-} from "./inbox.ts";
-import {
   foldKind,
   heldByIri,
   heldVisibilityOf,
@@ -94,6 +86,14 @@ import {
   type Unsound,
 } from "./loader.ts";
 import { manifestAtHead, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
+import {
+  payloadFor,
+  returnToProposer,
+  suggestionIsWaiting,
+  targetOfMergeKey,
+  type SuggestionKind,
+  type SuggestionPayload,
+} from "./suggestions.ts";
 import { conceptVisibilityFrom } from "./visibility.ts";
 
 export {
@@ -128,7 +128,7 @@ export {
   suggestionSetSummary,
   type SuggestionKind,
   type SuggestionRequest,
-} from "./inbox.ts";
+} from "./suggestions.ts";
 /** @public S3 */
 export type {
   DecideSuggestionInput,
@@ -137,9 +137,9 @@ export type {
   SubmitSuggestionSetRefusal,
   SuggestionDecided,
   SuggestionSetSubmitted,
-} from "./inbox.ts";
+} from "./suggestions.ts";
 /** @public S5 */
-export type { SuggestionSummaryItem } from "./inbox.ts";
+export type { SuggestionSummaryItem } from "./suggestions.ts";
 export {
   evidencePaneOf,
   overrideConceptClass,

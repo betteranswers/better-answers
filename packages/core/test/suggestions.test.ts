@@ -1281,7 +1281,7 @@ describe("an acceptance reached straight through the write path", () => {
   });
 });
 
-describe("what the inbox refuses before it does any work", () => {
+describe("what a suggestion set refuses before it does any work", () => {
   it("refuses an undeclared kind with a word callers act on", async () => {
     const scenario = await arrange();
 

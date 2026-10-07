@@ -1,5 +1,5 @@
 {
-  "description": "concept-inbox (ADR 0031, ADR 0012): submitting a suggestion set is one function call, the set's summary is re-rendered against concept_identity every time it is asked for, and nothing reads a payload but the acceptance path. Each suite seeds `workspaces` and `concepts`, calls submit_suggestion_set as `set.role` inside a transaction scoped to `set.workspace_id`, then reads suggestion_set_summary as app_rt in that scope and asserts one row per `expect_summary` entry, in that order. Every `refusals` entry is then run as its own role, in the named scope ('' = no scope), and must fail with the SQLSTATE given — never a value.",
+  "description": "suggestions (ADR 0031, ADR 0012): submitting a suggestion set is one function call, the set's summary is re-rendered against concept_identity every time it is asked for, and nothing reads a payload but the acceptance path. Each suite seeds `workspaces` and `concepts`, calls submit_suggestion_set as `set.role` inside a transaction scoped to `set.workspace_id`, then reads suggestion_set_summary as app_rt in that scope and asserts one row per `expect_summary` entry, in that order. Every `refusals` entry is then run as its own role, in the named scope ('' = no scope), and must fail with the SQLSTATE given — never a value.",
   "workspaces": [
     { "id": "01J6AAAAAAAAAAAAAAAAAAAAAA", "name": "Workspace A" },
     { "id": "01J6BBBBBBBBBBBBBBBBBBBBBB", "name": "Workspace B" }
@@ -90,7 +90,7 @@
       "sqlstate": "42501"
     },
     {
-      "why": "no run reads another run's suggested concepts out of the inbox: the payload function is the api's alone",
+      "why": "no run reads another run's suggested concepts back: the payload function is the api's alone",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "SELECT 1 FROM concept_write_request_for('01J6S1AAAAAAAAAAAAAAAAAAAA')",

@@ -19,7 +19,7 @@ C4Component
     Component(audit, "audit", "insert-only audit log", "The one append-only audit log: the typed event vocabulary, two doors, four families")
 
     Component(sources, "sources", "slice", "Connect, publish, narrow, widen; the review acts; reprocess; the DPIA input; passages; the upload sweep")
-    Component(concepts, "concepts", "slice", "The write path, the inbox, the loader, the reconciler, visibility and the cascade's first level, map maintenance")
+    Component(concepts, "concepts", "slice", "The write path, the suggestions, the loader, the reconciler, visibility and the cascade's first level, map maintenance")
     Component(answering, "answering", "slice", "find, ask, open, give_feedback; S2 re-seams ask as plan, draft, record")
     Component(guides, "guides", "slice", "Compositions and includes, recomputed as the cascade's second level; definitions and sections at S3")
     Component(erasure, "erasure", "slice", "Subject requests, the erasure map, suppressions, the routine, replay on restore, the rehearsal; the top of the slice graph")

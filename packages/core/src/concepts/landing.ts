@@ -25,8 +25,8 @@ import { fileAt, type Committed, type GitDoor } from "../store/git/index.ts";
 import { writeConceptDelta } from "../store/map/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import { contentHashOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
-import { markDeciding } from "./inbox.ts";
 import type { Acceptance } from "./index.ts";
+import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
 
 /** Title-cases each word and drops a plural: `policies` and `Policy` both fold to `Policy`. */

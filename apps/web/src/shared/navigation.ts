@@ -219,9 +219,9 @@ export const CONTROL_CENTRE = {
       summary: "Suggested changes waiting for a decision.",
       pages: [
         {
-          name: "Queue",
-          path: "/suggestions/queue",
-          icon: "queue",
+          name: "To decide",
+          path: "/suggestions/to-decide",
+          icon: "to-decide",
           built: false,
           seenBy: ADMINS,
         },

@@ -1,0 +1,67 @@
+{
+  "noun": "inbox",
+  "readerWord": "suggestions",
+  "sweep": "U15. Knowledge words: suggestions and To decide",
+  "collisions": [
+    {
+      "with": "the Inbox area, what waits on a person, which keeps its name",
+      "codeWord": "suggestions"
+    },
+    {
+      "with": "the journeys' test inbox and a person's email inbox",
+      "codeWord": "suggestions"
+    }
+  ],
+  "words": [
+    {
+      "from": "concept inbox",
+      "to": "suggestions"
+    },
+    {
+      "from": "inbox",
+      "to": "suggestions"
+    }
+  ],
+  "symbols": {
+    "paths": [
+      "packages/core/src/concepts/**",
+      "packages/core/src/audit/vocabulary.ts",
+      "packages/core/test/audit.test.ts",
+      "packages/core/test/suggestions.test.ts",
+      "packages/core/test/suggestions.contract.test.ts",
+      "packages/core/test/concept-inbox.contract.test.ts",
+      "packages/core/test/tier-contract.test.ts",
+      "packages/core/test/import-direction.test.ts",
+      "packages/schema/src/definer-reach.ts",
+      "packages/schema/test/rls.test.ts"
+    ]
+  },
+  "text": {
+    "paths": [
+      "packages/core/src/concepts/**",
+      "packages/core/src/audit/vocabulary.ts",
+      "packages/core/test/audit.test.ts",
+      "packages/core/test/suggestions.test.ts",
+      "packages/core/test/suggestions.contract.test.ts",
+      "packages/core/test/concept-inbox.contract.test.ts",
+      "packages/core/test/tier-contract.test.ts",
+      "packages/core/test/import-direction.test.ts",
+      "packages/schema/src/definer-reach.ts",
+      "packages/schema/test/rls.test.ts",
+      "contracts/manifest.json",
+      "contracts/concept-inbox/**",
+      "contracts/suggestions/**",
+      "apps/worker/tests/test_tier_contract.py"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "the words test's own planted fixtures and ratchet",
+      "paths": ["apps/api/tests/avoid-words.test.ts", "apps/api/tests/old-words-ratchet.json"]
+    },
+    {
+      "sense": "the migration that built the store, whose file name stored history keeps (R22)",
+      "matches": ["the-inbox", "the inbox substrate"]
+    }
+  ]
+}

@@ -27,7 +27,7 @@ export const SECURITY_DEFINER_REACH = [
     args: "p_set_id text, p_kind text, p_proposer text, p_requests jsonb",
     reaches: ["public.concept_write_request", "public.suggestion"],
     reason:
-      "Past both callers' grants. ALL is revoked on `concept_write_request` for `app_rt` and `worker_rt` alike and on `suggestion` for `worker_rt`, so the surface shows the worker holding nothing on either table while its whole write path into the inbox runs through this one function, which guards the set's size, its kinds against the calling role and the request count before writing a row.",
+      "Past both callers' grants. ALL is revoked on `concept_write_request` for `app_rt` and `worker_rt` alike and on `suggestion` for `worker_rt`, so the surface shows the worker holding nothing on either table while its whole write path into the suggestions runs through this one function, which guards the set's size, its kinds against the calling role and the request count before writing a row.",
   },
   {
     fn: "public.suggestion_set_summary",
