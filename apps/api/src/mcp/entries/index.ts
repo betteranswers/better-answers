@@ -35,7 +35,7 @@ const trust = z.object({
 
 type WireTrust = z.infer<typeof trust>;
 
-/** Core says who verified a concept and when; the wire keeps the keys its clients read (R21). */
+/** Core says who verified a concept and when; the wire keeps the keys its clients read. */
 const wireTrust = ({ tier, status, verifiedBy, verifiedAt, rider }: Trust): WireTrust => ({
   tier,
   status,

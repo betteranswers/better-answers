@@ -47,7 +47,7 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 26. As an Editor, I want to save an answer as an `Answer` and see it decided one at a time against the closest existing `Answer`, so that the bid library grows without duplicates.
 27. As an Editor, I want to paste a bid document, confirm its extracted question set in a table, and have every question answered as a background job streamed per question, so that a response set is drafted from the knowledge with citations and the unanswered questions sort to the top.
 28. As an Editor, I want the response-set document out through the one renderer, recorded as one usage per response, so that what I submitted is traceable to the concepts it cited.
-29. As an Editor, I want to check a concept against its sources and see *Checked by me · date* on it, and never be able to check a body I generated, so that a check is worth something.
+29. As an Editor, I want to verify a concept against its sources and see *Verified by me · date* on it, and never be able to verify a body I generated, so that a verification is worth something.
 30. As an Editor, I want a conflict — two values for one claim across sources — shown with both values and their evidence, and resolved by me in one of four ways, so that the pipeline never picks a side on my behalf.
 
 ### The Viewer
