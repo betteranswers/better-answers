@@ -48,9 +48,9 @@
   --focus-ring: 0 0 0 var(--focus-ring-width) var(--accent-200), 0 0 0 1px var(--accent-600);
 
   /* Trust words — a tint behind a word that already says it */
-  --trust-checked-bg: var(--green-50);
-  --trust-checked-fg: var(--green-700);
-  --trust-checked-border: var(--green-200);
+  --trust-verified-bg: var(--green-50);
+  --trust-verified-fg: var(--green-700);
+  --trust-verified-border: var(--green-200);
   --trust-unverified-bg: var(--grey-100);
   --trust-unverified-fg: var(--grey-600);
   --trust-unverified-border: var(--grey-200);
@@ -112,9 +112,9 @@
   --control-disabled-fg: #5b6068;
   --focus-ring: 0 0 0 var(--focus-ring-width) rgba(63, 98, 234, 0.4), 0 0 0 1px var(--accent-400);
 
-  --trust-checked-bg: rgba(19, 122, 82, 0.16);
-  --trust-checked-fg: #5fc79b;
-  --trust-checked-border: rgba(19, 122, 82, 0.4);
+  --trust-verified-bg: rgba(19, 122, 82, 0.16);
+  --trust-verified-fg: #5fc79b;
+  --trust-verified-border: rgba(19, 122, 82, 0.4);
   --trust-unverified-bg: #1b1e22;
   --trust-unverified-fg: #a3a8b0;
   --trust-unverified-border: #2a2e34;
