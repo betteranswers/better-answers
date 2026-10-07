@@ -2,15 +2,6 @@
   "apps/web/src/app/words.ts": {
     "act": 2
   },
-  "apps/web/src/features/auth/link-words.ts": {
-    "check": 1
-  },
-  "apps/web/src/features/auth/refusal-words.ts": {
-    "check": 11
-  },
-  "apps/web/src/features/auth/second-factor-words.ts": {
-    "check": 1
-  },
   "apps/web/src/features/console/grant-words.ts": {
     "client": 1
   },
@@ -22,11 +13,9 @@
     "client": 1
   },
   "apps/web/src/features/people/refusal-words.ts": {
-    "check": 1,
     "domain": 4
   },
   "apps/web/src/features/sources/refusal-words.ts": {
-    "check": 1,
     "class": 3,
     "finding group": 5
   },
@@ -37,17 +26,9 @@
   "apps/web/src/shared/navigation.ts": {
     "act": 1,
     "answer audit": 1,
-    "check": 1,
-    "Checks due": 1,
     "domain": 2,
     "priced plan": 1,
     "Queue": 1,
     "slug": 1
-  },
-  "apps/web/src/shared/refusal-words.ts": {
-    "check": 1
-  },
-  "apps/web/src/shared/role-words.ts": {
-    "check": 3
   }
 }
