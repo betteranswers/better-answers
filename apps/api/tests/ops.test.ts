@@ -221,7 +221,7 @@ const provisioning = (app: TestApp, flags: readonly string[]): Promise<Run> =>
 const adding = (app: TestApp, workspaceId: string, email: string, role: string): Promise<Run> =>
   opsWith(app, ["add-member", "--workspace", workspaceId, "--email", email, "--role", role], {});
 
-const membershipsOf = async (app: TestApp, workspaceId: string, userId: string) => {
+const membersOf = async (app: TestApp, workspaceId: string, userId: string) => {
   const found = await app.database.superuser.query<{ id: string; role: string }>(
     "SELECT id, role FROM member WHERE workspace_id = $1 AND user_id = $2",
     [workspaceId, userId],
@@ -229,7 +229,7 @@ const membershipsOf = async (app: TestApp, workspaceId: string, userId: string) 
   return found.rows;
 };
 
-const membershipsHeldBy = async (app: TestApp, userId: string): Promise<number> => {
+const workspaceCountOf = async (app: TestApp, userId: string): Promise<number> => {
   const found = await app.database.superuser.query("SELECT 1 FROM member WHERE user_id = $1", [
     userId,
   ]);
@@ -1036,7 +1036,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
       expect(run.lines).toEqual([
-        `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin membership, one concept file and one indexed document naming them); take the dump, then run phase two`,
+        `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin member, one concept file and one indexed document naming them); take the dump, then run phase two`,
         `${email},human:${email},Rehearsal subject ${workspaceId}`,
       ]);
       const seededRow = await app().database.superuser.query(
@@ -1198,7 +1198,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           level: 30,
           actor: "process:better-answers-erasure",
           erasure_request_id: erasure.rows[0]?.id,
-          arm: "last-membership",
+          arm: "last-workspace",
           pseudonymised: 1,
           sessions_deleted: 0,
           verifications_deleted: 0,
@@ -1783,7 +1783,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("provision-workspace — a client's workspace and its first Admin", () => {
+  describe("provision-workspace — a customer's workspace and its first Admin", () => {
     const standingOf = async (app: TestApp, id: string) => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
         `SELECT w.name, w.slug,
@@ -1797,7 +1797,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return found.rows;
     };
 
-    it("stands up workspace, partition, membership, config, audit log and repository", async () => {
+    it("stands up workspace, partition, member, config, audit log and repository", async () => {
       const admin = await app().person(undefined, "Priya Shah");
       const slug = aSlug();
 
@@ -1818,7 +1818,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await standingOf(app(), id)).toEqual([
         { name: "Acme", slug, partition: true, ttl: "300000" },
       ]);
-      expect(await membershipsOf(app(), id, admin.id)).toEqual([
+      expect(await membersOf(app(), id, admin.id)).toEqual([
         { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
       ]);
       expect(await rowsOfAct(app(), id, "platform.workspace.provisioned")).toEqual([
@@ -1847,7 +1847,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
       expect(run.exitCode).toBe(0);
-      expect(await membershipsOf(app(), idOnTheDoneLine(run), admin.id)).toEqual([
+      expect(await membersOf(app(), idOnTheDoneLine(run), admin.id)).toEqual([
         { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
       ]);
     });
@@ -1889,7 +1889,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         `provision-workspace: REFUSED — no-display-name: ${admin.email} has given no display name; have them sign in and give one, then run this again`,
       ]);
       expect(await workspacesWithSlug(app(), slug)).toBe(0);
-      expect(await membershipsHeldBy(app(), admin.id)).toBe(0);
+      expect(await workspaceCountOf(app(), admin.id)).toBe(0);
     });
 
     it("refuses slug-taken for a held slug, and writes nothing", async () => {
@@ -1920,7 +1920,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         `provision-workspace: REFUSED — slug-taken: another workspace already holds the slug ${slug}`,
       ]);
       expect(await workspacesWithSlug(app(), slug)).toBe(1);
-      expect(await membershipsHeldBy(app(), second.id)).toBe(0);
+      expect(await workspaceCountOf(app(), second.id)).toBe(0);
     });
 
     it("refuses malformed for a blank name or slug, writing nothing", async () => {
@@ -1939,7 +1939,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         "provision-workspace: REFUSED — malformed: the name and the slug must each carry at least one character",
       ]);
-      expect(await membershipsHeldBy(app(), admin.id)).toBe(0);
+      expect(await workspaceCountOf(app(), admin.id)).toBe(0);
     });
 
     it("refuses without a repositories' root, before writing anything", async () => {
@@ -1985,7 +1985,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("add-member — a signed-in person made a workspace's member", () => {
     it.each(["Admin", "Editor", "Viewer"])(
-      "makes a person a %s, writing membership and audit events",
+      "makes a person a %s member, with audit events",
       async (role) => {
         const { workspaceId } = await app().provision();
         const person = await app().person();
@@ -1996,7 +1996,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         expect(run.lines).toEqual([
           `add-member: done — ${person.email} added to workspace ${workspaceId} as ${role}`,
         ]);
-        expect(await membershipsOf(app(), workspaceId, person.id)).toEqual([
+        expect(await membersOf(app(), workspaceId, person.id)).toEqual([
           { id: expect.stringMatching(ULID_SHAPE), role },
         ]);
         expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([
@@ -2012,7 +2012,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await adding(app(), workspaceId, "sam.okoro@acme.invalid", "Viewer");
 
       expect(run.exitCode).toBe(0);
-      expect(await membershipsOf(app(), workspaceId, person.id)).toEqual([
+      expect(await membersOf(app(), workspaceId, person.id)).toEqual([
         { id: expect.stringMatching(ULID_SHAPE), role: "Viewer" },
       ]);
     });
@@ -2039,7 +2039,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         `add-member: REFUSED — no-display-name: ${person.email} has given no display name; have them sign in and give one, then run this again`,
       ]);
-      expect(await membershipsHeldBy(app(), person.id)).toBe(0);
+      expect(await workspaceCountOf(app(), person.id)).toBe(0);
       expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([]);
     });
 
@@ -2053,7 +2053,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         `add-member: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
       ]);
-      expect(await membershipsHeldBy(app(), person.id)).toBe(0);
+      expect(await workspaceCountOf(app(), person.id)).toBe(0);
       expect(await auditLogOf(app(), nowhere)).toEqual([]);
     });
 
@@ -2069,10 +2069,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(again.lines).toEqual([
         `add-member: REFUSED — already-a-member: ${person.email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People page`,
       ]);
-      expect((await membershipsOf(app(), workspaceId, person.id)).map((row) => row.role)).toEqual([
+      expect((await membersOf(app(), workspaceId, person.id)).map((row) => row.role)).toEqual([
         "Editor",
       ]);
-      expect((await membershipsOf(app(), workspaceId, admin.id)).map((row) => row.role)).toEqual([
+      expect((await membersOf(app(), workspaceId, admin.id)).map((row) => row.role)).toEqual([
         "Admin",
       ]);
       expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toHaveLength(1);
@@ -2086,7 +2086,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual(["add-member: --role must be one of Admin, Editor, Viewer"]);
-      expect(await membershipsOf(app(), workspaceId, person.id)).toEqual([]);
+      expect(await membersOf(app(), workspaceId, person.id)).toEqual([]);
     });
 
     it("answers usage to a non-id workspace or a missing flag", async () => {
@@ -2180,7 +2180,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       await signIn(app(), client, email);
 
       expect(member.exitCode).toBe(0);
-      expect(await membershipsOf(app(), workspaceId, personId)).toEqual([
+      expect(await membersOf(app(), workspaceId, personId)).toEqual([
         { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
       ]);
       const session = sessionHolder.parse(await (await client.fetch("/get-session")).json());
@@ -2397,7 +2397,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `test-workspace: stranger@${fixture.domain}, an Editor, is no part of the fixture; left in place`,
         ],
       });
-      expect(await membershipsOf(app(), id, stranger.id)).toEqual([
+      expect(await membersOf(app(), id, stranger.id)).toEqual([
         { id: expect.stringMatching(ULID_SHAPE), role: "Editor" },
       ]);
     });

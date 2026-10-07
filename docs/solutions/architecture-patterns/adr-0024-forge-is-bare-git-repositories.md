@@ -42,7 +42,7 @@ The worker holds the detector's weights once, mapped from the file. On VPC 1 it 
 
 ## Why
 
-- The two IONOS contracts cannot be resized, and cash is tight before the first client pays.
+- The two IONOS contracts cannot be resized, and cash is tight before the first customer pays.
 - The api is the only committer (ADR 0012), with no human accounts on the forge, so Forgejo's UI, SSH server, user model and schema ran for nobody.
 - A 3–5 GB CPU embedding server does not fit on a 4 GB box beside production.
 - A swap file lets a first index that outgrows the cap run slower rather than fail.
@@ -57,7 +57,7 @@ The worker holds the detector's weights once, mapped from the file. On VPC 1 it 
 - D, Supabase for Postgres: no more memory than the box, and every table moved to a new sub-processor.
 - E, a third contract before go-live: money the effort does not have yet. Kept as the fallback.
 - Keeping Forgejo: it fits, but it would be a service to patch, drill, back up and mirror for no one.
-- No swap, hard caps only: the first client's index must not fail.
+- No swap, hard caps only: the first customer's index must not fail.
 - A git library inside the api: a customer-hosted worker cannot mount a shared volume. Read-only git smart HTTP answers that for v1.0.
 - A smaller detector, or step E, for the worker's memory: the weights held once fit the box.
 

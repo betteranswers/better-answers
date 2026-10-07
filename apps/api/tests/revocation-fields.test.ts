@@ -37,13 +37,13 @@ describe("the revocation instants the identity provider carries", () => {
     expect(platformWritten(fields["credentialsRevokedAt"])).toEqual(PLATFORM_DATE);
   });
 
-  it("gives a membership its own instant, kept to one workspace", () => {
+  it("gives a member its own instant, kept to one workspace", () => {
     const fields = memberSchema()?.additionalFields ?? {};
 
     expect(platformWritten(fields["credentialsRevokedAt"])).toEqual(PLATFORM_DATE);
   });
 
-  it("keeps the membership instant from what a colleague sees", () => {
+  it("keeps the member's instant from what a colleague sees", () => {
     const fields = memberSchema()?.additionalFields ?? {};
 
     expect(fields["credentialsRevokedAt"]?.returned).toBe(false);

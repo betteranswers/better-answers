@@ -67,7 +67,7 @@ const memberRows = (page: Page): Locator =>
     .getByRole("row")
     .filter({ has: page.getByRole("cell") });
 
-/** Matched by name anywhere in the path, because the client batches its reads. */
+/** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const theMembersRead = (url: URL) => url.pathname.includes("members.list");
 
 type Teammate = { readonly address: string; readonly id: string };

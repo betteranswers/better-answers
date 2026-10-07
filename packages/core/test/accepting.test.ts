@@ -70,7 +70,7 @@ const statusOf = async (invitationId: string) =>
   ).rows[0]?.status;
 
 describe("accepting an invitation", () => {
-  it("leaves one membership; the second answers already-a-member", async () => {
+  it("leaves one member row; the second answers already-a-member", async () => {
     const { workspace, personId, invitationId } = await anInvitation("Twice");
 
     const [first, second] = await whileActsWaitAt(

@@ -2,7 +2,7 @@ import type { ROLES } from "@better-answers/schema";
 
 import type { IconName } from "./icon.tsx";
 
-/** A workspace role, as the session's membership names it. */
+/** A workspace role, as the session's member names it. */
 export type Role = (typeof ROLES)[number];
 
 /** The operator holds no role in the console, so its pages are shown to the mark instead. */
@@ -403,7 +403,7 @@ export const CONSOLE = {
       id: "people",
       name: "People",
       summary:
-        "Every person on the platform, the workspaces they belong to and their role in each, with the sessions and grants that can act as them.",
+        "Every person on the platform, the workspaces they belong to and their role in each, with the sessions and assistant access that can act as them.",
       movedFrom: ["/console/people"],
       pages: [
         {
@@ -491,7 +491,7 @@ export const HOMES = {
 } as const satisfies { readonly [who in RoleOrOperator]: Page };
 
 export type Reader = {
-  /** Undefined until the membership read answers, so nothing role-gated shows meanwhile. */
+  /** Undefined until the member read answers, so nothing role-gated shows meanwhile. */
   readonly role: RoleOrOperator | undefined;
   readonly owns: readonly string[];
 };

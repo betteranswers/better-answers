@@ -35,7 +35,7 @@ Read before proposing any key, writing convention or feature that touches a conc
 
 ## The platform's stance (Liam, 26/08/2026)
 
-- **OKF targets the data layer.** The bundle is the substrate any AI system reads and writes: structured, contextual, portable, machine-readable, and readable by a person in any editor. System-agnostic, so a client can adopt new AI tools against it with confidence.
+- **OKF targets the data layer.** The bundle is the substrate any AI system reads and writes: structured, contextual, portable, machine-readable, and readable by a person in any editor. System-agnostic, so a customer can adopt new AI tools against it with confidence.
 - **Two knowledge layers on OKF.** The bundle (concepts, graph-*shaped* through its links) and the map built on top (queryable, traversable, reasoned over). Everything the spec leaves open is met in the map and in records — never with keys in the file. The spec's silence on supersession is a boundary, not a gap.
 - **Simplicity is the reason OKF is here.** If a planned feature or piece of infrastructure needs a concept file to carry more than the spec plus `iri` and `locator`, the approach is probably over-complicated; re-evaluate before proceeding.
 - **The file is written for a company with no platform** and to the spec.

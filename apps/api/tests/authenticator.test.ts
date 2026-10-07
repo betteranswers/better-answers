@@ -182,7 +182,7 @@ describe("setting up an authenticator", () => {
     const { answered } = await setUpOn(client);
 
     expect(answered.status).toBe(200);
-    expect(await refusalOf(api.session.membership.query())).toMatchObject({
+    expect(await refusalOf(api.session.member.query())).toMatchObject({
       data: { httpStatus: 401, refusal: { word: "credentials-revoked", class: "unauthenticated" } },
     });
   });

@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 
-import { useRole } from "@/features/auth/membership.ts";
+import { useRole } from "@/features/auth/member.ts";
 import { HOMES, type Page } from "@/shared/navigation.ts";
 
 import { goHome } from "./words.ts";
@@ -19,7 +19,7 @@ export function GoHome(properties: {
   );
 }
 
-/** Asked only here, so the console never reads a membership its reader need not hold. */
+/** Asked only here, so the console never reads a workspace its reader need not be a member of. */
 function RoleHomeLink(properties: { readonly className: string }) {
   const role = useRole();
 

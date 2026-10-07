@@ -10,7 +10,7 @@ import { CONTROL_CENTRE, HOMES, INVITE_A_PERSON, type Role } from "@/shared/navi
 import { appAt, openApp } from "./open-app.tsx";
 import { addressOf, answered, answeringAs, withTheApiDown } from "./stubbed-api.ts";
 
-const A_MEMBERSHIP = {
+const A_MEMBER = {
   workspace: { id: "w", name: "Northern Tooling" },
   person: { id: "p", name: "Ada", email: "ada@example.test" },
   role: "Admin",
@@ -45,7 +45,7 @@ const answering =
     return answered(
       names.map((name) =>
         refusal === undefined
-          ? { result: { data: { ...A_MEMBERSHIP, role } } }
+          ? { result: { data: { ...A_MEMBER, role } } }
           : {
               error: {
                 message: refusal,
@@ -62,12 +62,12 @@ const answering =
     );
   };
 
-/** The shell's one read of the membership is dropped; the frame's read after it answers. */
+/** The shell's one member read is dropped; the frame's read after it answers. */
 const losingTheShellsRead = (role: Role) => {
   const answer = answeringAs(role);
   let lost = false;
   return (input: string | URL | Request): Promise<Response> => {
-    if (lost || !addressOf(input).pathname.includes("session.membership")) return answer(input);
+    if (lost || !addressOf(input).pathname.includes("session.member")) return answer(input);
     lost = true;
     return Promise.reject(new TypeError("the request was dropped"));
   };
@@ -76,7 +76,7 @@ const losingTheShellsRead = (role: Role) => {
 /** What a page's `beforeLoad` finds once the role is in hand and lets the reader see it. */
 const TAKEN = { hidden: false, unread: false };
 
-const membershipAsks = () => asked.filter((name) => name === "session.membership").length;
+const memberAsks = () => asked.filter((name) => name === "session.member").length;
 
 const openAt = async (path: string, clients?: AppClients) => (await openApp(path, clients)).router;
 
@@ -152,9 +152,9 @@ describe("a person the api will not answer about", () => {
     await rail().findByRole("link", { name: CONTROL_CENTRE.name });
     await vi.waitFor(() => expect(router.state.matches.at(-1)?.context).toMatchObject(TAKEN));
 
-    // An Admin who demotes themself reads their membership again, as a Viewer.
+    // An Admin who demotes themself reads their role again, as a Viewer.
     vi.stubGlobal("fetch", answeringAs("Viewer"));
-    await clients.queryClient.refetchQueries({ queryKey: [["session", "membership"]] });
+    await clients.queryClient.refetchQueries({ queryKey: [["session", "member"]] });
     await rail().findByRole("link", { name: HOMES.Viewer.name });
 
     expect(heading()).toBe("People");
@@ -162,17 +162,17 @@ describe("a person the api will not answer about", () => {
   });
 });
 
-describe("the membership the shell and its redirect both read", () => {
+describe("the member the shell and its redirect both read", () => {
   it("is read once across drawing the shell and changing pages", async () => {
     vi.stubGlobal("fetch", answering());
     const router = await openAt("/people/members");
     await screen.findByText("Northern Tooling", { exact: false });
-    expect(membershipAsks()).toBe(1);
+    expect(memberAsks()).toBe(1);
 
     await router.navigate({ href: "/people/groups" });
 
     expect(router.state.location.pathname).toBe("/people/groups");
-    expect(membershipAsks()).toBe(1);
+    expect(memberAsks()).toBe(1);
   });
 });
 

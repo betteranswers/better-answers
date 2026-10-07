@@ -26,7 +26,7 @@ export const nextAfterJoining = (query: string): string =>
   stillLive(query) ? `/choose-workspace${query}` : "/";
 
 /**
- * The client plugin sends the page's signed query with every write, and the api refuses a lapsed
+ * The Better Auth client plugin sends the page's signed query with every write, and the api refuses a lapsed
  * one, sign-out included.
  */
 export const dropTheCarriedFlow = (): void => {
@@ -66,7 +66,7 @@ export const nextAfterSignIn = (query: string): string => {
   return safeReturnPath(new URLSearchParams(query).get("redirect")) ?? "/";
 };
 
-/** Claude is the one client the authorization server admits, so a signed flow is Claude's. */
+/** Claude is the one assistant the authorization server admits, so a signed flow is Claude's. */
 export const carriedOnTo = (query: string): CarriedOn | undefined => {
   if (carriedFlow(query) !== "") return "connecting";
   const back = safeReturnPath(new URLSearchParams(query).get("redirect"));

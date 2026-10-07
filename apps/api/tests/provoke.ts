@@ -196,7 +196,7 @@ export type HeldRevocation = {
 };
 
 /**
- * The row is written and locked with its commit still to come: the moment a held membership read
+ * The row is written and locked with its commit still to come: the moment a held member read
  * must wait out.
  */
 export const revocationHeldOpen = async (app: TestApp, userId: string): Promise<HeldRevocation> => {

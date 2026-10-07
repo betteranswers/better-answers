@@ -4,7 +4,7 @@ import { testData } from "@better-answers/schema/testing";
 
 import type { PlatformPrincipal, WorkspaceId } from "../src/kernel/index.ts";
 import { bundleHealth, enqueueJob, enqueueJobIn, JOB_IS_OVER, jobById } from "../src/runs/index.ts";
-import { folded, withMembership, withScope, type Tx } from "../src/store/postgres/index.ts";
+import { folded, withMember, withScope, type Tx } from "../src/store/postgres/index.ts";
 import { abortTheTransaction, countWaitingOnLocks, until } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -377,12 +377,12 @@ describe("an act landing its rows and job in one transaction", () => {
     const scenario = await arrange();
 
     const editor = folded(
-      await withMembership(scenario.editor, scenario.postgres, (_fresh, tx) =>
+      await withMember(scenario.editor, scenario.postgres, (_fresh, tx) =>
         enqueueJobIn(scenario.editor, tx, boundJob(scenario.workspaceId)),
       ),
     );
     const admin = folded(
-      await withMembership(scenario.admin, scenario.postgres, (_fresh, tx) =>
+      await withMember(scenario.admin, scenario.postgres, (_fresh, tx) =>
         enqueueJobIn(scenario.admin, tx, boundJob(scenario.workspaceId)),
       ),
     );

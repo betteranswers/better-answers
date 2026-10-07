@@ -224,7 +224,7 @@ describe("the audit log", () => {
     });
   });
 
-  it("names each ended grant's client and workspace, else its ids", async () => {
+  it("names each ended grant's assistant and workspace, else its ids", async () => {
     const workspace = await provisionedWorkspace(db(), "Granted");
     const gone = "https://gone.example.invalid/metadata";
     const claude = await seedingWith(db().pool, async (seed) => {

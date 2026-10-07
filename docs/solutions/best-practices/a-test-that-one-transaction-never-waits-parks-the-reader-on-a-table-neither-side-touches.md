@@ -8,12 +8,12 @@ component: testing-framework
 severity: medium
 applies_when:
   - "Proving that a long read or export holds no row another act needs, so that act never waits on it"
-  - "Testing that a read moved off a held door (withMembership, FOR SHARE) onto an unheld one (withMembershipUnheld) stops blocking role changes or removals"
+  - "Testing that a read moved off a held door (withMember, FOR SHARE) onto an unheld one (withMemberUnheld) stops blocking role changes or removals"
   - "Needing to pause a transaction partway when the statement to pause at is a SELECT, where the BEFORE INSERT/UPDATE triggers of whileActsWaitAt cannot hold it"
   - "Choosing the lock or table a concurrency test parks one side on"
 symptoms:
   - "A no-wait claim tested by running the two acts one after the other passes whether or not the first holds the row, because its transaction has already committed"
-  - "A no-wait test that parks the reader too early, before its membership read, passes with the held door too, so it proves nothing"
+  - "A no-wait test that parks the reader too early, before its member read, passes with the held door too, so it proves nothing"
 root_cause: concurrency
 resolution_type: test_fix
 related_components:
@@ -34,7 +34,7 @@ tags:
 
 ## Context
 
-People U14 (BA-49) added an audit-log export that reads up to 10,000 events. A mutation reads its caller's membership `FOR SHARE` (ADR 0043, `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md`), and a role change takes every Admin's member row `FOR UPDATE` (`packages/core/src/members/last-admin.ts:36-37`). An export on that road would stall every other Admin's role change for as long as it read. So the export reads through `withMembershipUnheld` (`packages/core/src/store/postgres/index.ts:367`), which runs `MEMBERSHIP_QUERY` (line 255) without the `FOR SHARE OF m, u` that `MEMBERSHIP_QUERY_HELD` (line 269) adds.
+People U14 (BA-49) added an audit-log export that reads up to 10,000 events. A mutation reads its caller's member `FOR SHARE` (ADR 0043, `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md`), and a role change takes every Admin's member row `FOR UPDATE` (`packages/core/src/members/last-admin.ts:36-37`). An export on that road would stall every other Admin's role change for as long as it read. So the export reads through `withMemberUnheld` (`packages/core/src/store/postgres/index.ts:367`), which runs `MEMBER_QUERY` (line 255) without the `FOR SHARE OF m, u` that `MEMBER_QUERY_HELD` (line 269) adds.
 
 The plan's test scenario was "while an export runs, another Admin's role change does not wait on it". Running the two one after the other proves nothing, because the export's transaction has ended before the role change starts. The repository's race helpers, `whileActsWaitAt` and `racedAt` (`packages/core/test/suite-postgres.ts:172`, `:217`), hold acts at a `BEFORE INSERT` or `BEFORE UPDATE` trigger. The export's read writes nothing, so a trigger has nothing to hold.
 
@@ -42,11 +42,11 @@ The plan's test scenario was "while an export runs, another Admin's role change 
 
 Park the reader on a table lock that only a **later** statement of the reader touches, then run the contender with a lock timeout while the reader is parked:
 
-1. **Hold a table the reader reaches after the row it is accused of holding, and that the contender never touches.** `groupTableHeld` (`packages/core/test/audit-export.test.ts:322`) opens a transaction and takes `LOCK TABLE "group" IN ACCESS EXCLUSIVE MODE` (line 325). The export's search reads `"group"` in `groupsNamed` (`packages/core/src/members/audit-log.ts:175`, the `SELECT` at `:181`), after the membership query has run. That query reads `member`, `"user"` and `group_member`, never `"group"`. A role change never reads `"group"` either.
+1. **Hold a table the reader reaches after the row it is accused of holding, and that the contender never touches.** `groupTableHeld` (`packages/core/test/audit-export.test.ts:322`) opens a transaction and takes `LOCK TABLE "group" IN ACCESS EXCLUSIVE MODE` (line 325). The export's search reads `"group"` in `groupsNamed` (`packages/core/src/members/audit-log.ts:175`, the `SELECT` at `:181`), after the member query has run. That query reads `member`, `"user"` and `group_member`, never `"group"`. A role change never reads `"group"` either.
 2. **Know the reader is parked before starting the contender.** `waitingOnTheGroupTable` (line 334) polls `pg_locks` joined to `pg_class` for a lock on `group` that is `NOT l.granted` (line 338). A fixed sleep would race.
 3. **Bound the contender instead of letting it hang.** The role change runs on another connection after `SET LOCAL lock_timeout = '2s'` (line 406). If the reader held the Admin's member row, the change fails with a lock timeout rather than hanging the suite.
 4. **Release the table, then await the reader.** The export finishes once the lock is gone.
-5. **Prove the test discriminates.** Swap the reader onto the held door (`withMembershipUnheld(admitted.value` to `withMembership(admitted.value` in `packages/core/src/members/audit-export.ts`): the test must fail on the timeout. In this session it did, after 2s with `{ ok: false }`, and it passed again on the unheld door.
+5. **Prove the test discriminates.** Swap the reader onto the held door (`withMemberUnheld(admitted.value` to `withMember(admitted.value` in `packages/core/src/members/audit-export.ts`): the test must fail on the timeout. In this session it did, after 2s with `{ ok: false }`, and it passed again on the unheld door.
 
 The test is "lets another Admin change a role meanwhile" (line 394). Its export searches for `"Cal"` (line 400), so `groupsNamed` runs and the park lands where it should.
 
@@ -54,7 +54,7 @@ The test is "lets another Admin change a role meanwhile" (line 394). Its export 
 
 A no-wait claim fails silently. Put the export back on the held door and nothing errors: every other Admin's role change and removal simply queues for the length of an export. A test that cannot catch that is worse than none, because it reads as proof. The two traps both produce a test that passes either way:
 
-- **Parking too early.** If the held table is one the reader touches before the row it is accused of holding, the reader stops before taking that row. The contender then passes on the held door too. Here, the membership query must not touch the parked table.
+- **Parking too early.** If the held table is one the reader touches before the row it is accused of holding, the reader stops before taking that row. The contender then passes on the held door too. Here, the member query must not touch the parked table.
 - **Parking on a table the contender needs.** The contender then waits on the test's own lock, and the test fails on both doors. `ACCESS EXCLUSIVE` blocks even a plain `SELECT`, so check every statement of the contender, not just its writes. A table the contender only reads is no better.
 
 ## When to Apply
@@ -72,7 +72,7 @@ const held = await groupTableHeld(); // LOCK TABLE "group" IN ACCESS EXCLUSIVE M
 
 const exporting = exportAs(workspace, workspace.adminUserId, { search: "Cal" });
 await waitingOnTheGroupTable(); // pg_locks: a lock on "group", NOT granted
-const changed = await readingAs(db().runtimePool, beasMembership, async (principal, tx) => {
+const changed = await readingAs(db().runtimePool, beasMember, async (principal, tx) => {
   await tx.query("SET LOCAL lock_timeout = '2s'");
   return changeRole(principal, tx, inputOf(changeRoleInput, { personId: cal, role: "Editor" }));
 });

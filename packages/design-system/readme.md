@@ -321,7 +321,7 @@ Three registries, one rule: they own behaviour — keyboard, focus, ARIA, virtua
 streaming. We own meaning — the trust words, the citation unit, the register, the marks,
 and every word on a page. Where the two meet, take theirs and skin it. The auth pages
 are the platform's own, on the auth module's hooks over the better-auth client (ADR 0033,
-amended 2026-09-05); the client says *organization* throughout and the module's word map
+amended 2026-09-05); Better Auth's client says *organization* throughout and the module's word map
 says *workspace*; that map is not optional.
 
 **A pill is Kibo UI's Pill** (owner, 25/09/2026; <https://www.kibo-ui.com/components/pill>).

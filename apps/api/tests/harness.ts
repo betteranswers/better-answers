@@ -65,10 +65,10 @@ const CLAUDE_METADATA_DOCUMENT = {
   token_endpoint_auth_method: "none",
 } as const;
 
-/** A claude.ai client whose metadata document names no `client_name`. */
+/** A claude.ai assistant whose metadata document names no `client_name`. */
 export const NAMELESS_CLIENT_ID = "https://claude.ai/oauth/nameless-client-metadata";
 
-/** A claude.ai client that signs its token requests with a key it publishes at `jwks_uri`. */
+/** A claude.ai assistant that signs its token requests with a key it publishes at `jwks_uri`. */
 export const KEYED_CLIENT_ID = "https://claude.ai/oauth/keyed-client-metadata";
 export const KEYED_CLIENT_JWKS_URI = "https://claude.ai/oauth/keyed-client-jwks.json";
 /** Shared by the assertion's header and the published key, so the two cannot drift. */
@@ -136,7 +136,7 @@ export type TestApp = {
 
   readonly emails: EmailMessage[];
 
-  /** Each URL the api asked for a client's metadata document, in order. */
+  /** Each URL the api asked for an assistant's metadata document, in order. */
   readonly metadataFetches: string[];
 
   readonly logs: LogLine[];
@@ -291,7 +291,7 @@ export const serverFor = (
 
 /**
  * Runs `work` in one transaction as the member `who` names.
- * @throws when the membership or `work` answers a refusal.
+ * @throws when the member read or `work` answers a refusal.
  */
 export const actingIn = async <T>(
   app: TestApp,

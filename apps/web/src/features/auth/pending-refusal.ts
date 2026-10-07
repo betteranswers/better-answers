@@ -5,7 +5,7 @@ import type { FailedDuring } from "@/shared/api/query-client.ts";
 import { refusalOf, type ApiProxy } from "@/shared/api/trpc.ts";
 
 import { CodeRefused, SIGNED_OUT } from "./auth-hooks.ts";
-import { SECOND_FACTOR_PENDING } from "./membership.ts";
+import { SECOND_FACTOR_PENDING } from "./member.ts";
 import {
   CONFIRM_STEP,
   confirmDetour,

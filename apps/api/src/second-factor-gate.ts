@@ -35,7 +35,7 @@ export const PENDING_LIBRARY_PATHS: ReadonlyMap<string, PendingStep> = new Map<s
   ],
 );
 
-/** Paths acting on no session the browser holds: a sign-in makes one; a client or a bearer reads none. */
+/** Paths acting on no session the browser holds: a sign-in makes one; an assistant or a bearer reads none. */
 export const SESSIONLESS_LIBRARY_PATHS: ReadonlySet<string> = new Set([
   "/.well-known/oauth-authorization-server",
   "/.well-known/openid-configuration",

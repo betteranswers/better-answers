@@ -25,12 +25,12 @@ import { ChooseWorkspacePage } from "@/features/auth/choose-workspace-page.tsx";
 import { DisplayNamePage } from "@/features/auth/display-name-page.tsx";
 import { LinkPage } from "@/features/auth/link-page.tsx";
 import {
-  membershipRefusal,
+  memberRefusal,
   NEEDS_A_PICK,
   roleHeld,
   SECOND_FACTOR_PENDING,
-  useMembership,
-} from "@/features/auth/membership.ts";
+  useMember,
+} from "@/features/auth/member.ts";
 import { NoWorkspacePage } from "@/features/auth/no-workspace-page.tsx";
 import { detourAfter } from "@/features/auth/pending-refusal.ts";
 import { ConfirmPage, RecoveryPage } from "@/features/auth/second-factor-pages.tsx";
@@ -221,7 +221,7 @@ const noWorkspaceRoute = createRoute({
   beforeLoad: ({ context, location }) => confirmedFirst(context, location),
 });
 
-/** Outside the shell: the person joining holds no membership of the workspace yet. */
+/** Outside the shell: the person joining is not yet a member of the workspace. */
 const acceptInvitationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/invitations/$invitationId",
@@ -257,7 +257,7 @@ const shellRoute = createRoute({
   notFoundComponent: () => <UnknownPage />,
   // The sign-in page and the picker are this route's siblings, so this never runs on them.
   beforeLoad: async ({ context, location }) => {
-    const refusal = await membershipRefusal(context.queryClient, context.api);
+    const refusal = await memberRefusal(context.queryClient, context.api);
     if (refusal === undefined) return;
 
     throw redirect(await shellDetour(context, location, refusal));
@@ -270,12 +270,12 @@ const memberOf = (context: ShellContext): Reader =>
 
 /** No role is held, so asking again is the one way on; the route moves once it answers. */
 function RoleUnread() {
-  const membership = useMembership();
+  const member = useMember();
 
   return (
     <FailedPage
       reset={() => {
-        void membership.refetch();
+        void member.refetch();
       }}
       said={ROLE_UNREAD}
     />

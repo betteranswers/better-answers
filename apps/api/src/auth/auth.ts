@@ -149,7 +149,7 @@ const AUDITED_PATHS: ReadonlyMap<string, AuditEvent> = new Map([
 const auditedEvent = (path: string): AuditEvent | undefined => AUDITED_PATHS.get(path);
 
 /**
- * Their writes change a membership or a workspace with no audit event; the slug check tells
+ * Their writes change a member or a workspace with no audit event; the slug check tells
  * anyone whether a company is a customer.
  */
 const CLOSED_ORGANISATION_PATHS = [
@@ -374,21 +374,21 @@ const reasonOf = (error: string | Error): string =>
 export const createAuth = (deps: AuthDependencies) => {
   const audit = deps.logger.child({ module: "auth" });
 
-  const membershipsOf = async (userId: string): Promise<readonly string[]> => {
+  const workspacesOf = async (userId: string): Promise<readonly string[]> => {
     const held = await workspacesHeldBy(IDENTITY_PRINCIPAL, deps.door, userId);
     if (held.ok) return held.value;
     if (held.error instanceof Error) throw held.error;
     audit.warn(
-      { event: "auth.membership_read", principal: userId, outcome: held.error },
-      "auth.membership_read",
+      { event: "auth.workspaces_read", principal: userId, outcome: held.error },
+      "auth.workspaces_read",
     );
     return [];
   };
 
   const soleOf = (held: readonly string[]): string | undefined =>
     held.length === 1 ? held[0] : undefined;
-  const soleMembershipOf = async (userId: string): Promise<string | undefined> =>
-    soleOf(await membershipsOf(userId));
+  const soleWorkspaceOf = async (userId: string): Promise<string | undefined> =>
+    soleOf(await workspacesOf(userId));
 
   const consentedWorkspaceOf = (session: Session, held: readonly string[]): string | undefined => {
     const stillActive = activeWorkspaceOf(session);
@@ -596,7 +596,7 @@ export const createAuth = (deps: AuthDependencies) => {
               context?.path === PASSKEY_VERIFY_PATH
                 ? await confirmingAPasskeySignIn(presentedCredential.parse(context.body))
                 : {};
-            const only = await soleMembershipOf(session.userId);
+            const only = await soleWorkspaceOf(session.userId);
             const active = only === undefined ? {} : { activeOrganizationId: only };
             return { data: { ...session, ...confirmed, ...active } };
           },
@@ -714,7 +714,7 @@ export const createAuth = (deps: AuthDependencies) => {
             page: `${deps.publicUrl}/choose-workspace`,
 
             consentReferenceId: async ({ session, user: person }) => {
-              const active = consentedWorkspaceOf(session, await membershipsOf(person.id));
+              const active = consentedWorkspaceOf(session, await workspacesOf(person.id));
               if (active === undefined) {
                 throw new APIError("BAD_REQUEST", {
                   error: "set_workspace",
@@ -727,10 +727,10 @@ export const createAuth = (deps: AuthDependencies) => {
             shouldRedirect: async ({ session, user: person }) => {
               // A pending session confirms on the way, from the post-login page, before any consent.
               if (pendingOr(await judged(deps, { id: session.id }))) return true;
-              // The post-login page asks for a display name first; skipping it for a sole
-              // membership would carry an unnamed person straight to consent.
+              // The post-login page asks for a display name first; skipping it for a person
+              // in one workspace would carry an unnamed person straight to consent.
               if (hasNoDisplayName(person.name)) return true;
-              const held = await membershipsOf(person.id);
+              const held = await workspacesOf(person.id);
               const active = activeWorkspaceOf(session);
               if (active !== undefined && held.includes(active)) return false;
 

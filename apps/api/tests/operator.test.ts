@@ -47,7 +47,7 @@ const CONSOLE_CALLS: readonly (readonly [
   ],
 ];
 
-/** The same procedures as a client holding only a bearer asks for them. */
+/** The same procedures as an assistant holding only a bearer asks for them. */
 const BEARER_ASKS: readonly (readonly [string, RequestInit])[] = [
   ["console.workspaces.list", {}],
   ["console.people.list", {}],
@@ -452,7 +452,7 @@ describe("ending every sign-in and token everywhere, from the console", () => {
       },
     ]);
 
-    // Consent resolves the person in the workspace picked, so reaching the code at the client's
+    // Consent resolves the person in the workspace picked, so reaching the code at the assistant's
     // redirect is a fresh sign-in admitted there.
     for (const workspaceId of [acme.workspaceId, beta.workspaceId]) {
       await connectAsHost(app(), app().client(), person, { pick: workspaceId });
@@ -498,10 +498,10 @@ describe("ending every sign-in and token everywhere, from the console", () => {
 
     const again = await webSignedIn(app(), acme.admin.email);
 
-    expect(await refusalOfCall(before.api.session.membership.query())).toMatchObject({
+    expect(await refusalOfCall(before.api.session.member.query())).toMatchObject({
       data: { refusal: { word: "no-session" } },
     });
-    expect(await again.api.session.membership.query()).toMatchObject({
+    expect(await again.api.session.member.query()).toMatchObject({
       workspace: { id: acme.workspaceId },
       person: { id: acme.admin.id },
       role: "Admin",
@@ -766,7 +766,7 @@ describe("the console's list and inspection of people", () => {
           id: person.id,
           displayName: "Robin Hart",
           email: person.email,
-          memberships: [
+          workspaces: [
             { workspace: { id: acme.workspaceId, name: "Acme" }, role: "Editor" },
             { workspace: { id: zenith.workspaceId, name: "Zenith" }, role: "Viewer" },
           ],
@@ -811,7 +811,7 @@ describe("the console's list and inspection of people", () => {
     });
   });
 
-  it("shows a person's session and their client's standing grant", async () => {
+  it("shows a person's session and their assistant's standing grant", async () => {
     const { api } = await theOperatorOnTheWeb();
     const workspace = await app().provision({ name: "Acme" });
     const connected = await connectAsHost(app(), app().client(), workspace.admin);
@@ -825,7 +825,7 @@ describe("the console's list and inspection of people", () => {
       sessions: [{ createdAt: instant, lastUsedAt: instant, expiresAt: instant }],
       grants: [
         {
-          client: { id: CLAUDE_CLIENT_ID, name: "Claude" },
+          assistant: { id: CLAUDE_CLIENT_ID, name: "Claude" },
           workspace: { id: workspace.workspaceId, name: "Acme" },
           issuedAt: instant,
           lastUsedAt: instant,
@@ -859,7 +859,7 @@ describe("the console's list and inspection of people", () => {
       grants: [],
       ended: [
         {
-          client: claude,
+          assistant: claude,
           workspace: { id: zenith.workspaceId, name: "Zenith" },
           issuedAt: instant,
           endedAt: instant,
@@ -867,7 +867,7 @@ describe("the console's list and inspection of people", () => {
           endedBy: { kind: "person", displayName: operators.admin.name },
         },
         {
-          client: claude,
+          assistant: claude,
           workspace: { id: acme.workspaceId, name: "Acme" },
           issuedAt: instant,
           endedAt: instant,
@@ -885,7 +885,7 @@ describe("the console's list and inspection of people", () => {
   /** The one grant Claude holds for Acme's Admin, ended by the authorization server alone. */
   const endedByTheServer = (workspaceId: string) => [
     {
-      client: { id: CLAUDE_CLIENT_ID, name: "Claude" },
+      assistant: { id: CLAUDE_CLIENT_ID, name: "Claude" },
       workspace: { id: workspaceId, name: "Acme" },
       issuedAt: expect.stringMatching(ISO_INSTANT),
       endedAt: expect.stringMatching(ISO_INSTANT),
@@ -903,14 +903,14 @@ describe("the console's list and inspection of people", () => {
     return { api, acme, host, refreshToken: refreshToken ?? "" };
   };
 
-  const revokedByItsClient = async () => {
+  const revokedByItsAssistant = async () => {
     const { api, acme, host, refreshToken } = await acmeConnected();
     expect((await revokeAtEndpoint(host, refreshToken)).status).toBe(200);
     return { api, acme };
   };
 
-  it("shows a client's own revocation as the authorization server's ending", async () => {
-    const { api, acme } = await revokedByItsClient();
+  it("shows an assistant's own revocation as the authorization server's ending", async () => {
+    const { api, acme } = await revokedByItsAssistant();
 
     const inspected = await api.console.people.inspect.query({ personId: acme.admin.id });
 
@@ -934,8 +934,8 @@ describe("the console's list and inspection of people", () => {
     });
   });
 
-  it("leaves a grant its client revoked out of revoking everywhere", async () => {
-    const { api, acme } = await revokedByItsClient();
+  it("leaves a grant its assistant revoked out of revoking everywhere", async () => {
+    const { api, acme } = await revokedByItsAssistant();
 
     await api.console.people.endEverySignInAndToken.mutate({ personId: acme.admin.id });
 

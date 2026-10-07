@@ -515,6 +515,101 @@ const PEOPLE_WORDS_LANDED = "2026-10-07";
 
 const PEOPLE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(PEOPLE_WORDS_LANDED)];
 
+/** Where `client` is a library's object in code: a pg or pool client, the harness's, S3's, tRPC's. */
+const CLIENT_OBJECT_TREES = [
+  "apps/api/src/migrate.ts",
+  "apps/api/tests/",
+  "apps/web/journeys/inbox.ts",
+  "apps/web/src/app/providers.tsx",
+  "apps/web/src/features/sources/sources-api.ts",
+  "apps/web/src/shared/api/trpc.ts",
+  "apps/worker/src/better_answers_worker/pipeline/objects.py",
+  "docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md",
+  "docs/solutions/logic-errors/a-second-mutate-drops-the-first-acts-callbacks.md",
+  "packages/core/src/store/",
+  "packages/core/test/",
+  "packages/schema/scripts/",
+  "packages/schema/test/",
+  "patches/",
+];
+
+const CLIENT_SENSES: readonly Sense[] = [
+  {
+    sense: "a package, module or file named for a library's client",
+    written:
+      /[\w@.-]*\/client\b(?:\/[\w-]+)*|\b(?:query|auth|web|api|second|model|git|typed-rest)-client\b|\bclient-(?:s3|instance|setup)\b|(?:postgresql|openssh)-client\b|"use client"/gi,
+  },
+  {
+    sense: "a library's or a tool's client, named by what it is",
+    written:
+      /\b(?:tRPC|query|Better Auth(?:['’]s)?|`?better-auth`?|typed|S3|object store|PostgreSQL|pool|database|test|model|provider|Messages-API|HTTP(?:\/2)?|mail|email|SSH|git|docker|desktop|machine|OAuth|keyed) client\b/gi,
+  },
+  {
+    sense: "OAuth's and HTTP's own names: a client id, its metadata document, secret and assertion",
+    written:
+      /\bclient[- ]ids?\b|\bclient[- ]ID[- ]metadata\b|\bclient metadata document\b|[\w-]*client-(?:metadata|jwks)\b|\bclient secrets?\b|\bclient[- ]assertion(?:-type)?\b|\bdynamic client registration\b|\bcf-access-client-(?:id|secret)\b|\bclient certificate\b/gi,
+  },
+  {
+    sense: "the requesting end of a connection: its address, its key, encryption on its side",
+    written:
+      /\bclient[- ](?:address(?:es)?|IP|key|side|backend)\b|\bBetter Auth's per-client one\b/gi,
+  },
+  ...CLIENT_OBJECT_TREES.map((within) => ({
+    sense: "a library's client object in code",
+    within,
+    written:
+      /\bclient(?=\??\.[\w$]|\s*[;=)\]}(]|: )|(?<=[([{,.]\s*)client\b|^\s*client,?$|(?<=\b(?:const|let|await|return|readonly) )client\b|(?<=[$#])client\b|\["client"\]|`client`|(?<=pg\.|type |: |\| )Client\b|\bclient=\{/g,
+  })),
+  {
+    sense: "the condition the DPIA input records and the redaction agreement quotes (R22)",
+    written: /\bnone until a health-sector client\b/g,
+  },
+  {
+    sense: "the stored subject kind of a consent's audit row (R22)",
+    within: "packages/core/test/sign-in-and-consent.test.ts",
+    written: /subject_kind: "client"/g,
+  },
+  {
+    sense: "the frozen release log's reason, as each row was written",
+    within: "deploy/RELEASES.md",
+    written: /\bpre-client\b/g,
+  },
+  {
+    sense: "the owner's own paths outside the repository, by their names",
+    written: /\.planning\/client-bundle\b|\bfirst-client-content-inventory\b/g,
+  },
+  {
+    sense: "OAuth's own records, as the exemptions describe them",
+    within: "packages/schema/src/rls-exemptions.ts",
+    written: /\bto every client\b|\bJoins client to resource\b/g,
+  },
+  {
+    sense: "an OAuth client row's id in the schema's fixtures",
+    within: "packages/schema/test/",
+    written: /"client(?:-resource)?-\d+"|`client-\$\{/g,
+  },
+  {
+    sense: "the harness's default client addresses",
+    within: "apps/api/tests/client-addresses",
+    written: /\bclients?\b/gi,
+  },
+  {
+    sense: "a browser, or the set-up traffic, as one client address",
+    within: ".claude/skills/browser-suite/",
+    written: /\bone client and\b|\bwhich client asked\b/g,
+  },
+  {
+    sense: "a browser asking codes from one client address",
+    within: "apps/web/e2e/sign-in.spec.ts",
+    written: /\bone client asks\b/g,
+  },
+  {
+    sense: "Better Auth's client, which the lint rule holds to the identity feature",
+    within: "apps/web/test/lint-rules.test.ts",
+    written: /\bthe client in the identity feature\b/g,
+  },
+];
+
 /** Where `chunk` is a piece of a byte stream, as Node's streams name it. */
 const BYTE_STREAM_TREES = [
   "apps/api/src/ops.ts",
@@ -1002,9 +1097,26 @@ export const OLD_WORDS: readonly OldWord[] = [
   ),
   avoided("cleanup", "sweep pass"),
   avoided("clear", "emptying a connected source"),
-  pending("client", "assistant", "assistant", "assistant", "one sense"),
+  {
+    word: "client",
+    use: "assistant",
+    entry: "assistant",
+    sweep: "assistant",
+    state: "landed",
+    reach: "one sense",
+    permitted: CLIENT_SENSES,
+    carvedOut: PEOPLE_WORDS_CARVED_OUT,
+  },
   avoided("client data on the box", "go-live", "for this day"),
-  pending("client grant", "access", "access (of an assistant)", "access", "everywhere"),
+  {
+    word: "client grant",
+    use: "access",
+    entry: "access (of an assistant)",
+    sweep: "access",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: PEOPLE_WORDS_CARVED_OUT,
+  },
   avoided("command", "action"),
   avoided("command palette", "Jump to"),
   pending("composition", "write-up", "write-up", "write-up", "everywhere"),
@@ -1161,7 +1273,22 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("masthead", "top band"),
   avoided("member id", "person id", "retired 05/09/2026: the member row's key names nothing"),
   avoided("member sheet", "member page", "the word until 02/10/2026"),
-  pending("membership", "member", "member", "member", "everywhere"),
+  {
+    word: "membership",
+    use: "member",
+    entry: "member",
+    sweep: "member",
+    state: "landed",
+    reach: "everywhere",
+    permitted: [
+      {
+        sense: "the count an erasure stores on its request's row and prints in its report (R22)",
+        within: "packages/core/",
+        written: /\bmembershipsEnded\b/g,
+      },
+    ],
+    carvedOut: PEOPLE_WORDS_CARVED_OUT,
+  },
   avoided("menu toggle", "navigation control"),
   avoided("message", "issue word"),
   avoided("metric", "signal"),

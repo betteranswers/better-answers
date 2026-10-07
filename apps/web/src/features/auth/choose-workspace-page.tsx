@@ -60,7 +60,7 @@ const whereThePersonStands = (
   };
 };
 
-const endedTheMembership = (refused: SwitchRefused | null): boolean =>
+const endedTheMember = (refused: SwitchRefused | null): boolean =>
   refused?.noLongerAMember === true;
 
 /** Once a pick is refused, the list or the refusal stands to be read rather than a pick retried. */
@@ -78,7 +78,7 @@ const whereThePickStands = (
     notConnected: went.nowhere || went.resume !== null,
     listed: held.length > 1 || (one && noLongerHeld !== undefined),
     refused: went.pick !== null,
-    removedFrom: endedTheMembership(went.pick) ? noLongerHeld : undefined,
+    removedFrom: endedTheMember(went.pick) ? noLongerHeld : undefined,
     opensAlone: one && noLongerHeld === undefined && went.pick === null && went.resume === null,
   };
 };
@@ -222,7 +222,7 @@ type Standing = {
   readonly unread: boolean;
   readonly listed: boolean;
   readonly refused: boolean;
-  /** Set only while the latest pick's refusal is the ended membership. */
+  /** Set only while the latest pick's refusal says the person is no longer a member. */
   readonly removedFrom: Workspace | undefined;
 };
 

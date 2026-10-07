@@ -22,10 +22,10 @@ const wrapperOf = (clients: AppClients) =>
     return <Providers clients={clients}>{properties.children}</Providers>;
   };
 
-/** The membership as the frame draws it: one read, mounted across every move between pages. */
+/** The member read as the frame draws it: one read, mounted across every move between pages. */
 function FrameRole() {
   const api = useTRPC();
-  const held = useQuery(api.session.membership.queryOptions(undefined, { refetchOnMount: false }));
+  const held = useQuery(api.session.member.queryOptions(undefined, { refetchOnMount: false }));
   return <p>{`Held: ${held.data?.role ?? "none"}`}</p>;
 }
 
@@ -80,7 +80,7 @@ const MEMBERS = "/people/members";
 
 const CHOOSER = "/choose-workspace";
 
-/** The reader, an Admin, on Members with their membership read; a failed read is not asked again. */
+/** The reader, an Admin, on Members with their member read; a failed read is not asked again. */
 const actingAt = async () => {
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
@@ -124,7 +124,7 @@ describe("going home after an act on yourself", () => {
     expect(history.length, "the move home pushed an entry of its own").toBe(2);
   });
 
-  it("sends a self-removed Admin to the chooser, holding no membership", async () => {
+  it("sends a self-removed Admin in no workspace to the chooser", async () => {
     const { router, clients } = await actingAt();
     clients.queryClient.setQueryData(WORKSPACES_HELD, [{ id: "w", name: "The workspace left" }]);
 

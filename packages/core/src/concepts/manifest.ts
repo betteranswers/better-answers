@@ -22,7 +22,7 @@ import {
   type CommitRefusal,
   type GitDoor,
 } from "../store/git/index.ts";
-import { withMembership, type PostgresDoor } from "../store/postgres/index.ts";
+import { withMember, type PostgresDoor } from "../store/postgres/index.ts";
 import { scalarPairOf, type FrontmatterSource } from "./file.ts";
 import { landBundleCommit } from "./landing.ts";
 
@@ -115,7 +115,7 @@ export const writeManifest = async (
     if (!committed.ok) return err(committed.error);
 
     const landed = await attempt(() =>
-      withMembership(principal, doors.postgres, async (fresh, tx) => {
+      withMember(principal, doors.postgres, async (fresh, tx) => {
         await record(fresh, tx, {
           id: auditEventId,
           act: MANIFEST_ACTS.written,

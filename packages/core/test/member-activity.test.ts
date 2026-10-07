@@ -225,7 +225,7 @@ describe("a person's activity", () => {
     ]);
   });
 
-  it("shows an earlier membership beneath the later one", async () => {
+  it("shows a rejoined member's earlier stint beneath the later one", async () => {
     const workspace = await provisionedWorkspace(db(), "Rejoined");
     const priya = await aPerson("Priya Shah");
     await accepted(priya, await invited(workspace, priya));

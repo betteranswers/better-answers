@@ -19,7 +19,7 @@ import {
 } from "./provoke.ts";
 import { anAdminOnTheWeb, refusalOfCall, webSignedIn } from "./web-client.ts";
 
-const MEMBERSHIP = `${TRPC_ENDPOINT}/session.membership`;
+const MEMBER = `${TRPC_ENDPOINT}/session.member`;
 
 const MEMBER_WORKSPACE_FK = "member_workspace_id_workspace_id_fk";
 
@@ -47,7 +47,7 @@ beforeEach(() => {
   app.logs.length = 0;
 });
 
-const membership = (client: TestClient): Promise<Response> => client.fetch(MEMBERSHIP);
+const member = (client: TestClient): Promise<Response> => client.fetch(MEMBER);
 
 const refusalCrossing = async (response: Response) => crossed.parse(await response.json()).error;
 
@@ -203,15 +203,15 @@ describe("a word of every class an act answers, crossing tRPC", () => {
 
 describe("a refusal crossing tRPC", () => {
   it.each([
-    ["no-session", async () => membership(app.client())],
-    ["no-active-workspace", async () => membership(await memberOfTwoWorkspaces(app))],
+    ["no-session", async () => member(app.client())],
+    ["no-active-workspace", async () => member(await memberOfTwoWorkspaces(app))],
     [
       "not-a-member",
       async () => {
         const workspace = await app.provision();
         const client = await signedInClient(app, workspace.admin.email);
         await app.removeMember(workspace.workspaceId, workspace.admin.id);
-        return membership(client);
+        return member(client);
       },
     ],
     [
@@ -219,7 +219,7 @@ describe("a refusal crossing tRPC", () => {
       async () => {
         const workspace = await app.provision();
         await app.endEverySignInAndToken(workspace.admin.id, new Date(Date.now() + 60_000));
-        return membership(await signedInClient(app, workspace.admin.email));
+        return member(await signedInClient(app, workspace.admin.email));
       },
     ],
     [
@@ -228,7 +228,7 @@ describe("a refusal crossing tRPC", () => {
         const workspace = await app.provision();
         const client = await signedInClient(app, workspace.admin.email);
         await sessionPointedAt(app, workspace.admin.id, "not-a-workspace-id");
-        return membership(client);
+        return member(client);
       },
     ],
   ])("sends %s as itself, under the status its class carries", async (word, provoke) => {
@@ -240,7 +240,7 @@ describe("a refusal crossing tRPC", () => {
     expect(data.refusal).toEqual({ word, class: "unauthenticated" });
   });
 
-  it("sends the membership read's own refusal as an unauthenticated word", async () => {
+  it("sends the member read's own refusal as an unauthenticated word", async () => {
     const workspace = await app.provision();
     const client = await signedInClient(app, workspace.admin.email);
     const definition = await constraintDefinition(app, MEMBER_WORKSPACE_FK);
@@ -261,7 +261,7 @@ describe("a refusal crossing tRPC", () => {
     try {
       await sessionPointedAt(app, workspace.admin.id, phantom);
 
-      const response = await membership(client);
+      const response = await member(client);
 
       expect(response.status).toBe(401);
       expect((await refusalCrossing(response)).data.refusal).toEqual({
@@ -277,7 +277,7 @@ describe("a refusal crossing tRPC", () => {
   });
 
   it("logs a refusal once, at info, with the word sent", async () => {
-    await membership(app.client());
+    await member(app.client());
 
     expect(
       logsOf("trpc.refused").map((line) => [line["refusal"], line["class"], line["level"]]),
@@ -290,16 +290,16 @@ describe("a refusal crossing tRPC", () => {
     const client = await signedInClient(app, workspace.admin.email);
 
     await withColumnRenamed("workspace", "name", async () => {
-      const response = await membership(client);
+      const response = await member(client);
 
       expect(response.status).toBe(500);
       const { message, data } = await refusalCrossing(response);
-      expect(message).toBe("readMembership failed");
+      expect(message).toBe("readMember failed");
       expect(data.refusal).toBeUndefined();
     });
 
     expect(logsOf("trpc.failed").map((line) => [line["act"], line["level"]])).toEqual([
-      ["readMembership", 50],
+      ["readMember", 50],
     ]);
   });
 
@@ -309,7 +309,7 @@ describe("a refusal crossing tRPC", () => {
 
     // A column the gate's read leaves alone, so the fault reaches the resolver.
     await withColumnRenamed("member", "credentials_revoked_at", async () => {
-      const response = await membership(client);
+      const response = await member(client);
 
       expect(response.status).toBe(500);
       expect((await refusalCrossing(response)).message).toBe("withPrincipal failed");

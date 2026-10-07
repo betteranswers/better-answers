@@ -34,13 +34,13 @@ type ListPeopleInput = z.output<typeof listPeopleInput>;
 
 type WorkspaceNamed = { readonly id: WorkspaceId; readonly name: string };
 
-type PersonMembership = { readonly workspace: WorkspaceNamed; readonly role: Role };
+type WorkspaceHeld = { readonly workspace: WorkspaceNamed; readonly role: Role };
 
 type PersonListed = {
   readonly id: UserId;
   readonly displayName: string;
   readonly email: string;
-  readonly memberships: readonly PersonMembership[];
+  readonly workspaces: readonly WorkspaceHeld[];
   readonly lastSignedInAt: string | null;
   readonly credentialsRevokedAt: string | null;
 };
@@ -58,7 +58,7 @@ type PersonRow = {
   readonly credentials_revoked_at: Date | null;
 };
 
-type MembershipRow = {
+type MemberRow = {
   readonly user_id: string;
   readonly role: string;
   readonly workspace_id: string;
@@ -81,30 +81,30 @@ const pageOf = (tx: Tx, pattern: string, input: ListPeopleInput) =>
     [pattern, input.limit, input.offset],
   );
 
-const membershipsOf = async (
+const workspacesOf = async (
   tx: Tx,
   personIds: readonly string[],
-): Promise<ReadonlyMap<string, readonly PersonMembership[]>> => {
-  const found = await tx.query<MembershipRow>(
+): Promise<ReadonlyMap<string, readonly WorkspaceHeld[]>> => {
+  const found = await tx.query<MemberRow>(
     `SELECT m.user_id, m.role, w.id AS workspace_id, w.name AS workspace_name
        FROM member m JOIN workspace w ON w.id = m.workspace_id
       WHERE m.user_id = ANY($1::text[])
       ORDER BY w.name, w.id`,
     [personIds],
   );
-  const held = new Map<string, readonly PersonMembership[]>();
+  const held = new Map<string, readonly WorkspaceHeld[]>();
   for (const row of found.rows) {
-    const membership: PersonMembership = {
+    const entry: WorkspaceHeld = {
       workspace: { id: workspaceIdOf(row.workspace_id), name: row.workspace_name },
       role: boundarySchemas.member.select.shape.role.parse(row.role),
     };
-    held.set(row.user_id, [...(held.get(row.user_id) ?? []), membership]);
+    held.set(row.user_id, [...(held.get(row.user_id) ?? []), entry]);
   }
   return held;
 };
 
 type HeldBy = {
-  readonly memberships: ReadonlyMap<string, readonly PersonMembership[]>;
+  readonly workspaces: ReadonlyMap<string, readonly WorkspaceHeld[]>;
   readonly signIns: ReadonlyMap<string, Date>;
 };
 
@@ -112,7 +112,7 @@ const personOf = (row: PersonRow, held: HeldBy): PersonListed => ({
   id: boundarySchemas.user.select.shape.id.parse(row.id),
   displayName: row.name,
   email: row.email,
-  memberships: held.memberships.get(row.id) ?? [],
+  workspaces: held.workspaces.get(row.id) ?? [],
   lastSignedInAt: isoOf(held.signIns.get(row.id) ?? null),
   credentialsRevokedAt: isoOf(row.credentials_revoked_at),
 });
@@ -136,7 +136,7 @@ export const listPeople = (
     const page = await pageOf(tx, pattern, input);
     const ids = page.rows.map((row) => row.id);
     const held: HeldBy = {
-      memberships: await membershipsOf(tx, ids),
+      workspaces: await workspacesOf(tx, ids),
       signIns: await latestOnIdentitySet(operator, tx, SIGN_IN_ACTS.signedIn, ids),
     };
     return {
@@ -157,16 +157,16 @@ type SessionHeld = {
 };
 
 type GrantHeld = {
-  /** The client's id is the address of its metadata document. */
-  readonly client: { readonly id: string; readonly name: string | null };
+  /** The assistant's id is the address of its metadata document. */
+  readonly assistant: { readonly id: string; readonly name: string | null };
   readonly workspace: WorkspaceNamed | null;
   readonly issuedAt: string;
-  /** When the client last refreshed; a call made on a live access token leaves no row. */
+  /** When the assistant last refreshed; a call made on a live access token leaves no row. */
   readonly lastUsedAt: string;
   readonly expiresAt: string;
 };
 
-/** Marked when a session ends or at the client's own revocation: the row never says which. */
+/** Marked when a session ends or at the assistant's own revocation: the row never says which. */
 type EndedByTheServer = { readonly kind: "authorization-server" };
 
 type EndedGrantInspected = GrantNamed & {
@@ -262,7 +262,7 @@ const sessionOf = (row: SessionRow): SessionHeld => ({
 });
 
 const grantOf = (row: GrantRow): GrantHeld => ({
-  client: { id: row.client_id, name: row.client_name },
+  assistant: { id: row.client_id, name: row.client_name },
   workspace:
     row.workspace_id === null
       ? null
@@ -360,8 +360,8 @@ const endedGrantsOf = async (tx: Tx, personId: UserId): Promise<readonly EndedGr
 };
 
 /**
- * The person's sessions by last use, each client grant they hold, and each an act or the
- * authorization server ended. A grant is a refresh token's line: a client that asked for none
+ * The person's sessions by last use, each assistant's access they hold, and each an act or the
+ * authorization server ended. A grant is a refresh token's line: an assistant that asked for none
  * holds only an access token no row keeps, which lapses within the hour.
  */
 export const inspectPerson = async (

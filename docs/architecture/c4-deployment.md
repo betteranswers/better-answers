@@ -39,7 +39,7 @@ C4Deployment
     Container(probe, "uptime-probe.sh", "host cron, every 5 min, Free plan", "Two paths on app. through the public edge; its own silence covers VPC 2")
   }
 
-  Deployment_Node(offhost, "Off-host", "Backblaze B2, EU; healthchecks.io", "Nothing here holds a plaintext client byte") {
+  Deployment_Node(offhost, "Off-host", "Backblaze B2, EU; healthchecks.io", "Nothing here holds a plaintext customer byte") {
     ContainerDb(dumps, "Dumps bucket", "S3, versioned, object lock in governance mode", "Encrypted Postgres dumps 48 h · 30 d · 8 w · 6 m; encrypted git bundles under git/; drill reports; the host credential can write and list, never delete")
     ContainerDb(mirrorbucket, "Mirror bucket", "S3, versioned, unlocked, 30-day non-current expiry", "The object-store mirror, so erasure deletions propagate")
     Container_Ext(healthchecks, "Dead-man switch", "healthchecks.io", "scheduler, sweeps, pg-hourly, nightly, drill, staging-wiped, uptime; journeys, in a project of its own")

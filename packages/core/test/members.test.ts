@@ -213,7 +213,7 @@ describe("renaming a group", () => {
 });
 
 describe("deleting a group", () => {
-  it("takes its memberships with it and writes the act", async () => {
+  it("takes its members with it and writes the act", async () => {
     const { workspace, groupId } = await oneGroupOnePerson("Eta", "Editor");
 
     const deleted = await asAdmin(workspace, (principal, tx) =>
@@ -222,10 +222,10 @@ describe("deleting a group", () => {
 
     expect(deleted).toEqual({ ok: true, value: { groupId } });
     expect(await asAdmin(workspace, listGroups)).toEqual({ ok: true, value: [] });
-    const memberships = await db().pool.query("SELECT 1 FROM group_member WHERE group_id = $1", [
+    const groupMembers = await db().pool.query("SELECT 1 FROM group_member WHERE group_id = $1", [
       groupId,
     ]);
-    expect(memberships.rowCount).toBe(0);
+    expect(groupMembers.rowCount).toBe(0);
     expect((await peopleActs(workspace.workspaceId)).map((event) => event.act)).toEqual([
       "people.group.created",
       "people.group.member_added",
@@ -286,10 +286,10 @@ describe("who is in a group", () => {
     const added = await putInGroup(workspace, groupId, stranger);
 
     expect(added).toEqual({ ok: false, error: "no-such-member" });
-    const memberships = await db().pool.query("SELECT 1 FROM group_member WHERE group_id = $1", [
+    const groupMembers = await db().pool.query("SELECT 1 FROM group_member WHERE group_id = $1", [
       groupId,
     ]);
-    expect(memberships.rowCount).toBe(0);
+    expect(groupMembers.rowCount).toBe(0);
   });
 
   it("refuses a repeat add, so the audit log records one", async () => {
@@ -457,7 +457,7 @@ describe("an act whose statement the store refuses", () => {
     ]);
   });
 
-  it("answers the store's failure, not a membership it never wrote", async () => {
+  it("answers the store's failure, not a member it never wrote", async () => {
     const workspace = await provisioned("Unwritten");
     const person = await seedMemberAt(workspace, "Viewer");
     const groupId = await madeGroup(workspace, "HR team");

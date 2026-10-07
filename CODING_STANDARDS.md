@@ -29,7 +29,7 @@ const row = refuse(member);
 if (!isRole(row.role)) return unknownRole();
 
 // GOOD — `refuse` returns the narrowed row, so the type is the one guard
-const row: MembershipRow & { role: Role } = refuse(member);
+const row: MemberRow & { role: Role } = refuse(member);
 ```
 
 ### Keep a function's complexity at 8 or under

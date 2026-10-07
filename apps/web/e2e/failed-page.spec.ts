@@ -100,8 +100,8 @@ test("shows the failed read at the index, then goes home", async ({
   await landedAtHome(page, "Admin");
 
   // Batched with whatever else the shell asks, so the read is found by name anywhere in the path.
-  const theMembershipRead = (url: URL) => url.pathname.includes("session.membership");
-  await page.route(theMembershipRead, (route) => route.abort());
+  const theMemberRead = (url: URL) => url.pathname.includes("session.member");
+  await page.route(theMemberRead, (route) => route.abort());
   await page.goto("/");
 
   await expect(page.getByRole("heading", { level: 1, name: FAILED_PAGE.heading })).toBeVisible();
@@ -110,7 +110,7 @@ test("shows the failed read at the index, then goes home", async ({
   await expect(page.getByRole("navigation", { name: RAIL }).getByRole("link")).toHaveCount(0);
   await passesTheAccessibilityGate();
 
-  await page.unroute(theMembershipRead);
+  await page.unroute(theMemberRead);
   await page.getByRole("button", { name: FAILED_PAGE.retry }).click();
   await landedAtHome(page, "Admin");
 });

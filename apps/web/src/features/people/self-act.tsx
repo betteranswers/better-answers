@@ -19,15 +19,15 @@ const ROLE_UNREAD = refusedWith({
 /** Carried in the home entry's history state, so it goes once the reader moves on. */
 const SENT_HOME = z.object({ homeOf: z.string().transform(roleOf) });
 
-type OwnMembershipChange = "demoted" | "removed";
+type OwnMemberChange = "demoted" | "removed";
 
 export const useIncludesYou = (personIds: readonly string[]): string | undefined => {
   const readerId = useReaderId();
   return readerId !== undefined && personIds.includes(readerId) ? INCLUDES_YOU : undefined;
 };
 
-const membershipOf = (api: ApiProxy) => ({
-  queryKey: api.session.membership.queryKey(),
+const memberOf = (api: ApiProxy) => ({
+  queryKey: api.session.member.queryKey(),
   exact: true,
 });
 
@@ -36,9 +36,9 @@ const roleReadAgain = async (
   queryClient: QueryClient,
   api: ApiProxy,
 ): Promise<Role | undefined> => {
-  const membership = membershipOf(api);
-  await queryClient.refetchQueries(membership);
-  const read = queryClient.getQueryState(membership.queryKey);
+  const member = memberOf(api);
+  await queryClient.refetchQueries(member);
+  const read = queryClient.getQueryState(member.queryKey);
   return read?.status === "success" && read.fetchStatus === "idle" ? read.data?.role : undefined;
 };
 
@@ -48,10 +48,10 @@ export const useSelfActHome = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const goHome = async (change: OwnMembershipChange): Promise<Outcome | undefined> => {
+  const goHome = async (change: OwnMemberChange): Promise<Outcome | undefined> => {
     if (change === "removed") {
       // Reset, not removed: the frame's mounted read never hears a removal and draws the old role.
-      void queryClient.resetQueries(membershipOf(api));
+      void queryClient.resetQueries(memberOf(api));
       // The chooser decides on its first read, so a workspace list held from before must not answer it.
       void queryClient.resetQueries({ type: "inactive" });
       // Not `/`: the session still names the workspace left, and the shell sends that refusal to sign-in.

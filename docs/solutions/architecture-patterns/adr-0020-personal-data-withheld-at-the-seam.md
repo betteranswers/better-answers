@@ -36,7 +36,7 @@ The **redaction seam** withholds personal data in the worker's conversion step a
 The erasure routine rewrites what the platform wrote; a person edits what the company wrote.
 
 - Every actor id the platform wrote (files, history, `bundle_commit` rows, verification rows, git author lines by mailmap) becomes `human:<erasure pseudonym>`, one pseudonym per workspace. The audit log is never rewritten: it names a person by person id.
-- On the person's last membership it pseudonymises the user row (email to a tombstone, name cleared, id kept) and deletes their sessions, verification rows, invitations and linked accounts. It ends this workspace's membership on every arm.
+- When this is the person's last workspace, it pseudonymises the user row (email to a tombstone, name cleared, id kept) and deletes their sessions, verification rows, invitations and linked accounts. It ends the person as a member here on every arm.
 - Erasure alone may leave a workspace with no Admin. The operator repairs it with `pnpm ops add-member`.
 - It clears the operator's mark where the person carries one.
 - It writes its replay copy to the object store, under `erasures/<workspace id>/`, before the completion commits.
@@ -48,7 +48,7 @@ A **suppression** is the workspace's: one per erasure request, holding the reque
 ## Why
 
 - The first corpus's most useful file is also the flagged one. Quarantine is the manual work the product exists to remove, and role-gating in place puts a sort code in four stores and at a processor.
-- A placeholder written before splitting is the one control that holds whatever a predicate, a prompt or a client's context later does with the text.
+- A placeholder written before splitting is the one control that holds whatever a predicate, a prompt or an assistant's context later does with the text.
 - No detector clears 0.6 F1 on independent benchmarks, so the design is detector plus review by category plus a Restricted default.
 - The first Admin is a bid writer, not a DPO, so the safe set must be what they get by doing nothing.
 - An actor id is a record, so the platform may rewrite it across history. A name in a concept body is knowledge the company asserts about itself (ADR 0011); rewriting it would make every export already issued diverge.

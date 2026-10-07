@@ -1,0 +1,67 @@
+{
+  "noun": "membership",
+  "readerWord": "member",
+  "sweep": "U16. People words: member",
+  "collisions": [
+    {
+      "with": "Better Auth's `member` table and the members slice, whose `MemberRefusal` the workspaces slice's own refusal for adding a member would have repeated by name; that one is named `AddingRefusal`, by hand",
+      "codeWord": "member"
+    },
+    {
+      "with": "the journeys' `Member`, a row of the Members list, in the file that also reads the session's member; that one is named `SessionMember`, by hand",
+      "codeWord": "member"
+    },
+    {
+      "with": "the members of a workspace or a group: a person's own set of places is named for the workspaces they hold (`WorkspaceHeld`, `workspacesOf`, `WorkspacesAndRoles`), and a group's rows in the tests are `groupMembers`, by hand",
+      "codeWord": "members"
+    }
+  ],
+  "words": [
+    {
+      "from": "membership",
+      "to": "member"
+    },
+    {
+      "from": "memberships",
+      "to": "members"
+    }
+  ],
+  "symbols": {
+    "paths": [
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/web/journeys/**"
+    ]
+  },
+  "text": {
+    "paths": [
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/web/journeys/**"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "the words test's own planted fixtures and ratchet",
+      "paths": ["apps/api/tests/avoid-words.test.ts", "apps/api/tests/old-words-ratchet.json"]
+    },
+    {
+      "sense": "the count of members an erasure ended, a key of the actions the erasure request's row stores and its stored report prints (R22)",
+      "matches": ["\\bmembershipsEnded\\b"]
+    }
+  ]
+}

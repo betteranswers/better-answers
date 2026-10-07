@@ -121,7 +121,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   A platform capability, not a repository workflow.
 - **Q&A pair** — a concept (`type: Answer`): a question as its title, the answer as its body,
   alternate phrasings of the question in the body, its sources the entry it came from and the
-  concepts the answer rests on. Knowledge a company keeps with no platform — the first client's
+  concepts the answer rests on. Knowledge a company keeps with no platform — the first customer's
   bid libraries are Q&A pairs today. Usage, submissions and outcomes are records attached to it.
 - **suggested concept** — _Code rename pending._ a concept the worker suggests (from extraction or
   enrichment) and the platform has not yet written to the knowledge base; it becomes a concept only
@@ -155,7 +155,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
 - **upload sweep** — _Internal._ the removal of the originals no document names, once past their
   grace: what a failed connect left, and what a concurrent repeat left when it lost the race to the
   first connect. **List-only** until the operator switches removal on, seven days after the first
-  upload is connected in a client's workspace on production: it counts what it would remove and
+  upload is connected in a customer's workspace on production: it counts what it would remove and
   removes nothing.
 - **map sweep** — _Internal._ the removal of every generation of a workspace's map but the live
   one.
@@ -545,7 +545,7 @@ from concepts elsewhere; the prose stays a platform record.
   **hidden** section is a definition setting: Admins see it marked hidden, readers do not,
   coverage still counts it.
 - **layer (of a section)** — one of the ways a section shows its knowledge: *assembled* (prose
-  written over the concepts it includes — the first client's Brief) or *quoted* (the included
+  written over the concepts it includes — the first customer's Brief) or *quoted* (the included
   concepts' own words — its Detail). A reader switches layers; the definition says which a
   section renders and which a role opens on.
 - **prompt** — what a section or a Q&A pair answers: a heading or a question.
@@ -744,7 +744,7 @@ to it by IRI and never restates it (ADR 0014).
   0024).
 - **local database** — _Internal._ a developer's own Postgres on the pinned image, migrated and
   holding the synthetic fixture, kept across restarts: what a GUI browses day to day. Nothing a
-  client wrote is in it.
+  customer wrote is in it.
 - **browsing role** — _Internal._ the read-only login every GUI profile signs in as, on the *local
   database* and on production: every workspace's rows in every table and view, no credential
   column, no write to a platform table. Made by an operator action, never by the journal.
@@ -773,9 +773,9 @@ to it by IRI and never restates it (ADR 0014).
 - **release mode** — _Internal._ how releases happen: **per-merge**, every green build on `main`
   released; **nightly**, one release a night just after a verified backup; **drill**, only a
   dispatched release riding a drill or a hotfix. The phases run in that order: per-merge until the
-  first client's bundle lands, nightly until *go-live*, drill after it.
-- **go-live** — _Internal._ the day the platform is live for its clients, no earlier than the end of
-  v0.1. It comes after the day the first client's data is on the box.
+  first customer's bundle lands, nightly until *go-live*, drill after it.
+- **go-live** — _Internal._ the day the platform is live for its customers, no earlier than the end of
+  v0.1. It comes after the day the first customer's data is on the box.
 - **journeys** — _Internal._ the small set of Playwright tests that sign in to production as each
   *test person*, with an email code read from the *test inbox*. Each **journey** walks the pages
   its role reaches, taking only actions it can undo and that cost nothing, so it leaves the *test
@@ -882,7 +882,7 @@ to it by IRI and never restates it (ADR 0014).
   (name something that exists), *malformed* (fix the shape of what was sent), *inapplicable*
   (well-formed, but not something this action applies to), *conflict* (the state moved: read again
   and decide again), *precondition* (something else comes first). A word reaches an agent, the
-  operator and the web client as itself; a person reads its sentence. Once shipped, a word is never
+  operator and the web app as itself; a person reads its sentence. Once shipped, a word is never
   removed and never changes class, so a caller that has never met a word can still act on its
   class (ADR 0043).
 - **issue word** — _Internal._ what a *malformed* refusal says about one field: one hyphenated word
@@ -894,7 +894,7 @@ to it by IRI and never restates it (ADR 0014).
   refusal's **items**, one *refusal word* per refused item, keyed by the id the caller sent for it
   or by an address's position in what was sent — never by an address or a name. Nothing of the set
   lands. The refusal's own word is the first refused item's word in id order. Only tRPC carries the
-  items, to the web client; MCP and `pnpm ops` answer the set's word alone.
+  items, to the web app; MCP and `pnpm ops` answer the set's word alone.
 - **end every sign-in and token** — the one action that ends what a person
   was issued, in two scopes. *In a workspace*: a workspace Admin ends every session and token a
   person holds there, by an instant on their member row the resolver refuses against; nothing
@@ -922,7 +922,7 @@ to it by IRI and never restates it (ADR 0014).
 - **short name** — _Code rename pending._ a workspace's unique short name, given when the platform
   provisions it: how a person names a workspace they do not belong to when they ask to join it.
   Never its id. Better Auth's API keeps its own word for it.
-- **member** — _Code rename pending._ a person's place in one workspace: the one *role* they hold
+- **member** — a person's place in one workspace: the one *role* they hold
   there, the *groups* they belong to in it, and the instant every sign-in and token they held there
   was last ended. It begins when the person accepts an *invitation*, or when the platform provisions
   the workspace or adds them; it ends when an Admin removes the member, which leaves the person and
@@ -1090,7 +1090,7 @@ to it by IRI and never restates it (ADR 0014).
   decided at the promotion gate.
 - **promotion gate** — where the `Answer` collection's owner or an Admin decides a promotion, one at
   a time: the proposed Answer beside the closest existing one (found when opened, judged same ·
-  variant · different) — update the existing, add as new, or decline; client-specific wording
+  variant · different) — update the existing, add as new, or decline; customer-specific wording
   stripped first. One governed write, the decider as author; a trim makes the decider the
   generator.
 - **MCP surface** — _Internal._ the platform's one tools-only MCP server at `app.<apex>/mcp`, on the
@@ -1119,13 +1119,13 @@ to it by IRI and never restates it (ADR 0014).
 - **personal token** — a person's own bearer credential for Claude Code and scripts (the
   `api_token` record): the same principal and scopes as an OAuth token, ninety days by default,
   shown once, minted on the Account page, listed to Admins in People › Personal tokens.
-- **assistant** — _Code rename pending._ a host a person has given access to the MCP surface by
+- **assistant** — a host a person has given access to the MCP surface by
   OAuth and has used: Claude on the web, Claude Code, ChatGPT. Under client-ID-metadata documents
   there is **no registration**, but the platform caches each assistant's metadata document as a row,
   with the scopes it may request, refreshed from the document on a schedule (ADR 0009): the System
   card lists the distinct `client_id` URLs seen on issued access, each named from its own metadata
   document, with who has connected through it. OAuth's own names for it stay.
-- **access (of an assistant)** — _Code rename pending._ what a person's consent gives an assistant:
+- **access (of an assistant)** — what a person's consent gives an assistant:
   the MCP surface in one workspace, or in none, lasting through the assistant's refreshes. It is
   open until it lapses or an action ends it: ending every sign-in and token, here or everywhere, or
   removing a member. That action's audit event records each access it ended, so ended access stays

@@ -36,7 +36,7 @@ export const HOSTNAME_SURFACES: readonly HostnameSurface[] = [
     paths: ["/consent"],
     hosts: ["app"],
     reason:
-      "Consent, the one page of the OAuth flow this tier still renders itself, on the product's origin but outside its shell. It keeps a name in this list rather than falling to the catch-all because it is the one path here with a fence of its own beside the hostname fence: its POST answers a redirect, so it can be reached only by a document navigation, and `auth/routes.ts` refuses a POST whose `Sec-Fetch-Dest` is not `document` on top of the same-origin check. What makes consent acceptable on the same origin as the product is the closed client list plus PKCE: the CIMD allow-list admits only `claude.ai`, so a code any script in the shell could obtain lands only at Claude's own redirect, bound to a verifier only the host holds.",
+      "Consent, the one page of the OAuth flow this tier still renders itself, on the product's origin but outside its shell. It keeps a name in this list rather than falling to the catch-all because it is the one path here with a fence of its own beside the hostname fence: its POST answers a redirect, so it can be reached only by a document navigation, and `auth/routes.ts` refuses a POST whose `Sec-Fetch-Dest` is not `document` on top of the same-origin check. What makes consent acceptable on the same origin as the product is the closed assistant list plus PKCE: the CIMD allow-list admits only `claude.ai`, so a code any script in the shell could obtain lands only at Claude's own redirect, bound to a verifier only the host holds.",
   },
   {
     paths: ["/sign-in-link/*"],

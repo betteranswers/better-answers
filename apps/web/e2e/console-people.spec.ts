@@ -450,7 +450,7 @@ test.describe("the console's Everyone page", () => {
 });
 
 test.describe("a person, opened from Everyone as a sheet", () => {
-  test("shows a person's workspaces, sessions and client grants", async ({
+  test("shows a person's workspaces, sessions and assistant access", async ({
     page,
     request,
     baseURL,
@@ -487,8 +487,8 @@ test.describe("a person, opened from Everyone as a sheet", () => {
               - definition: /\\d{4}/
               - term: Expires
               - definition: /\\d{4}/
-        - region "Client grants":
-          - heading "Client grants" [level=3]
+        - region "Assistant access":
+          - heading "Assistant access" [level=3]
           - list:
             - listitem "Claude":
               - heading "Claude" [level=4]
@@ -506,13 +506,13 @@ test.describe("a person, opened from Everyone as a sheet", () => {
           - button "Correct Priya Shah's display name"
         - region "End every sign-in everywhere":
           - heading "End every sign-in everywhere" [level=3]
-          - paragraph: /Ends every session and client grant Priya Shah holds/
+          - paragraph: /Ends every session and every assistant's access Priya Shah holds/
           - button "${REVOKE}"
         - button "Close"
     `);
     await passesTheAccessibilityGate();
 
-    const grant = regionOf(sheet, "Client grants").getByRole("listitem", { name: "Claude" });
+    const grant = regionOf(sheet, "Assistant access").getByRole("listitem", { name: "Claude" });
     await grant.getByRole("button", { name: "More about Claude's grant" }).click();
     await expect(grant).toContainText("https://claude.ai/oauth/mcp-oauth-client-metadata");
 
@@ -531,7 +531,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     const sheet = await openPriya(page, tag);
 
-    const grant = regionOf(sheet, "Client grants").getByRole("listitem", { name: "Claude" });
+    const grant = regionOf(sheet, "Assistant access").getByRole("listitem", { name: "Claude" });
     await expect(grant).toMatchAriaSnapshot(`
       - listitem "Claude":
         - heading "Claude" [level=4]
@@ -560,13 +560,13 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     const { operators } = await priyaConnected(page, request, baseURL, tag);
     const sheet = await openPriya(page, tag);
     const revoke = sheet.getByRole("button", { name: REVOKE });
-    const grant = regionOf(sheet, "Client grants").getByRole("listitem", { name: "Claude" });
+    const grant = regionOf(sheet, "Assistant access").getByRole("listitem", { name: "Claude" });
     await expect(grant).toBeVisible();
 
     await revoke.click();
     const confirmation = confirmationOf(page);
     await expect(confirmation).toContainText(
-      "Every session and client grant Priya Shah holds ends now, in every workspace",
+      "Every session and every assistant's access Priya Shah holds ends now, in every workspace",
     );
     await passesTheAccessibilityGate();
     await confirmation.getByRole("button", { name: "Cancel" }).click();
@@ -585,7 +585,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(regionOf(sheet, "Sessions")).toContainText("No session is open.");
     await theActLandedWithinItsBudget(page, "end every sign-in everywhere");
     await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("status")).toHaveText(
-      /^Priya Shah's sessions and client grants ended at \d{2}:\d{2} · .+\. They can sign in again\.$/,
+      /^Priya Shah's sessions and assistant access ended at \d{2}:\d{2} · .+\. They can sign in again\.$/,
     );
     await expect(revoke).toBeFocused();
     const endedEverywhere = `
@@ -642,7 +642,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
       .getByRole("button", { name: "End every sign-in everywhere" })
       .click();
     await expect(regionOf(again, "End every sign-in everywhere").getByRole("status")).toContainText(
-      "sessions and client grants ended",
+      "sessions and assistant access ended",
     );
     await expect(regionOf(again, "Sessions")).toContainText("No session is open.");
 
@@ -677,7 +677,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await page.keyboard.press("Enter");
 
     await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("status")).toContainText(
-      "sessions and client grants ended",
+      "sessions and assistant access ended",
     );
     await page.keyboard.press("Escape");
     await expect(personButton(page, "Priya Shah")).toBeFocused();

@@ -60,8 +60,8 @@ Each transport:
 
 **A transport never nests a transaction.** The base procedures:
 
-- A query resolves the membership unlocked.
-- A mutation reads the membership `FOR SHARE`.
+- A query resolves the member unlocked.
+- A mutation reads the member `FOR SHARE`.
 - An own-transaction procedure resolves the Principal in a short transaction, releases the connection, and hands the act the Principal and its doors.
 
 Every Postgres door rolls back when its work answers a refusal or throws. A principal-scoped door answers its own refusal apart from its work's, and an act that wants one union calls `folded` on it. One composition root, `openDoors` in `apps/api/src/doors.ts`, opens the four doors and the Clock (ADR 0040) and states the pool's size.
@@ -72,7 +72,7 @@ Every Postgres door rolls back when its work answers a refusal or throws. A prin
 
 - Refusal words retyped per act, admission answered in three places, input stated per transport and three composition roads were one absence. Only the audit half of an act was declared.
 - Classes sort a word by what its caller can do about it, so they fall one-to-one onto the status taxonomy every transport already has.
-- A spike built the constructor and dropped it. The hand-written `readMembership` answered its callers; the constructed `narrowConnectedSource` answered impacted 0, risk unknown. A code index that answers a lower bound for every act cannot tell anyone what an edit breaks.
+- A spike built the constructor and dropped it. The hand-written `readMember` answered its callers; the constructed `narrowConnectedSource` answered impacted 0, risk unknown. A code index that answers a lower bound for every act cannot tell anyone what an edit breaks.
 - Transaction ownership differs by act, bytes before rows and git before rows (ADR 0012), so nothing may own it generically.
 - A procedure holding a pooled connection for the whole call made an upload hold two of the pool's ten.
 - A door that committed a refused work kept the rows landed before the refusal. When the door folded its own refusal into the work's, a caller could not tell a refused principal from a refused act.
@@ -84,7 +84,7 @@ Every Postgres door rolls back when its work answers a refusal or throws. A prin
 - A constructed act: the code index answers a lower bound for it.
 - A constructor that also parses or owns the transaction: ownership differs by act.
 - Own-transaction acts each resolving their own Principal: `putObject` and `withRepositoryLock` take one outside any Postgres transaction.
-- A refusal as a value on the wire: every read page would branch on it, and a cached client could do nothing with a word it had never met.
+- A refusal as a value on the wire: every read page would branch on it, and a cached web app could do nothing with a word it had never met.
 - A check read before a set's write, to name the items it would refuse: another Admin's act can land between the read and the write.
 - No classes and a table per transport, or one flat list of words.
 - Capability-typed doors with no declared admission, a per-slice manifest a router is generated from, or schemas generated from types.

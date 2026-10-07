@@ -34,10 +34,10 @@ A person has one id: the id on the identity set's `user` row.
 
 Revocation has two scopes. Each deletes the tokens it ends rather than marking them, and a fresh sign-in mints anew.
 
-- In a workspace, an Admin revokes by an instant on the membership row. The act deletes the person's refresh and access tokens consented in that workspace and issued before the instant. Nothing outside the workspace changes, and the Admin never learns whether the person belongs to another.
+- In a workspace, an Admin revokes by an instant on the member row. The act deletes the person's refresh and access tokens consented in that workspace and issued before the instant. Nothing outside the workspace changes, and the Admin never learns whether the person belongs to another.
 - Everywhere, the operator revokes by an instant on the person. The act deletes every session and token the person was issued before the instant.
 - Each act that deletes a person's tokens names the grants it ended, by id, in its audit event: `people.person.credentials_revoked`, `people.member.credentials_revoked` and `people.member.removed`. When a workspace act ended any, it also writes `people.person.grants_ended` to the identity-set audit log.
-- No membership state is put on and taken off. Revocation ends what was issued.
+- No member state is put on and taken off. Revocation ends what was issued.
 
 A person's second factor is theirs, across every workspace (ADR 0048). Being an Admin in any one workspace, or the operator, requires it at every sign-in, and a workspace Admin never acts on another person's factors.
 
@@ -52,19 +52,19 @@ The audit slice, `packages/core/src/audit/`, has two doors. `record` takes a Pri
 ## Why
 
 - A person named by three ids is joined by none of them. An audit log keyed on one, a trailer on another and a file on a third cannot say what that person did.
-- A per-membership id leaves acts taken before a membership, a first sign-in or an access request, with no actor.
+- A per-member id leaves acts taken before a person joins, a first sign-in or an access request, with no actor.
 - One id shape means one boundary refinement, an audit log whose id order agrees with its timestamps, and one fixture both tiers pin, `contracts/id-shape/`.
-- A workspace Admin ending a person's sessions elsewhere is one company's decision reaching another's. Any rule that counts memberships is an oracle over them.
+- A workspace Admin ending a person's sessions elsewhere is one company's decision reaching another's. Any rule that counts the workspaces a person holds is an oracle over them.
 - An erasure target shared across workspaces lets two exported histories be joined on the person the request was meant to unlink.
-- A marked token, presented again, reaches the OAuth provider's replay path. That path deletes every refresh token the person holds for the client, with no workspace filter and no check of when each was issued. It ended grants in other workspaces, and a new grant taken after revoking everywhere. A deleted token answers "not found".
+- A marked token, presented again, reaches the OAuth provider's replay path. That path deletes every refresh token the person holds for the assistant, with no workspace filter and no check of when each was issued. It ended grants in other workspaces, and a new grant taken after revoking everywhere. A deleted token answers "not found".
 - Deleting a grant's rows left nothing to inspect, so each act records the grants it ended.
-- A factor held per membership would let one company's Admin decide how another's member signs in. Held per person, it follows the strongest role they hold anywhere.
+- A factor held per member would let one company's Admin decide how another's member signs in. Held per person, it follows the strongest role they hold anywhere.
 
 ## Rejected
 
 - A per-workspace pseudonym as the everyday id: two ids per person on every record.
 - Better Auth's own id shape: two shapes, two refinements, and a fixture the Python tier cannot pin.
-- The sole-membership rule for revocation: a cross-tenant oracle, and a tenant Admin reaching other tenants' credentials.
+- The one-workspace rule for revocation: a cross-tenant oracle, and a tenant Admin reaching other tenants' credentials.
 - One global rewrite target on erasure: linkable across controllers.
 - A member status a person is put into and taken out of: a second thing the resolver reads.
 - Marking tokens revoked: it reaches the provider's replay path. A `before` hook on `/oauth2/token` and a patch of the provider were rejected too.

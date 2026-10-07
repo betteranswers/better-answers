@@ -41,7 +41,7 @@ In v0.1 the entry step is full-text over the concept index alone. The S2 block b
 - Title weighted first, tags and *Also known as* second, body third.
 - No model call on the entry step.
 
-The concept unit of the one index, with its vectors and its catch-up run, is the reserve block S8. It lands only when the answer tests' recall on the first client's context wordings falls below the threshold S2 sets. When it lands, the worker writes the vector on a job whose row the governed write inserts, never inline and never at read.
+The concept unit of the one index, with its vectors and its catch-up run, is the reserve block S8. It lands only when the answer tests' recall on the first customer's context wordings falls below the threshold S2 sets. When it lands, the worker writes the vector on a job whose row the governed write inserts, never inline and never at read.
 
 ## Why
 

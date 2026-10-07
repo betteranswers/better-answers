@@ -252,8 +252,8 @@ export const withIdentityRead = async <T>(
 ): Promise<T> => transaction(door, (client) => work(client, platform));
 /* jscpd:ignore-end */
 
-const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_revoked_at,
-            m.credentials_revoked_at AS membership_revoked_at,
+const MEMBER_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_revoked_at,
+            m.credentials_revoked_at AS member_revoked_at,
             COALESCE((SELECT array_agg(gm.group_id ORDER BY gm.group_id)
                         FROM group_member gm
                        WHERE gm.workspace_id = m.workspace_id AND gm.user_id = m.user_id),
@@ -266,14 +266,14 @@ const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS per
  * Both rows held, or a revocation lands between the read and the commit; never on the boundary
  * read, which every request runs.
  */
-const MEMBERSHIP_QUERY_HELD = `${MEMBERSHIP_QUERY} FOR SHARE OF m, u`;
+const MEMBER_QUERY_HELD = `${MEMBER_QUERY} FOR SHARE OF m, u`;
 
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);
 
-type MembershipRow = {
+type MemberRow = {
   readonly role: string;
   readonly person_revoked_at: Date | null;
-  readonly membership_revoked_at: Date | null;
+  readonly member_revoked_at: Date | null;
   readonly group_ids: readonly string[];
 };
 
@@ -316,7 +316,7 @@ export const withPrincipal = async <T>(
   door: PostgresDoor,
   claims: Claims,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBERSHIP_QUERY);
+): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBER_QUERY);
 
 /**
  * As withPrincipal, but the member and user rows stay held until commit, so a revocation cannot
@@ -326,9 +326,9 @@ export const withHeldPrincipal = async <T>(
   door: PostgresDoor,
   claims: Claims,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBERSHIP_QUERY_HELD);
+): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBER_QUERY_HELD);
 
-const withMembershipQuery = async <T>(
+const withMemberQuery = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
@@ -354,28 +354,28 @@ const withMembershipQuery = async <T>(
  * the principal read back, groups included. Refuses a non-member, an unknown role, revoked
  * credentials, and a role that has moved.
  */
-export const withMembership = async <T>(
+export const withMember = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => withMembershipQuery(principal, door, work, MEMBERSHIP_QUERY_HELD);
+): Promise<Opened<T>> => withMemberQuery(principal, door, work, MEMBER_QUERY_HELD);
 
 /**
- * As withMembership, but the rows are read, not held, so a long read never stalls another
+ * As withMember, but the rows are read, not held, so a long read never stalls another
  * Admin's role change or removal.
  */
-export const withMembershipUnheld = async <T>(
+export const withMemberUnheld = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => withMembershipQuery(principal, door, work, MEMBERSHIP_QUERY);
+): Promise<Opened<T>> => withMemberQuery(principal, door, work, MEMBER_QUERY);
 
 const resolveScoped = async <T>(
   door: PostgresDoor,
   workspaceId: WorkspaceId,
   userId: UserId,
   credentialIssuedAtMs: number,
-  refusalFor: (row: MembershipRow | undefined) => Result<ResolvedMember, PrincipalRefusal>,
+  refusalFor: (row: MemberRow | undefined) => Result<ResolvedMember, PrincipalRefusal>,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
   query: string,
 ): Promise<Opened<T>> =>
@@ -384,8 +384,8 @@ const resolveScoped = async <T>(
     async (client): Promise<Opened<T>> => {
       await scopeTo(client, workspaceId);
 
-      const membership = await client.query<MembershipRow>(query, [workspaceId, userId]);
-      const resolved = refusalFor(membership.rows[0]);
+      const member = await client.query<MemberRow>(query, [workspaceId, userId]);
+      const resolved = refusalFor(member.rows[0]);
       if (!resolved.ok) return err(resolved.error);
 
       const principal: UserPrincipal = {
@@ -404,17 +404,17 @@ const resolveScoped = async <T>(
     (opened) => !opened.ok || answersARefusal(opened.value),
   );
 
-type ResolvedMember = MembershipRow & { readonly role: Role };
+type ResolvedMember = MemberRow & { readonly role: Role };
 
 const refuse = (
-  row: MembershipRow | undefined,
+  row: MemberRow | undefined,
   credentialIssuedAtMs: number,
 ): Result<ResolvedMember, PrincipalRefusal> => {
   if (row === undefined) return err("not-a-member");
 
   if (!isRole(row.role)) return err("role-unknown");
 
-  for (const revokedAt of [row.person_revoked_at, row.membership_revoked_at]) {
+  for (const revokedAt of [row.person_revoked_at, row.member_revoked_at]) {
     if (revokedAt !== null && credentialIssuedAtMs < revokedAt.getTime()) {
       return err("credentials-revoked");
     }

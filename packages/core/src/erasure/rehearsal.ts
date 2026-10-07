@@ -136,7 +136,7 @@ const personSeeded = async (
     return found.rows[0]?.id;
   });
 
-const membershipSeeded = (
+const memberSeeded = (
   platform: ErasurePrincipal,
   door: PostgresDoor,
   workspaceId: string,
@@ -251,7 +251,7 @@ const documentSeeded = async (
 };
 
 /* jscpd:ignore-start */
-/** A rerun finds the person, membership, concept and connected source the first run seeded. */
+/** A rerun finds the person, member row, concept and connected source the first run seeded. */
 export const seedSyntheticSubject = async (
   platform: ErasurePrincipal,
   doors: ErasureDoors,
@@ -272,7 +272,7 @@ export const seedSyntheticSubject = async (
   const subject = subjectOf(workspaceId, person.value);
 
   const member = await attempt(() =>
-    membershipSeeded(platform, doors.postgres, workspaceId, subject.personId),
+    memberSeeded(platform, doors.postgres, workspaceId, subject.personId),
   );
   if (!member.ok) return err(member.error);
 

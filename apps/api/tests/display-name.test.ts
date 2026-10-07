@@ -30,10 +30,10 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     await app().addMember(second.workspaceId, person.id, "Viewer");
     const { api } = await webSignedIn(app(), person.email);
 
-    const membership = await refusalOfCall(api.session.membership.query());
+    const member = await refusalOfCall(api.session.member.query());
     const set = await api.person.setDisplayName.mutate({ displayName: "Sam Okoro" });
 
-    expect(membership).toMatchObject({ data: { refusal: { word: "no-active-workspace" } } });
+    expect(member).toMatchObject({ data: { refusal: { word: "no-active-workspace" } } });
     expect(set.displayName).toBe("Sam Okoro");
     expect(await displayNameHeldBy(app(), person.id)).toBe("Sam Okoro");
   });

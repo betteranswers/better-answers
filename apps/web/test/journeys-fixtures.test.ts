@@ -533,7 +533,7 @@ const SOUND_MEMBERS = [
 const aWorkspace = (changed: Readonly<Record<string, Reply>> = {}): ReadonlyMap<string, Reply> =>
   new Map(
     Object.entries({
-      "GET /trpc/session.membership": answered({
+      "GET /trpc/session.member": answered({
         workspace: { name: "Test workspace" },
         person: { name: "Test Admin" },
         role: "Admin",
@@ -638,7 +638,7 @@ describe("the Admin's check, when the Admin's own standing changed", () => {
       person: { name: "Test Admin" },
       role: "Viewer",
     });
-    const run = await checkedAgainst(aWorkspace({ "GET /trpc/session.membership": asAViewer }));
+    const run = await checkedAgainst(aWorkspace({ "GET /trpc/session.member": asAViewer }));
 
     expect(run.outcome).toBe("could-not-run\n");
     expect(run.signIns).toBe(1);
@@ -657,17 +657,15 @@ describe("the Admin's check, when the Admin's own standing changed", () => {
     );
   }, 120_000);
 
-  it("stops the run when the product refuses the Admin's membership", async () => {
+  it("stops the run when the Admin's member read is refused", async () => {
     const run = await checkedAgainst(
-      aWorkspace({ "GET /trpc/session.membership": refusedWith("not-a-member", 401) }),
+      aWorkspace({ "GET /trpc/session.member": refusedWith("not-a-member", 401) }),
     );
 
     expect(run.outcome).toBe("could-not-run\n");
     expect(run.signIns).toBe(1);
     expect(run.summary).toContain(
-      stoppedFor(
-        "the test workspace refused the Admin's read of session.membership (not-a-member)",
-      ),
+      stoppedFor("the test workspace refused the Admin's read of session.member (not-a-member)"),
     );
   }, 120_000);
 

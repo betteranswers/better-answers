@@ -18,7 +18,7 @@ case "${requested}" in
     ;;
   "git-receive-pack "*)
     arg=${requested#git-receive-pack }
-    arg=${arg#\'}; arg=${arg%\'}   # the client quotes the path
+    arg=${arg#\'}; arg=${arg%\'}   # the git client quotes the path
     case "${arg}" in "${root}/"*.git) ;; *) refuse "git-receive-pack: path outside ${root}";; esac
     ws=${arg#"${root}/"}; ws=${ws%.git}
     is_workspace "${ws}" || refuse "git-receive-pack: not a workspace id"

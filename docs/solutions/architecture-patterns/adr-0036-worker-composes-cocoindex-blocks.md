@@ -72,7 +72,7 @@ A spike measured all of this on cocoindex 1.0.22. Conversion plus the withholdin
 - Renaming the target breaks that tracking without a sign. A spike on cocoindex 1.0.24 renamed the table to `index.passage` and one of its columns, then landed one row fewer, once under the passages app's own name and once under a new one. Neither sync deleted the omitted row, and neither raised an error. Only deleting the source's rows, removing its store and landing again restored the deletion. `test_a_wipe_leaves_no_old_store_and_tracks_removals_again` in `apps/worker/tests/test_pipeline_index.py` holds that path. The release's wipe step had no command until the BA-29 passage sweep's code review found the gap.
 - The store sits on the worker's own volume and no other process reaches it, so the removal is the worker's. A sync that opened the store first would answer out of the memo it was enqueued to throw away.
 - A memo keyed on policy re-ran the detector on every keep, suppression or rule switch, and a cached withholding kept a fix from reaching standing entries. Keyed on the text alone, policy is part of no key, and a converter upgrade re-detects only a document whose normalised text moved.
-- The findings store holds neither text nor target-state tracking, so a wipe can spare it. Its home was fixed before the first client's documents, because moving it later costs a detection of every page held.
+- The findings store holds neither text nor target-state tracking, so a wipe can spare it. Its home was fixed before the first customer's documents, because moving it later costs a detection of every page held.
 - cocoindex derives a mount path from `fn.__name__`, so renaming an internal function would have been a silent detection of every page.
 
 ## Rejected

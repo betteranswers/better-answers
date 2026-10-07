@@ -6,7 +6,7 @@ Each package's assessment behind the code-scanning alerts `scan.yml` raises with
 
 **CVE-2026-60002 in `openssh-client`, `image-backup`, alert #446, critical.** `ssh` can use freed memory when the server changes its host key during a key re-exchange. The path is run: the nightly `job_git_mirror` runs `ssh` and `git push` over SSH to the mirror.
 
-- **What holds it today.** The client speaks to that one host, whose host key `deploy/host-setup.sh` pins in the backup's `known_hosts`, so a re-exchange inside the session can come only from the mirror's own `sshd`.
+- **What holds it today.** The SSH client speaks to that one host, whose host key `deploy/host-setup.sh` pins in the backup's `known_hosts`, so a re-exchange inside the session can come only from the mirror's own `sshd`.
 - **What removes it.** BA-15: a Debian 13 `openssh-client` that fixes the flaw, built into the image and deployed. No such package is due. Debian marks trixie `<no-dsa>` (a minor issue), so its security team will issue no update, and only a stable point release could carry one. On 30/09/2026 `trixie-proposed-updates` held no fix, and `trixie-backports` carried 10.3p1, while the flaw is fixed from OpenSSH 10.4, in forky and sid only. The removal has no date.
 
 ## Assessed 30/09/2026
@@ -109,7 +109,7 @@ The service is `cron -f`, running `backup.sh` hourly and nightly through `backup
 - **Perl**: the four packages above, CVE-2026-9538, 4 alerts. For `git` and `postgresql-common`. Perl runs here as `pg_wrapper`, behind `psql`, `pg_dump` and `pg_dumpall`. It loads `POSIX`, `Socket` and `IPC::Open3`, and never `Archive::Tar`.
 - **systemd**: `systemd`, `libsystemd-shared`, `libsystemd0`, `libudev1`. CVE-2026-16742, 4 alerts. `systemd` comes in with `cron-daemon-common`. `systemd-homed` is not installed, and PID 1 is cron.
 - **`openssh-client`**: CVE-2026-59999 and CVE-2026-60000, 2 of its 3 alerts. For the mirror push. Both flaws are in `sshd`, which the image does not carry. CVE-2026-60002 is held open, above.
-- **`google.golang.org/grpc` in `rclone`**: CVE-2026-84445, 1 alert. The module has a fixed version, and no `rclone` release carries it yet, so it is assessed as a vulnerability with no fix. The panic is in gRPC's xDS server, `xds.NewGRPCServer`. The binary links 60 grpc packages and no xds one, and `rclone` runs as a client with no listener.
+- **`google.golang.org/grpc` in `rclone`**: CVE-2026-84445, 1 alert. The module has a fixed version, and no `rclone` release carries it yet, so it is assessed as a vulnerability with no fix. The panic is in gRPC's xDS server, `xds.NewGRPCServer`. The binary links 60 grpc packages and no xds one, and `rclone` runs as an HTTP client with no listener.
 - **`/etc/ssl/private/ssl-cert-snakeoil.key`**: a private key the secret scan flags, 1 alert. `ssl-cert`, a dependency of `postgresql-common`, generates it when the image is built. Nothing in the image serves TLS, and `psql` and `pg_dump` never read it, so it authenticates nothing.
 
 ### `image-worker`

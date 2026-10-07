@@ -7,13 +7,13 @@ import {
   workspacesHeldBy,
 } from "../workspaces/index.ts";
 
-export type IdentityArm = "no-person" | "last-membership" | "membership-ended";
+export type IdentityArm = "no-person" | "last-workspace" | "held-elsewhere";
 
 export type IdentitySwept = {
   readonly arm: IdentityArm;
 
   readonly pseudonymised: number;
-  readonly membershipsEnded: number;
+  readonly membersEnded: number;
   readonly sessions: number;
   readonly verifications: number;
   readonly accounts: number;
@@ -35,7 +35,7 @@ export type IdentitySwept = {
 
 const SWEPT_NOTHING = {
   pseudonymised: 0,
-  membershipsEnded: 0,
+  membersEnded: 0,
   sessions: 0,
   verifications: 0,
   accounts: 0,
@@ -124,9 +124,9 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
 };
 
 /**
- * Does nothing without a person. Otherwise ends the membership and last activity here, and only
+ * Does nothing without a person. Otherwise ends the member and their last activity here, and only
  * when it was the person's last deletes their sessions, accounts, verifications, invitations and
- * second factor, pseudonymises them and clears their marks. Throws when memberships cannot be read.
+ * second factor, pseudonymises them and clears their marks. Throws when the workspaces they hold cannot be read.
  */
 export const eraseFromTheIdentitySet = async (
   platform: PlatformPrincipal,
@@ -140,7 +140,7 @@ export const eraseFromTheIdentitySet = async (
 
   if (!held.ok) throw normalizeError(held.error);
   const elsewhere = held.value.filter((workspaceId) => workspaceId !== subject.workspaceId);
-  const arm: IdentityArm = elsewhere.length === 0 ? "last-membership" : "membership-ended";
+  const arm: IdentityArm = elsewhere.length === 0 ? "last-workspace" : "held-elsewhere";
 
   // One transaction for the step: of its tables only the last-activity one is under row-level
   // security, so the workspace's scope narrows nothing else.
@@ -152,9 +152,9 @@ export const eraseFromTheIdentitySet = async (
       subject.workspaceId,
       personId,
     ]);
-    const membershipsEnded = rowsOf(ended);
-    if (arm === "membership-ended") return { arm, ...SWEPT_NOTHING, membershipsEnded, lastActive };
+    const membersEnded = rowsOf(ended);
+    if (arm === "held-elsewhere") return { arm, ...SWEPT_NOTHING, membersEnded, lastActive };
     const swept = await sweepTheSet(tx, subject, `${subject.pseudonym}@${ERASED_DOMAIN}`);
-    return { arm, membershipsEnded, lastActive, ...swept };
+    return { arm, membersEnded, lastActive, ...swept };
   });
 };

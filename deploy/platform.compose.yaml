@@ -14,7 +14,7 @@ x-mem-512: &mem512
 x-bootstrap: &bootstrap
   DATABASE_URL: ${DATABASE_URL:?}
   S3_ENDPOINT: http://objectstore:3900
-  # garage.toml fixes the same word: a client signing for another region is refused.
+  # garage.toml fixes the same word: an S3 client signing for another region is refused.
   S3_REGION: garage
   S3_BUCKET: ${S3_BUCKET:?the platform's bucket — wizard-41.sh § Garage creates it}
   S3_ACCESS_KEY: ${OBJECTSTORE_ROOT_KEY:?}

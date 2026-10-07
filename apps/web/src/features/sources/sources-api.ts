@@ -68,7 +68,7 @@ export const usePreview = (connectedSourceId: string, enabled: boolean) => {
 
 /**
  * The one act whose input is bytes: its descriptor rides beside them, so it goes through the
- * client rather than an options factory built once.
+ * tRPC client, not an options factory built once.
  */
 export const useConnect = () => {
   const api = useTRPC();

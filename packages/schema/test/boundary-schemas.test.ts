@@ -940,7 +940,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.auditEvent[0], actor: USER_ID },
       { ...acceptedRows.auditEvent[0], actor: "Priya Patel" },
       { ...acceptedRows.auditEvent[0], detail: { person: { name: "Priya" } } },
-      { ...acceptedRows.auditEvent[0], detail: { grants: [{ client: { name: "Claude" } }] } },
+      { ...acceptedRows.auditEvent[0], detail: { grants: [{ assistant: { name: "Claude" } }] } },
       { ...acceptedRows.auditEvent[0], detail: { grants: [{ count: 3 }] } },
       { ...acceptedRows.auditEvent[2], batchId: "batch-1" },
     ],

@@ -130,7 +130,7 @@ export type BulkRemoveMembersRefusal =
   | Error;
 
 /**
- * Ends every ticked membership here and its tokens, or none: removing the workspace's last Admins
+ * Ends every ticked member here and their tokens, or none: removing the workspace's last Admins
  * refuses the set naming each. An id no member here holds, whatever the reason, is skipped.
  */
 export const bulkRemoveMembers = async (

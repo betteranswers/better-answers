@@ -73,7 +73,7 @@ const grantsTo = async (
   });
 
 describe("removing a member", () => {
-  it("ends the membership and its groups, recording the removal", async () => {
+  it("ends the member and its groups, recording the removal", async () => {
     const workspace = await provisionedWorkspace(db(), "Removed");
     const viewer = await joining(workspace, "Viewer");
     await seedingWith(db().pool, async (seed) => {
@@ -181,7 +181,7 @@ describe("what removing a member refuses", () => {
     expect(await removalsIn(ours)).toEqual([]);
   });
 
-  it("leaves the membership and tokens when its audit event fails", async () => {
+  it("leaves the member and tokens when its audit event fails", async () => {
     const workspace = await provisionedWorkspace(db(), "RemovalUnrecorded");
     const viewer = await joining(workspace, "Viewer");
     const issued = await grantsTo(viewer, { here: { workspaceId: workspace.workspaceId } });

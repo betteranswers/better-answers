@@ -579,7 +579,7 @@ describe("the 2025-11-25 leg", () => {
     ]);
   });
 
-  it("answers server/discover with method-not-found, so a client falls back", async () => {
+  it("answers server/discover with method-not-found, so an assistant falls back", async () => {
     const { client, token } = await connect();
 
     const body = await rpc(await legacy(client, token, "server/discover"));

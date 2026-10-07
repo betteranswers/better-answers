@@ -5,38 +5,38 @@ import type { WorkspaceId } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 export type GrantNames = {
-  readonly clients: ReadonlyMap<string, string | null>;
+  readonly assistants: ReadonlyMap<string, string | null>;
   readonly workspaces: ReadonlyMap<string, string>;
 };
 
-/** An ended grant as it is shown: named from the client and workspace rows as they stand now. */
+/** An ended grant as it is shown: named from the assistant and workspace rows as they stand now. */
 export type GrantNamed = {
-  readonly client: { readonly id: string; readonly name: string };
+  readonly assistant: { readonly id: string; readonly name: string };
   readonly workspace: { readonly id: WorkspaceId; readonly name: string } | null;
   readonly issuedAt: string;
 };
 
 /** One read of each table, by id, whatever the number of grants. */
 export const namesOfGrants = async (tx: Tx, grants: readonly EndedGrant[]): Promise<GrantNames> => {
-  const clientIds = [...new Set(grants.map((grant) => grant.clientId))];
+  const assistantIds = [...new Set(grants.map((grant) => grant.clientId))];
   const workspaceIds = [...new Set(grants.flatMap((grant) => grant.workspaceId ?? []))];
-  const clients = await tx.query<{ client_id: string; name: string | null }>(
+  const assistants = await tx.query<{ client_id: string; name: string | null }>(
     "SELECT client_id, name FROM oauth_client WHERE client_id = ANY($1::text[])",
-    [clientIds],
+    [assistantIds],
   );
   const workspaces = await tx.query<{ id: string; name: string }>(
     "SELECT id, name FROM workspace WHERE id = ANY($1::text[])",
     [workspaceIds],
   );
   return {
-    clients: new Map(clients.rows.map((row) => [row.client_id, row.name])),
+    assistants: new Map(assistants.rows.map((row) => [row.client_id, row.name])),
     workspaces: new Map(workspaces.rows.map((row) => [row.id, row.name])),
   };
 };
 
-/** A client or workspace with no name, or gone since, reads as its id, which a reader can look up. */
+/** An assistant or workspace with no name, or gone since, reads as its id, which a reader can look up. */
 export const grantNamed = (grant: EndedGrant, names: GrantNames): GrantNamed => ({
-  client: { id: grant.clientId, name: names.clients.get(grant.clientId) ?? grant.clientId },
+  assistant: { id: grant.clientId, name: names.assistants.get(grant.clientId) ?? grant.clientId },
   workspace:
     grant.workspaceId === null
       ? null
@@ -71,7 +71,7 @@ const namedField = (read: FieldRead, names: GrantNames): Detail[string] =>
         const named = grantNamed(grant, names);
         return {
           ...grant,
-          clientName: named.client.name,
+          clientName: named.assistant.name,
           workspaceName: named.workspace?.name ?? null,
         };
       })

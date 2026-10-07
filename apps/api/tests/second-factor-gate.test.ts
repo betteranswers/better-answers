@@ -30,9 +30,9 @@ const NO_SESSION = { data: { httpStatus: 401, refusal: { word: "no-session" } } 
 
 const apiOf = (client: TestClient) => webClientOf(client).api;
 
-const membershipOf = (client: TestClient) =>
+const memberOf = (client: TestClient) =>
   apiOf(client)
-    .session.membership.query()
+    .session.member.query()
     .catch((refused: unknown) => refused);
 
 const standingOf = async (client: TestClient) =>
@@ -79,9 +79,9 @@ describe("an Admin's sign-in", () => {
     const byEmail = await signedInByEmailOnly(app(), admin.email);
     const byPasskey = await signedInByPasskey(device);
 
-    expect(await membershipOf(byEmail)).toMatchObject(PENDING);
+    expect(await memberOf(byEmail)).toMatchObject(PENDING);
     expect(await standingOf(byEmail)).toBe("confirm");
-    expect(await membershipOf(byPasskey)).toMatchObject({ role: "Admin" });
+    expect(await memberOf(byPasskey)).toMatchObject({ role: "Admin" });
   });
 
   it("confirms first on the way to a workspace they view", async () => {
@@ -95,7 +95,7 @@ describe("an Admin's sign-in", () => {
     const confirmed = await setActiveWorkspace(client, elsewhere.workspaceId);
 
     expect([whilePending.status, confirmed.status]).toEqual([403, 200]);
-    expect(await membershipOf(client)).toMatchObject({ role: "Viewer" });
+    expect(await memberOf(client)).toMatchObject({ role: "Viewer" });
   });
 
   it("never passes the factor step on an email link alone", async () => {
@@ -115,7 +115,7 @@ describe("an Admin's sign-in", () => {
     const spent = await client.json("/second-factor/recovery", { code: recoveryCode });
 
     expect([byTheLink, spent.status, await standingOf(client)]).toEqual(["confirm", 200, "setup"]);
-    expect(await membershipOf(client)).toMatchObject(PENDING);
+    expect(await memberOf(client)).toMatchObject(PENDING);
   });
 
   it("never holds a non-Admin's email sign-in pending", async () => {
@@ -127,7 +127,7 @@ describe("an Admin's sign-in", () => {
     for (const person of [editor, viewer]) {
       const client = await signedInByEmailOnly(app(), person.email);
       expect(await standingOf(client)).toBe("not-required");
-      expect(await membershipOf(client)).toMatchObject({
+      expect(await memberOf(client)).toMatchObject({
         workspace: { id: workspace.workspaceId },
       });
     }
@@ -256,7 +256,7 @@ describe("becoming an Admin mid-session", () => {
     await apiOf(client).person.acceptInvitation.mutate({ invitationId: invitation.id });
 
     expect([before, await standingOf(client)]).toEqual(["not-required", "setup"]);
-    expect(await membershipOf(client)).toMatchObject(PENDING);
+    expect(await memberOf(client)).toMatchObject(PENDING);
   });
 
   it("makes the next request pending and sends the credential list", async () => {
@@ -265,10 +265,10 @@ describe("becoming an Admin mid-session", () => {
     await app().addMember(workspace.workspaceId, editor.id, "Editor");
     const { device } = await passkeyAddedOn(await signedInByEmailOnly(app(), editor.email));
     const promoted = await signedInByPasskey(device);
-    expect(await membershipOf(promoted)).toMatchObject({ role: "Editor" });
+    expect(await memberOf(promoted)).toMatchObject({ role: "Editor" });
     await madeAnAdminBy(workspace.admin.email, editor.id);
 
-    expect(await membershipOf(promoted)).toMatchObject(PENDING);
+    expect(await memberOf(promoted)).toMatchObject(PENDING);
     expect(await standingOf(promoted)).toBe("confirm");
     await expect
       .poll(
@@ -289,11 +289,11 @@ describe("a pending session's hour", () => {
   it("ends a pending session an hour after its first read", async () => {
     const { admin } = await anAdminHolding();
     const client = await signedInByEmailOnly(app(), admin.email);
-    expect(await membershipOf(client)).toMatchObject(PENDING);
+    expect(await memberOf(client)).toMatchObject(PENDING);
 
     shift.ms = ONE_HOUR_MS + 60_000;
     try {
-      expect(await membershipOf(client)).toMatchObject(NO_SESSION);
+      expect(await memberOf(client)).toMatchObject(NO_SESSION);
     } finally {
       shift.ms = 0;
     }
@@ -303,7 +303,7 @@ describe("a pending session's hour", () => {
   it("refuses a held session past its hour at the library", async () => {
     const { admin } = await anAdminHolding();
     const client = await signedInByEmailOnly(app(), admin.email);
-    expect(await membershipOf(client)).toMatchObject(PENDING);
+    expect(await memberOf(client)).toMatchObject(PENDING);
     const holder = await app().database.superuser.connect();
 
     shift.ms = ONE_HOUR_MS + 60_000;
@@ -332,11 +332,11 @@ describe("a pending session's hour", () => {
 
     shift.ms = ONE_HOUR_MS * 5;
     try {
-      const first = await membershipOf(client);
+      const first = await memberOf(client);
       shift.ms = ONE_HOUR_MS * 6 - 60_000;
-      const withinTheHour = await membershipOf(client);
+      const withinTheHour = await memberOf(client);
       shift.ms = ONE_HOUR_MS * 6 + 60_000;
-      const pastIt = await membershipOf(client);
+      const pastIt = await memberOf(client);
 
       expect([first, withinTheHour, pastIt]).toMatchObject([PENDING, PENDING, NO_SESSION]);
     } finally {
@@ -357,7 +357,7 @@ describe("a pending session's hour", () => {
     );
     await madeAnAdminBy(workspace.admin.email, editor.id);
 
-    expect(await membershipOf(client)).toMatchObject(PENDING);
+    expect(await memberOf(client)).toMatchObject(PENDING);
     expect(await standingOf(client)).toBe("setup");
     expect(await sessionRowsOf(editor.id)).toHaveLength(1);
   });

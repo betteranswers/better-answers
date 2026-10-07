@@ -84,7 +84,7 @@ const whatLanded = async (workspaceId: string, personId: string) => ({
 
 const NOTHING_LANDED = { flagged: [], raised: [], told: [] };
 
-/** A member of the workspace at `role`, on the web's own client. */
+/** A member of the workspace at `role`, on the web's own tRPC client. */
 const signedInAs = async (workspaceId: string, role: "Editor" | "Viewer") => {
   const member = await app.person();
   await app.addMember(workspaceId, member.id, role);

@@ -26,7 +26,7 @@ import {
   operatorAddresses,
   personIdByEmail,
   provisionWorkspace,
-  readMembership,
+  readMember,
   renameWorkspace,
   restoreSignIn,
   endEverySignInAndToken,
@@ -181,7 +181,7 @@ describe("provisioning a workspace", () => {
     ]);
   });
 
-  it("mints the first Admin's membership id, composed from nothing", async () => {
+  it("mints the first Admin's member row id, composed from nothing", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db().runtimePool);
     const id = ulid();
@@ -246,10 +246,10 @@ describe("provisioning a workspace", () => {
       const row = await db().pool.query("SELECT 1 FROM workspace WHERE id = $1", [id]);
       expect(row.rowCount).toBe(0);
       expect(await partitionExists(id)).toBe(false);
-      const memberships = await db().pool.query("SELECT 1 FROM member WHERE user_id = $1", [
+      const members = await db().pool.query("SELECT 1 FROM member WHERE user_id = $1", [
         adminUserId,
       ]);
-      expect(memberships.rowCount).toBe(0);
+      expect(members.rowCount).toBe(0);
       const events = await db().pool.query("SELECT 1 FROM audit_event WHERE workspace_id = $1", [
         id,
       ]);
@@ -537,7 +537,7 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
   });
 });
 
-describe("reading the current membership", () => {
+describe("reading the session's member", () => {
   it("answers the Principal's workspace, person and role", async () => {
     const here = await provisionedWorkspace(db(), "Acme", {
       name: "Priya Shah",
@@ -556,7 +556,7 @@ describe("reading the current membership", () => {
       client.release();
     }
     const readIn = (workspaceId: string) =>
-      readingAs(db().runtimePool, { workspaceId, userId: here.adminUserId }, readMembership);
+      readingAs(db().runtimePool, { workspaceId, userId: here.adminUserId }, readMember);
 
     expect(await readIn(here.workspaceId)).toEqual({
       ok: true,
@@ -581,7 +581,7 @@ describe("reading the current membership", () => {
 
     const gone = ulid();
     const readAs = (principal: UserPrincipal) =>
-      withScope(bootstrap, door, workspaceId, (tx) => readMembership(principal, tx));
+      withScope(bootstrap, door, workspaceId, (tx) => readMember(principal, tx));
 
     expect(await readAs(principalOf(gone, adminUserId, "Admin"))).toEqual({
       ok: false,
@@ -601,7 +601,7 @@ describe("reading the current membership", () => {
     });
 
     const read = await withScope(bootstrap, door, workspaceId, (tx) =>
-      readMembership(principalOf(workspaceId, stranger, "Editor"), tx),
+      readMember(principalOf(workspaceId, stranger, "Editor"), tx),
     );
 
     expect(read).toEqual({
@@ -627,12 +627,12 @@ describe("reading the current membership", () => {
     expect(provisioned.ok).toBe(true);
 
     const claims: Claims = { workspaceId: id, userId: adminUserId, issuedAt: new Date() };
-    let read: Awaited<ReturnType<typeof readMembership>> | undefined;
+    let read: Awaited<ReturnType<typeof readMember>> | undefined;
 
     await expect(
       withPrincipal(door, claims, async (principal, tx) => {
         await attempt(() => tx.query("SELECT no_such_function()"));
-        read = await readMembership(principal, tx);
+        read = await readMember(principal, tx);
       }),
     ).rejects.toThrow(/did not commit/);
 
@@ -642,14 +642,14 @@ describe("reading the current membership", () => {
   it("answers a locked person's row as a failure, not person-gone", async () => {
     const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Held");
     const holder = await db().pool.connect();
-    let read: Awaited<ReturnType<typeof readMembership>> | undefined;
+    let read: Awaited<ReturnType<typeof readMember>> | undefined;
 
     try {
       await holder.query('BEGIN; LOCK TABLE "user" IN ACCESS EXCLUSIVE MODE');
       await expect(
         withScope(bootstrap, door, workspaceId, async (tx) => {
           await tx.query("SET LOCAL lock_timeout = '200ms'");
-          read = await readMembership(principalOf(workspaceId, adminUserId, "Admin"), tx);
+          read = await readMember(principalOf(workspaceId, adminUserId, "Admin"), tx);
         }),
       ).rejects.toThrow(/did not commit/);
     } finally {
@@ -974,7 +974,7 @@ describe("what the slice answers when the store cannot be reached", () => {
 });
 
 describe("adding a signed-in person as a member, the platform's act", () => {
-  const membershipsOf = async (workspaceId: string, userId: string) => {
+  const membersOf = async (workspaceId: string, userId: string) => {
     const found = await db().pool.query<{ id: string; role: string }>(
       "SELECT id, role FROM member WHERE workspace_id = $1 AND user_id = $2",
       [workspaceId, userId],
@@ -1019,7 +1019,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
         ok: true,
         value: { workspaceId, userId, role, actorId: "process:better-answers-bootstrap" },
       });
-      const rows = await membershipsOf(workspaceId, userId);
+      const rows = await membersOf(workspaceId, userId);
       expect(rows).toEqual([{ id: expect.stringMatching(ULID_SHAPE), role }]);
       expect(rows[0]?.id).not.toContain(workspaceId);
       expect(rows[0]?.id).not.toContain(userId);
@@ -1052,7 +1052,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
     ]);
   });
 
-  it("writes the membership and its audit event together, or neither", async () => {
+  it("writes the member and its audit event together, or neither", async () => {
     const { door, workspaceId } = await provisionedWorkspace(db(), "Atomic");
     const { email, userId } = await signedIn();
 
@@ -1061,7 +1061,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
     );
 
     expect(added).toMatchObject({ ok: false, error: expect.any(Error) });
-    expect(await membershipsOf(workspaceId, userId)).toEqual([]);
+    expect(await membersOf(workspaceId, userId)).toEqual([]);
   });
 
   it("refuses a missing workspace, an unknown person, an existing member", async () => {
@@ -1081,7 +1081,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
       { ok: false, error: "already-a-member" },
     ]);
     expect(await memberCountOf(workspaceId)).toBe("1");
-    expect(await membershipsOf(workspaceId, adminUserId)).toEqual([
+    expect(await membersOf(workspaceId, adminUserId)).toEqual([
       { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
     ]);
     expect(await addedRowsOf(workspaceId)).toEqual([]);
@@ -1100,7 +1100,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
       const added = await addMember(bootstrap, door, { workspaceId, email, role: "Editor" });
 
       expect(added).toEqual({ ok: false, error: "no-display-name" });
-      expect(await membershipsOf(workspaceId, userId)).toEqual([]);
+      expect(await membersOf(workspaceId, userId)).toEqual([]);
       expect(await addedRowsOf(workspaceId)).toEqual([]);
     },
   );
@@ -1114,7 +1114,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
     const again = await addMember(bootstrap, door, { workspaceId, email, role: "Admin" });
 
     expect(again).toEqual({ ok: false, error: "already-a-member" });
-    expect((await membershipsOf(workspaceId, userId)).map((row) => row.role)).toEqual(["Editor"]);
+    expect((await membersOf(workspaceId, userId)).map((row) => row.role)).toEqual(["Editor"]);
     expect(await addedRowsOf(workspaceId)).toHaveLength(1);
   });
 

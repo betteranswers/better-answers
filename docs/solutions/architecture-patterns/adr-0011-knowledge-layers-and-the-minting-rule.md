@@ -48,11 +48,11 @@ What follows from the rule:
 
 - Five sessions in a row answered a platform need inside the concept file (`variants`, `tiers`, guide-shaped tags, a `relations` key, `superseded_by`) or in the wrong store (Q&A pairs as records, an enrichment pass "from the guides"). Each time the cause was the same: no document said what the layers were or where a unit belongs.
 - The bundle-alone test governs keys. This rule governs units, and names the layers the rest of the platform uses.
-- The first client's Q&A pairs are knowledge the company keeps today as markdown with no platform, so they are concepts. A guide section's assembled prose, or a response to an opportunity's question, exists only because the platform runs a use case, so it is a record.
+- The first customer's Q&A pairs are knowledge the company keeps today as markdown with no platform, so they are concepts. A guide section's assembled prose, or a response to an opportunity's question, exists only because the platform runs a use case, so it is a record.
 
 ## Rejected
 
-- Records first (everything assembled or answer-shaped a record): makes the client's answer library unportable and gives one kind of knowledge two trust mechanisms.
+- Records first (everything assembled or answer-shaped a record): makes the customer's answer library unportable and gives one kind of knowledge two trust mechanisms.
 - Bundle first (guides and answers as narrator concepts): prose over atoms drifts by design, and the bundle fills with UI-shaped state.
 - No rule, deciding per unit: the drift this rule ends.
 

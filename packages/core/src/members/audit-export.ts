@@ -16,8 +16,8 @@ import {
 import {
   type PostgresDoor,
   type Tx,
-  withMembership,
-  withMembershipUnheld,
+  withMember,
+  withMemberUnheld,
 } from "../store/postgres/index.ts";
 import type { AuditEventActor } from "../workspaces/index.ts";
 import {
@@ -211,14 +211,14 @@ export const exportAuditLog = async (
   if (!admitted.ok) return err(admitted.error);
 
   const read = await attempt(() =>
-    withMembershipUnheld(admitted.value, door, (member, tx) => readForExport(member, tx, input)),
+    withMemberUnheld(admitted.value, door, (member, tx) => readForExport(member, tx, input)),
   );
   if (!read.ok) return err(read.error);
   if (!read.value.ok) return err(read.value.error);
   const exported = read.value.value;
 
   const recorded = await attempt(() =>
-    withMembership(admitted.value, door, (member, tx) => recordExport(member, tx, input, exported)),
+    withMember(admitted.value, door, (member, tx) => recordExport(member, tx, input, exported)),
   );
   if (!recorded.ok) return err(recorded.error);
   if (!recorded.value.ok) return err(recorded.value.error);

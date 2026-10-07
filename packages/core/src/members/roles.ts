@@ -21,7 +21,7 @@ import {
 import type { Tx } from "../store/postgres/index.ts";
 import { promoting } from "../workspaces/index.ts";
 import { leavesNoAdmin, withMemberHeld, type HeldRefusal } from "./last-admin.ts";
-import { memberKeyed } from "./memberships.ts";
+import { memberKeyed } from "./member-list.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const ROLE_ACTS = declareActs("people", {

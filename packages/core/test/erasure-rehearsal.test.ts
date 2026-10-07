@@ -67,7 +67,7 @@ const personRow = async (personId: string) => {
   return read.rows[0];
 };
 
-const membershipRows = async (workspaceId: string, personId: string) => {
+const memberRows = async (workspaceId: string, personId: string) => {
   const read = await db().pool.query<{ role: string }>(
     "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2",
     [workspaceId, personId],
@@ -112,9 +112,7 @@ describe("the seed", () => {
 
     expect(subject.tokens).toEqual([email, named, name]);
     expect(await personRow(subject.personId)).toEqual({ name, email });
-    expect(await membershipRows(scenario.workspaceId, subject.personId)).toEqual([
-      { role: "Admin" },
-    ]);
+    expect(await memberRows(scenario.workspaceId, subject.personId)).toEqual([{ role: "Admin" }]);
   });
 
   it("connects a document naming the subject, queueing its sync", async () => {
@@ -175,7 +173,7 @@ describe("the seed", () => {
     expect(second.personId).toBe(first.personId);
     expect(second.tokens).toEqual(first.tokens);
     expect(second.document).toEqual(first.document);
-    expect(await membershipRows(scenario.workspaceId, first.personId)).toHaveLength(1);
+    expect(await memberRows(scenario.workspaceId, first.personId)).toHaveLength(1);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
     expect(await connectedSourcesIn(scenario.workspaceId)).toEqual([
       first.document.connectedSourceId,
@@ -294,7 +292,7 @@ describe("the rehearsal", () => {
     const after = await personRow(subject.personId);
     expect(after?.name).toBe("");
     expect(after?.email).not.toContain(subject.email);
-    expect(await membershipRows(scenario.workspaceId, subject.personId)).toEqual([]);
+    expect(await memberRows(scenario.workspaceId, subject.personId)).toEqual([]);
   });
 
   it("records one act under the platform principal, carrying no token", async () => {

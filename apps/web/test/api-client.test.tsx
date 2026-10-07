@@ -40,7 +40,7 @@ describe("the SPA's tRPC client", () => {
 });
 
 describe("the query provider above the router", () => {
-  it("wraps the router, so its pages reach the same client", async () => {
+  it("wraps the router, so its pages share one tRPC client", async () => {
     const clients = createAppClients();
     const router = createAppRouter(
       clients,
@@ -60,7 +60,7 @@ describe("the query provider above the router", () => {
   });
 });
 
-describe("the path the client and the api agree on", () => {
+describe("the path the tRPC client and the api agree on", () => {
   it("matches the one path apps/api mounts its router at", () => {
     const source = readFileSync(
       path.join(import.meta.dirname, "../../api/src/trpc/mount.ts"),

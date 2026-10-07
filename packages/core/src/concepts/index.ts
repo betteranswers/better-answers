@@ -48,7 +48,7 @@ import {
   type Committed,
   type GitDoor,
 } from "../store/git/index.ts";
-import { containing, withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { containing, withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import {
   hashedFileOf,
   renderConceptFile,
@@ -386,7 +386,7 @@ const writeUnderLock = async (
 
 const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: ParsedWrite) =>
   attempt(() =>
-    withMembership(principal, postgres, async (fresh, tx): Promise<Existing> => {
+    withMember(principal, postgres, async (fresh, tx): Promise<Existing> => {
       const { input, iri } = write;
       const held = await heldByIri(fresh, tx, iri);
       return {
@@ -488,7 +488,7 @@ const landWrite = async (
   committed: Committed,
 ): Promise<Result<void, WriteConceptRefusal | Error>> => {
   const landed = await attempt(() =>
-    withMembership(principal, postgres, async (fresh, tx) => {
+    withMember(principal, postgres, async (fresh, tx) => {
       const acceptance = write.input.acceptance;
       if (acceptance === undefined) {
         await record(fresh, tx, {
@@ -625,7 +625,7 @@ const preparedFor = async (
   suggestionId: string,
 ): Promise<Result<Prepared, AcceptSuggestionRefusal | Error>> => {
   const prepared = await attempt(() =>
-    withMembership(principal, postgres, async (fresh, tx) => {
+    withMember(principal, postgres, async (fresh, tx) => {
       const payload = await payloadFor(fresh, tx, suggestionId);
       if (payload === undefined) return undefined;
       const target = await targetOfMergeKey(fresh, tx, payload.mergeKey);
@@ -839,7 +839,7 @@ const importContextOf = (
   concepts: readonly LoadedConcept[],
 ) =>
   attempt(() =>
-    withMembership(principal, postgres, async (fresh, tx) => {
+    withMember(principal, postgres, async (fresh, tx) => {
       const standing = await standingAt(
         fresh,
         tx,
@@ -962,9 +962,7 @@ const verificationsRecordedOn = async (
   input: Parameters<typeof recordImportedVerifications>[2],
 ): Promise<Result<VerificationsRecorded, WriteConceptRefusal | Error>> => {
   const recorded = await attempt(() =>
-    withMembership(principal, postgres, (fresh, tx) =>
-      recordImportedVerifications(fresh, tx, input),
-    ),
+    withMember(principal, postgres, (fresh, tx) => recordImportedVerifications(fresh, tx, input)),
   );
   if (!recorded.ok) return err(recorded.error);
   return recorded.value;
@@ -1092,7 +1090,7 @@ type ConceptVerification = {
 
   readonly contentHash: string | null;
 
-  /** Read by person id, so it outlives the membership; null once erasure clears the name. */
+  /** Read by person id, so it stands after the member leaves; null once erasure clears the name. */
   readonly verifierName: string | null;
 };
 

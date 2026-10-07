@@ -35,7 +35,7 @@ Every stateful service is a bind mount under `/data/<service>`. Garage is the ob
 
 One variable, `RELEASE_MODE`, phases the releases:
 
-- `per-merge`: every green build on `main` releases its own commit, unless `main` has moved past it. It runs until the first client's bundle lands.
+- `per-merge`: every green build on `main` releases its own commit, unless `main` has moved past it. It runs until the first customer's bundle lands.
 - `nightly`: `main`'s newest green commit is released at 02:35 UTC, once the box's own verified backup is fresh. It runs until go-live.
 - `drill`: a dispatched release names the drill report it rides on, or a hotfix reason. It runs from go-live.
 - Any other value releases nothing.
@@ -49,7 +49,7 @@ The journeys sign in to production as the test people and walk the pages each ro
 
 Under `report` and `gate` the journeys run after every nightly or dispatched promotion whose smoke passes, before its tag. A release `build.yml` calls after a merge runs none, and keeps its smoke-only tag under every value. A scheduled night with nothing newer to promote runs them alone against the live release, in every release mode, and so does a journeys-only dispatch. They check out the commit the live api image was built from, read from the image's revision label.
 
-Until the first client uses the platform, a failed release never rolls production back: the owner decides, by the runbook's rollback. From that day, a failure re-promotes the last tagged release, unless the failed release added a migration, which alerts the owner instead. That rollback is BA-48, still to be built; its rejected marker landed first, with the gate.
+Until the first customer uses the platform, a failed release never rolls production back: the owner decides, by the runbook's rollback. From that day, a failure re-promotes the last tagged release, unless the failed release added a migration, which alerts the owner instead. That rollback is BA-48, still to be built; its rejected marker landed first, with the gate.
 
 Every irreplaceable byte is encrypted and copied off-host:
 
@@ -73,7 +73,7 @@ The edge is one tunnel and three hostnames. `app.` is open, with Better Auth its
 - Nothing reaches the stores stack from GitHub but the orchestrator's API, so the nightly release rides the box's own backup rather than one CI takes.
 - The first automatic release tagged a deploy that never happened: the edge answered empty credentials with a redirect that `curl -f` counted as success. Hence 2xx only, and a tag only for a release that held, so the newest tag is always the last release that held, and the rollback target. Under `gate` the release production runs may be newer than that tag and untagged, with its migrations applied all the same, so a rollback first lists the migrations it would cross.
 - The smoke reads `/health` and one unauthenticated document, so a release can pass it and refuse every sign-in. Only a run signed in as each role sees that.
-- The journeys skip a release `build.yml` calls because `per-merge` lasts only until the first client's bundle lands, and journeys on every release of a platform nobody relies on yet buy nothing.
+- The journeys skip a release `build.yml` calls because `per-merge` lasts only until the first customer's bundle lands, and journeys on every release of a platform nobody relies on yet buy nothing.
 - Every night runs them, with or without a promotion, so the alert hears from each night and a night with no run reads as a late check. They sit in the release's concurrency group, so they never overlap a release.
 - A refused night pings `could-not-run`, so an unknown mode or an unreadable history reaches the alert that night, not a day and a half later.
 - A failed release is rejected rather than promoted again: without the marker, `gate` would redeploy the same broken commit every night, restarting the api, until someone acted. Only `fail` rejects, since `could-not-run` says nothing about the release.

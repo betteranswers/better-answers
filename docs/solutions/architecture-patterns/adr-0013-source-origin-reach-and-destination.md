@@ -55,7 +55,7 @@ An Admin's recorded widen act (`widenConnectedSource`, in the `sources` slice) i
 
 ## Why
 
-- The first client's knowledge arrives in four shapes at once: files handed over, a SharePoint site, a public website, and systems it cites but never connects. One connected source shape with two axes covers them all without a type per case.
+- The first customer's knowledge arrives in four shapes at once: files handed over, a SharePoint site, a public website, and systems it cites but never connects. One connected source shape with two axes covers them all without a type per case.
 - Indexing is cheap and reversible. Extraction spends money and lands in a permanent history. So the two are gated differently.
 - A live read through a credential is the only honest way to cite a system the company has chosen not to copy.
 - Publishing is a legal act with confirmations: lawful basis recorded, privacy information updated, a DPIA reference. Sensitivity alone cannot say "not yet" or "for one group only".
@@ -73,8 +73,8 @@ An Admin's recorded widen act (`widenConnectedSource`, in the `sources` slice) i
 - Sensitivity as the only gate, or no gate: neither can say "indexed, not yet released".
 - URL-only citations, caching the cited page, or an evidence snapshot record: a stored copy is a copy the company chose not to make.
 - Mirror retention only, or several numeric retention classes: uploads have nothing to mirror, and map-only connected sources need transient.
-- A customer-hosted worker now, a worker-local folder watch, or a platform drop area: the share agent reaches an on-site folder with nothing of the platform on the client's network.
-- Every lifted connector switched on, an OKF-bundle upload connected source, or source ACL synchronisation: no first-client case.
+- A customer-hosted worker now, a worker-local folder watch, or a platform drop area: the share agent reaches an on-site folder with nothing of the platform on the customer's network.
+- Every lifted connector switched on, an OKF-bundle upload connected source, or source ACL synchronisation: no first-customer case.
 - Docling as the converter for layout: on CPU it wants more than twice the worker's 1.5 GB.
 
 ## History

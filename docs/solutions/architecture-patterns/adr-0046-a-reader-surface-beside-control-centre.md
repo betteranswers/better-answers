@@ -37,8 +37,8 @@ One thing stays open: an Editor's home once question sets land. It is Ask, or th
 ## Why
 
 - Someone who asks questions and reads answers should land where asking happens. Questions is where an Admin judges the answers other people got. Sending a Viewer there first shows them an audit they cannot act on, under a name they have not learnt yet.
-- The first fix proposed was to rename the view *Answers*. ADR 0017 had already refused that word for this door, because it would send readers to the bid library's wrong home, and the first client's bid library is 241 `Answer` concepts. The design review found the home was the fault, and the name never was.
-- The first change was cheap: the web client already ran a second area, the console, through the same frame. One rail of areas then made a second set of regions unnecessary. An Admin who also asks reaches Ask from the same rail.
+- The first fix proposed was to rename the view *Answers*. ADR 0017 had already refused that word for this door, because it would send readers to the bid library's wrong home, and the first customer's bid library is 241 `Answer` concepts. The design review found the home was the fault, and the name never was.
+- The first change was cheap: the web app already ran a second area, the console, through the same frame. One rail of areas then made a second set of regions unnecessary. An Admin who also asks reaches Ask from the same rail.
 - A reader needs their own history and the flags they can act on, not the workspace's questions. Ask gives them the first and their Inbox the second, so the workspace-wide audit stays with the Admin.
 
 ## Rejected

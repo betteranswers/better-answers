@@ -300,7 +300,7 @@ const join = async (
     "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
     [ulid(), workspaceId, joining.personId, role],
   );
-  // A session ended meanwhile matches no row: the membership still stands, and the next sign-in
+  // A session ended meanwhile matches no row: the person is still a member, and the next sign-in
   // finds it.
   await tx.query(
     `UPDATE session SET active_workspace_id = $1, updated_at = now()

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { refusedTheRun } from "./sign-in.ts";
 
-/** Named, not imported: the SPA's client module brings React's own with it. */
+/** Named, not imported: the SPA's tRPC client module brings React's own with it. */
 const TRPC = "/trpc";
 
 const asked = async (page: Page, procedure: string): Promise<APIResponse> => {
@@ -62,20 +62,20 @@ const checkedThroughTheSession = async <T>(
   return { kind: "read", value: await readFrom(answered, procedure, data) };
 };
 
-const MEMBERSHIP = z.object({
+const SESSION_MEMBER = z.object({
   workspace: z.object({ name: z.string() }),
   person: z.object({ name: z.string() }),
 });
 
-type Membership = z.output<typeof MEMBERSHIP>;
+type SessionMember = z.output<typeof SESSION_MEMBER>;
 
-export const membershipOf = (page: Page): Promise<Membership> =>
-  readThroughTheSession(page, "session.membership", MEMBERSHIP);
+export const sessionMemberOf = (page: Page): Promise<SessionMember> =>
+  readThroughTheSession(page, "session.member", SESSION_MEMBER);
 
 const ROLE_HELD = z.object({ role: z.string() });
 
 export const roleOfTheAdmin = async (page: Page): Promise<Checked<string>> => {
-  const held = await checkedThroughTheSession(page, "session.membership", ROLE_HELD);
+  const held = await checkedThroughTheSession(page, "session.member", ROLE_HELD);
   return held.kind === "read" ? { kind: "read", value: held.value.role } : held;
 };
 

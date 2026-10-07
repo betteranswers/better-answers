@@ -72,7 +72,7 @@ const personIdOf = async (address: string): Promise<string> => {
   return id;
 };
 
-const membershipsOf = async (workspaceId: string, personId: string) =>
+const membersOf = async (workspaceId: string, personId: string) =>
   (
     await app().database.superuser.query<{ role: string }>(
       "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2",
@@ -109,7 +109,7 @@ const nothingLanded = async (at: {
   readonly invitationId: string;
 }) => {
   const personId = await personIdOf(at.address);
-  expect(await membershipsOf(at.workspaceId, personId)).toEqual([]);
+  expect(await membersOf(at.workspaceId, personId)).toEqual([]);
   expect(await joinedEventsOf(personId)).toEqual([]);
   expect(await statusOf(at.invitationId)).toBe("pending");
 };
@@ -144,7 +144,7 @@ describe("accepting an invitation over tRPC", () => {
 
     const { workspaceId } = admin.workspace;
     expect(joined).toEqual({ workspaceId, workspaceName: "Calder Joinery", role: "Editor" });
-    expect(await api.session.membership.query()).toEqual({
+    expect(await api.session.member.query()).toEqual({
       workspace: { id: workspaceId, name: "Calder Joinery" },
       person: { id: personId, name: "Priya Shah", email: address },
       role: "Editor",
@@ -166,7 +166,7 @@ describe("accepting an invitation over tRPC", () => {
     const person = await app().person(anAddress("sam"), "Sam Okoro");
     await app().addMember(elsewhere.workspaceId, person.id, "Viewer");
     const { api, client } = await webSignedIn(app(), person.email);
-    expect(await api.session.membership.query()).toMatchObject({
+    expect(await api.session.member.query()).toMatchObject({
       workspace: { name: "Elsewhere Ltd" },
     });
     const admin = await anAdmin("Ryedale Metalwork");
@@ -174,15 +174,15 @@ describe("accepting an invitation over tRPC", () => {
 
     await api.person.acceptInvitation.mutate({ invitationId: linkedInvitationId(person.email) });
 
-    expect(await refusalOfCall(api.session.membership.query())).toMatchObject({
+    expect(await refusalOfCall(api.session.member.query())).toMatchObject({
       data: { httpStatus: 412, refusal: { word: "second-factor-pending" } },
     });
     await confirmedByTheHarness(app(), client);
-    expect(await api.session.membership.query()).toMatchObject({
+    expect(await api.session.member.query()).toMatchObject({
       workspace: { id: admin.workspace.workspaceId, name: "Ryedale Metalwork" },
       role: "Admin",
     });
-    expect(await membershipsOf(elsewhere.workspaceId, person.id)).toEqual([{ role: "Viewer" }]);
+    expect(await membersOf(elsewhere.workspaceId, person.id)).toEqual([{ role: "Viewer" }]);
   });
 
   it("matches the invited address whatever its case", async () => {
@@ -336,7 +336,7 @@ describe("refusing an accept over tRPC", () => {
       refusedAs(404, "no-such-invitation", "absent"),
     );
     const personId = await personIdOf(address);
-    expect(await membershipsOf(admin.workspace.workspaceId, personId)).toEqual([]);
+    expect(await membersOf(admin.workspace.workspaceId, personId)).toEqual([]);
     expect(await joinedEventsOf(personId)).toEqual([]);
     expect(await statusOf(invitationId)).toBe("canceled");
   });
@@ -360,9 +360,7 @@ describe("refusing an accept over tRPC", () => {
       refusedAs(409, "already-a-member", "conflict"),
     );
     const personId = await personIdOf(address);
-    expect(await membershipsOf(admin.workspace.workspaceId, personId)).toEqual([
-      { role: "Viewer" },
-    ]);
+    expect(await membersOf(admin.workspace.workspaceId, personId)).toEqual([{ role: "Viewer" }]);
     expect(await joinedEventsOf(personId)).toHaveLength(1);
   });
 
@@ -408,7 +406,7 @@ describe("a failed accept over tRPC", () => {
 
     expect(failed).toMatchObject({ data: { httpStatus: 500 } });
     await nothingLanded({ workspaceId: admin.workspace.workspaceId, address, invitationId });
-    expect(await refusalOfCall(api.session.membership.query())).toMatchObject(
+    expect(await refusalOfCall(api.session.member.query())).toMatchObject(
       refusedAs(401, "no-active-workspace", "unauthenticated"),
     );
   });

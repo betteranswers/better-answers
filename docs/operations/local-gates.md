@@ -165,7 +165,7 @@ The link cannot bloat the worktree's jCodeMunch index, for two independent reaso
 
 That `.gitignore` pattern carries no trailing slash on purpose. Git reads a symlink as a file, so `.scratch/` would match the primary's directory and leave every worktree's link showing as `?? .scratch`: the remove hook would then keep each worktree as one holding untracked work, and a `git add -A` would commit the link. `.planning` and `docs/personas` are ignored the same way.
 
-**Why the personas are linked, not committed.** They carry client material, and the repository is public. `docs/personas` is relative, so the one link resolves in the primary checkout and, through the `.planning` link, in every worktree. A cloud session has neither, and `/ce-dogfood` there infers a persona and says so.
+**Why the personas are linked, not committed.** They carry customer material, and the repository is public. `docs/personas` is relative, so the one link resolves in the primary checkout and, through the `.planning` link, in every worktree. A cloud session has neither, and `/ce-dogfood` there infers a persona and says so.
 
 Nothing is copied from `.env.local`: no workspace, test or compose file reads it, and tests reach Postgres through Testcontainers. If that changes, copy the file here — a `WorktreeCreate` hook suppresses `.worktreeinclude`.
 

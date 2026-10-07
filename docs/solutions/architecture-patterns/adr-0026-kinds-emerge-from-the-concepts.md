@@ -24,7 +24,7 @@ tags:
 
 ## The decision
 
-A concept's `type`, its kind, is the short string its producer chose, folded at write for case and plural only (*client*, *Clients* → *Client*). There is no vocabulary file.
+A concept's `type`, its kind, is the short string its producer chose, folded at write for case and plural only (*customer*, *Customers* → *Customer*). There is no vocabulary file.
 
 - The type vocabulary is the set of kinds in use, derived from the concept index with counts per kind and per domain. It is never a file in the bundle, never a table an Admin curates, and never checked closed-world.
 - A new kind arrives with the concepts that carry it. The suggestion set's summary names it, and accepting the concepts accepts the kind.

@@ -22,7 +22,7 @@ export const AN_AUDIT_EVENT_ROW_WITH_ITS_FAMILY = `INSERT INTO audit_event (id, 
 
 export const A_GROUP = `INSERT INTO "group" (id, workspace_id, name, origin) VALUES ($1, $2, $3, 'admin-curated')`;
 
-export const A_GROUP_MEMBERSHIP =
+export const A_GROUP_MEMBER =
   "INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ($1, $2, $3)";
 
 export const AN_ACCESS_REQUEST =

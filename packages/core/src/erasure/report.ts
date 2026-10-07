@@ -51,12 +51,12 @@ const ANCHOR_NAMED =
  * Both printed on every arm, with no count: printed on one arm alone, either would say which ran.
  */
 const SIGN_IN_IDENTITY_REMOVED =
-  "A person's sign-in identity is removed from the platform by the request that ends their " +
-  "last membership.";
+  "A person's sign-in identity is removed from the platform by the request that erases " +
+  "them from their last workspace.";
 
 const INVITATIONS_WHEREVER_SENT =
   "Invitations sent to the address a person signs in with are deleted wherever they were sent, " +
-  "by the request that ends their last membership; the invitation line above counts this " +
+  "by the request that erases them from their last workspace; the invitation line above counts this " +
   "workspace's alone.";
 
 const DOCUMENTS_WITHHELD =

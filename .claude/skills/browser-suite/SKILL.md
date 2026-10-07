@@ -102,9 +102,9 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | Act | What it does |
 | --- | --- |
 | `provision` | A workspace with its first Admin — the platform-provisioned act; the product offers no way to make one. It answers the workspace's id, name and slug, and the Admin |
-| `person` | A person with no membership, for the refused page and the picker |
-| `addMember` | A second membership at a named role — Admin, Editor or Viewer |
-| `removeMember` | Ends a membership, as the People page will |
+| `person` | A person in no workspace, for the refused page and the picker |
+| `addMember` | A second member at a named role — Admin, Editor or Viewer |
+| `removeMember` | Removes a member, as the People page will |
 | `endEverySignInAndToken` | Ends every sign-in and token a person holds, so the next request is refused |
 | `markTheOperator` | Grants the operator mark to the person holding an address, or clears it with `"revoke"`, through the ops command's own act and principal — the console's door, and a mark cleared under an open page |
 | `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent; or one accepted or cancelled, or with its expiry moved into the past |
@@ -134,7 +134,7 @@ Thirty-one more helpers in the same module drive the browser rather than the har
 | `landedAtHome` | Asserts the page is on a role's home, its address and its heading read off the navigation list. The heading is the page's group's name, or its area's where it has none |
 | `notFoundOfferingHome` | Asserts the not-found page and its link to a role's home. A page hidden from the role shows it, as an address that never existed does |
 | `signedInAtHome` | Opens the sign-in page, runs `signIn`, and waits for a role's home, an Admin's unless another is named, as a member of one workspace arrives |
-| `signedInWithNoWorkspace` | A new person with no membership, signed in through `signIn` and waiting on the no-workspace page, answered as the harness's `person` |
+| `signedInWithNoWorkspace` | A new person in no workspace, signed in through `signIn` and waiting on the no-workspace page, answered as the harness's `person` |
 | `avatarOf` | The avatar's button in the band, found by the person's name though it shows their initials alone |
 | `personMenuOpened` | Opens the avatar menu in the band by the person's name and answers it. The avatar shows initials alone, so the name and the role are one disclosure in |
 | `signOutFromTheShell` | Opens the avatar menu through `personMenuOpened`, then signs out, because sign-out is one disclosure in |
@@ -161,7 +161,7 @@ holding one. `emailsSentTo` counts the emails the capture holds for an address, 
 api delivers nothing to `@unreachable.example`, so a spec can meet an invitation whose email did
 not go.
 
-Five more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/consent.spec.ts` for the consent page, `apps/web/e2e/console-people.spec.ts` for a person holding a client grant:
+Five more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/consent.spec.ts` for the consent page, `apps/web/e2e/console-people.spec.ts` for a person who has given an assistant access:
 
 | Helper | What it does |
 | --- | --- |
@@ -250,7 +250,7 @@ three things, of which automated rules are only one:
 
 Ask for the `passesTheAccessibilityGate` fixture — called with no arguments — where the test does
 not end on the page it is about. The models-and-spend and failed-page specs walk on to other pages
-afterwards; every test in `apps/web/e2e/consent.spec.ts` ends at the client's own redirect, which
+afterwards; every test in `apps/web/e2e/consent.spec.ts` ends at the assistant's own redirect, which
 is another origin and no page of ours. A test that ends somewhere this product did not serve and
 audited nothing is refused by name, so an absence is a failure rather than a silence.
 

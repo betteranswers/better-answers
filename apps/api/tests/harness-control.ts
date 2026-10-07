@@ -47,7 +47,7 @@ const person = z.object({
   email: z.string().min(1).optional(),
   displayName: z.string().optional(),
 });
-const membership = z.object({
+const member = z.object({
   workspaceId: z.string().min(1),
   userId: z.string().min(1),
   role: z.enum(ROLES),
@@ -147,7 +147,7 @@ export const harnessControl = (app: TestApp): Hono => {
   });
 
   control.post(`${HARNESS_PREFIX}/members`, async (context) => {
-    const asked = await readBody(context.req.raw, membership);
+    const asked = await readBody(context.req.raw, member);
     await app.addMember(asked.workspaceId, asked.userId, asked.role);
     return context.json({ added: true });
   });

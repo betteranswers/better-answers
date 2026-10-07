@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe("removing a member from their page", () => {
-  it("waits on the reader's membership, then finds its outcome", async () => {
+  it("waits on the reader's member read, then finds its outcome", async () => {
     const clients = createAppClients();
     clients.queryClient.setDefaultOptions({ queries: { retry: false } });
     const read = Promise.withResolvers<void>();

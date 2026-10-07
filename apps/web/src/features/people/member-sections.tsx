@@ -46,7 +46,7 @@ export type Landings = {
 
 /** Removal is the page's to take: the person, and the page with them, leave as it lands. */
 export type Removal = {
-  /** None until the reader's own membership is read. */
+  /** None until the reader's own member read answers. */
   readonly remove: ((member: ListedMember) => void) | undefined;
   readonly outcome: Outcome | undefined;
 };

@@ -7,7 +7,7 @@ component: identity
 severity: high
 applies_when:
   - "Importing better-auth, or reading a Better Auth table, anywhere outside the auth modules"
-  - "Adding a People act, an invitation step or anything that writes a membership"
+  - "Adding a People act, an invitation step or anything that writes a member"
   - "Giving the operator a new read or write, or recording a sign-in, consent or token event"
   - "Adding a table that carries no workspace_id or has no row-level security"
   - "Registering a Better Auth plugin, or calling an endpoint that disabledPaths closes"
@@ -82,7 +82,7 @@ Better Auth is a stay. Any one of three triggers starts a migration: a licence o
 ## Why
 
 - Every container is an operational cost paid for good. Better Auth adds no process, no memory budget, no second backup story and no second migration owner (ADR 0007).
-- The identity set's reads come before authentication: a session by its token, a user by id or email, a client by its `client_id` URL. None lists across principals. The membership read then validates the token's workspace in the same transaction, before any tenant row.
+- The identity set's reads come before authentication: a session by its token, a user by id or email, an assistant by its `client_id` URL. None lists across principals. The member read then validates the token's workspace in the same transaction, before any tenant row.
 - The seam keeps `packages/core` testable without the library, since a `Principal` is a plain value. Two of the four kinds of caller never hold a Better Auth session: the worker and the platform's scheduled routines. No swap to Keycloak is planned.
 - The library runs `afterAcceptInvitation` after its own member write and outside any transaction, so the row and its event could not land or fail together. Accepting is not signing in.
 - `check-slug` answers *taken* or *free* for any slug to any signed-in person: an oracle over the workspace list.

@@ -212,7 +212,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   erasure-rehearsal --workspace <id> --synthetic --run --report <file>   phase two: erase them, write the report, print the tokens again
   dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; per token, which COPY section holds it and in how many lines — never a line
   provision-workspace --name <name> --slug <slug> --admin <email>
-                                                            a client's workspace with its first Admin, a person who has signed in; the id it minted is first on the done line
+                                                            a customer's workspace with its first Admin, a person who has signed in; the id it minted is first on the done line
   add-person --email <address> --name <display name>
                                                             a person named before their first sign-in, so add-member can take them; the id it minted is first on the done line
   add-member --workspace <id> --email <email> --role <${ROLES.join("|")}>
@@ -871,7 +871,7 @@ const seedingToBeDumped = async (
     return REFUSED;
   }
   io.say(
-    `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin membership, one concept file and one indexed document naming them); take the dump, then run phase two`,
+    `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin member, one concept file and one indexed document naming them); take the dump, then run phase two`,
   );
   io.say(seeded.value.tokens.join(","));
   return DONE;

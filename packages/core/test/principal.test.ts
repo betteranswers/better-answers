@@ -23,7 +23,7 @@ import {
   openPostgres,
   readWorkspaceConfig,
   tablesPresent,
-  withMembership,
+  withMember,
   withOperator,
   withPrincipal,
   withScope,
@@ -45,7 +45,7 @@ type Seeded = {
   groupIds: { here: readonly string[]; there: readonly string[] };
 };
 
-const seedMembership = async (
+const seedMember = async (
   overrides: {
     role?: "Admin" | "Editor" | "Viewer";
 
@@ -158,7 +158,7 @@ const through = async <T>(
   door: (typeof DOORS)[number],
   work: (principal: Principal, workspaceId: string, tx: Tx) => Promise<T>,
 ): Promise<{ readonly seeded: Seeded; readonly answered: T }> => {
-  const seeded = await seedMembership({ role: "Admin" });
+  const seeded = await seedMember({ role: "Admin" });
   const open = openPostgres(db().runtimePool);
   if (door === "the platform's") {
     const answered = await withScope(bootstrap, open, seeded.workspaceId, (tx, platform) =>
@@ -171,7 +171,7 @@ const through = async <T>(
   const opened =
     door === "the transport's"
       ? await withPrincipal(open, claims, scoped)
-      : await withMembership(await adminOf(open, claims), open, scoped);
+      : await withMember(await adminOf(open, claims), open, scoped);
   if (!opened.ok) throw new Error(`the Admin's door answered ${opened.error}`);
   return { seeded, answered: opened.value };
 };
@@ -220,12 +220,12 @@ describe("a principal-scoped door's answer", () => {
           byTheWork: withPrincipal(open, claimsFor(seeded), work),
         }
       : {
-          byTheDoor: withMembership(
+          byTheDoor: withMember(
             principalOf(seeded.otherWorkspaceId, seeded.userId, "Viewer"),
             open,
             work,
           ),
-          byTheWork: withMembership(
+          byTheWork: withMember(
             principalOf(seeded.workspaceId, seeded.userId, "Viewer"),
             open,
             work,
@@ -234,7 +234,7 @@ describe("a principal-scoped door's answer", () => {
   };
 
   it.each(TOLD_APART)("keeps %s door's own refusal apart from its work's", async (door) => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
 
     const { byTheDoor, byTheWork } = refusedBothWays(door, seeded, openPostgres(db().runtimePool));
 
@@ -243,7 +243,7 @@ describe("a principal-scoped door's answer", () => {
   });
 
   it("folds the door's refusal and the work's into one answer", async () => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
     const elsewhere = claimsFor(seeded, { workspaceId: seeded.otherWorkspaceId });
@@ -261,7 +261,7 @@ describe("a principal-scoped door's answer", () => {
 
   it("hands back a partly-Result answer untouched, with nothing to fold", async () => {
     type Partly = Result<number, typeof PROVOKED> | string;
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
     const partly = await withPrincipal(
@@ -279,7 +279,7 @@ describe("a principal-scoped door's answer", () => {
 
 describe("the Principal resolver", () => {
   it("builds the Principal in the work's own transaction", async () => {
-    const seeded = await seedMembership({ role: "Editor" });
+    const seeded = await seedMember({ role: "Editor" });
     const door = openPostgres(db().runtimePool);
     const claims = claimsFor(seeded);
 
@@ -303,7 +303,7 @@ describe("the Principal resolver", () => {
   });
 
   it("refuses a non-member of the workspace the credential names", async () => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
     const resolved = await withPrincipal(
@@ -317,7 +317,7 @@ describe("the Principal resolver", () => {
 
   it("refuses a credential issued before the person's credentials were revoked", async () => {
     const revokedAt = new Date("2026-09-01T12:00:00Z");
-    const seeded = await seedMembership({ revokedAt });
+    const seeded = await seedMember({ revokedAt });
     const door = openPostgres(db().runtimePool);
 
     const before = await withPrincipal(
@@ -337,7 +337,7 @@ describe("the Principal resolver", () => {
 
   it("refuses a credential issued before this workspace's own revocation", async () => {
     const revokedHereAt = new Date("2026-09-03T12:00:00Z");
-    const seeded = await seedMembership({ revokedHereAt });
+    const seeded = await seedMember({ revokedHereAt });
     const door = openPostgres(db().runtimePool);
 
     const before = await withPrincipal(
@@ -357,8 +357,8 @@ describe("the Principal resolver", () => {
   });
 
   it("lists the caller's groups here, or none when ungrouped", async () => {
-    const grouped = await seedMembership({ role: "Editor", groupsEach: 2 });
-    const alone = await seedMembership({ role: "Editor" });
+    const grouped = await seedMember({ role: "Editor", groupsEach: 2 });
+    const alone = await seedMember({ role: "Editor" });
     const door = openPostgres(db().runtimePool);
 
     const both = await withPrincipal(door, claimsFor(grouped), async ({ groups }) => groups);
@@ -370,7 +370,7 @@ describe("the Principal resolver", () => {
 
   it("lets a person revoked in one workspace work in another", async () => {
     const revokedHereAt = new Date("2026-09-03T12:00:00Z");
-    const seeded = await seedMembership({
+    const seeded = await seedMember({
       role: "Editor",
       revokedHereAt,
       memberOfBoth: true,
@@ -403,7 +403,7 @@ describe("the Principal resolver", () => {
   });
 
   it("refuses a role claim that disagrees with the member row", async () => {
-    const seeded = await seedMembership({ role: "Viewer" });
+    const seeded = await seedMember({ role: "Viewer" });
     const door = openPostgres(db().runtimePool);
 
     const disagreeing = await withPrincipal(
@@ -437,7 +437,7 @@ describe("the Principal resolver", () => {
     ["the workspace id", { workspaceId: "not-a-ulid" }],
     ["the user id", { userId: "" }],
   ] as const)("refuses claims where %s alone is malformed", async (_which, malformed) => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
     const resolved = await withPrincipal(door, claimsFor(seeded, malformed), async () => "reached");
@@ -447,7 +447,7 @@ describe("the Principal resolver", () => {
 
   it("lets through a credential issued at the revocation's instant", async () => {
     const revokedAt = new Date("2026-09-05T09:00:00.000Z");
-    const seeded = await seedMembership({ revokedAt, revokedHereAt: revokedAt });
+    const seeded = await seedMember({ revokedAt, revokedHereAt: revokedAt });
     const door = openPostgres(db().runtimePool);
 
     const atTheInstant = await withPrincipal(
@@ -460,7 +460,7 @@ describe("the Principal resolver", () => {
   });
 
   it("rolls the work back when it throws", async () => {
-    const seeded = await seedMembership({ role: "Admin" });
+    const seeded = await seedMember({ role: "Admin" });
     const door = openPostgres(db().runtimePool);
     const key = `probe-${ulid()}`;
 
@@ -476,7 +476,7 @@ describe("the Principal resolver", () => {
   });
 
   it("scopes every read inside the work to the Principal's workspace", async () => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const superuser = await db().pool.connect();
     try {
       const seed = testData(superuser);
@@ -511,7 +511,7 @@ const withRoleOutsideTheThree = async (
     key,
   );
   const role = before.rows[0]?.role;
-  if (role === undefined) throw new Error("the membership to corrupt was not seeded");
+  if (role === undefined) throw new Error("the member to corrupt was not seeded");
 
   const held = await pool.query<{ definition: string }>(
     `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
@@ -538,7 +538,7 @@ const withRoleOutsideTheThree = async (
 
 describe("a member row carrying a role the platform lacks", () => {
   it("refuses it rather than building a Principal at that role", async () => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
     await withRoleOutsideTheThree(seeded, async () => {
@@ -551,7 +551,7 @@ describe("a member row carrying a role the platform lacks", () => {
 
 describe("a workspace's config", () => {
   it("answers nothing for an unset key without failing the transaction", async () => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
     const resolved = await withPrincipal(door, claimsFor(seeded), (principal, tx) =>
@@ -580,7 +580,7 @@ describe("the catalogue read the estate's restore commands make", () => {
 
 describe("a transaction a caught failure aborted", () => {
   it("rejects a person's call at commit instead of reporting success", async () => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
     await expect(
@@ -592,7 +592,7 @@ describe("a transaction a caught failure aborted", () => {
   });
 
   it("rejects the platform's call at commit instead of reporting success", async () => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
 
     await expect(
@@ -606,7 +606,7 @@ describe("a transaction a caught failure aborted", () => {
 
 describe("the counters", () => {
   it("counts a token's calls per window, refusing past the ceiling", async () => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
     const rule = { windowMs: 60_000, max: 2 };
     const at = new Date("2026-09-01T10:00:30Z");
@@ -628,7 +628,7 @@ describe("the counters", () => {
   });
 
   it("drops a token's earlier windows, keeping another token's", async () => {
-    const seeded = await seedMembership();
+    const seeded = await seedMember();
     const door = openPostgres(db().runtimePool);
     const rule = { windowMs: 60_000, max: 2 };
     const swept = `jti-${ulid()}`;

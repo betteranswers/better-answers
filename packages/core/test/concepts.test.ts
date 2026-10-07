@@ -25,7 +25,7 @@ import {
   type Foldable,
   type Folded,
   type Tx,
-  withMembership,
+  withMember,
 } from "../src/store/postgres/index.ts";
 import {
   bundleHistory,
@@ -1251,7 +1251,7 @@ describe("authority that moved while the act was in flight", () => {
     expect(written.ok).toBe(true);
   });
 
-  it("refuses a writer whose membership ended, before any commit", async () => {
+  it("refuses a writer no longer a member, before any commit", async () => {
     const scenario = await arrange();
     await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
       scenario.workspaceId,
@@ -1274,7 +1274,7 @@ describe("authority that moved while the act was in flight", () => {
       let waiting: Promise<unknown> = Promise.resolve();
       try {
         const pid = await backendPidOf(revoker);
-        await withMembership(scenario.editor, scenario.postgres, async () => {
+        await withMember(scenario.editor, scenario.postgres, async () => {
           waiting = revoke(revoker, scenario, scope).then(() => {
             settled = true;
           });

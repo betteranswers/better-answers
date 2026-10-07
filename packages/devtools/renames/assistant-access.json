@@ -1,0 +1,27 @@
+{
+  "noun": "client grant",
+  "readerWord": "access",
+  "sweep": "U16. People words: access (of an assistant)",
+  "collisions": [],
+  "words": [
+    {
+      "from": "client grant",
+      "to": "assistant access"
+    },
+    {
+      "from": "client grants",
+      "to": "assistant access"
+    }
+  ],
+  "symbols": {
+    "paths": []
+  },
+  "text": {
+    "paths": [
+      "apps/web/src/features/console/**",
+      "apps/web/e2e/console-people.spec.ts",
+      "packages/core/src/workspaces/people.ts"
+    ]
+  },
+  "senses": []
+}

@@ -179,7 +179,7 @@ export const catchClaudesRedirect = (page: Page) =>
     route.fulfill({
       status: 200,
       contentType: "text/html",
-      body: "<!doctype html><title>Claude</title><p>The client received the redirect.</p>",
+      body: "<!doctype html><title>Claude</title><p>The assistant received the redirect.</p>",
     }),
   );
 

@@ -25,7 +25,7 @@ tags:
 A reader-facing page has a latency budget in three parts:
 
 - Lists and search hits render under one second.
-- An action applies under 100 milliseconds, optimistically in the client, with the server's answer reconciled after.
+- An action applies under 100 milliseconds, optimistically in the web app, with the server's answer reconciled after.
 - Answers stream. The first sentence is the first thing on the page, never a spinner until the last.
 
 The browser suite asserts the budget per page, against the served build (`apps/web/e2e/`). A missed budget is a bug.

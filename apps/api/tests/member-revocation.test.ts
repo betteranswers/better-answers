@@ -75,7 +75,7 @@ const signedInHere = async (email: string, workspaceId: string) => {
   return signedIn;
 };
 
-/** The member's client holds a grant in each workspace, and a third client presents them. */
+/** The member's assistant holds a grant in each workspace, and a third host presents them. */
 const connectedInBoth = async () => {
   const members = await aMemberOfTwoWorkspaces();
   const { here, elsewhere, person } = members;
@@ -104,16 +104,16 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     const first = await signedInHere(person.email, here.workspaceId);
     const second = await signedInHere(person.email, here.workspaceId);
     for (const { api } of [first, second]) {
-      expect((await api.session.membership.query()).workspace.id).toBe(here.workspaceId);
+      expect((await api.session.member.query()).workspace.id).toBe(here.workspaceId);
     }
 
     const revoked = await admin.members.endEverySignInAndToken.mutate({ personId: person.id });
 
     expect(revoked).toEqual({ personId: person.id, revokedAt: expect.stringMatching(ISO_INSTANT) });
-    expect(await refusalOfCall(first.api.session.membership.query())).toMatchObject(REVOKED_HERE);
-    expect(await refusalOfCall(second.api.session.membership.query())).toMatchObject(REVOKED_HERE);
+    expect(await refusalOfCall(first.api.session.member.query())).toMatchObject(REVOKED_HERE);
+    expect(await refusalOfCall(second.api.session.member.query())).toMatchObject(REVOKED_HERE);
     expect((await setActiveWorkspace(second.client, elsewhere.workspaceId)).status).toBe(200);
-    expect(await second.api.session.membership.query()).toMatchObject({
+    expect(await second.api.session.member.query()).toMatchObject({
       workspace: { id: elsewhere.workspaceId },
       role: "Viewer",
     });
@@ -130,8 +130,8 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
 
     const again = await signedInHere(person.email, here.workspaceId);
 
-    expect(await refusalOfCall(before.api.session.membership.query())).toMatchObject(REVOKED_HERE);
-    expect(await again.api.session.membership.query()).toMatchObject({
+    expect(await refusalOfCall(before.api.session.member.query())).toMatchObject(REVOKED_HERE);
+    expect(await again.api.session.member.query()).toMatchObject({
       workspace: { id: here.workspaceId },
       person: { id: person.id },
       role: "Editor",
@@ -240,7 +240,7 @@ describe("a revoked Admin on the People procedures", () => {
         { actor: `human:${workspace.admin.id}`, subject_id: second.id, detail: { grants: [] } },
       ],
     });
-    expect((await mine.session.membership.query()).role).toBe("Admin");
+    expect((await mine.session.member.query()).role).toBe("Admin");
   });
 });
 

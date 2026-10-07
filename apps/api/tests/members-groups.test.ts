@@ -53,14 +53,14 @@ type GroupEvent = {
   readonly detail: Readonly<Record<string, string>>;
 };
 
-/** Every group, membership and group event the workspace holds, read past row-level security. */
+/** Every group, group member and group event the workspace holds, read past row-level security. */
 const standing = async (workspaceId: string) => {
   const { superuser } = app.database;
   const groups = await superuser.query<{ id: string; name: string }>(
     'SELECT id, name FROM "group" WHERE workspace_id = $1 ORDER BY name',
     [workspaceId],
   );
-  const memberships = await superuser.query<{ group_id: string; user_id: string }>(
+  const groupMembers = await superuser.query<{ group_id: string; user_id: string }>(
     "SELECT group_id, user_id FROM group_member WHERE workspace_id = $1 ORDER BY group_id, user_id",
     [workspaceId],
   );
@@ -69,13 +69,13 @@ const standing = async (workspaceId: string) => {
       WHERE workspace_id = $1 AND act LIKE 'people.group.%' ORDER BY id`,
     [workspaceId],
   );
-  return { groups: groups.rows, memberships: memberships.rows, events: events.rows };
+  return { groups: groups.rows, groupMembers: groupMembers.rows, events: events.rows };
 };
 
 const membersOf = async (workspaceId: string, groupId: string): Promise<readonly string[]> =>
-  (await standing(workspaceId)).memberships
-    .filter((membership) => membership.group_id === groupId)
-    .map((membership) => membership.user_id);
+  (await standing(workspaceId)).groupMembers
+    .filter((groupMember) => groupMember.group_id === groupId)
+    .map((groupMember) => groupMember.user_id);
 
 const eventsIn = async (workspaceId: string): Promise<readonly GroupEvent[]> =>
   (await standing(workspaceId)).events;
@@ -200,7 +200,7 @@ describe("the group acts over tRPC", () => {
 
     const now = await standing(seeded.workspace.workspaceId);
     expect(now.groups).toEqual([{ id: seeded.bids, name: "Bid writers" }]);
-    expect(now.memberships).toEqual([]);
+    expect(now.groupMembers).toEqual([]);
     expect(now.events.map((event) => [event.act, event.subject_id])).toEqual([
       ["people.group.deleted", seeded.hr],
     ]);

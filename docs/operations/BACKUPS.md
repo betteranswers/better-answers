@@ -21,7 +21,7 @@ Everything in `dumps/` is **client-side encrypted with `age`** before upload; th
 | Object store (uploads, normalised text) | every bucket — originals under *mirror*/*keep*, and the *transient* connected sources' redacted normalised text the map rebuild needs (53 Q8) | `rclone sync` from the `backup` service — deletions propagate | `mirror/objectstore/` | nightly 02:00 | live + 30 d of non-current versions | yes | `rclone sync` back — step 3 |
 | Git store (`/data/git`, bare repositories) | one verified `git bundle --all` per workspace repository holding a ref, age-encrypted | `backup.sh nightly` reading `/data/git` read-only | `dumps/git/<workspace>/` | nightly 02:00 | 30 d of nightlies + first-of-month for 6 m | yes (history before a rewrite) | `git clone <bundle>` as the api's uid, from a directory of its own, and an empty repository for each workspace the restored database names with no bundle — step 4 |
 | Git store (second copy) | `git push --mirror` per repository holding a ref | the `backup` service over SSH to VPC 2's public IP under a deploy key (`GIT_MIRROR_SSH_TARGET`; the two VPCs do not route privately) | VPC 2 `/data/mirror/<workspace>.git` | nightly 02:00, after the bundles | live; `reflog expire` and `git gc --prune=now` on the mirror by the nightly job, after any push that replaced refs | yes | `git clone` from VPC 2 — never pulled *from* by production |
-| Coolify itself | its database and the `APP_KEY`-encrypted env — **not** `/data/coolify/ssh/keys/` (escrowed) | Coolify's instance backup | `dumps/coolify/` | daily | 30 d | no client data (env only) | `RUNBOOK.md` page 5 |
+| Coolify itself | its database and the `APP_KEY`-encrypted env — **not** `/data/coolify/ssh/keys/` (escrowed) | Coolify's instance backup | `dumps/coolify/` | daily | 30 d | no customer data (env only) | `RUNBOOK.md` page 5 |
 | Drill reports | log, staging's counts, RTO/RPO, erasure rehearsal | `restore-drill.sh` | `dumps/drills/` | monthly | 12 m | no (synthetic subject only) | read |
 
 ## Never backed up
@@ -57,7 +57,7 @@ The three dates are computed **from the timestamp of the last dump before the re
 
 A backup that restores proves the platform comes back. It does not prove that an erasure erased, which is the one claim a restore path cannot make for itself, so every third month the drill makes it on a synthetic subject, in **seven steps that each rest on the one before**:
 
-1. **Seed** the synthetic subject — a person, an Admin membership, one concept file naming them in one commit, and one bound document naming them by their work address and by name. The command waits for the worker to index the document, and refuses if the index job ends in anything but done or has not ended when the wait the drill gives it runs out. It prints the subject's tokens (email, address, display name) on its last line.
+1. **Seed** the synthetic subject — a person who is an Admin member, one concept file naming them in one commit, and one bound document naming them by their work address and by name. The command waits for the worker to index the document, and refuses if the index job ends in anything but done or has not ended when the wait the drill gives it runs out. It prints the subject's tokens (email, address, display name) on its last line.
 2. **`pg_dump`** the whole staging database to plain SQL, on the host.
 3. **`dump-grep`** that dump for the tokens and **find them, the index's passage table among the tables that hold them**. If they are not there the seed did not do what it says, and every step below would prove nothing; if no passage holds them, step 6 would prove nothing about the index.
 4. **Run the routine**, under the platform principal, writing the report the drill keeps.
@@ -76,7 +76,7 @@ Two boxes of 4 vCPU · 4 GB · 120 GB NVMe. VPC 1 runs all of production — the
 | Failure | Caught by |
 | --- | --- |
 | `/data/backup/staging` full | the job fails before upload → missed ping; the 42 disk signal at 80 % |
-| `pg_dump` / server version skew | the backup image installs PGDG's client of the database image's major, which a test on the Dockerfile and the image probe's `pg_dump --version` both hold |
+| `pg_dump` / server version skew | the backup image installs PGDG's PostgreSQL client of the database image's major, which a test on the Dockerfile and the image probe's `pg_dump --version` both hold |
 | bucket credential expired or rotated | `rclone` fails → missed ping |
 | partial upload | `verify` compares sizes against the bucket before the row and the ping |
 | lifecycle misconfigured | the drill's step 9 lists copies per tier against this matrix |

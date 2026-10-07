@@ -131,7 +131,7 @@ const resentAsIfItWent = (page: Page) =>
 const unsentIn = (where: Locator): Locator =>
   where.getByRole("region", { name: INVITATIONS_WORDS.unsent });
 
-/** The act as the page's own client would send it, under the Admin's session. */
+/** The act as the page's own tRPC client would send it, under the Admin's session. */
 const actedAside = async (page: Page, act: string, input: unknown): Promise<number> =>
   (await page.request.post(`/trpc/members.${act}`, { data: input })).status();
 
