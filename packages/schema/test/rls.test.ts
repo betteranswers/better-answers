@@ -1631,15 +1631,15 @@ describe("the inbox under app_rt", () => {
         ],
         [
           A_SUGGESTION,
-          "a repair from a person",
-          [WS_A, ulid(), ulid(), "repair", "human:01J6CCCCCCCCCCCCCCCCCCCCCC"],
-          /suggestion_repair_proposer_check/,
+          "a citation fix from a person",
+          [WS_A, ulid(), ulid(), "citation-fix", "human:01J6CCCCCCCCCCCCCCCCCCCCCC"],
+          /suggestion_citation_fix_proposer_check/,
         ],
         [
           A_SUGGESTION,
-          "a repair from a versioned producer",
-          [WS_A, ulid(), ulid(), "repair", "better-answers-citation-repair/1.0"],
-          /suggestion_repair_proposer_check/,
+          "a citation fix from a versioned producer",
+          [WS_A, ulid(), ulid(), "citation-fix", "better-answers-citation-fix/1.0"],
+          /suggestion_citation_fix_proposer_check/,
         ],
       ]);
 
@@ -1647,8 +1647,8 @@ describe("the inbox under app_rt", () => {
         WS_A,
         ulid(),
         ulid(),
-        "repair",
-        "process:better-answers-citation-repair",
+        "citation-fix",
+        "process:better-answers-citation-fix",
       ]);
       expect(platform.rowCount).toBe(1);
     });
@@ -1725,7 +1725,7 @@ describe("the inbox under app_rt", () => {
 const INSUFFICIENT_PRIVILEGE = "42501";
 
 /**
- * The one proposer form every kind's CHECK accepts, repair's platform-only one included, so
+ * The one proposer form every kind's CHECK accepts, a citation fix's platform-only one included, so
  * the pair under test is all the probe varies.
  */
 const A_PLATFORM_PROPOSER = "process:better-answers-test";

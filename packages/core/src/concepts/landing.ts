@@ -7,10 +7,10 @@ import {
   PUBLISHED_STATUSES,
   SENSITIVITY_DEFAULT,
   SUGGESTION_ACCEPTED_STATUS,
-  SUGGESTION_REPAIR_KIND,
+  SUGGESTION_CITATION_FIX_KIND,
   SUGGESTION_WAITING_STATUS,
   VERIFICATION_ERASURE_ORIGIN,
-  VERIFICATION_REPAIR_ORIGIN,
+  VERIFICATION_CITATION_FIX_ORIGIN,
 } from "@better-answers/schema";
 
 import {
@@ -382,12 +382,12 @@ const landAcceptance = async (tx: Tx, index: Landing, acceptance: Acceptance): P
   if (decided.rows.length === 0) {
     throw new Error("the suggestion was decided by somebody else while this act was in flight");
   }
-  if (acceptance.kind !== SUGGESTION_REPAIR_KIND) return;
+  if (acceptance.kind !== SUGGESTION_CITATION_FIX_KIND) return;
 
   await tx.query(
     `UPDATE concept_verification SET content_hash = $3, origin = $4
       WHERE workspace_id = $1 AND iri = $2 AND content_hash IS NOT NULL`,
-    [index.workspaceId, index.iri, index.contentHash, VERIFICATION_REPAIR_ORIGIN],
+    [index.workspaceId, index.iri, index.contentHash, VERIFICATION_CITATION_FIX_ORIGIN],
   );
 };
 

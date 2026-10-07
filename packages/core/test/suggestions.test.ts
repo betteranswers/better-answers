@@ -208,10 +208,10 @@ const seededSuggestion = async (
   }
 };
 
-const platformRepair = (scenario: Scenario, request: SuggestionRequest) =>
+const platformCitationFix = (scenario: Scenario, request: SuggestionRequest) =>
   seededSuggestion(scenario, request, {
-    kind: "repair",
-    proposer: "process:better-answers-citation-repair",
+    kind: "citation-fix",
+    proposer: "process:better-answers-citation-fix",
   });
 
 const verifiedBy = async (
@@ -775,7 +775,7 @@ describe("an acceptance at a path another concept holds", () => {
   });
 });
 
-describe("the platform's citation repair", () => {
+describe("the platform's citation fix", () => {
   it("re-hashes moved verifications, so Verified never becomes Changed since verified", async () => {
     const scenario = await arrange();
 
@@ -791,7 +791,7 @@ describe("the platform's citation repair", () => {
       status: "current",
     });
 
-    const set = await platformRepair(
+    const set = await platformCitationFix(
       scenario,
       requestFor({
         mergeKey: input.mergeKey,
@@ -804,11 +804,11 @@ describe("the platform's citation repair", () => {
 
     const [outcome] = await acceptAll(scenario, set.setId);
 
-    const repaired = acceptedOf(outcome);
+    const fixed = acceptedOf(outcome);
     expect(outcome === undefined ? undefined : refusalOf(outcome)).toBeUndefined();
-    if (repaired === undefined) return;
-    expect(repaired.contentHash).not.toBe(written.contentHash);
-    expect(repaired.contentHash).toBe(contentHashOf(cite("p.7"), input.body, input.path));
+    if (fixed === undefined) return;
+    expect(fixed.contentHash).not.toBe(written.contentHash);
+    expect(fixed.contentHash).toBe(contentHashOf(cite("p.7"), input.body, input.path));
 
     expect(await trustOf(scenario, written.iri)).toMatchObject({
       tier: "human-reviewed",
@@ -820,7 +820,9 @@ describe("the platform's citation repair", () => {
       "SELECT origin, content_hash FROM concept_verification WHERE workspace_id = $1 AND iri = $2",
       [scenario.workspaceId, written.iri],
     );
-    expect(verification.rows).toEqual([{ origin: "repair", content_hash: repaired.contentHash }]);
+    expect(verification.rows).toEqual([
+      { origin: "citation-fix", content_hash: fixed.contentHash },
+    ]);
   });
 
   it("leaves every other kind's verifications exactly where they were", async () => {
@@ -848,7 +850,7 @@ describe("the platform's citation repair", () => {
         submitSuggestionSet(
           principal,
           { postgres: scenario.postgres },
-          { kind: "repair", requests: [requestFor()] },
+          { kind: "citation-fix", requests: [requestFor()] },
         ),
       ),
     );
@@ -1324,7 +1326,7 @@ describe("what the inbox refuses before it does any work", () => {
 
     const refused = await Promise.all([
       raise("suggested-concept"),
-      raise("repair"),
+      raise("citation-fix"),
       raise("suggested-concept", scenario.editor),
     ]);
 

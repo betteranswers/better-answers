@@ -61,7 +61,7 @@ An Admin's recorded widen act (`widenConnectedSource`, in the `sources` slice) i
 - Publishing is a legal act with confirmations: lawful basis recorded, privacy information updated, a DPIA reference. Sensitivity alone cannot say "not yet" or "for one group only".
 - A concept's citation must survive the document it rests on, or trust is a lie.
 - The publish reads the latest index job, because publishing says somebody reviewed what the sync found.
-- A converter's normalised text is the address space every span and every content hash is read against. Swapping a converter's output reprocesses every document of that type and sends every citation into them to citation repair.
+- A converter's normalised text is the address space every span and every content hash is read against. Swapping a converter's output reprocesses every document of that type and sends every citation into them to a citation fix.
 - Conversion runs before the redaction seam, so its input is unredacted. A hosted parser is refused.
 - A document has no audience of its own, because an audience is a decision about people and a connected source is where that decision is made.
 - With no widen act, an Admin who published at Restricted could open the connected source only by connecting the file again: a one-way door, placed where the platform steers Admins.

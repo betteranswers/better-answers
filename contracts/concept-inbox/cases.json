@@ -118,10 +118,10 @@
       "sqlstate": "42501"
     },
     {
-      "why": "a repair is the platform running its own citation repair: accepting one re-points every standing check at the content it wrote, so nobody but a platform process may raise one",
+      "why": "a citation fix is the platform fixing a citation of its own: accepting one re-points every standing verification at the content it wrote, so nobody but a platform process may raise one",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R2AAAAAAAAAAAAAAAAAAAA', 'repair', 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '[{\"suggestion_id\": \"01J6S4DDDDDDDDDDDDDDDDDDDD\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R2AAAAAAAAAAAAAAAAAAAA', 'citation-fix', 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '[{\"suggestion_id\": \"01J6S4DDDDDDDDDDDDDDDDDDDD\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "23514"
     },
     {
@@ -139,10 +139,10 @@
       "sqlstate": "42501"
     },
     {
-      "why": "the platform's own citation repair is a routine the worker runs, and not a set the api may raise",
+      "why": "the platform's own citation fix is a routine the worker runs, and not a set the api may raise",
       "role": "app_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R6AAAAAAAAAAAAAAAAAAAA', 'repair', 'process:better-answers-citation-repair', '[{\"suggestion_id\": \"01J6S7GGGGGGGGGGGGGGGGGGGG\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R6AAAAAAAAAAAAAAAAAAAA', 'citation-fix', 'process:better-answers-citation-fix', '[{\"suggestion_id\": \"01J6S7GGGGGGGGGGGGGGGGGGGG\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "42501"
     },
     {

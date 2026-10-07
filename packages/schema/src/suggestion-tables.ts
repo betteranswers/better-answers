@@ -7,7 +7,7 @@ import { conceptIdentity } from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
-export const SUGGESTION_KINDS = ["edit", "suggested-concept", "promotion", "repair"] as const;
+export const SUGGESTION_KINDS = ["edit", "suggested-concept", "promotion", "citation-fix"] as const;
 
 export const SUGGESTION_EDIT_KIND = "edit" satisfies (typeof SUGGESTION_KINDS)[number];
 
@@ -19,10 +19,11 @@ export const SUGGESTION_KINDS_FROM_THE_APP = [
 export const SUGGESTION_KINDS_FROM_A_RUN = [
   "suggested-concept",
   "promotion",
-  "repair",
+  "citation-fix",
 ] as const satisfies readonly (typeof SUGGESTION_KINDS)[number][];
 
-export const SUGGESTION_REPAIR_KIND = "repair" satisfies (typeof SUGGESTION_KINDS)[number];
+export const SUGGESTION_CITATION_FIX_KIND =
+  "citation-fix" satisfies (typeof SUGGESTION_KINDS)[number];
 
 export const SUGGESTION_STATUSES = ["waiting", "accepted", "declined", "returned"] as const;
 
@@ -82,8 +83,10 @@ export const suggestion = withRLS(
     ),
 
     check(
-      "suggestion_repair_proposer_check",
-      sql.raw(`kind <> '${SUGGESTION_REPAIR_KIND}' OR proposer LIKE '${PLATFORM_ACTOR_PREFIX}%'`),
+      "suggestion_citation_fix_proposer_check",
+      sql.raw(
+        `kind <> '${SUGGESTION_CITATION_FIX_KIND}' OR proposer LIKE '${PLATFORM_ACTOR_PREFIX}%'`,
+      ),
     ),
     check(
       "suggestion_reason_length_check",
