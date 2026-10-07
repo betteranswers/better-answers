@@ -90,7 +90,7 @@ describe("the one navigation list", () => {
             [
               "Connected sources",
               "Publishing rules",
-              "Priced plan",
+              "Cost estimates",
               "Backlogs",
               "Removed at source",
               "Share agents",

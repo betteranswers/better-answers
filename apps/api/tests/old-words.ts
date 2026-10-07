@@ -515,6 +515,11 @@ const PEOPLE_WORDS_LANDED = "2026-10-07";
 
 const PEOPLE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(PEOPLE_WORDS_LANDED)];
 
+/** The knowledge words land in three pull requests; the page words first, on the day of their sweep. */
+const KNOWLEDGE_WORDS_LANDED = "2026-10-07";
+
+const KNOWLEDGE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(KNOWLEDGE_WORDS_LANDED)];
+
 /** Where the dead-man service's API names a check by its slug: the release's freshness gate. */
 const DEAD_MAN_CHECK_FILES = [
   "deploy/backup-fresh.sh",
@@ -1234,7 +1239,15 @@ export const OLD_WORDS: readonly OldWord[] = [
     reach: "everywhere",
     carvedOut: [writtenBefore(MODEL_CHOICE_LANDED)],
   },
-  pending("extraction plan", "cost estimate", "cost estimate", "cost estimate", "everywhere"),
+  {
+    word: "extraction plan",
+    use: "cost estimate",
+    entry: "cost estimate",
+    sweep: "cost estimate",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   avoided("FIDO", "passkey"),
   avoided("field error", "issue word"),
   pending(
@@ -1425,7 +1438,15 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("platform console", "console"),
   avoided("poll", "head check"),
   avoided("portal", "area"),
-  pending("priced plan", "cost estimate", "cost estimate", "cost estimate", "everywhere"),
+  {
+    word: "priced plan",
+    use: "cost estimate",
+    entry: "cost estimate",
+    sweep: "cost estimate",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   avoided("profile", "member page"),
   avoided("projection", "skeleton projection", "alone"),
   avoided("promote", "promotion", "as a reader's verb: a marketing word"),

@@ -66,7 +66,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | Inbox | (none) | Waiting on you | Admins and owners |
 | Control Centre | Overview | Overview | Admin |
 | | Suggestions | Queue | Admin |
-| | Sources | **Connected sources** · Publishing rules · Priced plan · Backlogs · Removed at source · Share agents | Admin |
+| | Sources | **Connected sources** · Publishing rules · Cost estimates · Backlogs · Removed at source · Share agents | Admin |
 | | Models | **Models and spend** · Spending limit | Admin |
 | | Questions | Answer audit · Answer tests | Admin |
 | | People | **Members** · **Groups** · Personal tokens | Admin |

@@ -248,8 +248,8 @@ export const CONTROL_CENTRE = {
           seenBy: ADMINS,
         },
         {
-          name: "Priced plan",
-          path: "/sources/priced-plan",
+          name: "Cost estimates",
+          path: "/sources/cost-estimates",
           icon: "price",
           built: false,
           seenBy: ADMINS,
