@@ -105,3 +105,37 @@ export const withRollback = async <T>(
     }
   }
 };
+
+/** As `withRollback`, but keeps what `fn` wrote for the cases after it. */
+export const withCommit = async (
+  pool: pg.Pool,
+  fn: (client: pg.PoolClient) => Promise<void>,
+): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await fn(client);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+/** An act's transaction that has written to the audit log and not yet committed. */
+export const whileAnAuditWriteIsOpen = async <T>(
+  pool: pg.Pool,
+  work: () => Promise<T>,
+): Promise<T> => {
+  const writer = await pool.connect();
+  try {
+    await writer.query("BEGIN");
+    await writer.query("LOCK TABLE audit_event IN ROW EXCLUSIVE MODE");
+    return await work();
+  } finally {
+    await writer.query("ROLLBACK");
+    writer.release();
+  }
+};

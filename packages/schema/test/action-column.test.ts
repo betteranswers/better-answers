@@ -9,7 +9,7 @@ import {
   NAMES_BEFORE_THE_ACTION,
 } from "./before-the-action.ts";
 import { testData } from "./factory.ts";
-import { withRollback } from "./harness.ts";
+import { whileAnAuditWriteIsOpen, withCommit, withRollback } from "./harness.ts";
 import { asTheMigrationOwnerOf, migrationStatements } from "./journal-statements.ts";
 import { postgresForSuite, refusalOf } from "./probes.ts";
 import {
@@ -28,14 +28,17 @@ const namedAsBefore = async (client: pg.PoolClient): Promise<void> => {
   for (const statement of NAMES_BEFORE_THE_ACTION) await client.query(statement);
 };
 
+/** As the superuser, since taking ownership would itself wait on a lock with no bound. */
+const replayed = async (client: pg.PoolClient): Promise<void> => {
+  for (const statement of migrationStatements(THE_MIGRATION)) await client.query(statement);
+};
+
 /** Run as a non-superuser owner of the two audit logs, as `migrate` connects. */
 const migrated = (client: pg.PoolClient): Promise<void> =>
   asTheMigrationOwnerOf(
     client,
     AUDIT_LOGS.map((log) => `TABLE public.${log}`),
-    async () => {
-      for (const statement of migrationStatements(THE_MIGRATION)) await client.query(statement);
-    },
+    () => replayed(client),
   );
 
 /** Reads after 0073 runs again over the names before it, inside a transaction rolled back after. */
@@ -77,7 +80,16 @@ const seededBefore = async (client: pg.PoolClient): Promise<void> => {
   }
 };
 
-/** Each row where it lies on disk: a rename that rewrote the table would move every one. */
+/** A rewrite gives each table a new file, which a rename never does. */
+const filesOf = async (client: pg.PoolClient) =>
+  (
+    await client.query<{ log: string; file: string }>(
+      `SELECT relname AS log, relfilenode::text AS file FROM pg_class
+        WHERE oid IN ('audit_event'::regclass, 'identity_audit_event'::regclass) ORDER BY 1`,
+    )
+  ).rows;
+
+/** Each row with its place on disk and every value it holds. */
 const rowsOf = async (client: pg.PoolClient, column: "act" | "action") => {
   const rows: Record<string, string>[] = [];
   for (const log of AUDIT_LOGS) {
@@ -131,14 +143,14 @@ describe("migration 0073 over audit logs written before it", () => {
     const [before, after] = await withRollback(db().pool, async (client) => {
       await namedAsBefore(client);
       await seededBefore(client);
-      const held = await rowsOf(client, "act");
+      const held = { files: await filesOf(client), rows: await rowsOf(client, "act") };
       await migrated(client);
-      return [held, await rowsOf(client, "action")];
+      return [held, { files: await filesOf(client), rows: await rowsOf(client, "action") }];
     });
 
-    expect(before).toHaveLength(STORED_ACTS.length * 2);
+    expect(before.rows).toHaveLength(STORED_ACTS.length * 2);
     expect(after).toEqual(before);
-    expect(after.map((row) => row["stored"]).toSorted()).toEqual(
+    expect(after.rows.map((row) => row["stored"]).toSorted()).toEqual(
       [...STORED_ACTS, ...STORED_ACTS].map(([, act]) => act).toSorted(),
     );
   });
@@ -205,5 +217,16 @@ describe("migration 0073 over audit logs written before it", () => {
     });
 
     expect(after).toBe("0");
+  });
+
+  it("fails rather than waits behind an open audit write", async () => {
+    await withCommit(db().pool, namedAsBefore);
+    try {
+      const blocked = whileAnAuditWriteIsOpen(db().pool, () => withRollback(db().pool, replayed));
+
+      await expect(blocked).rejects.toThrow(/canceling statement due to lock timeout/u);
+    } finally {
+      await withCommit(db().pool, replayed);
+    }
   });
 });
