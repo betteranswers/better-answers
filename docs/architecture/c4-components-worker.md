@@ -24,7 +24,7 @@ C4Component
     Component(detected, "pipeline/detected.py", "coco.fn, memo=True", "detected(normalised_text, detection_key): the one memo, answering spans")
     Component(redaction, "redaction/", "Presidio, GLiNER, spaCy", "The detector's recognisers and detection key; redact: the block rule, erasure matches, pseudonyms, withholdings, written spans")
     Component(catalogue, "pipeline/catalogue.py", "psycopg", "Reads the connected source, its workspace's suppressions and its documents' restores and dismissals; records findings, reconciles the catalogue, quarantines")
-    Component(extraction, "extraction", "planned S7", "Candidate concepts within the plan and the ceiling, proposed as concept_write_request rows; credentials injected per sync")
+    Component(extraction, "extraction", "planned S7", "Suggested concepts within the plan and the ceiling, proposed as concept_write_request rows; credentials injected per sync")
     Component(substrate, "schema_view.py, contract_stamp.py, ids.py, envelope.py, health.py, log.py, config.py", "substrate", "The committed schema view and baked contract digest; the ULID minter; the credential envelope; the process probe; one JSON log shape; the box's limits")
   }
 

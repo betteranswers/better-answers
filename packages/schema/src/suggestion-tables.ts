@@ -7,7 +7,7 @@ import { conceptIdentity } from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
-export const SUGGESTION_KINDS = ["edit", "candidate", "promotion", "repair"] as const;
+export const SUGGESTION_KINDS = ["edit", "suggested-concept", "promotion", "repair"] as const;
 
 export const SUGGESTION_EDIT_KIND = "edit" satisfies (typeof SUGGESTION_KINDS)[number];
 
@@ -17,7 +17,7 @@ export const SUGGESTION_KINDS_FROM_THE_APP = [
 ] as const satisfies readonly (typeof SUGGESTION_KINDS)[number][];
 
 export const SUGGESTION_KINDS_FROM_A_RUN = [
-  "candidate",
+  "suggested-concept",
   "promotion",
   "repair",
 ] as const satisfies readonly (typeof SUGGESTION_KINDS)[number][];

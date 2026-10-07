@@ -1505,7 +1505,7 @@ describe("the inbox under app_rt", () => {
       await client.query("ROLLBACK TO SAVEPOINT queue");
 
       const submitted = await submitSet(client, {
-        kind: "candidate",
+        kind: "suggested-concept",
         proposer: "better-answers-extract/1.0",
         requests: [submitRequest({ merge_key: "policy:expenses", path: "knowledge/expenses.md" })],
       });
@@ -1672,7 +1672,7 @@ describe("the inbox under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const submit = (frontmatter: unknown) =>
         submitSet(client, {
-          kind: "candidate",
+          kind: "suggested-concept",
           proposer: "better-answers-extraction/1.2",
           requests: [submitRequest({ frontmatter })],
         });

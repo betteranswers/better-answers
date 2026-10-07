@@ -17,7 +17,7 @@
     "role": "worker_rt",
     "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
     "set_id": "01J6RRRRRRRRRRRRRRRRRRRRRR",
-    "kind": "candidate",
+    "kind": "suggested-concept",
     "proposer": "better-answers-extraction/1.2",
     "requests": [
       {
@@ -57,7 +57,7 @@
       "why": "the merge key resolves to the concept it names, and the payload was written against the content that concept still holds",
       "suggestion_id": "01J6S1AAAAAAAAAAAAAAAAAAAA",
       "status": "waiting",
-      "kind": "candidate",
+      "kind": "suggested-concept",
       "merge_key": "policy:expenses",
       "resolved_iri": "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
       "base_moved": false
@@ -66,7 +66,7 @@
       "why": "the same merge key resolves the same way, and this payload was written against content that has moved since",
       "suggestion_id": "01J6S2BBBBBBBBBBBBBBBBBBBB",
       "status": "waiting",
-      "kind": "candidate",
+      "kind": "suggested-concept",
       "merge_key": "policy:expenses",
       "resolved_iri": "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
       "base_moved": true
@@ -75,7 +75,7 @@
       "why": "a merge key no concept holds is a new concept, and its acceptance mints the IRI",
       "suggestion_id": "01J6S3CCCCCCCCCCCCCCCCCCCC",
       "status": "waiting",
-      "kind": "candidate",
+      "kind": "suggested-concept",
       "merge_key": "policy:travel",
       "resolved_iri": null,
       "base_moved": false
@@ -90,7 +90,7 @@
       "sqlstate": "42501"
     },
     {
-      "why": "no run reads another run's candidates out of the inbox: the payload function is the api's alone",
+      "why": "no run reads another run's suggested concepts out of the inbox: the payload function is the api's alone",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "SELECT 1 FROM concept_write_request_for('01J6S1AAAAAAAAAAAAAAAAAAAA')",
@@ -132,10 +132,10 @@
       "sqlstate": "42501"
     },
     {
-      "why": "a *candidate* is what a run found, so the api, if it could raise one, could put work no run did into the queue an Admin decides from",
+      "why": "a *suggested concept* is what a run found, so the api, if it could raise one, could put work no run did into the queue an Admin decides from",
       "role": "app_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R8AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6S9JJJJJJJJJJJJJJJJJJJJ\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R8AAAAAAAAAAAAAAAAAAAA', 'suggested-concept', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6S9JJJJJJJJJJJJJJJJJJJJ\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "42501"
     },
     {
@@ -149,21 +149,21 @@
       "why": "a payload is the file an acceptance would commit and the write path reads its keys, so a frontmatter is a JSON object: a list, a scalar or JSON's null would store perfectly well and fail at the acceptance instead",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R9AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6SAKKKKKKKKKKKKKKKKKKKK\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"[1,2]\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R9AAAAAAAAAAAAAAAAAAAA', 'suggested-concept', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6SAKKKKKKKKKKKKKKKKKKKK\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"[1,2]\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "22023"
     },
     {
       "why": "and JSON's null is the one a caller reaches by accident, since a frontmatter nobody set serializes to it",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6RAAAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6SBLLLLLLLLLLLLLLLLLLLL\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"null\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6RAAAAAAAAAAAAAAAAAAAAA', 'suggested-concept', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6SBLLLLLLLLLLLLLLLLLLLL\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"null\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "22023"
     },
     {
       "why": "a payload's frontmatter is open by design, so its shape bounds nothing: the submit function measures the characters the caller wrote, which is the one place the sender's own serialization still exists",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R7AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', jsonb_build_array(jsonb_build_object('suggestion_id', '01J6S8HHHHHHHHHHHHHHHHHHHH', 'merge_key', 'policy:expenses', 'path', 'knowledge/expenses.md', 'concept_kind', 'Policy', 'title', 'Expenses', 'frontmatter', '{\"title\":\"' || repeat('x', 64000) || '\"}', 'body', 'b', 'base_content_hash', NULL)))",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R7AAAAAAAAAAAAAAAAAAAA', 'suggested-concept', 'better-answers-extraction/1.2', jsonb_build_array(jsonb_build_object('suggestion_id', '01J6S8HHHHHHHHHHHHHHHHHHHH', 'merge_key', 'policy:expenses', 'path', 'knowledge/expenses.md', 'concept_kind', 'Policy', 'title', 'Expenses', 'frontmatter', '{\"title\":\"' || repeat('x', 64000) || '\"}', 'body', 'b', 'base_content_hash', NULL)))",
       "sqlstate": "22023"
     },
     {
@@ -177,7 +177,7 @@
       "why": "a set is bounded by what an Admin could decide, so a producer does not choose how much it sends",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R4AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', '[]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R4AAAAAAAAAAAAAAAAAAAA', 'suggested-concept', 'better-answers-extraction/1.2', '[]'::jsonb)",
       "sqlstate": "22023"
     },
     {

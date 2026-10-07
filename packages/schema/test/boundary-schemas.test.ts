@@ -671,7 +671,7 @@ const acceptedRows = {
       workspaceId: WS_ID,
       id: "01J6TTTTTTTTTTTTTTTTTTTTTT",
       setId: SUGGESTION_SET_ID,
-      kind: "candidate",
+      kind: "suggested-concept",
       status: "accepted",
       proposer: "better-answers-extraction/1.2",
       targetIri: CONCEPT_IRI,

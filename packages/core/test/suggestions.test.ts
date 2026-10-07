@@ -434,14 +434,14 @@ describe("accepting a suggestion", () => {
     expect(facts.committer).toContain("Better Answers");
   });
 
-  it("commits a run's candidate with the accepting Admin as author", async () => {
+  it("commits a run's suggested concept, authored by the accepting Admin", async () => {
     const scenario = await arrange();
     const admin = await db().pool.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [
       scenario.admin.userId,
     ]);
 
     const set = await seededSuggestion(scenario, requestFor(), {
-      kind: "candidate",
+      kind: "suggested-concept",
       proposer: "better-answers-extraction/1.2",
     });
 
@@ -1080,7 +1080,7 @@ describe("what an acceptance answers when it cannot be prepared", () => {
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
   });
 
-  it("commits a person's candidate with the accepting Admin as author", async () => {
+  it("commits a person's suggested concept, authored by the accepting Admin", async () => {
     const scenario = await arrange();
     const admin = await db().pool.query<{ name: string; email: string }>(
       'SELECT name, email FROM "user" WHERE id = $1',
@@ -1092,7 +1092,7 @@ describe("what an acceptance answers when it cannot be prepared", () => {
     );
 
     const raised = await seededSuggestion(scenario, requestFor(), {
-      kind: "candidate",
+      kind: "suggested-concept",
       proposer: `human:${scenario.editor.userId}`,
     });
 
@@ -1323,9 +1323,9 @@ describe("what the inbox refuses before it does any work", () => {
       );
 
     const refused = await Promise.all([
-      raise("candidate"),
+      raise("suggested-concept"),
       raise("repair"),
-      raise("candidate", scenario.editor),
+      raise("suggested-concept", scenario.editor),
     ]);
 
     expect(refused).toEqual([
