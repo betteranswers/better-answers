@@ -1049,7 +1049,7 @@ These old words stay in code in the senses listed, after their sweep lands (KTD8
 | client | tRPC, pg and S3 clients; OAuth's `client_id` (R21) |
 | run | `pnpm run`, CI runs; *run key* |
 | check | CI's `check`; CHECK constraints; `knowledge.check.imported` (R22) |
-| domain | an email domain; *consumer-domain list* |
+| domain | an email, web or DNS domain; SQL's and launchd's domains; a subject area, in fixed phrases such as *domain word*; *consumer-domain list*. Widened from the email domain by the owner, 07/10/2026 |
 | bundle | OKF's bundle and the `bundle` wire key (R15, R21) |
 | class | `className`; retention class |
 | graph | GitNexus's call graph; `platform.graph.swept` (R22) |

@@ -35,7 +35,7 @@ export const findingsOfInput = z.object({ connectedSourceId: CONNECTED_SOURCE_ID
 
 export type FindingsOfInput = z.output<typeof findingsOfInput>;
 
-export type FindingGroup = {
+export type GroupOfFindings = {
   readonly documentId: string;
   readonly title: string;
   readonly sensitivity: string;
@@ -93,7 +93,7 @@ const effectiveClass = (own: string | null, connectedSource: string): Sensitivit
 
 const BROKEN_CLASS = new Error("a source document's class is not one the visibility words hold");
 
-const FINDING_GROUPS = `SELECT d.id AS "documentId", d.title,
+const GROUPS_OF_FINDINGS = `SELECT d.id AS "documentId", d.title,
             d.sensitivity AS "documentSensitivity", b.sensitivity AS "connectedSourceSensitivity",
             f.category, f.rule_id AS "ruleId", f.tier, count(*)::int AS found,
             count(*) FILTER (
@@ -132,7 +132,7 @@ const overriddenSpansOf = (
   return spans.success ? ok(spans.data) : err(UNREADABLE_RUN);
 };
 
-type GroupRow = Omit<FindingGroup, "specialCategory" | "sensitivity"> & {
+type GroupRow = Omit<GroupOfFindings, "specialCategory" | "sensitivity"> & {
   readonly documentSensitivity: string | null;
   readonly connectedSourceSensitivity: string;
 };
@@ -141,7 +141,7 @@ export const findingsOf = async (
   principal: UserPrincipal,
   tx: Tx,
   input: FindingsOfInput,
-): Promise<Result<readonly FindingGroup[], FindingsOfRefusal>> => {
+): Promise<Result<readonly GroupOfFindings[], FindingsOfRefusal>> => {
   const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
   const { workspaceId, connectedSourceId } = acting.value;
@@ -156,7 +156,7 @@ export const findingsOf = async (
   const overridden = named.value;
 
   const grouped = await attempt(() =>
-    tx.query<GroupRow>(FINDING_GROUPS, [
+    tx.query<GroupRow>(GROUPS_OF_FINDINGS, [
       workspaceId,
       connectedSourceId,
       overridden.map((span) => span.document_id),
@@ -167,7 +167,7 @@ export const findingsOf = async (
   );
   if (!grouped.ok) return err(grouped.error);
 
-  const groups: FindingGroup[] = [];
+  const groups: GroupOfFindings[] = [];
   for (const { documentSensitivity, connectedSourceSensitivity, ...row } of grouped.value.rows) {
     const sensitivity = effectiveClass(documentSensitivity, connectedSourceSensitivity);
     if (sensitivity === undefined) return err(BROKEN_CLASS);
@@ -176,40 +176,40 @@ export const findingsOf = async (
   return ok(groups);
 };
 
-export const findingGroupKey = boundarySchemas.finding.select.pick({
+export const groupOfFindingsKey = boundarySchemas.finding.select.pick({
   documentId: true,
   category: true,
   ruleId: true,
   tier: true,
 });
 
-type FindingGroupKey = z.output<typeof findingGroupKey>;
+type GroupOfFindingsKey = z.output<typeof groupOfFindingsKey>;
 
-const commandedGroups = z.array(findingGroupKey).min(1);
+const commandedGroups = z.array(groupOfFindingsKey).min(1);
 
-const sameFindingGroup = (left: FindingGroupKey, right: FindingGroupKey): boolean =>
+const sameGroupOfFindings = (left: GroupOfFindingsKey, right: GroupOfFindingsKey): boolean =>
   left.documentId === right.documentId &&
   left.category === right.category &&
   left.ruleId === right.ruleId &&
   left.tier === right.tier;
 
-const distinctFindingGroups = (
-  findingGroups: readonly FindingGroupKey[],
-): readonly FindingGroupKey[] =>
-  findingGroups.filter(
-    (findingGroup, index) =>
-      findingGroups.findIndex((other) => sameFindingGroup(other, findingGroup)) === index,
+const distinctGroupsOfFindings = (
+  groupsOfFindings: readonly GroupOfFindingsKey[],
+): readonly GroupOfFindingsKey[] =>
+  groupsOfFindings.filter(
+    (groupOfFindings, index) =>
+      groupsOfFindings.findIndex((other) => sameGroupOfFindings(other, groupOfFindings)) === index,
   );
 
-const findingGroupParameters = (findingGroups: readonly FindingGroupKey[]) =>
+const groupOfFindingsParameters = (groupsOfFindings: readonly GroupOfFindingsKey[]) =>
   [
-    findingGroups.map((findingGroup) => findingGroup.documentId),
-    findingGroups.map((findingGroup) => findingGroup.category),
-    findingGroups.map((findingGroup) => findingGroup.ruleId),
-    findingGroups.map((findingGroup) => findingGroup.tier),
+    groupsOfFindings.map((groupOfFindings) => groupOfFindings.documentId),
+    groupsOfFindings.map((groupOfFindings) => groupOfFindings.category),
+    groupsOfFindings.map((groupOfFindings) => groupOfFindings.ruleId),
+    groupsOfFindings.map((groupOfFindings) => groupOfFindings.tier),
   ] as const;
 
-const findingGroupClause = (alias: string, first: number): string =>
+const groupOfFindingsClause = (alias: string, first: number): string =>
   `(${alias}.document_id, ${alias}.category, ${alias}.rule_id, ${alias}.tier) IN
         (SELECT * FROM unnest($${first}::text[], $${first + 1}::text[],
                               $${first + 2}::text[], $${first + 3}::text[]))`;
@@ -217,7 +217,7 @@ const findingGroupClause = (alias: string, first: number): string =>
 export const keepInTextInput = z.object({
   connectedSourceId: CONNECTED_SOURCE_ID,
 
-  findingGroups: commandedGroups,
+  groupsOfFindings: commandedGroups,
 
   reason: RESTORE_REASON,
 });
@@ -243,29 +243,29 @@ const FINDINGS_OF_GROUPS = `SELECT f.id, f.document_id AS "documentId", f.catego
        FROM finding f
        JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
       WHERE f.workspace_id = $1 AND d.connected_source_id = $2 AND ${raisedByTheLastSync("f", "d")}
-        AND ${findingGroupClause("f", 3)}
+        AND ${groupOfFindingsClause("f", 3)}
       ORDER BY f.id
         FOR UPDATE OF f`;
 
-type HeldSpan = FindingGroupKey & { readonly id: string };
+type HeldSpan = GroupOfFindingsKey & { readonly id: string };
 
 const spansOfGroups = async (
   tx: Tx,
   workspaceId: string,
   connectedSourceId: string,
-  findingGroups: readonly FindingGroupKey[],
+  groupsOfFindings: readonly GroupOfFindingsKey[],
 ): Promise<Result<readonly HeldSpan[], "no-such-finding" | Error>> => {
   const held = await attempt(() =>
     tx.query<HeldSpan>(FINDINGS_OF_GROUPS, [
       workspaceId,
       connectedSourceId,
-      ...findingGroupParameters(findingGroups),
+      ...groupOfFindingsParameters(groupsOfFindings),
     ]),
   );
   if (!held.ok) return err(held.error);
   const spans = held.value.rows;
-  const everyGroupHeld = findingGroups.every((findingGroup) =>
-    spans.some((span) => sameFindingGroup(span, findingGroup)),
+  const everyGroupHeld = groupsOfFindings.every((groupOfFindings) =>
+    spans.some((span) => sameGroupOfFindings(span, groupOfFindings)),
   );
   return everyGroupHeld ? ok(spans) : err("no-such-finding");
 };
@@ -289,16 +289,16 @@ const spansCommanded = async <GroupRefusal extends string>(
   tx: Tx,
   input: {
     readonly connectedSourceId: ConnectedSourceId;
-    readonly findingGroups: readonly FindingGroupKey[];
+    readonly groupsOfFindings: readonly GroupOfFindingsKey[];
   },
-  refusalOf: (findingGroup: FindingGroupKey) => GroupRefusal | undefined,
+  refusalOf: (groupOfFindings: GroupOfFindingsKey) => GroupRefusal | undefined,
 ): Promise<Result<CommandedSpans, SpansRefusal<GroupRefusal>>> => {
   const acting = adminOnConnectedSource(principal, input.connectedSourceId);
   if (!acting.ok) return err(acting.error);
 
-  const findingGroups = distinctFindingGroups(input.findingGroups);
-  for (const findingGroup of findingGroups) {
-    const refused = refusalOf(findingGroup);
+  const groupsOfFindings = distinctGroupsOfFindings(input.groupsOfFindings);
+  for (const groupOfFindings of groupsOfFindings) {
+    const refused = refusalOf(groupOfFindings);
     if (refused !== undefined) return err(refused);
   }
 
@@ -312,7 +312,7 @@ const spansCommanded = async <GroupRefusal extends string>(
     tx,
     acting.value.workspaceId,
     acting.value.connectedSourceId,
-    findingGroups,
+    groupsOfFindings,
   );
   if (!held.ok) return err(held.error);
   return ok({ acting: acting.value, spans: held.value });
@@ -356,8 +356,8 @@ export const keepInText = async (
   tx: Tx,
   input: KeepInTextInput,
 ): Promise<Result<KeptInText, KeepInTextRefusal>> => {
-  const commanded = await spansCommanded(principal, tx, input, (findingGroup) =>
-    findingGroup.tier === REDACTION_ALWAYS_TIER ? undefined : "not-the-always-set",
+  const commanded = await spansCommanded(principal, tx, input, (groupOfFindings) =>
+    groupOfFindings.tier === REDACTION_ALWAYS_TIER ? undefined : "not-the-always-set",
   );
   if (!commanded.ok) return err(commanded.error);
   const { acting, spans } = commanded.value;
@@ -399,7 +399,7 @@ const REVIEW_ACTS = declareActs("sources", {
 export const narrowDocumentsInput = z.object({
   connectedSourceId: CONNECTED_SOURCE_ID,
 
-  findingGroups: commandedGroups,
+  groupsOfFindings: commandedGroups,
 
   sensitivity: boundarySchemas.sourceDocument.select.shape.sensitivity
     .unwrap()
@@ -437,7 +437,7 @@ const NARROWED = "narrowed" satisfies (typeof FINDING_REVIEW_STATES)[number];
 const NARROWED_REVIEW = `UPDATE finding f
         SET review_state = $2, reviewed_by = $3, reviewed_at = now()
        FROM source_document d
-      WHERE f.workspace_id = $1 AND f.review_state = $4 AND ${findingGroupClause("f", 5)}
+      WHERE f.workspace_id = $1 AND f.review_state = $4 AND ${groupOfFindingsClause("f", 5)}
         AND d.workspace_id = f.workspace_id AND d.id = f.document_id
         AND ${raisedByTheLastSync("f", "d")}`;
 
@@ -483,8 +483,8 @@ export const narrowDocuments = async (
   const { admin, workspaceId, connectedSourceId } = acting.value;
 
   const next = input.sensitivity;
-  const findingGroups = distinctFindingGroups(input.findingGroups);
-  const named = [...new Set(findingGroups.map((findingGroup) => findingGroup.documentId))];
+  const groupsOfFindings = distinctGroupsOfFindings(input.groupsOfFindings);
+  const named = [...new Set(groupsOfFindings.map((groupOfFindings) => groupOfFindings.documentId))];
 
   const opened = await openingACascadeOverHeldGroups(admin, tx, []);
   if (!opened.ok) return err(opened.error);
@@ -507,7 +507,7 @@ export const narrowDocuments = async (
       NARROWED,
       actorIdOf(admin),
       FINDING_UNREVIEWED_STATE,
-      ...findingGroupParameters(findingGroups),
+      ...groupOfFindingsParameters(groupsOfFindings),
     ]),
   );
   if (!reviewed.ok) return err(reviewed.error);
@@ -538,7 +538,7 @@ export const narrowDocuments = async (
 export const dismissAsNotSpecialCategoryInput = z.object({
   connectedSourceId: CONNECTED_SOURCE_ID,
 
-  findingGroups: commandedGroups,
+  groupsOfFindings: commandedGroups,
 
   reason: boundarySchemas.finding.select.shape.reviewReason.unwrap(),
 });
@@ -573,8 +573,8 @@ export const dismissAsNotSpecialCategory = async (
   tx: Tx,
   input: DismissAsNotSpecialCategoryInput,
 ): Promise<Result<DismissedAsNotSpecialCategory, DismissAsNotSpecialCategoryRefusal>> => {
-  const commanded = await spansCommanded(principal, tx, input, (findingGroup) =>
-    SPECIAL_CATEGORIES.has(findingGroup.category) ? undefined : "not-special-category",
+  const commanded = await spansCommanded(principal, tx, input, (groupOfFindings) =>
+    SPECIAL_CATEGORIES.has(groupOfFindings.category) ? undefined : "not-special-category",
   );
   if (!commanded.ok) return err(commanded.error);
   const { acting, spans } = commanded.value;

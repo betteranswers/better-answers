@@ -515,7 +515,7 @@ const PEOPLE_WORDS_LANDED = "2026-10-07";
 
 const PEOPLE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(PEOPLE_WORDS_LANDED)];
 
-/** The knowledge words land in three pull requests; the page words first, on the day of their sweep. */
+/** The knowledge words land in three pull requests, one noun at a time, each on the day of its sweep. */
 const KNOWLEDGE_WORDS_LANDED = "2026-10-07";
 
 const KNOWLEDGE_WORDS_CARVED_OUT: readonly CarveOut[] = [writtenBefore(KNOWLEDGE_WORDS_LANDED)];
@@ -994,6 +994,96 @@ const UNCHECKED_SENSES: readonly Sense[] = [
   { sense: "TypeScript's own compiler option", written: /\bnoUncheckedIndexedAccess\b/g },
 ];
 
+const HIT_SENSES: readonly Sense[] = [
+  { sense: "a cache hit", written: /\bcache[- ]hit\b/gi },
+  {
+    sense: "a reconciler hit, one commit the reconciler replayed (internal)",
+    written: /\breconciler[- ]hits?\b/gi,
+  },
+  ...["packages/core/src/concepts/reconciler-hit.ts", "packages/core/test/reconciler.test.ts"].map(
+    (within) => ({
+      sense: "a reconciler hit, in the module and the test that read them",
+      within,
+      written: /\bhit\b/g,
+    }),
+  ),
+  { sense: "the area a control answers a pointer over", written: /\bhit area\b/g },
+];
+
+/** Trees whose every domain is an email or DNS one: the testing domain, DKIM, the consumer domains. */
+const MAIL_AND_DNS_TREES = [
+  "packages/core/src/members/",
+  "packages/core/test/invitation-sets.test.ts",
+  "packages/core/test/invitations.test.ts",
+  "packages/core/test/test-workspace.test.ts",
+  "packages/schema/src/test-workspace.ts",
+  "packages/schema/test/test-workspace.test.ts",
+  "packages/schema/test/email-address.test.ts",
+  "apps/api/tests/members-invitations.test.ts",
+  "apps/api/tests/serve.ts",
+  "apps/web/e2e/people-invitations.spec.ts",
+  "apps/web/journeys/",
+  "apps/web/test/journeys-inbox.test.ts",
+  "apps/web/test/signed-mail.ts",
+  "apps/worker/src/better_answers_worker/redaction/",
+  "apps/worker/tests/fixtures/redaction/",
+  "contracts/erasure-match/",
+  "docs/solutions/best-practices/a-cloudflare-email-worker-test-inbox-needs-its-own-zone-and-a-token-scoped-to-it.md",
+];
+
+/** Each sense is code or a fixed phrase, so "per domain" and "the domain's owner" stay refused. */
+const DOMAIN_SENSES: readonly Sense[] = [
+  {
+    sense: "an email domain, named by what it carries or sends",
+    written:
+      /\b(?:email|e-mail|mail|testing|consumer|sending|sender|signing|reserved|apex|custom|search)[- ]domains?\b|\bsender['’]s domain\b|`search` domain\b/gi,
+  },
+  {
+    sense: "an address on or off an email domain, or what reaches it",
+    written:
+      /\baddress(?:es)? (?:on|off) (?:any other|that|this|its) domain\b|\bwhat reaches (?:that|this) domain\b|\boff a marked workspace['’]s domain\b|\boff-domain\b|\bdomain of its own\b/gi,
+  },
+  ...MAIL_AND_DNS_TREES.map((within) => ({
+    sense: "an email or DNS domain, in a tree that writes no other",
+    within,
+    written: /\bdomains?\b/gi,
+  })),
+  {
+    sense:
+      "a web domain: a placeholder host, a cookie's attribute, a domain name or label, a relying party's",
+    written:
+      /<domain>|\bDomain=|\bdomain (?:names?|labels?)\b|\bWebAuthn domain\b|\brelying party (?:must be|is) a domain\b|\bWorker['’]s domains\b/gi,
+  },
+  {
+    sense: "the ops command's flag naming the testing domain",
+    written: /--domain\b|(?<=\[)"domain"(?=,)/g,
+  },
+  {
+    sense: "a SQL domain, a type with its own constraint",
+    written:
+      /\bCREATE DOMAIN\b|\ba domain declared NOT NULL\b|\bthe domain declares\b|\bguarded domain VALUE\b/g,
+  },
+  {
+    sense: "launchd's domain, in the script that loads the doc watcher",
+    within: "scripts/jdocmunch-watch-cap.sh",
+    written: /\bDOMAIN=|\$DOMAIN\b|"\$DOMAIN/g,
+  },
+  {
+    sense:
+      "a subject area, in fixed phrases: the glossary's domain words, domain knowledge, a domain type",
+    written:
+      /\bdomain[- ](?:docs?|documentation|terms?|words?|glossary|concepts?|knowledge|language|English|types?|values?|roles?|facts|schemas|expertise|specific)\b|\bauthority domains?\b|\bagents\/domain\.md\b/gi,
+  },
+];
+
+const TYPE_VOCABULARY_SENSES: readonly Sense[] = [
+  {
+    sense: "TypeScript's type keyword before the refusal vocabulary's type, a set of refusal words",
+    within: "packages/core/src/kernel/",
+    written: /\btype Vocabulary\b/g,
+  },
+];
+
 export const OLD_WORDS: readonly OldWord[] = [
   avoided("2FA", "second factor"),
   avoided("access token", "personal token"),
@@ -1167,7 +1257,15 @@ export const OLD_WORDS: readonly OldWord[] = [
       ...VENDORED,
     ],
   },
-  pending("citation marker", "footnote", "footnote", "footnote", "everywhere"),
+  {
+    word: "citation marker",
+    use: "footnote",
+    entry: "footnote",
+    sweep: "footnote",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   avoided("citations list", "evidence pane"),
   pending("class", "sensitivity", "sensitivity", "sensitivity", "one sense"),
   pending(
@@ -1226,7 +1324,16 @@ export const OLD_WORDS: readonly OldWord[] = [
     "a concept's sensitivity is derived, from its evidence",
   ),
   avoided("detection", "withholding"),
-  pending("domain", "collection", "collection", "collection", "one sense"),
+  {
+    word: "domain",
+    use: "collection",
+    entry: "collection",
+    sweep: "collection",
+    state: "landed",
+    reach: "one sense",
+    permitted: DOMAIN_SENSES,
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   avoided("drawer", "navigation control"),
   avoided("environment", "estate"),
   avoided("epic", "block"),
@@ -1258,13 +1365,15 @@ export const OLD_WORDS: readonly OldWord[] = [
   },
   avoided("FIDO", "passkey"),
   avoided("field error", "issue word"),
-  pending(
-    "finding group",
-    "group of findings",
-    "group of findings",
-    "group of findings",
-    "everywhere",
-  ),
+  {
+    word: "finding group",
+    use: "group of findings",
+    entry: "group of findings",
+    sweep: "group of findings",
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   avoided("folded class", "effective class"),
   avoided("Forgejo", "forge", "as a component"),
   avoided("front end", "area"),
@@ -1301,7 +1410,16 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("guard", "admission"),
   avoided("hamburger", "navigation control"),
   avoided("helper", "step (of an action)"),
-  pending("hit", "match", "match", "match", "one sense"),
+  {
+    word: "hit",
+    use: "match",
+    entry: "match",
+    sweep: "match",
+    state: "landed",
+    reach: "one sense",
+    permitted: HIT_SENSES,
+    carvedOut: [...KNOWLEDGE_WORDS_CARVED_OUT, ...VENDORED],
+  },
   avoided("holder", "claimant"),
   avoided("id generator", "minter"),
   avoided("idempotency key", "run key", "cocoindex's word for its stable data ids"),
@@ -1633,7 +1751,16 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("TTL", "verification interval"),
   avoided("two-factor", "second factor"),
   avoided("type definition", "Term"),
-  pending("type vocabulary", "kind", "kind", "kind", "everywhere"),
+  {
+    word: "type vocabulary",
+    use: "kind",
+    entry: "kind",
+    sweep: "kind",
+    state: "landed",
+    reach: "everywhere",
+    permitted: TYPE_VOCABULARY_SENSES,
+    carvedOut: KNOWLEDGE_WORDS_CARVED_OUT,
+  },
   {
     word: "Unchecked",
     use: "Unverified",

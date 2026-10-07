@@ -103,7 +103,7 @@ describe("what a kernel parse answers", () => {
   it("carries no offending value when every field is wrong", () => {
     const read = parse(keepInTextInput, {
       connectedSourceId: SECRET,
-      findingGroups: [{ ...ALWAYS_GROUP, tier: SECRET }],
+      groupsOfFindings: [{ ...ALWAYS_GROUP, tier: SECRET }],
       reason: "",
     });
 
@@ -113,7 +113,7 @@ describe("what a kernel parse answers", () => {
         word: "malformed",
         fields: {
           connectedSourceId: "bad-format",
-          "findingGroups.0.tier": "not-in-set",
+          "groupsOfFindings.0.tier": "not-in-set",
           reason: "too-small",
         },
       },
@@ -251,13 +251,13 @@ describe("the shapes the Sources acts are handed", () => {
     expect(
       parse(narrowDocumentsInput, {
         connectedSourceId: A_CONNECTED_SOURCE,
-        findingGroups: [ALWAYS_GROUP],
+        groupsOfFindings: [ALWAYS_GROUP],
       }),
     ).toEqual({
       ok: true,
       value: {
         connectedSourceId: A_CONNECTED_SOURCE,
-        findingGroups: [ALWAYS_GROUP],
+        groupsOfFindings: [ALWAYS_GROUP],
         sensitivity: "Restricted",
       },
     });
@@ -279,11 +279,11 @@ describe("the shapes the Sources acts are handed", () => {
       refusalOf(
         parse(keepInTextInput, {
           connectedSourceId: A_CONNECTED_SOURCE,
-          findingGroups: [{ ...ALWAYS_GROUP, tier: "sometimes" }],
+          groupsOfFindings: [{ ...ALWAYS_GROUP, tier: "sometimes" }],
           reason: REASON,
         }),
       ),
-    ).toEqual({ word: "malformed", fields: { "findingGroups.0.tier": "not-in-set" } });
+    ).toEqual({ word: "malformed", fields: { "groupsOfFindings.0.tier": "not-in-set" } });
   });
 
   it("refuses a missing, blank or overlong dismissal reason", () => {
@@ -296,7 +296,7 @@ describe("the shapes the Sources acts are handed", () => {
         refusalOf(
           parse(dismissAsNotSpecialCategoryInput, {
             connectedSourceId: A_CONNECTED_SOURCE,
-            findingGroups: [ALWAYS_GROUP],
+            groupsOfFindings: [ALWAYS_GROUP],
             reason,
           }),
         ),
@@ -307,7 +307,7 @@ describe("the shapes the Sources acts are handed", () => {
   it("brands the ids an act is handed", () => {
     const kept = parse(keepInTextInput, {
       connectedSourceId: A_CONNECTED_SOURCE,
-      findingGroups: [ALWAYS_GROUP],
+      groupsOfFindings: [ALWAYS_GROUP],
       reason: REASON,
     });
 
@@ -315,7 +315,7 @@ describe("the shapes the Sources acts are handed", () => {
       ok: true,
       value: {
         connectedSourceId: A_CONNECTED_SOURCE,
-        findingGroups: [ALWAYS_GROUP],
+        groupsOfFindings: [ALWAYS_GROUP],
         reason: REASON,
       },
     });

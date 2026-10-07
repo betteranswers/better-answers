@@ -48,7 +48,7 @@ People on records:
 
 Decided for the S3 block and not yet in the tree:
 
-- `concept_owner` is a table on the `concepts` slice, keyed against `concept_identity`, with a per-domain default beside it.
+- `concept_owner` is a table on the `concepts` slice, keyed against `concept_identity`, with a per-collection default beside it.
 - A composition declares its two homes, `section` and `response`, together, so the second home adds a writer and never a migration.
 - The by-IRI key and the version column set are one helper each, `attachedByIri()` and `versionColumns()`.
 
@@ -60,7 +60,7 @@ Decided for the S3 block and not yet in the tree:
 - Every one of these is a line now and a migration with user-visible churn later. Two reviewers reached the same verdicts independently.
 - Partitioning a table that carries a policy changes the catalogue assertion the RLS suite proves. A retention delete would need a role that is not the api's.
 - `audit_event.id` is a global key, so without the unique index no family could carry a composite key to the audit row it was written with.
-- An owner as a column cannot hold both a per-domain default and a per-concept override.
+- An owner as a column cannot hold both a per-collection default and a per-concept override.
 - The member row's key is one the organisation plugin requires and nothing of ours references. A person has one id, the user row's (ADR 0035).
 
 ## Rejected

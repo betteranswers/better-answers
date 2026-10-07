@@ -20,7 +20,7 @@ import {
   useNarrowDocuments,
   type DismissedAsNotSpecialCategory,
   type DocumentsNarrowed,
-  type FindingGroup,
+  type GroupOfFindings,
 } from "./sources-api.ts";
 import {
   REVIEW_HEADING,
@@ -40,7 +40,7 @@ const takesAnyGroup = (): boolean => true;
 
 const askOf = (ready: TickedGroups) => ({
   connectedSourceId: ready.connectedSourceId,
-  findingGroups: ready.groups.map(keyOf),
+  groupsOfFindings: ready.groups.map(keyOf),
 });
 
 const reasonedAsk = (ready: TickedGroups, reason: string) => ({ ...askOf(ready), reason });
@@ -51,7 +51,7 @@ const reasonedAsk = (ready: TickedGroups, reason: string) => ({ ...askOf(ready),
  */
 const useBulkAct = (
   connectedSourceId: string,
-  takes: (group: FindingGroup) => boolean = takesAnyGroup,
+  takes: (group: GroupOfFindings) => boolean = takesAnyGroup,
 ) => {
   const [ticked, tick] = useTickedGroups();
   const [open, setOpen] = useState(false);
@@ -147,7 +147,7 @@ function BulkAct(properties: {
   );
 }
 
-function TickedList(properties: { readonly groups: readonly FindingGroup[] }) {
+function TickedList(properties: { readonly groups: readonly GroupOfFindings[] }) {
   return (
     <ul className="grid gap-1">
       {properties.groups.map((group) => (
@@ -206,7 +206,7 @@ export function KeepInTextAct(properties: { readonly connectedSourceId: string }
   const act = useBulkAct(properties.connectedSourceId);
   const keep = useKeepInText();
   const groups = act.ready?.groups ?? [];
-  const named = counted(groups.length, "finding group", "finding groups");
+  const named = counted(groups.length, "group of findings", "groups of findings");
   /** Counted off the groups the review listed, so the page reads nothing of the spans kept. */
   const spans = counted(
     groups.reduce((sum, group) => sum + group.found, 0),
@@ -300,12 +300,12 @@ function SyncStatus(properties: { readonly connectedSourceId: string; readonly j
     : sync.status;
 }
 
-const isSpecialCategory = (group: FindingGroup): boolean => group.specialCategory;
+const isSpecialCategory = (group: GroupOfFindings): boolean => group.specialCategory;
 
 export function DismissAsNotSpecialCategoryAct(properties: { readonly connectedSourceId: string }) {
   const act = useBulkAct(properties.connectedSourceId, isSpecialCategory);
   const dismiss = useDismissAsNotSpecialCategory();
-  const named = counted(act.ready?.groups.length ?? 0, "finding group", "finding groups");
+  const named = counted(act.ready?.groups.length ?? 0, "group of findings", "groups of findings");
 
   const dismissed = (reason: string) => {
     act.command<DismissedAsNotSpecialCategory>({

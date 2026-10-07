@@ -737,6 +737,74 @@ describe("a word that lands with its sweep", () => {
         .toSorted(),
     );
   });
+
+  it("refuses the type vocabulary, passing the refusal Vocabulary type", () => {
+    const old = ["type", "vocabulary"].join(" ");
+    const refused = {
+      "docs/okf-v02.md": `the ${old} is a derived Kinds list`,
+      "packages/core/src/concepts/planted.ts":
+        `export type ${old.split(" ")[1]} = readonly string[];`.replace("vocabulary", "Vocabulary"),
+    };
+    const passed = {
+      "packages/core/src/kernel/planted.ts":
+        "export type Vocabulary = Readonly<Record<string, RefusalClass>>;",
+    };
+
+    expect([...linesOver({ ...refused, ...passed }, [rowOf(old)])].toSorted()).toEqual(
+      Object.entries(refused)
+        .map(([file, text]) => `${file}:1: ${text}`)
+        .toSorted(),
+    );
+  });
+
+  it("refuses a match written as a hit, passing other hits", () => {
+    const hit = ["h", "it"].join("");
+    const refused = {
+      [WORDS]: `export const SAID = "One ${hit} per line.";`,
+      "packages/core/src/answering/planted.ts": `const first = (${hit}: FindMatch) => ${hit}.title;`,
+      "docs/solutions/architecture-patterns/adr-0018-planted.md": `- A concept ${hit} sits beside a document.`,
+      "packages/core/src/concepts/planted.ts": `// the reconciler's ${hit} is not this one`,
+    };
+    const passed = {
+      "apps/worker/Dockerfile": `# a cache ${hit} stands in for it`,
+      ".github/workflows/planted.yml": `if: steps.node.outputs.cache-${hit} != 'true'`,
+      "CONCEPTS.md": `- **reconciler ${hit}** — _Internal._ one commit the reconciler replayed.`,
+      [`packages/core/src/concepts/reconciler-${hit}.ts`]: `const ${hit} = await tx.query(REPLAYED);`,
+      "apps/web/src/shared/ui/planted.tsx": `/** The button stays a bare ${hit} area. */`,
+    };
+
+    expect([...linesOver({ ...refused, ...passed }, [rowOf(hit)])].toSorted()).toEqual(
+      Object.entries(refused)
+        .map(([file, text]) => `${file}:1: ${text}`)
+        .toSorted(),
+    );
+  });
+
+  it("refuses a collection written as a domain, passing other domains", () => {
+    const domain = ["dom", "ain"].join("");
+    const refused = {
+      [WORDS]: `export const SAID = "Who owns each ${domain}.";`,
+      "docs/solutions/architecture-patterns/adr-0047-planted.md": `- An owner per ${domain} decides.`,
+      "docs/specs/v01-route.md": `the ${domain}'s owner, with a per-${domain} default`,
+      "packages/core/src/concepts/planted.ts": `// A ${domain} is never a file key.`,
+      "CONCEPTS.md": `listed with its owners, ${domain} by ${domain}.`,
+      "docs/architecture/c4-planted.md": `Each concept is scoped to its ${domain}; the rule lands on that ${domain}.`,
+    };
+    const passed = {
+      "packages/core/src/members/planted.ts": `const ${domain} = await testingDomainOf(admin, tx);`,
+      "docs/operations/RUNBOOK.md": `an address on that ${domain}, or on the testing ${domain}`,
+      "docs/solutions/architecture-patterns/adr-0008-planted.md": `at \`app.<${domain}>/mcp\``,
+      "packages/schema/test/planted.test.ts": `CREATE ${domain.toUpperCase()} probe AS text`,
+      "AGENTS.md": `### ${domain} docs: each ${domain} word is defined first.`,
+      "apps/web/playwright.config.ts": `/** A relying party must be a ${domain}, never an IP. */`,
+    };
+
+    expect([...linesOver({ ...refused, ...passed }, [rowOf(domain)])].toSorted()).toEqual(
+      Object.entries(refused)
+        .map(([file, text]) => `${file}:1: ${text}`)
+        .toSorted(),
+    );
+  });
 });
 
 describe("the product's name in a planted tree", () => {

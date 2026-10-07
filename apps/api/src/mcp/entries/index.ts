@@ -15,7 +15,7 @@ import {
   TRUST_RIDERS,
   TRUST_STATUSES,
   TRUST_TIERS,
-  type FindHit,
+  type FindMatch,
   type FindResult,
   type OpenResult,
   type Trust,
@@ -52,23 +52,23 @@ const coreTrust = ({ tier, status, checkedBy, checkedAt, rider }: WireTrust): Tr
   rider,
 });
 
-type WireHit<Hit> = Hit extends { readonly trust: Trust }
-  ? Omit<Hit, "trust"> & { readonly trust: WireTrust }
-  : Hit;
+type WireMatch<Match> = Match extends { readonly trust: Trust }
+  ? Omit<Match, "trust"> & { readonly trust: WireTrust }
+  : Match;
 
-type WireFound = { readonly query: string; readonly hits: readonly WireHit<FindHit>[] };
+type WireFound = { readonly query: string; readonly hits: readonly WireMatch<FindMatch>[] };
 
 const foundOnTheWire = (found: FindResult): WireFound => ({
   query: found.query,
-  hits: found.hits.map((hit) =>
-    hit.layer === "bundles" ? { ...hit, trust: wireTrust(hit.trust) } : hit,
+  hits: found.matches.map((match) =>
+    match.layer === "bundles" ? { ...match, trust: wireTrust(match.trust) } : match,
   ),
 });
 
 const foundInCore = (found: WireFound): FindResult => ({
   query: found.query,
-  hits: found.hits.map((hit) =>
-    hit.layer === "bundles" ? { ...hit, trust: coreTrust(hit.trust) } : hit,
+  matches: found.hits.map((match) =>
+    match.layer === "bundles" ? { ...match, trust: coreTrust(match.trust) } : match,
   ),
 });
 
@@ -99,7 +99,7 @@ const passage = z.object({
   sensitivity: z.string(),
 });
 
-const hit = z.discriminatedUnion("layer", [
+const match = z.discriminatedUnion("layer", [
   z.object({
     layer: z.literal("bundles"),
     iri: z.string(),
@@ -122,15 +122,15 @@ const findEntry = defineEntry({
   name: "find",
   title: "Find in the company's knowledge",
   description:
-    "Search the company's knowledge and return a preview of what matches: one line per hit. A concept carries its kind, title and trust state; a document nothing on the map covers carries its title, the class it is held under and the marker 'Not company knowledge'. Use `open` to read a hit in full — a concept by its `iri`, a document by the `locator` on its line.",
+    "Search the company's knowledge and preview what it finds: one line per match. A concept carries its kind, title and trust state; a document nothing on the map covers carries its title, the class it is held under and the marker 'Not company knowledge'. Use `open` to read a match in full — a concept by its `iri`, a document by the `locator` on its line.",
   scopes: ["knowledge:read"],
   input: z.object({
     query: z.string().min(1).max(500).describe("What to look for, in the person's own words."),
-    limit: z.number().int().min(1).max(20).default(5).describe("How many hits to preview."),
+    limit: z.number().int().min(1).max(20).default(5).describe("How many matches to preview."),
   }),
   output: z.object({
     query: z.string(),
-    hits: z.array(hit),
+    hits: z.array(match),
   }),
   annotations: {
     readOnlyHint: true,
@@ -184,7 +184,7 @@ const openEntry = defineEntry({
   name: "open",
   title: "Open a concept, or the passage a citation rests on",
   description:
-    "The verbatim fetch: a concept by its `iri` (from a `find` hit or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by its `locator`, which a document hit and a citation both carry. Give one of the two. Each evidence item names its source, and carries the `locator` that opens it only where the source gives one: an imported concept's evidence often has none, and an item with no `locator` has no passage to open. Quote what comes back; do not summarise it.",
+    "The verbatim fetch: a concept by its `iri` (from a `find` match or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by its `locator`, which a document match and a citation both carry. Give one of the two. Each evidence item names its source, and carries the `locator` that opens it only where the source gives one: an imported concept's evidence often has none, and an item with no `locator` has no passage to open. Quote what comes back; do not summarise it.",
   scopes: ["knowledge:read"],
   input: z
     .object({

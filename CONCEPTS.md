@@ -48,7 +48,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   set (ADR 0026).
 - **Also known as** — a conventional body line naming a concept's other names; a confirmed alias
   lands there through an edit suggestion, and the merge key derives its names from it.
-- **collection** — _Code rename pending._ a top-level division of a company's knowledge by
+- **collection** — a top-level division of a company's knowledge by
   ownership: the company itself, one product or service, one sector, listed with its owners on
   Knowledge › Collections and owners. The knowledge base is organised collection-first, and a
   collection is a future bundle boundary. Not an email domain.
@@ -231,7 +231,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   withheld at on its connected source now: its rule's, raised to *always* by the officer-block rule
   or by an erasure request that names it. A finding the last sync did not raise, because the rules
   moved on, is no longer shown to a reviewer, acted on or counted at a publish.
-- **group of findings** — _Code rename pending._ the unit of the review: one document's *findings*
+- **group of findings** — the unit of the review: one document's *findings*
   of one category, raised by one rule at one tier, with how many there are. It is what the review
   lists and what the three bulk actions below are taken over; it names no span and carries no
   value, so a reviewer acts on what was found without ever being shown it. Not a *group*, which is
@@ -565,7 +565,7 @@ from concepts elsewhere; the prose stays a platform record.
 - **citation** — the unit a reader follows back to the source: a concept, the source and locator it
   rests on, and the cited passage, shown beside the claim it supports. In a search match, the same
   unit shown as the match.
-- **footnote** — _Code rename pending._ the mark in a write-up's prose that ties one claim to one
+- **footnote** — the mark in a write-up's prose that ties one claim to one
   include: a footnote reference labelled by the include (ADR 0015). What the reader sees as the
   passage beside the claim, and what the copied text carries as a numbered footnote; its text is
   never stored, always rendered from the include.
@@ -582,7 +582,7 @@ from concepts elsewhere; the prose stays a platform record.
   (a Q&A pair), which an answer may reuse or cite.
 - **answer contract** — _Internal._ the one shape an answer takes for the UI, MCP and the response
   record: an event stream — verdict first — folded into one object (ADR 0016).
-- **match** — _Code rename pending._ one unit a search returns, typed by its knowledge layer: a
+- **match** — one unit a search returns, typed by its knowledge layer: a
   concept, with the guide sections it appears in and the documents it rests on nested under it; a
   guide section or a document on its own only when no concept covers it. Every match wears its trust
   or sensitivity word; a document nothing rests on reads *Not company knowledge*. The MCP wire's key
@@ -792,7 +792,7 @@ to it by IRI and never restates it (ADR 0014).
   harness.
 - **test inbox** — _Internal._ named in full, because *Inbox* alone is a person's *area*, which
   points into *To decide*: the Cloudflare Email Worker `apps/test-inbox`, on the *testing domain*,
-  a domain apart from the product's. It keeps what reaches that domain for a day and judges
+  an email domain apart from the product's. It keeps what reaches that domain for a day and judges
   nothing. The *journeys* read each sign-in code from it through its API, with a key that reads it
   and does nothing else, and verify each email's DKIM signature themselves. Outside the *estate*:
   the owner deploys it by hand, and nothing in CI can change it.

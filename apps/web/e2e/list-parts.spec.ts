@@ -113,11 +113,11 @@ const targetOf = (tick: Locator) =>
       [reach, reach],
     ];
     const missed = corners.filter(([across, down]) => {
-      const hit = document.elementFromPoint(
+      const topmost = document.elementFromPoint(
         box.left + box.width / 2 + across,
         box.top + box.height / 2 + down,
       );
-      return hit === null || !node.contains(hit);
+      return topmost === null || !node.contains(topmost);
     });
     return { drawn: [box.width, box.height], missed };
   }, TARGET);

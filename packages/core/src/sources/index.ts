@@ -55,7 +55,7 @@ export { restoreFinding, restoreFindingInput } from "./findings.ts";
 export {
   dismissAsNotSpecialCategory,
   dismissAsNotSpecialCategoryInput,
-  findingGroupKey,
+  groupOfFindingsKey,
   findingsOf,
   findingsOfInput,
   keepInText,
@@ -82,7 +82,7 @@ export {
   previewPassages,
   previewPassagesInput,
   type Passage,
-  type PassageHit,
+  type PassageMatch,
   type PreviewedPassage,
 } from "./passages.ts";
 export { listConnectedSources } from "./listing.ts";

@@ -2287,13 +2287,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("test-workspace — the journeys' fixture, made or repaired", () => {
     const aFixture = () => {
-      const domain = `${ulid().toLowerCase()}.testing.invalid`;
+      const addressDomain = `${ulid().toLowerCase()}.testing.invalid`;
       return {
-        domain,
+        addressDomain,
         shortName: `journeys-${ulid().toLowerCase()}`,
-        admin: `admin@${domain}`,
-        editor: `editor@${domain}`,
-        viewer: `viewer@${domain}`,
+        admin: `admin@${addressDomain}`,
+        editor: `editor@${addressDomain}`,
+        viewer: `viewer@${addressDomain}`,
       };
     };
 
@@ -2301,7 +2301,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const flagsOf = (fixture: Fixture): readonly string[] => [
       "--domain",
-      fixture.domain,
+      fixture.addressDomain,
       "--short-name",
       fixture.shortName,
       "--admin",
@@ -2334,7 +2334,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const peopleOn = async (app: TestApp, fixture: Fixture): Promise<number> => {
       const found = await app.database.superuser.query(
         'SELECT 1 FROM "user" WHERE lower(email) LIKE $1',
-        [`%@${fixture.domain}`],
+        [`%@${fixture.addressDomain}`],
       );
       return found.rowCount ?? 0;
     };
@@ -2347,7 +2347,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.exitCode).toBe(0);
       const id = idOnTheDoneLine(run);
       expect(run.lines).toEqual([
-        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.domain}; provisioned, mark written, 54 people added, 53 members added`,
+        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.addressDomain}; provisioned, mark written, 54 people added, 53 members added`,
       ]);
       expect(await rolesIn(app(), id)).toEqual([
         { role: "Admin", members: 1 },
@@ -2370,17 +2370,17 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 0,
         lines: [
-          `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.domain}; nothing to do`,
+          `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.addressDomain}; nothing to do`,
         ],
       });
       expect(await auditRowsIn(app(), id)).toBe(recorded);
     });
 
-    it("prints the stored domain and short name, not the input", async () => {
+    it("prints the stored testing domain and short name, not input", async () => {
       const fixture = aFixture();
       const padded = {
         ...fixture,
-        domain: ` ${fixture.domain.toUpperCase()} `,
+        addressDomain: ` ${fixture.addressDomain.toUpperCase()} `,
         shortName: ` ${fixture.shortName} `,
       };
 
@@ -2388,14 +2388,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const id = idOnTheDoneLine(run);
       expect(run.lines).toEqual([
-        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.domain}; provisioned, mark written, 54 people added, 53 members added`,
+        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.addressDomain}; provisioned, mark written, 54 people added, 53 members added`,
       ]);
     });
 
     it("names a member outside the fixture, leaving them in place", async () => {
       const fixture = aFixture();
       const id = idOnTheDoneLine(await fixing(app(), fixture));
-      const stranger = await app().person(`stranger@${fixture.domain}`, "Sam Stranger");
+      const stranger = await app().person(`stranger@${fixture.addressDomain}`, "Sam Stranger");
       await app().addMember(id, stranger.id, "Editor");
 
       const run = await fixing(app(), fixture);
@@ -2403,8 +2403,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 0,
         lines: [
-          `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.domain}; nothing to do`,
-          `test-workspace: stranger@${fixture.domain}, an Editor, is no part of the fixture; left in place`,
+          `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.addressDomain}; nothing to do`,
+          `test-workspace: stranger@${fixture.addressDomain}, an Editor, is no part of the fixture; left in place`,
         ],
       });
       expect(await membersOf(app(), id, stranger.id)).toEqual([
@@ -2420,7 +2420,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 7,
         lines: [
-          `test-workspace: REFUSED — off-testing-domain: viewer@elsewhere.invalid is not on ${fixture.domain}, where every test person's address is`,
+          `test-workspace: REFUSED — off-testing-domain: viewer@elsewhere.invalid is not on ${fixture.addressDomain}, where every test person's address is`,
         ],
       });
       expect(await workspacesWithShortName(app(), fixture.shortName)).toBe(0);
@@ -2480,7 +2480,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 8,
         lines: [
-          `test-workspace: REFUSED — slug-taken: the workspace holding the short name ${fixture.shortName} has a member or a waiting invitation off ${fixture.domain}, so it is not the test workspace; it is left as it is`,
+          `test-workspace: REFUSED — slug-taken: the workspace holding the short name ${fixture.shortName} has a member or a waiting invitation off ${fixture.addressDomain}, so it is not the test workspace; it is left as it is`,
         ],
       });
       expect(await auditRowsIn(app(), id)).toBe(recorded);
@@ -2526,7 +2526,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
       const again = await fixing(app(), fixture);
       expect(again.lines).toEqual([
-        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.domain}; nothing to do`,
+        `test-workspace: done — ${id}, short name ${fixture.shortName}, testing domain ${fixture.addressDomain}; nothing to do`,
       ]);
     });
 
@@ -3312,14 +3312,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const found = await reading(app(), workspaceId, admin.id, (principal, tx) =>
         find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),
       );
-      const [hit, ...rest] = found.hits;
+      const [match, ...rest] = found.matches;
       expect(rest).toEqual([]);
-      if (hit?.layer !== "bundles") throw new Error("the hit is not a concept");
+      if (match?.layer !== "bundles") throw new Error("the match is not a concept");
       expect({
-        kind: hit.kind,
-        title: hit.title,
-        tags: hit.tags,
-        words: trustWords(hit.trust),
+        kind: match.kind,
+        title: match.title,
+        tags: match.tags,
+        words: trustWords(match.trust),
       }).toEqual({
         kind: "Answer",
         title: "Data retention period",
@@ -3328,7 +3328,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
 
       const opened = await reading(app(), workspaceId, admin.id, (principal, tx) =>
-        open(principal, tx, { iri: hit.iri }, IMPORTED_AT),
+        open(principal, tx, { iri: match.iri }, IMPORTED_AT),
       );
       if (!opened.found) throw new Error("the concept was not found");
       expect(opened.concept?.trust).toEqual({
@@ -3599,9 +3599,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const found = await reading(app(), workspaceId, owner.id, (principal, tx) =>
         find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),
       );
-      const hit = found.hits[0];
-      if (hit?.layer !== "bundles") throw new Error("the hit is not a concept");
-      expect(trustWords(hit.trust)).toBe("Verified by Theo Approver · 1 June 2026 · imported");
+      const match = found.matches[0];
+      if (match?.layer !== "bundles") throw new Error("the match is not a concept");
+      expect(trustWords(match.trust)).toBe("Verified by Theo Approver · 1 June 2026 · imported");
     });
   });
 });

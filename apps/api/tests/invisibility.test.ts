@@ -101,7 +101,7 @@ const restrictedSourcedConcept = async () => {
 };
 
 describe("a Restricted-sourced concept, to a Viewer's token", () => {
-  it("is no hit through find, though the Admin finds it", async () => {
+  it("is no match through find, though the Admin finds it", async () => {
     const { iri, viewer, admin } = await restrictedSourcedConcept();
 
     const found = await called(viewer.client, viewer.token, "find", { query: "remuneration" });
@@ -109,7 +109,7 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
 
     expect(structured(found)).toEqual({ query: "remuneration", hits: [] });
     expect(rendered(found)).toBe("Nothing in the company's knowledge matches that.");
-    expect(rpcListOf(structured(seen)["hits"]).map((hit) => hit["iri"])).toEqual([iri]);
+    expect(rpcListOf(structured(seen)["hits"]).map((match) => match["iri"])).toEqual([iri]);
   });
 
   it("is absent from ask's answer, though cited in the Admin's", async () => {
@@ -208,7 +208,7 @@ const documentsAndTheConceptOverThem = async () => {
 };
 
 describe("the document layer through the MCP entries", () => {
-  it("previews a document as its layer's hit, skipping covered ones", async () => {
+  it("previews a document as its layer's match, skipping covered ones", async () => {
     const { iri, standalone, viewer } = await documentsAndTheConceptOverThem();
 
     const found = await called(viewer.client, viewer.token, "find", { query: QUERY });

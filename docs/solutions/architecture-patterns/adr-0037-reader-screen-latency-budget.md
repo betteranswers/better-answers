@@ -24,7 +24,7 @@ tags:
 
 A reader-facing page has a latency budget in three parts:
 
-- Lists and search hits render under one second.
+- Lists and search matches render under one second.
 - An action applies under 100 milliseconds, optimistically in the web app, with the server's answer reconciled after.
 - Answers stream. The first sentence is the first thing on the page, never a spinner until the last.
 

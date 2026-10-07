@@ -13,7 +13,6 @@ tags:
   - adr-0015
   - composition
   - include
-  - citation-marker
   - footnote
   - markdown
   - renderer
@@ -23,7 +22,7 @@ tags:
 
 ## The decision
 
-A composition's prose (a guide section's Brief, a response) is stored as markdown. Every claim in it that rests on a concept carries a citation marker: a markdown footnote reference labelled by the include's id (`…within 30 days[^i7].`).
+A composition's prose (a guide section's Brief, a response) is stored as markdown. Every claim in it that rests on a concept carries a footnote: a markdown footnote reference labelled by the include's id (`…within 30 days[^i7].`).
 
 - The include row carries the concept's IRI, the context wording chosen (its heading and the hash of that section's text), the concept's content hash at generation and the cited span.
 - Footnote definitions are never stored. They are rendered from the include rows every time the prose is shown, exported or copied.

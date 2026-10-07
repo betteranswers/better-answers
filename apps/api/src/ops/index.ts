@@ -1188,7 +1188,7 @@ const testWorkspaceReason = (
 ): string => {
   switch (refusal) {
     case "malformed":
-      return "malformed: --domain is a domain every test and invented address can carry, --short-name is not blank, and the three addresses are three different addresses";
+      return "malformed: --domain is an email domain every test and invented address can carry, --short-name is not blank, and the three addresses are three different addresses";
     case "slug-taken":
       return `slug-taken: the workspace holding the short name ${asked.shortName} has a member or a waiting invitation off ${asked.testingDomain}, so it is not the test workspace; it is left as it is`;
     case "no-display-name":

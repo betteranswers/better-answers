@@ -54,7 +54,7 @@ The walk's timeout is set per statement, never on a role. Entry is by key, never
 - Generations, the debounce and the watermark bridged a second store the api could not write transactionally. That store is gone. Rebuild-equivalence and the nightly second parser keep the map derived.
 - A refusal after the commit would be the reconciler's finding, and the reconciler is for crashes.
 - A carried passage visibility was a copy five writers in two tiers kept equal by racing.
-- One walk per full-text hit multiplies the cost and the row cap's reach by the number of hits.
+- One walk per full-text match multiplies the cost and the row cap's reach by the number of matches.
 
 ## Rejected
 

@@ -111,7 +111,7 @@ grep -rln "consumeVerificationValue(" node_modules/better-auth/dist node_modules
 cd ../.. && grep -rn "FROM verification" apps/api/src packages/core/src
 ```
 
-For each `findVerificationValue` hit, find its gate in the lines that follow: an `expiresAt` comparison, or a later consume whose null result refuses. In 1.7.5 the first command finds 12 sites. A new site, or a site whose gate has moved, is what the audit is for.
+For each call to `findVerificationValue`, find its gate in the lines that follow: an `expiresAt` comparison, or a later consume whose null result refuses. In 1.7.5 the first command finds 12 sites. A new site, or a site whose gate has moved, is what the audit is for.
 
 The api also clears the library's promotion lock by its name (_Fixed: an orphaned lock skipped one promotion_, below). `apps/api/tests/promotion-lock.test.ts` fails if a release renames the lock or re-keys its reservation, which would otherwise make the clear delete nothing. When it fails, find the new name with:
 

@@ -636,7 +636,7 @@ describe("the Sources procedures over the wire", () => {
 
     const kept = await api.sources.keepInText.mutate({
       connectedSourceId,
-      findingGroups: [
+      groupsOfFindings: [
         {
           documentId,
           category: "bank-details",
@@ -668,7 +668,7 @@ describe("the Sources procedures over the wire", () => {
 
     const dismissed = await api.sources.dismissAsNotSpecialCategory.mutate({
       connectedSourceId,
-      findingGroups: [{ documentId, ...A_HEALTH_CUE, tier: "always" }],
+      groupsOfFindings: [{ documentId, ...A_HEALTH_CUE, tier: "always" }],
       reason: "Our engineers diagnose faults in pumps, never in people.",
     });
 
@@ -692,7 +692,7 @@ describe("the Sources procedures over the wire", () => {
     const refused = await refusalOfCall(
       api.sources.dismissAsNotSpecialCategory.mutate({
         connectedSourceId,
-        findingGroups: [
+        groupsOfFindings: [
           {
             documentId,
             category: "bank-details",
@@ -712,7 +712,7 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
-  it("narrows the documents a finding group sits in", async () => {
+  it("narrows the documents a group of findings sits in", async () => {
     const { workspace, api } = await anAdmin();
     const { connectedSourceId, documentId } = await unpublishedConnectedSource(
       workspace.workspaceId,
@@ -721,7 +721,7 @@ describe("the Sources procedures over the wire", () => {
 
     const narrowed = await api.sources.narrowDocuments.mutate({
       connectedSourceId,
-      findingGroups: [
+      groupsOfFindings: [
         {
           documentId,
           category: "bank-details",

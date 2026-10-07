@@ -9,7 +9,7 @@ import {
   KeepInTextAct,
   NarrowDocumentsAct,
 } from "@/features/sources/review-acts.tsx";
-import type { FindingGroup } from "@/features/sources/sources-api.ts";
+import type { GroupOfFindings } from "@/features/sources/sources-api.ts";
 import { useTickedGroups } from "@/features/sources/sources-state.ts";
 import { ViewStateSlot } from "@/shared/page-toolbar.tsx";
 
@@ -19,7 +19,7 @@ const THE_CONNECTED_SOURCE = "01K5T0000000000000000BIND1";
 
 const ANOTHER_CONNECTED_SOURCE = "01K5T0000000000000000BIND2";
 
-const BANK_DETAILS: FindingGroup = {
+const BANK_DETAILS: GroupOfFindings = {
   documentId: "01K5T00000000000000000DOC1",
   title: "Supplier form",
   sensitivity: "Internal",
@@ -32,7 +32,7 @@ const BANK_DETAILS: FindingGroup = {
   dismissed: 0,
 };
 
-const HEALTH_CUE: FindingGroup = {
+const HEALTH_CUE: GroupOfFindings = {
   documentId: "01K5T00000000000000000DOC2",
   title: "Pump service notes",
   sensitivity: "Restricted",
@@ -52,7 +52,7 @@ const NOT_SPECIAL_CATEGORY = `${why} ${next}`;
 /** The review's half of the slot, standing in for the findings table a click writes through. */
 function TicksIn(properties: { readonly connectedSourceId: string }) {
   const [, tick] = useTickedGroups();
-  const ticking = (groups: readonly FindingGroup[]) => () => {
+  const ticking = (groups: readonly GroupOfFindings[]) => () => {
     tick({ connectedSourceId: properties.connectedSourceId, groups });
   };
   return (
@@ -85,7 +85,7 @@ const reviewing = (connectedSourceId: string, tickedIn: string) =>
 const act = (name: string) => screen.getByRole<HTMLButtonElement>("button", { name });
 
 describe("the review's three bulk acts", () => {
-  it("stand disabled until the review ticks a finding group", () => {
+  it("stand disabled until the review ticks a group of findings", () => {
     reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
     expect(act("Keep in text").disabled).toBe(true);
@@ -99,7 +99,7 @@ describe("the review's three bulk acts", () => {
 
     fireEvent.click(act("Tick bank details"));
 
-    expect(act("Keep 1 finding group in text").disabled).toBe(false);
+    expect(act("Keep 1 group of findings in text").disabled).toBe(false);
     expect(act("Narrow 1 document").disabled).toBe(false);
   });
 
@@ -120,7 +120,7 @@ describe("the dismissal as not special category", () => {
 
     fireEvent.click(act("Tick the health cue"));
 
-    expect(act("Dismiss 1 finding group as not special category").disabled).toBe(false);
+    expect(act("Dismiss 1 group of findings as not special category").disabled).toBe(false);
     expect(screen.queryByText(NOT_SPECIAL_CATEGORY)).toBeNull();
   });
 
@@ -134,7 +134,7 @@ describe("the dismissal as not special category", () => {
     expect(dismissal.getAttribute("aria-describedby")).toBe(
       screen.getByText(NOT_SPECIAL_CATEGORY).id,
     );
-    expect(act("Keep 2 finding groups in text").disabled).toBe(false);
+    expect(act("Keep 2 groups of findings in text").disabled).toBe(false);
   });
 
   it("opens on s, asking a reason and naming no finding", () => {
@@ -144,7 +144,7 @@ describe("the dismissal as not special category", () => {
     fireEvent.keyDown(document.body, { key: "s" });
 
     const dialog = screen.getByRole("dialog", {
-      name: "Dismiss 1 finding group as not special category",
+      name: "Dismiss 1 group of findings as not special category",
     });
     expect(dialog.textContent).toContain(
       "special category by HEALTH_CUE in Pump service notes: 1 found",

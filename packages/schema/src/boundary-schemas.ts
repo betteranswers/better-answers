@@ -285,8 +285,9 @@ export const invitationEmailCounterUpdate = createUpdateSchema(
 );
 
 /** What an address carries after its `@`, lower-cased, so a match is a plain comparison. */
-const isTestingDomain = (domain: string): boolean =>
-  domain === domain.toLowerCase() && EMAIL_ADDRESS.safeParse(`mark@${domain}`).success;
+const isTestingDomain = (testingDomain: string): boolean =>
+  testingDomain === testingDomain.toLowerCase() &&
+  EMAIL_ADDRESS.safeParse(`mark@${testingDomain}`).success;
 
 const testWorkspaceMarkRefinements = {
   workspaceId,

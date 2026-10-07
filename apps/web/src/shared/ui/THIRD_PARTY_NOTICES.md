@@ -18,7 +18,7 @@ T-228 added `sheet` the same day with the same CLI; its two digests were taken t
 arrival edits are listed below with the others.
 
 T-136 added `checkbox` and `progress` on **23 September 2026** with the same CLI,
-`shadcn@4.20.1`, for the Sources page's finding groups, publish confirmations and upload; their
+`shadcn@4.20.1`, for the Sources page's groups of findings, publish confirmations and upload; their
 two digests were taken that day and their arrival edits are listed below with the others.
 
 T-397 added `avatar` and Kibo UI's `pill` on **25 September 2026** with the same CLI,

@@ -14,7 +14,7 @@ the hosted product at `better-answers.com`.
 | `VISION.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
 | `CONCEPTS.md` | in that repo | The **domain glossary**: each entry a person meets is headed by the word a page uses, and an entry only the code meets is marked internal |
 | `CODING_STANDARDS.md` | in that repo | disclosure model, latency and keyboard budget, WCAG 2.2 AA + GOV.UK semantics |
-| `docs/archive/adr/0001–0027` | in that repo | Answer contract (0016), citation markers (0015), the write path (0012), trust derivation (0019), open-core (0027) |
+| `docs/archive/adr/0001–0027` | in that repo | Answer contract (0016), footnotes (0015), the write path (0012), trust derivation (0019), open-core (0027) |
 | Styling brief (from the user) | — | "better-auth, Vercel, Linear" — the visual register |
 
 **When this system was authored, the repository held no interface code.** It was
@@ -38,11 +38,11 @@ The areas the rail lists, each holding groups of pages (§4, *The shell*):
 
 - **Ask** — a question, a cited answer, and what it could not answer. Every role.
 - **Knowledge** — search, guides and the map's concepts for every role; its curation
-  pages for Admins and the owners of a domain. A search hit is typed by knowledge layer
+  pages for Admins and the owners of a collection. A search match is typed by knowledge layer
   and wears its trust or sensitivity word. A guide is assembled *Brief* and quoted
   *Detail* layers over the concepts, with coverage.
 - **Inbox** — what waits on a person who decides something: Admins, and the owners of a
-  domain.
+  collection.
 - **Control Centre** — the one Admin area, in eight groups: Overview, Suggestions,
   Sources, Agent Operations, Questions, People, Personal data and System.
 
@@ -138,7 +138,7 @@ Dark theme is a full alias flip on `[data-theme="dark"]`, page `#0b0c0e`. Never 
 never a coloured left border, never colour as the only signal.
 
 **Type.** Geist for everything, Geist Mono for identity and machine strings (IRIs, commit
-hashes, actor ids, citation markers, tabular figures). Only three weights ship: 400, 500,
+hashes, actor ids, footnotes, tabular figures). Only three weights ship: 400, 500,
 600. Interface body is **14px**; reader prose is **16px at 1.65** on a 68ch measure.
 Tracking tightens as size grows (−0.022em display → −0.006em body); the 11px micro-label
 opens to +0.06em upper case. Tabular figures wherever numbers stack.
@@ -276,7 +276,7 @@ one is added there. The `Icon` component is the only way to render one.
 `apps/web/src/shared/ui/` and nowhere else**, because a chevron inside a `Select` is behaviour,
 not meaning (ADR 0033).
 
-**Logo.** Two square brackets with a square between them, like a citation marker:
+**Logo.** Two square brackets with a square between them, like a footnote:
 `assets/logo.svg`, imported as `@better-answers/design-system/assets/logo.svg`. It is one
 path on a 16-unit grid in `currentColor`, so it takes the colour of the text around it,
 and its weight is Geist Mono's own bracket, between 500 and 600 (`assets/README.md` gives
@@ -287,7 +287,7 @@ tab icon, 24 or 32px in the band. Its accessible name is `better-answers`.
 **Name.** The product's name is `better-answers` everywhere a person reads it: a page,
 the tab title, the api's pages, an email and its sender name. Lower-case and hyphenated,
 at the start of a sentence as anywhere else. Beside the logo it is set in Geist Mono 500;
-in running text it takes the text's own face. The domain is `better-answers.com`. Never
+in running text it takes the text's own face. The domain name is `better-answers.com`. Never
 "BetterAnswers", never "Better-Answers", never "BA", and never two capitalised words.
 
 ## 6. What is in this repository

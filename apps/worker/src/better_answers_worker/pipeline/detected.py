@@ -35,8 +35,8 @@ def detected(normalised_text: str, detection_key: str) -> tuple[Span, ...]:
 def raised_by_the_detector(normalised_text: str, detection_key: str) -> Raised:
     """`detection_key` is never read by the detector: it
     keys the memo, so moving it detects every text afresh."""
-    # A missed body runs inline on this thread, so it appends here; a hit leaves it
-    # empty.
+    # A missed body runs inline on this thread, so it appends here;
+    # a cache hit leaves it empty.
     read: list[bool] = []
     token = _READ_AFRESH.set(read)
     try:

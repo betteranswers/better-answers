@@ -29,8 +29,8 @@ import {
   keyOf,
   useFindings,
   usePreview,
-  type FindingGroup,
-  type FindingGroupKey,
+  type GroupOfFindings,
+  type GroupOfFindingsKey,
   type ListedConnectedSource,
 } from "./sources-api.ts";
 import {
@@ -58,7 +58,7 @@ function Note(properties: { readonly tag: string; readonly children: ReactNode }
 }
 
 function GroupNotes(properties: {
-  readonly group: FindingGroup;
+  readonly group: GroupOfFindings;
   readonly narrowedBySeam: boolean;
 }) {
   const { group, narrowedBySeam } = properties;
@@ -135,14 +135,14 @@ function Preview(properties: { readonly connectedSource: ListedConnectedSource }
 
 function FindingsTable(properties: {
   readonly connectedSource: ListedConnectedSource;
-  readonly groups: readonly FindingGroup[];
+  readonly groups: readonly GroupOfFindings[];
 }) {
   const { connectedSource, groups } = properties;
   const [ticked, tick] = useTickedGroups();
-  const [inFocus, setInFocus] = useState<FindingGroupKey>();
+  const [inFocus, setInFocus] = useState<GroupOfFindingsKey>();
   const selected = groupsTickedIn(ticked, connectedSource.connectedSourceId);
 
-  const toggle = (group: FindingGroup) => {
+  const toggle = (group: GroupOfFindings) => {
     tick({
       connectedSourceId: connectedSource.connectedSourceId,
       groups: groupIsIn(selected, group)
@@ -169,9 +169,9 @@ function FindingsTable(properties: {
   return (
     <Table>
       <TableCaption>
-        {counted(selected.length, "finding group", "finding groups")} selected. Select a group with{" "}
-        <kbd className="font-mono">{SOURCES_KEYSTROKES.select.key}</kbd>, then keep it in text,
-        narrow its document or dismiss it as not special category with the acts above.
+        {counted(selected.length, "group of findings", "groups of findings")} selected. Select a
+        group with <kbd className="font-mono">{SOURCES_KEYSTROKES.select.key}</kbd>, then keep it in
+        text, narrow its document or dismiss it as not special category with the acts above.
       </TableCaption>
       <TableHeader>
         <TableRow>
@@ -230,7 +230,7 @@ export function Review(properties: { readonly connectedSource: ListedConnectedSo
       </h2>
       <p className="mt-2 text-muted-foreground">
         What the last sync found, per category and rule, counted. No value is shown: the three acts
-        take a finding group, never what it found.
+        take a group of findings, never what it found.
       </p>
 
       <div aria-live="polite" className="mt-4">

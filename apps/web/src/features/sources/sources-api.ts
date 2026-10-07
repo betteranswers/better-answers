@@ -9,9 +9,12 @@ type Api = ReturnType<typeof useTRPC>;
 
 export type ListedConnectedSource = inferOutput<Api["sources"]["list"]>[number];
 
-export type FindingGroup = inferOutput<Api["sources"]["findings"]>[number];
+export type GroupOfFindings = inferOutput<Api["sources"]["findings"]>[number];
 
-export type FindingGroupKey = Pick<FindingGroup, "documentId" | "category" | "ruleId" | "tier">;
+export type GroupOfFindingsKey = Pick<
+  GroupOfFindings,
+  "documentId" | "category" | "ruleId" | "tier"
+>;
 
 export type DocumentsNarrowed = inferOutput<Api["sources"]["narrowDocuments"]>;
 
@@ -171,16 +174,18 @@ export const useWidenConnectedSource = () => {
   return useMutation(api.sources.widen.mutationOptions(useClassSetOnTheRow()));
 };
 
-const sameGroup = (left: FindingGroupKey, right: FindingGroupKey): boolean =>
+const sameGroup = (left: GroupOfFindingsKey, right: GroupOfFindingsKey): boolean =>
   left.documentId === right.documentId &&
   left.category === right.category &&
   left.ruleId === right.ruleId &&
   left.tier === right.tier;
 
-export const groupIsIn = (groups: readonly FindingGroupKey[], group: FindingGroupKey): boolean =>
-  groups.some((held) => sameGroup(held, group));
+export const groupIsIn = (
+  groups: readonly GroupOfFindingsKey[],
+  group: GroupOfFindingsKey,
+): boolean => groups.some((held) => sameGroup(held, group));
 
-export const keyOf = (group: FindingGroupKey): FindingGroupKey => ({
+export const keyOf = (group: GroupOfFindingsKey): GroupOfFindingsKey => ({
   documentId: group.documentId,
   category: group.category,
   ruleId: group.ruleId,
@@ -188,7 +193,7 @@ export const keyOf = (group: FindingGroupKey): FindingGroupKey => ({
 });
 
 /** What a group is, as one string for a list's key: it names no finding and no span. */
-export const groupKeyText = (group: FindingGroupKey): string =>
+export const groupKeyText = (group: GroupOfFindingsKey): string =>
   [group.documentId, group.category, group.ruleId, group.tier].join(" ");
 
 export const useKeepInText = () => {
@@ -208,7 +213,7 @@ export const useNarrowDocuments = () => {
   return useMutation(
     api.sources.narrowDocuments.mutationOptions({
       onMutate: (asked) => {
-        const narrowed = new Set(asked.findingGroups.map((group) => group.documentId));
+        const narrowed = new Set(asked.groupsOfFindings.map((group) => group.documentId));
         return optimistic(
           api.sources.findings.queryKey({ connectedSourceId: asked.connectedSourceId }),
           (groups) =>
@@ -234,7 +239,9 @@ export const useDismissAsNotSpecialCategory = () => {
           api.sources.findings.queryKey({ connectedSourceId: asked.connectedSourceId }),
           (groups) =>
             groups.map((group) =>
-              groupIsIn(asked.findingGroups, group) ? { ...group, dismissed: group.found } : group,
+              groupIsIn(asked.groupsOfFindings, group)
+                ? { ...group, dismissed: group.found }
+                : group,
             ),
         ),
       onError: (_refusal, _asked, held) => held?.undo(),

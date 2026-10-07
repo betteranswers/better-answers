@@ -11,7 +11,7 @@ import {
   previewPassagesInput,
   type LocatorRefusal,
   type Passage,
-  type PassageHit,
+  type PassageMatch,
   type PreviewedPassage,
 } from "../src/sources/index.ts";
 import { contractFixture, documentPassageRow, OPEN_OUTCOMES } from "./contract-fixture.ts";
@@ -209,7 +209,7 @@ const DRAFT = {
   charEnd: 46,
 } as const;
 
-const hitOn = (
+const matchOn = (
   documentId: string,
   what: { readonly title: string; readonly charEnd: number },
   sensitivity = "Internal",
@@ -439,7 +439,7 @@ describe("what a passage read fails on", () => {
 const searching = async (
   person: UserPrincipal,
   limit = 10,
-): Promise<readonly PassageHit[] | Error> =>
+): Promise<readonly PassageMatch[] | Error> =>
   answered(
     await reading(person, async (reader, tx) => {
       const found = await findPassages(reader, tx, QUERY, limit);
@@ -467,10 +467,10 @@ describe("the passages a search finds", () => {
     const viewer = await searching(scenario.viewer);
     const admin = await searching(scenario.admin);
 
-    expect(viewer).toEqual([hitOn(manual, MANUAL), hitOn(handbook, HANDBOOK)]);
-    expect(admin).toEqual([hitOn(manual, MANUAL)]);
+    expect(viewer).toEqual([matchOn(manual, MANUAL), matchOn(handbook, HANDBOOK)]);
+    expect(admin).toEqual([matchOn(manual, MANUAL)]);
 
-    expect(await searching(scenario.viewer, 1)).toEqual([hitOn(manual, MANUAL)]);
+    expect(await searching(scenario.viewer, 1)).toEqual([matchOn(manual, MANUAL)]);
   });
 
   it("finds a passage only for readers in the source's audience", async () => {
@@ -486,7 +486,7 @@ describe("the passages a search finds", () => {
     const inside = await searching(scenario.editor);
 
     expect(outside).toEqual([]);
-    expect(inside).toEqual([hitOn(minutes, MINUTES)]);
+    expect(inside).toEqual([matchOn(minutes, MINUTES)]);
   });
 
   it("finds no passage of a source under review for anyone", async () => {

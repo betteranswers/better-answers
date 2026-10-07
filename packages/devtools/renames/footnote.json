@@ -1,0 +1,54 @@
+{
+  "noun": "citation marker",
+  "readerWord": "footnote",
+  "sweep": "U15. Knowledge words: footnote",
+  "collisions": [],
+  "words": [
+    {
+      "from": "citation marker",
+      "to": "footnote"
+    },
+    {
+      "from": "citation markers",
+      "to": "footnotes"
+    }
+  ],
+  "symbols": {
+    "paths": [
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/web/journeys/**",
+      "apps/worker/src/**",
+      "apps/worker/tests/**"
+    ]
+  },
+  "text": {
+    "paths": [
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/**",
+      "apps/web/test/**",
+      "apps/web/e2e/**",
+      "apps/web/journeys/**",
+      "apps/worker/src/**",
+      "apps/worker/tests/**"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "the words test's own planted fixtures and ratchet",
+      "paths": ["apps/api/tests/avoid-words.test.ts", "apps/api/tests/old-words-ratchet.json"]
+    }
+  ]
+}

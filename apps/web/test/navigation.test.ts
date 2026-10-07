@@ -73,7 +73,7 @@ describe("the one navigation list", () => {
               "Due for verification",
               "Conflicts",
               "Kinds",
-              "Domains and owners",
+              "Collections and owners",
               "Exports",
             ],
           ],

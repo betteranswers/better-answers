@@ -29,7 +29,7 @@ const SYNC_FINISHED_AT = new Date("2026-09-11T08:30:00.000Z");
 const NOW = new Date("2026-09-11T12:00:00.000Z");
 
 /**
- * Every document below answers this query, so an absent hit is the read predicate and never an
+ * Every document below answers this query, so an absent match is the read predicate and never an
  * unmatched term.
  */
 const QUERY = "holiday policy";
@@ -206,21 +206,23 @@ type Reach = { readonly found: boolean; readonly opened: boolean };
 const REACHED: Reach = { found: true, opened: true };
 const WITHHELD: Reach = { found: false, opened: false };
 
-const sourceHits = async (person: UserPrincipal): Promise<readonly string[]> =>
+const sourceMatches = async (person: UserPrincipal): Promise<readonly string[]> =>
   answered(
     await reading(person, async (reader, tx) => {
       const found = await find(reader, tx, { query: QUERY, limit: 10 }, NOW);
       if (!found.ok) throw found.error;
-      return found.value.hits.flatMap((hit) => (hit.layer === "sources" ? [hit.locator] : []));
+      return found.value.matches.flatMap((match) =>
+        match.layer === "sources" ? [match.locator] : [],
+      );
     }),
   );
 
 const rowsFound = async (person: UserPrincipal, documentId: string): Promise<number> =>
-  (await sourceHits(person)).filter((locator) => locator.startsWith(`${documentId}/`)).length;
+  (await sourceMatches(person)).filter((locator) => locator.startsWith(`${documentId}/`)).length;
 
 const reaches = async (person: UserPrincipal, where: Landing): Promise<Reach> => {
   const wire = wireOf(where.documentId, where.text);
-  const found = (await sourceHits(person)).includes(wire);
+  const found = (await sourceMatches(person)).includes(wire);
   const opened = answered(
     await reading(person, async (reader, tx) => {
       const read = await open(reader, tx, { locator: wire }, NOW);
@@ -285,7 +287,7 @@ const narrowingTheDocument = (scenario: Scenario, connectedSourceId: string, doc
       tx,
       inputOf(narrowDocumentsInput, {
         connectedSourceId,
-        findingGroups: [
+        groupsOfFindings: [
           {
             documentId,
             category: "bank-details",

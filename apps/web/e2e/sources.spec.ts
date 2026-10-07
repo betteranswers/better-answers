@@ -417,7 +417,7 @@ test.describe("reviewing a connected source's findings", () => {
 
     await expect(reviewOf(page, "Supplier forms").getByRole("table")).toMatchAriaSnapshot(`
       - table:
-        - caption: 0 finding groups selected. Select a group with x, then keep it in text, narrow its document or dismiss it as not special category with the acts above.
+        - caption: 0 groups of findings selected. Select a group with x, then keep it in text, narrow its document or dismiss it as not special category with the acts above.
         - rowgroup:
           - row "Selected Category Rule Document Found Class":
             - columnheader "Selected"
@@ -491,7 +491,7 @@ test.describe("reviewing a connected source's findings", () => {
     ).toBeChecked();
 
     await page.keyboard.press("k");
-    const keeping = page.getByRole("dialog", { name: "Keep 1 finding group in text" });
+    const keeping = page.getByRole("dialog", { name: "Keep 1 group of findings in text" });
     await expect(keeping).toContainText(
       "bank details by UK_BANK_ACCOUNT in Supplier form: 2 found",
     );
@@ -501,7 +501,7 @@ test.describe("reviewing a connected source's findings", () => {
 
     await expect(
       page.getByText(
-        "Kept 1 finding group in text: 2 spans restored, and the sync that lets them back in is queued.",
+        "Kept 1 group of findings in text: 2 spans restored, and the sync that lets them back in is queued.",
       ),
     ).toBeVisible();
     await expect(
@@ -562,12 +562,14 @@ test.describe("reviewing a connected source's findings", () => {
     const healthCue = review.getByRole("checkbox", { name: HEALTH_CUE_BOX });
     await expect(healthCue).toBeFocused();
     await page.keyboard.press("x");
-    await expect(dismissal).toHaveAccessibleName("Dismiss 1 finding group as not special category");
+    await expect(dismissal).toHaveAccessibleName(
+      "Dismiss 1 group of findings as not special category",
+    );
     await expect(dismissal).toBeEnabled();
 
     await page.keyboard.press("s");
     const dismissing = page.getByRole("dialog", {
-      name: "Dismiss 1 finding group as not special category",
+      name: "Dismiss 1 group of findings as not special category",
     });
     await expect(dismissing).toContainText(
       "special category by HEALTH_CUE in Staff survey: 1 found",
@@ -582,7 +584,7 @@ test.describe("reviewing a connected source's findings", () => {
     await theActLandedWithinItsBudget(page, "dismissal");
 
     await expect(review).toContainText(
-      "Dismissed 1 finding group as not special category in 1 document. The sync that reads the dismissal: queued.",
+      "Dismissed 1 group of findings as not special category in 1 document. The sync that reads the dismissal: queued.",
     );
     await expect(healthCue, "focus did not come back to the row the act left").toBeFocused();
     const row = findingRow(page, "Supplier forms", "Staff survey", "HEALTH_CUE");
@@ -718,7 +720,7 @@ test.describe("reviewing a connected source's findings", () => {
     await reviewOf(page, "Supplier forms").getByRole("checkbox", { name: HEALTH_CUE_BOX }).click();
     await expect(
       reviewOf(page, "Supplier forms").getByRole("button", {
-        name: "Dismiss 1 finding group as not special category",
+        name: "Dismiss 1 group of findings as not special category",
       }),
     ).toBeEnabled();
 
@@ -1069,13 +1071,13 @@ test.describe("the Sources page's keystrokes", () => {
         - term: w
         - definition: Widen the connected source in focus
         - term: x
-        - definition: Select or clear the finding group in focus
+        - definition: Select or clear the group of findings in focus
         - term: k
-        - definition: Keep the selected finding groups in text
+        - definition: Keep the selected groups of findings in text
         - term: d
-        - definition: Narrow the documents the selected finding groups sit in
+        - definition: Narrow the documents the selected groups of findings sit in
         - term: s
-        - definition: Dismiss the selected finding groups as not special category
+        - definition: Dismiss the selected groups of findings as not special category
         - term: "?"
         - definition: ${JSON.stringify(KEYSTROKE_WORDS.showTheList)}
         - term: /⌘K|Ctrl K/

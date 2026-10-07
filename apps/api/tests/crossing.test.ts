@@ -139,7 +139,7 @@ const A_WORD_OF_EACH_CLASS = [
       const connectedSourceId = await connectedSourceIn(workspaceId, null);
       return api.sources.narrowDocuments.mutate({
         connectedSourceId,
-        findingGroups: [{ documentId: ulid(), tier: "always", ...A_SORT_CODE }],
+        groupsOfFindings: [{ documentId: ulid(), tier: "always", ...A_SORT_CODE }],
       });
     },
   ],
@@ -150,7 +150,7 @@ const A_WORD_OF_EACH_CLASS = [
     async () =>
       (await anAdmin()).api.sources.keepInText.mutate({
         connectedSourceId: ulid(),
-        findingGroups: [{ documentId: ulid(), tier: "default-on", ...A_SORT_CODE }],
+        groupsOfFindings: [{ documentId: ulid(), tier: "default-on", ...A_SORT_CODE }],
         reason: "The sort code is the company's own.",
       }),
   ],

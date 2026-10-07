@@ -16,7 +16,7 @@ tags:
   - open
   - token-scope
   - principal
-  - hit
+  - match
 ---
 
 # One MCP surface of four entries, the Principal from the token, grown only by scope
@@ -28,9 +28,9 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 - The Principal comes from the token. No entry takes a workspace.
 - The MCP surface grows by token scope, never by a second server. The scopes today are `knowledge:read` and `feedback:write`.
 
-`find`'s hit is a union by knowledge layer.
+`find`'s match is a union by knowledge layer.
 
-- A concept hit (`layer: "bundles"`) sits beside a document hit (`layer: "sources"`), which the rendering marks *Not company knowledge*.
+- A concept match (`layer: "bundles"`) sits beside a document match (`layer: "sources"`), which the rendering marks *Not company knowledge*.
 - A document that a concept visible to the caller cites is left out.
 - The caller's limit is spent on the union, concepts first.
 - The two arms are ranked separately until S2.
@@ -46,7 +46,7 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 - Long and scheduled work (question sets, briefings, exposure sweeps) belongs to headless agents reading through these same entries and proposing into Suggestions.
 - `describe_estate`, the fifth entry, was dropped. All four others answered through the real claude.ai assistant with no orienting call first, and its budget could not be measured with no estate. `find` is the preview step an agent orients by.
 - The token from claude.ai carries no role, so the role is read per call, in the same transaction as the read it authorises.
-- A reader asking for five hits is asking to be handed five things. Running both arms to five would hand them ten.
+- A reader asking for five matches is asking to be handed five things. Running both arms to five would hand them ten.
 - A concept is the company's answer, and a raw passage is what there was no answer for. So concepts come first.
 - One ranking across the two layers needs a score both arms share. That is S2's question.
 - An imported bundle's `sources` entry often has no locator, since `sources[].locator` is a key the platform adds. An empty locator would be a passage `open` cannot fetch.

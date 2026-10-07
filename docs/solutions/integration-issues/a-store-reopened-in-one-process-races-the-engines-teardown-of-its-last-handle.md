@@ -41,7 +41,7 @@ Upstream paths below are in the installed packages, heed 0.22.1 and cocoindex 1.
 - `coco.Environment(...)` raised a plain `RuntimeError` whose text is exactly `environment already open in this program; close it to be able to open it again with different options`.
 - Merge-group runs 36358367778, 36358640405, 36992793999 and 37061772234 failed this way: 4 of 78 merge groups since PR #448. Each dropped an unrelated PR (#472, #470, #506, #514) that touched no worker file.
 - Every failure was a test in `apps/worker/tests/test_pipeline_landed.py` that calls `read_the_copies` twice, each read through its own `Host`: `test_a_rule_switched_off_on_the_source_detects_nothing_afresh` (twice), `test_a_suppression_withholds_the_name_without_rerunning_the_detector` and `test_another_converter_over_the_same_normalised_text_detects_nothing_afresh`.
-- A two-read race script never hit it locally in 120 rounds.
+- A two-read race script never reproduced it locally in 120 rounds.
 
 ## What Didn't Work
 
