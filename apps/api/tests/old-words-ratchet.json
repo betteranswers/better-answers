@@ -47,7 +47,6 @@
   },
   "apps/web/src/shared/navigation.ts": {
     "act": 1,
-    "agent token": 1,
     "answer audit": 1,
     "check": 1,
     "Checks due": 1,

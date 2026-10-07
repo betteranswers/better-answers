@@ -902,7 +902,7 @@ to it by IRI and never restates it (ADR 0014).
   operator ends every session and token the person holds, by an instant on the person. Both end
   what was issued; a fresh sign-in mints anew. The member page's last section reads *Remove and end
   every sign-in*.
-- **share agent token** — _Code rename pending._ a **share agent's** credential: scoped to one
+- **share agent token** — a **share agent's** credential: scoped to one
   connected source, minted and ended by an Admin, validated in the api before any request body is
   read, and good only for the `/agent/v1` routes a share agent uses to push documents in from a
   company's own network (ADR 0008 amendment, ADR 0041's *agent* class). Listed on Control Centre ›

@@ -269,8 +269,8 @@ export const CONTROL_CENTRE = {
           seenBy: ADMINS,
         },
         {
-          name: "Agent tokens",
-          path: "/sources/agent-tokens",
+          name: "Share agents",
+          path: "/sources/share-agents",
           icon: "token",
           built: false,
           seenBy: ADMINS,

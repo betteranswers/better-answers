@@ -86,7 +86,7 @@ describe("the one navigation list", () => {
               "Priced plan",
               "Backlogs",
               "Gone-at-source impact",
-              "Agent tokens",
+              "Share agents",
             ],
           ],
           ["Models", ["Models and spend", "Spending limit"]],
