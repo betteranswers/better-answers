@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import os
 import re
 import threading
 import time
@@ -349,6 +350,34 @@ def test_a_sources_stores_sit_at_sibling_paths_in_its_directory(
     )
     assert passage_store != findings
     assert passage_store.is_dir() and findings.is_dir()
+
+
+def test_removing_a_store_never_made_passes_quietly(tmp_path: Path) -> None:
+    sync = a_sync_on("connected-source-never-opened")
+
+    with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
+        host.remove_connected_source_store(sync)
+
+        assert not host.connected_source_directory(sync).exists()
+
+
+def test_a_store_that_cannot_be_removed_fails_the_removal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sync = a_sync_on("connected-source-on-a-locked-volume")
+
+    def refuse(*_: object, **__: object) -> None:
+        raise PermissionError("the volume refuses the removal")
+
+    with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
+        passage_store = host.store_directory(sync, CONNECTED_SOURCE_STORE)
+        passage_store.mkdir(parents=True)
+        monkeypatch.setattr(os, "rmdir", refuse)
+
+        with pytest.raises(PermissionError):
+            host.remove_connected_source_store(sync)
+
+    assert passage_store.is_dir()
 
 
 def test_a_connected_sources_lmdb_size_is_readable_after_its_run(

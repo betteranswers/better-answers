@@ -39,7 +39,7 @@ CONVERTER_PIN = converter_pin_of(
 
 
 class UnreadableError(Exception):
-    """`name` is what a unreadable document's row records: the
+    """`name` is what an unreadable document's row records: the
     failure's class name, or `UnsupportedMediaType` or `NeedsOcrError`."""
 
     def __init__(self, name: str, message: str) -> None:
