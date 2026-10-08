@@ -28,10 +28,10 @@ const focusOnArrival = (node: HTMLElement | null) => {
   node?.focus();
 };
 
-type NameActs = {
+type NameActions = {
   readonly correct: (personId: string) => void;
   readonly focusedOn: (personId: string) => void;
-  /** The person whose act takes focus as it arrives: back from signing in, or refused. */
+  /** The person whose action takes focus as it arrives: back from signing in, or refused. */
   readonly personToFocus: string | undefined;
 };
 
@@ -56,12 +56,15 @@ function Flags(properties: { readonly waiting: NameWaiting }) {
   );
 }
 
-function CorrectAct(properties: { readonly waiting: NameWaiting; readonly acts: NameActs }) {
-  const { waiting, acts } = properties;
+function CorrectAction(properties: {
+  readonly waiting: NameWaiting;
+  readonly actions: NameActions;
+}) {
+  const { waiting, actions } = properties;
   const { personId } = waiting;
   return (
     <Button
-      ref={personId === acts.personToFocus ? focusOnArrival : undefined}
+      ref={personId === actions.personToFocus ? focusOnArrival : undefined}
       id={correctButtonId(personId)}
       variant="outline"
       size="sm"
@@ -69,10 +72,10 @@ function CorrectAct(properties: { readonly waiting: NameWaiting; readonly acts: 
       aria-label={correctWords(waiting.displayName)}
       aria-keyshortcuts={NAMES_WAITING_KEYSTROKES.correct.key}
       onFocus={() => {
-        acts.focusedOn(personId);
+        actions.focusedOn(personId);
       }}
       onClick={() => {
-        acts.correct(personId);
+        actions.correct(personId);
       }}
     >
       Correct
@@ -80,8 +83,8 @@ function CorrectAct(properties: { readonly waiting: NameWaiting; readonly acts: 
   );
 }
 
-/** The row's own act corrects it, so the acts ride into the columns. */
-const columnsFor = (acts: NameActs) =>
+/** The row's own action corrects it, so the actions ride into the columns. */
+const columnsFor = (actions: NameActions) =>
   column.columns([
     column.display({
       id: "person",
@@ -94,9 +97,9 @@ const columnsFor = (acts: NameActs) =>
       cell: ({ row }) => <Flags waiting={row.original} />,
     }),
     column.display({
-      id: "acts",
-      header: "Acts",
-      cell: ({ row }) => <CorrectAct waiting={row.original} acts={acts} />,
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => <CorrectAction waiting={row.original} actions={actions} />,
     }),
   ]);
 
@@ -235,7 +238,7 @@ export function NamesWaitingList(properties: {
         <div className="mt-4 border border-border bg-card">
           <GridTable
             table={table}
-            caption="Every display name an Admin flagged and nobody has corrected since, the longest waiting first, with the workspaces that flagged it and when. Each row's act corrects the name."
+            caption="Every display name an Admin flagged and nobody has corrected since, the longest waiting first, with the workspaces that flagged it and when. Each row's action corrects the name."
             empty={<NothingWaits />}
           />
         </div>

@@ -71,7 +71,7 @@ The envelope a credential is sealed in has a written format:
 - Fork Onyx or Dust: Enterprise gates or SaaS entanglement on exactly the parts needed, and an operational floor far above a two-box estate.
 - Several Python services from day one: more deploy units for one customer. Module seams keep this a compose-file change later.
 - Minimise Python by rewriting in TypeScript: rewrites Python-only libraries for no v0.1 gain and still leaves two runtimes.
-- Track upstream by submodules or long-lived fork branches: a refresh must be a deliberate, tested act.
+- Track upstream by submodules or long-lived fork branches: a refresh must be a deliberate, tested action.
 - ChaCha20-Poly1305: equal strength and the same nonce discipline, with nothing gained for a second cipher.
 - XChaCha20-Poly1305: the OpenSSL that Node exposes does not carry it, so it would need a lift or a second library.
 

@@ -245,7 +245,7 @@ describe("a git failure after the precondition passed", () => {
 });
 
 describe("the message the git door composes", () => {
-  it("carries all five trailers when an act names them all", async () => {
+  it("carries all five trailers when an action names them all", async () => {
     const bundle = await arrange();
     const trailers = {
       actor: `human:${ulid()}` satisfies ActorId,
@@ -291,7 +291,7 @@ const gate = (): { readonly waited: Promise<void>; readonly open: () => void } =
 const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 describe("the per-repository lock", () => {
-  it("queues a third act behind a second still holding it", async () => {
+  it("queues a third action behind a second still holding it", async () => {
     const bundle = await arrange();
     const order: string[] = [];
     const first = gate();

@@ -259,13 +259,13 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return verifyingTheCode(context, person, asked.code, reserved.value.noticeDue);
   };
 
-  /** The act counts its own failures, and refuses a kind still waiting with the ceiling met. */
+  /** The action counts its own failures, and refuses a kind still waiting with the ceiling met. */
   const spending =
-    (act: SpendsACode, wrong: { readonly error: string }, used?: FactorChange) =>
+    (action: SpendsACode, wrong: { readonly error: string }, used?: FactorChange) =>
     async (context: Context, person: SignedIn): Promise<Response> => {
       const sent = await parsedBody(context, typedCode);
       if (!sent.success) return context.json(wrong, 400);
-      const tried = await act(IDENTITY_PRINCIPAL, door, {
+      const tried = await action(IDENTITY_PRINCIPAL, door, {
         ...askedBy(clock, person),
         code: sent.data.code,
       });

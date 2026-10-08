@@ -52,7 +52,7 @@ const namesInSchema = (schema: unknown, seen: Set<unknown> = new Set()): readonl
   return [...ownNamesOf(def), ...innerOf(def).flatMap((inner) => namesInSchema(inner, seen))];
 };
 
-const QUOTED_ACT = /"([a-z_]+\.[a-z_]+\.[a-z_]+)"/g;
+const QUOTED_ACTION = /"([a-z_]+\.[a-z_]+\.[a-z_]+)"/g;
 
 /** A page's or group's older addresses, a list that may wrap onto lines of its own. */
 const MOVED_FROM = /movedFrom: \[([^\]]*)\]/g;
@@ -81,9 +81,9 @@ export const keptNamesUnder = (root: string): Readonly<Record<string, readonly s
     .split("\n")
     .filter((line) => line.startsWith("/")),
   "the stored-names register": STORED_ACT_NAMES,
-  "stored act names": matchesIn(
-    readUnder(root, "apps/web/src/features/people/audit-acts.ts"),
-    QUOTED_ACT,
+  "stored action names": matchesIn(
+    readUnder(root, "apps/web/src/features/people/audit-actions.ts"),
+    QUOTED_ACTION,
   ),
   "old page addresses": movedFromIn(readUnder(root, "apps/web/src/shared/navigation.ts")),
 });

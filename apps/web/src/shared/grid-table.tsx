@@ -286,7 +286,7 @@ export function GridTable<Features extends TableFeatures, Data extends RowData>(
               ))}
             {rowMenu === undefined ? null : (
               <TableHead scope="col" className={cn(HEAD, "w-12")}>
-                <span className="sr-only">Acts</span>
+                <span className="sr-only">Actions</span>
               </TableHead>
             )}
           </TableRow>

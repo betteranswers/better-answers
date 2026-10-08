@@ -19,7 +19,7 @@ const useArrival = (found: keyof Arrival): boolean =>
   });
 
 /**
- * Decided on arrival, so a role changed mid-act waits for the next move. An arrival without a
+ * Decided on arrival, so a role changed mid-action waits for the next move. An arrival without a
  * role follows the list until retaken.
  */
 export const useHidden = (tree: VisibleTree, path: string): boolean => {

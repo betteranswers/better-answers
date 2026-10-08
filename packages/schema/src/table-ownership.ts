@@ -123,7 +123,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "workspaces",
     access: "read and write",
     reason:
-      "Ending every sign-in and token a person holds writes the instant every later claim is refused against; the platform writes a person it names before their first sign-in, unverified, and that sign-in finds the row; the person's own act writes their display name under its one rule, and adding a member or provisioning reads it to refuse a person with none; and the member read looks up the person's name and address for the shell, as the operator's list of people does for every person, with their revocation instant.",
+      "Ending every sign-in and token a person holds writes the instant every later claim is refused against; the platform writes a person it names before their first sign-in, unverified, and that sign-in finds the row; the person's own action writes their display name under its one rule, and adding a member or provisioning reads it to refuse a person with none; and the member read looks up the person's name and address for the shell, as the operator's list of people does for every person, with their revocation instant.",
   },
   {
     table: "public.session",
@@ -276,7 +276,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "members",
     access: "read and write",
     reason:
-      "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; the request act reads the same row to answer already-a-member neutrally. An Admin's acts on a member write the row itself — a role change, a removal and the member's revocation instant — and a role change or a removal first holds every Admin row of the workspace, so it never loses its last. The test workspace's fixture reads every workspace its people hold, to refuse one held anywhere else, and sets back a role that drifted under the platform's own actor.",
+      "Adding a person to a group reads whether they are a member of the workspace first, so the action answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; the request action reads the same row to answer already-a-member neutrally. An Admin's actions on a member write the row itself — a role change, a removal and the member's revocation instant — and a role change or a removal first holds every Admin row of the workspace, so it never loses its last. The test workspace's fixture reads every workspace its people hold, to refuse one held anywhere else, and sets back a role that drifted under the platform's own actor.",
   },
   {
     table: "public.user",
@@ -297,7 +297,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "concepts",
     access: "read",
     reason:
-      "Accepting an *edit* suggestion commits with the proposer as git author, and a git author line is a name and an address — which the audit log's `human:<person id>` deliberately is not, so the act reads them off the person the proposer names.",
+      "Accepting an *edit* suggestion commits with the proposer as git author, and a git author line is a name and an address — which the audit log's `human:<person id>` deliberately is not, so the action reads them off the person the proposer names.",
   },
   {
     table: "public.member",
@@ -339,7 +339,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: MAP_DOOR,
     access: "read",
     reason:
-      "The delta builder resolves a link's target to a concept and reads its kind off the index inside the act's own transaction, and a newly landed concept's linkers are found there — the map is derived from the rows the same transaction just wrote.",
+      "The delta builder resolves a link's target to a concept and reads its kind off the index inside the action's own transaction, and a newly landed concept's linkers are found there — the map is derived from the rows the same transaction just wrote.",
   },
   {
     table: "public.source_document",
@@ -360,7 +360,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "sources",
     access: "read",
     reason:
-      "The publish act reads the status of the connected source's latest sync, its `index` job by subject, inside its own transaction: the worker holds SELECT alone on `connected_source`, so the sync's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through. One column of one row, by the statement in `packages/core/src/sources/connected-source.ts`. The review read's other question of the same table — what the latest finished sync found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
+      "The publish action reads the status of the connected source's latest sync, its `index` job by subject, inside its own transaction: the worker holds SELECT alone on `connected_source`, so the sync's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through. One column of one row, by the statement in `packages/core/src/sources/connected-source.ts`. The review read's other question of the same table — what the latest finished sync found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
   },
   {
     table: "public.concept_index",

@@ -53,7 +53,7 @@ describe("the actor a record names", () => {
   });
 });
 
-describe("the guard on an act only an Admin may perform", () => {
+describe("the guard on an action only an Admin may perform", () => {
   it("lets an Admin through with the role narrowed to Admin", () => {
     const admin = person("Admin");
     const guarded = requireAdmin(admin);

@@ -42,7 +42,7 @@ describe("removing a member from their page", () => {
       result.current.removal?.mutate({ personId: "q" });
     });
 
-    // The stub refuses every act, so the removal ends refused rather than lost.
+    // The stub refuses every action, so the removal ends refused rather than lost.
     await waitFor(() => expect(result.current.outcome?.status).toBe("error"));
   });
 });

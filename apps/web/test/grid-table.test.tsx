@@ -133,10 +133,10 @@ describe("the shared table", () => {
   });
 
   it("names the row menu by its row; Escape returns focus", async () => {
-    const acts: string[] = [];
-    render(<MembersList onAct={(act) => acts.push(act)} />);
+    const actions: string[] = [];
+    render(<MembersList onAction={(action) => actions.push(action)} />);
 
-    const trigger = screen.getByRole("button", { name: "Acts for Bo Diddley" });
+    const trigger = screen.getByRole("button", { name: "Actions for Bo Diddley" });
     trigger.focus();
     const menu = opened(trigger);
     expect(
@@ -153,13 +153,13 @@ describe("the shared table", () => {
     });
 
     fireEvent.click(within(opened(trigger)).getByRole("menuitem", { name: "Open" }));
-    expect(acts).toEqual(["open bo"]);
+    expect(actions).toEqual(["open bo"]);
   });
 
-  it("heads the tick, columns and acts in one row", () => {
+  it("heads the tick, columns and actions in one row", () => {
     render(<MembersList />);
 
-    expect(headRows()).toEqual([["", "Person", "Role", "Groups", "Joined", "Acts"]]);
+    expect(headRows()).toEqual([["", "Person", "Role", "Groups", "Joined", "Actions"]]);
   });
 });
 
@@ -207,7 +207,7 @@ describe("a row's link", () => {
 });
 
 describe("the list's states", () => {
-  it("offers the page's primary act when nothing is listed", () => {
+  it("offers the page's primary action when nothing is listed", () => {
     render(<MembersList members={[]} />);
 
     expect(screen.getByText("No one belongs to this workspace yet.")).toBeTruthy();
@@ -323,7 +323,7 @@ describe("the list's pages", () => {
 
   it("loads more on the page's keystroke, and not while loading", () => {
     const more = vi.fn<() => void>();
-    const keystroke = { key: "m", act: "Load older events" };
+    const keystroke = { key: "m", action: "Load older events" };
     const { rerender } = render(
       <ListPages
         pages={{

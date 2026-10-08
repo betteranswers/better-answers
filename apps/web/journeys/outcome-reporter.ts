@@ -26,7 +26,7 @@ const OUTSIDE_ANY_STEP = "outside any step";
 /** A timeout or a stop leaves its step unfinished, with no error and a duration of -1. */
 const endedThere = (step: TestStep): boolean => step.error !== undefined || step.duration < 0;
 
-/** A page or an act is a `test.step`, and one may sit inside a fixture's step, as sign-in does. */
+/** A page or an action is a `test.step`, and one may sit inside a fixture's step, as sign-in does. */
 const failingStepsOf = (steps: readonly TestStep[]): readonly string[] => {
   const failing = steps.find(endedThere);
   if (failing === undefined) return [];

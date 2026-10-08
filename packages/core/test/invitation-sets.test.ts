@@ -89,7 +89,7 @@ describe("inviting several addresses at once", () => {
     ]);
     expect(sent.map((one) => one.expiresAt)).toEqual([A_WEEK_LATER, A_WEEK_LATER, A_WEEK_LATER]);
     const events = await invitationEvents(workspace);
-    expect(events.map((event) => [event.act, event.subject_id])).toEqual(
+    expect(events.map((event) => [event.action, event.subject_id])).toEqual(
       sent.map((one) => ["people.invitation.created", one.invitationId]),
     );
     const [batch] = events.map((event) => event.batch_id);
@@ -119,7 +119,7 @@ describe("inviting several addresses at once", () => {
       [ana, "pending"],
       [ben, "pending"],
     ]);
-    expect((await invitationEvents(workspace)).map((event) => event.act)).toEqual([
+    expect((await invitationEvents(workspace)).map((event) => event.action)).toEqual([
       "people.invitation.created",
       "people.invitation.created",
     ]);
@@ -149,19 +149,19 @@ describe("inviting several addresses at once", () => {
     expect(batch).toMatch(ULID);
     expect(events).toEqual([
       expect.objectContaining({
-        act: "people.invitation.created",
+        action: "people.invitation.created",
         subject_id: toBen,
         detail: { role: "Editor" },
         batch_id: batch,
       }),
       expect.objectContaining({
-        act: "people.invitation.created",
+        action: "people.invitation.created",
         subject_id: toAna,
         detail: { role: "Editor" },
         batch_id: batch,
       }),
       expect.objectContaining({
-        act: "people.invitation.cancelled",
+        action: "people.invitation.cancelled",
         subject_id: first.invitationId,
         detail: { replacedByInvitationId: toAna },
         batch_id: batch,
@@ -460,7 +460,7 @@ describe("resending a set of invitations", () => {
       ["pending", "2031-07-02T12:00:00.000Z"],
     ]);
     const events = (await invitationEvents(workspace)).filter(
-      (event) => event.act === "people.invitation.resent",
+      (event) => event.action === "people.invitation.resent",
     );
     expect(sorted(events.map((event) => event.subject_id))).toEqual(sorted(ids));
     const [batch] = events.map((event) => event.batch_id);
@@ -593,7 +593,7 @@ describe("resending a set of invitations", () => {
 
     expect(resent).toMatchObject({ ok: true, value: [{ invitationId: invited.invitationId }] });
     expect((await invitationEvents(workspace)).at(-1)).toMatchObject({
-      act: "people.invitation.resent",
+      action: "people.invitation.resent",
       batch_id: null,
     });
     expect(await emailsCountedTo(workspace, ana)).toBe(2);
@@ -617,7 +617,7 @@ describe("cancelling a set of invitations", () => {
       "canceled",
     ]);
     const events = (await invitationEvents(workspace)).filter(
-      (event) => event.act === "people.invitation.cancelled",
+      (event) => event.action === "people.invitation.cancelled",
     );
     const [batch] = events.map((event) => event.batch_id);
     expect(batch).toMatch(ULID);
@@ -659,7 +659,7 @@ describe("cancelling a set of invitations", () => {
     });
     expect(
       (await invitationEvents(workspace))
-        .filter((event) => event.act === "people.invitation.cancelled")
+        .filter((event) => event.action === "people.invitation.cancelled")
         .map((event) => [event.subject_id, event.batch_id]),
     ).toEqual([
       [gone.invitationId, null],
@@ -702,7 +702,7 @@ const EACH_SET_ON_IDS = [
   ["cancel", cancellingSet],
 ] as const;
 
-describe.each(EACH_SET_ON_IDS)("asked to %s another workspace's invitation", (_verb, actOn) => {
+describe.each(EACH_SET_ON_IDS)("asked to %s another workspace's invitation", (_verb, actionOn) => {
   it("names it as it names a random id, changing nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "SetOnOurs");
     const elsewhere = await provisionedWorkspace(db(), "SetOnTheirs");
@@ -710,8 +710,8 @@ describe.each(EACH_SET_ON_IDS)("asked to %s another workspace's invitation", (_v
     const random = ulid();
 
     const answers = [
-      await actOn(workspace, [theirs.invitationId]),
-      await actOn(workspace, [random]),
+      await actionOn(workspace, [theirs.invitationId]),
+      await actionOn(workspace, [random]),
     ];
 
     expect(answers).toEqual(
@@ -746,13 +746,13 @@ describe("the invitation ids asked to resend or cancel", () => {
   });
 });
 
-type SetAct = (
+type SetAction = (
   principal: UserPrincipal,
   tx: Tx,
   invitationId: string,
 ) => Promise<Result<unknown, unknown>>;
 
-const EACH_SET_ACT: readonly (readonly [string, SetAct])[] = [
+const EACH_SET_ACTION: readonly (readonly [string, SetAction])[] = [
   [
     "invite",
     (principal, tx) =>
@@ -780,7 +780,7 @@ const EACH_SET_ACT: readonly (readonly [string, SetAct])[] = [
   ],
 ];
 
-describe.each(EACH_SET_ACT)("who may %s a set of invitations", (_verb, act) => {
+describe.each(EACH_SET_ACTION)("who may %s a set of invitations", (_verb, action) => {
   it.each(["Editor", "Viewer"] as const)(
     "refuses a member at %s, before any read",
     async (role) => {
@@ -791,7 +791,7 @@ describe.each(EACH_SET_ACT)("who may %s a set of invitations", (_verb, act) => {
 
       const refused = await as(workspace, person.id, async (principal, tx) => {
         await abortTheTransaction(tx);
-        return act(principal, tx, invited.invitationId);
+        return action(principal, tx, invited.invitationId);
       });
 
       expect(refused).toEqual({ ok: false, error: "role-forbids" });
@@ -800,7 +800,7 @@ describe.each(EACH_SET_ACT)("who may %s a set of invitations", (_verb, act) => {
   );
 });
 
-describe.each(EACH_SET_ACT)("a set act to %s whose event fails", (_verb, act) => {
+describe.each(EACH_SET_ACTION)("a set action to %s whose event fails", (_verb, action) => {
   it("fails, leaving every invitation and count as it was", async () => {
     const workspace = await provisionedWorkspace(db(), "SetUnrecorded");
     const ana = addressOf("ana");
@@ -809,7 +809,7 @@ describe.each(EACH_SET_ACT)("a set act to %s whose event fails", (_verb, act) =>
 
     const failed = await whileWritesAreRefused(db().pool, "audit_event", () =>
       as(workspace, workspace.adminUserId, (principal, tx) =>
-        act(principal, tx, invited.invitationId),
+        action(principal, tx, invited.invitationId),
       ),
     );
 

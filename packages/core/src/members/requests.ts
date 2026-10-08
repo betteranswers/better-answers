@@ -2,8 +2,8 @@ import { z } from "zod";
 
 import { ACCESS_REQUEST_OPEN_STATUS, boundarySchemas } from "@better-answers/schema";
 
-import { act, declareActs, record, recordFor } from "../audit/index.ts";
-import type { DetailOf, AuditAct } from "../audit/index.ts";
+import { action, declareActions, record, recordFor } from "../audit/index.ts";
+import type { DetailOf, AuditAction } from "../audit/index.ts";
 import {
   actorIdOfPerson,
   attempt,
@@ -26,14 +26,14 @@ import { workspaceIdByShortName } from "../workspaces/index.ts";
 import { mintInvitation, type InvitationToSend } from "./invitations.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-const REQUEST_ACTS = declareActs("people", {
-  asked: act("people.request.asked", { requesterId: "id" }),
-  approved: act("people.request.approved", {
+const REQUEST_ACTIONS = declareActions("people", {
+  asked: action("people.request.asked", { requesterId: "id" }),
+  approved: action("people.request.approved", {
     requesterId: "id",
     role: "role",
     invitationId: "id",
   }),
-  declined: act("people.request.declined", { requesterId: "id" }),
+  declined: action("people.request.declined", { requesterId: "id" }),
 });
 
 /** The role an approval grants when it names none. */
@@ -92,7 +92,7 @@ export const requestAccess = async (
       await recordFor(platform, tx, {
         id: ulid(),
         actor: actorIdOfPerson(requester.data),
-        act: REQUEST_ACTS.asked,
+        action: REQUEST_ACTIONS.asked,
         subjectId: id,
         detail: { requesterId: requester.data },
       });
@@ -154,13 +154,13 @@ const claimForDecision = async (
   });
 };
 
-const landDecision = async <A extends AuditAct>(
+const landDecision = async <A extends AuditAction>(
   admin: AdminUserPrincipal,
   tx: Tx,
   requestId: AccessRequestId,
   decision: {
     readonly status: AccessRequestStatus;
-    readonly act: A;
+    readonly action: A;
     readonly detail: DetailOf<A["detail"]>;
 
     readonly invitationId: string | null;
@@ -168,7 +168,7 @@ const landDecision = async <A extends AuditAct>(
 ): Promise<Result<undefined, Error>> => {
   await record(admin, tx, {
     id: ulid(),
-    act: decision.act,
+    action: decision.action,
     subjectId: requestId,
     detail: decision.detail,
   });
@@ -223,7 +223,7 @@ export const approveRequest = async (
 
   const decided = await landDecision(admin, tx, requestId, {
     status: "approved",
-    act: REQUEST_ACTS.approved,
+    action: REQUEST_ACTIONS.approved,
     detail: { requesterId: claimed.value.requesterId, role: role.data, invitationId },
     invitationId,
   });
@@ -247,7 +247,7 @@ export const declineRequest = async (
 
   const decided = await landDecision(admin, tx, requestId, {
     status: "declined",
-    act: REQUEST_ACTS.declined,
+    action: REQUEST_ACTIONS.declined,
     detail: { requesterId: claimed.value.requesterId },
     invitationId: null,
   });

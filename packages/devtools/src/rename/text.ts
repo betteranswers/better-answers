@@ -23,8 +23,8 @@ const LONE_WORD = "lone word, joiner unknown";
 /** A lone word outside a script string is a name: a Python identifier, a dict key or a JSON key. */
 const NAME_JOINER = "_";
 
-/** `family.subject.verb`: a stored act name, which events keep writing after any sweep. */
-const STORED_ACT = new RegExp(`^(?:${FAMILIES.join("|")})\\.[a-z_]+\\.[a-z_]+$`);
+/** `family.subject.verb`: a stored action name, which events keep writing after any sweep. */
+const STORED_ACTION = new RegExp(`^(?:${FAMILIES.join("|")})\\.[a-z_]+\\.[a-z_]+$`);
 
 /** A whole repository's matches, each with its source line, outgrow the default megabyte. */
 const SCAN_BUFFER_BYTES = 512 * 1024 * 1024;
@@ -126,7 +126,7 @@ const scanned = (root: string, words: Words): readonly ScanMatch[] => {
 
 const fixedVerdict = (match: ScanMatch): string | undefined => {
   if (isRole(match.ruleId, "module")) return MODULE_PATH;
-  return STORED_ACT.test(match.text) ? STORED_HISTORY : undefined;
+  return STORED_ACTION.test(match.text) ? STORED_HISTORY : undefined;
 };
 
 /** A script string can be reader text, such as a tab label, which camel case would turn into code. */

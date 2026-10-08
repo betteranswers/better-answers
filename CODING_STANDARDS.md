@@ -251,32 +251,32 @@ Reviewer: attack a change to a migration, a grant, a policy or a definer functio
 
 No other module in the tier reads it, and no call site does. A suite, a script and this repository's own tooling are outside the rule. A setting that no step in the tier reads yet does not belong in the module. Passing the environment on to a child process is a different matter, and it lives in one named function.
 
-### Run an act's admission before its first `await`
+### Run an action's admission before its first `await`
 
-Before an act opens a transaction or reads a row, it judges whether the principal may ask for it. Nothing is then done for a caller it was never going to serve. The judgement is pure and works from:
+Before an action opens a transaction or reads a row, it judges whether the principal may ask for it. Nothing is then done for a caller it was never going to serve. The judgement is pure and works from:
 
 - the principal's kind;
 - a person's role, as a level;
 - the purposes a platform principal acts for;
 - the parsed input.
 
-It refuses in a word of the forbidden or unauthenticated class. A step takes the principal its act admitted and judges none.
+It refuses in a word of the forbidden or unauthenticated class. A step takes the principal its action admitted and judges none.
 
 ## Audit
 
-### Write an act and its audit event in one transaction
+### Write an action and its audit event in one transaction
 
-Every Admin act, governed write and platform act writes its event through the audit slice. It does so in the same transaction as the rows the event describes, so an act whose event cannot be written does not happen. One row per act and target: a bulk act is N rows sharing a batch id, never one hiding N. Call the doors bare. A wrapper that catches the abort hands it back as a value the act might not read.
+Every Admin action, governed write and platform action writes its event through the audit slice. It does so in the same transaction as the rows the event describes, so an action whose event cannot be written does not happen. One row per action and target: a bulk action is N rows sharing a batch id, never one hiding N. Call the doors bare. A wrapper that catches the abort hands it back as a value the action might not read.
 
-### Name an act `family.subject.verb`, and declare it
+### Name an action `family.subject.verb`, and declare it
 
-The four families are the one closed list: people, knowledge, sources, platform. Each slice declares its acts against the template type the audit slice exports. The doors accept a declared act and nothing else. The subject is what was acted on, and the verb what happened: `people.member.role_changed`, `sources.binding.published`.
+The four families are the one closed list: people, knowledge, sources, platform. Each slice declares its actions against the template type the audit slice exports. The doors accept a declared action and nothing else. The subject is what was acted on, and the verb what happened: `people.member.role_changed`, `sources.binding.published`.
 
 ### Derive the actor as an `ActorId`
 
 The row's actor is the kernel's `ActorId`, derived from the Principal by the kernel's one function. It is never composed by hand, and never an email, a display name or a session. A concept file keeps `human:<email>` in `generated.by` and `verified[].by`. The two forms differ by decision, which is why erasure rewrites files and never the audit log.
 
-### Audit a platform or a deferred act under its own actor
+### Audit a platform or a deferred action under its own actor
 
 Work that outlives a session names the actor the kernel derives from its principal, never a person's session. For the platform, that is its own actor id. The audit slice has two doors and no third:
 
@@ -285,7 +285,7 @@ Work that outlives a session names the actor the kernel derives from its princip
 
 ### Carry ids and role words in the detail
 
-The structured detail names a record by its id, and a role by its word: Admin, Editor, Viewer. It carries an act's confirmations as typed fields. It never carries an email, a display name, a prompt or a completion. An audit log holding one would need rewriting on erasure, and the audit log is never rewritten.
+The structured detail names a record by its id, and a role by its word: Admin, Editor, Viewer. It carries an action's confirmations as typed fields. It never carries an email, a display name, a prompt or a completion. An audit log holding one would need rewriting on erasure, and the audit log is never rewritten.
 
 ### Keep the audit log append-only in the database
 
@@ -297,7 +297,7 @@ The writer mints a ULID through the kernel minter, and the column has no databas
 
 ### Keep a read, a run and a health check out of the audit log
 
-A read writes no row, unless a decision names the view an act. An event with no workspace, like a token issued or a workspace pick, is a log line, unless declared for the identity-set audit log, as a sign-in and a passkey's or an authenticator's setup are. A consent lands in its workspace's. Each lands after the library's commit: a failed row is a log line, never a refusal. Runs, *Questions asked*, signals, alerts, spend, backups and health checks are their own records.
+A read writes no row, unless a decision names the view an action. An event with no workspace, like a token issued or a workspace pick, is a log line, unless declared for the identity-set audit log, as a sign-in and a passkey's or an authenticator's setup are. A consent lands in its workspace's. Each lands after the library's commit: a failed row is a log line, never a refusal. Runs, *Questions asked*, signals, alerts, spend, backups and health checks are their own records.
 
 ## OKF
 

@@ -66,11 +66,11 @@ const asAdmin = <T>(
   work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
 ): Promise<Folded<T>> => asPerson(workspace, workspace.adminUserId, work);
 
-const peopleActs = async (
+const peopleActions = async (
   workspaceId: string,
 ): Promise<
   readonly {
-    act: string;
+    action: string;
     actor: string;
     subject_kind: string;
     subject_id: string;
@@ -78,13 +78,13 @@ const peopleActs = async (
   }[]
 > => {
   const rows = await db().pool.query<{
-    act: string;
+    action: string;
     actor: string;
     subject_kind: string;
     subject_id: string;
     detail: Record<string, string>;
   }>(
-    "SELECT action AS act, actor, subject_kind, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND family = 'people' ORDER BY id",
+    "SELECT action, actor, subject_kind, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND family = 'people' ORDER BY id",
     [workspaceId],
   );
   return rows.rows;
@@ -122,7 +122,7 @@ const oneGroupOnePerson = async (
 };
 
 describe("making a group", () => {
-  it("gives an Admin a listed group and writes the act", async () => {
+  it("gives an Admin a listed group and writes the action", async () => {
     const workspace = await provisioned("Acme");
 
     const groupId = await madeGroup(workspace, "HR team");
@@ -132,9 +132,9 @@ describe("making a group", () => {
       ok: true,
       value: [{ id: groupId, name: "HR team", origin: "admin-curated", memberCount: 0 }],
     });
-    expect(await peopleActs(workspace.workspaceId)).toEqual([
+    expect(await peopleActions(workspace.workspaceId)).toEqual([
       {
-        act: "people.group.created",
+        action: "people.group.created",
         actor: `human:${workspace.adminUserId}`,
         subject_kind: "group",
         subject_id: groupId,
@@ -153,7 +153,7 @@ describe("making a group", () => {
 
     expect(again).toEqual({ ok: false, error: "name-taken" });
     expect(await groupRowCount(workspace.workspaceId)).toBe(1);
-    expect(await peopleActs(workspace.workspaceId)).toHaveLength(1);
+    expect(await peopleActions(workspace.workspaceId)).toHaveLength(1);
   });
 
   it("refuses a name blank once trimmed, writing no row", async () => {
@@ -213,7 +213,7 @@ describe("renaming a group", () => {
 });
 
 describe("deleting a group", () => {
-  it("takes its members with it and writes the act", async () => {
+  it("takes its members with it and writes the action", async () => {
     const { workspace, groupId } = await oneGroupOnePerson("Eta", "Editor");
 
     const deleted = await asAdmin(workspace, (principal, tx) =>
@@ -226,7 +226,7 @@ describe("deleting a group", () => {
       groupId,
     ]);
     expect(groupMembers.rowCount).toBe(0);
-    expect((await peopleActs(workspace.workspaceId)).map((event) => event.act)).toEqual([
+    expect((await peopleActions(workspace.workspaceId)).map((event) => event.action)).toEqual([
       "people.group.created",
       "people.group.member_added",
       "people.group.deleted",
@@ -247,7 +247,7 @@ describe("deleting a group", () => {
 });
 
 describe("who is in a group", () => {
-  it("puts one person in several groups, each act naming both", async () => {
+  it("puts one person in several groups, each action naming both", async () => {
     const workspace = await provisioned("Iota");
     const person = await seedMemberAt(workspace, "Viewer");
     const hr = await madeGroup(workspace, "HR team");
@@ -269,8 +269,8 @@ describe("who is in a group", () => {
     });
 
     expect(
-      (await peopleActs(workspace.workspaceId))
-        .filter((event) => event.act === "people.group.member_added")
+      (await peopleActions(workspace.workspaceId))
+        .filter((event) => event.action === "people.group.member_added")
         .map((event) => ({ subject: event.subject_id, detail: event.detail })),
     ).toEqual([
       { subject: hr, detail: { userId: person } },
@@ -299,8 +299,8 @@ describe("who is in a group", () => {
 
     expect(again).toEqual({ ok: false, error: "already-in-group" });
     expect(
-      (await peopleActs(workspace.workspaceId)).filter(
-        (event) => event.act === "people.group.member_added",
+      (await peopleActions(workspace.workspaceId)).filter(
+        (event) => event.action === "people.group.member_added",
       ),
     ).toHaveLength(1);
   });
@@ -317,7 +317,7 @@ describe("who is in a group", () => {
 
     expect(removed).toEqual({ ok: true, value: { groupId, userId: person } });
     expect(again).toEqual({ ok: false, error: "not-in-group" });
-    expect((await peopleActs(workspace.workspaceId)).map((event) => event.act)).toEqual([
+    expect((await peopleActions(workspace.workspaceId)).map((event) => event.action)).toEqual([
       "people.group.created",
       "people.group.member_added",
       "people.group.member_removed",
@@ -401,7 +401,7 @@ const whileTheTableIsGone = async <T>(table: string, work: () => Promise<T>): Pr
   }
 };
 
-describe("what a group act refuses before it reads anything", () => {
+describe("what a group action refuses before it reads anything", () => {
   it("refuses a malformed group id to every verb naming one", async () => {
     const workspace = await provisioned("Shapeless");
     const person = await seedMemberAt(workspace, "Viewer");
@@ -439,7 +439,7 @@ describe("what a group act refuses before it reads anything", () => {
   });
 });
 
-describe("an act whose statement the store refuses", () => {
+describe("an action whose statement the store refuses", () => {
   it("hands back the store's failure from every verb, writing nothing", async () => {
     const { workspace, person, groupId } = await oneGroupOnePerson("Failing");
     const verbs = everyVerb(groupId, person);
@@ -451,7 +451,7 @@ describe("an act whose statement the store refuses", () => {
 
     expect(outcomes).toEqual(refusedAlike(verbs, expect.any(Error)));
 
-    expect((await peopleActs(workspace.workspaceId)).map((event) => event.act)).toEqual([
+    expect((await peopleActions(workspace.workspaceId)).map((event) => event.action)).toEqual([
       "people.group.created",
       "people.group.member_added",
     ]);
@@ -526,7 +526,7 @@ describe("a role that may not shape who sees what", () => {
       if (!outcomes.ok) return;
       expect(outcomes.value).toEqual(refusedAlike(everyVerb(groupId, person), "role-forbids"));
 
-      expect((await peopleActs(workspace.workspaceId)).map((event) => event.act)).toEqual([
+      expect((await peopleActions(workspace.workspaceId)).map((event) => event.action)).toEqual([
         "people.group.created",
         "people.group.member_added",
       ]);
@@ -555,7 +555,7 @@ describe("an Admin of another workspace", () => {
       value: [{ id: groupId, name: "HR team", origin: "admin-curated", memberCount: 1 }],
     });
 
-    expect(await peopleActs(theirs.workspaceId)).toEqual([]);
+    expect(await peopleActions(theirs.workspaceId)).toEqual([]);
   });
 
   it("makes its own group under a name another workspace holds", async () => {
@@ -570,7 +570,7 @@ describe("an Admin of another workspace", () => {
   });
 });
 
-describe("an act whose transaction fails after it", () => {
+describe("an action whose transaction fails after it", () => {
   it("leaves neither the group nor its audit event behind", async () => {
     const workspace = await provisioned("Together");
     let groupId: string | undefined;
@@ -588,6 +588,6 @@ describe("an act whose transaction fails after it", () => {
     expect(groupId).toBeDefined();
     expect(await groupRowCount(workspace.workspaceId)).toBe(0);
 
-    expect(await peopleActs(workspace.workspaceId)).toEqual([]);
+    expect(await peopleActions(workspace.workspaceId)).toEqual([]);
   });
 });

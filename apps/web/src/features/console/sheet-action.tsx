@@ -3,17 +3,17 @@ import type { ReactNode, RefObject } from "react";
 import { Button } from "@/shared/ui/button.tsx";
 
 /** Held, not disabled, while the api answers: focus comes back here when its dialog closes. */
-export function SheetActButton(properties: {
-  readonly actRef: RefObject<HTMLButtonElement | null>;
+export function SheetActionButton(properties: {
+  readonly actionRef: RefObject<HTMLButtonElement | null>;
   readonly consequenceId: string;
   readonly pending: boolean;
   readonly onAsk: () => void;
   readonly children: ReactNode;
 }) {
-  const { actRef, consequenceId, pending, onAsk, children } = properties;
+  const { actionRef, consequenceId, pending, onAsk, children } = properties;
   return (
     <Button
-      ref={actRef}
+      ref={actionRef}
       variant="outline"
       aria-describedby={consequenceId}
       aria-haspopup="dialog"

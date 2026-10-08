@@ -14,7 +14,7 @@ import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable, RowLink } from "@/shared/grid-table.tsx";
 import { ListPages, ListState, pageWithin } from "@/shared/list-pages.tsx";
 import { RowMenu } from "@/shared/row-menu.tsx";
-import { SelectionAct, SelectionBar } from "@/shared/selection-bar.tsx";
+import { SelectionAction, SelectionBar } from "@/shared/selection-bar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
@@ -102,21 +102,21 @@ export function BareList() {
 
 const NOTHING = () => undefined;
 
-const menuOf = (act: (said: string) => void) => (member: Member) => (
+const menuOf = (action: (said: string) => void) => (member: Member) => (
   <RowMenu
     name={member.name}
-    acts={[
+    actions={[
       {
         label: "Open",
         onSelect: () => {
-          act(`open ${member.id}`);
+          action(`open ${member.id}`);
         },
       },
       {
         label: "Remove from workspace",
         destructive: true,
         onSelect: () => {
-          act(`remove ${member.id}`);
+          action(`remove ${member.id}`);
         },
       },
     ]}
@@ -170,7 +170,7 @@ type Asked = {
   readonly pageSize?: number;
   readonly read?: "loading" | "failed" | "ready";
   readonly onRetry?: () => void;
-  readonly onAct?: (act: string) => void;
+  readonly onAction?: (action: string) => void;
 };
 
 type Narrowed = { readonly search: string; readonly role: string | undefined };
@@ -184,7 +184,7 @@ const emptyOf = (narrowed: Narrowed, clear: () => void, focusAfterClear: FocusTa
         state={{
           kind: "empty",
           words: "No one belongs to this workspace yet.",
-          act: <Button>Invite people</Button>,
+          action: <Button>Invite people</Button>,
         }}
       />
     );
@@ -205,7 +205,7 @@ const matching = (members: readonly Member[], narrowed: Narrowed): Member[] =>
 
 /** Ticks sit outside the table's rows. Narrowing comes before the table, so the total is known when the page is chosen. */
 function useMembersList(asked: Asked) {
-  const { members = MEMBERS, pageSize = 25, onAct = NOTHING } = asked;
+  const { members = MEMBERS, pageSize = 25, onAction = NOTHING } = asked;
   const [narrowed, setNarrowed] = useState<Narrowed>({ search: "", role: undefined });
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
   const [sorted, setSorted] = useState<{ readonly id: string; readonly desc: boolean }>();
@@ -216,9 +216,9 @@ function useMembersList(asked: Asked) {
   const columns = useMemo(
     () =>
       linkedColumns((member) => {
-        onAct(`open ${member.id}`);
+        onAction(`open ${member.id}`);
       }),
-    [onAct],
+    [onAction],
   );
   const data = matching(members, narrowed);
   const pageIndex = pageWithin(asksForPage, pageSize, data.length);
@@ -238,7 +238,7 @@ function useMembersList(asked: Asked) {
     setPageIndex(0);
   };
   return {
-    onAct,
+    onAction,
     narrowed,
     narrow,
     ticked,
@@ -281,7 +281,7 @@ function MembersTable(properties: { readonly held: Held }) {
           onSortedChange: held.setSorted,
         }}
         hidden={held.hidden}
-        rowMenu={menuOf(held.onAct)}
+        rowMenu={menuOf(held.onAction)}
         empty={emptyOf(held.narrowed, clearFilters(held), held.searchRef)}
       />
       <ListPages
@@ -360,19 +360,19 @@ export function MembersList(properties: Asked) {
         ticked={ticked}
         shown={held.table.getRowModel().rows.map((row) => row.id)}
         noun={["member", "members"]}
-        clearKeystroke={{ key: "x", act: "Clear the selection" }}
+        clearKeystroke={{ key: "x", action: "Clear the selection" }}
         onClear={() => {
           held.setTicked(new Set());
         }}
         focusAfterClear={held.searchRef}
       >
-        <SelectionAct
+        <SelectionAction
           onClick={() => {
-            held.onAct(`change the role of ${[...ticked].join(", ")}`);
+            held.onAction(`change the role of ${[...ticked].join(", ")}`);
           }}
         >
           Change role
-        </SelectionAct>
+        </SelectionAction>
       </SelectionBar>
       <MembersRead asked={properties} held={held} />
     </div>

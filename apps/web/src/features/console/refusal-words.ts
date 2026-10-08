@@ -3,7 +3,7 @@ import { DISPLAY_NAME_REFUSED } from "@/shared/display-name-words.ts";
 import type { Said, SaidOfWord } from "@/shared/refusal-words.ts";
 
 /**
- * What every console act answers a person without the mark; their standing read says so without
+ * What every console action answers a person without the mark; their standing read says so without
  * asking one.
  */
 export const NOT_THE_OPERATOR = "not-the-operator" satisfies RefusalWord;

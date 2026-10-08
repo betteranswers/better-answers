@@ -66,7 +66,7 @@ const ITS_HEADING = headingOf(MODELS_AND_SPEND);
 
 const SWAP_BUDGET_MS = 1000;
 
-const ACT_BUDGET_MS = 100;
+const ACTION_BUDGET_MS = 100;
 
 const NARROW = { width: 320, height: 720 };
 
@@ -849,7 +849,7 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
   await expect(modelChoicesCardOf(page)).toBeVisible();
 });
 
-test("draws no toolbar over a page without tabs or acts", async ({ page, request }) => {
+test("draws no toolbar over a page without tabs or actions", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
   await expect(
     page.getByRole("heading", { level: 1, name: headingOf(HOMES.Viewer) }),
@@ -901,7 +901,7 @@ test("holds toggle and band still while the nav hides", async ({
   await expect(nav).toHaveCount(0);
   const elapsed = Date.now() - started;
   test.info().annotations.push({ type: "closing the menu", description: `${elapsed} ms` });
-  expect(elapsed).toBeLessThan(ACT_BUDGET_MS);
+  expect(elapsed).toBeLessThan(ACTION_BUDGET_MS);
 
   // The toggle, the band and the rail are where they were, to the pixel: only the nav left.
   const open = openerOf(page);
@@ -1063,7 +1063,7 @@ test("remembers a closed menu on this browser only", async ({ page, request }) =
   await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
   await theModelChoicesHaveLanded(page);
 
-  // Listening only across the act, so neither the start above nor the reload below is mistaken
+  // Listening only across the action, so neither the start above nor the reload below is mistaken
   // for it.
   const asked: string[] = [];
   const noting = (each: { url: () => string }) => asked.push(each.url());

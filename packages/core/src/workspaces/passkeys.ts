@@ -3,7 +3,7 @@ import { z } from "zod";
 import { boundarySchemas, ULID } from "@better-answers/schema";
 import { PASSKEY_NAME_MAX_LENGTH } from "@better-answers/schema/second-factor";
 
-import { act, declareIdentitySetActs } from "../audit/index.ts";
+import { action, declareIdentitySetActions } from "../audit/index.ts";
 import {
   attempt,
   err,
@@ -26,10 +26,10 @@ import {
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 /** Ids alone: the log is append-only, so a name a person later changes never lands in it. */
-const PASSKEY_ACTS = declareIdentitySetActs("people", {
-  passkeyAdded: act("people.person.passkey_added", { passkeyId: "id" }),
-  passkeyRenamed: act("people.person.passkey_renamed", { passkeyId: "id" }),
-  passkeyRemoved: act("people.person.passkey_removed", { passkeyId: "id" }),
+const PASSKEY_ACTIONS = declareIdentitySetActions("people", {
+  passkeyAdded: action("people.person.passkey_added", { passkeyId: "id" }),
+  passkeyRenamed: action("people.person.passkey_renamed", { passkeyId: "id" }),
+  passkeyRemoved: action("people.person.passkey_removed", { passkeyId: "id" }),
 });
 
 const passkeyId = z.string().regex(ULID);
@@ -73,9 +73,9 @@ const recording = (
   platform: PlatformPrincipal,
   tx: Tx,
   ids: Ids,
-  act: (typeof PASSKEY_ACTS)[keyof typeof PASSKEY_ACTS],
+  action: (typeof PASSKEY_ACTIONS)[keyof typeof PASSKEY_ACTIONS],
 ): Promise<void> =>
-  recordingTheirOwn(platform, tx, ids.personId, act, { passkeyId: ids.passkeyId });
+  recordingTheirOwn(platform, tx, ids.personId, action, { passkeyId: ids.passkeyId });
 
 type PasskeyAdded = {
   readonly passkeyId: string;
@@ -98,7 +98,7 @@ const recordingAdded = async (
 ): Promise<AddedAnswer> => {
   if (!(await holdThePerson(tx, input.personId))) return err("person-gone");
   if (!(await holds(tx, input))) return err("no-passkey");
-  await recording(platform, tx, input, PASSKEY_ACTS.passkeyAdded);
+  await recording(platform, tx, input, PASSKEY_ACTIONS.passkeyAdded);
   const stamped = await stamping(tx, input);
   const facts = await factsOf(tx, input.personId);
   const issued =
@@ -159,7 +159,7 @@ export const renamePasskey = async (
           [ids.passkeyId, ids.personId, name.value],
         );
         if (written.rowCount !== 1) return err("no-passkey");
-        await recording(platform, tx, ids, PASSKEY_ACTS.passkeyRenamed);
+        await recording(platform, tx, ids, PASSKEY_ACTIONS.passkeyRenamed);
         return ok({ passkeyId: ids.passkeyId, name: name.value });
       },
     ),
@@ -192,7 +192,7 @@ const removing = async (
   }
   await tx.query("DELETE FROM passkey WHERE id = $1", [ids.passkeyId]);
   await unconfirmingTheOthers(tx, ids.personId, actingSessionId);
-  await recording(platform, tx, ids, PASSKEY_ACTS.passkeyRemoved);
+  await recording(platform, tx, ids, PASSKEY_ACTIONS.passkeyRemoved);
   return ok({ passkeyId: ids.passkeyId });
 };
 

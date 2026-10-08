@@ -19,7 +19,7 @@ const sessionHolder = z.object({ user: z.object({ id: z.string() }) });
 
 const signInRowsOf = (personId: string) =>
   app().database.superuser.query(
-    `SELECT action AS act, actor, subject_id, detail, row_to_json(identity_audit_event)::text AS whole
+    `SELECT action, actor, subject_id, detail, row_to_json(identity_audit_event)::text AS whole
        FROM identity_audit_event
       WHERE action = 'people.person.signed_in' AND subject_id = $1`,
     [personId],
@@ -27,7 +27,7 @@ const signInRowsOf = (personId: string) =>
 
 const consentRowsBy = (personId: string) =>
   app().database.superuser.query(
-    `SELECT workspace_id, action AS act, actor, subject_id, detail FROM audit_event
+    `SELECT workspace_id, action, actor, subject_id, detail FROM audit_event
       WHERE action = 'people.client.consented' AND actor = $1`,
     [`human:${personId}`],
   );
@@ -63,7 +63,7 @@ describe("a sign-in, recorded on the identity-set audit log", () => {
     const recorded = await signInRowsOf(person.id);
     expect(recorded.rows).toEqual([
       {
-        act: "people.person.signed_in",
+        action: "people.person.signed_in",
         actor: `human:${person.id}`,
         subject_id: person.id,
         detail: { method: "email_code" },
@@ -168,7 +168,7 @@ describe("a consent, recorded on the consented workspace's audit log", () => {
     expect((await consentRowsBy(person.id)).rows).toEqual([
       {
         workspace_id: second,
-        act: "people.client.consented",
+        action: "people.client.consented",
         actor: `human:${person.id}`,
         subject_id: CLAUDE_CLIENT_ID,
         detail: {},

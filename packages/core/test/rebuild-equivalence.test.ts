@@ -225,7 +225,7 @@ describe("the worker's rebuild against the api's own map", () => {
       const { linker, group } = await buildTheMap(scenario);
 
       const live = await liveGenerationOf(scenario.workspaceId);
-      expect(live, "the api's acts wrote a live generation").toBe(1);
+      expect(live, "the api's actions wrote a live generation").toBe(1);
       const liveNodes = await nodesAt(scenario.workspaceId, 1);
       const liveEdges = await edgesAt(scenario.workspaceId, 1);
 
@@ -267,7 +267,7 @@ describe("the worker's rebuild against the api's own map", () => {
     EQUIVALENCE_ALLOWANCE_MS,
   );
 
-  it("finds no parser mismatch over the bundle those acts wrote", async () => {
+  it("finds no parser mismatch over the bundle those actions wrote", async () => {
     const scenario = await arrange();
     await buildTheMap(scenario);
 

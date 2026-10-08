@@ -19,7 +19,7 @@ const ADD_A_PASSKEY = "Add a passkey";
 /** What a passkey does, said wherever one is offered. */
 const PASSKEY_SIGNS_YOU_IN = "A passkey signs you in with your fingerprint, face or device PIN";
 
-export const ACCOUNT_ACTS = {
+export const ACCOUNT_ACTIONS = {
   readAgain: "Read your sign-in again",
   addPasskey: ADD_A_PASSKEY,
   setUp: SET_UP,
@@ -135,8 +135,8 @@ export const codesLeft = (unused: number, madeAt: string): string =>
 /** The api sends the notice without waiting on it, so the page never says it arrived. */
 const noticeTo = (address: string): string => `A notice is on its way to ${address}.`;
 
-/** Said once an act lands, with the notice every change of a second factor sends. */
-export const ACT_LANDED = {
+/** Said once an action lands, with the notice every change of a second factor sends. */
+export const ACTION_LANDED = {
   passkeyAdded: (name: string, address: string) => `Passkey "${name}" added. ${noticeTo(address)}`,
   passkeyRenamed: (name: string) => `Passkey renamed "${name}".`,
   passkeyRemoved: (name: string, address: string) =>

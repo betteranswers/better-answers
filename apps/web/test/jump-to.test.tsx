@@ -28,7 +28,7 @@ const outline = (groups: readonly JumpGroup[]) =>
 const valuesOf = (groups: readonly JumpGroup[]) =>
   groups.flatMap((group) => group.jumps.map((jump) => jump.value));
 
-/** Open on no page an act or a member asks, so no query carries into a jump. */
+/** Open on no page an action or a member asks, so no query carries into a jump. */
 const AT_ROOT = { pathname: "/", searchStr: "" };
 
 const PRIYA = { personId: "p1", displayName: "Priya Shah", address: "priya@example.test" };
@@ -38,7 +38,7 @@ const NAMELESS = { personId: "p2", displayName: "", address: "new@example.test" 
 /** A second Priya Shah, so two members share every word a reader sees but their address. */
 const ANOTHER_PRIYA = { personId: "p3", displayName: "Priya Shah", address: "ps@example.test" };
 
-/** One area, a built page with an act, and an unbuilt page with one. */
+/** One area, a built page with an action, and an unbuilt page with one. */
 const STUB: readonly Area[] = [
   {
     id: "yard",
@@ -55,7 +55,7 @@ const STUB: readonly Area[] = [
             icon: "table",
             built: true,
             seenBy: ["Admin", "Editor"],
-            acts: [{ name: "Order timber", asks: "order", icon: "invite" }],
+            actions: [{ name: "Order timber", asks: "order", icon: "invite" }],
           },
           {
             name: "Steel",
@@ -63,7 +63,7 @@ const STUB: readonly Area[] = [
             icon: "table",
             built: false,
             seenBy: ["Admin", "Editor"],
-            acts: [{ name: "Order steel", asks: "order", icon: "invite" }],
+            actions: [{ name: "Order steel", asks: "order", icon: "invite" }],
           },
           {
             name: "Deliveries",
@@ -79,39 +79,39 @@ const STUB: readonly Area[] = [
 ];
 
 describe("what jump-to lists", () => {
-  it("lists a stub tree's built pages and their acts alone", () => {
+  it("lists a stub tree's built pages and their actions alone", () => {
     expect(outline(jumpsIn(treeOf("Admin", STUB), undefined, AT_ROOT))).toEqual([
       ["Areas", ["Yard"]],
       ["Pages", ["Timber", "Deliveries"]],
-      [JUMP_TO.groups.acts, ["Order timber"]],
+      [JUMP_TO.groups.actions, ["Order timber"]],
     ]);
   });
 
-  it("drops an act with the page hidden from the role", () => {
+  it("drops an action with the page hidden from the role", () => {
     const editors = jumpsIn(treeOf("Editor", STUB), undefined, AT_ROOT);
 
     expect(outline(editors)).toEqual([
       [JUMP_TO.groups.areas, ["Yard"]],
       [JUMP_TO.groups.pages, ["Timber"]],
-      [JUMP_TO.groups.acts, ["Order timber"]],
+      [JUMP_TO.groups.actions, ["Order timber"]],
     ]);
     expect(jumpsIn(treeOf("Viewer", STUB), undefined, AT_ROOT)).toEqual([]);
   });
 
-  it("lists a Viewer's Ask once, with no members or acts", () => {
+  it("lists a Viewer's Ask once, with no members or actions", () => {
     expect(outline(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT))).toEqual([
       [JUMP_TO.groups.areas, ["Ask"]],
     ]);
   });
 
-  it("lists an Admin's built pages, the invite act and members", () => {
+  it("lists an Admin's built pages, the invite action and members", () => {
     expect(outline(jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT))).toEqual([
       [JUMP_TO.groups.areas, ["Control Centre"]],
       [
         JUMP_TO.groups.pages,
         ["Connected sources", "Models and spend", "Members", "Groups", "Audit log"],
       ],
-      [JUMP_TO.groups.acts, [INVITE_A_PERSON.name]],
+      [JUMP_TO.groups.actions, [INVITE_A_PERSON.name]],
       [JUMP_TO.groups.members, ["Priya Shah", "new@example.test"]],
     ]);
   });
@@ -122,7 +122,7 @@ describe("what jump-to lists", () => {
     expect(new Set(values).size).toBe(values.length);
   });
 
-  it("leads each item to its place, asking Members for acts", () => {
+  it("leads each item to its place, asking Members for actions", () => {
     const groups = jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT);
     const to = Object.fromEntries(
       groups.flatMap((group) => group.jumps.map((jump) => [jump.name, jump.to])),
@@ -130,7 +130,7 @@ describe("what jump-to lists", () => {
 
     expect(to["Control Centre"]).toBe("/people/members");
     expect(to["Audit log"]).toBe("/system/audit-log");
-    expect(to[INVITE_A_PERSON.name]).toBe("/people/members?act=invite");
+    expect(to[INVITE_A_PERSON.name]).toBe("/people/members?action=invite");
   });
 
   it("leads a member to their page from anywhere", () => {
@@ -147,7 +147,7 @@ describe("what jump-to lists", () => {
     expect(toOf(narrowed)).toBe("/people/members/p1");
   });
 
-  it("keeps Members' list filters when asking Members for an act", () => {
+  it("keeps Members' list filters when asking Members for an action", () => {
     const filtered = { pathname: "/people/members", searchStr: "?members.role=Editor" };
     const elsewhere = { pathname: "/people/groups", searchStr: "?groups.search=ops" };
     const toOf = (here: typeof filtered) =>
@@ -155,8 +155,8 @@ describe("what jump-to lists", () => {
         .flatMap((group) => group.jumps)
         .find((jump) => jump.name === INVITE_A_PERSON.name)?.to;
 
-    expect(toOf(filtered)).toBe("/people/members?members.role=Editor&act=invite");
-    expect(toOf(elsewhere)).toBe("/people/members?act=invite");
+    expect(toOf(filtered)).toBe("/people/members?members.role=Editor&action=invite");
+    expect(toOf(elsewhere)).toBe("/people/members?action=invite");
   });
 });
 
@@ -209,7 +209,7 @@ describe("what typing leaves", () => {
 
   it("finds Invite a person by its first word", () => {
     expect(outline(matching(jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT), "invite"))).toEqual([
-      [JUMP_TO.groups.acts, [INVITE_A_PERSON.name]],
+      [JUMP_TO.groups.actions, [INVITE_A_PERSON.name]],
     ]);
   });
 
@@ -252,10 +252,10 @@ describe("what the dialog's outcome line says", () => {
     });
   });
 
-  it("promises a Viewer pages, an Admin members and acts too", () => {
+  it("promises a Viewer pages, an Admin members and actions too", () => {
     expect(findWhat([JUMP_TO.kinds.page])).toBe("Find a page");
-    expect(findWhat([JUMP_TO.kinds.page, JUMP_TO.kinds.member, JUMP_TO.kinds.act])).toBe(
-      "Find a page, a member or an act",
+    expect(findWhat([JUMP_TO.kinds.page, JUMP_TO.kinds.member, JUMP_TO.kinds.action])).toBe(
+      "Find a page, a member or an action",
     );
   });
 });

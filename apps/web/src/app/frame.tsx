@@ -6,9 +6,9 @@ import { useMember } from "@/features/auth/member.ts";
 import { PasskeyOffer } from "@/features/auth/passkey-offer.tsx";
 import { useUnsavedChangeSaid } from "@/features/auth/unsaved-change.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
-import { HomeLine } from "@/features/people/self-act.tsx";
+import { HomeLine } from "@/features/people/self-action.tsx";
 import { BreadcrumbLastPartSlot } from "@/shared/breadcrumb-last-part.ts";
-import { ShellKeystrokes, ShellKeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
+import { ShellKeystrokes, ShellKeystrokesAction, type Keystroke } from "@/shared/keystrokes.tsx";
 import {
   EVERY_AREA,
   placeAt,
@@ -139,7 +139,7 @@ export function Frame(properties: {
               />
             }
             jumpTo={<JumpTo offered={offersJumpTo} wide={wide} tree={visible} jumping={jumping} />}
-            keystrokes={<ShellKeystrokesAct at="band" />}
+            keystrokes={<ShellKeystrokesAction at="band" />}
             signingOut={signingOut}
             onSignOut={signOut}
             outcome={switching.outcome ?? unsaved}
@@ -210,7 +210,7 @@ function Navigation(properties: {
         areas={properties.areas}
         openAreaId={open?.area.id}
         tooltips
-        foot={<ShellKeystrokesAct at="rail" />}
+        foot={<ShellKeystrokesAction at="rail" />}
       />
 
       {open === undefined ? null : (

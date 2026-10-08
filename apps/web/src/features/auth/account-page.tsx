@@ -1,7 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
-import { KeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
+import { KeystrokesAction, type Keystroke } from "@/shared/keystrokes.tsx";
 import { NO_RESPONSE, NO_RESPONSE_TO_A_READ } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
@@ -16,7 +16,7 @@ import {
 import {
   ACCOUNT_HEADING,
   ACCOUNT_WORDS,
-  ACT_LANDED,
+  ACTION_LANDED,
   PASSKEY_WORDS,
   passkeyNameFor,
 } from "./account-words.ts";
@@ -57,7 +57,7 @@ const SIGN_IN_HEADING = "sign-in-heading";
 
 const REFUSED = "account-refused";
 
-/** The node an act brings in takes focus as it mounts, since it is not there when the act ends. */
+/** The node an action brings in takes focus as it mounts, since it is not there when the action ends. */
 const useLanding = (first: Landing | undefined) => {
   const awaited = useRef<Landing | undefined>(first);
   const at: LandsAt = (landing) => (node) => {
@@ -73,8 +73,8 @@ const useLanding = (first: Landing | undefined) => {
   };
 };
 
-/** Each act clears what the last one said, so the page speaks of one act at a time. */
-const useAccountActs = (
+/** Each action clears what the last one said, so the page speaks of one action at a time. */
+const useAccountActions = (
   address: string,
   firstLanding: Landing | undefined,
   routes: AuthenticatorRoutes,
@@ -109,7 +109,7 @@ const useAccountActs = (
   const passkeyAdded = (added: PasskeyAdded, name: string) => {
     begin();
     setAddOpen(false);
-    setSaid(ACT_LANDED.passkeyAdded(name, address));
+    setSaid(ACTION_LANDED.passkeyAdded(name, address));
     if (added.recoveryCodes === null) {
       landing.expect(`passkey:${added.passkeyId}`);
       return;
@@ -120,7 +120,7 @@ const useAccountActs = (
 
   const passkeyRenamed = (name: string) => {
     begin();
-    setSaid(ACT_LANDED.passkeyRenamed(name));
+    setSaid(ACTION_LANDED.passkeyRenamed(name));
   };
 
   const removeAPasskey = (passkey: Passkey) => {
@@ -130,7 +130,7 @@ const useAccountActs = (
       {
         onSuccess: () => {
           landing.expect("passkeys");
-          setSaid(ACT_LANDED.passkeyRemoved(passkey.name ?? PASSKEY_WORDS.unnamed, address));
+          setSaid(ACTION_LANDED.passkeyRemoved(passkey.name ?? PASSKEY_WORDS.unnamed, address));
         },
       },
     );
@@ -145,7 +145,7 @@ const useAccountActs = (
     begin();
     setSetupOpen(false);
     starting.reset();
-    setSaid(ACT_LANDED.setUp(address));
+    setSaid(ACTION_LANDED.setUp(address));
     if (issued === null) {
       focusOn(AUTHENTICATOR_HEADING);
       return;
@@ -159,7 +159,7 @@ const useAccountActs = (
     landing.expect("set-up");
     remove.mutate(undefined, {
       onSuccess: () => {
-        setSaid(ACT_LANDED.removed(address));
+        setSaid(ACTION_LANDED.removed(address));
       },
       onError: () => {
         landing.expect(undefined);
@@ -175,7 +175,7 @@ const useAccountActs = (
         onSuccess: ({ recoveryCodes, madeAt }) => {
           landing.expect("save-codes");
           setInHand({ codes: recoveryCodes, replacing, madeAt });
-          setSaid(replacing ? ACT_LANDED.replaced(address) : ACT_LANDED.made(address));
+          setSaid(replacing ? ACTION_LANDED.replaced(address) : ACTION_LANDED.made(address));
         },
       },
     );
@@ -219,37 +219,40 @@ const useAccountActs = (
   };
 };
 
-type AccountActs = ReturnType<typeof useAccountActs>;
+type AccountActions = ReturnType<typeof useAccountActions>;
 
 /** A read already drawn stands through a refetch that fails, so only a first read's is said. */
-const failureOnThePage = (read: SecondFactorRead, acts: AccountActs) => {
+const failureOnThePage = (read: SecondFactorRead, actions: AccountActions) => {
   if (read.data === undefined && read.error !== null) {
     return { failure: read.error, unanswered: NO_RESPONSE_TO_A_READ };
   }
-  if (acts.remove.error !== null)
-    return { failure: acts.remove.error, unanswered: REMOVAL_UNANSWERED };
-  if (acts.removePasskey.error !== null)
-    return { failure: acts.removePasskey.error, unanswered: PASSKEY_REMOVAL_UNANSWERED };
-  const made = acts.make.error;
+  if (actions.remove.error !== null)
+    return { failure: actions.remove.error, unanswered: REMOVAL_UNANSWERED };
+  if (actions.removePasskey.error !== null)
+    return { failure: actions.removePasskey.error, unanswered: PASSKEY_REMOVAL_UNANSWERED };
+  const made = actions.make.error;
   return { failure: made, unanswered: made === null ? NO_RESPONSE : codesUnanswered(made) };
 };
 
-/** The opening acts of the passkeys and the authenticator, each offered while it is closed. */
-const openingKeystrokes = (read: SecondFactorRead, acts: AccountActs): readonly Keystroke[] => {
+/** The opening actions of the passkeys and the authenticator, each offered while it is closed. */
+const openingKeystrokes = (
+  read: SecondFactorRead,
+  actions: AccountActions,
+): readonly Keystroke[] => {
   if (read.data === undefined) return [];
-  const offersAdd = !acts.addOpen && passkeysHere();
-  const offersSetup = !acts.setupOpen && read.data.authenticator !== "set-up";
+  const offersAdd = !actions.addOpen && passkeysHere();
+  const offersSetup = !actions.setupOpen && read.data.authenticator !== "set-up";
   return [...(offersAdd ? [ADD_A_PASSKEY] : []), ...(offersSetup ? [SET_UP] : [])];
 };
 
-/** In the order the page shows their acts. */
-const keystrokesOf = (read: SecondFactorRead, acts: AccountActs): readonly Keystroke[] => {
-  const keyShown = acts.setupOpen && acts.starting.data !== undefined;
+/** In the order the page shows their actions. */
+const keystrokesOf = (read: SecondFactorRead, actions: AccountActions): readonly Keystroke[] => {
+  const keyShown = actions.setupOpen && actions.starting.data !== undefined;
   return [
     ...(readUnanswered(read) ? [READ_AGAIN] : []),
-    ...openingKeystrokes(read, acts),
+    ...openingKeystrokes(read, actions),
     ...(keyShown ? [COPY_KEY] : []),
-    ...(acts.inHand === undefined ? [] : CODES_KEYSTROKES),
+    ...(actions.inHand === undefined ? [] : CODES_KEYSTROKES),
   ];
 };
 
@@ -261,54 +264,54 @@ export function AccountPage() {
   // A session a code granted must swap the factors, which only the replacing routes do.
   const routes =
     read.data?.thisSession?.setupGranted === true ? NEW_AUTHENTICATOR : FIRST_AUTHENTICATOR;
-  const acts = useAccountActs(
+  const actions = useAccountActions(
     address,
     hash === ADD_A_PASSKEY_BUTTON ? "add-a-passkey" : undefined,
     routes,
   );
-  const { failure, unanswered } = failureOnThePage(read, acts);
+  const { failure, unanswered } = failureOnThePage(read, actions);
 
   return (
     <AuthPage title={ACCOUNT_HEADING}>
       <section aria-labelledby={SIGN_IN_HEADING} className="mt-8">
         <h2 id={SIGN_IN_HEADING}>{ACCOUNT_WORDS.signIn}</h2>
-        <Outcome tone="said">{acts.said}</Outcome>
+        <Outcome tone="said">{actions.said}</Outcome>
         <SecondFactorRefused id={REFUSED} read={read} failure={failure} unanswered={unanswered} />
 
         <PasskeysSection
           held={read.data}
           here={passkeysHere()}
-          addOpen={acts.addOpen}
-          suggestedName={acts.suggestedName}
-          removing={acts.removePasskey.isPending}
-          landsAt={acts.landsAt}
-          onAddOpen={acts.toggleAdd}
-          onAdded={acts.passkeyAdded}
-          onRenamed={acts.passkeyRenamed}
-          onRemove={acts.removeAPasskey}
+          addOpen={actions.addOpen}
+          suggestedName={actions.suggestedName}
+          removing={actions.removePasskey.isPending}
+          landsAt={actions.landsAt}
+          onAddOpen={actions.toggleAdd}
+          onAdded={actions.passkeyAdded}
+          onRenamed={actions.passkeyRenamed}
+          onRemove={actions.removeAPasskey}
         />
         <AuthenticatorSection
           held={read.data}
-          setupOpen={acts.setupOpen}
-          routes={acts.routes}
-          starting={acts.starting}
-          finishing={acts.finishing}
-          removing={acts.remove.isPending}
-          landsAt={acts.landsAt}
-          onSetUp={acts.toggleSetup}
-          onFinished={acts.finished}
-          onRemove={acts.removeTheAuthenticator}
+          setupOpen={actions.setupOpen}
+          routes={actions.routes}
+          starting={actions.starting}
+          finishing={actions.finishing}
+          removing={actions.remove.isPending}
+          landsAt={actions.landsAt}
+          onSetUp={actions.toggleSetup}
+          onFinished={actions.finished}
+          onRemove={actions.removeTheAuthenticator}
         />
         <RecoveryCodesSection
           held={read.data}
-          inHand={acts.inHand}
+          inHand={actions.inHand}
           address={address}
-          making={acts.make.isPending}
-          acknowledging={acts.acknowledge.isPending}
-          acknowledgeFailure={saidOfAcknowledging(acts.acknowledge.error)}
-          landsAt={acts.landsAt}
-          onMake={acts.makeCodes}
-          onDone={acts.done}
+          making={actions.make.isPending}
+          acknowledging={actions.acknowledge.isPending}
+          acknowledgeFailure={saidOfAcknowledging(actions.acknowledge.error)}
+          landsAt={actions.landsAt}
+          onMake={actions.makeCodes}
+          onDone={actions.done}
         />
       </section>
 
@@ -317,7 +320,7 @@ export function AccountPage() {
           <Link to="/">{ACCOUNT_WORDS.goOn}</Link>
         </Button>
         <SignOutButton />
-        <KeystrokesAct page={ACCOUNT_HEADING} keystrokes={keystrokesOf(read, acts)} />
+        <KeystrokesAction page={ACCOUNT_HEADING} keystrokes={keystrokesOf(read, actions)} />
       </div>
     </AuthPage>
   );

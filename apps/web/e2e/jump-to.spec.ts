@@ -127,7 +127,7 @@ test("hides People from a Viewer, reading no members", async ({ page, request })
   expect(membersReads, "a Viewer's jump-to asked for the members").toEqual([]);
 });
 
-test("opens the invite act on Members for an Admin", async ({ page, request }) => {
+test("opens the invite action on Members for an Admin", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Calder Joinery");
 
   await opened(page, "Meta+k");
@@ -139,7 +139,7 @@ test("opens the invite act on Members for an Admin", async ({ page, request }) =
   await expect(invite).toBeVisible();
   await expect(invite.getByLabel("Email address")).toBeFocused();
   await expect(dialogOf(page)).toHaveCount(0);
-  // The act takes its ask off the address, so a reload or a step back does not reopen it.
+  // The action takes its ask off the address, so a reload or a step back does not reopen it.
   await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}$`));
 
   await page.keyboard.press("Escape");
@@ -236,7 +236,7 @@ test("draws the list within its second, timed in the page", async ({ page, reque
 
   await clockTheNextKey(page, { at: "//*[@role='dialog']", reads: TOM });
   await page.keyboard.press("Meta+k");
-  const elapsed = await page.evaluate(() => Reflect.get(window, "actClocked"));
+  const elapsed = await page.evaluate(() => Reflect.get(window, "actionClocked"));
   test.info().annotations.push({ type: "jump-to list", description: `${elapsed} ms` });
   expect(elapsed, "the jump-to list did not draw within its second").toBeLessThan(LIST_BUDGET_MS);
 
@@ -245,7 +245,7 @@ test("draws the list within its second, timed in the page", async ({ page, reque
   await expect(optionOf(page, INVITE_A_PERSON.name)).toBeVisible();
 });
 
-test("keeps pages and acts through a held, then failed, read", async ({ page, request }) => {
+test("keeps pages and actions through a held, then failed, read", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Swale Joinery");
   const held = Promise.withResolvers<void>();
   await page.route(theMembersRead, async (route) => {

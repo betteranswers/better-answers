@@ -295,7 +295,7 @@ describe("the rehearsal", () => {
     expect(await memberRows(scenario.workspaceId, subject.personId)).toEqual([]);
   });
 
-  it("records one act under the platform principal, carrying no token", async () => {
+  it("records one action under the platform principal, carrying no token", async () => {
     const scenario = await arrange();
     const subject = await seeding(scenario);
 

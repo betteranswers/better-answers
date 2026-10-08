@@ -17,7 +17,7 @@ import {
 import {
   admit,
   attempt,
-  declareAct,
+  declareAction,
   err,
   ok,
   PERSON_PREFIX,
@@ -40,7 +40,7 @@ import type { MemberRefusal } from "./vocabulary.ts";
 
 const AUDIT_LOG_PAGE = 50;
 
-/** People's names and addresses, group names, or an act's words; never stored, never logged. */
+/** People's names and addresses, group names, or an action's words; never stored, never logged. */
 const auditSearch = z.string().trim().max(100);
 
 export const readAuditLogInput = z.object({
@@ -53,14 +53,14 @@ export const readAuditLogInput = z.object({
 
 export type ReadAuditLogInput = z.output<typeof readAuditLogInput>;
 
-const readAuditLogAct = declareAct({
+const readAuditLogAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: readAuditLogInput,
   refuses: ["role-forbids"],
   effect: "read",
 });
 
-export type ReadAuditLogRefusal = MemberRefusal<RefusalOf<typeof readAuditLogAct>> | Error;
+export type ReadAuditLogRefusal = MemberRefusal<RefusalOf<typeof readAuditLogAction>> | Error;
 
 /** A thing an event names that has a name of its own; one since removed is said by its kind. */
 type ThingKind = "connected-source" | "document" | "concept";
@@ -80,7 +80,7 @@ export type AuditEventSubject =
 
 export type ReadAuditEvent = Pick<
   AuditEventRow,
-  "id" | "act" | "family" | "subjectKind" | "subjectId" | "actor"
+  "id" | "action" | "family" | "subjectKind" | "subjectId" | "actor"
 > & {
   /** An ISO instant, which is what a `Date` becomes on the wire anyway. */
   readonly at: string;
@@ -114,17 +114,17 @@ export const PERSON_NAMED_IN = [
   {
     key: "userId",
     subjectKinds: ["group", "member"],
-    acts: ["people.group.member_added", "people.group.member_removed", "people.member.added"],
+    actions: ["people.group.member_added", "people.group.member_removed", "people.member.added"],
   },
   {
     key: "requesterId",
     subjectKinds: ["request"],
-    acts: ["people.request.asked", "people.request.approved", "people.request.declined"],
+    actions: ["people.request.asked", "people.request.approved", "people.request.declined"],
   },
   {
     key: "adminUserId",
     subjectKinds: ["workspace"],
-    acts: ["platform.workspace.provisioned"],
+    actions: ["platform.workspace.provisioned"],
   },
 ] as const satisfies readonly DetailNaming[];
 
@@ -132,19 +132,19 @@ export const PERSON_NAMED_IN = [
 type Found = {
   readonly people: readonly UserId[];
   readonly groups: readonly string[];
-  readonly acts: readonly string[];
+  readonly actions: readonly string[];
   /** More people or groups matched than are read, so the events of the rest are left out. */
   readonly tooBroad: boolean;
 };
 
-/** The events naming any of the people or groups, or taking any of the acts. */
+/** The events naming any of the people or groups, or taking any of the actions. */
 export const soughtFor = (found: Omit<Found, "tooBroad">): EventsSought => ({
   people: found.people,
   subjects: [
     { kinds: PERSON_SUBJECT_KINDS, ids: found.people },
     { kinds: ["group"], ids: found.groups },
   ],
-  acts: found.acts,
+  actions: found.actions,
   detail: PERSON_NAMED_IN,
 });
 
@@ -152,29 +152,29 @@ export const soughtFor = (found: Omit<Found, "tooBroad">): EventsSought => ({
 const IDS_SOUGHT = 100;
 
 /** A subject and verb, as `member.role_changed` reads "member role changed". */
-const wordsOfAct = (name: string): string =>
+const wordsOfAction = (name: string): string =>
   name.split(".").slice(1).join(" ").replaceAll("_", " ");
 
 /**
  * The stored register, since the declarations hold only the slices this process imported. The
  * page's words find an action, and so do its stored name's.
  */
-const actsWorded = (search: string): readonly string[] => {
+const actionsWorded = (search: string): readonly string[] => {
   const words = search.toLowerCase().split(/\s+/).join(" ");
   return STORED_ACT_NAMES.filter(
     (name) =>
-      wordsOfAct(name).includes(words) || ACTION_HEADLINES[name].toLowerCase().includes(words),
+      wordsOfAction(name).includes(words) || ACTION_HEADLINES[name].toLowerCase().includes(words),
   );
 };
 
 /** An event of the workspace in `$scope` naming the person `u` in its detail, as the read finds them. */
 const namedInDetail = (scope: number, bind: Bind): string =>
   PERSON_NAMED_IN.map(
-    ({ key, subjectKinds, acts }) =>
+    ({ key, subjectKinds, actions }) =>
       `OR EXISTS (SELECT 1 FROM audit_event e
                    WHERE e.workspace_id = $${scope}
                      AND e.subject_kind = ANY($${bind(subjectKinds)}::text[])
-                     AND e.action = ANY($${bind(acts)}::text[])
+                     AND e.action = ANY($${bind(actions)}::text[])
                      AND e.detail ->> $${bind(key)}::text = u.id)`,
   ).join("\n");
 
@@ -216,7 +216,7 @@ const groupsNamed = async (
   return found.rows.map((row) => row.id);
 };
 
-/** The people, groups and acts a search names, each read inside the principal's workspace. */
+/** The people, groups and actions a search names, each read inside the principal's workspace. */
 const foundBy = async (principal: UserPrincipal, tx: Tx, search: string): Promise<Found> => {
   const pattern = containing(search);
   const people = await peopleNamed(principal, tx, pattern);
@@ -224,7 +224,7 @@ const foundBy = async (principal: UserPrincipal, tx: Tx, search: string): Promis
   return {
     people: people.slice(0, IDS_SOUGHT),
     groups: groups.slice(0, IDS_SOUGHT),
-    acts: actsWorded(search),
+    actions: actionsWorded(search),
     tooBroad: people.length > IDS_SOUGHT || groups.length > IDS_SOUGHT,
   };
 };
@@ -360,7 +360,7 @@ const eventOf = (
   detail: ReadAuditEvent["detail"] | undefined,
 ): ReadAuditEvent => ({
   id: row.id,
-  act: row.act,
+  action: row.action,
   family: row.family,
   subjectKind: row.subjectKind,
   subjectId: row.subjectId,
@@ -411,14 +411,14 @@ export const eventsNamed = async (
 
 /**
  * The workspace's own audit log, newest first; the identity-set audit log is never read. A grant
- * an act ended is named from its assistant and workspace as they stand now.
+ * an action ended is named from its assistant and workspace as they stand now.
  */
 export const readAuditLog = async (
   principal: UserPrincipal,
   tx: Tx,
   input: ReadAuditLogInput,
 ): Promise<Result<SearchedAuditLogPage, ReadAuditLogRefusal>> => {
-  const admitted = admit(readAuditLogAct, principal, input);
+  const admitted = admit(readAuditLogAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
   const read = await attempt(async () => {

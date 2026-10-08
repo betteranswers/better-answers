@@ -130,7 +130,7 @@ export type OpsIo = {
 
   readonly readTree?: ((directory: string) => Promise<BundleTree>) | undefined;
 
-  /** Absent where no email transport is configured, so an act that must notify refuses. */
+  /** Absent where no email transport is configured, so an action that must notify refuses. */
   readonly mail?: Mail | undefined;
 };
 
@@ -677,7 +677,7 @@ const reconcileWatermark = async (
   const found = `head ${head ?? "none"}, watermark ${watermark ?? "none"}, replayed ${replayed.length}, already landed ${skipped.length}`;
   if (stopped !== undefined) {
     io.say(
-      `reconcile-watermark: REFUSED — stopped at ${stopped.sha} (${reasonOf(stopped.reason)}); ${found}; every commit before it landed and nothing after it was attempted, and this workspace stays behind that commit until a person acts`,
+      `reconcile-watermark: REFUSED — stopped at ${stopped.sha} (${reasonOf(stopped.reason)}); ${found}; every commit before it landed and nothing after it was attempted, and this workspace stays behind that commit until a person steps in`,
     );
     return REFUSED;
   }
@@ -1022,7 +1022,7 @@ const provisionRefused = (
 };
 
 /**
- * The repository lives outside the Postgres transaction, so the root is checked before the act
+ * The repository lives outside the Postgres transaction, so the root is checked before the action
  * and the repository made after it.
  */
 const provisionWorkspaceCommand = async (
@@ -1082,7 +1082,7 @@ const memberReason = (
     case "no-such-workspace":
       return noSuchWorkspace(workspaceId);
     case "already-a-member":
-      return `already-a-member: ${email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People page`;
+      return `already-a-member: ${email} is already a member of workspace ${workspaceId}; a role change is the Admin's action on the People page`;
   }
 };
 

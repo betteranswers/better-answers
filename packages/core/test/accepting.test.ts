@@ -11,7 +11,7 @@ import {
   postgresForSuite,
   seedingWith,
   until,
-  whileActsWaitAt,
+  whileActionsWaitAt,
 } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -56,8 +56,8 @@ const membersOf = async (workspaceId: string, personId: string) =>
 
 const joinedEvents = async (personId: string) =>
   (
-    await db().pool.query<{ act: string }>(
-      "SELECT action AS act FROM audit_event WHERE subject_id = $1 AND action = 'people.member.joined'",
+    await db().pool.query<{ action: string }>(
+      "SELECT action FROM audit_event WHERE subject_id = $1 AND action = 'people.member.joined'",
       [personId],
     )
   ).rows;
@@ -73,7 +73,7 @@ describe("accepting an invitation", () => {
   it("leaves one member row; the second answers already-a-member", async () => {
     const { workspace, personId, invitationId } = await anInvitation("Twice");
 
-    const [first, second] = await whileActsWaitAt(
+    const [first, second] = await whileActionsWaitAt(
       db().pool,
       "member",
       "INSERT",
@@ -103,7 +103,7 @@ describe("accepting an invitation", () => {
   it("answers already-a-member from the index, landing nothing", async () => {
     const { workspace, personId, invitationId } = await anInvitation("Raced");
 
-    const raced = await whileActsWaitAt(db().pool, "invitation", "UPDATE", async (release) => {
+    const raced = await whileActionsWaitAt(db().pool, "invitation", "UPDATE", async (release) => {
       const accept = accepting(personId, invitationId);
       await until(async () => (await countWaitingOnLocks(db().pool)) >= 1);
       await seedingWith(db().pool, (seed) =>

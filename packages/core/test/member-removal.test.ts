@@ -316,7 +316,7 @@ describe("removing many members at once", () => {
     ]);
   });
 
-  it("removes 200 members holding tokens in one act", async () => {
+  it("removes 200 members holding tokens in one action", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkTwoHundred");
     const members: string[] = [];
     for (let each = 0; each < 200; each += 1) {

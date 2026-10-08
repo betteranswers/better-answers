@@ -1,8 +1,20 @@
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-/** What another place may ask of a page as it opens: one of its acts, or a search. */
-type Ask = "act" | "search";
+/** What another place may ask of a page as it opens: one of its actions, or a search. */
+export type Ask = "action" | "search";
+
+/** Each ask's older key, which a bookmark or a saved sign-in return address can still carry. */
+const ASKED_BEFORE = {
+  action: "act",
+  search: undefined,
+} as const satisfies Readonly<Record<Ask, string | undefined>>;
+
+export const askedIn = (query: URLSearchParams, ask: Ask): string | undefined => {
+  const before = ASKED_BEFORE[ask];
+  const asked = query.get(ask) ?? (before === undefined ? null : query.get(before));
+  return asked ?? undefined;
+};
 
 export type Here = { readonly pathname: string; readonly searchStr: string };
 
@@ -31,7 +43,7 @@ export const askingHere = (here: Here, path: string, ask: Ask, value: string): s
 export const useAsked = (ask: Ask, take: (value: string) => void): void => {
   // Its own key alone, so a list writing the rest of the query does not draw the page again.
   const asked = useRouterState({
-    select: (state) => new URLSearchParams(state.location.searchStr).get(ask) ?? undefined,
+    select: (state) => askedIn(new URLSearchParams(state.location.searchStr), ask),
   });
   const router = useRouter();
   const [taken, setTaken] = useState<string>();
@@ -48,6 +60,8 @@ export const useAsked = (ask: Ask, take: (value: string) => void): void => {
     const { pathname, searchStr } = router.latestLocation;
     const rest = new URLSearchParams(searchStr);
     rest.delete(ask);
+    const before = ASKED_BEFORE[ask];
+    if (before !== undefined) rest.delete(before);
     void router.navigate({ href: hrefOf(pathname, rest), replace: true });
   }, [ask, asked, router]);
 };

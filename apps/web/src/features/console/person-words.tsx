@@ -6,7 +6,7 @@ import type { HeldGrant, ListedPerson } from "./people-api.ts";
 export const nameOf = (person: ListedPerson): string =>
   nameOrAddress(person.displayName, person.email);
 
-/** Past its expiry a grant refreshes nothing, though no act ended it. */
+/** Past its expiry a grant refreshes nothing, though no action ended it. */
 export const grantStateOf = (grant: HeldGrant, nowMs: number): "Expired" | "Live" =>
   Date.parse(grant.expiresAt) <= nowMs ? "Expired" : "Live";
 

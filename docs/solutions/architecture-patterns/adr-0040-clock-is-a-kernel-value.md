@@ -1,5 +1,5 @@
 ---
-title: "The clock is a kernel value the api hands to every act that reads time"
+title: "The clock is a kernel value the api hands to every action that reads time"
 date: 2026-09-26
 module: packages/core
 problem_type: architecture_pattern
@@ -18,14 +18,14 @@ tags:
   - timestamps
 ---
 
-# The clock is a kernel value the api hands to every act that reads time
+# The clock is a kernel value the api hands to every action that reads time
 
 ## The decision
 
 A `Clock`, `{ now(): Date }`, lives in the kernel (`packages/core/src/kernel/clock.ts`). It is a value, not a fifth door. The api builds one `systemClock()` per process, in `apps/api/src/main.ts` and again in `apps/api/src/ops.ts`, and hands it down explicitly.
 
-- An act that reads one instant and spends it once takes a plain `now: Date` from its caller (`open`, `find`, `approveRequest`, the git door's `CommitRequest.at`).
-- An act that hands the reading on to more than one call takes the `Clock` and reads it itself (`writeConcept`, the reconciler).
+- An action that reads one instant and spends it once takes a plain `now: Date` from its caller (`open`, `find`, `approveRequest`, the git door's `CommitRequest.at`).
+- An action that hands the reading on to more than one call takes the `Clock` and reads it itself (`writeConcept`, the reconciler).
 - No parameter defaults to `new Date()`.
 - A row's own timestamp stays the database's `now()`: the audit log, `bundle_commit` and the worker's job queue.
 - The worker is handed no Clock. Its one clock-shaped read is the ULID minter's, which orders an id and decides nothing.

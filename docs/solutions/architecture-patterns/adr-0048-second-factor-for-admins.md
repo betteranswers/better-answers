@@ -7,7 +7,7 @@ component: identity
 severity: high
 applies_when:
   - "Adding a tRPC procedure, an api route or a Better Auth plugin endpoint a signed-in browser reaches"
-  - "Adding an act that makes a person an Admin or the operator, or removes a second factor"
+  - "Adding an action that makes a person an Admin or the operator, or removes a second factor"
   - "Changing what a session's confirmation stamp, pending clock or setup grant means"
   - "Signing an Admin or the operator in from a test suite, the browser suite or the journeys"
 tags:
@@ -38,7 +38,7 @@ A person who is an Admin in any workspace, and the operator, must hold a second 
   - the OAuth post-login rule, which sends a pending session's authorize to the post-login page, so no code is issued until it confirms. `/oauth2/continue` and `/oauth2/consent` refuse it.
 - **The refusal has its own word,** `second-factor-pending`, in the `precondition` class. Signing in again would only meet it again, so the SPA sends the person to confirm or setup, never to sign-in.
 - **`/get-session` answers a pending session without renewing it.**
-- **Becoming an Admin or the operator is a promotion.** Each act that makes a person one, from needing no factor, clears every session's confirmation and pending clock in its own transaction, and marks the person (`user.promoted_at`) until they first confirm. The confirm page then lists every credential that can confirm, by name and date. The tRPC acts mail the same list once they commit: a role move, a bulk role move and an Admin invitation accepted.
+- **Becoming an Admin or the operator is a promotion.** Each action that makes a person one, from needing no factor, clears every session's confirmation and pending clock in its own transaction, and marks the person (`user.promoted_at`) until they first confirm. The confirm page then lists every credential that can confirm, by name and date. The tRPC actions mail the same list once they commit: a role move, a bulk role move and an Admin invitation accepted.
 - **A confirmation does not outlive its factor.** Removing a passkey or the authenticator, or replacing every factor after a recovery code, clears the confirmation of the person's other sessions; the session that acted keeps its own.
 - **Tests sign in past the gate by the harness's own writes,** never by weakening it. The api suites' `signIn` gives a person who must hold a factor an authenticator if they hold none and stamps the session. The browser suite confirms through the real confirm page with an authenticator the harness writes. The gate's own tests sign in by email alone.
 
@@ -49,7 +49,7 @@ A person who is an Admin in any workspace, and the operator, must hold a second 
 - A stored *pending* state goes stale the moment a role changes elsewhere. Deriving the standing per request makes a promotion, a demotion and a removal take effect at once.
 - The pending clock bounds a session that holds only the mailbox: an hour after anyone sees it pending, it is gone, and a session from before the switch is not deleted on sight.
 - Sending the post-login page on, rather than refusing `/oauth2/authorize`, keeps the "connect Claude" flow's signed query whole, and the oauth plugin resumes authorize inside the sign-in request, where a refusal would become the sign-in's answer.
-- A promotion must make the next request pending even when the session was stamped as a Viewer by a passkey. Clearing the stamps in the promoting act does that; the mark carries the promotion block until the first confirmation.
+- A promotion must make the next request pending even when the session was stamped as a Viewer by a passkey. Clearing the stamps in the promoting action does that; the mark carries the promotion block until the first confirmation.
 - A stamp records no factor. Removing a factor because it was lost or stolen must not leave a session it confirmed standing.
 
 ## Rejected

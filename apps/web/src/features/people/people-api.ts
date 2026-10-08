@@ -24,7 +24,7 @@ export type CredentialsRevokedHere = inferOutput<Api["members"]["endEverySignInA
 
 export type ActivityEvent = inferOutput<Api["members"]["activity"]>["events"][number];
 
-/** Whether the person took the act, it was done to them, or both, as a self-demotion is. */
+/** Whether the person took the action, it was done to them, or both, as a self-demotion is. */
 export type Direction = ActivityEvent["direction"];
 
 /** By name, so a row the cache takes sits among the others where a reader looks for it. */
@@ -47,7 +47,7 @@ export const useActivity = (personId: string) => {
 };
 
 /**
- * An act is a line of the member's Activity. Not awaited: a waiting first read is never cancelled,
+ * An action is a line of the member's Activity. Not awaited: a waiting first read is never cancelled,
  * so the outcome would wait too.
  */
 export const useActivityReadAgain = () => {
@@ -70,7 +70,7 @@ export const useMembers = () => {
 };
 
 /**
- * The list takes the act before the api answers, so it lands within 100 ms. The act may touch the
+ * The list takes the action before the api answers, so it lands within 100 ms. The action may touch the
  * reader's own member row.
  */
 const useReconciledList = <Asked>(
@@ -181,7 +181,7 @@ export const useRemovalOf = (personId: string | undefined) => {
   }).at(-1);
 };
 
-/** Who a bulk act changed; the rest of the set was already as asked. */
+/** Who a bulk action changed; the rest of the set was already as asked. */
 export type BulkChanged = inferOutput<Api["members"]["bulkChangeRole"]>;
 
 type Ticked = { readonly personIds: readonly string[] };
@@ -203,7 +203,7 @@ export const useBulkChangeRole = () => {
   return useMutation(api.members.bulkChangeRole.mutationOptions(reconciled));
 };
 
-/** A group's member count moves with these acts, so the groups are read again beside the list. */
+/** A group's member count moves with these actions, so the groups are read again beside the list. */
 const useGroupsReadAgain = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

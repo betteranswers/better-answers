@@ -19,10 +19,10 @@ import { counted } from "@/shared/words.ts";
 
 import { outcomeOfFailure } from "./refusal.tsx";
 import {
-  DismissAsNotSpecialCategoryAct,
-  KeepInTextAct,
-  NarrowDocumentsAct,
-} from "./review-acts.tsx";
+  DismissAsNotSpecialCategoryAction,
+  KeepInTextAction,
+  NarrowDocumentsAction,
+} from "./review-actions.tsx";
 import {
   groupIsIn,
   groupKeyText,
@@ -171,7 +171,7 @@ function FindingsTable(properties: {
       <TableCaption>
         {counted(selected.length, "group of findings", "groups of findings")} selected. Select a
         group with <kbd className="font-mono">{SOURCES_KEYSTROKES.select.key}</kbd>, then keep it in
-        text, narrow its document or dismiss it as not special category with the acts above.
+        text, narrow its document or dismiss it as not special category with the actions above.
       </TableCaption>
       <TableHeader>
         <TableRow>
@@ -229,8 +229,8 @@ export function Review(properties: { readonly connectedSource: ListedConnectedSo
         Review of {connectedSource.name}
       </h2>
       <p className="mt-2 text-muted-foreground">
-        What the last sync found, per category and rule, counted. No value is shown: the three acts
-        take a group of findings, never what it found.
+        What the last sync found, per category and rule, counted. No value is shown: the three
+        actions take a group of findings, never what it found.
       </p>
 
       <div aria-live="polite" className="mt-4">
@@ -241,9 +241,11 @@ export function Review(properties: { readonly connectedSource: ListedConnectedSo
       {findings.data === undefined || findings.data.length === 0 ? null : (
         <>
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-            <KeepInTextAct connectedSourceId={connectedSource.connectedSourceId} />
-            <NarrowDocumentsAct connectedSourceId={connectedSource.connectedSourceId} />
-            <DismissAsNotSpecialCategoryAct connectedSourceId={connectedSource.connectedSourceId} />
+            <KeepInTextAction connectedSourceId={connectedSource.connectedSourceId} />
+            <NarrowDocumentsAction connectedSourceId={connectedSource.connectedSourceId} />
+            <DismissAsNotSpecialCategoryAction
+              connectedSourceId={connectedSource.connectedSourceId}
+            />
           </div>
           <FindingsTable connectedSource={connectedSource} groups={findings.data} />
         </>

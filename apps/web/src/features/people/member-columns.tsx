@@ -39,19 +39,19 @@ export const HIDEABLE = [
   { id: "joined", label: "Joined" },
 ] as const;
 
-type MemberActs = {
+type MemberActions = {
   /** Opens the member's page, where the link alone would lose a search still settling. */
   readonly open: (personId: string) => void;
   readonly focusedOn: (personId: string) => void;
 };
 
 /**
- * The list's acts reach each cell here, not through the columns: new columns draw every link
+ * The list's actions reach each cell here, not through the columns: new columns draw every link
  * afresh, dropping focus a press just gave.
  */
-export const MemberActsContext = createContext<MemberActs | undefined>(undefined);
+export const MemberActionsContext = createContext<MemberActions | undefined>(undefined);
 
-/** What the last bulk act's refusal said of each person it named. */
+/** What the last bulk action's refusal said of each person it named. */
 export type RefusedRows = ReadonlyMap<string, Said>;
 
 export const NO_MARKS: RefusedRows = new Map();
@@ -61,7 +61,7 @@ function PersonCell(properties: {
   readonly refused: Said | undefined;
 }) {
   const { member, refused } = properties;
-  const acts = useContext(MemberActsContext);
+  const actions = useContext(MemberActionsContext);
   const { personId, displayName, address } = member;
   return (
     <span className="flex min-w-0 items-start gap-2">
@@ -73,10 +73,10 @@ function PersonCell(properties: {
         <RowLink
           href={memberPageOf(personId)}
           onFocus={() => {
-            acts?.focusedOn(personId);
+            actions?.focusedOn(personId);
           }}
           onOpen={() => {
-            acts?.open(personId);
+            actions?.open(personId);
           }}
         >
           {displayName === "" ? (
@@ -97,7 +97,7 @@ function PersonCell(properties: {
   );
 }
 
-/** The person's own cell says why a bulk act refused them, so the refusals ride in. */
+/** The person's own cell says why a bulk action refused them, so the refusals ride in. */
 export const memberColumns = (refused: RefusedRows) =>
   column.columns([
     column.accessor((member) => nameOf(member), {

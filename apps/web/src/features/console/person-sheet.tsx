@@ -14,7 +14,7 @@ import { CorrectDisplayName } from "./correct-display-name.tsx";
 import { EndEverySignInEverywhere } from "./end-every-sign-in-everywhere.tsx";
 import { Facts } from "./facts.tsx";
 import { endedByWords } from "./grant-words.ts";
-import type { FreshAct } from "./people-address.ts";
+import type { FreshAction } from "./people-address.ts";
 import {
   useInspected,
   type EndedGrant,
@@ -25,8 +25,8 @@ import {
 import { At, grantStateOf, Instant, WorkspacesAndRoles, nameOf } from "./person-words.tsx";
 import { readRefused } from "./words.ts";
 
-/** Where focus lands when the sheet opens: on the person, or straight on one of their acts. */
-export type OpenedAt = "person" | FreshAct;
+/** Where focus lands when the sheet opens: on the person, or straight on one of their actions. */
+export type OpenedAt = "person" | FreshAction;
 
 export const personButtonId = (personId: string): string => `person-${personId}`;
 
@@ -253,8 +253,8 @@ export function PersonSheet(properties: {
           </Facts>
         </SheetPart>
         <HeldCredentials person={person} />
-        <CorrectDisplayName person={person} actRef={correctRef} />
-        <EndEverySignInEverywhere person={person} actRef={revokeRef} />
+        <CorrectDisplayName person={person} actionRef={correctRef} />
+        <EndEverySignInEverywhere person={person} actionRef={revokeRef} />
       </div>
     </RowSheet>
   );

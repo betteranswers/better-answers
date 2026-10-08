@@ -64,7 +64,7 @@ const sessionRowsOf = async (personId: string) =>
     )
   ).rows;
 
-/** Through the Members page's own act, by the workspace's confirmed Admin. */
+/** Through the Members page's own action, by the workspace's confirmed Admin. */
 const madeAnAdminBy = async (adminEmail: string, personId: string): Promise<void> => {
   const adminClient = await signedInByEmailOnly(app(), adminEmail);
   await confirmedByTheHarness(app(), adminClient);

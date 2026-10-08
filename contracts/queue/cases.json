@@ -191,7 +191,7 @@
   ],
   "refused_enqueues": [
     {
-      "why": "a second queued job for a connected source that already has one waiting is the database's refusal and never a second row — the *run key* over queued rows — so the act that enqueued it reads the waiting job's id back instead of landing a duplicate run",
+      "why": "a second queued job for a connected source that already has one waiting is the database's refusal and never a second row — the *run key* over queued rows — so the action that enqueued it reads the waiting job's id back instead of landing a duplicate run",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6JDBBBBBBBBBBBBBBBBBBBB",
       "kind": "index",

@@ -163,7 +163,7 @@ test.describe("the shared list parts, drawn together", () => {
     await page.keyboard.press("Space");
     await expect(bar(page).getByRole("status")).toHaveText("1 member selected.");
 
-    const trigger = page.getByRole("button", { name: "Acts for Cy Twombly" });
+    const trigger = page.getByRole("button", { name: "Actions for Cy Twombly" });
     await tabUntilFocused(page, trigger);
     await page.keyboard.press("Enter");
     await expect(page.getByRole("menuitem", { name: "Open" })).toBeFocused();
@@ -184,7 +184,7 @@ test.describe("the shared list parts, drawn together", () => {
               - button "Role"
             - columnheader "Groups"
             - columnheader "Joined"
-            - columnheader "Acts"
+            - columnheader "Actions"
         - rowgroup:
           - row /Cy Twombly/:
             - cell "Select Cy Twombly":
@@ -194,8 +194,8 @@ test.describe("the shared list parts, drawn together", () => {
             - cell "Viewer"
             - cell "Finance"
             - cell "3 March 2026"
-            - cell "Acts for Cy Twombly":
-              - button "Acts for Cy Twombly"
+            - cell "Actions for Cy Twombly":
+              - button "Actions for Cy Twombly"
     `);
 
     await page.keyboard.press("x");
@@ -207,9 +207,9 @@ test.describe("the shared list parts, drawn together", () => {
     await tabUntilFocused(page, tickOf(page, "Cy Twombly"));
     await page.keyboard.press("Space");
 
-    const act = bar(page).getByRole("button", { name: "Change role" });
+    const action = bar(page).getByRole("button", { name: "Change role" });
     const clear = bar(page).getByRole("button", { name: "Clear selection" });
-    await backUntilFocused(page, act);
+    await backUntilFocused(page, action);
     await page.keyboard.press("ArrowRight");
     await expect(clear).toBeFocused();
     await page.keyboard.press("Shift+Tab");

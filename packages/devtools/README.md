@@ -344,7 +344,7 @@ name. The other is a lone word in a script string, such as a tab label that is t
 alone, where nothing beside the word shows its joiner. In Python and JSON a lone word is a name, and takes
 `_`. A dry run writes nothing. The runner holds its own list of kept paths, so no map can
 forget one: migrations, `docs/archive/`, plans, the stored-names register, the generated audit
-acts, the words test's list, the maps themselves and the lifted snapshots. A rename that would
+actions, the words test's list, the maps themselves and the lifted snapshots. A rename that would
 reach a kept file is refused whole, since half a rename would not compile, and each pass
 settles every file before it writes one, so a refusal writes nothing.
 

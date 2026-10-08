@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { INVITATION_ACTS, INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
+import { INVITATION_ACTIONS, INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
@@ -23,7 +23,7 @@ import {
   saysItsSentenceNotItsWord,
   signIn,
   signInHeading,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 const READ_BUDGET_MS = 1000;
@@ -81,7 +81,7 @@ test("an invited newcomer names themselves on the invitation, then joins", async
   await passesTheAccessibilityGate();
 
   const keystrokes = await keystrokesListed(page, "this page");
-  await expect(keystrokes).toContainText(INVITATION_ACTS.join);
+  await expect(keystrokes).toContainText(INVITATION_ACTIONS.join);
   await keystrokesDismissed(page, keystrokes);
 
   await nameField(page).fill("Priya Shah");
@@ -92,7 +92,7 @@ test("an invited newcomer names themselves on the invitation, then joins", async
     reads: INVITATION_WORDS.joining,
   });
   await page.keyboard.press("j");
-  await theActLandedWithinItsBudget(page, "name and accept");
+  await theActionLandedWithinItsBudget(page, "name and accept");
 
   const bar = page.getByRole("banner");
   await expect(bar.getByText("Calder Joinery")).toBeVisible();
@@ -125,7 +125,7 @@ test("a named invitee reads it within a second, joins keyboard-only", async ({
   const ring = await joinButton(page, "Ryedale Metalwork").evaluate(
     (element) => getComputedStyle(element).boxShadow,
   );
-  expect(ring, "the focused act shows no focus ring").not.toBe("none");
+  expect(ring, "the focused action shows no focus ring").not.toBe("none");
   await page.keyboard.press("Enter");
 
   await expect(page.getByRole("banner").getByText("Ryedale Metalwork")).toBeVisible();
@@ -187,7 +187,7 @@ test("keeps a given name when the join is then refused", async ({
   });
   await passesTheAccessibilityGate();
 
-  await page.getByRole("button", { name: INVITATION_ACTS.yourWorkspaces }).click();
+  await page.getByRole("button", { name: INVITATION_ACTIONS.yourWorkspaces }).click();
   await landedAtHome(page, "Viewer");
   await expect(page.getByRole("banner").getByRole("button", { name: /Ines Moreau/ })).toBeVisible();
 });
@@ -248,7 +248,7 @@ test("refuses a person at another address, offering the invited one", async ({
     - main:
       - heading ${quoted(INVITATION_WORDS.untitled)} [level=1]
       - alert: ${quoted(refused)}
-      - button ${quoted(INVITATION_ACTS.anotherAddress)}
+      - button ${quoted(INVITATION_ACTIONS.anotherAddress)}
       - button "Sign out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
@@ -256,7 +256,7 @@ test("refuses a person at another address, offering the invited one", async ({
   await passesTheAccessibilityGate();
 
   const keystrokes = await keystrokesListed(page, "this page");
-  await expect(keystrokes).toContainText(INVITATION_ACTS.anotherAddress);
+  await expect(keystrokes).toContainText(INVITATION_ACTIONS.anotherAddress);
   await page.keyboard.press("Escape");
   await expect(keystrokes).toBeHidden();
   await page.keyboard.press("s");

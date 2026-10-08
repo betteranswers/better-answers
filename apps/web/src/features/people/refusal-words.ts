@@ -28,7 +28,7 @@ export const SAID_OF_A_MEMBER = {
   },
 } satisfies SaidOfWord;
 
-/** A bulk act refuses the whole set, so each item's line says why that one person stopped it. */
+/** A bulk action refuses the whole set, so each item's line says why that one person stopped it. */
 export const SAID_OF_TICKED_MEMBERS = {
   "role-forbids": SAID_OF_A_MEMBER["role-forbids"],
   "not-a-member": SAID_OF_A_MEMBER["not-a-member"],
@@ -101,14 +101,14 @@ export const SAID_OF_TICKED_INVITATIONS = {
 
 /**
  * Invite, Resend and bulk Resend count each address's emails and the workspace's; either ceiling
- * refuses the act whole, and the answer does not say which.
+ * refuses the action whole, and the answer does not say which.
  */
 export const invitationsCeiling = (liftsInSeconds: number): Said => ({
   why: "This workspace, or an address here, has had too many invitation emails this hour, so nothing was sent.",
   next: `Try again in ${minutesUntil(liftsInSeconds)}.`,
 });
 
-/** A group act refuses `malformed` for a name with no letter or figure in it. */
+/** A group action refuses `malformed` for a name with no letter or figure in it. */
 export const SAID_OF_A_GROUP = {
   "role-forbids": {
     why: "Only an Admin of this workspace sees its groups.",

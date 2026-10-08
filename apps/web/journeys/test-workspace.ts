@@ -98,7 +98,7 @@ const readOrStop = <T>(checked: Checked<T>): T =>
       );
 
 /**
- * Read through the Admin's session before any act, their own role first. A finding stops the
+ * Read through the Admin's session before any action, their own role first. A finding stops the
  * run, so the Editor and Viewer never sign in.
  */
 export const theFixtureHolds = async (page: Page, people: TestPeople): Promise<RepairMembers> => {

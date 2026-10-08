@@ -12,7 +12,7 @@ import {
 } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-import { act, declareActs, record } from "../audit/index.ts";
+import { action, declareActions, record } from "../audit/index.ts";
 import {
   err,
   isPortablePath,
@@ -30,8 +30,8 @@ import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts
 import type { Frontmatter, FrontmatterSource } from "./file.ts";
 import { foldKind, mergeKeyOf } from "./landing.ts";
 
-const IMPORT_ACTS = declareActs("knowledge", {
-  verificationImported: act("knowledge.check.imported", { iri: "iri", verificationId: "id" }),
+const IMPORT_ACTIONS = declareActions("knowledge", {
+  verificationImported: action("knowledge.check.imported", { iri: "iri", verificationId: "id" }),
 });
 
 export const IMPORT_SENSITIVITY_DEFAULT = "Internal" satisfies (typeof SENSITIVITIES)[number];
@@ -486,7 +486,7 @@ export const recordImportedVerifications = async (
     );
     await record(principal, tx, {
       id: ulid(),
-      act: IMPORT_ACTS.verificationImported,
+      action: IMPORT_ACTIONS.verificationImported,
       subjectId: verificationId,
       batchId: input.batchId,
       detail: { iri: input.iri, verificationId },

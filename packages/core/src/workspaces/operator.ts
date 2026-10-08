@@ -1,6 +1,6 @@
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareIdentitySetActs, record } from "../audit/index.ts";
+import { action, declareIdentitySetActions, record } from "../audit/index.ts";
 import {
   attempt,
   err,
@@ -23,12 +23,12 @@ import { hashOfTyped, mintOneTimeCode } from "./recovery-codes.ts";
 import { OPERATOR_RESTORE_PREFIX, SESSION_VERIFICATION_PREFIXES } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-const OPERATOR_ACTS = declareIdentitySetActs("people", {
-  grant: act("people.operator.granted", {}),
-  revoke: act("people.operator.revoked", {}),
+const OPERATOR_ACTIONS = declareIdentitySetActions("people", {
+  grant: action("people.operator.granted", {}),
+  revoke: action("people.operator.revoked", {}),
 });
 
-type MarkChange = keyof typeof OPERATOR_ACTS;
+type MarkChange = keyof typeof OPERATOR_ACTIONS;
 
 type OperatorMarkInput = {
   readonly email: string;
@@ -66,7 +66,7 @@ const marking = async (
   ]);
   await record(platform, tx, {
     id: ulid(),
-    act: OPERATOR_ACTS[input.change],
+    action: OPERATOR_ACTIONS[input.change],
     subjectId: personId,
     detail: {},
   });
@@ -90,8 +90,8 @@ export const setOperatorMark = async (
   return marked.value;
 };
 
-const RESTORE_ACTS = declareIdentitySetActs("people", {
-  restored: act("people.person.sign_in_restored", {}),
+const RESTORE_ACTIONS = declareIdentitySetActions("people", {
+  restored: action("people.person.sign_in_restored", {}),
 });
 
 const RESTORE_CODE_LIFETIME_MS = 24 * 60 * 60_000;
@@ -167,7 +167,7 @@ const restoring = async (
   ]);
   await record(platform, tx, {
     id: ulid(),
-    act: RESTORE_ACTS.restored,
+    action: RESTORE_ACTIONS.restored,
     subjectId: personId,
     detail: {},
   });
@@ -210,7 +210,7 @@ type OperatorStanding =
   | { readonly operator: true; readonly name: string };
 
 /**
- * Whether a signed-in person stands as the operator, by the rule every console act is resolved
+ * Whether a signed-in person stands as the operator, by the rule every console action is resolved
  * on, and their display name where they do. It answers no rather than refusing.
  */
 export const standingAsOperator = async (

@@ -168,14 +168,14 @@ describe("a governed write", () => {
       Audit: written.auditEventId,
     });
 
-    const joined = await db().pool.query<{ act: string; sha: string }>(
-      `SELECT e.action AS act, c.sha
+    const joined = await db().pool.query<{ action: string; sha: string }>(
+      `SELECT e.action, c.sha
          FROM audit_event e JOIN bundle_commit c
            ON c.workspace_id = e.workspace_id AND c.audit_event_id = e.id
         WHERE e.id = $1`,
       [written.auditEventId],
     );
-    expect(joined.rows).toEqual([{ act: "knowledge.concept.committed", sha: written.sha }]);
+    expect(joined.rows).toEqual([{ action: "knowledge.concept.committed", sha: written.sha }]);
   });
 
   it("writes the file with its frontmatter, body and own IRI", async () => {
@@ -203,7 +203,7 @@ describe("a governed write", () => {
       ].join("\n"),
     );
 
-    // Written down, never computed here: an expectation this act's own hash produced would
+    // Written down, never computed here: an expectation this action's own hash produced would
     // agree with any canonicalisation at all, the Python tier's included.
     expect(written.contentHash).toBe(
       "16f6c6993084b35862434bc90dece1fb2c2669cbddc21c910bdcd95bef0dcecc",
@@ -233,7 +233,7 @@ describe("a governed write", () => {
     expect(row.rows[0]?.content_hash).toBe(written.contentHash);
   });
 
-  it("takes the file's status when the act names none", async () => {
+  it("takes the file's status when the action names none", async () => {
     const scenario = await arrange();
 
     const input = writeFor({
@@ -252,7 +252,7 @@ describe("a governed write", () => {
     expect(file).toContain('"status": "stable"');
   });
 
-  it("keeps the file's own type and title over the act's", async () => {
+  it("keeps the file's own type and title over the action's", async () => {
     const scenario = await arrange();
 
     const input = writeFor({
@@ -399,7 +399,7 @@ describe("a governed write", () => {
     ).toBe(absolute);
   });
 
-  it("keeps recorded commits a prefix of history across many acts", async () => {
+  it("keeps recorded commits a prefix of history across many actions", async () => {
     const scenario = await arrange();
     let head: string | null = null;
     const shas: string[] = [];
@@ -1212,7 +1212,7 @@ const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Pr
   expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(commits);
 };
 
-describe("authority that moved while the act was in flight", () => {
+describe("authority that moved while the action was in flight", () => {
   it("refuses a writer whose role moved, before any commit", async () => {
     const scenario = await arrange();
 
@@ -1265,7 +1265,7 @@ describe("authority that moved while the act was in flight", () => {
   });
 
   it.each(["here", "everywhere"] as const)(
-    "holds a revocation %s behind the act, then refuses writes",
+    "holds a revocation %s behind the action, then refuses writes",
     async (scope) => {
       const scenario = await arrange();
 
@@ -1297,7 +1297,7 @@ describe("authority that moved while the act was in flight", () => {
     },
   );
 
-  it("refuses the rows for a revocation the act cannot see", async () => {
+  it("refuses the rows for a revocation the action cannot see", async () => {
     const scenario = await arrange();
 
     const revoker = await db().pool.connect();
@@ -1398,7 +1398,7 @@ describe("a failure after the commit", () => {
 });
 
 describe("the per-repository lock", () => {
-  it("serialises acts per bundle but not across bundles", async () => {
+  it("serialises actions per bundle but not across bundles", async () => {
     const door = bundles();
     const here = await arrange();
     const there = await arrange();
@@ -1437,12 +1437,12 @@ describe("the per-repository lock", () => {
     expect(await recordedCommits(scenario.workspaceId)).toEqual(history);
   });
 
-  it("releases the bundle when an act fails inside the lock", async () => {
+  it("releases the bundle when an action fails inside the lock", async () => {
     const scenario = await arrange();
     await landed(scenario, writeFor());
 
     /**
-     * A failure the act meets inside the lock; one decided before the lock is taken would
+     * A failure the action meets inside the lock; one decided before the lock is taken would
      * prove nothing about releasing it.
      */
     const failed = await write(scenario, scenario.editor, writeFor({ expects: { head: null } }));

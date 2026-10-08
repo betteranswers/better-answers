@@ -301,7 +301,7 @@ export const actingIn = async <T>(
   const answered = folded<T>(
     await withPrincipal(app.doors.postgres, { ...who, issuedAt: new Date() }, work),
   );
-  if (!answered.ok) throw new Error(`the act answered ${String(answered.error)}`);
+  if (!answered.ok) throw new Error(`the action answered ${String(answered.error)}`);
   return answered.value;
 };
 

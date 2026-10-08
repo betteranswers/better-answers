@@ -1,10 +1,10 @@
 import type { z } from "zod";
 
-import { act, declareActs, type DetailOf, record, type Matched } from "../audit/index.ts";
+import { action, declareActions, type DetailOf, record, type Matched } from "../audit/index.ts";
 import {
   admit,
   attempt,
-  declareAct,
+  declareAction,
   err,
   ok,
   type PrincipalRefusal,
@@ -29,8 +29,8 @@ import {
 } from "./audit-log.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-const EXPORT_ACTS = declareActs("platform", {
-  exported: act("platform.audit_log.exported", {
+const EXPORT_ACTIONS = declareActions("platform", {
+  exported: action("platform.audit_log.exported", {
     matched: "matched",
     family: "family?",
     eventCount: "count",
@@ -46,7 +46,7 @@ export const exportAuditLogInput = readAuditLogInput.pick({ family: true, search
 
 export type ExportAuditLogInput = z.output<typeof exportAuditLogInput>;
 
-const exportAuditLogAct = declareAct({
+const exportAuditLogAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: exportAuditLogInput,
   refuses: ["role-forbids"],
@@ -54,7 +54,7 @@ const exportAuditLogAct = declareAct({
 });
 
 export type ExportAuditLogRefusal =
-  | MemberRefusal<RefusalOf<typeof exportAuditLogAct>>
+  | MemberRefusal<RefusalOf<typeof exportAuditLogAction>>
   | PrincipalRefusal
   | Error;
 
@@ -119,12 +119,12 @@ const detailWords = (detail: ReadAuditEvent["detail"]): string =>
     )
     .join("; ");
 
-const HEADER = ["Time", "Family", "Act", "Actor", "Subject", "Detail"];
+const HEADER = ["Time", "Family", "Action", "Actor", "Subject", "Detail"];
 
 const cellsOf = (event: ReadAuditEvent): readonly string[] => [
   event.at,
   event.family,
-  event.act,
+  event.action,
   actorWords(event.by),
   event.subject === null ? `${event.subjectKind} ${event.subjectId}` : subjectWords(event.subject),
   detailWords(event.detail),
@@ -148,8 +148,8 @@ const csvOf = (read: Read): string =>
 
 /** Built a field at a time, as the family is stored only when the export was narrowed to one. */
 type ExportedDetail = {
-  -readonly [Key in keyof DetailOf<typeof EXPORT_ACTS.exported.detail>]: DetailOf<
-    typeof EXPORT_ACTS.exported.detail
+  -readonly [Key in keyof DetailOf<typeof EXPORT_ACTIONS.exported.detail>]: DetailOf<
+    typeof EXPORT_ACTIONS.exported.detail
   >[Key];
 };
 
@@ -192,14 +192,14 @@ const recordExport = async (
   if (input.family !== undefined) detail.family = input.family;
   await record(principal, tx, {
     id: ulid(),
-    act: EXPORT_ACTS.exported,
+    action: EXPORT_ACTIONS.exported,
     subjectId: principal.workspaceId,
     detail,
   });
 };
 
 /**
- * Reads holding no row, so no other Admin's act waits on the export, then records it in a short
+ * Reads holding no row, so no other Admin's action waits on the export, then records it in a short
  * transaction, answering once that committed.
  */
 export const exportAuditLog = async (
@@ -207,7 +207,7 @@ export const exportAuditLog = async (
   door: PostgresDoor,
   input: ExportAuditLogInput,
 ): Promise<Result<AuditExport, ExportAuditLogRefusal>> => {
-  const admitted = admit(exportAuditLogAct, principal, input);
+  const admitted = admit(exportAuditLogAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
   const read = await attempt(() =>

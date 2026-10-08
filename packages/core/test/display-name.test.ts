@@ -78,7 +78,7 @@ const displayNameHeld = async (personId: string): Promise<string | undefined> =>
 
 const identitySetRowsFor = async (personId: string) => {
   const found = await db().pool.query(
-    `SELECT id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id
+    `SELECT id, action, family, actor, subject_kind, subject_id, detail, batch_id
        FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id`,
     [personId],
   );
@@ -176,7 +176,7 @@ describe("setting one's own display name", () => {
     expect(await identitySetRowsFor(adminUserId)).toEqual([
       {
         id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
-        act: "people.person.named",
+        action: "people.person.named",
         family: "people",
         actor: `human:${adminUserId}`,
         subject_kind: "person",
@@ -238,7 +238,7 @@ describe("correcting a display name, as the operator", () => {
     expect(await identitySetRowsFor(personId)).toEqual([
       {
         id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
-        act: "people.person.renamed",
+        action: "people.person.renamed",
         family: "people",
         actor: `human:${operatorId}`,
         subject_kind: "person",
@@ -266,7 +266,7 @@ describe("correcting a display name, as the operator", () => {
     const { answered } = await correcting({ personId, displayName: "Priya Shah" });
 
     expect(answered).toMatchObject({ ok: true, value: { ok: true } });
-    expect((await identitySetRowsFor(personId)).map((row) => row.act)).toEqual([
+    expect((await identitySetRowsFor(personId)).map((row) => row.action)).toEqual([
       "people.person.renamed",
     ]);
   });

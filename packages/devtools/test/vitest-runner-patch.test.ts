@@ -14,7 +14,7 @@ export const declare = (family: string): string => {
   return family;
 };
 
-export const ACTS = declare("knowledge");
+export const ACTIONS = declare("knowledge");
 
 export const isFamily = (family: string): boolean => {
   return FAMILIES.includes(family);
@@ -23,11 +23,11 @@ export const isFamily = (family: string): boolean => {
 
 const SUITE = `import { describe, expect, it } from "vitest";
 
-import { ACTS, isFamily } from "../src/family.ts";
+import { ACTIONS, isFamily } from "../src/family.ts";
 
 describe("a family", () => {
   it("declares the family", () => {
-    expect(ACTS).toBe("knowledge");
+    expect(ACTIONS).toBe("knowledge");
   });
 
   it("tells a family from a stranger", () => {
@@ -111,11 +111,11 @@ it("opens nothing", () => {
 `,
   "test/family.test.ts": `import { describe, expect, it } from "vitest";
 
-import { ACTS, describeFamily } from "../src/family.ts";
+import { ACTIONS, describeFamily } from "../src/family.ts";
 
 describe("a family", () => {
   it("declares the family", () => {
-    expect(ACTS).toBe("knowledge");
+    expect(ACTIONS).toBe("knowledge");
   });
 
   it("describes a family", () => {

@@ -141,7 +141,7 @@ const aFinishedSync = (workspaceId: string, connectedSourceId: string): Promise<
   });
 
 /**
- * Every act refuses a widening, so the restoring half of each pair can only be written onto
+ * Every action refuses a widening, so the restoring half of each pair can only be written onto
  * the source row itself.
  */
 const theConnectedSourceRowNowSays = async (
@@ -315,7 +315,7 @@ const publishingTheConnectedSource = (scenario: Scenario, connectedSourceId: str
     }),
   );
 
-describe("a reader's answer as the Admin's acts move source rows", () => {
+describe("a reader's answer as the Admin's actions move source rows", () => {
   it("withholds a source's passages when narrowed, restoring them once widened", async () => {
     const scenario = await arrange();
     const where = await aConnectedSourceHoldingOneDocument(scenario.workspaceId, {
@@ -431,7 +431,7 @@ describe("a narrowing queues no sync", () => {
     });
     await landed(scenario.workspaceId, theConnectedSource);
     await landed(scenario.workspaceId, theOther);
-    // The sync that had already been and gone, so an empty answer below is the act and not a
+    // The sync that had already been and gone, so an empty answer below is the action and not a
     // reader that sees nothing.
     await aFinishedSync(scenario.workspaceId, theOther.connectedSourceId);
     const theSyncThatRan = {
@@ -464,7 +464,7 @@ describe("a narrowing queues no sync", () => {
 type HeldNarrowing = { readonly commit: () => Promise<void> };
 
 /**
- * The act's work does not return until `commit` is called, so its transaction stays open with
+ * The action's work does not return until `commit` is called, so its transaction stays open with
  * the narrowing applied and uncommitted.
  */
 const aNarrowingHeldUncommitted = async (
@@ -474,7 +474,7 @@ const aNarrowingHeldUncommitted = async (
   const applied = Promise.withResolvers<void>();
   const held = Promise.withResolvers<void>();
   const asked = inputOf(narrowConnectedSourceInput, narrowedTo(connectedSourceId, "Restricted"));
-  const act = reading(scenario.admin, async (admin, tx) => {
+  const action = reading(scenario.admin, async (admin, tx) => {
     try {
       return await narrowConnectedSource(admin, tx, asked);
     } finally {
@@ -486,7 +486,7 @@ const aNarrowingHeldUncommitted = async (
   return {
     commit: async () => {
       held.resolve();
-      answered(await act);
+      answered(await action);
     },
   };
 };

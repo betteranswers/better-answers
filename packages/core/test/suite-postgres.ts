@@ -37,7 +37,7 @@ export const postgresForSuite = (): (() => MigratedPostgres) => {
 };
 
 /**
- * For an act that reads every workspace the database holds, whose totals another case's rows
+ * For an action that reads every workspace the database holds, whose totals another case's rows
  * would change.
  */
 export const postgresForEachCase = (): (() => MigratedPostgres) => {
@@ -92,7 +92,7 @@ export const readingAs = async <T>(
   );
 
 export const answered = <Value, Refusal>(read: Result<Value, Refusal>): Value => {
-  if (!read.ok) throw new Error(`the act answered ${String(read.error)}`);
+  if (!read.ok) throw new Error(`the action answered ${String(read.error)}`);
   return read.value;
 };
 
@@ -158,7 +158,7 @@ export const abortTheTransaction = async (tx: Tx): Promise<void> => {
 };
 
 /**
- * Once released, acts pass `in turn`, each holding the rest back until it commits, or all
+ * Once released, actions pass `in turn`, each holding the rest back until it commits, or all
  * `together`, so their statements interleave.
  */
 type Released = "in turn" | "together";
@@ -169,7 +169,7 @@ const HOLD_OF: Readonly<Record<Released, string>> = {
 };
 
 /** Each `event` on `table` blocks until `work` calls `release` or ends. */
-export const whileActsWaitAt = async <T>(
+export const whileActionsWaitAt = async <T>(
   pool: pg.Pool,
   table: string,
   event: "INSERT" | "UPDATE",
@@ -177,7 +177,7 @@ export const whileActsWaitAt = async <T>(
   released: Released = "in turn",
 ): Promise<T> => {
   const holder = await pool.connect();
-  const key = "hashtext('test-acts-wait-at')";
+  const key = "hashtext('test-actions-wait-at')";
   let unlocked = false;
   const release = async (): Promise<void> => {
     if (unlocked) return;
@@ -186,20 +186,20 @@ export const whileActsWaitAt = async <T>(
   };
   await holder.query(`SELECT pg_advisory_lock(${key}, ${key})`);
   await pool.query(
-    `CREATE OR REPLACE FUNCTION test_acts_wait_at() RETURNS trigger LANGUAGE plpgsql AS $$
+    `CREATE OR REPLACE FUNCTION test_actions_wait_at() RETURNS trigger LANGUAGE plpgsql AS $$
      BEGIN PERFORM ${HOLD_OF[released]}(${key}, ${key}); RETURN NEW; END $$`,
   );
   await pool.query(
-    `CREATE TRIGGER test_acts_wait_at BEFORE ${event} ON "${table}"
-     FOR EACH ROW EXECUTE FUNCTION test_acts_wait_at()`,
+    `CREATE TRIGGER test_actions_wait_at BEFORE ${event} ON "${table}"
+     FOR EACH ROW EXECUTE FUNCTION test_actions_wait_at()`,
   );
   try {
     return await work(release);
   } finally {
     await release();
     holder.release();
-    await pool.query(`DROP TRIGGER test_acts_wait_at ON "${table}"`);
-    await pool.query("DROP FUNCTION test_acts_wait_at()");
+    await pool.query(`DROP TRIGGER test_actions_wait_at ON "${table}"`);
+    await pool.query("DROP FUNCTION test_actions_wait_at()");
   }
 };
 
@@ -213,20 +213,20 @@ export const statementsWaitingOnALock = async (pool: pg.Pool): Promise<readonly 
 export const countWaitingOnLocks = async (pool: pg.Pool): Promise<number> =>
   (await statementsWaitingOnALock(pool)).length;
 
-/** Starts every act, lets them past `table`'s inserts once each waits on a lock, and answers each. */
+/** Starts every action, lets them past `table`'s inserts once each waits on a lock, and answers each. */
 export const racedAt = <T>(
   pool: pg.Pool,
   table: string,
-  acts: readonly (() => Promise<T>)[],
+  actions: readonly (() => Promise<T>)[],
   released: Released = "in turn",
 ): Promise<readonly T[]> =>
-  whileActsWaitAt(
+  whileActionsWaitAt(
     pool,
     table,
     "INSERT",
     async (release) => {
-      const racing = acts.map((act) => act());
-      await until(async () => (await countWaitingOnLocks(pool)) === acts.length);
+      const racing = actions.map((action) => action());
+      await until(async () => (await countWaitingOnLocks(pool)) === actions.length);
       await release();
       return Promise.all(racing);
     },

@@ -113,7 +113,7 @@ export const INVITATIONS_WORDS = {
   pages: "Pages of invitations",
   loading: "The invitations are still loading.",
   caption:
-    "Invitations to this workspace, each with its role, the day it was sent and the day it expires. A tick selects a waiting or expired invitation for an act on every invitation selected.",
+    "Invitations to this workspace, each with its role, the day it was sent and the day it expires. A tick selects a waiting or expired invitation for an action on every invitation selected.",
   noneIn: {
     waiting: EMPTY_LINES.invitations,
     accepted: "No invitation has been accepted yet.",
@@ -136,13 +136,13 @@ export const INVITATIONS_WORDS = {
     cancelled: cancelledSaid,
     refused: (count: number) =>
       `Nothing changed. ${counted(count, "invitation was", "invitations were")} refused:`,
-    tooMany: (most: number) => `Select at most ${invitations(most)} for one act.`,
+    tooMany: (most: number) => `Select at most ${invitations(most)} for one action.`,
   },
   unsent: "Emails that did not go",
   resendTo: (address: string) => `Resend the invitation to ${address}`,
 } as const;
 
-/** The dialog's words; its title and its button are the act's own name. */
+/** The dialog's words; its title and its button are the action's own name. */
 export const INVITE_WORDS = {
   description:
     "Each gets an email with a link to join, good for seven days. An address with an invitation waiting gets this one in its place.",

@@ -35,7 +35,7 @@ import {
   signedInAtHome,
   signIn,
   skipLinkReachesThePage,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -156,7 +156,7 @@ const nameFieldOf = (dialog: Locator): Locator =>
   dialog.getByRole("textbox", { name: "Display name" });
 
 /**
- * The act opens on the name as it stands, under the rule and the consequence; Cancel hands focus
+ * The action opens on the name as it stands, under the rule and the consequence; Cancel hands focus
  * back. `audit` runs on the open dialog.
  */
 const correctingCancelled = async (
@@ -180,7 +180,7 @@ const correctingCancelled = async (
 
 const namesWaiting = (page: Page) => page.getByRole("region", { name: "Names waiting" });
 
-/** The count, told apart by its words from the act's own status beside it. */
+/** The count, told apart by its words from the action's own status beside it. */
 const waitingCount = (page: Page): Locator =>
   namesWaiting(page).getByRole("status").filter({ hasText: "to be corrected." });
 
@@ -583,7 +583,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await page.keyboard.press("Enter");
 
     await expect(regionOf(sheet, "Sessions")).toContainText("No session is open.");
-    await theActLandedWithinItsBudget(page, "end every sign-in everywhere");
+    await theActionLandedWithinItsBudget(page, "end every sign-in everywhere");
     await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("status")).toHaveText(
       /^Priya Shah's sessions and assistant access ended at \d{2}:\d{2} · .+\. They can sign in again\.$/,
     );
@@ -708,7 +708,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     const renamed = sheetOf(page, "Priya Sharma");
     await expect(renamed.getByRole("heading", { level: 2 })).toHaveText("Priya Sharma");
-    await theActLandedWithinItsBudget(page, "correct display name");
+    await theActionLandedWithinItsBudget(page, "correct display name");
     const part = regionOf(renamed, "Display name");
     await expect(part.getByRole("status")).toHaveText(savedWords("Priya Shah", "Priya Sharma"));
     await expect(
@@ -804,10 +804,10 @@ test.describe("the console's Names waiting page", () => {
         - table:
           - caption: /Every display name an Admin flagged/
           - rowgroup:
-            - row "Person Flagged by Acts":
+            - row "Person Flagged by Actions":
               - columnheader "Person"
               - columnheader "Flagged by"
-              - columnheader "Acts"
+              - columnheader "Actions"
           - rowgroup:
             - row /${name}/:
               - cell "${name}"
@@ -841,7 +841,7 @@ test.describe("the console's Names waiting page", () => {
     await page.keyboard.press("Enter");
 
     await expect(waitingRowOf(page, name)).toHaveCount(0);
-    await theActLandedWithinItsBudget(page, "correct display name");
+    await theActionLandedWithinItsBudget(page, "correct display name");
     await expect(namesWaiting(page)).toContainText(savedWords(name, corrected));
     await expect(namesWaiting(page).getByRole("heading", { name: "Names waiting" })).toBeFocused();
 

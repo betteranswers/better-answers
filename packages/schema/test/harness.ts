@@ -124,7 +124,7 @@ export const withCommit = async (
   }
 };
 
-/** An act's transaction that has written to the audit log and not yet committed. */
+/** An action's transaction that has written to the audit log and not yet committed. */
 export const whileAnAuditWriteIsOpen = async <T>(
   pool: pg.Pool,
   work: () => Promise<T>,

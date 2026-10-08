@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 
 import { refusalOf, useTRPC, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
-import { KeystrokesAct, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
@@ -12,11 +12,15 @@ import { AuthPage, ReadAgain, Refused } from "./auth-page.tsx";
 import { carriedFlow, invitationAt, pageQuery } from "./carried-flow.ts";
 import { INVITATIONS_UNANSWERED } from "./refusal-words.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
-import { NO_WORKSPACE_ACTS, NO_WORKSPACE_HEADING, NO_WORKSPACE_WORDS } from "./workspace-words.ts";
+import {
+  NO_WORKSPACE_ACTIONS,
+  NO_WORKSPACE_HEADING,
+  NO_WORKSPACE_WORDS,
+} from "./workspace-words.ts";
 
-const TO_INVITATIONS: Keystroke = { key: "i", act: NO_WORKSPACE_ACTS.toInvitations };
+const TO_INVITATIONS: Keystroke = { key: "i", action: NO_WORKSPACE_ACTIONS.toInvitations };
 
-const READ_AGAIN: Keystroke = { key: "r", act: NO_WORKSPACE_ACTS.readAgain };
+const READ_AGAIN: Keystroke = { key: "r", action: NO_WORKSPACE_ACTIONS.readAgain };
 
 const INVITATIONS_HEADING = "invitations-heading";
 
@@ -132,7 +136,7 @@ function Invitations(properties: { readonly read: InvitationsRead; readonly carr
   );
 }
 
-/** In the order the page shows their acts. */
+/** In the order the page shows their actions. */
 const keystrokesOf = (read: InvitationsRead): readonly Keystroke[] => [
   ...(unanswered(read) ? [READ_AGAIN] : []),
   ...(listedIn(read).length > 0 ? [TO_INVITATIONS] : []),
@@ -155,7 +159,7 @@ export function NoWorkspacePage() {
       <div className="mt-8 flex flex-wrap items-center gap-2">
         <AccountLink />
         <SignOutButton />
-        <KeystrokesAct page="this page" keystrokes={keystrokesOf(invitations)} />
+        <KeystrokesAction page="this page" keystrokes={keystrokesOf(invitations)} />
       </div>
     </AuthPage>
   );

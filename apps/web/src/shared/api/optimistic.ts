@@ -3,7 +3,7 @@ import { useQueryClient, type DataTag, type QueryKey } from "@tanstack/react-que
 export type Undo = { readonly undo: () => void };
 
 /**
- * A click must read as done within a tenth of a second, so the cache takes the act before the
+ * A click must read as done within a tenth of a second, so the cache takes the action before the
  * api answers.
  */
 export const useOptimistic = () => {

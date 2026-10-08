@@ -49,7 +49,7 @@ const replayedThen = <T>(read: (client: pg.PoolClient) => Promise<T>): Promise<T
     return read(client);
   });
 
-const STORED_ACTS = [
+const STORED_ACTIONS = [
   ["audit_event", "sources.binding.published"],
   ["audit_event", "people.member.joined"],
   ["identity_audit_event", "people.person.signed_in"],
@@ -60,19 +60,19 @@ const STORED_ACTS = [
 const seededBefore = async (client: pg.PoolClient): Promise<void> => {
   const seed = testData(client);
   for (const workspace of [await seed.workspace(), await seed.workspace()]) {
-    for (const [log, act] of STORED_ACTS) {
-      const detail = JSON.stringify({ kept: act });
+    for (const [log, action] of STORED_ACTIONS) {
+      const detail = JSON.stringify({ kept: action });
       await (log === "audit_event"
         ? client.query(AN_AUDIT_EVENT_ROW_BEFORE_THE_ACTION, [
             ulid(),
             workspace.id,
-            act,
+            action,
             ulid(),
             detail,
           ])
         : client.query(AN_IDENTITY_SET_AUDIT_EVENT_ROW_BEFORE_THE_ACTION, [
             ulid(),
-            act,
+            action,
             ulid(),
             detail,
           ]));
@@ -148,10 +148,10 @@ describe("migration 0073 over audit logs written before it", () => {
       return [held, { files: await filesOf(client), rows: await rowsOf(client, "action") }];
     });
 
-    expect(before.rows).toHaveLength(STORED_ACTS.length * 2);
+    expect(before.rows).toHaveLength(STORED_ACTIONS.length * 2);
     expect(after).toEqual(before);
     expect(after.rows.map((row) => row["stored"]).toSorted()).toEqual(
-      [...STORED_ACTS, ...STORED_ACTS].map(([, act]) => act).toSorted(),
+      [...STORED_ACTIONS, ...STORED_ACTIONS].map(([, action]) => action).toSorted(),
     );
   });
 

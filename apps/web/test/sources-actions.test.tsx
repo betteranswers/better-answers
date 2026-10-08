@@ -5,10 +5,10 @@ import { createAppClients, Providers } from "@/app/providers.tsx";
 import { SAID_OF_A_CONNECTED_SOURCE } from "@/features/sources/refusal-words.ts";
 import { refusedFor } from "@/features/sources/refusal.tsx";
 import {
-  DismissAsNotSpecialCategoryAct,
-  KeepInTextAct,
-  NarrowDocumentsAct,
-} from "@/features/sources/review-acts.tsx";
+  DismissAsNotSpecialCategoryAction,
+  KeepInTextAction,
+  NarrowDocumentsAction,
+} from "@/features/sources/review-actions.tsx";
 import type { GroupOfFindings } from "@/features/sources/sources-api.ts";
 import { useTickedGroups } from "@/features/sources/sources-state.ts";
 import { ViewStateSlot } from "@/shared/page-toolbar.tsx";
@@ -75,42 +75,42 @@ const reviewing = (connectedSourceId: string, tickedIn: string) =>
     <Providers clients={createAppClients()}>
       <ViewStateSlot>
         <TicksIn connectedSourceId={tickedIn} />
-        <KeepInTextAct connectedSourceId={connectedSourceId} />
-        <NarrowDocumentsAct connectedSourceId={connectedSourceId} />
-        <DismissAsNotSpecialCategoryAct connectedSourceId={connectedSourceId} />
+        <KeepInTextAction connectedSourceId={connectedSourceId} />
+        <NarrowDocumentsAction connectedSourceId={connectedSourceId} />
+        <DismissAsNotSpecialCategoryAction connectedSourceId={connectedSourceId} />
       </ViewStateSlot>
     </Providers>,
   );
 
-const act = (name: string) => screen.getByRole<HTMLButtonElement>("button", { name });
+const action = (name: string) => screen.getByRole<HTMLButtonElement>("button", { name });
 
-describe("the review's three bulk acts", () => {
+describe("the review's three bulk actions", () => {
   it("stand disabled until the review ticks a group of findings", () => {
     reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
-    expect(act("Keep in text").disabled).toBe(true);
-    expect(act("Narrow these documents").disabled).toBe(true);
-    expect(act("Dismiss as not special category").disabled).toBe(true);
+    expect(action("Keep in text").disabled).toBe(true);
+    expect(action("Narrow these documents").disabled).toBe(true);
+    expect(action("Dismiss as not special category").disabled).toBe(true);
     expect(screen.queryByText(NOT_SPECIAL_CATEGORY)).toBeNull();
   });
 
   it("name the ticked groups kept and documents narrowed", () => {
     reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
-    fireEvent.click(act("Tick bank details"));
+    fireEvent.click(action("Tick bank details"));
 
-    expect(act("Keep 1 group of findings in text").disabled).toBe(false);
-    expect(act("Narrow 1 document").disabled).toBe(false);
+    expect(action("Keep 1 group of findings in text").disabled).toBe(false);
+    expect(action("Narrow 1 document").disabled).toBe(false);
   });
 
   it("never take groups another connected source's review ticked", () => {
     reviewing(THE_CONNECTED_SOURCE, ANOTHER_CONNECTED_SOURCE);
 
-    fireEvent.click(act("Tick the health cue"));
+    fireEvent.click(action("Tick the health cue"));
 
-    expect(act("Keep in text").disabled).toBe(true);
-    expect(act("Narrow these documents").disabled).toBe(true);
-    expect(act("Dismiss as not special category").disabled).toBe(true);
+    expect(action("Keep in text").disabled).toBe(true);
+    expect(action("Narrow these documents").disabled).toBe(true);
+    expect(action("Dismiss as not special category").disabled).toBe(true);
   });
 });
 
@@ -118,28 +118,28 @@ describe("the dismissal as not special category", () => {
   it("is offered over ticked special category groups alone", () => {
     reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
-    fireEvent.click(act("Tick the health cue"));
+    fireEvent.click(action("Tick the health cue"));
 
-    expect(act("Dismiss 1 group of findings as not special category").disabled).toBe(false);
+    expect(action("Dismiss 1 group of findings as not special category").disabled).toBe(false);
     expect(screen.queryByText(NOT_SPECIAL_CATEGORY)).toBeNull();
   });
 
   it("stands disabled over a mixed selection, and says why", () => {
     reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
-    fireEvent.click(act("Tick both"));
+    fireEvent.click(action("Tick both"));
 
-    const dismissal = act("Dismiss as not special category");
+    const dismissal = action("Dismiss as not special category");
     expect(dismissal.disabled).toBe(true);
     expect(dismissal.getAttribute("aria-describedby")).toBe(
       screen.getByText(NOT_SPECIAL_CATEGORY).id,
     );
-    expect(act("Keep 2 groups of findings in text").disabled).toBe(false);
+    expect(action("Keep 2 groups of findings in text").disabled).toBe(false);
   });
 
   it("opens on s, asking a reason and naming no finding", () => {
     reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
-    fireEvent.click(act("Tick the health cue"));
+    fireEvent.click(action("Tick the health cue"));
 
     fireEvent.keyDown(document.body, { key: "s" });
 

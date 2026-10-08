@@ -7,7 +7,7 @@ import {
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
 import {
-  ACT_LANDED,
+  ACTION_LANDED,
   AUTHENTICATOR_WORDS,
   PASSKEY_WORDS,
   RECOVERY_CODE_WORDS,
@@ -128,7 +128,9 @@ const anAdminWithBothFactors = async (page: Page, api: APIRequestContext) => {
   await page.getByRole("button", { name: PASSKEY_WORDS.add }).click();
   await page.getByLabel(PASSKEY_WORDS.nameField).fill("Work laptop");
   await page.getByRole("button", { name: PASSKEY_WORDS.addCommit }).click();
-  await expect(page.getByText(ACT_LANDED.passkeyAdded("Work laptop", admin.email))).toBeVisible();
+  await expect(
+    page.getByText(ACTION_LANDED.passkeyAdded("Work laptop", admin.email)),
+  ).toBeVisible();
 
   await device.leftUnattended();
   await signedInAgain(page, api, admin.email);

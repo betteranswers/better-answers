@@ -54,7 +54,7 @@ import {
   readingAs,
   seedingWith,
   until,
-  whileActsWaitAt,
+  whileActionsWaitAt,
   whileWritesAreRefused,
 } from "./suite-postgres.ts";
 
@@ -91,7 +91,7 @@ const tokenState = async (
 
 const identityRowsAbout = async (personId: string) => {
   const found = await db().pool.query(
-    "SELECT action AS act, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
+    "SELECT action, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
     [personId],
   );
   return found.rows;
@@ -141,7 +141,7 @@ describe("provisioning a workspace", () => {
     expect(written.rows).toEqual([{ key: "mcp.tools_list_ttl_ms" }]);
   });
 
-  it("writes the platform's provisioning act beside the rows it describes", async () => {
+  it("writes the platform's provisioning action beside the rows it describes", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db().runtimePool);
     const id = ulid();
@@ -164,14 +164,14 @@ describe("provisioning a workspace", () => {
     expect(beside.rows[0]?.rows).toBe("3");
     expect(await partitionExists(id)).toBe(true);
     const events = await db().pool.query<{ id: string }>(
-      "SELECT id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1",
+      "SELECT id, action, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1",
       [id],
     );
 
     expect(events.rows).toEqual([
       {
         id: expect.stringMatching(ULID_SHAPE),
-        act: "platform.workspace.provisioned",
+        action: "platform.workspace.provisioned",
         family: "platform",
         actor: "process:better-answers-bootstrap",
         subject_kind: "workspace",
@@ -388,7 +388,7 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
     ]);
     expect(await identityRowsAbout(personId)).toEqual([
       {
-        act: "people.person.credentials_revoked",
+        action: "people.person.credentials_revoked",
         actor: `human:${operatorId}`,
         detail: {
           grants: [
@@ -492,7 +492,7 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
       value: { ok: true, value: { personId, revokedAt: "2026-09-02T12:00:00.000Z" } },
     });
     expect(await revokedAtOf(personId)).toEqual([{ credentials_revoked_at: AT }]);
-    expect((await identityRowsAbout(personId)).map((row) => row.act)).toEqual([
+    expect((await identityRowsAbout(personId)).map((row) => row.action)).toEqual([
       "people.person.credentials_revoked",
       "people.person.credentials_revoked",
     ]);
@@ -868,7 +868,7 @@ describe("the workspaces a person holds", () => {
 describe("what the slice answers when the store cannot be reached", () => {
   const at = new Date("2026-09-05T12:00:00Z");
 
-  it("answers the store's Error from every act, never a word", async () => {
+  it("answers the store's Error from every action, never a word", async () => {
     const door = await unreachableDoor();
     const userId = ulid();
     const answers: readonly (readonly [string, unknown])[] = [
@@ -922,7 +922,7 @@ describe("what the slice answers when the store cannot be reached", () => {
     credentialIssuedAtMs: signedIn.getTime(),
   });
 
-  it("hands back the store's Error from the operator's acts", async () => {
+  it("hands back the store's Error from the operator's actions", async () => {
     const closed = await closedTransaction();
     const operator = operatorSignedInAt(at);
 
@@ -977,7 +977,7 @@ describe("what the slice answers when the store cannot be reached", () => {
   });
 });
 
-describe("adding a signed-in person as a member, the platform's act", () => {
+describe("adding a signed-in person as a member, the platform's action", () => {
   const membersOf = async (workspaceId: string, userId: string) => {
     const found = await db().pool.query<{ id: string; role: string }>(
       "SELECT id, role FROM member WHERE workspace_id = $1 AND user_id = $2",
@@ -988,7 +988,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
 
   const addedRowsOf = async (workspaceId: string) => {
     const found = await db().pool.query(
-      "SELECT id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND action = 'people.member.added' ORDER BY at, id",
+      "SELECT id, action, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND action = 'people.member.added' ORDER BY at, id",
       [workspaceId],
     );
     return found.rows;
@@ -1045,7 +1045,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
     expect(await addedRowsOf(workspaceId)).toEqual([
       {
         id: expect.stringMatching(ULID_SHAPE),
-        act: "people.member.added",
+        action: "people.member.added",
         family: "people",
         actor: "process:better-answers-bootstrap",
         subject_kind: "member",
@@ -1132,7 +1132,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
   });
 });
 
-describe("renaming a workspace — the platform's act", () => {
+describe("renaming a workspace — the platform's action", () => {
   const standingOf = async (workspaceId: string) => {
     const found = await db().pool.query<{ name: string; shortName: string }>(
       'SELECT name, short_name AS "shortName" FROM workspace WHERE id = $1',
@@ -1143,7 +1143,7 @@ describe("renaming a workspace — the platform's act", () => {
 
   const renamedRowsOf = async (workspaceId: string) => {
     const found = await db().pool.query(
-      "SELECT id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND action = 'platform.workspace.renamed' ORDER BY at, id",
+      "SELECT id, action, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND action = 'platform.workspace.renamed' ORDER BY at, id",
       [workspaceId],
     );
     return found.rows;
@@ -1172,7 +1172,7 @@ describe("renaming a workspace — the platform's act", () => {
     expect(await renamedRowsOf(workspaceId)).toEqual([
       {
         id: expect.stringMatching(ULID_SHAPE),
-        act: "platform.workspace.renamed",
+        action: "platform.workspace.renamed",
         family: "platform",
         actor: "process:better-answers-bootstrap",
         subject_kind: "workspace",
@@ -1279,7 +1279,7 @@ describe("the person behind an email", () => {
   });
 });
 
-describe("adding a person before their first sign-in, the platform's act", () => {
+describe("adding a person before their first sign-in, the platform's action", () => {
   const personsAt = async (email: string) => {
     const found = await db().pool.query<{
       id: string;
@@ -1327,7 +1327,7 @@ describe("adding a person before their first sign-in, the platform's act", () =>
       },
     ]);
     expect(await identityRowsAbout(personId)).toEqual([
-      { act: "people.person.added", actor: "process:better-answers-bootstrap", detail: {} },
+      { action: "people.person.added", actor: "process:better-answers-bootstrap", detail: {} },
     ]);
   });
 
@@ -1392,7 +1392,7 @@ describe("adding a person before their first sign-in, the platform's act", () =>
     const email = addressOf("racing");
     const before = await addedRowCount();
 
-    const answers = await whileActsWaitAt(db().pool, "user", "INSERT", async (release) => {
+    const answers = await whileActionsWaitAt(db().pool, "user", "INSERT", async (release) => {
       const racing = [adding(email, "First Racer"), adding(email, "Second Racer")];
       await until(async () => (await countWaitingOnLocks(db().pool)) === 2);
       await release();
@@ -1440,11 +1440,11 @@ describe("the operator mark, set and cleared by the platform", () => {
     expect(marked).toEqual({ ok: true, value: { personId, changed: true } });
     expect(await markOf(personId)).toBe(true);
     expect(await identityRowsAbout(personId)).toEqual([
-      { act: "people.operator.granted", actor: "process:better-answers-bootstrap", detail: {} },
+      { action: "people.operator.granted", actor: "process:better-answers-bootstrap", detail: {} },
     ]);
   });
 
-  it("clears the mark, recording the clearing as its own act", async () => {
+  it("clears the mark, recording the clearing as its own action", async () => {
     const email = addressOf("leaver");
     const personId = await seedPerson(db().pool, { email, operator: true });
 
@@ -1453,7 +1453,7 @@ describe("the operator mark, set and cleared by the platform", () => {
     expect(cleared.ok && cleared.value.changed).toBe(true);
     expect(await markOf(personId)).toBe(false);
     expect(await identityRowsAbout(personId)).toEqual([
-      { act: "people.operator.revoked", actor: "process:better-answers-bootstrap", detail: {} },
+      { action: "people.operator.revoked", actor: "process:better-answers-bootstrap", detail: {} },
     ]);
   });
 

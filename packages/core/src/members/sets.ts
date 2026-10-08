@@ -3,7 +3,7 @@ import { byCodeUnit } from "@better-answers/schema/code-unit";
 import type { RefusedItems, UserId } from "../kernel/index.ts";
 
 export type BulkOutcome<Id extends string = UserId> = {
-  /** Each row the act changed, in id order. */
+  /** Each row the action changed, in id order. */
   readonly changed: readonly Id[];
 
   /** How many it left as they were: already so, or nothing here to change. */

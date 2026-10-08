@@ -6,22 +6,22 @@ import { useKeystroke } from "@/shared/keystrokes.tsx";
 afterEach(cleanup);
 
 describe("a single-key keystroke", () => {
-  it("acts once while its key is held", () => {
-    const act = vi.fn<() => void>();
+  it("runs once while its key is held", () => {
+    const action = vi.fn<() => void>();
     renderHook(() => {
-      useKeystroke({ key: "o", act: "Open the member in focus" }, act);
+      useKeystroke({ key: "o", action: "Open the member in focus" }, action);
     });
 
     fireEvent.keyDown(document.body, { key: "o" });
     fireEvent.keyDown(document.body, { key: "o", repeat: true });
     fireEvent.keyDown(document.body, { key: "o", repeat: true });
 
-    expect(act).toHaveBeenCalledTimes(1);
+    expect(action).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a held key from the browser", () => {
     renderHook(() => {
-      useKeystroke({ key: "o", act: "Open the member in focus" }, vi.fn<() => void>());
+      useKeystroke({ key: "o", action: "Open the member in focus" }, vi.fn<() => void>());
     });
 
     fireEvent.keyDown(document.body, { key: "o" });

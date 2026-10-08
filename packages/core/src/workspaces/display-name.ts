@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareIdentitySetActs, record, recordFor } from "../audit/index.ts";
+import { action, declareIdentitySetActions, record, recordFor } from "../audit/index.ts";
 import {
   actorIdOfPerson,
   attempt,
@@ -23,13 +23,13 @@ import type { WorkspaceRefusal } from "./vocabulary.ts";
  * Each row names the person by id and holds no name, so erasure's one copy to blank is the user
  * row.
  */
-const PERSON_ACTS = declareIdentitySetActs("people", {
-  named: act("people.person.named", {}),
-  renamed: act("people.person.renamed", {}),
+const PERSON_ACTIONS = declareIdentitySetActions("people", {
+  named: action("people.person.named", {}),
+  renamed: action("people.person.renamed", {}),
 });
 
 /** The operator's correction: a name flag raised before it waits no more. */
-export const DISPLAY_NAME_CORRECTED = PERSON_ACTS.renamed;
+export const DISPLAY_NAME_CORRECTED = PERSON_ACTIONS.renamed;
 
 const DISPLAY_NAME_MAX_CHARACTERS = 100;
 
@@ -143,7 +143,7 @@ export const setDisplayName = async (
       await recordFor(platform, tx, {
         id: ulid(),
         actor: actorIdOfPerson(personId.data),
-        act: PERSON_ACTS.named,
+        action: PERSON_ACTIONS.named,
         subjectId: personId.data,
         detail: {},
       });
@@ -161,7 +161,7 @@ export const correctDisplayNameInput = z.object({
 });
 
 type CorrectDisplayNameInput = z.output<typeof correctDisplayNameInput> & {
-  /** When the act happens, which the sign-in's age is judged against. */
+  /** When the action happens, which the sign-in's age is judged against. */
   readonly at: Date;
 };
 
@@ -191,7 +191,7 @@ export const correctDisplayName = async (
 
   await record(fresh.value, tx, {
     id: ulid(),
-    act: DISPLAY_NAME_CORRECTED,
+    action: DISPLAY_NAME_CORRECTED,
     subjectId: personId,
     detail: {},
     stampedAsWritten: true,

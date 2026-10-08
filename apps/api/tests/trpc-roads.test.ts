@@ -72,7 +72,7 @@ const A_SIGNED_IN_PERSON = {
 
 const wire = z.object({ error: z.object({ data: z.object({ refusal: z.unknown() }) }) });
 
-/** A procedure whose act answers `answered`, asked as the web asks, through tRPC's own handler. */
+/** A procedure whose action answers `answered`, asked as the web asks, through tRPC's own handler. */
 const refusalCrossing = async (
   answered: RefusalAnswer,
   standing: SecondFactorStanding = A_SIGNED_IN_PERSON.standing,
@@ -150,7 +150,7 @@ describe("a refusal naming items, crossing tRPC", () => {
     });
 
     const refused = logs.filter((line) => line["event"] === "trpc.refused");
-    expect(refused.map((line) => [line["act"], line["refusal"], line["class"]])).toEqual([
+    expect(refused.map((line) => [line["action"], line["refusal"], line["class"]])).toEqual([
       ["refuseTheSet", "last-admin", "precondition"],
     ]);
     expect(JSON.stringify(refused)).not.toMatch(/01K6H0A7Q3W9E2R5T8Y1U4I6O[01]/);
@@ -158,7 +158,7 @@ describe("a refusal naming items, crossing tRPC", () => {
 });
 
 describe("a pending session crossing tRPC", () => {
-  it("refuses a procedure outside the pending set before its act", async () => {
+  it("refuses a procedure outside the pending set before its action", async () => {
     for (const standing of ["confirm", "setup"] as const) {
       const crossed = await refusalCrossing("no-such-member", standing);
 
@@ -169,7 +169,7 @@ describe("a pending session crossing tRPC", () => {
     }
   });
 
-  it("lets a confirmed session through to the act's own answer", async () => {
+  it("lets a confirmed session through to the action's own answer", async () => {
     const crossed = await refusalCrossing("no-such-member", "confirmed");
 
     expect(crossed.refusal).toStrictEqual({ word: "no-such-member", class: "absent" });

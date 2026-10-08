@@ -88,11 +88,11 @@ const openTheWindow = async (): Promise<() => Promise<void>> => {
 };
 
 const inTheWindow = async <T extends { readonly ok: boolean }>(
-  act: () => Promise<T>,
+  action: () => Promise<T>,
 ): Promise<T> => {
   const close = await openTheWindow();
   try {
-    return await act();
+    return await action();
   } finally {
     await close();
   }
@@ -176,7 +176,7 @@ const rowsOf = async (workspaceId: string) => {
   return read.rows;
 };
 
-/** The flag the replay act declares as optional, read as such. */
+/** The flag the replay action declares as optional, read as such. */
 const replayDetail = z.object({ evidenceAgrees: z.boolean().optional() });
 
 const replayedEvents = async (workspaceId: string) => {
@@ -308,14 +308,14 @@ describe("a commit whose rows were lost", () => {
         },
       },
     ]);
-    const joined = await db().pool.query<{ act: string; actor: string }>(
-      `SELECT e.action AS act, e.actor FROM bundle_commit c
+    const joined = await db().pool.query<{ action: string; actor: string }>(
+      `SELECT e.action, e.actor FROM bundle_commit c
          JOIN audit_event e ON e.workspace_id = c.workspace_id AND e.id = c.audit_event_id
         WHERE c.workspace_id = $1 AND c.sha = $2`,
       [scenario.workspaceId, sha],
     );
     expect(joined.rows).toEqual([
-      { act: "platform.reconciler.replayed", actor: "process:better-answers-reconciler" },
+      { action: "platform.reconciler.replayed", actor: "process:better-answers-reconciler" },
     ]);
     const booked = await db().pool.query(
       "SELECT 1 FROM audit_event WHERE workspace_id = $1 AND actor = $2 AND action LIKE 'knowledge.%'",
@@ -998,21 +998,21 @@ describe("a commit the rows cannot take", () => {
 });
 
 describe("the fence", () => {
-  it("waits behind a live act on the same bundle", async () => {
+  it("waits behind a live action on the same bundle", async () => {
     const scenario = await arrange();
     const order: string[] = [];
-    const act = withRepositoryLock(scenario.editor, scenario.git, async () => {
-      order.push("act in");
+    const action = withRepositoryLock(scenario.editor, scenario.git, async () => {
+      order.push("action in");
       await new Promise((resolve) => setTimeout(resolve, 30));
-      order.push("act out");
+      order.push("action out");
     });
     const run = reconcile(RECONCILER, doorsOf(scenario), {
       workspaceId: scenario.workspaceId,
     }).then(() => order.push("reconciler out"));
 
-    await Promise.all([act, run]);
+    await Promise.all([action, run]);
 
-    expect(order).toEqual(["act in", "act out", "reconciler out"]);
+    expect(order).toEqual(["action in", "action out", "reconciler out"]);
   });
 });
 

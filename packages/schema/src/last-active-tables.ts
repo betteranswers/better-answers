@@ -5,7 +5,7 @@ import { user } from "./identity-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
-/** Not a `member` column, so its stamp never waits on the holds every member act takes. */
+/** Not a `member` column, so its stamp never waits on the holds every member action takes. */
 export const workspaceLastActive = withRLS(
   "workspace_last_active",
   {

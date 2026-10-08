@@ -33,7 +33,7 @@ export const minutesUntil = (seconds: number): string => {
 export const nameOrAddress = (displayName: string, address: string): string =>
   displayName === "" ? address : displayName;
 
-/** Who did an act: the kind, not the words, since a person may give any display name. */
+/** Who did an action: the kind, not the words, since a person may give any display name. */
 export type DoneBy =
   | { readonly kind: "person"; readonly displayName: string }
   | { readonly kind: "former-member" }

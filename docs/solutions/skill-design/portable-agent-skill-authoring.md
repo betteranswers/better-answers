@@ -148,7 +148,7 @@ The protocol kernel begins with outcome and completion behavior. Add other field
 - Authority, when sources may conflict.
 - Boundaries, when scope or mutation is risky.
 - Decision state, when work persists or branches.
-- Act/ask rules, when ambiguity can change scope or authority.
+- Go-ahead/ask rules, when ambiguity can change scope or authority.
 - Evidence rules, when claims need provenance.
 - Coverage floors, when missing a category silently makes the result incomplete.
 - Failure branches, when a missing capability could otherwise cause a silent skip.

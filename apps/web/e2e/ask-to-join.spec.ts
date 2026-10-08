@@ -13,7 +13,7 @@ import {
   keystrokesListed,
   provision,
   signedInWithNoWorkspace,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 /** Stated, not imported: `apps/web` takes nothing from `apps/api` at runtime. */
@@ -99,7 +99,7 @@ test("a person in no workspace asks to join by keyboard", async ({
     reads: ASK_TO_JOIN_WORDS.asking,
   });
   await page.keyboard.press("Enter");
-  await theActLandedWithinItsBudget(page, "ask to join");
+  await theActionLandedWithinItsBudget(page, "ask to join");
 
   await expect(requestSent(page)).toBeFocused();
   await expect(requestSent(page)).toMatchAriaSnapshot(`

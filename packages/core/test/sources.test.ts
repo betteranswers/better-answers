@@ -285,7 +285,7 @@ describe("an Admin connects an upload", () => {
     const { input } = handbookOffered();
 
     /**
-     * The job is the transaction's last statement, so refusing it fails the act with three rows
+     * The job is the transaction's last statement, so refusing it fails the action with three rows
      * written: only that tells one transaction from four statements.
      */
     const bound = await whileWritesAreRefused(db().pool, "job", () =>
@@ -1258,7 +1258,7 @@ describe("an Admin reprocesses a connected source", () => {
     );
   });
 
-  it("keeps passages and queues nothing when its act later fails", async () => {
+  it("keeps passages and queues nothing when its action later fails", async () => {
     const scenario = await arrange();
     const { connectedSourceId } = await indexedHandbook(scenario);
 

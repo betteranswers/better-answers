@@ -54,7 +54,7 @@ import {
   countWaitingOnLocks,
   statementsWaitingOnALock,
   until,
-  whileActsWaitAt,
+  whileActionsWaitAt,
 } from "./suite-postgres.ts";
 import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -118,7 +118,7 @@ const passageRowsAreHeld = async (
 };
 
 /**
- * No act under test holds a passage row, so the probe's `true` branch needs this control to stay
+ * No action under test holds a passage row, so the probe's `true` branch needs this control to stay
  * honest.
  */
 const whileAPassageRowIsHeld = async <T>(
@@ -140,15 +140,15 @@ const whileAPassageRowIsHeld = async <T>(
   }
 };
 
-/** A second connected source under a held id fails the transaction after the act has landed every row. */
+/** A second connected source under a held id fails the transaction after the action has landed every row. */
 const landedThenTheTransactionFailed = (
   scenario: Scenario,
   connectedSourceId: string,
-  act: (admin: UserPrincipal, tx: Tx) => Promise<{ readonly ok: boolean }>,
+  action: (admin: UserPrincipal, tx: Tx) => Promise<{ readonly ok: boolean }>,
 ) =>
   expect(
     reading(scenario.admin, async (admin, tx) => {
-      expect((await act(admin, tx)).ok).toBe(true);
+      expect((await action(admin, tx)).ok).toBe(true);
       await attempt(() =>
         connectedSourceIdTakenAgain(tx, scenario.workspaceId, {
           connectedSourceId,
@@ -203,7 +203,7 @@ const someoneWaitsOnALock = async (): Promise<boolean> =>
 const besideAnOpenNarrowing = async <T>(
   scenario: Scenario,
   narrowing: (tx: Tx) => Promise<{ readonly ok: boolean }>,
-  act: () => Promise<T>,
+  action: () => Promise<T>,
 ): Promise<{ readonly outcome: T; readonly waitingAt: readonly string[] }> => {
   const holder = await db().runtimePool.connect();
   try {
@@ -212,7 +212,7 @@ const besideAnOpenNarrowing = async <T>(
     expect(await narrowing(holder)).toMatchObject({ ok: true });
 
     let settled = false;
-    const acting = act().then((outcome) => {
+    const acting = action().then((outcome) => {
       settled = true;
       return outcome;
     });
@@ -737,7 +737,7 @@ describe("narrowing a connected source", () => {
       ),
     ).toBe(true);
 
-    await whileActsWaitAt(db().pool, "concept_index", "UPDATE", async (release) => {
+    await whileActionsWaitAt(db().pool, "concept_index", "UPDATE", async (release) => {
       const narrowing = reading(scenario.admin, (admin, tx) =>
         narrowingAsked(admin, tx, {
           connectedSourceId: connectedSource.connectedSourceId,
@@ -992,7 +992,7 @@ describe("narrowing a connected source", () => {
     write: () => Promise<Awaited<ReturnType<typeof rewriteCiting>>>,
     narrowing: NarrowingAsked,
   ): Promise<void> => {
-    await whileActsWaitAt(db().pool, table, event, async (release) => {
+    await whileActionsWaitAt(db().pool, table, event, async (release) => {
       const rewriting = write();
       await until(async () => (await countWaitingOnLocks(db().pool)) >= 1);
       const narrowed = reading(scenario.admin, (admin, tx) => narrowingAsked(admin, tx, narrowing));
@@ -1026,7 +1026,7 @@ describe("narrowing a connected source", () => {
     );
   });
 
-  it("recomputes a write-up two acts reach, intersecting audiences to nobody", async () => {
+  it("recomputes a write-up two actions reach, intersecting audiences to nobody", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
     const sales = await groupNamed(db(), scenario, "Sales", [scenario.viewer]);
@@ -1065,7 +1065,7 @@ describe("narrowing a connected source", () => {
       second.documentId,
     ]);
 
-    await whileActsWaitAt(db().pool, "audit_event", "INSERT", async (release) => {
+    await whileActionsWaitAt(db().pool, "audit_event", "INSERT", async (release) => {
       const narrowings: Promise<Folded<Awaited<ReturnType<typeof narrowConnectedSource>>>>[] = [];
       for (const [at, connectedSource] of [first, second].entries()) {
         narrowings.push(
@@ -1503,7 +1503,7 @@ describe("narrowing documents", () => {
     scenario: Scenario,
     narrowed: Sourced,
     waitingAt: string,
-    act: () => Promise<T>,
+    action: () => Promise<T>,
   ): Promise<T> => {
     const beside = await besideAnOpenNarrowing(
       scenario,
@@ -1524,7 +1524,7 @@ describe("narrowing documents", () => {
             sensitivity: "Restricted",
           }),
         ),
-      act,
+      action,
     );
     expect(beside.waitingAt).toEqual([expect.stringContaining(waitingAt)]);
     return beside.outcome;

@@ -9,7 +9,7 @@ import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
 import {
-  ACCOUNT_ACTS,
+  ACCOUNT_ACTIONS,
   RECOVERY_CODE_WORDS,
   RECOVERY_CODES_FILE,
   recoveryCodesText,
@@ -24,13 +24,13 @@ import {
   saidOfASecondFactorRefusal,
 } from "./refusal-words.ts";
 
-const COPY_CODES: Keystroke = { key: "c", act: ACCOUNT_ACTS.copyCodes };
+const COPY_CODES: Keystroke = { key: "c", action: ACCOUNT_ACTIONS.copyCodes };
 
-const DOWNLOAD_CODES: Keystroke = { key: "d", act: ACCOUNT_ACTS.download };
+const DOWNLOAD_CODES: Keystroke = { key: "d", action: ACCOUNT_ACTIONS.download };
 
-const PRINT_CODES: Keystroke = { key: "p", act: ACCOUNT_ACTS.print };
+const PRINT_CODES: Keystroke = { key: "p", action: ACCOUNT_ACTIONS.print };
 
-/** In the order the block shows its acts. */
+/** In the order the block shows its actions. */
 export const CODES_KEYSTROKES: readonly Keystroke[] = [COPY_CODES, DOWNLOAD_CODES, PRINT_CODES];
 
 /** Shown once: the api keeps only their hashes, so seeing codes again takes a new set. */
@@ -44,7 +44,7 @@ export type CodesInHand = {
 const asAFile = (text: string): string =>
   `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`;
 
-function CodesActs(properties: {
+function CodesActions(properties: {
   readonly inHand: CodesInHand;
   readonly address: string;
   readonly onCopied: (copied: boolean) => void;
@@ -211,7 +211,7 @@ export function RecoveryCodes(properties: {
         ))}
       </ol>
 
-      <CodesActs inHand={inHand} address={address} onCopied={setCopied} />
+      <CodesActions inHand={inHand} address={address} onCopied={setCopied} />
       <Outcome tone="said">{copied === true ? RECOVERY_CODE_WORDS.copied : null}</Outcome>
 
       <div className="mt-6 flex items-center gap-2">

@@ -338,7 +338,7 @@ test.describe("the System group's Audit log page", () => {
 
     const keystrokes = await keystrokesListed(page, AUDIT_LOG.name);
     for (const keystroke of Object.values(KEY))
-      await expect(keystrokes).toContainText(keystroke.act);
+      await expect(keystrokes).toContainText(keystroke.action);
     await page.keyboard.press("Escape");
     await expect(keystrokes).toHaveCount(0);
 

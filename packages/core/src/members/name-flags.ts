@@ -2,12 +2,12 @@ import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareActs, declareIdentitySetActs, record } from "../audit/index.ts";
+import { action, declareActions, declareIdentitySetActions, record } from "../audit/index.ts";
 import {
   admit,
   attempt,
   attemptResult,
-  declareAct,
+  declareAction,
   err,
   ok,
   type AdmittedOf,
@@ -23,17 +23,17 @@ import { DISPLAY_NAME_CORRECTED, holdTheNameOf, notErasedAt } from "../workspace
 import type { MemberRefusal } from "./vocabulary.ts";
 
 /** Neither row holds the name: the person row keeps the one copy, which erasure blanks. */
-const FLAGGED_ACTS = declareActs("people", {
-  flagged: act("people.person.name_flagged", {}),
+const FLAGGED_ACTIONS = declareActions("people", {
+  flagged: action("people.person.name_flagged", {}),
 });
 
 /** The operator reads what waits from here, since no workspace's audit log is theirs to read. */
-const RAISED_ACTS = declareIdentitySetActs("people", {
-  raised: act("people.name_flag.raised", { workspaceId: "id" }),
+const RAISED_ACTIONS = declareIdentitySetActions("people", {
+  raised: action("people.name_flag.raised", { workspaceId: "id" }),
 });
 
 /**
- * Over the rows aliased `raised`. It takes `$1` and `$2` from `WAITING_ACTS`, so a query using it
+ * Over the rows aliased `raised`. It takes `$1` and `$2` from `WAITING_ACTIONS`, so a query using it
  * numbers its own parameters from `$3`.
  */
 const STILL_WAITING = `raised.subject_kind = split_part($1, '.', 2) AND raised.action = $1
@@ -43,7 +43,7 @@ const STILL_WAITING = `raised.subject_kind = split_part($1, '.', 2) AND raised.a
           AND corrected.subject_id = raised.subject_id),
       '-infinity')`;
 
-const WAITING_ACTS = [RAISED_ACTS.raised.name, DISPLAY_NAME_CORRECTED.name] as const;
+const WAITING_ACTIONS = [RAISED_ACTIONS.raised.name, DISPLAY_NAME_CORRECTED.name] as const;
 
 export const flagDisplayNameInput = z.object({
   personId: boundarySchemas.user.select.shape.id,
@@ -51,7 +51,7 @@ export const flagDisplayNameInput = z.object({
 
 export type FlagDisplayNameInput = z.output<typeof flagDisplayNameInput>;
 
-const flagDisplayNameAct = declareAct({
+const flagDisplayNameAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: flagDisplayNameInput,
   refuses: ["role-forbids", "no-such-member"],
@@ -90,7 +90,7 @@ const A_FLAG_WAITS = `SELECT EXISTS (
 const FLAGGED_ROW = z.object({ displayName: z.string(), workspaceName: z.string() });
 
 const flagging = async (
-  admin: AdmittedOf<typeof flagDisplayNameAct>,
+  admin: AdmittedOf<typeof flagDisplayNameAction>,
   tx: Tx,
   personId: UserId,
 ): Promise<Result<NameFlagged, MemberRefusal<"no-such-member">>> => {
@@ -101,7 +101,7 @@ const flagging = async (
   const person = FLAGGED_ROW.parse(found);
 
   const waiting = await tx.query<{ waits: boolean }>(A_FLAG_WAITS, [
-    ...WAITING_ACTS,
+    ...WAITING_ACTIONS,
     personId,
     workspaceId,
   ]);
@@ -109,13 +109,13 @@ const flagging = async (
 
   await record(admin, tx, {
     id: ulid(),
-    act: FLAGGED_ACTS.flagged,
+    action: FLAGGED_ACTIONS.flagged,
     subjectId: personId,
     detail: {},
   });
   await record(admin, tx, {
     id: ulid(),
-    act: RAISED_ACTS.raised,
+    action: RAISED_ACTIONS.raised,
     subjectId: personId,
     detail: { workspaceId },
     stampedAsWritten: true,
@@ -126,14 +126,14 @@ const flagging = async (
 /**
  * Flags a member's display name to the operator. The caller's answer is the same for every member
  * and whether or not a flag already waits; only the transport learns whether one was raised, to
- * tell the operator once it commits. An Admin has no act that changes the name itself.
+ * tell the operator once it commits. An Admin has no action that changes the name itself.
  */
 export const flagDisplayName = async (
   principal: UserPrincipal,
   tx: Tx,
   input: FlagDisplayNameInput,
 ): Promise<Result<NameFlagged, FlagDisplayNameRefusal>> => {
-  const admitted = admit(flagDisplayNameAct, principal, input);
+  const admitted = admit(flagDisplayNameAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
   return attemptResult(() => flagging(admitted.value, tx, input.personId));
@@ -197,6 +197,6 @@ export const listNamesWaiting = (
   tx: Tx,
 ): Promise<Result<readonly NameWaiting[], Error>> =>
   attempt(async () => {
-    const found = await tx.query(FLAGS_WAITING, [...WAITING_ACTS]);
+    const found = await tx.query(FLAGS_WAITING, [...WAITING_ACTIONS]);
     return byPerson(found.rows.map((row) => WAITING_ROW.parse(row)));
   });

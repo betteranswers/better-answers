@@ -10,7 +10,7 @@ const KEPT: readonly { readonly glob: string; readonly reason: string }[] = [
   { glob: "docs/archive/**", reason: STORED_HISTORY },
   { glob: "docs/plans/**", reason: STORED_HISTORY },
   { glob: "packages/core/src/audit/stored-names.ts", reason: STORED_HISTORY },
-  { glob: "apps/web/src/features/people/audit-acts.ts", reason: STORED_HISTORY },
+  { glob: "apps/web/src/features/people/audit-actions.ts", reason: STORED_HISTORY },
   { glob: "apps/api/tests/old-words.ts", reason: "the words test's list" },
   // A map rewritten by its own sweep could no longer be replayed.
   { glob: "packages/devtools/renames/**", reason: "a rename map" },

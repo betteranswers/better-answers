@@ -62,16 +62,16 @@ describe("the selection bar", () => {
     ).toBe("true");
   });
 
-  it("hosts the page's bulk acts over every ticked row", () => {
-    const acts: string[] = [];
-    render(<MembersList pageSize={2} onAct={(act) => acts.push(act)} />);
+  it("hosts the page's bulk actions over every ticked row", () => {
+    const actions: string[] = [];
+    render(<MembersList pageSize={2} onAction={(action) => actions.push(action)} />);
 
     tick("Cy Twombly");
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     tick("Ed Ruscha");
     fireEvent.click(within(bar() ?? document.body).getByRole("button", { name: "Change role" }));
 
-    expect(acts).toEqual(["change the role of cy, ed"]);
+    expect(actions).toEqual(["change the role of cy, ed"]);
   });
 
   it("clears on the page's keystroke", () => {
@@ -88,20 +88,20 @@ describe("the selection bar", () => {
   it("moves between its buttons by arrow keys, one tab stop", async () => {
     render(<MembersList />);
     tick("Ada Lovelace");
-    const act = within(bar() ?? document.body).getByRole("button", { name: "Change role" });
+    const action = within(bar() ?? document.body).getByRole("button", { name: "Change role" });
     const clear = within(bar() ?? document.body).getByRole("button", { name: "Clear selection" });
 
-    act.focus();
-    fireEvent.keyDown(act, { key: "ArrowRight" });
+    action.focus();
+    fireEvent.keyDown(action, { key: "ArrowRight" });
     // The registry moves focus a task after the key.
     await waitFor(() => {
       expect(document.activeElement).toBe(clear);
     });
-    expect([act.tabIndex, clear.tabIndex]).toEqual([-1, 0]);
+    expect([action.tabIndex, clear.tabIndex]).toEqual([-1, 0]);
 
     fireEvent.keyDown(clear, { key: "ArrowRight" });
     await waitFor(() => {
-      expect(document.activeElement).toBe(act);
+      expect(document.activeElement).toBe(action);
     });
   });
 

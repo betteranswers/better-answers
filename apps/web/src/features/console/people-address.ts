@@ -1,4 +1,4 @@
-import { addressOf } from "@/shared/address-ask.ts";
+import { addressOf, type Ask, askedIn } from "@/shared/address-ask.ts";
 import type { PagePath } from "@/shared/navigation.ts";
 
 /** Typed by the navigation list, so a page moved there fails here at compile time. */
@@ -10,25 +10,27 @@ const SEARCH = "search";
 
 const PERSON = "person";
 
-const ACT = "act";
+/** Read through `askedIn`, so a return address under the older key still lands. */
+const ACTION: Ask = "action";
 
-/** The sheet's two acts that ask for a sign-in from the last hour. */
-export type FreshAct = "revoke" | "correct";
+/** The sheet's two actions that ask for a sign-in from the last hour. */
+export type FreshAction = "revoke" | "correct";
 
-/** Where signing in again comes back to: the person, found by their address, open at the act. */
+/** Where signing in again comes back to: the person, found by their address, open at the action. */
 export const backTo = (
   person: { readonly id: string; readonly email: string },
-  act: FreshAct,
-): string => addressOf(EVERYONE_PATH, { [SEARCH]: person.email, [PERSON]: person.id, [ACT]: act });
+  action: FreshAction,
+): string =>
+  addressOf(EVERYONE_PATH, { [SEARCH]: person.email, [PERSON]: person.id, [ACTION]: action });
 
-/** Where signing in again comes back to from Names waiting: the list, focus on the person's act. */
+/** Where signing in again comes back to from Names waiting: the list, focus on the person's action. */
 export const backToTheName = (personId: string): string =>
   addressOf(NAMES_WAITING_PATH, { [PERSON]: personId });
 
 export type Arrival = {
   readonly search: string;
   readonly personId: string | undefined;
-  readonly act: FreshAct;
+  readonly action: FreshAction;
 };
 
 /** Read off the address bar, whose query the router would re-type as JSON. */
@@ -37,6 +39,6 @@ export const arrival = (): Arrival => {
   return {
     search: query.get(SEARCH) ?? "",
     personId: query.get(PERSON) ?? undefined,
-    act: query.get(ACT) === "correct" ? "correct" : "revoke",
+    action: askedIn(query, ACTION) === "correct" ? "correct" : "revoke",
   };
 };

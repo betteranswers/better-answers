@@ -11,7 +11,7 @@ const asToolError = (text: string): CallToolResult => ({
 });
 
 /**
- * An act's refusal or failure answers as a tool error. Its rejection is caught here, not by the
+ * An action's refusal or failure answers as a tool error. Its rejection is caught here, not by the
  * protocol, so it is logged once.
  */
 export const crossing = async <Value>(

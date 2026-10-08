@@ -30,7 +30,7 @@ const WORKSPACE = "01K4TEARDOWN000000000000";
  * What lets the case go red: a teardown that never waits has finished several times over
  * before the second write lands.
  */
-const ACT_PAUSE_MS = 250;
+const ACTION_PAUSE_MS = 250;
 
 const OBJECTS_NOBODY_WAITS_FOR = 400;
 
@@ -63,15 +63,15 @@ const isGone = async (root: string): Promise<boolean> => {
 };
 
 describe("a bundle root's teardown", () => {
-  it("waits for an act still writing before removing the root", async () => {
+  it("waits for an action still writing before removing the root", async () => {
     const { root, door, gitDir } = await rootWithBundle();
     const scratch = await scratchDir();
     let written = 0;
 
-    const act = withRepositoryLockAs(PLATFORM, door, WORKSPACE, async () => {
+    const action = withRepositoryLockAs(PLATFORM, door, WORKSPACE, async () => {
       await objectWrittenInto(gitDir, scratch, 1);
       written = 1;
-      await sleep(ACT_PAUSE_MS);
+      await sleep(ACTION_PAUSE_MS);
       await objectWrittenInto(gitDir, scratch, 2);
       written = 2;
     }).then(
@@ -83,9 +83,9 @@ describe("a bundle root's teardown", () => {
 
     await removeBundleRoot(root);
 
-    expect({ written, act: await act, gone: await isGone(root) }).toEqual({
+    expect({ written, action: await action, gone: await isGone(root) }).toEqual({
       written: 2,
-      act: "finished",
+      action: "finished",
       gone: true,
     });
     await rm(scratch, { recursive: true, force: true });

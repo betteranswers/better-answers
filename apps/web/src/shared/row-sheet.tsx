@@ -12,7 +12,7 @@ export function RowSheet(properties: {
   readonly onOpen: () => void;
   readonly onClose: () => void;
 
-  /** For an act that takes the row away with it, so the list says where focus lands instead. */
+  /** For an action that takes the row away with it, so the list says where focus lands instead. */
   readonly returnFocus?: () => void;
   readonly children: ReactNode;
 }) {

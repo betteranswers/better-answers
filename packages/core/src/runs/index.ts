@@ -21,7 +21,7 @@ import {
 import {
   admit,
   attempt,
-  declareAct,
+  declareAction,
   err,
   EVERY_PURPOSE,
   ok,
@@ -129,7 +129,7 @@ export const enqueueJobInput = z.discriminatedUnion("kind", [
   }),
 ]);
 
-export const enqueueJobAct = declareAct({
+export const enqueueJobAction = declareAction({
   /** The level is the kind's own, and a kind with no descriptor is left to the highest role. */
   admits: (input: z.output<typeof enqueueJobInput>) => ({
     role: descriptorOf(input.kind)?.enqueuedBy ?? ROLES[0],
@@ -140,9 +140,9 @@ export const enqueueJobAct = declareAct({
   effect: "write",
 });
 
-export type EnqueueJobInput = InputOf<typeof enqueueJobAct>;
+export type EnqueueJobInput = InputOf<typeof enqueueJobAction>;
 
-export type EnqueueJobRefusal = KernelRefusal<RefusalOf<typeof enqueueJobAct>>;
+export type EnqueueJobRefusal = KernelRefusal<RefusalOf<typeof enqueueJobAction>>;
 
 const ENQUEUE = `WITH inserted AS (
     INSERT INTO job (workspace_id, id, kind, subject_id, reason)
@@ -206,7 +206,7 @@ const landJob = async (tx: Tx, workspaceId: string, job: JobInsert): Promise<str
   ]);
   const answered = landed.rows[0]?.id;
   if (answered === undefined) {
-    throw new Error("another act queued this subject while this one was enqueueing it");
+    throw new Error("another action queued this subject while this one was enqueueing it");
   }
   return answered;
 };
@@ -214,7 +214,7 @@ const landJob = async (tx: Tx, workspaceId: string, job: JobInsert): Promise<str
 /**
  * Reuses a job already queued for the subject and answers its id; a reason that empties the
  * connected source replaces a queued reason that does not. Refuses `malformed` for input its kind does not
- * take, or another workspace's. Rejects when another act queues the subject meanwhile.
+ * take, or another workspace's. Rejects when another action queues the subject meanwhile.
  */
 export const enqueueJobIn = async (
   principal: Principal,
@@ -225,7 +225,7 @@ export const enqueueJobIn = async (
   if (descriptor === undefined) return err("malformed");
 
   /** Both ways into the enqueue pass here, so the gate stands where the door has not yet opened. */
-  const admitted = admit(enqueueJobAct, principal, input);
+  const admitted = admit(enqueueJobAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   if (principal.kind !== "platform" && input.workspaceId !== principal.workspaceId) {
     return err("malformed");

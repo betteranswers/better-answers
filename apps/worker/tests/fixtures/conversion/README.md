@@ -52,5 +52,5 @@ uv run --with reportlab --with python-docx --with pillow python <the generator>
 ```
 
 They are regenerated only if what they hold has to change, and a regeneration re-runs
-T-130's first act: the converters' output is the span address space, so bytes that move
+T-130's first step: the converters' output is the span address space, so bytes that move
 move every expected literal beside them.

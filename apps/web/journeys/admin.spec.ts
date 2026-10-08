@@ -3,7 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { AUDIT_LOG_WORDS } from "@/features/people/audit-log-words.ts";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
-import { BULK_WORDS, SELECTED_MEMBERS } from "@/features/people/member-act-words.ts";
+import { BULK_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
 import { NOTHING_CONNECTED } from "@/features/sources/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
 
@@ -43,10 +43,10 @@ const groupsRegion = (page: Page): Locator => page.getByRole("region", { name: "
 const groupButton = (page: Page, name: string): Locator =>
   groupsRegion(page).getByRole("button", { name, exact: true });
 
-type BulkAct = { readonly act: string; readonly title: (count: number) => string };
+type BulkAction = { readonly action: string; readonly title: (count: number) => string };
 
 /** Ticked on the first page, where the invented members' names sort the repair members. */
-const opened = async (page: Page, names: readonly string[], bulk: BulkAct): Promise<Locator> => {
+const opened = async (page: Page, names: readonly string[], bulk: BulkAction): Promise<Locator> => {
   await page.goto(MEMBERS);
   for (const name of names) {
     await membersRegion(page)
@@ -55,7 +55,7 @@ const opened = async (page: Page, names: readonly string[], bulk: BulkAct): Prom
   }
   await page
     .getByRole("toolbar", { name: SELECTED_MEMBERS })
-    .getByRole("button", { name: bulk.act, exact: true })
+    .getByRole("button", { name: bulk.action, exact: true })
     .click();
   return page.getByRole("dialog", { name: bulk.title(names.length) });
 };
@@ -65,7 +65,7 @@ const chosen = async (dialog: Locator, field: string, option: string): Promise<v
   await dialog.page().getByRole("option", { name: option, exact: true }).click();
 };
 
-/** A bulk act is refused while another is going, so each waits for its own outcome line. */
+/** A bulk action is refused while another is going, so each waits for its own outcome line. */
 const rolesChanged = async (page: Page, names: readonly string[], role: Role): Promise<void> => {
   const { changeRole } = BULK_WORDS;
   const dialog = await opened(page, names, changeRole);
@@ -170,7 +170,7 @@ const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
   await gate();
 };
 
-/** Only read: an act on either would upload documents or spend on models. */
+/** Only read: an action on either would upload documents or spend on models. */
 const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
   await test.step("Invitations", async () => {
     await page.goto(MEMBERS);

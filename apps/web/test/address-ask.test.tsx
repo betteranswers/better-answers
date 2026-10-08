@@ -2,7 +2,7 @@ import { act, cleanup, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { askingHere, useAsked } from "@/shared/address-ask.ts";
+import { askedIn, askingHere, useAsked } from "@/shared/address-ask.ts";
 
 import { openPages } from "./address-router.tsx";
 
@@ -60,38 +60,52 @@ describe("a search another place asks of a page", () => {
   });
 });
 
-const ActAndSearch = () => {
+const ActionAndSearch = () => {
   const [taken, setTaken] = useState<readonly string[]>([]);
-  useAsked("act", (value) => setTaken((before) => [...before, `act ${value}`]));
+  useAsked("action", (value) => setTaken((before) => [...before, `action ${value}`]));
   useAsked("search", (value) => setTaken((before) => [...before, `search ${value}`]));
   return <output>{taken.join(", ")}</output>;
 };
 
+const openActionAndSearchAt = (asked: string) =>
+  openPages({ "/members": ActionAndSearch, "/elsewhere": () => null }, ["/elsewhere", asked]);
+
 describe("two asks in one address", () => {
   it("takes each once and clears both from the address", async () => {
-    const { history, at } = await openPages(
-      { "/members": ActAndSearch, "/elsewhere": () => null },
-      ["/elsewhere", "/members?act=invite&search=priya"],
-    );
+    const { history, at } = await openActionAndSearchAt("/members?action=invite&search=priya");
 
     await at("/members");
-    expect(takenSoFar()).toBe("act invite, search priya");
+    expect(takenSoFar()).toBe("action invite, search priya");
+    expect(history.length, "a clear pushed an entry of its own").toBe(2);
+  });
+
+  it("takes an action under its older key, then clears it", async () => {
+    const { history, at } = await openActionAndSearchAt("/members?act=invite&search=priya");
+
+    await at("/members");
+    expect(takenSoFar()).toBe("action invite, search priya");
     expect(history.length, "a clear pushed an entry of its own").toBe(2);
   });
 });
 
-describe("asking a page for an act", () => {
+describe("asking a page for an action", () => {
   const HERE = { pathname: "/members", searchStr: "?members.role=Editor&members.page=2" };
 
   it("adds to the query of the page already open", () => {
-    expect(askingHere(HERE, "/members", "act", "invite")).toBe(
-      "/members?members.role=Editor&members.page=2&act=invite",
+    expect(askingHere(HERE, "/members", "action", "invite")).toBe(
+      "/members?members.role=Editor&members.page=2&action=invite",
     );
   });
 
   it("carries no other page's query", () => {
-    expect(askingHere(HERE, "/groups", "act", "invite")).toBe("/groups?act=invite");
+    expect(askingHere(HERE, "/groups", "action", "invite")).toBe("/groups?action=invite");
     const onGroups = { pathname: "/groups", searchStr: "?groups.search=ops" };
-    expect(askingHere(onGroups, "/members", "act", "invite")).toBe("/members?act=invite");
+    expect(askingHere(onGroups, "/members", "action", "invite")).toBe("/members?action=invite");
+  });
+
+  it("reads a return address's action under its older key", () => {
+    const signedInAgain = new URLSearchParams("?search=priya%40acme.invalid&person=p1&act=correct");
+
+    expect(askedIn(signedInAgain, "action")).toBe("correct");
   });
 });

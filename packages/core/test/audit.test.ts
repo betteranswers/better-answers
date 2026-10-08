@@ -6,12 +6,12 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { FAMILIES, ulid } from "@better-answers/schema";
 
 import {
-  act,
-  type ActName,
+  action,
+  type ActionName,
   batchIdFor,
   declarations,
-  declareActs,
-  declareIdentitySetActs,
+  declareActions,
+  declareIdentitySetActions,
   record,
   recordEach,
   recordFor,
@@ -36,16 +36,16 @@ import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
-const actLiteralsIn = (files: readonly string[]): Set<string> =>
+const actionLiteralsIn = (files: readonly string[]): Set<string> =>
   new Set(
     files.flatMap((file) =>
-      [...readFileSync(file, "utf8").matchAll(/\bact\(\s*"([a-z_.]+)"/g)].map(
+      [...readFileSync(file, "utf8").matchAll(/\baction\(\s*"([a-z_.]+)"/g)].map(
         (match) => match[1] ?? "",
       ),
     ),
   );
 
-const declaredActNames = () => declarations().flatMap((declaration) => declaration.acts);
+const declaredActionNames = () => declarations().flatMap((declaration) => declaration.actions);
 
 const provisioned = () => provisionedWorkspace(db(), "Audited");
 
@@ -56,7 +56,7 @@ const writingIn =
 const rowById = async (id: string) => {
   const found = await db().pool.query<{
     workspace_id: string;
-    act: string;
+    action: string;
     family: string;
     actor: string;
     subject_kind: string;
@@ -64,14 +64,14 @@ const rowById = async (id: string) => {
     detail: Record<string, string | number | boolean>;
     batch_id: string | null;
   }>(
-    "SELECT workspace_id, action AS act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE id = $1",
+    "SELECT workspace_id, action, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE id = $1",
     [id],
   );
   return found.rows[0];
 };
 
-describe("the declared-acts walk", () => {
-  it("holds every slice's acts to the four families by prefix", async () => {
+describe("the declared-actions walk", () => {
+  it("holds every slice's actions to the four families by prefix", async () => {
     await loadEveryEntryPoint();
     const walked = declarations();
     expect(walked.length).toBeGreaterThan(0);
@@ -82,19 +82,19 @@ describe("the declared-acts walk", () => {
         known: true,
       });
 
-      for (const name of declaration.acts) {
+      for (const name of declaration.actions) {
         expect({ name, prefix: name.split(".")[0] }).toEqual({ name, prefix: declaration.family });
       }
     }
   });
 
   it.skipIf(sourceTreeIsInstrumented())(
-    "reaches every act declared in the tree, and no other",
+    "reaches every action declared in the tree, and no other",
     async () => {
       await loadEveryEntryPoint();
-      const registered = new Set<string>(declaredActNames());
-      const inTree = actLiteralsIn(coreSourceFiles());
-      const inThisSuite = actLiteralsIn([path.resolve(import.meta.dirname, "audit.test.ts")]);
+      const registered = new Set<string>(declaredActionNames());
+      const inTree = actionLiteralsIn(coreSourceFiles());
+      const inThisSuite = actionLiteralsIn([path.resolve(import.meta.dirname, "audit.test.ts")]);
 
       expect([...inTree].filter((name) => !registered.has(name))).toEqual([]);
       expect([...registered].filter((name) => !inTree.has(name) && !inThisSuite.has(name))).toEqual(
@@ -104,16 +104,16 @@ describe("the declared-acts walk", () => {
     },
   );
 
-  it("answers the act's name and its rows' detail shape", () => {
-    expect(act("platform.probe.shaped", { adminUserId: "id", confirmed: "flag" })).toEqual({
+  it("answers the action's name and its rows' detail shape", () => {
+    expect(action("platform.probe.shaped", { adminUserId: "id", confirmed: "flag" })).toEqual({
       name: "platform.probe.shaped",
       detail: { adminUserId: "id", confirmed: "flag" },
     });
   });
 
-  it("registers exactly the acts given and hands them back", () => {
-    const registered = declareActs("platform", {
-      accepted: act("platform.probe.accepted", { confirmed: "flag" }),
+  it("registers exactly the actions given and hands them back", () => {
+    const registered = declareActions("platform", {
+      accepted: action("platform.probe.accepted", { confirmed: "flag" }),
     });
 
     expect(registered).toEqual({
@@ -121,27 +121,27 @@ describe("the declared-acts walk", () => {
     });
     expect(declarations()).toContainEqual({
       family: "platform",
-      acts: ["platform.probe.accepted"],
+      actions: ["platform.probe.accepted"],
       detailKeys: ["confirmed"],
     });
   });
 
-  it("refuses an act declared under a family not its prefix", () => {
+  it("refuses an action declared under a family not its prefix", () => {
     expect(() =>
       // @ts-expect-error — the runtime half of what the type already refuses.
-      declareActs("platform", { added: act("people.member.added", {}) }),
-    ).toThrow(/not a platform act/);
+      declareActions("platform", { added: action("people.member.added", {}) }),
+    ).toThrow(/not a platform action/);
   });
 
   it("refuses a fifth family, in the type and at runtime", () => {
-    expectTypeOf<"billing.invoice.sent">().not.toExtend<ActName>();
+    expectTypeOf<"billing.invoice.sent">().not.toExtend<ActionName>();
     expect(() =>
       // @ts-expect-error — the family set is the one closed list.
-      declareActs("billing", { sent: act("billing.invoice.sent", {}) }),
-    ).toThrow(/not a billing act/);
+      declareActions("billing", { sent: action("billing.invoice.sent", {}) }),
+    ).toThrow(/not a billing action/);
   });
 
-  it("refuses an act whose subject is never an audit event", () => {
+  it("refuses an action whose subject is never an audit event", () => {
     const neverASubject = [
       "run",
       "questions_asked",
@@ -155,40 +155,40 @@ describe("the declared-acts walk", () => {
     ];
     for (const subject of neverASubject) {
       expect(() =>
-        declareActs("platform", { probe: act(`platform.${subject}.started`, {}) }),
+        declareActions("platform", { probe: action(`platform.${subject}.started`, {}) }),
       ).toThrow(/never an audit event/);
     }
   });
 
-  it("registers nothing when one act of a declaration is refused", () => {
+  it("registers nothing when one action of a declaration is refused", () => {
     expect(() =>
-      declareActs("platform", {
-        fine: act("platform.probe.atomic", {}),
-        refused: act("platform.run.started", {}),
+      declareActions("platform", {
+        fine: action("platform.probe.atomic", {}),
+        refused: action("platform.run.started", {}),
       }),
     ).toThrow(/never an audit event/);
-    expect(declaredActNames()).not.toContain("platform.probe.atomic");
+    expect(declaredActionNames()).not.toContain("platform.probe.atomic");
   });
 
-  it("refuses an act declared twice, so each has one slice", () => {
-    declareActs("platform", { first: act("platform.probe.twice", {}) });
-    expect(() => declareActs("platform", { again: act("platform.probe.twice", {}) })).toThrow(
+  it("refuses an action declared twice, so each has one slice", () => {
+    declareActions("platform", { first: action("platform.probe.twice", {}) });
+    expect(() => declareActions("platform", { again: action("platform.probe.twice", {}) })).toThrow(
       /declared twice/,
     );
   });
 
-  it("refuses an act named twice in one declaration, declaring none", () => {
+  it("refuses an action named twice in one declaration, declaring none", () => {
     expect(() =>
-      declareActs("platform", {
-        one: act("platform.probe.doubled", {}),
-        two: act("platform.probe.doubled", {}),
-        other: act("platform.probe.beside", {}),
+      declareActions("platform", {
+        one: action("platform.probe.doubled", {}),
+        two: action("platform.probe.doubled", {}),
+        other: action("platform.probe.beside", {}),
       }),
     ).toThrow("audit: platform.probe.doubled is declared twice");
-    expect(declaredActNames()).not.toContain("platform.probe.doubled");
-    expect(declaredActNames()).not.toContain("platform.probe.beside");
+    expect(declaredActionNames()).not.toContain("platform.probe.doubled");
+    expect(declaredActionNames()).not.toContain("platform.probe.beside");
     expect(() =>
-      declareActs("platform", { once: act("platform.probe.doubled", {}) }),
+      declareActions("platform", { once: action("platform.probe.doubled", {}) }),
     ).not.toThrow();
   });
 
@@ -229,15 +229,15 @@ describe("the declared-acts walk", () => {
   );
 });
 
-const PROBE = declareActs("platform", {
-  written: act("platform.probe.written", { adminUserId: "id", role: "role", confirmed: "flag" }),
-  noted: act("platform.probe.noted", { confirmed: "flag" }),
+const PROBE = declareActions("platform", {
+  written: action("platform.probe.written", { adminUserId: "id", role: "role", confirmed: "flag" }),
+  noted: action("platform.probe.noted", { confirmed: "flag" }),
 
-  optional: act("platform.probe.optional", { adminUserId: "id?", confirmed: "flag" }),
+  optional: action("platform.probe.optional", { adminUserId: "id?", confirmed: "flag" }),
 
-  ended: act("platform.probe.ended", { grants: "grants" }),
+  ended: action("platform.probe.ended", { grants: "grants" }),
 
-  hashed: act("platform.probe.hashed", { contentHash: "contentHash" }),
+  hashed: action("platform.probe.hashed", { contentHash: "contentHash" }),
 });
 
 const rowsOfSubjects = async (subjectIds: readonly string[]) => {
@@ -252,7 +252,7 @@ const rowsOfSubjects = async (subjectIds: readonly string[]) => {
   return found.rows;
 };
 
-describe("a batch id, for one act written over several subjects", () => {
+describe("a batch id, for one action written over several subjects", () => {
   it("names no batch for none or one subject", () => {
     expect(batchIdFor(0)).toBeUndefined();
     expect(batchIdFor(1)).toBeUndefined();
@@ -310,7 +310,7 @@ describe("the first door — record, the actor from the Principal", () => {
       (principal, tx) =>
         record(principal, tx, {
           id,
-          act: PROBE.written,
+          action: PROBE.written,
           subjectId: adminUserId,
           detail: { adminUserId, role: "Editor", confirmed: true },
         }),
@@ -322,7 +322,7 @@ describe("the first door — record, the actor from the Principal", () => {
     });
     expect(await rowById(id)).toEqual({
       workspace_id: workspaceId,
-      act: "platform.probe.written",
+      action: "platform.probe.written",
       family: "platform",
       actor: `human:${adminUserId}`,
       subject_kind: "probe",
@@ -340,7 +340,7 @@ describe("the first door — record, the actor from the Principal", () => {
     const written = await withScope(bootstrap, door, workspaceId, (tx) =>
       record(bootstrap, tx, {
         id,
-        act: PROBE.noted,
+        action: PROBE.noted,
         subjectId: ulid(),
         detail: { confirmed: true },
         batchId,
@@ -364,7 +364,7 @@ describe("the first door — record, the actor from the Principal", () => {
       withScope(bootstrap, door, "", (tx) =>
         record(bootstrap, tx, {
           id,
-          act: PROBE.noted,
+          action: PROBE.noted,
           subjectId: ulid(),
           detail: { confirmed: true },
         }),
@@ -384,7 +384,7 @@ describe("the first door — record, the actor from the Principal", () => {
       withScope(bootstrap, here.door, scope, (tx) =>
         record(theirs, tx, {
           id,
-          act: PROBE.noted,
+          action: PROBE.noted,
           subjectId: there.workspaceId,
           detail: { confirmed: true },
         }),
@@ -408,7 +408,7 @@ describe("the first door — record, the actor from the Principal", () => {
     await withScope(bootstrap, door, workspaceId, (tx) =>
       record(bootstrap, tx, {
         id: named,
-        act: PROBE.optional,
+        action: PROBE.optional,
         subjectId: adminUserId,
         detail: { adminUserId, confirmed: true },
       }),
@@ -416,7 +416,7 @@ describe("the first door — record, the actor from the Principal", () => {
     await withScope(bootstrap, door, workspaceId, (tx) =>
       record(bootstrap, tx, {
         id: left,
-        act: PROBE.optional,
+        action: PROBE.optional,
         subjectId: adminUserId,
         detail: { confirmed: true },
       }),
@@ -433,7 +433,7 @@ describe("the first door — record, the actor from the Principal", () => {
     await expect(
       write({
         id: ulid(),
-        act: PROBE.optional,
+        action: PROBE.optional,
         subjectId: adminUserId,
 
         detail: { adminUserId },
@@ -442,7 +442,7 @@ describe("the first door — record, the actor from the Principal", () => {
     await expect(
       write({
         id: ulid(),
-        act: PROBE.optional,
+        action: PROBE.optional,
         subjectId: adminUserId,
         detail: { adminUserId: "priya@example.invalid", confirmed: true },
       }),
@@ -458,14 +458,14 @@ describe("the first door — record, the actor from the Principal", () => {
         workspaceId,
       )({
         id: ulid(),
-        act: PROBE.hashed,
+        action: PROBE.hashed,
         subjectId: adminUserId,
         detail: { contentHash: "sha256:not-a-digest" },
       }),
     ).rejects.toThrow(/contentHash is not a contentHash$/);
   });
 
-  it("rejects a detail naming a field the act does not", async () => {
+  it("rejects a detail naming a field the action does not", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
 
@@ -473,24 +473,24 @@ describe("the first door — record, the actor from the Principal", () => {
       withScope(bootstrap, door, workspaceId, (tx) =>
         record(bootstrap, tx, {
           id,
-          act: PROBE.noted,
-          // @ts-expect-error — the act names `confirmed` and nothing else; the runtime half.
+          action: PROBE.noted,
+          // @ts-expect-error — the action names `confirmed` and nothing else; the runtime half.
           detail: { confirmed: true, email: "priya@example.invalid" },
           subjectId: adminUserId,
         }),
       ),
-    ).rejects.toThrow(/names a field the act does not: email/);
+    ).rejects.toThrow(/names a field the action does not: email/);
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("rejects email ids, missing fields, undeclared acts and unminted ids", async () => {
+  it("rejects email ids, missing fields, undeclared actions and unminted ids", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const write = writingIn(door, workspaceId);
 
     await expect(
       write({
         id: ulid(),
-        act: PROBE.written,
+        action: PROBE.written,
         subjectId: adminUserId,
         detail: { adminUserId: "priya@example.invalid", role: "Admin", confirmed: true },
       }),
@@ -500,7 +500,7 @@ describe("the first door — record, the actor from the Principal", () => {
     await expect(
       write({
         id: ulid(),
-        act: PROBE.written,
+        action: PROBE.written,
         subjectId: adminUserId,
 
         detail: { adminUserId, role: "Admin" },
@@ -509,7 +509,7 @@ describe("the first door — record, the actor from the Principal", () => {
     await expect(
       write({
         id: ulid(),
-        act: act("platform.probe.undeclared", {}),
+        action: action("platform.probe.undeclared", {}),
         subjectId: adminUserId,
         detail: {},
       }),
@@ -518,7 +518,7 @@ describe("the first door — record, the actor from the Principal", () => {
     await expect(
       write({
         id: "audit-1",
-        act: PROBE.noted,
+        action: PROBE.noted,
         subjectId: adminUserId,
         detail: { confirmed: true },
       }),
@@ -540,7 +540,7 @@ describe("the second door — recordFor, the platform naming the actor", () => {
       recordFor(bootstrap, tx, {
         id,
         actor: requester,
-        act: PROBE.noted,
+        action: PROBE.noted,
         subjectId: workspaceId,
         detail: { confirmed: true },
       }),
@@ -556,13 +556,13 @@ describe("the second door — recordFor, the platform naming the actor", () => {
   });
 });
 
-const IDENTITY_PROBE = declareIdentitySetActs("platform", {
-  noted: act("platform.probe.identity_noted", { confirmed: "flag" }),
+const IDENTITY_PROBE = declareIdentitySetActions("platform", {
+  noted: action("platform.probe.identity_noted", { confirmed: "flag" }),
 });
 
 const identityRowById = async (id: string) => {
   const found = await db().pool.query(
-    "SELECT action AS act, family, actor, subject_kind, subject_id, detail, batch_id FROM identity_audit_event WHERE id = $1",
+    "SELECT action, family, actor, subject_kind, subject_id, detail, batch_id FROM identity_audit_event WHERE id = $1",
     [id],
   );
   return found.rows[0];
@@ -578,7 +578,7 @@ describe("the identity-set audit log, reached through either door", () => {
       recordFor(bootstrap, tx, {
         id,
         actor: `human:${personId}`,
-        act: IDENTITY_PROBE.noted,
+        action: IDENTITY_PROBE.noted,
         subjectId: personId,
         detail: { confirmed: true },
       }),
@@ -586,7 +586,7 @@ describe("the identity-set audit log, reached through either door", () => {
 
     expect(written).toEqual({ id, actorId: `human:${personId}` });
     expect(await identityRowById(id)).toEqual({
-      act: "platform.probe.identity_noted",
+      action: "platform.probe.identity_noted",
       family: "platform",
       actor: `human:${personId}`,
       subject_kind: "probe",
@@ -607,7 +607,7 @@ describe("the identity-set audit log, reached through either door", () => {
       (principal, tx) =>
         record(principal, tx, {
           id,
-          act: IDENTITY_PROBE.noted,
+          action: IDENTITY_PROBE.noted,
           subjectId: adminUserId,
           detail: { confirmed: false },
         }),
@@ -626,7 +626,7 @@ describe("the identity-set audit log, reached through either door", () => {
     const { operatorId } = await asANewOperator(db(), new Date(), (operator, tx) =>
       record(operator, tx, {
         id,
-        act: IDENTITY_PROBE.noted,
+        action: IDENTITY_PROBE.noted,
         subjectId: operator.userId,
         detail: { confirmed: true },
       }),
@@ -639,13 +639,13 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("refuses a workspace's act under the operator, who has none", async () => {
+  it("refuses a workspace's action under the operator, who has none", async () => {
     const id = ulid();
 
     const writing = asANewOperator(db(), new Date(), (operator, tx) =>
       record(operator, tx, {
         id,
-        act: PROBE.noted,
+        action: PROBE.noted,
         subjectId: operator.userId,
         detail: { confirmed: true },
       }),
@@ -657,7 +657,7 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("holds the detail to the act's declared shape", async () => {
+  it("holds the detail to the action's declared shape", async () => {
     const door = openPostgres(db().runtimePool);
     const id = ulid();
 
@@ -666,13 +666,13 @@ describe("the identity-set audit log, reached through either door", () => {
         recordFor(bootstrap, tx, {
           id,
           actor: `human:${ulid()}`,
-          act: IDENTITY_PROBE.noted,
+          action: IDENTITY_PROBE.noted,
           subjectId: ulid(),
-          // @ts-expect-error — the act names `confirmed` and nothing else; the runtime half.
+          // @ts-expect-error — the action names `confirmed` and nothing else; the runtime half.
           detail: { confirmed: true, name: "Priya Shah" },
         }),
       ),
-    ).rejects.toThrow(/names a field the act does not: name/);
+    ).rejects.toThrow(/names a field the action does not: name/);
     expect(await identityRowById(id)).toBeUndefined();
   });
 
@@ -682,7 +682,7 @@ describe("the identity-set audit log, reached through either door", () => {
     const event = (id: string) => ({
       id,
       actor: `human:${ulid()}` as const,
-      act: IDENTITY_PROBE.noted,
+      action: IDENTITY_PROBE.noted,
       subjectId: ulid(),
       detail: { confirmed: true },
     });
@@ -703,14 +703,14 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(atOf(stamped)).toBeGreaterThanOrEqual((began?.getTime() ?? 0) + 10);
   });
 
-  it("registers an identity-set act once, among the declared acts", () => {
+  it("registers an identity-set action once, among the declared actions", () => {
     expect(declarations()).toContainEqual({
       family: "platform",
-      acts: ["platform.probe.identity_noted"],
+      actions: ["platform.probe.identity_noted"],
       detailKeys: ["confirmed"],
     });
     expect(() =>
-      declareIdentitySetActs("platform", { again: act("platform.probe.identity_noted", {}) }),
+      declareIdentitySetActions("platform", { again: action("platform.probe.identity_noted", {}) }),
     ).toThrow(/declared twice/);
   });
 });
@@ -732,7 +732,7 @@ describe("a detail's list of ended grants", () => {
     await writingIn(
       door,
       workspaceId,
-    )({ id, act: PROBE.ended, subjectId: adminUserId, detail: { grants } });
+    )({ id, action: PROBE.ended, subjectId: adminUserId, detail: { grants } });
 
     expect(await rowById(id)).toMatchObject({ detail: { grants } });
   });
@@ -746,7 +746,7 @@ describe("a detail's list of ended grants", () => {
       workspaceId,
     )({
       id,
-      act: PROBE.ended,
+      action: PROBE.ended,
       subjectId: adminUserId,
       detail: { grants: [] },
     });
@@ -774,7 +774,7 @@ describe("a detail's list of ended grants", () => {
         workspaceId,
       )({
         id: ulid(),
-        act: PROBE.ended,
+        action: PROBE.ended,
         subjectId: adminUserId,
         // @ts-expect-error — each case breaks the grant's shape; the runtime half.
         detail: { grants: [grant] },
@@ -789,7 +789,7 @@ describe("a detail's list of ended grants", () => {
       workspaceId,
     )({
       id: ulid(),
-      act: PROBE.ended,
+      action: PROBE.ended,
       subjectId: adminUserId,
       // @ts-expect-error — no list of ended grants; the runtime half.
       detail: { grants: grants(workspaceId) },

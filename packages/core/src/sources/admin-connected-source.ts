@@ -33,7 +33,7 @@ export type ActingOnConnectedSource = {
   readonly connectedSourceId: ConnectedSourceId;
 };
 
-/** The platform carries no workspace, so its standing names the one its act was asked for. */
+/** The platform carries no workspace, so its standing names the one its action was asked for. */
 export type PlatformOnConnectedSource = {
   readonly platform: PlatformPrincipal;
   readonly workspaceId: WorkspaceId;

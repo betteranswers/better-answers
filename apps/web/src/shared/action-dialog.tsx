@@ -14,10 +14,10 @@ import {
 type Content = Pick<ComponentProps<typeof DialogContent>, "className" | "onCloseAutoFocus">;
 
 /**
- * The consequence is a required part, so no act on the page can ask for the click before
+ * The consequence is a required part, so no action on the page can ask for the click before
  * saying what it does.
  */
-export function ActDialog(properties: {
+export function ActionDialog(properties: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly title: ReactNode;
@@ -48,7 +48,7 @@ export function ActDialog(properties: {
 }
 
 type Parts = Pick<
-  ComponentProps<typeof ActDialog>,
+  ComponentProps<typeof ActionDialog>,
   "title" | "consequence" | "commit" | "children"
 >;
 
@@ -56,12 +56,12 @@ type Parts = Pick<
  * Open for as long as its opener mounts it. No Radix trigger opened it, so `onFocusBack` says
  * where focus goes as it closes.
  */
-export function MountedActDialog(
+export function MountedActionDialog(
   properties: Parts & { readonly onClose: () => void; readonly onFocusBack: () => void },
 ) {
   const { onClose, onFocusBack, ...parts } = properties;
   return (
-    <ActDialog
+    <ActionDialog
       {...parts}
       open
       onOpenChange={(open) => {

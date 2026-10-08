@@ -232,7 +232,7 @@ const verificationRows = async (workspaceId: string) => {
 
 const knowledgeEventsOf = async (workspaceId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
-    `SELECT action AS act, actor, subject_kind, batch_id
+    `SELECT action, actor, subject_kind, batch_id
        FROM audit_event WHERE workspace_id = $1 AND action LIKE 'knowledge.%'
       ORDER BY at, id`,
     [workspaceId],
@@ -516,7 +516,7 @@ describe("importing the bundle", () => {
     );
     expect(
       new Set(
-        auditEvents.map((row) => `${String(row["act"])} on a ${String(row["subject_kind"])}`),
+        auditEvents.map((row) => `${String(row["action"])} on a ${String(row["subject_kind"])}`),
       ),
     ).toEqual(
       new Set([
@@ -527,7 +527,7 @@ describe("importing the bundle", () => {
     );
     const batches = new Set(
       auditEvents
-        .filter((row) => row["act"] === "knowledge.check.imported")
+        .filter((row) => row["action"] === "knowledge.check.imported")
         .map((row) => row["batch_id"]),
     );
     expect(batches.size).toBe(1);
@@ -745,7 +745,7 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
       actor: `human:${scenario.editor.userId}`,
     });
     expect(
-      (await knowledgeEventsOf(scenario.workspaceId)).slice(-3).map((row) => row["act"]),
+      (await knowledgeEventsOf(scenario.workspaceId)).slice(-3).map((row) => row["action"]),
     ).toEqual([
       "knowledge.concept.committed",
       "knowledge.concept.committed",

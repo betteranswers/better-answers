@@ -28,7 +28,7 @@ const refusedOf = (correctName: CorrectName, personId: string): Refused | undefi
   };
 };
 
-/** `was` is kept, since the cache no longer holds the name it replaced once the act lands. */
+/** `was` is kept, since the cache no longer holds the name it replaced once the action lands. */
 export const useCorrecting = () => {
   const correctName = useCorrectDisplayName();
   const [was, setWas] = useState("");
@@ -40,7 +40,7 @@ export const useCorrecting = () => {
     outcome: outcomeOf(correctName, was),
     /** Refused over a sign-in too old, which signing in again mends. */
     staleFor: stale ? refusedFor : undefined,
-    /** Refused for any other reason, so the person's act takes focus back. */
+    /** Refused for any other reason, so the person's action takes focus back. */
     otherwiseRefusedFor: stale ? undefined : refusedFor,
     refusedAt: (personId: string) => refusedOf(correctName, personId),
     save: (asked: {

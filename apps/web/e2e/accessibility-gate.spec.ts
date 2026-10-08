@@ -11,7 +11,7 @@ const drawAPictureWithNoAltText = (): void => {
   document.querySelector("main")?.append(picture);
 };
 
-/** A refused act's button, held at its disabled look until the fade's last moment. */
+/** A refused action's button, held at its disabled look until the fade's last moment. */
 const fadeAButtonBackFromItsDisabledLook = (): void => {
   const button = document.createElement("button");
   button.textContent = "Make Test person a Viewer";

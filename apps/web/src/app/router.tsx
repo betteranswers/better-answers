@@ -431,7 +431,7 @@ const routesOf = (areas: readonly Area[], shell: AnyRoute, reading: Reading): An
         staticData: { toolbar: built.toolbar },
       });
     }),
-    // No toolbar: a detail has the page's place, not its tabs or acts.
+    // No toolbar: a detail has the page's place, not its tabs or actions.
     ...details.map(({ page, param, detail }) =>
       createRoute({
         getParentRoute: () => shell,

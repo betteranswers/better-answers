@@ -29,7 +29,7 @@ import {
   provision,
   quoted,
   signInHeading,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 /** `CLIENT_IP_HEADER`, named not imported: `apps/web` takes nothing from `apps/api` at runtime. */
@@ -313,7 +313,7 @@ test("the code reads as six digits, and c copies it", async ({
 
   await clockTheNextKey(page, { at: "//main", reads: LINK_WORDS.copied });
   await page.keyboard.press("c");
-  await theActLandedWithinItsBudget(page, "copy");
+  await theActionLandedWithinItsBudget(page, "copy");
 });
 
 test("an invitee signing in by link lands on the invitation", async ({

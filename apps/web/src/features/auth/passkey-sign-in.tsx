@@ -43,7 +43,7 @@ export const saidWhileSigningInWithAPasskey = (
 };
 
 /** Offered only where the browser can use a passkey; the email field's autofill offers it too. */
-export function PasskeyAct(properties: {
+export function PasskeyAction(properties: {
   readonly pending: boolean;
   readonly onSignIn: () => void;
 }) {

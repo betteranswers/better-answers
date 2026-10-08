@@ -4,7 +4,7 @@ import { BREADCRUMB, JUMP_TO, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { headlineOf, sentenceOf as saidOfAct } from "@/features/people/audit-sentences.ts";
+import { headlineOf, sentenceOf as saidOfAction } from "@/features/people/audit-sentences.ts";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
   ACTIVITY_WORDS,
@@ -14,7 +14,7 @@ import {
   MEMBER_PAGE_WORDS,
   NO_LONGER_LISTED,
   SELECTED_MEMBERS,
-} from "@/features/people/member-act-words.ts";
+} from "@/features/people/member-action-words.ts";
 import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { SAID_OF_A_MEMBER, SAID_OF_TICKED_MEMBERS } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
@@ -50,12 +50,12 @@ import {
   switcherMenuOf,
   switcherOf,
   tabUntilFocused,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-const ACT_BUDGET_MS = 100;
+const ACTION_BUDGET_MS = 100;
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
@@ -75,15 +75,15 @@ const MEMBERS_READ = (url: URL): boolean => url.pathname.includes("members.list"
 const REMOVAL = (url: URL): boolean => url.pathname.includes("members.remove");
 
 /**
- * The api's refusal of an act racing another, as the tRPC client's batch carries it back, once `held`
+ * The api's refusal of an action racing another, as the tRPC client's batch carries it back, once `held`
  * lets it go.
  */
 const answeredChangedMeanwhile = (
   page: Page,
-  act: (url: URL) => boolean,
+  action: (url: URL) => boolean,
   held: Promise<void> = Promise.resolve(),
 ) =>
-  page.route(act, async (route) => {
+  page.route(action, async (route) => {
     await held;
     await route.fulfill({
       status: 409,
@@ -233,9 +233,9 @@ const clockTheSearch = (page: Page, saying: string) =>
 
 const theSearchLandedWithinItsBudget = async (page: Page) => {
   const elapsed = await page.evaluate(() => Reflect.get(window, "searchClocked"));
-  test.info().annotations.push({ type: "search act", description: `${elapsed} ms` });
+  test.info().annotations.push({ type: "search action", description: `${elapsed} ms` });
   expect(elapsed, "the search did not narrow the list within its budget").toBeLessThan(
-    ACT_BUDGET_MS,
+    ACTION_BUDGET_MS,
   );
 };
 
@@ -477,7 +477,7 @@ test.describe("the People group's Members page", () => {
               - columnheader "Groups"
               - columnheader "Joined":
                 - button "Joined"
-              - columnheader "Acts"
+              - columnheader "Actions"
           - rowgroup:
             - row /Priya Shah/:
               - cell:
@@ -488,7 +488,7 @@ test.describe("the People group's Members page", () => {
               - cell "No group"
               - cell /\\d{4}/
               - cell:
-                - button "Acts for Priya Shah"
+                - button "Actions for Priya Shah"
             - row /Sam Okoro/:
               - cell:
                 - checkbox "Select Sam Okoro"
@@ -498,7 +498,7 @@ test.describe("the People group's Members page", () => {
               - cell "No group"
               - cell /\\d{4}/
               - cell:
-                - button "Acts for Sam Okoro"
+                - button "Actions for Sam Okoro"
             - row /Test person/:
               - cell:
                 - checkbox "Select Test person"
@@ -508,7 +508,7 @@ test.describe("the People group's Members page", () => {
               - cell "No group"
               - cell /\\d{4}/
               - cell:
-                - button "Acts for Test person"
+                - button "Actions for Test person"
     `);
 
     await passesTheAccessibilityGate();
@@ -540,7 +540,7 @@ test.describe("a member's own page", () => {
     await expect(page.getByRole("tab")).toHaveCount(0);
 
     await backToMembers(page);
-    await membersRegion(page).getByRole("button", { name: "Acts for Priya Shah" }).click();
+    await membersRegion(page).getByRole("button", { name: "Actions for Priya Shah" }).click();
     await page.getByRole("menuitem", { name: "Open" }).click();
     await expect(page).toHaveURL(priyasPage);
     await expect(personHeading(page, "Priya Shah")).toBeFocused();
@@ -766,7 +766,7 @@ test.describe("a member's own page", () => {
     await expect(rolePickerRegion(page).getByRole("status")).toHaveText(
       "Sam Okoro is an Editor now, from their next request.",
     );
-    await theActLandedWithinItsBudget(page, "role change");
+    await theActionLandedWithinItsBudget(page, "role change");
     await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
 
     await page.reload();
@@ -896,10 +896,10 @@ test.describe("a member's own page", () => {
       "Priya Shah is a Viewer now, from their next request.",
     );
 
-    // The page's own keystrokes reach each act's control again, listed under Members.
+    // The page's own keystrokes reach each action's control again, listed under Members.
     const onThePage = await keystrokesListed(page, MEMBERS.name);
     for (const keystroke of Object.values(MEMBER_PAGE_KEYSTROKES)) {
-      await expect(onThePage).toContainText(keystroke.act);
+      await expect(onThePage).toContainText(keystroke.action);
     }
     await keystrokesDismissed(page, onThePage);
     await page.keyboard.press(MEMBER_PAGE_KEYSTROKES.remove.key);
@@ -929,14 +929,14 @@ test.describe("a member's Activity", () => {
     await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
     await thePage(page).getByRole("button", { name: "Make Priya Shah an Editor" }).click();
 
-    const changed = saidOfAct({
-      act: "people.member.role_changed",
+    const changed = saidOfAction({
+      action: "people.member.role_changed",
       by: named("Hannah Wright"),
       subject: named("Priya Shah"),
       detail: { role: "Editor" },
       named: {},
     });
-    // The page the act was taken on reads its Activity again once the act settles.
+    // The page the action was taken on reads its Activity again once the action settles.
     await expect(linesOf(page)).toHaveCount(1);
     await expect(linesOf(page)).toContainText(changed);
     await expect(linesOf(page)).toContainText(ACTIVITY_WORDS.direction.to("Priya Shah"));
@@ -991,8 +991,8 @@ test.describe("a member's Activity", () => {
 
     await openedByName(page, "Ola Brennan");
 
-    const joined = saidOfAct({
-      act: "people.member.joined",
+    const joined = saidOfAction({
+      action: "people.member.joined",
       by: named("Ola Brennan"),
       subject: named("Ola Brennan"),
       detail: { role: "Admin" },
@@ -1016,8 +1016,8 @@ test.describe("a member's Activity", () => {
 
     await page.goto(memberPageAt(asker.id));
 
-    const asked = saidOfAct({
-      act: "people.request.asked",
+    const asked = saidOfAction({
+      action: "people.request.asked",
       by: named("Ola Asker"),
       subject: null,
       detail: {},
@@ -1136,7 +1136,7 @@ test.describe("ending every sign-in and token a member holds here", () => {
     await expect(credentialsRegion(page).getByRole("status")).toContainText(
       "Every sign-in and token Priya Shah held here has ended.",
     );
-    await theActLandedWithinItsBudget(page, "revocation");
+    await theActionLandedWithinItsBudget(page, "revocation");
     await expect(revoke).toBeFocused();
     await expect(accessOf(page)).toContainText(ENDED_AT);
     await passesTheAccessibilityGate();
@@ -1245,7 +1245,7 @@ test.describe("removing a member from their page", () => {
         .getByRole("status")
         .filter({ hasText: MEMBER_PAGE_WORDS.removed("Priya Shah") }),
     ).toBeVisible();
-    await theActLandedWithinItsBudget(page, "removal");
+    await theActionLandedWithinItsBudget(page, "removal");
 
     await page.goBack();
     await expect(page).toHaveURL(priyasPage);
@@ -1397,7 +1397,7 @@ test.describe("a member's display name, flagged to better-answers support", () =
     await page.keyboard.press("Enter");
 
     await expect(said).toHaveText(SENT_TO_THE_OPERATOR);
-    await theActLandedWithinItsBudget(page, "name flag");
+    await theActionLandedWithinItsBudget(page, "name flag");
     await expect(flagButton(page)).toBeFocused();
 
     await page.keyboard.press("Enter");
@@ -1607,8 +1607,8 @@ const tickOf = (page: Page, name: string): Locator =>
 
 const selectionBar = (page: Page): Locator => page.getByRole("toolbar", { name: SELECTED_MEMBERS });
 
-const selectionAct = (page: Page, act: string): Locator =>
-  selectionBar(page).getByRole("button", { name: act, exact: true });
+const selectionAction = (page: Page, action: string): Locator =>
+  selectionBar(page).getByRole("button", { name: action, exact: true });
 
 const pagesOf = (page: Page): Locator => page.getByRole("navigation", { name: "Pages of members" });
 
@@ -1645,14 +1645,14 @@ const aWorkspaceOfThirtyEditors = async (
 
 /** Opens the bar's Change role and answers its dialog, the role select in focus. */
 const changeRoleOpened = async (page: Page, count: number): Promise<Locator> => {
-  await selectionAct(page, BULK_WORDS.changeRole.act).click();
+  await selectionAction(page, BULK_WORDS.changeRole.action).click();
   const dialog = page.getByRole("dialog", { name: BULK_WORDS.changeRole.title(count) });
   await expect(dialog.getByRole("combobox", { name: "Role" })).toBeFocused();
   return dialog;
 };
 
 const removedThroughTheBar = async (page: Page, count: number): Promise<void> => {
-  await selectionAct(page, BULK_WORDS.remove.act).click();
+  await selectionAction(page, BULK_WORDS.remove.action).click();
   await page
     .getByRole("dialog", { name: BULK_WORDS.remove.title(count) })
     .getByRole("button", { name: BULK_WORDS.remove.commit(count) })
@@ -1665,7 +1665,7 @@ const removedThemselfThroughTheBar = async (page: Page): Promise<void> => {
   await removedThroughTheBar(page, 1);
 };
 
-test.describe("bulk acts on the members ticked", () => {
+test.describe("bulk actions on the members ticked", () => {
   test("refuses demoting both Admins, naming each, ticks kept", async ({
     page,
     request,
@@ -1783,7 +1783,7 @@ test.describe("bulk acts on the members ticked", () => {
       .getByRole("checkbox", { name: "Select every member on this page" })
       .check();
     await expect(selectionBar(page).getByRole("status")).toHaveText("10 members selected.");
-    await selectionAct(page, BULK_WORDS.addToGroup.act).click();
+    await selectionAction(page, BULK_WORDS.addToGroup.action).click();
     const dialog = page.getByRole("dialog", { name: BULK_WORDS.addToGroup.title(10) });
     const group = dialog.getByRole("combobox", { name: "Group" });
     await expect(group).toBeFocused();
@@ -1831,7 +1831,7 @@ test.describe("bulk acts on the members ticked", () => {
     await page.keyboard.press("Escape");
 
     await tickOf(page, "Test person").check();
-    await selectionAct(page, BULK_WORDS.remove.act).click();
+    await selectionAction(page, BULK_WORDS.remove.action).click();
     const dialog = page.getByRole("dialog", { name: BULK_WORDS.remove.title(1) });
     await expect(dialog).toContainText(INCLUDES_YOU);
     await dialog.getByRole("button", { name: BULK_WORDS.remove.commit(1) }).click();
@@ -1883,7 +1883,7 @@ test.describe("bulk acts on the members ticked", () => {
     await tickOf(page, "Priya Shah").check();
     await tickOf(page, "Sam Okoro").check();
 
-    const remove = selectionAct(page, BULK_WORDS.remove.act);
+    const remove = selectionAction(page, BULK_WORDS.remove.action);
     await remove.click();
     const dialog = page.getByRole("dialog", { name: BULK_WORDS.remove.title(2) });
     await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
@@ -1924,7 +1924,7 @@ test.describe("bulk acts on the members ticked", () => {
     await page.keyboard.press("Enter");
 
     await expect(saidInTheList(page, BULK_WORDS.changeRole.done(3, "Viewer", 0))).toBeVisible();
-    await theActLandedWithinItsBudget(page, "bulk role change");
+    await theActionLandedWithinItsBudget(page, "bulk role change");
     await page.keyboard.press(PEOPLE_KEYSTROKES.previousPage.key);
     await expect(cellOf(page, "Person 01", "Role")).toHaveText("Viewer");
     await expect(cellOf(page, "Person 02", "Role")).toHaveText("Viewer");
@@ -1952,7 +1952,7 @@ test.describe("bulk acts on the members ticked", () => {
     );
   });
 
-  test("keyboard alone: tick two, act, focus lands on the list", async ({
+  test("keyboard alone: tick two, change roles, focus on the list", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -1960,8 +1960,8 @@ test.describe("bulk acts on the members ticked", () => {
     await skippedToMembers(page, request, "Calder Spinning");
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
-    await expect(keystrokes).toContainText(PEOPLE_KEYSTROKES.changeSelectedRoles.act);
-    await expect(keystrokes).toContainText(PEOPLE_KEYSTROKES.tick.act);
+    await expect(keystrokes).toContainText(PEOPLE_KEYSTROKES.changeSelectedRoles.action);
+    await expect(keystrokes).toContainText(PEOPLE_KEYSTROKES.tick.action);
     await keystrokesDismissed(page, keystrokes);
 
     await tabUntilFocused(page, tickOf(page, "Priya Shah"));
@@ -2044,7 +2044,7 @@ test.describe("bulk acts on the members ticked", () => {
     await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Editor");
   });
 
-  test("a second act waits on the first, whose refusal lands", async ({
+  test("a second action waits on the first, whose refusal lands", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -2058,9 +2058,9 @@ test.describe("bulk acts on the members ticked", () => {
     await expect(saidInTheList(page, BULK_WORDS.changeRole.pending(1, "Viewer"))).toBeVisible();
 
     await tickOf(page, "Sam Okoro").check();
-    const act = selectionAct(page, BULK_WORDS.changeRole.act);
-    await expect(act).toHaveAttribute("aria-disabled", "true");
-    await act.focus();
+    const action = selectionAction(page, BULK_WORDS.changeRole.action);
+    await expect(action).toHaveAttribute("aria-disabled", "true");
+    await action.focus();
     await page.keyboard.press("Enter");
     await expect(saidInTheList(page, BULK_WORDS.stillGoing)).toBeVisible();
     await page.keyboard.press(`Shift+${PEOPLE_KEYSTROKES.removeSelected.key}`);
@@ -2073,12 +2073,12 @@ test.describe("bulk acts on the members ticked", () => {
       word: "changed-meanwhile",
     });
     await expect(tickOf(page, "Priya Shah")).toBeChecked();
-    await expect(act).not.toHaveAttribute("aria-disabled", "true");
+    await expect(action).not.toHaveAttribute("aria-disabled", "true");
   });
 
-  test("the row menu's Change role acts on its one member", async ({ page, request }) => {
+  test("the row menu's Change role changes its one member alone", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Nidd Weaving");
-    await membersRegion(page).getByRole("button", { name: "Acts for Sam Okoro" }).click();
+    await membersRegion(page).getByRole("button", { name: "Actions for Sam Okoro" }).click();
     const menu = page.getByRole("menu");
     await expect(menu.getByRole("menuitem")).toHaveText([
       "Open",
@@ -2123,7 +2123,7 @@ test.describe("bulk acts on the members ticked", () => {
       memberIds: [],
     });
     await page.reload();
-    await membersRegion(page).getByRole("button", { name: "Acts for Sam Okoro" }).click();
+    await membersRegion(page).getByRole("button", { name: "Actions for Sam Okoro" }).click();
     await page.getByRole("menuitem", { name: "Add to group" }).click();
 
     const box = thePage(page).getByRole("checkbox", { name: "Site leads" });

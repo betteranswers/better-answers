@@ -7,7 +7,7 @@ import {
   actorIdOfPerson,
   admit,
   attempt,
-  declareAct,
+  declareAction,
   err,
   ok,
   type RefusalOf,
@@ -35,18 +35,18 @@ export const readActivityInput = z.object({
 
 export type ReadActivityInput = z.output<typeof readActivityInput>;
 
-const readActivityAct = declareAct({
+const readActivityAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: readActivityInput,
   refuses: ["role-forbids"],
   effect: "read",
 });
 
-export type ReadActivityRefusal = MemberRefusal<RefusalOf<typeof readActivityAct>> | Error;
+export type ReadActivityRefusal = MemberRefusal<RefusalOf<typeof readActivityAction>> | Error;
 
 type ReadEvent = AuditLogPage["events"][number];
 
-/** Whether the person took the act, it was done to them, or both, as a self-demotion is. */
+/** Whether the person took the action, it was done to them, or both, as a self-demotion is. */
 type Direction = "by" | "to" | "both";
 
 export type ActivityPage = Omit<AuditLogPage, "events"> & {
@@ -60,8 +60,8 @@ const isDoneTo = (event: ReadEvent, personId: UserId): boolean =>
   (PERSON_SUBJECT_KINDS.some((kind) => kind === event.subjectKind) &&
     event.subjectId === personId) ||
   PERSON_NAMED_IN.some(
-    ({ key, acts }) =>
-      acts.some((act) => act === event.act) &&
+    ({ key, actions }) =>
+      actions.some((action) => action === event.action) &&
       Object.hasOwn(event.detail, key) &&
       event.detail[key] === personId,
   );
@@ -85,12 +85,12 @@ export const readActivity = async (
   tx: Tx,
   input: ReadActivityInput,
 ): Promise<Result<ActivityPage, ReadActivityRefusal>> => {
-  const admitted = admit(readActivityAct, principal, input);
+  const admitted = admit(readActivityAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
   const read = await attempt(async () => {
     const page = await eventsSoughtNewestFirst(admitted.value, tx, {
-      sought: soughtFor({ people: [input.personId], groups: [], acts: [] }),
+      sought: soughtFor({ people: [input.personId], groups: [], actions: [] }),
       cursor: input.cursor,
       limit: ACTIVITY_PAGE,
     });

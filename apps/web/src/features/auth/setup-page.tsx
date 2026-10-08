@@ -1,9 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
-import { KeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
+import { KeystrokesAction, type Keystroke } from "@/shared/keystrokes.tsx";
 
-import { ActButton } from "./account-sections.tsx";
+import { ActionButton } from "./account-sections.tsx";
 import {
   ACCOUNT_WORDS,
   PASSKEY_WORDS,
@@ -53,7 +53,7 @@ import { CONFIRM_STEP, stepAfterTheCodes, stepAfterTheFactors } from "./second-f
 import { SETUP_WORDS } from "./second-factor-words.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
 
-const SET_UP_INSTEAD: Keystroke = { key: "s", act: SETUP_WORDS.authenticatorInstead };
+const SET_UP_INSTEAD: Keystroke = { key: "s", action: SETUP_WORDS.authenticatorInstead };
 
 /** First: holds none. New: a recovery code granted this session. Restored: by the operator. */
 type Variant = "first" | "new" | "restored";
@@ -129,7 +129,7 @@ function CodesToFinish(properties: { readonly inHand: CodesInHand; readonly quer
         }}
       />
       <div className="mt-10 flex flex-wrap items-center gap-2">
-        <KeystrokesAct page={RECOVERY_CODE_WORDS.saveHeading} keystrokes={CODES_KEYSTROKES} />
+        <KeystrokesAction page={RECOVERY_CODE_WORDS.saveHeading} keystrokes={CODES_KEYSTROKES} />
         <SignOutButton />
       </div>
     </AuthPage>
@@ -228,15 +228,15 @@ function SetupWays(properties: {
           />
         </div>
       ) : null}
-      <ActButton
-        actRef={here ? null : first}
+      <ActionButton
+        actionRef={here ? null : first}
         unavailable={finishing}
         label={SETUP_WORDS.authenticatorInstead}
         className="mt-6"
         expanded={setup.open}
         controls={setup.open ? setupId : undefined}
         keystroke={SET_UP_INSTEAD}
-        onAct={setup.toggle}
+        onAction={setup.toggle}
       />
       {setup.open ? (
         <AuthenticatorSetup
@@ -381,11 +381,11 @@ export function CodesPage() {
         unanswered={make.error === null ? CODES_UNANSWERED : codesUnanswered(make.error)}
       />
       {make.error === null ? null : (
-        <ActButton
+        <ActionButton
           unavailable={make.isPending}
           label={ACCOUNT_WORDS.tryAgain}
           className="mt-4"
-          onAct={makeASet}
+          onAction={makeASet}
         />
       )}
       <div className="mt-10 flex flex-wrap items-center gap-2">

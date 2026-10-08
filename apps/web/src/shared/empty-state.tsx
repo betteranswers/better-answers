@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/utils.ts";
 
 /**
- * `action` only where the page has no other way to take the act: a second button for it reads
- * as a different act.
+ * `action` only where the page has no other way to take the action: a second button for it reads
+ * as a different action.
  */
 export function EmptyState(properties: {
   readonly line: string;

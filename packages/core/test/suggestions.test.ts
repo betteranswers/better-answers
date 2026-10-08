@@ -122,10 +122,10 @@ const suggestionRow = async (suggestionId: string) => {
   return found.rows[0];
 };
 
-const auditEventsFor = async (workspaceId: string, act: string) => {
+const auditEventsFor = async (workspaceId: string, action: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
-    "SELECT action AS act, subject_id, subject_kind, batch_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
-    [workspaceId, act],
+    "SELECT action, subject_id, subject_kind, batch_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
+    [workspaceId, action],
   );
   return found.rows;
 };
@@ -369,7 +369,7 @@ describe("accepting a suggestion", () => {
     });
     expect(await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.accepted")).toEqual([
       {
-        act: "knowledge.suggestion.accepted",
+        action: "knowledge.suggestion.accepted",
         subject_id: set.suggestionIds[0],
         subject_kind: "suggestion",
         batch_id: null,
@@ -633,7 +633,7 @@ describe("declining a suggestion", () => {
 
     expect(await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([
       {
-        act: "knowledge.suggestion.declined",
+        action: "knowledge.suggestion.declined",
         subject_id: set.suggestionIds[0],
         subject_kind: "suggestion",
         batch_id: null,
@@ -868,7 +868,7 @@ describe("the platform's citation fix", () => {
   });
 });
 
-describe("two acts over one suggestion", () => {
+describe("two actions over one suggestion", () => {
   it("lets one of an acceptance and a decline through", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
@@ -960,7 +960,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
     });
     const accepted = await accepting;
     if (accepted?.ok !== true) {
-      throw new Error(`the acceptance act itself was refused: ${String(accepted?.error)}`);
+      throw new Error(`the acceptance action itself was refused: ${String(accepted?.error)}`);
     }
     return accepted.value;
   };
@@ -1013,7 +1013,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
   });
 
-  it("throws rather than commits a decision another act made", async () => {
+  it("throws rather than commits a decision another action made", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
@@ -1041,7 +1041,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
     const outcome = outcomes[0]?.outcome;
     expect(outcome).toEqual({ ok: false, error: expect.any(Error) });
     expect(outcome?.ok === false && String(outcome.error)).toContain(
-      "decided by somebody else while this act was in flight",
+      "decided by somebody else while this action was in flight",
     );
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "declined" });
     expect(await countOf("concept_index", scenario.workspaceId)).toBe("0");
@@ -1282,7 +1282,7 @@ describe("an acceptance reached straight through the write path", () => {
 });
 
 describe("what a suggestion set refuses before it does any work", () => {
-  it("refuses an undeclared kind with a word callers act on", async () => {
+  it("refuses an undeclared kind as malformed", async () => {
     const scenario = await arrange();
 
     const set = await submitSuggestionSet(

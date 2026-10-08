@@ -9,7 +9,7 @@ export type Role = (typeof ROLES)[number];
 export type RoleOrOperator = Role | "operator";
 
 /** Something a page does that jump-to offers by name, to whoever may see the page. */
-type Act = {
+type Action = {
   readonly name: string;
   /** What the page's address carries to open it. */
   readonly asks: string;
@@ -20,7 +20,7 @@ export const INVITE_A_PERSON = {
   name: "Invite a person",
   asks: "invite",
   icon: "invite",
-} as const satisfies Act;
+} as const satisfies Action;
 
 /** One segment beneath a page, naming a row: listed nowhere, gated and framed as its page. */
 type Detail = {
@@ -37,7 +37,7 @@ export type Page = {
   readonly owners?: true;
   /** Every older address, each leading here only for a person who may see the page. */
   readonly movedFrom?: readonly string[];
-  readonly acts?: readonly Act[];
+  readonly actions?: readonly Action[];
   readonly detail?: Detail;
 };
 
@@ -333,7 +333,7 @@ export const CONTROL_CENTRE = {
           icon: "people",
           built: true,
           seenBy: ADMINS,
-          acts: [INVITE_A_PERSON],
+          actions: [INVITE_A_PERSON],
           detail: { param: "personId" },
         },
         { name: "Groups", path: "/people/groups", icon: "groups", built: true, seenBy: ADMINS },

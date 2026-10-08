@@ -32,7 +32,7 @@ The comment-density gate counts comments with cloc, and cloc does not know where
 ## Symptoms
 
 - `pnpm run check:gates` fails on `comment-density` with `the-root-tool-configuration source: 0.10 comment lines per code line, over the 0.10 ceiling`.
-- The change that set it off added a code line and no comment: one string, `"apps/web/src/features/people/audit-acts.ts"`, in the `ignore` array of `jscpd.config.mjs`.
+- The change that set it off added a code line and no comment: one string, `"apps/web/src/features/people/audit-actions.ts"`, in the `ignore` array of `jscpd.config.mjs`.
 - Taking that one line out makes the gate pass, and putting it back fails it.
 
 ## What Didn't Work
@@ -46,7 +46,7 @@ Put the new entry where cloc cannot read it as inside a comment: above the first
 
 ```js
 ignore: [
-  "apps/web/src/features/people/audit-acts.ts",
+  "apps/web/src/features/people/audit-actions.ts",
 
   "apps/web/src/shared/ui/**",
 

@@ -7,7 +7,7 @@ import {
   INVITE_WORDS,
   STATUS_WORDS,
 } from "@/features/people/invitation-words.ts";
-import { BULK_WORDS } from "@/features/people/member-act-words.ts";
+import { BULK_WORDS } from "@/features/people/member-action-words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { invitationsCeiling, SAID_OF_TICKED_INVITATIONS } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
@@ -30,7 +30,7 @@ import {
   signIn,
   tabOpenedByKeyboard,
   tabUntilFocused,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
 } from "./harness.ts";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
@@ -74,21 +74,21 @@ const tickOf = (page: Page, address: string): Locator =>
   invitationsRegion(page).getByRole("checkbox", { name: `Select ${address}`, exact: true });
 
 const menuOf = (page: Page, address: string): Locator =>
-  invitationsRegion(page).getByRole("button", { name: `Acts for ${address}` });
+  invitationsRegion(page).getByRole("button", { name: `Actions for ${address}` });
 
-const selectionAct = (page: Page, act: string): Locator =>
+const selectionAction = (page: Page, action: string): Locator =>
   page
     .getByRole("toolbar", { name: INVITATIONS_WORDS.selected })
-    .getByRole("button", { name: act, exact: true });
+    .getByRole("button", { name: action, exact: true });
 
 const saidInTheTab = (page: Page, words: string): Locator =>
   invitationsRegion(page).getByRole("status").filter({ hasText: words });
 
-const INVITE = PEOPLE_KEYSTROKES.invite.act;
+const INVITE = PEOPLE_KEYSTROKES.invite.action;
 
 const inviteDialog = (page: Page) => page.getByRole("dialog", { name: INVITE });
 
-const inviteAct = (page: Page) => page.getByRole("button", { name: INVITE, exact: true });
+const inviteAction = (page: Page) => page.getByRole("button", { name: INVITE, exact: true });
 
 const addressField = (page: Page) => inviteDialog(page).getByLabel(INVITE_WORDS.field);
 
@@ -131,9 +131,9 @@ const resentAsIfItWent = (page: Page) =>
 const unsentIn = (where: Locator): Locator =>
   where.getByRole("region", { name: INVITATIONS_WORDS.unsent });
 
-/** The act as the page's own tRPC client would send it, under the Admin's session. */
-const actedAside = async (page: Page, act: string, input: unknown): Promise<number> =>
-  (await page.request.post(`/trpc/members.${act}`, { data: input })).status();
+/** The action as the page's own tRPC client would send it, under the Admin's session. */
+const actedAside = async (page: Page, action: string, input: unknown): Promise<number> =>
+  (await page.request.post(`/trpc/members.${action}`, { data: input })).status();
 
 type AtInvitations = {
   readonly workspaceId: string;
@@ -207,7 +207,7 @@ const invitedEach = async (
 const anEightDayOldInvitation = { expiresAt: new Date(Date.now() - DAY_MS) };
 
 const dialogOpened = async (page: Page): Promise<void> => {
-  await inviteAct(page).click();
+  await inviteAction(page).click();
   await expect(addressField(page)).toBeFocused();
 };
 
@@ -235,7 +235,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();
     await inviteDialog(page).getByRole("button", { name: "Done" }).click();
     await expect(inviteDialog(page)).toHaveCount(0);
-    await expect(inviteAct(page)).toBeFocused();
+    await expect(inviteAction(page)).toBeFocused();
 
     await expect(invitationRows(page)).toHaveCount(1);
     const cells = rowOf(page, address).getByRole("cell");
@@ -273,10 +273,11 @@ test.describe("the People page's Invitations tab", () => {
             - row:
               - cell "${EMPTY_LINES.invitations}"
     `);
-    await expect(invitingButtons(page), "the toolbar's act is the one way to invite").toHaveCount(
-      1,
-    );
-    await expect(inviteAct(page)).toBeVisible();
+    await expect(
+      invitingButtons(page),
+      "the toolbar's action is the one way to invite",
+    ).toHaveCount(1);
+    await expect(inviteAction(page)).toBeVisible();
   });
 
   test("names a member's address inline before anything is sent", async ({ page, request }) => {
@@ -298,7 +299,7 @@ test.describe("the People page's Invitations tab", () => {
       sentenceOf(INVITE_REFUSED.flagged),
     );
     await page.keyboard.press("Escape");
-    await expect(inviteAct(page)).toBeFocused();
+    await expect(inviteAction(page)).toBeFocused();
     await expect(invitationRows(page)).toHaveCount(0);
   });
 
@@ -534,7 +535,7 @@ test.describe("the People page's Invitations tab", () => {
     await openInvitations(page);
 
     await tickOf(page, offline).check();
-    await selectionAct(page, INVITATIONS_WORDS.resend).click();
+    await selectionAction(page, INVITATIONS_WORDS.resend).click();
     const unsent = unsentIn(invitationsRegion(page));
     const resend = unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(offline) });
     await expect(resend).toBeVisible();
@@ -640,7 +641,7 @@ test.describe("the People page's Invitations tab", () => {
 
     await tickOf(page, ana).check();
     await tickOf(page, ben).check();
-    await selectionAct(page, INVITATIONS_WORDS.cancel).click();
+    await selectionAction(page, INVITATIONS_WORDS.cancel).click();
 
     await expect(invitationRows(page)).toHaveCount(0);
     await expect(
@@ -677,7 +678,7 @@ test.describe("the People page's Invitations tab", () => {
     await shownUnder(page, "expired");
 
     await tickOf(page, old).check();
-    await selectionAct(page, INVITATIONS_WORDS.resend).click();
+    await selectionAction(page, INVITATIONS_WORDS.resend).click();
 
     await expect(saidInTheTab(page, "Sent 1 invitation again. It lasts until")).toBeVisible();
     await expect(rowOf(page, old)).toHaveCount(0);
@@ -700,7 +701,7 @@ test.describe("the People page's Invitations tab", () => {
       "2 invitations selected, 2 not shown.",
     );
     expect(await actedAside(page, "cancelInvitation", { invitationId: ids[0] })).toBe(200);
-    await selectionAct(page, INVITATIONS_WORDS.resend).click();
+    await selectionAction(page, INVITATIONS_WORDS.resend).click();
 
     const refusal = invitationsRegion(page).getByRole("alert");
     await expect(refusal).toContainText(INVITATIONS_WORDS.bulk.refused(1));
@@ -713,7 +714,7 @@ test.describe("the People page's Invitations tab", () => {
     expect(await emailsSentTo(request, kept), "the refused set sent nothing").toBe(0);
   });
 
-  test("a second act waits on the first, whose answer lands", async ({ page, request }) => {
+  test("a second action waits on the first, whose answer lands", async ({ page, request }) => {
     const [ana, ben] = [anAddress("ana"), anAddress("ben")];
     await anAdminAtInvitations(page, request, "Wharfe Ropery", (at) =>
       invitedEach(request, at, [ana, ben]).then(() => undefined),
@@ -729,22 +730,22 @@ test.describe("the People page's Invitations tab", () => {
     );
 
     await tickOf(page, ana).check();
-    await selectionAct(page, INVITATIONS_WORDS.cancel).click();
+    await selectionAction(page, INVITATIONS_WORDS.cancel).click();
     await expect(saidInTheTab(page, INVITATIONS_WORDS.bulk.cancelling(1))).toBeVisible();
     await tickOf(page, ben).check();
-    const act = selectionAct(page, INVITATIONS_WORDS.cancel);
-    await expect(act).toHaveAttribute("aria-disabled", "true");
-    await act.focus();
+    const action = selectionAction(page, INVITATIONS_WORDS.cancel);
+    await expect(action).toHaveAttribute("aria-disabled", "true");
+    await action.focus();
     await page.keyboard.press("Enter");
     await expect(saidInTheTab(page, BULK_WORDS.stillGoing)).toBeVisible();
 
     answered.resolve();
     await expect(saidInTheTab(page, INVITATIONS_WORDS.bulk.cancelled(1, 0))).toBeVisible();
     await expect(tickOf(page, ben)).toBeChecked();
-    await expect(act).not.toHaveAttribute("aria-disabled", "true");
+    await expect(action).not.toHaveAttribute("aria-disabled", "true");
   });
 
-  test("accepted and cancelled invitations offer no tick and no acts", async ({
+  test("accepted and cancelled invitations offer no tick and no actions", async ({
     page,
     request,
   }) => {
@@ -793,7 +794,7 @@ test.describe("the People page's Invitations tab", () => {
     });
     await page.keyboard.press(PEOPLE_KEYSTROKES.cancel.key);
     await expect(rowOf(page, dropped)).toHaveCount(0);
-    await theActLandedWithinItsBudget(page, "cancel");
+    await theActionLandedWithinItsBudget(page, "cancel");
     await expect(
       invitationsRegion(page).getByRole("heading", { name: "Invitations" }),
     ).toBeFocused();
@@ -802,13 +803,13 @@ test.describe("the People page's Invitations tab", () => {
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
     for (const listed of [
       INVITE,
-      PEOPLE_KEYSTROKES.searchInvitations.act,
-      PEOPLE_KEYSTROKES.resend.act,
-      PEOPLE_KEYSTROKES.cancel.act,
-      PEOPLE_KEYSTROKES.tickInvitation.act,
-      PEOPLE_KEYSTROKES.resendSelected.act,
-      PEOPLE_KEYSTROKES.cancelSelected.act,
-      PEOPLE_KEYSTROKES.nextInvitations.act,
+      PEOPLE_KEYSTROKES.searchInvitations.action,
+      PEOPLE_KEYSTROKES.resend.action,
+      PEOPLE_KEYSTROKES.cancel.action,
+      PEOPLE_KEYSTROKES.tickInvitation.action,
+      PEOPLE_KEYSTROKES.resendSelected.action,
+      PEOPLE_KEYSTROKES.cancelSelected.action,
+      PEOPLE_KEYSTROKES.nextInvitations.action,
     ]) {
       await expect(keystrokes).toContainText(listed);
     }
@@ -836,7 +837,7 @@ test.describe("the People page's Invitations tab", () => {
     await passesTheAccessibilityGate();
     await page.keyboard.press("Enter");
     await expect(inviteDialog(page)).toHaveCount(0);
-    await expect(inviteAct(page)).toBeFocused();
+    await expect(inviteAction(page)).toBeFocused();
     await expect(invitationRows(page)).toHaveCount(2);
 
     await expect(invitationsRegion(page)).toMatchAriaSnapshot(`
@@ -860,7 +861,7 @@ test.describe("the People page's Invitations tab", () => {
               - columnheader "Sent"
               - columnheader "Expires"
               - columnheader "Invited by"
-              - columnheader "Acts"
+              - columnheader "Actions"
           - rowgroup:
             - row /invited-/:
               - cell:
@@ -871,7 +872,7 @@ test.describe("the People page's Invitations tab", () => {
               - cell /\\d{4}/
               - cell "Test person"
               - cell:
-                - button /Acts for invited-/
+                - button /Actions for invited-/
             - row /kept-/
     `);
   });
@@ -901,12 +902,12 @@ test.describe("the People page's Invitations tab", () => {
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(inviteDialog(page)).toHaveCount(0);
-    await expect(inviteAct(page)).toBeFocused();
+    await expect(inviteAction(page)).toBeFocused();
     await openInvitations(page);
     await expect(invitationRows(page)).toHaveCount(2);
   });
 
-  test("fits a 320px page, its acts in view", async ({ page, request }) => {
+  test("fits a 320px page, its actions in view", async ({ page, request }) => {
     const long = anAddress("a-rather-long-name.for-wrapping");
     await anAdminAtInvitations(page, request, "Wensleydale Tanning", (at) =>
       invitedEach(request, at, [long]).then(() => undefined),

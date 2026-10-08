@@ -21,7 +21,7 @@ import {
   seedConnectedSources,
   signIn,
   skipLinkReachesThePage,
-  theActLandedWithinItsBudget,
+  theActionLandedWithinItsBudget,
   type SeedConnectedSource,
 } from "./harness.ts";
 
@@ -164,7 +164,7 @@ test.describe("the Sources page's list of connected sources", () => {
       "searchable: Its passages are found by search and opened by the readers it is published to.",
     );
     await expect(handbook).toContainText(
-      "keep: The platform holds the record; nothing leaves without an Admin's act.",
+      "keep: The platform holds the record; nothing leaves without an Admin's action.",
     );
     await expect(page.locator("main")).not.toContainText(AN_ID);
   });
@@ -246,7 +246,7 @@ test.describe("connecting a document on the Sources page", () => {
     `);
     await expect(
       page.getByRole("button", { name: /^connect/i }),
-      "the toolbar's act is the one way to connect",
+      "the toolbar's action is the one way to connect",
     ).toHaveCount(1);
     await passesTheAccessibilityGate();
     await skipLinkReachesThePage(page);
@@ -417,7 +417,7 @@ test.describe("reviewing a connected source's findings", () => {
 
     await expect(reviewOf(page, "Supplier forms").getByRole("table")).toMatchAriaSnapshot(`
       - table:
-        - caption: 0 groups of findings selected. Select a group with x, then keep it in text, narrow its document or dismiss it as not special category with the acts above.
+        - caption: 0 groups of findings selected. Select a group with x, then keep it in text, narrow its document or dismiss it as not special category with the actions above.
         - rowgroup:
           - row "Selected Category Rule Document Found Sensitivity":
             - columnheader "Selected"
@@ -581,12 +581,12 @@ test.describe("reviewing a connected source's findings", () => {
       reads: "Dismissed",
     });
     await page.keyboard.press("Enter");
-    await theActLandedWithinItsBudget(page, "dismissal");
+    await theActionLandedWithinItsBudget(page, "dismissal");
 
     await expect(review).toContainText(
       "Dismissed 1 group of findings as not special category in 1 document. The sync that reads the dismissal: queued.",
     );
-    await expect(healthCue, "focus did not come back to the row the act left").toBeFocused();
+    await expect(healthCue, "focus did not come back to the row the action left").toBeFocused();
     const row = findingRow(page, "Supplier forms", "Staff survey", "HEALTH_CUE");
     await expect(row).toContainText(A_DISMISSED_SPAN);
     await expect(row).not.toContainText("Already narrowed");
@@ -822,7 +822,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       reads: "published",
     });
     await page.keyboard.press("Enter");
-    await theActLandedWithinItsBudget(page, "publish");
+    await theActionLandedWithinItsBudget(page, "publish");
 
     await expect(
       page.getByText(
@@ -896,7 +896,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await page.keyboard.press("w");
     const dialog = page.getByRole("dialog", { name: "Widen Tender answers" });
     await expect(dialog).toHaveAccessibleDescription(
-      "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every write-up including one, moves with it in the same act. A document with a narrower sensitivity of its own keeps it.",
+      "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every write-up including one, moves with it in the same action. A document with a narrower sensitivity of its own keeps it.",
     );
     const sensitivityPicked = dialog.getByRole("combobox", { name: "Sensitivity" });
     await expect(sensitivityPicked).toBeFocused();
@@ -955,7 +955,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       reads: "Internal",
     });
     await page.keyboard.press("Enter");
-    await theActLandedWithinItsBudget(page, "widen");
+    await theActionLandedWithinItsBudget(page, "widen");
 
     await expect(connectedSourcesRegion(page).getByRole("status")).toContainText(
       "Widened “Tender answers” to Internal for everyone in the workspace. 1 concept and 1 write-up moved with it.",
@@ -1091,7 +1091,7 @@ test.describe("the Sources page's keystrokes", () => {
     `);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
-    // The rail's: the toolbar keeps the page's own acts alone.
+    // The rail's: the toolbar keeps the page's own actions alone.
     const keystrokes = page
       .getByRole("navigation", { name: RAIL })
       .getByRole("button", { name: KEYSTROKE_WORDS.button });

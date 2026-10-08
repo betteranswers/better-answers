@@ -3,7 +3,7 @@ import { z } from "zod";
 import { boundarySchemas } from "@better-answers/schema";
 import { THROTTLED_KINDS } from "@better-answers/schema/second-factor";
 
-import { act, declareIdentitySetActs, type SecondFactor } from "../audit/index.ts";
+import { action, declareIdentitySetActions, type SecondFactor } from "../audit/index.ts";
 import {
   attempt,
   CeilingMet,
@@ -46,10 +46,10 @@ import { AUTHENTICATOR_SECRET_PREFIX, OPERATOR_RESTORE_PREFIX } from "./sign-in-
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 /** The factor's kind alone: which passkey or code was used is no change to any factor. */
-const CONFIRMING_ACTS = declareIdentitySetActs("people", {
-  confirmed: act("people.person.second_factor_confirmed", { method: "secondFactor" }),
-  replaced: act("people.person.factors_replaced", { by: "secondFactor" }),
-  restoreAccepted: act("people.person.restore_code_accepted", {}),
+const CONFIRMING_ACTIONS = declareIdentitySetActions("people", {
+  confirmed: action("people.person.second_factor_confirmed", { method: "secondFactor" }),
+  replaced: action("people.person.factors_replaced", { by: "secondFactor" }),
+  restoreAccepted: action("people.person.restore_code_accepted", {}),
 });
 
 /** How long a replacement setup's sealed secret waits for its first working code. */
@@ -70,7 +70,7 @@ const HOLDING_THE_SESSION = `
     FROM session WHERE id = $1 AND user_id = $2 FOR UPDATE`;
 
 /**
- * Person, then session, in every act here, so none holds what another waits on. A held session
+ * Person, then session, in every action here, so none holds what another waits on. A held session
  * cannot be signed out before the stamp lands.
  */
 const holding = async (
@@ -121,7 +121,7 @@ const confirming = async (
 ): Promise<void> => {
   await stamping(tx, { sessionId: held.sessionId, personId: held.personId, at: held.now });
   await resettingTheThrottle(tx, held.personId, ["authenticator"]);
-  await recordingTheirOwn(platform, tx, held.personId, CONFIRMING_ACTS.confirmed, { method });
+  await recordingTheirOwn(platform, tx, held.personId, CONFIRMING_ACTIONS.confirmed, { method });
 };
 
 const passkeyAssertion = z.object({
@@ -292,7 +292,7 @@ export const acceptRestoreCode = async (
         held.now,
       ]);
       if (consumed.rowCount === 0) return undefined;
-      await recordingTheirOwn(platform, tx, held.personId, CONFIRMING_ACTS.restoreAccepted, {});
+      await recordingTheirOwn(platform, tx, held.personId, CONFIRMING_ACTIONS.restoreAccepted, {});
       return { granted: true as const };
     });
   });
@@ -425,7 +425,7 @@ const finishingTheReplacement = async (
   const issued = await issuingRecoveryCodes(platform, tx, held.personId, held.now);
   await stamping(tx, { sessionId: held.sessionId, personId: held.personId, at: held.now });
   await resettingTheThrottle(tx, held.personId, THROTTLED_KINDS);
-  await recordingTheirOwn(platform, tx, held.personId, CONFIRMING_ACTS.replaced, { by });
+  await recordingTheirOwn(platform, tx, held.personId, CONFIRMING_ACTIONS.replaced, { by });
   return { issued: { recoveryCodes: issued.recoveryCodes, madeAt: issued.madeAt } };
 };
 

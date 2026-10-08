@@ -28,8 +28,8 @@ import { nameOrAddress } from "@/shared/words.ts";
 
 import { findWhat, JUMP_TO, nothingMatches } from "./words.ts";
 
-/** Where focus goes once chosen: a place hands it to the page, an act to its own dialog. */
-type Kind = "place" | "member" | "act";
+/** Where focus goes once chosen: a place hands it to the page, an action to its own dialog. */
+type Kind = "place" | "member" | "action";
 
 type Jump = {
   /** Unique across the list, so two namesakes are never one selection. */
@@ -90,15 +90,15 @@ const pageJump = ({ area, menuGroup, page }: Placed): Jump =>
     area.name,
   );
 
-const actJumps = (page: Page, here: Here): readonly Jump[] =>
-  (page.acts ?? []).map((act) =>
+const actionJumps = (page: Page, here: Here): readonly Jump[] =>
+  (page.actions ?? []).map((action) =>
     jumpOf({
-      value: `act ${page.path} ${act.asks}`,
-      name: act.name,
+      value: `action ${page.path} ${action.asks}`,
+      name: action.name,
       said: page.name,
-      icon: act.icon,
-      to: askingHere(here, page.path, "act", act.asks),
-      kind: "act",
+      icon: action.icon,
+      to: askingHere(here, page.path, "action", action.asks),
+      kind: "action",
     }),
   );
 
@@ -113,7 +113,7 @@ const memberJump = (member: Member): Jump =>
     kind: "member",
   });
 
-/** Only what the visible tree holds, so an unbuilt or hidden page and its acts never show. */
+/** Only what the visible tree holds, so an unbuilt or hidden page and its actions never show. */
 export const jumpsIn = (
   tree: VisibleTree,
   members: readonly Member[] | undefined,
@@ -123,8 +123,8 @@ export const jumpsIn = (
     { heading: JUMP_TO.groups.areas, jumps: tree.areas.map(areaJump) },
     { heading: JUMP_TO.groups.pages, jumps: tree.areas.flatMap(placedIn).map(pageJump) },
     {
-      heading: JUMP_TO.groups.acts,
-      jumps: pagesOf(tree.areas).flatMap((page) => actJumps(page, here)),
+      heading: JUMP_TO.groups.actions,
+      jumps: pagesOf(tree.areas).flatMap((page) => actionJumps(page, here)),
     },
     {
       heading: JUMP_TO.groups.members,
@@ -205,7 +205,7 @@ const ON_APPLE = typeof navigator !== "undefined" && /Mac|iPhone|iPad/u.test(nav
 const CHORD = ON_APPLE ? "⌘K" : "Ctrl K";
 
 /** For the shell's list of keystrokes, which names it on every page. */
-export const JUMP_TO_KEYSTROKE: Keystroke = { key: CHORD, act: JUMP_TO.name };
+export const JUMP_TO_KEYSTROKE: Keystroke = { key: CHORD, action: JUMP_TO.name };
 
 function Trigger(properties: {
   readonly wide: boolean;
@@ -289,8 +289,8 @@ function JumpList(
   const kinds = [
     JUMP_TO.kinds.page,
     ...(read === "unasked" ? [] : [JUMP_TO.kinds.member]),
-    ...(every.some(({ jumps }) => jumps.some(({ kind }) => kind === "act"))
-      ? [JUMP_TO.kinds.act]
+    ...(every.some(({ jumps }) => jumps.some(({ kind }) => kind === "action"))
+      ? [JUMP_TO.kinds.action]
       : []),
   ];
 
@@ -357,13 +357,13 @@ export function JumpTo(properties: {
     void navigate({ href: jump.to });
   };
 
-  // Fired once the dialog has gone, which is after an act's own dialog has opened.
+  // Fired once the dialog has gone, which is after an action's own dialog has opened.
   const landFocus = (event: Event) => {
     event.preventDefault();
     const kind = chosen.current;
     chosen.current = undefined;
     if (kind === undefined) jumping.triggerRef.current?.focus();
-    else if (kind !== "act") document.querySelector("main")?.focus();
+    else if (kind !== "action") document.querySelector("main")?.focus();
   };
 
   return (

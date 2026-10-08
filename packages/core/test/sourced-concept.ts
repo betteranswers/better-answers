@@ -33,7 +33,7 @@ export const visibilitySuite = () => {
   };
 };
 
-/** Seeds rows straight into the tables on the privileged pool; no act runs. */
+/** Seeds rows straight into the tables on the privileged pool; no action runs. */
 export const seededBy = async <T>(
   db: MigratedPostgres,
   work: (seed: TestData) => Promise<T>,
@@ -80,7 +80,7 @@ export const connectedSourceHolding = (
 const INDEXED_AT = new Date("2026-09-24T09:00:00.000Z");
 const PUBLISHED_AT = new Date("2026-09-24T10:00:00.000Z");
 
-/** Seeds a finished sync, then publishes as `admin`; the act's answer comes back unverified. */
+/** Seeds a finished sync, then publishes as `admin`; the action's answer comes back unverified. */
 export const publishedOnceIndexed = async (
   db: MigratedPostgres,
   admin: UserPrincipal,
@@ -239,7 +239,7 @@ export type SourcedConcept = ConceptWritten & {
 
 let sequence = 0;
 
-/** Writes a stable Note citing each document once, through the act; throws on a refusal. */
+/** Writes a stable Note citing each document once, through the action; throws on a refusal. */
 export const conceptCiting = async (
   scenario: Scenario,
   writer: UserPrincipal,
@@ -349,7 +349,7 @@ export const edgeVisibilityHeld = async (
 export const auditEventRowsOf = async (
   pool: pg.Pool,
   workspaceId: string,
-  act: string,
+  action: string,
 ): Promise<
   readonly {
     readonly id: string;
@@ -365,7 +365,7 @@ export const auditEventRowsOf = async (
     detail: Record<string, unknown>;
   }>(
     "SELECT id, actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
-    [workspaceId, act],
+    [workspaceId, action],
   );
   return read.rows;
 };

@@ -147,7 +147,7 @@ const transaction = async <T>(
 const DEADLOCK_DETECTED = "40P01";
 
 /**
- * Two acts each waiting on a lock the other holds: Postgres aborts one, and that act answers
+ * Two actions each waiting on a lock the other holds: Postgres aborts one, and that action answers
  * `changed-meanwhile` rather than failing. Any other error is itself.
  */
 export const refusalOfDeadlock = (error: Error): KernelRefusal<"changed-meanwhile"> | Error =>
@@ -584,7 +584,7 @@ export const consumeCall = async (
 ): Promise<CounterOutcome> => countForWorkspace(principal, tx, "call", tokenId, rule, now, 1);
 
 /**
- * As consumeCall, counting `amount` invitation emails against `key` at once. An act that refuses
+ * As consumeCall, counting `amount` invitation emails against `key` at once. An action that refuses
  * or fails after it rolls the count back, and the counter row stays held until it commits.
  */
 export const consumeInvitationEmails = async (

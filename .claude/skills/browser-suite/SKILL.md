@@ -1,6 +1,6 @@
 ---
 name: browser-suite
-description: How this repository drives a browser — the served-build seam, the two client-address fixtures, the api harness's acts, locators, waiting, the accessibility gate and the journeys. Use when writing, changing, debugging or running a Playwright spec under apps/web/e2e or a journey under apps/web/journeys.
+description: How this repository drives a browser — the served-build seam, the two client-address fixtures, the api harness's actions, locators, waiting, the accessibility gate and the journeys. Use when writing, changing, debugging or running a Playwright spec under apps/web/e2e or a journey under apps/web/journeys.
 ---
 
 # The browser suite
@@ -92,33 +92,33 @@ to do with what it was testing, and Better Auth logs that it could not tell the 
 A spec that means to prove a ceiling names which of the three it is proving, and reaches it from
 the side that counts. Read the numbers off those files rather than from here.
 
-## The harness's acts
+## The harness's actions
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Eighteen acts
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Eighteen actions
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
 `apps/api/tests/harness-sources.ts` and the People three from `apps/api/tests/harness-people.ts`:
 
-| Act | What it does |
+| Action | What it does |
 | --- | --- |
-| `provision` | A workspace with its first Admin — the platform-provisioned act; the product offers no way to make one. It answers the workspace's id, name and short name, and the Admin |
+| `provision` | A workspace with its first Admin — the platform-provisioned action; the product offers no way to make one. It answers the workspace's id, name and short name, and the Admin |
 | `person` | A person in no workspace, for the refused page and the picker |
 | `addMember` | A second member at a named role — Admin, Editor or Viewer |
 | `removeMember` | Removes a member, as the People page will |
 | `endEverySignInAndToken` | Ends every sign-in and token a person holds, so the next request is refused |
-| `markTheOperator` | Grants the operator mark to the person holding an address, or clears it with `"revoke"`, through the ops command's own act and principal — the console's door, and a mark cleared under an open page |
-| `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent; or one accepted or cancelled, or with its expiry moved into the past |
+| `markTheOperator` | Grants the operator mark to the person holding an address, or clears it with `"revoke"`, through the ops command's own action and principal — the console's door, and a mark cleared under an open page |
+| `invite` | A waiting invitation to an address at a named role, as the invite action leaves it, with no email sent; or one accepted or cancelled, or with its expiry moved into the past |
 | `ageTheSignIn` | Moves every session a person holds to a sign-in 61 minutes ago, behind the api's back — how a spec meets `sign-in-too-old` without waiting an hour |
 | `ageThePendingHour` | Moves the pending clock of every session a person holds to an hour and a minute ago, behind the api's back — how a spec meets a sign-in that ended unconfirmed without waiting the hour |
 | `ageTheCode` | Moves the expiry of the code sent to an address into the past — how a spec meets an expired code without waiting out its lifetime |
-| `withAnAuthenticator` | Writes an authenticator for an address straight to the store, sealed as the library seals one, spending no emailed code and sending no notice, and answers the key a spec makes codes from with `authenticatorCodeAt`. A second ask answers the same key. It also issues ten recovery codes, marked saved, as a first setup leaves an Admin. `enrolledWith` is the same act answering those codes too, or issuing none with `"none"`, as someone just made an Admin holds |
-| `restored` | The platform operator's restore, through the ops command's own act and principal: the person's factors, recovery codes and sessions end, and a restore code that expires in 24 hours is answered. No notice is sent, so a code read back afterwards is still the sign-in's |
+| `withAnAuthenticator` | Writes an authenticator for an address straight to the store, sealed as the library seals one, spending no emailed code and sending no notice, and answers the key a spec makes codes from with `authenticatorCodeAt`. A second ask answers the same key. It also issues ten recovery codes, marked saved, as a first setup leaves an Admin. `enrolledWith` is the same action answering those codes too, or issuing none with `"none"`, as someone just made an Admin holds |
+| `restored` | The platform operator's restore, through the ops command's own action and principal: the person's factors, recovery codes and sessions end, and a restore code that expires in 24 hours is answered. No notice is sent, so a code read back afterwards is still the sign-in's |
 | `seedModelChoices` | The model choices a workspace has made; a purpose left out of the list has no model choice, which the page must show rather than omit |
-| `seedConnectedSources` | Connected sources as their acts and the worker leave them — documents, findings kept or overridden by an erasure, unreadable documents, passages, a sync at any status, a concept and write-up citing a document — answering each connected source's and document's id |
+| `seedConnectedSources` | Connected sources as their actions and the worker leave them — documents, findings kept or overridden by an erasure, unreadable documents, passages, a sync at any status, a concept and write-up citing a document — answering each connected source's and document's id |
 | `moveTheSync` | The worker's two steps over the workspace's one sync, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
-| `makeGroups` | Groups made by a named member through the members slice's own acts, one transaction each, every group holding the members `memberIds` names — the member's own acts on the audit log, and the groups the `Groups` page and a member's page start from |
-| `askToJoin` | A person's ask to join a workspace by its short name, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
-| `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* page |
+| `makeGroups` | Groups made by a named member through the members slice's own actions, one transaction each, every group holding the members `memberIds` names — the member's own actions on the audit log, and the groups the `Groups` page and a member's page start from |
+| `askToJoin` | A person's ask to join a workspace by its short name, with a reason, through the members slice's own action and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
+| `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own action and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* page |
 
 Thirty-one more helpers in the same module drive the browser rather than the harness:
 
@@ -129,7 +129,7 @@ Thirty-one more helpers in the same module drive the browser rather than the har
 | `quoted` | A table's sentence quoted as an inline aria snapshot takes it, so the snapshot reads the words rather than copying them |
 | `signInByEmail` | Signs a person in **through the product's own page** — fill the address, send, read the six-digit code back from the captured transport, and fill it. Six digits submit on their own, so it clicks nothing, and it waits for the code field to be gone, because leaving the page sooner cancels the sign-in. An Admin or the operator is left on the confirm or setup page, which is where a spec about those pages starts |
 | `signIn` | `signInByEmail`, then, once the first page draws, past the confirm or setup page an Admin or the operator meets: it gives the person the harness's authenticator through `withAnAuthenticator`, opens the confirm page afresh with the page's own query, and types the code — the gate passed through the real page, never around it. Anyone else is left where the sign-in sends them. Most specs sign in with this |
-| `confirmedWhenAsked` | Waits for the confirm or setup page an act sent the person to, such as joining as an Admin, then passes it as `signIn` does |
+| `confirmedWhenAsked` | Waits for the confirm or setup page an action sent the person to, such as joining as an Admin, then passes it as `signIn` does |
 | `aMemberSignedInAt` | A new workspace's Editor or Viewer, signed in having asked for a path first, so sign-in carries them back to it — where a refused page is proved |
 | `landedAtHome` | Asserts the page is on a role's home, its address and its heading read off the navigation list. The heading is the page's group's name, or its area's where it has none |
 | `notFoundOfferingHome` | Asserts the not-found page and its link to a role's home. A page hidden from the role shows it, as an address that never existed does |
@@ -150,8 +150,8 @@ Thirty-one more helpers in the same module drive the browser rather than the har
 | `keystrokesListed` | Presses `?` and answers the list of keystrokes once it is open, named for the open page as the navigation list names it |
 | `keystrokesButton` | The one *Keyboard shortcuts* button, in the page or in a region it is given: at the rail's foot where the layout is wide, in the band where it is narrow, and a page's own outside the shell |
 | `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later. A key pressed sooner keeps the focus it moved |
-| `clockTheNextKey` | Starts the act's clock in the page: from the next key to the node an XPath names reading a given text |
-| `theActLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the act's 100 ms |
+| `clockTheNextKey` | Starts the action's clock in the page: from the next key to the node an XPath names reading a given text |
+| `theActionLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the action's 100 ms |
 | `saysItsSentenceNotItsWord` | Asserts an alert reads the sentence a feature's refusal table holds for a word, and that the word is nowhere on the page |
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
 | `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
@@ -194,7 +194,7 @@ Five more play Claude's part in its OAuth flow on the suite's own origin — `ap
   `apps/web/e2e/frame.spec.ts` holds the shell. `apps/web/e2e/jump-to.spec.ts` and
   `apps/web/e2e/workspace-switcher.spec.ts` are the worked examples for jump-to and the switcher.
 - **Wait with auto-retrying matchers.** `await expect(…).toBeVisible()`, `.toHaveURL()`,
-  `.toHaveCount(0)`. Where a navigation must complete before the next act, assert the thing that
+  `.toHaveCount(0)`. Where a navigation must complete before the next action, assert the thing that
   proves the page was left. Never a fixed sleep, and never a load state.
 - **Title says what the system does for whom** — `"a member of two workspaces picks
   one, and everything after is scoped to the pick"`, not `"picker test"`.
@@ -215,9 +215,9 @@ Five more play Claude's part in its OAuth flow on the suite's own origin — `ap
   loads it without the rest of the SPA.
 - **A latency budget is measured, annotated and asserted** — `test.info().annotations.push(…)`
   beside the comparison, so a run that passes still says how close it came. A list's second is
-  timed from a fresh `goto`, so no cache answers it. An act's 100 ms is timed **in the page** — a
+  timed from a fresh `goto`, so no cache answers it. An action's 100 ms is timed **in the page** — a
   keydown listener and a `MutationObserver` — because a matcher's polling is coarser than the
-  budget. `apps/web/e2e/sources.spec.ts` times both; the act's clock is the harness's two helpers
+  budget. `apps/web/e2e/sources.spec.ts` times both; the action's clock is the harness's two helpers
   above.
 - **A shared part no page draws yet is bundled with Vite, not imported.** Playwright compiles
   every `.tsx` it loads with its own JSX runtime, so React cannot render a component a spec imports.
@@ -238,7 +238,7 @@ three things, of which automated rules are only one:
   first waits for every transition on the page to end, because axe reads a control part-way
   through its fade as a contrast nobody settles on. A refusal handing a button back from its
   disabled look is the case. An endless animation, such as a spinner, is audited running.
-- **A keyboard traversal** reaching the page and each of its acts without a pointer:
+- **A keyboard traversal** reaching the page and each of its actions without a pointer:
   `apps/web/e2e/sign-in.spec.ts` for the three pages outside the shell,
   `apps/web/e2e/frame.spec.ts` for the band, the rail and the menu, and
   `apps/web/e2e/models-and-spend.spec.ts` and `apps/web/e2e/failed-page.spec.ts` for theirs. It is the
@@ -309,7 +309,7 @@ on every page it leaves. It overrides `context` and `request` with no client add
 production's edge sets one. A journey names its person with `test.use({ role })`, and the fixture
 signs them in on the product's own sign-in page and signs them out on the server afterwards,
 even after a failure. The locators come from `apps/web/e2e/locators.ts`, which `harness.ts`
-re-exports. Production has no harness, so `.oxlintrc.json` refuses any harness act under
+re-exports. Production has no harness, so `.oxlintrc.json` refuses any harness action under
 `apps/web/journeys/` except `codeSentTo`, the harness code source below. The harness's Admin key,
 below, is a request of the journeys' own, made only under that source.
 
@@ -323,7 +323,7 @@ below, is a request of the journeys' own, made only under that source.
 | Traces, screenshots and video | A trace on the retry | Off: a trace, screenshot or video of a signed-in page would publish a live session |
 | Reporter | `list` and the flaky report | The outcome reporter alone, so no failure's detail, which can hold an address, reaches a public log |
 
-The Admin's journey reads the test workspace before any act. A workspace that differs from its
+The Admin's journey reads the test workspace before any action. A workspace that differs from its
 fixture stops the run `could-not-run`, and nobody else signs in.
 
 `JOURNEYS_CODE_SOURCE` names where a sign-in's code is read. Unset, or any other value, it ends
@@ -346,7 +346,7 @@ key on a second ask, so a by-hand run needs no key and skips no step.
 Both read the test people's addresses from `JOURNEYS_ADMIN_EMAIL`, `JOURNEYS_EDITOR_EMAIL` and
 `JOURNEYS_VIEWER_EMAIL`. By hand, build first, start the api with
 `pnpm --filter @better-answers/api run serve:e2e <port>`, and make the test workspace through
-`POST /__harness/test-workspaces`, the fixture command's own act, which
+`POST /__harness/test-workspaces`, the fixture command's own action, which
 `apps/api/tests/harness-control.ts` mounts and no spec calls. It takes a testing domain, a short name and
 the three addresses. Then:
 

@@ -28,7 +28,7 @@ Every answer the platform gives is one retained, correctable record in *Question
 - Its skeleton (citations with their trust at the time, the predicate that applied, reuse and the judge's verdict, feedback, corrections) is kept for good.
 - Its content (the question, the answer, who asked) is kept twelve months by default, then thinned to the skeleton.
 - Feedback is *helpful*, or a flag with one reason: *wrong*, *out of date*, *incomplete* or *should not have shown*. The reason becomes a record in someone's queue.
-- A correction is an Admin's or owner's act that records the level the answer went wrong at (concept, source or retrieval) and links the act that fixed it.
+- A correction is an Admin's or owner's action that records the level the answer went wrong at (concept, source or retrieval) and links the action that fixed it.
 - A retrieval correction is kept as an answer test, replayed retrieval-only when the answer path changes and weekly.
 
 An `Answer` concept is minted or updated only at a gate a person runs, the promotion gate.
@@ -37,7 +37,7 @@ An `Answer` concept is minted or updated only at a gate a person runs, the promo
 - The `Answer` collection's owner or an Admin decides it one at a time, never in bulk: update the existing, add as new, or decline.
 - Accepting is one governed write with the decider as author. A trim makes the decider the generator.
 
-Control Centre is one area of eight groups: Overview, Suggestions, Sources, Agent Operations, Questions, People, Personal data and System. ADR 0047 lists each group's pages.
+Control Centre is one area of eight groups: Overview, Suggestions, Sources, Models, Questions, People, Personal data and System. ADR 0047 lists each group's pages.
 
 - Questions holds *Questions asked* and the answer tests. A promotion waits in Suggestions' queue with every other suggestion.
 - People's pages are members, groups and tokens.

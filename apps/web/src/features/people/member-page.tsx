@@ -20,7 +20,7 @@ import type { Outcome } from "@/shared/outcome.tsx";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
-import { MEMBER_PAGE_WORDS as WORDS } from "./member-act-words.ts";
+import { MEMBER_PAGE_WORDS as WORDS } from "./member-action-words.ts";
 import { MemberActivity } from "./member-activity.tsx";
 import {
   Access,
@@ -38,7 +38,7 @@ import {
 import { useMembers, useReaderId, useRemoveMember, type ListedMember } from "./people-api.ts";
 import { MEMBER_PAGE_KEYSTROKES as KEY } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
-import { useSelfActHome } from "./self-act.tsx";
+import { useSelfActionHome } from "./self-action.tsx";
 import { nameOf } from "./words.tsx";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
@@ -57,7 +57,7 @@ type Section = {
   readonly id: string;
   readonly title: string;
   readonly draw: ComponentType<Drawn>;
-  /** Set apart below the rest, since its acts end the person's access. */
+  /** Set apart below the rest, since its actions end the person's access. */
   readonly apart?: true;
 };
 
@@ -96,7 +96,7 @@ const useRemoval = (
 ): Removal => {
   const removeMember = useRemoveMember();
   const readerId = useReaderId();
-  const { goHome } = useSelfActHome();
+  const { goHome } = useSelfActionHome();
   const navigate = useNavigate();
   const [outcome, setOutcome] = useState<Outcome>();
 
@@ -137,7 +137,7 @@ function NoSuchMember() {
       state={{
         kind: "empty",
         words: WORDS.noSuchMember,
-        act: (
+        action: (
           <Link to={MEMBERS_PAGE.path} className="text-brand underline">
             {WORDS.toMembers}
           </Link>
@@ -197,7 +197,7 @@ function SectionNav() {
   );
 }
 
-/** Each act's control, and focus put on it: by a keystroke, or as the page opens at the act. */
+/** Each action's control, and focus put on it: by a keystroke, or as the page opens at the action. */
 const useLandings = () => {
   const title = useRef<HTMLHeadingElement>(null);
   const landings: Landings = {
@@ -273,7 +273,7 @@ function MemberShown(properties: {
     landOn("removal");
   });
 
-  // The page is opened at an act by a move from Members, which hands focus on to its control.
+  // The page is opened at an action by a move from Members, which hands focus on to its control.
   const arrive = useEffectEvent((at: OpenedAt) => {
     landOn(at);
   });

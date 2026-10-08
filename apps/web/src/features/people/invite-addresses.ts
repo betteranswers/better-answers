@@ -1,7 +1,7 @@
 import { EMAIL_ADDRESS } from "@better-answers/schema/email-address";
 
 /**
- * Matches the api's cap for one send or one act on a set, which refuses any more as input it
+ * Matches the api's cap for one send or one action on a set, which refuses any more as input it
  * cannot read.
  */
 export const MOST_AT_ONCE = 50;

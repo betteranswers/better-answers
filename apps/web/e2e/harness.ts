@@ -83,7 +83,7 @@ const invitationWritten = z.object({ id: z.string() });
 /** The store keeps Better Auth's spelling; a spec says the glossary's. */
 const STORED_STATUS = { accepted: "accepted", cancelled: "canceled" } as const;
 
-/** As the invite act leaves it, less the email no spec reads; or accepted, cancelled, or past expiry. */
+/** As the invite action leaves it, less the email no spec reads; or accepted, cancelled, or past expiry. */
 export const invite = (
   api: APIRequestContext,
   input: {
@@ -289,7 +289,7 @@ export const moveTheSync = (
 const groupsMade = z.object({ made: z.number() });
 
 /**
- * Groups made by the member `userId` names, through the slice's own acts, each holding every one
+ * Groups made by the member `userId` names, through the slice's own actions, each holding every one
  * of `memberIds`.
  */
 export const makeGroups = (
@@ -408,7 +408,7 @@ const firstPageDrawn = async (page: Page): Promise<boolean> => {
   return PENDING_PAGE.test(new URL(page.url()).pathname);
 };
 
-/** For an act that makes the session pending, such as joining as an Admin. */
+/** For an action that makes the session pending, such as joining as an Admin. */
 export const confirmedWhenAsked = async (
   page: Page,
   api: APIRequestContext,

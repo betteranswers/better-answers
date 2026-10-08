@@ -10,7 +10,7 @@ import {
   type Visibility,
   type VisibilityRow,
 } from "../access/index.ts";
-import { act, declareActs, record } from "../audit/index.ts";
+import { action, declareActions, record } from "../audit/index.ts";
 import { recomputeWriteUpsIncluding } from "../guides/index.ts";
 import {
   actorIdOf,
@@ -33,8 +33,8 @@ import { writeConceptVisibility } from "../store/map/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import { restsAlsoOnItsReconcilerHit } from "./reconciler-hit.ts";
 
-const VISIBILITY_ACTS = declareActs("knowledge", {
-  sensitivityOverridden: act("knowledge.concept.class_overridden", {
+const VISIBILITY_ACTIONS = declareActions("knowledge", {
+  sensitivityOverridden: action("knowledge.concept.class_overridden", {
     iri: "iri",
     sensitivity: "sensitivity",
     audience: "audience",
@@ -167,7 +167,7 @@ export const conceptVisibilityFrom = async (
 type IndexVisibilityRow = VisibilityRow & { readonly workspace_id: string; readonly kind: string };
 
 /**
- * Every act that cascades takes this at its head; without it two narrowings each hold what
+ * Every action that cascades takes this at its head; without it two narrowings each hold what
  * the other wants.
  */
 const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> => {
@@ -351,7 +351,7 @@ const writeOverride = async (
 
   await record(admin, tx, {
     id: auditEventId,
-    act: VISIBILITY_ACTS.sensitivityOverridden,
+    action: VISIBILITY_ACTIONS.sensitivityOverridden,
     subjectId: iri,
     detail: { iri, sensitivity: visibility.sensitivity, audience: visibility.audience },
   });

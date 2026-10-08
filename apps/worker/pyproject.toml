@@ -96,7 +96,7 @@ dependencies = [
     # manylinux_2_17 on x86_64 and aarch64 and macOS arm64, which is every machine this
     # repository builds on.
     #
-    # Bumping either pin re-runs the first act on the worker image and re-dates its
+    # Bumping either pin re-runs the first step on the worker image and re-dates its
     # readings: `apps/worker/tests/test_image.py`'s
     # `test_both_converters_hold_on_the_image_under_the_engines_runtime`.
     "firecrawl-anydoc==0.2.4",

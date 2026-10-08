@@ -558,7 +558,7 @@ from concepts elsewhere; the prose stays a platform record.
   a concept, never another write-up.
 - **needs review** — the state of a write-up whose included concept changed or was removed,
   whose expectation is unmet, or on which a review found a fault; the platform *marks* it (a
-  reader *flags* an answer); shown, never hidden, until a person acts.
+  reader *flags* an answer); shown, never hidden, until a person steps in.
 - **skeleton projection** — the guide's structure the platform writes into the company's
   repository (kind, subject, roles, sections with their prompts and included concepts; no
   prose), regenerated when the guide definition changes.
@@ -669,7 +669,7 @@ to it by IRI and never restates it (ADR 0014).
   **knowledge**, **sources**, **platform** — named as the first word of its *audit action*,
   `family.subject.verb`; jobs, *Questions asked*, *signals* and spend are their own records and
   never audit events.
-- **audit action** — _Code rename pending._ the name an *audit event* is recorded under,
+- **audit action** — the name an *audit event* is recorded under,
   `family.subject.verb` (`sources.binding.published`), declared by the part of the platform that
   performs it and never a free string. One *action* may write more than one, and a read writes none
   (ADR 0043). A stored name stays as it was written, and the Audit log shows it in today's
@@ -858,7 +858,7 @@ to it by IRI and never restates it (ADR 0014).
   do: a *display name* corrected in every workspace at once, an Admin restored when they hold
   neither a *second factor* nor a *recovery code*, anything across workspaces. Behind it is the
   *operator*.
-- **action** — _Code rename pending._ what an entry — a page's call, an MCP entry, an ops command,
+- **action** — what an entry — a page's call, an MCP entry, an ops command,
   the reconciler's tick — may ask the platform to do as a *principal*: one thing, a **read** or a
   **write**, answered with its value or with a *refusal*. Reading a connected source's findings is
   an action as much as publishing the connected source is. Where the *audit log* records an action,
@@ -1050,7 +1050,7 @@ to it by IRI and never restates it (ADR 0014).
   the page takes over every ticked row, and offers *Clear selection*. A tick stays through a change
   of page, search or filter, which is why the bar counts the ticked rows out of sight. Not the
   page's *toolbar*.
-- **bulk action** — _Code rename pending._ an action an Admin takes over every ticked row at once,
+- **bulk action** — an action an Admin takes over every ticked row at once,
   from the *selection bar*: on Members, *Change role*, *Add to group* and *Remove*. It changes every
   ticked row or none: if any is refused, nothing lands, and the refusal names each refused person
   with its *refused items*, shown or not. A ticked row whose change is already true is **skipped**,
@@ -1114,7 +1114,7 @@ to it by IRI and never restates it (ADR 0014).
   meaning something different: `okf://` identifies a **concept**, `ui://` identifies a **view (of an
   MCP App)**. On the wire only, never in a file.
 - **token scope** — _Internal._ what a token may do on the MCP surface: `knowledge:read`,
-  `feedback:write`; `act:*` later. Shown at consent in the person's words, never as an id. Not a
+  `feedback:write`; `action:*` later. Shown at consent in the person's words, never as an id. Not a
   connected source's scope.
 - **personal token** — a person's own bearer credential for Claude Code and scripts (the
   `api_token` record): the same principal and scopes as an OAuth token, ninety days by default,

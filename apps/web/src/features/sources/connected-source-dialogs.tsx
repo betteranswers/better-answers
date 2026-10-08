@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from "react";
 
-import { ActDialog } from "@/shared/act-dialog.tsx";
+import { ActionDialog } from "@/shared/action-dialog.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
@@ -32,7 +32,7 @@ type DialogProperties<Asked> = {
   readonly onConfirm: (asked: Asked) => void;
 };
 
-/** The act's own row may lose the control that opened it, so focus goes back to the connected source. */
+/** The action's own row may lose the control that opened it, so focus goes back to the connected source. */
 const toTheConnectedSource = (connectedSourceId: string) => (event: Event) => {
   event.preventDefault();
   document.getElementById(connectedSourceHeadingId(connectedSourceId))?.focus();
@@ -134,7 +134,7 @@ export function PublishDialog(properties: DialogProperties<Confirmations>) {
   };
 
   return (
-    <ActDialog
+    <ActionDialog
       open
       onOpenChange={closedBy(onClose)}
       content={{
@@ -175,7 +175,7 @@ export function PublishDialog(properties: DialogProperties<Confirmations>) {
           ? "One governed write, audited under your name."
           : "Publishing needs all three confirmations."}
       </p>
-    </ActDialog>
+    </ActionDialog>
   );
 }
 
@@ -244,12 +244,12 @@ export function NarrowDialog(properties: DialogProperties<Sensitivity>) {
   const [sensitivity, setSensitivity] = useState<Sensitivity>(narrower[0] ?? NARROWEST);
 
   return (
-    <ActDialog
+    <ActionDialog
       open
       onOpenChange={closedBy(onClose)}
       content={{ onCloseAutoFocus: toTheConnectedSource(connectedSource.connectedSourceId) }}
       title={`Narrow ${connectedSource.name}`}
-      consequence="Every concept citing its documents, and every write-up including one of those concepts, moves with it in the same act. A narrowing never widens; widening it back is an act of its own."
+      consequence="Every concept citing its documents, and every write-up including one of those concepts, moves with it in the same action. A narrowing never widens; widening it back is an action of its own."
       commit={
         <Button
           onClick={() => {
@@ -270,7 +270,7 @@ export function NarrowDialog(properties: DialogProperties<Sensitivity>) {
         It is {connectedSource.sensitivity} now. Its audience stays{" "}
         {AUDIENCE_WORDS[connectedSource.audience].toLowerCase()}.
       </p>
-    </ActDialog>
+    </ActionDialog>
   );
 }
 
@@ -299,7 +299,7 @@ const asksWider = (connectedSource: ListedConnectedSource, asked: Widening): boo
 
 const WIDENING_CONSEQUENCE = {
   published:
-    "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every write-up including one, moves with it in the same act.",
+    "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every write-up including one, moves with it in the same action.",
   unpublished:
     "Nobody but an Admin reads it until you publish it, and the publish then releases the sensitivity you choose here.",
 };
@@ -317,7 +317,7 @@ export function WidenDialog(properties: DialogProperties<Widening>) {
   const publication = connectedSource.publishedAt === null ? "unpublished" : "published";
 
   return (
-    <ActDialog
+    <ActionDialog
       open
       onOpenChange={closedBy(onClose)}
       content={{
@@ -374,6 +374,6 @@ export function WidenDialog(properties: DialogProperties<Widening>) {
       <p id={hintId} className="text-sm text-muted-foreground">
         {wider ? "One governed write, audited under your name." : whyAndNextOf("not-wider")}
       </p>
-    </ActDialog>
+    </ActionDialog>
   );
 }

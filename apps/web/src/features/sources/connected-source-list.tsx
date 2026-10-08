@@ -17,7 +17,7 @@ import {
   STATE_MEANS,
 } from "./words.ts";
 
-export type ConnectedSourceActs = {
+export type ConnectedSourceActions = {
   readonly onFocusConnectedSource: (connectedSourceId: string) => void;
   readonly onReview: (connectedSourceId: string) => void;
   readonly onPublish: (connectedSource: ListedConnectedSource) => void;
@@ -34,7 +34,7 @@ const audienceWords = (connectedSource: ListedConnectedSource): string => {
   return named === 0 ? words : `${words} (${counted(named, "group", "groups")})`;
 };
 
-/** The one disclosure: what a reader weighs after the lead, never an act of its own. */
+/** The one disclosure: what a reader weighs after the lead, never an action of its own. */
 function MoreAbout(properties: {
   readonly connectedSource: ListedConnectedSource;
   readonly onFocus: () => void;
@@ -105,14 +105,14 @@ function MoreAbout(properties: {
 
 function ConnectedSourceItem(properties: {
   readonly connectedSource: ListedConnectedSource;
-  readonly acts: ConnectedSourceActs;
+  readonly actions: ConnectedSourceActions;
 }) {
-  const { connectedSource, acts } = properties;
+  const { connectedSource, actions } = properties;
   const headingId = connectedSourceHeadingId(connectedSource.connectedSourceId);
   const named = <span className="sr-only"> {connectedSource.name}</span>;
   /** Every control in the row names its connected source as the one in focus, for the keystrokes. */
   const focused = () => {
-    acts.onFocusConnectedSource(connectedSource.connectedSourceId);
+    actions.onFocusConnectedSource(connectedSource.connectedSourceId);
   };
 
   return (
@@ -131,7 +131,7 @@ function ConnectedSourceItem(properties: {
             aria-keyshortcuts={SOURCES_KEYSTROKES.review.key}
             onFocus={focused}
             onClick={() => {
-              acts.onReview(connectedSource.connectedSourceId);
+              actions.onReview(connectedSource.connectedSourceId);
             }}
           >
             Review{named}
@@ -143,7 +143,7 @@ function ConnectedSourceItem(properties: {
               aria-keyshortcuts={SOURCES_KEYSTROKES.publish.key}
               onFocus={focused}
               onClick={() => {
-                acts.onPublish(connectedSource);
+                actions.onPublish(connectedSource);
               }}
             >
               Publish{named}
@@ -156,7 +156,7 @@ function ConnectedSourceItem(properties: {
               aria-keyshortcuts={SOURCES_KEYSTROKES.narrow.key}
               onFocus={focused}
               onClick={() => {
-                acts.onNarrow(connectedSource);
+                actions.onNarrow(connectedSource);
               }}
             >
               Narrow{named}
@@ -169,7 +169,7 @@ function ConnectedSourceItem(properties: {
               aria-keyshortcuts={SOURCES_KEYSTROKES.widen.key}
               onFocus={focused}
               onClick={() => {
-                acts.onWiden(connectedSource);
+                actions.onWiden(connectedSource);
               }}
             >
               Widen{named}
@@ -197,7 +197,7 @@ function ConnectedSourceItem(properties: {
 
 export function ConnectedSourceList(properties: {
   readonly connectedSources: readonly ListedConnectedSource[];
-  readonly acts: ConnectedSourceActs;
+  readonly actions: ConnectedSourceActions;
 }) {
   return (
     <ul className="mt-4">
@@ -205,7 +205,7 @@ export function ConnectedSourceList(properties: {
         <ConnectedSourceItem
           key={connectedSource.connectedSourceId}
           connectedSource={connectedSource}
-          acts={properties.acts}
+          actions={properties.actions}
         />
       ))}
     </ul>

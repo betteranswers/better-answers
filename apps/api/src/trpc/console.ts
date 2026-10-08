@@ -26,12 +26,12 @@ type AsTheOperator = {
 };
 
 /**
- * The sign-in's age is judged against the procedure's own instant. The act's function name labels
+ * The sign-in's age is judged against the procedure's own instant. The action's function name labels
  * its logs; never pass an anonymous one.
  */
 const writtenNow =
   <Input, Value>(
-    act: (
+    action: (
       operator: OperatorPrincipal,
       tx: Tx,
       input: Input & { readonly at: Date },
@@ -46,8 +46,8 @@ const writtenNow =
   }): Promise<Value> =>
     crossing(
       ctx,
-      act.name,
-      given(input, (asked) => act(ctx.operator, ctx.tx, { ...asked, at: ctx.clock.now() })),
+      action.name,
+      given(input, (asked) => action(ctx.operator, ctx.tx, { ...asked, at: ctx.clock.now() })),
     );
 
 export const consoleRouter = router({

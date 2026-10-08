@@ -54,13 +54,13 @@ import {
   RECOVERY_WORDS,
 } from "./second-factor-words.ts";
 
-const USE_YOUR_PASSKEY: Keystroke = { key: "p", act: CONFIRM_WORDS.passkey };
+const USE_YOUR_PASSKEY: Keystroke = { key: "p", action: CONFIRM_WORDS.passkey };
 
-const TO_THE_CODE: Keystroke = { key: "c", act: CONFIRM_WORDS.toTheCode };
+const TO_THE_CODE: Keystroke = { key: "c", action: CONFIRM_WORDS.toTheCode };
 
-const USE_A_RECOVERY_CODE: Keystroke = { key: "u", act: CONFIRM_WORDS.recoveryCode };
+const USE_A_RECOVERY_CODE: Keystroke = { key: "u", action: CONFIRM_WORDS.recoveryCode };
 
-const BACK_TO_CONFIRM: Keystroke = { key: "b", act: RECOVERY_WORDS.instead };
+const BACK_TO_CONFIRM: Keystroke = { key: "b", action: RECOVERY_WORDS.instead };
 
 /** A passkey counts only where this browser can use it. */
 const passkeyHere = (held: SecondFactor): boolean => held.passkeys.length > 0 && passkeysHere();

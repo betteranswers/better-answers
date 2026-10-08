@@ -105,7 +105,7 @@ function EventLine(properties: { readonly event: ReadAuditEvent }) {
           <Button variant="link" size="sm" className="group h-auto gap-1 self-start px-0">
             {WORDS.details}
             <span className="sr-only">
-              {WORDS.detailsOf(headlineOf(event.act), instantWords(event.at))}
+              {WORDS.detailsOf(headlineOf(event.action), instantWords(event.at))}
             </span>
             <Icon
               name="caret-down"
@@ -128,7 +128,7 @@ function NoneShown(properties: {
 }) {
   const { asked } = properties;
   if (asked.family === undefined && asked.search === "") {
-    return <ListState state={{ kind: "empty", words: WORDS.none, act: undefined }} />;
+    return <ListState state={{ kind: "empty", words: WORDS.none, action: undefined }} />;
   }
   return (
     <ListState
@@ -206,7 +206,7 @@ const exportFailed = (failure: Error | ApiError): Outcome => {
     : refusedWith(auditExportCeiling(liftsInSeconds));
 };
 
-function ExportAct(properties: {
+function ExportAction(properties: {
   readonly asked: Asked;
   readonly nothingMatches: boolean;
   readonly say: (outcome: Outcome) => void;
@@ -269,7 +269,7 @@ function AuditLogRegion() {
     <section aria-labelledby={headingId} className="mt-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id={headingId}>{WORDS.heading}</h2>
-        <ExportAct
+        <ExportAction
           asked={asked}
           nothingMatches={auditLog.data !== undefined && events.length === 0}
           say={setOutcome}

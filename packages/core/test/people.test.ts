@@ -374,10 +374,10 @@ describe("inspecting a person's ended grants", () => {
   const ISSUED = new Date("2026-09-20T09:00:00.000Z");
 
   /** Newest first, as the inspection lists them. */
-  const endedAtOf = async (act: string, personId: string) => {
+  const endedAtOf = async (action: string, personId: string) => {
     const found = await db().pool.query<{ at: Date }>(
       "SELECT at FROM identity_audit_event WHERE subject_id = $1 AND action = $2 ORDER BY at DESC",
-      [personId, act],
+      [personId, action],
     );
     return found.rows.map((row) => row.at.toISOString());
   };
@@ -483,7 +483,7 @@ describe("inspecting a person's ended grants", () => {
     });
   });
 
-  it("orders by each act's instant, then newest issued first", async () => {
+  it("orders by each action's instant, then newest issued first", async () => {
     const acme = await provisionedWorkspace(db(), "Acme");
     const personId = await seedPerson(db().pool);
     const grant = (issuedAt: string) => ({
@@ -497,7 +497,7 @@ describe("inspecting a person's ended grants", () => {
         seed.identityAuditEvent({
           ...about,
           id,
-          act: "people.person.grants_ended",
+          action: "people.person.grants_ended",
           at: new Date(at),
           detail: { workspaceId: acme.workspaceId, grants: issued.map(grant) },
         });
@@ -510,7 +510,7 @@ describe("inspecting a person's ended grants", () => {
       ]);
       await seed.identityAuditEvent({
         ...about,
-        act: "people.person.credentials_revoked",
+        action: "people.person.credentials_revoked",
         at: new Date("2026-09-26T10:00:00.000Z"),
         detail: {},
       });
@@ -541,7 +541,7 @@ describe("inspecting a person's ended grants", () => {
       await seed.identityAuditEvent({
         actor: "process:better-answers-test",
         subjectId: personId,
-        act: "people.person.credentials_revoked",
+        action: "people.person.credentials_revoked",
         detail: {
           grants: [
             { clientId: client.clientId, workspaceId: gone, issuedAt: ISSUED.toISOString() },
@@ -608,7 +608,7 @@ describe("inspecting a person's ended grants", () => {
       return client.clientId;
     });
 
-  it("orders the server's ending among the acts' by its instant", async () => {
+  it("orders the server's ending among the actions' by its instant", async () => {
     const personId = await seedPerson(db().pool);
     await endedByTheServer(
       personId,
@@ -619,7 +619,7 @@ describe("inspecting a person's ended grants", () => {
       for (const at of ["2026-09-25T10:00:00.000Z", "2026-09-23T10:00:00.000Z"]) {
         await seed.identityAuditEvent({
           subjectId: personId,
-          act: "people.person.credentials_revoked",
+          action: "people.person.credentials_revoked",
           at: new Date(at),
           detail: {
             grants: [

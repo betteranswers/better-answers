@@ -45,7 +45,7 @@ The import direction has five rules:
 
 All five are one rule in the repository's own lint plugin, `better-answers/import-direction`, in `packages/devtools/lint-rules/rules/import-direction.ts`. It places both ends of an import in a zone by position under the package whose `package.json` names `@better-answers/core`. A face is a directory's `index.ts` that `packages/core/package.json`'s `exports` map names, and a face the map does not name is refused. Inside a slice, the slice is the unit, so its own subdirectories reach each other freely. `import/no-cycle` holds rule 4's acyclic clause. `packages/core/test/import-direction.test.ts` holds each refusal where it fires and where it stays silent.
 
-Every query reaches its store through a store door in `packages/core/src/store/`. Row-level security is the tenancy guarantee (ADR 0032), and the door is ergonomics over it. A transaction that spans slices lives in the slice that owns the act.
+Every query reaches its store through a store door in `packages/core/src/store/`. Row-level security is the tenancy guarantee (ADR 0032), and the door is ergonomics over it. A transaction that spans slices lives in the slice that owns the action.
 
 Every one of the four doors is real in a test, and none may be faked: `CODING_STANDARDS.md`'s rule *Run every store the platform runs, for real*. An in-memory adapter is for a service someone else runs, such as an LLM provider, behind that service's own adapter. The test inbox's D1 is such a service: its store takes the few D1 calls it makes, and its suite runs the same SQL through `node:sqlite`.
 

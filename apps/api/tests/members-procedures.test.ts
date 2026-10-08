@@ -139,14 +139,14 @@ const roleHeldBy = async (workspaceId: string, personId: string): Promise<string
   return held.rows[0]?.role;
 };
 
-const eventsIn = async (workspaceId: string, act: string) => {
+const eventsIn = async (workspaceId: string, action: string) => {
   const rows = await app.database.superuser.query<{
     actor: string;
     subject_id: string;
     detail: Readonly<Record<string, string>>;
   }>(
     "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY id",
-    [workspaceId, act],
+    [workspaceId, action],
   );
   return rows.rows;
 };
@@ -161,8 +161,8 @@ const removalsIn = (workspaceId: string) => eventsIn(workspaceId, REMOVED);
 
 type WebApi = Awaited<ReturnType<typeof webSignedIn>>["api"];
 
-/** Each act on one member as the Members view asks it, beside the audit act it writes. */
-const ACTS_ON_A_MEMBER = [
+/** Each action on one member as the Members view asks it, beside the audit action it writes. */
+const ACTIONS_ON_A_MEMBER = [
   {
     verb: "change a role",
     ask: (api: WebApi, personId: string) =>
@@ -246,7 +246,7 @@ describe("changing a member's role over tRPC", () => {
   });
 });
 
-describe.each(ACTS_ON_A_MEMBER)("who may $verb", ({ ask, recorded }) => {
+describe.each(ACTIONS_ON_A_MEMBER)("who may $verb", ({ ask, recorded }) => {
   it.each(["Editor", "Viewer"] as const)(
     "refuses a member at %s, role-forbids, recording nothing",
     async (role) => {
@@ -355,7 +355,7 @@ describe("a role change that fails partway", () => {
       );
     });
 
-    // The act holds the member row itself, so its own name labels the failure.
+    // The action holds the member row itself, so its own name labels the failure.
     expect(failureOf(answered)).toEqual({
       message: "changeRole failed",
       httpStatus: 500,
@@ -519,7 +519,7 @@ describe("a person's activity over tRPC", () => {
     const onPriyas = await api.members.activity.query({ personId: priya.id });
 
     const lines = (page: typeof onHannahs) =>
-      page.events.map(({ act, subject, direction }) => [act, subject, direction]);
+      page.events.map(({ action, subject, direction }) => [action, subject, direction]);
     const priyaNamed = { kind: "person", displayName: "Priya Shah", address: priya.email };
     expect(lines(onHannahs)).toEqual([
       ["people.member.role_changed", priyaNamed, "by"],
@@ -599,7 +599,7 @@ describe("a removal that fails partway", () => {
 
 const sortedIds = (ids: readonly string[]): readonly string[] => ids.toSorted();
 
-describe("bulk acts on members over tRPC", () => {
+describe("bulk actions on members over tRPC", () => {
   it("changes each ticked role, counting one already held", async () => {
     const { workspace, editor, viewer } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);

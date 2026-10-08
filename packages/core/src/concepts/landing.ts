@@ -380,7 +380,7 @@ const landAcceptance = async (tx: Tx, index: Landing, acceptance: Acceptance): P
     ],
   );
   if (decided.rows.length === 0) {
-    throw new Error("the suggestion was decided by somebody else while this act was in flight");
+    throw new Error("the suggestion was decided by somebody else while this action was in flight");
   }
   if (acceptance.kind !== SUGGESTION_CITATION_FIX_KIND) return;
 

@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
-import { HomeLine, useIncludesYou, useSelfActHome } from "@/features/people/self-act.tsx";
+import { HomeLine, useIncludesYou, useSelfActionHome } from "@/features/people/self-action.tsx";
 import { useTRPC } from "@/shared/api/trpc.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -39,9 +39,9 @@ const framedBy = (clients: AppClients) =>
     );
   };
 
-/** Members, where the act that included the reader has just succeeded. */
+/** Members, where the action that included the reader has just succeeded. */
 function ActedOnMyself() {
-  const { goHome } = useSelfActHome();
+  const { goHome } = useSelfActionHome();
   const [outcome, setOutcome] = useState<Outcome>();
 
   return (
@@ -97,7 +97,7 @@ const actingAt = async () => {
 /** The chooser's list, as the band's switcher leaves it once its menu has been opened and shut. */
 const WORKSPACES_HELD = ["auth", "workspaces"];
 
-describe("an act's confirmation", () => {
+describe("an action's confirmation", () => {
   it("says the set includes the reader, and only then", async () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
     const { result } = renderHook(() => [useIncludesYou(["q", "p"]), useIncludesYou(["q"])], {
@@ -109,7 +109,7 @@ describe("an act's confirmation", () => {
   });
 });
 
-describe("going home after an act on yourself", () => {
+describe("going home after an action on yourself", () => {
   it("sends a self-demoted Admin to an Editor's home, saying why", async () => {
     const { router, history } = await actingAt();
 

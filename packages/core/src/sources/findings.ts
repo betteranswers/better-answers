@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { boundarySchemas, REDACTION_ALWAYS_TIER } from "@better-answers/schema";
 
-import { act, declareActs, record } from "../audit/index.ts";
+import { action, declareActions, record } from "../audit/index.ts";
 import {
   actorIdOf,
   attempt,
@@ -16,8 +16,8 @@ import {
 import type { Tx } from "../store/postgres/index.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
-const FINDING_ACTS = declareActs("sources", {
-  restored: act("sources.finding.restored", { findingId: "id" }),
+const FINDING_ACTIONS = declareActions("sources", {
+  restored: action("sources.finding.restored", { findingId: "id" }),
 });
 
 const FINDING_ID = boundarySchemas.finding.select.shape.id;
@@ -86,7 +86,7 @@ export const restoreFinding = async (
 
   await record(admin.value, tx, {
     id: auditEventId,
-    act: FINDING_ACTS.restored,
+    action: FINDING_ACTIONS.restored,
     subjectId: findingId,
     detail: { findingId },
     batchId: input.batchId,

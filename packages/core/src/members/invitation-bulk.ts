@@ -6,7 +6,7 @@ import { recordEach } from "../audit/index.ts";
 import {
   admit,
   attempt,
-  declareAct,
+  declareAction,
   err,
   ok,
   type AdminUserPrincipal,
@@ -21,7 +21,7 @@ import { waitingCounted } from "./invitation-ceilings.ts";
 import {
   ADMIN_ALONE,
   expiryFrom,
-  INVITATION_ACTS,
+  INVITATION_ACTIONS,
   INVITATION_ID,
   MOST_AT_ONCE,
   NO_SUCH_INVITATION,
@@ -50,14 +50,14 @@ const ON_A_SET: readonly MemberRefusal<
   "role-forbids" | "no-such-invitation" | "changed-meanwhile"
 >[] = ["role-forbids", "no-such-invitation", "changed-meanwhile"];
 
-const bulkResendInvitationsAct = declareAct({
+const bulkResendInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: bulkInvitationsInput,
   refuses: [...ON_A_SET, OFF_TESTING_DOMAIN],
   effect: "write",
 });
 
-const bulkCancelInvitationsAct = declareAct({
+const bulkCancelInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: bulkInvitationsInput,
   refuses: ON_A_SET,
@@ -76,7 +76,7 @@ export type BulkResendInvitationsRefusal = SetRefusal<
 
 export type BulkCancelInvitationsRefusal = SetRefusal<MemberRefusal<"no-such-invitation">>;
 
-/** One statement, in id order, so two acts holding overlapping sets take them alike. */
+/** One statement, in id order, so two actions holding overlapping sets take them alike. */
 const HELD_INVITATIONS = `SELECT id, status FROM invitation
                            WHERE workspace_id = $1 AND id = ANY($2::text[])
                            ORDER BY id FOR UPDATE`;
@@ -130,7 +130,7 @@ const renewedUnderHold = async (
   await recordEach(
     admin,
     tx,
-    INVITATION_ACTS.resent,
+    INVITATION_ACTIONS.resent,
     invitations.map(({ invitationId }) => ({ subjectId: invitationId, detail: {} })),
   );
   const workspaceName = await workspaceNameOf(admin, tx);
@@ -151,7 +151,7 @@ export const bulkResendInvitations = async (
   tx: Tx,
   input: BulkResendInvitationsInput,
 ): Promise<Result<readonly InvitationToSend[], BulkResendInvitationsRefusal>> => {
-  const admitted = admit(bulkResendInvitationsAct, principal, input);
+  const admitted = admit(bulkResendInvitationsAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const renewing = { invitationIds: distinct(input.invitationIds), now: input.now };
 
@@ -187,7 +187,7 @@ const cancelledUnderHold = async (
   await recordEach(
     admin,
     tx,
-    INVITATION_ACTS.cancelled,
+    INVITATION_ACTIONS.cancelled,
     changed.map((subjectId) => ({ subjectId, detail: {} })),
   );
   return ok(outcomeOf<string>(invitationIds, changed));
@@ -202,7 +202,7 @@ export const bulkCancelInvitations = async (
   tx: Tx,
   input: z.output<typeof bulkInvitationsInput>,
 ): Promise<Result<BulkOutcome<string>, BulkCancelInvitationsRefusal>> => {
-  const admitted = admit(bulkCancelInvitationsAct, principal, input);
+  const admitted = admit(bulkCancelInvitationsAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const invitationIds = distinct(input.invitationIds);
 

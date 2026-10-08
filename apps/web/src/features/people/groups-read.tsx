@@ -2,7 +2,7 @@ import type { ApiError } from "@/shared/api/trpc.ts";
 import { OutcomeLine } from "@/shared/outcome.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
 
-import { GROUPS_LOADING } from "./member-act-words.ts";
+import { GROUPS_LOADING } from "./member-action-words.ts";
 import { outcomeOfGroupFailure } from "./refusal.tsx";
 
 export function GroupsReadSaid(properties: {

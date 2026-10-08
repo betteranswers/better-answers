@@ -18,8 +18,8 @@ export const LINK_WORDS = {
   readingAgain: "Checking",
 } as const;
 
-/** Each keystroke's act, as the list of keystrokes names it. */
-export const LINK_ACTS = {
+/** Each keystroke's action, as the list of keystrokes names it. */
+export const LINK_ACTIONS = {
   copy: "Copy the code",
   readAgain: "Check the link again",
   backToSignIn: "Go back to sign-in",

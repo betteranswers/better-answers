@@ -1,11 +1,11 @@
 import { byWords, counted, nameOrAddress } from "@/shared/words.ts";
 
-import { HEADLINES, type DECLARED_ACTS } from "./audit-acts.ts";
+import { HEADLINES, type DECLARED_ACTIONS } from "./audit-actions.ts";
 import { namedIn } from "./audit-details.ts";
 import type { ReadAuditEvent } from "./audit-log-api.ts";
 import { GONE_WORDS, removedWords, THING_NOUNS, type Thing } from "./audit-subjects.ts";
 
-export type SaidEvent = Pick<ReadAuditEvent, "act" | "by" | "subject" | "detail" | "named">;
+export type SaidEvent = Pick<ReadAuditEvent, "action" | "by" | "subject" | "detail" | "named">;
 
 type Subject = SaidEvent["subject"];
 
@@ -19,13 +19,13 @@ type Slots = {
 
 type Sentence = (slots: Slots) => string;
 
-type DeclaredAct = (typeof DECLARED_ACTS)[number];
+type DeclaredAction = (typeof DECLARED_ACTIONS)[number];
 
 const sentenceCase = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 
 /** `people.member.role_changed` reads "Member role changed": the action's subject, then its verb. */
-const wordsOfName = (act: string): string => {
-  const [, subject = "", verb = ""] = act.split(".");
+const wordsOfName = (action: string): string => {
+  const [, subject = "", verb = ""] = action.split(".");
   return sentenceCase(`${subject} ${verb}`.replaceAll("_", " "));
 };
 
@@ -182,24 +182,24 @@ const SENTENCES = {
     `${by} dismissed the findings in ${documentNamed(subject)} as not special category`,
   "sources.finding.restored": ({ by }) => `${by} kept a finding in text`,
   "sources.upload.swept": ({ by }) => `${by} deleted an uploaded file no document uses`,
-} as const satisfies Readonly<Record<DeclaredAct, Sentence>>;
+} as const satisfies Readonly<Record<DeclaredAction, Sentence>>;
 
 const SAID: ReadonlyMap<string, Sentence> = new Map(Object.entries(SENTENCES));
 
 const HEADED: ReadonlyMap<string, string> = new Map(Object.entries(HEADLINES));
 
 /** Each action a sentence says, so a test can hold the list to the actions core declares. */
-export const ACTS_SAID: readonly string[] = [...SAID.keys()];
+export const ACTIONS_SAID: readonly string[] = [...SAID.keys()];
 
-export const ACTS_HEADED: readonly string[] = [...HEADED.keys()];
+export const ACTIONS_HEADED: readonly string[] = [...HEADED.keys()];
 
 /** An action the web was built before falls back to its stored name in words. */
-export const headlineOf = (act: string): string => HEADED.get(act) ?? wordsOfName(act);
+export const headlineOf = (action: string): string => HEADED.get(action) ?? wordsOfName(action);
 
 export const sentenceOf = (event: SaidEvent): string => {
-  const sentence = SAID.get(event.act);
+  const sentence = SAID.get(event.action);
   return sentence === undefined
-    ? wordsOfName(event.act)
+    ? wordsOfName(event.action)
     : sentence({
         by: opening(event.by),
         subject: event.subject,

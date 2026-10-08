@@ -7,12 +7,12 @@ problem_type: best_practice
 component: testing-framework
 severity: medium
 applies_when:
-  - "Proving that a long read or export holds no row another act needs, so that act never waits on it"
+  - "Proving that a long read or export holds no row another action needs, so that action never waits on it"
   - "Testing that a read moved off a held door (withMember, FOR SHARE) onto an unheld one (withMemberUnheld) stops blocking role changes or removals"
-  - "Needing to pause a transaction partway when the statement to pause at is a SELECT, where the BEFORE INSERT/UPDATE triggers of whileActsWaitAt cannot hold it"
+  - "Needing to pause a transaction partway when the statement to pause at is a SELECT, where the BEFORE INSERT/UPDATE triggers of whileActionsWaitAt cannot hold it"
   - "Choosing the lock or table a concurrency test parks one side on"
 symptoms:
-  - "A no-wait claim tested by running the two acts one after the other passes whether or not the first holds the row, because its transaction has already committed"
+  - "A no-wait claim tested by running the two actions one after the other passes whether or not the first holds the row, because its transaction has already committed"
   - "A no-wait test that parks the reader too early, before its member read, passes with the held door too, so it proves nothing"
 root_cause: concurrency
 resolution_type: test_fix
@@ -36,7 +36,7 @@ tags:
 
 People U14 (BA-49) added an audit-log export that reads up to 10,000 events. A mutation reads its caller's member `FOR SHARE` (ADR 0043, `docs/solutions/architecture-patterns/adr-0043-what-an-act-is.md`), and a role change takes every Admin's member row `FOR UPDATE` (`packages/core/src/members/last-admin.ts:36-37`). An export on that road would stall every other Admin's role change for as long as it read. So the export reads through `withMemberUnheld` (`packages/core/src/store/postgres/index.ts:367`), which runs `MEMBER_QUERY` (line 255) without the `FOR SHARE OF m, u` that `MEMBER_QUERY_HELD` (line 269) adds.
 
-The plan's test scenario was "while an export runs, another Admin's role change does not wait on it". Running the two one after the other proves nothing, because the export's transaction has ended before the role change starts. The repository's race helpers, `whileActsWaitAt` and `racedAt` (`packages/core/test/suite-postgres.ts:172`, `:217`), hold acts at a `BEFORE INSERT` or `BEFORE UPDATE` trigger. The export's read writes nothing, so a trigger has nothing to hold.
+The plan's test scenario was "while an export runs, another Admin's role change does not wait on it". Running the two one after the other proves nothing, because the export's transaction has ended before the role change starts. The repository's race helpers, `whileActionsWaitAt` and `racedAt` (`packages/core/test/suite-postgres.ts:172`, `:217`), hold actions at a `BEFORE INSERT` or `BEFORE UPDATE` trigger. The export's read writes nothing, so a trigger has nothing to hold.
 
 ## Guidance
 
@@ -60,8 +60,8 @@ A no-wait claim fails silently. Put the export back on the held door and nothing
 ## When to Apply
 
 - Any "does X wait on Y" test where X is a read, or where the moment to pause at is a read.
-- Moving an act from a held door to an unheld one, or narrowing which rows an act holds.
-- Not for proving a lock order between two writers. Hold those at the first contended write with `whileActsWaitAt`, as `docs/solutions/best-practices/a-race-test-held-late-or-released-in-turn-cannot-prove-a-lock-order.md` explains.
+- Moving an action from a held door to an unheld one, or narrowing which rows an action holds.
+- Not for proving a lock order between two writers. Hold those at the first contended write with `whileActionsWaitAt`, as `docs/solutions/best-practices/a-race-test-held-late-or-released-in-turn-cannot-prove-a-lock-order.md` explains.
 
 ## Examples
 

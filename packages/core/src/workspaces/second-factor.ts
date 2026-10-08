@@ -1,10 +1,10 @@
 import { boundarySchemas } from "@better-answers/schema";
 
 import {
-  act,
+  action,
   type AuditEvent,
-  type AuditAct,
-  declareIdentitySetActs,
+  type AuditAction,
+  declareIdentitySetActions,
   recordFor,
 } from "../audit/index.ts";
 import {
@@ -34,9 +34,9 @@ import { issuingRecoveryCodes, type RecoveryCodesMade } from "./recovery-codes.t
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 /** Ids alone: an authenticator has no name, and its secret never leaves the library's row. */
-const SECOND_FACTOR_ACTS = declareIdentitySetActs("people", {
-  authenticatorAdded: act("people.person.authenticator_added", { authenticatorId: "id" }),
-  authenticatorRemoved: act("people.person.authenticator_removed", { authenticatorId: "id" }),
+const SECOND_FACTOR_ACTIONS = declareIdentitySetActions("people", {
+  authenticatorAdded: action("people.person.authenticator_added", { authenticatorId: "id" }),
+  authenticatorRemoved: action("people.person.authenticator_removed", { authenticatorId: "id" }),
 });
 
 export const ADMIN: Role = "Admin";
@@ -45,18 +45,18 @@ export const ADMIN: Role = "Admin";
 export const mustHoldOneOf = (person: string): string =>
   `${person}.operator OR EXISTS (SELECT 1 FROM member m WHERE m.user_id = ${person}.id AND m.role = $2)`;
 
-/** A person's act on their own second factor: they are its actor and its subject. */
-export const recordingTheirOwn = async <A extends AuditAct>(
+/** A person's action on their own second factor: they are its actor and its subject. */
+export const recordingTheirOwn = async <A extends AuditAction>(
   platform: PlatformPrincipal,
   tx: Tx,
   personId: UserId,
-  act: A,
+  action: A,
   detail: AuditEvent<A>["detail"],
 ): Promise<void> => {
   await recordFor(platform, tx, {
     id: ulid(),
     actor: actorIdOfPerson(personId),
-    act,
+    action,
     subjectId: personId,
     detail,
   });
@@ -197,10 +197,10 @@ const recordingOnce = async (
     `SELECT 1 FROM identity_audit_event
       WHERE subject_kind = split_part($2, '.', 2) AND subject_id = $1 AND action = $2
         AND detail->>'authenticatorId' = $3`,
-    [personId, SECOND_FACTOR_ACTS.authenticatorAdded.name, authenticatorId],
+    [personId, SECOND_FACTOR_ACTIONS.authenticatorAdded.name, authenticatorId],
   );
   if ((recorded.rowCount ?? 0) > 0) return false;
-  await recordingTheirOwn(platform, tx, personId, SECOND_FACTOR_ACTS.authenticatorAdded, {
+  await recordingTheirOwn(platform, tx, personId, SECOND_FACTOR_ACTIONS.authenticatorAdded, {
     authenticatorId,
   });
   return true;
@@ -269,7 +269,7 @@ const removing = async (
   await tx.query("DELETE FROM authenticator WHERE id = $1", [facts.authenticatorId]);
   await tx.query('UPDATE "user" SET authenticator_enabled = false WHERE id = $1', [personId]);
   await unconfirmingTheOthers(tx, personId, actingSessionId);
-  await recordingTheirOwn(platform, tx, personId, SECOND_FACTOR_ACTS.authenticatorRemoved, {
+  await recordingTheirOwn(platform, tx, personId, SECOND_FACTOR_ACTIONS.authenticatorRemoved, {
     authenticatorId: facts.authenticatorId,
   });
   return ok({ authenticatorId: facts.authenticatorId });

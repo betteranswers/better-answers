@@ -68,7 +68,7 @@ const RETENTIONS = new Map<string, Meaning>([
     "keep",
     {
       word: "keep",
-      means: "The platform holds the record; nothing leaves without an Admin's act.",
+      means: "The platform holds the record; nothing leaves without an Admin's action.",
     },
   ],
   [

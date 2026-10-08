@@ -5,15 +5,15 @@ export type PageTab = { readonly id: string; readonly name: string };
 export type PageToolbar = {
   readonly tabs?: readonly PageTab[] | undefined;
   /**
-   * A route's static data is built once, so an act carries its own behaviour and reads the
+   * A route's static data is built once, so an action carries its own behaviour and reads the
    * page's own state from the slot below.
    */
-  readonly acts?: ReactNode | undefined;
+  readonly actions?: ReactNode | undefined;
 };
 
 /** An empty bar above a page's content is the defect this guards. */
 export const isFilled = (toolbar: PageToolbar | undefined): toolbar is PageToolbar =>
-  (toolbar?.tabs ?? []).length > 0 || toolbar?.acts !== undefined;
+  (toolbar?.tabs ?? []).length > 0 || toolbar?.actions !== undefined;
 
 const OpenTab = createContext<string | undefined>(undefined);
 
@@ -67,7 +67,7 @@ export function ViewStateSlot(properties: { readonly children: ReactNode }) {
 }
 
 /**
- * A page declares its slot once and its content and its acts call what this hands back, so
+ * A page declares its slot once and its content and its actions call what this hands back, so
  * the type is stated in one place.
  */
 export function viewStateOf<Value>(page: string) {

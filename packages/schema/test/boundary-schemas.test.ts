@@ -208,7 +208,7 @@ const acceptedRows = {
   identityAuditEvent: [
     {
       id: "01J6GGGGGGGGGGGGGGGGGGGGG5",
-      act: "people.person.named",
+      action: "people.person.named",
       actor: `human:${USER_ID}`,
       subjectId: USER_ID,
       detail: {},
@@ -219,7 +219,7 @@ const acceptedRows = {
     {
       id: AUDIT_EVENT_ID,
       workspaceId: WS_ID,
-      act: "people.member.role_changed",
+      action: "people.member.role_changed",
       actor: `human:${USER_ID}`,
       subjectId: USER_ID,
       detail: { role: "Editor", previousRole: "Viewer" },
@@ -227,7 +227,7 @@ const acceptedRows = {
     {
       id: "01J6GGGGGGGGGGGGGGGGGGGGG2",
       workspaceId: WS_ID,
-      act: "platform.workspace.provisioned",
+      action: "platform.workspace.provisioned",
       actor: "process:better-answers-bootstrap",
       subjectId: WS_ID,
       detail: { adminUserId: USER_ID, role: "Admin" },
@@ -235,7 +235,7 @@ const acceptedRows = {
     {
       id: "01J6GGGGGGGGGGGGGGGGGGGGG3",
       workspaceId: WS_ID,
-      act: "knowledge.suggestion.accepted",
+      action: "knowledge.suggestion.accepted",
       actor: "better-answers-enrichment/1.2",
       subjectId: "01J6GGGGGGGGGGGGGGGGGGGGG4",
       detail: { confirmed: true, count: 3 },
@@ -244,7 +244,7 @@ const acceptedRows = {
     {
       id: "01J6GGGGGGGGGGGGGGGGGGGGG6",
       workspaceId: WS_ID,
-      act: "people.member.credentials_revoked",
+      action: "people.member.credentials_revoked",
       actor: `human:${USER_ID}`,
       subjectId: USER_ID,
       detail: {
@@ -934,8 +934,8 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
 
     auditEvent: [
       { ...acceptedRows.auditEvent[0], id: "audit-1" },
-      { ...acceptedRows.auditEvent[0], act: "billing.invoice.sent" },
-      { ...acceptedRows.auditEvent[0], act: "people.member" },
+      { ...acceptedRows.auditEvent[0], action: "billing.invoice.sent" },
+      { ...acceptedRows.auditEvent[0], action: "people.member" },
       { ...acceptedRows.auditEvent[0], actor: "human:priya@example.invalid" },
       { ...acceptedRows.auditEvent[0], actor: USER_ID },
       { ...acceptedRows.auditEvent[0], actor: "Priya Patel" },
@@ -946,7 +946,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     ],
     identityAuditEvent: [
       { ...acceptedRows.identityAuditEvent[0], id: "named-1" },
-      { ...acceptedRows.identityAuditEvent[0], act: "billing.person.named" },
+      { ...acceptedRows.identityAuditEvent[0], action: "billing.person.named" },
       { ...acceptedRows.identityAuditEvent[0], actor: "Priya Patel" },
       { ...acceptedRows.identityAuditEvent[0], detail: { person: { name: "Priya" } } },
     ],
@@ -1405,7 +1405,7 @@ describe("5 — the inferred type is pinned", () => {
       {
         id: AuditEventId;
         workspaceId: WorkspaceId;
-        act: `${Family}.${string}.${string}`;
+        action: `${Family}.${string}.${string}`;
         family: Family;
         actor: string;
         subjectKind: string;

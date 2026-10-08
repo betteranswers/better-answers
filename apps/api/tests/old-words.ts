@@ -66,14 +66,6 @@ const avoided = (word: string, entry: string, why?: string, use = entry): Avoide
   ...(why === undefined ? {} : { why }),
 });
 
-const pending = (
-  word: string,
-  use: string,
-  entry: string,
-  sweep: string,
-  reach: Reach,
-): Renamed => ({ word, use, entry, sweep, state: "pending", reach });
-
 const APP_SENSES: readonly Sense[] = [
   { sense: "the whole product", written: /\b(?:an app|better-answers app)\b/gi },
   { sense: "the SPA", written: /\b(?:single-page|web) app\b/gi },
@@ -206,6 +198,17 @@ const PAGE_AREA_MENU_CARVED_OUT: readonly CarveOut[] = [
 const MODEL_CHOICE = "model choice";
 
 const MODEL_CHOICE_LANDED = "2026-10-05";
+
+const AGENT_OPERATIONS_SENSES: readonly Sense[] = [
+  {
+    sense:
+      "the Flux AgentOps comparison and its history, which keep the group's old name until a later page lands",
+    within:
+      "docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md",
+    written:
+      /\bAgent Operations against Flux AgentOps\b|\b(?:page|Approvals) in Agent Operations\b|\bfolded into Agent Operations\b|\bAgent Operations group is now\b/g,
+  },
+];
 
 /** Trees where every route is one the api, the SPA's sign-in or a fake server answers over HTTP. */
 const HTTP_ROUTE_TREES = [
@@ -592,7 +595,7 @@ const CLIENT_OBJECT_TREES = [
   "apps/web/src/shared/api/trpc.ts",
   "apps/worker/src/better_answers_worker/pipeline/objects.py",
   "docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md",
-  "docs/solutions/logic-errors/a-second-mutate-drops-the-first-acts-callbacks.md",
+  "docs/solutions/logic-errors/a-second-mutate-drops-the-first-actions-callbacks.md",
   "packages/core/src/store/",
   "packages/core/test/",
   "packages/schema/scripts/",
@@ -846,7 +849,7 @@ const OTHER_RUN_TREES = [
   "packages/core/src/sweeps/",
   "packages/core/src/workspaces/",
   "packages/core/stryker.config.mjs",
-  "packages/core/test/audit-acts.test.ts",
+  "packages/core/test/audit-actions.test.ts",
   "packages/core/test/concepts.test.ts",
   "packages/core/test/cost-ledger.contract.test.ts",
   "packages/core/test/environment-lint.test.ts",
@@ -1188,18 +1191,135 @@ const QUARANTINE_SENSES: readonly Sense[] = [
   },
 ];
 
+const ACTION = "action";
+
+const ACTION_LANDED = "2026-10-08";
+
+const ACTION_CARVED_OUT: readonly CarveOut[] = [
+  writtenBefore(ACTION_LANDED),
+  ...SWEEPS_OWN_WORDS,
+  ...VENDORED,
+];
+
+/** The names migration 0073 renamed, which a test puts back and runs the migration over again. */
+const STORED_BEFORE_0073: readonly Sense[] = [
+  ...[
+    "packages/schema/test/before-the-action.ts",
+    "packages/schema/test/action-column.test.ts",
+  ].map((within) => ({
+    sense: "the audit logs' column and constraints as migration 0073 found them (R22)",
+    within,
+    written: /["']act["']|\(act\||(?<=\(id, (?:workspace_id, )?)act(?=, actor\b)/g,
+  })),
+  {
+    sense:
+      "the column's name in the release note of migration 0073, and the error an older api answers",
+    within: "docs/operations/RUNBOOK.md",
+    written: /`act`|column "act" does not exist/g,
+  },
+];
+
+/**
+ * Fitted to the tree, and held to lower case so a label such as "Acts for" stays refused. Mirrored
+ * in `packages/devtools/renames/action.json`.
+ */
+const ACT_AS_A_VERB = [
+  String.raw`(?<=\b(?:to|can|cannot|can't|will|won't|would|could|should|must|may|might|never|not|who|[Tt]hey|[Ww]e|[Yy]ou|[Nn]obody)\s+(?:still\s+|only\s+|also\s+)?)act\b`,
+  String.raw`(?<=\b(?:that|and)\s)act (?:on|as)\b`,
+];
+
+/** A verb's subject before *acts*, fitted to the tree; any other word leaves the plural a noun. */
+const ACTS_AS_A_VERB = [
+  String.raw`\b[Ww]ho acts\b`,
+  String.raw`(?<=\b(?:agent|step|reader|reviewer|principal\*?|run|nothing|never|or|Renovate)\s)acts (?:on|as|for)\b`,
+];
+
+/** Where an address asks under the query key a page had before this sweep, which is read still. */
+const ASKING_UNDER_THE_OLDER_KEY = [
+  "apps/web/test/address-ask.test.tsx",
+  "apps/web/test/people-address.test.ts",
+];
+
+const ACT_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  ...STORED_BEFORE_0073,
+  {
+    sense: "React's and Testing Library's act, in a call or its import",
+    within: "apps/web/test/",
+    written: /\bact(?=\()|\bact\b(?=[^;]*\bfrom "(?:react|@testing-library\/[\w-]+)")/g,
+  },
+  {
+    sense: "the plain verb, after a word that makes it one",
+    written: new RegExp(ACT_AS_A_VERB.join("|"), "g"),
+  },
+  {
+    sense: "the query key a page was asked with before this sweep, read still (R22)",
+    within: "apps/web/src/shared/address-ask.ts",
+    written: /\baction: "act"/g,
+  },
+  ...ASKING_UNDER_THE_OLDER_KEY.map((within) => ({
+    sense: "an address asking under that older query key, in a test that proves it is still read",
+    within,
+    written: /[?&]act=/g,
+  })),
+];
+
+const ACTS_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  {
+    sense: "the plain verb, after its subject",
+    written: new RegExp(ACTS_AS_A_VERB.join("|"), "g"),
+  },
+];
+
 export const OLD_WORDS: readonly OldWord[] = [
   avoided("2FA", "second factor"),
   avoided("access token", "personal token"),
   avoided("account", "workspace", "also never a member"),
-  pending("act", "action", "action", "action", "one sense"),
+  {
+    word: "act",
+    use: ACTION,
+    entry: ACTION,
+    sweep: ACTION,
+    state: "landed",
+    reach: "one sense",
+    permitted: ACT_SENSES,
+    carvedOut: ACTION_CARVED_OUT,
+  },
   avoided("action bar", "toolbar"),
   avoided("action name", "audit action"),
   avoided("activity log", "Activity (of a person)"),
   avoided("activity record", "record family", "the draft's word"),
-  pending("actor id", "the person's name", "actor id", "Audit log", "reader text"),
+  {
+    word: "actor id",
+    use: "the person's name",
+    entry: "actor id",
+    sweep: "Audit log",
+    state: "landed",
+    reach: "reader text",
+  },
+  {
+    word: "acts",
+    use: "actions",
+    entry: ACTION,
+    sweep: ACTION,
+    state: "landed",
+    reach: "everywhere",
+    why: "the plural and its compounds; a singular compound such as declareAct is read by neither row",
+    permitted: ACTS_SENSES,
+    carvedOut: ACTION_CARVED_OUT,
+  },
   avoided("admin panel", "console"),
-  pending("Agent Operations", "Models", "Control Centre", "model choice", "everywhere"),
+  {
+    word: "Agent Operations",
+    use: "Models",
+    entry: "Control Centre",
+    sweep: MODEL_CHOICE,
+    state: "landed",
+    reach: "everywhere",
+    permitted: AGENT_OPERATIONS_SENSES,
+    carvedOut: [writtenBefore(MODEL_CHOICE_LANDED)],
+  },
   {
     word: "agent token",
     use: "share agent token",
@@ -1238,7 +1358,15 @@ export const OLD_WORDS: readonly OldWord[] = [
       { holds: under("packages/design-system/"), why: NO_TIER_SENSE },
     ],
   },
-  pending("audit act", "audit action", "audit action", "action", "everywhere"),
+  {
+    word: "audit act",
+    use: "audit action",
+    entry: "audit action",
+    sweep: ACTION,
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: ACTION_CARVED_OUT,
+  },
   avoided("audit line", "log line"),
   avoided("authenticator app", "authenticator"),
   avoided("authorisation", "admission", "the sign-in server's word"),
@@ -1287,7 +1415,15 @@ export const OLD_WORDS: readonly OldWord[] = [
     carvedOut: CONNECTED_SOURCE_ROWS_CARVED_OUT,
   },
   avoided("budget cap", "spending limit"),
-  pending("bulk act", "bulk action", "bulk action", "action", "everywhere"),
+  {
+    word: "bulk act",
+    use: "bulk action",
+    entry: "bulk action",
+    sweep: ACTION,
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: ACTION_CARVED_OUT,
+  },
   {
     word: "bundle",
     use: "knowledge base",
@@ -1702,7 +1838,14 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("pending", "invitation", "the value Better Auth stores", "waiting"),
   avoided("pending concept", "concept write request"),
   avoided("permission check", "admission"),
-  pending("person id", "the person's name", "person id", "Audit log", "reader text"),
+  {
+    word: "person id",
+    use: "the person's name",
+    entry: "person id",
+    sweep: "Audit log",
+    state: "landed",
+    reach: "reader text",
+  },
   avoided("person's name", "display name"),
   avoided("phase", "block"),
   avoided("phrasing variant", "context wording", "the record it was until 27/08/2026"),
@@ -1924,6 +2067,22 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("the server", "api"),
   avoided("ticket", "job"),
   avoided("timeline", "Activity (of a person)"),
+  {
+    word: "Tokens",
+    use: "Personal tokens",
+    entry: "personal token",
+    sweep: "Personal tokens",
+    state: "landed",
+    reach: "one sense",
+    why: "the People page's name; a token, a design token and a detail's label keep the word",
+    permitted: [
+      {
+        sense: "the page's name now, which holds the old one",
+        written: /\b[Pp]ersonal[ -]tokens\b/g,
+      },
+    ],
+    reads: (file) => file === "apps/web/src/shared/navigation.ts",
+  },
   avoided("top bar", "top band", "the word until 30/09/2026"),
   avoided("TOTP", "authenticator"),
   avoided("track", "strand"),

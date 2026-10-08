@@ -227,7 +227,7 @@ describe("which paths reach which lane", () => {
 
 describe("which lane a change runs in", () => {
   it("takes the docs lane when every changed path is markdown", () => {
-    expect(laneOf(["docs/adr/0043-what-an-act-is.md"])).toEqual("docs");
+    expect(laneOf(["docs/adr/0043-what-an-action-is.md"])).toEqual("docs");
     expect(laneOf(["docs/specs/T-121.md", "CONCEPTS.md", "apps/web/CODING_STANDARDS.md"])).toEqual(
       "docs",
     );

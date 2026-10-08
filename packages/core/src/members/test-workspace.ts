@@ -3,7 +3,7 @@ import { z } from "zod";
 import { boundarySchemas, INVITATION_WAITING_STATUS } from "@better-answers/schema";
 import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/test-workspace";
 
-import { act, batchIdFor, declareActs, record } from "../audit/index.ts";
+import { action, batchIdFor, declareActions, record } from "../audit/index.ts";
 import {
   attempt,
   emailAddressOf,
@@ -35,8 +35,8 @@ import { roleWrittenByPlatform, type RoleChanged } from "./roles.ts";
 import { isOffDomain, OFF_TESTING_DOMAIN } from "./testing-domain.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-const MARK_ACTS = declareActs("platform", {
-  marked: act("platform.workspace.marked", { corrected: "flag" }),
+const MARK_ACTIONS = declareActions("platform", {
+  marked: action("platform.workspace.marked", { corrected: "flag" }),
 });
 
 const TEST_WORKSPACE_NAME = "Test workspace";
@@ -335,7 +335,7 @@ const markEnsured = (
     await tx.query(MARK_WRITTEN, [workspaceId, testingDomain]);
     await record(platform, tx, {
       id: ulid(),
-      act: MARK_ACTS.marked,
+      action: MARK_ACTIONS.marked,
       subjectId: workspaceId,
       detail: { corrected: was !== undefined },
     });
@@ -415,7 +415,7 @@ const membersEnsured = async (
 };
 
 /**
- * Each step is an existing act with its own transaction; a failure leaves what landed, and a
+ * Each step is an existing action with its own transaction; a failure leaves what landed, and a
  * re-run repairs from there.
  */
 const fixtureWritten = async (

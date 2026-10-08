@@ -89,8 +89,8 @@ const pageOf = (read: Result<ActivityPage, unknown>): ActivityPage => {
 };
 
 const linesOf = async (workspace: ProvisionedWorkspace, personId: string) =>
-  pageOf(await activityOf(workspace, personId)).events.map(({ act, direction }) => [
-    act,
+  pageOf(await activityOf(workspace, personId)).events.map(({ action, direction }) => [
+    action,
     direction,
   ]);
 
@@ -159,7 +159,7 @@ describe("a person's activity", () => {
     const onPriyas = pageOf(await activityOf(workspace, priya));
 
     const theChange = {
-      act: "people.member.role_changed",
+      action: "people.member.role_changed",
       actor: `human:${hannah}`,
       subjectId: priya,
       by: { kind: "person", displayName: "Hannah Reid", address: "hannah.reid@example.invalid" },
@@ -169,7 +169,7 @@ describe("a person's activity", () => {
     expect(onHannahs).toEqual({
       events: [
         expect.objectContaining({ ...theChange, direction: "by" }),
-        expect.objectContaining({ act: "platform.workspace.provisioned", direction: "to" }),
+        expect.objectContaining({ action: "platform.workspace.provisioned", direction: "to" }),
       ],
       nextCursor: null,
     });
@@ -187,7 +187,7 @@ describe("a person's activity", () => {
 
     const page = pageOf(await activityOf(workspace, workspace.adminUserId, null, sam));
 
-    expect(page.events.map(({ act, direction }) => [act, direction])).toEqual([
+    expect(page.events.map(({ action, direction }) => [action, direction])).toEqual([
       ["people.member.role_changed", "both"],
       ["platform.workspace.provisioned", "to"],
     ]);
@@ -343,7 +343,7 @@ describe("a person's activity", () => {
     expect(pageOf(await activityOf(workspace, ulid()))).toEqual({ events: [], nextCursor: null });
   });
 
-  it("finds every act naming the person in its detail alone", async () => {
+  it("finds every action naming the person in its detail alone", async () => {
     const workspace = await provisionedWorkspace(db(), "NamedInDetail");
     const priya = await aPerson("Priya Shah");
     const namings = [
@@ -356,17 +356,17 @@ describe("a person's activity", () => {
       ["adminUserId", "platform.workspace.provisioned"],
     ] as const;
     await seedingWith(db().pool, async (seed) => {
-      for (const [key, act] of namings) {
+      for (const [key, action] of namings) {
         await seed.auditEvent({
           workspaceId: workspace.workspaceId,
-          act,
+          action,
           detail: { [key]: priya },
         });
       }
     });
 
     expect((await linesOf(workspace, priya)).toSorted()).toEqual(
-      namings.map(([, act]) => [act, "to"]).toSorted(),
+      namings.map(([, action]) => [action, "to"]).toSorted(),
     );
   });
 });
@@ -386,14 +386,14 @@ const sixtyEventsOf = async (
       const at = new Date(Date.UTC(2026, 8, 1, 9, 0, secondOf(index)));
       const common = { workspaceId: workspace.workspaceId, at };
       const shapes = [
-        { act: "people.group.created", actor: `human:${priya}`, detail: {} },
+        { action: "people.group.created", actor: `human:${priya}`, detail: {} },
         {
-          act: "people.group.member_added",
+          action: "people.group.member_added",
           actor: `human:${workspace.adminUserId}`,
           detail: { userId: priya },
         },
         {
-          act: "people.member.role_changed",
+          action: "people.member.role_changed",
           actor: `human:${priya}`,
           subjectId: priya,
           detail: { previousRole: "Admin", role: "Editor" },
@@ -493,12 +493,12 @@ const PEOPLE = 30;
 
 /** Most events are about concepts; a tenth add someone to a group, a tenth ask to join. */
 const busyEvent = (index: number, named: string) => {
-  if (index % 10 === 0) return { act: "people.group.member_added", detail: { userId: named } };
-  if (index % 10 === 1) return { act: "people.request.asked", detail: { requesterId: named } };
-  return { act: "knowledge.concept.published", detail: {} };
+  if (index % 10 === 0) return { action: "people.group.member_added", detail: { userId: named } };
+  if (index % 10 === 1) return { action: "people.request.asked", detail: { requesterId: named } };
+  return { action: "knowledge.concept.published", detail: {} };
 };
 
-/** Three thousand events across thirty actors, a hundred of them Priya's own acts. */
+/** Three thousand events across thirty actors, a hundred of them Priya's own actions. */
 const aBusyLog = async (workspace: ProvisionedWorkspace, priya: string) => {
   const actors = [priya, ...Array.from({ length: PEOPLE - 1 }, () => ulid())];
   await seedingWith(db().pool, async (seed) => {
@@ -543,7 +543,7 @@ const planOfTheRead = (workspace: ProvisionedWorkspace, priya: string) =>
   );
 
 describe("reading a busy audit log", () => {
-  it("reads each arm through an index, own acts by actor", async () => {
+  it("reads each arm through an index, own actions by actor", async () => {
     const workspace = await provisionedWorkspace(db(), "Busy");
     const priya = await memberAt(workspace, "Admin", "Priya Shah");
     await aBusyLog(workspace, priya);

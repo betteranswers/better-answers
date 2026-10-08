@@ -49,7 +49,7 @@ describe("the audit log over tRPC", () => {
 
     const page = await api.members.auditLog.query({});
 
-    expect(page.events.map(({ act, by }) => [act, by])).toEqual([
+    expect(page.events.map(({ action, by }) => [action, by])).toEqual([
       ["people.group.created", { kind: "person", displayName: admin.name, address: admin.email }],
       ["people.group.created", { kind: "person", displayName: "", address: unnamed.email }],
       ["platform.workspace.provisioned", { kind: "platform" }],
@@ -74,7 +74,7 @@ describe("the audit log over tRPC", () => {
     const page = await api.members.auditLog.query({});
 
     expect(await signInsOf(workspace.admin.id)).toBe(2);
-    expect(page.events.map((event) => event.act)).toEqual(["platform.workspace.provisioned"]);
+    expect(page.events.map((event) => event.action)).toEqual(["platform.workspace.provisioned"]);
   });
 
   it("answers one family, a page at a time", async () => {
@@ -92,7 +92,7 @@ describe("the audit log over tRPC", () => {
 
     expect(first.events).toHaveLength(2);
     expect(first.nextCursor).toBe(first.events[1]?.id);
-    expect(rest.events.map((event) => event.act)).toEqual(["people.group.created"]);
+    expect(rest.events.map((event) => event.action)).toEqual(["people.group.created"]);
     expect(rest.nextCursor).toBeNull();
   });
 
@@ -108,7 +108,7 @@ describe("the audit log over tRPC", () => {
 
     const page = await api.members.auditLog.query({});
 
-    expect(page.events.map((event) => [event.act, event.subjectId])).toEqual([
+    expect(page.events.map((event) => [event.action, event.subjectId])).toEqual([
       ["platform.workspace.provisioned", mine.workspaceId],
     ]);
   });
@@ -131,7 +131,7 @@ describe("searching and exporting over tRPC", () => {
 
     const page = await api.members.auditLog.query({ search: "bid" });
 
-    expect(page.events.map((event) => [event.act, event.subject])).toEqual([
+    expect(page.events.map((event) => [event.action, event.subject])).toEqual([
       ["people.group.created", { kind: "group", name: "Bid writers" }],
     ]);
     expect(page.searchTooBroad).toBe(false);

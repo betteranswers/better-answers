@@ -1,6 +1,6 @@
 import { useId, useRef, type FormEvent } from "react";
 
-import { MountedActDialog } from "@/shared/act-dialog.tsx";
+import { MountedActionDialog } from "@/shared/action-dialog.tsx";
 import { DISPLAY_NAME_MAX_CHARACTERS } from "@/shared/display-name-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
@@ -35,7 +35,7 @@ export function CorrectNameDialog(properties: {
   };
 
   return (
-    <MountedActDialog
+    <MountedActionDialog
       onClose={properties.onClose}
       onFocusBack={() => {
         properties.onFocusBack(saved.current);
@@ -69,6 +69,6 @@ export function CorrectNameDialog(properties: {
           </p>
         )}
       </form>
-    </MountedActDialog>
+    </MountedActionDialog>
   );
 }

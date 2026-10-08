@@ -52,8 +52,8 @@ import { outcomeOfSendingFailure } from "./refusal.tsx";
 import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
 import { UnsentEmails } from "./unsent-emails.tsx";
 
-/** The keystroke list names the act as the button does, so inviting has one name. */
-const ACT_NAME = PEOPLE_KEYSTROKES.invite.act;
+/** The keystroke list names the action as the button does, so inviting has one name. */
+const ACTION_NAME = PEOPLE_KEYSTROKES.invite.action;
 
 const NO_FLAGS: ReadonlyMap<string, Flag> = new Map();
 
@@ -293,14 +293,14 @@ function Sent(properties: {
         <Button
           type="button"
           variant={waiting ? "default" : "outline"}
-          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the control that had focus is gone, and the addresses waiting are where the act leads
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the control that had focus is gone, and the addresses waiting are where the action leads
           autoFocus={waiting}
           onClick={properties.onAgain}
         >
-          {ACT_NAME}
+          {ACTION_NAME}
         </Button>
         <DialogClose asChild>
-          {/* oxlint-disable-next-line jsx-a11y/no-autofocus -- the control that had focus is gone, and this is where the act leaves the reader */}
+          {/* oxlint-disable-next-line jsx-a11y/no-autofocus -- the control that had focus is gone, and this is where the action leaves the reader */}
           <Button type="button" variant={waiting ? "outline" : "default"} autoFocus={!waiting}>
             {INVITE_WORDS.done}
           </Button>
@@ -383,7 +383,7 @@ function InviteForm(properties: {
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{ACT_NAME}</DialogTitle>
+        <DialogTitle>{ACTION_NAME}</DialogTitle>
         <DialogDescription>{INVITE_WORDS.description}</DialogDescription>
       </DialogHeader>
 
@@ -431,7 +431,7 @@ function InviteForm(properties: {
   );
 }
 
-export function InviteAct() {
+export function InviteAction() {
   const [open, setOpen] = useState(false);
   const [invites, setInvites] = useState(0);
   const [left, setLeft] = useState("");
@@ -443,8 +443,8 @@ export function InviteAct() {
     setOpen(true);
   };
   useKeystroke(PEOPLE_KEYSTROKES.invite, show);
-  useAsked("act", (act) => {
-    if (act === INVITE_A_PERSON.asks) show();
+  useAsked("action", (action) => {
+    if (action === INVITE_A_PERSON.asks) show();
   });
 
   /** A fresh form in the open dialog, focus on its field where the pressed button was. */
@@ -467,7 +467,7 @@ export function InviteAct() {
       {/* The trigger is where a closed dialog hands focus back, however it was opened. */}
       <DialogTrigger asChild>
         <Button size="sm" aria-keyshortcuts={PEOPLE_KEYSTROKES.invite.key}>
-          {ACT_NAME}
+          {ACTION_NAME}
         </Button>
       </DialogTrigger>
       <DialogContent className="wrap-anywhere">

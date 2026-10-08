@@ -5,10 +5,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
-  MemberBulkActs,
+  MemberBulkActions,
   MemberBulkDialogs,
-  useMemberBulkActs,
-} from "@/features/people/member-bulk-acts.tsx";
+  useMemberBulkActions,
+} from "@/features/people/member-bulk-actions.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
 
@@ -24,7 +24,7 @@ const NOTHING = () => undefined;
 
 const MEMBERS = "/people/members";
 
-const AT_MOST = "Select at most 200 members for one act.";
+const AT_MOST = "Select at most 200 members for one action.";
 
 /** Members' bar and dialogs over `count` ticks, standing in for the table that ticked them. */
 const tickedMembers = (count: number, readable: boolean) =>
@@ -34,7 +34,7 @@ const tickedMembers = (count: number, readable: boolean) =>
     );
     const [outcome, say] = useState<Outcome>();
     const heading = useRef<HTMLHeadingElement>(null);
-    const acts = useMemberBulkActs({
+    const actions = useMemberBulkActions({
       readable,
       ticked,
       tick,
@@ -57,9 +57,9 @@ const tickedMembers = (count: number, readable: boolean) =>
           onClear={NOTHING}
           focusAfterClear={heading}
         >
-          <MemberBulkActs acts={acts} />
+          <MemberBulkActions actions={actions} />
         </SelectionBar>
-        <MemberBulkDialogs acts={acts} />
+        <MemberBulkDialogs actions={actions} />
       </>
     );
   };
@@ -77,14 +77,14 @@ const ticking = async (count: number, readable = true) => {
   );
 };
 
-const ACTS = [
+const ACTIONS = [
   ["Change role", "C"],
   ["Add to group", "G"],
   ["Remove", "D"],
 ];
 
-describe("the members' bulk acts", () => {
-  it.each(ACTS)("refuses %s on 201 ticked, opening nothing", async (label) => {
+describe("the members' bulk actions", () => {
+  it.each(ACTIONS)("refuses %s on 201 ticked, opening nothing", async (label) => {
     await ticking(201);
 
     fireEvent.click(screen.getByRole("button", { name: label }));
@@ -93,7 +93,7 @@ describe("the members' bulk acts", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it.each(ACTS)("refuses %s's Shift+%s on 201 ticked", async (_, key) => {
+  it.each(ACTIONS)("refuses %s's Shift+%s on 201 ticked", async (_, key) => {
     await ticking(201);
 
     fireEvent.keyDown(document.body, { key, shiftKey: true });

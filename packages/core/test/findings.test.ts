@@ -47,18 +47,18 @@ const NOTHING_RESTORED = { restored_at: null, restored_by: null, restore_reason:
 const restoreEventsOf = async (pool: pg.Pool, workspaceId: string) => {
   const found = await pool.query<{
     id: string;
-    act: string;
+    action: string;
     family: string;
     actor: string;
     subject_kind: string;
     subject_id: string;
     detail: Record<string, unknown>;
   }>(
-    `SELECT id, action AS act, family, actor, subject_kind, subject_id, detail
+    `SELECT id, action, family, actor, subject_kind, subject_id, detail
        FROM audit_event WHERE workspace_id = $1 ORDER BY at, id`,
     [workspaceId],
   );
-  return found.rows.filter((row) => row.act === "sources.finding.restored");
+  return found.rows.filter((row) => row.action === "sources.finding.restored");
 };
 
 describe("an Admin's restore of one always-set span", () => {
@@ -85,7 +85,7 @@ describe("an Admin's restore of one always-set span", () => {
     expect(await restoreEventsOf(db().pool, scenario.workspaceId)).toEqual([
       {
         id: restored.ok ? restored.value.auditEventId : "",
-        act: "sources.finding.restored",
+        action: "sources.finding.restored",
         family: "sources",
         actor: `human:${scenario.admin.userId}`,
         subject_kind: "finding",
@@ -130,7 +130,7 @@ describe("an Admin's restore of one always-set span", () => {
   });
 });
 
-describe("what the restore act refuses", () => {
+describe("what the restore action refuses", () => {
   it.each([
     ["a Viewer", (scenario: Scenario) => scenario.viewer, {}, "role-forbids"],
     ["an Editor", (scenario: Scenario) => scenario.editor, {}, "role-forbids"],

@@ -184,7 +184,7 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
     }
   });
 
-  it("lists the act's instant, taken from the api's clock", async () => {
+  it("lists the action's instant, taken from the api's clock", async () => {
     const { person, admin } = await aMemberOfTwoWorkspaces();
     const before = Date.now();
 

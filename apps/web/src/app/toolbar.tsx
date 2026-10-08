@@ -71,7 +71,7 @@ export function PagePanel(properties: { readonly children: ReactNode }) {
 }
 
 export function Toolbar(properties: { readonly name: string; readonly toolbar: PageToolbar }) {
-  const { tabs, acts } = properties.toolbar;
+  const { tabs, actions } = properties.toolbar;
 
   return (
     // No `role="toolbar"`: it promises one tab stop and arrow keys across the band, which is
@@ -87,8 +87,8 @@ export function Toolbar(properties: { readonly name: string; readonly toolbar: P
         </TabsList>
       )}
 
-      {acts === undefined ? null : (
-        <div className="ml-auto flex shrink-0 items-center gap-2">{acts}</div>
+      {actions === undefined ? null : (
+        <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>
       )}
     </div>
   );

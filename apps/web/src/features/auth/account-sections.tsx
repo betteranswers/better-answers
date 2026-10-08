@@ -1,13 +1,13 @@
 import { useId, useRef, useState, type Ref } from "react";
 
-import { ActDialog } from "@/shared/act-dialog.tsx";
+import { ActionDialog } from "@/shared/action-dialog.tsx";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
-  ACCOUNT_ACTS,
+  ACCOUNT_ACTIONS,
   AUTHENTICATOR_WORDS,
   codesLeft,
   RECOVERY_CODE_WORDS,
@@ -22,13 +22,13 @@ import type {
   StartingTheSetup,
 } from "./second-factor-hooks.ts";
 
-export const SET_UP: Keystroke = { key: "s", act: ACCOUNT_ACTS.setUp };
+export const SET_UP: Keystroke = { key: "s", action: ACCOUNT_ACTIONS.setUp };
 
 export const AUTHENTICATOR_HEADING = "authenticator-heading";
 
 const RECOVERY_CODES_HEADING = "recovery-codes-heading";
 
-/** Where focus goes once an act's result is drawn: each is a node the act brings in. */
+/** Where focus goes once an action's result is drawn: each is a node the action brings in. */
 export type Landing =
   | "set-up"
   | "save-codes"
@@ -40,48 +40,51 @@ export type Landing =
 export type LandsAt = (landing: Landing) => (node: HTMLElement | null) => void;
 
 /** A child, so only a button given a keystroke listens for one. */
-function ActKeystroke(properties: { readonly keystroke: Keystroke; readonly onKey: () => void }) {
+function ActionKeystroke(properties: {
+  readonly keystroke: Keystroke;
+  readonly onKey: () => void;
+}) {
   useKeystroke(properties.keystroke, properties.onKey);
   return null;
 }
 
 /**
- * An act's own button, focusable while it cannot run, so focus never drops as it waits. Its
+ * An action's own button, focusable while it cannot run, so focus never drops as it waits. Its
  * keystroke passes the same guard.
  */
-export function ActButton(properties: {
+export function ActionButton(properties: {
   readonly id?: string;
   readonly unavailable: boolean;
   readonly label: string;
   readonly describedBy?: string | undefined;
-  readonly actRef?: Ref<HTMLButtonElement>;
+  readonly actionRef?: Ref<HTMLButtonElement>;
   readonly className?: string;
   /** Given by a button that shows and hides a part; its keystroke only ever shows it. */
   readonly expanded?: boolean;
   readonly controls?: string | undefined;
   readonly keystroke?: Keystroke;
-  readonly onAct: () => void;
+  readonly onAction: () => void;
 }) {
   const {
     id,
     unavailable,
     label,
     describedBy,
-    actRef,
+    actionRef,
     className,
     expanded,
     controls,
     keystroke,
-    onAct,
+    onAction,
   } = properties;
-  const act = () => {
-    if (!unavailable) onAct();
+  const action = () => {
+    if (!unavailable) onAction();
   };
   return (
     <>
       <Button
         id={id}
-        ref={actRef}
+        ref={actionRef}
         type="button"
         variant="outline"
         className={cn("aria-disabled:opacity-50", className)}
@@ -90,15 +93,15 @@ export function ActButton(properties: {
         aria-expanded={expanded}
         aria-controls={controls}
         aria-keyshortcuts={keystroke?.key}
-        onClick={act}
+        onClick={action}
       >
         {label}
       </Button>
       {keystroke === undefined ? null : (
-        <ActKeystroke
+        <ActionKeystroke
           keystroke={keystroke}
           onKey={() => {
-            if (expanded !== true) act();
+            if (expanded !== true) action();
           }}
         />
       )}
@@ -120,15 +123,15 @@ function NoAuthenticator(properties: {
   return (
     <>
       <p className="mt-2">{AUTHENTICATOR_WORDS.none}</p>
-      <ActButton
-        actRef={properties.landsAt("set-up")}
+      <ActionButton
+        actionRef={properties.landsAt("set-up")}
         unavailable={properties.finishing}
         label={AUTHENTICATOR_WORDS.setUp}
         className="mt-3"
         expanded={properties.setupOpen}
         controls={properties.setupOpen ? setupId : undefined}
         keystroke={SET_UP}
-        onAct={properties.onSetUp}
+        onAction={properties.onSetUp}
       />
       {properties.setupOpen ? (
         <AuthenticatorSetup
@@ -168,12 +171,12 @@ export function RemoveKeepingTheLast(properties: {
 
   return (
     <>
-      <ActButton
-        actRef={removeRef}
+      <ActionButton
+        actionRef={removeRef}
         unavailable={properties.last || properties.removing}
         label={words.remove}
         describedBy={properties.last ? reasonId : undefined}
-        onAct={() => {
+        onAction={() => {
           setConfirming(true);
         }}
       />
@@ -182,7 +185,7 @@ export function RemoveKeepingTheLast(properties: {
           {sentenceOf(SAID_OF_SECOND_FACTOR["last-second-factor"])}
         </p>
       ) : null}
-      <ActDialog
+      <ActionDialog
         open={confirming}
         onOpenChange={setConfirming}
         content={{
@@ -275,7 +278,7 @@ function ReplaceCodes(properties: {
   readonly making: boolean;
   readonly onMake: (replacing: boolean) => void;
 }) {
-  const actRef = useRef<HTMLButtonElement>(null);
+  const actionRef = useRef<HTMLButtonElement>(null);
   const [confirming, setConfirming] = useState(false);
 
   return (
@@ -284,22 +287,22 @@ function ReplaceCodes(properties: {
         {codesLeft(properties.left.unused, properties.left.madeAt)}
       </p>
       <div className="mt-3">
-        <ActButton
-          actRef={actRef}
+        <ActionButton
+          actionRef={actionRef}
           unavailable={properties.making}
           label={properties.making ? RECOVERY_CODE_WORDS.making : RECOVERY_CODE_WORDS.replace}
-          onAct={() => {
+          onAction={() => {
             setConfirming(true);
           }}
         />
       </div>
-      <ActDialog
+      <ActionDialog
         open={confirming}
         onOpenChange={setConfirming}
         content={{
           onCloseAutoFocus: (event) => {
             event.preventDefault();
-            actRef.current?.focus();
+            actionRef.current?.focus();
           },
         }}
         title={RECOVERY_CODE_WORDS.replaceTitle}
@@ -329,10 +332,10 @@ function MakeCodes(properties: {
     <>
       <p className="mt-2">{RECOVERY_CODE_WORDS.none}</p>
       <div className="mt-3">
-        <ActButton
+        <ActionButton
           unavailable={properties.making}
           label={properties.making ? RECOVERY_CODE_WORDS.making : RECOVERY_CODE_WORDS.make}
-          onAct={() => {
+          onAction={() => {
             properties.onMake(false);
           }}
         />

@@ -7,7 +7,7 @@ export type FreshnessRefusal = KernelRefusal<"sign-in-too-old">;
 /** A session cookie stolen later than this after its sign-in reaches none of the operator's writes. */
 const SIGN_IN_FRESH_FOR_MS = 3_600_000;
 
-/** Judged against the act's own instant rather than a clock read here, so a test can hold it still. */
+/** Judged against the action's own instant rather than a clock read here, so a test can hold it still. */
 export const requireFreshSignIn = (
   operator: OperatorPrincipal,
   at: Date,

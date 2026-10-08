@@ -901,6 +901,17 @@ sequenceDiagram
 - (a) Migration 0073 renames the `act` column on both audit logs to `action`, with `audit_event_action_check`, `identity_audit_event_action_check`, `audit_event_action_not_null` and `identity_audit_event_action_not_null`, and changes every file that names the column in SQL. It releases under watch (KTD4). The TypeScript key stays `act`, so a raw read selects `action AS act` until (b).
 - (b) The rest of this unit: the identifiers, files, lint rule, web app and docs, the words test's rows, and the aliases (a) left. The words test's *act* row permits the senses found across the tree: React's and Testing Library's `act`, the plain verb through an anchored sense, and the places R22 keeps. A second row holds *acts*. The query key `?act=` becomes `?action=`, and the old key is still read. The audit export's CSV header "Act" and the other loose items become *action*.
 
+**What (b) did (08/10/2026):**
+- The map is `packages/devtools/renames/action.json`: *acts* to *actions* and *act* to *action* across the api, the web app, core, the schema's source and tests, the lint rules, the contracts' prose and the worker's test guard. Its senses keep the anchored verb, the old query key, the names migration 0073 renamed in its two tests, and the words test's own fixtures. Replayed on the swept tree, it lists no rename.
+- Code: `declareAction`, `declareActions`, `AuditAction`, `ActionName`, `ACTION_PATTERN`, the Drizzle key `action` (a second `generate` finds nothing to migrate), and `declaredActionNames`. The `action AS act` aliases are gone. `generate:audit-actions` writes `audit-actions.ts`. Nineteen of the twenty files named for *act* took *action*, the generated one among them; ADR 0043's doc keeps its filename (KTD14) and gained an amendment. The lint rule is `action-admits-before-await`.
+- Pages: Jump to's *Actions*, the row menu's "Actions for {name}", *bulk action*, and the export's CSV header "Action". A page asked `?action=` also takes `?act=`, and a fresh sign-in's return address is read through the same function, so a bookmark or a sign-in under way still lands (KTD11's principle).
+- Wire: the tRPC keys and the api's log key `act` became `action`; nothing outside the api's own tests reads the log key. No MCP schema key held the word. Only contract prose changed, so both stamps were regenerated.
+- Words test: *act* (one sense) and *acts* (everywhere) landed beside *audit act* and *bulk act*, carved out before 08/10/2026. Neither row sees a singular camel-case compound such as `declareAct`; the map's replay and a grep for compounds found none left. `CONCEPTS.md`'s last three pending marks are gone.
+- Kept: the stored action names and the register's `STORED_ACT_NAMES` (R22), React's `act`, the plain verb, and the old column's name in migration 0073's tests and release note.
+- Three rows pending since 03/10/2026, whose sweeps had merged, landed in the same pull request. *actor id* and *person id* (U8) land in reader text, where neither is written. *Agent Operations* (U9) lands everywhere: the design-system readme, ADR 0017 and ADR 0047's current text now say *Models*, and a sense keeps ADR 0047's Flux AgentOps comparison and its history, as its amendment of 05/10/2026 decided.
+- Appendix B's People "Tokens" gained a row. Reader text cannot hold it, because a reader-text row reads every form of *tokens* and takes no sense. It is a one-sense row read in `apps/web/src/shared/navigation.ts` alone, where pages are named. The erasure detail labelled "Tokens" counts a person's tokens, not the page.
+- Every row in `apps/api/tests/old-words.ts` is now landed, and `CONCEPTS.md` carries no pending mark. Its preamble still defines the mark, because `apps/api/tests/words-scan.ts` reads it and refuses an entry so marked that no pending row names.
+
 **Files:**
 - Modify: `packages/core/src/kernel/`, `packages/core/src/audit/`, every slice declaring acts, `packages/schema/src/audit-tables.ts` with a new migration, `packages/devtools/lint-rules/rules/act-admits-before-await.ts` and its test, `.oxlintrc.json`, `apps/web/src/` files named for *act*, the five `CODING_STANDARDS.md` files, ADR 0043 doc, `docs/agents/`
 - Create: `packages/devtools/renames/action.json`
@@ -932,7 +943,7 @@ sequenceDiagram
 | `pnpm run check:web` | The web app's types, tests and browser suite | U7, U8, every sweep touching pages |
 | `pnpm run check:worker` | The worker's suites and the prepare test | U6, U9 to U13, U15 |
 | `pnpm --filter @better-answers/schema run generate`, then again with no diff | A rename migration keeps the snapshot in step | U9 to U12, U15, U17 |
-| `generate:worker-view`, `generate:roles-surface`, `generate:contract-stamp` (schema) and `generate:audit-acts` (core) | Generated files in step, drift-checked | Every schema sweep, U17 |
+| `generate:worker-view`, `generate:roles-surface`, `generate:contract-stamp` (schema) and `generate:audit-actions` (core) | Generated files in step, drift-checked | Every schema sweep, U17 |
 | `pnpm run check:gates` | Lint, comment and format gates, including the renamed lint rule | U6, U17 |
 | `pnpm run check` | Everything; CI's arbiter | Every pull request |
 | `deploy/restore-drill.sh` | Renamed tables restore and count | After U17 |

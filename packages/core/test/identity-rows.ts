@@ -328,7 +328,7 @@ export const issuedCredentialsFor = async (
   }
 };
 
-/** Seeded tokens named by grant, so an assertion reads which ones an act ended. */
+/** Seeded tokens named by grant, so an assertion reads which ones an action ended. */
 export type NamedGrants = {
   readonly clientId: string;
   readonly labelById: ReadonlyMap<string, string>;

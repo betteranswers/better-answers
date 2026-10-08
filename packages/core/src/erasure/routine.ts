@@ -1,6 +1,6 @@
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
+import { action, declareActions, record, type DetailOf } from "../audit/index.ts";
 import { carryVerificationsOntoRewrite, moveBundleCommits } from "../concepts/index.ts";
 import {
   attempt,
@@ -74,15 +74,15 @@ const IDENTITY_STEP_LOGGED =
  */
 const DUMP_LOCK = 41;
 
-const ERASURE_ACTS = declareActs("people", {
-  completed: act("people.erasure.completed", {
+const ERASURE_ACTIONS = declareActions("people", {
+  completed: action("people.erasure.completed", {
     subjectRequestId: "id",
     personId: "id?",
     locations: "count",
   }),
 });
 
-type CompletedDetail = DetailOf<(typeof ERASURE_ACTS)["completed"]["detail"]>;
+type CompletedDetail = DetailOf<(typeof ERASURE_ACTIONS)["completed"]["detail"]>;
 
 export type RunErasureRefusal = "malformed" | "no-such-request" | "not-an-erasure" | "no-address";
 
@@ -461,7 +461,7 @@ const completeTheRequest = async (
 
       await record(platform, tx, {
         id: auditEventId,
-        act: ERASURE_ACTS.completed,
+        action: ERASURE_ACTIONS.completed,
         subjectId: erasure.id,
         detail: detailOf(request, map),
       });

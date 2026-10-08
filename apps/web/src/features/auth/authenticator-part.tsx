@@ -6,7 +6,7 @@ import { SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { QRCode } from "@/shared/ui/kibo-ui/qr-code.tsx";
 
-import { ACCOUNT_ACTS, AUTHENTICATOR_WORDS } from "./account-words.ts";
+import { ACCOUNT_ACTIONS, AUTHENTICATOR_WORDS } from "./account-words.ts";
 import { CodeRefused, SIGNED_OUT, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
 import { Outcome } from "./auth-page.tsx";
 import {
@@ -39,7 +39,7 @@ import {
   type StartingTheSetup,
 } from "./second-factor-hooks.ts";
 
-export const COPY_KEY: Keystroke = { key: "k", act: ACCOUNT_ACTS.copyKey };
+export const COPY_KEY: Keystroke = { key: "k", action: ACCOUNT_ACTIONS.copyKey };
 
 const CONFLICT = 409;
 

@@ -23,7 +23,7 @@ import {
 import { focusOn, Refused } from "./auth-page.tsx";
 import { ASK_REFUSED, ASK_UNANSWERED, askedTooOften, REASON_REFUSED } from "./refusal-words.ts";
 
-export const ASK_TO_JOIN: Keystroke = { key: "j", act: ASK_TO_JOIN_WORDS.heading };
+export const ASK_TO_JOIN: Keystroke = { key: "j", action: ASK_TO_JOIN_WORDS.heading };
 
 const HEADING = "ask-to-join-heading";
 

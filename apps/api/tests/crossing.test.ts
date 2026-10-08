@@ -185,7 +185,7 @@ const A_WORD_OF_EACH_CLASS = [
   ],
 ] as const;
 
-describe("a word of every class an act answers, crossing tRPC", () => {
+describe("a word of every class an action answers, crossing tRPC", () => {
   it.each(A_WORD_OF_EACH_CLASS)(
     "sends a %s refusal's own word and status, logged once",
     async (refusalClass, refusal, status, provoke) => {
@@ -298,7 +298,7 @@ describe("a refusal crossing tRPC", () => {
       expect(data.refusal).toBeUndefined();
     });
 
-    expect(logsOf("trpc.failed").map((line) => [line["act"], line["level"]])).toEqual([
+    expect(logsOf("trpc.failed").map((line) => [line["action"], line["level"]])).toEqual([
       ["readMember", 50],
     ]);
   });
@@ -315,7 +315,7 @@ describe("a refusal crossing tRPC", () => {
       expect((await refusalCrossing(response)).message).toBe("withPrincipal failed");
     });
 
-    expect(logsOf("trpc.failed").map((line) => [line["act"], line["level"]])).toEqual([
+    expect(logsOf("trpc.failed").map((line) => [line["action"], line["level"]])).toEqual([
       ["withPrincipal", 50],
     ]);
   });

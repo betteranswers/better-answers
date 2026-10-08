@@ -1,6 +1,6 @@
 import { boundarySchemas, FULL_REBUILD_KIND } from "@better-answers/schema";
 
-import { act, declareActs, recordEach } from "../audit/index.ts";
+import { action, declareActions, recordEach } from "../audit/index.ts";
 import {
   attempt,
   err,
@@ -29,8 +29,8 @@ export const MAP_MAINTENANCE: MapMaintenancePrincipal = {
   actorId: MAP_ACTOR,
 };
 
-const MAP_ACTS = declareActs("platform", {
-  swept: act("platform.graph.swept", {
+const MAP_ACTIONS = declareActions("platform", {
+  swept: action("platform.graph.swept", {
     generation: "count",
     nodes: "count",
     edges: "count",
@@ -69,7 +69,7 @@ export const sweepMap = async (
       await recordEach(
         platform,
         tx,
-        MAP_ACTS.swept,
+        MAP_ACTIONS.swept,
         generations.map(({ gen, nodes, edges }) => ({
           subjectId: String(gen),
           detail: { generation: gen, nodes, edges },

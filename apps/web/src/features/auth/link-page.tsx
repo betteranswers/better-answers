@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { KeystrokesAct, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import type { Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -25,7 +25,7 @@ import {
   CODE_NOT_COPIED,
   codeShown,
   codeSpelled,
-  LINK_ACTS,
+  LINK_ACTIONS,
   LINK_UNREAD,
   LINK_WORDS,
   signingInAs,
@@ -35,11 +35,11 @@ import { SIGN_IN_UNANSWERED, tooManyCodesTried } from "./refusal-words.ts";
 import { useStepAfterSignIn } from "./second-factor-steps.ts";
 import { SIGN_IN_WORDS } from "./sign-in-words.ts";
 
-const COPY: Keystroke = { key: "c", act: LINK_ACTS.copy };
+const COPY: Keystroke = { key: "c", action: LINK_ACTIONS.copy };
 
-const READ_AGAIN: Keystroke = { key: "r", act: LINK_ACTS.readAgain };
+const READ_AGAIN: Keystroke = { key: "r", action: LINK_ACTIONS.readAgain };
 
-const BACK_TO_SIGN_IN: Keystroke = { key: "s", act: LINK_ACTS.backToSignIn };
+const BACK_TO_SIGN_IN: Keystroke = { key: "s", action: LINK_ACTIONS.backToSignIn };
 
 const REFUSED = "link-refused";
 
@@ -78,7 +78,7 @@ const seenOf = (
   return read.error === null ? CHECKING : { state: "unread", failure: read.error };
 };
 
-/** What the page's acts stand on, handed to whichever state is shown. */
+/** What the page's actions stand on, handed to whichever state is shown. */
 type Acting = {
   readonly signingIn: boolean;
   readonly signInFailure: Error | null;
@@ -96,7 +96,7 @@ type Slots = {
   readonly said: string | null;
   readonly body: ReactNode;
   readonly refused: Said | undefined;
-  readonly acts: ReactNode;
+  readonly actions: ReactNode;
 };
 
 function SignInHere(properties: { readonly signingIn: boolean; readonly onSignIn: () => void }) {
@@ -176,7 +176,7 @@ function BackToSignIn(properties: { readonly focused: boolean; readonly carried:
       >
         {LINK_WORDS.backToSignIn}
       </a>
-      <KeystrokesAct page={KEYSTROKE_WORDS.thisPage} keystrokes={[BACK_TO_SIGN_IN]} />
+      <KeystrokesAction page={KEYSTROKE_WORDS.thisPage} keystrokes={[BACK_TO_SIGN_IN]} />
     </div>
   );
 }
@@ -188,7 +188,7 @@ const CHECKING_SLOTS: Slots = {
   said: LINK_WORDS.checking,
   body: null,
   refused: undefined,
-  acts: null,
+  actions: null,
 };
 
 const unreadSlots = (failure: Error, acting: Acting): Slots => ({
@@ -197,7 +197,7 @@ const unreadSlots = (failure: Error, acting: Acting): Slots => ({
   body: null,
   refused: saidOfFailure(failure, LINK_UNREAD),
   // The fragment is gone from the address, so a reload would show the dead page.
-  acts: (
+  actions: (
     <div className="mt-6 flex flex-wrap items-center gap-2">
       <ReadAgain
         keystroke={READ_AGAIN}
@@ -205,7 +205,7 @@ const unreadSlots = (failure: Error, acting: Acting): Slots => ({
         words={LINK_WORDS}
         onReadAgain={acting.onReadAgain}
       />
-      <KeystrokesAct page={KEYSTROKE_WORDS.thisPage} keystrokes={[READ_AGAIN]} />
+      <KeystrokesAction page={KEYSTROKE_WORDS.thisPage} keystrokes={[READ_AGAIN]} />
     </div>
   ),
 });
@@ -225,7 +225,7 @@ const boundSlots = (bound: Bound, acting: Acting): Slots => ({
     acting.signInFailure === null
       ? undefined
       : saidOfFailure(acting.signInFailure, SIGN_IN_UNANSWERED),
-  acts: null,
+  actions: null,
 });
 
 const elsewhereSlots = (elsewhere: Elsewhere, acting: Acting): Slots => ({
@@ -241,9 +241,9 @@ const elsewhereSlots = (elsewhere: Elsewhere, acting: Acting): Slots => ({
     />
   ),
   refused: acting.copied === false ? CODE_NOT_COPIED : undefined,
-  acts: (
+  actions: (
     <div className="mt-6">
-      <KeystrokesAct page={KEYSTROKE_WORDS.thisPage} keystrokes={[COPY]} />
+      <KeystrokesAction page={KEYSTROKE_WORDS.thisPage} keystrokes={[COPY]} />
     </div>
   ),
 });
@@ -253,7 +253,7 @@ const deadSlots = (acting: Acting): Slots => ({
   said: LINK_WORDS.dead,
   body: null,
   refused: undefined,
-  acts: <BackToSignIn focused={acting.signInFailure !== null} carried={acting.carried} />,
+  actions: <BackToSignIn focused={acting.signInFailure !== null} carried={acting.carried} />,
 });
 
 const slotsOf = (seen: Seen, acting: Acting): Slots => {
@@ -326,7 +326,7 @@ export function LinkPage() {
       <Outcome tone="refused" id={REFUSED}>
         {slots.refused === undefined ? null : <RefusalLine said={slots.refused} />}
       </Outcome>
-      {slots.acts}
+      {slots.actions}
     </AuthPage>
   );
 }

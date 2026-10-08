@@ -47,7 +47,7 @@ An unpublished connected source derives as Restricted until its publish.
 - The publish is let through only once the connected source's latest sync is done.
 - The publish releases the connected source's sensitivity down the cascade.
 
-An Admin's recorded widen act (`widenConnectedSource`, in the `sources` slice) is the one road by which a connected source widens.
+An Admin's recorded widen action (`widenConnectedSource`, in the `sources` slice) is the one road by which a connected source widens.
 
 - Its audit row carries the sensitivity and audience the connected source moved from and to.
 - It is refused while a special-category finding is unreviewed.
@@ -58,13 +58,13 @@ An Admin's recorded widen act (`widenConnectedSource`, in the `sources` slice) i
 - The first customer's knowledge arrives in four shapes at once: files handed over, a SharePoint site, a public website, and systems it cites but never connects. One connected source shape with two axes covers them all without a type per case.
 - Indexing is cheap and reversible. Extraction spends money and lands in a permanent history. So the two are gated differently.
 - A live read through a credential is the only honest way to cite a system the company has chosen not to copy.
-- Publishing is a legal act with confirmations: lawful basis recorded, privacy information updated, a DPIA reference. Sensitivity alone cannot say "not yet" or "for one group only".
+- Publishing is a legal action with confirmations: lawful basis recorded, privacy information updated, a DPIA reference. Sensitivity alone cannot say "not yet" or "for one group only".
 - A concept's citation must survive the document it rests on, or trust is a lie.
 - The publish reads the latest index job, because publishing says somebody reviewed what the sync found.
 - A converter's normalised text is the address space every span and every content hash is read against. Swapping a converter's output reprocesses every document of that type and sends every citation into them to a citation fix.
 - Conversion runs before the redaction seam, so its input is unredacted. A hosted parser is refused.
 - A document has no audience of its own, because an audience is a decision about people and a connected source is where that decision is made.
-- With no widen act, an Admin who published at Restricted could open the connected source only by connecting the file again: a one-way door, placed where the platform steers Admins.
+- With no widen action, an Admin who published at Restricted could open the connected source only by connecting the file again: a one-way door, placed where the platform steers Admins.
 
 ## Rejected
 

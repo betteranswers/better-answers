@@ -181,7 +181,7 @@ const typedTree = (files: Tree, include: readonly string[] = ["src"]): Tree => (
 });
 
 const callsRevoke = (call: string): string =>
-  `const revoke = async (): Promise<void> => {};\n\nexport const act = async (): Promise<void> => {\n  ${call}\n};\n`;
+  `const revoke = async (): Promise<void> => {};\n\nexport const action = async (): Promise<void> => {\n  ${call}\n};\n`;
 
 describe("no promise floats: a call is awaited or `void`", () => {
   const forgotten = typedTree({ "src/forgotten.ts": callsRevoke("revoke();") });
@@ -367,8 +367,8 @@ const ADOPTED = [
   {
     rule: "typescript/no-meaningless-void-operator",
     refuses: "a void on a call that already returns nothing",
-    fires: `const close = (): void => {};\n\nexport const act = (): void => void close();\n`,
-    silent: `const close = async (): Promise<void> => {};\n\nexport const act = (): void => void close();\n`,
+    fires: `const close = (): void => {};\n\nexport const action = (): void => void close();\n`,
+    silent: `const close = async (): Promise<void> => {};\n\nexport const action = (): void => void close();\n`,
   },
   {
     rule: "typescript/no-misused-spread",

@@ -11,7 +11,7 @@ import {
   type RefusalWord,
 } from "@/shared/api/trpc.ts";
 import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
-import { KeystrokesAct, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { saidOfRefusal, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
@@ -26,15 +26,15 @@ import {
 } from "./auth-hooks.ts";
 import { AuthPage, Outcome, ReadAgain, Refused } from "./auth-page.tsx";
 import { carriedFlow, invitationAt, leavingFor, pageQuery } from "./carried-flow.ts";
-import { INVITATION_ACTS, INVITATION_WORDS } from "./invitation-words.ts";
+import { INVITATION_ACTIONS, INVITATION_WORDS } from "./invitation-words.ts";
 import { INVITATION_UNANSWERED, JOIN_UNANSWERED, SAID_OF_ACCEPTING } from "./refusal-words.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
 
 type Invitation = inferOutput<ReturnType<typeof useTRPC>["person"]["invitation"]>;
 
-const JOIN: Keystroke = { key: "j", act: INVITATION_ACTS.join };
+const JOIN: Keystroke = { key: "j", action: INVITATION_ACTIONS.join };
 
-const READ_AGAIN: Keystroke = { key: "r", act: INVITATION_ACTS.readAgain };
+const READ_AGAIN: Keystroke = { key: "r", action: INVITATION_ACTIONS.readAgain };
 
 const PAGE = "this page";
 
@@ -48,7 +48,7 @@ const NAME_HINT = "display-name-hint";
 
 const NAME_REFUSED = "display-name-refused";
 
-/** The one act a refusal leaves the person: a page to go to, from the path of this page. */
+/** The one action a refusal leaves the person: a page to go to, from the path of this page. */
 type WayOn = {
   readonly keystroke: Keystroke;
   readonly to: (here: string) => string;
@@ -59,12 +59,12 @@ type WayOn = {
 
 const WAY_OF_WORD = {
   "invitation-for-another-address": {
-    keystroke: { key: "s", act: INVITATION_ACTS.anotherAddress },
+    keystroke: { key: "s", action: INVITATION_ACTIONS.anotherAddress },
     to: (here) => here,
     signingOutFirst: true,
   },
   "already-a-member": {
-    keystroke: { key: "w", act: INVITATION_ACTS.yourWorkspaces },
+    keystroke: { key: "w", action: INVITATION_ACTIONS.yourWorkspaces },
     to: () => `/choose-workspace${carriedFlow(pageQuery())}`,
   },
 } satisfies Partial<Record<RefusalWord, WayOn>>;
@@ -82,7 +82,7 @@ const wayOf = (failure: Error | ApiError | null): WayOn | undefined => {
   return word === undefined ? undefined : WAYS.get(word);
 };
 
-function WayOnAct(properties: { readonly way: WayOn; readonly here: string }) {
+function WayOnAction(properties: { readonly way: WayOn; readonly here: string }) {
   const { way, here } = properties;
   const navigate = useNavigate();
   const { signOut, signingOut } = useSignOut(way.to(here));
@@ -104,7 +104,7 @@ function WayOnAct(properties: { readonly way: WayOn; readonly here: string }) {
       aria-keyshortcuts={way.keystroke.key}
       onClick={go}
     >
-      {way.keystroke.act}
+      {way.keystroke.action}
     </Button>
   );
 }
@@ -113,7 +113,7 @@ function Leaving(properties: { readonly keystrokes: readonly Keystroke[] }) {
   return (
     <div className="mt-8 flex flex-wrap items-center gap-2">
       <SignOutButton />
-      <KeystrokesAct page={PAGE} keystrokes={properties.keystrokes} />
+      <KeystrokesAction page={PAGE} keystrokes={properties.keystrokes} />
     </div>
   );
 }
@@ -145,14 +145,14 @@ function InvitationUnread(properties: {
             onReadAgain={properties.onReadAgain}
           />
         ) : null}
-        {way === undefined ? null : <WayOnAct way={way} here={properties.here} />}
+        {way === undefined ? null : <WayOnAction way={way} here={properties.here} />}
       </div>
       <Leaving keystrokes={keystrokes} />
     </AuthPage>
   );
 }
 
-/** Above the join, for a person who has given no name: saving it is the join's first act. */
+/** Above the join, for a person who has given no name: saving it is the join's first action. */
 function NameAsked(properties: {
   readonly name: string;
   readonly onName: (name: string) => void;
@@ -207,7 +207,7 @@ function JoinRefused(properties: {
       />
       {way === undefined ? null : (
         <div className="mt-4">
-          <WayOnAct way={way} here={here} />
+          <WayOnAction way={way} here={here} />
         </div>
       )}
     </>

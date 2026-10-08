@@ -26,13 +26,16 @@ const ON_THE_FIRST_PAGE: Outcome = { tone: "said", words: "This is the first pag
 
 const ON_THE_LAST_PAGE: Outcome = { tone: "said", words: "This is the last page of people." };
 
-type PersonActs = {
+type PersonActions = {
   readonly open: (personId: string) => void;
   readonly focusedOn: (personId: string) => void;
 };
 
-function PersonCell(properties: { readonly person: ListedPerson; readonly acts: PersonActs }) {
-  const { person, acts } = properties;
+function PersonCell(properties: {
+  readonly person: ListedPerson;
+  readonly actions: PersonActions;
+}) {
+  const { person, actions } = properties;
   const unnamed = person.displayName === "";
   return (
     <div className="grid justify-items-start gap-0.5">
@@ -42,10 +45,10 @@ function PersonCell(properties: { readonly person: ListedPerson; readonly acts: 
         aria-haspopup="dialog"
         className="h-auto p-0 text-left font-medium whitespace-normal text-foreground"
         onFocus={() => {
-          acts.focusedOn(person.id);
+          actions.focusedOn(person.id);
         }}
         onClick={() => {
-          acts.open(person.id);
+          actions.open(person.id);
         }}
       >
         {unnamed ? <span className="text-muted-foreground">No display name yet</span> : null}
@@ -56,13 +59,13 @@ function PersonCell(properties: { readonly person: ListedPerson; readonly acts: 
   );
 }
 
-/** The person's own cell opens them, so its acts ride into the columns. */
-const columnsFor = (acts: PersonActs) =>
+/** The person's own cell opens them, so its actions ride into the columns. */
+const columnsFor = (actions: PersonActions) =>
   column.columns([
     column.display({
       id: "person",
       header: "Person",
-      cell: ({ row }) => <PersonCell person={row.original} acts={acts} />,
+      cell: ({ row }) => <PersonCell person={row.original} actions={actions} />,
     }),
     column.display({
       id: "workspaces",
@@ -118,9 +121,9 @@ function NoOneMatches(properties: { readonly search: string; readonly onClear: (
 
 type Opened = { readonly personId: string; readonly at: OpenedAt };
 
-/** Signing in again comes back with the person named, to be reopened at the act. */
+/** Signing in again comes back with the person named, to be reopened at the action. */
 const reopened = (arrived: Arrival): Opened | undefined =>
-  arrived.personId === undefined ? undefined : { personId: arrived.personId, at: arrived.act };
+  arrived.personId === undefined ? undefined : { personId: arrived.personId, at: arrived.action };
 
 const NO_ONE: readonly ListedPerson[] = [];
 

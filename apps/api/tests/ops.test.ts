@@ -245,10 +245,10 @@ const workspacesWithShortName = async (app: TestApp, shortName: string): Promise
   return found.rowCount ?? 0;
 };
 
-const rowsOfAct = async (app: TestApp, workspaceId: string, act: string) => {
+const rowsOfAction = async (app: TestApp, workspaceId: string, action: string) => {
   const found = await app.database.superuser.query<Record<string, unknown>>(
     "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND action = $2 ORDER BY at, id",
-    [workspaceId, act],
+    [workspaceId, action],
   );
   return found.rows;
 };
@@ -285,11 +285,11 @@ const erasedAt = async (
   return { ...rehearsed.value, workspaceId };
 };
 
-type AuditEventRow = { act: string; actor: string; subject_id: string };
+type AuditEventRow = { action: string; actor: string; subject_id: string };
 
 const auditLogOf = async (app: TestApp, workspaceId: string): Promise<readonly AuditEventRow[]> => {
   const found = await app.database.superuser.query<AuditEventRow>(
-    "SELECT action AS act, actor, subject_id FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
+    "SELECT action, actor, subject_id FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
     [workspaceId],
   );
   return found.rows;
@@ -441,7 +441,7 @@ const completedBeforeTheFinder = async (
   }
 };
 
-const whatAReplayActsOn = async (app: TestApp, workspaceId: string) => ({
+const whatAReplayReaches = async (app: TestApp, workspaceId: string) => ({
   passages: (
     await app.database.superuser.query<{ id: string }>(
       `SELECT id FROM "index".passage WHERE workspace_id = $1 ORDER BY id`,
@@ -532,7 +532,7 @@ const replayedAfterTheWindow = async (
 
 const lostInTheWindow = async (
   app: TestApp,
-  act: () => Promise<{ readonly ok: boolean }>,
+  action: () => Promise<{ readonly ok: boolean }>,
 ): Promise<void> => {
   const superuser = app.database.superuser;
   await superuser.query(
@@ -543,7 +543,7 @@ const lostInTheWindow = async (
     "CREATE TRIGGER crash_in_the_window BEFORE INSERT ON bundle_commit FOR EACH ROW EXECUTE FUNCTION crash_in_the_window()",
   );
   try {
-    expect((await act()).ok).toBe(false);
+    expect((await action()).ok).toBe(false);
   } finally {
     await superuser.query("DROP TRIGGER crash_in_the_window ON bundle_commit");
     await superuser.query("DROP FUNCTION crash_in_the_window()");
@@ -647,7 +647,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
       expect(await auditLogOf(app(), erased.workspaceId)).toContainEqual({
-        act: "platform.erasure.replayed",
+        action: "platform.erasure.replayed",
         actor: "process:better-answers-erasure",
         subject_id: erased.erasureRequestId,
       });
@@ -698,7 +698,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         admin.id,
         "Expense claims go to Sam Okafor at sam.okafor@meridianfenland.co.uk by Friday.\n",
       );
-      const indexedBefore = await whatAReplayActsOn(app(), workspaceId);
+      const indexedBefore = await whatAReplayReaches(app(), workspaceId);
       const erasureRequestId = await completedBeforeTheFinder(
         app(),
         workspaceId,
@@ -711,7 +711,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         ["replay-erasures", "--since", BEFORE_THE_FINDER_SINCE],
         {},
       );
-      const afterTheFirst = await whatAReplayActsOn(app(), workspaceId);
+      const afterTheFirst = await whatAReplayReaches(app(), workspaceId);
       const second = await opsWith(
         app(),
         ["replay-erasures", "--since", BEFORE_THE_FINDER_SINCE],
@@ -741,10 +741,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
         suppressions: [{ identifiers }],
       });
       expect([second.exitCode, second.lines]).toEqual([0, replayedOnce]);
-      expect(await whatAReplayActsOn(app(), workspaceId)).toEqual(afterTheFirst);
+      expect(await whatAReplayReaches(app(), workspaceId)).toEqual(afterTheFirst);
       expect(
         (await auditLogOf(app(), workspaceId)).filter(
-          (row) => row.act === "platform.erasure.replayed",
+          (row) => row.action === "platform.erasure.replayed",
         ),
       ).toHaveLength(2);
     });
@@ -933,7 +933,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       if (!bound.ok) throw new Error(`the connect was refused: ${String(bound.error)}`);
 
       /**
-       * The job is the transaction's last statement, so refusing it leaves the object the act put
+       * The job is the transaction's last statement, so refusing it leaves the object the action put
        * before it and no row that names the object.
        */
       const failed = await whileWritesAreRefused(app().database.superuser, "job", () =>
@@ -1166,7 +1166,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
       expect(written).toContain("Exports already issued are not recalled.");
       expect(await auditLogOf(app(), workspaceId)).toContainEqual({
-        act: "platform.erasure.rehearsed",
+        action: "platform.erasure.rehearsed",
         actor: "process:better-answers-erasure",
         subject_id: expect.any(String),
       });
@@ -1462,7 +1462,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       await boundAndIndexed(app(), workspaceId, admin.id, "Expense claims are paid monthly.\n");
 
       const run = await ops(app(), ["reindex-connected-sources", "--workspace", workspaceId]);
-      const after = await whatAReplayActsOn(app(), workspaceId);
+      const after = await whatAReplayReaches(app(), workspaceId);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
@@ -1626,7 +1626,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
 
       const rows = await app().database.superuser.query<Record<string, unknown>>(
-        `SELECT c.sha, c.parent_sha, c.actor, e.action AS act, e.detail,
+        `SELECT c.sha, c.parent_sha, c.actor, e.action, e.detail,
                 (SELECT count(*)::int FROM concept_index i WHERE i.workspace_id = c.workspace_id) AS concepts
            FROM bundle_commit c
            JOIN audit_event e ON e.workspace_id = c.workspace_id AND e.id = c.audit_event_id
@@ -1638,7 +1638,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           sha,
           parent_sha: null,
           actor: `human:${admin.id}`,
-          act: "platform.reconciler.replayed",
+          action: "platform.reconciler.replayed",
           detail: { commitSha: sha, bundleId: "01J6BBBBBBBBBBBBBBBBBBBBBB" },
           concepts: 0,
         },
@@ -1823,7 +1823,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await membersOf(app(), id, admin.id)).toEqual([
         { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
       ]);
-      expect(await rowsOfAct(app(), id, "platform.workspace.provisioned")).toEqual([
+      expect(await rowsOfAction(app(), id, "platform.workspace.provisioned")).toEqual([
         {
           actor: BOOTSTRAP_ACTOR,
           subject_id: id,
@@ -2009,7 +2009,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         expect(await membersOf(app(), workspaceId, person.id)).toEqual([
           { id: expect.stringMatching(ULID_SHAPE), role },
         ]);
-        expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([
+        expect(await rowsOfAction(app(), workspaceId, "people.member.added")).toEqual([
           { actor: BOOTSTRAP_ACTOR, subject_id: person.id, detail: { userId: person.id, role } },
         ]);
       },
@@ -2036,7 +2036,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         "add-member: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
       ]);
-      expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([]);
+      expect(await rowsOfAction(app(), workspaceId, "people.member.added")).toEqual([]);
     });
 
     it("refuses no-display-name, says what to do next, writes nothing", async () => {
@@ -2050,7 +2050,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         `add-member: REFUSED — no-display-name: ${person.email} has given no display name; have them sign in and give one, then run this again`,
       ]);
       expect(await workspaceCountOf(app(), person.id)).toBe(0);
-      expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([]);
+      expect(await rowsOfAction(app(), workspaceId, "people.member.added")).toEqual([]);
     });
 
     it("refuses no-such-workspace for an unknown id, and writes nothing", async () => {
@@ -2077,7 +2077,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect([again.exitCode, theAdmin.exitCode]).toEqual([8, 8]);
       expect(again.lines).toEqual([
-        `add-member: REFUSED — already-a-member: ${person.email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People page`,
+        `add-member: REFUSED — already-a-member: ${person.email} is already a member of workspace ${workspaceId}; a role change is the Admin's action on the People page`,
       ]);
       expect((await membersOf(app(), workspaceId, person.id)).map((row) => row.role)).toEqual([
         "Editor",
@@ -2085,7 +2085,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect((await membersOf(app(), workspaceId, admin.id)).map((row) => row.role)).toEqual([
         "Admin",
       ]);
-      expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toHaveLength(1);
+      expect(await rowsOfAction(app(), workspaceId, "people.member.added")).toHaveLength(1);
     });
 
     it("answers usage to a fourth role word, and writes nothing", async () => {
@@ -2583,7 +2583,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
       return {
         standing: standing.rows,
-        renamed: await rowsOfAct(app, workspaceId, "platform.workspace.renamed"),
+        renamed: await rowsOfAction(app, workspaceId, "platform.workspace.renamed"),
       };
     };
 
@@ -2790,7 +2790,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const identityRowsOf = async (personId: string) =>
       (
         await app().database.superuser.query(
-          "SELECT action AS act, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
+          "SELECT action, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
           [personId],
         )
       ).rows;
@@ -2862,7 +2862,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         `restore-sign-in: a notice of the restore went to ${person.email}`,
       ]);
       expect((await identityRowsOf(person.id)).slice(before.length)).toEqual([
-        { act: "people.person.sign_in_restored", actor: IDENTITY_ACTOR, detail: {} },
+        { action: "people.person.sign_in_restored", actor: IDENTITY_ACTOR, detail: {} },
       ]);
       expect(sent.map((message) => [message.to, message.subject])).toEqual([
         [person.email, NOTICE],
@@ -3107,7 +3107,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const commitsOf = async (app: TestApp, workspaceId: string) => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
-        `SELECT c.sha, c.parent_sha, e.action AS act
+        `SELECT c.sha, c.parent_sha, e.action
            FROM bundle_commit c
            JOIN audit_event e ON e.workspace_id = c.workspace_id AND e.id = c.audit_event_id
           WHERE c.workspace_id = $1
@@ -3159,9 +3159,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return found.rows;
     };
 
-    const actsOf = async (app: TestApp, workspaceId: string) => {
-      const found = await app.database.superuser.query<{ act: string; events: number }>(
-        `SELECT action AS act, count(*)::int AS events FROM audit_event
+    const actionsOf = async (app: TestApp, workspaceId: string) => {
+      const found = await app.database.superuser.query<{ action: string; events: number }>(
+        `SELECT action, count(*)::int AS events FROM audit_event
           WHERE workspace_id = $1 AND action LIKE 'knowledge.%'
           GROUP BY action ORDER BY action`,
         [workspaceId],
@@ -3203,9 +3203,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(commits[0]).toEqual({
         sha: expect.any(String),
         parent_sha: null,
-        act: "knowledge.manifest.written",
+        action: "knowledge.manifest.written",
       });
-      expect(commits.slice(1).map((row) => [row["act"], row["parent_sha"]])).toEqual(
+      expect(commits.slice(1).map((row) => [row["action"], row["parent_sha"]])).toEqual(
         commits.slice(0, -1).map((row) => ["knowledge.concept.committed", row["sha"]]),
       );
       const rows = await indexRowsOf(app(), workspaceId);
@@ -3303,10 +3303,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
           origin: "imported",
         },
       ]);
-      expect(await actsOf(app(), workspaceId)).toEqual([
-        { act: "knowledge.check.imported", events: 7 },
-        { act: "knowledge.concept.committed", events: 9 },
-        { act: "knowledge.manifest.written", events: 1 },
+      expect(await actionsOf(app(), workspaceId)).toEqual([
+        { action: "knowledge.check.imported", events: 7 },
+        { action: "knowledge.concept.committed", events: 9 },
+        { action: "knowledge.manifest.written", events: 1 },
       ]);
 
       const found = await reading(app(), workspaceId, admin.id, (principal, tx) =>

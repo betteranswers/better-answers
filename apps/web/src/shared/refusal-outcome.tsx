@@ -31,10 +31,10 @@ export const refusalOutcome = (
 ): Outcome => refusedWith(saidOfRefusal(featureWords, word, refusalClass));
 
 /** A read saves nothing, so its failure with no word must not say nothing was saved. */
-export type FailedIn = "act" | "read";
+export type FailedIn = "action" | "read";
 
 const UNANSWERED = {
-  act: NO_RESPONSE,
+  action: NO_RESPONSE,
   read: NO_RESPONSE_TO_A_READ,
 } satisfies Record<FailedIn, Said>;
 
@@ -42,7 +42,7 @@ const UNANSWERED = {
 export const failureOutcome = (
   featureWords: SaidOfWord,
   failure: Error | ApiError,
-  failedIn: FailedIn = "act",
+  failedIn: FailedIn = "action",
 ): Outcome => {
   const refusal = refusalOf(failure);
   return refusal === undefined
