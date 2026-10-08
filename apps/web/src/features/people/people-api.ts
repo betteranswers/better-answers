@@ -69,6 +69,8 @@ export const useMembers = () => {
   return useQuery(api.members.list.queryOptions());
 };
 
+type Taken = { readonly before: readonly ListedMember[] | undefined };
+
 /**
  * The list takes the action before the api answers, so it lands within 100 ms. The action may touch the
  * reader's own member row.
@@ -80,8 +82,9 @@ const useReconciledList = <Asked>(
   const queryClient = useQueryClient();
   const activityReadAgain = useActivityReadAgain();
   const listKey = api.members.list.queryKey();
+  // Callers spread these into `useMutation`: the React lint takes a callback passed through `mutationOptions` as called during render.
   return {
-    onMutate: async (asked: Asked) => {
+    onMutate: async (asked: Asked): Promise<Taken> => {
       await queryClient.cancelQueries({ queryKey: listKey });
       const before = queryClient.getQueryData(listKey);
       queryClient.setQueryData(listKey, (listed) =>
@@ -89,11 +92,7 @@ const useReconciledList = <Asked>(
       );
       return { before };
     },
-    onError: (
-      _refusal: ApiError,
-      _asked: Asked,
-      taken: { readonly before: readonly ListedMember[] | undefined } | undefined,
-    ) => {
+    onError: (_refusal: ApiError, _asked: Asked, taken: Taken | undefined) => {
       queryClient.setQueryData(listKey, taken?.before);
     },
     onSettled: () => {
@@ -116,7 +115,7 @@ export const useChangeRole = () => {
       );
     },
   );
-  return useMutation(api.members.changeRole.mutationOptions(reconciled));
+  return useMutation({ ...api.members.changeRole.mutationOptions<Taken>(), ...reconciled });
 };
 
 /** The instant shown at once is the browser's; the list read after the answer holds the api's. */
@@ -128,7 +127,10 @@ export const useEndEverySignInAndToken = () => {
       member.personId === asked.personId ? { ...member, credentialsRevokedAt } : member,
     );
   });
-  return useMutation(api.members.endEverySignInAndToken.mutationOptions(reconciled));
+  return useMutation({
+    ...api.members.endEverySignInAndToken.mutationOptions<Taken>(),
+    ...reconciled,
+  });
 };
 
 /** The shell's own read of who is signed in, and where, shared rather than asked again. */
@@ -152,7 +154,7 @@ export const useRemoveMember = () => {
   const reconciled = useReconciledList((listed, asked: { readonly personId: string }) =>
     listed.filter((member) => member.personId !== asked.personId),
   );
-  const options = api.members.remove.mutationOptions(reconciled);
+  const options = { ...api.members.remove.mutationOptions<Taken>(), ...reconciled };
   const removal = useMutation(
     workspaceId === undefined ? options : { ...options, meta: { workspaceId } },
   );
@@ -200,7 +202,7 @@ export const useBulkChangeRole = () => {
       ticked(member) && role !== undefined ? { ...member, role } : member,
     );
   });
-  return useMutation(api.members.bulkChangeRole.mutationOptions(reconciled));
+  return useMutation({ ...api.members.bulkChangeRole.mutationOptions<Taken>(), ...reconciled });
 };
 
 /** A group's member count moves with these actions, so the groups are read again beside the list. */
@@ -217,12 +219,11 @@ export const useBulkRemove = () => {
     const ticked = tickedIn(asked);
     return listed.filter((member) => !ticked(member));
   });
-  return useMutation(
-    api.members.bulkRemove.mutationOptions({
-      ...reconciled,
-      onSettled: () => Promise.all([reconciled.onSettled(), groupsReadAgain()]),
-    }),
-  );
+  return useMutation({
+    ...api.members.bulkRemove.mutationOptions<Taken>(),
+    ...reconciled,
+    onSettled: () => Promise.all([reconciled.onSettled(), groupsReadAgain()]),
+  });
 };
 
 type GroupHeld = ListedMember["groups"][number];
@@ -248,10 +249,9 @@ export const useBulkAddToGroup = () => {
     const join = joinedTo({ groupId: named.id, name: named.name });
     return listed.map((member) => (ticked(member) ? join(member) : member));
   });
-  return useMutation(
-    api.members.bulkAddToGroup.mutationOptions({
-      ...reconciled,
-      onSettled: () => Promise.all([reconciled.onSettled(), groupsReadAgain()]),
-    }),
-  );
+  return useMutation({
+    ...api.members.bulkAddToGroup.mutationOptions<Taken>(),
+    ...reconciled,
+    onSettled: () => Promise.all([reconciled.onSettled(), groupsReadAgain()]),
+  });
 };

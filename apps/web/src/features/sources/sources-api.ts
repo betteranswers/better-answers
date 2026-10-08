@@ -115,21 +115,21 @@ export const usePublish = () => {
   const api = useTRPC();
   const optimistic = useOptimistic();
   const reconcile = useReconcile();
-  return useMutation(
-    api.sources.publish.mutationOptions({
-      onMutate: (asked) =>
-        optimistic(
-          api.sources.list.queryKey(),
-          onTheConnectedSource(asked.connectedSourceId, (connectedSource) => ({
-            ...connectedSource,
-            state: "published",
-            publishedAt: new Date().toISOString(),
-          })),
-        ),
-      onError: (_refusal, _asked, held) => held?.undo(),
-      onSettled: () => reconcile(),
-    }),
-  );
+  // The callbacks go to the hook itself: the React lint takes one passed through `mutationOptions` as called during render.
+  return useMutation({
+    ...api.sources.publish.mutationOptions<Undo>(),
+    onMutate: (asked) =>
+      optimistic(
+        api.sources.list.queryKey(),
+        onTheConnectedSource(asked.connectedSourceId, (connectedSource) => ({
+          ...connectedSource,
+          state: "published",
+          publishedAt: new Date().toISOString(),
+        })),
+      ),
+    onError: (_refusal, _asked, held) => held?.undo(),
+    onSettled: () => reconcile(),
+  });
 };
 
 /**
