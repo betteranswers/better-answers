@@ -777,7 +777,7 @@ const SYNC_CARVED_OUT: readonly CarveOut[] = [
   ...VENDORED,
 ];
 
-/** No sync is written here. A tree that writes one is named file by file, so a sync stays read there. */
+/** Every run here is a tool's or a suite's. A tree that also writes a sync is named file by file. */
 const OTHER_RUN_TREES = [
   ".claude/",
   ".github/",
@@ -841,7 +841,6 @@ const OTHER_RUN_TREES = [
   "docs/solutions/integration-issues/",
   "docs/solutions/logic-errors/",
   "docs/solutions/skill-design/",
-  "docs/specs/v01-route.md",
   "package.json",
   "packages/core/package.json",
   "packages/core/scripts/",
