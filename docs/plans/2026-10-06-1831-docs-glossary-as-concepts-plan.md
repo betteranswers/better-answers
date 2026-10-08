@@ -57,7 +57,7 @@ The words test (`apps/api/tests/avoid-words.test.ts` with `words-scan.ts`) reads
 
 **The format**
 
-- R6. After BA-29's last sweep, the glossary's structure and entries follow each of CE's rules, as the table under *CE's rules, rule by rule* records. A rule is not followed only where the owner has recorded an exception and its reason. The preamble names every exception, because CE's skills read that file and not this plan.
+- R6. After BA-29's last sweep, the glossary's structure and entries follow each of CE's rules, as the table under *CE's rules, rule by rule* records. A rule is not followed only where the owner has recorded an exception and its reason, or where the table marks it deferred. The preamble names every exception, because CE's skills read that file and not this plan, and names no deferral.
 - R7. The words test reads the reshaped file and keeps every check it makes today: entry heads, the two marks, the word a page says instead, its old-words list against the glossary, and the line scan of the glossary for old words.
 - R9. The words test fails, rather than reading nothing, when an entry is written in the bullet shape the reshape retires.
 
@@ -98,7 +98,7 @@ CE's rules are `skills/ce-compound/references/concepts-vocabulary.md` in the plu
 ### Scope Boundaries
 
 - No entry's meaning changes, and no head changes its wording. U2 changes format and removes what CE's rules exclude. Where removing a phrase would change what an entry says, that is a D-question, not a build call.
-- No entry is added, folded, retired or deleted, apart from the three kinds of principal folded into their parent entry (KTD11).
+- No entry is added, folded, retired or deleted. The three kinds of principal are body lines of the principal entry today, and KTD11 rewrites them as a sentence.
 - BA-29's sweeps and its old-words list are BA-29's work, and BA-29 is done.
 - `docs/archive/` is not edited.
 - Not built: a committed check that cluster prose sits only before a cluster's first entry. KTD8's second comparison catches prose the reshape absorbs. A later edit that puts prose after an entry would lengthen that entry's definition and change no mark, which the internal-word check would show only if the prose said what a page says. Evidence that would change the call: a CE run that writes cluster prose after entries.
@@ -141,7 +141,7 @@ Each is the owner's to decide. U2's build starts only once each has an answer, b
   - **A. Keep #593's rule.** Every CE edit shows in its pull request's diff, and Cubic and the owner review it. The glossary grows with the work. An entry can enter that no decision settled, and `ce-compound-refresh` applies its edits without asking.
   - **B. Additions only from settled decisions.** CE may refine, fold, scrub and retire, and a new entry comes only from a plan, a brainstorm or a decision doc that settled it. The preamble must say so, because CE reads it. CE's own rules let a `ce-compound` run add, so the preamble overrides CE's skills, and no test enforces it.
   - **C. Keep A, and have a pull request name each entry CE added.** That costs `ce-commit-push-pr` one line of body per addition, and the gate is review alone.
-  - **Recommendation: A.** The owner chose it on 06/10/2026 against B's shape, and nothing since has shown an unreviewed entry landing. Whichever stands, the preamble says it in one sentence (R4).
+  - **Recommendation: A.** The parent plan records the owner choosing it on 06/10/2026 against B's shape, and nothing since has shown an unreviewed entry landing. Whichever stands, the preamble says it in one sentence (R4).
 - **D2. ADR numbers in entries (unresolved).** 69 lines cite one.
   - **A. Remove them and state the rule in words** (KTD6). The entry stands on its own, as CE requires, and a reader finds the reasoning by searching the decision docs for the term.
   - **B. Keep them, as an exception.** A reader can go straight to the reasoning, but CE's skills read a number they cannot resolve, and a renumbered decision leaves a stale pointer.
