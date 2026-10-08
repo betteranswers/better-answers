@@ -56,14 +56,6 @@ const CARVED_OUT: readonly CarveOut[] = [
     holds: (file) => file === "packages/core/src/audit/stored-names.ts",
     why: "the stored-names register spells each act name and detail key as audit rows keep it",
   },
-  {
-    holds: under("packages/devtools/renames/"),
-    why: "a rename map names the old word it replaces, as a migration does",
-  },
-  {
-    holds: (file) => file === "packages/devtools/test/rename.test.ts",
-    why: "the rename runner's fixtures spell the old words they rename",
-  },
   { holds: under(".cubic/"), why: "Cubic generates it and rewrites it" },
   {
     holds: under("apps/api/.claude/skills/"),
@@ -88,7 +80,7 @@ const CARVED_OUT: readonly CarveOut[] = [
     holds: (file) =>
       [
         "docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md",
-        "docs/solutions/best-practices/what-a-rename-sweeps-runner-and-prose-pass-get-wrong-and-the-checks-that-catch-it.md",
+        "docs/solutions/best-practices/what-a-rename-prose-pass-gets-wrong-and-the-checks-that-catch-it.md",
         "docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md",
       ].includes(file),
     why: "a rename's learning names the words it renamed",
@@ -391,8 +383,6 @@ describe("the senses the people words keep", () => {
         "apps/web/src/planted.ts": `// The ${WORD} claims the job.`,
         "apps/web/CODING_STANDARDS.md": `The ${WORD} claims the job.`,
         "packages/core/src/audit/stored-names.ts": `// The ${WORD} claims the job.`,
-        "packages/devtools/renames/planted.ts": `// The ${WORD} claims the job.`,
-        "packages/devtools/test/rename.test.ts": `// The ${WORD} claims the job.`,
         "packages/devtools/test/planted.test.ts": `// The ${WORD} claims the job.`,
       },
       [APP],

@@ -595,10 +595,7 @@ const STORED_BEFORE_0073: readonly Sense[] = [
   },
 ];
 
-/**
- * Fitted to the tree, and held to lower case so a label such as "Acts for" stays refused. Mirrored
- * in `packages/devtools/renames/action.json`.
- */
+/** Fitted to the tree, and held to lower case so a label such as "Acts for" stays refused. */
 const ACT_AS_A_VERB = [
   String.raw`(?<=\b(?:to|can|cannot|can't|will|won't|would|could|should|must|may|might|never|not|who|[Tt]hey|[Ww]e|[Yy]ou|[Nn]obody)\s+(?:still\s+|only\s+|also\s+)?)act\b`,
   String.raw`(?<=\b(?:that|and)\s)act (?:on|as)\b`,
