@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { ASK_TO_JOIN_PERSON_RULE } from "../src/auth/constants.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
-import { appForSuite } from "./suite-app.ts";
+import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import { NO_SESSION_ANSWERED, refusalOfCall, statusOf, webSignedIn } from "./web-client.ts";
 
-const app = appForSuite();
+const { clock, stopTheClock } = aStoppableClock();
+
+const app = appForSuite({ clock });
 
 const REQUEST_ACCESS = `${TRPC_ENDPOINT}/person.requestAccess`;
 
@@ -123,15 +125,14 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     const workspace = await app().provision();
     const { person, api, client } = await aSignedInPerson();
     const statuses: number[] = [];
+    stopTheClock();
 
-    // The window is wall-clock aligned, so a burst straddling a boundary starts its count
-    // again: ask until refused, not a fixed number.
-    for (let attempt = 0; attempt <= ASK_TO_JOIN_PERSON_RULE.max * 2 + 1; attempt += 1) {
-      const status = await statusOf(
-        api.person.requestAccess.mutate({ shortName: unknownShortName(), reason: REASON }),
+    for (let attempt = 0; attempt <= ASK_TO_JOIN_PERSON_RULE.max; attempt += 1) {
+      statuses.push(
+        await statusOf(
+          api.person.requestAccess.mutate({ shortName: unknownShortName(), reason: REASON }),
+        ),
       );
-      statuses.push(status);
-      if (status === 429) break;
     }
     const known = await client.json(REQUEST_ACCESS, {
       shortName: workspace.shortName,
@@ -139,8 +140,10 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     });
     const someoneElse = await aSignedInPerson();
 
-    expect(statuses.at(-1)).toBe(429);
-    expect(statuses.filter((status) => status === 200).length).toBeGreaterThanOrEqual(10);
+    expect(statuses).toEqual([
+      ...Array.from({ length: ASK_TO_JOIN_PERSON_RULE.max }, () => 200),
+      429,
+    ]);
     expect(known.status).toBe(429);
     const retryAfter = Number(known.headers.get("retry-after"));
     expect(retryAfter).toBeGreaterThanOrEqual(1);

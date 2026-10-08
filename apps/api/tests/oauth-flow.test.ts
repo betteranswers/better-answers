@@ -35,15 +35,18 @@ import {
   startApp,
   type TestApp,
 } from "./harness.ts";
+import { aStoppableClock } from "./suite-app.ts";
 import { webSignedIn } from "./web-client.ts";
 
 const json = async <T>(response: Response, shape: z.ZodType<T>): Promise<T> =>
   shape.parse(await response.json());
 
+const { clock, stopTheClock } = aStoppableClock();
+
 let app: TestApp;
 
 beforeAll(async () => {
-  app = await startApp();
+  app = await startApp({ clock });
 });
 
 afterAll(async () => {
@@ -889,27 +892,35 @@ describe("the audit logs", () => {
 });
 
 describe("the limits", () => {
-  /**
-   * The windows are wall-clock aligned, so a loop may straddle a boundary; 2·max + 1 puts
-   * max + 1 into one window.
-   */
-  const untilRefused = async (send: () => Promise<Response>, max: number): Promise<number[]> => {
+  /** Sends `max` the ceiling lets through, then one past it. */
+  const onePast = async (send: () => Promise<Response>, max: number): Promise<number[]> => {
     const statuses: number[] = [];
-    for (let attempt = 0; attempt < 2 * max + 1; attempt += 1) statuses.push((await send()).status);
+    for (let attempt = 0; attempt <= max; attempt += 1) statuses.push((await send()).status);
     return statuses;
+  };
+
+  /** Better Auth's own limiter refuses with a `message`, not this `error`. */
+  const isOurRefusal = async (answer: Response): Promise<boolean> =>
+    answer.status === 429 &&
+    refusal.safeParse(await answer.json()).data?.error === "too_many_requests";
+
+  const refusedOnlyAtTheLast = (statuses: readonly number[]): void => {
+    expect(statuses.slice(0, -1)).not.toContain(429);
+    expect(statuses.at(-1)).toBe(429);
   };
 
   it("keys the page limit on CF-Connecting-IP alone, ignoring spoofed X-Forwarded-For", async () => {
     const client = app.client("203.0.113.10");
     let spoof = 0;
+    stopTheClock();
 
-    const statuses = await untilRefused(
+    const statuses = await onePast(
       () =>
         client.fetch("/consent", { headers: { "x-forwarded-for": `203.0.113.${(spoof += 1)}` } }),
       30,
     );
 
-    expect(statuses).toContain(429);
+    refusedOnlyAtTheLast(statuses);
 
     const other = await app
       .client("203.0.113.11")
@@ -920,8 +931,9 @@ describe("the limits", () => {
   it("throttles codes per email across addresses", async () => {
     const email = `throttled-${Date.now()}@example.invalid`;
     let address = 20;
+    stopTheClock();
 
-    const statuses = await untilRefused(
+    const statuses = await onePast(
       () =>
         app
           .client(`203.0.113.${(address += 1)}`)
@@ -929,8 +941,8 @@ describe("the limits", () => {
       5,
     );
 
-    expect(statuses).toContain(429);
-    expect(app.emails.filter((message) => message.to === email).length).toBeLessThanOrEqual(10);
+    refusedOnlyAtTheLast(statuses);
+    expect(app.emails.filter((message) => message.to === email).length).toBeLessThanOrEqual(5);
   });
 
   it("leaves a malformed code request to Better Auth's refusal", async () => {
@@ -950,14 +962,17 @@ describe("the limits", () => {
     "limits %s per address, before Better Auth's own limiter",
     async (path) => {
       const client = app.client();
-      const refusals: unknown[] = [];
+      stopTheClock();
 
-      for (let attempt = 0; attempt < 2 * OAUTH_IP_RULE.max + 1; attempt += 1) {
-        const answer = await client.fetch(path);
-        if (answer.status === 429) refusals.push(await answer.json());
+      const refusedByUs: boolean[] = [];
+      for (let attempt = 0; attempt < OAUTH_IP_RULE.max; attempt += 1) {
+        refusedByUs.push(await isOurRefusal(await client.fetch(path)));
       }
+      const past = await client.fetch(path);
 
-      expect(refusals).toContainEqual(expect.objectContaining({ error: "too_many_requests" }));
+      expect(refusedByUs).not.toContain(true);
+      expect(past.status).toBe(429);
+      expect(await past.json()).toMatchObject({ error: "too_many_requests" });
     },
   );
 
@@ -965,7 +980,7 @@ describe("the limits", () => {
     const client = app.client("203.0.113.40");
     let attempt = 0;
 
-    const statuses = await untilRefused(
+    const statuses = await onePast(
       () =>
         client.fetch("/email-otp/send-verification-otp", {
           method: "POST",
@@ -978,7 +993,7 @@ describe("the limits", () => {
       5,
     );
 
-    expect(statuses).toContain(429);
+    refusedOnlyAtTheLast(statuses);
     const stored = await app.database.superuser.query("SELECT count(*)::int AS n FROM rate_limit");
     expect(Number(stored.rows[0]?.n)).toBeGreaterThan(0);
   });

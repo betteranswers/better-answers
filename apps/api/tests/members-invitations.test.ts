@@ -17,11 +17,14 @@ import {
   type Api,
 } from "./people-suite.ts";
 import { whileCommitsAreRefused } from "./provoke.ts";
+import { aStoppableClock } from "./suite-app.ts";
 import { refusalOfCall, statusOf, webSignedIn } from "./web-client.ts";
 
 const unreachable = new Set<string>();
 
-const app = appForSuite(unreachable);
+const { clock, stopTheClock } = aStoppableClock();
+
+const app = appForSuite(unreachable, clock);
 
 const INVITE = `${TRPC_ENDPOINT}/members.invite`;
 
@@ -51,13 +54,17 @@ const anAdmin = async () => {
   return { workspace, ...(await webSignedIn(app(), workspace.admin.email)) };
 };
 
-/** Sends to `address` until refused: the window is the wall clock's hour, so a count can restart. */
+/** One workspace emails an address at most this often in an hour. */
+const PER_ADDRESS_CEILING = 5;
+
+const TO_THE_CEILING = [...Array.from({ length: PER_ADDRESS_CEILING }, () => 200), 429];
+
+/** Sends to `address` up to its ceiling and once past it, the clock stopped while it counts. */
 const sentToTheCeiling = async (api: Api, address: string): Promise<readonly number[]> => {
   const statuses: number[] = [];
-  for (let attempt = 0; attempt <= 11; attempt += 1) {
-    const status = await statusOf(inviting(api, [address]));
-    statuses.push(status);
-    if (status === 429) return statuses;
+  stopTheClock();
+  for (let attempt = 0; attempt <= PER_ADDRESS_CEILING; attempt += 1) {
+    statuses.push(await statusOf(inviting(api, [address])));
   }
   return statuses;
 };
@@ -268,8 +275,7 @@ describe("the per-address ceiling over tRPC", () => {
     const statuses = await sentToTheCeiling(api, ana);
     const refused = await client.json(INVITE, { addresses: [ben, ana], role: "Viewer" });
 
-    expect(statuses.at(-1)).toBe(429);
-    expect(statuses.filter((status) => status === 200).length).toBeGreaterThanOrEqual(5);
+    expect(statuses).toEqual(TO_THE_CEILING);
     expect(refused.status).toBe(429);
     const retryAfter = Number(refused.headers.get("retry-after"));
     expect(retryAfter).toBeGreaterThanOrEqual(1);
@@ -278,7 +284,7 @@ describe("the per-address ceiling over tRPC", () => {
       error: { data: { code: "TOO_MANY_REQUESTS", retryAfterSeconds: retryAfter } },
     });
     expect(emailsTo(app(), ben)).toEqual([]);
-    expect(emailsTo(app(), ana)).toHaveLength(statuses.length - 1);
+    expect(emailsTo(app(), ana)).toHaveLength(PER_ADDRESS_CEILING);
     expect((await api.members.invitations.query()).map((row) => row.address)).toEqual([ana]);
   });
 
@@ -296,7 +302,7 @@ describe("the per-address ceiling over tRPC", () => {
       }),
     );
 
-    expect(statuses.at(-1)).toBe(429);
+    expect(statuses).toEqual(TO_THE_CEILING);
     expect(refused).toMatchObject({ data: { httpStatus: 429, code: "TOO_MANY_REQUESTS" } });
     expect(emailsTo(app(), toBen.address)).toHaveLength(1);
     expect(await api.members.invitations.query()).toEqual(before);

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -20,18 +20,13 @@ import {
   PAGE_IP_RULE,
 } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
-import { startApp, type TestApp, type TestClient } from "./harness.ts";
+import type { TestClient } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
+import { appForSuite, aStoppableClock } from "./suite-app.ts";
 
-let app: TestApp;
+const { clock, stopTheClock } = aStoppableClock();
 
-beforeAll(async () => {
-  app = await startApp();
-});
-
-afterAll(async () => {
-  await app.stop();
-});
+const app = appForSuite({ clock });
 
 type Params = Readonly<Record<string, unknown>>;
 
@@ -157,22 +152,22 @@ const callTool = (client: TestClient, token: string, name: string, args: Params)
 const firstText = (called: z.infer<typeof toolCalled>): string => called.content[0]?.text ?? "";
 
 const connect = async (scope = "knowledge:read feedback:write offline_access") => {
-  const workspace = await app.provision();
-  const client = app.client();
-  const tokens = await connectAsHost(app, client, workspace.admin, { scope });
+  const workspace = await app().provision();
+  const client = app().client();
+  const tokens = await connectAsHost(app(), client, workspace.admin, { scope });
   return { workspace, client, token: tokens.accessToken };
 };
 
-/**
- * The window is wall-clock aligned, so a burst of max + 1 can straddle a boundary and never be
- * refused; 2·max + 1 cannot.
- */
+/** Sends `max` the ceiling lets through, then one past it, the clock stopped while it counts. */
 const pastTheCeiling = async (max: number, send: () => Promise<Response>) => {
-  let answer = await send();
-  for (let call = 1; call < 2 * max + 1 && answer.status !== 429; call += 1) answer = await send();
+  stopTheClock();
+  const letThrough: number[] = [];
+  for (let call = 0; call < max; call += 1) letThrough.push((await send()).status);
+  const answer = await send();
 
   const body = ceilingRefusal.safeParse(await answer.json());
   return {
+    refusedBefore: letThrough.filter((status) => status === 429).length,
     status: answer.status,
     hasRetryAfter: answer.headers.get("retry-after") !== null,
     sentence: body.success ? body.data.error_description : undefined,
@@ -180,6 +175,7 @@ const pastTheCeiling = async (max: number, send: () => Promise<Response>) => {
 };
 
 const REFUSED_AT_THE_CEILING = {
+  refusedBefore: 0,
   status: 429,
   hasRetryAfter: true,
   sentence: expect.stringContaining("an Admin can raise the ceiling in System"),
@@ -336,8 +332,8 @@ describe("era-independent", () => {
     const { workspace, client, token } = await connect();
     expect((await modern(client, token, "tools/list")).status).toBe(200);
 
-    await app.endEverySignInAndToken(workspace.admin.id, new Date(Date.now() + 1_000));
-    const before = app.logs.length;
+    await app().endEverySignInAndToken(workspace.admin.id, new Date(Date.now() + 1_000));
+    const before = app().logs.length;
 
     const refused = await modern(client, token, "tools/list");
     expect(refused.status).toBe(401);
@@ -345,7 +341,7 @@ describe("era-independent", () => {
     const challenge = refused.headers.get("www-authenticate") ?? "";
     expect(challenge).toContain('error="invalid_token"');
     expect(challenge).not.toContain("credentials-revoked");
-    expect(app.logs.slice(before)).toContainEqual(
+    expect(app().logs.slice(before)).toContainEqual(
       expect.objectContaining({
         event: "mcp.refused",
         refusal: "credentials-revoked",
@@ -356,14 +352,14 @@ describe("era-independent", () => {
 
   it("refuses a former member's token, its reason logged, not sent", async () => {
     const { workspace, client, token } = await connect();
-    await app.removeMember(workspace.workspaceId, workspace.admin.id);
-    const before = app.logs.length;
+    await app().removeMember(workspace.workspaceId, workspace.admin.id);
+    const before = app().logs.length;
 
     const refused = await modern(client, token, "tools/list");
 
     expect(refused.status).toBe(401);
     expect(refused.headers.get("www-authenticate") ?? "").not.toContain("not-a-member");
-    expect(app.logs.slice(before)).toContainEqual(
+    expect(app().logs.slice(before)).toContainEqual(
       expect.objectContaining({
         event: "mcp.refused",
         refusal: "not-a-member",
@@ -400,7 +396,7 @@ describe("a call with no bearer", () => {
     modern(client, "", "tools/list", {}, { headers: { authorization: "" } });
 
   it("is challenged for the bearer it lacks", async () => {
-    const challenged = await unauthenticated(app.client());
+    const challenged = await unauthenticated(app().client());
 
     expect(challenged.status).toBe(401);
     expect(challenged.headers.get("www-authenticate")).toContain(
@@ -409,7 +405,7 @@ describe("a call with no bearer", () => {
   });
 
   it("answers 429 once its address floods the surface", async () => {
-    const client = app.client();
+    const client = app().client();
 
     const refused = await pastTheCeiling(MCP_UNAUTHENTICATED_IP_RULE.max, () =>
       unauthenticated(client),
@@ -419,16 +415,15 @@ describe("a call with no bearer", () => {
   });
 
   it("spends the one budget its address has on the pages", async () => {
-    const client = app.client();
-    const consents: number[] = [];
+    const client = app().client();
+    stopTheClock();
 
-    // Ten rounds cross at most one window edge, so five of them, 35 counts, share a window.
-    for (let round = 0; round < 10; round += 1) {
-      for (let call = 0; call < PAGE_IP_RULE.max / 5; call += 1) await unauthenticated(client);
-      consents.push((await client.fetch("/consent")).status);
-    }
+    for (let call = 1; call < PAGE_IP_RULE.max; call += 1) await unauthenticated(client);
+    const atTheCeiling = await client.fetch("/consent");
+    const pastIt = await client.fetch("/consent");
 
-    expect(consents).toContain(429);
+    expect(atTheCeiling.status).not.toBe(429);
+    expect(pastIt.status).toBe(429);
   });
 });
 
@@ -459,7 +454,7 @@ describe("the 2026-07-28 leg", () => {
 
   it("reads the TTL from the workspace's config row", async () => {
     const { workspace, client, token } = await connect();
-    await app.setWorkspaceConfig(workspace.workspaceId, TOOLS_LIST_TTL_CONFIG_KEY, "42000");
+    await app().setWorkspaceConfig(workspace.workspaceId, TOOLS_LIST_TTL_CONFIG_KEY, "42000");
 
     const listed = await result(await modern(client, token, "tools/list"), toolsListed);
 
@@ -518,11 +513,11 @@ describe("the 2026-07-28 leg", () => {
 
   it("logs a request the handler rejects, as the mcp module", async () => {
     const { client, token } = await connect();
-    const before = app.logs.length;
+    const before = app().logs.length;
 
     await modern(client, token, "tools/list", {}, { headers: { "mcp-method": "" } });
 
-    expect(app.logs.slice(before)).toContainEqual(
+    expect(app().logs.slice(before)).toContainEqual(
       expect.objectContaining({
         level: 40,
         module: "mcp",

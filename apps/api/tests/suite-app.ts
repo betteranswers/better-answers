@@ -48,4 +48,5 @@ export const aStoppableClock = (): { readonly clock: Clock; readonly stopTheCloc
 const WEB_ROOT = fileURLToPath(new URL("fixtures/web-build", import.meta.url));
 
 /** As `appForSuite`, with the fixture web build served. */
-export const servedApp = (): (() => TestApp) => appForSuite({ webRoot: WEB_ROOT });
+export const servedApp = (options: Pick<TestAppOptions, "clock"> = {}): (() => TestApp) =>
+  appForSuite({ ...options, webRoot: WEB_ROOT });
