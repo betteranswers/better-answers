@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -9,13 +9,14 @@ import {
 
 import { TRPC_IP_RULE } from "../src/auth/index.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
-import { startApp, type TestApp, type TestClient } from "./harness.ts";
+import type { TestClient } from "./harness.ts";
 import {
   constraintDefinition,
   memberOfTwoWorkspaces,
   sessionPointedAt,
   signedInClient,
 } from "./provoke.ts";
+import { appForSuite, aStoppableClock } from "./suite-app.ts";
 
 const TRPC_MODEL_CHOICES_LIST = `${TRPC_ENDPOINT}/modelChoices.list`;
 
@@ -31,18 +32,12 @@ const modelChoiceShape = z.object({
 const answered = z.object({ result: z.object({ data: z.array(modelChoiceShape) }) });
 const refused = z.object({ error: z.object({ message: z.string() }) });
 
-let app: TestApp;
+const { clock, stopTheClock } = aStoppableClock();
 
-beforeAll(async () => {
-  app = await startApp();
-});
-
-afterAll(async () => {
-  await app.stop();
-});
+const app = appForSuite({ clock });
 
 const seedModelChoices = async (workspaceId: string): Promise<void> => {
-  const client = await app.database.superuser.connect();
+  const client = await app().database.superuser.connect();
   try {
     const seed = testData(client);
     for (const modelChoice of CONFIGURED_MODEL_CHOICES)
@@ -62,10 +57,10 @@ const MEMBER_ROLE_CHECK = "member_role_check";
 
 describe("the model choices list over the wire", () => {
   it("answers one model choice per purpose, embedding fixed with dimensions", async () => {
-    const workspace = await app.provision();
+    const workspace = await app().provision();
     await seedModelChoices(workspace.workspaceId);
 
-    const response = await listModelChoices(await signedInClient(app, workspace.admin.email));
+    const response = await listModelChoices(await signedInClient(app(), workspace.admin.email));
 
     expect(response.status).toBe(200);
     expect(answered.parse(await response.json()).result.data).toEqual(LISTED_MODEL_CHOICES);
@@ -74,12 +69,12 @@ describe("the model choices list over the wire", () => {
   it.each(["Admin", "Editor", "Viewer"] as const)(
     "lets a member at %s read the list",
     async (role) => {
-      const workspace = await app.provision();
+      const workspace = await app().provision();
       await seedModelChoices(workspace.workspaceId);
-      const person = await app.person();
-      await app.addMember(workspace.workspaceId, person.id, role);
+      const person = await app().person();
+      await app().addMember(workspace.workspaceId, person.id, role);
 
-      const response = await listModelChoices(await signedInClient(app, person.email));
+      const response = await listModelChoices(await signedInClient(app(), person.email));
 
       expect(response.status).toBe(200);
       const listed = answered.parse(await response.json()).result.data;
@@ -90,10 +85,10 @@ describe("the model choices list over the wire", () => {
   );
 
   it("never shows a member another workspace's model choices", async () => {
-    const mine = await app.provision();
+    const mine = await app().provision();
     await seedModelChoices(mine.workspaceId);
-    const theirs = await app.provision();
-    const client = await app.database.superuser.connect();
+    const theirs = await app().provision();
+    const client = await app().database.superuser.connect();
     try {
       await testData(client).modelChoice({
         workspaceId: theirs.workspaceId,
@@ -105,7 +100,7 @@ describe("the model choices list over the wire", () => {
       client.release();
     }
 
-    const response = await listModelChoices(await signedInClient(app, mine.admin.email));
+    const response = await listModelChoices(await signedInClient(app(), mine.admin.email));
 
     const listed = answered.parse(await response.json()).result.data;
     expect(listed.map((modelChoice) => modelChoice.model)).not.toContain("mistral-large");
@@ -114,23 +109,23 @@ describe("the model choices list over the wire", () => {
 
 describe("what the model choices list refuses", () => {
   it("refuses a request with no session", async () => {
-    const response = await listModelChoices(app.client());
+    const response = await listModelChoices(app().client());
 
     expect(response.status).toBe(401);
     expect(await messageOf(response)).toBe("no-session");
   });
 
   it("refuses a signed-in person with no workspace picked yet", async () => {
-    const response = await listModelChoices(await memberOfTwoWorkspaces(app));
+    const response = await listModelChoices(await memberOfTwoWorkspaces(app()));
 
     expect(response.status).toBe(401);
     expect(await messageOf(response)).toBe("no-active-workspace");
   });
 
   it("refuses a person who stopped being a member mid-session", async () => {
-    const workspace = await app.provision();
-    const client = await signedInClient(app, workspace.admin.email);
-    await app.removeMember(workspace.workspaceId, workspace.admin.id);
+    const workspace = await app().provision();
+    const client = await signedInClient(app(), workspace.admin.email);
+    await app().removeMember(workspace.workspaceId, workspace.admin.id);
 
     const response = await listModelChoices(client);
 
@@ -139,10 +134,10 @@ describe("what the model choices list refuses", () => {
   });
 
   it("refuses a session issued before the person's credentials were revoked", async () => {
-    const workspace = await app.provision();
+    const workspace = await app().provision();
 
-    await app.endEverySignInAndToken(workspace.admin.id, new Date(Date.now() + 60_000));
-    const client = await signedInClient(app, workspace.admin.email);
+    await app().endEverySignInAndToken(workspace.admin.id, new Date(Date.now() + 60_000));
+    const client = await signedInClient(app(), workspace.admin.email);
 
     const response = await listModelChoices(client);
 
@@ -151,13 +146,13 @@ describe("what the model choices list refuses", () => {
   });
 
   it("refuses a member role outside the platform's three", async () => {
-    const workspace = await app.provision();
-    const client = await signedInClient(app, workspace.admin.email);
-    const { superuser } = app.database;
+    const workspace = await app().provision();
+    const client = await signedInClient(app(), workspace.admin.email);
+    const { superuser } = app().database;
     const where = "workspace_id = $1 AND user_id = $2";
     const member = [workspace.workspaceId, workspace.admin.id];
 
-    const definition = await constraintDefinition(app, MEMBER_ROLE_CHECK);
+    const definition = await constraintDefinition(app(), MEMBER_ROLE_CHECK);
     try {
       await superuser.query(`ALTER TABLE "member" DROP CONSTRAINT "${MEMBER_ROLE_CHECK}"`);
       await superuser.query(`UPDATE "member" SET role = 'Owner' WHERE ${where}`, member);
@@ -172,30 +167,28 @@ describe("what the model choices list refuses", () => {
         `ALTER TABLE "member" ADD CONSTRAINT "${MEMBER_ROLE_CHECK}" ${definition}`,
       );
     }
-    expect(await constraintDefinition(app, MEMBER_ROLE_CHECK)).toBe(definition);
+    expect(await constraintDefinition(app(), MEMBER_ROLE_CHECK)).toBe(definition);
   });
 
   it("refuses one address's flood before each request spends a lookup", async () => {
-    const client = app.client("203.0.113.60");
+    const client = app().client("203.0.113.60");
     const statuses: number[] = [];
+    stopTheClock();
 
-    // The window is wall-clock aligned, so a burst straddling a boundary starts its count
-    // again: ask until refused, not a fixed number.
-    for (let attempt = 0; attempt <= TRPC_IP_RULE.max * 2 + 1; attempt += 1) {
-      const status = (await listModelChoices(client)).status;
-      statuses.push(status);
-      if (status === 429) break;
+    for (let attempt = 0; attempt <= TRPC_IP_RULE.max; attempt += 1) {
+      statuses.push((await listModelChoices(client)).status);
     }
 
-    expect(statuses).toContain(429);
+    expect(statuses.slice(0, -1)).not.toContain(429);
+    expect(statuses.at(-1)).toBe(429);
 
-    expect((await listModelChoices(app.client("203.0.113.61"))).status).toBe(401);
+    expect((await listModelChoices(app().client("203.0.113.61"))).status).toBe(401);
   });
 
   it("refuses a session whose active workspace is no workspace id", async () => {
-    const workspace = await app.provision();
-    const client = await signedInClient(app, workspace.admin.email);
-    await sessionPointedAt(app, workspace.admin.id, "not-a-workspace-id");
+    const workspace = await app().provision();
+    const client = await signedInClient(app(), workspace.admin.email);
+    await sessionPointedAt(app(), workspace.admin.id, "not-a-workspace-id");
 
     const response = await listModelChoices(client);
 

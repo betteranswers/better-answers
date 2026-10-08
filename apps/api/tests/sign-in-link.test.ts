@@ -6,9 +6,11 @@ import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
 import { confirmedByTheHarness } from "./factor-harness.ts";
 import { authorizeUrl, continueAfterPostLogin, pkce } from "./flow.ts";
 import { PUBLIC_URL, type TestClient } from "./harness.ts";
-import { servedApp } from "./suite-app.ts";
+import { aStoppableClock, servedApp } from "./suite-app.ts";
 
-const app = servedApp();
+const { clock, stopTheClock } = aStoppableClock();
+
+const app = servedApp({ clock });
 
 const LINK_PAGE = "/sign-in/link";
 const DESCRIBE = "/sign-in-link/describe";
@@ -233,14 +235,20 @@ describe("reading a link", () => {
     const person = await app().person();
     const asking = app().client();
     const { token } = await askedFor(asking, person.email);
-    for (let read = 0; read < 11; read += 1) await describeLink(app().client(), token);
+    stopTheClock();
+    const reads: number[] = [];
+    for (let read = 0; read < 11; read += 1) {
+      reads.push((await describeLink(app().client(), token)).status);
+    }
 
+    expect(reads.at(-1)).toBe(429);
     expect((await asking.json(SIGN_IN_BY_LINK, { token })).status).toBe(200);
   });
 
   it("refuses one link's reads past its own ceiling", async () => {
     const person = await app().person();
     const { token } = await askedFor(app().client(), person.email);
+    stopTheClock();
 
     const answers: number[] = [];
     for (let read = 0; read < 11; read += 1) {

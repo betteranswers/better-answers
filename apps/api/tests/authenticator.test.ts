@@ -15,13 +15,16 @@ import {
   startOn,
   whileCommitsAreRefused,
 } from "./provoke.ts";
-import { appForSuite } from "./suite-app.ts";
+import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import { webClientOf, webSignedIn } from "./web-client.ts";
 
 /** While set, the relay holds every message to the address until the test ends. */
 let mailHeld: { readonly to: string; readonly until: Promise<void> } | undefined;
 
+const { clock, stopTheClock } = aStoppableClock();
+
 const app = appForSuite({
+  clock,
   onEmail: async (message) => {
     if (message.to === mailHeld?.to) await mailHeld.until;
   },
@@ -313,6 +316,7 @@ describe("setting up an authenticator", () => {
     const { client } = await aSignedInPerson();
     const wrong = aWrongCode(codeNow(await startOn(client)));
     const answers: number[] = [];
+    stopTheClock();
 
     for (let tried = 0; tried < 11; tried += 1) {
       answers.push((await client.json(FINISH, { code: wrong })).status);

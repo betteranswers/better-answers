@@ -1,5 +1,7 @@
 import { afterAll, beforeAll } from "vitest";
 
+import type { Clock } from "@better-answers/core/kernel";
+
 import { askToJoin } from "./harness-people.ts";
 import { startApp, type TestApp } from "./harness.ts";
 import { sessionPointedAt } from "./provoke.ts";
@@ -17,11 +19,12 @@ export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@client.example`;
 
 /** Its transport refuses the addresses in `unreachable`, as an SMTP relay that is down would. */
-export const appForSuite = (unreachable: ReadonlySet<string>): (() => TestApp) => {
+export const appForSuite = (unreachable: ReadonlySet<string>, clock?: Clock): (() => TestApp) => {
   let started: TestApp | undefined;
 
   beforeAll(async () => {
     started = await startApp({
+      clock,
       onEmail: (message) => {
         if (unreachable.has(message.to)) throw new Error("the relay refused the message");
       },
