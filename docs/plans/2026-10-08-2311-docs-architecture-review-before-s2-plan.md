@@ -35,7 +35,7 @@ BA-35 settles the architecture under S2a and S2b. It records the fourteen decisi
 
 S2a is next on the knowledge strand, and the route holds it behind this review. A fresh survey on 08/10/2026 found 38 places where the code's shape will cost S2a: rules written two or three times, registries checked in one direction only, ground two features share kept inside one of them. Several sit exactly where S2a writes next, so S2a would copy them a third time. One is a correctness gap: when a sync narrows a document, the concepts citing it keep their old sensitivity. It cannot happen in production today, because nothing writes citations yet.
 
-The staff review turned the survey into fourteen decisions and fourteen packages. The owner is not technical and asked that an independent staff engineer check each recommendation against common practice before approval. That check found thirteen standard, one genuine trade-off, and none wrong. It also corrected five premises and flagged three smells in the repository's own setup.
+The staff review turned the survey into fourteen decisions and fourteen packages, WP1 to WP14; this plan adds WP15. The owner is not technical and asked that an independent staff engineer check each recommendation against common practice before approval. That check found thirteen standard, one genuine trade-off, and none wrong. It also corrected five premises and flagged three smells in the repository's own setup.
 
 ### Key Decisions
 
