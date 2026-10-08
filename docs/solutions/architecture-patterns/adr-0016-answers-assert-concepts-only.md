@@ -35,13 +35,13 @@ An answer is served as one answer contract for the UI, MCP and the response reco
 
 When the map is unavailable, the answer runs at depth 0. Entry points, the judge and reuse still run, and the context header line says the map is unavailable.
 
-In v0.1 the entry step is full-text over the concept index alone. The S2 block builds it, and the tree does not hold it yet.
+In v0.1 the entry step is full-text over the concept index alone. The S2a block builds it, and the tree does not hold it yet.
 
 - A stored `tsvector` on the concept index, written in the governed write's transaction, so a concept is searchable at commit.
 - Title weighted first, tags and *Also known as* second, body third.
 - No model call on the entry step.
 
-The concept unit of the one index, with its vectors and its catch-up run, is the reserve block S8. It lands only when the answer tests' recall on the first customer's context wordings falls below the threshold S2 sets. When it lands, the worker writes the vector on a job whose row the governed write inserts, never inline and never at read.
+The concept unit of the one index, with its vectors and its catch-up run, is the reserve block S8. It lands only when the answer tests' recall on the first customer's context wordings falls below the threshold S2b sets. When it lands, the worker writes the vector on a job whose row the governed write inserts, never inline and never at read.
 
 ## Why
 

@@ -116,12 +116,12 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
-| Ask | none; the home says it is on its way | New question, Your questions, and the concept page a match or a citation opens (S2) | none yet |
-| Knowledge | none | Search (S2). Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
+| Ask | none; the home says it is on its way | New question, Your questions (S2b), and the concept page a match or a citation opens (S2a) | none yet |
+| Knowledge | none | Search (S2a). Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of actions an agent takes as the person |
-| Control Centre | Connected sources. Models and spend. Members, Groups. Audit log | Overview, which no block names. To decide (S5). Cost estimates (S4). Publishing rules, Backlogs, Removed at source. Spending limit (S7). Questions asked, Answer tests (S2). Personal tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Share agents, with the share agent. Runs, Connected assistants, Settings. Then: feeds and systems read live in Sources, Approvals in Agent Operations |
+| Control Centre | Connected sources. Models and spend. Members, Groups. Audit log | Overview, which no block names. To decide (S5). Cost estimates (S4). Publishing rules, Backlogs, Removed at source. Spending limit (S7). Questions asked, Answer tests (S2b). Personal tokens (P1). Erasure and suppression, Signals, Health, Backups (O1) | Share agents, with the share agent. Runs, Connected assistants, Settings. Then: feeds and systems read live in Sources, Approvals in Agent Operations |
 | Console | Everyone, Names waiting, Every workspace | none | The identity-set audit log |
 
 Two things stay open:

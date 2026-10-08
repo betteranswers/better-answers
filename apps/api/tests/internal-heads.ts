@@ -57,6 +57,7 @@ export const INTERNAL_HEADS: readonly string[] = [
   "merge key",
   "minter",
   "minting",
+  "model client",
   "operator",
   "outcome",
   "person id",

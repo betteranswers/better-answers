@@ -831,12 +831,20 @@ one sync.
 
 ### model choice
 
-A workspace's choice of model and provider for one purpose (extraction, enrichment, answering,
-judging, embedding), local or hosted.
+A workspace's choice of model, local or hosted, for one purpose (extraction, enrichment, answering,
+judging, embedding).
 
 One model choice per purpose, listed on Control Centre › Models › Models and spend. It names the
 model it calls. The embedding model choice is **fixed** — the word a reader sees on it — from the
 start, before any vector exists, and never changes once vectors exist.
+
+### model client
+
+_Internal._ the one seam a *model choice* is called through; it names the model, never who hosts
+it.
+
+Fetch-shaped, so a local model and a hosted one take one code path, and a test fakes the seam at
+its wire while our own code is never mocked.
 
 ### DPIA input
 
@@ -1927,7 +1935,7 @@ The finder the *top band* opens by click, ⌘K or Ctrl+K, to go somewhere in one
 
 It holds the *areas* and *pages* the person may see, the workspace's members for a person who may
 see People, each opening their *member page*, and the actions their role may take, such as *Invite
-a person*, listed under the headings Areas, Pages, Actions and Members. Knowledge joins it with S2's
+a person*, listed under the headings Areas, Pages, Actions and Members. Knowledge joins it with S2a's
 retrieval; until then it is not a search.
 
 ### promotion
