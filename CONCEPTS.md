@@ -851,37 +851,68 @@ for code and never for a reader: tier `human-reviewed` reads *Verified by*, `mac
 *Verified automatically* and `unverified` *Unverified*; status `changed-since-checked` reads
 *Changed since verified*; `checkedBy` and `checkedAt` carry who verified it and when.
 
-- **Verified by <person>** — human-reviewed: a named person confirmed it against its sources on a
-  date; shown as "Verified by Priya Shah · 3 March 2026". The name is the verifier's current
-  *display name*, and it stands after they leave the workspace; once they are erased the
-  verification reads "Verified by a former member" and still counts.
-- **Verified automatically** — machine-confirmed: an agent that did not generate it confirmed it.
-- **Unverified** — nobody has confirmed it.
-- **Changed since verified** — its content changed after its most recent `verified` event; the
-  earlier verification is kept, and it reads so until a person or an agent verifies it again.
-- **Out of date** — past its shelf life (`stale_after`); needs verifying again.
-- **Draft** — proposed, not yet part of what the company states.
-- **Left** — a `Person` concept whose person has left the company; kept for history; never
-  offered to new work. Never *Deprecated*: a person has no successor.
-- **Deprecated** — no longer current; kept for history; its successor is linked; never offered
-  to new work.
-
 Two **riders** may follow *Verified by* and never change the tier: **· imported** (a verification
 recorded before the platform, kept as written) and **· source moved on** (its source changed or is
 gone since the verification; the verification stands; the reason is on the row). No other rider
 exists.
 
-- **shared beyond its evidence** — the state where a recorded Admin override lets a reader see a
-  concept whose cited evidence they may not view (ADR 0023). Never a rider and never a trust
-  signal — the tier and *Verified by* stand untouched. The evidence pane leads with the reader's
-  access ("Based on your current access, the evidence isn't included"), always names the Admin
-  whose override created the state, and never dead-ends (Liam, 05/09/2026 — exact copy polished
-  at spec time; the fixed rule is the routing, not the sentence).
-- **evidence pane** — what a reader sees of a concept's cited evidence: one of three states off two
-  counts — *included*, *partly included* or *not included* in their access. It leads with the
-  reader's access, lists only the evidence they may open, names the Admin whose *sensitivity
-  override* put them in *shared beyond its evidence* where one has, and always says where to go
-  next, so it is never a dead end (ADR 0023; Liam, 05/09/2026). Never a trust signal.
+### Verified by <person>
+
+Human-reviewed: a named person confirmed it against its sources on a date; shown as "Verified by
+Priya Shah · 3 March 2026".
+
+The name is the verifier's current *display name*, and it stands after they leave the workspace;
+once they are erased the verification reads "Verified by a former member" and still counts.
+
+### Verified automatically
+
+Machine-confirmed: an agent that did not generate it confirmed it.
+
+### Unverified
+
+Nobody has confirmed it.
+
+### Changed since verified
+
+Its content changed after its most recent `verified` event; the earlier verification is kept, and
+it reads so until a person or an agent verifies it again.
+
+### Out of date
+
+Past its shelf life (`stale_after`); needs verifying again.
+
+### Draft
+
+Proposed, not yet part of what the company states.
+
+### Left
+
+A `Person` concept whose person has left the company; kept for history; never offered to new work.
+
+Never *Deprecated*: a person has no successor.
+
+### Deprecated
+
+No longer current; kept for history; its successor is linked; never offered to new work.
+
+### shared beyond its evidence
+
+The state where a recorded Admin override lets a reader see a concept whose cited evidence they
+may not view.
+
+Never a rider and never a trust signal — the tier and *Verified by* stand untouched. The evidence
+pane leads with the reader's access ("Based on your current access, the evidence isn't
+included"), always names the Admin whose override created the state, and never dead-ends (exact
+copy polished at spec time; the fixed rule is the routing, not the sentence).
+
+### evidence pane
+
+What a reader sees of a concept's cited evidence: one of three states off two counts —
+*included*, *partly included* or *not included* in their access.
+
+It leads with the reader's access, lists only the evidence they may open, names the Admin whose
+*sensitivity override* put them in *shared beyond its evidence* where one has, and always says
+where to go next, so it is never a dead end. Never a trust signal.
 
 ## Guides and answers
 
