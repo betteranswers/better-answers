@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# Exit 2 is the only code whose stderr reaches the model; every other outcome exits 0, so
-# a tree without the gate refuses no edit.
+# Only exit 2's stderr reaches the model; all else exits 0, so a tree with no gate refuses no edit.
 INPUT="$(cat)"
 FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)"
 [ -n "$FILE" ] || exit 0
@@ -15,8 +14,7 @@ fi
 
 DIRECTORY="$(dirname "$FILE")"
 [ -d "$DIRECTORY" ] || exit 0
-# Physically: git answers with a resolved path, and a `/tmp` that is really `/private/tmp`
-# would read as outside every root.
+# Physically: git answers resolved paths, so a `/tmp` that is `/private/tmp` would match no root.
 DIRECTORY="$(cd "$DIRECTORY" && pwd -P)"
 FILE="$DIRECTORY/$(basename "$FILE")"
 [ -f "$FILE" ] || exit 0
@@ -58,8 +56,7 @@ case "$FILE" in
   fi
   OUTPUT="$(cd "$ROOT" && "$TOOL" --report-unused-disable-directives-severity=error --format=unix "$RELATIVE" 2>&1)"
   STATUS=$?
-  # The root config holds every rule, and a parse error answers 1 too, so only a comment rule
-  # refuses the edit.
+  # The root config holds every rule and a parse error answers 1 too; only a comment rule refuses.
   FOUND="$(printf '%s\n' "$OUTPUT" | grep -E "$COMMENT_RULES" || true)"
   ;;
 *.py)
@@ -75,8 +72,7 @@ esac
 
 [ "$STATUS" -eq 0 ] && exit 0
 
-# A 1 naming no comment is the gate failing, not the comment, and refusing that edit leaves the
-# agent no rule to read.
+# A 1 naming no comment is the gate failing; refusing that edit leaves the agent no rule to read.
 if [ "$STATUS" -ne 1 ] || [ -z "$FOUND" ]; then
   echo "comment-gate-hook: the comment gate exited $STATUS over $RELATIVE without naming a comment" >&2
   printf '%s\n' "${OUTPUT:-$FOUND}" >&2

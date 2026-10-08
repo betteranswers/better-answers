@@ -74,7 +74,6 @@ head_names() {
   } | sort -u
 }
 
-# Epoch seconds at which a pull request merged with worktree $1's HEAD $2 as its head, or nothing.
 # A branch that moved on after its merge holds work the merge never saw, so the head must match.
 pr_merged_at() {
   command -v gh >/dev/null 2>&1 || return 0
@@ -97,8 +96,7 @@ remove_worktree() {
   say "removed $worktree"
   drop_index "$real"
   [ -n "$branch" ] || return 0
-  # `-d` weighs a branch against its upstream, else against the main checkout's HEAD, and that
-  # HEAD lags the origin/main the worktree was judged by.
+  # `-d` weighs a branch by its upstream, else by the main checkout's HEAD, which lags origin/main.
   git -C "$root" branch --quiet --set-upstream-to=origin/main "$branch" >/dev/null 2>&1
   if git -C "$root" branch -d "$branch" >/dev/null 2>&1; then
     say "deleted branch $branch"
