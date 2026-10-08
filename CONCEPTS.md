@@ -2,19 +2,18 @@
 
 Root glossary for the platform. Each entry a person meets is headed by the word they read on a
 page, in an MCP tool's text or answer, or in an email, and the code, the database and the docs use
-that same word. Two marks may open a definition. `_Internal._` marks something no person meets; its
-entry carries the name its code uses. `_Code rename pending._` marks an entry whose code still uses
-an older name until that noun's sweep lands, and `apps/api/tests/old-words.ts` gives that name.
-Names the platform does not own keep theirs: OKF's keys and nouns and the keys written into concept
-files, the MCP wire, a library's or a protocol's own names, and stored history. Terms not listed
-here are still draft.
+that same word. `_Internal._` may open a definition: it marks something no person meets, and its
+entry carries the name its code uses. Names the platform does not own keep theirs: OKF's keys and
+nouns and the keys written into concept files, the MCP wire, a library's or a protocol's own names,
+and stored history. Terms not listed here are still draft.
 
 Compound Engineering's skills add, refine, fold and retire entries under their own rules for
 `CONCEPTS.md`, and each edit is reviewed in its pull request. Four exceptions to those rules hold
-here. The two marks above stay where they open a definition. The file carries no list of words to
-avoid, and an entry that absorbs another does not name the word it replaced: the old words live in
-the words test, so an agent reads only the word to write. A name the platform does not own keeps its
-code form in an entry, a value on the MCP wire included. A rule scoped to v0.1 keeps that scope.
+here. The `_Internal._` mark stays where it opens a definition. The file carries no lines of words
+to avoid, and an entry that absorbs another does not name the word it replaced, so an agent reads
+only the word to write: the words test holds the old words it refuses, and the retired words are
+kept outside the repository. A name the platform does not own keeps its code form in an entry, a
+value on the MCP wire included. A rule scoped to v0.1 keeps that scope.
 
 Each entry is a `###` heading under its cluster: a definition of one sentence, then a paragraph for
 its rules when it has them. A cluster's own prose sits before its first entry.

@@ -279,7 +279,7 @@ const giveFeedbackEntry = defineEntry({
   name: "give_feedback",
   title: "Give feedback on an answer",
   description:
-    "Record a reader's verdict on an answer or a concept: helpful, or a flag — wrong, out of date, incomplete, or should not have been shown — with what was wrong in their words. Called from a view's button or on the person's explicit ask; it is the surface's one write.",
+    "Record a reader's verdict on an answer or a concept: helpful, or a flag — wrong, out of date, incomplete, or should not have been shown — with what was wrong in their words. Called from a view's button or on the person's explicit ask; it is the server's one write.",
   scopes: ["knowledge:read", "feedback:write"],
   // A flag with no reason is the action's own refusal, not a rule the flat wire shape could carry.
   input: z.object({

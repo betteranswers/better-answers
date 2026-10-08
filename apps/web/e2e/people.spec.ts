@@ -211,7 +211,7 @@ const SENT_TO_THE_OPERATOR =
 
 const EACH_ROLE_MEANS = {
   Admin: "Manages people and sources, and does everything an Editor does.",
-  Editor: "Checks concepts, runs question sets and saves Answers.",
+  Editor: "Checks concepts, asks question sets and saves Answers.",
   Viewer: "Asks questions, flags answers and suggests changes.",
 };
 
@@ -607,7 +607,7 @@ test.describe("a member's own page", () => {
               - radio "Admin"
               - text: Admin Manages people and sources, and does everything an Editor does.
               - radio "Editor" [checked]
-              - text: Editor Checks concepts, runs question sets and saves Answers.
+              - text: Editor Checks concepts, asks question sets and saves Answers.
               - radio "Viewer"
               - text: Viewer Asks questions, flags answers and suggests changes.
             - button "Make Priya Shah an Editor" [disabled]

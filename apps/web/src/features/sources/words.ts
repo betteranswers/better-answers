@@ -49,7 +49,8 @@ const DESTINATIONS = new Map<string, Meaning>([
     "bundle",
     {
       word: "knowledge base",
-      means: "Concepts drawn from it arrive as suggestions an Admin accepts, once extraction runs.",
+      means:
+        "Concepts drawn from it arrive as suggestions an Admin accepts, once extraction finishes.",
     },
   ],
   ["map", { word: "map", means: "The people, meetings and tasks it names join the map." }],

@@ -8,7 +8,6 @@ problem_type: best_practice
 component: stores
 severity: medium
 applies_when:
-  - "A BA-29 sweep (U10, U11, U12, U15, U17) renames a table, column, constraint, function or stored value"
   - "Any change renames a table or column in packages/schema/src/ and needs a migration"
   - "A migration rewrites a stored value that a CHECK constraint lists, on a table that forces row-level security"
   - "A migration loops over objects or rows that exist only once a workspace does, such as its partitions"

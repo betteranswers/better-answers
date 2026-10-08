@@ -1,5 +1,5 @@
 ---
-title: "How a rename sweep lands a word in the words test"
+title: "How a rename adds its old word to the words test"
 date: 2026-10-03
 last_updated: 2026-10-08
 category: best-practices
@@ -8,20 +8,16 @@ problem_type: best_practice
 component: testing-framework
 severity: medium
 applies_when:
-  - "A BA-29 sweep (U8 to U17) reaches KTD5 step 5 and marks its rows landed in apps/api/tests/old-words.ts"
-  - "Adding or changing a permitted sense, a carve-out or a reach on a row of the old-words list"
-  - "Removing a _Code rename pending._ mark from CONCEPTS.md"
-  - "Refreshing apps/api/tests/old-words-ratchet.json"
-  - "Reviewing a sweep pull request's diff of old-words.ts, CONCEPTS.md or the ratchet baseline"
-  - "Landing a one-sense row for a shared word, such as run, check or act, whose first scan finds thousands of lines in other senses"
-  - "A sweep widens the reach of a row that has already landed"
+  - "A pull request renames a word the glossary defines, and adds the old word's row to apps/api/tests/old-words.ts"
+  - "Adding or changing a permitted sense, a carve-out, a reads list or a reach on a row of the old-words list"
+  - "Reviewing a pull request's diff of old-words.ts or CONCEPTS.md"
+  - "Adding a row for a shared word, such as check or class, whose first scan finds hundreds of lines in other senses"
+  - "Widening the reach of a row the list already holds"
   - "Writing a plain-verb sense for a shared word, or a second row for its plural"
-  - "Adding a pending row to the old-words list, or moving the day a pending row names"
 symptoms:
-  - "KTD5 step 5 says only that a sweep marks its rows landed, but landing a row also needs senses, a plans carve-out, a glossary edit and a baseline refresh"
-  - "Several mistakes in a landed row pass the words test without a finding: a sense regex without the g flag, a carve-out on a reader-text row, a row flipped back to pending with a later `landsBy`, a plural under a one-sense row"
-  - "A one-sense row held to Appendix G's senses for a common English word reports hundreds of findings in other senses"
-  - "Widening a landed reader-text row fails planted fixtures that used it as their reader-text example"
+  - "Several mistakes in a row pass the words test without a finding: a sense regex without the g flag, a carve-out on a reader-text row, a plural under a one-sense row"
+  - "A one-sense row for a common English word reports hundreds of findings in other senses"
+  - "Widening a reader-text row fails planted fixtures that used it as their reader-text example"
   - "A plain-verb sense written as the determiners it excludes passes a noun with a word between, such as 'a live act on the same bundle'"
 root_cause: missing_workflow_step
 resolution_type: workflow_improvement
@@ -30,174 +26,99 @@ related_components:
 tags:
   - words-test
   - old-words
-  - rename-sweep
+  - rename
   - glossary
-  - ratchet
   - carve-out
   - reader-text
-  - ba-29
 ---
 
-# How a rename sweep lands a word in the words test
+# How a rename adds its old word to the words test
 
 ## Context
 
-BA-29 renames the platform's words to the reader's words, one noun per sweep (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, units U7 to U17, KTD5 at plan:201-208). The words test, `apps/api/tests/avoid-words.test.ts`, refuses an old word once its row in `apps/api/tests/old-words.ts` is landed (KTD1, plan:178). KTD5's step 5 says only that a sweep "marks its rows landed in the words test's list" (plan:206). The state change is one line, but the scan behaves in ways a sweep must know to land a row correctly, and some of them let an old word through with no finding.
+The words test, `apps/api/tests/avoid-words.test.ts`, refuses each word in `apps/api/tests/old-words.ts` where its row's reach says. A rename lands the glossary entry, the code and the row in one pull request, so the row is refused from the merge on and needs no state. BA-29 renamed the platform's words in sweeps, each with a pending phase, a ratchet and a glossary mark; all of that is gone. What stays is how the scan reads a row, and the mistakes that pass it in silence.
 
-The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull request (U1 to U4, merged as #529), in the commits from "test(api): read the old words from their own list" to "test(api): fail the words test on a reader-text file it cannot parse". U6, on branch `feat/ba-29-u6-sweep-tooling`, then added the stored-names register and deferred senses. Line numbers below are from U6's head. U7 (#543) since added senses and rows to `old-words.ts`, so its line numbers have moved; find a row or helper there by name.
+**A row** (`OldWord` in `old-words.ts`): `word`, `use` (the word to write), `entry` (the glossary head it sits under), `sweep` (the rename that replaced it, named in each finding), `reach`, and optional `why`, `permitted`, `carvedOut` and `reads`. `listFaults` keeps the list sorted case-insensitively, one row per word, each under a head the glossary has.
 
-**Two row shapes** (`old-words.ts`):
-
-- `Renamed` (23-36): `word`, `use`, `entry`, `sweep`, `state: "pending" | "landed"`, `reach`, and optional `landsBy`, `why`, `permitted`, `carvedOut`, `reads`. The `pending(...)` helper that once built a pending row is gone (#616), so a pending row is written out in full, as the example under *Examples* is.
-- **A pending row names the day its sweep is due to merge.** `landsBy` is that day, written `YYYY-MM-DD`. `overduePending` (`words-scan.ts`) refuses a pending row with no such day, and one whose day is before today, naming the row and its sweep ("holds no row pending past its sweep's day", `avoid-words.test.ts`). Take the day from the sweep's plan or issue, with no margin added: a later day only delays the alarm, because the test cannot see a merge and a sweep that merges early and forgets its row stays green until the day. If the sweep slips, move the day in a commit a reviewer sees. Once the day passes, the merge queue refuses every group, and a local `check` fails, until the row lands or is re-dated. A pull request stays green, because it runs no suite. BA-71 added this after three rows stayed pending five days past their sweeps' merges.
-- `Avoided` (37-43): `sweep: null`, built by `avoided(...)` (61-67). `isRenamed` is `row.sweep !== null` (`words-scan.ts:60`). No scan reads an avoided row.
-
-**The reach decides which scan reads a landed row** (`old-words.ts:19-20`):
+**The reach decides which scan reads a row:**
 
 | reach | Read by | Matches |
 |---|---|---|
-| `"everywhere"` | the line scan of every tracked file, `lineFindings` (`words-scan.ts:231-241`) | any form: plurals, camelCase, snake_case, hyphens (`findsIn` with `anyForm`, 122-129; `wordsOfCompounds`, 114-115) |
-| `"one sense"` | the same line scan | the whole word only, any case (124-125) |
-| `"reader text"` | reader strings only, `readerFindings` (402-412), in the files `READER_TEXT` names (255-260) | any form (406) |
+| `"everywhere"` | the line scan of every tracked file, `lineFindings` | any form: plurals, camelCase, snake_case, hyphens (`findsIn` with `anyForm`, `wordsOfCompounds`) |
+| `"one sense"` | the same line scan | the whole word only, any case |
+| `"reader text"` | reader strings only, `readerFindings`, in the files `READER_TEXT` names | any form |
 
-**Landed rows to copy:** the api row (one sense, `APP_SENSES`, its own carve-outs; `old-words.ts:157-170`), `Better Answers` (one sense, `reads: isCodeAPersonReads`; 180-189), the audit log row (everywhere, with senses; 327-336), the audit action row (everywhere, no senses; 337-344), and the trust words `Changed since checked` (198-205), `Checked by` (208-216), `needs checking again` (368-375), all reader text, and `Unchecked`, which U14 widened to everywhere (step 10). U14's `check` row is the one-sense row that `reads:` holds to the files writing its sense (step 9). These line numbers predate later sweeps, so find a row by its word. The first sweep's three rows, from U7, are the rows whose `sweep` is `PAGE_AREA_MENU`: two one-sense rows whose senses are partly held to one tree by `within`, and one everywhere row with a sense for a stored browser key. All three carve out with `PAGE_AREA_MENU_CARVED_OUT`.
+**Rows to copy:** the api row (`app`: one sense, `APP_SENSES`, its own carve-outs), `Better Answers` (one sense, `reads: isCodeAPersonReads`), the audit log row (`ledger`: everywhere, with senses), the audit action row (everywhere, no senses), the trust words (reader text), `Unchecked` (widened from reader text to everywhere), and `check` (one sense, held by `reads:` to the files that write the trust event).
 
 ## Guidance
 
 ### The procedure
 
-1. **Before the flip, prove the old word gone in every form.** Run KTD5 step 4's `rg` check case-insensitively, for plurals and compounds too. A landed one-sense row matches the whole word alone (trap 3), so this search is the only proof that its plural, and every compound name holding it, are gone.
+1. **Before adding the row, prove the old word gone in every form.** Search case-insensitively for plurals and compounds too. A one-sense row matches the whole word alone (trap 2), so this search is the only proof that its plural, and every compound name holding it, are gone.
 
-2. **Flip the state.** Write the row out in full with `state: "landed"`, as the api and audit log rows are, and remove its `landsBy`. Land every row the sweep names in the sweep's own pull request: a row left pending fails the words test once its day passes. Keep the row where it sorts: `outOfOrder` compares words case-insensitively and refuses a duplicate (`words-scan.ts:62-68`).
+2. **Add the row where it sorts,** in the pull request that renames the word. Pick the reach: everywhere for a word with no other sense, one sense for a word other senses share, reader text for a word only a page must not write.
 
-3. **Give it the senses it keeps.** A `Sense` (`old-words.ts:10-15`) has a `sense` label, a `written` regex, an optional `within` path prefix and an optional `until` sweep. `lineScanOf` blanks every permitted match, keeping only senses whose `within` the file path starts with and whose `until` names a sweep that still has a pending row (`keepsIn`, `words-scan.ts:175-177`), and every kept name, then tries the word again (`words-scan.ts:189-195`, `213`).
-   - For a one-sense row, write the senses Appendix G lists for the word (plan:1001-1023). Add `within` when one tree alone writes the sense, as the api's own names for its tier are held to `apps/api/` (`old-words.ts:101-107`, the `within` at 104) and the cost ledger's contract to `contracts/cost-ledger/` (115-119). When the word is common English, measure what those senses leave before landing it (step 8).
-   - A landed row can carry a sense with `until` naming the later sweep it waits on, for a name that sweep renames (plan:186). The sense holds while that sweep has a pending row, and once it lands the name is read again ("passes a deferred sense until its later sweep lands", `avoid-words.test.ts:543-562`).
-   - An everywhere row may carry senses too. The audit log row is everywhere and carries `permitted` senses (335). The difference between the two reaches is how the word is matched, not whether senses apply.
-   - Give every regex the `g` flag. `blankedBy` uses `String.replace` (`words-scan.ts:134-138`), so a regex without `g` blanks the first use on a line and leaves a second one to be read as the old word. Every sense in the file today is `/…/gi` or `/…/g`.
-   - Names on the wire and in storage need no sense, because they reach the scan as kept names (step 7).
-   - A reader-text row takes no senses. `readerFindings` reads only `rows` and `kept` from the scan (`words-scan.ts:402`), so `permitted`, `carvedOut` and `reads` on such a row do nothing. Its kept senses come from kept names alone.
+3. **Give it the senses it keeps.** A `Sense` has a `sense` label, a `written` regex and an optional `within` path prefix. `lineScanOf` blanks every permitted match whose `within` the file path starts with, and every kept name, then tries the word again.
+   - Add `within` when one tree alone writes the sense, as the api's own names for its tier are held to `apps/api/` and the cost ledger's contract to `contracts/cost-ledger/`.
+   - An everywhere row may carry senses too. The difference between the two reaches is how the word is matched, not whether senses apply.
+   - Give every regex the `g` flag. `blankedBy` uses `String.replace`, so a regex without `g` blanks the first use on a line and leaves a second one to be read as the old word.
+   - Names on the wire and in storage need no sense, because they reach the scan as kept names (step 5).
+   - A reader-text row takes no senses. `readerFindings` reads only `rows` and `kept`, so `permitted`, `carvedOut` and `reads` on such a row do nothing.
 
-4. **Carve out, on the row itself, the plans and dogfood reports dated before the landing.** `docs/plans/` has no global carve-out: the planted test reports a dated plan as a finding (`avoid-words.test.ts:301-325`, the plan at 321). R22 keeps completed plans' words (plan:103, Key Decision at plan:62), and the comment on `CARVED_OUT` says a sweep carves them out on its own row (`avoid-words.test.ts:38`). U7 (#543) wrote the first such carve-out as a helper in `old-words.ts`, `writtenBefore(day)`. It also covers `docs/dogfood-reports/`, because a dogfood report quotes the page text of its day. Use the helper, with the sweep's landing date in one constant shared by its rows, as U7's three `PAGE_AREA_MENU` rows do:
+4. **Leave the dated plans to the global carve-out.** `CARVED_OUT` in `avoid-words.test.ts` holds `writtenBefore("2026-10-08")`, so a plan or dogfood report dated before 08/10/2026 keeps the words of its day (R22). One dated later is read for every row, so a plan written after a rename writes the new word. A file with no dated name falls back to `"9999"` and is read. A row's own `carvedOut` holds for that row alone; `CarveOut.why` is required, and no carve-out ever holds a `CODING_STANDARDS.md`.
 
-   ```ts
-   const CONNECTED_SOURCE_LANDED = "2026-10-20";
-   // on each row the sweep lands:
-   carvedOut: [writtenBefore(CONNECTED_SOURCE_LANDED)],
-   ```
+5. **Never rename a stored or wire name.** R21 and R22 keep them. They pass because `keptNamesUnder` reads them from where each is declared: refusal words; MCP entry names, scopes and schema keys and values; Better Auth's endpoints; the stored-names register's action names; stored action names from `audit-actions.ts`; old page addresses from `movedFrom`. Migrations and their snapshots pass through the global `CARVED_OUT`. The stored-names register, `packages/core/src/audit/stored-names.ts`, sits in `CARVED_OUT` too, so a stored detail key's literal is allowed there alone and code elsewhere writes `STORED_DETAIL_KEYS.<name>`. A kept name that is one plain word counts as code only when quoted or backticked (`keptPatternsOf`), so prose writing the same word is still read. In reader text, a string that is a kept name whole is skipped. A renamed table's derived names are refused in the database by `packages/schema/test/renamed-names.test.ts`.
 
-   Inside the helper, a file with no dated name falls back to `"9999"`, so it is still scanned. The comparison is strict, so a plan or report dated on the landing day or later is read. A sweep whose own learning quotes the words it removes carves that one file out beside the helper, as `PAGE_AREA_MENU_CARVED_OUT` does. Carve out per row, never in the global `CARVED_OUT`: a global entry would stop every landed word being read in those plans, including words that landed before a plan was written. A row's carve-out holds for that row alone (`avoid-words.test.ts:327-340`). `CarveOut.why` is required (`old-words.ts:17`), and no carve-out ever holds a `CODING_STANDARDS.md` (`words-scan.ts:164-165`).
-
-5. **Remove the glossary's pending mark when the entry's last pending row lands.** `unlisted` faults an entry marked `_Code rename pending._` that no pending row names (`words-scan.ts:75-82`). A landed row does not count (the planted case "a pending entry named by a landed row alone", `avoid-words.test.ts:1017-1021`). So landing the entry's last pending row without removing the mark fails the list test. Nothing checks the reverse: removing the mark while another pending row still names the entry passes, and the glossary then says the code is done when it is not. Rows share entries. `bind` (one sense) and `binding` (everywhere) both sit under *connected source* (`old-words.ts:191-192`). Search the list for the entry before removing its mark.
-
-6. **Run the words test, and refresh the ratchet only after it has fallen.**
-
-   ```sh
-   pnpm --filter @better-answers/api run test tests/avoid-words.test.ts
-   # only when that run is green:
-   UPDATE_OLD_WORDS_RATCHET=1 pnpm --filter @better-answers/api run test tests/avoid-words.test.ts
-   ```
-
-   The ratchet counts pending rows alone (`words-scan.ts:471`), so a landed word disappears from the counts and its baseline entries stay behind. `ratchetRises` reports only a count above the baseline (487-495), so those leftover entries never fail; the refresh just clears them. Run the plain command first: the update writes the baseline before the comparison reads it (`avoid-words.test.ts:156-164`), so a refresh run always passes and would write any rise into the baseline. In the diff, the baseline should only lose entries or lower numbers.
-
-7. **Never rename a stored or wire name.** R21 and R22 keep them (plan:102-103). They pass because `keptNamesUnder` reads them from where each is declared (`kept-names.ts:66-83`): refusal words; MCP entry names, scopes and schema keys and values; Better Auth's endpoints; the stored-names register's action names; stored action names from `audit-actions.ts`; old page addresses from `movedFrom`. Migrations and their snapshots are not kept names. They pass through the global `CARVED_OUT` (`avoid-words.test.ts:44-48`). The stored-names register (KTD15, plan:233) now exists at `packages/core/src/audit/stored-names.ts`. Its action names, `STORED_ACT_NAMES`, are kept names (`kept-names.ts:77`). Its detail keys are not: the register sits in the global `CARVED_OUT` (`avoid-words.test.ts:49-52`), so a stored detail key's literal is allowed there alone, and code elsewhere writes `STORED_DETAIL_KEYS.<name>` ("refuses a stored detail key outside the stored-names register", `avoid-words.test.ts:512-530`). A kept name that is one plain word counts as code only when quoted or backticked (`keptPatternsOf`, `words-scan.ts:144-149`), so prose writing the same word is still read. In reader text, a string that is a kept name whole is skipped (396-399).
+6. **Prove the row with a planted case, and watch it fail.** Plant the old word where the row must refuse it and where a sense must pass it, and expect only the first set. Widening a sense, or adding a tree to a `within`, turns it red. The whole-tree scan cannot catch a sense that is too broad: it fails only when a sense is too narrow.
 
 ### Traps the test does not report
 
-1. **A reader-text row is never line-scanned.** `lineFindings` drops it (`words-scan.ts:235`). Landing one refuses the word in `READER_TEXT` files alone (255-260), never in docs or identifiers. That is by design for OKF and wire words (R15, R21), but a sweep cannot rely on the test to clear its docs. To refuse the word in code or CSS too, widen the row's reach (step 10).
-2. **Flipping a landed row back to pending switches it off, with a finding only once its day passes.** A pending row needs a `landsBy`, so a flip with none fails at once, but a flip that names a later day passes until then. No scan reads a pending row (`landed`, `words-scan.ts:226`; "reads a pending word nowhere", `avoid-words.test.ts:375-381`), and `listFaults` does not object. A reviewer sees it only in the diff. The one side effect is that the ratchet counts the word again from no baseline, so a page using it fails as a rise once the baseline has been refreshed past it.
-3. **A one-sense row matches the whole word alone.** `findsIn` without `anyForm` is `(?<!\w)word(?!\w)` (`words-scan.ts:124`), so a plural or a compound passes once the row lands ("reads a word held to senses whole, never in compounds", `avoid-words.test.ts:450-452`). While the row was pending the ratchet counted every form (`countIn`, 131-132), but only in page words (`PAGE_WORDS`, 249-252, read at 473), and it stops counting at the flip (471).
-4. **A lone lowercase word is read only in a words module.** `isRead` reads it only when the file matches `WORDS_MODULE` (`words-scan.ts:310-312`, 245; planted at `avoid-words.test.ts:861-869`). A string such as `"binding"` in `navigation.ts`, an MCP entry, the answer renderer or an email is invisible to the reader-text, internal-word and ratchet checks. The line scan still sees it for an everywhere or one-sense row, but for a reader-text row nothing does. A sweep that renames a words module out of the `*words.ts` pattern drops it from those checks too, and passes. The test fails loudly only when a whole source of reader text yields no string (`readerStringsPerSource`, `words-scan.ts:386-393`; the test at `avoid-words.test.ts:112-119`) or a reader-text file does not parse (the throw at `words-scan.ts:360`; planted at `avoid-words.test.ts:871-875`). Losing one words module among several trips neither.
-5. **Landing a row can wake the internal-word check.** `watchedInternals` leaves an `_Internal._` head unwatched while a pending row names its word (`words-scan.ts:422-436`; planted at `avoid-words.test.ts:763-778`). U8's `actor id` and `person id` are pending reader-text rows (`old-words.ts:143`, `397`) and internal heads (`CONCEPTS.md:613`, `620`), so landing them sets both `readerFindings` and `internalFindings` reading the same strings. If such a head is ordinary English, add it to `NOT_WATCHED_ON_PAGES` (`old-words.ts:527-554`). `unwatchedStrays` refuses an unwatched head that heads no internal entry (`words-scan.ts:86-91`).
+1. **A reader-text row is never line-scanned.** `lineFindings` drops it. The row refuses the word in `READER_TEXT` files alone, never in docs or identifiers. To refuse the word in code or CSS too, widen the row's reach (trap 5).
+2. **A one-sense row matches the whole word alone.** `findsIn` without `anyForm` is `(?<!\w)word(?!\w)`, so a plural or a compound passes, and `_` is a word character, so a snake_case name holding the word passes too. Search the word's own trees for `[a-z]Word`, `Word[A-Z]`, `_word` and `word_` by hand.
+3. **A lone lowercase word is read only in a words module.** `isRead` reads it only when the file matches `WORDS_MODULE`. A string such as `"member"` in `navigation.ts`, an MCP entry, the answer renderer or an email is invisible to the reader-text and internal-word checks. The test fails loudly only when a whole source of reader text yields no string (`readerStringsPerSource`) or a reader-text file does not parse. Losing one words module among several trips neither.
+4. **An internal head is watched on pages.** `internalFindings` refuses an `_Internal._` head's word in reader text unless `NOT_WATCHED_ON_PAGES` lists it as ordinary English. `INTERNAL_HEADS` (`apps/api/tests/internal-heads.ts`) fails the test when a listed head loses its mark, so retiring or renaming an internal entry edits that list in the same change.
+5. **Widening a reader-text row to everywhere breaks the planted fixtures that borrowed it.** `Unchecked` was reader text alone, so the old colour tokens `--trust-unchecked-*` passed. Its row was widened to everywhere with `UNCHECKED_SENSES` (TypeScript's `noUncheckedIndexedAccess`), and the planted tests that used the live row as their reader-text example failed, because the row now read their CSS line too. Pin such fixtures to a reader-text copy of the row (`CHECKED_IN_READER_TEXT`).
 
-### Landing a shared word that is mostly other senses
+### A shared word that is mostly other senses
 
-U13 landed *run*, held to one sense, when it renamed a connected source's run to a sync. The first scan after the flip found about 3,000 lines. Nearly all of them were a CI, test or release run, a backup, the plain verb, a code identifier or a command a tool runs. U14's *check* and U17's *act* have the same shape. What worked, in order:
+BA-29 held *run*, *act*, *domain*, *client*, *hit*, *screen* and *surface* to senses fitted across the whole tree: thousands of lines for *run* alone, a list of trees that never write the renamed thing, a plain-verb sense per word. On 08/10/2026 the owner moved *run*, *client*, *hit*, *screen* and *surface* to reader text, and made *route*, *graph* and *bind* avoided words with no row. *act* and *domain* kept their senses, because a page says "act as you" and "testing domain" in their other senses, and a reader-text row has no senses to pass them. The lesson is to choose the narrow road first:
 
-1. **Fit the senses to the test's own findings, not to a guess.** Save the failing run's finding lines, then use a throwaway script that imports `OLD_WORDS`, takes the row's `permitted` senses (honouring `within`), blanks each finding line with them and reports what is left. Each edit to the senses then costs a second, not a full test run. Re-run the real test after each round, because the saved findings only cover lines the earlier senses missed. Tightening a sense can expose lines the old one hid.
-2. **Scope by tree, and name the renamed thing's own trees file by file.** Most hits sat in trees that never write a sync: `.github/`, `deploy/`, `packages/devtools/`, `docs/operations/` and the journeys. A bare `\brun\b` sense, `within` each of those prefixes, cleared them (`OTHER_RUN_TREES`, `apps/api/tests/old-words.ts:605`). Where a tree also writes the renamed thing (the sources slice, the worker's pipeline, `CONCEPTS.md`, the C4 docs), list only the files whose runs are a tool's. Code review caught `apps/web/src/shared/` listed whole, which would have hidden a "Last run" in `navigation.ts`.
-3. **Keep the renamed thing's natural phrases out of every sense.** A sense listing run kinds by their lead word let "first run" and "failed run" through. Those are the commonest ways to write a sync, so both came out after review, and the one tool-run "first run" left was exempted by file. A code sense that matched `run` before any punctuation also blanked prose ("On that run, a document…"). Code shapes have to be code-only: `run(`, `run.x`, `run =`, `run:` with a callable after it, a declaration keyword before it.
-4. **Prove the row with a planted case, and watch it fail.** "refuses a sync written as a run, passing other runs" (`apps/api/tests/avoid-words.test.ts:640`) plants sync-shaped lines in a words module, the sources slice and a C4 doc, and plants other runs in their own trees. Only the first set may be found. Adding the sources tree to `OTHER_RUN_TREES`, or "first" back to the kinds, turns it red. The whole-tree scan alone cannot catch a sense that is too broad: it only fails when a sense is too narrow.
-5. **Grep the compounds by hand.** Trap 3 above cuts both ways. A one-sense row cannot see `run` inside an identifier, because `findsIn` is `(?<!\w)word(?!\w)` (`apps/api/tests/words-scan.ts:146`) and `_` is a word character. After the green test, the cross-model review still found the worker's `_fail_the_run`. A grep it prompted found `ConnectedSourceRun`, eleven worker test names such as `..._reads_always_next_run`, and five test helpers such as `theRunThatRan`. Search the word's own trees for `[a-z]Run`, `Run[A-Z]`, `_run` and `run_` before calling the sweep done.
-
-### What the verification sweep added (U14)
-
-U14 renamed *check* to *verification* as the trust event (branch `feat/ba-29-u14-verification`). Its rows met three cases steps 1 to 7 do not cover. Each matters to the sweeps still to come: U15 lands *class*, *candidate* and *repair*, and U17 lands *act* across 366 files, all common English.
-
-8. **Count first, then take the road to the owner.** The section above fits a shared word's senses across the whole tree. Before choosing that road, flip the row locally with only Appendix G's senses, run the words test and count what is left. For *check*, Appendix G's three senses (CI's `check`, CHECK constraints, `knowledge.check.imported`) left 885 findings in about 200 files outside `docs/plans/`, almost none of them the trust event. Fitting senses across the tree, as above, or holding the row to the files that write the renamed sense (step 9) is a scope decision the plan did not make, so take the count to the owner with a recommendation.
-
-9. **Hold such a row with `reads:` to the files that write the sense it renames.** The owner chose this for *check*. The row lists `TRUST_EVENT_FILES`: core's concepts and answering slices, their tests and the MCP entries (`old-words.ts:788`, the row at `940`). The line scan ANDs a row's `reads` with its carve-outs (`words-scan.ts:208-209`), so the word is refused only in those files and keeps every other sense elsewhere. The *Better Answers* row's `reads: isCodeAPersonReads` is the precedent. Three consequences follow:
-   - No dated plan sits under those files, so the row needs no `writtenBefore` carve-out.
-   - A `reads` list passes silently if it names the wrong files. Prove it bites: plant the word in one of the files (`// a planted check`), run the test, see the finding, and remove the plant.
-   - Trap 3 still applies inside the list. Search every form of the word over those files (`checks`, `checked`, `checker`) before the flip. The ratchet stops counting the word once it lands (step 6), so verb uses on pages are no longer counted. That follows from the scope, not a defect.
-
-   Widening the list later is the owner's call. The review's second model proposed adding the erasure slice and the schema, and the finding was set aside as settled scope.
-
-10. **Widening a landed reader-text row to everywhere breaks the planted fixtures that borrowed it.** `Unchecked` was landed in reader text alone (trap 1), so the old colour tokens `--trust-unchecked-*` passed the test. To refuse them, U14 set the row's reach to everywhere and gave it `UNCHECKED_SENSES` (TypeScript's `noUncheckedIndexedAccess`) and `VERIFICATION_CARVED_OUT` (the row at `old-words.ts:1390`, the two lists at `779` and `830`). It also reworded the plain-English *unchecked* in two ADR docs and a hook script. Three planted tests in `avoid-words.test.ts` used the live row as their reader-text example, and two of them failed, because the row now reads the planted CSS line too. Pin those fixtures to a reader-text copy of the row (`CHECKED_IN_READER_TEXT`, `avoid-words.test.ts:221`), as `pendingNow` pins a pending copy. Add a planted case showing the widened row refusing the token ("refuses the old trust token once its row reads everywhere", `avoid-words.test.ts:919`).
-
-### What the action sweep added (U17)
-
-U17 renamed *act* to *action* in two parts: the column in #615, then the code, pages and docs on branch `liam/ba-29-u17b-action-words`. The owner held *act* to senses fitted across the tree, as *run* and *domain* are, and asked for a second row for *acts*. Steps 11 to 13 are what its code review found.
-
-11. **Name the words that make the verb, never the words that make the noun.** The first plain-verb sense blanked "act on" and "act as" unless a determiner or a possessive came directly before them, through a negative lookbehind over `an`, `the`, `each`, `its`, `X's` and the like. Any noun with a word in between passed: "a live act on the same bundle", "the invite act on Members", "for acts on our own estate". With `that` in its list of modals, "the sync that act queued" passed too. All four were lines the sweep had just rewritten, so a branch bringing them back would have stayed green. Review found it, and a validator confirmed it by running the regexes over those lines. The fix lists what makes the verb, fitted to the tree as the *run* row's verb sense already was (`ACT_AS_A_VERB` and `ACTS_AS_A_VERB` in `apps/api/tests/old-words.ts`):
-    - a modal or a pronoun before *act* (`to`, `can`, `may`, `they` and the rest);
-    - `that` or `and` before *act on* or *act as*;
-    - a short list of subjects before *acts on*, *acts as* or *acts for* (`agent`, `step`, `reader`, `principal` and the rest), and *who acts*.
-
-    The verb itself is matched in lower case, so a reader's label such as "Acts for {name}" stays refused. Each noun shape has a planted refused line ("refuses an act, passing React's act and the verb" and its plural twin, `apps/api/tests/avoid-words.test.ts`). Adding a word that comes before one of those nouns, such as `live`, turns its case red, which is the proof step 4 of *Landing a shared word that is mostly other senses* asks for.
-
-12. **A one-sense row and an everywhere row for the plural still miss a singular compound.** The *act* row is one sense, so it matches the whole word (trap 3): it refuses "an act" but not `declareAct`, `ActDialog` or `onAct`. The *acts* row reads everywhere, so `wordsOfCompounds` splits `declareActs` and `GROUP_ACTS` into words, and `anyFormOf`'s non-word bounds find `review-acts.tsx` and "Acts for". `anyFormOf` wants the plural `s`, though, so no singular compound reaches it. The proof that none remain sits outside the words test: the map's replay lists no `rename` (step 13 of the runner learning), and `git grep -P` for camel and snake forms (`[a-z]Act\b|\bAct[A-Z]|_act\b|\bact_|_ACT\b|\bACT_`) outside the carve-outs finds only Stryker's `stryMutAct_` marker and the runner test's `saidOfAct` fixture. Use `-P` or `rg`: on macOS, `git grep -E` ignores `\b` and finds nothing. The pattern cannot see a word between underscores: the stored-names register's `STORED_ACT_NAMES` keeps its name (R22), and the one-sense row passes it with no sense at all. The plural row's `why` says that neither row reads a singular compound, so nobody takes it as covering every compound.
-
-13. **Keep the map's verb sense and the row's verb sense the same.** The rename map's verb sense was first a narrower, case-sensitive copy of the row's. A replay on an older branch would then have rewritten a string's "You act on it" to "You action on it", and the words test only refuses the old word, so nothing would have caught it. `packages/devtools/renames/action.json` now carries the patterns of `ACT_AS_A_VERB` and `ACTS_AS_A_VERB`, and the comment over `ACT_AS_A_VERB` in `old-words.ts` names the map as its mirror.
+1. **Count, then take the road to the owner.** Add the row locally with the obvious senses, run the words test and count what is left. For *check*, three senses left 885 findings in about 200 files, almost none of them the trust event. Fitting senses across the tree is a scope decision, so take the count to the owner with a recommendation.
+2. **Prefer reader text or `reads:`.** A row held by `reads:` to the files that write the renamed sense is refused there alone and keeps every other sense elsewhere; the line scan ANDs `reads` with the carve-outs. `check`, `class`, `candidate`, `repair` and `inbox` are held that way. A `reads` list passes silently if it names the wrong files, so plant the word in one of them and see the finding.
+3. **When senses are fitted, fit them to the test's own findings.** Save the failing run's lines, and blank them with the row's senses in a throwaway script that imports `OLD_WORDS`, so each edit costs a second. Keep the renamed thing's own phrases out of every sense: "first run" and "failed run" are the commonest ways to write a sync.
+4. **Name the words that make the verb, never the words that make the noun.** A plain-verb sense that blanked *act on* unless a determiner came directly before it passed every noun with a word between: "a live act on the same bundle". List what makes the verb instead, a modal or pronoun before it, or a subject before the plural, as `ACTS_AS_A_VERB` does, and match the verb in lower case so a label such as "Acts for {name}" stays refused.
+5. **A one-sense row and an everywhere row for the plural still miss a singular compound.** The *acts* row reads everywhere and finds `declareActs`, but `anyFormOf` wants the plural `s`, so `declareAct` passes both rows. The row's `why` says so, and the proof that none remain is a grep outside the words test (`rg -P '[a-z]Act\b|\bAct[A-Z]|_act\b|\bact_'`; on macOS, `git grep -E` ignores `\b`).
 
 ## Why This Matters
 
-The words test is the one gate on R12, which refuses an old word once it has landed, and on R22, which keeps stored history. Eleven sweeps each repeat this landing. Most mistakes here pass in silence: a missing `g`, a carve-out on a reader-text row, a flip back to pending, a plural under a one-sense row. The ones that fail loudly tempt the wrong fix. An old plan edited to pass breaks R22, a wire name renamed to pass breaks the assistants R21 protects, and a ratchet rise refreshed away hides new old words on pages.
+The words test is the one gate that refuses an old word once its rename has merged (R12), and it keeps stored history (R22). Most mistakes in a row pass in silence: a missing `g`, a carve-out on a reader-text row, a plural under a one-sense row, a `reads` list naming the wrong files. The ones that fail loudly tempt the wrong fix. An old plan edited to pass breaks R22, and a wire name renamed to pass breaks the assistants R21 protects.
 
 ## When to Apply
 
-- At KTD5 step 5 of each BA-29 sweep, U8 to U17, and whenever a later rename lands a row.
-- On any change to `old-words.ts`, the `_Code rename pending._` marks in `CONCEPTS.md`, or `old-words-ratchet.json`.
-- When reviewing a sweep's pull request. Check the diff for `state` flips both ways, a `landsBy` on each new pending row and none on a landed one, `g` on every new sense, `within` where one tree writes a sense, a `writtenBefore` carve-out on each newly landed line-scanned row, and a baseline that only fell.
+- In each pull request that renames a word the glossary defines.
+- On any change to `old-words.ts`.
+- When reviewing such a change. Check the diff for `g` on every new sense, `within` where one tree writes a sense, a planted case for every new sense, and no row added for a rename that has not landed in the same diff.
 
 ## Examples
 
-**A pending row, and the same row landed.** U11 lands `binding` on, say, 2026-10-20:
+**A row for a word with no other sense:**
 
 ```ts
-// before: pending, due on its sweep's expected merge day
 {
-  word: "binding",
-  use: "connected source",
-  entry: "connected source",
-  sweep: "connected source",
-  state: "pending",
-  landsBy: "2026-10-20",
+  word: "ledger act",
+  use: "audit action",
+  entry: "audit action",
+  sweep: "audit log",
   reach: "everywhere",
-},
-
-// after
-{
-  word: "binding",
-  use: "connected source",
-  entry: "connected source",
-  sweep: "connected source",
-  state: "landed",
-  reach: "everywhere",
-  carvedOut: [writtenBefore(CONNECTED_SOURCE_LANDED)], // "2026-10-20"
 },
 ```
 
-KTD1 also gives this row a deferred sense for `binding_id` on `index.chunk`, the worker's store-directory constant and the store-size env key until U12 renames them (plan:186). Written with `until: "passage"`, U12's sweep, the sense stops keeping those names once U12 lands. `bind` still names *connected source* as a pending row, so the glossary keeps its mark until `bind` lands as well.
+**A one-sense row to copy:** the api row holds its senses in `APP_SENSES`, with the api's own names held to `apps/api/` by `within`. It carves out `apps/web/` and `packages/design-system/` on its own row, because the word there is the SPA's own zone, not the tier.
 
-**Landed and pending, side by side** (`avoid-words.test.ts:481-486`): `const binding = await read(tx);` passes while the row is pending and is reported once it lands. The migration SQL, its snapshot and `old-words.ts` itself in the same planted tree pass either way.
-
-**A sense added for a collision** ("refuses an act, passing React's act and the verb", `avoid-words.test.ts`): the landed `act` row's sense "React's and Testing Library's act, in a call or its import", held to `apps/web/test/`, passes `await act(...)` and `import { act, cleanup } from "@testing-library/react"` in a web test, and the row still refuses "Each act lands at once." in a words module.
-
-**A one-sense row to copy:** the api row (`old-words.ts:157-170`) holds its senses in `APP_SENSES` (77-108), with the api's own names held to `apps/api/` by `within`. It carves out `apps/web/` and `packages/design-system/` on its own row, because the word there is the SPA's own zone, not the tier.
+**A row held to the files of its sense:** the `candidate` row reads only `SUGGESTION_KIND_FILES`, so a candidate under test keeps its word everywhere else.
 
 ## Related
 
-- `docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`: KTD1 (178), KTD5 (201-208), KTD6 (209-215), KTD7 (216), KTD8 (217), KTD15 (233), R12 (93), R21 and R22 (102-103), U7 (543-571), Appendix G (1001-1023).
-- `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`, amended by the same plan.
-- `CONCEPTS.md:5-7`, the preamble that defines `_Internal._` and `_Code rename pending._`.
+- `docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`: the BA-29 plan, with R12, R21 and R22.
+- `docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md`: the migration a rename of a stored name needs.
+- `CONCEPTS.md`'s preamble, which defines `_Internal._`.
