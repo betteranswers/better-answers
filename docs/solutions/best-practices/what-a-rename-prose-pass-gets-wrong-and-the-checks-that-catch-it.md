@@ -46,7 +46,7 @@ A rename that spans the tree replaces the old word with a pattern over every tra
 
 **2. Hold every stored and wire name.** Anything a browser, a database, a URL or another program stores or sends keeps its name (R22): localStorage and sessionStorage keys, cookie names, query-string and router keys, header names, CSS custom properties and design tokens, and any string that names one of them, such as a test title. U7's pass renamed the menu's localStorage key `better-answers.secondary-nav`, so every reader who had hidden the menu would have seen it again, and turned the test title "the page's own surface token" (the colour token `--surface-page`) into "area token". A test cannot protect a stored key by spelling it out: the same pass rewrites the test's literal too. Only a keep rule keeps it.
 
-Leave out of the pass every path the words test carves out (`CARVED_OUT` in `apps/api/tests/avoid-words.test.ts`: migrations and their snapshots, `docs/archive/`, plans and dogfood reports dated before 08/10/2026, the stored-names register, lifted code) and every generated file, such as `apps/web/src/features/people/audit-actions.ts`. They hold stored history or are regenerated, and no test fails when a pass rewrites them.
+Leave out of the pass every path the words test carves out (`CARVED_OUT` in `apps/api/tests/avoid-words.test.ts`: migrations and their snapshots, `docs/archive/`, plans and dogfood reports dated before 2026-10-08, the stored-names register, lifted code) and every generated file, such as `apps/web/src/features/people/audit-actions.ts`. They hold stored history or are regenerated, and no test fails when a pass rewrites them.
 
 **3. A word inside longer names in other senses.** With *domain* to *collection*, a pass that matches the word at camel humps and joiners rewrites `testingDomain`, `domainOf`, `OFF_TESTING_DOMAIN` and the stored column `testing_domain`; *hit* to *match* rewrites `reconcilerHits`. None of them meant the reader's word, and the column would change with no migration. Narrow the pass to the files that write the renamed sense, or give the longer names an unanchored keep rule. Then grep the word's own trees for longer names that do mean it: the words test's one-sense row matches the whole word only.
 
@@ -90,7 +90,7 @@ rg -U -n -i 'secondary[\s*/#]+nav' -g '!docs/archive/**' -g '!docs/{plans,dogfoo
   -g '!docs/{plans,dogfood-reports}/2026-10-0[1-7]-*' -g '!apps/api/tests/old-words.ts' -g '!docs/solutions/best-practices/*renam*'
 ```
 
-The globs leave out files the words test also skips: the archive, plans and dogfood reports dated before 08/10/2026, the list, and the rename learnings, which quote the words a rename removes.
+The globs leave out files the words test also skips: the archive, plans and dogfood reports dated before 2026-10-08, the list, and the rename learnings, which quote the words a rename removes.
 
 **10. Leave a fixture under `contracts/` as written.** Both tiers read those fixtures, and the api tier's contract digest is computed from them (`packages/schema/test/contract-digest.test.ts`). Rewording one moves the digest for wording alone; give the old word a sense on its row in the words test instead. When a fixture must change, regenerate both stamps after the pass, never before it: U11's pass reworded fixture prose after the stamps were generated, and the worker's hand-edited-digest test failed.
 
