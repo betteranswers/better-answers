@@ -1037,7 +1037,7 @@ describe("the glossary's entries", () => {
     ]);
   });
 
-  it("reads no entry under a tail, but the next cluster", () => {
+  it("reads no tail entry, and reads the cluster after it", () => {
     const glossary = [
       "## Flagged ambiguities",
       "",
