@@ -6,7 +6,6 @@ packages:
 
 # `false` rather than no entry: pnpm 11 makes an undecided build script a hard error.
 allowBuilds:
-  '@ast-grep/cli': false
   cpu-features: false
   esbuild: true
   lefthook: false
