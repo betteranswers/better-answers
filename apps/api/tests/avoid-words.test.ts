@@ -29,6 +29,7 @@ import {
   isRenamed,
   lineFindings,
   listFaults,
+  overduePending,
   ratchetCounts,
   ratchetRises,
   readerFindings,
@@ -102,6 +103,13 @@ describe("the list of old words", () => {
     expect(
       listFaults(OLD_WORDS, glossary, NOT_WATCHED_ON_PAGES),
       "apps/api/tests/old-words.ts and CONCEPTS.md disagree. Keep the list sorted, one row per word, each under an entry the glossary heads, and a pending row for every entry marked pending.",
+    ).toEqual([]);
+  });
+
+  it("holds no row pending past its sweep's day", () => {
+    expect(
+      overduePending(OLD_WORDS, new Date().toISOString().slice(0, 10)),
+      "a row in apps/api/tests/old-words.ts is pending with no day, or past its day. Once the sweep has merged, land the row. If it has not merged, set landsBy to the day it is now expected to.",
     ).toEqual([]);
   });
 
@@ -1390,5 +1398,55 @@ describe("faults in a planted list", () => {
     expect(listFaults([PENDING_ROW], PLANTED_GLOSSARY, [{ head: "Unverified" }])).toEqual([
       `"Unverified" is left unwatched on pages, but it heads no internal entry`,
     ]);
+  });
+});
+
+describe("a pending row past its day", () => {
+  const TODAY = "2026-10-08";
+  const UNDATED: Renamed = {
+    word: "actor id",
+    use: "the person's name",
+    entry: "actor id",
+    sweep: "Audit log",
+    state: "pending",
+    reach: "reader text",
+  };
+  const STALE: Renamed = { ...UNDATED, landsBy: "2026-10-07" };
+
+  it("refuses a stale pending row, naming it and its sweep", () => {
+    expect(overduePending([STALE], TODAY)).toEqual([
+      `"actor id" is still pending, but the Audit log sweep was due to land by 2026-10-07`,
+    ]);
+  });
+
+  it.each([
+    { due: "a pending row due today", landsBy: TODAY },
+    { due: "a pending row due after today", landsBy: "2026-10-09" },
+  ])("passes $due", ({ landsBy }) => {
+    expect(overduePending([{ ...STALE, landsBy }], TODAY)).toEqual([]);
+  });
+
+  it.each([
+    { fault: "no day", row: UNDATED },
+    {
+      fault: "a day not written YYYY-MM-DD",
+      row: { ...STALE, landsBy: "2026-10-4" },
+    },
+  ])("refuses a pending row with $fault", ({ row }) => {
+    expect(overduePending([row], TODAY)).toEqual([
+      `"actor id" is pending for the Audit log sweep, but names no day it lands by, as YYYY-MM-DD`,
+    ]);
+  });
+
+  it("reads no landed or avoided row", () => {
+    expect(
+      overduePending(
+        [
+          { ...STALE, state: "landed" },
+          { word: "cursor", use: "watermark", entry: "watermark", sweep: null },
+        ],
+        TODAY,
+      ),
+    ).toEqual([]);
   });
 });

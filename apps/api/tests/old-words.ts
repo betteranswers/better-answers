@@ -26,6 +26,8 @@ export type Renamed = {
   readonly entry: string;
   readonly sweep: string;
   readonly state: "pending" | "landed";
+  /** The day its sweep is due to merge, as YYYY-MM-DD: a pending row needs one, and is refused after it. */
+  readonly landsBy?: string;
   readonly reach: Reach;
   readonly why?: string;
   readonly permitted?: readonly Sense[];
