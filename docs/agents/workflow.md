@@ -58,6 +58,7 @@ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
 ### Merge queue facts
 
 - GitHub clears the auto-merge flag when a PR enters the merge queue. Do not read that as 'disarmed'.
+- A PR armed with `gh pr merge --auto` enters the queue only once its required checks pass. Until then it has no queue entry, which does not mean it left the queue: `autoMergeRequest` is set and the state is still `OPEN`. A PR that left the queue unmerged has neither a queue entry nor `autoMergeRequest`.
 - `gh pr view` has no `isInMergeQueue` field. Use GraphQL: `gh api graphql -f query='{repository(owner:"O",name:"R"){pullRequest(number:N){mergeQueueEntry{state position}}}}'`.
 - Land sibling PRs that touch the same files one at a time, rebasing between merges.
 
