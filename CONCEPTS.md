@@ -921,68 +921,132 @@ lives in a bundle (Q&A pairs do — they are concepts).
 The platform exports a guide's *structure* into the company's repository so it can be rebuilt
 from concepts elsewhere; the prose stays a platform record.
 
-- **guide** — a set of pages that gives the company's people, by role, its knowledge about one
-  subject (a product, a service, a sector, the company itself), configurable per company. A guide is
-  never the unit of trust: every fact it shows is a concept. A guide has no publish state: it is
-  seen from the moment it exists, every section wearing its trust badge. Its readers are roles,
-  never an audience.
-- **guide definition** — the company-owned description of a guide: its kind, subject, the
-  roles it serves (each with a default layer and an action threshold), its layers and its tree
-  of sections. Seeded from a template, then owned outright.
-- **template** — a platform-shipped guide definition a company seeds from (a bid-library
-  product guide, a sector guide, a sales play, a battlecard, a documentation set). Later
-  template changes arrive as suggestions, never applied.
-- **section** — one node of a guide definition's tree: a prompt, a role label (know / say /
-  show / do), a usage note, the layers it renders, and an expectation of which concepts should
-  populate it. A section inside a section is still a section (the draft's "subsection"). A
-  **hidden** section is a definition setting: Admins see it marked hidden, readers do not,
-  coverage still counts it.
-- **layer (of a section)** — one of the ways a section shows its knowledge: *assembled* (prose
-  written over the concepts it includes — the first customer's Brief) or *quoted* (the included
-  concepts' own words — its Detail). A reader switches layers; the definition says which a
-  section renders and which a role opens on.
-- **prompt** — what a section or a Q&A pair answers: a heading or a question.
-- **write-up** — the written prose in a guide section or a tender response:
-  assembled prose plus the ordered concepts it includes or cites, with its own provenance and
-  verification. A guide section and a response are its two homes. Its shown trust is the weaker of
-  its own and its cited concepts'.
-- **include** — _Internal._ one concept a write-up draws on, in order, with the context wording
-  chosen for it and the concept's content as it stood when the prose was written. An include names
-  a concept, never another write-up.
-- **needs review** — the state of a write-up whose included concept changed or was removed,
-  whose expectation is unmet, or on which a review found a fault; the platform *marks* it (a
-  reader *flags* an answer); shown, never hidden, until a person steps in.
-- **skeleton projection** — the guide's structure the platform writes into the company's
-  repository (kind, subject, roles, sections with their prompts and included concepts; no
-  prose), regenerated when the guide definition changes.
-- **citation** — the unit a reader follows back to the source: a concept, the source and locator it
-  rests on, and the cited passage, shown beside the claim it supports. In a search match, the same
-  unit shown as the match.
-- **footnote** — the mark in a write-up's prose that ties one claim to one
-  include: a footnote reference labelled by the include (ADR 0015). What the reader sees as the
-  passage beside the claim, and what the copied text carries as a numbered footnote; its text is
-  never stored, always rendered from the include.
-- **expectation** — a section's statement of which concepts should populate it (by type,
-  relation to the subject, tag or feed); coverage is expectation minus what is included.
-- **response** — a write-up scoped to one question put to the company: a question-set
-  question in v0.1 (ticket 47 Q10), an opportunity's question once the opportunity layer arrives.
-  A record like every write-up; the opportunity, when there is one, attaches to it later
-  (Liam, 26/08/2026). Empty, carrying its unmapped passages, when nothing on the map answers.
-- **answer** — what the platform returns for a question: prose asserting concepts only, a
-  passage per claim, its verdict for the caller's role, and what it could not answer — found by
-  traversal first (an existing `Answer` reused as it stands, shown with the question it
-  answered) and drafted over the walk's concepts otherwise (ADR 0016). Not the `Answer` concept
-  (a Q&A pair), which an answer may reuse or cite.
-- **answer contract** — _Internal._ the one shape an answer takes for the UI, MCP and the response
-  record: an event stream — verdict first — folded into one object (ADR 0016).
-- **match** — one unit a search returns, typed by its knowledge layer: a
-  concept, with the guide sections it appears in and the documents it rests on nested under it; a
-  guide section or a document on its own only when no concept covers it. Every match wears its trust
-  or sensitivity word; a document nothing rests on reads *Not company knowledge*. The MCP wire's key
-  for them stays `hits`.
-- **unmapped passage** — a passage from a connected document that no concept rests on, shown
-  where nothing on the map answers — source, locator, sensitivity word — never asserted as the
-  company's answer; one action from a suggested concept.
+### guide
+
+A set of pages that gives the company's people, by role, its knowledge about one subject (a
+product, a service, a sector, the company itself), configurable per company.
+
+A guide is never the unit of trust: every fact it shows is a concept. A guide has no publish
+state: it is seen from the moment it exists, every section wearing its trust badge. Its readers
+are roles, never an audience.
+
+### guide definition
+
+The company-owned description of a guide: its kind, subject, the roles it serves (each with a
+default layer and an action threshold), its layers and its tree of sections.
+
+Seeded from a template, then owned outright.
+
+### template
+
+A platform-shipped guide definition a company seeds from (a bid-library product guide, a sector
+guide, a sales play, a battlecard, a documentation set).
+
+Later template changes arrive as suggestions, never applied.
+
+### section
+
+One node of a guide definition's tree: a prompt, a role label (know / say / show / do), a usage
+note, the layers it renders, and an expectation of which concepts should populate it.
+
+A section inside a section is still a section (the draft's "subsection"). A **hidden** section is
+a definition setting: Admins see it marked hidden, readers do not, coverage still counts it.
+
+### layer (of a section)
+
+One of the ways a section shows its knowledge: *assembled* (prose written over the concepts it
+includes — the first customer's Brief) or *quoted* (the included concepts' own words — its
+Detail).
+
+A reader switches layers; the definition says which a section renders and which a role opens on.
+
+### prompt
+
+What a section or a Q&A pair answers: a heading or a question.
+
+### write-up
+
+The written prose in a guide section or a tender response: assembled prose plus the ordered
+concepts it includes or cites, with its own provenance and verification.
+
+A guide section and a response are its two homes. Its shown trust is the weaker of its own and its
+cited concepts'.
+
+### include
+
+_Internal._ one concept a write-up draws on, in order, with the context wording chosen for it and
+the concept's content as it stood when the prose was written.
+
+An include names a concept, never another write-up.
+
+### needs review
+
+The state of a write-up whose included concept changed or was removed, whose expectation is
+unmet, or on which a review found a fault; the platform *marks* it (a reader *flags* an answer);
+shown, never hidden, until a person steps in.
+
+### skeleton projection
+
+The guide's structure the platform writes into the company's repository (kind, subject, roles,
+sections with their prompts and included concepts; no prose), regenerated when the guide
+definition changes.
+
+### citation
+
+The unit a reader follows back to the source: a concept, the source and locator it rests on, and
+the cited passage, shown beside the claim it supports.
+
+In a search match, the same unit shown as the match.
+
+### footnote
+
+The mark in a write-up's prose that ties one claim to one include: a footnote reference labelled
+by the include.
+
+What the reader sees as the passage beside the claim, and what the copied text carries as a
+numbered footnote; its text is never stored, always rendered from the include.
+
+### expectation
+
+A section's statement of which concepts should populate it (by type, relation to the subject, tag
+or feed); coverage is expectation minus what is included.
+
+### response
+
+A write-up scoped to one question put to the company: a question-set question in v0.1, an
+opportunity's question once the opportunity layer arrives.
+
+A record like every write-up; the opportunity, when there is one, attaches to it later. Empty,
+carrying its unmapped passages, when nothing on the map answers.
+
+### answer
+
+What the platform returns for a question: prose asserting concepts only, a passage per claim, its
+verdict for the caller's role, and what it could not answer — found by traversal first (an
+existing `Answer` reused as it stands, shown with the question it answered) and drafted over the
+walk's concepts otherwise.
+
+Not the `Answer` concept (a Q&A pair), which an answer may reuse or cite.
+
+### answer contract
+
+_Internal._ the one shape an answer takes for the UI, MCP and the response record: an event
+stream — verdict first — folded into one object.
+
+### match
+
+One unit a search returns, typed by its knowledge layer: a concept, with the guide sections it
+appears in and the documents it rests on nested under it; a guide section or a document on its own
+only when no concept covers it.
+
+Every match wears its trust or sensitivity word; a document nothing rests on reads *Not company
+knowledge*. The MCP wire's key for them stays `hits`.
+
+### unmapped passage
+
+A passage from a connected document that no concept rests on, shown where nothing on the map
+answers — source, locator, sensitivity word — never asserted as the company's answer; one action
+from a suggested concept.
 
 ## Records the platform keeps
 
