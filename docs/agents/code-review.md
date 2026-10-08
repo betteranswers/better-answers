@@ -26,4 +26,4 @@ The same config names the model's reasoning effort, `high`. Four machine setting
 
 `get_pr_issues` on the `cubic` MCP lists a pull request's findings when the threads are hard to read. *Fix with cubic* hands a finding to Cubic's coding-agent provider; use it when you are driving the pull request by hand, never while `ce-babysit-pr` is running, because two fixers pushing to one branch undo each other.
 
-When Cubic's allowance runs out, its check completes neutral with *AI review line limit reached*, and nothing arms: the owner decides whether the pull request merges unreviewed. Its allowance resets on the first of each month.
+When Cubic's allowance runs out, its check completes neutral with *AI review line limit reached*, and nothing arms. During development, the session arms it by hand (`docs/agents/workflow.md`, *Merging*) once `check` is green and every thread is resolved. Its allowance resets on the first of each month.
