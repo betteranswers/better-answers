@@ -117,7 +117,7 @@ Only `apps/api/src/server.ts` builds Better Auth outside the tests. Production a
 
 | Proves | Command | Unit |
 | --- | --- | --- |
-| The race and the unmigrated case | `pnpm --filter @better-answers/api run test tests/health.test.ts` | U1 |
+| The race, the narrowing and the unmigrated case | `pnpm --filter @better-answers/api run test tests/health.test.ts tests/unique-violations.test.ts` | U1 |
 | Nothing else in the api moved | `pnpm --filter @better-answers/api run check` | U1 |
 | Lint and the root gates | `pnpm run check:gates` | U1 |
 
