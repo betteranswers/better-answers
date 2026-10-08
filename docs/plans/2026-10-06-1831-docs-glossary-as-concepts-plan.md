@@ -14,10 +14,10 @@ execution: code
 
 - **Objective:** Compound Engineering's planning, brainstorming, compounding and review skills read the project's glossary in the place they look for it, and keep it current in a form they can edit without working around it. No `ce-compound` run stops to reason about a second glossary again.
 - **Means:** The glossary moves from `CONTEXT.md` to `CONCEPTS.md`, and every reference follows (KTD1). Its entries then take CE's format, and the words test reads that format (KTD4, KTD7).
-- **Authority:** The Product Contract's requirements come first, then the Key Technical Decisions, then the units. A decision marked `session-settled` is not reopened. An owner decision listed under Open Questions is the owner's to answer, and the build does not answer it.
+- **Authority:** The Product Contract's requirements come first, then the Key Technical Decisions, then the units. A decision marked `session-settled`, or recorded under Owner Decisions, is not reopened.
 - **Stop conditions:**
   - A test reads the glossary in a way the change cannot satisfy without changing what the test checks.
-  - U2 is reached while #620 (BA-71) is still open, or while an owner decision under Open Questions is unanswered.
+  - U2 is reached while #620 (BA-71) is still open.
   - A CE rule turns out to conflict with the words test in a way this plan does not name.
   - The before-and-after comparison of entries (KTD8) differs in a way no owner decision explains.
 - **Execution profile:** Two pull requests. U1 merged as #593 on 06/10/2026, `Related to BA-59`, and #596 recorded R8's check. U2 lands as the second, `Fixes BA-59`, on the branch `liam/ba-59-concepts-reshape`, rebased onto `main` once #620 has merged (KTD10). U2 changes `.ts` files, so its merge group runs the full lane.
@@ -74,30 +74,30 @@ The words test (`apps/api/tests/avoid-words.test.ts` with `words-scan.ts`) reads
 
 ### CE's rules, rule by rule
 
-CE's rules are `skills/ce-compound/references/concepts-vocabulary.md` in the plugin release `.claude/settings.json` pins (3.30.4 on 08/10/2026). This table records where each lands. "Follow" is U2's work; "Exception" is recorded in the preamble; "D*n*" waits on the owner (Open Questions).
+CE's rules are `skills/ce-compound/references/concepts-vocabulary.md` in the plugin release `.claude/settings.json` pins (3.30.4 on 08/10/2026). This table records where each lands. "Follow" is U2's work; "Exception" is recorded in the preamble; "D*n*" names the owner decision that settles it (Owner Decisions).
 
 | CE's rule | Here |
 |---|---|
 | The file lives at the root as `CONCEPTS.md` | Follow (U1) |
-| Which runs may add, refine, fold, retire, delete or scrub | Follow CE's list; who may add is D1 |
+| Which runs may add, refine, fold, retire, delete or scrub | Follow CE's list (D1) |
 | Terms enter by accretion and by seeding | Follow. A repo-wide seeding bootstrap is deferred (Scope Boundaries) |
 | Pick one word and list dropped synonyms as `Avoid:` | Exception: no `Avoid:` line, and no fold note naming an old word (Key Decisions) |
-| No implementation specifics: paths, class and function names, table names, library calls | Follow for the platform's own identifiers. Names the platform does not own are D3 |
+| No implementation specifics: paths, class and function names, table names, library calls | Follow for the platform's own identifiers. Exception: names the platform does not own stay (D3) |
 | No status fields, dates or owners on entries | Exception for the two marks (Key Decisions). Dates and owners' names are removed |
-| No examples or current-config values: thresholds, counts, enum values | Follow: state the behaviour. A count that defines the concept, such as three layers, is the concept and stays. Wire values are D3 |
-| No links to PRs, issues, channels or roadmap milestones | Follow for tickets and pull requests. ADR numbers are D2 |
-| No version-specific claims | Follow for history ("until 30/09/2026 …"). The *v0.1* scope of a rule is D4 |
+| No examples or current-config values: thresholds, counts, enum values | Follow: state the behaviour. A count that defines the concept, such as three layers, is the concept and stays. Exception: wire values stay (D3) |
+| No links to PRs, issues, channels or roadmap milestones | Follow: tickets, pull requests and ADR numbers come out (D2) |
+| No version-specific claims | Follow for history ("until 30/09/2026 …"). Exception: a *v0.1* qualifier stays where dropping it would change the rule (D4) |
 | A project-specific term an entry leans on is defined too | Follow for terms U2 meets. A sweep for missing terms is deferred |
 | What earns a slot, and what keeps one | Deferred: U2 removes and folds no entry (D5) |
 | One-sentence definition; a second paragraph only for behavioural rules | Follow (KTD11) |
 | Relationships section, optional | Follow: each cluster's opening prose stays as its relationships note |
 | Cluster by domain relationship | Follow: the `##` clusters stay |
 | Flagged ambiguities tail | Follow (KTD12) |
-| Retired tail, only when it has entries | Follow: absent, because U2 retires no entry (Scope Boundaries). A later `ce-compound-refresh` run, or D5's answer, may add it |
+| Retired tail, only when it has entries | Follow: absent, because U2 retires no entry (Scope Boundaries). A later `ce-compound-refresh` run may add it (D5) |
 
 ### Scope Boundaries
 
-- No entry's meaning changes, and no head changes its wording. U2 changes format and removes what CE's rules exclude. Where removing a phrase would change what an entry says, that is a D-question, not a build call.
+- No entry's meaning changes, and no head changes its wording. U2 changes format and removes what CE's rules exclude. Where removing a phrase would change what an entry says, the phrase stays.
 - No entry is added, folded, retired or deleted. The three kinds of principal are body lines of the principal entry today, and KTD11 rewrites them as a sentence.
 - BA-29's sweeps and its old-words list are BA-29's work, and BA-29 is done.
 - `docs/archive/` is not edited.
@@ -119,7 +119,7 @@ CE's rules are `skills/ce-compound/references/concepts-vocabulary.md` in the plu
 - KTD3. **`domain.md` states CE's rule in one sentence and points to CE.** It does not copy CE's mutation list, which CE owns and may change. It keeps the part of the earlier rule that still holds: a domain word used in code is defined in `CONCEPTS.md` in the same change. Governs R4, R5.
 - KTD4. **U2 drops the parser's bullet branch once no entry is a bullet.** Kept, the branch would misread the reshaped file: a column-0 `- **x** —` list inside a `###` entry's body opens a new entry and cuts the heading entry's definition short. Dropped, a stray bullet entry would go unread, which R9's guard turns into a failure. Governs R7, R9.
 - KTD5. **The marks open the definition sentence, as they do now.** A `###` entry reads `### head`, then a definition that starts with `_Internal._` or `_Code rename pending._` when it carries one. The preamble keeps defining both marks, the pending one included, so a later sweep and CE's skills know what it means. Governs R6, R7.
-- KTD6. **U2 removes ticket numbers, pull request numbers, dates, owners' names and the platform's own identifiers from entries, and keeps the rule each one carried.** Where an entry needs the rule the pointer stood for, U2 states it in words. ADR numbers, names the platform does not own, and *v0.1* qualifiers wait on D2, D3 and D4. Governs R6.
+- KTD6. **U2 removes ticket numbers, pull request numbers, dates, owners' names and the platform's own identifiers from entries, and keeps the rule each one carried.** Where an entry needs the rule the pointer stood for, U2 states it in words. ADR numbers come out too (D2). Names the platform does not own and *v0.1* qualifiers that scope a rule stay (D3, D4). Governs R6.
 - KTD7. **The parser reads no entry under `## Flagged ambiguities` or `## Retired`.** CE writes one-line notes there, and a `###` in a tail is not a term with a definition. Reading resumes under any other `##` heading. Today a `###` under a tail would be read as an entry, so this is new behaviour, built test-first. Governs R7.
 - KTD8. **The reshape is proved by two before-and-after comparisons.** The first compares each entry's (head, mark, page word) triple, from `entriesOf`, the mark rule and `PAGES_SAY`, and any difference must be one an owner decision explains. Only five definitions say what a page says, so the triples cannot see prose absorbed into most entries. The second therefore compares each cluster's opening prose: every line that sits in no entry on the file as it stands, the riders paragraph included, must sit between its `##` heading and that cluster's first `###` on the reshaped file. Both are build-time checks reported in the pull request, not committed tests, because CE adds entries and a pinned list would refuse every one. Governs R7.
 - KTD9. **The glossary keeps every phrase a permitted sense matches, on one line.** The line scan reads the glossary like any tracked file. Seven phrases for *run* are permitted only inside `CONCEPTS.md` (`old-words.ts`, the sense *a release's run and its outcome word*), and other senses match phrases anywhere. The scan reads line by line, so a phrase split across a line break is two lines that each fail. Where a definition must be reworded, U2 rewords the sense's pattern in the same commit rather than widening it. Governs R7.
@@ -133,31 +133,15 @@ CE's rules are `skills/ce-compound/references/concepts-vocabulary.md` in the plu
 - `ce-compound`'s vocabulary capture runs on any qualifying learning. U1's pull request satisfied R8 through #596.
 - No sweep or other change marks an entry `_Code rename pending._` between now and U2's merge. If one does, its pending row carries the `landsBy` that #620 requires, and U2 keeps the mark at the head of the reshaped definition.
 
-### Open Questions
+### Owner Decisions
 
-Each is the owner's to decide. U2's build starts only once each has an answer, because each changes what the build writes. The recommendation is the planner's.
+The owner decided each of these on 08/10/2026, choosing among the options the plan set out. Each governs what U2 writes.
 
-- **D1. Who may add an entry (unresolved).** `docs/agents/domain.md`, as #593 wrote it, says CE's skills add, refine, fold and retire entries under CE's rules, and that a domain word code uses is defined in the same change or before it. Before #593, a term entered only once a decision had settled it.
-  - **A. Keep #593's rule.** Every CE edit shows in its pull request's diff, and Cubic and the owner review it. The glossary grows with the work. An entry can enter that no decision settled, and `ce-compound-refresh` applies its edits without asking.
-  - **B. Additions only from settled decisions.** CE may refine, fold, scrub and retire, and a new entry comes only from a plan, a brainstorm or a decision doc that settled it. The preamble must say so, because CE reads it. CE's own rules let a `ce-compound` run add, so the preamble overrides CE's skills, and no test enforces it.
-  - **C. Keep A, and have a pull request name each entry CE added.** That costs `ce-commit-push-pr` one line of body per addition, and the gate is review alone.
-  - **Recommendation: A.** The parent plan records the owner choosing it on 06/10/2026 against B's shape, and nothing since has shown an unreviewed entry landing. Whichever stands, the preamble says it in one sentence (R4).
-- **D2. ADR numbers in entries (unresolved).** 69 lines cite one.
-  - **A. Remove them and state the rule in words** (KTD6). The entry stands on its own, as CE requires, and a reader finds the reasoning by searching the decision docs for the term.
-  - **B. Keep them, as an exception.** A reader can go straight to the reasoning, but CE's skills read a number they cannot resolve, and a renumbered decision leaves a stale pointer.
-  - **Recommendation: A.**
-- **D3. Names the platform does not own (unresolved).** The preamble already says OKF's keys, the MCP wire and a protocol's own names keep theirs. *Trust words the reader sees* maps each wire value, such as `human-reviewed`, to the words a reader sees. CE forbids implementation names and enum values.
-  - **A. Keep names the platform does not own, as an exception, and remove the platform's own identifiers.** This keeps the mapping that the trust cluster exists to state.
-  - **B. Remove every code-formatted name.** The file conforms fully, and the wire-to-reader mapping goes to the decision docs.
-  - **Recommendation: A.**
-- **D4. The *v0.1* scope of a rule (unresolved).** Nine lines bound a rule to v0.1, such as "a company's knowledge is one knowledge base in v0.1". CE forbids version-specific claims. Dropping the qualifier would make a scoped rule read as permanent, which changes the entry's meaning.
-  - **A. Keep the qualifier, as an exception, where dropping it would change the rule.**
-  - **B. Drop the qualifier and the sentence it scopes.** The file loses rules that hold today.
-  - **Recommendation: A.**
-- **D5. Whether U2 judges which entries keep their slot (unresolved).** CE's rules fold an entry that is a property of another and delete one that general programming vocabulary covers.
-  - **A. Defer it to a `ce-compound-refresh` run after U2.** Folding or deleting changes heads, so it needs old-words rows moved and owner review per entry. U2's comparison (KTD8) stays a pure format check.
-  - **B. Do it in U2.** The file conforms sooner, but the comparison can no longer tell a format change from a content change.
-  - **Recommendation: A.**
+- **D1. Who may add an entry: #593's rule stands.** CE's skills add, refine, fold and retire entries under CE's rules, and each edit is reviewed in its pull request. Chosen over additions only from settled decisions, and over a pull request naming each entry CE added. The preamble, `AGENTS.md` and `domain.md` say it in one sentence (R4).
+- **D2. ADR numbers come out of entries,** and each entry states the rule in words (KTD6). Chosen over keeping them as an exception.
+- **D3. Names the platform does not own stay, as an exception,** and the platform's own identifiers come out. Chosen over removing every code-formatted name.
+- **D4. A *v0.1* qualifier stays, as an exception, where dropping it would change the rule.** Chosen over dropping the qualifier and the sentence it scopes.
+- **D5. U2 judges no entry's slot.** That is left to a `ce-compound-refresh` run after U2, so the comparison (KTD8) stays a pure format check. Chosen over doing it in U2.
 
 ### System-Wide Impact
 
@@ -203,20 +187,19 @@ Each is the owner's to decide. U2's build starts only once each has an answer, b
 
 - **Goal:** Every entry in `CONCEPTS.md` is a `###` heading in CE's format, apart from the exceptions the owner records, and the words test reads only that shape.
 - **Requirements:** R4, R6, R7, R9; KTD4 to KTD13.
-- **Dependencies:** U1 (merged), BA-29's U17 (merged), #620 merged, and D1 to D5 answered.
+- **Dependencies:** U1 (merged), BA-29's U17 (merged), #620 (merged), and the owner decisions D1 to D5.
 - **Files:**
   - `CONCEPTS.md`
   - `apps/api/tests/words-scan.ts`, `apps/api/tests/avoid-words.test.ts`
   - `apps/api/tests/old-words.ts`, only where a permitted sense's pattern must follow a reworded phrase (KTD9)
   - `AGENTS.md`, whose glossary line gains one sentence saying who may change an entry (R4), which it does not say today
-  - `docs/agents/domain.md`, only if D1's answer changes the rule
 - **Approach:**
   1. Rebase the branch onto `main` after #620 merges. Record both baselines on the file as it stands: the (head, mark, page word) triples and each cluster's opening prose (KTD8).
   2. Reshape one `##` cluster per commit (KTD13):
      - each entry becomes `### head`, with the head's wording unchanged
      - its mark, if any, opens the definition (KTD5)
      - the definition becomes one sentence, with rules in a second paragraph (KTD11)
-     - ticket and pull request numbers, dates, owners' names and the platform's own identifiers come out, and ADR numbers, names the platform does not own and *v0.1* qualifiers follow D2, D3 and D4 (KTD6)
+     - ticket and pull request numbers, dates, owners' names and the platform's own identifiers come out, as do ADR numbers, while names the platform does not own and rule-scoping *v0.1* qualifiers stay (KTD6)
      - every permitted-sense phrase stays whole on one line (KTD9).
   3. Add `## Flagged ambiguities` at the tail (KTD12).
   4. Rewrite the preamble. It keeps the definitions of both marks and the note on names the platform does not own. It names every exception the owner recorded, says a new entry is a `###` heading, states D1's rule in one sentence, and writes no `Avoid:` form the avoided-words guard would match.
@@ -259,7 +242,7 @@ Each is the owner's to decide. U2's build starts only once each has an answer, b
 ## Definition of Done
 
 - `CONCEPTS.md` is at the root with `CONTEXT.md`'s history, and nothing outside `docs/archive/` names `CONTEXT.md` apart from the R2 exception.
-- `AGENTS.md`, `domain.md` and the glossary's preamble say who may change an entry, as D1's answer has it, and `cubic.yaml` names `CONCEPTS.md`.
+- `AGENTS.md`, `domain.md` and the glossary's preamble say who may change an entry, as D1 has it, and `cubic.yaml` names `CONCEPTS.md`.
 - A `ce-compound` run reported on `CONCEPTS.md`, created no second file, and left the marks in place.
 - After U2: every entry is a `###` heading in CE's format apart from the recorded exceptions, the preamble names those exceptions, the words test reads the same triples as before, and a bullet entry fails it.
 - No abandoned wording or experimental edits are left in either diff.
