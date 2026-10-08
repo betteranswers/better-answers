@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import gc
 import shutil
 import threading
@@ -237,8 +238,11 @@ class Host:
         # Evicted before the directory goes: removing it under an open handle would
         # leave the engine writing into a store nothing can read.
         self._evict(sync, CONNECTED_SOURCE_STORE)
+        # Only a store never made is passed over: one left standing keeps its personal
+        # text, so the sync fails rather than index over it.
         for store in (CONNECTED_SOURCE_STORE, *STORES_NAMED_BEFORE_THE_PASSAGE_SWEEP):
-            shutil.rmtree(self.store_directory(sync, store), ignore_errors=True)
+            with contextlib.suppress(FileNotFoundError):
+                shutil.rmtree(self.store_directory(sync, store))
 
     def pool(self, workspace_id: str) -> asyncpg.Pool:
         held = self._pools.get(workspace_id)
