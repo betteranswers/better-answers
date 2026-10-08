@@ -13,6 +13,7 @@ applies_when:
   - "Reviewing a pull request's diff of old-words.ts or CONCEPTS.md"
   - "Adding a row for a shared word, such as check or class, whose first scan finds hundreds of lines in other senses"
   - "Widening the reach of a row the list already holds"
+  - "Changing a glossary word whose code follows later, in a block's rename batch"
   - "Writing a plain-verb sense for a shared word, or a second row for its plural"
 symptoms:
   - "Several mistakes in a row pass the words test without a finding: a sense regex without the g flag, a carve-out on a reader-text row, a plural under a one-sense row"
@@ -36,7 +37,7 @@ tags:
 
 ## Context
 
-The words test, `apps/api/tests/avoid-words.test.ts`, refuses each word in `apps/api/tests/old-words.ts` where its row's reach says. A rename lands the glossary entry, the code and the row in one pull request, so the row is refused from the merge on and needs no state. BA-29 renamed the platform's words in sweeps, each with a pending phase, a ratchet and a glossary mark; all of that is gone. What stays is how the scan reads a row, and the mistakes that pass it in silence.
+The words test, `apps/api/tests/avoid-words.test.ts`, refuses each word in `apps/api/tests/old-words.ts` where its row's reach says. A rename lands in two steps (ADR 0047, amended 08/10/2026). The glossary entry, the text on pages, live docs and the row land first, the row reading reader text alone, with its `sweep` naming the block whose batch renames the code. That block's batch renames every remaining occurrence and widens the row in its own pull request. The row needs no state beyond its reach and its `sweep`. BA-29 renamed the platform's words in sweeps, each with a pending phase, a ratchet and a glossary mark; all of that is gone. What stays is how the scan reads a row, and the mistakes that pass it in silence.
 
 **A row** (`OldWord` in `old-words.ts`): `word`, `use` (the word to write), `entry` (the glossary head it sits under), `sweep` (the rename that replaced it, named in each finding), `reach`, and optional `why`, `permitted`, `carvedOut` and `reads`. `listFaults` keeps the list sorted case-insensitively, one row per word, each under a head the glossary has.
 
@@ -54,9 +55,9 @@ The words test, `apps/api/tests/avoid-words.test.ts`, refuses each word in `apps
 
 ### The procedure
 
-1. **Before adding the row, prove the old word gone in every form.** Search case-insensitively for plurals and compounds too. A one-sense row matches the whole word alone (trap 2), so this search is the only proof that its plural, and every compound name holding it, are gone.
+1. **Before each step, prove the old word gone from what that step's row reads.** When the reader-text row lands, prove it gone from reader text, and search live docs by hand, since a reader-text row never reads them (trap 1). When the batch widens the row, prove it gone in every form. Search case-insensitively for plurals and compounds too. A one-sense row matches the whole word alone (trap 2), so this search is the only proof that its plural, and every compound name holding it, are gone.
 
-2. **Add the row where it sorts,** in the pull request that renames the word. Pick the reach: everywhere for a word with no other sense, one sense for a word other senses share, reader text for a word only a page must not write.
+2. **Add the row where it sorts,** in the pull request that changes the glossary entry. While the code waits for a block's batch, the row reads reader text and its `sweep` names that block's batch. The batch then sets the reach it keeps: everywhere for a word with no other sense, one sense for a word other senses share, reader text for a word only a page must not write.
 
 3. **Give it the senses it keeps.** A `Sense` has a `sense` label, a `written` regex and an optional `within` path prefix. `lineScanOf` blanks every permitted match whose `within` the file path starts with, and every kept name, then tries the word again.
    - Add `within` when one tree alone writes the sense, as the api's own names for its tier are held to `apps/api/` and the cost ledger's contract to `contracts/cost-ledger/`.
@@ -97,7 +98,7 @@ The words test is the one gate that refuses an old word once its rename has merg
 
 - In each pull request that renames a word the glossary defines.
 - On any change to `old-words.ts`.
-- When reviewing such a change. Check the diff for `g` on every new sense, `within` where one tree writes a sense, a planted case for every new sense, and no row added for a rename that has not landed in the same diff.
+- When reviewing such a change. Check the diff for `g` on every new sense, `within` where one tree writes a sense, a planted case for every new sense, and no row added ahead of its code rename unless it reads reader text alone and its `sweep` names the block whose batch renames the code.
 
 ## Examples
 

@@ -162,7 +162,7 @@ A directive names what it suppresses and gives its reason on the same line. This
 
 ### Keep `CONCEPTS.md` a glossary and nothing else
 
-It holds domain terms, one definition each, and no implementation detail. A qualified entry, **word (of X)**, is a term of its own, not a second definition of the bare word. Code takes the glossary's word, and a missing word is defined in `CONCEPTS.md` in the same change as its first code use, or earlier.
+It holds domain terms, one definition each, and no implementation detail. A qualified entry, **word (of X)**, is a term of its own, not a second definition of the bare word. Code takes the glossary's word: when the glossary renames a word, the code follows in one block's rename batch (ADR 0047). A missing word is defined in `CONCEPTS.md` in the same change as its first code use, or earlier.
 
 Reviewer: no scan can tell a definition from an implementation detail. Nor can one tell whether a new identifier took its word from the glossary.
 
