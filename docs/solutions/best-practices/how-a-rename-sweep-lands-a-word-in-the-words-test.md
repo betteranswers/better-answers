@@ -1,7 +1,7 @@
 ---
 title: "How a rename sweep lands a word in the words test"
 date: 2026-10-03
-last_updated: 2026-10-07
+last_updated: 2026-10-08
 category: best-practices
 module: apps/api
 problem_type: best_practice
@@ -15,11 +15,13 @@ applies_when:
   - "Reviewing a sweep pull request's diff of old-words.ts, CONCEPTS.md or the ratchet baseline"
   - "Landing a one-sense row for a shared word, such as run, check or act, whose first scan finds thousands of lines in other senses"
   - "A sweep widens the reach of a row that has already landed"
+  - "Writing a plain-verb sense for a shared word, or a second row for its plural"
 symptoms:
   - "KTD5 step 5 says only that a sweep marks its rows landed, but landing a row also needs senses, a plans carve-out, a glossary edit and a baseline refresh"
   - "Several mistakes in a landed row pass the words test without a finding: a sense regex without the g flag, a carve-out on a reader-text row, a row flipped back to pending, a plural under a one-sense row"
   - "A one-sense row held to Appendix G's senses for a common English word reports hundreds of findings in other senses"
   - "Widening a landed reader-text row fails planted fixtures that used it as their reader-text example"
+  - "A plain-verb sense written as the determiners it excludes passes a noun with a word between, such as 'a live act on the same bundle'"
 root_cause: missing_workflow_step
 resolution_type: workflow_improvement
 related_components:
@@ -131,13 +133,28 @@ U14 renamed *check* to *verification* as the trust event (branch `feat/ba-29-u14
 
 10. **Widening a landed reader-text row to everywhere breaks the planted fixtures that borrowed it.** `Unchecked` was landed in reader text alone (trap 1), so the old colour tokens `--trust-unchecked-*` passed the test. To refuse them, U14 set the row's reach to everywhere and gave it `UNCHECKED_SENSES` (TypeScript's `noUncheckedIndexedAccess`) and `VERIFICATION_CARVED_OUT` (the row at `old-words.ts:1390`, the two lists at `779` and `830`). It also reworded the plain-English *unchecked* in two ADR docs and a hook script. Three planted tests in `avoid-words.test.ts` used the live row as their reader-text example, and two of them failed, because the row now reads the planted CSS line too. Pin those fixtures to a reader-text copy of the row (`CHECKED_IN_READER_TEXT`, `avoid-words.test.ts:221`), as `pendingNow` pins a pending copy. Add a planted case showing the widened row refusing the token ("refuses the old trust token once its row reads everywhere", `avoid-words.test.ts:919`).
 
+### What the action sweep added (U17)
+
+U17 renamed *act* to *action* in two parts: the column in #615, then the code, pages and docs on branch `liam/ba-29-u17b-action-words`. The owner held *act* to senses fitted across the tree, as *run* and *domain* are, and asked for a second row for *acts*. Steps 11 to 13 are what its code review found.
+
+11. **Name the words that make the verb, never the words that make the noun.** The first plain-verb sense blanked "act on" and "act as" unless a determiner or a possessive came directly before them, through a negative lookbehind over `an`, `the`, `each`, `its`, `X's` and the like. Any noun with a word in between passed: "a live act on the same bundle", "the invite act on Members", "for acts on our own estate". With `that` in its list of modals, "the sync that act queued" passed too. All four were lines the sweep had just rewritten, so a branch bringing them back would have stayed green. Review found it, and a validator confirmed it by running the regexes over those lines. The fix lists what makes the verb, fitted to the tree as the *run* row's verb sense already was (`ACT_AS_A_VERB` and `ACTS_AS_A_VERB` in `apps/api/tests/old-words.ts`):
+    - a modal or a pronoun before *act* (`to`, `can`, `may`, `they` and the rest);
+    - `that` or `and` before *act on* or *act as*;
+    - a short list of subjects before *acts on*, *acts as* or *acts for* (`agent`, `step`, `reader`, `principal` and the rest), and *who acts*.
+
+    The verb itself is matched in lower case, so a reader's label such as "Acts for {name}" stays refused. Each noun shape has a planted refused line ("refuses an act, passing React's act and the verb" and its plural twin, `apps/api/tests/avoid-words.test.ts`). Adding a word that comes before one of those nouns, such as `live`, turns its case red, which is the proof step 4 of *Landing a shared word that is mostly other senses* asks for.
+
+12. **A one-sense row and an everywhere row for the plural still miss a singular compound.** The *act* row is one sense, so it matches the whole word (trap 3): it refuses "an act" but not `declareAct`, `ActDialog` or `onAct`. The *acts* row reads everywhere, so `wordsOfCompounds` splits `declareActs` and `GROUP_ACTS` into words, and `anyFormOf`'s non-word bounds find `review-acts.tsx` and "Acts for". `anyFormOf` wants the plural `s`, though, so no singular compound reaches it. The proof that none remain sits outside the words test: the map's replay lists no `rename` (step 13 of the runner learning), and `git grep -P` for camel and snake forms (`[a-z]Act\b|\bAct[A-Z]|_act\b|\bact_|_ACT\b|\bACT_`) outside the carve-outs finds only Stryker's `stryMutAct_` marker and the runner test's `saidOfAct` fixture. Use `-P` or `rg`: on macOS, `git grep -E` ignores `\b` and finds nothing. The pattern cannot see a word between underscores: the stored-names register's `STORED_ACT_NAMES` keeps its name (R22), and the one-sense row passes it with no sense at all. The plural row's `why` says that neither row reads a singular compound, so nobody takes it as covering every compound.
+
+13. **Keep the map's verb sense and the row's verb sense the same.** The rename map's verb sense was first a narrower, case-sensitive copy of the row's. A replay on an older branch would then have rewritten a string's "You act on it" to "You action on it", and the words test only refuses the old word, so nothing would have caught it. `packages/devtools/renames/action.json` now carries the patterns of `ACT_AS_A_VERB` and `ACTS_AS_A_VERB`, and the comment over `ACT_AS_A_VERB` in `old-words.ts` names the map as its mirror.
+
 ## Why This Matters
 
 The words test is the one gate on R12, which refuses an old word once it has landed, and on R22, which keeps stored history. Eleven sweeps each repeat this landing. Most mistakes here pass in silence: a missing `g`, a carve-out on a reader-text row, a flip back to pending, a plural under a one-sense row. The ones that fail loudly tempt the wrong fix. An old plan edited to pass breaks R22, a wire name renamed to pass breaks the assistants R21 protects, and a ratchet rise refreshed away hides new old words on pages.
 
 ## When to Apply
 
-- At KTD5 step 5 of every sweep still to come, U8 to U17.
+- At KTD5 step 5 of each BA-29 sweep, U8 to U17, and whenever a later rename lands a row.
 - On any change to `old-words.ts`, the `_Code rename pending._` marks in `CONCEPTS.md`, or `old-words-ratchet.json`.
 - When reviewing a sweep's pull request. Check the diff for `state` flips both ways, `g` on every new sense, `within` where one tree writes a sense, a `writtenBefore` carve-out on each newly landed line-scanned row, and a baseline that only fell.
 
@@ -165,7 +182,7 @@ KTD1 also gives this row a deferred sense for `binding_id` on `index.chunk`, the
 
 **Landed and pending, side by side** (`avoid-words.test.ts:481-486`): `const binding = await read(tx);` passes while the row is pending and is reported once it lands. The migration SQL, its snapshot and `old-words.ts` itself in the same planted tree pass either way.
 
-**A sense added for a collision** (`avoid-words.test.ts:595-610`): `act` landed with `permitted: [{ sense: "React's and Testing Library's act", written: /\bact\(/g }]` passes `await act(...)` in a web test and still refuses "Each act lands at once." in a words module.
+**A sense added for a collision** ("refuses an act, passing React's act and the verb", `avoid-words.test.ts`): the landed `act` row's sense "React's and Testing Library's act, in a call or its import", held to `apps/web/test/`, passes `await act(...)` and `import { act, cleanup } from "@testing-library/react"` in a web test, and the row still refuses "Each act lands at once." in a words module.
 
 **A one-sense row to copy:** the api row (`old-words.ts:157-170`) holds its senses in `APP_SENSES` (77-108), with the api's own names held to `apps/api/` by `within`. It carves out `apps/web/` and `packages/design-system/` on its own row, because the word there is the SPA's own zone, not the tier.
 
