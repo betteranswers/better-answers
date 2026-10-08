@@ -16,9 +16,10 @@ applies_when:
   - "Landing a one-sense row for a shared word, such as run, check or act, whose first scan finds thousands of lines in other senses"
   - "A sweep widens the reach of a row that has already landed"
   - "Writing a plain-verb sense for a shared word, or a second row for its plural"
+  - "Adding a pending row to the old-words list, or moving the day a pending row names"
 symptoms:
   - "KTD5 step 5 says only that a sweep marks its rows landed, but landing a row also needs senses, a plans carve-out, a glossary edit and a baseline refresh"
-  - "Several mistakes in a landed row pass the words test without a finding: a sense regex without the g flag, a carve-out on a reader-text row, a row flipped back to pending, a plural under a one-sense row"
+  - "Several mistakes in a landed row pass the words test without a finding: a sense regex without the g flag, a carve-out on a reader-text row, a row flipped back to pending with a later `landsBy`, a plural under a one-sense row"
   - "A one-sense row held to Appendix G's senses for a common English word reports hundreds of findings in other senses"
   - "Widening a landed reader-text row fails planted fixtures that used it as their reader-text example"
   - "A plain-verb sense written as the determiners it excludes passes a noun with a word between, such as 'a live act on the same bundle'"
@@ -47,7 +48,8 @@ The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull re
 
 **Two row shapes** (`old-words.ts`):
 
-- `Renamed` (23-34): `word`, `use`, `entry`, `sweep`, `state: "pending" | "landed"`, `reach`, and optional `why`, `permitted`, `carvedOut`, `reads`. The `pending(...)` helper (69-75) builds one with `state: "pending"` and none of the optional fields.
+- `Renamed` (23-36): `word`, `use`, `entry`, `sweep`, `state: "pending" | "landed"`, `reach`, and optional `landsBy`, `why`, `permitted`, `carvedOut`, `reads`. The `pending(...)` helper that once built a pending row is gone (#616), so a pending row is written out in full, as the example under *Examples* is.
+- **A pending row names the day its sweep is due to merge.** `landsBy` is that day, written `YYYY-MM-DD`. `overduePending` (`words-scan.ts`) refuses a pending row with no such day, and one whose day is before today, naming the row and its sweep ("holds no row pending past its sweep's day", `avoid-words.test.ts`). Take the day from the sweep's plan or issue, with no margin added: a later day only delays the alarm, because the test cannot see a merge and a sweep that merges early and forgets its row stays green until the day. If the sweep slips, move the day in a commit a reviewer sees. Once the day passes, the merge queue refuses every group, and a local `check` fails, until the row lands or is re-dated. A pull request stays green, because it runs no suite. BA-71 added this after three rows stayed pending five days past their sweeps' merges.
 - `Avoided` (37-43): `sweep: null`, built by `avoided(...)` (61-67). `isRenamed` is `row.sweep !== null` (`words-scan.ts:60`). No scan reads an avoided row.
 
 **The reach decides which scan reads a landed row** (`old-words.ts:19-20`):
@@ -66,7 +68,7 @@ The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull re
 
 1. **Before the flip, prove the old word gone in every form.** Run KTD5 step 4's `rg` check case-insensitively, for plurals and compounds too. A landed one-sense row matches the whole word alone (trap 3), so this search is the only proof that its plural, and every compound name holding it, are gone.
 
-2. **Flip the state.** Write the row out in full with `state: "landed"`, as the api and audit log rows are. `pending(...)` cannot express a landed row. Keep the row where it sorts: `outOfOrder` compares words case-insensitively and refuses a duplicate (`words-scan.ts:62-68`).
+2. **Flip the state.** Write the row out in full with `state: "landed"`, as the api and audit log rows are, and remove its `landsBy`. Land every row the sweep names in the sweep's own pull request: a row left pending fails the words test once its day passes. Keep the row where it sorts: `outOfOrder` compares words case-insensitively and refuses a duplicate (`words-scan.ts:62-68`).
 
 3. **Give it the senses it keeps.** A `Sense` (`old-words.ts:10-15`) has a `sense` label, a `written` regex, an optional `within` path prefix and an optional `until` sweep. `lineScanOf` blanks every permitted match, keeping only senses whose `within` the file path starts with and whose `until` names a sweep that still has a pending row (`keepsIn`, `words-scan.ts:175-177`), and every kept name, then tries the word again (`words-scan.ts:189-195`, `213`).
    - For a one-sense row, write the senses Appendix G lists for the word (plan:1001-1023). Add `within` when one tree alone writes the sense, as the api's own names for its tier are held to `apps/api/` (`old-words.ts:101-107`, the `within` at 104) and the cost ledger's contract to `contracts/cost-ledger/` (115-119). When the word is common English, measure what those senses leave before landing it (step 8).
@@ -103,7 +105,7 @@ The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull re
 ### Traps the test does not report
 
 1. **A reader-text row is never line-scanned.** `lineFindings` drops it (`words-scan.ts:235`). Landing one refuses the word in `READER_TEXT` files alone (255-260), never in docs or identifiers. That is by design for OKF and wire words (R15, R21), but a sweep cannot rely on the test to clear its docs. To refuse the word in code or CSS too, widen the row's reach (step 10).
-2. **Flipping a landed row back to pending switches it off without a finding.** No scan reads a pending row (`landed`, `words-scan.ts:226`; "reads a pending word nowhere", `avoid-words.test.ts:375-381`), and `listFaults` does not object. A reviewer sees it only in the diff. The one side effect is that the ratchet counts the word again from no baseline, so a page using it fails as a rise once the baseline has been refreshed past it.
+2. **Flipping a landed row back to pending switches it off, with a finding only once its day passes.** A pending row needs a `landsBy`, so a flip with none fails at once, but a flip that names a later day passes until then. No scan reads a pending row (`landed`, `words-scan.ts:226`; "reads a pending word nowhere", `avoid-words.test.ts:375-381`), and `listFaults` does not object. A reviewer sees it only in the diff. The one side effect is that the ratchet counts the word again from no baseline, so a page using it fails as a rise once the baseline has been refreshed past it.
 3. **A one-sense row matches the whole word alone.** `findsIn` without `anyForm` is `(?<!\w)word(?!\w)` (`words-scan.ts:124`), so a plural or a compound passes once the row lands ("reads a word held to senses whole, never in compounds", `avoid-words.test.ts:450-452`). While the row was pending the ratchet counted every form (`countIn`, 131-132), but only in page words (`PAGE_WORDS`, 249-252, read at 473), and it stops counting at the flip (471).
 4. **A lone lowercase word is read only in a words module.** `isRead` reads it only when the file matches `WORDS_MODULE` (`words-scan.ts:310-312`, 245; planted at `avoid-words.test.ts:861-869`). A string such as `"binding"` in `navigation.ts`, an MCP entry, the answer renderer or an email is invisible to the reader-text, internal-word and ratchet checks. The line scan still sees it for an everywhere or one-sense row, but for a reader-text row nothing does. A sweep that renames a words module out of the `*words.ts` pattern drops it from those checks too, and passes. The test fails loudly only when a whole source of reader text yields no string (`readerStringsPerSource`, `words-scan.ts:386-393`; the test at `avoid-words.test.ts:112-119`) or a reader-text file does not parse (the throw at `words-scan.ts:360`; planted at `avoid-words.test.ts:871-875`). Losing one words module among several trips neither.
 5. **Landing a row can wake the internal-word check.** `watchedInternals` leaves an `_Internal._` head unwatched while a pending row names its word (`words-scan.ts:422-436`; planted at `avoid-words.test.ts:763-778`). U8's `actor id` and `person id` are pending reader-text rows (`old-words.ts:143`, `397`) and internal heads (`CONCEPTS.md:613`, `620`), so landing them sets both `readerFindings` and `internalFindings` reading the same strings. If such a head is ordinary English, add it to `NOT_WATCHED_ON_PAGES` (`old-words.ts:527-554`). `unwatchedStrays` refuses an unwatched head that heads no internal entry (`words-scan.ts:86-91`).
@@ -156,15 +158,23 @@ The words test is the one gate on R12, which refuses an old word once it has lan
 
 - At KTD5 step 5 of each BA-29 sweep, U8 to U17, and whenever a later rename lands a row.
 - On any change to `old-words.ts`, the `_Code rename pending._` marks in `CONCEPTS.md`, or `old-words-ratchet.json`.
-- When reviewing a sweep's pull request. Check the diff for `state` flips both ways, `g` on every new sense, `within` where one tree writes a sense, a `writtenBefore` carve-out on each newly landed line-scanned row, and a baseline that only fell.
+- When reviewing a sweep's pull request. Check the diff for `state` flips both ways, a `landsBy` on each new pending row and none on a landed one, `g` on every new sense, `within` where one tree writes a sense, a `writtenBefore` carve-out on each newly landed line-scanned row, and a baseline that only fell.
 
 ## Examples
 
 **A pending row, and the same row landed.** U11 lands `binding` on, say, 2026-10-20:
 
 ```ts
-// before (old-words.ts:192)
-pending("binding", "connected source", "connected source", "connected source", "everywhere"),
+// before: pending, due on its sweep's expected merge day
+{
+  word: "binding",
+  use: "connected source",
+  entry: "connected source",
+  sweep: "connected source",
+  state: "pending",
+  landsBy: "2026-10-20",
+  reach: "everywhere",
+},
 
 // after
 {

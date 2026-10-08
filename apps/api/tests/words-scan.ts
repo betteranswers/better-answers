@@ -249,6 +249,29 @@ const landed = (rows: readonly OldWord[]): readonly Renamed[] => inState(rows, "
 
 const stillPending = (rows: readonly OldWord[]): readonly Renamed[] => inState(rows, "pending");
 
+const DAY_FORM = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Days compare as strings, so a month and day swapped would sort late and pass for months. */
+const isACalendarDay = (text: string): boolean => {
+  const at = Date.parse(`${text}T00:00:00Z`);
+  return DAY_FORM.test(text) && !Number.isNaN(at) && new Date(at).toISOString().startsWith(text);
+};
+
+const overdueIn = ({ word, sweep, landsBy }: Renamed, today: string): readonly string[] => {
+  if (landsBy === undefined || !isACalendarDay(landsBy)) {
+    return [
+      `"${word}" is pending for the ${sweep} sweep, but names no day it lands by, as YYYY-MM-DD`,
+    ];
+  }
+  return landsBy < today
+    ? [`"${word}" is still pending, but the ${sweep} sweep was due to land by ${landsBy}`]
+    : [];
+};
+
+/** Each pending row that names no day its sweep lands by, or whose day is before `today`. */
+export const overduePending = (rows: readonly OldWord[], today: string): readonly string[] =>
+  stillPending(rows).flatMap((row) => overdueIn(row, today));
+
 /** Every landed word a tracked line still uses, outside its carve-outs and the senses it keeps. */
 export const lineFindings = (root: string, { rows, carvedOut, kept }: Scan): readonly Finding[] => {
   const keptPatterns = keptPatternsOf(kept);
