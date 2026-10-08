@@ -1721,237 +1721,427 @@ own: not a *record family*.
 
 ## The platform's areas and tools
 
-- **better-answers** — the product's name, written so wherever a person reads it: on its pages,
-  the browser tab, the sign-in pages and the emails, the sender's name included (30/09/2026,
-  replacing ticket 22's prose form of 27/08/2026). In this glossary and the docs it is still *the
-  platform*. Concept IRIs live on its apex, `https://better-answers.com/c/<ulid>`.
+### better-answers
 
-- **Control Centre** — the one Admin *area*, shown to Admins alone, where the workspace's sources,
-  suggestions, agents and spend, the answers it gave, its people, its personal data and its system
-  are seen and acted on. Its *menu* has eight groups (ADR 0017, ADR 0047): **Overview** (where to
-  focus), **Suggestions** (*To decide*: every waiting suggestion, promotions included),
-  **Sources** (Connected sources, Publishing rules, Cost estimates, Backlogs, Removed at source,
-  Share agents), **Models** (Models and spend, the spending limit), **Questions** (*Questions
-  asked*, flagged first; the answer tests), **People** (members, groups, Personal tokens),
-  **Personal data** (erasure and suppression) and **System** (the audit log, signals, health,
-  backups).
-- **console** — the *operator*'s area over every workspace, outside any one of them and never part
-  of Control Centre, drawn in the same frame as a workspace and reached from the *workspace
-  switcher*, with two groups of its own: **People** (Everyone: every person, the workspaces they
-  belong to and their role in each, their sessions and access; end every sign-in and token
-  everywhere. Names waiting: correct a display name) and **Workspaces** (Every workspace: each with
-  its member count, read-only) (ADR 0047). Shown to the operator alone and reached only from a
-  signed-in session, never from a token.
-- **area** — the top level of the platform's navigation, one entry in the
-  *icon rail*: **Ask** (every role; the *home* of an Editor or a Viewer), **Knowledge** (every role;
-  its Curation group for Admins and owners), **Inbox** (Admins and owners: what waits on the person,
-  pointing into *To decide*) and **Control Centre** (Admins), with an area for produced work (named
-  with S6) and **Briefings** (Then) to come (ADR 0047). A person sees only the areas holding a
-  *page* they may see. The *console* is the operator's area, reached from the *workspace switcher*
-  and never the rail. Until 30/09/2026 Ask was drawn apart from Control Centre (ADR 0046).
-- **menu group** — _Internal._ a heading in the *menu* over some of one *area*'s *pages*:
-  Control Centre's eight, Knowledge's Browse and Curation. An area with none lists its pages alone,
-  as Ask and Inbox do. A menu group holding no page the person may see is hidden whole. What was a
-  page of Control Centre until 30/09/2026 is now a menu group. Not a *group* of members, though
-  People › Groups lists those.
-- **page** — one place a person reads or acts on, with an address of its own
-  and an icon in the *menu*, under its menu group where its area has them: Members, Connected sources,
-  Audit log. Control Centre's are listed in its entry above, and every area's in ADR 0047, in the
-  order the menu shows them. A person sees a page by their *role* or by owning a *collection* it
-  serves. A page not built, or not theirs to see, appears nowhere, and its address shows the same
-  **not-found page** as one that never existed, offering their *home*. A page that fails says
-  "This page didn't load". A page may carry *tabs*. What was a view until 30/09/2026 is now a page.
-  Not a *view (of an MCP App)*.
-- **tab** — a division inside one *page*, named in the page's *toolbar*: Members' Members and
-  Invitations. A tab has no address of its own; the open tab is the *breadcrumb*'s last part.
-- **detail address** — _Internal._ an address one segment beneath a *page*, naming one of its rows,
-  as a *member page* names a person (ADR 0047). It is the page's place, not a page: listed nowhere,
-  seen by whoever may see the page, and drawn in the page's frame with no *toolbar*. An address
-  deeper than it names nothing.
-- **member page** — one *member*'s page, at the *detail address* beneath Members, opened from
-  their row, its *row menu*, a Members keystroke or *Jump to*. A header names them, their address
-  and their role, over three sections: **Access** (their role, their groups, when they joined, when
-  every sign-in and token they held here was last ended, and the *display name* flag), their
-  *Activity*, and **Remove and end every sign-in**, set apart last. A section has no address. A page
-  naming no member says so and leads to Members.
-- **home (of a role)** — the *page* a member lands on after signing in, and the one offered back
-  when a page fails or an address names nothing they may see: Ask for an Editor or a Viewer, and
-  People › Members for an Admin until Control Centre › Overview is built. A role's home shows in
-  the *icon rail* even before it is built, and then says plainly that it is on its way. The
-  *console* has one home for everyone, Workspaces › Every workspace.
-- **icon rail** — the region down the left edge, below the *top band*, listing the *areas* a person
-  may see, each an icon carrying its area's name and marking the area open; the **rail** for short,
-  named *Areas* on the page. The utilities sit at its foot: **Keyboard shortcuts**, which lists the
-  open page's keystrokes as `?` does, and help and settings once they exist. Where the window is not
-  wide, the top band holds Keyboard shortcuts instead.
-- **menu** — the region beside the icon rail, below the *top band*, listing
-  the open *area*'s groups, each a heading over its *pages*, marking the page being read, and
-  swapping when the area changes. No heading in it repeats the area's name. The *navigation control*
-  hides it (*Hide the menu*) and shows it again, moving nothing in the top band, and that choice is
-  remembered on the browser it was made on.
-- **navigation control** — the button in the *top band*, beside the *workspace switcher* where the
-  window is wide, governing whether the navigation is showing: where the window is wide enough for
-  the regions it hides the menu and shows it again, saying which state it is in and staying where
-  it is; where it is not, it opens the icon rail and the menu over the content, in a sheet titled
-  *Menu*, and gives focus back when it closes.
-- **toolbar** — the region above a page's content carrying that page's tabs at one end and its
-  actions at the other, filled by the page; a page with neither gets no toolbar.
-- **selection bar** — the strip above a list that shows only while some of its rows are ticked:
-  it says how many are ticked and how many of those the list is not showing, carries the actions
-  the page takes over every ticked row, and offers *Clear selection*. A tick stays through a change
-  of page, search or filter, which is why the bar counts the ticked rows out of sight. Not the
-  page's *toolbar*.
-- **bulk action** — an action an Admin takes over every ticked row at once,
-  from the *selection bar*: on Members, *Change role*, *Add to group* and *Remove*. It changes every
-  ticked row or none: if any is refused, nothing lands, and the refusal names each refused person
-  with its *refused items*, shown or not. A ticked row whose change is already true is **skipped**,
-  never refused, and the outcome counts it. A set that includes the acting Admin says so before it
-  is confirmed.
-- **row menu** — the menu at the end of a list's row, its button named for whose actions these are
-  (*Actions for* Priya Shah), holding the actions on that row alone; a destructive action sits last,
-  apart. Not the *selection bar*.
-- **view-state slot** — _Internal._ the one place the open page writes what the actions on its
-  toolbar must read, such as what a reader has ticked. It answers empty to any page but the one
-  that wrote it, and it is emptied when the reader opens another tab.
-- **top band** — _Internal._ the region across the full width of every workspace and *console* page,
-  above the icon rail and the menu, in three cells: the *logo* over the rail; the *workspace
-  switcher* and the *navigation control* over the menu; then the *breadcrumb*, *Jump to* and the
-  **avatar menu**, which shows the person's initials and opens to their name, their role and *Sign
-  out*. It holds no page's actions: those are in the page's own *toolbar*. Hiding the menu moves
-  nothing in it. Where the window is not wide it takes two rows, the breadcrumb alone on the
-  second, and scrolls with the page.
-- **logo** — the product's symbol: two square brackets with a square between them, like a
-  citation. It fills the *top band*'s first cell and leads to the person's *home*, and it stands
-  on the sign-in pages and as the browser tab's icon. Its accessible name is `better-answers`.
-- **workspace switcher** — the control in the *top band*'s second cell naming the workspace being
-  read and listing every workspace the person is a member of: choosing one takes them to its
-  *home*, and *All workspaces* opens the workspace picker. It lists the *console* to the operator
-  alone.
-- **breadcrumb** — the line in the *top band* naming where the person is: the *area*, the group,
-  the *page* and the open *tab*, or on a *member page* the person's name, each part but the last
-  leading to its place. It names every part at every width; only the wide band shortens the middle
-  ones.
-- **Jump to** — the finder the *top band* opens by click, ⌘K or Ctrl+K, to go somewhere in one
-  move: the *areas* and *pages* the person may see, the workspace's members for a person who may
-  see People, each opening their *member page*, and the actions their role may take, such as
-  *Invite a person*, listed under the headings Areas, Pages, Actions and Members. Knowledge joins it
-  with S2's retrieval; until then it is not a search.
-- **promotion** — an Editor's proposal that an answer or a response become an `Answer`
-  concept — the button is *Save as an Answer* — kept as a suggestion of kind *promotion* until
-  decided at the promotion gate.
-- **promotion gate** — where the `Answer` collection's owner or an Admin decides a promotion, one at
-  a time: the proposed Answer beside the closest existing one (found when opened, judged same ·
-  variant · different) — update the existing, add as new, or decline; customer-specific wording
-  stripped first. One governed write, the decider as author; a trim makes the decider the
-  generator.
-- **MCP surface** — _Internal._ the platform's one tools-only MCP server at `app.<apex>/mcp`, on the
-  product's own origin (T-045, 2026-09-03; `mcp.<apex>` before it): four entries in v0.1 — `find`,
-  `ask`, `open`, `give_feedback` — the principal from the token, the same predicate and audit as the
-  api, grown later by token scope, never by a second server (ADR 0018). Guides and the question set
-  are not on it. Never named on a page; the System card says *Connected assistants*.
-- **MCP tool** — one of the MCP surface's entries: a named, described, typed function that never
-  takes a workspace and returns structured content with its human rendering. Not a connector's
-  read-live tool.
-- **open (an MCP entry)** — the verbatim step of two-step retrieval: a concept by its IRI, or the
-  passage a citation rests on by its locator; `find` is the preview step.
-- **MCP App** — a view the platform serves for an assistant to render inside the conversation:
-  an HTML page addressed by a `ui://` URI, named in an entry's metadata, drawn in a sandbox the
-  host controls, able to call the same entries the assistant can. It shows a concept, an answer
-  or a set of matches; it is never a second way in (ADR 0030).
-- **view (of an MCP App)** — the rendering half of an MCP App: one `ui://` resource bound to one
-  entry. Every one has a **human rendering** behind it — the text form of the same result — and not
-  every human rendering has one. Not a *page*, once called a view.
-- **`ui://`** — _Internal._ the wire URI scheme for a view of an MCP App. Beside `okf://` and
-  meaning something different: `okf://` identifies a **concept**, `ui://` identifies a **view (of an
-  MCP App)**. On the wire only, never in a file.
-- **token scope** — _Internal._ what a token may do on the MCP surface: `knowledge:read`,
-  `feedback:write`; `action:*` later. Shown at consent in the person's words, never as an id. Not a
-  connected source's scope.
-- **personal token** — a person's own bearer credential for Claude Code and scripts (the
-  `api_token` record): the same principal and scopes as an OAuth token, ninety days by default,
-  shown once, minted on the Account page, listed to Admins in People › Personal tokens.
-- **assistant** — a host a person has given access to the MCP surface by
-  OAuth and has used: Claude on the web, Claude Code, ChatGPT. Under client-ID-metadata documents
-  there is **no registration**, but the platform caches each assistant's metadata document as a row,
-  with the scopes it may request, refreshed from the document on a schedule (ADR 0009): the System
-  card lists the distinct `client_id` URLs seen on issued access, each named from its own metadata
-  document, with who has connected through it. OAuth's own names for it stay.
-- **access (of an assistant)** — what a person's consent gives an assistant:
-  the MCP surface in one workspace, or in none, lasting through the assistant's refreshes. It is
-  open until it lapses or an action ends it: ending every sign-in and token, here or everywhere, or
-  removing a member. That action's audit event records each access it ended, so ended access stays
-  on record after its tokens are gone. The authorization server can end it too, when the person's
-  session ends or the assistant disconnects. Nothing records that end, so it stands only while its
-  tokens do.
-- **Account page** — a person's own small page outside Control Centre: name, role,
-  workspace, personal tokens, and two sections of its own. **Sign-in**
-  holds the person's *passkeys*, their *second factor*, their *recovery codes* and any Microsoft
-  account they linked; **Sessions** lists their *sessions*.
-- **sign-in** — how a person proves who they are to the platform: the *sign-in link* or the
-  six-digit code in a sign-in email, a *passkey*, or Microsoft for a company on Microsoft 365
-  (T-045 grilling Q10, 2026-09-03); never a password. A passkey is a whole sign-in on its own; a
-  person who must hold a *second factor* and signs in by email confirms it before reaching any
-  page. A person signs in first and an Admin then adds them to a workspace; whether an
-  invitation must come first is open (T-027). A Microsoft account signs in only on an exact match
-  with that person's email.
-- **sign-in link** — the link in a sign-in email, which makes one credential with the email's
-  six-digit code: both last the code's five minutes, and signing in with either spends both. It
-  signs in only the browser that asked for the code, and only when the person presses *Sign in* on
-  the page it opens, so a mail scanner that opens it first changes nothing. Opened anywhere else,
-  the page shows the code to type where the person started.
-- **passkey** — a sign-in credential that a person's device or password manager keeps for the
-  platform, unlocked by their face, fingerprint or device PIN and good only on the platform's own
-  address, so a page imitating the platform cannot use it. A person adds, names and removes their
-  own on the *Account page*. Signing in with one needs no email, and it stands for the *second
-  factor* as well.
-- **authenticator** — a phone application that shows a changing six-digit code for the platform,
-  set up from a QR code or from its key written out; one of the two kinds of *second factor*. A
-  page imitating the platform can pass its code on as it is typed, which it cannot do with a
-  *passkey*.
-- **second factor** — what a person holds besides their mailbox to prove who they are: a *passkey*
-  or an *authenticator*. A person who is an Admin in any workspace, and the *operator*, must hold
-  one, and sets one up before reaching any page if they hold none; anyone else may add a passkey
-  for a quicker sign-in. It is the person's own, across every workspace: neither an email nor a
-  workspace Admin can remove, reset or stand in for it, and an Admin cannot remove their last one.
-  Every change to it is announced to the person's email address.
-- **recovery code** — one of ten one-time codes an Admin is shown once, when they first set up a
-  *second factor*, to keep somewhere safe. One gets them in once in place of their second factor
-  and takes them straight to setting up a new one; replacing the set on the *Account page* voids
-  the old one. An Admin with no factor and no code left is restored by the *operator* alone, with
-  a *restore code*.
-- **restore code** — the one code the *operator* issues when restoring an Admin who holds neither
-  a *second factor* nor a *recovery code*. The operator first confirms who the Admin is by a
-  channel other than their email, and hands the code over by that same channel. It is good once, and setting
-  up a new second factor after the restore needs it, so whoever holds only the Admin's mailbox
-  cannot finish the restore.
-- **re-confirm** — an Admin's confirming their *second factor* again before a high-impact action,
-  such as removing a member, changing a role, ending every sign-in and token or an export, when
-  they last confirmed it over an hour before. The action goes ahead once they have.
-- **session** — one browser's sign-in, lasting up to thirty days and renewed while it is used. A
-  person sees their own on the *Account page*, each with its device, its browser and when it was
-  last active, never a place, and may sign any one out, or every one but the current one. Signing
-  a session out ends that session alone, never an assistant's *access* or a *personal token*.
-- **last active** — when a member last used one workspace, through the platform or through
-  Claude. A workspace knows it of its own members alone, never their activity in another workspace
-  or when they last signed in, which would tell one company about another. When a *session* was
-  last active is the person's own, on the *Account page*.
+The product's name, written so wherever a person reads it: on its pages, the browser tab, the
+sign-in pages and the emails, the sender's name included.
 
-- **generation** — _Internal._ the stamp every bundle-and-record node and edge in the map carries; a
-  workspace has one live generation, flipped by one row update after a full rebuild, and every read
-  binds it. Generations exist **for full rebuilds only** — an ordinary edit's delta lands in the
-  api's own commit transaction and writes no new generation (ADR 0023). Source entities carry none:
-  they are reconciled per document.
-- **map rebuild** — the job that **rebuilds** one workspace's map in full as
-  a new generation, for one of six reasons — first build · model choice change · reconciler ·
-  erasure · upgrade · drill — and flips it live in one row update. It is not how an ordinary edit
-  reaches the map: that delta is written by the api in the same transaction as the concept index
-  row, the `bundle_commit` and the `audit_event` (ADR 0023).
-- **entity merge** — _Internal._ the rule an Admin's confirmed alias-merge suggestion writes: an
-  audit event, never a commit; undone by deleting it and re-deriving (ADR 0023).
-- **canonical entity** — the node an entity merge produces: keyed by the rule, carrying no
-  connected source, with every contribution hanging off it under its own connected source,
-  sensitivity and audience; never shown when no contribution is visible to the reader; never a
-  concept (ADR 0023).
+In this glossary and the docs it is still *the platform*. Concept IRIs live on its apex,
+`https://better-answers.com/c/<ulid>`.
+
+### Control Centre
+
+The one Admin *area*, shown to Admins alone, where the workspace's sources, suggestions, agents and
+spend, the answers it gave, its people, its personal data and its system are seen and acted on.
+
+Its *menu* has eight groups: **Overview** (where to focus), **Suggestions** (*To decide*: every
+waiting suggestion, promotions included), **Sources** (Connected sources, Publishing rules, Cost
+estimates, Backlogs, Removed at source, Share agents), **Models** (Models and spend, the spending
+limit), **Questions** (*Questions asked*, flagged first; the answer tests), **People** (members,
+groups, Personal tokens), **Personal data** (erasure and suppression) and **System** (the audit
+log, signals, health, backups).
+
+### console
+
+The *operator*'s area over every workspace, outside any one of them and never part of Control
+Centre, drawn in the same frame as a workspace and reached from the *workspace switcher*.
+
+It has two groups of its own: **People** (Everyone: every person, the workspaces they belong to and
+their role in each, their sessions and access; end every sign-in and token everywhere. Names
+waiting: correct a display name) and **Workspaces** (Every workspace: each with its member count,
+read-only). Shown to the operator alone and reached only from a signed-in session, never from a
+token.
+
+### area
+
+The top level of the platform's navigation, one entry in the *icon rail*.
+
+The areas are **Ask** (every role; the *home* of an Editor or a Viewer), **Knowledge** (every role;
+its Curation group for Admins and owners), **Inbox** (Admins and owners: what waits on the person,
+pointing into *To decide*) and **Control Centre** (Admins), with an area for produced work (named
+with S6) and **Briefings** (Then) to come. A person sees only the areas holding a *page* they may
+see. The *console* is the operator's area, reached from the *workspace switcher* and never the rail.
+
+### menu group
+
+_Internal._ a heading in the *menu* over some of one *area*'s *pages*: Control Centre's eight,
+Knowledge's Browse and Curation.
+
+An area with none lists its pages alone, as Ask and Inbox do. A menu group holding no page the
+person may see is hidden whole. Not a *group* of members, though People › Groups lists those.
+
+### page
+
+One place a person reads or acts on, with an address of its own and an icon in the *menu*, under
+its menu group where its area has them: Members, Connected sources, Audit log.
+
+Control Centre's are listed in its entry above, in the order the menu shows them. A person sees a
+page by their *role* or by owning a *collection* it serves. A page not built, or not theirs to see,
+appears nowhere, and its address shows the same **not-found page** as one that never existed,
+offering their *home*. A page that fails says "This page didn't load". A page may carry *tabs*. Not
+a *view (of an MCP App)*.
+
+### tab
+
+A division inside one *page*, named in the page's *toolbar*: Members' Members and Invitations.
+
+A tab has no address of its own; the open tab is the *breadcrumb*'s last part.
+
+### detail address
+
+_Internal._ an address one segment beneath a *page*, naming one of its rows, as a *member page*
+names a person.
+
+It is the page's place, not a page: listed nowhere, seen by whoever may see the page, and drawn in
+the page's frame with no *toolbar*. An address deeper than it names nothing.
+
+### member page
+
+One *member*'s page, at the *detail address* beneath Members, opened from their row, its *row
+menu*, a Members keystroke or *Jump to*.
+
+A header names them, their address and their role, over three sections: **Access** (their role,
+their groups, when they joined, when every sign-in and token they held here was last ended, and the
+*display name* flag), their *Activity*, and **Remove and end every sign-in**, set apart last. A
+section has no address. A page naming no member says so and leads to Members.
+
+### home (of a role)
+
+The *page* a member lands on after signing in, and the one offered back when a page fails or an
+address names nothing they may see.
+
+It is Ask for an Editor or a Viewer, and People › Members for an Admin until Control Centre ›
+Overview is built. A role's home shows in the *icon rail* even before it is built, and then says
+plainly that it is on its way. The *console* has one home for everyone, Workspaces › Every
+workspace.
+
+### icon rail
+
+The region down the left edge, below the *top band*, listing the *areas* a person may see, each an
+icon carrying its area's name and marking the area open; the **rail** for short, named *Areas* on
+the page.
+
+The utilities sit at its foot: **Keyboard shortcuts**, which lists the open page's keystrokes as
+`?` does, and help and settings once they exist. Where the window is not wide, the top band holds
+Keyboard shortcuts instead.
+
+### menu
+
+The region beside the icon rail, below the *top band*, listing the open *area*'s groups, each a
+heading over its *pages*, marking the page being read, and swapping when the area changes.
+
+No heading in it repeats the area's name. The *navigation control* hides it (*Hide the menu*) and
+shows it again, moving nothing in the top band, and that choice is remembered on the browser it was
+made on.
+
+### navigation control
+
+The button in the *top band*, beside the *workspace switcher* where the window is wide, governing
+whether the navigation is showing.
+
+Where the window is wide enough for the regions it hides the menu and shows it again, saying which
+state it is in and staying where it is; where it is not, it opens the icon rail and the menu over
+the content, in a sheet titled *Menu*, and gives focus back when it closes.
+
+### toolbar
+
+The region above a page's content carrying that page's tabs at one end and its actions at the
+other, filled by the page.
+
+A page with neither gets no toolbar.
+
+### selection bar
+
+The strip above a list that shows only while some of its rows are ticked.
+
+It says how many are ticked and how many of those the list is not showing, carries the actions the
+page takes over every ticked row, and offers *Clear selection*. A tick stays through a change of
+page, search or filter, which is why the bar counts the ticked rows out of sight. Not the page's
+*toolbar*.
+
+### bulk action
+
+An action an Admin takes over every ticked row at once, from the *selection bar*: on Members,
+*Change role*, *Add to group* and *Remove*.
+
+It changes every ticked row or none: if any is refused, nothing lands, and the refusal names each
+refused person with its *refused items*, shown or not. A ticked row whose change is already true is
+**skipped**, never refused, and the outcome counts it. A set that includes the acting Admin says so
+before it is confirmed.
+
+### row menu
+
+The menu at the end of a list's row, its button named for whose actions these are (*Actions for*
+Priya Shah), holding the actions on that row alone.
+
+A destructive action sits last, apart. Not the *selection bar*.
+
+### view-state slot
+
+_Internal._ the one place the open page writes what the actions on its toolbar must read, such as
+what a reader has ticked.
+
+It answers empty to any page but the one that wrote it, and it is emptied when the reader opens
+another tab.
+
+### top band
+
+_Internal._ the region across the full width of every workspace and *console* page, above the icon
+rail and the menu, in three cells.
+
+Its three cells are the *logo* over the rail; the *workspace switcher* and the *navigation control*
+over the menu; then the *breadcrumb*, *Jump to* and the **avatar menu**, which shows the person's
+initials and opens to their name, their role and *Sign out*. It holds no page's actions: those are
+in the page's own *toolbar*. Hiding the menu moves nothing in it. Where the window is not wide it
+takes two rows, the breadcrumb alone on the second, and scrolls with the page.
+
+### logo
+
+The product's symbol: two square brackets with a square between them, like a citation.
+
+It fills the *top band*'s first cell and leads to the person's *home*, and it stands on the sign-in
+pages and as the browser tab's icon. Its accessible name is `better-answers`.
+
+### workspace switcher
+
+The control in the *top band*'s second cell naming the workspace being read and listing every
+workspace the person is a member of.
+
+Choosing one takes them to its *home*, and *All workspaces* opens the workspace picker. It lists the
+*console* to the operator alone.
+
+### breadcrumb
+
+The line in the *top band* naming where the person is: the *area*, the group, the *page* and the
+open *tab*, or on a *member page* the person's name, each part but the last leading to its place.
+
+It names every part at every width; only the wide band shortens the middle ones.
+
+### Jump to
+
+The finder the *top band* opens by click, ⌘K or Ctrl+K, to go somewhere in one move.
+
+It holds the *areas* and *pages* the person may see, the workspace's members for a person who may
+see People, each opening their *member page*, and the actions their role may take, such as *Invite
+a person*, listed under the headings Areas, Pages, Actions and Members. Knowledge joins it with S2's
+retrieval; until then it is not a search.
+
+### promotion
+
+An Editor's proposal that an answer or a response become an `Answer` concept — the button is *Save
+as an Answer* — kept as a suggestion of kind *promotion* until decided at the promotion gate.
+
+### promotion gate
+
+Where the `Answer` collection's owner or an Admin decides a promotion, one at a time: the proposed
+Answer beside the closest existing one (found when opened, judged same · variant · different) —
+update the existing, add as new, or decline; customer-specific wording stripped first.
+
+One governed write, the decider as author; a trim makes the decider the generator.
+
+### MCP surface
+
+_Internal._ the platform's one tools-only MCP server at `app.<apex>/mcp`, on the product's own
+origin.
+
+It has four entries in v0.1 — `find`, `ask`, `open`, `give_feedback` — the principal from the
+token, the same predicate and audit as the api, grown later by token scope, never by a second
+server. Guides and the question set are not on it. Never named on a page; the System card says
+*Connected assistants*.
+
+### MCP tool
+
+One of the MCP surface's entries: a named, described, typed function that never takes a workspace
+and returns structured content with its human rendering.
+
+Not a connector's read-live tool.
+
+### open (an MCP entry)
+
+The verbatim step of two-step retrieval: a concept by its IRI, or the passage a citation rests on by
+its locator; `find` is the preview step.
+
+### MCP App
+
+A view the platform serves for an assistant to render inside the conversation: an HTML page
+addressed by a `ui://` URI, named in an entry's metadata, drawn in a sandbox the host controls, able
+to call the same entries the assistant can.
+
+It shows a concept, an answer or a set of matches; it is never a second way in.
+
+### view (of an MCP App)
+
+The rendering half of an MCP App: one `ui://` resource bound to one entry.
+
+Every one has a **human rendering** behind it — the text form of the same result — and not every
+human rendering has one. Not a *page*.
+
+### `ui://`
+
+_Internal._ the wire URI scheme for a view of an MCP App.
+
+Beside `okf://` and meaning something different: `okf://` identifies a **concept**, `ui://`
+identifies a **view (of an MCP App)**. On the wire only, never in a file.
+
+### token scope
+
+_Internal._ what a token may do on the MCP surface: `knowledge:read`, `feedback:write`; `action:*`
+later.
+
+Shown at consent in the person's words, never as an id. Not a connected source's scope.
+
+### personal token
+
+A person's own bearer credential for Claude Code and scripts: the same principal and scopes as an
+OAuth token, ninety days by default, shown once, minted on the Account page, listed to Admins in
+People › Personal tokens.
+
+### assistant
+
+A host a person has given access to the MCP surface by OAuth and has used: Claude on the web, Claude
+Code, ChatGPT.
+
+Under client-ID-metadata documents there is **no registration**, but the platform caches each
+assistant's metadata document as a row, with the scopes it may request, refreshed from the document
+on a schedule: the System card lists the distinct `client_id` URLs seen on issued access, each named
+from its own metadata document, with who has connected through it. OAuth's own names for it stay.
+
+### access (of an assistant)
+
+What a person's consent gives an assistant: the MCP surface in one workspace, or in none, lasting
+through the assistant's refreshes.
+
+It is open until it lapses or an action ends it: ending every sign-in and token, here or
+everywhere, or removing a member. That action's audit event records each access it ended, so ended
+access stays on record after its tokens are gone. The authorization server can end it too, when the
+person's session ends or the assistant disconnects. Nothing records that end, so it stands only
+while its tokens do.
+
+### Account page
+
+A person's own small page outside Control Centre: name, role, workspace, personal tokens, and two
+sections of its own.
+
+**Sign-in** holds the person's *passkeys*, their *second factor*, their *recovery codes* and any
+Microsoft account they linked; **Sessions** lists their *sessions*.
+
+### sign-in
+
+How a person proves who they are to the platform: the *sign-in link* or the six-digit code in a
+sign-in email, a *passkey*, or Microsoft for a company on Microsoft 365; never a password.
+
+A passkey is a whole sign-in on its own; a person who must hold a *second factor* and signs in by
+email confirms it before reaching any page. A person signs in first and an Admin then adds them to
+a workspace; whether an invitation must come first is open. A Microsoft account signs in only on an
+exact match with that person's email.
+
+### sign-in link
+
+The link in a sign-in email, which makes one credential with the email's six-digit code.
+
+Both last the code's five minutes, and signing in with either spends both. It signs in only the
+browser that asked for the code, and only when the person presses *Sign in* on the page it opens,
+so a mail scanner that opens it first changes nothing. Opened anywhere else, the page shows the code
+to type where the person started.
+
+### passkey
+
+A sign-in credential that a person's device or password manager keeps for the platform, unlocked by
+their face, fingerprint or device PIN and good only on the platform's own address, so a page
+imitating the platform cannot use it.
+
+A person adds, names and removes their own on the *Account page*. Signing in with one needs no
+email, and it stands for the *second factor* as well.
+
+### authenticator
+
+A phone application that shows a changing six-digit code for the platform, set up from a QR code or
+from its key written out; one of the two kinds of *second factor*.
+
+A page imitating the platform can pass its code on as it is typed, which it cannot do with a
+*passkey*.
+
+### second factor
+
+What a person holds besides their mailbox to prove who they are: a *passkey* or an *authenticator*.
+
+A person who is an Admin in any workspace, and the *operator*, must hold one, and sets one up before
+reaching any page if they hold none; anyone else may add a passkey for a quicker sign-in. It is the
+person's own, across every workspace: neither an email nor a workspace Admin can remove, reset or
+stand in for it, and an Admin cannot remove their last one. Every change to it is announced to the
+person's email address.
+
+### recovery code
+
+One of ten one-time codes an Admin is shown once, when they first set up a *second factor*, to keep
+somewhere safe.
+
+One gets them in once in place of their second factor and takes them straight to setting up a new
+one; replacing the set on the *Account page* voids the old one. An Admin with no factor and no code
+left is restored by the *operator* alone, with a *restore code*.
+
+### restore code
+
+The one code the *operator* issues when restoring an Admin who holds neither a *second factor* nor
+a *recovery code*.
+
+The operator first confirms who the Admin is by a channel other than their email, and hands the
+code over by that same channel. It is good once, and setting up a new second factor after the
+restore needs it, so whoever holds only the Admin's mailbox cannot finish the restore.
+
+### re-confirm
+
+An Admin's confirming their *second factor* again before a high-impact action, such as removing a
+member, changing a role, ending every sign-in and token or an export, when they last confirmed it
+over an hour before.
+
+The action goes ahead once they have.
+
+### session
+
+One browser's sign-in, lasting up to thirty days and renewed while it is used.
+
+A person sees their own on the *Account page*, each with its device, its browser and when it was
+last active, never a place, and may sign any one out, or every one but the current one. Signing a
+session out ends that session alone, never an assistant's *access* or a *personal token*.
+
+### last active
+
+When a member last used one workspace, through the platform or through Claude.
+
+A workspace knows it of its own members alone, never their activity in another workspace or when
+they last signed in, which would tell one company about another. When a *session* was last active
+is the person's own, on the *Account page*.
+
+### generation
+
+_Internal._ the stamp every bundle-and-record node and edge in the map carries.
+
+A workspace has one live generation, flipped by one row update after a full rebuild, and every read
+binds it. Generations exist **for full rebuilds only** — an ordinary edit's delta lands in the api's
+own commit transaction and writes no new generation. Source entities carry none: they are
+reconciled per document.
+
+### map rebuild
+
+The job that **rebuilds** one workspace's map in full as a new generation, for one of six reasons —
+first build · model choice change · reconciler · erasure · upgrade · drill — and flips it live in
+one row update.
+
+It is not how an ordinary edit reaches the map: that delta is written by the api in the same
+transaction as the concept index row, the bundle commit and the audit event.
+
+### entity merge
+
+_Internal._ the rule an Admin's confirmed alias-merge suggestion writes: an audit event, never a
+commit; undone by deleting it and re-deriving.
+
+### canonical entity
+
+The node an entity merge produces: keyed by the rule, carrying no connected source, with every
+contribution hanging off it under its own connected source, sensitivity and audience.
+
+Never shown when no contribution is visible to the reader; never a concept.
 
 ## The route
 
