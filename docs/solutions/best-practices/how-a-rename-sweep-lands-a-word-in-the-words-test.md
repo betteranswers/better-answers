@@ -13,6 +13,7 @@ applies_when:
   - "Reviewing a pull request's diff of old-words.ts or CONCEPTS.md"
   - "Adding a row for a shared word, such as check or class, whose first scan finds hundreds of lines in other senses"
   - "Widening the reach of a row the list already holds"
+  - "Changing a glossary word whose code follows later, in a block's rename batch"
   - "Writing a plain-verb sense for a shared word, or a second row for its plural"
 symptoms:
   - "Several mistakes in a row pass the words test without a finding: a sense regex without the g flag, a carve-out on a reader-text row, a plural under a one-sense row"
@@ -36,7 +37,7 @@ tags:
 
 ## Context
 
-The words test, `apps/api/tests/avoid-words.test.ts`, refuses each word in `apps/api/tests/old-words.ts` where its row's reach says. A rename lands the glossary entry, the code and the row in one pull request, so the row is refused from the merge on and needs no state. BA-29 renamed the platform's words in sweeps, each with a pending phase, a ratchet and a glossary mark; all of that is gone. What stays is how the scan reads a row, and the mistakes that pass it in silence.
+The words test, `apps/api/tests/avoid-words.test.ts`, refuses each word in `apps/api/tests/old-words.ts` where its row's reach says. A rename whose code follows the glossary lands in two steps (ADR 0047, amended 08/10/2026). First the glossary entry, the text on pages, live docs and the row land, the row reading reader text alone, with its `sweep` naming the block whose rename batch renames the code. Then that batch renames every remaining occurrence and sets the row to the reach it keeps. A word only a page must not write lands in one step, its row reading reader text for good. The row needs no state beyond its reach and its `sweep`. BA-29 renamed the platform's words in sweeps, each with a pending phase, a ratchet and a glossary mark; all of that is gone. What stays is how the scan reads a row, and the mistakes that pass it in silence.
 
 **A row** (`OldWord` in `old-words.ts`): `word`, `use` (the word to write), `entry` (the glossary head it sits under), `sweep` (the rename that replaced it, named in each finding), `reach`, and optional `why`, `permitted`, `carvedOut` and `reads`. `listFaults` keeps the list sorted case-insensitively, one row per word, each under a head the glossary has.
 
@@ -54,9 +55,9 @@ The words test, `apps/api/tests/avoid-words.test.ts`, refuses each word in `apps
 
 ### The procedure
 
-1. **Before adding the row, prove the old word gone in every form.** Search case-insensitively for plurals and compounds too. A one-sense row matches the whole word alone (trap 2), so this search is the only proof that its plural, and every compound name holding it, are gone.
+1. **Before each step, prove the old word gone from what that step's row reads.** When the reader-text row lands, prove it gone from reader text, and search live docs by hand, since a reader-text row never reads them (trap 1). When the batch sets the row's kept reach, prove it gone from everything that reach reads. Search case-insensitively for plurals and compounds too. A one-sense row matches the whole word alone (trap 2), so this search is the only proof that its plural, and every compound name holding it, are gone.
 
-2. **Add the row where it sorts,** in the pull request that renames the word. Pick the reach: everywhere for a word with no other sense, one sense for a word other senses share, reader text for a word only a page must not write.
+2. **Add the row where it sorts,** in the pull request that changes the glossary entry, and decide the reach the word keeps: everywhere for a word with no other sense, one sense for a word other senses share, reader text for a word only a page must not write. When the code must follow in a block's rename batch, the row starts at reader text with its `sweep` naming that batch, and the same pull request names the batch in that block's lines in the route spec, as P1's lines name the `UserId` rename, so the block's planner finds it. The batch then sets the kept reach.
 
 3. **Give it the senses it keeps.** A `Sense` has a `sense` label, a `written` regex and an optional `within` path prefix. `lineScanOf` blanks every permitted match whose `within` the file path starts with, and every kept name, then tries the word again.
    - Add `within` when one tree alone writes the sense, as the api's own names for its tier are held to `apps/api/` and the cost ledger's contract to `contracts/cost-ledger/`.
@@ -65,7 +66,7 @@ The words test, `apps/api/tests/avoid-words.test.ts`, refuses each word in `apps
    - Names on the wire and in storage need no sense, because they reach the scan as kept names (step 5).
    - A reader-text row takes no senses. `readerFindings` reads only `rows` and `kept`, so `permitted`, `carvedOut` and `reads` on such a row do nothing.
 
-4. **Leave the dated plans to the global carve-out.** `CARVED_OUT` in `avoid-words.test.ts` holds `writtenBefore("2026-10-08")`, so a plan or dogfood report dated before 08/10/2026 keeps the words of its day (R22). One dated later is read for every row, so a plan written after a rename writes the new word. A rename whose old word is in a plan or dogfood report dated from the cutoff up to its own merge, its own plan included, moves the date in `writtenBefore` to its merge day in the same pull request, and never edits the plan. A file with no dated name falls back to `"9999"` and is read. A row's own `carvedOut` holds for that row alone; `CarveOut.why` is required, and no carve-out ever holds a `CODING_STANDARDS.md`.
+4. **Leave the dated plans to the global carve-out.** `CARVED_OUT` in `avoid-words.test.ts` holds `writtenBefore("2026-10-08")`, so a plan or dogfood report dated before 08/10/2026 keeps the words of its day (R22). One dated later is read for every row, so a plan written after a rename writes the new word. A rename whose old word is in a plan or dogfood report dated from the cutoff up to its own merge, its own plan included, moves the date in `writtenBefore` to the day after its merge in the same pull request, since the carve-out keeps only dates strictly before it, and never edits the plan. When the code follows in a block's batch, that is the batch's pull request, which sets the row's kept reach: a reader-text row never reads a plan, so a date moved at the glossary change protects nothing. A file with no dated name falls back to `"9999"` and is read. A row's own `carvedOut` holds for that row alone; `CarveOut.why` is required, and no carve-out ever holds a `CODING_STANDARDS.md`.
 
 5. **Never rename a stored or wire name.** R21 and R22 keep them. They pass because `keptNamesUnder` reads them from where each is declared: refusal words; MCP entry names, scopes and schema keys and values; Better Auth's endpoints; the stored-names register's action names; stored action names from `audit-actions.ts`; old page addresses from `movedFrom`. Migrations and their snapshots pass through the global `CARVED_OUT`. The stored-names register, `packages/core/src/audit/stored-names.ts`, sits in `CARVED_OUT` too, so a stored detail key's literal is allowed there alone and code elsewhere writes `STORED_DETAIL_KEYS.<name>`. A kept name that is one plain word counts as code only when quoted or backticked (`keptPatternsOf`), so prose writing the same word is still read. In reader text, a string that is a kept name whole is skipped. A renamed table's derived names are refused in the database by `packages/schema/test/renamed-names.test.ts`.
 
@@ -97,7 +98,7 @@ The words test is the one gate that refuses an old word once its rename has merg
 
 - In each pull request that renames a word the glossary defines.
 - On any change to `old-words.ts`.
-- When reviewing such a change. Check the diff for `g` on every new sense, `within` where one tree writes a sense, a planted case for every new sense, and no row added for a rename that has not landed in the same diff.
+- When reviewing such a change. Check the diff for `g` on every new sense, `within` where one tree writes a sense, a planted case for every new sense, and no row added ahead of its code rename unless it reads reader text alone and its `sweep` names the block whose batch renames the code.
 
 ## Examples
 

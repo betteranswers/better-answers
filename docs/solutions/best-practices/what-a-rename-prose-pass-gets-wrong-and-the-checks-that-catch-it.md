@@ -137,6 +137,6 @@ The `secondary nav` row in `apps/api/tests/old-words.ts` carries the same sense,
 
 ## Related
 
-- `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md`: adding the old word's row to the words test, in the same pull request.
+- `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md`: adding the old word's row to the words test, and widening it when the code follows in a block's rename batch.
 - `docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md`: the migration a rename of a stored name needs.
 - `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`: what a moved or unbuilt address shows.

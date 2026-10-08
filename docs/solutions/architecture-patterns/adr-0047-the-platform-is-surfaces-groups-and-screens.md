@@ -11,6 +11,7 @@ applies_when:
   - "Deciding who sees a page, by role or by owning a collection"
   - "Changing a role's home, or what an unbuilt, hidden or moved address shows"
   - "Naming a level of the navigation in code, tests or docs"
+  - "Renaming a word the glossary changed, and deciding when the code follows"
 tags:
   - adr-0047
   - area
@@ -22,6 +23,8 @@ tags:
   - home
   - detail-address
   - member-page
+  - concept-page
+  - rename-batch
 ---
 
 # The platform is a rail of areas, each holding groups of pages
@@ -35,7 +38,7 @@ The platform's navigation has four levels, and the code names them the same way:
 - A **page** has an address of its own and an icon in the menu.
 - A **tab** divides one page. It has no address.
 
-A page may also declare a **detail address**, one segment beneath its own, naming one of its rows. Members declares the first: a **member page** at `/people/members/<person>`. A detail address is the page's place, not a fifth level:
+A page may also declare a **detail address**, one segment beneath its own, naming one of its rows. Members declares the first: a **member page** at `/people/members/<person>`. Search declares the second, which S2a builds: the **concept page** at `/knowledge/search/<ulid>`, opened by a match or a citation. A detail address is the page's place, not a fifth level:
 
 - Nothing lists it. It is not in the rail, the menu, or jump-to's pages and actions. Jump-to's member results lead to it.
 - It is seen exactly where its page is seen, so a role that may not see Members gets the not-found page at a member page.
@@ -116,18 +119,15 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
-| Ask | none; the home says it is on its way | New question, Your questions (S2b), and the concept page a match or a citation opens (S2a) | none yet |
-| Knowledge | none | Search (S2a). Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
+| Ask | none; the home says it is on its way | New question, Your questions (S2b) | none yet |
+| Knowledge | none | Search, with the concept page as its detail (S2a). Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of actions an agent takes as the person |
 | Control Centre | Connected sources. Models and spend. Members, Groups. Audit log | Overview, which no block names. To decide (S5). Cost estimates (S4). Publishing rules, Backlogs, Removed at source. Spending limit (S7). Questions asked, Answer tests (S2b). Personal tokens (P1). Erasure and suppression, Signals, Health, Backups (O1) | Share agents, with the share agent. Runs, Connected assistants, Settings. Then: feeds and systems read live in Sources, Approvals in Agent Operations |
 | Console | Everyone, Names waiting, Every workspace | none | The identity-set audit log |
 
-Two things stay open:
-
-- **The work area's name.** It waits for S6, which builds its first page.
-- **Which area Search sits on**: Ask or Knowledge. v0.1's list declares it in Knowledge's Browse group.
+One thing stays open: **the work area's name**. It waits for S6, which builds its first page.
 
 ## Why
 
@@ -152,6 +152,7 @@ Two things stay open:
 - The console in the avatar menu: it is a place, not an account setting.
 - A member page as a route written beside the generated ones, outside the list: the visibility gate, the frame and the breadcrumb would each need a second source. The list declares it instead.
 - An address for each section of a member page: a section is part of one page, and only a page has an address.
+- The concept page on Ask, or as a new kind of navigation entry: Ask's home is not built, so an Admin would not see a detail beneath it, and a new kind for one page waits for a second page that needs it.
 
 ## History
 
@@ -164,3 +165,5 @@ Amended 02/10/2026 by the sign-in and security plan (`docs/plans/2026-10-01-2241
 Amended 03/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, KTD1 and KTD5). The glossary rewrite settled the trust words, the third thing this record left open, and ADR 0019 now lists them. It also set the direction for every name. One word holds everywhere: the reader's word heads the glossary entry, and code, types, database tables and columns, contracts and live docs are renamed to it, one noun at a time. Names the platform does not own keep theirs: OKF's vocabulary and the keys the platform writes into concept files (`iri`, `sources[].locator`); names on the wire, which are MCP entry names, MCP tool schema keys and values, token scopes and refusal words; names a library or protocol owns, such as OAuth's and Better Auth's; and stored history, which is audit action names and detail keys, migrations, old page addresses, `docs/archive/` and completed plans in `docs/plans/`. An old word leaves the glossary for `apps/api/tests/old-words.ts`, which only the words test reads. The navigation's levels have reader words now, *area* for an entry in the rail and *page* for a place with an address of its own, and this record takes them when the pages sweep renames the code. The four levels and every rule above stand.
 
 Amended 05/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, U9 and KTD11). Control Centre's Agent Operations group is now **Models**: Routes and spend is *Models and spend* at `/models/models-and-spend`, and Ceiling is *Spending limit*. Both older addresses of the page lead to it. The Flux AgentOps comparison above keeps the group's old name, because where its later pages (Runs, Approvals, Connected assistants) land is open until one is built. The four levels and every rule above stand.
+
+Amended 08/10/2026 by the architecture review before S2 plan (`docs/plans/2026-10-08-2311-docs-architecture-review-before-s2-plan.md`, R1 and R2). The concept page is Search's detail at `/knowledge/search/<ulid>`, seen wherever Search is seen, which is by every role. A malformed id, an absent concept and a withheld one all draw the one state inside the page that names no one. That settles the open question of Search's area as Knowledge. S3 adds the concept page's actions and amends the sentence that a detail draws no toolbar. Code now follows a renamed word in batches. The glossary entry, the text on a page and live docs change at once. Code, types, database tables and columns, and contracts follow in one batch per block, which renames every remaining occurrence in that block's pull request. Until the batch lands, the old word's row in `apps/api/tests/old-words.ts` refuses it in reader text only and names the batch's block. The four levels and every rule above stand.
