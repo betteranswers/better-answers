@@ -1488,153 +1488,236 @@ rather than redescribing one.
 
 ## People
 
-- **workspace** — the tenancy boundary and the unit a company occupies: one company's people,
-  connected sources, bundle repository, index, map and records. **Every tenant row, every
-  object-store prefix, every map node and edge carries its workspace id**, and every query reaches
-  its store through a store door, over row-level security (ADR 0032). Better Auth's identity set is
-  not tenant data: read by key before a workspace is known, it is what a workspace id is resolved
-  from (ADR 0009). One deployment holds many; a person may belong to more than one and picks before
-  consent. Workspaces are provisioned by the platform, never created by a person. Better Auth's own
-  name for it stays inside its API and is mapped to *workspace* in our code and on every page.
-- **tenant** — _Internal._ the same boundary said from the platform's side, used only where the
-  sentence is about isolation rather than about a company: *tenanted by rule*,
-  *multi-tenant-ready*. There is one boundary and it is the workspace; *tenant* never appears on a
-  page and is never a second concept.
-- **principal** — _Internal._ who a call is made as: `workspaceId`, `userId` and `role`, built by the
-  transport from a verified bearer and passed as the first parameter of every `packages/core`
-  function that touches tenant data. It has **three kinds** (ADR 0009, 2026-09-04):
-  - **user principal** — a signed-in person in one workspace, with the role they hold there as a
-    member.
-  - **platform principal** — the platform acting as itself, with its own actor id
-    (`process:better-answers-<purpose>`) and no person behind it: the erasure routine, the nightly
-    audit, the reconciler. Its actions are audited under that identity and never under a person's.
-  - **operator principal** — the *operator*; its own entry below.
+### workspace
 
-  One more word has no type yet — **deferred principal**: a named person's authority carried into
-  work that outlives their session (a background job, a scheduled sync, a replay). It records the
-  person it borrowed from and **expires with the authority it borrowed**, so a job cannot outlive
-  the access that started it. Work that outlives a session runs under a deferred or a platform
-  principal, never under a live user session. The *actor id* is the id on a file, not the
-  principal.
-- **operator** — _Internal._ the platform's own administrator over every workspace: a real person on
-  the identity set, made the operator by a **mark** on their person that only the platform's own
-  tooling grants or takes away, never a page, and that erasure clears with the rest of their
-  identity; a third principal kind beside a user and the platform, audited under their own id.
-  Never a workspace *role*; *Admin* is the highest role a workspace has. A page names them
-  *better-answers support*.
-- **better-answers support** — who a page sends a person to for what nobody in their workspace can
-  do: a *display name* corrected in every workspace at once, an Admin restored when they hold
-  neither a *second factor* nor a *recovery code*, anything across workspaces. Behind it is the
-  *operator*.
-- **action** — what an entry — a page's call, an MCP entry, an ops command,
-  the reconciler's tick — may ask the platform to do as a *principal*: one thing, a **read** or a
-  **write**, answered with its value or with a *refusal*. Reading a connected source's findings is
-  an action as much as publishing the connected source is. Where the *audit log* records an action,
-  its *audit event* lands with it, under its *audit action* (ADR 0043). An endpoint or a procedure
-  is a transport's way of reaching an action, never the action itself.
-- **step (of an action)** — _Internal._ a part of an action that runs only inside the action that
-  called it and never on its own: writing the *audit event*, queueing a *job*, reading whether a
-  person holds every audience group. It is handed the principal its action admitted, judges no
-  *admission* and has no *refusal* of its own — a step that cannot do its part fails the whole
-  action, and nothing of the action lands.
-- **admission** — _Internal._ the judgement of whether a *principal* may perform an *action* at all,
-  made before the action does anything: from the principal's kind, a person's role, the purpose a
-  *platform principal* acts for, and what was asked — never from a stored row. Whether the thing
-  named exists, or is in a state to be acted on, is the action's own question, and its answer is a
-  *refusal* of another class.
-- **refusal** — an action's answer when it will not do what was asked: one hyphenated **refusal
-  word** naming what refused (`role-forbids`, `no-such-binding`, `already-published`) — something
-  the caller can act on, where a failure is something to log and try again. A word means one thing
-  wherever it appears and belongs to one of seven **classes**, by what the caller can do about it:
-  *unauthenticated* (sign in again), *forbidden* (someone with the authority must do it), *absent*
-  (name something that exists), *malformed* (fix the shape of what was sent), *inapplicable*
-  (well-formed, but not something this action applies to), *conflict* (the state moved: read again
-  and decide again), *precondition* (something else comes first). A word reaches an agent, the
-  operator and the web app as itself; a person reads its sentence. Once shipped, a word is never
-  removed and never changes class, so a caller that has never met a word can still act on its
-  class (ADR 0043).
-- **issue word** — _Internal._ what a *malformed* refusal says about one field: one hyphenated word
-  from the kernel's closed list (`missing`, `wrong-type`, `too-small`, `not-in-set`, `bad-format`)
-  naming how the field was wrong, carried in a map of field path to word. The map never holds the
-  value that was wrong, so a refusal can be logged and shown whatever the field held. A field path
-  names a field, never a class: the class is the refusal's, and it is always *malformed*.
-- **refused items** — _Internal._ what a *refusal* adds when an action refuses a whole set: a
-  refusal's **items**, one *refusal word* per refused item, keyed by the id the caller sent for it
-  or by an address's position in what was sent — never by an address or a name. Nothing of the set
-  lands. The refusal's own word is the first refused item's word in id order. Only tRPC carries the
-  items, to the web app; MCP and `pnpm ops` answer the set's word alone.
-- **end every sign-in and token** — the one action that ends what a person
-  was issued, in two scopes. *In a workspace*: a workspace Admin ends every session and token a
-  person holds there, by an instant on their member row the resolver refuses against; nothing
-  outside that workspace changes, and the Admin never learns whether others exist. *Everywhere*: the
-  operator ends every session and token the person holds, by an instant on the person. Both end
-  what was issued; a fresh sign-in mints anew. The member page's last section reads *Remove and end
-  every sign-in*.
-- **share agent token** — a **share agent's** credential: scoped to one
-  connected source, minted and ended by an Admin, validated in the api before any request body is
-  read, and good only for the `/agent/v1` routes a share agent uses to push documents in from a
-  company's own network (ADR 0008 amendment, ADR 0041's *agent* class). Listed on Control Centre ›
-  Sources › Share agents. Not a personal token (a person's own bearer for Claude Code and scripts)
-  and not an OAuth access token.
+the tenancy boundary and the unit a company occupies: one company's people, connected sources,
+bundle repository, index, map and records.
 
-- **role (of a person)** — what a person may do in every area, a **level** never a job title:
-  **Admin**, **Editor** or **Viewer** in v0.1 (the Principal every call carries; Liam, 27/08/2026 —
-  the platform is agnostic about who a bid writer is). Editors and Admins verify concepts, answer
-  question sets and save Answers from history; Viewers ask, flag and suggest. Owning a *collection*
-  grants actions on it to a person of any role, so a Viewer may own one (ADR 0047). A guide
-  definition sets, per role, the default layer and the action threshold; a connected source's
-  *audience* is who may see, never a role. Not a section's role label.
-- **access request** — a signed-in person's recorded ask to join one workspace, with a reason;
-  decided by an Admin — approved (which mints the invitation) or declined — each decision on the
-  *audit log*. Not a *subject request*.
-- **short name** — a workspace's unique short name, given when the platform provisions it: how a
-  person names a workspace they do not belong to when they ask to join it. Never its id. Better
-  Auth's API keeps its own word for it.
-- **member** — a person's place in one workspace: the one *role* they hold
-  there, the *groups* they belong to in it, and the instant every sign-in and token they held there
-  was last ended. It begins when the person accepts an *invitation*, or when the platform provisions
-  the workspace or adds them; it ends when an Admin removes the member, which leaves the person and
-  their *display name* as they were, or when an *erasure request* is carried out; either way every
-  *audit event* naming the person stands. A workspace keeps at least one Admin: no role change or
-  removal may leave it with none — erasure alone may, since the right outranks the rule, and the
-  operator then adds an Admin. A person is a **member** of each workspace they hold such a place in.
-- **invitation** — an Admin's offer of a place as a *member*, with one *role*, to one email address,
-  sent to that address and good for seven days; accepted only by a person signed in with that
-  address, whatever its letter case, which is when they become a member. Approving an *access
-  request* mints one; a new invitation to an address with one waiting replaces it. Whether the
-  address already belongs to a person on the platform never changes what the Admin is told. Its
-  **status** is one of four: **waiting** until it is accepted, cancelled, replaced, or its seven
-  days pass into **expired**; **expired** once its seven days pass unaccepted, until a resend
-  renews it or an Admin cancels it; **accepted**; or **cancelled**, as a replaced one is. Its
-  email goes after the invitation is made, so an invitation can wait with its email **unsent**;
-  a resend sends it again.
-- **test workspace** — _Internal._ the workspace the *journeys* sign in to in production, made and
-  set back by `pnpm ops test-workspace` alone, never by a page: the three *test people* and the 51
-  *invented members*. A page says *kept for testing*. It carries a **mark**, a row of its own
-  naming its *testing domain*, which only that command writes and the api cannot remove. While the
-  mark stands, every *invitation* the workspace sends, resends or mints from an *access request*
-  goes to an address on that domain, and one off it is refused `off-testing-domain`. Not the
-  *operator*'s mark, which is on a person.
-- **testing domain** — what follows the `@` of every address a *test workspace* invites,
-  lower-cased and matched whole, so a subdomain is another one. An email domain, never a
-  *collection* of the company's knowledge.
-- **test person** — _Internal._ one of the three people the *journeys* sign in as: the test Admin,
-  the test Editor and the test Viewer of the *test workspace*. The workspace also holds 51
-  **invented members**, Viewers nobody signs in as, so that every list a journey pages through runs
-  past one page. None of them is the *operator* or a *member* of another workspace. Each address
-  is on the *testing domain*, so anything that lists or counts people can tell them from real ones,
-  and every code sent to one reaches the *test inbox*. None is ever erased: erasure tombstones the
-  address for good, so one who must go is removed from the test workspace instead. A journey undoes
-  every action it takes, and the next run sets back what a failed one left, so the test
-  workspace's *audit log* is their one lasting record.
-- **Activity (of a person)** — one person's part in the workspace's *audit log*, read by an Admin
-  alone, in People: every *audit event* they took and every one done to them, newest first, each
-  marked with its **direction**: *by*, *to* or both, as a self-demotion is. It spans their whole
-  history in the workspace, their *access requests* and earlier times as a member included. An
-  *invitation* names an address, not a person, so one sent before they joined is in its inviter's
-  Activity alone; their *sign-ins* and the *display name* they give are in the
-  *identity-set audit log*, which no workspace reads. A read of the audit log, kept nowhere of its
-  own: not a *record family*.
+**Every tenant row, every object-store prefix, every map node and edge carries its workspace id**,
+and every query reaches its store through a store door, over row-level security. Better Auth's
+identity set is not tenant data: read by key before a workspace is known, it is what a workspace id
+is resolved from. One deployment holds many; a person may belong to more than one and picks before
+consent. Workspaces are provisioned by the platform, never created by a person. Better Auth's own
+name for it stays inside its API and is mapped to *workspace* in our code and on every page.
+
+### tenant
+
+_Internal._ the same boundary said from the platform's side, used only where the sentence is about
+isolation rather than about a company: *tenanted by rule*, *multi-tenant-ready*.
+
+There is one boundary and it is the workspace; *tenant* never appears on a page and is never a
+second concept.
+
+### principal
+
+_Internal._ who a call is made as: a workspace id, a user id and a role, built by the transport from
+a verified bearer and passed as the first parameter of every function of the core package that
+touches tenant data.
+
+It has **three kinds**: the **user principal**, a signed-in person in one workspace, with the role
+they hold there as a member; the **platform principal**, the platform acting as itself, with its own
+actor id and no person behind it (the erasure routine, the nightly audit, the reconciler); and the
+**operator principal**, the *operator* (its own entry below). A platform principal's actions are
+audited under that identity and never under a person's.
+
+One more word has no type yet — **deferred principal**: a named person's authority carried into
+work that outlives their session (a background job, a scheduled sync, a replay). It records the
+person it borrowed from and **expires with the authority it borrowed**, so a job cannot outlive the
+access that started it. Work that outlives a session runs under a deferred or a platform principal,
+never under a live user session. The *actor id* is the id on a file, not the principal.
+
+### operator
+
+_Internal._ the platform's own administrator over every workspace: a real person on the identity
+set, made the operator by a **mark** on their person that only the platform's own tooling grants or
+takes away, never a page, and that erasure clears with the rest of their identity; a third principal
+kind beside a user and the platform, audited under their own id.
+
+Never a workspace *role*; *Admin* is the highest role a workspace has.
+A page names them *better-answers support*.
+
+### better-answers support
+
+who a page sends a person to for what nobody in their workspace can do: a *display name* corrected
+in every workspace at once, an Admin restored when they hold neither a *second factor* nor a
+*recovery code*, anything across workspaces.
+
+Behind it is the *operator*.
+
+### action
+
+what an entry — a page's call, an MCP entry, an ops command, the reconciler's tick — may ask the
+platform to do as a *principal*: one thing, a **read** or a **write**, answered with its value or
+with a *refusal*.
+
+Reading a connected source's findings is an action as much as publishing the connected source is.
+Where the *audit log* records an action, its *audit event* lands with it, under its *audit action*.
+An endpoint or a procedure is a transport's way of reaching an action, never the action itself.
+
+### step (of an action)
+
+_Internal._ a part of an action that runs only inside the action that called it and never on its
+own: writing the *audit event*, queueing a *job*, reading whether a person holds every audience
+group.
+
+It is handed the principal its action admitted, judges no *admission* and has no *refusal* of its
+own — a step that cannot do its part fails the whole action, and nothing of the action lands.
+
+### admission
+
+_Internal._ the judgement of whether a *principal* may perform an *action* at all, made before the
+action does anything: from the principal's kind, a person's role, the purpose a
+*platform principal* acts for, and what was asked — never from a stored row.
+
+Whether the thing named exists, or is in a state to be acted on, is the action's own question, and
+its answer is a *refusal* of another class.
+
+### refusal
+
+an action's answer when it will not do what was asked: one hyphenated **refusal word** naming what
+refused (`role-forbids`, `no-such-binding`, `already-published`) — something the caller can act
+on, where a failure is something to log and try again.
+
+A word means one thing wherever it appears and belongs to one of seven **classes**, by what the
+caller can do about it: *unauthenticated* (sign in again), *forbidden* (someone with the authority
+must do it), *absent* (name something that exists), *malformed* (fix the shape of what was sent),
+*inapplicable* (well-formed, but not something this action applies to), *conflict* (the state
+moved: read again and decide again), *precondition* (something else comes first). A word reaches an
+agent, the operator and the web app as itself; a person reads its sentence. Once shipped, a word is
+never removed and never changes class, so a caller that has never met a word can still act on its
+class.
+
+### issue word
+
+_Internal._ what a *malformed* refusal says about one field: one hyphenated word from the kernel's
+closed list (`missing`, `wrong-type`, `too-small`, `not-in-set`, `bad-format`) naming how the field
+was wrong, carried in a map of field path to word.
+
+The map never holds the value that was wrong, so a refusal can be logged and shown whatever the
+field held. A field path names a field, never a class: the class is the refusal's, and it is always
+*malformed*.
+
+### refused items
+
+_Internal._ what a *refusal* adds when an action refuses a whole set: a refusal's **items**, one
+*refusal word* per refused item, keyed by the id the caller sent for it or by an address's position
+in what was sent — never by an address or a name.
+
+Nothing of the set lands. The refusal's own word is the first refused item's word in id order. Only
+tRPC carries the items, to the web app; MCP and an ops command answer the set's word alone.
+
+### end every sign-in and token
+
+the one action that ends what a person was issued, in two scopes.
+
+*In a workspace*: a workspace Admin ends every session and token a person holds there, by an
+instant on their member row the resolver refuses against; nothing outside that workspace changes,
+and the Admin never learns whether others exist. *Everywhere*: the operator ends every session and
+token the person holds, by an instant on the person. Both end what was issued; a fresh sign-in
+mints anew. The member page's last section reads *Remove and end every sign-in*.
+
+### share agent token
+
+a **share agent's** credential: scoped to one connected source, minted and ended by an Admin,
+validated in the api before any request body is read, and good only for the routes a share agent
+uses to push documents in from a company's own network (the *agent* class).
+
+Listed on Control Centre › Sources › Share agents. Not a personal token (a person's own bearer for
+Claude Code and scripts) and not an OAuth access token.
+
+### role (of a person)
+
+what a person may do in every area, a **level** never a job title: **Admin**, **Editor** or
+**Viewer** in v0.1 (the Principal every call carries; the platform is agnostic about who a bid
+writer is).
+
+Editors and Admins verify concepts, answer question sets and save Answers from history; Viewers
+ask, flag and suggest. Owning a *collection* grants actions on it to a person of any role, so a
+Viewer may own one. A guide definition sets, per role, the default layer and the action threshold;
+a connected source's *audience* is who may see, never a role. Not a section's role label.
+
+### access request
+
+a signed-in person's recorded ask to join one workspace, with a reason; decided by an Admin —
+approved (which mints the invitation) or declined — each decision on the *audit log*.
+
+Not a *subject request*.
+
+### short name
+
+a workspace's unique short name, given when the platform provisions it: how a person names a
+workspace they do not belong to when they ask to join it.
+
+Never its id. Better Auth's API keeps its own word for it.
+
+### member
+
+a person's place in one workspace: the one *role* they hold there, the *groups* they belong to in
+it, and the instant every sign-in and token they held there was last ended.
+
+It begins when the person accepts an *invitation*, or when the platform provisions the workspace or
+adds them; it ends when an Admin removes the member, which leaves the person and their
+*display name* as they were, or when an *erasure request* is carried out; either way every
+*audit event* naming the person stands. A workspace keeps at least one Admin: no role change or
+removal may leave it with none — erasure alone may, since the right outranks the rule, and the
+operator then adds an Admin. A person is a **member** of each workspace they hold such a place in.
+
+### invitation
+
+an Admin's offer of a place as a *member*, with one *role*, to one email address, sent to that
+address and good for seven days; accepted only by a person signed in with that address, whatever its
+letter case, which is when they become a member.
+
+Approving an *access request* mints one; a new invitation to an address with one waiting replaces
+it. Whether the address already belongs to a person on the platform never changes what the Admin is
+told. Its **status** is one of four: **waiting** until it is accepted, cancelled, replaced, or its
+seven days pass into **expired**; **expired** once its seven days pass unaccepted, until a resend
+renews it or an Admin cancels it; **accepted**; or **cancelled**, as a replaced one is. Its email
+goes after the invitation is made, so an invitation can wait with its email **unsent**; a resend
+sends it again.
+
+### test workspace
+
+_Internal._ the workspace the *journeys* sign in to in production, made and set back by one ops
+command alone, never by a page: the three *test people* and the 51 *invented members*.
+
+A page says *kept for testing*. It carries a **mark**, a row of its own naming its
+*testing domain*, which only that command writes and the api cannot remove. While the mark stands,
+every *invitation* the workspace sends, resends or mints from an *access request* goes to an
+address on that domain, and one off it is refused `off-testing-domain`. Not the *operator*'s mark,
+which is on a person.
+
+### testing domain
+
+what follows the `@` of every address a *test workspace* invites, lower-cased and matched whole, so
+a subdomain is another one.
+
+An email domain, never a *collection* of the company's knowledge.
+
+### test person
+
+_Internal._ one of the three people the *journeys* sign in as: the test Admin, the test Editor and
+the test Viewer of the *test workspace*.
+
+The workspace also holds 51 **invented members**, Viewers nobody signs in as, so that every list a
+journey pages through runs past one page. None of them is the *operator* or a *member* of another
+workspace. Each address is on the *testing domain*, so anything that lists or counts people can
+tell them from real ones, and every code sent to one reaches the *test inbox*. None is ever erased:
+erasure tombstones the address for good, so one who must go is removed from the test workspace
+instead. A journey undoes every action it takes, and the next run sets back what a failed one left,
+so the test workspace's *audit log* is their one lasting record.
+
+### Activity (of a person)
+
+one person's part in the workspace's *audit log*, read by an Admin alone, in People: every
+*audit event* they took and every one done to them, newest first, each marked with its
+**direction**: *by*, *to* or both, as a self-demotion is.
+
+It spans their whole history in the workspace, their *access requests* and earlier times as a member
+included. An *invitation* names an address, not a person, so one sent before they joined is in its
+inviter's Activity alone; their *sign-ins* and the *display name* they give are in the
+*identity-set audit log*, which no workspace reads. A read of the audit log, kept nowhere of its
+own: not a *record family*.
 
 ## The platform's areas and tools
 
