@@ -9,10 +9,15 @@ Names the platform does not own keep theirs: OKF's keys and nouns and the keys w
 files, the MCP wire, a library's or a protocol's own names, and stored history. Terms not listed
 here are still draft.
 
-Compound Engineering's skills edit this file under their own rules for `CONCEPTS.md`, with three
-exceptions that hold here. The two marks above stay where they open a definition. The file carries
-no list of words to avoid: the old words live in the words test, so an agent reads only the word to
-write. A new entry follows the shape of the entries around it.
+Compound Engineering's skills add, refine, fold and retire entries under their own rules for
+`CONCEPTS.md`, and each edit is reviewed in its pull request. Four exceptions to those rules hold
+here. The two marks above stay where they open a definition. The file carries no list of words to
+avoid, and an entry that absorbs another does not name the word it replaced: the old words live in
+the words test, so an agent reads only the word to write. A name the platform does not own keeps its
+code form in an entry, a value on the MCP wire included. A rule scoped to v0.1 keeps that scope.
+
+Each entry is a `###` heading under its cluster: a definition of one sentence, then a paragraph for
+its rules when it has them. A cluster's own prose sits before its first entry.
 
 ## Knowledge model
 
@@ -2180,3 +2185,24 @@ request and an armed auto-merge, the queue doing the merge.
 
 The adjective is the other sense — a *landed copy* is a state of the knowledge layer, and nothing
 here lands one.
+
+## Flagged ambiguities
+
+- *Knowledge base* and *bundle* name one thing from two sides: a page says *knowledge base*, and
+  *bundle* is OKF's noun, kept in code, concept files and the MCP wire.
+- *Estate* and *bundle estate* are distinct: the *estate* is the running deployment, and the
+  knowledge sense is always said with *bundle*.
+- A *link* and an *IRI (of a concept)* are distinct: a page shows a *link*, and the IRI is the
+  identity beneath it.
+- *Left* and *Deprecated* are distinct: a person who has left is *Left*, never *Deprecated*, because
+  a person has no successor.
+- *Land (the verb)* and a *landed copy* are distinct: to land is to take a change to `main`, and a
+  landed copy is a state of the knowledge layer.
+- A *page* and a *menu group* are distinct: a page is one place a person reads or acts on, and a
+  menu group is a heading in the menu over some of one area's pages.
+- A *page* and a *view (of an MCP App)* are distinct: a view is the rendering half of an MCP App,
+  never a page.
+- A *menu group* and a *group* are distinct: a menu group heads pages in the menu, and a group is
+  one of members.
+- *Tenant* and *workspace* name one boundary: a page says *workspace*, and *tenant* is the same
+  boundary said from the platform's side, never a second concept.
