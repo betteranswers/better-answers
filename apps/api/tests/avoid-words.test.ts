@@ -705,12 +705,17 @@ describe("a word that lands with its sweep", () => {
       "packages/core/src/members/planted.ts": `/** An ${act} on the person names them by person id. */`,
       "docs/operations/planted.md": `A role change is the Admin's ${act} on the People page.`,
       "apps/web/test/planted.test.tsx": `// The ${act} the row menu opened has landed.`,
+      "docs/architecture/planted.md": `It removes the store as the first statement of the sync that ${act} queued.`,
+      "apps/web/e2e/planted.spec.ts": `test("opens the invite ${act} on Members for an Admin", async () => {});`,
+      "packages/core/test/planted.test.ts": `it("waits behind a live ${act} on the same bundle", async () => {});`,
     };
     const passed = {
       "apps/web/test/planted-react.test.tsx": `await ${act}(async () => render(<Members />));`,
       "apps/web/test/planted-import.test.tsx": `import { ${act}, cleanup } from "@testing-library/react";`,
       "apps/api/src/auth/planted.ts": `/** A session that must confirm first holds no claims to ${act} on. */`,
       "apps/web/src/shared/planted.tsx": `/** Only \`forbidden\` names who can ${act}, because the reader can't. */`,
+      "apps/web/src/shared/planted-grid.tsx": `/** The row focus is in, for keystrokes that ${act} on it. */`,
+      "packages/design-system/planted.md": `Ask some questions, and ${act} as an expert designer.`,
       "apps/web/src/shared/address-ask.ts": `const ASKED_BEFORE = { action: "${act}", search: undefined };`,
       "packages/schema/test/before-the-action.ts": `ALTER TABLE "audit_event" RENAME COLUMN "action" TO "${act}"`,
     };
@@ -730,6 +735,8 @@ describe("a word that lands with its sweep", () => {
       "apps/web/src/shared/planted-menu.tsx": `<RowActions label={\`${Acts} for \${name}\`} />`,
       "apps/web/src/features/sources/planted.tsx": `import { Review } from "./review-${acts}.tsx";`,
       "docs/architecture/planted.md": `The three bulk ${acts} take groups of findings.`,
+      "docs/solutions/planted.md": `The credential class is for ${acts} on our own estate.`,
+      "packages/core/src/audit/planted.ts": `// The audit log records ${acts} on a person.`,
     };
     const passed = {
       "apps/api/src/mcp/planted.ts": `// the set's word alone, which is what an agent ${acts} on.`,

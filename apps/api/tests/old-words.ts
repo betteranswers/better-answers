@@ -1209,7 +1209,7 @@ const STORED_BEFORE_0073: readonly Sense[] = [
   ].map((within) => ({
     sense: "the audit logs' column and constraints as migration 0073 found them (R22)",
     within,
-    written: /\bact\b/g,
+    written: /["']act["']|\(act\||(?<=\(id, (?:workspace_id, )?)act(?=, actor\b)/g,
   })),
   {
     sense:
@@ -1220,10 +1220,25 @@ const STORED_BEFORE_0073: readonly Sense[] = [
 ];
 
 /**
- * A determiner or a possessive before *act on* makes it the noun. The verb keeps to lower case, so
- * a label "Acts for" stays refused.
+ * Fitted to the tree, and held to lower case so a label such as "Acts for" stays refused. Mirrored
+ * in `packages/devtools/renames/action.json`.
  */
-const NOT_A_NOUN_BEFORE = String.raw`(?<!\b(?:[Aa]n?|[Tt]he|[Ee]ach|[Ee]very|[Oo]ne|[Nn]o|[Aa]ny|[Ii]ts|[Tt]heir|[Tt]his|[Tt]hese|[Tt]hose|own|whose|two|bulk|set|group|[\w-]+['’]s)\s)`;
+const ACT_AS_A_VERB = [
+  String.raw`(?<=\b(?:to|can|cannot|can't|will|won't|would|could|should|must|may|might|never|not|who|[Tt]hey|[Ww]e|[Yy]ou|[Nn]obody)\s+(?:still\s+|only\s+|also\s+)?)act\b`,
+  String.raw`(?<=\b(?:that|and)\s)act (?:on|as)\b`,
+];
+
+/** A verb's subject before *acts*, fitted to the tree; any other word leaves the plural a noun. */
+const ACTS_AS_A_VERB = [
+  String.raw`\b[Ww]ho acts\b`,
+  String.raw`(?<=\b(?:agent|step|reader|reviewer|principal\*?|run|nothing|never|or|Renovate)\s)acts (?:on|as|for)\b`,
+];
+
+/** Where an address asks under the query key a page had before this sweep, which is read still. */
+const ASKING_UNDER_THE_OLDER_KEY = [
+  "apps/web/test/address-ask.test.tsx",
+  "apps/web/test/people-address.test.ts",
+];
 
 const ACT_SENSES: readonly Sense[] = [
   ...FILED_NAMES,
@@ -1234,32 +1249,26 @@ const ACT_SENSES: readonly Sense[] = [
     written: /\bact(?=\()|\bact\b(?=[^;]*\bfrom "(?:react|@testing-library\/[\w-]+)")/g,
   },
   {
-    sense: "the plain verb, after a word that makes it one, or before on or as",
-    written: new RegExp(
-      String.raw`(?<=\b(?:to|can|cannot|can't|will|won't|would|could|should|must|may|might|never|not|who|that|they|[Ww]e|[Yy]ou|[Nn]obody)\s+(?:still\s+|only\s+|also\s+)?)act\b|${NOT_A_NOUN_BEFORE}\bact (?:on|as)\b`,
-      "g",
-    ),
+    sense: "the plain verb, after a word that makes it one",
+    written: new RegExp(ACT_AS_A_VERB.join("|"), "g"),
   },
   {
     sense: "the query key a page was asked with before this sweep, read still (R22)",
     within: "apps/web/src/shared/address-ask.ts",
     written: /\baction: "act"/g,
   },
-  {
-    sense: "an address asking under that older query key, in the test that proves it is still read",
-    within: "apps/web/test/address-ask.test.tsx",
+  ...ASKING_UNDER_THE_OLDER_KEY.map((within) => ({
+    sense: "an address asking under that older query key, in a test that proves it is still read",
+    within,
     written: /[?&]act=/g,
-  },
+  })),
 ];
 
 const ACTS_SENSES: readonly Sense[] = [
   ...FILED_NAMES,
   {
-    sense: "the plain verb, its subject's own: who acts, or acts on, as or for something",
-    written: new RegExp(
-      String.raw`\b[Ww]ho acts\b|${NOT_A_NOUN_BEFORE}\bacts (?:on|as|for)\b`,
-      "g",
-    ),
+    sense: "the plain verb, after its subject",
+    written: new RegExp(ACTS_AS_A_VERB.join("|"), "g"),
   },
 ];
 
@@ -1296,7 +1305,7 @@ export const OLD_WORDS: readonly OldWord[] = [
     sweep: ACTION,
     state: "landed",
     reach: "everywhere",
-    why: "the plural and every compound name, which the one-sense act row reads whole",
+    why: "the plural and its compounds; a singular compound such as declareAct is read by neither row",
     permitted: ACTS_SENSES,
     carvedOut: ACTION_CARVED_OUT,
   },

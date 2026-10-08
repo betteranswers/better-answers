@@ -58,14 +58,21 @@
   },
   "senses": [
     {
-      "sense": "the plain verb, after a word that makes it one",
+      "sense": "the plain verb, after a word that makes it one, as the words test's act and acts rows read it",
       "matches": [
-        "\\b(?:to|can|cannot|will|would|could|should|must|may|might|never|not|who|they|we|you)\\s+act\\b"
+        "(?<=\\b(?:to|can|cannot|can't|will|won't|would|could|should|must|may|might|never|not|who|[Tt]hey|[Ww]e|[Yy]ou|[Nn]obody)\\s+(?:still\\s+|only\\s+|also\\s+)?)act\\b",
+        "(?<=\\b(?:that|and)\\s)act (?:on|as)\\b",
+        "\\b[Ww]ho acts\\b",
+        "(?<=\\b(?:agent|step|reader|reviewer|principal\\*?|run|nothing|never|or|Renovate)\\s)acts (?:on|as|for)\\b"
       ]
     },
     {
       "sense": "the query key an address asked with before this sweep, read still so a bookmark or a sign-in under way keeps working",
-      "paths": ["apps/web/src/shared/address-ask.ts", "apps/web/test/address-ask.test.tsx"],
+      "paths": [
+        "apps/web/src/shared/address-ask.ts",
+        "apps/web/test/address-ask.test.tsx",
+        "apps/web/test/people-address.test.ts"
+      ],
       "matches": ["^act$", "[?&]act="]
     },
     {

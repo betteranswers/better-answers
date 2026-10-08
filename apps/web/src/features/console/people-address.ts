@@ -10,7 +10,7 @@ const SEARCH = "search";
 
 const PERSON = "person";
 
-/** Asked as a page asks for its action, so a return address from before the sweep still lands. */
+/** Read through `askedIn`, so a return address under the older key still lands. */
 const ACTION: Ask = "action";
 
 /** The sheet's two actions that ask for a sign-in from the last hour. */

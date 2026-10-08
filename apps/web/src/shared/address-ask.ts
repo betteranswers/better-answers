@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 /** What another place may ask of a page as it opens: one of its actions, or a search. */
 export type Ask = "action" | "search";
 
-/**
- * The key each ask had before the action sweep, read still, so a bookmark or a sign-in under way
- * keeps asking.
- */
+/** Each ask's older key, which a bookmark or a saved sign-in return address can still carry. */
 const ASKED_BEFORE = {
   action: "act",
   search: undefined,
