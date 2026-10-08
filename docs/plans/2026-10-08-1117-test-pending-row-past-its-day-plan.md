@@ -61,7 +61,7 @@ The two cases differ. U9 landed its other two rows and forgot one. U8 changed no
 
 | Risk | Mitigation |
 |---|---|
-| The check reads the wall clock. Once a pending row's day passes, `check` turns red on every branch with no commit, and the merge queue stops until someone lands or re-dates the row | This is the alarm BA-71 asks for. The failure message names the remedy. The pull request body says so. This pull request adds no pending row, so nothing turns red when it merges |
+| The check reads the wall clock. Once a pending row's day passes, the merge queue refuses every group, and a local `check` fails, with no commit, until someone lands or re-dates the row. A pull request runs no suite, so it stays green | This is the alarm BA-71 asks for. The failure message names the remedy. The pull request body says so. This pull request adds no pending row, so nothing turns red when it merges |
 | A sweep that slips moves `landsBy` forward and the row stays pending | Moving the day is an edit a reviewer sees in the diff, which is the point. The learning says to move it only when the sweep has not merged |
 
 ### Assumptions

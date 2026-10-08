@@ -1432,6 +1432,8 @@ describe("a pending row past its day", () => {
       fault: "a day not written YYYY-MM-DD",
       row: { ...STALE, landsBy: "2026-10-4" },
     },
+    { fault: "its month and day swapped", row: { ...STALE, landsBy: "2026-20-10" } },
+    { fault: "a day its month lacks", row: { ...STALE, landsBy: "2026-02-30" } },
   ])("refuses a pending row with $fault", ({ row }) => {
     expect(overduePending([row], TODAY)).toEqual([
       `"actor id" is pending for the Audit log sweep, but names no day it lands by, as YYYY-MM-DD`,
