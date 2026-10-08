@@ -29,7 +29,7 @@ const FAILED: Read = { error: new Error("the network is down"), isPending: false
 
 const SETTLED: Read = { error: null, isPending: false };
 
-describe("a read's lines, said after their region mounts (BA-31)", () => {
+describe("a read's lines, said after their region mounts", () => {
   it("mounts the region empty, then says the loading line", () => {
     const { seen, Seen } = regionsSeen(REGION);
 

@@ -16,17 +16,19 @@ const HEADER = `\
 #
 # This file is the review point for the hostname fence's catch-all entry
 # (apps/api/src/ingress/hostnames.ts). That entry gives \`/*\` to \`app.\` — the one
-# origin the product, the authorization server and the MCP surface share (ADR 0034) —
-# without listing what it admits, because the list is the plugin list's; this is what
-# it admitted when a human last looked. A path added here is a path the fence hands to
-# that hostname — read it before you commit it, and check it against ADR 0022 and
-# ADR 0034. Two classes are refused by configuration rather than by the fence and are
-# reviewed here for that reason: the password and sign-up paths (no password or sign-up
-# plugin is enabled, and the product never posts to them — sign-in is an email code, the
-# sign-in link the same email carries, or Microsoft, never a password), and the social
-# paths, which open for Microsoft in its own task (ADR 0034). The sign-in link's own two
-# routes are the api's, not the library's, so they are not listed here: the hostname
-# fence names them beside consent.
+# origin the product, the authorization server and the MCP surface share — without
+# listing what it admits, because the list is the plugin list's; this is what it
+# admitted when a human last looked. A path added here is a path the fence hands to
+# that hostname — read it before you commit it, and check that the one origin needs
+# it. The hostname list is the edge's second fence, after the tunnel's ingress rules,
+# because Better Auth's handler answers on every hostname the process is given. Two
+# classes are refused by configuration rather than by the fence and are reviewed here
+# for that reason: the password and sign-up paths (no password or sign-up plugin is
+# enabled, and the product never posts to them — sign-in is an email code, the sign-in
+# link the same email carries, or Microsoft, never a password), and the social paths,
+# which open for Microsoft in its own task. The sign-in link's own two routes are the
+# api's, not the library's, so they are not listed here: the hostname fence names them
+# beside consent.
 #
 # Refresh:
 #   UPDATE_BETTER_AUTH_ENDPOINTS=1 pnpm --filter @better-answers/api run test tests/better-auth-endpoints.test.ts
@@ -106,7 +108,7 @@ describe("what Better Auth mounts behind the fence's catch-all", () => {
 
     expect(
       { added, removed },
-      "Better Auth's mounted set has moved. `added` is a path the fence's catch-all now admits on app. and nobody has reviewed; `removed` is a path something may still call. Read both against ADR 0022 and ADR 0034, then refresh tests/better-auth-endpoints.txt.",
+      "Better Auth's mounted set has moved. `added` is a path the fence's catch-all now admits on app. and nobody has reviewed; `removed` is a path something may still call. Read both against the one origin's needs, and against sign-in never taking a password, then refresh tests/better-auth-endpoints.txt.",
     ).toEqual({ added: [], removed: [] });
   });
 
