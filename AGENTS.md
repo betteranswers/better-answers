@@ -7,7 +7,7 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 ## Read first
 
 - `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block. A block becomes a plan through `/ce-brainstorm` and `/ce-plan` (*Workflow*, below).
-- `CONCEPTS.md` — the glossary. Name things in code, tests, docs and commits with its words.
+- `CONCEPTS.md` — the glossary. Name things in code, tests, docs and commits with its words. Compound Engineering's skills add, refine, fold and retire its entries under CE's rules, and each edit is reviewed in its pull request; `docs/agents/domain.md` says more.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature that relates to the knowledge layer.
 - `CODING_STANDARDS.md` — the constitution: every rule that binds work in this repo. A directory's own rules live beside it, in `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md`, `apps/worker/CODING_STANDARDS.md` and `deploy/CODING_STANDARDS.md`.
 - `docs/solutions/architecture-patterns/` — why the architecture is the way it is: one doc per live decision. `/ce-plan` finds the ones a plan touches. Code cites a decision as `ADR NNNN`, and its doc is `adr-NNNN-<slug>.md`. A change that moves a decision edits its doc in the same commit, and says so in the pull request. The ADRs these came from, with their amendments, are frozen in `docs/archive/adr/`.

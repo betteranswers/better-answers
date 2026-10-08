@@ -35,6 +35,7 @@ import {
   readerFindings,
   readerStringsIn,
   readerStringsPerSource,
+  unreadEntriesIn,
 } from "./words-scan.ts";
 
 /** A sweep that lands a word carves out, on its own row, the plans dated before it. */
@@ -133,6 +134,13 @@ describe("the list of old words", () => {
 
   it("leaves the glossary no list of words to avoid", () => {
     expect(glossary).not.toMatch(AVOID_LIST);
+  });
+
+  it("writes every glossary entry where the words test reads it", () => {
+    expect(
+      unreadEntriesIn(glossary),
+      "CONCEPTS.md writes an entry the words test does not read. Write it as a `### head` heading in its cluster, never as a bullet and never under Flagged ambiguities or Retired.",
+    ).toEqual([]);
   });
 });
 
@@ -951,36 +959,53 @@ describe("the product's name in a planted tree", () => {
 const PLANTED_GLOSSARY = [
   "# Glossary",
   "",
-  "- **watermark** — _Internal._ the last commit a workspace's rows know about.",
-  "- **job** — _Internal._ one unit of background work.",
-  "- **landed copy** — _Internal._ a document's bytes as the platform holds them. A page says",
-  "  *Received*.",
-  "- **actor id** — _Internal._ who a record names. A page shows the person's name.",
-  "- **step (of an action)** — _Internal._ a part of an action that runs only inside it.",
-  "- **`ui://`** — _Internal._ the wire URI scheme for a view.",
-  "- **principal** — _Internal._ who a call is made as:",
-  "  - **cursor** — _Internal._ a sub-bullet, part of its entry.",
-  "- **connected source** — _Code rename pending._ an Admin's connection of one source.",
-  "- **Unverified** — nobody has confirmed it.",
+  "### watermark",
+  "_Internal._ the last commit a workspace's rows know about.",
+  "",
+  "### job",
+  "_Internal._ one unit of background work.",
+  "",
+  "### landed copy",
+  "_Internal._ a document's bytes as the platform holds them. A page says",
+  "*Received*.",
+  "",
+  "### actor id",
+  "_Internal._ who a record names. A page shows the person's name.",
+  "",
+  "### step (of an action)",
+  "_Internal._ a part of an action that runs only inside it.",
+  "",
+  "### `ui://`",
+  "_Internal._ the wire URI scheme for a view.",
+  "",
+  "### principal",
+  "_Internal._ who a call is made as:",
+  "  - **cursor** — _Internal._ an indented line, part of its entry.",
+  "",
+  "### connected source",
+  "_Code rename pending._ an Admin's connection of one source.",
+  "",
+  "### Unverified",
+  "nobody has confirmed it.",
   "",
 ].join("\n");
 
 describe("the glossary's entries", () => {
-  it("joins an entry's indented lines and closes it otherwise", () => {
+  it("reads no bullet as an entry", () => {
     const glossary = [
-      "  an indented line before any entry",
-      "- **watermark** — the last commit",
-      "  a workspace's rows know about.",
+      "- **job** — _Internal._ one unit of background work.",
       "",
-      "  an indented line after a blank one",
-      "- **job** — one unit of work.",
-      "A line that is no entry's.",
-      "  indented again",
+      "### watermark",
+      "_Internal._ the last commit a workspace's rows know about.",
+      "- **cursor** — _Internal._ a bullet line inside the entry above.",
     ].join("\n");
 
     expect(entriesOf(glossary)).toEqual([
-      { term: "watermark", definition: "the last commit a workspace's rows know about." },
-      { term: "job", definition: "one unit of work." },
+      {
+        term: "watermark",
+        definition:
+          "_Internal._ the last commit a workspace's rows know about. - **cursor** — _Internal._ a bullet line inside the entry above.",
+      },
     ]);
   });
 
@@ -997,7 +1022,7 @@ describe("the glossary's entries", () => {
       "",
       "_Code rename pending._ an Admin's connection of one source.",
       "## Flagged ambiguities",
-      "- **cursor** — _Internal._ a bullet entry beside the headed ones.",
+      "- *job* and *watermark* are distinct.",
     ].join("\n");
 
     expect(entriesOf(glossary)).toEqual([
@@ -1009,7 +1034,53 @@ describe("the glossary's entries", () => {
         term: "connected source",
         definition: "_Code rename pending._ an Admin's connection of one source.",
       },
-      { term: "cursor", definition: "_Internal._ a bullet entry beside the headed ones." },
+    ]);
+  });
+
+  it("reads no tail entry, and reads the cluster after it", () => {
+    const glossary = [
+      "## Flagged ambiguities",
+      "",
+      "### cursor",
+      "_Internal._ a heading under the first tail.",
+      "",
+      "## Retired",
+      "",
+      "### checkpoint",
+      "_Internal._ a heading under the second tail.",
+      "",
+      "## Work",
+      "",
+      "### job",
+      "_Internal._ one unit of background work.",
+    ].join("\n");
+
+    expect(entriesOf(glossary)).toEqual([
+      { term: "job", definition: "_Internal._ one unit of background work." },
+    ]);
+  });
+
+  it("finds each entry the parser would not read, by line", () => {
+    const glossary = [
+      "## Work",
+      "",
+      "- **job** — _Internal._ one unit of background work.",
+      "",
+      "### watermark",
+      "_Internal._ the last commit, read with:",
+      "  - **cursor** — an indented line, part of its entry.",
+      "",
+      "## Retired",
+      "",
+      "- **checkpoint** — what a watermark was once called.",
+      "",
+      "### cursor",
+      "_Internal._ an entry written after the tail.",
+    ].join("\n");
+
+    expect(unreadEntriesIn(glossary)).toEqual([
+      'line 3: "- **job** — _Internal._ one unit of background work." is a bullet; write it as "### job"',
+      'line 13: "### cursor" sits under a tail, which holds no entry; move it into its cluster',
     ]);
   });
 
