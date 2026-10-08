@@ -33,8 +33,8 @@ reviews:
       own rules. Apply each to changes in its directory.
     - `docs/solutions/architecture-patterns/` — the live architecture decisions, one
       doc each, at `adr-NNNN-<slug>.md`. Code states a decision in words, never by
-      its number or its doc's path. A change that moves a decision edits its doc in the same pull request, never
-      silently. Say which decision is contradicted.
+      its number or its doc's path. A change that moves a decision edits its doc in
+      the same pull request, never silently. Say which decision is contradicted.
     - Deep modules. Much behaviour behind a small interface. A wide interface
       over thin behaviour is a finding even when the code is correct.
     - Comments say WHY, never WHAT. History belongs in git. A stated precondition, or a
