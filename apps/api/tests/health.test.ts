@@ -115,7 +115,9 @@ describe("two apis starting together over one fresh database", () => {
       await vi.waitFor(
         async () => {
           const waiting = await database.superuser.query<{ count: number }>(
-            "SELECT count(*)::int AS count FROM pg_locks WHERE NOT granted AND relation = 'oauth_resource'::regclass",
+            `SELECT count(*)::int AS count FROM pg_locks
+              WHERE NOT granted AND relation = 'oauth_resource'::regclass
+                AND database = (SELECT oid FROM pg_database WHERE datname = current_database())`,
           );
           expect(waiting.rows[0]?.count).toBe(servers.length);
         },

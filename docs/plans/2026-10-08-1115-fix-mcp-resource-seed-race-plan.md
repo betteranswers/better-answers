@@ -93,6 +93,7 @@ Only `apps/api/src/server.ts` builds Better Auth outside the tests. Production a
 - `apps/api/src/auth/auth.ts` (`database:` builds the wrapped adapter)
 - new `apps/api/src/auth/store-errors.ts` (the wrapper), if keeping it out of `auth.ts` reads better; otherwise a local function in `auth.ts`
 - `apps/api/tests/health.test.ts` (the regression test)
+- new `apps/api/tests/unique-violations.test.ts` (the wrapper's two outcomes, through the real adapter)
 
 **Approach:**
 1. Write the wrapper (KTD2 to KTD4): it takes the adapter factory, and returns a factory that replaces `create` on each instance with one that rethrows a unique violation's store error.
@@ -104,6 +105,7 @@ Only `apps/api/src/server.ts` builds Better Auth outside the tests. Production a
 
 **Test scenarios:**
 - Integration, the race (R1). Over a fresh database from `startTestDatabase()`, hold a SHARE lock on `oauth_resource`, build two servers with `serverFor`, wait until two inserts wait on the lock, commit, and ask both for `/health`. Both answer `status: "healthy"`, `identity: "ready"`.
+- Integration, the narrowing (R3). Through the real adapter, a duplicate insert rejects with pg's `DatabaseError` (code `23505`), and a foreign-key refusal still rejects with Drizzle's wrapper (its `cause` code `23503`).
 - Integration, unmigrated (R2). The existing "reports unhealthy when the identity provider could not start" test still passes.
 - Integration, the rest (R3). The full api suite still passes, so the schema check, transactions and every path that hits no unique violation are unchanged.
 

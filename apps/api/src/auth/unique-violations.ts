@@ -18,7 +18,7 @@ export const surfacingUniqueViolations =
       try {
         return await create(data);
       } catch (error) {
-        // Drizzle wraps the driver's error, keeping the store's own on `cause`.
+        // Drizzle keeps the store's own error on `cause`. Retire this once the plugin reads `cause`.
         const cause = error instanceof Error ? error.cause : undefined;
         throw cause instanceof DatabaseError && cause.code === UNIQUE_VIOLATION ? cause : error;
       }
