@@ -10,48 +10,53 @@ export const GLOSSARY = "CONCEPTS.md";
 /** The glossary carries no list of old words in any emphasis: those live in old-words.ts. */
 export const AVOID_LIST = /_Avoid_|\bAvoid\b\W{0,3}:/;
 
-const BULLET_HEAD = /^- \*\*(?<term>.+?)\*\* — (?<rest>.*)$/;
 const HEADING_HEAD = /^### (?<term>.+?)\s*$/;
+const BULLET_ENTRY = /^- \*\*(?<term>.+?)\*\* — /;
+const TAIL = /^## (?:Flagged ambiguities|Retired)\s*$/;
 
 type Entry = { readonly term: string; readonly definition: string };
 
-type Open = { readonly shape: "bullet" | "heading"; readonly entry: Entry };
-
-const openedBy = (line: string): Open | undefined => {
-  const bullet = BULLET_HEAD.exec(line)?.groups;
-  if (bullet?.["term"] !== undefined) {
-    return { shape: "bullet", entry: { term: bullet["term"], definition: bullet["rest"] ?? "" } };
-  }
-  const term = HEADING_HEAD.exec(line)?.groups?.["term"];
-  return term === undefined ? undefined : { shape: "heading", entry: { term, definition: "" } };
+/** A line under either tail reads as a heading, so it closes an entry and opens none. */
+const linesOf = (glossary: string): readonly string[] => {
+  let inTail = false;
+  return glossary.split("\n").map((line) => {
+    if (line.startsWith("## ")) inTail = TAIL.test(line);
+    return inTail ? "#" : line;
+  });
 };
 
-const continues = ({ shape }: Open, line: string): boolean =>
-  shape === "bullet" ? line.startsWith("  ") : !line.startsWith("#");
-
-const grown = ({ shape, entry }: Open, line: string): Open => ({
-  shape,
-  entry: { term: entry.term, definition: `${entry.definition} ${line.trim()}`.trim() },
+const grown = (entry: Entry, line: string): Entry => ({
+  term: entry.term,
+  definition: `${entry.definition} ${line.trim()}`.trim(),
 });
 
-/** An entry is a `- **head** —` bullet or a `### head` heading, as Compound Engineering writes one. */
+/** An entry is a `### head` heading, as Compound Engineering writes one, outside the two tails. */
 export const entriesOf = (glossary: string): readonly Entry[] => {
   const entries: Entry[] = [];
-  let open: Open | undefined;
-  for (const line of glossary.split("\n")) {
-    const opening = openedBy(line);
-    if (opening !== undefined) {
-      open = opening;
-      entries.push(opening.entry);
-    } else if (open !== undefined && continues(open, line)) {
-      open = line.trim() === "" ? open : grown(open, line);
-      entries[entries.length - 1] = open.entry;
-    } else {
+  let open: Entry | undefined;
+  for (const line of linesOf(glossary)) {
+    const term = HEADING_HEAD.exec(line)?.groups?.["term"];
+    if (term !== undefined) {
+      open = { term, definition: "" };
+      entries.push(open);
+    } else if (line.startsWith("#")) {
       open = undefined;
+    } else if (open !== undefined && line.trim() !== "") {
+      open = grown(open, line);
+      entries[entries.length - 1] = open;
     }
   }
   return entries;
 };
+
+/** Each entry written as a bullet outside the tails, which `entriesOf` would not read. */
+export const bulletEntriesIn = (glossary: string): readonly string[] =>
+  linesOf(glossary).flatMap((line, index) => {
+    const term = BULLET_ENTRY.exec(line)?.groups?.["term"];
+    return term === undefined
+      ? []
+      : [`line ${String(index + 1)}: "${line}" is a bullet; write it as "### ${term}"`];
+  });
 
 const markOf = ({ definition }: Entry): "internal" | "pending" | undefined => {
   if (definition.startsWith("_Internal._")) return "internal";
