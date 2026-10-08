@@ -33,7 +33,7 @@ import {
   unreadEntriesIn,
 } from "./words-scan.ts";
 
-/** A dated plan or dogfood report keeps the words of its day (R22); a later one is read. */
+/** A dated plan or dogfood report keeps the words of its day; a later one is read. */
 const writtenBefore = (day: string): CarveOut => ({
   holds: (file) =>
     (/^docs\/(?:plans|dogfood-reports)\/(\d{4}-\d{2}-\d{2})-/.exec(file)?.[1] ?? "9999") < day,
@@ -172,14 +172,14 @@ describe("the list of old words", () => {
 });
 
 describe("the tree, against the list", () => {
-  it("uses no landed word outside the senses it keeps", () => {
+  it("uses no old word outside the senses it keeps", () => {
     expect(
       said(lineFindings(repositoryRoot, SCAN)),
       "a line writes a word the glossary has replaced. Write the word each line names, as CONCEPTS.md and apps/web/CODING_STANDARDS.md say; where the use is a sense the word keeps, add that sense to its row in apps/api/tests/old-words.ts.",
     ).toEqual([]);
   });
 
-  it("writes no landed word in what a person reads", () => {
+  it("writes no old word in what a person reads", () => {
     expect(
       said(readerFindings(repositoryRoot, SCAN)),
       "a page, an MCP tool's text, an answer or an email writes a word the glossary has replaced. Write the word each line names.",
@@ -573,7 +573,7 @@ describe("a word its rename lands", () => {
     ]);
   });
 
-  it("passes a kept refusal word once the word has landed", () => {
+  it("passes a kept refusal word the row refuses", () => {
     const refusal = `no-such-${BOUND}`;
     const line = `return found ? "${refusal}" : err("${refusal}");`;
     const files = { "packages/core/src/planted.ts": line };
@@ -1064,12 +1064,8 @@ describe("the glossary's entries", () => {
 });
 
 describe("what a person reads, in a planted tree", () => {
-  const internalsOver = (
-    text: string,
-    file = WORDS,
-    rows: readonly OldWord[] = [],
-  ): readonly string[] =>
-    internalFindings(plantedTree({ [file]: text }), PLANTED_GLOSSARY, scanOf(rows), [
+  const internalsOver = (text: string, file = WORDS): readonly string[] =>
+    internalFindings(plantedTree({ [file]: text }), PLANTED_GLOSSARY, scanOf([]), [
       { head: "job" },
     ]).map((finding) => `${at(finding)} → ${finding.internal.pagesSay ?? "-"}`);
 
@@ -1149,7 +1145,7 @@ describe("what a person reads, in a planted tree", () => {
     ).toEqual([]);
   });
 
-  it("refuses a landed word in reader text alone", () => {
+  it("refuses an old word in reader text alone", () => {
     const tree = plantedTree({
       [WORDS]: `export const TRUST = "${CHECKED}";`,
       "packages/design-system/tokens.css": `--trust-${CHECKED.toLowerCase()}-ink: #444;`,
@@ -1168,7 +1164,7 @@ describe("what a person reads, in a planted tree", () => {
     ]);
   });
 
-  it("refuses any form of a landed word in MCP text", () => {
+  it("refuses any form of an old word in MCP text", () => {
     const tree = plantedTree({
       "apps/api/src/mcp/entries/index.ts": 'const description = "Lists both IRIs here.";',
       "packages/core/src/answering/index.ts": `const unverified = (): string => "${CHECKED}";`,

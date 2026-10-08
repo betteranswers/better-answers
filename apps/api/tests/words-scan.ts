@@ -441,7 +441,7 @@ const watchedInternals = (
 export const internalFindings = (
   root: string,
   glossary: string,
-  { kept }: Scan,
+  { kept }: Pick<Scan, "kept">,
   notWatched: readonly Unwatched[],
 ): readonly InternalFinding[] => {
   const keptPatterns = keptPatternsOf(kept);
