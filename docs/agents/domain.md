@@ -40,9 +40,9 @@ The rule this repo runs on: **a domain word code uses is defined in `CONCEPTS.md
 
 ## Flag decision conflicts
 
-If your output contradicts a decision in `docs/solutions/architecture-patterns/`, raise it explicitly rather than silently overriding:
+If your output contradicts a decision in `docs/solutions/architecture-patterns/`, raise it explicitly rather than silently overriding. Say the decision in words, and name its doc only where a reader can open it, never in code:
 
-> _Contradicts ADR 0007 (plain Postgres, app-owned migrations) — but worth reopening because…_
+> _Contradicts the decision that the database is plain Postgres and the api owns every migration (`adr-0007-plain-postgres-and-app-owned-migrations.md`) — but worth reopening because…_
 
 ## Where a changed decision lands
 
