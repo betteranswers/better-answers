@@ -223,7 +223,7 @@ test.describe("the People page's Invitations tab", () => {
     await inviteDialog(page).getByRole("combobox", { name: "Role" }).click();
     await page.getByRole("option", { name: "Editor" }).click();
     await expect(inviteDialog(page)).toContainText(
-      "Checks concepts, runs question sets and saves Answers.",
+      "Checks concepts, asks question sets and saves Answers.",
     );
     await inviteDialog(page)
       .getByRole("button", { name: INVITE_WORDS.send(1) })

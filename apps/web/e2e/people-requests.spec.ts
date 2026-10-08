@@ -122,7 +122,7 @@ test.describe("the People page's Requests tab", () => {
     await expect(approving).toContainText(`Approving emails ${priya} an invitation`);
     await approving.getByRole("combobox", { name: "Role" }).click();
     await page.getByRole("option", { name: "Editor" }).click();
-    await expect(approving).toContainText("Checks concepts, runs question sets and saves Answers.");
+    await expect(approving).toContainText("Checks concepts, asks question sets and saves Answers.");
     await approving.getByRole("button", { name: "Approve and send the invitation" }).click();
 
     await expect(approving).toHaveCount(0);
@@ -233,7 +233,7 @@ test.describe("the People page's Requests tab", () => {
     ).toBeFocused();
     await page.keyboard.press("a");
     await editorPickedByKeyboard(page, approving.getByRole("combobox", { name: "Role" }));
-    await expect(approving).toContainText("Checks concepts, runs question sets and saves Answers.");
+    await expect(approving).toContainText("Checks concepts, asks question sets and saves Answers.");
     await tabUntilFocused(
       page,
       approving.getByRole("button", { name: "Approve and send the invitation" }),

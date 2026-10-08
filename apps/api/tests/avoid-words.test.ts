@@ -1,45 +1,48 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
+import { INTERNAL_HEADS } from "./internal-heads.ts";
 import { keptNamesUnder } from "./kept-names.ts";
 import {
   type CarveOut,
   NOT_WATCHED_ON_PAGES,
   OLD_WORDS,
   type OldWord,
-  type Renamed,
   under,
 } from "./old-words.ts";
 import { readUnder } from "./tree-walk.ts";
 import {
   AVOID_LIST,
-  type Counts,
   entriesOf,
   type Finding,
   GLOSSARY,
   type InternalFinding,
   internalFindings,
-  isRenamed,
   lineFindings,
   listFaults,
-  overduePending,
-  ratchetCounts,
-  ratchetRises,
   readerFindings,
   readerStringsIn,
   readerStringsPerSource,
+  unmarkedInternals,
   unreadEntriesIn,
 } from "./words-scan.ts";
 
-/** A sweep that lands a word carves out, on its own row, the plans dated before it. */
+/** A dated plan or dogfood report keeps the words of its day; a later one is read. */
+const writtenBefore = (day: string): CarveOut => ({
+  holds: (file) =>
+    (/^docs\/(?:plans|dogfood-reports)\/(\d{4}-\d{2}-\d{2})-/.exec(file)?.[1] ?? "9999") < day,
+  why: "a completed plan or dogfood report keeps the words of its day (R22)",
+});
+
+/** What no row reads: a later rename lands its row in the pull request that renames the word. */
 const CARVED_OUT: readonly CarveOut[] = [
+  writtenBefore("2026-10-08"),
   {
     holds: under("docs/archive/"),
     why: "the archive is frozen history, kept in the words of its day",
@@ -72,12 +75,36 @@ const CARVED_OUT: readonly CarveOut[] = [
   },
   {
     holds: (file) =>
+      ["complexity-gate", "mutation-testing"].some((skill) =>
+        file.startsWith(`.claude/skills/${skill}/`),
+      ),
+    why: "a skill copied from jspiro/skills, kept as upstream wrote it",
+  },
+  {
+    holds: (file) => file === ".compound-engineering/config.example.yaml",
+    why: "Compound Engineering's own example config, kept as its engine writes it",
+  },
+  {
+    holds: (file) =>
       [
-        "apps/api/tests/avoid-words.test.ts",
-        "apps/api/tests/old-words.ts",
-        "apps/api/tests/old-words-ratchet.json",
+        "docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md",
+        "docs/solutions/best-practices/what-a-rename-sweeps-runner-and-prose-pass-get-wrong-and-the-checks-that-catch-it.md",
+        "docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md",
       ].includes(file),
-    why: "this scan, its list and its baseline spell the words they refuse",
+    why: "a rename's learning names the words it renamed",
+  },
+  {
+    holds: (file) => file === "pnpm-lock.yaml" || file === "LICENSE",
+    why: "a package's name is its publisher's, and the licence is the Apache Foundation's text",
+  },
+  {
+    holds: under("packages/devtools/lifts/"),
+    why: "lifted code keeps the words of the source it was lifted from",
+  },
+  {
+    holds: (file) =>
+      ["apps/api/tests/avoid-words.test.ts", "apps/api/tests/old-words.ts"].includes(file),
+    why: "this scan and its list spell the words they refuse",
   },
 ];
 
@@ -103,14 +130,14 @@ describe("the list of old words", () => {
   it("agrees with the glossary it serves", () => {
     expect(
       listFaults(OLD_WORDS, glossary, NOT_WATCHED_ON_PAGES),
-      "apps/api/tests/old-words.ts and CONCEPTS.md disagree. Keep the list sorted, one row per word, each under an entry the glossary heads, and a pending row for every entry marked pending.",
+      "apps/api/tests/old-words.ts and CONCEPTS.md disagree. Keep the list sorted, one row per word, each under an entry the glossary heads.",
     ).toEqual([]);
   });
 
-  it("holds no row pending past its sweep's day", () => {
+  it("keeps every listed internal head marked internal", () => {
     expect(
-      overduePending(OLD_WORDS, new Date().toISOString().slice(0, 10)),
-      "a row in apps/api/tests/old-words.ts is pending with no day, or past its day. Once the sweep has merged, land the row. If it has not merged, set landsBy to the day it is now expected to.",
+      unmarkedInternals(INTERNAL_HEADS, glossary),
+      "CONCEPTS.md lost an _Internal._ mark, or a head apps/api/tests/internal-heads.ts lists. Put the mark back at the start of the entry's definition. Where the entry was retired or renamed on purpose, change the list in the same change.",
     ).toEqual([]);
   });
 
@@ -144,22 +171,15 @@ describe("the list of old words", () => {
   });
 });
 
-const RATCHET = path.join(import.meta.dirname, "old-words-ratchet.json");
-
-const COUNTS = z.record(z.string(), z.record(z.string(), z.number().int()));
-
-const baseline = (): Counts =>
-  existsSync(RATCHET) ? COUNTS.parse(JSON.parse(readFileSync(RATCHET, "utf8"))) : {};
-
 describe("the tree, against the list", () => {
-  it("uses no landed word outside the senses it keeps", () => {
+  it("uses no old word outside the senses it keeps", () => {
     expect(
       said(lineFindings(repositoryRoot, SCAN)),
       "a line writes a word the glossary has replaced. Write the word each line names, as CONCEPTS.md and apps/web/CODING_STANDARDS.md say; where the use is a sense the word keeps, add that sense to its row in apps/api/tests/old-words.ts.",
     ).toEqual([]);
   });
 
-  it("writes no landed word in what a person reads", () => {
+  it("writes no old word in what a person reads", () => {
     expect(
       said(readerFindings(repositoryRoot, SCAN)),
       "a page, an MCP tool's text, an answer or an email writes a word the glossary has replaced. Write the word each line names.",
@@ -170,18 +190,6 @@ describe("the tree, against the list", () => {
     expect(
       saidOfInternals(internalFindings(repositoryRoot, glossary, SCAN, NOT_WATCHED_ON_PAGES)),
       "a person would read a word CONCEPTS.md marks internal. Write what each line names; where the head is ordinary English, add it to NOT_WATCHED_ON_PAGES in apps/api/tests/old-words.ts.",
-    ).toEqual([]);
-  });
-
-  it("writes no pending word on a page above its baseline", () => {
-    const counts = ratchetCounts(repositoryRoot, OLD_WORDS);
-    if (process.env["UPDATE_OLD_WORDS_RATCHET"] === "1") {
-      writeFileSync(RATCHET, `${JSON.stringify(counts, null, 2)}\n`);
-    }
-
-    expect(
-      ratchetRises(counts, baseline()),
-      "a page's words write a word still pending its sweep more often than before. Write the reader's word its row names in apps/api/tests/old-words.ts. Once counts fall, lower the baseline: UPDATE_OLD_WORDS_RATCHET=1 pnpm --filter @better-answers/api run test tests/avoid-words.test.ts",
     ).toEqual([]);
   });
 });
@@ -203,20 +211,11 @@ const plantedTree = (files: Readonly<Record<string, string>>): string => {
 const at = ({ file, line, text }: { file: string; line: number; text: string }): string =>
   `${file}:${String(line)}: ${text}`;
 
-const rowOf = (word: string): Renamed => {
+const rowOf = (word: string): OldWord => {
   const row = OLD_WORDS.find((one) => one.word === word);
-  if (row === undefined || !isRenamed(row)) throw new Error(`no renamed row for ${word}`);
+  if (row === undefined) throw new Error(`no row for ${word}`);
   return row;
 };
-
-const landedNow = (row: Renamed, change: Partial<Renamed> = {}): Renamed => ({
-  ...row,
-  state: "landed",
-  ...change,
-});
-
-/** A landed row as it stood before its sweep, for a fixture about a word still pending. */
-const pendingNow = (row: Renamed): Renamed => ({ ...row, state: "pending" });
 
 /** Spelled in halves, so no fixture reads as a finding should this file's carve-out be lifted. */
 const WORD = ["a", "pp"].join("");
@@ -229,17 +228,16 @@ const LEDGER = rowOf(RETIRED);
 const LEDGER_ACT = rowOf(`${RETIRED} act`);
 
 const BOUND = ["bind", "ing"].join("");
-const BINDING = landedNow(rowOf(BOUND));
+const BINDING = rowOf(BOUND);
 
 const CHECKED = ["Un", "checked"].join("");
 
 /** The row as it read before the verification sweep widened it, for fixtures on reader text alone. */
-const CHECKED_IN_READER_TEXT: Renamed = (({ word, use, entry, sweep, state }: Renamed) => ({
+const CHECKED_IN_READER_TEXT: OldWord = (({ word, use, entry, sweep }: OldWord) => ({
   word,
   use,
   entry,
   sweep,
-  state,
   reach: "reader text" as const,
 }))(rowOf(CHECKED));
 
@@ -329,32 +327,11 @@ describe("the sense a planted line is read in", () => {
   });
 });
 
-const ASSISTANT_WORD = ["cli", "ent"].join("");
 const MEMBER_WORD = ["member", "ship"].join("");
 const SHORT_NAME_WORD = ["sl", "ug"].join("");
-
-/** The trees whose code may hold a library's client object, which the row's senses leave be. */
-const CLIENT_OBJECT_TREES = ["apps/api/tests/", "packages/core/test/", "packages/schema/test/"];
+const ASSISTANT_WORD = ["cli", "ent"].join("");
 
 describe("the senses the people words keep", () => {
-  it.each(CLIENT_OBJECT_TREES)("refuses an assistant in prose under %s", (tree) => {
-    const planted = `// Connect a ${ASSISTANT_WORD} to the workspace; the ${ASSISTANT_WORD}'s access ends.`;
-    expect(linesOver({ [`${tree}planted.ts`]: planted }, [rowOf(ASSISTANT_WORD)])).toEqual([
-      `${tree}planted.ts:1: ${planted}`,
-    ]);
-  });
-
-  it.each([
-    `  const rows = await ${ASSISTANT_WORD}.query("SELECT 1");`,
-    `  await refusesEach(${ASSISTANT_WORD}, [["DELETE FROM job", "removing a job"]]);`,
-    `const s3 = new S3Client({ region }); // the S3 ${ASSISTANT_WORD} signing for one region`,
-    `// The tRPC ${ASSISTANT_WORD} batches its reads; the ${ASSISTANT_WORD}_id names the assistant.`,
-  ])("passes a library's client object or OAuth's name, case %$", (planted) => {
-    expect(linesOver({ "apps/api/tests/planted.ts": planted }, [rowOf(ASSISTANT_WORD)])).toEqual(
-      [],
-    );
-  });
-
   it("keeps the stored count of members ended in core alone", () => {
     const planted = `  ${MEMBER_WORD}sEnded: swept.membersEnded,`;
     const row = rowOf(MEMBER_WORD);
@@ -405,7 +382,10 @@ describe("the senses the people words keep", () => {
       {
         "docs/archive/adr/0001-planted.md": `The ${WORD} claims the job.`,
         "docs/archive/specs/T-001.md": `The ${WORD} claims the job.`,
-        "docs/plans/2026-01-01-planted-plan.md": `The ${WORD} claims the job.`,
+        "docs/plans/2026-10-07-planted-plan.md": `The ${WORD} claims the job.`,
+        "docs/dogfood-reports/2026-10-07-planted.md": `The ${WORD} claims the job.`,
+        "docs/plans/2026-10-08-planted-plan.md": `The ${WORD} claims the job.`,
+        "docs/dogfood-reports/2026-10-09-planted.md": `The ${WORD} claims the job.`,
         "docs/specs/v01-route.md": `The ${WORD} claims the job.`,
         "apps/api/.claude/skills/resend/SKILL.md": `The ${WORD} claims the job.`,
         "apps/web/src/planted.ts": `// The ${WORD} claims the job.`,
@@ -420,7 +400,8 @@ describe("the senses the people words keep", () => {
 
     expect(findings).toEqual([
       `apps/web/CODING_STANDARDS.md:1: The ${WORD} claims the job.`,
-      `docs/plans/2026-01-01-planted-plan.md:1: The ${WORD} claims the job.`,
+      `docs/dogfood-reports/2026-10-09-planted.md:1: The ${WORD} claims the job.`,
+      `docs/plans/2026-10-08-planted-plan.md:1: The ${WORD} claims the job.`,
       `docs/specs/v01-route.md:1: The ${WORD} claims the job.`,
       `packages/devtools/test/planted.test.ts:1: // The ${WORD} claims the job.`,
     ]);
@@ -463,7 +444,6 @@ describe("the senses the people words keep", () => {
         "apps/api/tests/planted.test.ts": `// The ${WORD} claims the job.`,
         "apps/api/tests/avoid-words.test.ts": `// The ${WORD} claims the job.`,
         "apps/api/tests/old-words.ts": `// The ${WORD} claims the job.`,
-        "apps/api/tests/old-words-ratchet.json": `{ "${WORD}": 1 }`,
       },
       [APP],
     );
@@ -472,14 +452,6 @@ describe("the senses the people words keep", () => {
       `apps/api/src/planted.ts:1: // The ${WORD} claims the job.`,
       `apps/api/tests/planted.test.ts:1: // The ${WORD} claims the job.`,
     ]);
-  });
-
-  it("reads a pending word nowhere", () => {
-    const findings = linesOver({ "docs/planted.md": `The ${WORD} claims the job.` }, [
-      { ...APP, state: "pending" },
-    ]);
-
-    expect(findings).toEqual([]);
   });
 });
 
@@ -572,7 +544,7 @@ describe("a word retired outright, beside one held to its senses", () => {
   });
 });
 
-describe("a word that lands with its sweep", () => {
+describe("a word its rename lands", () => {
   const AT_SOURCE = {
     "packages/core/src/planted.ts": `const ${BOUND} = await read(tx);`,
     "packages/schema/migrations/0099_planted.sql": `ALTER TABLE source_${BOUND} ADD COLUMN x text;`,
@@ -580,8 +552,7 @@ describe("a word that lands with its sweep", () => {
     "apps/api/tests/old-words.ts": `word: "${BOUND}",`,
   };
 
-  it("passes in code while pending, and fails once landed", () => {
-    expect(linesOver(AT_SOURCE, [pendingNow(rowOf(BOUND))])).toEqual([]);
+  it("refuses it in code, passing migrations and the list", () => {
     expect(linesOver(AT_SOURCE, [BINDING])).toEqual([
       `packages/core/src/planted.ts:1: const ${BOUND} = await read(tx);`,
     ]);
@@ -602,7 +573,7 @@ describe("a word that lands with its sweep", () => {
     ]);
   });
 
-  it("passes a kept refusal word once the word has landed", () => {
+  it("passes a kept refusal word the row refuses", () => {
     const refusal = `no-such-${BOUND}`;
     const line = `return found ? "${refusal}" : err("${refusal}");`;
     const files = { "packages/core/src/planted.ts": line };
@@ -662,27 +633,6 @@ describe("a word that lands with its sweep", () => {
     ]);
   });
 
-  it("passes a deferred sense until its later sweep lands", () => {
-    const chunk = ["ch", "unk"].join("");
-    const passage = rowOf(chunk);
-    const line = `    WHERE ${BOUND}_id = %s`;
-    const deferred = landedNow(rowOf(BOUND), {
-      permitted: [
-        {
-          sense: `the ${BOUND}_id column on index.${chunk}`,
-          written: new RegExp(`\\b${BOUND}_id\\b`, "g"),
-          until: "passage",
-        },
-      ],
-    });
-    const files = { "apps/worker/src/planted.py": line };
-
-    expect(linesOver(files, [deferred, { ...passage, state: "pending" }])).toEqual([]);
-    expect(linesOver(files, [deferred, landedNow(passage)])).toEqual([
-      `apps/worker/src/planted.py:1: ${line.trim()}`,
-    ]);
-  });
-
   it("keeps a dotted or hyphenated name wherever prose writes it", () => {
     const act = `sources.${BOUND}.published`;
     const refusal = `no-such-${BOUND}`;
@@ -691,7 +641,7 @@ describe("a word that lands with its sweep", () => {
     expect(linesOver(files, [BINDING], [act, refusal])).toEqual([]);
   });
 
-  it("passes named parameters, and refuses landed words, in MCP text", () => {
+  it("passes named parameters, and refuses old words, in MCP text", () => {
     const hit = ["h", "it"].join("");
     const files = {
       "apps/api/src/mcp/entries/index.ts": [
@@ -702,16 +652,14 @@ describe("a word that lands with its sweep", () => {
         `});`,
       ].join("\n"),
     };
-    const rows = [landedNow(rowOf("IRI")), landedNow(rowOf(hit))];
     const tree = plantedTree(files);
-    const scan = scanOf(rows, ["iri"]);
+    const scan = scanOf([rowOf("IRI"), rowOf(hit)], ["iri"]);
 
     expect(readerFindings(tree, scan).map(at)).toEqual([
+      `apps/api/src/mcp/entries/index.ts:3: One line per ${hit}`,
       "apps/api/src/mcp/entries/index.ts:4: Give the iri you found.",
     ]);
-    expect(lineFindings(tree, scan).map(at)).toEqual([
-      `apps/api/src/mcp/entries/index.ts:3: title: "One line per ${hit}",`,
-    ]);
+    expect(lineFindings(tree, scan)).toEqual([]);
   });
 
   it("refuses an act, passing React's act and the verb", () => {
@@ -795,29 +743,6 @@ describe("a word that lands with its sweep", () => {
     expect(linesOver(files, [rowOf(tokens)])).toEqual([`${navigation}:1: name: "${tokens}",`]);
   });
 
-  it("refuses a sync written as a run, passing other runs", () => {
-    const run = ["r", "un"].join("");
-    const refused = {
-      [WORDS]: `export const SAID = "Last ${run} failed.";`,
-      "packages/core/src/sources/listing.ts": `* off the connected source's latest ${run}.`,
-      "docs/architecture/c4-dynamic-sync.md": `A document the ${run} cannot read is quarantined.`,
-      "packages/core/src/sources/connected-source.ts": `// its first ${run} and its publish`,
-    };
-    const passed = {
-      "apps/web/test/planted.test.ts": `// pnpm --filter @better-answers/web ${run} test`,
-      "docs/operations/CI.md": `The mutation ${run} keeps its baseline.`,
-      "docs/operations/local-gates.md": `A failed CI ${run} names its leg.`,
-      "apps/api/src/trpc/planted.ts": `  ${run}: (input) => answer(input),`,
-      "CONCEPTS.md": `- **${run} key** — _Internal._ the key a queued job is held to.`,
-    };
-
-    expect([...linesOver({ ...refused, ...passed }, [rowOf(run)])].toSorted()).toEqual(
-      Object.entries(refused)
-        .map(([file, text]) => `${file}:1: ${text}`)
-        .toSorted(),
-    );
-  });
-
   it("refuses the type vocabulary, passing the refusal Vocabulary type", () => {
     const old = ["type", "vocabulary"].join(" ");
     const refused = {
@@ -831,29 +756,6 @@ describe("a word that lands with its sweep", () => {
     };
 
     expect([...linesOver({ ...refused, ...passed }, [rowOf(old)])].toSorted()).toEqual(
-      Object.entries(refused)
-        .map(([file, text]) => `${file}:1: ${text}`)
-        .toSorted(),
-    );
-  });
-
-  it("refuses a match written as a hit, passing other hits", () => {
-    const hit = ["h", "it"].join("");
-    const refused = {
-      [WORDS]: `export const SAID = "One ${hit} per line.";`,
-      "packages/core/src/answering/planted.ts": `const first = (${hit}: FindMatch) => ${hit}.title;`,
-      "docs/solutions/architecture-patterns/adr-0018-planted.md": `- A concept ${hit} sits beside a document.`,
-      "packages/core/src/concepts/planted.ts": `// the reconciler's ${hit} is not this one`,
-    };
-    const passed = {
-      "apps/worker/Dockerfile": `# a cache ${hit} stands in for it`,
-      ".github/workflows/planted.yml": `if: steps.node.outputs.cache-${hit} != 'true'`,
-      "CONCEPTS.md": `- **reconciler ${hit}** — _Internal._ one commit the reconciler replayed.`,
-      [`packages/core/src/concepts/reconciler-${hit}.ts`]: `const ${hit} = await tx.query(REPLAYED);`,
-      "apps/web/src/shared/ui/planted.tsx": `/** The button stays a bare ${hit} area. */`,
-    };
-
-    expect([...linesOver({ ...refused, ...passed }, [rowOf(hit)])].toSorted()).toEqual(
       Object.entries(refused)
         .map(([file, text]) => `${file}:1: ${text}`)
         .toSorted(),
@@ -921,6 +823,27 @@ describe("a word that lands with its sweep", () => {
       refused.map((file) => `${file}:1: ${line}`).toSorted(),
     );
   });
+
+  /** Common words a page must not write, which code, docs and every other sense keep. */
+  it.each(
+    [
+      ["r", "un"],
+      ["cli", "ent"],
+      ["h", "it"],
+      ["scr", "een"],
+      ["sur", "face"],
+    ].map((halves) => halves.join("")),
+  )("refuses %s in reader text alone", (word) => {
+    const tree = plantedTree({
+      [WORDS]: `export const SAID = "Each ${word} is shown here.";`,
+      "packages/core/src/planted.ts": `// Each ${word} is read here.`,
+      "docs/planted.md": `Each ${word} is read here.`,
+    });
+    const scan = scanOf([rowOf(word)]);
+
+    expect(readerFindings(tree, scan).map(at)).toEqual([`${WORDS}:1: Each ${word} is shown here.`]);
+    expect(lineFindings(tree, scan)).toEqual([]);
+  });
 });
 
 describe("the product's name in a planted tree", () => {
@@ -983,7 +906,7 @@ const PLANTED_GLOSSARY = [
   "  - **cursor** — _Internal._ an indented line, part of its entry.",
   "",
   "### connected source",
-  "_Code rename pending._ an Admin's connection of one source.",
+  "an Admin's connection of one source.",
   "",
   "### Unverified",
   "nobody has confirmed it.",
@@ -1020,7 +943,7 @@ describe("the glossary's entries", () => {
       "",
       "### connected source",
       "",
-      "_Code rename pending._ an Admin's connection of one source.",
+      "an Admin's connection of one source.",
       "## Flagged ambiguities",
       "- *job* and *watermark* are distinct.",
     ].join("\n");
@@ -1032,7 +955,7 @@ describe("the glossary's entries", () => {
       },
       {
         term: "connected source",
-        definition: "_Code rename pending._ an Admin's connection of one source.",
+        definition: "an Admin's connection of one source.",
       },
     ]);
   });
@@ -1089,9 +1012,6 @@ describe("the glossary's entries", () => {
       "### job",
       "_Internal._ one unit of background work. A page says *Task*.",
       "",
-      "### connected source",
-      "_Code rename pending._ an Admin's connection of one source.",
-      "",
       "### Unverified",
       "nobody has confirmed it.",
     ].join("\n");
@@ -1104,9 +1024,35 @@ describe("the glossary's entries", () => {
         [],
       ).map((finding) => `${finding.internal.head} → ${finding.internal.pagesSay ?? "-"}`),
     ).toEqual(["job → Task"]);
-    expect(listFaults([], glossary, [])).toContain(
-      `"connected source" is marked pending, but no pending row names its code's word`,
-    );
+  });
+
+  it("refuses a listed internal head unmarked or gone", () => {
+    const listed = ["watermark", "job", "landed copy"];
+    const scrubbed = PLANTED_GLOSSARY.replace(
+      "_Internal._ one unit of background work.",
+      "one unit of background work.",
+    ).replace("### landed copy", "### stored copy");
+
+    expect(unmarkedInternals(listed, PLANTED_GLOSSARY)).toEqual([]);
+    expect(unmarkedInternals(listed, scrubbed)).toEqual([
+      `"job" is listed internal, but no glossary entry under it opens _Internal._`,
+      `"landed copy" is listed internal, but no glossary entry under it opens _Internal._`,
+    ]);
+  });
+
+  it("passes a marked head the list does not name", () => {
+    expect(unmarkedInternals(["job"], PLANTED_GLOSSARY)).toEqual([]);
+  });
+
+  it("refuses the real glossary with one listed mark scrubbed", () => {
+    const [head] = INTERNAL_HEADS;
+    if (head === undefined) throw new Error("no internal head is listed");
+    const marked = `### ${head}\n\n_Internal._ `;
+    expect(glossary).toContain(marked);
+
+    expect(unmarkedInternals(INTERNAL_HEADS, glossary.replace(marked, `### ${head}\n\n`))).toEqual([
+      `"${head}" is listed internal, but no glossary entry under it opens _Internal._`,
+    ]);
   });
 
   it("refuses a list of words to avoid, in any emphasis", () => {
@@ -1118,12 +1064,8 @@ describe("the glossary's entries", () => {
 });
 
 describe("what a person reads, in a planted tree", () => {
-  const internalsOver = (
-    text: string,
-    file = WORDS,
-    rows: readonly OldWord[] = [],
-  ): readonly string[] =>
-    internalFindings(plantedTree({ [file]: text }), PLANTED_GLOSSARY, scanOf(rows), [
+  const internalsOver = (text: string, file = WORDS): readonly string[] =>
+    internalFindings(plantedTree({ [file]: text }), PLANTED_GLOSSARY, scanOf([]), [
       { head: "job" },
     ]).map((finding) => `${at(finding)} → ${finding.internal.pagesSay ?? "-"}`);
 
@@ -1194,23 +1136,6 @@ describe("what a person reads, in a planted tree", () => {
     expect(internalsOver('export const DONE = "The job is done.";')).toEqual([]);
   });
 
-  it("waits on a pending row's word, never a landed row's", () => {
-    const text = 'export const MOVED = "The watermark moved";';
-    const row: Renamed = {
-      word: "watermark",
-      use: "last commit",
-      entry: "watermark",
-      sweep: "map",
-      state: "pending",
-      reach: "reader text",
-    };
-
-    expect(internalsOver(text, WORDS, [row])).toEqual([]);
-    expect(internalsOver(text, WORDS, [{ ...row, state: "landed" }])).toEqual([
-      `${WORDS}:1: The watermark moved → -`,
-    ]);
-  });
-
   it("reads no file where a person's text is not written", () => {
     expect(
       internalsOver(
@@ -1220,7 +1145,7 @@ describe("what a person reads, in a planted tree", () => {
     ).toEqual([]);
   });
 
-  it("refuses a landed word in reader text alone", () => {
+  it("refuses an old word in reader text alone", () => {
     const tree = plantedTree({
       [WORDS]: `export const TRUST = "${CHECKED}";`,
       "packages/design-system/tokens.css": `--trust-${CHECKED.toLowerCase()}-ink: #444;`,
@@ -1239,12 +1164,12 @@ describe("what a person reads, in a planted tree", () => {
     ]);
   });
 
-  it("refuses any form of a landed word in MCP text", () => {
+  it("refuses any form of an old word in MCP text", () => {
     const tree = plantedTree({
       "apps/api/src/mcp/entries/index.ts": 'const description = "Lists both IRIs here.";',
       "packages/core/src/answering/index.ts": `const unverified = (): string => "${CHECKED}";`,
     });
-    const rows = [landedNow(rowOf("IRI")), CHECKED_IN_READER_TEXT];
+    const rows = [rowOf("IRI"), CHECKED_IN_READER_TEXT];
 
     expect(readerFindings(tree, scanOf(rows)).map(at)).toEqual([
       "apps/api/src/mcp/entries/index.ts:1: Lists both IRIs here.",
@@ -1365,161 +1290,48 @@ describe("the strings a person reads in a source file", () => {
   });
 });
 
-describe("the ratchet on pending words", () => {
-  const NAVIGATION = "apps/web/src/shared/navigation.ts";
-  const counted = (text: string, navigation = 'export const N = "Members and groups";'): Counts =>
-    ratchetCounts(
-      plantedTree({
-        [WORDS]: text,
-        [NAVIGATION]: navigation,
-        "apps/web/src/features/sources/table.tsx": `const T = "${BOUND} ${BOUND}";`,
-      }),
-      [pendingNow(rowOf(BOUND)), rowOf("route"), landedNow(rowOf("screen"))],
-    );
-
-  it("counts a pending word in a page's words alone", () => {
-    expect(counted(`export const A = "Each ${BOUND} and its ${BOUND}s";`)).toEqual({
-      [WORDS]: { [BOUND]: 2 },
-    });
-  });
-
-  it("counts a pending word standing alone in lowercase", () => {
-    expect(counted(`export const B = "${BOUND}";`)).toEqual({ [WORDS]: { [BOUND]: 1 } });
-  });
-
-  it("counts in the navigation as in a words module", () => {
-    expect(counted('export const A = "Nothing pending";', 'const name = "Bindings";')).toEqual({
-      [NAVIGATION]: { [BOUND]: 1 },
-    });
-  });
-
-  it("refuses one more than the baseline, and passes one fewer", () => {
-    const baselineOf: Counts = { [WORDS]: { [BOUND]: 2 } };
-
-    expect(ratchetRises({ [WORDS]: { [BOUND]: 3 } }, baselineOf)).toEqual([
-      `${WORDS}: "${BOUND}" 3 times, against 2`,
-    ]);
-    expect(ratchetRises({ [WORDS]: { [BOUND]: 1 } }, baselineOf)).toEqual([]);
-  });
-
-  it("starts a word new to a file at none", () => {
-    expect(ratchetRises({ [WORDS]: { route: 1 } }, {})).toEqual([
-      `${WORDS}: "route" 1 times, against 0`,
-    ]);
-  });
-});
-
 describe("faults in a planted list", () => {
-  const avoidedRow = (word: string, entry = "watermark"): OldWord => ({
+  const row = (word: string, entry = "watermark"): OldWord => ({
     word,
     use: entry,
     entry,
-    sweep: null,
-  });
-  const PENDING_ROW: Renamed = {
-    word: BOUND,
-    use: "connected source",
-    entry: "connected source",
-    sweep: "connected source",
-    state: "pending",
+    sweep: entry,
     reach: "everywhere",
-  };
-  const UNNAMED = `"connected source" is marked pending, but no pending row names its code's word`;
+  });
 
   it("passes a sorted list whose rows sit under heads", () => {
     expect(
-      listFaults([PENDING_ROW, avoidedRow("checkpoint"), avoidedRow("cursor")], PLANTED_GLOSSARY, [
-        { head: "job" },
-      ]),
+      listFaults(
+        [row(BOUND, "connected source"), row("checkpoint"), row("cursor")],
+        PLANTED_GLOSSARY,
+        [{ head: "job" }],
+      ),
     ).toEqual([]);
   });
 
   it.each([
     {
       fault: "a row out of order",
-      rows: [avoidedRow("checkpoint"), PENDING_ROW],
-      found: `"checkpoint" is listed before "${BOUND}", out of order or twice`,
+      rows: [row("cursor"), row("checkpoint")],
+      found: `"cursor" is listed before "checkpoint", out of order or twice`,
     },
     {
       fault: "a word listed twice",
-      rows: [PENDING_ROW, avoidedRow("cursor"), avoidedRow("Cursor")],
+      rows: [row("cursor"), row("Cursor")],
       found: `"cursor" is listed before "Cursor", out of order or twice`,
     },
     {
       fault: "a row under no head",
-      rows: [PENDING_ROW, avoidedRow("cursor", "tracker")],
+      rows: [row("cursor", "tracker")],
       found: `"cursor" sits under "tracker", which heads no glossary entry`,
-    },
-    { fault: "a pending entry with no row", rows: [avoidedRow("cursor")], found: UNNAMED },
-    {
-      fault: "a pending entry named by an avoided row alone",
-      rows: [avoidedRow("connection", "connected source")],
-      found: UNNAMED,
-    },
-    {
-      fault: "a pending entry named by a landed row alone",
-      rows: [{ ...PENDING_ROW, state: "landed" as const }],
-      found: UNNAMED,
     },
   ])("finds $fault", ({ rows, found }) => {
     expect(listFaults(rows, PLANTED_GLOSSARY, [])).toContain(found);
   });
 
   it("finds an unwatched head the glossary does not mark internal", () => {
-    expect(listFaults([PENDING_ROW], PLANTED_GLOSSARY, [{ head: "Unverified" }])).toEqual([
+    expect(listFaults([], PLANTED_GLOSSARY, [{ head: "Unverified" }])).toEqual([
       `"Unverified" is left unwatched on pages, but it heads no internal entry`,
     ]);
-  });
-});
-
-describe("a pending row past its day", () => {
-  const TODAY = "2026-10-08";
-  const UNDATED: Renamed = {
-    word: "actor id",
-    use: "the person's name",
-    entry: "actor id",
-    sweep: "Audit log",
-    state: "pending",
-    reach: "reader text",
-  };
-  const STALE: Renamed = { ...UNDATED, landsBy: "2026-10-07" };
-
-  it("refuses a stale pending row, naming it and its sweep", () => {
-    expect(overduePending([STALE], TODAY)).toEqual([
-      `"actor id" is still pending, but the Audit log sweep was due to land by 2026-10-07`,
-    ]);
-  });
-
-  it.each([
-    { due: "a pending row due today", landsBy: TODAY },
-    { due: "a pending row due after today", landsBy: "2026-10-09" },
-  ])("passes $due", ({ landsBy }) => {
-    expect(overduePending([{ ...STALE, landsBy }], TODAY)).toEqual([]);
-  });
-
-  it.each([
-    { fault: "no day", row: UNDATED },
-    {
-      fault: "a day not written YYYY-MM-DD",
-      row: { ...STALE, landsBy: "2026-10-4" },
-    },
-    { fault: "its month and day swapped", row: { ...STALE, landsBy: "2026-20-10" } },
-    { fault: "a day its month lacks", row: { ...STALE, landsBy: "2026-02-30" } },
-  ])("refuses a pending row with $fault", ({ row }) => {
-    expect(overduePending([row], TODAY)).toEqual([
-      `"actor id" is pending for the Audit log sweep, but names no day it lands by, as YYYY-MM-DD`,
-    ]);
-  });
-
-  it("reads no landed or avoided row", () => {
-    expect(
-      overduePending(
-        [
-          { ...STALE, state: "landed" },
-          { word: "cursor", use: "watermark", entry: "watermark", sweep: null },
-        ],
-        TODAY,
-      ),
-    ).toEqual([]);
   });
 });

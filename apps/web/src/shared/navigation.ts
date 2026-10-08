@@ -281,7 +281,7 @@ export const CONTROL_CENTRE = {
     {
       id: "models",
       name: "Models",
-      summary: "The model each purpose runs on, and what it spends.",
+      summary: "The model each purpose uses, and what it spends.",
       pages: [
         {
           name: "Models and spend",
