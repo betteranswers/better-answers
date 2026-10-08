@@ -2147,21 +2147,36 @@ Never shown when no contribution is visible to the reader; never a concept.
 
 How the work from the foundation to a finished v0.1 is cut and ordered.
 
-- **route spec** — _Internal._ the one document that holds the way to a finished v0.1: a head over
-  the vision's v0.1 row, then the *blocks* in order, each with its edges and the obligations it
-  carries, and a status table that is the product frontier every product session reads first.
-  Each block is planned from it. A Wayfinder map is charted only for a destination the route spec
-  does not already hold. A plan is one piece of work's, in `docs/plans/`, never the route spec.
-- **block** — _Internal._ one section of the route spec: a destination a product session can pick,
-  about a page — the ADRs and words it rests on, what in the tree it builds on, what it must carry,
-  its blocking edges, a seam sketch. Taken to `/ce-brainstorm` and `/ce-plan` before its build; its
-  plans are in `docs/plans/`, and the block itself is never one. Each block lands its own page. A
-  slice is a `packages/core` capability, never a block.
-- **strand** — _Internal._ one chain of blocks the route spec orders by their edges, worked in
-  parallel with the other: the *knowledge strand* (a document to a passage, an answer, the
-  producer) and the *records strand* (guides, suggestions). A block belongs to one strand; a
-  cross-strand edge is stated on the block.
-- **land (the verb)** — _Internal._ to take a change to `main` through the merge queue: a branch, a
-  commit, a push, a pull request and an armed auto-merge, the queue doing the merge. The adjective
-  is the other sense — a *landed copy* is a state of the knowledge layer, and nothing here lands
-  one.
+### route spec
+
+_Internal._ the one document that holds the way to a finished v0.1: a head over the vision's v0.1
+row, then the *blocks* in order, each with its edges and the obligations it carries, and a status
+table that is the product frontier every product session reads first.
+
+Each block is planned from it. A Wayfinder map is charted only for a destination the route spec does
+not already hold. A plan is one piece of work's, never the route spec.
+
+### block
+
+_Internal._ one section of the route spec: a destination a product session can pick, about a page —
+the ADRs and words it rests on, what in the tree it builds on, what it must carry, its blocking
+edges, a seam sketch.
+
+Taken to `/ce-brainstorm` and `/ce-plan` before its build; the block itself is never one of its
+plans. Each block lands its own page. A slice is a core package capability, never a block.
+
+### strand
+
+_Internal._ one chain of blocks the route spec orders by their edges, worked in parallel with the
+other: the *knowledge strand* (a document to a passage, an answer, the producer) and the *records
+strand* (guides, suggestions).
+
+A block belongs to one strand; a cross-strand edge is stated on the block.
+
+### land (the verb)
+
+_Internal._ to take a change to `main` through the merge queue: a branch, a commit, a push, a pull
+request and an armed auto-merge, the queue doing the merge.
+
+The adjective is the other sense — a *landed copy* is a state of the knowledge layer, and nothing
+here lands one.
