@@ -54,7 +54,7 @@ The staff review turned the survey into fourteen decisions and fourteen packages
 
 - R1. The concept page is Search's detail page, at `/knowledge/search/<ulid>`. It is seen by every role and opened from a Search match, and later from an Ask citation. ADR 0047 is amended in BA-35's pull request: its v0.1 table stops placing the concept page on Ask, its open line on which area Search sits on closes as Knowledge, and its "a detail draws no toolbar" rule is named as the sentence S3 amends when it adds the page's actions.
 - R2. ADR 0047's glossary amendment of 03/10/2026 changes when code follows a renamed word. The glossary entry, the text a person reads on a page, and live docs change at once. Code, types, tables, columns and contracts follow in one batch per block, which renames every remaining occurrence of the old word, wherever it sits, in that block's pull request.
-- R3. While a renamed word's code batch is pending, its row in `apps/api/tests/old-words.ts` refuses it in reader text only and names the block whose batch renames it. When the batch lands, the row refuses it everywhere.
+- R3. While a renamed word's code batch is pending, its row in `apps/api/tests/old-words.ts` refuses it in reader text only and names the block whose batch renames it. When the batch lands, it widens the row to the reach it keeps: everywhere, or one sense for a word other senses share.
 
 **The fourteen decisions**
 
@@ -96,7 +96,7 @@ The staff review turned the survey into fourteen decisions and fourteen packages
 | WP11 Worker kinds | descriptors generated into the worker; a both-ways kind check; health counted by claiming tier | S4 and S6 | not reversible if it becomes an agreement | ADR 0031 if so |
 | WP12 People's instant updates | `useOptimistic` over a filter; one table of the reads each action moves | P1 | reversible | none |
 | WP13 Auth refusal crossing | auth's person routes answer `{ word, class }`; one unwrapping on the web | P1 | reversible | ADR 0043 |
-| WP14 System's home | the audit log page under `features/system/`; detail labels paired with their keys | O1 | reversible | none |
+| WP14 System's home | the audit log page under `features/system/` | O1 | reversible | none |
 | WP15 One refusal catalogue | refusal words composed in one place instead of registered as each module loads | before S3 | reversible | ADR 0043 if its mechanism sentence changes |
 
 - R6. S2a's critical path is: R1 → S2a's plan → its core units, with WP2 landed → its web units, with WP5 landed → its browser suite and budget test. WP3 lands before the core unit that writes the vector. Everything else runs beside the path.
@@ -197,7 +197,7 @@ The owner asked that anything a typical repository would not do be flagged as pr
 ### Key Technical Decisions
 
 - KTD1. **One docs pull request, with the Linear writes around it.** The issues are filed first so the route spec can name each package by its `BA-N`; the attachments and comments follow once the pull request exists to link. Reverting the merge undoes the docs and leaves the issues, which is the right way round: the issues describe work still owed.
-- KTD2. **A batched rename reuses the words test's reader-text reach.** While its batch is pending, an old word's row in `apps/api/tests/old-words.ts` has `reach: "reader text"` and its `sweep` names the block's batch; the batch widens it to `"everywhere"`. No new field and no pending state: BA-29 removed its pending phase and ratchet, and `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md` already documents widening a row from reader text to everywhere. Governs R3.
+- KTD2. **A batched rename reuses the words test's reader-text reach.** While its batch is pending, an old word's row in `apps/api/tests/old-words.ts` has `reach: "reader text"` and its `sweep` names the block's batch; the batch widens it to the reach it keeps. No new field and no pending state: BA-29 removed its pending phase and ratchet, and `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md` already documents widening a row from reader text to everywhere. Governs R3.
 - KTD3. **Every block's record is a dated "BA-35's lines" paragraph in BA-35's pull request.** T-113's verdicts took the same shape, as *T-113's lines* in each block. The later blocks' lines land now, because for WP11 to WP14 and the placed cards the route spec is the only record a planner opens. Governs R9.
 - KTD4. **ADR 0047 changes in its body and gains a History paragraph.** The table and the open list are corrected in place, and a paragraph headed "Amended 08/10/2026 by the architecture review before S2 plan" says what moved, as its four earlier amendments do. Governs R1, R2.
 - KTD5. **The rename rule's other two statements change with it.** `CODING_STANDARDS.md`'s glossary rule ("Code takes the glossary's word") and the rename learning's Context ("A rename lands the glossary entry, the code and the row in one pull request") would otherwise contradict R2. Governs R2.
