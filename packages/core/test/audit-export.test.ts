@@ -130,7 +130,7 @@ describe("the audit log's export", () => {
     expect(file.count).toBe(1);
   });
 
-  it("records the Admin, family and person matched, AE11", async () => {
+  it("records the Admin, family and person matched", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportRecorded");
     const address = `priya.${workspace.workspaceId.toLowerCase()}@example.com`;
     const priya = await memberAt(workspace, "Viewer", { name: "Priya Shah", email: address });

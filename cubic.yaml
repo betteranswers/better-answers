@@ -32,9 +32,9 @@ reviews:
       `apps/worker/CODING_STANDARDS.md` and `deploy/CODING_STANDARDS.md` — a directory's
       own rules. Apply each to changes in its directory.
     - `docs/solutions/architecture-patterns/` — the live architecture decisions, one
-      doc each; code cites one as `ADR NNNN`, and its doc is `adr-NNNN-<slug>.md`. A
-      change that moves a decision edits its doc in the same pull request, never
-      silently. Say which decision is contradicted.
+      doc each, at `adr-NNNN-<slug>.md`. Code states a decision in words, never by
+      its number or its doc's path. A change that moves a decision edits its doc in
+      the same pull request, never silently. Say which decision is contradicted.
     - Deep modules. Much behaviour behind a small interface. A wide interface
       over thin behaviour is a finding even when the code is correct.
     - Comments say WHY, never WHAT. History belongs in git. A stated precondition, or a

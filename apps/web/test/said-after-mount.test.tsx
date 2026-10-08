@@ -51,7 +51,7 @@ const A_CONNECTED_SOURCE: ListedConnectedSource = {
   unreadableByReason: {},
 };
 
-describe("a page's read, said after its region mounts (BA-31)", () => {
+describe("a page's read, said after its region mounts", () => {
   it("fills a loading region beside a refusal line after mount", () => {
     const seen = mounted(REGION, <GroupsPage />);
 

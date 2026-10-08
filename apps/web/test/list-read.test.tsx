@@ -23,7 +23,7 @@ const listRead = (read: { readonly error: Error | null; readonly isPending: bool
   </ListRead>
 );
 
-describe("a list's read, said after its region mounts (BA-31)", () => {
+describe("a list's read, said after its region mounts", () => {
   it("mounts the loading region empty, then says the line", () => {
     const { seen, Seen } = regionsSeen("output");
 
