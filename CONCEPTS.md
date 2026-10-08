@@ -1050,230 +1050,441 @@ from a suggested concept.
 
 ## Records the platform keeps
 
-Records exist because the platform runs a use case (ADR 0011); every record about a concept refers
-to it by IRI and never restates it (ADR 0014).
+Records exist because the platform runs a use case; every record about a concept refers to it by IRI
+and never restates it.
 
-- **record family** — _Internal._ one kind of record the platform keeps: one shape, one reason to
-  exist (the use case or the derived view it serves). Records are never a knowledge layer.
-- **verification** — the platform's record of one person or agent confirming a concept or a
-  write-up against its sources: who, when, and the content confirmed. A concept file's `verified`
-  event is its projection.
-- **verification request** — a reader's or the platform's ask that a concept or a write-up be
-  verified, with a reason — a reader's flag, *due for verification*, *shelf life ending*, *source
-  changed*, *source gone*, *cited concept deprecated*, *verifier left*, *verifier erased*; one open
-  per concept and reason; lands in its owner's queue, the interval ones batched into the weekly
-  digest, and listed on Knowledge › Due for verification.
-- **verification interval** — how long after its latest matching verification a concept of a
-  kind is *due for verification*: a per-kind workspace setting with platform defaults
-  (Certification, Insurance, Rate: twelve months; most kinds none); never written into a file.
-- **shelf life** — the reader's word for `stale_after`: the date after which a concept is *Out of
-  date*; absent means none.
-- **actor id** — _Internal._ who a `generated.by` or `verified[].by` names: a person as
-  `human:<email>` (as Google's samples), the platform's agents as `better-answers-<purpose>/<version>`,
-  a process as `process:better-answers-<purpose>`. Verifier and generator must differ on the
-  producer part. On a record the platform keeps — the *audit log*, a commit trailer, a suggestion's
-  proposer — a person is `human:<person id>`; the file forms stand. A page shows the person's name.
-- **actor alias** — an Admin's mapping of an imported actor id to a member, so *Verified by* can
-  name them; the file is never rewritten.
-- **person id** — _Internal._ the platform's one stable id for a person: minted by the platform at
-  their first sign-in, or earlier when the platform adds them by name, carried on the identity set's
-  user row, `userId` on every Principal, and what every record names a person by as
-  `human:<person id>`. Never written into a concept file, which keeps `human:<email>` (ADR 0019).
-  The member row's key names nothing (05/09/2026). A page shows the person's name.
-- **display name** — the one line a person is credited by wherever the platform names them:
-  *Verified by*, a commit's author, a member list. The person states it themselves; an Admin flags
-  an inappropriate one and the *operator* corrects it, since one name is shown in every workspace
-  the person belongs to and no workspace's Admin may learn of the others. Not a *Person* concept's
-  name, which the company publishes.
-- **minter** — _Internal._ the kernel's one function that mints every id the platform writes, a
-  time-ordered ULID; Better Auth is handed it too, so every identity id has the same shape (ADR
-  0035). Not the *minting* rule, which decides where a unit of knowledge lives (ADR 0011).
-- **owner (of a concept)** — the person answerable for keeping a concept verified and current: the
-  collection's owner unless the concept names its own. May edit it directly and decides *edit*
-  suggestions on it. Distinct from a connected source's owner and from the bundle manifest's owner.
-- **usage** — one recorded action that takes a concept or a write-up out of the platform: copied
-  into a document, exported in a document (a response-set document is one usage per response),
-  later submitted. Being in a section is not usage; a citation in an answer is counted from
-  *Questions asked*. (Not OKF's `usage_count`, which is a source's use by a concept.)
-- **conflict** — two values for one claim found across sources, recorded with both values and
-  their evidence; raised by the pipeline, resolved only by a person (supersede, deprecate, split by
-  tier, dismiss).
-- **question set** — the ordered questions a document put to the company, which responses
-  answer; extracted as a suggestion and confirmed by the person before any response is drafted;
-  an input to a use case, never a source and never company knowledge. Not a pack, not an
-  opportunity.
-- **Questions asked** — the retained record of every answer the platform
-  gave, and the page an Admin reads it on, flagged first: who asked, where, what was answered, what
-  it cited and how trusted that was at the time, the predicate that applied and, on reuse, the
-  matched `Answer` and the judge's verdict; with the feedback and corrections it received. Not part
-  of the audit log. Content is kept twelve months by default, then thinned to the skeleton —
-  citations, trust then, verdicts, feedback and corrections — kept for good (ADR 0017).
-- **feedback** — a reader's verdict on one answer, never the platform's: *helpful*, or a **flag**
-  with a reason — *wrong* · *out of date* · *incomplete* · *should not have shown* — that becomes
-  a record in someone's queue (a verification request, an edit suggestion, or the Admin's to
-  pass on).
-- **correction** — an Admin's or owner's action on one answer in *Questions asked* that records the
-  level it went wrong at — concept, source or retrieval — and links the action that fixed it; never
-  a text edit.
-- **answer test** — a retrieval correction kept as a test: a question, a role, the concepts the
-  answer must reach and must not, the `Answer` it must or must not reuse, the expected verdict;
-  the workspace's tests are replayed retrieval-only when the answer path changes and weekly;
-  *stale* when a concept it names is deprecated.
-- **audit event** — the record of one action by an Admin, the platform or a person acting on their
-  own identity — what was done, to what, by whom, when, with what confirmations — in the one
-  append-only *audit log* a workspace keeps, or in the *identity-set audit log* when the action
-  belongs to no workspace. Every event belongs to one of four families — **people**,
-  **knowledge**, **sources**, **platform** — named as the first word of its *audit action*,
-  `family.subject.verb`; jobs, *Questions asked*, *signals* and spend are their own records and
-  never audit events.
-- **audit action** — the name an *audit event* is recorded under,
-  `family.subject.verb` (`sources.binding.published`), declared by the part of the platform that
-  performs it and never a free string. One *action* may write more than one, and a read writes none
-  (ADR 0043). A stored name stays as it was written, and the Audit log shows it in today's
-  words.
-- **audit log** — the one append-only record of every *audit event* a workspace keeps, written in
-  the same action it records; an Admin reads their workspace's own on System › Audit log (moved from
-  People on 30/09/2026), and never another's. Not *Questions asked*, which records answers.
-- **audit export** — a file of the *audit events* an Admin's search and family matched, itself
-  recorded as an audit event that names the people and groups matched but never the words searched
-  for. Not an *export* of knowledge.
-- **identity-set audit log** — the append-only record of the actions that belong to no workspace
-  because they act on a person's identity itself: a person giving their own *display name*, an
-  Admin's flag on one, a sign-in, every write the *operator* makes, and an Admin's action that ends
-  a person's access. It sits beside the *audit log* and uses the same *audit actions*. A person
-  appears in it by *person id*, never by name or address, and no row is ever rewritten. Only the
-  operator reads it; no workspace's Admin ever does.
-- **log line** — _Internal._ one line the running platform writes to its operational log for
-  whoever runs it: a token refresh, a workspace picked, a failure. Never a record: nothing reads it
-  back as evidence of an action, and an action that must be answerable for is an *audit event*, not
-  a log line.
-- **erasure request** — a person's request that their personal data leave the platform: what was
-  done in every store, when, and when the backups are beyond use. A valid one reaching the bundle
-  runs the history-rewrite routine (ADR 0020) and carries the *erasure pseudonym* it minted.
-- **erasure pseudonym** — _Internal._ the per-workspace opaque id, minted at erasure and kept on the
-  erasure request, that `human:<email>` becomes across that workspace's files and history on a
-  valid erasure request. Never the person id, so two workspaces' rewritten histories cannot be
-  joined on one person.
-- **subject request** — a person's access or erasure request — a member's, or one recorded on
-  behalf of a person the company's files name who never signed in (10/09/2026): the same
-  per-store finder over the request's identifier set, the one-month clock from its start;
-  access answers with where the platform holds the person and under which categories, never
-  a passage.
-- **suppression** — the workspace's entry that keeps a person's identifiers out of every derived
-  store: one per *erasure request*, holding the request's identifier set, applied to every
-  document of the workspace on every sync, now and later.
-- **erasure match** — _Internal._ a bounded, case-folded occurrence of a *suppression*'s identifier
-  in a document's normalised text, which the *redaction seam* withholds. It is a withholding and
-  never a *finding*: no finding row holds it, no review reaches it and no *keep in text* releases
-  it. An identifier below the **identifier floor** — under three characters once normalised, or a
-  name of one word — raises none, and recording a *subject request* refuses it as too broad to
-  withhold.
-- **erasure map** — _Internal._ the per-store finder's answer for one *subject request*: every store
-  family the platform holds and what in each of them names the person, found over the request's
-  identifier set. Its documents entry names the live documents whose indexed text holds an
-  identifier, and those choose which connected sources are wiped now; the *suppression* is written
-  from the request's identifier set, not from the map.
-- **replay copy** — _Internal._ the completed *erasure request*'s copy in the object store — the
-  request, its *erasure pseudonym*, the identifier set and the *erasure map* — that a restore reads
-  to run the erasure again over a dump older than the request. Restricted personal data, as a
-  *suppression* is.
-- **erasure rehearsal** — _Internal._ the *restore drill*'s proof that erasure erases, run against
-  *staging* in two phases so a dump can be taken between them: a **synthetic subject** — a person
-  the platform invented, addressed under a reserved domain that resolves nowhere — is seeded into a
-  workspace as a member, with a concept file naming them and a connected document naming them by
-  their address and their name, which the first phase waits to see indexed; the erasure routine is
-  then run over them and answers with the real report. Its **tokens** are the values that subject
-  is greppable by in a dump, each one a value the erasure removes; *token* here is `dump-grep
-  --tokens`' sense of the word and never a credential (*personal token*, *share agent token*).
-- **version (of a record)** — one state of a write-up or a guide definition, kept for good with
-  who changed it and why; the current state is the latest version. Concepts have git instead.
+### record family
 
-- **backup** — one scheduled copy of one store, or one restore drill, as a
-  row: what, when, outcome, size, where it went, whether it holds personal data, when it expires,
-  and — for a drill — how long the restore took.
-- **tier (of a backup)** — _Internal._ where a database dump is filed by when it was taken, which
-  sets how long it is kept: hourly, daily, weekly or monthly. It is not a *retention class*, which
-  is a connected source's.
-- **restore drill** — _Internal._ the monthly rehearsal that restores the platform from its copies
-  into staging, proves it answers, records the recovery time, and wipes staging afterwards.
-- **staging** — _Internal._ a second copy of the platform on VPC 2 holding synthetic data only,
-  brought up on demand for a drill or a rehearsal and wiped after; it never stands between them (ADR
-  0024).
-- **local database** — _Internal._ a developer's own Postgres on the pinned image, migrated and
-  holding the synthetic fixture, kept across restarts: what a GUI browses day to day. Nothing a
-  customer wrote is in it.
-- **browsing role** — _Internal._ the read-only login every GUI profile signs in as, on the *local
-  database* and on production: every workspace's rows in every table and view, no credential
-  column, no write to a platform table. Made by an operator action, never by the journal.
-- **git store** — _Internal._ one of the platform's four shared stores (ADR 0005): the bare git
-  repositories under `/data/git`, one per workspace, holding the bundle. The api is its only writer
-  and the worker mounts it read-only at a commit; it is backed up as a verified `git bundle` per
-  workspace and mirrored to the second box.
-- **forge** — _Internal._ the same thing named from the outside: the bare git repository per
-  workspace that the api writes and the worker reads at a commit. **No forge *service* runs** — no
-  UI, no SSH server, no user model, no second schema (ADR 0024).
-- **root refusal** — _Internal._ `openGit`'s refusal of a root that is not an absolute path or not
-  an existing directory: validated once, at open, so nothing downstream — `initRepository` included —
-  trusts a root nobody validated (ADR 0024).
-- **deploy unit** — _Internal._ **what one release changes**: the platform stack — `migrate`, `api`,
-  `worker` — deployed by image digest. The stores stack and the database resource are **not** in it:
-  they change on their own upgrade drill, not on a release. Use the phrase in this sense only; a
-  document that means "everything on the boxes" says **estate** (ADR 0022; A16 of the pre-build
-  gate).
-- **release** — _Internal._ the recorded promotion of a built image digest to production, on its
-  own or by an Admin's dispatch, as the *release mode* says. A release is recorded, as a
-  `release/*` tag, only once it has held: its smoke passed and, under `JOURNEYS_MODE=gate`, its
-  *journeys* ended `held` too. A release `build.yml` calls after a merge runs no journeys, so it
-  holds on its smoke under every value. Under `gate` a release whose journeys end `fail` is tagged
-  `rejected/*` instead, and the nightly release never promotes that commit again until the tag is
-  deleted.
-- **release mode** — _Internal._ how releases happen: **per-merge**, every green build on `main`
-  released; **nightly**, one release a night just after a verified backup; **drill**, only a
-  dispatched release riding a drill or a hotfix. The phases run in that order: per-merge until the
-  first customer's bundle lands, nightly until *go-live*, drill after it.
-- **go-live** — _Internal._ the day the platform is live for its customers, no earlier than the end of
-  v0.1. It comes after the day the first customer's data is on the box.
-- **journeys** — _Internal._ the small set of Playwright tests that sign in to production as each
-  *test person*, with an email code read from the *test inbox*. Each **journey** walks the pages
-  its role reaches, taking only actions it can undo and that cost nothing, so it leaves the *test
-  workspace* as it found it. They run after a scheduled or dispatched *release*'s smoke, and alone
-  against the live release on a scheduled night with nothing newer to promote or on a
-  journeys-only dispatch; a release `build.yml` calls after a merge never runs them. A run ends in
-  one **outcome word**, the body of its *dead-man ping*: `held`, every journey passed; `fail`, a
-  page did not do what its journey asks, no code came within 90 seconds, or the promote failed and
-  none ran; `could-not-run`, the run could not judge the release, because the inbox, the edge, a
-  setting or the commit under test stood in its way, the gate refused the run or its promote was
-  cancelled, or the test workspace was found holding something its fixture does not. `JOURNEYS_MODE` stages them: under `off`, or while it is unset,
-  none run; under `report` they run and report; under `gate` a release they ran on is recorded
-  only once they end `held`. Not the browser suite, whose specs seed a fresh database through its
-  harness.
-- **test inbox** — _Internal._ named in full, because *Inbox* alone is a person's *area*, which
-  points into *To decide*: the Cloudflare Email Worker `apps/test-inbox`, on the *testing domain*,
-  an email domain apart from the product's. It keeps what reaches that domain for a day and judges
-  nothing. The *journeys* read each sign-in code from it through its API, with a key that reads it
-  and does nothing else, and verify each email's DKIM signature themselves. Outside the *estate*:
-  the owner deploys it by hand, and nothing in CI can change it.
-- **signal** — a named query over rows the platform already keeps, with a threshold that makes it
-  worth a line on System (ADR 0025). Never a metric scraped from a process.
-- **alert** — a signal over its threshold, recorded once as a `platform_event` and emailed by the
-  api (immediate or in the daily digest) until a *cleared* event closes it (ADR 0025).
-- **dead-man ping** — _Internal._ the outbound heartbeat a job sends only after its work is
-  verified; silence is the alert. Carries an outcome word and sizes, never a path or an error.
-- **escrow** — _Internal._ the two-holder vault outside every box that keeps the handful of secrets
-  whose loss loses everything else.
-- **envelope** — _Internal._ the sealed form a secret is kept in: one versioned frame, written by
-  either tier and read the same way by the other, which opens only under the key it was sealed
-  with. A frame whose version a reader does not know is refused, never guessed (ADR 0005).
-- **boundary schema** — _Internal._ the validation schema a caller is held to for one table, in
-  three shapes (select, insert, update), generated from the table rather than written beside it, so
-  a column has one definition and a boundary cannot drift from it (ADR 0028). Narrowed by
-  refinements and composed at a boundary by picking, omitting and extending; a table's columns are
-  described in one place only.
-- **refinement** — _Internal._ a narrowing of one column's boundary schema, written beside that
-  column: a brand, a format, a trim, a value set smaller than the column's. A refinement only ever
-  makes the accepted set smaller, and the parity test proves it by offering what the refinement
-  accepts to the column itself (ADR 0028). Not a boundary's own shaping, which selects columns
-  rather than redescribing one.
+_Internal._ one kind of record the platform keeps: one shape, one reason to exist (the use case or the
+derived view it serves).
+
+Records are never a knowledge layer.
+
+### verification
+
+The platform's record of one person or agent confirming a concept or a write-up against its sources:
+who, when, and the content confirmed.
+
+A concept file's `verified` event is its projection.
+
+### verification request
+
+A reader's or the platform's ask that a concept or a write-up be verified, with a reason — a reader's
+flag, *due for verification*, *shelf life ending*, *source changed*, *source gone*, *cited concept
+deprecated*, *verifier left*, *verifier erased*.
+
+One is open per concept and reason; it lands in its owner's queue, the interval ones batched into the
+weekly digest, and is listed on Knowledge › Due for verification.
+
+### verification interval
+
+How long after its latest matching verification a concept of a kind is *due for verification*: a
+per-kind workspace setting with platform defaults (Certification, Insurance, Rate: twelve months; most
+kinds none).
+
+It is never written into a file.
+
+### shelf life
+
+The reader's word for `stale_after`: the date after which a concept is *Out of date*; absent means
+none.
+
+### actor id
+
+_Internal._ who a `generated.by` or `verified[].by` names: a person as `human:<email>` (as Google's
+samples), the platform's agents by their purpose and version, a process by its purpose.
+
+Verifier and generator must differ on the producer part. On a record the platform keeps — the *audit
+log*, a commit trailer, a suggestion's proposer — a person is `human:<person id>`; the file forms
+stand. A page shows the person's name.
+
+### actor alias
+
+An Admin's mapping of an imported actor id to a member, so *Verified by* can name them; the file is
+never rewritten.
+
+### person id
+
+_Internal._ the platform's one stable id for a person: minted by the platform at their first sign-in,
+or earlier when the platform adds them by name, carried on the identity set's user row and on every
+Principal, and what every record names a person by as `human:<person id>`.
+
+It is never written into a concept file, which keeps `human:<email>`. The member row's key names
+nothing. A page shows the person's name.
+
+### display name
+
+The one line a person is credited by wherever the platform names them: *Verified by*, a commit's
+author, a member list.
+
+The person states it themselves; an Admin flags an inappropriate one and the *operator* corrects it,
+since one name is shown in every workspace the person belongs to and no workspace's Admin may learn of
+the others. Not a *Person* concept's name, which the company publishes.
+
+### minter
+
+_Internal._ the kernel's one function that mints every id the platform writes, a time-ordered ULID.
+
+Better Auth is handed it too, so every identity id has the same shape. Not the *minting* rule, which
+decides where a unit of knowledge lives.
+
+### owner (of a concept)
+
+The person answerable for keeping a concept verified and current: the collection's owner unless the
+concept names its own.
+
+The owner may edit it directly and decides *edit* suggestions on it. Distinct from a connected
+source's owner and from the bundle manifest's owner.
+
+### usage
+
+One recorded action that takes a concept or a write-up out of the platform: copied into a document,
+exported in a document (a response-set document is one usage per response), later submitted.
+
+Being in a section is not usage; a citation in an answer is counted from *Questions asked*. (Not
+OKF's `usage_count`, which is a source's use by a concept.)
+
+### conflict
+
+Two values for one claim found across sources, recorded with both values and their evidence.
+
+It is raised by the pipeline, resolved only by a person (supersede, deprecate, split by tier,
+dismiss).
+
+### question set
+
+The ordered questions a document put to the company, which responses answer.
+
+It is extracted as a suggestion and confirmed by the person before any response is drafted; an input
+to a use case, never a source and never company knowledge. Not a pack, not an opportunity.
+
+### Questions asked
+
+The retained record of every answer the platform gave, and the page an Admin reads it on, flagged
+first: who asked, where, what was answered, what it cited and how trusted that was at the time, the
+predicate that applied and, on reuse, the matched `Answer` and the judge's verdict; with the feedback
+and corrections it received.
+
+Not part of the audit log. Content is kept twelve months by default, then thinned to the skeleton —
+citations, trust then, verdicts, feedback and corrections — kept for good.
+
+### feedback
+
+A reader's verdict on one answer, never the platform's.
+
+It is *helpful*, or a **flag** with a reason — *wrong* · *out of date* · *incomplete* · *should not
+have shown* — that becomes a record in someone's queue (a verification request, an edit suggestion,
+or the Admin's to pass on).
+
+### correction
+
+An Admin's or owner's action on one answer in *Questions asked* that records the level it went wrong
+at — concept, source or retrieval — and links the action that fixed it.
+
+It is never a text edit.
+
+### answer test
+
+A retrieval correction kept as a test: a question, a role, the concepts the answer must reach and must
+not, the `Answer` it must or must not reuse, the expected verdict.
+
+The workspace's tests are replayed retrieval-only when the answer path changes and weekly; a test is
+*stale* when a concept it names is deprecated.
+
+### audit event
+
+The record of one action by an Admin, the platform or a person acting on their own identity — what was
+done, to what, by whom, when, with what confirmations — in the one append-only *audit log* a workspace
+keeps, or in the *identity-set audit log* when the action belongs to no workspace.
+
+Every event belongs to one of four families — **people**, **knowledge**, **sources**, **platform** —
+named as the first word of its *audit action*, `family.subject.verb`; jobs, *Questions asked*,
+*signals* and spend are their own records and never audit events.
+
+### audit action
+
+The name an *audit event* is recorded under, `family.subject.verb`, declared by the part of the
+platform that performs it and never a free string.
+
+One *action* may write more than one, and a read writes none. A stored name stays as it was written,
+and the Audit log shows it in today's words.
+
+### audit log
+
+The one append-only record of every *audit event* a workspace keeps, written in the same action it
+records.
+
+An Admin reads their workspace's own on System › Audit log, and never another's. Not *Questions
+asked*, which records answers.
+
+### audit export
+
+A file of the *audit events* an Admin's search and family matched, itself recorded as an audit event
+that names the people and groups matched but never the words searched for.
+
+Not an *export* of knowledge.
+
+### identity-set audit log
+
+The append-only record of the actions that belong to no workspace because they act on a person's
+identity itself: a person giving their own *display name*, an Admin's flag on one, a sign-in, every
+write the *operator* makes, and an Admin's action that ends a person's access.
+
+It sits beside the *audit log* and uses the same *audit actions*. A person appears in it by *person
+id*, never by name or address, and no row is ever rewritten. Only the operator reads it; no
+workspace's Admin ever does.
+
+### log line
+
+_Internal._ one line the running platform writes to its operational log for whoever runs it: a token
+refresh, a workspace picked, a failure.
+
+Never a record: nothing reads it back as evidence of an action, and an action that must be answerable
+for is an *audit event*, not a log line.
+
+### erasure request
+
+A person's request that their personal data leave the platform: what was done in every store, when,
+and when the backups are beyond use.
+
+A valid one reaching the bundle runs the history-rewrite routine and carries the *erasure pseudonym*
+it minted.
+
+### erasure pseudonym
+
+_Internal._ the per-workspace opaque id, minted at erasure and kept on the erasure request, that
+`human:<email>` becomes across that workspace's files and history on a valid erasure request.
+
+Never the person id, so two workspaces' rewritten histories cannot be joined on one person.
+
+### subject request
+
+A person's access or erasure request — a member's, or one recorded on behalf of a person the company's
+files name who never signed in.
+
+Each has the same per-store finder over the request's identifier set, the one-month clock from its
+start; access answers with where the platform holds the person and under which categories, never a
+passage.
+
+### suppression
+
+The workspace's entry that keeps a person's identifiers out of every derived store.
+
+It is one per *erasure request*, holding the request's identifier set, applied to every document of
+the workspace on every sync, now and later.
+
+### erasure match
+
+_Internal._ a bounded, case-folded occurrence of a *suppression*'s identifier in a document's
+normalised text, which the *redaction seam* withholds.
+
+It is a withholding and never a *finding*: no finding row holds it, no review reaches it and no *keep
+in text* releases it. An identifier below the **identifier floor** — under three characters once
+normalised, or a name of one word — raises none, and recording a *subject request* refuses it as too
+broad to withhold.
+
+### erasure map
+
+_Internal._ the per-store finder's answer for one *subject request*: every store family the platform
+holds and what in each of them names the person, found over the request's identifier set.
+
+Its documents entry names the live documents whose indexed text holds an identifier, and those choose
+which connected sources are wiped now; the *suppression* is written from the request's identifier
+set, not from the map.
+
+### replay copy
+
+_Internal._ the completed *erasure request*'s copy in the object store — the request, its *erasure
+pseudonym*, the identifier set and the *erasure map* — that a restore reads to run the erasure again
+over a dump older than the request.
+
+Restricted personal data, as a *suppression* is.
+
+### erasure rehearsal
+
+_Internal._ the *restore drill*'s proof that erasure erases, run against *staging* in two phases so a
+dump can be taken between them.
+
+A **synthetic subject** — a person the platform invented, addressed under a reserved domain that
+resolves nowhere — is seeded into a workspace as a member, with a concept file naming them and a
+connected document naming them by their address and their name, which the first phase waits to see
+indexed; the erasure routine is then run over them and answers with the real report. Its **tokens**
+are the values that subject is greppable by in a dump, each one a value the erasure removes; *token*
+here is a value a dump is greppable by, and never a credential (*personal token*, *share agent
+token*).
+
+### version (of a record)
+
+One state of a write-up or a guide definition, kept for good with who changed it and why.
+
+The current state is the latest version. Concepts have git instead.
+
+### backup
+
+One scheduled copy of one store, or one restore drill, as a row: what, when, outcome, size, where it
+went, whether it holds personal data, when it expires, and — for a drill — how long the restore took.
+
+### tier (of a backup)
+
+_Internal._ where a database dump is filed by when it was taken, which sets how long it is kept:
+hourly, daily, weekly or monthly.
+
+It is not a *retention class*, which is a connected source's.
+
+### restore drill
+
+_Internal._ the monthly rehearsal that restores the platform from its copies into staging, proves it
+answers, records the recovery time, and wipes staging afterwards.
+
+### staging
+
+_Internal._ a second copy of the platform on VPC 2 holding synthetic data only, brought up on demand
+for a drill or a rehearsal and wiped after; it never stands between them.
+
+### local database
+
+_Internal._ a developer's own Postgres on the pinned image, migrated and holding the synthetic
+fixture, kept across restarts: what a GUI browses day to day.
+
+Nothing a customer wrote is in it.
+
+### browsing role
+
+_Internal._ the read-only login every GUI profile signs in as, on the *local database* and on
+production: every workspace's rows in every table and view, no credential column, no write to a
+platform table.
+
+Made by an operator action, never by the journal.
+
+### git store
+
+_Internal._ one of the platform's four shared stores: the bare git repositories, one per workspace,
+holding the bundle.
+
+The api is its only writer and the worker mounts it read-only at a commit; it is backed up as a
+verified `git bundle` per workspace and mirrored to the second box.
+
+### forge
+
+_Internal._ the same thing named from the outside: the bare git repository per workspace that the api
+writes and the worker reads at a commit.
+
+**No forge *service* runs** — no UI, no SSH server, no user model, no second schema.
+
+### root refusal
+
+_Internal._ the git store's refusal of a root that is not an absolute path or not an existing
+directory: validated once, at open, so nothing downstream trusts a root nobody validated.
+
+### deploy unit
+
+_Internal._ **what one release changes**: the platform stack — migrate, api, worker — deployed by
+image digest.
+
+The stores stack and the database resource are **not** in it: they change on their own upgrade drill,
+not on a release. Use the phrase in this sense only; a document that means "everything on the boxes"
+says **estate**.
+
+### release
+
+_Internal._ the recorded promotion of a built image digest to production, on its own or by an Admin's
+dispatch, as the *release mode* says.
+
+A release is recorded, as a tag, only once it has held: its smoke passed and, under `gate`, its
+*journeys* ended `held` too. A release the build calls after a merge runs no journeys, so it holds on
+its smoke under every value. Under `gate` a release whose journeys end `fail` is tagged rejected
+instead, and the nightly release never promotes that commit again until the tag is deleted.
+
+### release mode
+
+_Internal._ how releases happen: **per-merge**, every green build on `main` released; **nightly**,
+one release a night just after a verified backup; **drill**, only a dispatched release riding a drill
+or a hotfix.
+
+The phases run in that order: per-merge until the first customer's bundle lands, nightly until
+*go-live*, drill after it.
+
+### go-live
+
+_Internal._ the day the platform is live for its customers, no earlier than the end of v0.1.
+
+It comes after the day the first customer's data is on the box.
+
+### journeys
+
+_Internal._ the small set of Playwright tests that sign in to production as each *test person*, with
+an email code read from the *test inbox*.
+
+Each **journey** walks the pages its role reaches, taking only actions it can undo and that cost
+nothing, so it leaves the *test workspace* as it found it. They run after a scheduled or dispatched
+*release*'s smoke, and alone against the live release on a scheduled night with nothing newer to
+promote or on a journeys-only dispatch; a release the build calls after a merge never runs them.
+A run ends in one **outcome word**, the body of its *dead-man ping*: `held`, every journey passed;
+`fail`, a page did not do what its journey asks, no code came within 90 seconds, or the promote
+failed and none ran; `could-not-run`, the run could not judge the release, because the inbox, the
+edge, a setting or the commit under test stood in its way, the gate refused the run or its promote
+was cancelled, or the test workspace was found holding something its fixture does not. One setting
+stages them: under `off`, or while it is unset, none run; under `report` they run and report; under
+`gate` a release they ran on is recorded only once they end `held`. Not the browser suite, whose
+specs seed a fresh database through its harness.
+
+### test inbox
+
+_Internal._ named in full, because *Inbox* alone is a person's *area*, which points into *To decide*:
+the Cloudflare Email Worker, on the *testing domain*, an email domain apart from the product's.
+
+It keeps what reaches that domain for a day and judges nothing. The *journeys* read each sign-in code
+from it through its API, with a key that reads it and does nothing else, and verify each email's DKIM
+signature themselves. Outside the *estate*: the owner deploys it by hand, and nothing in CI can change
+it.
+
+### signal
+
+A named query over rows the platform already keeps, with a threshold that makes it worth a line on
+System.
+
+Never a metric scraped from a process.
+
+### alert
+
+A signal over its threshold, recorded once as a platform event and emailed by the api (immediate or in
+the daily digest) until a *cleared* event closes it.
+
+### dead-man ping
+
+_Internal._ the outbound heartbeat a job sends only after its work is verified.
+
+Silence is the alert. It carries an outcome word and sizes, never a path or an error.
+
+### escrow
+
+_Internal._ the two-holder vault outside every box that keeps the handful of secrets whose loss loses
+everything else.
+
+### envelope
+
+_Internal._ the sealed form a secret is kept in: one versioned frame, written by either tier and read
+the same way by the other, which opens only under the key it was sealed with.
+
+A frame whose version a reader does not know is refused, never guessed.
+
+### boundary schema
+
+_Internal._ the validation schema a caller is held to for one table, in three shapes (select, insert,
+update), generated from the table rather than written beside it, so a column has one definition and a
+boundary cannot drift from it.
+
+It is narrowed by refinements and composed at a boundary by picking, omitting and extending; a
+table's columns are described in one place only.
+
+### refinement
+
+_Internal._ a narrowing of one column's boundary schema, written beside that column: a brand, a
+format, a trim, a value set smaller than the column's.
+
+A refinement only ever makes the accepted set smaller, and the parity test proves it by offering what
+the refinement accepts to the column itself. Not a boundary's own shaping, which selects columns
+rather than redescribing one.
 
 ## People
 
