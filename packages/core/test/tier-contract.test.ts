@@ -354,7 +354,7 @@ const citation = z.object({
       name: z.string(),
       pattern: z.string(),
       why: z.string(),
-      cites: z.array(z.object({ prose: z.array(z.string()), cited: z.array(z.string()) })),
+      cites: z.array(z.object({ prose: z.string(), cited: z.string() })),
     }),
   ),
   cites_nothing: z.array(z.string()),
@@ -368,7 +368,7 @@ const readCitation = () =>
 const commenting = (prose: string): string => `// ${prose}\nexport const keep = 1;\n`;
 
 const citedSentences = readCitation().patterns.flatMap(({ name, cites }) =>
-  cites.map((one) => ({ name, prose: one.prose.join(""), cited: one.cited.join("") })),
+  cites.map(({ prose, cited }) => ({ name, prose, cited })),
 );
 
 const probeFor = (index: number): string => `probe-${index}.ts`;

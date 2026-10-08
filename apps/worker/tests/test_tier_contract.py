@@ -707,8 +707,8 @@ def test_the_comment_gate_refuses_every_sentence_the_fixture_says_cites(
 ) -> None:
     for pattern in read_citation()["patterns"]:
         for case in pattern["cites"]:
-            prose = "".join(case["prose"])
-            cited = "".join(case["cited"])
+            prose = case["prose"]
+            cited = case["cited"]
             said = _the_gate_over(tmp_path, prose)
 
             assert f"cites {pattern['name']} (`{cited}`)" in said, prose
