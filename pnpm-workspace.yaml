@@ -17,7 +17,6 @@ patchedDependencies:
   '@stryker-mutator/vitest-runner': patches/@stryker-mutator__vitest-runner.patch
   testcontainers: patches/testcontainers.patch
 
-# `@trpc/server` needs TypeScript for its types alone, yet names it a required peer, which pnpm
-# installs, native compiler included, in the api's image.
+# `@trpc/server` needs TypeScript for types alone, but as a required peer it lands in the api image.
 overrides:
   '@trpc/server>typescript': '-'

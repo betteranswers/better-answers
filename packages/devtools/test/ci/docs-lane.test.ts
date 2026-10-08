@@ -409,7 +409,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   {
     file: "packages/devtools/test/ci/deploy-tree.test.ts",
     reads:
-      "the deploy tree, .github/workflows/*.yml and deploy/RELEASES.md and docs/operations/{RUNBOOK,SECRETS,coolify}.md",
+      "the deploy tree, every workflow under .github/workflows, deploy/RELEASES.md and docs/operations/{RUNBOOK,SECRETS,coolify}.md",
     inTheLane: "check:docs:devtools",
   },
   {
@@ -436,7 +436,7 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   },
   {
     file: "apps/web/test/browser-suite-skill.test.ts",
-    reads: ".claude/skills/browser-suite/SKILL.md, and every apps/** path it names",
+    reads: ".claude/skills/browser-suite/SKILL.md, and every path under apps/ it names",
     inTheLane: "check:docs:web",
   },
   {

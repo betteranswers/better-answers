@@ -1,6 +1,7 @@
 ---
 title: "cloc counts the lines between two glob strings in a JS config as a block comment"
 date: 2026-10-04
+last_updated: 2026-10-08
 category: integration-issues
 module: repository
 problem_type: integration_issue
@@ -76,6 +77,8 @@ and one when `"plain/entry.ts"` comes first. A line placed above the first `/**`
 - When the comment-density gate fails on a root tool configuration file and the diff adds no comment, look for glob strings with `/**` or `*/` around the lines you added before you look for a comment to delete.
 - In `jscpd.config.mjs`, `knip.config.ts` and the other files of that unit, add a plain entry above the first `/**`-shaped glob in its list, or next to another plain entry outside the glob spans.
 - Do not raise the ceiling or add a comment to rebalance the ratio. The miscount is in where the line sits, and moving the line fixes it.
+- Moving fixes a plain entry, not the globs themselves. cloc strips each span from `/**` to the next `*/` and joins what is left, so of globs on consecutive lines only the first counts as code. `jscpd.config.mjs` still reports five of its six glob lines as comment with every plain entry above them.
+- In a string no code reads, such as a test table's description, write a path without its glob. One row of `packages/devtools/test/ci/docs-lane.test.ts` named `.github/workflows/*.yml` in prose, and cloc counted the 133 lines from there to the next doc block's `*/` as comment.
 
 ## Related
 

@@ -8,7 +8,7 @@ WORKTREE_PATH="$(cd "$WORKTREE_ARG" && pwd -P)"
 git -C "$WORKTREE_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
   || { echo "Error: '$WORKTREE_PATH' is not a git worktree." >&2; exit 1; }
 
-# A hook inherits the session's PATH, which is not always a login shell's. A PATH that
+# A hook inherits the session's PATH, which is not always a login shell's.
 export PATH="$HOME/Library/pnpm:$HOME/.local/bin:/opt/homebrew/bin:$PATH"
 if ! command -v node >/dev/null 2>&1 && [ -d "$HOME/.nvm/versions/node" ]; then
   WANT="$(cat "$WORKTREE_PATH/.node-version" 2>/dev/null || echo 24)"
@@ -79,9 +79,8 @@ else
   echo "  jcodemunch: not on PATH — skipped; edits here register in the primary checkout's index" >&2
 fi
 
-# jDocMunch shares one index across a checkout's worktrees unless asked for a branch-local one,
-# and only its Python API asks. The index takes the worktree's folder name, which is how its
-# edit hook finds it; without one, a doc edit here lands in the primary checkout's index.
+# Only jDocMunch's Python API asks for a branch-local index, named after the folder so its edit hook
+# finds it; without one, a doc edit here lands in the primary checkout's index.
 if command -v jdocmunch-mcp >/dev/null 2>&1; then
   START=$SECONDS
   JDOC_PYTHON="$(dirname "$(readlink -f "$(command -v jdocmunch-mcp)")")/python3"

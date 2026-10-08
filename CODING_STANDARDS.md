@@ -135,11 +135,24 @@ A workspace's `check` runs every step it has, even after one fails, and reports 
 Say only what code cannot: a constraint, a trade-off or a trap. Use plain words, 25 at most. Absent is the default. Never:
 
 - restate the code or tell its history;
-- cite a ticket, date, decision or rule. The same holds for a string a person reads, tests apart.
+- cite a ticket, date, decision or rule, a migration's shared reason apart (next rule). The same holds for a string a person reads, tests apart.
 
 A declaration's comment is `/** */`. An exported function in `packages/core`, `packages/schema` or the worker may carry a 50-word doc block saying what its signature cannot.
 
 Reviewer: no tool reads a comment's intent.
+
+### Cite a migration's shared reason, never restate it
+
+A migration that bounds a lock or writes a tenant table's rows does so for reasons a decision already gives. Its comment cites that decision in a few words and restates none of them.
+
+```sql
+-- BAD — the reason, written out again in every migration
+-- A rename takes an ACCESS EXCLUSIVE lock; five seconds bounds the wait behind a reader, and a
+-- failed release is re-run by hand.
+
+-- GOOD
+-- Bounded wait for the rename's lock (ADR 0007).
+```
 
 ### Give a directive its reason on the same line
 

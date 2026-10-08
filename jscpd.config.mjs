@@ -12,14 +12,14 @@ export const jscpdConfig = {
   ignore: [
     "apps/web/src/features/people/audit-actions.ts",
 
-    "apps/web/src/shared/ui/**",
-
-    "**/lifts/**",
-
     "apps/worker/src/better_answers_worker/schema_view.py",
 
     "pnpm-lock.yaml",
     "apps/worker/uv.lock",
+
+    "apps/web/src/shared/ui/**",
+
+    "**/lifts/**",
 
     "**/node_modules/**",
     "**/dist/**",

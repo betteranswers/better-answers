@@ -30,8 +30,7 @@ const config: KnipConfig = {
 
     "apps/web": {
       entry: [
-        // Installed ahead of the pages that use it, so a component nothing imports, or an
-        // export of one, is not dead code.
+        // Installed ahead of its pages, so an unimported component or export is not dead code.
         "src/shared/ui/**",
 
         "journeys/*.spec.ts",

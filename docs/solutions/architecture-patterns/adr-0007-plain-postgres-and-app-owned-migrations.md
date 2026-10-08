@@ -10,6 +10,7 @@ applies_when:
   - "Letting the worker or cocoindex create, drop or alter anything in the database"
   - "Changing how a workspace's passage partition is made at provisioning"
   - "Proposing Supabase, Neon or another database host"
+  - "Writing a migration that renames, takes a lock writers wait on, or writes a tenant table's rows"
 tags:
   - adr-0007
   - postgres
@@ -18,6 +19,8 @@ tags:
   - passage-partition
   - provisioning
   - managed-by-user
+  - lock-timeout
+  - check-constraint
 ---
 
 # Plain Postgres, with the api owning every migration and all DDL
@@ -40,8 +43,15 @@ A workspace's passage partition is attached, never created as a partition.
 
 A migration that takes a lock writers wait on bounds its own wait.
 
-- A plain `CREATE INDEX` on a busy table is such a migration. It runs `SET LOCAL lock_timeout` before the lock, and sets it back to `DEFAULT` before the next migration in the batch. `0059_the-actor-index.sql` is the first.
+- A plain `CREATE INDEX` on a busy table is such a migration, and so is a rename. It runs `SET LOCAL lock_timeout = '5s'` before the lock, and sets it back to `DEFAULT` before the next migration in the batch. `0059_the-actor-index.sql` is the first.
 - A timeout stops the release's `migrate` step, and the release is re-run by hand.
+
+A migration writes a tenant table's rows in each workspace's scope.
+
+- It sets the scope per workspace with `set_config('app.workspace_id', …, true)` inside a `DO` block, and clears it after the loop. `0048_the-retired-run-reason.sql` is the first.
+- To rewrite a stored value a CHECK lists, it drops the CHECK first and adds it back after the rewrite. `0066_the-model-choice.sql` is the first.
+
+A migration that bounds a lock or writes a tenant table's rows cites `ADR 0007` for why in a few words, and restates none of it.
 
 ## Why
 
@@ -52,7 +62,11 @@ A migration that takes a lock writers wait on bounds its own wait.
 - ATTACH holds `index.passage` in SHARE UPDATE EXCLUSIVE and ACCESS SHARE, and the parent's indexes in SHARE UPDATE EXCLUSIVE. Neither conflicts with a read's ACCESS SHARE or a write's ROW EXCLUSIVE. The one mode it contends for with a writer is SHARE ROW EXCLUSIVE on `source_document`, and while it waits for that it holds nothing a passage read or write waits on. Two provisions queue one behind the other and form no cycle. The modes were read from `pg_locks` on the pinned image, Postgres 18.6.
 - A `lock_timeout` would turn the wait into a refused sign-up that nothing retries. The wait holds up other writes of documents, never a read of them or a passage's key check.
 - A plain `CREATE INDEX` that waits for its lock queues every later write to the table behind it. A migration has someone to retry it, so a bounded wait costs a re-run release, not a refused person.
+- A rename takes ACCESS EXCLUSIVE, which queues every read of the table behind it as well as every write. Five seconds bounds that wait.
 - Drizzle runs every pending migration in one transaction, so a `SET LOCAL` in one would still bind the migrations after it. The reset ends the bound with its own migration.
+- The CHECK lists the old values, so it refuses the new one until it is dropped.
+- Row-level security is forced on every tenant table and a migration runs as the table's owner, so a bare `UPDATE` reaches no row.
+- `ADD CONSTRAINT` validates every row standing, so the CHECK's return proves no old value survived the rewrite.
 - Nothing depends on a vendor helper, so a hosted Postgres stays a connection-string change away.
 
 ## Rejected

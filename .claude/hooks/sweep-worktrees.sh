@@ -19,8 +19,7 @@ git -C "$ROOT" fetch --quiet origin main >/dev/null 2>&1 \
   || say "fetch failed — judging by the origin/main last fetched"
 NOW="$(date +%s)"
 
-# Epoch seconds of the merge that brought commit $2 into origin/main, or nothing. A fresh worktree's
-# HEAD sits on origin/main's own line, holding no commit of its own, so that never counts.
+# A fresh worktree's HEAD sits on origin/main's own line, with no commit of its own: never a merge.
 landed_at() {
   git -C "$1" merge-base --is-ancestor "$2" origin/main 2>/dev/null || return 0
   case "$(git -C "$1" rev-list --first-parent origin/main)" in
