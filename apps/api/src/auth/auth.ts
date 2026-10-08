@@ -80,6 +80,7 @@ import { dropAnExpiredPromotionLock } from "./promotion-lock.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
 import { signInEmail } from "./sign-in-email.ts";
 import { keepALink, signInMethodOfThisCall } from "./sign-in-link.ts";
+import { surfacingUniqueViolations } from "./unique-violations.ts";
 
 type AuthEndpoint = NonNullable<BetterAuthPlugin["endpoints"]>[string];
 
@@ -520,7 +521,9 @@ export const createAuth = (deps: AuthDependencies) => {
 
     basePath: "/",
     secret: deps.secret,
-    database: drizzleAdapter(db, { provider: "pg", schema: identitySchema }),
+    database: surfacingUniqueViolations(
+      drizzleAdapter(db, { provider: "pg", schema: identitySchema }),
+    ),
 
     trustedOrigins: [deps.publicUrl],
     /**
