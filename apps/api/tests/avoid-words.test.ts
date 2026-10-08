@@ -20,7 +20,6 @@ import {
 import { readUnder } from "./tree-walk.ts";
 import {
   AVOID_LIST,
-  bulletEntriesIn,
   type Counts,
   entriesOf,
   type Finding,
@@ -36,6 +35,7 @@ import {
   readerFindings,
   readerStringsIn,
   readerStringsPerSource,
+  unreadEntriesIn,
 } from "./words-scan.ts";
 
 /** A sweep that lands a word carves out, on its own row, the plans dated before it. */
@@ -136,10 +136,10 @@ describe("the list of old words", () => {
     expect(glossary).not.toMatch(AVOID_LIST);
   });
 
-  it("writes every entry of the glossary as a heading", () => {
+  it("writes every glossary entry where the words test reads it", () => {
     expect(
-      bulletEntriesIn(glossary),
-      "CONCEPTS.md writes an entry as a bullet, which the words test does not read. Write it as a `### head` heading, its definition below it.",
+      unreadEntriesIn(glossary),
+      "CONCEPTS.md writes an entry the words test does not read. Write it as a `### head` heading in its cluster, never as a bullet and never under Flagged ambiguities or Retired.",
     ).toEqual([]);
   });
 });
@@ -1060,7 +1060,7 @@ describe("the glossary's entries", () => {
     ]);
   });
 
-  it("finds a bullet entry outside the tails, by its line", () => {
+  it("finds each entry the parser would not read, by line", () => {
     const glossary = [
       "## Work",
       "",
@@ -1073,10 +1073,14 @@ describe("the glossary's entries", () => {
       "## Retired",
       "",
       "- **checkpoint** — what a watermark was once called.",
+      "",
+      "### cursor",
+      "_Internal._ an entry written after the tail.",
     ].join("\n");
 
-    expect(bulletEntriesIn(glossary)).toEqual([
+    expect(unreadEntriesIn(glossary)).toEqual([
       'line 3: "- **job** — _Internal._ one unit of background work." is a bullet; write it as "### job"',
+      'line 13: "### cursor" sits under a tail, which holds no entry; move it into its cluster',
     ]);
   });
 

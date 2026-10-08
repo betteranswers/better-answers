@@ -16,12 +16,13 @@ const TAIL = /^## (?:Flagged ambiguities|Retired)\s*$/;
 
 type Entry = { readonly term: string; readonly definition: string };
 
-/** A line under either tail reads as a heading, so it closes an entry and opens none. */
-const linesOf = (glossary: string): readonly string[] => {
+type Line = { readonly text: string; readonly inTail: boolean };
+
+const linesOf = (glossary: string): readonly Line[] => {
   let inTail = false;
-  return glossary.split("\n").map((line) => {
-    if (line.startsWith("## ")) inTail = TAIL.test(line);
-    return inTail ? "#" : line;
+  return glossary.split("\n").map((text) => {
+    if (text.startsWith("## ")) inTail = TAIL.test(text);
+    return { text, inTail };
   });
 };
 
@@ -30,33 +31,44 @@ const grown = (entry: Entry, line: string): Entry => ({
   definition: `${entry.definition} ${line.trim()}`.trim(),
 });
 
+const headOf = ({ text, inTail }: Line): string | undefined =>
+  inTail ? undefined : HEADING_HEAD.exec(text)?.groups?.["term"];
+
+const closes = ({ text, inTail }: Line): boolean => inTail || text.startsWith("#");
+
 /** An entry is a `### head` heading, as Compound Engineering writes one, outside the two tails. */
 export const entriesOf = (glossary: string): readonly Entry[] => {
   const entries: Entry[] = [];
   let open: Entry | undefined;
   for (const line of linesOf(glossary)) {
-    const term = HEADING_HEAD.exec(line)?.groups?.["term"];
+    const term = headOf(line);
     if (term !== undefined) {
       open = { term, definition: "" };
       entries.push(open);
-    } else if (line.startsWith("#")) {
+    } else if (closes(line)) {
       open = undefined;
-    } else if (open !== undefined && line.trim() !== "") {
-      open = grown(open, line);
+    } else if (open !== undefined && line.text.trim() !== "") {
+      open = grown(open, line.text);
       entries[entries.length - 1] = open;
     }
   }
   return entries;
 };
 
-/** Each entry written as a bullet outside the tails, which `entriesOf` would not read. */
-export const bulletEntriesIn = (glossary: string): readonly string[] =>
-  linesOf(glossary).flatMap((line, index) => {
-    const term = BULLET_ENTRY.exec(line)?.groups?.["term"];
-    return term === undefined
-      ? []
-      : [`line ${String(index + 1)}: "${line}" is a bullet; write it as "### ${term}"`];
-  });
+const unreadAt = ({ text, inTail }: Line, number: number): readonly string[] => {
+  const where = `line ${String(number)}: "${text}"`;
+  if (inTail) {
+    return HEADING_HEAD.test(text)
+      ? [`${where} sits under a tail, which holds no entry; move it into its cluster`]
+      : [];
+  }
+  const term = BULLET_ENTRY.exec(text)?.groups?.["term"];
+  return term === undefined ? [] : [`${where} is a bullet; write it as "### ${term}"`];
+};
+
+/** Each entry written where `entriesOf` would not read it: as a bullet, or under a tail. */
+export const unreadEntriesIn = (glossary: string): readonly string[] =>
+  linesOf(glossary).flatMap((line, index) => unreadAt(line, index + 1));
 
 const markOf = ({ definition }: Entry): "internal" | "pending" | undefined => {
   if (definition.startsWith("_Internal._")) return "internal";
