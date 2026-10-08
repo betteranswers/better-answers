@@ -33,7 +33,7 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 - A concept match (`layer: "bundles"`) sits beside a document match (`layer: "sources"`), which the rendering marks *Not company knowledge*.
 - A document that a concept visible to the caller cites is left out.
 - The caller's limit is spent on the union, concepts first.
-- The two arms are ranked separately until S2.
+- The two arms are ranked separately until S2a.
 
 `open` takes one IRI or one wire locator.
 
@@ -48,7 +48,7 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 - The token from claude.ai carries no role, so the role is read per call, in the same transaction as the read it authorises.
 - A reader asking for five matches is asking to be handed five things. Running both arms to five would hand them ten.
 - A concept is the company's answer, and a raw passage is what there was no answer for. So concepts come first.
-- One ranking across the two layers needs a score both arms share. That is S2's question.
+- One ranking across the two layers needs a score both arms share. That is S2a's question.
 - An imported bundle's `sources` entry often has no locator, since `sources[].locator` is a key the platform adds. An empty locator would be a passage `open` cannot fetch.
 
 ## Rejected
