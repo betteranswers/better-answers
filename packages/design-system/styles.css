@@ -75,3 +75,22 @@
     content: none;
   }
 }
+
+/* Magic UI's grid and dot patterns, drawn from the tokens so the substrate keeps the layout's pitch. */
+@layer components {
+  [data-grid-pattern] {
+    background-image:
+      linear-gradient(var(--grid-line) var(--border-width), transparent var(--border-width)),
+      linear-gradient(90deg, var(--grid-line) var(--border-width), transparent var(--border-width));
+    background-size: var(--grid-module) var(--grid-module);
+  }
+
+  [data-dot-pattern] {
+    background-image: radial-gradient(
+      circle at var(--dot-radius) var(--dot-radius),
+      var(--dot-color) var(--dot-radius),
+      transparent var(--dot-radius)
+    );
+    background-size: var(--dot-gap) var(--dot-gap);
+  }
+}
