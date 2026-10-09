@@ -3392,12 +3392,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return calledTool(app().client(), accessToken, "open", { iri });
     };
 
-    it("renders imported evidence over MCP, no unopenable locator", async () => {
+    it("renders imported evidence over MCP, a page as its place", async () => {
       const opened = await openedOverMcp(TWO_SOURCES);
 
       expect(rendered(opened).split("\n").slice(-3)).toEqual([
         "Evidence:",
-        "- Acme Bid Library v1, entry ENTRY-001",
+        "- Acme Bid Library v1, entry ENTRY-001, p.4",
         "- Acme Product Library v2, entry PROD-005",
       ]);
     });
@@ -3412,13 +3412,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
       expect(rpcOf(structured(opened)["concept"])["evidence"]).toStrictEqual([
-        { id: "ENTRY-001", source: "Acme Bid Library v1, entry ENTRY-001" },
+        { id: "ENTRY-001", source: "Acme Bid Library v1, entry ENTRY-001", at: "p.4" },
         { id: "PROD-005", source: "Acme Product Library v2, entry PROD-005" },
         { id: "PROD-006", source: "Acme Product Library v2, entry PROD-006" },
       ]);
       expect(rendered(opened).split("\n").slice(-4)).toEqual([
         "Evidence:",
-        "- Acme Bid Library v1, entry ENTRY-001",
+        "- Acme Bid Library v1, entry ENTRY-001, p.4",
         "- Acme Product Library v2, entry PROD-005",
         "- Acme Product Library v2, entry PROD-006",
       ]);

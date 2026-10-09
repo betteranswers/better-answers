@@ -144,7 +144,10 @@ const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "i");
 
 /** A locator with no passage address's shape, such as `p.4`: it names nothing a reader is kept from. */
 const placeOf = (doors: Doors, locator: string | null): string | undefined =>
-  locator === null || doors.namesPassage(locator) || NAMES_A_DOCUMENT.test(locator)
+  locator === null ||
+  locator.trim() === "" ||
+  doors.namesPassage(locator) ||
+  NAMES_A_DOCUMENT.test(locator)
     ? undefined
     : locator;
 

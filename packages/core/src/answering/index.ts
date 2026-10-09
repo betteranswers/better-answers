@@ -445,10 +445,14 @@ const findLine = (match: FindMatch<string>): string =>
     ? `${match.kind} · ${match.title} · ${match.trustWords} · ${match.iri}`
     : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator}`;
 
-export const renderFind = (result: FindResult<string>): string =>
-  result.matches.length === 0
-    ? "Nothing in the company's knowledge matches that."
-    : result.matches.map(findLine).join("\n");
+/** A client may read only the text, so the way to the next page is written out too. */
+export const renderFind = (result: FindResult<string>): string => {
+  if (result.matches.length === 0) return "Nothing in the company's knowledge matches that.";
+  const lines = result.matches.map(findLine);
+  return result.nextCursor === undefined
+    ? lines.join("\n")
+    : [...lines, "", `More follow: call find again with cursor ${result.nextCursor}`].join("\n");
+};
 
 export const renderOpen = (result: OpenResult<string>): string => {
   if (!result.found) {

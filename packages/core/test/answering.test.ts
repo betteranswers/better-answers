@@ -211,6 +211,30 @@ describe("the preview's rendering", () => {
       ].join("\n"),
     );
   });
+
+  it("writes out the cursor when more matches follow", () => {
+    expect(
+      renderFind({
+        query: "invoice",
+        matches: [
+          {
+            layer: "sources",
+            kind: "document",
+            title: "The bid library's invoice",
+            locator: "01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44",
+            sensitivity: "Internal",
+          },
+        ],
+        nextCursor: "eyJydW4iOiJ3ZWFrIn0",
+      }),
+    ).toBe(
+      [
+        "document · The bid library's invoice · Not company knowledge · Internal · 01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44",
+        "",
+        "More follow: call find again with cursor eyJydW4iOiJ3ZWFrIn0",
+      ].join("\n"),
+    );
+  });
 });
 
 describe("open's and feedback's renderings", () => {

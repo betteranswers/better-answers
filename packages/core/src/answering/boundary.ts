@@ -93,6 +93,7 @@ const evidenceItem = z.object({
   source: z.string(),
   at: z
     .string()
+    .regex(/\S/)
     .exactOptional()
     .describe("The concept's own place in the source, such as a page; it opens nothing."),
   locator: z

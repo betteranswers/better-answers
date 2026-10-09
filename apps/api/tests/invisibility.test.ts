@@ -271,6 +271,13 @@ describe("the document layer through the MCP entries", () => {
       hits: [expect.objectContaining({ layer: "bundles", iri, title: COVERING_TITLE })],
       nextCursor: expect.stringMatching(/^[\w-]+$/),
     });
+    expect(rendered(first)).toBe(
+      [
+        `Note · ${COVERING_TITLE} · Unverified · ${iri}`,
+        "",
+        `More follow: call find again with cursor ${String(cursor)}`,
+      ].join("\n"),
+    );
     expect(structured(second)).toEqual({
       query: QUERY,
       hits: [

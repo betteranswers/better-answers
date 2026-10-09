@@ -107,7 +107,7 @@ const findEntry = defineEntry({
   name: "find",
   title: "Find in the company's knowledge",
   description:
-    "Search the company's knowledge and preview what it finds: one line per match. A concept carries its kind, title and trust state; a document nothing on the map covers carries its title, the sensitivity it is held under and the marker 'Not company knowledge'. Use `open` to read a match in full — a concept by its `iri`, a document by the `locator` on its line.",
+    "Search the company's knowledge and preview what it finds: one line per match. A concept carries its kind, title and trust state; a document nothing on the map covers carries its title, the sensitivity it is held under and the marker 'Not company knowledge'. Use `open` to read a match in full — a concept by its `iri`, a document by the `locator` on its line. When more matches follow, the answer carries `nextCursor`; pass it back as `cursor` for the next page.",
   scopes: ["knowledge:read"],
   // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the answering slice's own schema; the emitted-schema test reads its keys
   input: findInput,
@@ -176,7 +176,7 @@ const openEntry = defineEntry({
   name: "open",
   title: "Open a concept, or the passage a citation rests on",
   description:
-    "The verbatim fetch: a concept by its `iri` (from a `find` match or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by its `locator`, which a document match and a citation both carry. Give one of the two. Each evidence item names its source in the concept's own words, and carries the `locator` of a passage or the `iri` of a concept that opens it only where there is one you may read: an imported concept's evidence often has neither, and an item with neither has nothing to open. Quote what comes back; do not summarise it.",
+    "The verbatim fetch: a concept by its `iri` (from a `find` match or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by its `locator`, which a document match and a citation both carry. Give one of the two. Each evidence item names its source in the concept's own words, and carries the `locator` of a passage or the `iri` of a concept that opens it only where there is one you may read: an imported concept's evidence often has neither, and an item with neither has nothing to open. An item's `at` is the concept's own place in the source, such as a page, and opens nothing. Quote what comes back; do not summarise it.",
   scopes: ["knowledge:read"],
   // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the answering slice's own schema; the emitted-schema test reads its keys
   input: openInput,

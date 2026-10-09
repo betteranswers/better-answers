@@ -466,9 +466,11 @@ describe("what a concept read cannot open", () => {
   });
 
   it.each([
-    ["in lower case", (documentId: string) => `${documentId.toLowerCase()}/chars:0-5`],
-    ["with its span reversed", (documentId: string) => `${documentId}/chars:5-0`],
-  ])("drops a malformed passage address %s", async (_case, malformed) => {
+    ["a passage address in lower case", (id: string) => `${id.toLowerCase()}/chars:0-5`],
+    ["a passage address spanning backwards", (id: string) => `${id}/chars:5-0`],
+    ["a document id beside a page", (id: string) => `p.4 of ${id}`],
+    ["spaces alone", () => "   "],
+  ])("keeps no place for %s", async (_case, malformed) => {
     const scenario = await arrange();
     const { restricted } = await restrictedPassage(scenario);
     const locator = malformed(restricted.documentId);
@@ -482,14 +484,40 @@ describe("what a concept read cannot open", () => {
     expect(read?.frontmatter["sources"]).toEqual([{ title: "Minutes", resource: "Minutes" }]);
   });
 
+  it("keeps a page beside a withheld concept, never its iri", async () => {
+    const scenario = await arrange();
+    const { withheld } = await readableAndWithheld(scenario);
+    const cited = { title: "Board note", resource: withheld.iri, locator: "p.4" };
+    const written = await noteNaming(scenario, [cited]);
+
+    const viewer = await readFor(scenario.viewer, written.iri);
+    const admin = await readFor(scenario.admin, written.iri);
+
+    expect(viewer?.pane.evidence).toEqual([{ source: "Board note", at: "p.4" }]);
+    expect(viewer?.frontmatter["sources"]).toEqual([
+      { title: "Board note", resource: "Board note", locator: "p.4" },
+    ]);
+    expect(admin?.pane.evidence).toEqual([{ source: "Board note", at: "p.4", iri: withheld.iri }]);
+    expect(admin?.frontmatter["sources"]).toEqual([cited]);
+  });
+
   it("keeps a page locator on a source written as text", async () => {
     const scenario = await arrange();
     const { locator } = await restrictedPassage(scenario);
-    const written = await noteNaming(scenario, ["Bid library#p.4", `minutes#${locator}`]);
+    const written = await noteNaming(scenario, [
+      "Bid library#p.4",
+      `minutes#${locator}`,
+      "Handbook#",
+    ]);
 
     const read = await readFor(scenario.viewer, written.iri);
 
-    expect(read?.frontmatter["sources"]).toEqual(["Bid library#p.4", "minutes"]);
+    expect(read?.frontmatter["sources"]).toEqual(["Bid library#p.4", "minutes", "Handbook"]);
+    expect(read?.pane.evidence).toEqual([
+      { source: "Bid library", at: "p.4" },
+      { source: "minutes" },
+      { source: "Handbook" },
+    ]);
   });
 
   it("labels a source by resource when its title is blank", async () => {
