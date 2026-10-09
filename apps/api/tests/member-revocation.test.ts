@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { describe, expect, it } from "vitest";
 
 import { connectAsHost, refresh, revokeAtEndpoint, setActiveWorkspace } from "./flow.ts";
@@ -90,6 +92,12 @@ const connectedInBoth = async () => {
   return { ...members, inHere, inElsewhere, host: app().client() };
 };
 
+/** A bearer's `iat` is in whole seconds, so one minted in the revocation's own second reads as before it. */
+const untilTheSecondAfter = async (instantMs: number): Promise<void> => {
+  const wait = Math.ceil(instantMs / 1000) * 1000 - Date.now();
+  if (wait > 0) await sleep(wait);
+};
+
 const tokenAnswers = async (
   host: TestClient,
   tokens: { readonly accessToken: string; readonly refreshToken: string | undefined },
@@ -136,6 +144,23 @@ describe("ending a member's sign-ins and tokens here, over tRPC", () => {
       person: { id: person.id },
       role: "Editor",
     });
+  });
+
+  it("admits the member's MCP bearer issued after the revocation lands", async () => {
+    const { here, person, admin } = await aMemberOfTwoWorkspaces();
+    const before = await connectAsHost(app(), app().client(), person, { pick: here.workspaceId });
+    const { revokedAt } = await admin.members.endEverySignInAndToken.mutate({
+      personId: person.id,
+    });
+    await untilTheSecondAfter(Date.parse(revokedAt));
+
+    const again = await connectAsHost(app(), app().client(), person, { pick: here.workspaceId });
+
+    const host = app().client();
+    expect({
+      before: (await callMcp(host, before.accessToken, "tools/list")).status,
+      again: (await callMcp(host, again.accessToken, "tools/list")).status,
+    }).toEqual({ before: 401, again: 200 });
   });
 
   it("ends the member's tokens for this workspace, not another's", async () => {
