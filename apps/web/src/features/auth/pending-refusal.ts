@@ -46,6 +46,6 @@ export const detourAfter = async (
 ): Promise<string | undefined> => {
   if (onAPendingPage(at.pathname)) return isSignedOut(failure) ? `/sign-in${at.query}` : undefined;
   if (!isPendingRefusal(failure)) return undefined;
-  if (during === "change") rememberAChangeUnsaved(at.pathname);
+  if (during === "action") rememberAChangeUnsaved(at.pathname);
   return confirmDetour(reading.queryClient, reading.api, at);
 };

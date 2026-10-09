@@ -1,3 +1,4 @@
+import type { FailedDuring } from "@/shared/api/query-client.ts";
 import {
   refusalOf,
   type ApiError,
@@ -24,31 +25,37 @@ export const refusedWith = (said: Said): Outcome => ({
   words: <RefusalLine said={said} />,
 });
 
-export const refusalOutcome = (
+const refusalOutcome = (
   featureWords: SaidOfWord,
   word: RefusalWord,
   refusalClass: RefusalClass,
 ): Outcome => refusedWith(saidOfRefusal(featureWords, word, refusalClass));
 
 /** A read saves nothing, so its failure with no word must not say nothing was saved. */
-export type FailedIn = "action" | "read";
-
 const UNANSWERED = {
   action: NO_RESPONSE,
   read: NO_RESPONSE_TO_A_READ,
-} satisfies Record<FailedIn, Said>;
+} satisfies Record<FailedDuring, Said>;
 
 /** A failure with no refusal word is the network's, never the reader's to fix. */
-export const failureOutcome = (
+const failureOutcome = (
   featureWords: SaidOfWord,
   failure: Error | ApiError,
-  failedIn: FailedIn = "action",
+  during: FailedDuring,
 ): Outcome => {
   const refusal = refusalOf(failure);
   return refusal === undefined
-    ? refusedWith(UNANSWERED[failedIn])
+    ? refusedWith(UNANSWERED[during])
     : refusalOutcome(featureWords, refusal.word, refusal.class);
 };
+
+/** A feature's words, named once: its word first, then the class's, then no response. */
+export const refusalsOf = (featureWords: SaidOfWord) => ({
+  outcomeOfFailure: (failure: Error | ApiError, during: FailedDuring): Outcome =>
+    failureOutcome(featureWords, failure, during),
+  refusedFor: (word: RefusalWord, refusalClass: RefusalClass): Outcome =>
+    refusalOutcome(featureWords, word, refusalClass),
+});
 
 type ItemSaid = { readonly id: string; readonly said: Said };
 
@@ -93,7 +100,7 @@ export const setRefusalOutcome = (refused: {
 }): Outcome => {
   const { featureWords, failure } = refused;
   const count = saidOfItems(featureWords, failure).length;
-  if (count === 0) return failureOutcome(featureWords, failure);
+  if (count === 0) return failureOutcome(featureWords, failure, "action");
   return {
     tone: "refused",
     words: (

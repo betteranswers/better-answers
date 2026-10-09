@@ -13,10 +13,10 @@ import { Pages, turnsOf, type PageTurns } from "./everyone-pages.tsx";
 import { SearchField, useAsking } from "./everyone-search.tsx";
 import { arrival, EVERYONE_PATH, type Arrival } from "./people-address.ts";
 import { usePeople, type Asked, type ListedPerson } from "./people-api.ts";
-import { NO_PERSON_IN_FOCUS, PEOPLE_KEYSTROKES } from "./people-keystrokes.ts";
+import { PEOPLE_KEYSTROKES } from "./people-keystrokes.ts";
 import { PersonSheet, personButtonId, type OpenedAt } from "./person-sheet.tsx";
 import { Instant, WorkspacesAndRoles } from "./person-words.tsx";
-import { readRefused } from "./words.ts";
+import { NO_PERSON_IN_FOCUS, readRefused } from "./words.ts";
 
 const features = tableFeatures({});
 

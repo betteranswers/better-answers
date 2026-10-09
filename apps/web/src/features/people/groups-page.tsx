@@ -23,7 +23,7 @@ import {
   type ListedGroup,
 } from "./groups-api.ts";
 import { inNameOrder, useMembers } from "./people-api.ts";
-import { GROUPS_KEYSTROKES } from "./people-state.ts";
+import { GROUPS_KEYSTROKES, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfGroupFailure } from "./refusal.tsx";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
@@ -131,7 +131,7 @@ function CreateGroupForm(properties: {
         onCreated(groupId, name);
       },
       (failure: Error) => {
-        onRefused(outcomeOfGroupFailure(failure));
+        onRefused(outcomeOfGroupFailure(failure, "action"));
       },
     );
   };
@@ -159,7 +159,7 @@ function CreateGroupForm(properties: {
   );
 }
 
-const NOTHING_IN_FOCUS = selectFirst("group");
+const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.group);
 
 type Opened = { readonly groupId: string; readonly at: GroupOpenedAt };
 
@@ -233,7 +233,7 @@ function GroupList(properties: {
         setOutcome({ tone: "said", words: `${group.name} is deleted.` });
       },
       (failure: Error) => {
-        setOutcome(outcomeOfGroupFailure(failure));
+        setOutcome(outcomeOfGroupFailure(failure, "action"));
       },
     );
   };

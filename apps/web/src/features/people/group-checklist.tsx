@@ -49,7 +49,7 @@ export function GroupChecklist(properties: {
         setOutcome({ tone: "said", words: said });
       },
       (failure: Error) => {
-        setOutcome(outcomeOfGroupFailure(failure));
+        setOutcome(outcomeOfGroupFailure(failure, "action"));
       },
     );
   };

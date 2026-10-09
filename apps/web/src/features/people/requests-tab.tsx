@@ -10,7 +10,7 @@ import { ApproveRequest } from "./approve-request.tsx";
 import { EMPTY_LINES } from "./empty-lines.ts";
 import { approvedOutcome } from "./invitation-words.ts";
 import type { Role } from "./people-api.ts";
-import { PEOPLE_KEYSTROKES } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfRequestFailure } from "./refusal.tsx";
 import {
   requesterName,
@@ -30,7 +30,7 @@ import {
 
 const COLUMNS = ["Person", "Reason", "State", "Asked", "Actions"] as const;
 
-const NOTHING_HELD = selectFirst("request");
+const NOTHING_HELD = selectFirst(PEOPLE_SELECT_FIRST.request);
 
 const countOf = (requests: readonly WaitingRequest[]): string =>
   requests.length === 1 ? "1 request waiting" : `${requests.length} requests waiting`;
@@ -130,7 +130,7 @@ function RequestList(properties: {
       { requestId: request.id },
       {
         onError: (failure) => {
-          onOutcome(outcomeOfRequestFailure(failure));
+          onOutcome(outcomeOfRequestFailure(failure, "action"));
         },
       },
     );
@@ -213,7 +213,7 @@ export function RequestsTab() {
           setOutcome(approvedOutcome(invited));
         },
         onError: (failure) => {
-          setOutcome(outcomeOfRequestFailure(failure));
+          setOutcome(outcomeOfRequestFailure(failure, "action"));
         },
       },
     );

@@ -6,7 +6,7 @@ import { z } from "zod";
 type Held = string | number | undefined;
 
 /** Each field's `.catch` is the list's default for a missing or malformed value. */
-type ListFields = Readonly<Record<string, z.ZodCatch<z.ZodType<Held>>>>;
+export type ListFields = Readonly<Record<string, z.ZodCatch<z.ZodType<Held>>>>;
 
 type AddressState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
 
@@ -52,16 +52,18 @@ export const useListAddress = <Fields extends ListFields>(prefix: string, fields
 
   // Replaced, never pushed, so typing fills no history; read from the address at the write, so
   // two writes in one handler both land.
-  const write = (patch: Partial<AddressState<Fields>>): void => {
+  /** Names fields one by one, for a caller that knows some of them but not the list's whole shape. */
+  const writeHeld = (patch: readonly (readonly [string, unknown])[]): void => {
     void navigate({
       to: ".",
-      search: (current: Query) => ({
-        ...current,
-        ...written(prefix, defaults, Object.entries(patch)),
-      }),
+      search: (current: Query) => ({ ...current, ...written(prefix, defaults, patch) }),
       replace: true,
     });
   };
 
-  return { state, write };
+  const write = (patch: Partial<AddressState<Fields>>): void => {
+    writeHeld(Object.entries(patch));
+  };
+
+  return { state, write, writeHeld };
 };

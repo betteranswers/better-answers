@@ -10,8 +10,8 @@ const RETRY_ATTEMPTS = 2;
  */
 const worthAnotherAsk = (error: Error) => refusalOf(error) === undefined;
 
-/** A read saves nothing, so only a refused change leaves something unsaved. */
-export type FailedDuring = "read" | "change";
+/** A read saves nothing, so only a refused action leaves something unsaved. */
+export type FailedDuring = "read" | "action";
 
 /** Typed as the cache types it, though the auth library's failures arrive as plain objects. */
 export type FailureHeard = (failure: Error, during: FailedDuring) => void;
@@ -25,7 +25,7 @@ export const createQueryClient = (heard: FailureHeard = () => undefined) =>
     }),
     mutationCache: new MutationCache({
       onError: (failure) => {
-        heard(failure, "change");
+        heard(failure, "action");
       },
     }),
     defaultOptions: {

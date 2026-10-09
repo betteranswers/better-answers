@@ -5,10 +5,10 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefOb
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
-import { useListAddress } from "@/shared/list-address.ts";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { RowMenu } from "@/shared/row-menu.tsx";
+import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
 import { useHiddenColumns } from "@/shared/wide-layout.ts";
 
@@ -37,16 +37,14 @@ import {
   MEMBERS_FIELDS,
   MEMBERS_LIST,
   memberPageOf,
-  pageIndexOf,
   RETURNED_FROM_A_REMOVAL,
   sortedOf,
   sortOf,
-  useSettledSearch,
   type OpenedAt,
   type Opening,
 } from "./members-address.ts";
 import { useMembers, useRemovalOf, type ListedMember, type Role } from "./people-api.ts";
-import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
 import { ROLES } from "./role-meanings.ts";
 import { nameOf } from "./words.tsx";
@@ -56,7 +54,7 @@ const PAGE_SIZE = 25;
 
 const SEARCH_LABEL = "Search by name or address";
 
-const NOTHING_IN_FOCUS = selectFirst("member");
+const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.member);
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -92,26 +90,19 @@ const matching = (narrowing: Narrowing) => {
     `${member.displayName} ${member.address}`.toLowerCase().includes(search);
 };
 
-/** Read in render from the address, so Back and a reload come to the same rows. */
+/** A clear empties the search and filters and keeps the reader's sort. */
+const KEPT_ON_CLEAR = ["sort"] as const;
+
 const useNarrowedMembers = (listed: readonly ListedMember[]) => {
-  const { state, write } = useListAddress(MEMBERS_LIST, MEMBERS_FIELDS);
-  const [search, setSearch, flush] = useSettledSearch(state.search, (settled) => {
-    write({ search: settled, page: 1 });
-  });
-  const { role, group } = state;
+  const list = useSearchedList(MEMBERS_LIST, MEMBERS_FIELDS, KEPT_ON_CLEAR);
+  const { search } = list;
+  const { role, group } = list.state;
   const narrowing: Narrowing = { search, role, group };
   const data = useMemo(
     () => listed.filter(matching({ search, role, group })),
     [listed, search, role, group],
   );
-  const pageIndex = pageIndexOf(search, state, PAGE_SIZE, data.length);
-
-  const clear = () => {
-    setSearch("");
-    write({ search: "", role: undefined, group: undefined, page: 1 });
-  };
-
-  return { state, write, search, setSearch, flush, narrowing, data, pageIndex, clear };
+  return { ...list, narrowing, data, pageIndex: list.pageIndex(PAGE_SIZE, data.length) };
 };
 
 type Narrowed = ReturnType<typeof useNarrowedMembers>;
@@ -146,7 +137,7 @@ const removalSaid = (
   removal: ReturnType<typeof useRemovalOf>,
 ): Outcome | undefined => {
   if (name === undefined || removal === undefined) return undefined;
-  if (removal.error !== null) return outcomeOfFailure(removal.error);
+  if (removal.error !== null) return outcomeOfFailure(removal.error, "action");
   return {
     tone: "said",
     words:
@@ -304,20 +295,6 @@ function CountLine(properties: {
   );
 }
 
-const usePageTurns = (narrowed: Narrowed) => {
-  const pageCount = Math.ceil(narrowed.data.length / PAGE_SIZE);
-  const turn = (pageIndex: number) => {
-    if (pageIndex >= 0 && pageIndex < pageCount) narrowed.write({ page: pageIndex + 1 });
-  };
-  useKeystroke(KEY.previousPage, () => {
-    turn(narrowed.pageIndex - 1);
-  });
-  useKeystroke(KEY.nextPage, () => {
-    turn(narrowed.pageIndex + 1);
-  });
-  return turn;
-};
-
 /** A ticked person the list has since lost is still named by the action that refused them. */
 const namedIn =
   (listed: readonly ListedMember[]) =>
@@ -341,7 +318,6 @@ function MemberList(properties: {
   const [refused, setRefused] = useState<RefusedRows>(NO_MARKS);
   const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
   const searchRef = useRef<HTMLInputElement>(null);
-  const turn = usePageTurns(narrowed);
   const openMember = useOpenMember(narrowed.flush);
   const returned = useReturnedFromARemoval(heading);
 
@@ -443,8 +419,10 @@ function MemberList(properties: {
               pageIndex: narrowed.pageIndex,
               pageSize: PAGE_SIZE,
               total: narrowed.data.length,
-              onTurn: turn,
-              keystrokes: { previous: KEY.previousPage.key, next: KEY.nextPage.key },
+              onTurn: (pageIndex) => {
+                narrowed.write({ page: pageIndex + 1 });
+              },
+              keystrokes: { previous: KEY.previousPage, next: KEY.nextPage },
             }}
           />
         </MembersRead>

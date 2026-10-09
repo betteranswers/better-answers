@@ -103,7 +103,7 @@ function RenameGroup(properties: {
         setOutcome({ tone: "said", words: `${was} is ${name} now.` });
       },
       (failure: Error) => {
-        setOutcome(outcomeOfGroupFailure(failure));
+        setOutcome(outcomeOfGroupFailure(failure, "action"));
       },
     );
   };

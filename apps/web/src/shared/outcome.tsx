@@ -1,15 +1,11 @@
 import type { ReactNode } from "react";
 
-import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
-
 export type Outcome =
   | { readonly tone: "said"; readonly words: ReactNode }
   | { readonly tone: "refused"; readonly words: ReactNode };
 
-export const selectFirst = (row: keyof typeof SELECT_FIRST): Outcome => ({
-  tone: "said",
-  words: SELECT_FIRST[row],
-});
+/** Said when a row's keystroke is pressed and no row has held focus; the line names the row. */
+export const selectFirst = (line: string): Outcome => ({ tone: "said", words: line });
 
 /**
  * Both regions stand from the first render, because a live region inserted with its words already

@@ -122,7 +122,7 @@ const useRemoval = (
         },
         onError: (failure: Error | ApiError) => {
           hold(undefined);
-          setOutcome(outcomeOfFailure(failure));
+          setOutcome(outcomeOfFailure(failure, "action"));
         },
       },
     );

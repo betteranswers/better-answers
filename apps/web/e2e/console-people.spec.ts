@@ -3,13 +3,17 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { JUMP_TO } from "@/app/words.ts";
 import { ENDED_BY_THE_SERVER } from "@/features/console/grant-words.ts";
 import {
+  SELECT_A_NAME_FIRST,
+  SELECT_A_PERSON_FIRST,
+} from "@/features/console/people-keystrokes.ts";
+import {
   NOT_THE_OPERATOR,
   ONLY_THE_OPERATOR,
   SAID_OF_A_REVOCATION,
   SAID_OF_CORRECTING,
   SIGN_IN_TOO_OLD,
 } from "@/features/console/refusal-words.ts";
-import { KEYSTROKE_WORDS, SELECT_FIRST } from "@/shared/keystroke-words.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { sentenceOf, SIGN_IN_AGAIN } from "@/shared/refusal-words.ts";
 
@@ -407,7 +411,7 @@ test.describe("the console's Everyone page", () => {
 
     await skipLinkReachesThePage(page);
     await page.keyboard.press("o");
-    await expect(everyone(page)).toContainText(SELECT_FIRST.person);
+    await expect(everyone(page)).toContainText(SELECT_A_PERSON_FIRST);
 
     const listed = (await keystrokesListed(page, EVERYONE.name)).getByRole("definition");
     await expect(listed).toHaveText([
@@ -908,7 +912,7 @@ test.describe("the console's Names waiting page", () => {
 
     await skipLinkReachesThePage(page);
     await page.keyboard.press("c");
-    await expect(namesWaiting(page)).toContainText(SELECT_FIRST.name);
+    await expect(namesWaiting(page)).toContainText(SELECT_A_NAME_FIRST);
     const listed = await keystrokesListed(page, NAMES_WAITING.name);
     await expect(listed.getByRole("definition")).toHaveText([
       "Correct the display name in focus",

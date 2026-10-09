@@ -2,10 +2,9 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { consequenceOfDeleting } from "@/features/people/group-words.ts";
-import { GROUPS_KEYSTROKES } from "@/features/people/people-state.ts";
+import { GROUPS_KEYSTROKES, PEOPLE_SELECT_FIRST } from "@/features/people/people-state.ts";
 import { SAID_OF_A_GROUP } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
-import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -355,7 +354,7 @@ test.describe("a group's actions", () => {
     await keystrokesDismissed(page, keystrokes);
 
     await page.keyboard.press("o");
-    await expect(groupsRegion(page)).toContainText(SELECT_FIRST.group);
+    await expect(groupsRegion(page)).toContainText(PEOPLE_SELECT_FIRST.group);
 
     await page.keyboard.press("n");
     await expect(nameField(page)).toBeFocused();

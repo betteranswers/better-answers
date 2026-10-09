@@ -128,7 +128,7 @@ export function ConnectAction() {
           });
         },
         onError: (failure) => {
-          setOutcome(outcomeOfFailure(failure));
+          setOutcome(outcomeOfFailure(failure, "action"));
         },
         onSettled: () => {
           unwatch();

@@ -1,6 +1,14 @@
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import { INVITE_A_PERSON } from "@/shared/navigation.ts";
 
+/** Said when a row's keystroke is pressed and no row has held focus, naming the row to pick. */
+export const PEOPLE_SELECT_FIRST = {
+  member: "Select a member first.",
+  group: "Select a group first.",
+  invitation: "Select an invitation first.",
+  request: "Select a request first.",
+} as const;
+
 export const PEOPLE_KEYSTROKES = {
   search: { key: "/", action: "Search the members by name or address" },
   open: { key: "o", action: "Open the member in focus" },

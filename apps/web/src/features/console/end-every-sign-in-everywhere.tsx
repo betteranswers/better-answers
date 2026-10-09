@@ -25,7 +25,7 @@ const outcomeOf = (revocation: Revocation, name: string): Outcome | undefined =>
       words: `${name}'s sessions and assistant access ended at ${instantWords(revocation.data.revokedAt)}. They can sign in again.`,
     };
   }
-  return revocation.isError ? revocationRefused(revocation.error) : undefined;
+  return revocation.isError ? revocationRefused(revocation.error, "action") : undefined;
 };
 
 export function EndEverySignInEverywhere(properties: {

@@ -4,11 +4,11 @@ import { ceilingLiftsIn, type ApiError } from "@/shared/api/trpc.ts";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import { useListAddress } from "@/shared/list-address.ts";
 import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { failureOutcome, refusedWith } from "@/shared/refusal-outcome.tsx";
+import { refusedWith } from "@/shared/refusal-outcome.tsx";
+import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -33,8 +33,8 @@ import { AUDIT_LOG_WORDS as WORDS } from "./audit-log-words.ts";
 import { headlineOf, sentenceOf } from "./audit-sentences.ts";
 import { personSaid } from "./audit-subjects.ts";
 import { EventDays, useLanding } from "./event-days.tsx";
-import { useSettledSearch } from "./members-address.ts";
-import { auditExportCeiling, SAID_OF_THE_AUDIT_LOG } from "./refusal-words.ts";
+import { auditExportCeiling } from "./refusal-words.ts";
+import { outcomeOfAuditLogFailure } from "./refusal.tsx";
 
 const system = menuGroupIn(CONTROL_CENTRE, "system");
 
@@ -202,7 +202,7 @@ const save = (csv: string, name: string): void => {
 const exportFailed = (failure: Error | ApiError): Outcome => {
   const liftsInSeconds = ceilingLiftsIn(failure);
   return liftsInSeconds === undefined
-    ? failureOutcome(SAID_OF_THE_AUDIT_LOG, failure)
+    ? outcomeOfAuditLogFailure(failure, "action")
     : refusedWith(auditExportCeiling(liftsInSeconds));
 };
 
@@ -242,24 +242,14 @@ function ExportAction(properties: {
   );
 }
 
-/** Read in render from the address, so a reload or Back comes to the same events. */
-const useAsked = () => {
-  const { state, write } = useListAddress(AUDIT_LOG_LIST, AUDIT_LOG_FIELDS);
-  const [search, setSearch] = useSettledSearch(state.search, (settled) => {
-    write({ search: settled });
-  });
-  const asked: Asked = { family: state.family, search: state.search };
-  const clear = () => {
-    setSearch("");
-    write({ search: "", family: undefined });
-  };
-  return { asked, write, search, setSearch, clear };
-};
-
 function AuditLogRegion() {
   const headingId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
-  const { asked, write, search, setSearch, clear } = useAsked();
+  const { state, write, search, setSearch, clear } = useSearchedList(
+    AUDIT_LOG_LIST,
+    AUDIT_LOG_FIELDS,
+  );
+  const asked: Asked = { family: state.family, search: state.search };
   const auditLog = useAuditLog(asked);
   const [outcome, setOutcome] = useState<Outcome>();
   const events = useMemo(() => eventsOf(auditLog.data), [auditLog.data]);
@@ -311,7 +301,7 @@ function AuditLogRegion() {
         <ListRead
           read={auditLog}
           loading={WORDS.loading}
-          failed={(failure) => failureOutcome(SAID_OF_THE_AUDIT_LOG, failure, "read").words}
+          failed={(failure) => outcomeOfAuditLogFailure(failure, "read").words}
           focusAfterRetry={searchRef}
         >
           {/* Keyed, so a page of older events never lands its focus in another search's list. */}
