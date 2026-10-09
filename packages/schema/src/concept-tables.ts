@@ -13,6 +13,7 @@ import { z } from "zod";
 
 import { ACTOR_ID_PATTERN } from "./actor-id.ts";
 import { listed, stamp } from "./column-helpers.ts";
+import { FULL_TEXT_LANGUAGE, searchVector } from "./full-text-match.ts";
 import { AUDIENCE_CHECK, SENSITIVITIES, SENSITIVITY_DEFAULT } from "./readable-columns.ts";
 import { sourceDocument } from "./source-tables.ts";
 import { ULID_CHARACTERS } from "./ulid.ts";
@@ -204,6 +205,14 @@ export const bundleCommit = withRLS(
   ],
 );
 
+/** `(?n)` anchors `^` and `$` at each line, so the *Also known as* line is read alone. */
+const CONCEPT_SEARCH = [
+  `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, title), 'A')`,
+  `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, jsonb_path_query_array(frontmatter, '$.tags[*]')), 'B')`,
+  `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, coalesce(substring(body from '(?n)^Also known as: (.*)$'), '')), 'B')`,
+  `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, body), 'C')`,
+].join(" || ");
+
 export const conceptIndex = withRLS(
   "concept_index",
   {
@@ -225,14 +234,18 @@ export const conceptIndex = withRLS(
     audience: text("audience").notNull(),
     audienceGroups: text("audience_groups").array(),
     updatedAt: stamp("updated_at").notNull().defaultNow(),
+
+    search: searchVector("search").notNull().generatedAlwaysAs(sql.raw(CONCEPT_SEARCH)),
   },
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.iri] }),
     identityKey(table, "concept_index_identity_fk"),
+    check("concept_index_iri_check", sql.raw(`iri ~ '${IRI.source}'`)),
     check("concept_index_audience_check", sql.raw(AUDIENCE_CHECK)),
 
     uniqueIndex("concept_index_workspace_id_path_uidx").on(table.workspaceId, table.path),
+    index("concept_index_search_gin").using("gin", table.search),
 
     foreignKey({
       columns: [table.workspaceId, table.commitSha],

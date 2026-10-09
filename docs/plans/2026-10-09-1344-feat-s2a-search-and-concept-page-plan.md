@@ -56,6 +56,7 @@ The design system specifies a registration mark, Frame, Card and an accent-fille
 - **The primary button takes the accent fill.** The design-system readme says so, and the owner ruled it right over the Tailwind bridge's near-black on 09/10/2026. It lands in the web CSS wiring fix (#636), ahead of S2a. Governs R7.
 - **A concept comes before document passages only when it holds at least half the query's words.** Governs R10. (session-settled: user-directed — chosen over keeping every concept match ahead of every passage: under any-word matching, *how long do we keep audit logs* matches about 98 of the customer's concepts through *audit* alone, so passages would not appear for pages.)
 - **A search matches on any of its words.** Governs R9. (session-settled: user-directed — chosen over requiring every word, and over every word first with any word as a fallback: question-style searches such as *how long do we keep audit logs* must reach *Audit Logs Retention*, and the recall figure should measure full text fairly.)
+- **The database refuses a concept row whose IRI breaks the IRI pattern.** U3 adds the CHECK constraint in its migration. Governs R1. (session-settled: user-directed, 09/10/2026 — chosen over trusting the two writers' validation alone: a stray row would make `find` or `open` error on a read every Viewer can reach, and constraining stored data now is cheaper than later.)
 
 ### Requirements
 
@@ -142,6 +143,7 @@ The design system specifies a registration mark, Frame, Card and an accent-fille
   - The language comes from `FULL_TEXT_LANGUAGE`, so no second regconfig literal is written.
   - `concept_index` is one table under row-level security, not partitioned per workspace. A stored generated column therefore needs no change to the governed write: Postgres computes it in the commit transaction, as it does `index.passage.search`. `ts_match_vq`'s LEAKPROOF mark, which `migrate` reapplies, covers the match.
   - The migration is hand-written SQL bracketed by `lock_timeout` (ADR 0007), because adding the column rewrites the table. Its merge is not reversible.
+  - The same migration, inside the same bracket, adds a CHECK constraint holding `concept_index.iri` to the `IRI` pattern. Postgres's regular expressions are not JavaScript's, so a test holds the SQL pattern and the TypeScript `IRI` to the same accepted and refused strings.
   - Governs R1, R9.
 - KTD2. **The matching rule is one query builder in `full-text-match.ts`: the query's lexemes joined by OR, ordered by how many distinct query lexemes a row holds, then by `ts_rank_cd`, then by key.**
   - It instantiates R9's Key Decision.
@@ -394,16 +396,18 @@ flowchart LR
   - Modify: `packages/schema/src/concept-tables.ts`, `packages/schema/migrations/meta/` (snapshot, edited by hand), `packages/schema/test/boundary-schemas.test.ts`, `packages/schema/test/passage-columns.test.ts` or a sibling, `apps/worker/src/better_answers_worker/schema_view.py` (regenerated), `packages/schema/roles-surface.json` (regenerated).
 - **Approach:**
   1. Declare the column with `searchVector` and `generatedAlwaysAs`, using KTD1's expression and the language from `FULL_TEXT_LANGUAGE`.
-  2. Write the migration by hand. Open it with the ADR 0032 custom-migration line and bracket it with `SET LOCAL lock_timeout`. Add one GIN index.
+  2. Write the migration by hand. Open it with the ADR 0032 custom-migration line and bracket it with `SET LOCAL lock_timeout`. Add one GIN index, and the CHECK constraint on `iri` (KTD1). Declare the constraint on the table too, so `generate` prints no changes.
   3. Keep the column out of the insert boundary schema, and give it a plain schema per shape (ADR 0028).
   4. Confirm `generate` then prints no changes.
 - **Patterns to follow:** `index.passage.search` in `packages/schema/src/index-tables.ts`; migrations `0070` and `0073` for the lock bracket; `packages/core/test/passage-plans.test.ts` for the plan-shape checks.
 - **Test scenarios:**
   - A concept written through `writeConcept` has a vector with its title at weight A, its tags and *Also known as* line at B, and its body at C.
   - An UPDATE to a concept's body through the landing path changes its vector in the same transaction.
-  - The insert schema refuses a fixture row that sets the column. Select and update shapes pass their per-shape tests.
+  - The insert and update schemas drop the column from a fixture row that sets it, as `index.passage.search`'s do. Select and update shapes pass their per-shape tests.
   - On a database `migrate` has run, a concept match uses the GIN index. With the LEAKPROOF mark removed, it does not.
   - The generated expression is accepted as immutable on the pinned Postgres image.
+  - A raw INSERT of a concept row with a malformed IRI is refused by the constraint.
+  - The constraint's pattern and the TypeScript `IRI` accept and refuse the same strings.
 - **Verification:** schema, core and worker `check` pass. A staging migrate is timed inside the lock bracket. The pull request says `Merge risk: not reversible`.
 
 ### U4. Any-word matching, ranking and the cursor
@@ -430,6 +434,7 @@ flowchart LR
   - Paging: the second page continues each arm after the cursor's bounds, and a page past the end returns none, with no `nextCursor`.
   - A cursor naming a withheld concept's IRI returns the same page as one naming an absent IRI.
   - A query of only stop words returns no matches and no error, through both arms.
+  - A query holding `!`, `:*`, `&` or an unbalanced parenthesis matches by its words and never errors. The builder takes its lexemes from Postgres's own parse of the text, never by splicing raw words into `to_tsquery` syntax, because every Viewer can reach this read.
   - A Restricted concept matches for an Admin and not for a Viewer, and is never counted.
   - A passage under a readable concept is left out of the passage arm. One under a withheld concept is not left out, and gives nothing away.
   - `ask` cites by the same rule: a term matching only a body word still cites that concept.
@@ -619,6 +624,7 @@ flowchart LR
   - A malformed id, an absent concept and a withheld concept show the same *not found*, and the breadcrumb never shows a withheld title.
   - A body link to a concept IRI goes to `/knowledge/search/<ulid>`.
   - Raw HTML in a body renders as text.
+  - An image in a body renders as its alt text and is never fetched, because a remote image would tell a third party who read which concept.
   - Every `contracts/links` case, run through the body renderer, resolves its marks as the fixture says (`concept-body.test.tsx`).
   - A sources-list entry opens the same panel as its citation mark.
   - A failed read shows its retry state, not *not found*.

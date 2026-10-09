@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0073_the-action"
+MIGRATION_ID = "0074_the-concept-search"
 
-MIGRATION_WHEN = 1791407037889
+MIGRATION_WHEN = 1791559340097
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -102,6 +102,7 @@ TABLES: dict[str, dict[str, str]] = {
         "audience": "text NOT NULL",
         "updated_at": "timestamp with time zone NOT NULL",
         "audience_groups": "text[]",
+        "search": "tsvector NOT NULL",
     },
     "public.concept_sensitivity_override": {
         "workspace_id": "text NOT NULL",

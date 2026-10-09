@@ -1,4 +1,3 @@
-import pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { MARK_THE_MATCH_LEAKPROOF } from "@better-answers/schema";
@@ -6,51 +5,11 @@ import { UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { findPassages, previewPassages, previewPassagesInput } from "../src/sources/index.ts";
-import type { Answered, Tx } from "../src/store/postgres/index.ts";
+import { planned } from "./planned.ts";
 import { seededBy, visibilitySuite } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
-import { answered, readingAs } from "./suite-postgres.ts";
 
 const { db, arrange } = visibilitySuite();
-
-/**
- * auto_explain plans the statement the call itself ran; at test size a sequential scan beats
- * every index, so it is switched off.
- */
-const PLANNED_AS_THE_APP = [
-  "-c role=app_rt",
-  "-c session_preload_libraries=auto_explain",
-  "-c auto_explain.log_min_duration=0",
-  "-c auto_explain.log_level=notice",
-  "-c auto_explain.log_format=json",
-  "-c enable_seqscan=off",
-].join(" ");
-
-const INDEX_NAMED = /"Index Name": "(?<index>[^"]+)"/gu;
-
-type Planned<T> = { readonly answer: Answered<T>; readonly indexes: readonly string[] };
-
-const planned = async <T>(
-  person: UserPrincipal,
-  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Planned<T>> => {
-  const pool = new pg.Pool({ connectionString: db().connectionUri, options: PLANNED_AS_THE_APP });
-  const plans: string[] = [];
-  pool.on("connect", (client) => {
-    client.on("notice", (notice) => {
-      plans.push(notice.message ?? "");
-    });
-  });
-  try {
-    const answer = answered(await readingAs(pool, person, work));
-    const indexes = plans.flatMap((plan) =>
-      [...plan.matchAll(INDEX_NAMED)].flatMap((named) => named.groups?.["index"] ?? []),
-    );
-    return { answer, indexes };
-  } finally {
-    await pool.end();
-  }
-};
 
 const QUERY = "holiday policy";
 
@@ -131,7 +90,7 @@ const arrangedWithInvoices = async (): Promise<Arranged> => {
 };
 
 const searching = (person: UserPrincipal) =>
-  planned(person, (reader, tx) => findPassages(reader, tx, QUERY, 10));
+  planned(db(), person, (reader, tx) => findPassages(reader, tx, QUERY, 10));
 
 const theHandbookFound = (arranged: Arranged) => [
   {
@@ -184,7 +143,7 @@ describe("previewPassages' plan, as the api and under the passage's policy", () 
   it("lists a connected source's passages through the connected-source-first index", async () => {
     const arranged = await arrangedWithInvoices();
 
-    const previewed = await planned(arranged.admin, (admin, tx) =>
+    const previewed = await planned(db(), arranged.admin, (admin, tx) =>
       previewPassages(
         admin,
         tx,
