@@ -36,7 +36,6 @@ import {
   refusalFor,
   requireAdmin,
   ulid,
-  type ActorId,
   type Clock,
   type PrincipalRefusal,
   type Result,
@@ -99,6 +98,7 @@ import {
   type SuggestionKind,
   type SuggestionPayload,
 } from "./suggestions.ts";
+import type { ConceptVerification } from "./trust.ts";
 import { conceptVisibilityFrom } from "./visibility.ts";
 
 export {
@@ -169,6 +169,16 @@ export {
   type MapMaintenanceRefusal,
 } from "./map-maintenance.ts";
 export type { SweptGeneration } from "../store/map/index.ts";
+export {
+  TRUST_RIDERS,
+  TRUST_STATUSES,
+  TRUST_TIERS,
+  trustOf,
+  trustWords,
+  ukLongDate,
+  type Trust,
+  type TrustStatus,
+} from "./trust.ts";
 
 const CONCEPT_ACTIONS = declareActions("knowledge", {
   committed: action("knowledge.concept.committed", {
@@ -1089,16 +1099,6 @@ export const importBundle = async (
   return input.dryRun === true
     ? dryRunImport(principal, doors.git, opened.value)
     : runImport(principal, doors, opened.value, sensitivity);
-};
-
-type ConceptVerification = {
-  readonly actor: ActorId;
-  readonly at: Date;
-
-  readonly contentHash: string | null;
-
-  /** Read by person id, so it stands after the member leaves; null once erasure clears the name. */
-  readonly verifierName: string | null;
 };
 
 export type OpenedConcept = {
