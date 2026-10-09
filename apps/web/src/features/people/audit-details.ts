@@ -1,5 +1,8 @@
+import type { DECLARED_ACTIONS } from "./audit-actions.ts";
 import type { ReadAuditEvent } from "./audit-log-api.ts";
 import { GONE_WORDS, personSaid, removedWords } from "./audit-subjects.ts";
+
+type DeclaredAction = (typeof DECLARED_ACTIONS)[number];
 
 type NamedOrList = ReadAuditEvent["named"][string];
 
@@ -79,6 +82,35 @@ const VALUE_LABELS = new Map(
     grants: "Access ended",
   }),
 );
+
+export const LABELLED_DETAIL_KEYS: readonly string[] = [
+  ...NAMED_LABELS.keys(),
+  ...VALUE_LABELS.keys(),
+];
+
+/** Ids and hashes the read never names, and a sweep's subject and row counts no reader acts on. */
+export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, readonly string[]>>> = {
+  "knowledge.check.imported": ["verificationId"],
+  "knowledge.concept.committed": ["commitSha", "contentHash"],
+  "knowledge.manifest.written": ["bundleId", "commitSha"],
+  "knowledge.suggestion.accepted": ["commitSha", "contentHash", "setId"],
+  "knowledge.suggestion.declined": ["setId"],
+  "knowledge.suggestion.returned": ["setId"],
+  "people.erasure.completed": ["subjectRequestId"],
+  "people.name_flag.raised": ["workspaceId"],
+  "people.person.authenticator_added": ["authenticatorId"],
+  "people.person.authenticator_removed": ["authenticatorId"],
+  "people.person.grants_ended": ["workspaceId"],
+  "people.person.passkey_added": ["passkeyId"],
+  "people.person.passkey_removed": ["passkeyId"],
+  "people.person.passkey_renamed": ["passkeyId"],
+  "platform.erasure.rehearsed": ["erasureRequestId", "subjectRequestId"],
+  "platform.erasure.replayed": ["erasureRequestId", "subjectRequestId"],
+  "platform.graph.swept": ["edges", "generation", "nodes"],
+  "platform.reconciler.replayed": ["bundleId", "commitSha", "contentHash"],
+  "sources.binding.published": ["dpiaHash"],
+  "sources.finding.restored": ["findingId"],
+};
 
 /** Stored values a reader would not say: a sign-in method, an audience, a family. */
 const VALUE_WORDS: ReadonlyMap<unknown, string> = new Map([
