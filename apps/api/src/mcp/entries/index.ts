@@ -106,6 +106,7 @@ const match = z.discriminatedUnion("layer", [
     kind: z.string(),
     title: z.string(),
     trust,
+    trustWords: z.string(),
     bundle: z.string(),
     tags: z.array(z.string()),
   }),
@@ -184,7 +185,7 @@ const openEntry = defineEntry({
   name: "open",
   title: "Open a concept, or the passage a citation rests on",
   description:
-    "The verbatim fetch: a concept by its `iri` (from a `find` match or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by its `locator`, which a document match and a citation both carry. Give one of the two. Each evidence item names its source, and carries the `locator` that opens it only where the source gives one: an imported concept's evidence often has none, and an item with no `locator` has no passage to open. Quote what comes back; do not summarise it.",
+    "The verbatim fetch: a concept by its `iri` (from a `find` match or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by its `locator`, which a document match and a citation both carry. Give one of the two. Each evidence item names its source in the concept's own words, and carries the `locator` of a passage or the `iri` of a concept that opens it only where there is one you may read: an imported concept's evidence often has neither, and an item with neither has nothing to open. Quote what comes back; do not summarise it.",
   scopes: ["knowledge:read"],
   input: z
     .object({
@@ -212,16 +213,26 @@ const openEntry = defineEntry({
 
             frontmatter: conceptFrontmatter,
             body: z.string(),
-            relations: z.array(z.object({ kind: z.string(), target: z.string() })),
+            relations: z.array(
+              z.object({ kind: z.string(), target: z.string(), title: z.string() }),
+            ),
             trust,
+            trustWords: z.string(),
             evidence: z.array(
               z.object({
+                id: z.string().exactOptional(),
+                source: z.string(),
                 locator: z
                   .string()
                   .regex(/\S/)
                   .exactOptional()
-                  .describe("What opens the passage; absent where the source gives none."),
-                source: z.string(),
+                  .describe("What opens the passage; absent where there is none you may read."),
+                iri: z
+                  .string()
+                  .exactOptional()
+                  .describe(
+                    "The concept this source names; absent where there is none you may read.",
+                  ),
               }),
             ),
           })

@@ -2,8 +2,6 @@ import { boundarySchemas } from "@better-answers/schema";
 
 import {
   derivedVisibility,
-  readableClause,
-  readableParameters,
   RESTRICTED_TO_ADMINS,
   visibilityFrom,
   visibilityOf,
@@ -17,11 +15,9 @@ import {
   attempt,
   attemptResult,
   err,
-  isActorId,
   ok,
   requireAdmin,
   ulid,
-  type ActorId,
   type AdminUserPrincipal,
   type Principal,
   type Result,
@@ -404,106 +400,3 @@ const writeOverride = async (
   });
   return ok({ iri, auditEventId, visibility });
 };
-
-type ReadableEvidence = {
-  readonly locator: string;
-
-  readonly resource: string;
-};
-
-export type EvidencePane = {
-  readonly access: "included" | "partly-included" | "not-included";
-
-  readonly lead: string;
-
-  readonly evidence: readonly ReadableEvidence[];
-
-  readonly sharedBeyondEvidence: { readonly by: ActorId; readonly at: Date } | undefined;
-
-  readonly next: string;
-};
-
-const PANE_COPY = {
-  nothingCited: "This concept cites no source, so there is nothing to include.",
-  included: "Based on your current access, the evidence is included.",
-  partlyIncluded: "Based on your current access, some of the evidence isn't included.",
-  notIncluded: "Based on your current access, the evidence isn't included.",
-  sharedBeyondEvidence: "An Admin shared this concept beyond its evidence.",
-  nextWhenIncluded: "Open a source to read the passage the concept rests on.",
-  nextWhenWithheld: "Ask an Admin for access to the sources, or read the concept as it stands.",
-  nextWhenNothingCited: "Read the concept as it stands.",
-} as const;
-
-const PANE_WORDS = {
-  "nothing-cited": { lead: PANE_COPY.nothingCited, next: PANE_COPY.nextWhenNothingCited },
-  included: { lead: PANE_COPY.included, next: PANE_COPY.nextWhenIncluded },
-  "partly-included": { lead: PANE_COPY.partlyIncluded, next: PANE_COPY.nextWhenWithheld },
-  "not-included": { lead: PANE_COPY.notIncluded, next: PANE_COPY.nextWhenWithheld },
-} as const satisfies Record<
-  EvidencePane["access"] | "nothing-cited",
-  { readonly lead: string; readonly next: string }
->;
-
-/** `actor` and `recorded_at` are null together: no override row joined. */
-type PaneFacts = {
-  readonly cited: number;
-
-  readonly readable: readonly ReadableEvidence[];
-} & (
-  | { readonly actor: null; readonly recorded_at: null }
-  | { readonly actor: string; readonly recorded_at: Date }
-);
-
-/** `undefined` when the principal cannot read the concept, or no concept has the IRI. */
-export const evidencePaneOf = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  iri: string,
-): Promise<Result<EvidencePane | undefined, Error>> => {
-  // One statement, so one snapshot: reads taken apart can straddle a re-write's commit.
-  const read = await attempt(() =>
-    tx.query<PaneFacts>(
-      `SELECT count(ce.locator)::int AS cited,
-              coalesce(
-                json_agg(json_build_object('locator', ce.locator, 'resource', e.resource)
-                         ORDER BY ce.locator, ce.source_document_id)
-                  FILTER (WHERE e.resource IS NOT NULL),
-                '[]') AS readable,
-              o.actor, o.recorded_at
-         FROM concept_index c
-         LEFT JOIN concept_sensitivity_override o ON o.workspace_id = c.workspace_id AND o.iri = c.iri
-         LEFT JOIN concept_evidence ce ON ce.workspace_id = c.workspace_id AND ce.iri = c.iri
-         LEFT JOIN (evidence e
-                    JOIN source_document d
-                      ON d.workspace_id = e.workspace_id AND d.id = e.source_document_id
-                    JOIN connected_source b ON b.workspace_id = d.workspace_id AND b.id = d.connected_source_id)
-                ON e.workspace_id = ce.workspace_id AND e.source_document_id = ce.source_document_id
-               AND e.locator = ce.locator AND ${readableClause("b", 3)}
-        WHERE c.workspace_id = $1 AND c.iri = $2 AND ${readableClause("c", 3)}
-        GROUP BY c.iri, o.actor, o.recorded_at`,
-      [principal.workspaceId, iri, ...readableParameters(principal)],
-    ),
-  );
-  if (!read.ok) return err(read.error);
-  const [facts] = read.value.rows;
-  return ok(facts === undefined ? undefined : paneOf(facts));
-};
-
-const paneOf = (facts: PaneFacts): EvidencePane => {
-  const withheld = facts.cited - facts.readable.length;
-  const access =
-    withheld === 0 ? "included" : facts.readable.length === 0 ? "not-included" : "partly-included";
-  const sharedBeyondEvidence = withheld > 0 ? sharerOf(facts) : undefined;
-  const { lead, next } =
-    PANE_WORDS[access === "included" && facts.cited === 0 ? "nothing-cited" : access];
-  return {
-    access,
-    lead: sharedBeyondEvidence === undefined ? lead : `${lead} ${PANE_COPY.sharedBeyondEvidence}`,
-    evidence: facts.readable,
-    sharedBeyondEvidence,
-    next,
-  };
-};
-
-const sharerOf = ({ actor, recorded_at }: PaneFacts): EvidencePane["sharedBeyondEvidence"] =>
-  actor !== null && isActorId(actor) ? { by: actor, at: recorded_at } : undefined;

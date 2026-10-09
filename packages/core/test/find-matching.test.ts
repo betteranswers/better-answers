@@ -383,7 +383,26 @@ describe("ask's per-word lookup", () => {
       await reading(viewer, (reader, tx) => ask(reader, tx, { question: "When is the audit?" })),
     );
 
-    expect(answer.citations).toEqual([{ iri: records, url: records }]);
+    expect(answer.citations).toEqual([
+      { iri: records, url: `/knowledge/search/${records.slice(-26)}` },
+    ]);
+  });
+
+  it("links a citation to the concept's page by its ulid", async () => {
+    const { workspaceId, viewer } = await arrange();
+    const iri = "https://better-answers.com/c/01J8ZQ4M7V3K9T2R5N6P8W1XYD";
+    await seededBy(db(), async (seed) => {
+      await seed.conceptIdentity({ workspaceId, iri });
+      await seed.conceptIndex({ workspaceId, iri, title: "Audit Logs Retention" });
+    });
+
+    const answer = answered(
+      await reading(viewer, (reader, tx) => ask(reader, tx, { question: "audit retention" })),
+    );
+
+    expect(answer.citations).toEqual([
+      { iri, url: "/knowledge/search/01J8ZQ4M7V3K9T2R5N6P8W1XYD" },
+    ]);
   });
 });
 

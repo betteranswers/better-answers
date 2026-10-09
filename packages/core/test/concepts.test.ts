@@ -1499,7 +1499,13 @@ describe("opening a concept by IRI", () => {
     expect(opened.value.concept).toEqual({
       iri: written.iri,
 
-      frontmatter: { ...input.frontmatter, status: "stable", iri: written.iri },
+      frontmatter: {
+        title: "Expenses",
+        type: "Policy",
+        sources: [{ title: "Handbook", resource: "Handbook" }],
+        status: "stable",
+        iri: written.iri,
+      },
       body: input.body,
       relations: [],
       trust: {
@@ -1509,7 +1515,8 @@ describe("opening a concept by IRI", () => {
         verifiedAt: null,
         rider: null,
       },
-      evidence: [{ locator: "p.4", source: "Handbook" }],
+      trustWords: "Unverified",
+      evidence: [{ source: "Handbook" }],
     });
   });
 
@@ -1683,8 +1690,8 @@ describe("opening a concept by IRI", () => {
     ]);
 
     expect(cited.ok && cited.value.found && cited.value.concept?.evidence).toStrictEqual([
-      { locator: "p.4", source: "Handbook" },
-      { locator: "p.9", source: "/sources/travel.pdf" },
+      { source: "Handbook" },
+      { source: "/sources/travel.pdf" },
       { source: "/sources/rates.csv" },
     ]);
     expect(uncited.ok && uncited.value.found && uncited.value.concept?.evidence).toEqual([]);

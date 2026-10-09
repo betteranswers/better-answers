@@ -2,9 +2,9 @@ import type { ConceptIri, MatchStrength } from "@better-answers/schema";
 
 import type { Frontmatter } from "../concepts/index.ts";
 import {
-  citedSource,
-  conceptByIri,
+  conceptPageOf,
   findConcepts,
+  readConcept,
   trustOf,
   trustWords,
   ukLongDate,
@@ -36,6 +36,7 @@ type ConceptMatch<Iri extends string> = {
   readonly kind: string;
   readonly title: string;
   readonly trust: Trust;
+  readonly trustWords: string;
   readonly bundle: string;
   readonly tags: readonly string[];
 };
@@ -63,13 +64,26 @@ type ConceptView<Iri extends string> = {
   readonly iri: Iri;
   readonly frontmatter: Frontmatter;
   readonly body: string;
-  readonly relations: readonly { readonly kind: string; readonly target: string }[];
+  readonly relations: readonly {
+    readonly kind: string;
+    readonly target: Iri;
+    readonly title: string;
+  }[];
   readonly trust: Trust;
-  readonly evidence: readonly Evidence[];
+  readonly trustWords: string;
+  readonly evidence: readonly Evidence<Iri>[];
 };
 
-/** `locator` is left out when the source gives none, or gives only spaces; it is never `""`. */
-type Evidence = { readonly locator?: string; readonly source: string };
+/**
+ * `source` is the file's own label. `locator` or `iri` is what opens it, given only where the reader
+ * may open it; neither is ever `""`.
+ */
+type Evidence<Iri extends string> = {
+  readonly id?: string;
+  readonly source: string;
+  readonly locator?: string;
+  readonly iri?: Iri;
+};
 
 type PassageView = {
   readonly locator: string;
@@ -257,15 +271,19 @@ export const find = async (
   return ok(next === undefined ? found : { ...found, nextCursor: cursorOf(next) });
 };
 
-const conceptMatchOf = (concept: OpenedConcept, now: Date): ConceptMatch<ConceptIri> => ({
-  layer: "bundles",
-  iri: concept.iri,
-  kind: concept.kind,
-  title: concept.title,
-  trust: trustOf(concept, now),
-  bundle: bundleOf(concept.path),
-  tags: tagsOf(concept.frontmatter),
-});
+const conceptMatchOf = (concept: OpenedConcept, now: Date): ConceptMatch<ConceptIri> => {
+  const trust = trustOf(concept, now);
+  return {
+    layer: "bundles",
+    iri: concept.iri,
+    kind: concept.kind,
+    title: concept.title,
+    trust,
+    trustWords: trustWords(trust),
+    bundle: bundleOf(concept.path),
+    tags: tagsOf(concept.frontmatter),
+  };
+};
 
 const documentMatchOf = (match: PassageMatch): DocumentMatch => ({
   layer: "sources",
@@ -274,21 +292,6 @@ const documentMatchOf = (match: PassageMatch): DocumentMatch => ({
   locator: match.locator,
   sensitivity: match.sensitivity,
 });
-
-const evidenceOf = (concept: OpenedConcept): ConceptView<ConceptIri>["evidence"] => {
-  const sources = concept.frontmatter["sources"];
-  if (!Array.isArray(sources)) return [];
-
-  return sources.flatMap((entry) => {
-    const cited = citedSource(entry);
-    if (cited === undefined) return [];
-
-    const title = typeof entry === "string" ? undefined : entry["title"];
-    const source = typeof title === "string" && title !== "" ? title : cited.resource;
-    const locator = cited.locator ?? "";
-    return [locator.trim() === "" ? { source } : { locator, source }];
-  });
-};
 
 /** A concept or passage that is not there answers `found: false`, not an error. */
 export const open = async (
@@ -308,21 +311,24 @@ export const open = async (
     return ok({ found: true, passage: { locator, source: title, text, sensitivity } });
   }
 
-  const concept = await conceptByIri(principal, tx, input.iri);
+  const concept = await readConcept(principal, tx, input.iri, {
+    passageAt: (locator) => passageAt(principal, tx, locator),
+    now,
+  });
   if (!concept.ok) return err(concept.error);
   if (concept.value === undefined) return ok({ found: false, iri: input.iri });
 
-  const found = concept.value;
+  const { iri, frontmatter, body, relations, trust, pane } = concept.value;
   return ok({
     found: true,
     concept: {
-      iri: found.iri,
-      frontmatter: found.frontmatter,
-      body: found.body,
-
-      relations: [],
-      trust: trustOf(found, now),
-      evidence: evidenceOf(found),
+      iri,
+      frontmatter,
+      body,
+      relations,
+      trust,
+      trustWords: concept.value.trustWords,
+      evidence: pane.evidence,
     },
   });
 };
@@ -363,7 +369,7 @@ export const ask = async (
     .toSorted(
       (one, other) => one.title.localeCompare(other.title) || one.iri.localeCompare(other.iri),
     )
-    .map((concept) => ({ iri: concept.iri, url: concept.iri }));
+    .map((concept) => ({ iri: concept.iri, url: conceptPageOf(concept.iri) }));
   return ok({
     verdict: "refuse",
     text: NOT_ANSWERED,
@@ -384,7 +390,7 @@ export const giveFeedback = async (
 
 const findLine = (match: FindMatch<string>): string =>
   match.layer === "bundles"
-    ? `${match.kind} · ${match.title} · ${trustWords(match.trust)} · ${match.iri}`
+    ? `${match.kind} · ${match.title} · ${match.trustWords} · ${match.iri}`
     : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator}`;
 
 export const renderFind = (result: FindResult<string>): string =>
@@ -406,22 +412,30 @@ export const renderOpen = (result: OpenResult<string>): string => {
       `— ${passage.source} (${passage.locator}) · ${passage.sensitivity}`,
     ].join("\n");
   }
-  if (result.concept === undefined) return "Nothing to show.";
-  const { concept } = result;
+  return result.concept === undefined ? "Nothing to show." : conceptText(result.concept);
+};
+
+const listed = (heading: string, lines: readonly string[]): readonly string[] =>
+  lines.length === 0 ? [] : ["", heading, ...lines];
+
+const conceptText = (concept: ConceptView<string>): string => {
   const title =
     typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
-  const evidence = concept.evidence
-    .map(({ source, locator }) =>
-      locator === undefined ? `- ${source}` : `- ${source} (${locator})`,
-    )
-    .join("\n");
+  const evidence = concept.evidence.map(({ source, locator, iri }) => {
+    const opens = locator ?? iri;
+    return opens === undefined ? `- ${source}` : `- ${source} (${opens})`;
+  });
+  const related = concept.relations.map(
+    ({ kind, title: named, target }) => `- ${kind} · ${named} · ${target}`,
+  );
   return [
     `# ${title}`,
     "",
     concept.body.trimEnd(),
     "",
-    `_${trustWords(concept.trust)}_`,
-    ...(evidence === "" ? [] : ["", "Evidence:", evidence]),
+    `_${concept.trustWords}_`,
+    ...listed("Evidence:", evidence),
+    ...listed("Related:", related),
   ].join("\n");
 };
 

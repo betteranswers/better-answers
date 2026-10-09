@@ -178,6 +178,7 @@ describe("the preview's rendering", () => {
             kind: "Policy",
             title: "Expenses",
             trust: unverified,
+            trustWords: "Unverified",
             bundle: "acme",
             tags: [],
           },
@@ -193,6 +194,7 @@ describe("the preview's rendering", () => {
               verifiedAt: "2026-03-03",
               rider: null,
             },
+            trustWords: "Verified by Priya Shah · 3 March 2026",
             bundle: "acme",
             tags: ["travel"],
           },
@@ -233,6 +235,7 @@ describe("open's and feedback's renderings", () => {
           body: "Expenses are claimed within thirty days.",
           relations: [],
           trust: unverified,
+          trustWords: "Unverified",
           evidence: [
             { locator: "p.4", source: "Handbook" },
             { locator: "p.9", source: "Travel policy" },
@@ -254,6 +257,47 @@ describe("open's and feedback's renderings", () => {
     );
   });
 
+  it("renders each source's opening and the concept's relations", () => {
+    expect(
+      renderOpen({
+        found: true,
+        concept: {
+          iri: "https://better-answers.com/c/01A",
+          frontmatter: { title: "Expenses", type: "Policy" },
+          body: "Expenses follow the travel policy.",
+          relations: [
+            {
+              kind: "LINKS_TO",
+              target: "https://better-answers.com/c/01B",
+              title: "Travel policy",
+            },
+          ],
+          trust: unverified,
+          trustWords: "Unverified",
+          evidence: [
+            { id: "T-1", source: "Travel policy", iri: "https://better-answers.com/c/01B" },
+            { id: "M-2", source: "The board's minutes" },
+          ],
+        },
+      }),
+    ).toBe(
+      [
+        "# Expenses",
+        "",
+        "Expenses follow the travel policy.",
+        "",
+        "_Unverified_",
+        "",
+        "Evidence:",
+        "- Travel policy (https://better-answers.com/c/01B)",
+        "- The board's minutes",
+        "",
+        "Related:",
+        "- LINKS_TO · Travel policy · https://better-answers.com/c/01B",
+      ].join("\n"),
+    );
+  });
+
   it("heads an untitled concept with its IRI, omitting empty evidence", () => {
     expect(
       renderOpen({
@@ -270,6 +314,7 @@ describe("open's and feedback's renderings", () => {
             verifiedAt: "2026-03-03",
             rider: null,
           },
+          trustWords: "Verified by Priya Shah · 3 March 2026",
           evidence: [],
         },
       }),
@@ -486,6 +531,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
             kind: "Policy",
             title: CONCEPT_TITLE,
             trust: unverified,
+            trustWords: "Unverified",
             bundle: "knowledge",
             tags: [],
           },
