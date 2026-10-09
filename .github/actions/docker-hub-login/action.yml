@@ -1,0 +1,21 @@
+name: docker-hub-login
+description: Log in to Docker Hub read-only, so a leg's image pulls count against the account's limit and not the runner address's.
+inputs:
+  username:
+    description: The Docker Hub account, from the DOCKERHUB_USERNAME secret.
+    required: true
+  token:
+    description: A read-only Docker Hub access token, from the DOCKERHUB_TOKEN secret.
+    required: true
+runs:
+  using: composite
+  steps:
+    # A run without the secrets, a fork's, pulls anonymously as before and says so.
+    - if: inputs.username == '' || inputs.token == ''
+      shell: bash
+      run: echo "::warning::no Docker Hub credentials reached this job, so its image pulls are anonymous and share the runner address's rate limit"
+    - if: inputs.username != '' && inputs.token != ''
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      with:
+        username: ${{ inputs.username }}
+        password: ${{ inputs.token }}

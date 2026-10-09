@@ -18,6 +18,12 @@ on:
           other; `packages/devtools/test/ci/image-job.test.ts` holds that both ways.
         type: boolean
         default: false
+    # Passed by name from `build.yml`; a called workflow reads no secret it was not handed.
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
 
 # A pull request cancels the run it supersedes; a run `build.yml` calls never does,
 # because every commit that lands is worth an image.
@@ -159,6 +165,12 @@ jobs:
           grep -q lefthook "$hook" || { echo "$hook is not lefthook's"; exit 1; }
       - run: uv sync --frozen
         working-directory: apps/worker
+      # The suites' Postgres and the images they build pull from Docker Hub, whose anonymous
+      # limit is the runner address's and is shared with strangers (BA-96).
+      - uses: ./.github/actions/docker-hub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
       # `check:tree` less `packages/core`'s suite, which is `full-core`'s.
       - run: pnpm check:root
 
@@ -200,6 +212,10 @@ jobs:
       - run: uv sync --frozen
         working-directory: apps/worker
       - uses: ./.github/actions/git-filter-repo
+      - uses: ./.github/actions/docker-hub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
       - run: pnpm check:core:suite --shard="${SHARD}"
         env:
           SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
@@ -246,6 +262,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/docker-hub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: ./.github/actions/git-filter-repo
       - run: pnpm check:api
         env:
@@ -268,6 +288,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
+      - uses: ./.github/actions/docker-hub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
       - run: pnpm check:web
         env:
           TRACE_ARTIFACT: browser-traces-attempt-${{ github.run_attempt }}
@@ -321,6 +345,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/docker-hub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
       - run: pnpm check:worker
         env:
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller || needs.lane.outputs.images == 'no' }}
