@@ -1,0 +1,1721 @@
+{
+  "note": "Synthetic Answers about an invented company and its invented product, Tallyloom, written once for the recall measure. None of it is, or is taken from, any customer's content. Each answer's paraphrases are questions it is the master Answer for.",
+  "groups": [
+    {
+      "group": "security",
+      "answers": [
+        {
+          "key": "password-length",
+          "title": "Password Length Rule",
+          "body": "Staff passwords are at least fourteen characters long. We check new passwords against a list of known breached passwords and refuse any match.",
+          "paraphrases": [
+            "how many characters must a staff password have",
+            "do you block passwords that appeared in breaches"
+          ]
+        },
+        {
+          "key": "multi-factor-sign-in",
+          "title": "Multi-Factor Sign-In",
+          "body": "Every staff account needs a second factor at sign-in. We accept authenticator apps and hardware keys, and we do not allow text-message codes.",
+          "paraphrases": ["is two-step verification required for employees"]
+        },
+        {
+          "key": "laptop-disk-encryption",
+          "title": "Laptop Disk Encryption",
+          "body": "Every company laptop has full-disk encryption turned on before it is handed to its user. The recovery keys are held in our device management console.",
+          "paraphrases": [
+            "are staff computers encrypted",
+            "what protects data if a work notebook is stolen"
+          ]
+        },
+        {
+          "key": "mobile-device-management",
+          "title": "Mobile Device Management",
+          "body": "Phones that open work email are enrolled in our device management service. It enforces a screen lock and can wipe work data remotely.",
+          "paraphrases": ["can you remotely erase a lost work phone"]
+        },
+        {
+          "key": "patching-cadence",
+          "title": "Operating System Patching",
+          "body": "Critical security patches are applied to laptops and servers within fourteen days of release. Other updates follow in the monthly maintenance cycle.",
+          "paraphrases": [
+            "how quickly do you install security updates",
+            "what is your patch window for critical fixes"
+          ]
+        },
+        {
+          "key": "malware-protection",
+          "title": "Malware Protection",
+          "body": "All laptops run endpoint protection that scans files on access and reports detections to a central console watched during working hours.",
+          "paraphrases": ["do your machines have antivirus"]
+        },
+        {
+          "key": "office-firewall",
+          "title": "Office Network Firewall",
+          "body": "The office network sits behind a managed firewall that blocks inbound traffic by default. Rule changes go through a recorded change request.",
+          "paraphrases": ["how is the office network protected from the internet"]
+        },
+        {
+          "key": "penetration-testing",
+          "title": "Penetration Testing",
+          "body": "An outside firm tests our public services once a year and after any major change. Findings rated high are fixed within thirty days.",
+          "paraphrases": [
+            "how often do you commission a pen test",
+            "who carries out your security testing"
+          ]
+        },
+        {
+          "key": "vulnerability-scanning",
+          "title": "Vulnerability Scanning",
+          "body": "Our servers and public addresses are scanned for known weaknesses every week. The results are reviewed in the Monday operations meeting.",
+          "paraphrases": ["do you scan your systems for weaknesses"]
+        },
+        {
+          "key": "incident-response-plan",
+          "title": "Incident Response Plan",
+          "body": "A written incident response plan names who leads, who communicates and how evidence is kept. We rehearse it with a tabletop exercise twice a year.",
+          "paraphrases": [
+            "what happens when a security incident is detected",
+            "do you practise handling incidents"
+          ]
+        },
+        {
+          "key": "breach-notification",
+          "title": "Breach Notification Window",
+          "body": "If a breach affects a customer's data, we tell that customer within twenty-four hours of confirming it, before any regulator deadline.",
+          "paraphrases": ["how soon will you inform us of a data breach"]
+        },
+        {
+          "key": "security-awareness-training",
+          "title": "Security Awareness Training",
+          "body": "Every new starter completes security awareness training in their first week, and all staff repeat a shorter course each year.",
+          "paraphrases": [
+            "do employees get cyber security training",
+            "how often is security training refreshed"
+          ]
+        },
+        {
+          "key": "phishing-simulation",
+          "title": "Phishing Simulation",
+          "body": "We send simulated phishing emails to all staff every quarter. Anyone who clicks is offered a short follow-up session, never a penalty.",
+          "paraphrases": ["do you test staff with fake scam emails"]
+        },
+        {
+          "key": "access-reviews",
+          "title": "Quarterly Access Reviews",
+          "body": "Team leads confirm each quarter who still needs access to the systems they own. Access nobody confirms is removed.",
+          "paraphrases": ["how often are user permissions reviewed"]
+        },
+        {
+          "key": "leaver-access-removal",
+          "title": "Leaver Account Removal",
+          "body": "A leaver's accounts are disabled by the end of their last working day. Shared credentials they knew are changed the same week.",
+          "paraphrases": [
+            "when are former employees locked out",
+            "what happens to accounts when someone leaves"
+          ]
+        },
+        {
+          "key": "privileged-accounts",
+          "title": "Privileged Accounts",
+          "body": "Administrator rights sit on separate accounts used only for administration. Fewer than five people hold them, and each use is recorded.",
+          "paraphrases": ["who has admin rights to your servers"]
+        },
+        {
+          "key": "administrator-activity-logging",
+          "title": "Administrator Activity Logging",
+          "body": "Actions taken with administrator accounts are logged to a store the administrators themselves cannot edit.",
+          "paraphrases": ["can admins tamper with their own activity records"]
+        },
+        {
+          "key": "security-log-retention",
+          "title": "Security Log Retention",
+          "body": "Security event logs are kept for thirteen months, so a full year can be compared with the month before it.",
+          "paraphrases": [
+            "how long are security logs stored",
+            "for what period do you keep event records"
+          ]
+        },
+        {
+          "key": "backup-frequency",
+          "title": "Backup Frequency",
+          "body": "Production databases are backed up every hour, and file storage every night. Backups are copied to a second region.",
+          "paraphrases": ["how often is customer data backed up"]
+        },
+        {
+          "key": "backup-restore-testing",
+          "title": "Backup Restore Testing",
+          "body": "Each month we restore a recent backup to a scratch environment and check that the data reads back whole.",
+          "paraphrases": [
+            "do you prove your backups actually work",
+            "how frequently are restores rehearsed"
+          ]
+        },
+        {
+          "key": "recovery-time-objective",
+          "title": "Recovery Time Objective",
+          "body": "After a serious outage we aim to have the service running again within four hours.",
+          "paraphrases": ["what is your RTO"]
+        },
+        {
+          "key": "recovery-point-objective",
+          "title": "Recovery Point Objective",
+          "body": "At most one hour of data could be lost in a disaster, because backups run hourly.",
+          "paraphrases": ["how much data could be lost in a disaster", "what is your RPO"]
+        },
+        {
+          "key": "hosting-location",
+          "title": "Hosting Location",
+          "body": "Our production systems are hosted in two data centres in the United Kingdom. No customer data is stored outside the UK.",
+          "paraphrases": ["where are your servers based"]
+        },
+        {
+          "key": "encryption-in-transit",
+          "title": "Network Traffic Encryption",
+          "body": "All traffic to our services uses TLS 1.2 or later. Older protocols are switched off on every public endpoint.",
+          "paraphrases": [
+            "is data protected while it travels over the network",
+            "which TLS versions do you accept"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "privacy",
+      "answers": [
+        {
+          "key": "data-protection-officer",
+          "title": "Data Protection Officer",
+          "body": "Our data protection officer is reachable at a dedicated mailbox and reports to the board each quarter.",
+          "paraphrases": ["who handles privacy questions in your company"]
+        },
+        {
+          "key": "subject-access-requests",
+          "title": "Subject Access Requests",
+          "body": "We answer a request from a person for the data we hold on them within one calendar month, and usually within ten working days.",
+          "paraphrases": [
+            "how long do you take to respond to a SAR",
+            "how can someone get a copy of their personal data"
+          ]
+        },
+        {
+          "key": "customer-data-retention",
+          "title": "Customer Data Retention",
+          "body": "Customer records are kept for the life of the contract and six years after it ends, to meet accounting rules.",
+          "paraphrases": ["how long do you hold on to client information"]
+        },
+        {
+          "key": "deletion-at-contract-end",
+          "title": "Deletion at Contract End",
+          "body": "When a contract ends, we return the customer's data on request and then delete it from live systems within sixty days.",
+          "paraphrases": [
+            "what happens to our data when we stop being a customer",
+            "do you erase records after termination"
+          ]
+        },
+        {
+          "key": "subprocessor-list",
+          "title": "Subprocessor List",
+          "body": "We publish a list of the subprocessors that handle customer data and give thirty days' notice before adding a new one.",
+          "paraphrases": ["which third parties process our information"]
+        },
+        {
+          "key": "international-transfers",
+          "title": "Sending Personal Data Abroad",
+          "body": "We do not transfer personal data outside the UK. If that ever changes, we would use the approved contract clauses first.",
+          "paraphrases": ["is personal data sent abroad"]
+        },
+        {
+          "key": "privacy-notice",
+          "title": "Published Privacy Statement",
+          "body": "Our privacy notice explains what we collect, why, and for how long. It is linked from every sign-up form.",
+          "paraphrases": ["where can I read how you use personal information"]
+        },
+        {
+          "key": "cookie-consent",
+          "title": "Cookie Consent",
+          "body": "Our website sets no tracking cookies until a visitor agrees to them. Declining is as easy as accepting.",
+          "paraphrases": ["do you ask before setting tracking cookies"]
+        },
+        {
+          "key": "impact-assessments",
+          "title": "Privacy Impact Assessments",
+          "body": "A privacy impact assessment is written before any new processing that could put people at high risk.",
+          "paraphrases": [
+            "when do you carry out a DPIA",
+            "do you assess privacy risk before new projects"
+          ]
+        },
+        {
+          "key": "data-classification",
+          "title": "Information Classification",
+          "body": "Information is labelled Public, Internal, Confidential or Secret, and each label sets who may see it and how it is sent.",
+          "paraphrases": ["what classification scheme do you use for documents"]
+        },
+        {
+          "key": "records-of-processing",
+          "title": "Processing Activity Register",
+          "body": "We keep a register of every processing activity, its purpose, its lawful basis and its retention period.",
+          "paraphrases": ["do you maintain a ROPA"]
+        },
+        {
+          "key": "marketing-consent",
+          "title": "Marketing Consent",
+          "body": "We send marketing emails only to people who opted in, and every email carries a one-click unsubscribe link.",
+          "paraphrases": [
+            "how do people stop your marketing emails",
+            "do you need permission to send newsletters"
+          ]
+        },
+        {
+          "key": "cctv-use",
+          "title": "CCTV at the Office",
+          "body": "Cameras cover the office entrance and car park only. Footage is kept for thirty days unless an incident needs it longer.",
+          "paraphrases": ["how long is camera footage kept"]
+        },
+        {
+          "key": "special-category-data",
+          "title": "Special Category Data",
+          "body": "We avoid collecting health or other special category data about customers. Where staff health data is needed, only HR can read it.",
+          "paraphrases": ["do you hold sensitive health information"]
+        },
+        {
+          "key": "analytics-anonymisation",
+          "title": "Anonymised Product Analytics",
+          "body": "Usage analytics are stripped of names and addresses before they are stored, and are never sold.",
+          "paraphrases": ["is usage tracking anonymous"]
+        },
+        {
+          "key": "data-minimisation",
+          "title": "Data Minimisation",
+          "body": "Each form asks only for what the task needs. Fields nobody uses are removed at the yearly form review.",
+          "paraphrases": ["do you collect more data than you need"]
+        }
+      ]
+    },
+    {
+      "group": "people",
+      "answers": [
+        {
+          "key": "annual-leave",
+          "title": "Annual Leave Allowance",
+          "body": "Full-time staff have twenty-six days of annual leave plus public holidays. Up to five unused days carry over to the next year.",
+          "paraphrases": ["how many holiday days do employees get", "can unused vacation roll over"]
+        },
+        {
+          "key": "sickness-reporting",
+          "title": "Reporting Sickness",
+          "body": "Anyone too unwell to work tells their manager by phone before ten in the morning on the first day.",
+          "paraphrases": ["who do I call when I am ill"]
+        },
+        {
+          "key": "parental-leave",
+          "title": "Parental Leave",
+          "body": "Parents receive full pay for the first sixteen weeks of leave, whichever parent they are.",
+          "paraphrases": [
+            "what is the maternity and paternity package",
+            "how long is paid leave for new parents"
+          ]
+        },
+        {
+          "key": "flexible-working",
+          "title": "Flexible Working Requests",
+          "body": "Anyone can ask to change their hours or pattern from their first day. Managers reply in writing within four weeks.",
+          "paraphrases": ["can I ask for different working hours"]
+        },
+        {
+          "key": "remote-working",
+          "title": "Working From Home",
+          "body": "Most roles can work from home up to three days a week. We provide a monitor, keyboard and chair for the home desk.",
+          "paraphrases": ["is hybrid work allowed", "what equipment do you give remote staff"]
+        },
+        {
+          "key": "expense-claims",
+          "title": "Expense Claim Deadline",
+          "body": "Expenses are claimed within sixty days of being spent, with a photo of the receipt attached.",
+          "paraphrases": ["how long do I have to submit expenses"]
+        },
+        {
+          "key": "mileage-rate",
+          "title": "Mileage Rate",
+          "body": "Business journeys in a private car are repaid at forty-five pence a mile for the first ten thousand miles.",
+          "paraphrases": ["what do you pay per mile for driving", "how are car journeys reimbursed"]
+        },
+        {
+          "key": "training-budget",
+          "title": "Personal Training Budget",
+          "body": "Each person has a yearly learning budget of eight hundred pounds for courses, books or conferences.",
+          "paraphrases": ["is there money for courses and conferences"]
+        },
+        {
+          "key": "probation-period",
+          "title": "Probation Period",
+          "body": "New starters are on probation for three months, with a review meeting at the end of each month.",
+          "paraphrases": ["how long is the trial period for new hires"]
+        },
+        {
+          "key": "notice-period",
+          "title": "Notice Period",
+          "body": "After probation the notice period is one month for most roles and three months for senior roles.",
+          "paraphrases": [
+            "how much notice must I give when resigning",
+            "what notice do managers serve"
+          ]
+        },
+        {
+          "key": "performance-reviews",
+          "title": "Performance Reviews",
+          "body": "Everyone has a short review with their manager every six months, focused on goals and support rather than ratings.",
+          "paraphrases": ["how often are appraisals held"]
+        },
+        {
+          "key": "whistleblowing",
+          "title": "Whistleblowing Line",
+          "body": "Staff can raise a concern in confidence through an outside reporting line, and nobody suffers for raising one in good faith.",
+          "paraphrases": ["how can employees report wrongdoing anonymously"]
+        },
+        {
+          "key": "grievance-procedure",
+          "title": "Grievance Procedure",
+          "body": "A grievance is raised in writing to a manager not involved in it, who meets the person within ten working days.",
+          "paraphrases": [
+            "how do I make a formal complaint about work",
+            "what is the process for raising a grievance"
+          ]
+        },
+        {
+          "key": "code-of-conduct",
+          "title": "Code of Conduct",
+          "body": "Our code of conduct sets how we treat each other, customers and suppliers. Every starter signs it.",
+          "paraphrases": ["do you have a staff behaviour policy"]
+        },
+        {
+          "key": "equal-opportunities",
+          "title": "Equal Opportunities",
+          "body": "We recruit, pay and promote on merit, and we publish our pay gap figures each spring.",
+          "paraphrases": ["what is your equality and diversity approach"]
+        },
+        {
+          "key": "background-checks",
+          "title": "Pre-Employment Screening",
+          "body": "Before an offer is confirmed we check references, identity and, for roles with data access, criminal records at the basic level.",
+          "paraphrases": [
+            "do you vet staff before they start",
+            "are criminal record checks done on new employees"
+          ]
+        },
+        {
+          "key": "right-to-work",
+          "title": "Right to Work Checks",
+          "body": "We check every new starter's right to work in the UK before their first day and keep a copy of the evidence.",
+          "paraphrases": ["how do you confirm people can legally work here"]
+        },
+        {
+          "key": "pension-contributions",
+          "title": "Pension Contributions",
+          "body": "The company pays six percent of salary into the workplace pension when the employee pays four percent.",
+          "paraphrases": ["how much does the employer add to pensions"]
+        },
+        {
+          "key": "cycle-scheme",
+          "title": "Cycle to Work Scheme",
+          "body": "Staff can buy a bicycle through salary sacrifice, spreading the cost over twelve months.",
+          "paraphrases": ["can I get a bike through payroll"]
+        },
+        {
+          "key": "employee-assistance",
+          "title": "Employee Assistance Programme",
+          "body": "A free and confidential helpline offers counselling and advice to staff and their families, day and night.",
+          "paraphrases": [
+            "is there a wellbeing helpline for staff",
+            "can employees get free counselling"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "commercial",
+      "answers": [
+        {
+          "key": "payment-terms",
+          "title": "Payment Terms",
+          "body": "Our invoices are due thirty days from the invoice date, paid by bank transfer or direct debit.",
+          "paraphrases": [
+            "when do your invoices need paying",
+            "what are your standard terms for payment"
+          ]
+        },
+        {
+          "key": "invoice-disputes",
+          "title": "Invoice Disputes",
+          "body": "Raise a query about an invoice within fourteen days and we pause the due date on the disputed lines until it is settled.",
+          "paraphrases": ["what if we disagree with a bill"]
+        },
+        {
+          "key": "purchase-orders",
+          "title": "Purchase Order Numbers",
+          "body": "We add your purchase order number to every invoice if you send it before the invoice is raised.",
+          "paraphrases": ["can you quote our PO on invoices"]
+        },
+        {
+          "key": "vat-registration",
+          "title": "VAT Registration",
+          "body": "We are registered for VAT in the UK, and the number is printed at the foot of every invoice.",
+          "paraphrases": ["are you VAT registered"]
+        },
+        {
+          "key": "professional-indemnity",
+          "title": "Professional Indemnity Insurance",
+          "body": "We hold professional indemnity insurance of five million pounds for any one claim.",
+          "paraphrases": ["what PI cover do you carry", "how much indemnity insurance do you have"]
+        },
+        {
+          "key": "public-liability",
+          "title": "Public Liability Insurance",
+          "body": "Our public liability insurance covers ten million pounds, and employer's liability the same.",
+          "paraphrases": ["what is your public liability limit"]
+        },
+        {
+          "key": "credit-checks",
+          "title": "Customer Credit Checks",
+          "body": "We run a credit check before agreeing terms above twenty thousand pounds a year.",
+          "paraphrases": ["will you check our credit rating"]
+        },
+        {
+          "key": "late-payment-interest",
+          "title": "Late Payment Interest",
+          "body": "On invoices more than thirty days overdue we may charge statutory interest, though we always call first.",
+          "paraphrases": ["do you charge interest on overdue invoices"]
+        },
+        {
+          "key": "price-reviews",
+          "title": "Annual Price Review",
+          "body": "Prices are reviewed once a year on the contract anniversary, and any rise is capped at inflation plus two percent.",
+          "paraphrases": [
+            "how often can you increase prices",
+            "is there a cap on yearly price rises"
+          ]
+        },
+        {
+          "key": "charity-discount",
+          "title": "Charity Discount",
+          "body": "Registered charities receive a twenty percent discount on list prices.",
+          "paraphrases": ["do non-profits get cheaper rates"]
+        },
+        {
+          "key": "contract-length",
+          "title": "Contract Length",
+          "body": "Our standard contract runs for twelve months and then rolls on month by month.",
+          "paraphrases": ["how long is the minimum term"]
+        },
+        {
+          "key": "termination-for-convenience",
+          "title": "Termination for Convenience",
+          "body": "Either side can end the contract with ninety days' written notice after the first year.",
+          "paraphrases": [
+            "can we cancel without a reason",
+            "what notice do we need to give to end the agreement"
+          ]
+        },
+        {
+          "key": "liability-cap",
+          "title": "Limitation of Liability",
+          "body": "Our total liability in a year is limited to the fees paid in that year, except for the losses the law does not let us limit.",
+          "paraphrases": ["what is the cap on your liability"]
+        },
+        {
+          "key": "service-credits",
+          "title": "Service Credits",
+          "body": "If availability falls below the agreed target in a month, the next invoice carries a credit worth five percent of that month's fees.",
+          "paraphrases": ["do we get money back when the service misses its target"]
+        },
+        {
+          "key": "source-code-escrow",
+          "title": "Source Code Escrow",
+          "body": "Customers on the enterprise plan can join an escrow agreement that releases our source code if we cease trading.",
+          "paraphrases": [
+            "is there an escrow arrangement",
+            "what if your company goes out of business"
+          ]
+        },
+        {
+          "key": "billing-currency",
+          "title": "Billing Currency",
+          "body": "We invoice in pounds sterling only.",
+          "paraphrases": ["can you bill in euros or dollars"]
+        },
+        {
+          "key": "refund-policy",
+          "title": "Refund Policy",
+          "body": "Fees paid in advance for a period not yet started are refunded in full if the contract ends early through our fault.",
+          "paraphrases": ["do you give refunds"]
+        },
+        {
+          "key": "financial-accounts",
+          "title": "Financial Statements",
+          "body": "Our filed accounts for the last three years are available on request, and the latest are public at Companies House.",
+          "paraphrases": ["can we see your accounts", "how do we check your financial stability"]
+        }
+      ]
+    },
+    {
+      "group": "compliance",
+      "answers": [
+        {
+          "key": "quality-certification",
+          "title": "Quality Management Certification",
+          "body": "We are certified to ISO 9001 for the design and support of our software, audited each year by an accredited body.",
+          "paraphrases": ["are you ISO 9001 certified"]
+        },
+        {
+          "key": "information-security-certification",
+          "title": "Information Security Certification",
+          "body": "Our information security management system is certified to ISO/IEC 27001, with the scope covering every customer-facing service.",
+          "paraphrases": [
+            "do you hold ISO 27001",
+            "is your security programme independently certified"
+          ]
+        },
+        {
+          "key": "cyber-essentials",
+          "title": "Cyber Essentials Plus",
+          "body": "We have held Cyber Essentials Plus for four years running, renewed every twelve months.",
+          "paraphrases": ["do you have Cyber Essentials"]
+        },
+        {
+          "key": "web-accessibility",
+          "title": "Web Accessibility Standard",
+          "body": "Our websites and apps are built to meet WCAG 2.2 level AA, and an outside tester checks them each year.",
+          "paraphrases": [
+            "is your website accessible to disabled users",
+            "which WCAG level do you meet"
+          ]
+        },
+        {
+          "key": "modern-slavery",
+          "title": "Modern Slavery Statement",
+          "body": "Our modern slavery statement is published on our website and signed by a director each year.",
+          "paraphrases": ["where is your anti-slavery statement"]
+        },
+        {
+          "key": "anti-bribery",
+          "title": "Anti-Bribery Policy",
+          "body": "Nobody may offer or accept gifts worth more than fifty pounds, and every gift is entered in a register.",
+          "paraphrases": [
+            "what is your policy on gifts and hospitality",
+            "how do you prevent bribery"
+          ]
+        },
+        {
+          "key": "environmental-policy",
+          "title": "Environmental Policy",
+          "body": "Our environmental policy commits us to cut waste, reuse equipment and choose suppliers who report their emissions.",
+          "paraphrases": ["do you have a green policy"]
+        },
+        {
+          "key": "carbon-reduction-plan",
+          "title": "Carbon Reduction Plan",
+          "body": "We publish a carbon reduction plan that commits to net zero by 2040, with the baseline year and current emissions stated.",
+          "paraphrases": ["when will you reach net zero", "do you have a plan to lower emissions"]
+        },
+        {
+          "key": "social-value",
+          "title": "Social Value",
+          "body": "Each employee has two paid volunteering days a year, and we offer work placements to local school leavers.",
+          "paraphrases": ["what do you give back to the community"]
+        },
+        {
+          "key": "health-and-safety",
+          "title": "Health and Safety Policy",
+          "body": "A director is responsible for health and safety, and risk assessments for the office are reviewed every year.",
+          "paraphrases": ["who is accountable for workplace safety"]
+        },
+        {
+          "key": "conflicts-of-interest",
+          "title": "Conflicts of Interest",
+          "body": "Staff declare any outside interest that could affect their work, and the declarations are reviewed each year.",
+          "paraphrases": ["how do you manage conflicts of interest"]
+        },
+        {
+          "key": "sanctions-screening",
+          "title": "Sanctions Screening",
+          "body": "New suppliers and customers are screened against the UK sanctions list before the first contract is signed.",
+          "paraphrases": ["do you check partners against sanctions lists"]
+        },
+        {
+          "key": "quality-complaints",
+          "title": "Handling Complaints",
+          "body": "A complaint is acknowledged within one working day and given a named owner, and we aim to resolve it within ten.",
+          "paraphrases": [
+            "how do you deal with customer complaints",
+            "what is your complaints process"
+          ]
+        },
+        {
+          "key": "customer-audits",
+          "title": "Customer Audit Rights",
+          "body": "Customers may audit our controls once a year with thirty days' notice, or sooner after a confirmed incident.",
+          "paraphrases": ["can we audit you"]
+        }
+      ]
+    },
+    {
+      "group": "service",
+      "answers": [
+        {
+          "key": "support-hours",
+          "title": "Support Hours",
+          "body": "Our support team answers from eight in the morning to six in the evening, Monday to Friday, except bank holidays.",
+          "paraphrases": ["when is your help desk open", "what times can we reach support"]
+        },
+        {
+          "key": "urgent-response-time",
+          "title": "Urgent Issue Response Time",
+          "body": "A priority one issue, where the service is down for everyone, gets a response within thirty minutes at any hour.",
+          "paraphrases": ["how fast do you react to a critical outage"]
+        },
+        {
+          "key": "escalation-path",
+          "title": "Escalation Path",
+          "body": "If an issue is not moving, ask for the duty manager. If it still stalls, the head of support takes it within one working day.",
+          "paraphrases": ["who do we escalate to when support is slow"]
+        },
+        {
+          "key": "account-manager",
+          "title": "Named Account Manager",
+          "body": "Every customer on an annual plan has a named account manager who meets them at least twice a year.",
+          "paraphrases": [
+            "will we have a dedicated contact",
+            "who is our point of contact for the account"
+          ]
+        },
+        {
+          "key": "status-page",
+          "title": "Service Status Page",
+          "body": "Our public status page shows the live state of every service and the history of past incidents.",
+          "paraphrases": ["where can we see if the service is down"]
+        },
+        {
+          "key": "maintenance-windows",
+          "title": "Planned Maintenance",
+          "body": "Planned maintenance happens on Sunday mornings between six and eight, announced at least seven days ahead.",
+          "paraphrases": [
+            "when do you do scheduled maintenance",
+            "how much warning do you give for downtime"
+          ]
+        },
+        {
+          "key": "release-notes",
+          "title": "Release Notes",
+          "body": "Each release is described in plain notes published on the day it ships, with anything that changes behaviour called out first.",
+          "paraphrases": ["where do you announce new versions"]
+        },
+        {
+          "key": "customer-training",
+          "title": "Customer Training Sessions",
+          "body": "New customers get two live training sessions, and recorded courses are free for every user.",
+          "paraphrases": ["do you train our staff", "are there tutorials for new users"]
+        },
+        {
+          "key": "onboarding-timeline",
+          "title": "Onboarding Timeline",
+          "body": "Most customers are set up and working within three weeks of signing, with a weekly call until go-live.",
+          "paraphrases": ["how long does implementation take"]
+        },
+        {
+          "key": "success-reviews",
+          "title": "Customer Success Reviews",
+          "body": "Twice a year we review how a customer uses the service and suggest changes that would save them time.",
+          "paraphrases": ["do you hold regular account reviews"]
+        },
+        {
+          "key": "feature-requests",
+          "title": "Feature Requests",
+          "body": "Customers suggest features on a shared board, and we report each quarter on what we built from it.",
+          "paraphrases": ["how can we ask for a new capability", "do you take product suggestions"]
+        },
+        {
+          "key": "bug-reports",
+          "title": "Reporting a Bug",
+          "body": "Report a fault through the support portal with steps to reproduce it. Each report receives a reference number straight away.",
+          "paraphrases": ["how do we tell you about a defect"]
+        },
+        {
+          "key": "availability-target",
+          "title": "Availability Target",
+          "body": "We commit to 99.9 percent availability each month, measured outside planned maintenance.",
+          "paraphrases": ["what uptime do you guarantee", "what is your SLA for availability"]
+        },
+        {
+          "key": "holiday-support-cover",
+          "title": "Holiday Support Cover",
+          "body": "Over the Christmas break a reduced support team works each weekday, and urgent cover runs as normal.",
+          "paraphrases": ["is support available over Christmas"]
+        },
+        {
+          "key": "support-languages",
+          "title": "Support Languages",
+          "body": "Support is offered in English and Welsh. Our guides are written in plain English.",
+          "paraphrases": ["can we get help in Welsh"]
+        },
+        {
+          "key": "user-guides",
+          "title": "User Guides",
+          "body": "Step-by-step guides for every screen live in our online help centre, updated with each release.",
+          "paraphrases": ["is there documentation for users", "where is the help centre"]
+        }
+      ]
+    },
+    {
+      "group": "office",
+      "answers": [
+        {
+          "key": "visitor-sign-in",
+          "title": "Visitor Sign-In",
+          "body": "Visitors sign in at reception, wear a badge and are accompanied by their host at all times.",
+          "paraphrases": ["what do guests do when they arrive at the office"]
+        },
+        {
+          "key": "office-hours",
+          "title": "Office Opening Hours",
+          "body": "The office is open from seven in the morning until seven in the evening on weekdays.",
+          "paraphrases": ["what time does the building open", "when does the office close"]
+        },
+        {
+          "key": "staff-parking",
+          "title": "Staff Parking",
+          "body": "Twelve parking spaces are shared through the desk booking tool, with two kept for disabled drivers.",
+          "paraphrases": ["is there parking at the office"]
+        },
+        {
+          "key": "fire-drills",
+          "title": "Fire Drills",
+          "body": "We hold a fire drill every six months, and fire wardens are named on each floor.",
+          "paraphrases": ["how often do you practise evacuating the building"]
+        },
+        {
+          "key": "first-aid",
+          "title": "First Aid Cover",
+          "body": "At least two trained first aiders are in the office whenever it is open, and the kit is by the kitchen.",
+          "paraphrases": [
+            "who can help if someone is injured at work",
+            "where is the first aid box"
+          ]
+        },
+        {
+          "key": "desk-booking",
+          "title": "Desk Booking",
+          "body": "Desks are booked a day ahead in the booking tool, and a desk left empty by ten is released.",
+          "paraphrases": ["how do I reserve a workstation"]
+        },
+        {
+          "key": "printing",
+          "title": "Printing",
+          "body": "Printers release a job only when you tap your access card, so nothing sits in the tray.",
+          "paraphrases": ["how does secure printing work"]
+        },
+        {
+          "key": "guest-wifi",
+          "title": "Guest Wi-Fi",
+          "body": "Guests use a separate wireless network that cannot reach any internal system. Its password changes weekly.",
+          "paraphrases": [
+            "can visitors get on the internet",
+            "is the guest network kept apart from the staff network"
+          ]
+        },
+        {
+          "key": "lost-property",
+          "title": "Lost Property",
+          "body": "Lost items are kept at reception for a month and then given to charity.",
+          "paraphrases": ["what happens to things left behind"]
+        },
+        {
+          "key": "access-cards",
+          "title": "Building Access Cards",
+          "body": "Each person has an access card for the doors they need. A lost card is cancelled within an hour of being reported.",
+          "paraphrases": ["what if I lose my door pass"]
+        },
+        {
+          "key": "clean-desk",
+          "title": "Clear Desk Rule",
+          "body": "Papers and devices are locked away at the end of each day, and screens lock after five idle minutes.",
+          "paraphrases": ["do you have a clean desk policy", "when do screens lock automatically"]
+        },
+        {
+          "key": "confidential-waste",
+          "title": "Confidential Waste",
+          "body": "Confidential paper goes into locked bins that a certified firm shreds on site every fortnight.",
+          "paraphrases": ["how are sensitive papers destroyed"]
+        },
+        {
+          "key": "equipment-loans",
+          "title": "Equipment Loans",
+          "body": "Spare laptops, headsets and cameras can be borrowed from the IT cupboard for up to a week.",
+          "paraphrases": ["can I borrow a spare headset"]
+        },
+        {
+          "key": "software-requests",
+          "title": "Software Requests",
+          "body": "New software is requested through the IT portal. IT checks its licence and security before installing it.",
+          "paraphrases": ["how do I get a new application installed", "who approves new software"]
+        },
+        {
+          "key": "phone-system",
+          "title": "Phone System",
+          "body": "Our phones run through an internet telephony service, so every number rings on laptops as well as desk handsets.",
+          "paraphrases": ["can I answer my work number from a laptop"]
+        },
+        {
+          "key": "email-signature",
+          "title": "Email Signature",
+          "body": "Every email signature carries the person's name, role and the company's registered address, set centrally.",
+          "paraphrases": ["what should go in my email footer"]
+        },
+        {
+          "key": "video-calls",
+          "title": "Video Calls",
+          "body": "Internal meetings use one approved video tool. Meetings with customers can use the customer's tool if they prefer.",
+          "paraphrases": [
+            "which video conferencing app do you use",
+            "can we meet on our own conferencing platform"
+          ]
+        },
+        {
+          "key": "travel-booking",
+          "title": "Business Travel Booking",
+          "body": "Business travel is booked through our travel agent, standard class by default, at least a week ahead where possible.",
+          "paraphrases": ["how do I book train tickets for work"]
+        }
+      ]
+    },
+    {
+      "group": "continuity",
+      "answers": [
+        {
+          "key": "supplier-reviews",
+          "title": "Key Supplier Reviews",
+          "body": "Our ten most important suppliers are reviewed each year for security, finances and service quality.",
+          "paraphrases": [
+            "how do you monitor your main vendors",
+            "do you assess suppliers regularly"
+          ]
+        },
+        {
+          "key": "supplier-onboarding",
+          "title": "Supplier Onboarding",
+          "body": "A new supplier completes our security questionnaire and signs our data terms before it receives any customer data.",
+          "paraphrases": ["what checks happen before you take on a vendor"]
+        },
+        {
+          "key": "continuity-plan-testing",
+          "title": "Business Continuity Testing",
+          "body": "Our business continuity plan is tested once a year with a full exercise, and the lessons are fed back into the plan.",
+          "paraphrases": [
+            "how often do you test the BCP",
+            "have you rehearsed your continuity arrangements"
+          ]
+        },
+        {
+          "key": "pandemic-planning",
+          "title": "Pandemic Planning",
+          "body": "Every role can be done from home, so an outbreak that closes the office does not stop our service.",
+          "paraphrases": ["what happens if staff cannot come into the office because of illness"]
+        },
+        {
+          "key": "office-loss",
+          "title": "Loss of the Office",
+          "body": "If the office became unusable, staff would work from home the same day. No service depends on the building.",
+          "paraphrases": ["what if your premises burned down"]
+        },
+        {
+          "key": "staff-shortage",
+          "title": "Staff Shortage Cover",
+          "body": "Each critical task has at least two people trained to do it, and cover is planned before any long absence.",
+          "paraphrases": [
+            "what if key people are unavailable",
+            "do you have backup for critical staff"
+          ]
+        },
+        {
+          "key": "subcontracting",
+          "title": "Use of Subcontractors",
+          "body": "We do not subcontract customer work without the customer's written agreement.",
+          "paraphrases": ["will you outsource any of our work"]
+        },
+        {
+          "key": "offshore-staff",
+          "title": "Offshore Staff",
+          "body": "All our staff are based in the UK, and nobody outside it can reach customer data.",
+          "paraphrases": ["are any of your employees overseas"]
+        },
+        {
+          "key": "company-size",
+          "title": "Company Size",
+          "body": "We employ forty-two people, of whom eighteen work on engineering and support.",
+          "paraphrases": ["how many employees do you have", "how big is your team"]
+        },
+        {
+          "key": "years-trading",
+          "title": "Years Trading",
+          "body": "We have traded since 2014 and have served customers continuously since our first year.",
+          "paraphrases": ["how long has your business been operating"]
+        },
+        {
+          "key": "company-registration",
+          "title": "Company Registration",
+          "body": "We are a private limited company registered in England and Wales, and our number is on every invoice.",
+          "paraphrases": ["what is your company number", "where are you incorporated"]
+        },
+        {
+          "key": "ownership",
+          "title": "Ownership",
+          "body": "The company is owned by its two founders and an employee ownership trust, with no outside investors.",
+          "paraphrases": ["who owns your business"]
+        },
+        {
+          "key": "customer-references",
+          "title": "Customer References",
+          "body": "We can put you in touch with three current customers of a similar size who have agreed to be referees.",
+          "paraphrases": ["can you provide references", "who can we speak to about your work"]
+        },
+        {
+          "key": "case-studies",
+          "title": "Case Studies",
+          "body": "Written case studies from customers in retail, logistics and care are available on our website.",
+          "paraphrases": ["do you have examples of past projects"]
+        },
+        {
+          "key": "supplier-sustainability",
+          "title": "Sustainable Suppliers",
+          "body": "We prefer suppliers that publish their emissions, and we ask our largest suppliers for their plans each year.",
+          "paraphrases": ["do you consider sustainability when buying"]
+        },
+        {
+          "key": "ethical-sourcing",
+          "title": "Ethical Sourcing",
+          "body": "Hardware is bought from vendors that publish supply chain audits, and old equipment is refurbished or recycled.",
+          "paraphrases": ["where does your hardware come from", "what happens to old laptops"]
+        },
+        {
+          "key": "local-suppliers",
+          "title": "Local Suppliers",
+          "body": "Where price and quality are equal, we choose a supplier from our own region.",
+          "paraphrases": ["do you buy from local businesses"]
+        },
+        {
+          "key": "sme-status",
+          "title": "SME Status",
+          "body": "We are a small business by the government's definition, with fewer than fifty staff and turnover under ten million pounds.",
+          "paraphrases": [
+            "would you be classed as a small or medium firm",
+            "do you count as a small enterprise"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "tallyloom",
+      "answers": [
+        {
+          "key": "what-tallyloom-is",
+          "title": "About Tallyloom",
+          "body": "Tallyloom is our business management suite. It brings ledgers, payroll, rotas, stock, fleet and the helpdesk into one place.",
+          "paraphrases": ["what does your software do", "what is Tallyloom for"]
+        },
+        {
+          "key": "tallyloom-browsers",
+          "title": "Tallyloom Supported Browsers",
+          "body": "Tallyloom runs in the current and previous versions of the major desktop browsers. No plug-ins are needed.",
+          "paraphrases": ["which web browsers work with the system"]
+        },
+        {
+          "key": "tallyloom-mobile-app",
+          "title": "Tallyloom Mobile App",
+          "body": "The Tallyloom app for phones covers approvals, rotas and expenses, and works on both major phone platforms.",
+          "paraphrases": ["is there a phone app", "can I use the suite on my mobile"]
+        },
+        {
+          "key": "tallyloom-single-sign-on",
+          "title": "Tallyloom Single Sign-On",
+          "body": "Tallyloom supports single sign-on through SAML and OpenID Connect, so staff sign in with their company identity.",
+          "paraphrases": ["does it support SSO"]
+        },
+        {
+          "key": "tallyloom-user-roles",
+          "title": "Tallyloom User Roles",
+          "body": "Tallyloom has four built-in roles, Owner, Manager, Member and Guest, and each module can narrow a role further.",
+          "paraphrases": [
+            "what permission levels does the platform offer",
+            "can access be limited by role"
+          ]
+        },
+        {
+          "key": "tallyloom-api",
+          "title": "Tallyloom API",
+          "body": "Tallyloom has a documented REST API. Keys are issued per integration and can be revoked at any time.",
+          "paraphrases": ["can developers connect to it programmatically"]
+        },
+        {
+          "key": "tallyloom-webhooks",
+          "title": "Tallyloom Webhooks",
+          "body": "Tallyloom can call your own address whenever a record changes, signed so you can check the call came from us.",
+          "paraphrases": ["can the system notify our app when data changes"]
+        },
+        {
+          "key": "tallyloom-full-export",
+          "title": "Tallyloom Full Account Export",
+          "body": "An Owner can download everything in a Tallyloom account as a single archive of CSV files at any time.",
+          "paraphrases": [
+            "can we take all our data with us",
+            "how do we get a complete copy of our account"
+          ]
+        },
+        {
+          "key": "tallyloom-hosting",
+          "title": "Tallyloom Hosting",
+          "body": "Tallyloom is hosted in UK data centres and runs across two sites, so either site can carry the load alone.",
+          "paraphrases": ["where is the suite hosted"]
+        },
+        {
+          "key": "tallyloom-uptime-history",
+          "title": "Tallyloom Uptime History",
+          "body": "Over the last twelve months Tallyloom was available 99.97 percent of the time, as the status page records.",
+          "paraphrases": ["how reliable has the platform been"]
+        },
+        {
+          "key": "tallyloom-pricing-tiers",
+          "title": "Tallyloom Pricing Plans",
+          "body": "Tallyloom comes in three plans, Starter, Growth and Enterprise, priced per user per month.",
+          "paraphrases": ["how much does it cost", "what subscription options are there"]
+        },
+        {
+          "key": "tallyloom-free-trial",
+          "title": "Tallyloom Free Trial",
+          "body": "Anyone can try Tallyloom free for thirty days with every module turned on and no card required.",
+          "paraphrases": ["can we test the product before buying"]
+        },
+        {
+          "key": "tallyloom-user-limits",
+          "title": "Tallyloom User Limits",
+          "body": "Starter allows up to twenty-five users. Growth and Enterprise have no upper limit.",
+          "paraphrases": ["how many people can use the system"]
+        },
+        {
+          "key": "tallyloom-audit-trail",
+          "title": "Tallyloom Audit Trail",
+          "body": "Tallyloom keeps an account-wide audit trail of sign-ins, setting changes and exports, which Owners can search.",
+          "paraphrases": [
+            "can we see who changed account settings",
+            "is there an activity log for the whole account"
+          ]
+        },
+        {
+          "key": "tallyloom-two-factor",
+          "title": "Tallyloom Two-Factor Sign-In",
+          "body": "An Owner can require every Tallyloom user to set up an authenticator app before their first sign-in.",
+          "paraphrases": ["can we force MFA for our users"]
+        },
+        {
+          "key": "tallyloom-offline",
+          "title": "Tallyloom Offline Use",
+          "body": "The Tallyloom phone app keeps working without signal and sends its changes once it reconnects.",
+          "paraphrases": ["does the app work without internet"]
+        },
+        {
+          "key": "tallyloom-accounting-integrations",
+          "title": "Tallyloom Accounting Integrations",
+          "body": "Tallyloom connects to the three most common UK accounting packages and keeps contacts and invoices in step.",
+          "paraphrases": [
+            "does it sync with our bookkeeping software",
+            "which finance packages can it link to"
+          ]
+        },
+        {
+          "key": "tallyloom-data-import",
+          "title": "Tallyloom Data Import",
+          "body": "During onboarding we import your existing records into Tallyloom from spreadsheets or from most rival systems.",
+          "paraphrases": ["can you move our data over from our old system"]
+        },
+        {
+          "key": "tallyloom-custom-fields",
+          "title": "Tallyloom Custom Fields",
+          "body": "Managers can add custom fields to most Tallyloom records, such as text, dates, numbers and drop-down lists.",
+          "paraphrases": ["can we add our own fields to records"]
+        },
+        {
+          "key": "tallyloom-dashboards",
+          "title": "Tallyloom Dashboards",
+          "body": "Each Tallyloom user can build a dashboard of charts and counts drawn from any module they can see.",
+          "paraphrases": [
+            "is there a home screen with charts",
+            "can users build their own dashboards"
+          ]
+        },
+        {
+          "key": "tallyloom-accessibility",
+          "title": "Tallyloom Accessibility",
+          "body": "Tallyloom works with screen readers and keyboard-only use, and its accessibility statement lists known gaps.",
+          "paraphrases": ["can blind users work with the software"]
+        },
+        {
+          "key": "tallyloom-languages",
+          "title": "Tallyloom Interface Languages",
+          "body": "The Tallyloom interface is available in English and Welsh, chosen by each user.",
+          "paraphrases": ["can the screens be shown in Welsh"]
+        },
+        {
+          "key": "tallyloom-release-cadence",
+          "title": "Tallyloom Release Schedule",
+          "body": "New Tallyloom versions ship every second Tuesday. Changes that alter how a screen works are announced a month ahead.",
+          "paraphrases": ["how often do you update the product", "when do new versions come out"]
+        },
+        {
+          "key": "tallyloom-sandbox",
+          "title": "Tallyloom Sandbox",
+          "body": "Enterprise customers get a sandbox copy of their Tallyloom account for testing, refreshed on request.",
+          "paraphrases": ["is there a test environment"]
+        }
+      ]
+    },
+    {
+      "group": "ledger",
+      "answers": [
+        {
+          "key": "ledger-data-export",
+          "title": "Ledger Data Export",
+          "body": "In Tallyloom Ledger, a Manager can export invoices and journals as CSV or PDF from the Export menu. Large exports arrive by email as a download link.",
+          "paraphrases": [
+            "how do I download our invoices as a spreadsheet",
+            "can ledger data be extracted to a file"
+          ]
+        },
+        {
+          "key": "ledger-csv-import",
+          "title": "Ledger CSV Import",
+          "body": "Tallyloom Ledger imports invoices and journals from a CSV file. The import checks every row first and lists any it cannot read before anything is saved.",
+          "paraphrases": ["can we upload invoices from a spreadsheet"]
+        },
+        {
+          "key": "ledger-approval-rules",
+          "title": "Ledger Approval Rules",
+          "body": "In Tallyloom Ledger, changes to invoices and journals above a set limit wait for the finance manager to approve them. The limit is set per team.",
+          "paraphrases": [
+            "who signs off changes to invoices",
+            "does ledger need approval before changes go through"
+          ]
+        },
+        {
+          "key": "ledger-notifications",
+          "title": "Ledger Notifications",
+          "body": "Tallyloom Ledger sends an email or app alert when an invoice becomes overdue. Each user chooses which alerts they receive.",
+          "paraphrases": ["how do I turn alerts on in ledger"]
+        },
+        {
+          "key": "ledger-archiving",
+          "title": "Ledger Archiving",
+          "body": "Old invoices and journals in Tallyloom Ledger can be archived. Archived records leave the everyday lists but stay searchable and can be restored.",
+          "paraphrases": [
+            "can we hide old invoices without deleting them",
+            "how does archiving work in ledger"
+          ]
+        },
+        {
+          "key": "ledger-permissions",
+          "title": "Ledger Permissions",
+          "body": "In Tallyloom Ledger, each role sees only the invoices and journals its teams own unless the finance manager grants wider access.",
+          "paraphrases": ["who can see invoices"]
+        },
+        {
+          "key": "ledger-change-history",
+          "title": "Ledger Change History",
+          "body": "Every change to invoices and journals in Tallyloom Ledger is kept in the record's history, showing who changed what and when.",
+          "paraphrases": ["can I see who edited invoices", "does ledger track edits"]
+        },
+        {
+          "key": "ledger-retention",
+          "title": "Ledger Record Retention",
+          "body": "Tallyloom Ledger keeps invoices and journals for seven years and then deletes them, unless a legal hold applies.",
+          "paraphrases": ["what is the retention period for ledger records"]
+        },
+        {
+          "key": "ledger-bulk-edit",
+          "title": "Ledger Bulk Editing",
+          "body": "A Manager can select many invoices and journals in Tallyloom Ledger and change a field on all of them at once. The change can be undone for an hour.",
+          "paraphrases": [
+            "can I update lots of invoices at the same time",
+            "is there mass editing in ledger"
+          ]
+        },
+        {
+          "key": "ledger-reports",
+          "title": "Ledger Reports",
+          "body": "Tallyloom Ledger comes with ready-made reports on cash flow and aged debt, and any report can be scheduled to arrive by email.",
+          "paraphrases": ["can I get a report on aged debtors"]
+        },
+        {
+          "key": "ledger-mobile-access",
+          "title": "Ledger on Mobile",
+          "body": "The Tallyloom phone app shows Ledger, so staff can approve invoices away from a desk.",
+          "paraphrases": [
+            "can staff approve invoices on their phone",
+            "is ledger available on mobile"
+          ]
+        },
+        {
+          "key": "ledger-integrations",
+          "title": "Ledger Integrations",
+          "body": "Tallyloom Ledger connects to bank feeds, so payments appear in the ledger without anyone typing them in again.",
+          "paraphrases": ["what does ledger integrate with"]
+        }
+      ]
+    },
+    {
+      "group": "payroll",
+      "answers": [
+        {
+          "key": "payroll-data-export",
+          "title": "Payroll Data Export",
+          "body": "In Tallyloom Payroll, a Manager can export payslips and pay runs as CSV or PDF from the Export menu. Large exports arrive by email as a download link.",
+          "paraphrases": ["how do I download our payslips as a spreadsheet"]
+        },
+        {
+          "key": "payroll-csv-import",
+          "title": "Payroll CSV Import",
+          "body": "Tallyloom Payroll imports payslips and pay runs from a CSV file. The import checks every row first and lists any it cannot read before anything is saved.",
+          "paraphrases": [
+            "can we upload payslips from a spreadsheet",
+            "is bulk loading supported in payroll"
+          ]
+        },
+        {
+          "key": "payroll-approval-rules",
+          "title": "Payroll Approval Rules",
+          "body": "In Tallyloom Payroll, changes to payslips and pay runs above a set limit wait for the payroll manager to approve them. The limit is set per team.",
+          "paraphrases": ["does payroll need approval before changes go through"]
+        },
+        {
+          "key": "payroll-notifications",
+          "title": "Payroll Notifications",
+          "body": "Tallyloom Payroll sends an email or app alert when a pay run is ready to check. Each user chooses which alerts they receive.",
+          "paraphrases": [
+            "will I get told when payroll is ready",
+            "how do I turn alerts on in payroll"
+          ]
+        },
+        {
+          "key": "payroll-archiving",
+          "title": "Payroll Archiving",
+          "body": "Old payslips and pay runs in Tallyloom Payroll can be archived. Archived records leave the everyday lists but stay searchable and can be restored.",
+          "paraphrases": ["can we hide old payslips without deleting them"]
+        },
+        {
+          "key": "payroll-permissions",
+          "title": "Payroll Permissions",
+          "body": "In Tallyloom Payroll, each role sees only the payslips and pay runs its teams own unless the payroll manager grants wider access.",
+          "paraphrases": ["who can see payslips", "how is access controlled in payroll"]
+        },
+        {
+          "key": "payroll-change-history",
+          "title": "Payroll Change History",
+          "body": "Every change to payslips and pay runs in Tallyloom Payroll is kept in the record's history, showing who changed what and when.",
+          "paraphrases": ["does payroll track edits"]
+        },
+        {
+          "key": "payroll-retention",
+          "title": "Payroll Record Retention",
+          "body": "Tallyloom Payroll keeps payslips and pay runs for six years and then deletes them, unless a legal hold applies.",
+          "paraphrases": [
+            "how long are payslips kept",
+            "what is the retention period for payroll records"
+          ]
+        },
+        {
+          "key": "payroll-bulk-edit",
+          "title": "Payroll Bulk Editing",
+          "body": "A Manager can select many payslips and pay runs in Tallyloom Payroll and change a field on all of them at once. The change can be undone for an hour.",
+          "paraphrases": ["can I update lots of payslips at the same time"]
+        },
+        {
+          "key": "payroll-reports",
+          "title": "Payroll Reports",
+          "body": "Tallyloom Payroll comes with ready-made reports on pay costs and deductions, and any report can be scheduled to arrive by email.",
+          "paraphrases": [
+            "can I get a report on employer costs",
+            "what reporting does payroll offer"
+          ]
+        },
+        {
+          "key": "payroll-mobile-access",
+          "title": "Payroll on Mobile",
+          "body": "The Tallyloom phone app shows Payroll, so staff can read their payslips away from a desk.",
+          "paraphrases": ["is payroll available on mobile"]
+        },
+        {
+          "key": "payroll-integrations",
+          "title": "Payroll Integrations",
+          "body": "Tallyloom Payroll connects to pension providers, so contributions are sent each pay run without anyone typing them in again.",
+          "paraphrases": ["does it link to pension providers", "what does payroll integrate with"]
+        }
+      ]
+    },
+    {
+      "group": "rota",
+      "answers": [
+        {
+          "key": "rota-data-export",
+          "title": "Rota Data Export",
+          "body": "In Tallyloom Rota, a Manager can export shifts and rotas as CSV or PDF from the Export menu. Large exports arrive by email as a download link.",
+          "paraphrases": [
+            "how do I download our shift patterns as a spreadsheet",
+            "can rota data be extracted to a file"
+          ]
+        },
+        {
+          "key": "rota-csv-import",
+          "title": "Rota CSV Import",
+          "body": "Tallyloom Rota imports shifts and rotas from a CSV file. The import checks every row first and lists any it cannot read before anything is saved.",
+          "paraphrases": ["is bulk loading supported in rota"]
+        },
+        {
+          "key": "rota-approval-rules",
+          "title": "Rota Approval Rules",
+          "body": "In Tallyloom Rota, changes to shifts and rotas above a set limit wait for the rota manager to approve them. The limit is set per team.",
+          "paraphrases": [
+            "who signs off changes to shift patterns",
+            "does rota need approval before changes go through"
+          ]
+        },
+        {
+          "key": "rota-notifications",
+          "title": "Rota Notifications",
+          "body": "Tallyloom Rota sends an email or app alert when a shift is changed. Each user chooses which alerts they receive.",
+          "paraphrases": ["will I get told when my shift changes"]
+        },
+        {
+          "key": "rota-archiving",
+          "title": "Rota Archiving",
+          "body": "Old shifts and rotas in Tallyloom Rota can be archived. Archived records leave the everyday lists but stay searchable and can be restored.",
+          "paraphrases": [
+            "can we hide old shift patterns without deleting them",
+            "how does archiving work in rota"
+          ]
+        },
+        {
+          "key": "rota-permissions",
+          "title": "Rota Permissions",
+          "body": "In Tallyloom Rota, each role sees only the shifts and rotas its teams own unless the rota manager grants wider access.",
+          "paraphrases": ["how is access controlled in rota"]
+        },
+        {
+          "key": "rota-change-history",
+          "title": "Rota Change History",
+          "body": "Every change to shifts and rotas in Tallyloom Rota is kept in the record's history, showing who changed what and when.",
+          "paraphrases": ["can I see who edited shift patterns", "does rota track edits"]
+        },
+        {
+          "key": "rota-retention",
+          "title": "Rota Record Retention",
+          "body": "Tallyloom Rota keeps shifts and rotas for three years and then deletes them, unless a legal hold applies.",
+          "paraphrases": ["how long are shift patterns kept"]
+        },
+        {
+          "key": "rota-bulk-edit",
+          "title": "Rota Bulk Editing",
+          "body": "A Manager can select many shifts and rotas in Tallyloom Rota and change a field on all of them at once. The change can be undone for an hour.",
+          "paraphrases": [
+            "can I update lots of shift patterns at the same time",
+            "is there mass editing in rota"
+          ]
+        },
+        {
+          "key": "rota-reports",
+          "title": "Rota Reports",
+          "body": "Tallyloom Rota comes with ready-made reports on hours worked and overtime, and any report can be scheduled to arrive by email.",
+          "paraphrases": ["what reporting does rota offer"]
+        },
+        {
+          "key": "rota-mobile-access",
+          "title": "Rota on Mobile",
+          "body": "The Tallyloom phone app shows Rota, so staff can swap shifts away from a desk.",
+          "paraphrases": ["can staff swap shifts on their phone", "is rota available on mobile"]
+        },
+        {
+          "key": "rota-integrations",
+          "title": "Rota Integrations",
+          "body": "Tallyloom Rota connects to time clocks, so clock-in times reach the rota without anyone typing them in again.",
+          "paraphrases": ["does it link to time clocks"]
+        }
+      ]
+    },
+    {
+      "group": "stockroom",
+      "answers": [
+        {
+          "key": "stockroom-data-export",
+          "title": "Stockroom Data Export",
+          "body": "In Tallyloom Stockroom, a Manager can export stock items and deliveries as CSV or PDF from the Export menu. Large exports arrive by email as a download link.",
+          "paraphrases": ["can stockroom data be extracted to a file"]
+        },
+        {
+          "key": "stockroom-csv-import",
+          "title": "Stockroom CSV Import",
+          "body": "Tallyloom Stockroom imports stock items and deliveries from a CSV file. The import checks every row first and lists any it cannot read before anything is saved.",
+          "paraphrases": [
+            "can we upload stock counts from a spreadsheet",
+            "is bulk loading supported in stockroom"
+          ]
+        },
+        {
+          "key": "stockroom-approval-rules",
+          "title": "Stockroom Approval Rules",
+          "body": "In Tallyloom Stockroom, changes to stock items and deliveries above a set limit wait for the stock manager to approve them. The limit is set per team.",
+          "paraphrases": ["who signs off changes to stock counts"]
+        },
+        {
+          "key": "stockroom-notifications",
+          "title": "Stockroom Notifications",
+          "body": "Tallyloom Stockroom sends an email or app alert when an item falls below its reorder level. Each user chooses which alerts they receive.",
+          "paraphrases": [
+            "will I get told when stock is running low",
+            "how do I turn alerts on in stockroom"
+          ]
+        },
+        {
+          "key": "stockroom-archiving",
+          "title": "Stockroom Archiving",
+          "body": "Old stock items and deliveries in Tallyloom Stockroom can be archived. Archived records leave the everyday lists but stay searchable and can be restored.",
+          "paraphrases": ["how does archiving work in stockroom"]
+        },
+        {
+          "key": "stockroom-permissions",
+          "title": "Stockroom Permissions",
+          "body": "In Tallyloom Stockroom, each role sees only the stock items and deliveries its teams own unless the stock manager grants wider access.",
+          "paraphrases": ["who can see stock counts", "how is access controlled in stockroom"]
+        },
+        {
+          "key": "stockroom-change-history",
+          "title": "Stockroom Change History",
+          "body": "Every change to stock items and deliveries in Tallyloom Stockroom is kept in the record's history, showing who changed what and when.",
+          "paraphrases": ["can I see who edited stock counts"]
+        },
+        {
+          "key": "stockroom-retention",
+          "title": "Stockroom Record Retention",
+          "body": "Tallyloom Stockroom keeps stock items and deliveries for four years and then deletes them, unless a legal hold applies.",
+          "paraphrases": [
+            "how long are stock counts kept",
+            "what is the retention period for stockroom records"
+          ]
+        },
+        {
+          "key": "stockroom-bulk-edit",
+          "title": "Stockroom Bulk Editing",
+          "body": "A Manager can select many stock items and deliveries in Tallyloom Stockroom and change a field on all of them at once. The change can be undone for an hour.",
+          "paraphrases": ["is there mass editing in stockroom"]
+        },
+        {
+          "key": "stockroom-reports",
+          "title": "Stockroom Reports",
+          "body": "Tallyloom Stockroom comes with ready-made reports on stock value and turnover, and any report can be scheduled to arrive by email.",
+          "paraphrases": [
+            "can I get a report on stock value",
+            "what reporting does stockroom offer"
+          ]
+        },
+        {
+          "key": "stockroom-mobile-access",
+          "title": "Stockroom on Mobile",
+          "body": "The Tallyloom phone app shows Stockroom, so staff can count stock away from a desk.",
+          "paraphrases": ["can staff count stock on their phone"]
+        },
+        {
+          "key": "stockroom-integrations",
+          "title": "Stockroom Integrations",
+          "body": "Tallyloom Stockroom connects to barcode scanners, so deliveries are booked in without anyone typing them in again.",
+          "paraphrases": ["does it link to barcode scanners", "what does stockroom integrate with"]
+        }
+      ]
+    },
+    {
+      "group": "fleet",
+      "answers": [
+        {
+          "key": "fleet-data-export",
+          "title": "Fleet Data Export",
+          "body": "In Tallyloom Fleet, a Manager can export vehicles and journeys as CSV or PDF from the Export menu. Large exports arrive by email as a download link.",
+          "paraphrases": [
+            "how do I download our vehicle records as a spreadsheet",
+            "can fleet data be extracted to a file"
+          ]
+        },
+        {
+          "key": "fleet-csv-import",
+          "title": "Fleet CSV Import",
+          "body": "Tallyloom Fleet imports vehicles and journeys from a CSV file. The import checks every row first and lists any it cannot read before anything is saved.",
+          "paraphrases": ["can we upload vehicle records from a spreadsheet"]
+        },
+        {
+          "key": "fleet-approval-rules",
+          "title": "Fleet Approval Rules",
+          "body": "In Tallyloom Fleet, changes to vehicles and journeys above a set limit wait for the fleet manager to approve them. The limit is set per team.",
+          "paraphrases": [
+            "who signs off changes to vehicle records",
+            "does fleet need approval before changes go through"
+          ]
+        },
+        {
+          "key": "fleet-notifications",
+          "title": "Fleet Notifications",
+          "body": "Tallyloom Fleet sends an email or app alert when a vehicle is due a service. Each user chooses which alerts they receive.",
+          "paraphrases": ["how do I turn alerts on in fleet"]
+        },
+        {
+          "key": "fleet-archiving",
+          "title": "Fleet Archiving",
+          "body": "Old vehicles and journeys in Tallyloom Fleet can be archived. Archived records leave the everyday lists but stay searchable and can be restored.",
+          "paraphrases": [
+            "can we hide old vehicle records without deleting them",
+            "how does archiving work in fleet"
+          ]
+        },
+        {
+          "key": "fleet-permissions",
+          "title": "Fleet Permissions",
+          "body": "In Tallyloom Fleet, each role sees only the vehicles and journeys its teams own unless the fleet manager grants wider access.",
+          "paraphrases": ["who can see vehicle records"]
+        },
+        {
+          "key": "fleet-change-history",
+          "title": "Fleet Change History",
+          "body": "Every change to vehicles and journeys in Tallyloom Fleet is kept in the record's history, showing who changed what and when.",
+          "paraphrases": ["can I see who edited vehicle records", "does fleet track edits"]
+        },
+        {
+          "key": "fleet-retention",
+          "title": "Fleet Record Retention",
+          "body": "Tallyloom Fleet keeps vehicles and journeys for five years and then deletes them, unless a legal hold applies.",
+          "paraphrases": ["what is the retention period for fleet records"]
+        },
+        {
+          "key": "fleet-bulk-edit",
+          "title": "Fleet Bulk Editing",
+          "body": "A Manager can select many vehicles and journeys in Tallyloom Fleet and change a field on all of them at once. The change can be undone for an hour.",
+          "paraphrases": [
+            "can I update lots of vehicle records at the same time",
+            "is there mass editing in fleet"
+          ]
+        },
+        {
+          "key": "fleet-reports",
+          "title": "Fleet Reports",
+          "body": "Tallyloom Fleet comes with ready-made reports on mileage and fuel use, and any report can be scheduled to arrive by email.",
+          "paraphrases": ["can I get a report on fuel spend"]
+        },
+        {
+          "key": "fleet-mobile-access",
+          "title": "Fleet on Mobile",
+          "body": "The Tallyloom phone app shows Fleet, so staff can log journeys away from a desk.",
+          "paraphrases": ["can staff log journeys on their phone", "is fleet available on mobile"]
+        },
+        {
+          "key": "fleet-integrations",
+          "title": "Fleet Integrations",
+          "body": "Tallyloom Fleet connects to vehicle trackers, so mileage is recorded without anyone typing them in again.",
+          "paraphrases": ["what does fleet integrate with"]
+        }
+      ]
+    },
+    {
+      "group": "helpdesk",
+      "answers": [
+        {
+          "key": "helpdesk-data-export",
+          "title": "Helpdesk Data Export",
+          "body": "In Tallyloom Helpdesk, a Manager can export tickets and replies as CSV or PDF from the Export menu. Large exports arrive by email as a download link.",
+          "paraphrases": ["how do I download our support tickets as a spreadsheet"]
+        },
+        {
+          "key": "helpdesk-csv-import",
+          "title": "Helpdesk CSV Import",
+          "body": "Tallyloom Helpdesk imports tickets and replies from a CSV file. The import checks every row first and lists any it cannot read before anything is saved.",
+          "paraphrases": [
+            "can we upload support tickets from a spreadsheet",
+            "is bulk loading supported in helpdesk"
+          ]
+        },
+        {
+          "key": "helpdesk-approval-rules",
+          "title": "Helpdesk Approval Rules",
+          "body": "In Tallyloom Helpdesk, changes to tickets and replies above a set limit wait for the support lead to approve them. The limit is set per team.",
+          "paraphrases": ["does helpdesk need approval before changes go through"]
+        },
+        {
+          "key": "helpdesk-notifications",
+          "title": "Helpdesk Notifications",
+          "body": "Tallyloom Helpdesk sends an email or app alert when a ticket is assigned. Each user chooses which alerts they receive.",
+          "paraphrases": [
+            "will I get told when a ticket is given to me",
+            "how do I turn alerts on in helpdesk"
+          ]
+        },
+        {
+          "key": "helpdesk-archiving",
+          "title": "Helpdesk Archiving",
+          "body": "Old tickets and replies in Tallyloom Helpdesk can be archived. Archived records leave the everyday lists but stay searchable and can be restored.",
+          "paraphrases": ["can we hide old support tickets without deleting them"]
+        },
+        {
+          "key": "helpdesk-permissions",
+          "title": "Helpdesk Permissions",
+          "body": "In Tallyloom Helpdesk, each role sees only the tickets and replies its teams own unless the support lead grants wider access.",
+          "paraphrases": ["who can see support tickets", "how is access controlled in helpdesk"]
+        },
+        {
+          "key": "helpdesk-change-history",
+          "title": "Helpdesk Change History",
+          "body": "Every change to tickets and replies in Tallyloom Helpdesk is kept in the record's history, showing who changed what and when.",
+          "paraphrases": ["does helpdesk track edits"]
+        },
+        {
+          "key": "helpdesk-retention",
+          "title": "Helpdesk Record Retention",
+          "body": "Tallyloom Helpdesk keeps tickets and replies for two years and then deletes them, unless a legal hold applies.",
+          "paraphrases": [
+            "how long are support tickets kept",
+            "what is the retention period for helpdesk records"
+          ]
+        },
+        {
+          "key": "helpdesk-bulk-edit",
+          "title": "Helpdesk Bulk Editing",
+          "body": "A Manager can select many tickets and replies in Tallyloom Helpdesk and change a field on all of them at once. The change can be undone for an hour.",
+          "paraphrases": ["can I update lots of support tickets at the same time"]
+        },
+        {
+          "key": "helpdesk-reports",
+          "title": "Helpdesk Reports",
+          "body": "Tallyloom Helpdesk comes with ready-made reports on response times and backlog, and any report can be scheduled to arrive by email.",
+          "paraphrases": [
+            "can I get a report on ticket backlog",
+            "what reporting does helpdesk offer"
+          ]
+        },
+        {
+          "key": "helpdesk-mobile-access",
+          "title": "Helpdesk on Mobile",
+          "body": "The Tallyloom phone app shows Helpdesk, so staff can answer tickets away from a desk.",
+          "paraphrases": ["is helpdesk available on mobile"]
+        },
+        {
+          "key": "helpdesk-integrations",
+          "title": "Helpdesk Integrations",
+          "body": "Tallyloom Helpdesk connects to shared email inboxes, so emails become tickets without anyone typing them in again.",
+          "paraphrases": [
+            "does it link to shared email inboxes",
+            "what does helpdesk integrate with"
+          ]
+        }
+      ]
+    }
+  ]
+}
