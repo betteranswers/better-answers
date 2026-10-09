@@ -333,7 +333,7 @@ describe("the evidence pane", () => {
         { source: "Another note" },
       ],
     });
-    expect(read?.frontmatter["sources"]).toEqual([
+    expect(read?.frontmatter["sources"]).toStrictEqual([
       { title: "Readable note", resource: readable.iri },
       { title: "Another note", resource: "Another note" },
       { title: "Another note", resource: "Another note" },
@@ -567,6 +567,55 @@ describe("a concept's relations", () => {
         { kind: "LINKS_TO", target: withheld.iri, title: withheld.title },
       ].toSorted(byTarget),
     );
+  });
+
+  it("lists the map's named edges, never a SAME_AS one", async () => {
+    const scenario = await arrange();
+    const { readable, withheld } = await readableAndWithheld(scenario);
+    const entry = await noteNaming(scenario, []);
+    await seededBy(db(), async (seed) => {
+      for (const [label, target] of [
+        ["CITES", readable],
+        ["SAME_AS", withheld],
+      ] as const) {
+        await seed.mapEdge({
+          workspaceId: scenario.workspaceId,
+          label,
+          fromUid: entry.iri,
+          toUid: target.iri,
+        });
+      }
+    });
+
+    const read = await readFor(scenario.admin, entry.iri);
+
+    expect(read?.relations).toEqual([
+      { kind: "CITES", target: readable.iri, title: readable.title },
+    ]);
+  });
+
+  it("answers a failed relations read as an error", async () => {
+    const scenario = await arrange();
+    const entry = await noteNaming(scenario, []);
+    const failure = new Error("the relations read failed");
+
+    const read = await reading(scenario.admin, (reader, tx) =>
+      readingThrough(
+        reader,
+        new Proxy(tx, {
+          get: (target, key) =>
+            key === "query"
+              ? (statement: string, values?: unknown[]) =>
+                  statement.includes("map_edge")
+                    ? Promise.reject(failure)
+                    : target.query(statement, values)
+              : Reflect.get(target, key),
+        }),
+        entry.iri,
+      ),
+    );
+
+    expect(read).toEqual({ ok: false, error: failure });
   });
 
   it("gives an Admin a Restricted concept's pane and relations", async () => {
