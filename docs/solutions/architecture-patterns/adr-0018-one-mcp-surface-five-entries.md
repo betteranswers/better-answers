@@ -47,7 +47,7 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 - `describe_estate`, the fifth entry, was dropped. All four others answered through the real claude.ai assistant with no orienting call first, and its budget could not be measured with no estate. `find` is the preview step an agent orients by.
 - The token from claude.ai carries no role, so the role is read per call, in the same transaction as the read it authorises.
 - A reader asking for five matches is asking to be handed five things. Running both arms to five would hand them ten.
-- A concept is the company's answer, and a raw passage is what there was no answer for. So concepts come first.
+- A concept is the company's answer, and a raw passage is what there was no answer for. So a concept holding at least half the query's words comes first. Under any-word matching, a concept sharing one word is weaker evidence than a passage, and putting every such concept first would keep passages off the page (owner, 09/10/2026).
 - One ranking across the two layers would need a score both arms share. S2a kept the arms apart (09/10/2026), and S2b's recall measure may reopen it.
 - An imported bundle's `sources` entry often has no locator, since `sources[].locator` is a key the platform adds. An empty locator would be a passage `open` cannot fetch.
 

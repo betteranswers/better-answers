@@ -425,7 +425,7 @@ flowchart LR
   - *audit log retention* reaches *Audit Logs Retention* (BA-11).
   - A concept whose body repeats *audit* a dozen times ranks below a concept whose title holds *audit*, *log* and *retention* once each.
   - A title match outranks the same words in a body.
-  - For *how long do we keep audit logs*, concepts holding at least four of its seven distinct words come first. Passages follow them, then concepts holding fewer, each run in KTD2's order.
+  - *how long do we keep audit logs* has four distinct lexemes once its stop words drop: *long*, *keep*, *audit*, *log*. Concepts holding at least two of them come first, *Audit Logs Retention* among them. Passages follow, then concepts holding one, each run in KTD2's order.
   - A query of one word puts every matching concept before every passage.
   - Paging: the second page continues each arm after the cursor's bounds, and a page past the end returns none, with no `nextCursor`.
   - A cursor naming a withheld concept's IRI returns the same page as one naming an absent IRI.
