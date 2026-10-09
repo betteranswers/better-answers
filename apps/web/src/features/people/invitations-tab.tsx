@@ -4,10 +4,10 @@ import { useId, useMemo, useRef, useState, type RefObject } from "react";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
-import { useListAddress } from "@/shared/list-address.ts";
 import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { RowMenu } from "@/shared/row-menu.tsx";
+import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
 import { useHiddenColumns } from "@/shared/wide-layout.ts";
 
@@ -37,7 +37,6 @@ import {
   type ListedInvitation,
   type SentInvitation,
 } from "./invitations-api.ts";
-import { pageIndexOf, useSettledSearch } from "./members-address.ts";
 import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
 import { UnsentEmails } from "./unsent-emails.tsx";
@@ -57,23 +56,16 @@ const matching = (search: string) => {
     invitation.address.toLowerCase().includes(sought);
 };
 
-/** Read in render from the address, so a reload or Back comes to the same rows. */
+/** A clear empties the search and stays on the status the reader chose. */
+const KEPT_ON_CLEAR = ["status"] as const;
+
 const useNarrowedInvitations = () => {
-  const { state, write } = useListAddress(INVITATIONS_LIST, INVITATIONS_FIELDS);
-  const read = useInvitations(state.status);
+  const list = useSearchedList(INVITATIONS_LIST, INVITATIONS_FIELDS, KEPT_ON_CLEAR);
+  const read = useInvitations(list.state.status);
   const listed = read.data ?? NO_ONE;
-  const [search, setSearch] = useSettledSearch(state.search, (settled) => {
-    write({ search: settled, page: 1 });
-  });
+  const { search } = list;
   const data = useMemo(() => listed.filter(matching(search)), [listed, search]);
-  const pageIndex = pageIndexOf(search, state, PAGE_SIZE, data.length);
-
-  const clear = () => {
-    setSearch("");
-    write({ search: "", page: 1 });
-  };
-
-  return { state, write, read, listed, search, setSearch, data, pageIndex, clear };
+  return { ...list, read, listed, data, pageIndex: list.pageIndex(PAGE_SIZE, data.length) };
 };
 
 type Narrowed = ReturnType<typeof useNarrowedInvitations>;
@@ -149,21 +141,6 @@ function NoneShown(properties: {
   );
 }
 
-const usePageTurns = (narrowed: Narrowed) => {
-  const lastPage = Math.ceil(narrowed.data.length / PAGE_SIZE) - 1;
-  const turnTo = (pageIndex: number) => {
-    if (pageIndex < 0 || pageIndex > lastPage) return;
-    narrowed.write({ page: pageIndex + 1 });
-  };
-  useKeystroke(KEY.previousInvitations, () => {
-    turnTo(narrowed.pageIndex - 1);
-  });
-  useKeystroke(KEY.nextInvitations, () => {
-    turnTo(narrowed.pageIndex + 1);
-  });
-  return turnTo;
-};
-
 /** A tick taken on another status or page keeps the address it was taken with. */
 const tickedFrom =
   (ticked: Ticked, listed: readonly ListedInvitation[]) =>
@@ -237,7 +214,6 @@ function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingEle
   const [unsent, setUnsent] = useState(NOTHING_UNSENT);
   const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
   const searchRef = useRef<HTMLInputElement>(null);
-  const turnTo = usePageTurns(narrowed);
 
   const table = useTable({
     features: invitationFeatures,
@@ -336,11 +312,10 @@ function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingEle
               pageIndex: narrowed.pageIndex,
               pageSize: PAGE_SIZE,
               total: narrowed.data.length,
-              onTurn: turnTo,
-              keystrokes: {
-                previous: KEY.previousInvitations.key,
-                next: KEY.nextInvitations.key,
+              onTurn: (pageIndex) => {
+                narrowed.write({ page: pageIndex + 1 });
               },
+              keystrokes: { previous: KEY.previousInvitations, next: KEY.nextInvitations },
             }}
           />
         </ListRead>

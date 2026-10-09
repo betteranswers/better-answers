@@ -138,9 +138,12 @@ type Pages = {
   readonly pageIndex: number;
   readonly pageSize: number;
   readonly total: number;
+  /** Called only with a page that exists. */
   readonly onTurn: (pageIndex: number) => void;
-  readonly keystrokes?: { readonly previous: string; readonly next: string };
+  readonly keystrokes?: Turns;
 };
+
+type Turns = { readonly previous: Keystroke; readonly next: Keystroke };
 
 /** Load more takes a cursor's lists, where no total is known ahead. */
 type More = {
@@ -161,35 +164,58 @@ const BAND = "border-t border-border bg-muted px-3 py-2";
 export const pageWithin = (pageIndex: number, pageSize: number, total: number): number =>
   Math.min(pageIndex, Math.max(0, Math.ceil(total / pageSize) - 1));
 
+function TurnsOn(properties: {
+  readonly keystrokes: Turns;
+  readonly pageIndex: number;
+  readonly turnTo: (pageIndex: number) => void;
+}) {
+  const { keystrokes, pageIndex, turnTo } = properties;
+  useKeystroke(keystrokes.previous, () => {
+    turnTo(pageIndex - 1);
+  });
+  useKeystroke(keystrokes.next, () => {
+    turnTo(pageIndex + 1);
+  });
+  return null;
+}
+
 function PageTurns(properties: { readonly pages: Pages }) {
   const { label, pageIndex, pageSize, total, onTurn, keystrokes } = properties.pages;
   const pageCount = Math.ceil(total / pageSize);
   if (pageCount <= 1) return null;
+  const turnTo = (index: number) => {
+    if (index >= 0 && index < pageCount) onTurn(index);
+  };
   const from = pageIndex * pageSize + 1;
   const to = Math.min(total, from + pageSize - 1);
   return (
-    <PaginationCounter
-      aria-label={label}
-      className={BAND}
-      summary={`Showing ${from}–${to} of ${total}.`}
-      counter={`Page ${pageIndex + 1} of ${pageCount}`}
-      previous={{
-        label: "Previous page",
-        disabled: pageIndex === 0,
-        keystroke: keystrokes?.previous,
-        onTurn: () => {
-          onTurn(pageIndex - 1);
-        },
-      }}
-      next={{
-        label: "Next page",
-        disabled: pageIndex >= pageCount - 1,
-        keystroke: keystrokes?.next,
-        onTurn: () => {
-          onTurn(pageIndex + 1);
-        },
-      }}
-    />
+    <>
+      <PaginationCounter
+        aria-label={label}
+        className={BAND}
+        summary={`Showing ${from}–${to} of ${total}.`}
+        counter={`Page ${pageIndex + 1} of ${pageCount}`}
+        previous={{
+          label: "Previous page",
+          disabled: pageIndex === 0,
+          keystroke: keystrokes?.previous.key,
+          onTurn: () => {
+            turnTo(pageIndex - 1);
+          },
+        }}
+        next={{
+          label: "Next page",
+          disabled: pageIndex >= pageCount - 1,
+          keystroke: keystrokes?.next.key,
+          onTurn: () => {
+            turnTo(pageIndex + 1);
+          },
+        }}
+      />
+      {keystrokes === undefined ? null : (
+        <TurnsOn keystrokes={keystrokes} pageIndex={pageIndex} turnTo={turnTo} />
+      )}
+    </>
   );
 }
 

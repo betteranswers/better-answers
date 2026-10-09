@@ -57,6 +57,19 @@ const pickRole = (role: string) => {
 
 const searchBox = () => screen.getByRole("searchbox", { name: "Search by name or address" });
 
+/** Three pages of five. */
+const PAGES_OF_TWELVE = {
+  kind: "pages",
+  label: "Pages of members",
+  pageSize: 5,
+  total: 12,
+} as const;
+
+const PAGE_KEYSTROKES = {
+  previous: { key: "[", action: "Show the previous page of members" },
+  next: { key: "]", action: "Show the next page of members" },
+};
+
 /** jsdom's click moves no focus, where a browser's press leaves it on the button. */
 const pressedWithFocus = (button: HTMLElement) => {
   button.focus();
@@ -357,6 +370,40 @@ describe("the list's pages", () => {
     );
     fireEvent.keyDown(document.body, { key: "m" });
     expect(more).toHaveBeenCalledTimes(1);
+  });
+
+  it("turns the page on the page's keystrokes", () => {
+    const turn = vi.fn<(pageIndex: number) => void>();
+    render(
+      <ListPages
+        pages={{ ...PAGES_OF_TWELVE, pageIndex: 1, onTurn: turn, keystrokes: PAGE_KEYSTROKES }}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Next page" }).getAttribute("aria-keyshortcuts"),
+    ).toBe("]");
+
+    fireEvent.keyDown(document.body, { key: "]" });
+    fireEvent.keyDown(document.body, { key: "[" });
+    expect(turn.mock.calls).toEqual([[2], [0]]);
+  });
+
+  it("turns no page past the first or the last", () => {
+    const turn = vi.fn<(pageIndex: number) => void>();
+    const { rerender } = render(
+      <ListPages
+        pages={{ ...PAGES_OF_TWELVE, pageIndex: 0, onTurn: turn, keystrokes: PAGE_KEYSTROKES }}
+      />,
+    );
+    fireEvent.keyDown(document.body, { key: "[" });
+
+    rerender(
+      <ListPages
+        pages={{ ...PAGES_OF_TWELVE, pageIndex: 2, onTurn: turn, keystrokes: PAGE_KEYSTROKES }}
+      />,
+    );
+    fireEvent.keyDown(document.body, { key: "]" });
+    expect(turn).not.toHaveBeenCalled();
   });
 
   it("loads more until nothing is left", () => {

@@ -1,10 +1,8 @@
-import { useEffect, useEffectEvent, useState } from "react";
 import { z } from "zod";
 
 import { ULID } from "@better-answers/schema/ulid";
 
 import { PAGE_NUMBER } from "@/shared/list-address.ts";
-import { pageWithin } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, detailAt, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import type { Role } from "./people-api.ts";
@@ -66,55 +64,3 @@ export type Removed = { readonly personId: string; readonly name: string };
 export const RETURNED_FROM_A_REMOVAL = z.object({
   removed: z.object({ personId: z.string(), name: z.string() }),
 });
-
-/** Long enough to span a burst of typing, short enough to land before a reader moves on. */
-const SETTLE_MS = 300;
-
-/**
- * The box holds each key at once; a box bound to the address loses keys while the router catches
- * up. Leaving flushes first.
- */
-export const useSettledSearch = (held: string, write: (search: string) => void) => {
-  const [draft, setDraft] = useState(held);
-  const [seen, setSeen] = useState(held);
-  const [sent, setSent] = useState<string>();
-
-  // An address moved by Back or a link is what the box shows; the box's own write is ignored only
-  // until it lands.
-  if (held !== seen) {
-    setSeen(held);
-    if (held === sent) setSent(undefined);
-    else setDraft(held);
-  }
-
-  const send = useEffectEvent((search: string) => {
-    setSent(search);
-    write(search);
-  });
-
-  useEffect(() => {
-    if (draft === held) return;
-    const settling = setTimeout(() => {
-      send(draft);
-    }, SETTLE_MS);
-    return () => {
-      clearTimeout(settling);
-    };
-  }, [draft, held]);
-
-  const flush = () => {
-    if (draft === held) return;
-    setSent(draft);
-    write(draft);
-  };
-
-  return [draft, setDraft, flush] as const;
-};
-
-/** A search still settling has not reached the address, so it shows its first page. */
-export const pageIndexOf = (
-  draft: string,
-  held: { readonly search: string; readonly page: number },
-  pageSize: number,
-  total: number,
-): number => pageWithin(draft === held.search ? held.page - 1 : 0, pageSize, total);
