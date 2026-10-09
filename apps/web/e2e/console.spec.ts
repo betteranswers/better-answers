@@ -1,8 +1,15 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
+
 import { ALL_WORKSPACES, goHome, JUMP_TO, RAIL, TOGGLE, UNKNOWN_PAGE } from "@/app/words.ts";
-import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
-import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
+import {
+  ACCOUNT_HEADING,
+  AUTHENTICATOR_WORDS,
+  RECOVERY_CODE_WORDS,
+} from "@/features/auth/account-words.ts";
+import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
+import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, HOMES } from "@/shared/navigation.ts";
@@ -15,6 +22,7 @@ import {
   anAddress,
   avatarOf,
   crumbOf,
+  keyShown,
   landedAtHome,
   markTheOperator,
   navOf,
@@ -24,9 +32,11 @@ import {
   railOf,
   signedInAtHome,
   signIn,
+  signInByEmail,
   skipLinkReachesThePage,
   switcherMenuOf,
   switcherOf,
+  withAnAuthenticator,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -158,6 +168,44 @@ test.describe("the way into the console", () => {
 
     await expect(page).toHaveURL(EVERY_WORKSPACE);
     await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
+  });
+
+  test("sends a no-workspace operator to the console after setup", async ({ page, request }) => {
+    const email = anAddress("operator");
+    await person(request, email);
+    await markTheOperator(request, email);
+    await page.goto("/sign-in");
+    await signInByEmail(page, request, email);
+
+    await page.getByRole("button", { name: SETUP_WORDS.authenticatorInstead }).click();
+    const key = await keyShown(page);
+    await page.getByLabel(AUTHENTICATOR_WORDS.codeField).fill(authenticatorCodeAt(key, new Date()));
+    await page.getByRole("checkbox", { name: RECOVERY_CODE_WORDS.saved }).check();
+    await page.getByRole("button", { name: RECOVERY_CODE_WORDS.finish }).click();
+
+    await expect(page).toHaveURL(EVERY_WORKSPACE);
+    await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
+    await expect(switcherOf(page, CONSOLE.name)).toBeVisible();
+  });
+
+  test("sends no-workspace operators to the console at sign-in and /", async ({
+    page,
+    request,
+  }) => {
+    const email = anAddress("operator");
+    await person(request, email);
+    await markTheOperator(request, email);
+    await withAnAuthenticator(request, email);
+    await page.goto("/sign-in");
+    await signIn(page, request, email);
+
+    await expect(page).toHaveURL(EVERY_WORKSPACE);
+    await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
+
+    await page.goto("/");
+    await expect(page).toHaveURL(EVERY_WORKSPACE);
+    await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: NO_WORKSPACE_HEADING })).toHaveCount(0);
   });
 
   test("lists the operator's workspaces from the console's switcher", async ({

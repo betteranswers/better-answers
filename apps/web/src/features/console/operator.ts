@@ -28,3 +28,20 @@ export const mustSignInForTheConsole = async (
     return error instanceof Error && refusalOf(error)?.class === "unauthenticated";
   }
 };
+
+/** Any failure answers no, so a person whose standing is unread sees what they saw before. */
+export const isTheOperator = async (
+  queryClient: QueryClient,
+  api: ApiProxy,
+  afresh: boolean,
+): Promise<boolean> => {
+  const asked = { ...standingOptions(api), retry: false };
+  try {
+    const standing = await (afresh
+      ? queryClient.fetchQuery(asked)
+      : queryClient.ensureQueryData(asked));
+    return standing.operator;
+  } catch {
+    return false;
+  }
+};
