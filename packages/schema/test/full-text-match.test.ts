@@ -235,6 +235,17 @@ describe("the any-word rule over concept rows", () => {
     });
   });
 
+  it.each([
+    ["the largest bounds", Number.MAX_SAFE_INTEGER, Number.MAX_VALUE],
+    ["the smallest rank", 0, Number.MIN_VALUE],
+  ])("compares a bound of %s without error", async (_case, matched, rank) => {
+    const after = await matchedOver([["Audit", UNRELATED]], "audit", {
+      after: [matched, rank, "Audit"],
+    });
+
+    expect(after.map(({ title }) => title)).toEqual(matched === 0 ? [] : ["Audit"]);
+  });
+
   it("reads `!`, `:*`, `&`, quotes and parentheses as no syntax", async () => {
     const matched = await matchedOver(
       [

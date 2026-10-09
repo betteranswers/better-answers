@@ -268,6 +268,21 @@ describe("find's pages", () => {
     ]);
   });
 
+  it.each([
+    ["the largest bounds", Number.MAX_SAFE_INTEGER, Number.MAX_VALUE],
+    ["the smallest rank", 0, Number.MIN_VALUE],
+  ])("reads a cursor of %s without error", async (_case, matched, rank) => {
+    const { workspaceId, viewer } = await arrange();
+    await conceptsLanded(workspaceId, [{ title: AUDIT_LOGS_RETENTION }]);
+
+    const page = await searching(viewer, QUESTION, 10, {
+      run: "strong",
+      bound: { matched, rank, key: conceptIriOf(ulid()) },
+    });
+
+    expect(page.query).toBe(QUESTION);
+  });
+
   it("pages past a withheld concept as past an absent one", async () => {
     const { workspaceId, viewer } = await arrange();
     const withheld = await conceptLanded(workspaceId, {
