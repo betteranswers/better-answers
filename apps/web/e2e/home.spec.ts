@@ -59,8 +59,10 @@ for (const role of ROLES) {
     await page.goto("/not-a-page");
 
     await expect(unknownPage(page)).toBeVisible();
+    await expect(page.getByRole("navigation", { name: RAIL })).toBeVisible();
     await expect(page.getByRole("link", { name: goHome(home) })).toBeVisible();
     await passesTheAccessibilityGate();
+    await skipLinkReachesThePage(page);
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: goHome(home) })).toBeFocused();
     await page.keyboard.press("Enter");

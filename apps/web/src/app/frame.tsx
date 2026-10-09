@@ -42,13 +42,13 @@ const NO_JUMP_TO: readonly Keystroke[] = [];
 const WITH_JUMP_TO: readonly Keystroke[] = [JUMP_TO_KEYSTROKE];
 
 function FrameKeystrokes(properties: {
-  readonly open: Place<VisibleArea> | undefined;
+  readonly name: string | undefined;
   readonly offersJumpTo: boolean;
   readonly children: ReactNode;
 }) {
   return (
     <ShellKeystrokes
-      page={properties.open?.page.name}
+      page={properties.name}
       shell={properties.offersJumpTo ? WITH_JUMP_TO : NO_JUMP_TO}
     >
       {properties.children}
@@ -64,12 +64,21 @@ const useRegion = (visible: VisibleTree, pathname: string): Region | undefined =
   return drawn !== undefined && isFilled(toolbar) ? { name: drawn.page.name, toolbar } : undefined;
 };
 
-/** A detail address's page names the part beneath its page; elsewhere the open tab does. */
+/** A page at a detail address, or at no place, names the last part; elsewhere the open tab does. */
 const belowThePage = (
   open: Place<VisibleArea> | undefined,
   openTab: PageTab | undefined,
   lastPart: string | undefined,
-): string | undefined => (open?.detail === undefined ? openTab?.name : lastPart);
+): string | undefined =>
+  open === undefined || open.detail !== undefined ? lastPart : openTab?.name;
+
+/** A page whose route sits outside the shell, drawn in it; `name` titles its keystroke list. */
+export type Handed = { readonly draw: ReactNode; readonly name?: string };
+
+const listNameOf = (
+  handed: Handed | undefined,
+  open: Place<VisibleArea> | undefined,
+): string | undefined => handed?.name ?? open?.page.name;
 
 /** A place hidden from the reader is no place here, so it draws as one that never existed. */
 export function Frame(properties: {
@@ -78,6 +87,7 @@ export function Frame(properties: {
   readonly here: Here | undefined;
   readonly person: Person | undefined;
   readonly offersTheConsole: boolean;
+  readonly page?: Handed | undefined;
 }) {
   const { visible, here } = properties;
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -102,7 +112,7 @@ export function Frame(properties: {
 
   return (
     <VisibleTreeContext value={visible}>
-      <FrameKeystrokes open={open} offersJumpTo={offersJumpTo}>
+      <FrameKeystrokes name={listNameOf(properties.page, open)} offersJumpTo={offersJumpTo}>
         <div className="flex min-h-screen flex-col bg-background">
           <a
             href="#page"
@@ -163,6 +173,7 @@ export function Frame(properties: {
                   key={here?.workspaceId}
                   region={region}
                   picked={[pickedTab, pickTab]}
+                  handed={properties.page}
                 />
               </BreadcrumbLastPartSlot>
             </div>
@@ -174,7 +185,7 @@ export function Frame(properties: {
 }
 
 /** One frame for every workspace area, so moving between them keeps the pressed menu button. */
-export function WorkspaceFrame() {
+export function WorkspaceFrame(properties: { readonly page?: Handed }) {
   const member = useMember();
   const standing = useOperatorStanding();
   const held = member.data;
@@ -192,6 +203,7 @@ export function WorkspaceFrame() {
       person={held === undefined ? undefined : { name: held.person.name, role: held.role }}
       // Offered to the operator alone: a way in anyone else would only be refused at.
       offersTheConsole={standing.data?.operator === true}
+      page={properties.page}
     />
   );
 }
@@ -228,6 +240,7 @@ function Navigation(properties: {
 function ToolbarAndPage(properties: {
   readonly region: Region | undefined;
   readonly picked: PickedTab;
+  readonly handed: Handed | undefined;
 }) {
   const { region } = properties;
 
@@ -245,7 +258,7 @@ function ToolbarAndPage(properties: {
         <div data-page-content className="max-w-page">
           <HomeLine />
           <PagePanel>
-            <Outlet />
+            {properties.handed === undefined ? <Outlet /> : properties.handed.draw}
           </PagePanel>
         </div>
       </main>

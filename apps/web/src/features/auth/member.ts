@@ -13,6 +13,12 @@ export const useMember = () => {
   return useQuery(memberOptions(api));
 };
 
+/** Asked once, for a page that draws nothing until the read answers. */
+export const useMemberAskedOnce = () => {
+  const api = useTRPC();
+  return useQuery({ ...memberOptions(api), retry: false });
+};
+
 export const useRole = () => {
   const api = useTRPC();
   return useQuery({ ...memberOptions(api), select: (held) => held.role }).data;
@@ -23,6 +29,8 @@ export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.role;
 
 export const NEEDS_A_PICK: RefusalWord = "no-active-workspace";
+
+export const NO_SESSION: RefusalWord = "no-session";
 
 export const SECOND_FACTOR_PENDING: RefusalWord = "second-factor-pending";
 

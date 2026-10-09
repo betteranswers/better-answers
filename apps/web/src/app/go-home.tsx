@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 
 import { useRole } from "@/features/auth/member.ts";
 import { HOMES, type Page } from "@/shared/navigation.ts";
+import { Button } from "@/shared/ui/button.tsx";
 
 import { goHome } from "./words.ts";
 
@@ -39,9 +40,9 @@ function HomeLink(properties: { readonly home: Page | undefined; readonly classN
 
   return (
     <p className={properties.className}>
-      <Link to={to} className="text-brand underline">
-        {goHome(properties.home)}
-      </Link>
+      <Button asChild variant="link" className="px-0">
+        <Link to={to}>{goHome(properties.home)}</Link>
+      </Button>
     </p>
   );
 }

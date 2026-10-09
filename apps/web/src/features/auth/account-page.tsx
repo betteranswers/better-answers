@@ -1,7 +1,8 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
-import { KeystrokesAction, type Keystroke } from "@/shared/keystrokes.tsx";
+import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
+import { KeystrokesAction, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
 import { NO_RESPONSE, NO_RESPONSE_TO_A_READ } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
@@ -256,8 +257,34 @@ const keystrokesOf = (read: SecondFactorRead, actions: AccountActions): readonly
   ];
 };
 
-/** Outside the shell, so a person with no workspace and the operator reach it too. */
-export function AccountPage() {
+const sameKeys = (one: readonly Keystroke[], other: readonly Keystroke[]): boolean =>
+  one.length === other.length && one.every((keystroke, at) => keystroke === other[at]);
+
+/** The same list while its keys are, so the shell registers it once per change, not per draw. */
+const useSteadyKeystrokes = (keystrokes: readonly Keystroke[]): readonly Keystroke[] => {
+  const [steady, keep] = useState(keystrokes);
+  if (!sameKeys(steady, keystrokes)) keep(keystrokes);
+  return steady;
+};
+
+/** In the shell, whose band holds sign-out and the way on, and whose list holds these keys. */
+function InTheShell(properties: {
+  readonly keystrokes: readonly Keystroke[];
+  readonly children: ReactNode;
+}) {
+  usePageKeystrokes(useSteadyKeystrokes(properties.keystrokes));
+  useBreadcrumbLastPart(ACCOUNT_HEADING);
+
+  return (
+    <>
+      <h1>{ACCOUNT_HEADING}</h1>
+      {properties.children}
+    </>
+  );
+}
+
+/** `framed` in a member's shell; outside it, so a person with no workspace reaches it too. */
+export function AccountPage(properties: { readonly framed?: boolean }) {
   const read = useSecondFactor();
   const address = useSession().data?.user.email ?? "";
   const hash = useLocation({ select: (location) => location.hash });
@@ -270,57 +297,64 @@ export function AccountPage() {
     routes,
   );
   const { failure, unanswered } = failureOnThePage(read, actions);
+  const keystrokes = keystrokesOf(read, actions);
+
+  const sections = (
+    <section aria-labelledby={SIGN_IN_HEADING} className="mt-8">
+      <h2 id={SIGN_IN_HEADING}>{ACCOUNT_WORDS.signIn}</h2>
+      <Outcome tone="said">{actions.said}</Outcome>
+      <SecondFactorRefused id={REFUSED} read={read} failure={failure} unanswered={unanswered} />
+
+      <PasskeysSection
+        held={read.data}
+        here={passkeysHere()}
+        addOpen={actions.addOpen}
+        suggestedName={actions.suggestedName}
+        removing={actions.removePasskey.isPending}
+        landsAt={actions.landsAt}
+        onAddOpen={actions.toggleAdd}
+        onAdded={actions.passkeyAdded}
+        onRenamed={actions.passkeyRenamed}
+        onRemove={actions.removeAPasskey}
+      />
+      <AuthenticatorSection
+        held={read.data}
+        setupOpen={actions.setupOpen}
+        routes={actions.routes}
+        starting={actions.starting}
+        finishing={actions.finishing}
+        removing={actions.remove.isPending}
+        landsAt={actions.landsAt}
+        onSetUp={actions.toggleSetup}
+        onFinished={actions.finished}
+        onRemove={actions.removeTheAuthenticator}
+      />
+      <RecoveryCodesSection
+        held={read.data}
+        inHand={actions.inHand}
+        address={address}
+        making={actions.make.isPending}
+        acknowledging={actions.acknowledge.isPending}
+        acknowledgeFailure={saidOfAcknowledging(actions.acknowledge.error)}
+        landsAt={actions.landsAt}
+        onMake={actions.makeCodes}
+        onDone={actions.done}
+      />
+    </section>
+  );
+  if (properties.framed === true)
+    return <InTheShell keystrokes={keystrokes}>{sections}</InTheShell>;
 
   return (
     <AuthPage title={ACCOUNT_HEADING}>
-      <section aria-labelledby={SIGN_IN_HEADING} className="mt-8">
-        <h2 id={SIGN_IN_HEADING}>{ACCOUNT_WORDS.signIn}</h2>
-        <Outcome tone="said">{actions.said}</Outcome>
-        <SecondFactorRefused id={REFUSED} read={read} failure={failure} unanswered={unanswered} />
-
-        <PasskeysSection
-          held={read.data}
-          here={passkeysHere()}
-          addOpen={actions.addOpen}
-          suggestedName={actions.suggestedName}
-          removing={actions.removePasskey.isPending}
-          landsAt={actions.landsAt}
-          onAddOpen={actions.toggleAdd}
-          onAdded={actions.passkeyAdded}
-          onRenamed={actions.passkeyRenamed}
-          onRemove={actions.removeAPasskey}
-        />
-        <AuthenticatorSection
-          held={read.data}
-          setupOpen={actions.setupOpen}
-          routes={actions.routes}
-          starting={actions.starting}
-          finishing={actions.finishing}
-          removing={actions.remove.isPending}
-          landsAt={actions.landsAt}
-          onSetUp={actions.toggleSetup}
-          onFinished={actions.finished}
-          onRemove={actions.removeTheAuthenticator}
-        />
-        <RecoveryCodesSection
-          held={read.data}
-          inHand={actions.inHand}
-          address={address}
-          making={actions.make.isPending}
-          acknowledging={actions.acknowledge.isPending}
-          acknowledgeFailure={saidOfAcknowledging(actions.acknowledge.error)}
-          landsAt={actions.landsAt}
-          onMake={actions.makeCodes}
-          onDone={actions.done}
-        />
-      </section>
+      {sections}
 
       <div className="mt-10 flex flex-wrap items-center gap-2">
         <Button asChild variant="link" className="px-0">
           <Link to="/">{ACCOUNT_WORDS.goOn}</Link>
         </Button>
         <SignOutButton />
-        <KeystrokesAction page={ACCOUNT_HEADING} keystrokes={keystrokesOf(read, actions)} />
+        <KeystrokesAction page={ACCOUNT_HEADING} keystrokes={keystrokes} />
       </div>
     </AuthPage>
   );
