@@ -1,5 +1,3 @@
-import { appendFile } from "node:fs/promises";
-
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { MAP_WALK_ROW_LIMIT, walkFrom } from "@better-answers/core/store/map";
@@ -8,6 +6,7 @@ import type { ConceptIri } from "@better-answers/schema";
 import { writeConcept, type WriteConceptInput } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
+import { inMs, percentile, recordFigures } from "./figures.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
 import { runWorkerOnce } from "./worker-process.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -101,29 +100,6 @@ const timedWalk = async (map: DenseMap, reader: UserPrincipal): Promise<TimedWal
   return { ...timed, waitedMs: performance.now() - started };
 };
 
-const percentile = (values: readonly number[], fraction: number): number => {
-  const sorted = values.toSorted((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))] ?? 0;
-};
-
-const inMs = (value: number): string => `${Math.round(value)} ms`;
-
-type Figure = readonly [name: string, value: string];
-
-const recordFigures = async (figures: readonly Figure[]): Promise<void> => {
-  const heading = "The map walk under concurrent read load";
-  process.stdout.write(
-    `\n${heading}: ${figures.map(([name, value]) => `${name} ${value}`).join("; ")}\n`,
-  );
-  const summary = process.env["GITHUB_STEP_SUMMARY"];
-  if (summary === undefined) return;
-  const rows = figures.map(([name, value]) => `| ${name} | ${value} |`);
-  await appendFile(
-    summary,
-    ["", `#### ${heading}`, "", "| Figure | Value |", "| --- | --- |", ...rows, ""].join("\n"),
-  );
-};
-
 describe("the map under concurrent read load", () => {
   let map: DenseMap;
 
@@ -146,7 +122,7 @@ describe("the map under concurrent read load", () => {
     const waitedMs = walks.map((walked) => walked.waitedMs);
     const walkMs = walks.map((walked) => walked.walkMs);
 
-    await recordFigures([
+    await recordFigures("The map walk under concurrent read load", [
       [
         "the walk that fills the cap, in one-row walks at the median",
         `${inOneRowWalks.toFixed(1)}, against a budget of ${WALK_BUDGET_IN_ONE_ROW_WALKS}`,
