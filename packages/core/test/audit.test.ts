@@ -122,7 +122,7 @@ describe("the declared-actions walk", () => {
     expect(declarations()).toContainEqual({
       family: "platform",
       actions: ["platform.probe.accepted"],
-      detailKeys: ["confirmed"],
+      detailKeysOf: { "platform.probe.accepted": ["confirmed"] },
     });
   });
 
@@ -707,7 +707,7 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(declarations()).toContainEqual({
       family: "platform",
       actions: ["platform.probe.identity_noted"],
-      detailKeys: ["confirmed"],
+      detailKeysOf: { "platform.probe.identity_noted": ["confirmed"] },
     });
     expect(() =>
       declareIdentitySetActions("platform", { again: action("platform.probe.identity_noted", {}) }),
