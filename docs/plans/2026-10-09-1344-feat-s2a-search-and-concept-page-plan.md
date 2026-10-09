@@ -403,7 +403,7 @@ flowchart LR
 - **Test scenarios:**
   - A concept written through `writeConcept` has a vector with its title at weight A, its tags and *Also known as* line at B, and its body at C.
   - An UPDATE to a concept's body through the landing path changes its vector in the same transaction.
-  - The insert schema refuses a fixture row that sets the column. Select and update shapes pass their per-shape tests.
+  - The insert and update schemas drop the column from a fixture row that sets it, as `index.passage.search`'s do. Select and update shapes pass their per-shape tests.
   - On a database `migrate` has run, a concept match uses the GIN index. With the LEAKPROOF mark removed, it does not.
   - The generated expression is accepted as immutable on the pinned Postgres image.
   - A raw INSERT of a concept row with a malformed IRI is refused by the constraint.
