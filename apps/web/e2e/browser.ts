@@ -38,10 +38,58 @@ const transitionsHaveEnded = async (page: Page): Promise<void> => {
   });
 };
 
+/** The design system's rationing: if everything is registered, nothing is. */
+const MOST_MARKED = 3;
+
+/** The marked objects a person sees: a mark inside a marked parent is never drawn. */
+const markedObjects = (page: Page): Promise<readonly string[]> =>
+  page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("[data-marks]")]
+      .filter(
+        (marked) =>
+          marked.checkVisibility() && getComputedStyle(marked, "::before").content !== "none",
+      )
+      .map((marked) => marked.outerHTML.slice(0, 80)),
+  );
+
+/** Axe reads an image under text as an undecided colour, so a texture or mark hides contrast. */
+const TEXTURES_ASIDE =
+  "[data-grid-pattern], [data-dot-pattern] { display: none !important; } [data-marks]::before { content: none !important; }";
+
+/** Axe's keys for a contrast it could not decide because of what was painted behind the text. */
+const UNDECIDED_BEHIND = new Set(["bgImage", "bgGradient", "pseudoContent"]);
+
 const auditOf = async (page: Page): Promise<void> => {
   await transitionsHaveEnded(page);
+  const marked = await markedObjects(page);
+  expect(
+    marked.length,
+    `${page.url()} marks ${String(marked.length)} objects: ${marked.join(" ")}`,
+  ).toBeLessThanOrEqual(MOST_MARKED);
+
+  const aside = await page.addStyleTag({ content: TEXTURES_ASIDE });
   const audit = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
+  await aside.evaluate((style) => {
+    style.parentNode?.removeChild(style);
+  });
+
   expect(audit.violations, `axe found violations on ${page.url()}`).toEqual([]);
+  const undecided = audit.incomplete
+    .filter((result) => result.id === "color-contrast")
+    .flatMap((result) => result.nodes)
+    .filter((node) =>
+      node.any.some((check) => {
+        const data: unknown = check.data;
+        return (
+          typeof data === "object" &&
+          data !== null &&
+          "messageKey" in data &&
+          UNDECIDED_BEHIND.has(String(data.messageKey))
+        );
+      }),
+    )
+    .map((node) => node.target.join(" "));
+  expect(undecided, `axe could not decide contrast over a texture on ${page.url()}`).toEqual([]);
 };
 
 export type BrowserFixtures = {

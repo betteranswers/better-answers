@@ -98,7 +98,7 @@ the pin.
 | File | Registry item | Item digest | File digest |
 | --- | --- | --- | --- |
 | `badge.tsx` | https://ui.shadcn.com/r/styles/new-york/badge.json | `ce3f01e6d6785477` | `051518194cec3127` |
-| `button.tsx` | https://ui.shadcn.com/r/styles/new-york/button.json | `4d8f39c3bd25e630` | `76bfc0a14e9c395d` |
+| `button.tsx` | https://ui.shadcn.com/r/styles/new-york/button.json | `4d8f39c3bd25e630` | `7af6cf444a7e3cdb` |
 | `carousel.tsx` | https://ui.shadcn.com/r/styles/new-york/carousel.json | `07c286e6b8c6a125` | `8db57d96badd03aa` |
 | `collapsible.tsx` | https://ui.shadcn.com/r/styles/new-york/collapsible.json | `9e935a82f4d846cc` | `f3ce568d1ede383d` |
 | `command.tsx` | https://ui.shadcn.com/r/styles/new-york/command.json | `b2800b32e6dbfb40` | `aa5236bf5e2680fd` |
@@ -351,6 +351,9 @@ The edits made on 10 October 2026 for BA-97, which built the blueprint layer:
 - `kibo-ui/counted-switch.tsx`: the radio's `focus-visible:shadow-none` became important, since
   the bridge's focus rule now outranks the kit's ring utilities, and the ring stays on the
   segment's span.
+- `button.tsx`: the `default` variant, the primary, sets `data-marks` at the 32px sizes and up
+  and draws its marks in `--accent-300`, and a new `accent` variant is the same fill unmarked,
+  for a committing action repeated per row.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the pages that use them carry the WCAG 2.2 AA

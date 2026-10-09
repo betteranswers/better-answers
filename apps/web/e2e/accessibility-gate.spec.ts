@@ -30,6 +30,28 @@ const setASpinnerTurning = (): void => {
   document.querySelector("main")?.append(spinner);
 };
 
+const markFourObjects = (): void => {
+  for (const name of ["Coverage", "Sources", "Members", "Spend"]) {
+    const region = document.createElement("section");
+    region.dataset["marks"] = "";
+    region.style.cssText = "height: 48px; margin: 16px; border: 1px solid var(--border)";
+    region.textContent = name;
+    document.querySelector("main")?.append(region);
+  }
+};
+
+/** Faint words inside a marked object, where a mark's own paint would leave axe undecided. */
+const writeFaintWordsInAMarkedObject = (): void => {
+  const region = document.createElement("section");
+  region.dataset["marks"] = "";
+  region.style.cssText = "margin: 16px; border: 1px solid var(--border)";
+  const faint = document.createElement("p");
+  faint.style.color = "var(--border)";
+  faint.textContent = "Nobody can read this sentence.";
+  region.append(faint);
+  document.querySelector("main")?.append(region);
+};
+
 const theSignInPage = async (page: Page): Promise<void> => {
   await page.goto("/sign-in");
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
@@ -73,4 +95,16 @@ test("audits a button once its fade from disabled has ended", async ({
 test("audits beside a spinner that never stops turning", async ({ page }) => {
   await theSignInPage(page);
   await page.evaluate(setASpinnerTurning);
+});
+
+test("refuses a page that marks more than three objects", async ({ page }) => {
+  test.fail();
+  await theSignInPage(page);
+  await page.evaluate(markFourObjects);
+});
+
+test("audits the contrast of words inside a marked object", async ({ page }) => {
+  test.fail();
+  await theSignInPage(page);
+  await page.evaluate(writeFaintWordsInAMarkedObject);
 });

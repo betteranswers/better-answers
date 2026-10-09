@@ -209,9 +209,11 @@ function RenameAPasskey(properties: {
           setName(event.target.value);
         }}
       />
+      {/* Each passkey's row holds its own save, so it takes the unmarked fill. */}
       <Button
         type="submit"
         size="sm"
+        variant="accent"
         className="aria-disabled:opacity-50"
         aria-disabled={renaming.isPending}
       >

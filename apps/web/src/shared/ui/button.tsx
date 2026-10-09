@@ -9,7 +9,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default:
+          "bg-primary text-primary-foreground [--mark-ink:var(--accent-300)] hover:bg-primary/90",
+        accent: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive dark:focus-visible:ring-destructive/40",
         outline:
@@ -36,6 +38,12 @@ const buttonVariants = cva(
   },
 );
 
+/**
+ * Under 32px a "+" is never drawn, and `accent` is the primary's fill unmarked, for an action
+ * repeated per row.
+ */
+const MARKED_SIZES: ReadonlySet<string> = new Set(["default", "sm", "lg"]);
+
 function Button({
   className,
   variant = "default",
@@ -53,6 +61,7 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      data-marks={variant === "default" && MARKED_SIZES.has(size ?? "") ? "" : undefined}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
