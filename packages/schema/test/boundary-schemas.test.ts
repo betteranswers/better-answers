@@ -1269,6 +1269,25 @@ describe("the customType exception, per shape", () => {
     expect(Object.keys(boundarySchemas.passage.insert.shape)).not.toContain("search");
     expect(Object.keys(boundarySchemas.passage.update.shape)).not.toContain("search");
   });
+
+  it("conceptIndex.select reads a row with or without search", () => {
+    const row = { ...acceptedRows.conceptIndex[0], audienceGroups: null, updatedAt: NOW };
+    const select = boundarySchemas.conceptIndex.select;
+    expect(select.safeParse({ ...row, search: "'expens':1A" }).success).toBe(true);
+    expect(select.safeParse(row).success).toBe(true);
+    expect(select.safeParse({ ...row, search: 1 }).success).toBe(false);
+  });
+
+  it("conceptIndex.insert and update drop a search the row sets", () => {
+    const forged = { search: "'forged':1A" };
+    const inserted = boundarySchemas.conceptIndex.insert.parse({
+      ...acceptedRows.conceptIndex[0],
+      ...forged,
+    });
+    const updated = boundarySchemas.conceptIndex.update.parse(forged);
+    expect(Object.keys(inserted)).not.toContain("search");
+    expect(Object.keys(updated)).not.toContain("search");
+  });
 });
 
 describe("5 — the inferred type is pinned", () => {
@@ -1673,6 +1692,7 @@ describe("5 — the inferred type is pinned", () => {
       commitSha: string;
       status: "draft" | "stable" | "deprecated" | "removed";
       updatedAt: Date;
+      search?: string | undefined;
     };
     bundleCommit: {
       workspaceId: WorkspaceId;

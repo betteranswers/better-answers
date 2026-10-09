@@ -457,7 +457,10 @@ const conceptIndexRefinements = {
   ...readableUnit,
 };
 
-const conceptIndexSelect = createSelectSchema(conceptIndex, conceptIndexRefinements);
+const conceptIndexSelect = createSelectSchema(conceptIndex, {
+  ...conceptIndexRefinements,
+  search: z.string().optional(),
+});
 const conceptIndexInsert = createInsertSchema(conceptIndex, conceptIndexRefinements);
 const conceptIndexUpdate = createUpdateSchema(conceptIndex, conceptIndexRefinements);
 
