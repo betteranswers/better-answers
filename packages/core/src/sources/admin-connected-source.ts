@@ -1,6 +1,4 @@
-import type { z } from "zod";
-
-import { boundarySchemas } from "@better-answers/schema";
+import { boundarySchemas, type ConnectedSourceId } from "@better-answers/schema";
 
 import {
   attempt,
@@ -19,7 +17,7 @@ import type { SourceRefusal } from "./vocabulary.ts";
 
 export const CONNECTED_SOURCE_ID = boundarySchemas.connectedSource.select.shape.id;
 
-export type ConnectedSourceId = z.output<typeof CONNECTED_SOURCE_ID>;
+export type { ConnectedSourceId };
 
 export const CONNECTED_SOURCE_VISIBILITY = boundarySchemas.connectedSource.select.pick({
   sensitivity: true,

@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
+import type { ConceptIri } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import {
@@ -492,6 +493,7 @@ describe("what the slice's four actions answer", () => {
     await expect(
       acting(reader, async (principal, tx) => {
         await tx.query("SELECT 1 / 0").catch(() => undefined);
+        // @ts-expect-error a read that fails before any row is read needs no minted iri
         answered = await open(principal, tx, { iri: "https://better-answers.com/c/01A" }, now);
       }),
     ).rejects.toThrow("the transaction did not commit");
@@ -515,7 +517,10 @@ describe("the two knowledge layers a search and a fetch reach", () => {
   const documentHolding = (workspaceId: string, shape: DocumentShape): Promise<LandedDocument> =>
     documentLanded(db().pool, workspaceId, shape);
 
-  const conceptResting = async (workspaceId: string, document: LandedDocument): Promise<string> => {
+  const conceptResting = async (
+    workspaceId: string,
+    document: LandedDocument,
+  ): Promise<ConceptIri> => {
     const client = await db().pool.connect();
     try {
       const seed = testData(client);

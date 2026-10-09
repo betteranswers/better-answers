@@ -137,9 +137,9 @@ const workspaceRefinements = {
   shortName: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const workspaceSelect = createSelectSchema(workspace, workspaceRefinements);
-export const workspaceInsert = createInsertSchema(workspace, workspaceRefinements);
-export const workspaceUpdate = createUpdateSchema(workspace, workspaceRefinements);
+const workspaceSelect = createSelectSchema(workspace, workspaceRefinements);
+const workspaceInsert = createInsertSchema(workspace, workspaceRefinements);
+const workspaceUpdate = createUpdateSchema(workspace, workspaceRefinements);
 
 const modelChoiceRefinements = {
   id: (schema: z.ZodString) => schema.trim().min(1),
@@ -151,27 +151,18 @@ const modelChoiceRefinements = {
   retentionTail: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const modelChoiceSelect = createSelectSchema(modelChoice, modelChoiceRefinements);
-export const modelChoiceInsert = createInsertSchema(modelChoice, modelChoiceRefinements);
-export const modelChoiceUpdate = createUpdateSchema(modelChoice, modelChoiceRefinements);
+const modelChoiceSelect = createSelectSchema(modelChoice, modelChoiceRefinements);
+const modelChoiceInsert = createInsertSchema(modelChoice, modelChoiceRefinements);
+const modelChoiceUpdate = createUpdateSchema(modelChoice, modelChoiceRefinements);
 
 const workspaceConfigRefinements = {
   workspaceId,
   key: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const workspaceConfigSelect = createSelectSchema(
-  workspaceConfig,
-  workspaceConfigRefinements,
-);
-export const workspaceConfigInsert = createInsertSchema(
-  workspaceConfig,
-  workspaceConfigRefinements,
-);
-export const workspaceConfigUpdate = createUpdateSchema(
-  workspaceConfig,
-  workspaceConfigRefinements,
-);
+const workspaceConfigSelect = createSelectSchema(workspaceConfig, workspaceConfigRefinements);
+const workspaceConfigInsert = createInsertSchema(workspaceConfig, workspaceConfigRefinements);
+const workspaceConfigUpdate = createUpdateSchema(workspaceConfig, workspaceConfigRefinements);
 
 const readableUnit = {
   sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
@@ -193,13 +184,13 @@ const passageRefinements = {
   charEnd: (schema: z.ZodNumber) => schema.int().nonnegative(),
 };
 
-export const passageSelect = createSelectSchema(passage, {
+const passageSelect = createSelectSchema(passage, {
   ...passageRefinements,
   search: z.string().optional(),
 });
-export const passageInsert = createInsertSchema(passage, passageRefinements);
+const passageInsert = createInsertSchema(passage, passageRefinements);
 
-export const passageUpdate = createUpdateSchema(passage, {
+const passageUpdate = createUpdateSchema(passage, {
   ...passageRefinements,
   embedding: passageRefinements.embedding.optional(),
 });
@@ -209,9 +200,9 @@ const userRefinements = {
   email: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const userSelect = createSelectSchema(user, userRefinements);
-export const userInsert = createInsertSchema(user, userRefinements);
-export const userUpdate = createUpdateSchema(user, userRefinements);
+const userSelect = createSelectSchema(user, userRefinements);
+const userInsert = createInsertSchema(user, userRefinements);
+const userUpdate = createUpdateSchema(user, userRefinements);
 
 const memberRefinements = {
   id: identityId,
@@ -221,21 +212,21 @@ const memberRefinements = {
   role: (schema: z.ZodString) => schema.pipe(z.enum(ROLES)),
 };
 
-export const memberSelect = createSelectSchema(member, memberRefinements);
-export const memberInsert = createInsertSchema(member, memberRefinements);
-export const memberUpdate = createUpdateSchema(member, memberRefinements);
+const memberSelect = createSelectSchema(member, memberRefinements);
+const memberInsert = createInsertSchema(member, memberRefinements);
+const memberUpdate = createUpdateSchema(member, memberRefinements);
 
 const sessionRefinements = { id: identityId };
 
-export const sessionSelect = createSelectSchema(session, sessionRefinements);
-export const sessionInsert = createInsertSchema(session, sessionRefinements);
-export const sessionUpdate = createUpdateSchema(session, sessionRefinements);
+const sessionSelect = createSelectSchema(session, sessionRefinements);
+const sessionInsert = createInsertSchema(session, sessionRefinements);
+const sessionUpdate = createUpdateSchema(session, sessionRefinements);
 
 const invitationRefinements = { id: identityId };
 
-export const invitationSelect = createSelectSchema(invitation, invitationRefinements);
-export const invitationInsert = createInsertSchema(invitation, invitationRefinements);
-export const invitationUpdate = createUpdateSchema(invitation, invitationRefinements);
+const invitationSelect = createSelectSchema(invitation, invitationRefinements);
+const invitationInsert = createInsertSchema(invitation, invitationRefinements);
+const invitationUpdate = createUpdateSchema(invitation, invitationRefinements);
 
 const groupRefinements = {
   id: groupId,
@@ -245,15 +236,15 @@ const groupRefinements = {
   origin: (schema: z.ZodString) => schema.pipe(z.enum(GROUP_ORIGINS)),
 };
 
-export const groupSelect = createSelectSchema(group, groupRefinements);
-export const groupInsert = createInsertSchema(group, groupRefinements);
-export const groupUpdate = createUpdateSchema(group, groupRefinements);
+const groupSelect = createSelectSchema(group, groupRefinements);
+const groupInsert = createInsertSchema(group, groupRefinements);
+const groupUpdate = createUpdateSchema(group, groupRefinements);
 
 const groupMemberRefinements = { workspaceId, groupId, userId };
 
-export const groupMemberSelect = createSelectSchema(groupMember, groupMemberRefinements);
-export const groupMemberInsert = createInsertSchema(groupMember, groupMemberRefinements);
-export const groupMemberUpdate = createUpdateSchema(groupMember, groupMemberRefinements);
+const groupMemberSelect = createSelectSchema(groupMember, groupMemberRefinements);
+const groupMemberInsert = createInsertSchema(groupMember, groupMemberRefinements);
+const groupMemberUpdate = createUpdateSchema(groupMember, groupMemberRefinements);
 
 const mcpCallCounterRefinements = {
   workspaceId,
@@ -261,9 +252,9 @@ const mcpCallCounterRefinements = {
   count: (schema: z.ZodNumber) => schema.int().nonnegative(),
 };
 
-export const mcpCallCounterSelect = createSelectSchema(mcpCallCounter, mcpCallCounterRefinements);
-export const mcpCallCounterInsert = createInsertSchema(mcpCallCounter, mcpCallCounterRefinements);
-export const mcpCallCounterUpdate = createUpdateSchema(mcpCallCounter, mcpCallCounterRefinements);
+const mcpCallCounterSelect = createSelectSchema(mcpCallCounter, mcpCallCounterRefinements);
+const mcpCallCounterInsert = createInsertSchema(mcpCallCounter, mcpCallCounterRefinements);
+const mcpCallCounterUpdate = createUpdateSchema(mcpCallCounter, mcpCallCounterRefinements);
 
 const invitationEmailCounterRefinements = {
   workspaceId,
@@ -271,15 +262,15 @@ const invitationEmailCounterRefinements = {
   count: (schema: z.ZodNumber) => schema.int().nonnegative(),
 };
 
-export const invitationEmailCounterSelect = createSelectSchema(
+const invitationEmailCounterSelect = createSelectSchema(
   invitationEmailCounter,
   invitationEmailCounterRefinements,
 );
-export const invitationEmailCounterInsert = createInsertSchema(
+const invitationEmailCounterInsert = createInsertSchema(
   invitationEmailCounter,
   invitationEmailCounterRefinements,
 );
-export const invitationEmailCounterUpdate = createUpdateSchema(
+const invitationEmailCounterUpdate = createUpdateSchema(
   invitationEmailCounter,
   invitationEmailCounterRefinements,
 );
@@ -294,18 +285,9 @@ const testWorkspaceMarkRefinements = {
   testingDomain: (schema: z.ZodString) => schema.refine(isTestingDomain),
 };
 
-export const testWorkspaceMarkSelect = createSelectSchema(
-  testWorkspaceMark,
-  testWorkspaceMarkRefinements,
-);
-export const testWorkspaceMarkInsert = createInsertSchema(
-  testWorkspaceMark,
-  testWorkspaceMarkRefinements,
-);
-export const testWorkspaceMarkUpdate = createUpdateSchema(
-  testWorkspaceMark,
-  testWorkspaceMarkRefinements,
-);
+const testWorkspaceMarkSelect = createSelectSchema(testWorkspaceMark, testWorkspaceMarkRefinements);
+const testWorkspaceMarkInsert = createInsertSchema(testWorkspaceMark, testWorkspaceMarkRefinements);
+const testWorkspaceMarkUpdate = createUpdateSchema(testWorkspaceMark, testWorkspaceMarkRefinements);
 
 const ingressCounterRefinements = {
   scope: (schema: z.ZodString) => schema.pipe(z.enum(INGRESS_SCOPES)),
@@ -313,18 +295,18 @@ const ingressCounterRefinements = {
   count: (schema: z.ZodNumber) => schema.int().nonnegative(),
 };
 
-export const ingressCounterSelect = createSelectSchema(ingressCounter, ingressCounterRefinements);
-export const ingressCounterInsert = createInsertSchema(ingressCounter, ingressCounterRefinements);
-export const ingressCounterUpdate = createUpdateSchema(ingressCounter, ingressCounterRefinements);
+const ingressCounterSelect = createSelectSchema(ingressCounter, ingressCounterRefinements);
+const ingressCounterInsert = createInsertSchema(ingressCounter, ingressCounterRefinements);
+const ingressCounterUpdate = createUpdateSchema(ingressCounter, ingressCounterRefinements);
 
 const contractStampRefinements = {
   onlyRow: (schema: z.ZodBoolean) => schema.pipe(z.literal(true)),
   digest: (schema: z.ZodString) => schema.regex(CONTRACT_DIGEST_PATTERN),
 };
 
-export const contractStampSelect = createSelectSchema(contractStamp, contractStampRefinements);
-export const contractStampInsert = createInsertSchema(contractStamp, contractStampRefinements);
-export const contractStampUpdate = createUpdateSchema(contractStamp, contractStampRefinements);
+const contractStampSelect = createSelectSchema(contractStamp, contractStampRefinements);
+const contractStampInsert = createInsertSchema(contractStamp, contractStampRefinements);
+const contractStampUpdate = createUpdateSchema(contractStamp, contractStampRefinements);
 
 const aCount = (schema: z.ZodNumber) => schema.int().nonnegative();
 
@@ -338,9 +320,9 @@ const sweepPassRefinements = {
   generations: aCount,
 };
 
-export const sweepPassSelect = createSelectSchema(sweepPass, sweepPassRefinements);
-export const sweepPassInsert = createInsertSchema(sweepPass, sweepPassRefinements);
-export const sweepPassUpdate = createUpdateSchema(sweepPass, sweepPassRefinements);
+const sweepPassSelect = createSelectSchema(sweepPass, sweepPassRefinements);
+const sweepPassInsert = createInsertSchema(sweepPass, sweepPassRefinements);
+const sweepPassUpdate = createUpdateSchema(sweepPass, sweepPassRefinements);
 
 export { ACTOR_ID } from "./actor-id.ts";
 
@@ -372,19 +354,19 @@ const auditLogDerivedRefinements = {
 
 const auditEventRefinements = { ...auditLogRefinements, workspaceId };
 
-export const auditEventSelect = createSelectSchema(auditEvent, {
+const auditEventSelect = createSelectSchema(auditEvent, {
   ...auditEventRefinements,
   ...auditLogDerivedRefinements,
 });
-export const auditEventInsert = createInsertSchema(auditEvent, auditEventRefinements);
-export const auditEventUpdate = createUpdateSchema(auditEvent, auditEventRefinements);
+const auditEventInsert = createInsertSchema(auditEvent, auditEventRefinements);
+const auditEventUpdate = createUpdateSchema(auditEvent, auditEventRefinements);
 
-export const identityAuditEventSelect = createSelectSchema(identityAuditEvent, {
+const identityAuditEventSelect = createSelectSchema(identityAuditEvent, {
   ...auditLogRefinements,
   ...auditLogDerivedRefinements,
 });
-export const identityAuditEventInsert = createInsertSchema(identityAuditEvent, auditLogRefinements);
-export const identityAuditEventUpdate = createUpdateSchema(identityAuditEvent, auditLogRefinements);
+const identityAuditEventInsert = createInsertSchema(identityAuditEvent, auditLogRefinements);
+const identityAuditEventUpdate = createUpdateSchema(identityAuditEvent, auditLogRefinements);
 
 const accessRequestRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID).brand<"AccessRequestId">(),
@@ -396,9 +378,9 @@ const accessRequestRefinements = {
   invitationId: identityId,
 };
 
-export const accessRequestSelect = createSelectSchema(accessRequest, accessRequestRefinements);
-export const accessRequestInsert = createInsertSchema(accessRequest, accessRequestRefinements);
-export const accessRequestUpdate = createUpdateSchema(accessRequest, accessRequestRefinements);
+const accessRequestSelect = createSelectSchema(accessRequest, accessRequestRefinements);
+const accessRequestInsert = createInsertSchema(accessRequest, accessRequestRefinements);
+const accessRequestUpdate = createUpdateSchema(accessRequest, accessRequestRefinements);
 
 const conceptIri = (schema: z.ZodString) => schema.regex(IRI).brand<"ConceptIri">();
 
@@ -452,18 +434,9 @@ const conceptIdentityRefinements = {
   mergeKey: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const conceptIdentitySelect = createSelectSchema(
-  conceptIdentity,
-  conceptIdentityRefinements,
-);
-export const conceptIdentityInsert = createInsertSchema(
-  conceptIdentity,
-  conceptIdentityRefinements,
-);
-export const conceptIdentityUpdate = createUpdateSchema(
-  conceptIdentity,
-  conceptIdentityRefinements,
-);
+const conceptIdentitySelect = createSelectSchema(conceptIdentity, conceptIdentityRefinements);
+const conceptIdentityInsert = createInsertSchema(conceptIdentity, conceptIdentityRefinements);
+const conceptIdentityUpdate = createUpdateSchema(conceptIdentity, conceptIdentityRefinements);
 
 const conceptFileRefinements = {
   path: (schema: z.ZodString) => schema.regex(CONCEPT_PATH),
@@ -484,9 +457,9 @@ const conceptIndexRefinements = {
   ...readableUnit,
 };
 
-export const conceptIndexSelect = createSelectSchema(conceptIndex, conceptIndexRefinements);
-export const conceptIndexInsert = createInsertSchema(conceptIndex, conceptIndexRefinements);
-export const conceptIndexUpdate = createUpdateSchema(conceptIndex, conceptIndexRefinements);
+const conceptIndexSelect = createSelectSchema(conceptIndex, conceptIndexRefinements);
+const conceptIndexInsert = createInsertSchema(conceptIndex, conceptIndexRefinements);
+const conceptIndexUpdate = createUpdateSchema(conceptIndex, conceptIndexRefinements);
 
 const bundleCommitRefinements = {
   workspaceId,
@@ -496,9 +469,9 @@ const bundleCommitRefinements = {
   actor: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
 };
 
-export const bundleCommitSelect = createSelectSchema(bundleCommit, bundleCommitRefinements);
-export const bundleCommitInsert = createInsertSchema(bundleCommit, bundleCommitRefinements);
-export const bundleCommitUpdate = createUpdateSchema(bundleCommit, bundleCommitRefinements);
+const bundleCommitSelect = createSelectSchema(bundleCommit, bundleCommitRefinements);
+const bundleCommitInsert = createInsertSchema(bundleCommit, bundleCommitRefinements);
+const bundleCommitUpdate = createUpdateSchema(bundleCommit, bundleCommitRefinements);
 
 const evidenceRefinements = {
   workspaceId,
@@ -508,9 +481,9 @@ const evidenceRefinements = {
   contentVersion: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const evidenceSelect = createSelectSchema(evidence, evidenceRefinements);
-export const evidenceInsert = createInsertSchema(evidence, evidenceRefinements);
-export const evidenceUpdate = createUpdateSchema(evidence, evidenceRefinements);
+const evidenceSelect = createSelectSchema(evidence, evidenceRefinements);
+const evidenceInsert = createInsertSchema(evidence, evidenceRefinements);
+const evidenceUpdate = createUpdateSchema(evidence, evidenceRefinements);
 
 const conceptVerificationRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID),
@@ -521,15 +494,15 @@ const conceptVerificationRefinements = {
   origin: (schema: z.ZodString) => schema.pipe(z.enum(VERIFICATION_ORIGINS)),
 };
 
-export const conceptVerificationSelect = createSelectSchema(
+const conceptVerificationSelect = createSelectSchema(
   conceptVerification,
   conceptVerificationRefinements,
 );
-export const conceptVerificationInsert = createInsertSchema(
+const conceptVerificationInsert = createInsertSchema(
   conceptVerification,
   conceptVerificationRefinements,
 );
-export const conceptVerificationUpdate = createUpdateSchema(
+const conceptVerificationUpdate = createUpdateSchema(
   conceptVerification,
   conceptVerificationRefinements,
 );
@@ -541,18 +514,9 @@ const conceptEvidenceRefinements = {
   locator: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const conceptEvidenceSelect = createSelectSchema(
-  conceptEvidence,
-  conceptEvidenceRefinements,
-);
-export const conceptEvidenceInsert = createInsertSchema(
-  conceptEvidence,
-  conceptEvidenceRefinements,
-);
-export const conceptEvidenceUpdate = createUpdateSchema(
-  conceptEvidence,
-  conceptEvidenceRefinements,
-);
+const conceptEvidenceSelect = createSelectSchema(conceptEvidence, conceptEvidenceRefinements);
+const conceptEvidenceInsert = createInsertSchema(conceptEvidence, conceptEvidenceRefinements);
+const conceptEvidenceUpdate = createUpdateSchema(conceptEvidence, conceptEvidenceRefinements);
 
 const conceptSensitivityOverrideRefinements = {
   workspaceId,
@@ -562,15 +526,15 @@ const conceptSensitivityOverrideRefinements = {
   auditEventId: (schema: z.ZodString) => schema.regex(ULID),
 };
 
-export const conceptSensitivityOverrideSelect = createSelectSchema(
+const conceptSensitivityOverrideSelect = createSelectSchema(
   conceptSensitivityOverride,
   conceptSensitivityOverrideRefinements,
 );
-export const conceptSensitivityOverrideInsert = createInsertSchema(
+const conceptSensitivityOverrideInsert = createInsertSchema(
   conceptSensitivityOverride,
   conceptSensitivityOverrideRefinements,
 );
-export const conceptSensitivityOverrideUpdate = createUpdateSchema(
+const conceptSensitivityOverrideUpdate = createUpdateSchema(
   conceptSensitivityOverride,
   conceptSensitivityOverrideRefinements,
 );
@@ -598,18 +562,9 @@ const connectedSourceRefinements = {
   rulesInForce: (schema: z.ZodType) => schema.pipe(rulesInForce),
 };
 
-export const connectedSourceSelect = createSelectSchema(
-  connectedSource,
-  connectedSourceRefinements,
-);
-export const connectedSourceInsert = createInsertSchema(
-  connectedSource,
-  connectedSourceRefinements,
-);
-export const connectedSourceUpdate = createUpdateSchema(
-  connectedSource,
-  connectedSourceRefinements,
-);
+const connectedSourceSelect = createSelectSchema(connectedSource, connectedSourceRefinements);
+const connectedSourceInsert = createInsertSchema(connectedSource, connectedSourceRefinements);
+const connectedSourceUpdate = createUpdateSchema(connectedSource, connectedSourceRefinements);
 
 const sourceDocumentRefinements = {
   workspaceId,
@@ -629,9 +584,9 @@ const sourceDocumentRefinements = {
   narrowedTo: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
 };
 
-export const sourceDocumentSelect = createSelectSchema(sourceDocument, sourceDocumentRefinements);
-export const sourceDocumentInsert = createInsertSchema(sourceDocument, sourceDocumentRefinements);
-export const sourceDocumentUpdate = createUpdateSchema(sourceDocument, sourceDocumentRefinements);
+const sourceDocumentSelect = createSelectSchema(sourceDocument, sourceDocumentRefinements);
+const sourceDocumentInsert = createInsertSchema(sourceDocument, sourceDocumentRefinements);
+const sourceDocumentUpdate = createUpdateSchema(sourceDocument, sourceDocumentRefinements);
 
 const findingRefinements = {
   workspaceId,
@@ -652,9 +607,9 @@ const findingRefinements = {
   restoreReason: (schema: z.ZodString) => schema.trim().min(1).max(FINDING_REASON_MAX),
 };
 
-export const findingSelect = createSelectSchema(finding, findingRefinements);
-export const findingInsert = createInsertSchema(finding, findingRefinements);
-export const findingUpdate = createUpdateSchema(finding, findingRefinements);
+const findingSelect = createSelectSchema(finding, findingRefinements);
+const findingInsert = createInsertSchema(finding, findingRefinements);
+const findingUpdate = createUpdateSchema(finding, findingRefinements);
 
 const subjectIdentifier = z.string().trim().min(1).max(SUBJECT_IDENTIFIER_MAX);
 const subjectIdentifierList = z.array(subjectIdentifier).max(SUBJECT_IDENTIFIERS_MAX);
@@ -679,9 +634,9 @@ const subjectRequestRefinements = {
   answer: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const subjectRequestSelect = createSelectSchema(subjectRequest, subjectRequestRefinements);
-export const subjectRequestInsert = createInsertSchema(subjectRequest, subjectRequestRefinements);
-export const subjectRequestUpdate = createUpdateSchema(subjectRequest, subjectRequestRefinements);
+const subjectRequestSelect = createSelectSchema(subjectRequest, subjectRequestRefinements);
+const subjectRequestInsert = createInsertSchema(subjectRequest, subjectRequestRefinements);
+const subjectRequestUpdate = createUpdateSchema(subjectRequest, subjectRequestRefinements);
 
 const erasureAction = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const erasureActions = z.union([
@@ -698,9 +653,9 @@ const erasureRequestRefinements = {
   report: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const erasureRequestSelect = createSelectSchema(erasureRequest, erasureRequestRefinements);
-export const erasureRequestInsert = createInsertSchema(erasureRequest, erasureRequestRefinements);
-export const erasureRequestUpdate = createUpdateSchema(erasureRequest, erasureRequestRefinements);
+const erasureRequestSelect = createSelectSchema(erasureRequest, erasureRequestRefinements);
+const erasureRequestInsert = createInsertSchema(erasureRequest, erasureRequestRefinements);
+const erasureRequestUpdate = createUpdateSchema(erasureRequest, erasureRequestRefinements);
 
 const suppressionIdentifiers = identifierSetOf(
   SUBJECT_IDENTIFIERS_MAX + SUPPRESSION_SIGN_IN_ADDRESSES_MAX,
@@ -712,9 +667,9 @@ const suppressionRefinements = {
   identifiers: (schema: z.ZodType) => schema.pipe(suppressionIdentifiers),
 };
 
-export const suppressionSelect = createSelectSchema(suppression, suppressionRefinements);
-export const suppressionInsert = createInsertSchema(suppression, suppressionRefinements);
-export const suppressionUpdate = createUpdateSchema(suppression, suppressionRefinements);
+const suppressionSelect = createSelectSchema(suppression, suppressionRefinements);
+const suppressionInsert = createInsertSchema(suppression, suppressionRefinements);
+const suppressionUpdate = createUpdateSchema(suppression, suppressionRefinements);
 
 const writeUpRefinements = {
   workspaceId,
@@ -722,9 +677,9 @@ const writeUpRefinements = {
   ...readableUnit,
 };
 
-export const writeUpSelect = createSelectSchema(writeUp, writeUpRefinements);
-export const writeUpInsert = createInsertSchema(writeUp, writeUpRefinements);
-export const writeUpUpdate = createUpdateSchema(writeUp, writeUpRefinements);
+const writeUpSelect = createSelectSchema(writeUp, writeUpRefinements);
+const writeUpInsert = createInsertSchema(writeUp, writeUpRefinements);
+const writeUpUpdate = createUpdateSchema(writeUp, writeUpRefinements);
 
 const writeUpIncludeRefinements = {
   workspaceId,
@@ -734,9 +689,9 @@ const writeUpIncludeRefinements = {
   iri: conceptIri,
 };
 
-export const writeUpIncludeSelect = createSelectSchema(writeUpInclude, writeUpIncludeRefinements);
-export const writeUpIncludeInsert = createInsertSchema(writeUpInclude, writeUpIncludeRefinements);
-export const writeUpIncludeUpdate = createUpdateSchema(writeUpInclude, writeUpIncludeRefinements);
+const writeUpIncludeSelect = createSelectSchema(writeUpInclude, writeUpIncludeRefinements);
+const writeUpIncludeInsert = createInsertSchema(writeUpInclude, writeUpIncludeRefinements);
+const writeUpIncludeUpdate = createUpdateSchema(writeUpInclude, writeUpIncludeRefinements);
 
 const mapLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
   schema.refine(
@@ -760,9 +715,9 @@ const mapGenerationRefinements = {
   liveGen: generation,
 };
 
-export const mapGenerationSelect = createSelectSchema(mapGeneration, mapGenerationRefinements);
-export const mapGenerationInsert = createInsertSchema(mapGeneration, mapGenerationRefinements);
-export const mapGenerationUpdate = createUpdateSchema(mapGeneration, mapGenerationRefinements);
+const mapGenerationSelect = createSelectSchema(mapGeneration, mapGenerationRefinements);
+const mapGenerationInsert = createInsertSchema(mapGeneration, mapGenerationRefinements);
+const mapGenerationUpdate = createUpdateSchema(mapGeneration, mapGenerationRefinements);
 
 const mapKey = (schema: z.ZodString) => schema.trim().min(1);
 
@@ -779,8 +734,8 @@ const mapNodeRefinements = {
   kind: mapKey,
 };
 
-export const mapNodeSelect = createSelectSchema(mapNode, mapNodeRefinements);
-export const mapNodeInsert = createInsertSchema(mapNode, mapNodeRefinements)
+const mapNodeSelect = createSelectSchema(mapNode, mapNodeRefinements);
+const mapNodeInsert = createInsertSchema(mapNode, mapNodeRefinements)
   .refine(sourceEntityCarriesNoGen, {
     message: "a source-entity label carries no generation",
     path: ["gen"],
@@ -789,7 +744,7 @@ export const mapNodeInsert = createInsertSchema(mapNode, mapNodeRefinements)
     message: "a closed node label is a bundle-and-record row and carries its generation",
     path: ["gen"],
   });
-export const mapNodeUpdate = createUpdateSchema(mapNode, mapNodeRefinements);
+const mapNodeUpdate = createUpdateSchema(mapNode, mapNodeRefinements);
 
 const mapEdgeRefinements = {
   ...mapRow,
@@ -800,12 +755,12 @@ const mapEdgeRefinements = {
   toKind: mapKey,
 };
 
-export const mapEdgeSelect = createSelectSchema(mapEdge, mapEdgeRefinements);
-export const mapEdgeInsert = createInsertSchema(mapEdge, mapEdgeRefinements).refine(
+const mapEdgeSelect = createSelectSchema(mapEdge, mapEdgeRefinements);
+const mapEdgeInsert = createInsertSchema(mapEdge, mapEdgeRefinements).refine(
   sourceEntityCarriesNoGen,
   { message: "a source-entity label carries no generation", path: ["gen"] },
 );
-export const mapEdgeUpdate = createUpdateSchema(mapEdge, mapEdgeRefinements);
+const mapEdgeUpdate = createUpdateSchema(mapEdge, mapEdgeRefinements);
 
 const outcomeScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const outcome = z.union([
@@ -830,9 +785,9 @@ const jobRefinements = {
   outcome: (schema: z.ZodType) => schema.pipe(outcome),
 };
 
-export const jobSelect = createSelectSchema(job, jobRefinements);
-export const jobInsert = createInsertSchema(job, jobRefinements);
-export const jobUpdate = createUpdateSchema(job, jobRefinements);
+const jobSelect = createSelectSchema(job, jobRefinements);
+const jobInsert = createInsertSchema(job, jobRefinements);
+const jobUpdate = createUpdateSchema(job, jobRefinements);
 
 const suggestionRefinements = {
   workspaceId,
@@ -846,9 +801,9 @@ const suggestionRefinements = {
   reason: (schema: z.ZodString) => schema.trim().min(1).max(SUGGESTION_REASON_MAX),
 };
 
-export const suggestionSelect = createSelectSchema(suggestion, suggestionRefinements);
-export const suggestionInsert = createInsertSchema(suggestion, suggestionRefinements);
-export const suggestionUpdate = createUpdateSchema(suggestion, suggestionRefinements);
+const suggestionSelect = createSelectSchema(suggestion, suggestionRefinements);
+const suggestionInsert = createInsertSchema(suggestion, suggestionRefinements);
+const suggestionUpdate = createUpdateSchema(suggestion, suggestionRefinements);
 
 const conceptWriteRequestRefinements = {
   workspaceId,
@@ -861,15 +816,15 @@ const conceptWriteRequestRefinements = {
   baseContentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
 };
 
-export const conceptWriteRequestSelect = createSelectSchema(
+const conceptWriteRequestSelect = createSelectSchema(
   conceptWriteRequest,
   conceptWriteRequestRefinements,
 );
-export const conceptWriteRequestInsert = createInsertSchema(
+const conceptWriteRequestInsert = createInsertSchema(
   conceptWriteRequest,
   conceptWriteRequestRefinements,
 );
-export const conceptWriteRequestUpdate = createUpdateSchema(
+const conceptWriteRequestUpdate = createUpdateSchema(
   conceptWriteRequest,
   conceptWriteRequestRefinements,
 );

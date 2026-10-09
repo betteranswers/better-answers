@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import { z } from "zod";
 
 import { ACTOR_ID_PATTERN } from "./actor-id.ts";
 import { listed, stamp } from "./column-helpers.ts";
@@ -49,7 +50,12 @@ export const IRI = new RegExp(
   `^${CONCEPT_IRI_PREFIX.replaceAll(".", String.raw`\.`)}${ULID_CHARACTERS}$`,
 );
 
-export const conceptIriOf = (minted: string): string => `${CONCEPT_IRI_PREFIX}${minted}`;
+/** The registry's `iri` columns carry the same brand; this one cannot import the registry. */
+const MINTED_IRI = z.string().regex(IRI).brand<"ConceptIri">();
+
+/** `minted` is a fresh ULID, so a throw here is a broken invariant, not input to refuse. */
+export const conceptIriOf = (minted: string): z.output<typeof MINTED_IRI> =>
+  MINTED_IRI.parse(`${CONCEPT_IRI_PREFIX}${minted}`);
 
 export const GIT_SHA = /^[0-9a-f]{40}$/;
 

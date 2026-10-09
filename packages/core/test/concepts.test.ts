@@ -60,7 +60,7 @@ const arrange = (): Promise<Scenario> => arrangeWorkspace(db(), bundles());
 
 let minted = 0;
 
-const iriFor = (): string => conceptIriOf(ulid());
+const iriFor = () => conceptIriOf(ulid());
 
 const writeFor = (overrides: Partial<WriteConceptInput> = {}): WriteConceptInput => {
   minted += 1;

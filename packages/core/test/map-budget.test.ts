@@ -3,6 +3,7 @@ import { appendFile } from "node:fs/promises";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { MAP_WALK_ROW_LIMIT, walkFrom } from "@better-answers/core/store/map";
+import type { ConceptIri } from "@better-answers/schema";
 
 import { writeConcept, type WriteConceptInput } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
@@ -54,21 +55,22 @@ const writeOf = (at: number, head: string | null): WriteConceptInput => ({
 
 type DenseMap = {
   readonly scenario: Scenario;
-  readonly entry: string;
-  readonly leaf: string;
+  readonly entry: ConceptIri;
+  readonly leaf: ConceptIri;
 };
 
 const landDenseMap = async (scenario: Scenario): Promise<DenseMap> => {
   let head: string | null = null;
-  let entry = "";
-  let leaf = "";
+  const iris: ConceptIri[] = [];
   for (let at = 0; at < CONCEPTS; at += 1) {
     const written = await writeConcept(scenario.editor, doorsOf(scenario), writeOf(at, head));
     if (!written.ok) throw new Error(`the map did not land: ${String(written.error)}`);
     head = written.value.sha;
-    entry = written.value.iri;
-    if (at === 0) leaf = written.value.iri;
+    iris.push(written.value.iri);
   }
+  const [leaf] = iris;
+  const entry = iris.at(-1);
+  if (leaf === undefined || entry === undefined) throw new Error("the map landed no concept");
   return { scenario, entry, leaf };
 };
 

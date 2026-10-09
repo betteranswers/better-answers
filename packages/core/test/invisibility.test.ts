@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { walkFrom, walkTo } from "@better-answers/core/store/map";
-import { conceptIriOf, ulid } from "@better-answers/schema";
+import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
 import { conceptByIri } from "../src/concepts/index.ts";
@@ -26,7 +26,7 @@ import type { Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange, reading } = visibilitySuite();
 
-const reaches = async (person: UserPrincipal, iri: string): Promise<boolean> => {
+const reaches = async (person: UserPrincipal, iri: ConceptIri): Promise<boolean> => {
   const read = await reading(person, (reader, tx) => conceptByIri(reader, tx, iri));
   if (!read.ok) throw read.error;
   return read.value !== undefined;

@@ -301,6 +301,18 @@ describe("era-independent", () => {
     });
   });
 
+  it.each([
+    ["a malformed iri", "not a concept iri"],
+    ["an iri nothing holds", "https://better-answers.com/c/01ARZ3NDEKTSV4RRFFQ69G5FAV"],
+  ])("answers open as absent for %s", async (_case, iri) => {
+    const { client, token } = await connect();
+
+    const opened = await result(await callTool(client, token, "open", { iri }), toolCalled);
+
+    expect(opened.structuredContent).toEqual({ found: false, iri });
+    expect(firstText(opened)).toBe(`No concept at ${iri}.`);
+  });
+
   it("answers find, ask and give_feedback through the Principal", async () => {
     const { client, token } = await connect();
 

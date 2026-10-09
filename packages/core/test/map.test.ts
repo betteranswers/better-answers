@@ -10,7 +10,7 @@ import {
   type ConceptDelta,
   type WalkStep,
 } from "@better-answers/core/store/map";
-import { citedSourcesOf, conceptIriOf, ulid } from "@better-answers/schema";
+import { citedSourcesOf, conceptIriOf, ids, ulid } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 
 import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
@@ -44,7 +44,9 @@ const walked = async (
   direction: typeof walkFrom = walkFrom,
 ): Promise<readonly WalkStep[]> =>
   answered(
-    await readingAs(db().runtimePool, reader, (principal, tx) => direction(principal, tx, uid)),
+    await readingAs(db().runtimePool, reader, (principal, tx) =>
+      direction(principal, tx, ids.conceptIri.parse(uid)),
+    ),
   );
 
 const uidsByDepth = (steps: readonly WalkStep[]): readonly (readonly [string, number])[] =>

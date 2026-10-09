@@ -21,7 +21,7 @@ import {
   type Trust,
 } from "@better-answers/core/answering";
 import { ok, parse, type Result } from "@better-answers/core/kernel";
-import { conceptFrontmatter } from "@better-answers/schema";
+import { conceptFrontmatter, ids } from "@better-answers/schema";
 
 import { defineEntry, type Entry } from "./define.ts";
 
@@ -56,7 +56,7 @@ type WireMatch<Match> = Match extends { readonly trust: Trust }
   ? Omit<Match, "trust"> & { readonly trust: WireTrust }
   : Match;
 
-type WireFound = { readonly query: string; readonly hits: readonly WireMatch<FindMatch>[] };
+type WireFound = { readonly query: string; readonly hits: readonly WireMatch<FindMatch<string>>[] };
 
 const foundOnTheWire = (found: FindResult): WireFound => ({
   query: found.query,
@@ -65,14 +65,14 @@ const foundOnTheWire = (found: FindResult): WireFound => ({
   ),
 });
 
-const foundInCore = (found: WireFound): FindResult => ({
+const foundInCore = (found: WireFound): FindResult<string> => ({
   query: found.query,
   matches: found.hits.map((match) =>
     match.layer === "bundles" ? { ...match, trust: coreTrust(match.trust) } : match,
   ),
 });
 
-const openedOnTheWire = (opened: OpenResult) => {
+const openedOnTheWire = (opened: OpenResult<string>) => {
   if (!opened.found) return opened;
   const { concept, ...rest } = opened;
   return concept === undefined
@@ -82,7 +82,7 @@ const openedOnTheWire = (opened: OpenResult) => {
 
 type WireOpened = ReturnType<typeof openedOnTheWire>;
 
-const openedInCore = (opened: WireOpened): OpenResult => {
+const openedInCore = (opened: WireOpened): OpenResult<string> => {
   if (!opened.found || !("concept" in opened)) return opened;
   return { ...opened, concept: { ...opened.concept, trust: coreTrust(opened.concept.trust) } };
 };
@@ -244,16 +244,18 @@ const openEntry = defineEntry({
     idempotentHint: true,
     openWorldHint: false,
   },
-  run: async (principal, tx, args, now) =>
-    wired(
-      await open(
-        principal,
-        tx,
-        args.iri === undefined ? { locator: args.locator ?? "" } : { iri: args.iri },
-        now,
-      ),
-      openedOnTheWire,
-    ),
+  run: async (principal, tx, args, now) => {
+    if (args.iri === undefined) {
+      return wired(
+        await open(principal, tx, { locator: args.locator ?? "" }, now),
+        openedOnTheWire,
+      );
+    }
+    // No concept holds an iri that is malformed, so it answers as one nobody holds.
+    const iri = ids.conceptIri.safeParse(args.iri);
+    if (!iri.success) return ok(openedOnTheWire({ found: false, iri: args.iri }));
+    return wired(await open(principal, tx, { iri: iri.data }, now), openedOnTheWire);
+  },
   render: (opened) => renderOpen(openedInCore(opened)),
 });
 
