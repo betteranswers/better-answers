@@ -1159,7 +1159,7 @@ const openedOf = (row: ConceptRow): OpenedConcept => ({
 export const conceptByIri = (
   principal: UserPrincipal,
   tx: Tx,
-  iri: string,
+  iri: ConceptIri,
 ): Promise<Result<OpenedConcept | undefined, Error>> =>
   attempt(async () => {
     const { rows } = await tx.query<ConceptRow>(`${CONCEPT_SELECT} AND c.iri = $4`, [
