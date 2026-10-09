@@ -13,10 +13,14 @@ export const AUDIT_ACTIONS_MODULE = path.resolve(
 
 const GENERATE = "pnpm --filter @better-answers/core run generate:audit-actions";
 
+type DetailKeysOf = Readonly<Record<string, readonly string[]>>;
+
 /** A slice declares its actions as its module loads, so every entry point is loaded first. */
-export const declaredActionNames = async (): Promise<readonly string[]> => {
+export const declaredDetailKeys = async (): Promise<DetailKeysOf> => {
   await loadEveryEntryPoint();
-  return declarations().flatMap((declaration) => declaration.actions);
+  return Object.fromEntries(
+    declarations().flatMap((declaration) => Object.entries(declaration.detailKeysOf)),
+  );
 };
 
 const HEADLINE_OF: ReadonlyMap<string, string> = new Map(Object.entries(ACTION_HEADLINES));
@@ -28,8 +32,16 @@ const headlineOf = (name: string): string => {
   return headline;
 };
 
-export const renderAuditActions = (names: readonly string[]): string => {
-  const sorted = names.toSorted(byCodeUnit);
+/** One line per action and key, which the formatter never rewraps however many keys an action has. */
+const detailKeyLines = (detailKeysOf: DetailKeysOf, sorted: readonly string[]): string[] =>
+  sorted.flatMap((name) =>
+    (detailKeysOf[name] ?? [])
+      .toSorted(byCodeUnit)
+      .map((key) => `  [${JSON.stringify(name)}, ${JSON.stringify(key)}],`),
+  );
+
+export const renderAuditActions = (detailKeysOf: DetailKeysOf): string => {
+  const sorted = Object.keys(detailKeysOf).toSorted(byCodeUnit);
   return [
     `// Generated, never edited: ${GENERATE}`,
     "",
@@ -40,6 +52,10 @@ export const renderAuditActions = (names: readonly string[]): string => {
     "export const HEADLINES = {",
     ...sorted.map((name) => `  "${name}": ${JSON.stringify(headlineOf(name))},`),
     "} as const satisfies Readonly<Record<(typeof DECLARED_ACTIONS)[number], string>>;",
+    "",
+    "export const DETAIL_KEYS = [",
+    ...detailKeyLines(detailKeysOf, sorted),
+    "] as const satisfies readonly (readonly [(typeof DECLARED_ACTIONS)[number], string])[];",
     "",
   ].join("\n");
 };
