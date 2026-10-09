@@ -16,6 +16,10 @@ const keyed = async () => {
   return { privateKey, jwk };
 };
 
+type Key = Awaited<ReturnType<typeof keyed>>;
+
+const encoded = (part: object): string => Buffer.from(JSON.stringify(part)).toString("base64url");
+
 const mint = async (
   privateKey: Awaited<ReturnType<typeof generateKeyPair>>["privateKey"],
   kid: string,
@@ -133,5 +137,52 @@ describe("the bearer verifier", () => {
     await verifier.verifyAccessToken(await mint(second.privateKey, second.jwk.kid, {}));
 
     expect(reads).toBe(2);
+  });
+
+  it("reads the key set once for a known kid", async () => {
+    const key = await keyed();
+    let reads = 0;
+    const verifier = createTokenVerifier({
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      jwks: async () => {
+        reads += 1;
+        return { keys: [key.jwk] };
+      },
+    });
+
+    await verifier.verifyAccessToken(await mint(key.privateKey, key.jwk.kid, {}));
+    await verifier.verifyAccessToken(await mint(key.privateKey, key.jwk.kid, {}));
+
+    expect(reads).toBe(1);
+  });
+
+  it.each<[string, (key: Key) => Promise<string>, string]>([
+    ["a non-JWT bearer", async () => "not-a-jwt", "the bearer is not a JWT"],
+    [
+      "an alg-less bearer",
+      async (key) =>
+        [encoded({ kid: key.jwk.kid }), encoded({ sub: "user-1" }), "bm90LWEtc2lnbmF0dXJl"].join(
+          ".",
+        ),
+      "the bearer names no algorithm",
+    ],
+    [
+      "a claims-less bearer",
+      async (key) =>
+        new SignJWT({})
+          .setProtectedHeader({ alg: "EdDSA", kid: key.jwk.kid })
+          .setIssuer(ISSUER)
+          .setAudience(AUDIENCE)
+          .sign(key.privateKey),
+      "the bearer's claims are not the surface's",
+    ],
+  ])("refuses %s, saying why", async (_case, bearer, reason) => {
+    const key = await keyed();
+
+    expect(await refusalOf(verifierPublishing(key.jwk), await bearer(key))).toMatchObject({
+      code: "invalid_token",
+      message: reason,
+    });
   });
 });

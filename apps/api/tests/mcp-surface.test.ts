@@ -380,6 +380,28 @@ describe("era-independent", () => {
     expect(refused.status).toBe(401);
   });
 
+  it("refuses a token lacking knowledge:read as insufficient scope", async () => {
+    const { client, token } = await connect("offline_access");
+
+    const refused = await modern(client, token, "tools/list");
+
+    expect(refused.status).toBe(403);
+    expect(refused.headers.get("www-authenticate")).toContain('error="insufficient_scope"');
+  });
+
+  it.each([
+    ["both an iri and a locator", { iri: "https://better-answers.com/c/01X", locator: "p.4" }],
+    ["neither an iri nor a locator", {}],
+  ])("refuses open given %s", async (_case, args) => {
+    const { client, token } = await connect();
+
+    const refused = await result(await callTool(client, token, "open", args), toolCalled);
+
+    expect(refused.isError).toBe(true);
+    expect(refused.structuredContent).toBeUndefined();
+    expect(firstText(refused)).toContain("give an `iri` or a `locator`, not both and not neither");
+  });
+
   it("answers 429 with one sentence past the token's ceiling", async () => {
     const { client, token } = await connect();
 
@@ -424,6 +446,33 @@ describe("a call with no bearer", () => {
 
     expect(atTheCeiling.status).not.toBe(429);
     expect(pastIt.status).toBe(429);
+  });
+});
+
+describe("a call with a refused bearer", () => {
+  it("is refused before the handler, when not a JWT", async () => {
+    const client = app().client();
+    const before = app().logs.length;
+
+    const refused = await modern(client, "not-a-jwt", "tools/list");
+
+    expect(refused.status).toBe(401);
+    expect(refused.headers.get("www-authenticate")).toContain('error="invalid_token"');
+    expect(
+      app()
+        .logs.slice(before)
+        .map((line) => line["event"]),
+    ).not.toContain("mcp.request");
+  });
+
+  it("answers 429 once its address floods the surface", async () => {
+    const client = app().client();
+
+    const refused = await pastTheCeiling(MCP_UNAUTHENTICATED_IP_RULE.max, () =>
+      modern(client, "not-a-jwt", "tools/list"),
+    );
+
+    expect(refused).toEqual(REFUSED_AT_THE_CEILING);
   });
 });
 
