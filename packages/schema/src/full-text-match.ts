@@ -12,7 +12,7 @@ export const searchVector = customType<{ data: string; driverData: string }>({
 });
 
 /** Takes words, quoted phrases and `-` as a reader types them, and never raises on prose. */
-export const fullTextQuery = (placeholder: string): string =>
+export const fullTextQuery = (placeholder: `$${number}`): string =>
   `websearch_to_tsquery(${FULL_TEXT_LANGUAGE}, ${placeholder})`;
 
 /**
