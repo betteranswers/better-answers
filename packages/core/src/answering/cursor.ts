@@ -58,4 +58,4 @@ export const findCursor = z
   });
 
 export const cursorOf = (position: FindPosition): string =>
-  Buffer.from(JSON.stringify(position), "utf8").toString("base64url");
+  Buffer.from(JSON.stringify(position)).toString("base64url");

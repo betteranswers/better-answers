@@ -9,7 +9,8 @@ import {
   type FindPosition,
   type FindResult,
 } from "../src/answering/index.ts";
-import type { UserPrincipal } from "../src/kernel/index.ts";
+import type { Result, UserPrincipal } from "../src/kernel/index.ts";
+import type { Tx } from "../src/store/postgres/index.ts";
 import {
   connectedSourceHolding,
   passageUnder,
@@ -310,6 +311,50 @@ describe("find's pages", () => {
   });
 });
 
+/** Runs `work` after a statement has failed, so every read it makes fails too. */
+const afterAFailedStatement = async <T>(
+  person: UserPrincipal,
+  work: (reader: UserPrincipal, tx: Tx) => Promise<Result<T, Error>>,
+): Promise<Result<T, Error> | undefined> => {
+  let answered: Result<T, Error> | undefined;
+  await expect(
+    reading(person, async (reader, tx) => {
+      await tx.query("SELECT 1 / 0").catch(() => undefined);
+      answered = await work(reader, tx);
+    }),
+  ).rejects.toThrow("the transaction did not commit");
+  return answered;
+};
+
+const PASSAGES_CURSOR =
+  "eyJydW4iOiJwYXNzYWdlcyIsImJvdW5kIjp7Im1hdGNoZWQiOjEsInJhbmsiOjAuMSwia2V5Ijp7InNvdXJjZURvY3VtZW50SWQiOiIwMUo2RERERERERERERERERERERERERERERCIsImNoYXJTdGFydCI6MH19fQ";
+
+describe("a failed read", () => {
+  it.each([
+    ["find from the first run", undefined],
+    ["find from the passage run", PASSAGES_CURSOR],
+  ])("answers %s as an error", async (_case, cursor) => {
+    const { viewer } = await arrange();
+    const after = cursor === undefined ? undefined : findCursor.parse(cursor);
+
+    const answered = await afterAFailedStatement(viewer, (reader, tx) =>
+      find(reader, tx, { query: QUESTION, limit: 10, after }, NOW),
+    );
+
+    expect(answered?.ok).toBe(false);
+  });
+
+  it("answers ask's lookup as an error", async () => {
+    const { viewer } = await arrange();
+
+    const answered = await afterAFailedStatement(viewer, (reader, tx) =>
+      ask(reader, tx, { question: QUESTION }),
+    );
+
+    expect(answered?.ok).toBe(false);
+  });
+});
+
 describe("ask's per-word lookup", () => {
   it("cites a concept whose body alone holds a word", async () => {
     const { workspaceId, viewer } = await arrange();
@@ -360,17 +405,15 @@ describe("the cursor find hands out", () => {
       "a key it does not know",
       "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6MCwicmFuayI6MCwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy8wMUo2TU1NTU1NTU1NTU1NTU1NTU1NTU1NTSJ9LCJleHRyYSI6MX0",
     ],
+    ["a character outside base64url before it", `!${PAST_THE_END}`],
+    ["a character outside base64url after it", `${PAST_THE_END}!`],
     ["one character too long", `${PAST_THE_END}${"A".repeat(513 - PAST_THE_END.length)}`],
   ])("refuses %s", (_case, cursor) => {
     expect(findCursor.safeParse(cursor).success).toBe(false);
   });
 
   it("reads a passage's position by document and offset", () => {
-    expect(
-      findCursor.parse(
-        "eyJydW4iOiJwYXNzYWdlcyIsImJvdW5kIjp7Im1hdGNoZWQiOjEsInJhbmsiOjAuMSwia2V5Ijp7InNvdXJjZURvY3VtZW50SWQiOiIwMUo2RERERERERERERERERERERERERERERCIsImNoYXJTdGFydCI6MH19fQ",
-      ),
-    ).toEqual({
+    expect(findCursor.parse(PASSAGES_CURSOR)).toEqual({
       run: "passages",
       bound: {
         matched: 1,
