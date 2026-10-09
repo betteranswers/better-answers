@@ -154,7 +154,7 @@ const NEVER_A_SUBJECT: ReadonlySet<string> = new Set([
 export type Declaration = {
   readonly family: Family;
   readonly actions: readonly ActionName[];
-  readonly detailKeys: readonly string[];
+  readonly detailKeysOf: Readonly<Record<ActionName, readonly string[]>>;
 };
 
 const declared: Declaration[] = [];
@@ -195,8 +195,10 @@ export const declareActions = <
     earlierInCall.add(name);
   }
   for (const name of names) declaredNames.add(name);
-  const detailKeys = new Set(Object.values(actions).flatMap(({ detail }) => Object.keys(detail)));
-  declared.push({ family, actions: names, detailKeys: [...detailKeys] });
+  const detailKeysOf = Object.fromEntries(
+    Object.values(actions).map(({ name, detail }) => [name, Object.keys(detail)]),
+  );
+  declared.push({ family, actions: names, detailKeysOf });
   return actions;
 };
 

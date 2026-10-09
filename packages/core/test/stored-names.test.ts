@@ -9,7 +9,7 @@ const declaredActionNames = (): readonly string[] =>
   declarations().flatMap((declaration) => declaration.actions);
 
 const declaredDetailKeys = (): ReadonlySet<string> =>
-  new Set(declarations().flatMap((declaration) => declaration.detailKeys));
+  new Set(declarations().flatMap((declaration) => Object.values(declaration.detailKeysOf).flat()));
 
 const sorted = (names: Iterable<string>): readonly string[] => [...names].toSorted(byCodeUnit);
 
