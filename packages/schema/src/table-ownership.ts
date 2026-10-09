@@ -363,6 +363,27 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "The publish action reads the status of the connected source's latest sync, its `index` job by subject, inside its own transaction: the worker holds SELECT alone on `connected_source`, so the sync's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through. One column of one row, by the statement in `packages/core/src/sources/connected-source.ts`. The review read's other question of the same table — what the latest finished sync found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
   },
   {
+    table: "public.audit_event",
+    by: "sources",
+    access: "read",
+    reason:
+      "A repeated upload connect answers with what the first one bound rather than streaming a second copy: `FIRST_OUTCOME` in `packages/core/src/sources/connected-source.ts` joins the connected source's document to the audit event that recorded its binding, by subject and action, to hand back that event's id. A read of one row the same action wrote, never a write.",
+  },
+  {
+    table: "public.concept_evidence",
+    by: "sources",
+    access: "read",
+    reason:
+      "Passage search leaves out a passage whose document is already evidence for a concept, so `find` answers with the concept rather than its raw source: the exclusion in `packages/core/src/sources/passages.ts` reads the evidence rows by document.",
+  },
+  {
+    table: "public.concept_index",
+    by: "sources",
+    access: "read",
+    reason:
+      "The same exclusion joins each such concept's index row to apply the reader's predicate to it, so a passage is left out only when its document is evidence for a concept the reader can read; a withheld concept never hides a passage the reader may read.",
+  },
+  {
     table: "public.concept_index",
     by: "guides",
     access: "read",
