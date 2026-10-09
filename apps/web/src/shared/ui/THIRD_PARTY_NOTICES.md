@@ -144,7 +144,7 @@ source file is listed.
 | | `empty/search/empty-search-2.tsx` | `fe2894413f5fe4d0` | |
 | | `empty/standard/empty-standard-6.tsx` | `25f2152a598a1fe5` | |
 | `kibo-ui/row-actions.tsx` | `dropdown-menu/actions/dropdown-menu-actions-2.tsx` | `58e26bf9f81588b0` | `6b15bd63236adbec` |
-| `kibo-ui/counted-switch.tsx` | `tabs/advanced/tabs-advanced-1.tsx` | `06e57ae8224ceace` | `b2bcfbc2d41b2d03` |
+| `kibo-ui/counted-switch.tsx` | `tabs/advanced/tabs-advanced-1.tsx` | `06e57ae8224ceace` | `4bcfd6e2c84fa4f9` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -345,6 +345,12 @@ The arrival edits on `banner`:
   Phosphor glyph the product's own pages draw.
 - `onChange` passes through an arrow that calls `onClose`, since the hook declares `onChange?:`
   without `| undefined` while `onClose?:` admits it.
+
+The edits made on 10 October 2026 for BA-97, which built the blueprint layer:
+
+- `kibo-ui/counted-switch.tsx`: the radio's `focus-visible:shadow-none` became important, since
+  the bridge's focus rule now outranks the kit's ring utilities, and the ring stays on the
+  segment's span.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the pages that use them carry the WCAG 2.2 AA

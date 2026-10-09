@@ -211,7 +211,7 @@
 /* ---------------------------------------------------------------------------
  * 5. Corrections the variables cannot reach.
  * A handful of kit components hardcode a radius or a ring instead of reading
- * the token. These three rules catch them. Keep this list SHORT — if it grows
+ * the token. These rules catch them. Keep this list SHORT — if it grows
  * past a dozen rules, the component should be edited in place instead.
  * ------------------------------------------------------------------------ */
 @layer utilities {
@@ -230,9 +230,10 @@
   }
 }
 
-@layer base {
-  /* Our focus treatment, not the kit's. */
-  :where(button, a, input, textarea, select, [tabindex]):focus-visible {
+@layer utilities {
+  /* Ours, not the kit's ring, which is under 3:1. Three classes' weight outranks its two-class
+     utilities and `shadow-xs`; an inner-ring part opts out with `!`. */
+  :is(button, a, input, textarea, select, summary, [tabindex]):focus-visible:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
   }

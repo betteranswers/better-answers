@@ -33,7 +33,7 @@ export const CountedSwitch = ({ label, value, choices, onValueChange }: CountedS
       <RadioGroupPrimitive.Item
         key={choice.value}
         value={choice.value}
-        className="group min-h-8 outline-none focus-visible:shadow-none"
+        className="group min-h-8 outline-none focus-visible:shadow-none!"
       >
         <span className="inline-flex min-h-8 group-focus-visible:shadow-[var(--focus-ring)]">
           {/* Its own span: two shadow utilities on one element set one property, so the checked elevation could hide the focus ring. */}
