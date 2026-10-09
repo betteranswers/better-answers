@@ -54,6 +54,7 @@ The design system specifies a registration mark, Frame, Card and an accent-fille
 - **No recall reading is taken on production in S2a.** (session-settled: user-directed — chosen over a reading over the customer's variant wordings and over owner-written paraphrases: a variant is a `##` section of its own concept's body (ADR 0004), which the index covers, so its reading would overstate recall, and the first real figure stays C1's.)
 - **A separate design-system package builds Frame, Card and the registration mark before S2a's web units.** Governs R7. (session-settled: user-directed — chosen over S2a's web units building them and over shipping with today's parts: the parts are built once, the existing pages can adopt them, and S2a's pages consume them.)
 - **The primary button takes the accent fill.** The design-system readme says so, and the owner ruled it right over the Tailwind bridge's near-black on 09/10/2026. It lands in the web CSS wiring fix (#636), ahead of S2a. Governs R7.
+- **A concept comes before document passages only when it holds at least half the query's words.** Governs R10. (session-settled: user-directed — chosen over keeping every concept match ahead of every passage: under any-word matching, *how long do we keep audit logs* matches about 98 of the customer's concepts through *audit* alone, so passages would not appear for pages.)
 - **A search matches on any of its words.** Governs R9. (session-settled: user-directed — chosen over requiring every word, and over every word first with any word as a fallback: question-style searches such as *how long do we keep audit logs* must reach *Audit Logs Retention*, and the recall figure should measure full text fairly.)
 
 ### Requirements
@@ -79,11 +80,12 @@ The design system specifies a registration mark, Frame, Card and an accent-fille
 
 **The route spec**
 
-- R8. The route spec's S2a and S2b blocks and their status rows record R2 to R7 and R9: the measure's move, the owner-only production reading, the web units' edge on the design-system package, and the matching rule.
+- R8. The route spec's S2a and S2b blocks and their status rows record R2 to R7, R9 and R10: the measure's move, the owner-only production reading, the web units' edge on the design-system package, the matching rule and the passage ordering.
 
 **Matching**
 
 - R9. A search matches a concept or a document passage that shares any meaningful word with the query, with the closest matches first. The same rule serves `find`, `ask` and Search.
+- R10. Concepts holding at least half the query's words come before document passages. Concepts holding fewer come after them.
 
 ### Acceptance Examples
 
@@ -130,7 +132,7 @@ The design system specifies a registration mark, Frame, Card and an accent-fille
 
 ## Planning Contract
 
-**Product Contract preservation:** changed: R9, its Key Decision, AE3 and AE4 added (owner, 09/10/2026, in planning). R8 now names R9. R7 now says the accent-filled primary button comes from #636, as its Key Decision already did. The four planning questions are answered by KTD3, KTD12, KTD12 and KTD13 and removed. Scope Boundaries and Dependencies gain what planning found. R1 to R7 and AE1 and AE2 are unchanged.
+**Product Contract preservation:** changed: R9, its Key Decision, AE3 and AE4 added (owner, 09/10/2026, in planning). R10 and its Key Decision added (owner, 09/10/2026, answering the review). R8 now names R9. R7 now says the accent-filled primary button comes from #636, as its Key Decision already did. The four planning questions are answered by KTD3, KTD12, KTD12 and KTD13 and removed. Scope Boundaries and Dependencies gain what planning found. R1 to R7 and AE1 and AE2 are unchanged.
 
 ### Key Technical Decisions
 
@@ -147,8 +149,13 @@ The design system specifies a registration mark, Frame, Card and an accent-fille
   - The concept arm, the passage arm and `ask`'s per-term lookup all take the rule, so `find` and `ask` match by one rule (the route's *T-113's lines*).
   - A query of stop words alone yields an empty query and matches nothing, which is not a failure. `websearch_to_tsquery`'s operators are not honoured.
   - Governs R9.
-- KTD3. **Matches form two runs, concepts first and then passages, each in KTD2's order; a concept's kind is a label on the match.** This reads the route's "ranked by kind" as rank within the concept arm, with kind shown. Passages fill the room after concepts (BA-35's lines), and the arms are never compared. ADR 0018's "ranked separately until S2a" line is edited to say so (U1). Governs R1.
-- KTD4. **`find` pages by an opaque keyset cursor per arm, `(arm, matched, rank, key)` in KTD2's order, and MCP `find` gains it as `nextCursor`.**
+- KTD3. **Matches form three runs: strong concept matches, then passages, then weak concept matches, each in KTD2's order. A concept's kind is a label on the match.**
+  - A strong concept match holds at least half the query's distinct words, rounded up. A weak one holds fewer.
+  - This reads the route's "ranked by kind" as rank within the concept arm, with kind shown.
+  - It instantiates the passage-ordering Key Decision.
+  - The arms are never compared.
+  - Governs R10. ADR 0018's "ranked separately until S2a" line is edited to say so (U1). Governs R1.
+- KTD4. **`find` pages by an opaque keyset cursor over KTD3's runs, `(run, matched, rank, key)` in KTD2's order, and MCP `find` gains it as `nextCursor`.**
   - The page size is MCP's `limit`, at most 20.
   - The server compares rows against the cursor's values and never looks up what it names, so a cursor cannot probe for a withheld concept.
   - A concept rewritten between pages may be skipped or repeated. The web keys rows by arm and id and drops a repeat.
@@ -309,10 +316,6 @@ flowchart LR
 
 ### Open Questions
 
-**Resolve Before U4 (the owner's)**
-
-- Under any-word matching, concepts-first can keep document passages off Search for pages. *how long do we keep audit logs* matches about 98 of the customer's concepts through *audit* alone. Recommended: a concept comes before passages only when it holds at least half the query's distinct words, and weaker concept matches follow the passages. This changes KTD3's order and adds one U4 test. The route's "concepts first" was written for substring matching. U1, U2, U3 and U7 do not depend on this answer.
-
 **Deferred to Implementation**
 
 - The relations cap's number (KTD7), sized so `open` on a large `Answer` stays well under the MCP client's response limit.
@@ -406,7 +409,7 @@ flowchart LR
 ### U4. Any-word matching, ranking and the cursor
 
 - **Goal:** `find`'s two arms and `ask` match by R9's rule, rank by KTD2, order by KTD3 and page by KTD4.
-- **Requirements:** R1, R9; KTD2, KTD3, KTD4; AE4.
+- **Requirements:** R1, R9, R10; KTD2, KTD3, KTD4; AE4.
 - **Dependencies:** U3.
 - **Files:**
   - Modify: `packages/schema/src/full-text-match.ts`, `packages/core/src/concepts/index.ts` (`findConcepts`, and the passage-exclusion clause moved here), `packages/core/src/sources/passages.ts` (`findPassages` returns its rank, and the 20-row cap becomes the page size), `packages/core/src/answering/index.ts` (`find`, `ask`'s per-term lookup).
@@ -422,7 +425,8 @@ flowchart LR
   - *audit log retention* reaches *Audit Logs Retention* (BA-11).
   - A concept whose body repeats *audit* a dozen times ranks below a concept whose title holds *audit*, *log* and *retention* once each.
   - A title match outranks the same words in a body.
-  - Concepts come first and passages fill the remaining room, each in its own rank order.
+  - For *how long do we keep audit logs*, concepts holding at least four of its seven distinct words come first. Passages follow them, then concepts holding fewer, each run in KTD2's order.
+  - A query of one word puts every matching concept before every passage.
   - Paging: the second page continues each arm after the cursor's bounds, and a page past the end returns none, with no `nextCursor`.
   - A cursor naming a withheld concept's IRI returns the same page as one naming an absent IRI.
   - A query of only stop words returns no matches and no error, through both arms.

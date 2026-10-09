@@ -232,6 +232,7 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 - **No recall reading is taken on production here.** A variant wording is a section of its own concept's body, so a variant used as the question finds its concept by its own words.
 - **The owner is this block's only user on production before C1.** The acceptance includes one search there, signed in as a member of the first customer's workspace: *audit log retention* reaches *Audit Logs Retention*.
 - **The web units use Frame, Card and the registration mark from a design-system package** cut from BA-36's findings, and wait on it. The accent-filled primary button landed in #636.
+- **A concept comes before document passages only when it holds at least half the query's words.** Weaker concept matches follow the passages. Without that, any-word matching would keep passages off Search for pages. This replaces "concepts first" in BA-35's lines above.
 - The jump-to *Search for …* row is built.
 
 **Edges.** Blocked by nothing on the route: S1 (done 23/09/2026) held `open` by locator only, and the entry step and the concept page wait on nothing (ADR 0016's own words; grill Q16, Q19). Blocks S2b for its plan step's entry points and for the concept page a citation opens. **T-113's verdict 1 is folded** for these lines (10/09/2026). Search is a page of Knowledge (ADR 0047): this block builds it and waits on nothing for it.
