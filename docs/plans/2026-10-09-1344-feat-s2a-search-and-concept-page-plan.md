@@ -483,6 +483,8 @@ flowchart LR
 - **Test scenarios:**
   - MCP `find` returns structured matches equal to literals, with `nextCursor` when more follow and none at the end.
   - Following `nextCursor` returns the next page with no repeat.
+  - The boundary schema takes `findCursor` from the answering slice and refuses a malformed cursor where it enters.
+  - A query holding U+0000 is refused as malformed, never answered with an Error. Today Postgres refuses it with 22021.
   - MCP `open` by IRI returns frontmatter, body, trust, relations and evidence as literals. Evidence items carry their source `id`.
   - Covers AE3. MCP `open`'s whole structured content for a Viewer, frontmatter included, holds no locator, document id or document title for an unreadable source.
   - MCP `find`'s concept matches carry their trust words as text.
@@ -543,6 +545,7 @@ flowchart LR
 - **Test scenarios:**
   - `knowledge.find`'s first page equals MCP `find`'s at the same limit.
   - `knowledge.find` pages through `nextCursor` to the end.
+  - `knowledge.find`'s input holds `limit` to 1–20, as MCP does, because core does not clamp it.
   - `knowledge.find` returns each concept match's trust words as text.
   - `knowledge.open` by IRI returns the read with trust words as text.
   - A malformed IRI is refused as malformed. An absent and a withheld concept give the same `NOT_FOUND`.

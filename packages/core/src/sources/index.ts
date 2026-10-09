@@ -90,6 +90,7 @@ export {
   previewPassages,
   previewPassagesInput,
   type Passage,
+  type PassageBound,
   type PassageMatch,
   type PreviewedPassage,
 } from "./passages.ts";

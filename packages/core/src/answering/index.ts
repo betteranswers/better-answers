@@ -1,4 +1,4 @@
-import type { ConceptIri } from "@better-answers/schema";
+import type { ConceptIri, MatchStrength } from "@better-answers/schema";
 
 import type { Frontmatter, FrontmatterValue } from "../concepts/index.ts";
 import { citedSource, conceptByIri, findConcepts, type OpenedConcept } from "../concepts/index.ts";
@@ -11,8 +11,11 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { findPassages, passageAt } from "../sources/index.ts";
+import { findPassages, passageAt, type PassageMatch } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { cursorOf, type FindPosition, type FindRun } from "./cursor.ts";
+
+export { findCursor, type FindPosition } from "./cursor.ts";
 
 export const TRUST_TIERS = ["unverified", "machine-confirmed", "human-reviewed"] as const;
 type TrustTier = (typeof TRUST_TIERS)[number];
@@ -111,6 +114,8 @@ export type FindMatch<Iri extends string = ConceptIri> = ConceptMatch<Iri> | Doc
 export type FindResult<Iri extends string = ConceptIri> = {
   readonly query: string;
   readonly matches: readonly FindMatch<Iri>[];
+
+  readonly nextCursor?: string;
 };
 
 export type { FrontmatterValue } from "../concepts/index.ts";
@@ -205,43 +210,131 @@ const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
   return Array.isArray(tags) ? tags.filter((tag) => typeof tag === "string") : [];
 };
 
+type Positioned<Match> = { readonly match: Match; readonly position: FindPosition };
+
+type RunReader<Match> = (
+  limit: number,
+  after: FindPosition | undefined,
+) => Promise<Result<readonly Positioned<Match>[], Error>>;
+
+type Search = {
+  readonly principal: UserPrincipal;
+  readonly tx: Tx;
+  readonly query: string;
+};
+
+const conceptRun =
+  ({ principal, tx, query }: Search, run: MatchStrength): RunReader<OpenedConcept> =>
+  async (limit, after) => {
+    const found = await findConcepts(principal, tx, {
+      query,
+      strength: run,
+      limit,
+      after: after?.run === run ? after.bound : undefined,
+    });
+    if (!found.ok) return err(found.error);
+    return ok(
+      found.value.map(({ concept, bound }) => ({ match: concept, position: { run, bound } })),
+    );
+  };
+
+const passageRun =
+  ({ principal, tx, query }: Search): RunReader<PassageMatch> =>
+  async (limit, after) => {
+    const found = await findPassages(principal, tx, {
+      query,
+      limit,
+      after: after?.run === "passages" ? after.bound : undefined,
+    });
+    if (!found.ok) return err(found.error);
+    return ok(
+      found.value.map(({ passage, bound }) => ({
+        match: passage,
+        position: { run: "passages" as const, bound },
+      })),
+    );
+  };
+
+type Page<Match> = { readonly matches: readonly Match[]; readonly next: FindPosition | undefined };
+
+/** Reads one row past `limit`, so a page names where it ended only when more follow. */
+const pageOf = async <Match>(
+  runs: readonly (readonly [FindRun, RunReader<Match>])[],
+  limit: number,
+  after: FindPosition | undefined,
+): Promise<Result<Page<Match>, Error>> => {
+  const read: Positioned<Match>[] = [];
+  const from = after === undefined ? 0 : runs.findIndex(([run]) => run === after.run);
+  for (const [, reader] of runs.slice(from)) {
+    if (read.length > limit) break;
+    const more = await reader(limit + 1 - read.length, after);
+    if (!more.ok) return err(more.error);
+    read.push(...more.value);
+  }
+  const page = read.slice(0, limit);
+  return ok({
+    matches: page.map(({ match }) => match),
+    next: read.length > limit ? page.at(-1)?.position : undefined,
+  });
+};
+
+const mappedRun =
+  <From, To>(reader: RunReader<From>, to: (from: From) => To): RunReader<To> =>
+  async (limit, after) => {
+    const read = await reader(limit, after);
+    if (!read.ok) return err(read.error);
+    return ok(read.value.map(({ match, position }) => ({ match: to(match), position })));
+  };
+
 /**
- * Concepts come first, up to `limit`; passages fill the room they leave. `now` decides which
- * concepts are past their shelf life.
+ * Concepts holding at least half the query's words, then passages, then concepts holding fewer,
+ * `limit` to a page, after `after` when given. `now` decides which concepts are past their shelf
+ * life.
  */
 export const find = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: { readonly query: string; readonly limit: number },
+  input: {
+    readonly query: string;
+    readonly limit: number;
+    readonly after?: FindPosition | undefined;
+  },
   now: Date,
 ): Promise<Result<FindResult, Error>> => {
-  const found = await findConcepts(principal, tx, input);
-  if (!found.ok) return err(found.error);
-  const room = Math.max(input.limit - found.value.length, 0);
-  const passages = await findPassages(principal, tx, input.query, room);
-  if (!passages.ok) return err(passages.error);
-  return ok({
-    query: input.query,
-    matches: [
-      ...found.value.map((concept): ConceptMatch<ConceptIri> => ({
-        layer: "bundles",
-        iri: concept.iri,
-        kind: concept.kind,
-        title: concept.title,
-        trust: trustOf(concept, now),
-        bundle: bundleOf(concept.path),
-        tags: tagsOf(concept.frontmatter),
-      })),
-      ...passages.value.map((match): DocumentMatch => ({
-        layer: "sources",
-        kind: "document",
-        title: match.title,
-        locator: match.locator,
-        sensitivity: match.sensitivity,
-      })),
+  const search = { principal, tx, query: input.query };
+  const toConcept = (concept: OpenedConcept) => conceptMatchOf(concept, now);
+  const page = await pageOf<FindMatch>(
+    [
+      ["strong", mappedRun(conceptRun(search, "strong"), toConcept)],
+      ["passages", mappedRun(passageRun(search), documentMatchOf)],
+      ["weak", mappedRun(conceptRun(search, "weak"), toConcept)],
     ],
-  });
+    input.limit,
+    input.after,
+  );
+  if (!page.ok) return err(page.error);
+  const { matches, next } = page.value;
+  const found: FindResult = { query: input.query, matches };
+  return ok(next === undefined ? found : { ...found, nextCursor: cursorOf(next) });
 };
+
+const conceptMatchOf = (concept: OpenedConcept, now: Date): ConceptMatch<ConceptIri> => ({
+  layer: "bundles",
+  iri: concept.iri,
+  kind: concept.kind,
+  title: concept.title,
+  trust: trustOf(concept, now),
+  bundle: bundleOf(concept.path),
+  tags: tagsOf(concept.frontmatter),
+});
+
+const documentMatchOf = (match: PassageMatch): DocumentMatch => ({
+  layer: "sources",
+  kind: "document",
+  title: match.title,
+  locator: match.locator,
+  sensitivity: match.sensitivity,
+});
 
 const trustOf = (concept: OpenedConcept, now: Date): Trust => {
   const { tier, verifiedBy, verifiedAt, rider } = trustOfVerification(concept.verification);
@@ -371,9 +464,17 @@ export const ask = async (
 ): Promise<Result<AnswerResult, Error>> => {
   const named = new Map<string, OpenedConcept>();
   for (const term of termsOf(input.question)) {
-    const found = await findConcepts(principal, tx, { query: term, limit: ASK_MATCHES_PER_TERM });
+    const search = { principal, tx, query: term };
+    const found = await pageOf(
+      [
+        ["strong", conceptRun(search, "strong")],
+        ["weak", conceptRun(search, "weak")],
+      ],
+      ASK_MATCHES_PER_TERM,
+      undefined,
+    );
     if (!found.ok) return err(found.error);
-    for (const concept of found.value) named.set(concept.iri, concept);
+    for (const concept of found.value.matches) named.set(concept.iri, concept);
   }
   const citations = [...named.values()]
     .toSorted(
