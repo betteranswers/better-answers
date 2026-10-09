@@ -834,24 +834,24 @@ describe("an imported concept, opened", () => {
     );
   };
 
-  it("renders a source's locator, and no parenthesis without one", async () => {
+  it("renders a locator no passage holds as no locator", async () => {
     const opened = await openedImport(TWO_SOURCES);
 
     expect(opened.ok).toBe(true);
     if (!opened.ok) return;
     expect(renderOpen(opened.value).split("\n").slice(-3)).toEqual([
       "Evidence:",
-      "- Acme Bid Library v1, entry ENTRY-001 (p.4)",
+      "- Acme Bid Library v1, entry ENTRY-001",
       "- Acme Product Library v2, entry PROD-005",
     ]);
   });
 
-  it("answers no locator for a source that carries none", async () => {
+  it("answers each source's id and title, with no unopenable locator", async () => {
     const opened = await openedImport(TWO_SOURCES);
 
     expect(opened.ok && opened.value.found && opened.value.concept?.evidence).toStrictEqual([
-      { locator: "p.4", source: "Acme Bid Library v1, entry ENTRY-001" },
-      { source: "Acme Product Library v2, entry PROD-005" },
+      { id: "ENTRY-001", source: "Acme Bid Library v1, entry ENTRY-001" },
+      { id: "PROD-005", source: "Acme Product Library v2, entry PROD-005" },
     ]);
   });
 
@@ -869,7 +869,7 @@ describe("an imported concept, opened", () => {
     expect(opened.ok).toBe(true);
     if (!opened.ok) return;
     expect(opened.value.found && opened.value.concept?.evidence).toStrictEqual([
-      { source: "Acme Product Library v2, entry PROD-005" },
+      { id: "PROD-005", source: "Acme Product Library v2, entry PROD-005" },
     ]);
     expect(renderOpen(opened.value).split("\n").slice(-2)).toEqual([
       "Evidence:",

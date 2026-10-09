@@ -6,7 +6,7 @@ import { walkFrom } from "@better-answers/core/store/map";
 import { conceptIriOf, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
-import { open } from "../src/answering/index.ts";
+import { mapWords, open } from "../src/answering/index.ts";
 import type { FrontmatterValue, TrustStatus } from "../src/answering/index.ts";
 import {
   contentHashOf,
@@ -14,8 +14,10 @@ import {
   foldKind,
   parseConceptFile,
   renderConceptFile,
+  trustWords,
   writeConcept,
   type Frontmatter,
+  type Trust,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
@@ -1497,7 +1499,13 @@ describe("opening a concept by IRI", () => {
     expect(opened.value.concept).toEqual({
       iri: written.iri,
 
-      frontmatter: { ...input.frontmatter, status: "stable", iri: written.iri },
+      frontmatter: {
+        title: "Expenses",
+        type: "Policy",
+        sources: [{ title: "Handbook", resource: "Handbook" }],
+        status: "stable",
+        iri: written.iri,
+      },
       body: input.body,
       relations: [],
       trust: {
@@ -1507,7 +1515,8 @@ describe("opening a concept by IRI", () => {
         verifiedAt: null,
         rider: null,
       },
-      evidence: [{ locator: "p.4", source: "Handbook" }],
+      trustWords: "Unverified",
+      evidence: [{ source: "Handbook" }],
     });
   });
 
@@ -1681,8 +1690,8 @@ describe("opening a concept by IRI", () => {
     ]);
 
     expect(cited.ok && cited.value.found && cited.value.concept?.evidence).toStrictEqual([
-      { locator: "p.4", source: "Handbook" },
-      { locator: "p.9", source: "/sources/travel.pdf" },
+      { source: "Handbook" },
+      { source: "/sources/travel.pdf" },
       { source: "/sources/rates.csv" },
     ]);
     expect(uncited.ok && uncited.value.found && uncited.value.concept?.evidence).toEqual([]);
@@ -1820,5 +1829,116 @@ describe("opening a concept by IRI", () => {
     );
 
     expect(reached).toEqual({ ok: true, value: undefined });
+  });
+});
+
+const unverified: Trust = {
+  tier: "unverified",
+  status: "current",
+  verifiedBy: null,
+  verifiedAt: null,
+  rider: null,
+};
+
+describe("the trust words", () => {
+  it("names a current unit's tier, verifier, date and any rider", () => {
+    expect(
+      trustWords({
+        tier: "human-reviewed",
+        status: "current",
+        verifiedBy: "Priya Shah",
+        verifiedAt: "2026-03-03",
+        rider: null,
+      }),
+    ).toBe("Verified by Priya Shah · 3 March 2026");
+    expect(
+      trustWords({
+        tier: "human-reviewed",
+        status: "current",
+        verifiedBy: "Priya Shah",
+        verifiedAt: "2026-03-03",
+        rider: "imported",
+      }),
+    ).toBe("Verified by Priya Shah · 3 March 2026 · imported");
+    expect(
+      trustWords({
+        tier: "machine-confirmed",
+        status: "current",
+        verifiedBy: null,
+        verifiedAt: null,
+        rider: "source-moved-on",
+      }),
+    ).toBe("Verified automatically · source moved on");
+    expect(
+      trustWords({
+        tier: "machine-confirmed",
+        status: "current",
+        verifiedBy: "process:better-answers-importer",
+        verifiedAt: "2026-03-03",
+        rider: null,
+      }),
+    ).toBe("Verified automatically");
+    expect(trustWords(unverified)).toBe("Unverified");
+  });
+
+  it("says a person verified, omitting a missing name or date", () => {
+    expect(
+      trustWords({
+        tier: "human-reviewed",
+        status: "current",
+        verifiedBy: "Priya Shah",
+        verifiedAt: null,
+        rider: null,
+      }),
+    ).toBe("Verified by Priya Shah");
+    expect(
+      trustWords({
+        tier: "human-reviewed",
+        status: "current",
+        verifiedBy: null,
+        verifiedAt: null,
+        rider: null,
+      }),
+    ).toBe("Verified by a person");
+  });
+
+  it("names a verifier erasure left nameless a former member", () => {
+    expect(
+      trustWords({
+        tier: "human-reviewed",
+        status: "current",
+        verifiedBy: "human:01J8ZQ4M7V3K9T2R5N6P8W1XYD",
+        verifiedAt: "2026-04-05T09:00:00.000Z",
+        rider: null,
+      }),
+    ).toBe("Verified by a former member · 5 April 2026");
+  });
+
+  it("shows an unreadable date as the file wrote it", () => {
+    expect(
+      trustWords({
+        tier: "human-reviewed",
+        status: "current",
+        verifiedBy: "Priya Shah",
+        verifiedAt: "when the contract ends",
+        rider: null,
+      }),
+    ).toBe("Verified by Priya Shah · when the contract ends");
+    expect(mapWords({ state: "as_of", at: "when the contract ends" })).toBe(
+      "map as of when the contract ends",
+    );
+  });
+
+  it("names any status but current, whatever the tier", () => {
+    const base = {
+      tier: "human-reviewed" as const,
+      verifiedBy: "A",
+      verifiedAt: "2026-01-01",
+      rider: null,
+    };
+    expect(trustWords({ ...base, status: "changed-since-checked" })).toBe("Changed since verified");
+    expect(trustWords({ ...base, status: "out-of-date" })).toBe("Out of date");
+    expect(trustWords({ ...base, status: "draft" })).toBe("Draft");
+    expect(trustWords({ ...base, status: "deprecated" })).toBe("Deprecated");
   });
 });

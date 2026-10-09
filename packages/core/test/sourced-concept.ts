@@ -4,6 +4,7 @@ import { head } from "@better-answers/core/store/git";
 import { testData, type MigratedPostgres, type TestData } from "@better-answers/schema/testing";
 
 import {
+  overrideConceptSensitivity,
   writeConcept,
   type ConceptWritten,
   type WriteConceptInput,
@@ -271,6 +272,44 @@ export const conceptCiting = async (
   if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
   return { ...written.value, path, mergeKey, title };
 };
+
+/** Re-writes the note through the action, citing `documents` in place of what it cited. */
+export const rewriteCiting = async (
+  scenario: Scenario,
+  writer: UserPrincipal,
+  written: SourcedConcept,
+  documents: readonly string[],
+  overrides: Partial<WriteConceptInput> = {},
+) =>
+  writeConcept(writer, doorsOf(scenario), {
+    iri: written.iri,
+    mergeKey: written.mergeKey,
+    path: written.path,
+    kind: "Note",
+    title: written.title,
+    frontmatter: { title: written.title, type: "Note" },
+    body: "The note says something else now.",
+    message: "Re-write the note",
+    author: { name: "Ada Editor", email: "ada@acme.invalid" },
+    expects: { head: await head(writer, scenario.git) },
+    evidence: documents.map((sourceDocumentId, at) => ({
+      sourceDocumentId,
+      locator: `p.${at + 1}`,
+      resource: `Document ${at + 1}`,
+    })),
+    ...overrides,
+  });
+
+/** The scenario's Admin overrides the concept's sensitivity, its audience everyone. */
+export const overriddenBy = (
+  db: MigratedPostgres,
+  scenario: Scenario,
+  iri: string,
+  sensitivity: string,
+) =>
+  readingAs(db.runtimePool, scenario.admin, (admin, tx) =>
+    overrideConceptSensitivity(admin, tx, { iri, sensitivity, audience: "everyone" }),
+  );
 
 /** Makes a group of `people` and returns its id; throws when the create or an add is refused. */
 export const groupNamed = async (

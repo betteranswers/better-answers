@@ -267,9 +267,9 @@ describe("era-independent", () => {
     expect(described.get("open")).toContain("`iri`");
     expect(described.get("open")).toContain("locator");
     expect(described.get("open")).toContain(
-      "carries the `locator` that opens it only where the source gives one",
+      "carries the `locator` of a passage or the `iri` of a concept that opens it only where there is one you may read",
     );
-    expect(described.get("open")).toContain("an item with no `locator` has no passage to open");
+    expect(described.get("open")).toContain("an item with neither has nothing to open");
 
     expect(described.get("find")).toContain("one line per match");
     expect(described.get("find")?.toLowerCase()).not.toContain("chunk");

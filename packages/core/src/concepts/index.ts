@@ -36,7 +36,6 @@ import {
   refusalFor,
   requireAdmin,
   ulid,
-  type ActorId,
   type Clock,
   type PrincipalRefusal,
   type Result,
@@ -92,6 +91,16 @@ import {
 } from "./loader.ts";
 import { manifestAtHead, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
 import {
+  paneOf,
+  projectedFrontmatter,
+  relationsOf,
+  resolvedSourcesOf,
+  type EvidencePane,
+  type PassageNamer,
+  type PassageReader,
+  type Relation,
+} from "./read.ts";
+import {
   payloadFor,
   returnToProposer,
   suggestionIsWaiting,
@@ -99,6 +108,7 @@ import {
   type SuggestionKind,
   type SuggestionPayload,
 } from "./suggestions.ts";
+import { trustOf, trustWords, type ConceptVerification, type Trust } from "./trust.ts";
 import { conceptVisibilityFrom } from "./visibility.ts";
 
 export {
@@ -145,7 +155,7 @@ export type {
 } from "./suggestions.ts";
 /** @public S5 */
 export type { SuggestionSummaryItem } from "./suggestions.ts";
-export { evidencePaneOf, cascadingVisibility, overrideConceptSensitivity } from "./visibility.ts";
+export { cascadingVisibility, overrideConceptSensitivity } from "./visibility.ts";
 export {
   followSyncs,
   followSyncsInEveryWorkspace,
@@ -159,8 +169,7 @@ export type {
   OverrideConceptSensitivityInput,
   OverrideConceptSensitivityRefusal,
 } from "./visibility.ts";
-/** @public S2 */
-export type { EvidencePane } from "./visibility.ts";
+export { conceptPageOf } from "./read.ts";
 export {
   MAP_MAINTENANCE,
   mapCounts,
@@ -169,6 +178,16 @@ export {
   type MapMaintenanceRefusal,
 } from "./map-maintenance.ts";
 export type { SweptGeneration } from "../store/map/index.ts";
+export {
+  TRUST_RIDERS,
+  TRUST_STATUSES,
+  TRUST_TIERS,
+  trustOf,
+  trustWords,
+  ukLongDate,
+  type Trust,
+  type TrustStatus,
+} from "./trust.ts";
 
 const CONCEPT_ACTIONS = declareActions("knowledge", {
   committed: action("knowledge.concept.committed", {
@@ -254,8 +273,6 @@ export type WriteConceptRefusal =
   | "no-such-document"
   | "already-decided"
   | "resolution-moved";
-
-export { citedSourceOf as citedSource } from "@better-answers/schema";
 
 const mayWrite = (principal: UserPrincipal): boolean => principal.role !== "Viewer";
 
@@ -1091,16 +1108,6 @@ export const importBundle = async (
     : runImport(principal, doors, opened.value, sensitivity);
 };
 
-type ConceptVerification = {
-  readonly actor: ActorId;
-  readonly at: Date;
-
-  readonly contentHash: string | null;
-
-  /** Read by person id, so it stands after the member leaves; null once erasure clears the name. */
-  readonly verifierName: string | null;
-};
-
 export type OpenedConcept = {
   readonly iri: ConceptIri;
   readonly path: string;
@@ -1180,6 +1187,73 @@ export const conceptByIri = (
     const row = rows[0];
     return row === undefined ? undefined : openedOf(row);
   });
+
+type ReadRow = ConceptRow & {
+  readonly shared_by: string | null;
+  readonly shared_at: Date | null;
+};
+
+const CONCEPT_READ = `${conceptSelect({
+  columns: "o.actor AS shared_by, o.recorded_at AS shared_at",
+  joins: `LEFT JOIN concept_sensitivity_override o
+                 ON o.workspace_id = c.workspace_id AND o.iri = c.iri`,
+})} AND c.iri = $4`;
+
+/** What a reader is shown of a concept: its frontmatter keeps a source's locator only where they may open it. */
+export type ConceptRead = {
+  readonly iri: ConceptIri;
+  readonly frontmatter: Frontmatter;
+  readonly body: string;
+  readonly trust: Trust;
+  readonly trustWords: string;
+  readonly pane: EvidencePane;
+  readonly relations: readonly Relation[];
+};
+
+const sharerOfRow = (row: ReadRow) =>
+  row.shared_by === null || row.shared_at === null
+    ? undefined
+    : { actor: row.shared_by, at: row.shared_at };
+
+/**
+ * `undefined` both when no concept holds the iri and when this principal may not read it. Each
+ * source opens a passage only through `passageAt`, read for this principal.
+ */
+export const readConcept = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  iri: ConceptIri,
+  reads: {
+    readonly passageAt: PassageReader;
+    readonly namesPassage: PassageNamer;
+    readonly now: Date;
+  },
+): Promise<Result<ConceptRead | undefined, Error>> => {
+  const read = await attempt(() =>
+    tx.query<ReadRow>(CONCEPT_READ, [principal.workspaceId, ...readableParameters(principal), iri]),
+  );
+  if (!read.ok) return err(read.error);
+  const [row] = read.value.rows;
+  if (row === undefined) return ok(undefined);
+  const concept = openedOf(row);
+  const sources = await resolvedSourcesOf(
+    { principal, tx, passageAt: reads.passageAt, namesPassage: reads.namesPassage },
+    concept.frontmatter,
+  );
+  if (!sources.ok) return err(sources.error);
+  const relations = await relationsOf(principal, tx, concept.iri);
+  if (!relations.ok) return err(relations.error);
+  const trust = trustOf(concept, reads.now);
+  return ok({
+    iri: concept.iri,
+    frontmatter: projectedFrontmatter(concept.frontmatter, sources.value),
+    body: concept.body,
+    trust,
+    trustWords: trustWords(trust),
+    pane: paneOf(sources.value, sharerOfRow(row)),
+    relations: relations.value,
+  });
+};
 
 const MATCH = anyWordMatch("c.search", "$4", ["c.iri"]);
 

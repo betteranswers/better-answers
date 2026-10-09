@@ -490,6 +490,7 @@ flowchart LR
   - MCP `find`'s concept matches carry their trust words as text.
   - Over MCP, a malformed IRI is an error result from input validation. In core, it is refused as `malformed`. A well-formed absent IRI and a withheld one both answer `found:false` with the same shape.
   - An Editor and a Viewer are admitted to both actions.
+  - U5 added `trustWords`, a relation's `title`, and an evidence item's `id` and `iri` to the MCP output schemas where they stood, and rewrote `open`'s description of evidence. The moved schemas keep those fields, and an evidence item carries `locator` or `iri` only where the reader may open it, never both.
 - **Verification:** core and api `check` pass, and the action lint passes.
 
 ### U7. The MCP auth findings
@@ -530,6 +531,7 @@ flowchart LR
   - Covers AE2. The recall test passes and prints its figure and the corpus size when recall is below 90 %, demonstrated once with a weakened fixture.
   - The recall test fails if the set is empty or unreadable.
   - No concept or paraphrase in the set comes from the customer's bundle.
+  - `open` beside 19 concurrent `open` calls is timed on a concept with several sources, a passage among them: U5's read resolves each source with its own statement.
 - **Verification:** core `check` passes, and the CI summary shows the recall figure.
 
 ### U9. The tRPC knowledge router
@@ -550,6 +552,7 @@ flowchart LR
   - `knowledge.open` by IRI returns the read with trust words as text.
   - A malformed IRI is refused as malformed. An absent and a withheld concept give the same `NOT_FOUND`.
   - A signed-out request is refused.
+  - `knowledge.open` carries the evidence pane's `access`, `lead` and `next` words beside its evidence list. `readConcept` computes them, and MCP `open`'s view leaves them out.
 - **Verification:** api `check` passes, and `trpc-roads.test.ts` still pins the roads.
 
 ### U10. Synthetic concepts in the harness and the seed
@@ -634,6 +637,8 @@ flowchart LR
   - Back returns to Search at the query left, with focus on the opened row.
   - After a workspace switch, the page's address shows *not found*, asserted on what is drawn.
   - The page renders under its budget and passes the accessibility gate.
+  - A citation mark resolves to the evidence item at the index `linksAndMarksOf` gives it over the projected frontmatter's `sources`. The projection keeps every entry naming a resource, in order, so the index holds.
+  - The sources list leads with the pane's access words and ends with where to go next. A concept whose sources name no passage address and no concept says it has no passage to open, never that access withholds one. A page locator such as `p.4` names no passage address.
 - **Verification:** web `check` passes, including e2e.
 
 ### U13. Jump-to's *Search for …* row

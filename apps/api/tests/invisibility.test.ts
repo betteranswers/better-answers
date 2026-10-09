@@ -226,6 +226,7 @@ describe("the document layer through the MCP entries", () => {
           checkedAt: null,
           rider: null,
         },
+        trustWords: "Unverified",
         bundle: "knowledge",
         tags: [],
       },

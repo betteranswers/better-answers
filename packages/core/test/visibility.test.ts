@@ -13,10 +13,8 @@ import { ask, find, open } from "../src/answering/index.ts";
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import {
   cascadingVisibility,
-  evidencePaneOf,
   overrideConceptSensitivity,
   writeConcept,
-  type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import { footnotesOf } from "../src/guides/index.ts";
 import { attempt, ok, parse, type UserPrincipal } from "../src/kernel/index.ts";
@@ -39,6 +37,8 @@ import {
   conceptCiting,
   conceptForGroup,
   conceptOnBoth,
+  overriddenBy,
+  rewriteCiting,
   documentUnder,
   edgeVisibilityHeld,
   groupNamed,
@@ -49,7 +49,6 @@ import {
   visibilityHeld,
   visibilitySuite,
   type Sourced,
-  type SourcedConcept,
 } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import {
@@ -168,9 +167,7 @@ const widenedTo = (scenario: Scenario, connectedSourceId: string, sensitivity: s
   );
 
 const overriddenTo = (scenario: Scenario, iri: string, sensitivity: string) =>
-  reading(scenario.admin, (admin, tx) =>
-    overrideConceptSensitivity(admin, tx, { iri, sensitivity, audience: "everyone" }),
-  );
+  overriddenBy(db(), scenario, iri, sensitivity);
 const EVERYONE = { audience: "everyone", audience_groups: null } as const;
 
 const landedFor = async (workspaceId: string, path: string, documentId: string) => {
@@ -461,32 +458,6 @@ describe("what a governed write derives from its cited connected sources", () =>
     );
   });
 });
-
-const rewriteCiting = async (
-  scenario: Scenario,
-  writer: UserPrincipal,
-  written: SourcedConcept,
-  documents: readonly string[],
-  overrides: Partial<WriteConceptInput> = {},
-) =>
-  writeConcept(writer, doorsOf(scenario), {
-    iri: written.iri,
-    mergeKey: written.mergeKey,
-    path: written.path,
-    kind: "Note",
-    title: written.title,
-    frontmatter: { title: written.title, type: "Note" },
-    body: "The note says something else now.",
-    message: "Re-write the note",
-    author: { name: "Ada Editor", email: "ada@acme.invalid" },
-    expects: { head: await head(writer, scenario.git) },
-    evidence: documents.map((sourceDocumentId, at) => ({
-      sourceDocumentId,
-      locator: `p.${at + 1}`,
-      resource: `Document ${at + 1}`,
-    })),
-    ...overrides,
-  });
 
 describe("what a re-write may not do to a concept's sensitivity", () => {
   it("refuses citations that widen the sensitivity or audience, committing nothing", async () => {
@@ -1860,247 +1831,6 @@ describe("an Admin's recorded override", () => {
   });
 });
 
-describe("the evidence pane", () => {
-  const paneFor = (person: UserPrincipal, iri: string) =>
-    reading(person, (reader, tx) => evidencePaneOf(reader, tx, iri));
-
-  /** A read takes no lock a write could hold, so the pane is paused through its `tx`. */
-  const paneAcross = async (
-    reader: UserPrincipal,
-    iri: string,
-    pauseAfter: (statement: string) => boolean,
-    write: () => Promise<{ readonly ok: boolean }>,
-  ) => {
-    let paused = false;
-    let wrote: { readonly ok: boolean } | undefined;
-    const pane = await reading(reader, (principal, tx) =>
-      evidencePaneOf(
-        principal,
-        new Proxy(tx, {
-          get: (target, key) =>
-            key === "query"
-              ? async (statement: string, values?: unknown[]) => {
-                  const read = await target.query(statement, values);
-                  if (!paused && pauseAfter(statement)) {
-                    paused = true;
-                    wrote = await write();
-                  }
-                  return read;
-                }
-              : Reflect.get(target, key),
-        }),
-        iri,
-      ),
-    );
-    return { pane, wrote };
-  };
-
-  it("answers a withheld concept exactly as one nobody minted", async () => {
-    const scenario = await arrange();
-    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
-    const written = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
-
-    const withheld = await paneFor(scenario.viewer, written.iri);
-    const absent = await paneFor(scenario.viewer, conceptIriOf(ulid()));
-
-    expect(withheld).toEqual({ ok: true, value: undefined });
-    expect(absent).toEqual(withheld);
-  });
-
-  it("leads with the reader's access and lists every openable piece", async () => {
-    const scenario = await arrange();
-    const { written } = await conceptOnBoth(db(), scenario);
-
-    const pane = await paneFor(scenario.admin, written.iri);
-
-    expect(pane).toEqual({
-      ok: true,
-      value: {
-        access: "included",
-        lead: "Based on your current access, the evidence is included.",
-        evidence: [
-          { locator: "p.1", resource: "Document 1" },
-          { locator: "p.2", resource: "Document 2" },
-        ],
-        sharedBeyondEvidence: undefined,
-        next: "Open a source to read the passage the concept rests on.",
-      },
-    });
-  });
-
-  it("names the overriding Admin and hides evidence the override outruns", async () => {
-    const scenario = await arrange();
-    const restricted = await connectedSourceHolding(db(), scenario.workspaceId, RESTRICTED);
-    const written = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
-      kind: "Person",
-      frontmatter: { title: "Ada Lovelace", type: "Person" },
-    });
-    await overriddenTo(scenario, written.iri, "Internal");
-
-    const pane = await paneFor(scenario.viewer, written.iri);
-
-    expect(pane.ok && pane.value).toMatchObject({
-      access: "not-included",
-      lead: "Based on your current access, the evidence isn't included. An Admin shared this concept beyond its evidence.",
-      evidence: [],
-      sharedBeyondEvidence: { by: `human:${scenario.admin.userId}` },
-      next: "Ask an Admin for access to the sources, or read the concept as it stands.",
-    });
-    expect(pane.ok && pane.value?.sharedBeyondEvidence?.at).toBeInstanceOf(Date);
-
-    expect(JSON.stringify(pane)).not.toContain("Document 1");
-  });
-
-  it("lists only the openable evidence when some is withheld", async () => {
-    const scenario = await arrange();
-    const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
-    const written = await conceptCiting(scenario, scenario.editor, [
-      restricted.documentId,
-      internal.documentId,
-    ]);
-    await overriddenTo(scenario, written.iri, "Internal");
-
-    const pane = await paneFor(scenario.viewer, written.iri);
-
-    expect(pane.ok && pane.value).toMatchObject({
-      access: "partly-included",
-      lead: "Based on your current access, some of the evidence isn't included. An Admin shared this concept beyond its evidence.",
-      evidence: [{ locator: "p.2", resource: "Document 2" }],
-      sharedBeyondEvidence: { by: `human:${scenario.admin.userId}` },
-    });
-  });
-
-  it("names no Admin when nothing is withheld, sourced or not", async () => {
-    const scenario = await arrange();
-    const unsourced = await conceptCiting(scenario, scenario.editor, [], {
-      sensitivity: "Internal",
-    });
-    const internal = await connectedSourceHolding(db(), scenario.workspaceId);
-    const sourced = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
-    await overriddenTo(scenario, sourced.iri, "Public");
-
-    const nothingCited = await paneFor(scenario.viewer, unsourced.iri);
-    const allIncluded = await paneFor(scenario.viewer, sourced.iri);
-
-    expect(nothingCited.ok && nothingCited.value).toEqual({
-      access: "included",
-      lead: "This concept cites no source, so there is nothing to include.",
-      evidence: [],
-      sharedBeyondEvidence: undefined,
-      next: "Read the concept as it stands.",
-    });
-    expect(allIncluded.ok && allIncluded.value).toMatchObject({
-      access: "included",
-      evidence: [{ locator: "p.1", resource: "Document 1" }],
-      sharedBeyondEvidence: undefined,
-    });
-  });
-
-  it("withholds evidence whose connected source is unpublished, naming no Admin", async () => {
-    const scenario = await arrange();
-    const unpublished = await connectedSourceHolding(db(), scenario.workspaceId, {
-      publishedAt: null,
-    });
-    const written = await conceptCiting(scenario, scenario.editor, [unpublished.documentId], {
-      sensitivity: "Internal",
-    });
-
-    const pane = await paneFor(scenario.admin, written.iri);
-
-    expect(pane.ok && pane.value).toMatchObject({
-      access: "not-included",
-      lead: "Based on your current access, the evidence isn't included.",
-      evidence: [],
-      sharedBeyondEvidence: undefined,
-    });
-  });
-
-  it("reads count and rows from one snapshot across a re-write", async () => {
-    const scenario = await arrange();
-    const kept = await connectedSourceHolding(db(), scenario.workspaceId);
-    const added = await connectedSourceHolding(db(), scenario.workspaceId);
-    const written = await conceptCiting(scenario, scenario.editor, [kept.documentId]);
-
-    const { pane, wrote } = await paneAcross(
-      scenario.admin,
-      written.iri,
-      (statement) => statement.includes("concept_evidence"),
-      () => rewriteCiting(scenario, scenario.editor, written, [kept.documentId, added.documentId]),
-    );
-
-    expect(wrote).toMatchObject({ ok: true });
-    expect(pane).toEqual({
-      ok: true,
-      value: {
-        access: "included",
-        lead: "Based on your current access, the evidence is included.",
-        evidence: [{ locator: "p.1", resource: "Document 1" }],
-        sharedBeyondEvidence: undefined,
-        next: "Open a source to read the passage the concept rests on.",
-      },
-    });
-    const after = await paneFor(scenario.admin, written.iri);
-    expect(after.ok && after.value).toMatchObject({
-      access: "included",
-      evidence: [
-        { locator: "p.1", resource: "Document 1" },
-        { locator: "p.2", resource: "Document 2" },
-      ],
-    });
-  });
-
-  it("answers from the snapshot that found the concept readable", async () => {
-    const scenario = await arrange();
-    const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
-    const written = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
-
-    const { pane, wrote } = await paneAcross(
-      scenario.viewer,
-      written.iri,
-      () => true,
-      () =>
-        rewriteCiting(scenario, scenario.admin, written, [
-          internal.documentId,
-          restricted.documentId,
-        ]),
-    );
-
-    expect(wrote).toMatchObject({ ok: true });
-    expect(pane.ok && pane.value).toMatchObject({
-      access: "included",
-      evidence: [{ locator: "p.1", resource: "Document 1" }],
-    });
-    expect(await paneFor(scenario.viewer, written.iri)).toEqual({ ok: true, value: undefined });
-  });
-
-  it("names the override that stood when the evidence was read", async () => {
-    const scenario = await arrange();
-    const { internal, restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
-    const written = await conceptCiting(scenario, scenario.editor, [
-      internal.documentId,
-      restricted.documentId,
-    ]);
-    await overriddenTo(scenario, written.iri, "Internal");
-    const stood = await db().pool.query<{ recorded_at: Date }>(
-      "SELECT recorded_at FROM concept_sensitivity_override WHERE workspace_id = $1 AND iri = $2",
-      [scenario.workspaceId, written.iri],
-    );
-
-    const { pane, wrote } = await paneAcross(
-      scenario.viewer,
-      written.iri,
-      () => true,
-      () => overriddenTo(scenario, written.iri, "Public"),
-    );
-
-    expect(wrote).toMatchObject({ ok: true });
-    expect(pane.ok && pane.value?.sharedBeyondEvidence).toEqual({
-      by: `human:${scenario.admin.userId}`,
-      at: stood.rows[0]?.recorded_at,
-    });
-  });
-});
-
 const expensesNotes = async (scenario: Scenario) => {
   const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
   const visible = await conceptCiting(scenario, scenario.editor, [internal.documentId], {
@@ -2147,6 +1877,7 @@ describe("find", () => {
               verifiedAt: null,
               rider: null,
             },
+            trustWords: "Unverified",
             bundle: "knowledge",
             tags: ["finance"],
           },
@@ -2178,7 +1909,7 @@ describe("find", () => {
       value: {
         verdict: "refuse",
         text: "Not answered from the company's knowledge.",
-        citations: [{ iri: visible.iri, url: visible.iri }],
+        citations: [{ iri: visible.iri, url: `/knowledge/search/${visible.iri.slice(-26)}` }],
         conflicts: [],
         coverage: { asked: 1, answered: 0 },
         unmappedPassages: [],

@@ -4,6 +4,7 @@ import { walkFrom, walkTo } from "@better-answers/core/store/map";
 import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
+import { open, renderOpen } from "../src/answering/index.ts";
 import { conceptByIri } from "../src/concepts/index.ts";
 import { footnotesOf } from "../src/guides/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
@@ -21,6 +22,7 @@ import {
   visibilitySuite,
   type Sourced,
 } from "./sourced-concept.ts";
+import { documentLanded } from "./suite-documents.ts";
 import { answered } from "./suite-postgres.ts";
 import type { Scenario } from "./workspace-with-bundle.ts";
 
@@ -146,6 +148,51 @@ describe("the audience arm of the read predicate", () => {
       addToGroup(admin, tx, { groupId: board, userId: scenario.admin.userId }),
     );
     expect(await reaches(scenario.admin, forBoardAdmins.iri)).toBe(true);
+  });
+});
+
+describe("a source the reader may not read", () => {
+  const opened = async (person: UserPrincipal, iri: ConceptIri) =>
+    answered(
+      await reading(person, (reader, tx) =>
+        open(reader, tx, { iri }, new Date("2026-09-08T12:00:00.000Z")),
+      ),
+    );
+
+  it("reaches a Viewer as the file's own words alone", async () => {
+    const scenario = await arrange();
+    const minutes = await documentLanded(db().pool, scenario.workspaceId, {
+      title: "Board minutes 2026",
+      text: "Pay rises are set by the board in March.",
+      sensitivity: "Restricted",
+    });
+    const written = await conceptCiting(scenario, scenario.editor, [], {
+      sensitivity: "Internal",
+      body: "Pay rises are set by the board.[^BM-1]",
+      frontmatter: {
+        type: "Note",
+        sources: [
+          {
+            id: "BM-1",
+            title: "The board's minutes",
+            resource: "minutes",
+            locator: minutes.locator,
+          },
+        ],
+      },
+    });
+
+    const viewer = await opened(scenario.viewer, written.iri);
+    const admin = await opened(scenario.admin, written.iri);
+    const seen = `${JSON.stringify(viewer)}\n${renderOpen(viewer)}`;
+
+    expect(viewer.found && viewer.concept?.evidence).toEqual([
+      { id: "BM-1", source: "The board's minutes" },
+    ]);
+    expect(seen).not.toContain(minutes.locator);
+    expect(seen).not.toContain(minutes.documentId);
+    expect(seen).not.toContain("Board minutes 2026");
+    expect(JSON.stringify(admin)).toContain(minutes.locator);
   });
 });
 

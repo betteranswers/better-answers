@@ -15,7 +15,6 @@ import {
   renderFeedback,
   renderFind,
   renderOpen,
-  trustWords,
   type AnswerResult,
   type FeedbackReason,
   type FeedbackReceipt,
@@ -72,109 +71,6 @@ const unverified: Trust = {
   verifiedAt: null,
   rider: null,
 };
-
-describe("the trust words", () => {
-  it("names a current unit's tier, verifier, date and any rider", () => {
-    expect(
-      trustWords({
-        tier: "human-reviewed",
-        status: "current",
-        verifiedBy: "Priya Shah",
-        verifiedAt: "2026-03-03",
-        rider: null,
-      }),
-    ).toBe("Verified by Priya Shah · 3 March 2026");
-    expect(
-      trustWords({
-        tier: "human-reviewed",
-        status: "current",
-        verifiedBy: "Priya Shah",
-        verifiedAt: "2026-03-03",
-        rider: "imported",
-      }),
-    ).toBe("Verified by Priya Shah · 3 March 2026 · imported");
-    expect(
-      trustWords({
-        tier: "machine-confirmed",
-        status: "current",
-        verifiedBy: null,
-        verifiedAt: null,
-        rider: "source-moved-on",
-      }),
-    ).toBe("Verified automatically · source moved on");
-    expect(
-      trustWords({
-        tier: "machine-confirmed",
-        status: "current",
-        verifiedBy: "process:better-answers-importer",
-        verifiedAt: "2026-03-03",
-        rider: null,
-      }),
-    ).toBe("Verified automatically");
-    expect(trustWords(unverified)).toBe("Unverified");
-  });
-
-  it("says a person verified, omitting a missing name or date", () => {
-    expect(
-      trustWords({
-        tier: "human-reviewed",
-        status: "current",
-        verifiedBy: "Priya Shah",
-        verifiedAt: null,
-        rider: null,
-      }),
-    ).toBe("Verified by Priya Shah");
-    expect(
-      trustWords({
-        tier: "human-reviewed",
-        status: "current",
-        verifiedBy: null,
-        verifiedAt: null,
-        rider: null,
-      }),
-    ).toBe("Verified by a person");
-  });
-
-  it("names a verifier erasure left nameless a former member", () => {
-    expect(
-      trustWords({
-        tier: "human-reviewed",
-        status: "current",
-        verifiedBy: "human:01J8ZQ4M7V3K9T2R5N6P8W1XYD",
-        verifiedAt: "2026-04-05T09:00:00.000Z",
-        rider: null,
-      }),
-    ).toBe("Verified by a former member · 5 April 2026");
-  });
-
-  it("shows an unreadable date as the file wrote it", () => {
-    expect(
-      trustWords({
-        tier: "human-reviewed",
-        status: "current",
-        verifiedBy: "Priya Shah",
-        verifiedAt: "when the contract ends",
-        rider: null,
-      }),
-    ).toBe("Verified by Priya Shah · when the contract ends");
-    expect(mapWords({ state: "as_of", at: "when the contract ends" })).toBe(
-      "map as of when the contract ends",
-    );
-  });
-
-  it("names any status but current, whatever the tier", () => {
-    const base = {
-      tier: "human-reviewed" as const,
-      verifiedBy: "A",
-      verifiedAt: "2026-01-01",
-      rider: null,
-    };
-    expect(trustWords({ ...base, status: "changed-since-checked" })).toBe("Changed since verified");
-    expect(trustWords({ ...base, status: "out-of-date" })).toBe("Out of date");
-    expect(trustWords({ ...base, status: "draft" })).toBe("Draft");
-    expect(trustWords({ ...base, status: "deprecated" })).toBe("Deprecated");
-  });
-});
 
 describe("the answer's rendering", () => {
   it("puts the verdict first and the map's line second", () => {
@@ -282,6 +178,7 @@ describe("the preview's rendering", () => {
             kind: "Policy",
             title: "Expenses",
             trust: unverified,
+            trustWords: "Unverified",
             bundle: "acme",
             tags: [],
           },
@@ -297,6 +194,7 @@ describe("the preview's rendering", () => {
               verifiedAt: "2026-03-03",
               rider: null,
             },
+            trustWords: "Verified by Priya Shah · 3 March 2026",
             bundle: "acme",
             tags: ["travel"],
           },
@@ -337,6 +235,7 @@ describe("open's and feedback's renderings", () => {
           body: "Expenses are claimed within thirty days.",
           relations: [],
           trust: unverified,
+          trustWords: "Unverified",
           evidence: [
             { locator: "p.4", source: "Handbook" },
             { locator: "p.9", source: "Travel policy" },
@@ -358,6 +257,47 @@ describe("open's and feedback's renderings", () => {
     );
   });
 
+  it("renders each source's opening and the concept's relations", () => {
+    expect(
+      renderOpen({
+        found: true,
+        concept: {
+          iri: "https://better-answers.com/c/01A",
+          frontmatter: { title: "Expenses", type: "Policy" },
+          body: "Expenses follow the travel policy.",
+          relations: [
+            {
+              kind: "LINKS_TO",
+              target: "https://better-answers.com/c/01B",
+              title: "Travel policy",
+            },
+          ],
+          trust: unverified,
+          trustWords: "Unverified",
+          evidence: [
+            { id: "T-1", source: "Travel policy", iri: "https://better-answers.com/c/01B" },
+            { id: "M-2", source: "The board's minutes" },
+          ],
+        },
+      }),
+    ).toBe(
+      [
+        "# Expenses",
+        "",
+        "Expenses follow the travel policy.",
+        "",
+        "_Unverified_",
+        "",
+        "Evidence:",
+        "- Travel policy (https://better-answers.com/c/01B)",
+        "- The board's minutes",
+        "",
+        "Related:",
+        "- LINKS_TO · Travel policy · https://better-answers.com/c/01B",
+      ].join("\n"),
+    );
+  });
+
   it("heads an untitled concept with its IRI, omitting empty evidence", () => {
     expect(
       renderOpen({
@@ -374,6 +314,7 @@ describe("open's and feedback's renderings", () => {
             verifiedAt: "2026-03-03",
             rider: null,
           },
+          trustWords: "Verified by Priya Shah · 3 March 2026",
           evidence: [],
         },
       }),
@@ -590,6 +531,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
             kind: "Policy",
             title: CONCEPT_TITLE,
             trust: unverified,
+            trustWords: "Unverified",
             bundle: "knowledge",
             tags: [],
           },
