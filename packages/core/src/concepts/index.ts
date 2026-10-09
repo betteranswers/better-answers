@@ -142,12 +142,7 @@ export type {
 } from "./suggestions.ts";
 /** @public S5 */
 export type { SuggestionSummaryItem } from "./suggestions.ts";
-export {
-  evidencePaneOf,
-  overrideConceptSensitivity,
-  openingACascadeOverHeldGroups,
-  recomputeVisibilitySourcedFrom,
-} from "./visibility.ts";
+export { evidencePaneOf, cascadingVisibility, overrideConceptSensitivity } from "./visibility.ts";
 /** @public S3 */
 export type {
   ConceptSensitivityOverridden,

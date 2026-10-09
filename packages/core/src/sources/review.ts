@@ -21,7 +21,7 @@ import {
   recordEach,
   STORED_DETAIL_KEYS,
 } from "../audit/index.ts";
-import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
+import { cascadingVisibility } from "../concepts/index.ts";
 import { actorIdOf, attempt, err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { enqueueJobIn, syncRefused, latestIndexOutcomeIn, type JobOutcome } from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
@@ -32,7 +32,6 @@ import {
   type ActingOnConnectedSource,
   type ConnectedSourceId,
 } from "./admin-connected-source.ts";
-import { cascadeOverEvidence } from "./cascade.ts";
 import { REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastSync, RESTORE_REASON, restoreFinding } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
@@ -476,28 +475,17 @@ const documentsToNarrow = async (
   return ok(rows);
 };
 
-/**
- * Sets each named document's sensitivity, marks the groups' unreviewed findings narrowed, and
- * recomputes the visibility of what those documents source. A sensitivity wider than any
- * document's effective class, the narrower of its own and its source's, refuses the whole command.
- */
-export const narrowDocuments = async (
-  principal: UserPrincipal,
+type DocumentsNarrowedBy = Pick<DocumentsNarrowed, "documentIds" | "batchId">;
+
+const documentsNarrowedBy = async (
+  acting: ActingOnConnectedSource,
   tx: Tx,
-  input: NarrowDocumentsInput,
-): Promise<Result<DocumentsNarrowed, NarrowDocumentsRefusal>> => {
-  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
-  if (!acting.ok) return err(acting.error);
-  const { admin, workspaceId, connectedSourceId } = acting.value;
-
-  const next = input.sensitivity;
-  const groupsOfFindings = distinctGroupsOfFindings(input.groupsOfFindings);
-  const named = [...new Set(groupsOfFindings.map((groupOfFindings) => groupOfFindings.documentId))];
-
-  const opened = await openingACascadeOverHeldGroups(admin, tx, []);
-  if (!opened.ok) return err(opened.error);
-
-  const documents = await documentsToNarrow(acting.value, tx, named, next);
+  groupsOfFindings: readonly GroupOfFindingsKey[],
+  named: readonly string[],
+  next: Sensitivity,
+): Promise<Result<DocumentsNarrowedBy, NarrowDocumentsRefusal>> => {
+  const { admin, workspaceId, connectedSourceId } = acting;
+  const documents = await documentsToNarrow(acting, tx, named, next);
   if (!documents.ok) return err(documents.error);
 
   const narrowed = await attempt(() =>
@@ -534,13 +522,36 @@ export const narrowDocuments = async (
       },
     })),
   );
+  return ok({ documentIds, batchId });
+};
 
-  const cascaded = await attempt(() =>
-    cascadeOverEvidence(admin, tx, { connectedSourceId, documentIds }),
+/**
+ * Sets each named document's sensitivity, marks the groups' unreviewed findings narrowed, and
+ * recomputes the visibility of what those documents source. A sensitivity wider than any
+ * document's effective class, the narrower of its own and its source's, refuses the whole command.
+ */
+export const narrowDocuments = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: NarrowDocumentsInput,
+): Promise<Result<DocumentsNarrowed, NarrowDocumentsRefusal>> => {
+  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
+  if (!acting.ok) return err(acting.error);
+  const { admin, connectedSourceId } = acting.value;
+
+  const next = input.sensitivity;
+  const groupsOfFindings = distinctGroupsOfFindings(input.groupsOfFindings);
+  const named = [...new Set(groupsOfFindings.map((groupOfFindings) => groupOfFindings.documentId))];
+
+  const cascaded = await cascadingVisibility(
+    admin,
+    tx,
+    { connectedSourceId, documentIds: named },
+    (tx) => documentsNarrowedBy(acting.value, tx, groupsOfFindings, named, next),
   );
   if (!cascaded.ok) return err(cascaded.error);
-
-  return ok({ connectedSourceId, documentIds, sensitivity: next, batchId, ...cascaded.value });
+  const { written, concepts, writeUps } = cascaded.value;
+  return ok({ connectedSourceId, ...written, sensitivity: next, concepts, writeUps });
 };
 
 export const dismissAsNotSpecialCategoryInput = z.object({

@@ -20,7 +20,7 @@ import {
   STORED_DETAIL_KEYS,
   type DetailOf,
 } from "../audit/index.ts";
-import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
+import { cascadingVisibility } from "../concepts/index.ts";
 import {
   admit,
   attempt,
@@ -57,7 +57,6 @@ import {
   type ActingOnConnectedSource,
   type PlatformOnConnectedSource,
 } from "./admin-connected-source.ts";
-import { cascadeOverEvidence } from "./cascade.ts";
 import { dpiaInputFor, type REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastSync } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
@@ -510,7 +509,7 @@ const dpiaAndFindingCounts = async (
 
 type PublishedDetail = DetailOf<(typeof CONNECTED_SOURCE_ACTIONS)["published"]["detail"]>;
 
-const publishAndCascade = async (
+const stampPublished = async (
   acting: ActingOnConnectedSource,
   tx: Tx,
   publishedAt: Date,
@@ -532,9 +531,34 @@ const publishAndCascade = async (
     subjectId: connectedSourceId,
     detail,
   });
-  const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { connectedSourceId }));
-  if (!cascaded.ok) return err(cascaded.error);
   return ok(auditEventId);
+};
+
+const publishWritten = async (
+  acting: ActingOnConnectedSource,
+  tx: Tx,
+  input: PublishConnectedSourceInput,
+): Promise<
+  Result<Omit<ConnectedSourcePublished, "connectedSourceId">, PublishConnectedSourceRefusal>
+> => {
+  const connectedSource = await connectedSourceToPublish(acting, tx);
+  if (!connectedSource.ok) return err(connectedSource.error);
+  const read = await dpiaAndFindingCounts(acting, tx);
+  if (!read.ok) return err(read.error);
+  const { dpiaHash, counts } = read.value;
+
+  const published = await stampPublished(acting, tx, input.publishedAt, {
+    [STORED_DETAIL_KEYS.connectedSourceId]: acting.connectedSourceId,
+    lawfulBasisRecorded: input.confirmations.lawfulBasisRecorded,
+    privacyInformationUpdated: input.confirmations.privacyInformationUpdated,
+    dpiaReferenced: input.confirmations.dpiaReferenced,
+    ...counts,
+    dpiaHash,
+    sensitivity: connectedSource.value.sensitivity,
+    audience: connectedSource.value.audience,
+  });
+  if (!published.ok) return err(published.error);
+  return ok({ auditEventId: published.value, dpiaHash });
 };
 
 /**
@@ -555,27 +579,11 @@ export const publishConnectedSource = async (
     return err("confirmation-missing");
   }
 
-  const opened = await openingACascadeOverHeldGroups(admin, tx, []);
-  if (!opened.ok) return err(opened.error);
-
-  const connectedSource = await connectedSourceToPublish(acting.value, tx);
-  if (!connectedSource.ok) return err(connectedSource.error);
-  const read = await dpiaAndFindingCounts(acting.value, tx);
-  if (!read.ok) return err(read.error);
-  const { dpiaHash, counts } = read.value;
-
-  const published = await publishAndCascade(acting.value, tx, input.publishedAt, {
-    [STORED_DETAIL_KEYS.connectedSourceId]: connectedSourceId,
-    lawfulBasisRecorded: input.confirmations.lawfulBasisRecorded,
-    privacyInformationUpdated: input.confirmations.privacyInformationUpdated,
-    dpiaReferenced: input.confirmations.dpiaReferenced,
-    ...counts,
-    dpiaHash,
-    sensitivity: connectedSource.value.sensitivity,
-    audience: connectedSource.value.audience,
-  });
-  if (!published.ok) return err(published.error);
-  return ok({ connectedSourceId: connectedSourceId, auditEventId: published.value, dpiaHash });
+  const cascaded = await cascadingVisibility(admin, tx, { connectedSourceId }, (tx) =>
+    publishWritten(acting.value, tx, input),
+  );
+  if (!cascaded.ok) return err(cascaded.error);
+  return ok({ connectedSourceId, ...cascaded.value.written });
 };
 
 export const reprocessConnectedSourceInput = z.object({
