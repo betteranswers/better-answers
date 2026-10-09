@@ -3,7 +3,7 @@ import { z } from "zod";
 import { TRUST_TIERS } from "@better-answers/core/answering";
 import { overrideConceptSensitivity, writeConcept } from "@better-answers/core/concepts";
 import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
-import { head, initRepository } from "@better-answers/core/store/git";
+import { head, initRepository, type GitDoor } from "@better-answers/core/store/git";
 import { AUDIENCES, SENSITIVITIES } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
@@ -54,13 +54,17 @@ type SeededConcept = {
 type Writer = {
   readonly principal: UserPrincipal;
   readonly author: { readonly name: string; readonly email: string };
+  readonly git: GitDoor;
 };
 
-const slugOf = (title: string): string =>
+const shortNameOf = (title: string): string =>
   title
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, "-")
     .replaceAll(/^-|-$/g, "");
+
+/** Every concept sits directly under `knowledge/`, so a link names the file alone. */
+const fileOf = (title: string): string => `${shortNameOf(title)}.md`;
 
 /** One published connected source per concept, at its sensitivity; each passage is cited apart. */
 const citationsOf = async (
@@ -109,7 +113,7 @@ const bodyOf = (
   links: readonly SeededConcept[],
 ): string => {
   const marks = citations.map((citation) => `[^${citation.id}]`).join("");
-  const named = links.map((link) => `[${link.title}](${slugOf(link.title)}.md)`);
+  const named = links.map((link) => `[${link.title}](${fileOf(link.title)})`);
   const related = named.length === 0 ? "" : `\n\nSee also ${named.join(", ")}.`;
   return `${concept.body}${marks}${related}\n`;
 };
@@ -131,16 +135,14 @@ const conceptWritten = async (
   concept: AskedConcept,
   earlier: readonly SeededConcept[],
 ) => {
-  const { principal } = writer;
+  const { principal, git } = writer;
   const citations = await citationsOf(app, principal.workspaceId, concept);
-  const path = `knowledge/${slugOf(concept.title)}.md`;
-  const git = openTestGit(app);
-  await initRepository(git, principal.workspaceId);
+  const path = `knowledge/${fileOf(concept.title)}`;
   const written = await writeConcept(
     principal,
     { git, postgres: app.doors.postgres, clock: app.doors.clock },
     {
-      mergeKey: `${slugOf(concept.kind)}:${slugOf(concept.title)}`,
+      mergeKey: `${shortNameOf(concept.kind)}:${shortNameOf(concept.title)}`,
       path,
       kind: concept.kind,
       title: concept.title,
@@ -252,9 +254,12 @@ export const seedConcepts = async (
   asked: z.output<typeof conceptsSeeding>,
 ): Promise<{ readonly concepts: readonly SeededConcept[] }> => {
   const { workspaceId, userId } = asked;
+  const git = openTestGit(app);
+  await initRepository(git, workspaceId);
   const writer = {
     principal: await actingIn(app, { workspaceId, userId }, async (principal) => principal),
     author: await authorOf(app, userId),
+    git,
   };
   const concepts: SeededConcept[] = [];
   for (const concept of asked.concepts) {

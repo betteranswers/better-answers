@@ -44,8 +44,9 @@ INSERT INTO "index".passage
     FROM fixture, jsonb_array_elements(d -> 'passages') AS c
   ON CONFLICT DO NOTHING;
 -- Rows alone: no repository holds this commit or these files, so an audit or a map rebuild names each concept's file missing.
+\set commit 0000000000000000000000000000000000000000
 INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor)
-  VALUES (:'workspace', '0000000000000000000000000000000000000000', '01M2SYNTHET1CC0MM1TAAAAAAA',
+  VALUES (:'workspace', :'commit', '01M2SYNTHET1CC0MM1TAAAAAAA',
           'process:better-answers-synthetic-seed')
   ON CONFLICT DO NOTHING;
 -- The invoice answer cites a passage of the unpublished document, so it is Restricted as a write would derive it.
@@ -76,18 +77,20 @@ INSERT INTO concept_index
      sensitivity, audience)
   SELECT :'workspace', iri, path, kind, title,
          jsonb_build_object('iri', iri, 'title', title, 'type', kind, 'status', 'stable', 'sources', sources),
-         body, encode(sha256(convert_to(body, 'UTF8')), 'hex'), '0000000000000000000000000000000000000000',
+         body, encode(sha256(convert_to(body, 'UTF8')), 'hex'), :'commit',
          'stable', now(), sensitivity, 'everyone'
     FROM concept
   ON CONFLICT DO NOTHING;
+-- A source with a locator is a passage of the fixture's document; one without names nothing the platform holds.
+CREATE TEMPORARY TABLE cited ON COMMIT DROP AS
+  SELECT iri, d ->> 'source_document_id' AS document_id, s ->> 'locator' AS locator, s ->> 'resource' AS resource
+    FROM concept, fixture, jsonb_array_elements(sources) AS s
+   WHERE s ? 'locator';
 INSERT INTO evidence (workspace_id, source_document_id, locator, resource)
-  SELECT :'workspace', d ->> 'source_document_id', d -> 'passages' -> 0 ->> 'locator', 'invoice-2026-041.md'
-    FROM fixture
+  SELECT :'workspace', document_id, locator, resource FROM cited
   ON CONFLICT DO NOTHING;
 INSERT INTO concept_evidence (workspace_id, iri, source_document_id, locator)
-  SELECT :'workspace', iri, d ->> 'source_document_id', d -> 'passages' -> 0 ->> 'locator'
-    FROM concept, fixture
-   WHERE merge_key = 'answer:invoice-payment-terms'
+  SELECT :'workspace', iri, document_id, locator FROM cited
   ON CONFLICT DO NOTHING;
 SELECT format('synthetic fixture present: workspace %s, short name synthetic, %s connected source, %s document, %s passages, %s concepts',
               :'workspace',

@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { z } from "zod";
 
-import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
+import type { AUDIENCES, REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
 import { CONFIRM_WORDS, SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
@@ -283,7 +283,7 @@ type SeedConcept = {
   readonly body: string;
   readonly kind?: string;
   readonly sensitivity?: Sensitivity;
-  readonly audience?: "everyone" | "groups";
+  readonly audience?: (typeof AUDIENCES)[number];
   readonly readers?: readonly string[];
   readonly trust?: "unverified" | "machine-confirmed" | "human-reviewed";
   readonly linksTo?: readonly string[];
