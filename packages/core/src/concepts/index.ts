@@ -96,6 +96,7 @@ import {
   relationsOf,
   resolvedSourcesOf,
   type EvidencePane,
+  type PassageNamer,
   type PassageReader,
   type Relation,
 } from "./read.ts";
@@ -1222,7 +1223,11 @@ export const readConcept = async (
   principal: UserPrincipal,
   tx: Tx,
   iri: ConceptIri,
-  reads: { readonly passageAt: PassageReader; readonly now: Date },
+  reads: {
+    readonly passageAt: PassageReader;
+    readonly namesPassage: PassageNamer;
+    readonly now: Date;
+  },
 ): Promise<Result<ConceptRead | undefined, Error>> => {
   const read = await attempt(() =>
     tx.query<ReadRow>(CONCEPT_READ, [principal.workspaceId, ...readableParameters(principal), iri]),
@@ -1232,7 +1237,7 @@ export const readConcept = async (
   if (row === undefined) return ok(undefined);
   const concept = openedOf(row);
   const sources = await resolvedSourcesOf(
-    { principal, tx, passageAt: reads.passageAt },
+    { principal, tx, passageAt: reads.passageAt, namesPassage: reads.namesPassage },
     concept.frontmatter,
   );
   if (!sources.ok) return err(sources.error);

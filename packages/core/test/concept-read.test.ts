@@ -9,8 +9,8 @@ import {
   type FrontmatterValue,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
-import type { UserPrincipal } from "../src/kernel/index.ts";
-import { passageAt } from "../src/sources/index.ts";
+import { err, type UserPrincipal } from "../src/kernel/index.ts";
+import { parseLocator, passageAt } from "../src/sources/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import {
   conceptCiting,
@@ -36,6 +36,7 @@ const HOLIDAY = "Holiday is twenty-eight days including bank holidays.";
 const readingThrough = (reader: UserPrincipal, tx: Tx, iri: ConceptIri) =>
   readConcept(reader, tx, iri, {
     passageAt: (locator) => passageAt(reader, tx, locator),
+    namesPassage: (locator) => parseLocator(locator).ok,
     now,
   });
 
@@ -423,6 +424,71 @@ describe("the evidence pane", () => {
   });
 });
 
+describe("what a concept read cannot open", () => {
+  it("tells an Admin a page locator opens no passage", async () => {
+    const scenario = await arrange();
+    const written = await noteNaming(scenario, [
+      { title: "Bid library", resource: "../sources/bid-library.md", locator: "p.4" },
+    ]);
+
+    const pane = await paneFor(scenario.admin, written.iri);
+
+    expect(pane).toEqual({
+      access: "included",
+      lead: "This concept names its sources, but none of them has a passage to open.",
+      evidence: [{ source: "Bid library" }],
+      sharedBeyondEvidence: undefined,
+      next: "Read the concept as it stands.",
+    });
+  });
+
+  it("labels a source by resource when its title is blank", async () => {
+    const scenario = await arrange();
+    const { locator } = await restrictedPassage(scenario);
+    const written = await noteNaming(scenario, [{ title: "   ", resource: "minutes", locator }]);
+
+    const read = await readFor(scenario.viewer, written.iri);
+
+    expect(read?.pane.evidence).toEqual([{ source: "minutes" }]);
+    expect(read?.frontmatter["sources"]).toEqual([{ resource: "minutes" }]);
+  });
+
+  it("leaves out a sources value that is no list", async () => {
+    const scenario = await arrange();
+    const { locator } = await restrictedPassage(scenario);
+    const scalar = await seededBy(db(), (seed) =>
+      seed.conceptIndex({
+        workspaceId: scenario.workspaceId,
+        frontmatter: { title: "Scalar", type: "Policy", sources: `minutes#${locator}` },
+      }),
+    );
+
+    const read = await readFor(scenario.viewer, ids.conceptIri.parse(scalar.iri));
+
+    expect(read?.frontmatter).toEqual({ title: "Scalar", type: "Policy" });
+    expect(read?.pane.evidence).toEqual([]);
+  });
+
+  it("answers a failed passage read as an error", async () => {
+    const scenario = await arrange();
+    const { locator } = await restrictedPassage(scenario);
+    const written = await noteNaming(scenario, [
+      { title: "Minutes", resource: "minutes", locator },
+    ]);
+    const failure = new Error("the passage read failed");
+
+    const read = await reading(scenario.admin, (reader, tx) =>
+      readConcept(reader, tx, written.iri, {
+        passageAt: () => Promise.resolve(err(failure)),
+        namesPassage: () => true,
+        now,
+      }),
+    );
+
+    expect(read).toEqual({ ok: false, error: failure });
+  });
+});
+
 describe("a concept's projected frontmatter", () => {
   it("keeps a locator only where the reader may open it", async () => {
     const scenario = await arrange();
@@ -469,6 +535,19 @@ const byTarget = (one: { readonly target: string }, other: { readonly target: st
   one.target.localeCompare(other.target);
 
 describe("a concept's relations", () => {
+  it("lists no lineage edge a cited concept leaves", async () => {
+    const scenario = await arrange();
+    const { readable } = await readableAndWithheld(scenario);
+    const written = await noteNaming(scenario, [
+      { title: "Readable note", resource: readable.iri },
+    ]);
+
+    const read = await readFor(scenario.admin, written.iri);
+
+    expect(read?.relations).toEqual([]);
+    expect(read?.pane.evidence).toEqual([{ source: "Readable note", iri: readable.iri }]);
+  });
+
   it("lists a readable linked concept, never a withheld one", async () => {
     const scenario = await arrange();
     const { internal, readable, withheld } = await readableAndWithheld(scenario);

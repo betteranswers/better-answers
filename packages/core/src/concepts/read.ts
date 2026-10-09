@@ -1,4 +1,4 @@
-import { citedSourceOf, ids, type ConceptIri } from "@better-answers/schema";
+import { citedSourceOf, ids, MAP_EDGE_LABELS, type ConceptIri } from "@better-answers/schema";
 import { CONCEPT_IRI_PREFIX } from "@better-answers/schema/concept-file";
 
 import { readableClause, readableParameters } from "../access/index.ts";
@@ -44,6 +44,9 @@ export type Relation = {
 /** Reads the passage at a locator for the reader; `not-found` when they cannot, whatever the reason. */
 export type PassageReader = (locator: string) => Promise<Result<unknown, typeof NOT_FOUND | Error>>;
 
+/** Whether a locator has a passage address's shape, so a page reference is never read as withheld. */
+export type PassageNamer = (locator: string) => boolean;
+
 /** The override that let this reader see the concept, when one is recorded. */
 type Sharer = { readonly actor: string; readonly at: Date } | undefined;
 
@@ -84,6 +87,7 @@ type Doors = {
   readonly principal: UserPrincipal;
   readonly tx: Tx;
   readonly passageAt: PassageReader;
+  readonly namesPassage: PassageNamer;
 };
 
 const READABLE_CONCEPT = `SELECT 1 FROM concept_index c
@@ -107,14 +111,18 @@ const readsPassage = async (doors: Doors, locator: string): Promise<Result<boole
 
 const labelOf = (entry: SourceEntry, resource: string): string => {
   const title = typeof entry === "string" ? undefined : entry["title"];
-  return typeof title === "string" && title !== "" ? title : resource;
+  return typeof title === "string" && title.trim() !== "" ? title : resource;
 };
 
 type Opening = { readonly locator: string } | { readonly iri: ConceptIri };
 
-/** A passage when the entry gives a locator, else a concept when its resource is a concept IRI. */
-const openingNamed = (locator: string | null, resource: string): Opening | undefined => {
-  if (locator !== null && locator.trim() !== "") return { locator };
+/** A passage when the entry's locator has an address's shape, else a concept when its resource is a concept IRI. */
+const openingNamed = (
+  doors: Doors,
+  locator: string | null,
+  resource: string,
+): Opening | undefined => {
+  if (locator !== null && doors.namesPassage(locator)) return { locator };
   const iri = ids.conceptIri.safeParse(resource);
   return iri.success ? { iri: iri.data } : undefined;
 };
@@ -130,7 +138,7 @@ const resolvedOf = async (
   if (cited === undefined) return ok(undefined);
   const source = labelOf(entry, cited.resource);
   const named: EvidenceItem = cited.id === null ? { source } : { id: cited.id, source };
-  const opening = openingNamed(cited.locator, cited.resource);
+  const opening = openingNamed(doors, cited.locator, cited.resource);
   if (opening === undefined) return ok({ entry, item: named, points: false, opens: false });
   const opens = await opensFor(doors, opening);
   if (!opens.ok) return err(opens.error);
@@ -228,11 +236,19 @@ export const paneOf = (resolved: readonly Resolved[], sharer: Sharer): EvidenceP
 /** Sized so a concept's read stays a small part of what an MCP client takes in one answer. */
 const RELATIONS_AT_MOST = 25;
 
+const BOOKKEEPING: readonly string[] = [
+  "DERIVED_FROM",
+  "SAME_AS",
+] satisfies (typeof MAP_EDGE_LABELS)[number][];
+
+/** The platform's own bookkeeping edges are not relations. */
+const RELATION_LABELS = MAP_EDGE_LABELS.filter((label) => !BOOKKEEPING.includes(label));
+
 const RELATIONS = `SELECT e.label AS kind, t.iri AS target, t.title
     FROM map_generation g
     JOIN map_edge e ON e.workspace_id = g.workspace_id AND (e.gen IS NULL OR e.gen = g.live_gen)
     JOIN concept_index t ON t.workspace_id = e.workspace_id AND t.iri = e.to_uid
-   WHERE g.workspace_id = $1 AND e.from_uid = $4
+   WHERE g.workspace_id = $1 AND e.from_uid = $4 AND e.label = ANY($5::text[])
      AND ${readableClause("e", 2)}
      AND ${readableClause("t", 2)}
    GROUP BY e.label, t.iri, t.title
@@ -250,6 +266,7 @@ export const relationsOf = (
       principal.workspaceId,
       ...readableParameters(principal),
       iri,
+      RELATION_LABELS,
     ]);
     return read.rows.map((row) => ({
       kind: row.kind,

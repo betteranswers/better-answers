@@ -12,7 +12,7 @@ import {
   type Trust,
 } from "../concepts/index.ts";
 import { err, NOT_FOUND, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
-import { findPassages, passageAt, type PassageMatch } from "../sources/index.ts";
+import { findPassages, parseLocator, passageAt, type PassageMatch } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { cursorOf, type FindPosition, type FindRun } from "./cursor.ts";
 
@@ -313,6 +313,7 @@ export const open = async (
 
   const concept = await readConcept(principal, tx, input.iri, {
     passageAt: (locator) => passageAt(principal, tx, locator),
+    namesPassage: (locator) => parseLocator(locator).ok,
     now,
   });
   if (!concept.ok) return err(concept.error);
