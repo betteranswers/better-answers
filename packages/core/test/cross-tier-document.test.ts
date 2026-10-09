@@ -4,10 +4,13 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { find, open, renderFind, renderOpen } from "../src/answering/index.ts";
+import { followSyncsInEveryWorkspace, SYNC_CASCADE } from "../src/concepts/index.ts";
 import { ERASURE, recordSubjectRequest, runErasure } from "../src/erasure/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
 import {
+  dismissAsNotSpecialCategory,
+  dismissAsNotSpecialCategoryInput,
   findingsOf as groupsOfFindingsFor,
   findingsOfInput,
   keepInText,
@@ -40,7 +43,7 @@ import {
   THE_TITLE,
   THE_WITHHELD_SPAN,
 } from "./cross-tier-fixture.ts";
-import { groupNamed, seededBy } from "./sourced-concept.ts";
+import { conceptCiting, groupNamed, seededBy, visibilityHeld } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import { answered, leaseLetLapse, readingAs, until } from "./suite-postgres.ts";
@@ -701,6 +704,69 @@ describe("an erasure over a bound document, read through both tiers", () => {
       expect(documentsTheMapFound(again)).toEqual([]);
       expect(await passagesOf(scenario.workspaceId, bound.connectedSourceId)).toEqual(landed);
       expect(await syncsOf(scenario.workspaceId, bound.connectedSourceId)).toEqual(runs);
+    },
+    A_CROSS_TIER_ALLOWANCE_MS,
+  );
+});
+
+const A_SICK_NOTE =
+  "# Absence\n\nThe team lead is on long-term sick leave after a diabetes diagnosis.\n";
+
+describe("a special-category verdict, followed through both tiers", () => {
+  it(
+    "widens a concept on the tick after a dismissal's sync",
+    async () => {
+      const scenario = await arrange();
+      const bound = await boundHandbook(scenario, "absence.md", A_SICK_NOTE);
+      await runTheWorker("cross-tier-7");
+      await publishedHandbook(scenario, bound.connectedSourceId);
+      const written = await conceptCiting(scenario, scenario.editor, [bound.documentId]);
+      const sensitivityHeld = async () =>
+        (await visibilityHeld(db().pool, "concept_index", scenario.workspaceId, written.iri))
+          ?.sensitivity;
+      const heldWhileNarrowed = await sensitivityHeld();
+      const groups = answered(
+        await acting(scenario.admin, (admin, tx) =>
+          groupsOfFindingsFor(
+            admin,
+            tx,
+            inputOf(findingsOfInput, { connectedSourceId: bound.connectedSourceId }),
+          ),
+        ),
+      ).filter((group) => group.category === "special-category");
+      answered(
+        await acting(scenario.admin, (admin, tx) =>
+          dismissAsNotSpecialCategory(
+            admin,
+            tx,
+            inputOf(dismissAsNotSpecialCategoryInput, {
+              connectedSourceId: bound.connectedSourceId,
+              groupsOfFindings: groups.map(({ documentId, category, ruleId, tier }) => ({
+                documentId,
+                category,
+                ruleId,
+                tier,
+              })),
+              reason: "A note on absence, kept for the rota.",
+            }),
+          ),
+        ),
+      );
+
+      await runTheWorker("cross-tier-7");
+      const lift = (await syncsOf(scenario.workspaceId, bound.connectedSourceId)).at(-1);
+      const heldAfterTheLift = await sensitivityHeld();
+      await followSyncsInEveryWorkspace(SYNC_CASCADE, scenario.postgres);
+
+      expect(heldWhileNarrowed).toBe("Restricted");
+      expect(lift?.outcome).toMatchObject({ sensitivity_moved: [bound.documentId] });
+      expect(heldAfterTheLift).toBe("Restricted");
+      expect(await sensitivityHeld()).toBe("Internal");
+      expect(
+        answered(await finding(scenario.editor, written.title)).matches.map((match) =>
+          match.layer === "bundles" ? match.iri : match.locator,
+        ),
+      ).toEqual([written.iri]);
     },
     A_CROSS_TIER_ALLOWANCE_MS,
   );

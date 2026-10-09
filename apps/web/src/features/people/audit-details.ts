@@ -107,6 +107,7 @@ export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, reado
   "platform.erasure.rehearsed": ["erasureRequestId", "subjectRequestId"],
   "platform.erasure.replayed": ["erasureRequestId", "subjectRequestId"],
   "platform.graph.swept": ["edges", "generation", "nodes"],
+  "platform.job.followed": ["attempts", "concepts", "documents", "writeUps"],
   "platform.reconciler.replayed": ["bundleId", "commitSha", "contentHash"],
   "sources.binding.published": ["dpiaHash"],
   "sources.finding.restored": ["findingId"],

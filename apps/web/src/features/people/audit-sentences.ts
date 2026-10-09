@@ -166,6 +166,7 @@ const SENTENCES = {
   "platform.erasure.rehearsed": ({ by }) => `${by} tested an erasure on a test copy`,
   "platform.erasure.replayed": ({ by }) => `${by} re-applied an erasure to a restored backup`,
   "platform.graph.swept": ({ by }) => `${by} cleared older copies of the map`,
+  "platform.job.followed": ({ by }) => `${by} updated who can see concepts after a sync`,
   "platform.reconciler.replayed": ({ by }) => `${by} re-applied a change to the knowledge base`,
   "platform.workspace.marked": ({ by }) =>
     `${by} kept the workspace's invitations to its testing domain`,

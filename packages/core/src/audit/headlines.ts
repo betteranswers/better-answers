@@ -56,6 +56,7 @@ export const ACTION_HEADLINES = {
   "platform.erasure.rehearsed": "Erasure tested",
   "platform.erasure.replayed": "Erasure re-applied",
   "platform.graph.swept": "Older map copies cleared",
+  "platform.job.followed": "Visibility updated after a sync",
   "platform.reconciler.replayed": "Change re-applied",
   "platform.workspace.marked": "Invitations kept to the testing domain",
   "platform.workspace.provisioned": "Workspace provisioned",
