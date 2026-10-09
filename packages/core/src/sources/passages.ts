@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { fullTextQuery, SENSITIVITIES } from "@better-answers/schema";
+import { anyWordMatch, SENSITIVITIES, type MatchBound } from "@better-answers/schema";
 
 import {
   narrower,
@@ -9,6 +9,7 @@ import {
   sensitivityAndAudienceClause,
   type Sensitivity,
 } from "../access/index.ts";
+import { evidenceForAReadableConcept } from "../concepts/index.ts";
 import { attempt, err, NOT_FOUND, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnConnectedSource, CONNECTED_SOURCE_ID } from "./admin-connected-source.ts";
@@ -128,23 +129,30 @@ const wireLocatorOf = (row: {
   readonly char_end: number;
 }): string => locatorOf(row.source_document_id, row.char_start, row.char_end);
 
-const MATCHING_ROWS = `SELECT c.source_document_id, c.char_start, c.char_end, c.sensitivity, d.title
+const MATCH = anyWordMatch("c.search", "$2", ["c.source_document_id", "c.char_start"]);
+
+const matchingRows = (
+  after: string,
+): string => `SELECT c.source_document_id, c.char_start, c.char_end, c.sensitivity, d.title,
+          ${MATCH.columns}
      FROM "index".readable_passage c
      JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id
-    CROSS JOIN ${fullTextQuery("$2")} AS q
+     ${MATCH.joins}
     WHERE c.workspace_id = $1
-      AND c.search @@ q
+      AND ${MATCH.matches}
       AND c.char_start IS NOT NULL
       AND c.char_end IS NOT NULL
       AND ${readableClause("c", 3)}
-      AND NOT EXISTS (SELECT 1
-                        FROM concept_evidence ce
-                        JOIN concept_index ci ON ci.workspace_id = ce.workspace_id AND ci.iri = ce.iri
-                       WHERE ce.workspace_id = c.workspace_id
-                         AND ce.source_document_id = c.source_document_id
-                         AND ${readableClause("ci", 5)})
-    ORDER BY ts_rank(c.search, q) DESC, c.source_document_id, c.char_start
+      AND NOT ${evidenceForAReadableConcept("c", 5)}
+      ${after}
+    ORDER BY ${MATCH.order}
     LIMIT $7`;
+
+const MATCHING_ROWS = matchingRows("");
+
+const MATCHING_ROWS_AFTER = matchingRows(
+  `AND ${MATCH.after({ matched: "$8", rank: "$9", key: ["$10", "$11"] })}`,
+);
 
 type MatchRow = {
   readonly source_document_id: string;
@@ -152,33 +160,61 @@ type MatchRow = {
   readonly char_end: number;
   readonly sensitivity: string | null;
   readonly title: string;
+  readonly matched: number;
+  readonly rank: number;
 };
 
+export type PassageBound = MatchBound<{
+  readonly sourceDocumentId: string;
+  readonly charStart: number;
+}>;
+
+export type PassageFound = { readonly passage: PassageMatch; readonly bound: PassageBound };
+
+const boundParameters = (after: PassageBound | undefined): readonly unknown[] =>
+  after === undefined
+    ? []
+    : [after.matched, after.rank, after.key.sourceDocumentId, after.key.charStart];
+
 /**
- * Leaves out a passage whose document is evidence for a concept the caller can read. `limit` is held
- * to 0 through 20.
+ * By the any-word rule, after `after` when given. Leaves out a passage whose document is evidence for
+ * a concept the caller can read.
  */
 export const findPassages = (
   principal: UserPrincipal,
   tx: Tx,
-  query: string,
-  limit: number,
-): Promise<Result<readonly PassageMatch[], Error>> => {
+  input: {
+    readonly query: string;
+    readonly limit: number;
+    readonly after?: PassageBound | undefined;
+  },
+): Promise<Result<readonly PassageFound[], Error>> => {
   const parameters = readableParameters(principal);
   return attempt(async () => {
-    const read = await tx.query<MatchRow>(MATCHING_ROWS, [
-      principal.workspaceId,
-      query,
-      ...parameters,
-      ...parameters,
-      matchesAsked(limit),
-    ]);
+    const read = await tx.query<MatchRow>(
+      input.after === undefined ? MATCHING_ROWS : MATCHING_ROWS_AFTER,
+      [
+        principal.workspaceId,
+        input.query,
+        ...parameters,
+        ...parameters,
+        input.limit,
+        ...boundParameters(input.after),
+      ],
+    );
 
     return read.rows.map((row) => ({
-      sourceDocumentId: row.source_document_id,
-      title: row.title,
-      locator: wireLocatorOf(row),
-      sensitivity: PASSAGE_SENSITIVITY.parse(row.sensitivity),
+      passage: {
+        sourceDocumentId: row.source_document_id,
+        title: row.title,
+        locator: wireLocatorOf(row),
+        sensitivity: PASSAGE_SENSITIVITY.parse(row.sensitivity),
+      },
+      bound: {
+        matched: row.matched,
+        rank: row.rank,
+        key: { sourceDocumentId: row.source_document_id, charStart: row.char_start },
+      },
     }));
   });
 };

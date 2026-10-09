@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  anyWordMatch,
   boundarySchemas,
   CONCEPT_STABLE_STATUS,
   conceptIriOf,
@@ -9,6 +10,8 @@ import {
   SUGGESTION_SET_MAX,
   type BundleManifest,
   type ConceptIri,
+  type MatchBound,
+  type MatchStrength,
   type SENSITIVITIES,
 } from "@better-answers/schema";
 
@@ -50,7 +53,7 @@ import {
   type Committed,
   type GitDoor,
 } from "../store/git/index.ts";
-import { containing, withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import {
   hashedFileOf,
   renderConceptFile,
@@ -1127,11 +1130,14 @@ type ConceptRow = {
   readonly verified_by_name: string | null;
 };
 
-const CONCEPT_SELECT = `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.body, c.status,
+const conceptSelect = (
+  ranked: { readonly columns: string; readonly joins: string } | undefined,
+): string => `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.body, c.status,
               c.content_hash, c.commit_sha,
               v.actor AS verified_by, v.verified_at, v.content_hash AS verified_hash,
-              NULLIF(verifier.name, '') AS verified_by_name
+              NULLIF(verifier.name, '') AS verified_by_name${ranked === undefined ? "" : `, ${ranked.columns}`}
          FROM concept_index c
+         ${ranked?.joins ?? ""}
          LEFT JOIN LATERAL (
                 SELECT actor, verified_at, content_hash
                   FROM concept_verification
@@ -1143,6 +1149,8 @@ const CONCEPT_SELECT = `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.
                 ON starts_with(v.actor, '${PERSON_PREFIX}')
                AND verifier.id = substr(v.actor, ${PERSON_PREFIX.length + 1})
         WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
+
+const CONCEPT_SELECT = conceptSelect(undefined);
 
 const openedOf = (row: ConceptRow): OpenedConcept => ({
   iri: ids.conceptIri.parse(row.iri),
@@ -1173,26 +1181,62 @@ export const conceptByIri = (
     return row === undefined ? undefined : openedOf(row);
   });
 
+const MATCH = anyWordMatch("c.search", "$4", ["c.iri"]);
+
+const matchingConcepts = (strength: MatchStrength, after: boolean): string =>
+  `${conceptSelect(MATCH)}
+      AND ${MATCH.matches}
+      AND ${MATCH.strength(strength)}
+      ${after ? `AND ${MATCH.after({ matched: "$6", rank: "$7", key: ["$8"] })}` : ""}
+    ORDER BY ${MATCH.order}
+    LIMIT $5`;
+
+export type ConceptBound = MatchBound<ConceptIri>;
+
+export type ConceptFound = { readonly concept: OpenedConcept; readonly bound: ConceptBound };
+
+type MatchingConceptRow = ConceptRow & { readonly matched: number; readonly rank: number };
+
 /**
- * Matches the trimmed query as literal text, ignoring case, in a readable concept's title or
- * body, ordered by title. A blank query or a `limit` under 1 finds nothing.
+ * Readable concepts by the any-word rule, after `after` when given. A strong match holds at least
+ * half the query's distinct words, a weak one fewer.
  */
-export const findConcepts = async (
+export const findConcepts = (
   principal: UserPrincipal,
   tx: Tx,
-  input: { readonly query: string; readonly limit: number },
-): Promise<Result<readonly OpenedConcept[], Error>> => {
-  const query = input.query.trim();
-  if (query === "" || input.limit < 1) return ok([]);
-  return attempt(async () => {
-    const { rows } = await tx.query<ConceptRow>(
-      `${CONCEPT_SELECT} AND (c.title ILIKE $4 OR c.body ILIKE $4)
-        ORDER BY c.title, c.iri LIMIT $5`,
-      [principal.workspaceId, ...readableParameters(principal), containing(query), input.limit],
+  input: {
+    readonly query: string;
+    readonly strength: MatchStrength;
+    readonly limit: number;
+    readonly after?: ConceptBound | undefined;
+  },
+): Promise<Result<readonly ConceptFound[], Error>> =>
+  attempt(async () => {
+    const { after } = input;
+    const { rows } = await tx.query<MatchingConceptRow>(
+      matchingConcepts(input.strength, after !== undefined),
+      [
+        principal.workspaceId,
+        ...readableParameters(principal),
+        input.query,
+        input.limit,
+        ...(after === undefined ? [] : [after.matched, after.rank, after.key]),
+      ],
     );
-    return rows.map(openedOf);
+    return rows.map((row) => {
+      const concept = openedOf(row);
+      return { concept, bound: { matched: row.matched, rank: row.rank, key: concept.iri } };
+    });
   });
-};
+
+/** Whether a document is evidence for a concept the caller can read, `alias` naming its passage. */
+export const evidenceForAReadableConcept = (alias: string, roleParameter: number): string =>
+  `EXISTS (SELECT 1
+             FROM concept_evidence ce
+             JOIN concept_index ci ON ci.workspace_id = ce.workspace_id AND ci.iri = ce.iri
+            WHERE ce.workspace_id = ${alias}.workspace_id
+              AND ce.source_document_id = ${alias}.source_document_id
+              AND ${readableClause("ci", roleParameter)})`;
 
 const verificationOf = (row: ConceptRow): ConceptVerification | undefined => {
   if (row.verified_by === null || row.verified_at === null || !isActorId(row.verified_by)) {

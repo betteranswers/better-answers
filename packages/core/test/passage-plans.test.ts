@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MARK_THE_MATCH_LEAKPROOF } from "@better-answers/schema";
 import { UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
-import type { UserPrincipal } from "../src/kernel/index.ts";
+import { ok, type UserPrincipal } from "../src/kernel/index.ts";
 import { findPassages, previewPassages, previewPassagesInput } from "../src/sources/index.ts";
 import { planned } from "./planned.ts";
 import { seededBy, visibilitySuite } from "./sourced-concept.ts";
@@ -90,7 +90,10 @@ const arrangedWithInvoices = async (): Promise<Arranged> => {
 };
 
 const searching = (person: UserPrincipal) =>
-  planned(db(), person, (reader, tx) => findPassages(reader, tx, QUERY, 10));
+  planned(db(), person, async (reader, tx) => {
+    const found = await findPassages(reader, tx, { query: QUERY, limit: 10 });
+    return found.ok ? ok(found.value.map(({ passage }) => passage)) : found;
+  });
 
 const theHandbookFound = (arranged: Arranged) => [
   {

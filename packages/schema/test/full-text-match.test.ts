@@ -6,7 +6,13 @@ import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
-import { fullTextQuery, MARK_THE_MATCH_LEAKPROOF, passage } from "../src/index.ts";
+import {
+  anyWordMatch,
+  MARK_THE_MATCH_LEAKPROOF,
+  passage,
+  type MatchStrength,
+} from "../src/index.ts";
+import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
 import { matchIsLeakproof, postgresForSuite, refusesEach, UNMARK_THE_MATCH } from "./probes.ts";
 
@@ -109,9 +115,143 @@ describe("the full-text rule's SQL", () => {
       params: [],
     });
   });
+});
 
-  it("parses a query as passage search always has", () => {
-    expect(fullTextQuery("$2")).toBe("websearch_to_tsquery('english', $2)");
+const BY_TITLE = anyWordMatch("c.search", "$2", ["c.title"]);
+
+type Narrowed = {
+  readonly strength?: MatchStrength;
+  readonly after?: readonly [matched: number, rank: number, title: string];
+};
+
+type Matched = { readonly title: string; readonly matched: number; readonly rank: number };
+
+/** Concept rows titled and bodied as given, read back by the rule over `text`, keyed by title. */
+const matchedOver = (
+  concepts: readonly (readonly [title: string, body: string])[],
+  text: string,
+  narrowed: Narrowed = {},
+): Promise<readonly Matched[]> =>
+  withRollback(db().pool, async (client) => {
+    const seed = testData(client);
+    const { id: workspaceId } = await seed.workspace();
+    for (const [title, body] of concepts) await seed.conceptIndex({ workspaceId, title, body });
+    const { strength, after } = narrowed;
+    const read = await client.query<Matched>(
+      `SELECT c.title, ${BY_TITLE.columns}
+         FROM concept_index c
+         ${BY_TITLE.joins}
+        WHERE c.workspace_id = $1
+          AND ${BY_TITLE.matches}
+          ${strength === undefined ? "" : `AND ${BY_TITLE.strength(strength)}`}
+          ${after === undefined ? "" : `AND ${BY_TITLE.after({ matched: "$3", rank: "$4", key: ["$5"] })}`}
+        ORDER BY ${BY_TITLE.order}`,
+      [workspaceId, text, ...(after ?? [])],
+    );
+    return read.rows;
+  });
+
+const UNRELATED = "Nothing here bears on it.";
+
+describe("the any-word rule over concept rows", () => {
+  it("matches a row holding any one of the text's words", async () => {
+    const matched = await matchedOver(
+      [
+        ["Audit Logs Retention", UNRELATED],
+        ["Retention", UNRELATED],
+        ["Holiday policy", UNRELATED],
+      ],
+      "audit log retention",
+    );
+
+    expect(matched.map(({ title }) => title)).toEqual(["Audit Logs Retention", "Retention"]);
+  });
+
+  it("ranks distinct words held, then density, then key", async () => {
+    const matched = await matchedOver(
+      [
+        ["Logs", "audit audit audit audit audit audit"],
+        ["Audit Logs Retention", UNRELATED],
+        ["Audit", UNRELATED],
+        ["Log", UNRELATED],
+      ],
+      "audit log retention",
+    );
+
+    expect(matched).toEqual([
+      { title: "Audit Logs Retention", matched: 3, rank: 3 },
+      { title: "Logs", matched: 2, rank: 2.200000047683716 },
+      { title: "Audit", matched: 1, rank: 1 },
+      { title: "Log", matched: 1, rank: 1 },
+    ]);
+  });
+
+  it("holds a strong match to half the words, rounded up", async () => {
+    const concepts = [
+      ["Audit", UNRELATED],
+      ["Audit Logs", UNRELATED],
+      ["Audit Logs Retention", UNRELATED],
+    ] as const;
+
+    const titles = async (text: string, strength: MatchStrength) =>
+      (await matchedOver(concepts, text, { strength })).map(({ title }) => title);
+
+    expect({
+      threeStrong: await titles("audit log retention", "strong"),
+      threeWeak: await titles("audit log retention", "weak"),
+      fourStrong: await titles("audit log retention policy", "strong"),
+      fourWeak: await titles("audit log retention policy", "weak"),
+    }).toEqual({
+      threeStrong: ["Audit Logs Retention", "Audit Logs"],
+      threeWeak: ["Audit"],
+      fourStrong: ["Audit Logs Retention", "Audit Logs"],
+      fourWeak: ["Audit"],
+    });
+  });
+
+  it("continues after a bound by words held, rank, then key", async () => {
+    const concepts = [
+      ["Audit Logs", UNRELATED],
+      ["Audit", "audit"],
+      ["Log", "log"],
+      ["Retention", UNRELATED],
+    ] as const;
+
+    const after = async (bound: NonNullable<Narrowed["after"]>) =>
+      (await matchedOver(concepts, "audit log retention", { after: bound })).map(
+        ({ title }) => title,
+      );
+
+    expect({
+      pastTheTwoWordRow: await after([2, 2, "Audit Logs"]),
+      pastTheDenserRow: await after([1, 1.2000000476837158, "Log"]),
+      pastTheKey: await after([1, 1.2000000476837158, "Audit"]),
+      pastTheLast: await after([1, 1, "Retention"]),
+    }).toEqual({
+      pastTheTwoWordRow: ["Audit", "Log", "Retention"],
+      pastTheDenserRow: ["Retention"],
+      pastTheKey: ["Log", "Retention"],
+      pastTheLast: [],
+    });
+  });
+
+  it("reads `!`, `:*`, `&`, quotes and parentheses as no syntax", async () => {
+    const matched = await matchedOver(
+      [
+        ["Audit Logs", UNRELATED],
+        ["O'Brien", UNRELATED],
+        ["Holiday policy", UNRELATED],
+      ],
+      String.raw`!audit:* & (log | 'o''brien \ "`,
+    );
+
+    expect(matched.map(({ title }) => title)).toEqual(["Audit Logs", "O'Brien"]);
+  });
+
+  it("matches nothing on stop words alone, and raises nothing", async () => {
+    const matched = await matchedOver([["The policy", "It is what it is."]], "the and of it is");
+
+    expect(matched).toEqual([]);
   });
 });
 

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { fullTextQuery, MARK_THE_MATCH_LEAKPROOF } from "@better-answers/schema";
+import { MARK_THE_MATCH_LEAKPROOF } from "@better-answers/schema";
 import { UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
+import { findConcepts } from "../src/concepts/index.ts";
 import { ok, type UserPrincipal } from "../src/kernel/index.ts";
 import { planned } from "./planned.ts";
 import { seededBy, visibilitySuite } from "./sourced-concept.ts";
@@ -41,15 +42,12 @@ const arrangedWithInvoices = async (): Promise<{
 };
 
 const matching = (person: UserPrincipal) =>
-  planned(db(), person, async (_reader, tx) => {
-    const { rows } = await tx.query<{ title: string }>(
-      `SELECT title FROM concept_index WHERE search @@ ${fullTextQuery("$1")}`,
-      [QUERY],
-    );
-    return ok(rows.map((row) => row.title));
+  planned(db(), person, async (reader, tx) => {
+    const found = await findConcepts(reader, tx, { query: QUERY, strength: "strong", limit: 10 });
+    return found.ok ? ok(found.value.map(({ concept }) => concept.title)) : found;
   });
 
-describe("a concept match's plan, as the api under its policy", () => {
+describe("the concept arm's plan, as the api under its policy", () => {
   it("matches through the GIN index on the search column", async () => {
     const { admin } = await arrangedWithInvoices();
 

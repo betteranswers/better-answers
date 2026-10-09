@@ -182,10 +182,7 @@ const BOARD_TITLE = "The board's note";
 const BOARD_TEXT = "The board's note on the bid.";
 const BOARD_CHAR_END = 28;
 
-/**
- * Two bare words on purpose: to_tsquery raises a syntax error on prose, so this query breaks
- * a read that drops websearch_to_tsquery.
- */
+/** Two bare words on purpose: spliced into `to_tsquery` as typed, they raise a syntax error. */
 const QUERY = "holiday policy";
 
 const HANDBOOK = {
@@ -442,8 +439,8 @@ const searching = async (
 ): Promise<readonly PassageMatch[] | Error> =>
   answered(
     await reading(person, async (reader, tx) => {
-      const found = await findPassages(reader, tx, QUERY, limit);
-      return found.ok ? found.value : found.error;
+      const found = await findPassages(reader, tx, { query: QUERY, limit });
+      return found.ok ? found.value.map(({ passage }) => passage) : found.error;
     }),
   );
 
