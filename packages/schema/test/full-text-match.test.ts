@@ -83,7 +83,7 @@ const LANGUAGE_IN_QUOTES = /(["'`])english\1/i;
 
 /** A call with no configuration falls back to the server's default, which can differ from ours. */
 const CALL_WITHOUT_THE_LANGUAGE =
-  /\b(?:to_tsvector|to_tsquery|plainto_tsquery|phraseto_tsquery|websearch_to_tsquery)\(\s*(?!\$\{FULL_TEXT_LANGUAGE\})/;
+  /\b(?:to_tsvector|to_tsquery|plainto_tsquery|phraseto_tsquery|websearch_to_tsquery)\s*\((?!\s*\$\{FULL_TEXT_LANGUAGE\})/i;
 
 const choosesItsOwnLanguage = (text: string): boolean =>
   LANGUAGE_IN_QUOTES.test(text) || CALL_WITHOUT_THE_LANGUAGE.test(text);
@@ -138,6 +138,12 @@ describe("the language every full-text match is parsed under", () => {
     expect(choosesItsOwnLanguage("CROSS JOIN websearch_to_tsquery($2) AS q")).toBe(true);
   });
 
+  it("is refused however the call's name is spelled", () => {
+    expect(
+      ["WEBSEARCH_TO_TSQUERY($2)", "to_tsquery ($2)"].filter(choosesItsOwnLanguage),
+    ).toHaveLength(2);
+  });
+
   it("is refused when a call names another configuration", () => {
     expect(choosesItsOwnLanguage("to_tsvector('simple', body)")).toBe(true);
   });
@@ -151,6 +157,7 @@ describe("the language every full-text match is parsed under", () => {
       [
         " * English for the compare-and-swap match below.",
         `SELECT plainto_tsquery(\${FULL_TEXT_LANGUAGE}, word) AS probe`,
+        `SELECT to_tsvector(\n  \${FULL_TEXT_LANGUAGE},\n  content\n)`,
       ].filter(choosesItsOwnLanguage),
     ).toEqual([]);
   });
