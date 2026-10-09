@@ -57,6 +57,8 @@ The design system specifies a registration mark, Frame, Card and an accent-fille
 - **A concept comes before document passages only when it holds at least half the query's words.** Governs R10. (session-settled: user-directed — chosen over keeping every concept match ahead of every passage: under any-word matching, *how long do we keep audit logs* matches about 98 of the customer's concepts through *audit* alone, so passages would not appear for pages.)
 - **A search matches on any of its words.** Governs R9. (session-settled: user-directed — chosen over requiring every word, and over every word first with any word as a fallback: question-style searches such as *how long do we keep audit logs* must reach *Audit Logs Retention*, and the recall figure should measure full text fairly.)
 - **The database refuses a concept row whose IRI breaks the IRI pattern.** U3 adds the CHECK constraint in its migration. Governs R1. (session-settled: user-directed, 09/10/2026 — chosen over trusting the two writers' validation alone: a stray row would make `find` or `open` error on a read every Viewer can reach, and constraining stored data now is cheaper than later.)
+- **A page locator such as `p.4` reaches every reader of the concept.** A locator with no passage address's shape names nothing behind a predicate, so the projection keeps it. A passage-shaped locator the reader cannot open is still dropped, because it can carry a document id. U6 builds it. Governs R1. (session-settled: user-directed, 09/10/2026 — chosen over dropping every locator the reader cannot open, which hid an imported concept's page references from Admins too.)
+- **MCP answers cite a concept by an absolute URL.** The MCP edge prefixes the public origin to `/knowledge/search/<ulid>`; the web keeps the relative path. U6 builds it. Governs R1. (session-settled: user-directed, 09/10/2026 — chosen over a relative path, which an outside MCP client cannot open.)
 
 ### Requirements
 
@@ -183,9 +185,9 @@ The design system specifies a registration mark, Frame, Card and an accent-fille
     - a concept, when the source names a concept IRI and that concept is readable under its own predicate first;
     - nothing otherwise.
   - An unreadable source keeps only its label: no locator, document id or current title (AE3).
-  - The read projects the frontmatter's `sources` entries by the same flow, so an unreadable entry keeps only its `title` (else its `resource`) and loses its `locator`. `open`'s `frontmatter` field, the tRPC read and the page's sources list all take the projected frontmatter, never the file's raw `sources`.
+  - The read projects the frontmatter's `sources` entries by the same flow, so an unreadable entry keeps only its `title` (else its `resource`) and loses its `locator`, unless the locator has no passage address's shape, such as a page locator `p.4`, which every reader keeps (owner, 09/10/2026; U6). `open`'s `frontmatter` field, the tRPC read and the page's sources list all take the projected frontmatter, never the file's raw `sources`.
   - `open`'s one rendering, which MCP and the web share, carries the trust words as text, because the web cannot import core. `find`'s output carries each concept match's trust words as text beside its `trust` in the same way.
-  - A concept's citation URL becomes `/knowledge/search/<ulid>` (ADR 0047).
+  - A concept's citation URL becomes `/knowledge/search/<ulid>` (ADR 0047). The MCP edge prefixes the public origin to it (owner, 09/10/2026; U6).
   - Governs R1.
 - KTD7. **`open`'s relations are projected from `map_edge` joined to the target's `concept_index` row under `readableClause`, before any edge column is read.** This is the edge-projection rule's first projection. A withheld target is absent from relations, while a body link to it stays a link that opens the one *not found*, the same as a concept not yet written. Relations are capped with no count. The cap is fixed in U5. Governs R1.
 - KTD8. **The answering slice owns the boundary schemas for `find` and `open`; the MCP entries and the tRPC procedures import them.**
@@ -473,7 +475,7 @@ flowchart LR
 - **Dependencies:** U4, U5.
 - **Files:**
   - Create: `packages/core/src/answering/boundary.ts`.
-  - Modify: `packages/core/src/answering/index.ts` (declare and admit `find`, `open`), `apps/api/src/mcp/entries/index.ts`.
+  - Modify: `packages/core/src/answering/index.ts` (declare and admit `find`, `open`), `apps/api/src/mcp/entries/index.ts` (the public origin on citation URLs), `packages/core/src/concepts/read.ts` (the page-locator projection).
   - Test: `packages/core/test/answering.test.ts`, `apps/api/tests/mcp-surface.test.ts`, `apps/api/tests/invisibility.test.ts`, `apps/api/tests/mcp-cross-tier.test.ts`.
 - **Approach:**
   1. Move the `find` and `open` input and output schemas out of the MCP entries.
@@ -491,6 +493,8 @@ flowchart LR
   - Over MCP, a malformed IRI is an error result from input validation. In core, it is refused as `malformed`. A well-formed absent IRI and a withheld one both answer `found:false` with the same shape.
   - An Editor and a Viewer are admitted to both actions.
   - U5 added `trustWords`, a relation's `title`, and an evidence item's `id` and `iri` to the MCP output schemas where they stood, and rewrote `open`'s description of evidence. The moved schemas keep those fields, and an evidence item carries `locator` or `iri` only where the reader may open it, never both.
+  - A page locator such as `p.4` stays on its source, in the pane and in `open`'s frontmatter, for a Viewer and an Admin alike, and the pane still says the source has nothing to open. A passage-shaped locator the reader cannot open is still dropped (AE3 holds).
+  - `ask`'s and `open`'s citation URLs over MCP are absolute, under the public origin. Core and the web keep `/knowledge/search/<ulid>`.
 - **Verification:** core and api `check` pass, and the action lint passes.
 
 ### U7. The MCP auth findings
