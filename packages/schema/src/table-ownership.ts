@@ -153,6 +153,55 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     reason: "The same two scopes, so a live access token cannot outlive its refresh row.",
   },
   {
+    table: "public.verification",
+    by: "workspaces",
+    access: "read and write",
+    reason:
+      "A second factor's confirm parks what it waits on as a row keyed by session or address — an authenticator's secret, a passkey's challenge, the operator's restore code — reads it back while it lives and deletes it once spent, so no code verifies twice.",
+  },
+  {
+    table: "public.passkey",
+    by: "workspaces",
+    access: "read and write",
+    reason:
+      "A person names, removes and confirms with their own passkeys here: a confirm advances the passkey's counter, a session's standing and the factor facts read whether the person holds one, and the operator's restore removes all but the one kept.",
+  },
+  {
+    table: "public.passkey_last_use",
+    by: "workspaces",
+    access: "read and write",
+    reason:
+      "A confirm by passkey stamps when it was last used, and the list of a person's passkeys reads that stamp beside each one.",
+  },
+  {
+    table: "public.authenticator",
+    by: "workspaces",
+    access: "read and write",
+    reason:
+      "Setting up an authenticator writes the person's row and confirming verifies it; a session's standing and the factor facts read whether it is verified, and removing it or the operator's restore deletes it.",
+  },
+  {
+    table: "public.recovery_code",
+    by: "workspaces",
+    access: "read and write",
+    reason:
+      "Recovery codes are minted, counted and spent here: a fresh set voids the old one, and spending deletes the one code typed in the transaction that confirms the session.",
+  },
+  {
+    table: "public.second_factor_throttle",
+    by: "workspaces",
+    access: "read and write",
+    reason:
+      "Each failed confirm counts against the person and a success clears the count, so the wait a wrong code earns is read and written in the transaction that judged the code.",
+  },
+  {
+    table: "public.identity_audit_event",
+    by: "workspaces",
+    access: "read",
+    reason:
+      "The operator's inspection of a person reads the identity set's records of their revocations, and an authenticator's addition is recorded once by reading for the record first; every write goes through the audit slice's face.",
+  },
+  {
     table: "public.user",
     by: "erasure",
     access: "read and write",
@@ -162,30 +211,30 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.member",
     by: "erasure",
-    access: "write",
+    access: "read and write",
     reason:
-      "Every erasure request ends the person as a member here, which is the whole of what the arm for a person who holds another workspace does; the judgement between the two arms is the platform's and is never shown to an Admin. The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above. The erasure rehearsal's seed writes the one member it later ends, so the drill's subject is held where a real member is.",
+      "Every erasure request ends the person as a member here, which is the whole of what the arm for a person who holds another workspace does; the judgement between the two arms is the platform's and is never shown to an Admin. The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above. The erasure rehearsal's seed writes the one member it later ends, so the drill's subject is held where a real member is. The erasure map reads the rows first, so an access answer names each one.",
   },
   {
     table: "public.session",
     by: "erasure",
-    access: "write",
+    access: "read and write",
     reason:
-      "A sign-in carries the address it came from and the agent that made it, so the person's sessions go with the identity set on the last workspace.",
+      "A sign-in carries the address it came from and the agent that made it, so the person's sessions go with the identity set on the last workspace. The erasure map reads them first, so an access answer names each one, and the verification sweep finds a person's session-keyed rows through them.",
   },
   {
     table: "public.verification",
     by: "erasure",
-    access: "write",
+    access: "read and write",
     reason:
-      "A verification row is keyed by the address a code was sent to rather than by person, so it is deleted by the identifier set's addresses and the one the user row still carries — the erasure map's own predicate, which is why it runs before the address is taken away.",
+      "A verification row is keyed by the address a code was sent to rather than by person, so it is deleted by the identifier set's addresses and the one the user row still carries — the erasure map's own predicate, which is why it runs before the address is taken away. The erasure map reads the rows first, so an access answer names each one.",
   },
   {
     table: "public.invitation",
     by: "erasure",
-    access: "write",
+    access: "read and write",
     reason:
-      "An invitation names the address it was sent to. Deleted inside the requesting workspace and no other: an invitation another company sent is that company's record to answer for, and the map is fenced the same way.",
+      "An invitation names the address it was sent to. Deleted inside the requesting workspace and no other: an invitation another company sent is that company's record to answer for, and the map is fenced the same way. The erasure map reads the rows first, so an access answer names each one.",
   },
   {
     table: "public.account",
@@ -197,9 +246,9 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.passkey",
     by: "erasure",
-    access: "write",
+    access: "read and write",
     reason:
-      "A passkey is the person's own credential, named by them and held for every workspace they belong to, so it goes with the identity set on the last workspace and stays while another workspace needs it. Its last-use row goes with it by the foreign key's cascade.",
+      "A passkey is the person's own credential, named by them and held for every workspace they belong to, so it goes with the identity set on the last workspace and stays while another workspace needs it. Its last-use row goes with it by the foreign key's cascade. The erasure map reads the rows first, so an access answer names each one.",
   },
   {
     table: "public.passkey_last_use",
@@ -225,16 +274,51 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.second_factor_throttle",
     by: "erasure",
-    access: "write",
+    access: "read and write",
     reason:
-      "A person's failed confirms are a record of their sign-in, kept across every workspace, so they go with the second factor on the last workspace and stay with it otherwise.",
+      "A person's failed confirms are a record of their sign-in, kept across every workspace, so they go with the second factor on the last workspace and stay with it otherwise. The erasure map reads the rows first, so an access answer names each one.",
   },
   {
     table: "public.workspace_last_active",
     by: "erasure",
-    access: "write",
+    access: "read and write",
     reason:
-      "When the person was last active here is this workspace's record of them, so every erasure from it deletes only that row under the workspace's scope.",
+      "When the person was last active here is this workspace's record of them, so every erasure from it deletes only that row under the workspace's scope. The erasure map reads it first, so an access answer names it.",
+  },
+  {
+    table: "index.passage",
+    by: "erasure",
+    access: "read",
+    reason:
+      "A person is found in the documents by searching the live passages for the identifier's words, and a candidate document's passages are read whole, in order, to confirm the match.",
+  },
+  {
+    table: "public.source_document",
+    by: "erasure",
+    access: "read",
+    reason:
+      "The passage search keeps to documents that are not gone, and re-deriving after an erasure reads the connected source each matched document came from, so each is reprocessed. The rehearsal finds its seeded document's connected source the same way.",
+  },
+  {
+    table: "public.bundle_commit",
+    by: "erasure",
+    access: "read",
+    reason:
+      "The erasure map lists every bundle commit the person is the actor of, so an access answer names each one.",
+  },
+  {
+    table: "public.concept_verification",
+    by: "erasure",
+    access: "read",
+    reason:
+      "The erasure map lists every verification the person recorded on a concept, so an access answer names each one.",
+  },
+  {
+    table: "public.concept_index",
+    by: "erasure",
+    access: "read",
+    reason:
+      "When the map finds the person named in a concept's file, the routine reads which concepts live at those paths, so it can re-derive each one.",
   },
   {
     table: "public.session",
@@ -270,6 +354,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read",
     reason:
       "The same one resolve query aggregates the caller's group ids into the Principal, because groups are re-read per call rather than carried on a credential: every visibility check then pays one member lookup it already has.",
+  },
+  {
+    table: "public.workspace_config",
+    by: POSTGRES_DOOR,
+    access: "read",
+    reason:
+      "A transport reads one setting of the caller's workspace by key in the transaction the door already scoped, as the MCP surface reads how long a client may keep its tool list.",
   },
   {
     table: "public.member",
@@ -309,9 +400,43 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.invitation",
     by: "members",
-    access: "write",
+    access: "read and write",
     reason:
-      "Approving an access request mints the invitation row directly, in the same transaction as the decision — a direct row write through the identity-write seam, never Better Auth's endpoint path, so the two invitation fences stand until the accept page ships.",
+      "Approving an access request mints the invitation row directly, in the same transaction as the decision — a direct row write through the identity-write seam, never Better Auth's endpoint path, so the two invitation fences stand until the accept page ships. The slice also lists, counts and accepts the workspace's invitations and reads their statuses, each row under the workspace's scope.",
+  },
+  {
+    table: "public.audit_event",
+    by: "members",
+    access: "read",
+    reason:
+      "The audit log's search for a person finds them as an event's actor, its subject or a person its detail names, so a former member is found and an outsider never.",
+  },
+  {
+    table: "public.identity_audit_event",
+    by: "members",
+    access: "read",
+    reason:
+      "A name flag is raised in the identity set, which no workspace's audit log holds, so the slice reads whether one still waits for a person and lists for the operator the flags not yet answered.",
+  },
+  {
+    table: "public.connected_source",
+    by: "members",
+    access: "read",
+    reason:
+      "The audit log names a connected source an event's detail points at by its name, under the workspace's scope, rather than by an id no Admin can read.",
+  },
+  {
+    table: "public.source_document",
+    by: "members",
+    access: "read",
+    reason:
+      "The audit log names a document an event's detail points at by its title, the same way.",
+  },
+  {
+    table: "public.concept_index",
+    by: "members",
+    access: "read",
+    reason: "The audit log names a concept an event's detail points at by its title, the same way.",
   },
   {
     table: "public.map_generation",
@@ -356,6 +481,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "A concept's sensitivity is the most restrictive among the connected sources of the evidence it cites and its audience their intersection; the evidence pane applies the reader's predicate to the same rows to say which cited evidence they may reach.",
   },
   {
+    table: "public.audit_event",
+    by: "concepts",
+    access: "read",
+    reason:
+      "A concept the reconciler replayed rests also on that replay's event, which records whether its evidence agreed, so its visibility reads the event through the concept's bundle commit; the sync cascade reads its own followed events to find when it first followed a sync and which syncs and attempts it has already followed, so it follows none twice.",
+  },
+  {
     table: "public.job",
     by: "sources",
     access: "read",
@@ -368,20 +500,6 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read",
     reason:
       "A repeated upload connect answers with what the first one bound rather than streaming a second copy: `FIRST_OUTCOME` in `packages/core/src/sources/connected-source.ts` joins the connected source's document to the audit event the first connect wrote, by subject and action, to hand back that event's id. A read of one row the same action wrote, never a write.",
-  },
-  {
-    table: "public.concept_evidence",
-    by: "sources",
-    access: "read",
-    reason:
-      "Passage search leaves out a passage whose document is already evidence for a concept, so `find` answers with the concept rather than its raw source: the exclusion in `packages/core/src/sources/passages.ts` reads the evidence rows by document.",
-  },
-  {
-    table: "public.concept_index",
-    by: "sources",
-    access: "read",
-    reason:
-      "The same exclusion joins each such concept's index row to apply the reader's predicate to it, so a passage is left out only when its document is evidence for a concept the reader can read; a withheld concept never hides a passage the reader may read.",
   },
   {
     table: "public.concept_index",

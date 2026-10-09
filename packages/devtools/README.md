@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Nine things live here.
+Ten things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -326,6 +326,43 @@ A walk that read no suite file exits 2 rather than reporting a tree without inse
 the silence the runner above exists to refuse. `test/insert-scan.test.ts` runs the script
 through the runner over a throwaway tree, both ways and in both languages, and proves the
 module beside a suite is refused until it is named.
+
+## `src/table-ownership-scan.ts` — the table-ownership scan
+
+The table-ownership map's holder, both ways. One slice writing SQL against another slice's
+tables has no import statement for a linter to see, so `scripts/table-ownership-scan.mjs` —
+`pnpm table-ownership-scan`, a root `check` step — reads the statements themselves. It walks
+the production TypeScript under `packages/core/src` and `apps/api/src`, parses each file with
+oxc, and reads every string literal and template for a table named after `FROM` or `JOIN`.
+The parse is `src/parsed-source.ts`, which the api's words scan shares, so a file that does not
+parse stops the run rather than reading as naming no table.
+
+A file belongs to the deepest owner whose directory holds it: a core directory other than
+`kernel` and `store`, or a path `OWNERS_OUTSIDE_CORE` lists. The scan refuses three things:
+
+- a table the map owns, named by a slice that neither owns it nor has a
+  `CROSS_OWNER_TABLE_ACCESS` entry for it, or read by a slice whose entry declares only a write;
+- such a table named in a file under no owner at all;
+- an entry that claims a read, `read` or `read and write`, when no statement in its slice reads
+  the table.
+
+A name is read as Postgres reads it: an unquoted name folds to lower case, a quoted one is kept
+as written, and an unqualified one is on `public`. A CTE the same string defines shadows only an
+unqualified name, and an alias never follows `FROM` or `JOIN`, so neither fires. A suite is not
+read: it sets up whatever its case needs.
+
+**What it cannot see.** A `DELETE FROM` names a table it writes, so any entry covers it, and
+it never counts as the read an entry claims. That a write-only entry's slice writes the table is
+not held: `INSERT` and `UPDATE` are not read, and the erasure routine deletes through a
+helper that takes the table's name as a value. A table named only through an interpolation, a
+comma join, or a `USING` list is not seen, and a CTE hides its name across the whole string that
+defines it. A sentence such as "removed from member" reads as SQL, so prose naming a table
+fires. The worker's Python is not read.
+
+The map is read from the tree the script runs in, so a throwaway tree carries its own. A walk
+that read no file, or a map with no table, exits 2. `test/table-ownership-scan.test.ts` runs
+the script through the runner over a failing and a passing tree for each direction, a CTE
+named like a table, a file under no owner, and an owner nested in another's directory.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 

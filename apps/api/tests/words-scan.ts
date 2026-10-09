@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { parseSync } from "oxc-parser";
+import { parsedSource } from "@better-answers/devtools/parsed-source";
 
 import type { CarveOut, OldWord, Sense } from "./old-words.ts";
 import { readUnder, treeFilesUnder } from "./tree-walk.ts";
@@ -351,9 +351,6 @@ const piecesOf = (node: Node, source: string): readonly Piece[] => {
     : [];
 };
 
-const lineAt = (starts: readonly number[], offset: number): number =>
-  starts.findLastIndex((start) => start <= offset) + 1;
-
 const visit = (value: unknown, found: (node: Node) => void): void => {
   if (Array.isArray(value)) {
     for (const item of value) visit(item, found);
@@ -366,16 +363,13 @@ const visit = (value: unknown, found: (node: Node) => void): void => {
 
 /** @throws when the file does not parse, which would otherwise read as holding no words. */
 export const readerStringsIn = (file: string, source: string): readonly ReaderString[] => {
-  const parsed = parseSync(file, source);
-  const [first] = parsed.errors;
-  if (first !== undefined) throw new Error(`${file} does not parse: ${first.message}`);
-  const starts = [0, ...[...source.matchAll(/\n/g)].map((match) => match.index + 1)];
+  const { program, lineOf } = parsedSource(file, source);
   const strings: ReaderString[] = [];
   const inWordsModule = WORDS_MODULE.test(file);
-  visit(parsed.program, (node) => {
+  visit(program, (node) => {
     const read = piecesOf(node, source).filter((piece) => isRead(piece.text, inWordsModule));
     for (const { offset, text } of read) {
-      strings.push({ line: lineAt(starts, offset), text: text.trim() });
+      strings.push({ line: lineOf(offset), text: text.trim() });
     }
   });
   return strings;

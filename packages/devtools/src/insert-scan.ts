@@ -1,28 +1,9 @@
-import { readdirSync } from "node:fs";
-import path from "node:path";
-
-import { byCodeUnit } from "@better-answers/schema/code-unit";
-
-import { isTestPath } from "./paths.ts";
+import { filesUnderEach, isTestPath } from "./paths.ts";
 
 /** A statement, not the two words: it opens a string literal, or a line inside a long one. */
 const RAW_INSERT = /(?:^|["'`])\s*insert\s+into\s+["'`]?[a-z_]/i;
 
 const SCANNED = /\.(?:tsx?|py)$/;
-
-const NEVER_WALKED = new Set([
-  ".git",
-  ".venv",
-  "__pycache__",
-  "build",
-  "coverage",
-  "dist",
-  "lifts",
-  "node_modules",
-  "playwright-report",
-  "reports",
-  "test-results",
-]);
 
 export const WHERE_THE_LIST_LIVES = "packages/devtools/src/insert-scan.ts";
 
@@ -50,20 +31,9 @@ export const isFactoryModule = (file: string): boolean => FACTORY_MODULES.includ
 
 export const isScanned = (file: string): boolean => isSuiteFile(file) && !isFactoryModule(file);
 
-/** Pruned as it descends, because a package tree links to itself and a full walk never ends. */
-const filesUnder = (root: string, directory: string): readonly string[] =>
-  readdirSync(path.join(root, directory), { withFileTypes: true }).flatMap((entry) => {
-    if (NEVER_WALKED.has(entry.name)) return [];
-    const relative = path.join(directory, entry.name);
-    if (entry.isDirectory()) return filesUnder(root, relative);
-    return entry.isFile() ? [relative] : [];
-  });
-
 /** Each scanned file under the `roots` directories, relative to `root`, once and sorted. */
 export const scannedFilesUnder = (root: string, roots: readonly string[]): readonly string[] =>
-  [...new Set(roots.flatMap((directory) => filesUnder(root, directory)))]
-    .filter(isScanned)
-    .sort(byCodeUnit);
+  filesUnderEach(root, roots).filter(isScanned);
 
 export type RawInsert = { readonly file: string; readonly line: number };
 
