@@ -45,7 +45,7 @@ export type Relation = {
 export type PassageReader = (locator: string) => Promise<Result<unknown, typeof NOT_FOUND | Error>>;
 
 /** The override that let this reader see the concept, when one is recorded. */
-export type Sharer = { readonly actor: string; readonly at: Date } | undefined;
+type Sharer = { readonly actor: string; readonly at: Date } | undefined;
 
 const PANE_COPY = {
   nothingCited: "This concept cites no source, so there is nothing to include.",
@@ -107,7 +107,7 @@ const readsPassage = async (doors: Doors, locator: string): Promise<Result<boole
 
 const labelOf = (entry: SourceEntry, resource: string): string => {
   const title = typeof entry === "string" ? undefined : entry["title"];
-  return typeof title === "string" && title.trim() !== "" ? title : resource;
+  return typeof title === "string" && title !== "" ? title : resource;
 };
 
 type Opening = { readonly locator: string } | { readonly iri: ConceptIri };
@@ -178,6 +178,7 @@ const projectedSources = (
   const records = resolved.flatMap(({ entry, item, opens }) =>
     typeof entry === "string" ? [] : [opens ? entry : labelOnlyRecord(entry, item.source)],
   );
+  // The file parser holds a `sources` list to strings alone or records alone.
   return records.length === 0 ? texts : records;
 };
 

@@ -318,7 +318,7 @@ export const open = async (
   if (!concept.ok) return err(concept.error);
   if (concept.value === undefined) return ok({ found: false, iri: input.iri });
 
-  const { iri, frontmatter, body, relations, trust, pane } = concept.value;
+  const { iri, frontmatter, body, relations, trust, trustWords: words, pane } = concept.value;
   return ok({
     found: true,
     concept: {
@@ -327,7 +327,7 @@ export const open = async (
       body,
       relations,
       trust,
-      trustWords: concept.value.trustWords,
+      trustWords: words,
       evidence: pane.evidence,
     },
   });
