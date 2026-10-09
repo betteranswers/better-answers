@@ -638,7 +638,7 @@ flowchart LR
   - After a workspace switch, the page's address shows *not found*, asserted on what is drawn.
   - The page renders under its budget and passes the accessibility gate.
   - A citation mark resolves to the evidence item at the index `linksAndMarksOf` gives it over the projected frontmatter's `sources`. The projection keeps every entry naming a resource, in order, so the index holds.
-  - The sources list leads with the pane's access words and ends with where to go next. A concept whose sources hold no locator and name no concept says it has no passage to open, never that access withholds one.
+  - The sources list leads with the pane's access words and ends with where to go next. A concept whose sources name no passage address and no concept says it has no passage to open, never that access withholds one. A page locator such as `p.4` names no passage address.
 - **Verification:** web `check` passes, including e2e.
 
 ### U13. Jump-to's *Search for …* row
