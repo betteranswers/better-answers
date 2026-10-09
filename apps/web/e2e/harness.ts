@@ -284,7 +284,7 @@ type SeedConcept = {
   readonly kind?: string;
   readonly sensitivity?: Sensitivity;
   readonly audience?: (typeof AUDIENCES)[number];
-  readonly readers?: readonly string[];
+  readonly groupMemberIds?: readonly string[];
   readonly trust?: "unverified" | "machine-confirmed" | "human-reviewed";
   readonly linksTo?: readonly string[];
   readonly sources?: readonly SeedCitedDocument[];
@@ -302,7 +302,7 @@ const seededConcepts = z.object({
 });
 
 /**
- * Written in order by `userId`, an Admin; `linksTo` names earlier concepts, and `readers` fill a
+ * Written in order by `userId`, an Admin; `linksTo` names earlier concepts, and `groupMemberIds` fill a
  * `"groups"` audience's one group.
  * @public S2a
  */

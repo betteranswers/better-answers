@@ -41,6 +41,8 @@ const fixture = z
 
 const SYNTHETIC_WORKSPACE = "01M2SYNTHET1CAAAAAAAAAAAAA";
 
+const SEEDED_LOCALLY = `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, short name synthetic, 1 connected source, 1 document, 3 passages, 3 concepts`;
+
 /** Its own project and port, so a developer's own local database is never the one this stops. */
 const project = `ba-local-database-test-${String(process.pid)}`;
 
@@ -110,10 +112,8 @@ describe("the local database", () => {
     expect(upFirst.stdout).toContain("--wipe");
   });
 
-  it("names the synthetic workspace's id as it seeds it", () => {
-    expect(upFirst.stdout).toContain(
-      `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, short name synthetic`,
-    );
+  it("names the synthetic workspace's id and concepts as it seeds", () => {
+    expect(upFirst.stdout).toContain(SEEDED_LOCALLY);
   });
 
   it("runs the one pinned image, by digest", () => {
@@ -270,8 +270,9 @@ describe("the local database", () => {
       );
       expect({ status: seeded.status, stderr: seeded.stderr }).toEqual({ status: 0, stderr: "" });
       expect(seeded.stdout).toContain(
-        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, short name synthetic, 1 connected source, 1 document, 3 passages, 3 concepts`,
+        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, short name synthetic, 1 connected source, 1 document, 3 passages`,
       );
+      expect(seeded.stdout).not.toContain("concepts");
     });
   });
 
@@ -293,6 +294,7 @@ describe("the local database", () => {
     });
     const again = localDatabase(port, ["up"]);
     expect(outcomeOf(again)).toEqual("ran");
+    expect(again.stdout).toContain(SEEDED_LOCALLY);
 
     const reopened = signedInAs("browse_ro", "browse_ro");
     try {

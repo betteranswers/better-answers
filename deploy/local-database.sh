@@ -33,7 +33,7 @@ up() {
   standing="$(in_database psql -qAt -U better_answers -d better_answers -c "SELECT id FROM workspace WHERE short_name = 'synthetic'")"
   [ -z "${standing}" ] || [ "${standing}" = "${synthetic}" ] \
     || refuse "this database holds the synthetic fixture under ${standing}, and its workspace is ${synthetic} now — deploy/local-database.sh down --wipe, then up"
-  in_database /repo/deploy/seed-synthetic.sh "$(owner_dsn 5432)"
+  in_database /repo/deploy/seed-synthetic.sh "$(owner_dsn 5432)" --with-concepts
   in_database psql -q -v ON_ERROR_STOP=1 -U better_answers -d better_answers -f /repo/deploy/browse-role.sql
   in_database psql -q -v ON_ERROR_STOP=1 -U better_answers -d better_answers -c "ALTER ROLE browse_ro PASSWORD 'browse_ro'"
   say "up on 127.0.0.1:${port}, database better_answers — a GUI signs in as browse_ro (password browse_ro), psql as better_answers (password better_answers)"

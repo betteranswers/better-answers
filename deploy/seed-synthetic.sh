@@ -5,15 +5,24 @@ set -euo pipefail
 workspace=01M2SYNTHET1CAAAAAAAAAAAAA
 [ "${1:-}" != "--workspace-id" ] || { printf '%s\n' "${workspace}"; exit 0; }
 
-dsn="${1:-${STAGING_DATABASE_URL:-}}"
-[ -n "${dsn}" ] || {
-  printf 'usage: seed-synthetic.sh <owner DSN>, or STAGING_DATABASE_URL set as the drill sets it; seed-synthetic.sh --workspace-id prints the id alone\n' >&2
+usage() {
+  printf 'usage: seed-synthetic.sh <owner DSN> [--with-concepts], or STAGING_DATABASE_URL set as the drill sets it; seed-synthetic.sh --workspace-id prints the id alone\n' >&2
   exit 64
 }
+dsn="${1:-${STAGING_DATABASE_URL:-}}"
+[ -n "${dsn}" ] || usage
+# Never on staging: its synthetic repository is empty, and a commit git lacks makes the reconciler refuse the workspace.
+concepts=false
+case "${2:-}" in
+  "") ;;
+  --with-concepts) concepts=true ;;
+  *) usage ;;
+esac
 cases="$(cat "$(dirname "$0")/../contracts/document-passage/cases.json")"
 
 # Staging must never hold an invented person, nor the sort code this redacted case withholds: that is the seam's input, which no row holds.
-PGCLIENTENCODING=UTF8 psql "${dsn}" -v ON_ERROR_STOP=1 -qAt -v cases="${cases}" -v workspace="${workspace}" <<'SQL'
+PGCLIENTENCODING=UTF8 psql "${dsn}" -v ON_ERROR_STOP=1 -qAt -v cases="${cases}" -v workspace="${workspace}" \
+  -v concepts="${concepts}" <<'SQL'
 BEGIN;
 INSERT INTO workspace (id, name, short_name)
   VALUES (:'workspace', 'Synthetic fixture', 'synthetic')
@@ -43,7 +52,8 @@ INSERT INTO "index".passage
          c ->> 'locator', c ->> 'content'
     FROM fixture, jsonb_array_elements(d -> 'passages') AS c
   ON CONFLICT DO NOTHING;
--- Rows alone: no repository holds this commit or these files, so an audit or a map rebuild names each concept's file missing.
+\if :concepts
+-- Rows alone: no repository holds this commit or these files.
 \set commit 0000000000000000000000000000000000000000
 INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor)
   VALUES (:'workspace', :'commit', '01M2SYNTHET1CC0MM1TAAAAAAA',
@@ -92,11 +102,14 @@ INSERT INTO evidence (workspace_id, source_document_id, locator, resource)
 INSERT INTO concept_evidence (workspace_id, iri, source_document_id, locator)
   SELECT :'workspace', iri, document_id, locator FROM cited
   ON CONFLICT DO NOTHING;
-SELECT format('synthetic fixture present: workspace %s, short name synthetic, %s connected source, %s document, %s passages, %s concepts',
+\endif
+SELECT format('synthetic fixture present: workspace %s, short name synthetic, %s connected source, %s document, %s passages%s',
               :'workspace',
               (SELECT count(*) FROM connected_source WHERE workspace_id = :'workspace'),
               (SELECT count(*) FROM source_document WHERE workspace_id = :'workspace'),
               (SELECT count(*) FROM "index".passage WHERE workspace_id = :'workspace'),
-              (SELECT count(*) FROM concept_index WHERE workspace_id = :'workspace'));
+              CASE WHEN :'concepts'::boolean
+                   THEN format(', %s concepts', (SELECT count(*) FROM concept_index WHERE workspace_id = :'workspace'))
+                   ELSE '' END);
 COMMIT;
 SQL

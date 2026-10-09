@@ -23,7 +23,7 @@ const aConcept = z.object({
   body: z.string().min(1),
   sensitivity: z.enum(SENSITIVITIES).default("Internal"),
   audience: z.enum(AUDIENCES).default("everyone"),
-  readers: z.array(z.string().min(1)).default([]),
+  groupMemberIds: z.array(z.string().min(1)).default([]),
   trust: z.enum(TRUST_TIERS).default("unverified"),
   linksTo: z.array(z.string().min(1)).default([]),
   sources: z.array(aCitedDocument).default([]),
@@ -173,7 +173,7 @@ const conceptWritten = async (
   return { ...written.value, path, citations };
 };
 
-/** The Admin's own override, to a group holding `readers`: a write alone leaves a new concept everyone's. */
+/** The Admin's own override, to a group holding `groupMemberIds`: a write alone leaves a new concept everyone's. */
 const narrowedToAGroup = async (
   app: TestApp,
   writer: Writer,
@@ -184,8 +184,8 @@ const narrowedToAGroup = async (
   const group = await inOneTransaction(app, async (client) => {
     const seed = testData(client);
     const made = await seed.group({ workspaceId, name: `${concept.title} readers` });
-    for (const reader of concept.readers) {
-      await seed.groupMember({ workspaceId, groupId: made.id, userId: reader });
+    for (const memberId of concept.groupMemberIds) {
+      await seed.groupMember({ workspaceId, groupId: made.id, userId: memberId });
     }
     return made;
   });
