@@ -254,22 +254,23 @@ function ToolbarAndPage(properties: {
       />
       {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
 
-      <main
-        id={PAGE}
-        aria-label="Page"
-        tabIndex={-1}
-        className="relative isolate flex-1 px-4 py-6 md:px-8"
-      >
-        {/* Moved down by the pane's top padding, so the page starts on a line of the grid. */}
-        <GridPattern className="[background-position:0_calc(var(--spacing)*6)]" />
-        {/* The page's width, not the prose measure: the design system's rule keeps text to it. */}
-        <div data-page-content className="max-w-page">
-          <HomeLine />
-          <PagePanel>
-            {properties.handed === undefined ? <Outlet /> : properties.handed.draw}
-          </PagePanel>
-        </div>
-      </main>
+      <GridPattern>
+        {/* The grid moves down by the top padding, so the page starts on one of its lines. */}
+        <main
+          id={PAGE}
+          aria-label="Page"
+          tabIndex={-1}
+          className="flex-1 [background-position:0_calc(var(--spacing)*6)] px-4 py-6 md:px-8"
+        >
+          {/* The page's width, not the prose measure: the design system's rule keeps text to it. */}
+          <div data-page-content className="max-w-page">
+            <HomeLine />
+            <PagePanel>
+              {properties.handed === undefined ? <Outlet /> : properties.handed.draw}
+            </PagePanel>
+          </div>
+        </main>
+      </GridPattern>
     </PageTabsRoot>
   );
 }

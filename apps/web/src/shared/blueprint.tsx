@@ -1,5 +1,5 @@
 import { Slot } from "radix-ui";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/utils.ts";
 
@@ -21,15 +21,15 @@ export function Frame({
   );
 }
 
-/** Behind its parent's content, which must be `relative isolate` so the layer stays inside it. */
-const LAYER = "pointer-events-none absolute inset-0 -z-10";
-
-/** The page's substrate at the layout's own pitch: one per page, never inside a card or dialog. */
-export function GridPattern(properties: { readonly className?: string }) {
-  return <div aria-hidden data-grid-pattern="" className={cn(LAYER, properties.className)} />;
+/**
+ * The page's substrate at the layout's own pitch, drawn as its child's background: one per page,
+ * never inside a card or dialog.
+ */
+export function GridPattern(properties: { readonly children: ReactElement }) {
+  return <Slot.Root data-grid-pattern="">{properties.children}</Slot.Root>;
 }
 
-/** "Nothing is here yet": a bounded empty area only, never behind content. */
-export function DotPattern(properties: { readonly className?: string }) {
-  return <div aria-hidden data-dot-pattern="" className={cn(LAYER, properties.className)} />;
+/** "Nothing is here yet", drawn as its child's background: a bounded empty area only. */
+export function DotPattern(properties: { readonly children: ReactElement }) {
+  return <Slot.Root data-dot-pattern="">{properties.children}</Slot.Root>;
 }

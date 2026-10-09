@@ -21,28 +21,29 @@ export const focusOn = (id: string) => {
 /** The card's marks stand for its primary button's. With no title, the children's first heading is the `h1`. */
 export function AuthPage(properties: { readonly title?: string; readonly children: ReactNode }) {
   return (
-    <div className="relative isolate flex min-h-screen flex-col bg-background">
-      <GridPattern />
-      <header className="px-4 py-5 md:px-8">
-        <p className="flex items-center gap-2 font-mono text-lg font-medium tracking-tight text-foreground">
-          <Logo />
-          {PRODUCT_NAME}
-        </p>
-      </header>
+    <GridPattern>
+      <div className="flex min-h-screen flex-col bg-background">
+        <header className="px-4 py-5 md:px-8">
+          <p className="flex items-center gap-2 font-mono text-lg font-medium tracking-tight text-foreground">
+            <Logo />
+            {PRODUCT_NAME}
+          </p>
+        </header>
 
-      <main id="page" className="flex-1 px-4 pb-16 md:px-8">
-        <Card marks className="mx-auto mt-4 w-full max-w-measure md:mt-16">
-          {properties.title === undefined ? null : (
-            <CardHeader>
-              <CardTitle asChild>
-                <h1 className="text-xl font-medium">{properties.title}</h1>
-              </CardTitle>
-            </CardHeader>
-          )}
-          <CardContent>{properties.children}</CardContent>
-        </Card>
-      </main>
-    </div>
+        <main id="page" className="flex-1 px-4 pb-16 md:px-8">
+          <Card marks className="mx-auto mt-4 w-full max-w-measure md:mt-16">
+            {properties.title === undefined ? null : (
+              <CardHeader>
+                <CardTitle asChild className="text-xl font-medium">
+                  <h1>{properties.title}</h1>
+                </CardTitle>
+              </CardHeader>
+            )}
+            <CardContent>{properties.children}</CardContent>
+          </Card>
+        </main>
+      </div>
+    </GridPattern>
   );
 }
 

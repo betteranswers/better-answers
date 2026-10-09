@@ -54,7 +54,7 @@ const markedObjects = (page: Page): Promise<readonly string[]> =>
 
 /** Axe reads an image under text as an undecided colour, so a texture or mark hides contrast. */
 const TEXTURES_ASIDE =
-  "[data-grid-pattern], [data-dot-pattern] { display: none !important; } [data-marks]::before { content: none !important; }";
+  "[data-grid-pattern], [data-dot-pattern] { background-image: none !important; } [data-marks]::before { content: none !important; }";
 
 /** Axe's keys for a contrast it could not decide because of what was painted behind the text. */
 const UNDECIDED_BEHIND = new Set(["bgImage", "bgGradient", "pseudoContent"]);
