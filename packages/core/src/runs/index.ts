@@ -5,6 +5,7 @@ import {
   FULL_REBUILD_KIND,
   INDEX_KIND,
   INDEX_REASONS,
+  JOB_CLAIMED_STATUS,
   JOB_DONE_STATUS,
   JOB_KIND_DESCRIPTORS,
   JOB_QUEUED_STATUS,
@@ -299,6 +300,149 @@ export const latestIndexOutcomeIn = async (
   if (!read.ok) return err(read.error);
   const row = read.value.rows[0];
   return row === undefined ? ok(null) : outcomeOf(row.outcome);
+};
+
+/** The index job outcome's key naming each document whose stored sensitivity the sync changed. */
+export const SENSITIVITY_MOVED_KEY = "sensitivity_moved";
+
+export type SyncMoved =
+  | { readonly kind: "whole-source" }
+  | { readonly kind: "documents"; readonly documentIds: readonly string[] };
+
+const WHOLE_SOURCE: SyncMoved = { kind: "whole-source" };
+
+const DOCUMENT_IDS = z.array(z.string().min(1));
+
+const movedByTheKey = (outcome: JobOutcome | null): SyncMoved => {
+  if (outcome === null || !Object.hasOwn(outcome, SENSITIVITY_MOVED_KEY)) return WHOLE_SOURCE;
+  const named = DOCUMENT_IDS.safeParse(outcome[SENSITIVITY_MOVED_KEY]);
+  return named.success ? { kind: "documents", documentIds: named.data } : WHOLE_SOURCE;
+};
+
+/**
+ * Only a done first attempt's key is trusted: a retry finds nothing left to move, and a failed,
+ * poisoned or lapsed sync may have moved documents it never named.
+ */
+export const whatTheSyncMoved = (sync: {
+  readonly status: JobStatus;
+  readonly attempts: number;
+  readonly outcome: JobOutcome | null;
+}): SyncMoved =>
+  sync.status === JOB_DONE_STATUS && sync.attempts <= 1
+    ? movedByTheKey(sync.outcome)
+    : WHOLE_SOURCE;
+
+/** `endedAt` is a lapsed claim's lease expiry, and every other sync's `finished_at`. */
+export type EndedSync = {
+  readonly jobId: string;
+  readonly connectedSourceId: string;
+  readonly status: JobStatus;
+  readonly attempts: number;
+  readonly endedAt: Date;
+  readonly moved: SyncMoved;
+};
+
+export type SyncScan =
+  | { readonly kind: "ended-since"; readonly at: Date }
+  | { readonly kind: "newest-per-source" };
+
+type EndedSyncRow = {
+  readonly id: string;
+  readonly subject_id: string;
+  readonly status: JobStatus;
+  readonly attempts: number;
+  readonly outcome: OutcomeColumn;
+  readonly ended_at: Date;
+};
+
+const LAPSED = `status = '${JOB_CLAIMED_STATUS}' AND lease_expires_at < now()`;
+
+const ENDED_SINCE = `SELECT id, subject_id, status, attempts, outcome,
+         COALESCE(finished_at, lease_expires_at) AS ended_at
+    FROM job
+   WHERE workspace_id = $1 AND kind = $2
+     AND (status = ANY($3::text[]) OR (${LAPSED}))
+     AND COALESCE(finished_at, lease_expires_at) >= $4
+   ORDER BY ended_at, id`;
+
+const NEWEST_PER_SOURCE = `SELECT * FROM (
+    SELECT DISTINCT ON (subject_id) id, subject_id, status, attempts, outcome,
+           finished_at AS ended_at
+      FROM job
+     WHERE workspace_id = $1 AND kind = $2 AND status = ANY($3::text[])
+     ORDER BY subject_id, finished_at DESC, id DESC
+  ) AS newest
+  UNION ALL
+  SELECT id, subject_id, status, attempts, outcome, lease_expires_at AS ended_at
+    FROM job
+   WHERE workspace_id = $1 AND kind = $2 AND ${LAPSED}
+   ORDER BY ended_at, id`;
+
+const scanOf = (workspaceId: string, scan: SyncScan): readonly [string, readonly unknown[]] => {
+  const shared = [workspaceId, INDEX_KIND, JOB_IS_OVER];
+  return scan.kind === "ended-since"
+    ? [ENDED_SINCE, [...shared, scan.at]]
+    : [NEWEST_PER_SOURCE, shared];
+};
+
+const endedSyncOf = (row: EndedSyncRow): EndedSync => {
+  const outcome = outcomeOf(row.outcome);
+  return {
+    jobId: row.id,
+    connectedSourceId: row.subject_id,
+    status: row.status,
+    attempts: row.attempts,
+    endedAt: row.ended_at,
+    moved: whatTheSyncMoved({
+      status: row.status,
+      attempts: row.attempts,
+      outcome: outcome.ok ? outcome.value : null,
+    }),
+  };
+};
+
+const readsSyncs = (principal: Principal): Result<Principal, RoleRefusal> =>
+  principal.kind === "platform" ? ok(principal) : requireAdmin(principal);
+
+/**
+ * Index jobs that ended, or whose claim lapsed, oldest first; never a queued job or a live claim.
+ * `newest-per-source` answers each connected source's newest ended sync and every lapsed claim.
+ */
+export const endedSyncs = async (
+  principal: Principal,
+  door: PostgresDoor,
+  input: { readonly workspaceId: string; readonly scan: SyncScan },
+): Promise<Result<readonly EndedSync[], RoleRefusal | PrincipalRefusal | Error>> => {
+  const reader = readsSyncs(principal);
+  if (!reader.ok) return err(reader.error);
+
+  const [statement, values] = scanOf(input.workspaceId, input.scan);
+  const read = await inWorkspace(principal, door, input.workspaceId, (tx) =>
+    tx.query<EndedSyncRow>(statement, [...values]),
+  );
+  return read.ok ? ok(read.value.rows.map(endedSyncOf)) : err(read.error);
+};
+
+/** Locks the sync's job row until `tx` ends, so a claimant whose lease lapsed cannot write after it. */
+export const lockSyncIn = async (
+  principal: Principal,
+  tx: Tx,
+  input: { readonly workspaceId: string; readonly jobId: string; readonly attempts: number },
+): Promise<Result<void, RoleRefusal | Error>> => {
+  const locker = readsSyncs(principal);
+  if (!locker.ok) return err(locker.error);
+
+  // A claim renewed or taken again since the listing is live: locking it would stall its heartbeat.
+  const locked = await attempt(() =>
+    tx.query(
+      `SELECT 1 FROM job
+        WHERE workspace_id = $1 AND id = $2 AND status = 'claimed' AND attempts = $3
+          AND lease_expires_at < clock_timestamp()
+          FOR UPDATE`,
+      [input.workspaceId, input.jobId, input.attempts],
+    ),
+  );
+  return locked.ok ? ok(undefined) : err(locked.error);
 };
 
 export const runsOfSubjectInput = z.object({ subjectId: SUBJECT_ID });

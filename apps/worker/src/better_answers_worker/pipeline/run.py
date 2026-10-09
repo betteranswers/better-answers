@@ -24,6 +24,8 @@ RULE_CHANGE_REASON = "rule-change"
 # left standing are re-upserted by nothing, the engine believing them landed.
 REASONS_EMPTYING_THE_CONNECTED_SOURCE = frozenset({WIPED_REASON, RULE_CHANGE_REASON})
 
+SENSITIVITY_MOVED_KEY = "sensitivity_moved"
+
 
 @dataclass(frozen=True, slots=True)
 class OverriddenRestore:
@@ -35,14 +37,16 @@ class OverriddenRestore:
 
 @dataclass(frozen=True, slots=True)
 class IndexOutcome:
-    """`lmdb_bytes` is what the connected source's stores hold on disk after the sync;
-    `restores_overridden_by_erasure` names restored spans an erasure withholds again."""
+    """`lmdb_bytes` is the connected source's stores on disk after the sync;
+    `restores_overridden_by_erasure`, restored spans an erasure withholds again;
+    `sensitivity_moved`, documents whose stored sensitivity changed."""
 
     documents: int
     passages: int
     lmdb_bytes: int
 
     restores_overridden_by_erasure: tuple[OverriddenRestore, ...] = ()
+    sensitivity_moved: tuple[str, ...] = ()
 
     def as_row(self) -> dict[str, Any]:
         return {
@@ -58,6 +62,7 @@ class IndexOutcome:
                 }
                 for span in self.restores_overridden_by_erasure
             ],
+            SENSITIVITY_MOVED_KEY: list(self.sensitivity_moved),
         }
 
 
@@ -65,14 +70,15 @@ def index_connected_source(
     bootstrap: Bootstrap,
     sync: Sync,
     *,
+    job: queue.ClaimedJob,
     copies: LandedCopies | None = None,
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> IndexOutcome:
     """Redacts the connected source's live documents, splits them into passages and
     lands the passage rows. A `wiped` or `rule-change` sync first empties the source's
-    store; a source that is gone lands nothing. `copies` defaults to the workspace's
-    bucket."""
+    store; a source that is gone lands nothing. Raises `ClaimLostError`, writing
+    nothing, once `job`'s claim is lost. `copies` defaults to the workspace's bucket."""
     with Host(bootstrap) as host:
         if sync.reason in REASONS_EMPTYING_THE_CONNECTED_SOURCE:
             host.remove_connected_source_store(sync)
@@ -102,8 +108,9 @@ def index_connected_source(
             # A document's sensitivity is on its row before any passage of it
             # is read.
             with queue.scoped(connection, sync.workspace_id) as cursor:
+                queue.hold_the_claim(cursor, job.id, bootstrap.worker_id)
                 record_findings(cursor, sync, landed.documents)
-                reconcile_catalogue(cursor, landed.documents)
+                moved = reconcile_catalogue(cursor, landed.documents)
                 unreadable_catalogue(cursor, landed.unreadable)
 
             passages = host.land_rows(
@@ -124,6 +131,7 @@ def index_connected_source(
                 for document in landed.documents
                 for finding in overridden_in(document.redacted.withholdings)
             ),
+            sensitivity_moved=moved,
         )
     return _finished(outcome, sync)
 

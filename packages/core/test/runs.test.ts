@@ -3,9 +3,19 @@ import { describe, expect, it } from "vitest";
 import { testData } from "@better-answers/schema/testing";
 
 import type { PlatformPrincipal, WorkspaceId } from "../src/kernel/index.ts";
-import { bundleHealth, enqueueJob, enqueueJobIn, JOB_IS_OVER, jobById } from "../src/runs/index.ts";
+import {
+  bundleHealth,
+  endedSyncs,
+  enqueueJob,
+  enqueueJobIn,
+  JOB_IS_OVER,
+  jobById,
+  lockSyncIn,
+  type SyncScan,
+} from "../src/runs/index.ts";
 import { folded, withMember, withScope, type Tx } from "../src/store/postgres/index.ts";
-import { abortTheTransaction, countWaitingOnLocks, until } from "./suite-postgres.ts";
+import { seededBy } from "./sourced-concept.ts";
+import { abortTheTransaction, countWaitingOnLocks, readingAs, until } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const mapMaintenance: PlatformPrincipal = {
@@ -637,5 +647,357 @@ describe("what the platform can say about the two parsers agreeing", () => {
       ok: false,
       error: "role-forbids",
     });
+  });
+});
+
+const THIRD_CONNECTED_SOURCE = "01K4Q9F3V8YXP7R2M6ZKWC3TDV";
+
+const FIRST_DOCUMENT = "01J6D1AAAAAAAAAAAAAAAAAAAA";
+
+const SECOND_DOCUMENT = "01J6D2AAAAAAAAAAAAAAAAAAAA";
+
+const SYNCED_FROM = new Date("2026-09-01T09:00:00.000Z");
+
+const minutesIn = (minutes: number): Date => new Date(SYNCED_FROM.getTime() + minutes * 60_000);
+
+const MOVED_NOTHING = { passages: 2, sensitivity_moved: [] };
+
+type Ended = {
+  readonly status: "done" | "failed" | "poisoned";
+  readonly finishedAt: Date;
+  readonly outcome: Readonly<Record<string, unknown>> | null;
+  readonly attempts?: number;
+  readonly subjectId?: string;
+};
+
+const claimOf = (subjectId: string) =>
+  ({
+    kind: "index",
+    subjectId,
+    reason: "connected",
+    enqueuedAt: SYNCED_FROM,
+    claimedBy: "worker-1",
+    claimedAt: SYNCED_FROM,
+    heartbeatAt: SYNCED_FROM,
+  }) as const;
+
+const syncEnded = (workspaceId: string, ended: Ended): Promise<string> =>
+  seededBy(db(), async (seed) => {
+    const job = await seed.job({
+      workspaceId,
+      ...claimOf(ended.subjectId ?? CONNECTED_SOURCE),
+      status: ended.status,
+      attempts: ended.attempts ?? 1,
+      finishedAt: ended.finishedAt,
+      outcome: ended.outcome,
+    });
+    return job.id;
+  });
+
+const syncClaimed = (
+  workspaceId: string,
+  leaseExpiresAt: Date,
+  subjectId = CONNECTED_SOURCE,
+): Promise<string> =>
+  seededBy(db(), async (seed) => {
+    const job = await seed.job({
+      workspaceId,
+      ...claimOf(subjectId),
+      status: "claimed",
+      attempts: 1,
+      leaseExpiresAt,
+    });
+    return job.id;
+  });
+
+const SINCE_THE_FIRST_SYNC: SyncScan = { kind: "ended-since", at: SYNCED_FROM };
+
+const syncsIn = (scenario: Scenario, scan: SyncScan = SINCE_THE_FIRST_SYNC) =>
+  endedSyncs(mapMaintenance, scenario.postgres, {
+    workspaceId: scenario.workspaceId,
+    scan,
+  });
+
+const readWhole = (jobId: string, status: string, attempts: number, endedMinutesIn: number) => ({
+  jobId,
+  connectedSourceId: CONNECTED_SOURCE,
+  status,
+  attempts,
+  endedAt: minutesIn(endedMinutesIn),
+  moved: { kind: "whole-source" },
+});
+
+/** Takes the lapsed-sync lock in a step whose transaction stays open until `release`. */
+const lockHeldOpen = async (scenario: Scenario, jobId: string) => {
+  let locked = false;
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const step = actionOf(scenario, async (tx) => {
+    const lock = await lockSyncIn(mapMaintenance, tx, {
+      workspaceId: scenario.workspaceId,
+      jobId,
+      attempts: 1,
+    });
+    locked = true;
+    await released;
+    return lock;
+  });
+  await until(async () => locked);
+  return { step, release };
+};
+
+describe("the syncs a workspace's step has still to consider", () => {
+  it("reads a first attempt's listed documents, and an empty key", async () => {
+    const scenario = await arrange();
+    const listed = await syncEnded(scenario.workspaceId, {
+      status: "done",
+      finishedAt: minutesIn(10),
+      outcome: {
+        passages: 2,
+        sensitivity_moved: [FIRST_DOCUMENT, SECOND_DOCUMENT],
+      },
+    });
+    const empty = await syncEnded(scenario.workspaceId, {
+      status: "done",
+      finishedAt: minutesIn(20),
+      outcome: MOVED_NOTHING,
+      subjectId: ANOTHER_CONNECTED_SOURCE,
+    });
+
+    expect(await syncsIn(scenario)).toEqual({
+      ok: true,
+      value: [
+        {
+          jobId: listed,
+          connectedSourceId: CONNECTED_SOURCE,
+          status: "done",
+          attempts: 1,
+          endedAt: minutesIn(10),
+          moved: {
+            kind: "documents",
+            documentIds: [FIRST_DOCUMENT, SECOND_DOCUMENT],
+          },
+        },
+        {
+          jobId: empty,
+          connectedSourceId: ANOTHER_CONNECTED_SOURCE,
+          status: "done",
+          attempts: 1,
+          endedAt: minutesIn(20),
+          moved: { kind: "documents", documentIds: [] },
+        },
+      ],
+    });
+  });
+
+  it("reads a retried, failed, poisoned, lapsed or keyless sync whole", async () => {
+    const scenario = await arrange();
+    const { workspaceId } = scenario;
+    const retried = await syncEnded(workspaceId, {
+      status: "done",
+      attempts: 2,
+      finishedAt: minutesIn(10),
+      outcome: { passages: 2, sensitivity_moved: [FIRST_DOCUMENT] },
+    });
+    const failed = await syncEnded(workspaceId, {
+      status: "failed",
+      finishedAt: minutesIn(20),
+      outcome: MOVED_NOTHING,
+    });
+    const poisoned = await syncEnded(workspaceId, {
+      status: "poisoned",
+      attempts: 3,
+      finishedAt: minutesIn(30),
+      outcome: null,
+    });
+    const lapsed = await syncClaimed(workspaceId, minutesIn(40));
+    const keyless = await syncEnded(workspaceId, {
+      status: "done",
+      finishedAt: minutesIn(50),
+      outcome: { passages: 2 },
+    });
+
+    const read = await syncsIn(scenario);
+
+    expect(read).toEqual({
+      ok: true,
+      value: [
+        readWhole(retried, "done", 2, 10),
+        readWhole(failed, "failed", 1, 20),
+        readWhole(poisoned, "poisoned", 3, 30),
+        readWhole(lapsed, "claimed", 1, 40),
+        readWhole(keyless, "done", 1, 50),
+      ],
+    });
+  });
+
+  it("reads an unreadable key or outcome as the whole source", async () => {
+    const scenario = await arrange();
+    const { workspaceId } = scenario;
+    const unreadableKey = await syncEnded(workspaceId, {
+      status: "done",
+      finishedAt: minutesIn(10),
+      outcome: { passages: 2, sensitivity_moved: "not-a-list" },
+    });
+    const unreadableOutcome = await syncEnded(workspaceId, {
+      status: "done",
+      finishedAt: minutesIn(20),
+      outcome: MOVED_NOTHING,
+    });
+    await outcomeWrittenRaw(workspaceId, unreadableOutcome, { sensitivity_moved: { deep: [] } });
+
+    expect(await syncsIn(scenario)).toEqual({
+      ok: true,
+      value: [readWhole(unreadableKey, "done", 1, 10), readWhole(unreadableOutcome, "done", 1, 20)],
+    });
+  });
+
+  it("never answers a queued job or a live claim", async () => {
+    const scenario = await arrange();
+    await seededBy(db(), (seed) => seed.job(boundJob(scenario.workspaceId)));
+    await syncClaimed(
+      scenario.workspaceId,
+      new Date(Date.now() + 3_600_000),
+      ANOTHER_CONNECTED_SOURCE,
+    );
+    const done = await syncEnded(scenario.workspaceId, {
+      status: "done",
+      finishedAt: minutesIn(10),
+      outcome: MOVED_NOTHING,
+      subjectId: THIRD_CONNECTED_SOURCE,
+    });
+
+    const read = await syncsIn(scenario);
+
+    expect(read.ok && read.value.map((sync) => sync.jobId)).toEqual([done]);
+  });
+
+  it("answers only syncs that ended at or after the instant", async () => {
+    const scenario = await arrange();
+    const { workspaceId } = scenario;
+    const endedAt = (minutes: number) =>
+      syncEnded(workspaceId, {
+        status: "done",
+        finishedAt: minutesIn(minutes),
+        outcome: MOVED_NOTHING,
+      });
+    await endedAt(10);
+    await syncClaimed(workspaceId, minutesIn(15));
+    const atTheInstant = await endedAt(20);
+    const lapsedAfter = await syncClaimed(workspaceId, minutesIn(25));
+    const after = await endedAt(30);
+
+    const read = await syncsIn(scenario, {
+      kind: "ended-since",
+      at: minutesIn(20),
+    });
+
+    expect(read.ok && read.value.map((sync) => sync.jobId)).toEqual([
+      atTheInstant,
+      lapsedAfter,
+      after,
+    ]);
+  });
+
+  it("answers each source's newest ended sync and every lapsed claim", async () => {
+    const scenario = await arrange();
+    const { workspaceId } = scenario;
+    await syncEnded(workspaceId, {
+      status: "done",
+      finishedAt: minutesIn(10),
+      outcome: MOVED_NOTHING,
+    });
+    const newest = await syncEnded(workspaceId, {
+      status: "poisoned",
+      attempts: 3,
+      finishedAt: minutesIn(30),
+      outcome: null,
+    });
+    await syncClaimed(workspaceId, new Date(Date.now() + 3_600_000));
+    const lapsedBefore = await syncClaimed(workspaceId, minutesIn(5), ANOTHER_CONNECTED_SOURCE);
+    const another = await syncEnded(workspaceId, {
+      status: "done",
+      finishedAt: minutesIn(20),
+      outcome: MOVED_NOTHING,
+      subjectId: ANOTHER_CONNECTED_SOURCE,
+    });
+    const onlyLapsed = await syncClaimed(workspaceId, minutesIn(40), THIRD_CONNECTED_SOURCE);
+
+    const read = await syncsIn(scenario, { kind: "newest-per-source" });
+
+    expect(read.ok && read.value.map((sync) => sync.jobId)).toEqual([
+      lapsedBefore,
+      another,
+      newest,
+      onlyLapsed,
+    ]);
+  });
+
+  it("reads only the workspace its principal is scoped to", async () => {
+    const scenario = await arrange();
+    const elsewhere = await arrange();
+    const ours = await syncEnded(scenario.workspaceId, {
+      status: "done",
+      finishedAt: minutesIn(10),
+      outcome: MOVED_NOTHING,
+    });
+    await syncEnded(elsewhere.workspaceId, {
+      status: "done",
+      finishedAt: minutesIn(10),
+      outcome: MOVED_NOTHING,
+    });
+
+    const read = await syncsIn(scenario);
+
+    expect(read.ok && read.value.map((sync) => sync.jobId)).toEqual([ours]);
+  });
+
+  it("refuses an Editor the syncs and the lock", async () => {
+    const scenario = await arrange();
+    const jobId = await syncClaimed(scenario.workspaceId, minutesIn(10));
+    const naming = { workspaceId: scenario.workspaceId, jobId, attempts: 1 };
+
+    expect(
+      await endedSyncs(scenario.editor, scenario.postgres, {
+        workspaceId: scenario.workspaceId,
+        scan: SINCE_THE_FIRST_SYNC,
+      }),
+    ).toEqual({ ok: false, error: "role-forbids" });
+    expect(
+      await readingAs(db().runtimePool, scenario.editor, (editor, tx) =>
+        lockSyncIn(editor, tx, naming),
+      ),
+    ).toEqual({ ok: false, error: "role-forbids" });
+  });
+
+  it("holds a lapsed sync's row until the step's transaction ends", async () => {
+    const scenario = await arrange();
+    const jobId = await syncClaimed(scenario.workspaceId, minutesIn(10));
+    const { step, release } = await lockHeldOpen(scenario, jobId);
+    const fenced = db().pool.query(
+      "SELECT id FROM job WHERE workspace_id = $1 AND id = $2 FOR KEY SHARE",
+      [scenario.workspaceId, jobId],
+    );
+    await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
+    release();
+
+    expect(await step).toEqual({ ok: true, value: undefined });
+    expect((await fenced).rows).toEqual([{ id: jobId }]);
+  });
+
+  it("leaves a claim renewed since the listing free to beat", async () => {
+    const scenario = await arrange();
+    const jobId = await syncClaimed(scenario.workspaceId, new Date(Date.now() + 60_000));
+    const { step, release } = await lockHeldOpen(scenario, jobId);
+    const beat = await db().pool.query(
+      "UPDATE job SET heartbeat_at = now() WHERE workspace_id = $1 AND id = $2",
+      [scenario.workspaceId, jobId],
+    );
+    release();
+
+    expect(beat.rowCount).toBe(1);
+    expect(await step).toEqual({ ok: true, value: undefined });
   });
 });

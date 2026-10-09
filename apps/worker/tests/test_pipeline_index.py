@@ -2,6 +2,7 @@ import hashlib
 import json
 import re
 from collections.abc import Callable, Iterator, Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -11,11 +12,16 @@ import psycopg
 import pytest
 
 from better_answers_worker import loop, queue
+from better_answers_worker.config import Bootstrap
 from better_answers_worker.kinds import sync
 from better_answers_worker.pipeline import (
     CONNECTED_SOURCE_STORE,
     DOCX_MEDIA_TYPE,
     FINDINGS_STORE,
+    SEAM_MS_PER_PAGE,
+    TIMEOUT_MARGIN_MS,
+    IndexOutcome,
+    LandedCopies,
     ReadDocument,
     RedactedDocument,
     Sync,
@@ -260,6 +266,60 @@ def seed_a_row_an_earlier_release_landed(
     connection.commit()
 
 
+A_LEASE_NO_TEST_OUTLIVES_SECONDS = 600
+
+
+def a_claimed_index_job(
+    cursor: psycopg.Cursor[Any], workspace_id: str, *, claimed_by: str
+) -> queue.ClaimedJob:
+    """The fence reads the claim alone, so the row's reason is any the table admits."""
+    row = seed_job(
+        cursor,
+        workspace_id=workspace_id,
+        kind="index",
+        reason="connected",
+        subject_id=CONNECTED_SOURCE,
+        status="claimed",
+        attempts=1,
+        claimed_by=claimed_by,
+        lease_expires_in_seconds=A_LEASE_NO_TEST_OUTLIVES_SECONDS,
+    )
+    return queue.ClaimedJob(
+        workspace_id=workspace_id,
+        id=str(row["id"]),
+        kind="index",
+        reason="connected",
+        subject_id=CONNECTED_SOURCE,
+        attempts=1,
+    )
+
+
+def indexed(
+    bootstrap: Bootstrap,
+    sync: Sync,
+    *,
+    copies: LandedCopies | None = None,
+    ms_per_page: int = SEAM_MS_PER_PAGE,
+    margin_ms: int = TIMEOUT_MARGIN_MS,
+) -> IndexOutcome:
+    """Under a live claim of the bootstrap's own worker, as the loop runs a sync."""
+    with (
+        queue.connected(bootstrap.database_url) as worker,
+        queue.scoped(worker, sync.workspace_id) as cursor,
+    ):
+        job = a_claimed_index_job(
+            cursor, sync.workspace_id, claimed_by=bootstrap.worker_id
+        )
+    return index_connected_source(
+        bootstrap,
+        sync,
+        job=job,
+        copies=copies,
+        ms_per_page=ms_per_page,
+        margin_ms=margin_ms,
+    )
+
+
 def a_sync(reason: str = "connected") -> Sync:
     return Sync(workspace_id="", connected_source_id=CONNECTED_SOURCE, reason=reason)
 
@@ -358,6 +418,7 @@ def test_the_loop_claims_runs_and_finishes_an_index_job(
     assert row[4]["lmdb_bytes"] > 0
 
     assert row[4]["restores_overridden_by_erasure"] == []
+    assert row[4]["sensitivity_moved"] == []
 
 
 def test_lands_every_passage_column_under_a_source_with_a_visibility(
@@ -373,7 +434,7 @@ def test_lands_every_passage_column_under_a_source_with_a_visibility(
     )
     bucket = a_bucket_holding_the_three()
 
-    outcome = index_connected_source(
+    outcome = indexed(
         bootstrap_for(dsn, tmp_path), sync_for(workspace_id), copies=bucket
     )
 
@@ -382,6 +443,7 @@ def test_lands_every_passage_column_under_a_source_with_a_visibility(
         "passages": 1,
         "lmdb_bytes": outcome.lmdb_bytes,
         "restores_overridden_by_erasure": [],
+        "sensitivity_moved": [],
     }
     assert passage_rows_of(connection, workspace_id) == [
         {
@@ -406,7 +468,7 @@ def test_the_findings_land_as_the_rows_an_admin_will_review(
         connection, documents=(AN_INVOICE_ID, A_SICK_NOTE_ID)
     )
 
-    index_connected_source(
+    indexed(
         bootstrap_for(dsn, tmp_path),
         sync_for(workspace_id),
         copies=a_bucket_holding_the_three(),
@@ -459,9 +521,7 @@ def test_reconciles_the_catalogue_and_lands_the_copy_beside_the_original(
     workspace_id = seed_the_connected_source(connection, documents=(AN_INVOICE_ID,))
     bucket = a_bucket_holding_the_three()
 
-    index_connected_source(
-        bootstrap_for(dsn, tmp_path), sync_for(workspace_id), copies=bucket
-    )
+    indexed(bootstrap_for(dsn, tmp_path), sync_for(workspace_id), copies=bucket)
 
     assert catalogue_rows_of(connection, workspace_id) == [
         {
@@ -496,7 +556,7 @@ def test_a_special_category_verdict_narrows_the_document_and_its_passages(
         connection, documents=(AN_INVOICE_ID, A_SICK_NOTE_ID)
     )
 
-    index_connected_source(
+    indexed(
         bootstrap_for(dsn, tmp_path),
         sync_for(workspace_id),
         copies=a_bucket_holding_the_three(),
@@ -531,7 +591,7 @@ def test_the_verdict_narrows_a_documents_class_and_never_widens_it(
         connection, A_SICK_NOTE_ID, standing
     )
 
-    index_connected_source(
+    indexed(
         bootstrap_for(dsn, tmp_path),
         sync_for(workspace_id),
         copies=a_bucket_holding_the_three(),
@@ -581,7 +641,7 @@ def test_a_document_without_a_verdict_keeps_its_standing_class(
         connection, AN_INVOICE_ID, "Restricted"
     )
 
-    index_connected_source(
+    indexed(
         bootstrap_for(dsn, tmp_path),
         sync_for(workspace_id),
         copies=a_bucket_holding_the_three(),
@@ -600,7 +660,7 @@ def test_marks_an_unreadable_document_on_its_own_catalogue_row(
         media_types={A_SICK_NOTE_ID: "application/pdf"},
     )
 
-    outcome = index_connected_source(
+    outcome = indexed(
         bootstrap_for(dsn, tmp_path),
         sync_for(workspace_id),
         copies=a_bucket_holding_the_three(),
@@ -634,7 +694,7 @@ def test_a_textless_pdf_names_ocr_on_its_row(
     bucket = a_bucket_holding_the_three()
     bucket.objects[original_key_of(A_SICK_NOTE_ID)] = A_SCANNED_PDF
 
-    outcome = index_connected_source(
+    outcome = indexed(
         bootstrap_for(dsn, tmp_path), sync_for(workspace_id), copies=bucket
     )
 
@@ -664,7 +724,7 @@ def test_marks_an_unlisted_media_type_unreadable_on_its_row(
     )
     bucket = a_bucket_holding_the_three()
 
-    outcome = index_connected_source(
+    outcome = indexed(
         bootstrap_for(dsn, tmp_path), sync_for(workspace_id), copies=bucket
     )
 
@@ -692,7 +752,7 @@ def test_lands_the_deadline_on_an_overrunning_documents_row(
     workspace_id = seed_the_connected_source(connection, documents=(AN_INVOICE_ID,))
     bucket = a_bucket_holding_the_three()
 
-    outcome = index_connected_source(
+    outcome = indexed(
         bootstrap_for(dsn, tmp_path),
         sync_for(workspace_id),
         copies=bucket,
@@ -723,11 +783,11 @@ def test_an_unreadable_document_read_next_sync_loses_its_reason(
     bootstrap = bootstrap_for(dsn, tmp_path)
     bucket = a_bucket_holding_the_three()
 
-    index_connected_source(bootstrap, sync_for(workspace_id), copies=bucket)
+    indexed(bootstrap, sync_for(workspace_id), copies=bucket)
     unreadable = catalogue_rows_of(connection, workspace_id)[0]
 
     bucket.objects[original_key_of(AN_INVOICE_ID)] = A_RATE_CARD_PDF
-    outcome = index_connected_source(bootstrap, sync_for(workspace_id), copies=bucket)
+    outcome = indexed(bootstrap, sync_for(workspace_id), copies=bucket)
 
     assert (unreadable["outcome"], unreadable["unreadable_reason"]) == (
         "unreadable",
@@ -762,7 +822,7 @@ def test_an_unexpected_document_failure_fails_the_sync_and_keeps_passages(
     bootstrap = bootstrap_for(dsn, tmp_path)
     bucket = a_bucket_holding_the_three()
     bucket.objects[original_key_of(A_SICK_NOTE_ID)] = AN_EXPENSES_POLICY_DOCX
-    index_connected_source(bootstrap, sync_for(workspace_id), copies=bucket)
+    indexed(bootstrap, sync_for(workspace_id), copies=bucket)
     passages = passage_rows_of(connection, workspace_id)
     catalogue = catalogue_rows_of(connection, workspace_id)
     writes = list(bucket.writes)
@@ -773,7 +833,7 @@ def test_an_unexpected_document_failure_fails_the_sync_and_keeps_passages(
     monkeypatch.setattr(anydoc, "to_markdown_bytes", out_of_memory)
 
     with pytest.raises(ConverterOutOfMemoryError):
-        index_connected_source(bootstrap, sync_for(workspace_id), copies=bucket)
+        indexed(bootstrap, sync_for(workspace_id), copies=bucket)
     assert {row["source_document_id"] for row in passages} == {
         AN_INVOICE_ID,
         A_SICK_NOTE_ID,
@@ -792,16 +852,14 @@ def test_reads_a_suppression_off_the_table_and_keeps_it_out(
     )
     bootstrap = bootstrap_for(dsn, tmp_path)
 
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
     kept = [row["content"] for row in passage_rows_of(connection, workspace_id)]
 
     with connection.cursor() as cursor:
         seed_suppression(cursor, workspace_id=workspace_id)
     connection.commit()
 
-    index_connected_source(
+    indexed(
         bootstrap,
         sync_for(workspace_id, "rule-change"),
         copies=a_bucket_holding_the_three(),
@@ -833,9 +891,7 @@ def test_an_earlier_suppression_reaches_every_document_the_connected_source_hold
         }
     )
 
-    index_connected_source(
-        bootstrap_for(dsn, tmp_path), sync_for(workspace_id), copies=both_notes
-    )
+    indexed(bootstrap_for(dsn, tmp_path), sync_for(workspace_id), copies=both_notes)
 
     assert [
         (row["source_document_id"], row["content"])
@@ -859,7 +915,7 @@ def test_the_next_sync_withholds_an_erased_address_without_a_finding(
     bootstrap = bootstrap_for(dsn, tmp_path)
     rota = ABucket({original_key_of(A_ROTA_ID): A_ROTA.encode()})
 
-    index_connected_source(bootstrap, sync_for(workspace_id), copies=rota)
+    indexed(bootstrap, sync_for(workspace_id), copies=rota)
     before = finding_rows_of(connection, workspace_id)
     with connection.cursor() as cursor:
         seed_suppression(
@@ -872,7 +928,7 @@ def test_the_next_sync_withholds_an_erased_address_without_a_finding(
             },
         )
     connection.commit()
-    index_connected_source(bootstrap, sync_for(workspace_id, "wiped"), copies=rota)
+    indexed(bootstrap, sync_for(workspace_id, "wiped"), copies=rota)
 
     assert [row["content"] for row in passage_rows_of(connection, workspace_id)] == [
         A_ROTA_ERASED
@@ -902,12 +958,10 @@ def test_a_second_sync_adds_no_finding_row_and_moves_none(
     )
     bootstrap = bootstrap_for(dsn, tmp_path)
 
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
     first = marked_rows_of(connection, workspace_id)
     written = readings_of(connection, workspace_id)
-    index_connected_source(
+    indexed(
         bootstrap,
         sync_for(workspace_id, "restored"),
         copies=a_bucket_holding_the_three(),
@@ -963,7 +1017,7 @@ def test_rereads_an_older_runs_span_and_moves_all_five_readings(
         )
     connection.commit()
 
-    index_connected_source(
+    indexed(
         bootstrap_for(dsn, tmp_path),
         sync_for(workspace_id),
         copies=a_bucket_holding_the_three(),
@@ -1009,7 +1063,7 @@ def test_a_restored_span_keeps_its_id_marks_and_restored_tier(
         )
     connection.commit()
 
-    index_connected_source(
+    indexed(
         bootstrap_for(dsn, tmp_path),
         sync_for(workspace_id),
         copies=a_bucket_holding_the_three(),
@@ -1050,9 +1104,7 @@ def test_a_name_a_later_erasure_raises_reads_always_next_sync(
     )
     bootstrap = bootstrap_for(dsn, tmp_path)
 
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
     # jscpd:ignore-end
     with connection.cursor() as cursor:
         reviewed = seed_narrowed(
@@ -1063,7 +1115,7 @@ def test_a_name_a_later_erasure_raises_reads_always_next_sync(
         )
         seed_suppression(cursor, workspace_id=workspace_id)
     connection.commit()
-    index_connected_source(
+    indexed(
         bootstrap,
         sync_for(workspace_id, "wiped"),
         copies=a_bucket_holding_the_three(),
@@ -1098,9 +1150,7 @@ def test_the_insert_raises_on_any_collision_but_a_known_span(
     connection, dsn = database
     workspace_id = seed_the_connected_source(connection, documents=(AN_INVOICE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
     taken = marked_rows_of(connection, workspace_id)[0]["id"]
     another_span = an_invoice_read_as(
         withholdings=(
@@ -1173,9 +1223,7 @@ def test_the_next_sync_puts_an_admin_restored_span_back(
     workspace_id = seed_the_connected_source(connection, documents=(AN_INVOICE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
 
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
     # jscpd:ignore-end
     withheld = [row["content"] for row in passage_rows_of(connection, workspace_id)]
 
@@ -1191,7 +1239,7 @@ def test_the_next_sync_puts_an_admin_restored_span_back(
     connection.commit()
 
     bucket = a_bucket_holding_the_three()
-    index_connected_source(bootstrap, sync_for(workspace_id, "restored"), copies=bucket)
+    indexed(bootstrap, sync_for(workspace_id, "restored"), copies=bucket)
 
     assert withheld == [AN_INVOICE_REDACTED]
     assert [row["content"] for row in passage_rows_of(connection, workspace_id)] == [
@@ -1289,11 +1337,13 @@ class OneDocumentSync:
             connection, documents=(document_id,), sensitivity=sensitivity
         )
         self.bootstrap = bootstrap_for(dsn, tmp_path)
+        self.moved: list[str] = []
 
     def sync(self, reason: str = "connected") -> dict[str, Any]:
-        index_connected_source(
+        outcome = indexed(
             self.bootstrap, sync_for(self.workspace_id, reason), copies=self.bucket
         )
+        self.moved = outcome.as_row()["sensitivity_moved"]
         return classes_read_at(self.connection, self.workspace_id, self.document_id)
 
     def marked(self, mark: Mark, span: tuple[int, int]) -> None:
@@ -1411,6 +1461,142 @@ def test_a_lifted_verdict_returns_to_the_admins_narrowing_only(
     }
 
 
+def test_a_sync_names_the_one_document_its_verdict_narrowed(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = seed_the_connected_source(
+        connection, documents=(AN_INVOICE_ID, A_SICK_NOTE_ID)
+    )
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE source_document SET sensitivity = 'Internal'"
+            " WHERE workspace_id = %s",
+            (workspace_id,),
+        )
+    connection.commit()
+
+    outcome = indexed(
+        bootstrap_for(dsn, tmp_path),
+        sync_for(workspace_id),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert [
+        (row["id"], row["sensitivity"], row["seen_again"])
+        for row in catalogue_rows_of(connection, workspace_id)
+    ] == [(AN_INVOICE_ID, "Internal", True), (A_SICK_NOTE_ID, "Restricted", True)]
+    assert outcome.as_row()["sensitivity_moved"] == [A_SICK_NOTE_ID]
+
+
+def test_a_dismissals_lift_to_no_narrowing_names_its_document(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    sick_note = OneDocumentSync(connection, dsn, tmp_path, A_SICK_NOTE_ID)
+    sick_note.sync()
+
+    sick_note.marked(seed_dismissal, THE_SICK_NOTES_HEALTH_SENTENCE)
+    lifted = sick_note.sync("dismissed")
+
+    assert (lifted["own"], lifted["narrowed_to"]) == (None, None)
+    assert sick_note.moved == [A_SICK_NOTE_ID]
+
+
+def test_a_verdict_the_document_already_holds_names_nothing(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = a_connected_source_whose_document_stands_at(
+        connection, A_SICK_NOTE_ID, "Restricted"
+    )
+
+    outcome = indexed(
+        bootstrap_for(dsn, tmp_path),
+        sync_for(workspace_id),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert finding_rows_of(connection, workspace_id) != []
+    assert outcome.as_row()["sensitivity_moved"] == []
+
+
+@pytest.mark.parametrize(
+    "revoking",
+    [
+        pytest.param(
+            "UPDATE job SET lease_expires_at = clock_timestamp() WHERE id = %s",
+            id="its lease lapsed",
+        ),
+        pytest.param(
+            "UPDATE job SET claimed_by = 'another-worker',"
+            " claimed_at = clock_timestamp(), heartbeat_at = clock_timestamp(),"
+            " lease_expires_at = clock_timestamp() + interval '60 seconds'"
+            " WHERE id = %s",
+            id="another worker claimed it since",
+        ),
+    ],
+)
+def test_a_revoked_claimant_moves_no_documents_sensitivity(
+    database: tuple[psycopg.Connection, str], tmp_path: Path, revoking: str
+) -> None:
+    connection, dsn = database
+    workspace_id = a_connected_source_whose_document_stands_at(
+        connection, A_SICK_NOTE_ID, "Internal"
+    )
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    with connection.cursor() as cursor:
+        job = a_claimed_index_job(cursor, workspace_id, claimed_by=bootstrap.worker_id)
+    connection.commit()
+
+    def revoke_the_claim() -> None:
+        connection.execute(revoking, (job.id,))
+        connection.commit()
+
+    bucket = ABucket(
+        {original_key_of(A_SICK_NOTE_ID): A_SICK_NOTE.encode()},
+        on_write=revoke_the_claim,
+    )
+
+    with pytest.raises(queue.ClaimLostError):
+        index_connected_source(
+            bootstrap, sync_for(workspace_id), job=job, copies=bucket
+        )
+
+    # The control: the claim was revoked mid-sync, after the claimant read the source.
+    assert bucket.writes
+    assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Internal"
+    assert finding_rows_of(connection, workspace_id) == []
+
+
+def test_a_heartbeat_renews_while_the_catalogue_write_holds_the_claim(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = a_connected_source_whose_document_stands_at(
+        connection, A_SICK_NOTE_ID, "Internal"
+    )
+    worker_id = bootstrap_for(dsn, tmp_path).worker_id
+    with connection.cursor() as cursor:
+        job = a_claimed_index_job(cursor, workspace_id, claimed_by=worker_id)
+    connection.commit()
+
+    with (
+        queue.connected(dsn) as writing,
+        queue.scoped(writing, workspace_id) as cursor,
+    ):
+        queue.hold_the_claim(cursor, job.id, worker_id)
+        with (
+            queue.connected(dsn) as beating,
+            queue.scoped(beating, workspace_id) as beat,
+        ):
+            # A wait fails here rather than hangs: no beat may queue behind the fence.
+            beat.execute("SET LOCAL lock_timeout = '2s'")
+            renewed = queue.heartbeat(beat, job.id, worker_id)
+
+    assert renewed
+
+
 THE_INVOICES_ACCOUNT_AS_FOUND = "00-00-00 and the account number is 12345678"
 
 
@@ -1421,9 +1607,7 @@ def test_an_erased_kept_span_stays_withheld_and_is_reported(
     connection, dsn = database
     workspace_id = seed_the_connected_source(connection, documents=(AN_INVOICE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
     # jscpd:ignore-end
     with connection.cursor() as cursor:
         seed_restore(
@@ -1436,7 +1620,7 @@ def test_an_erased_kept_span_stays_withheld_and_is_reported(
         )
     connection.commit()
 
-    kept = index_connected_source(
+    kept = indexed(
         bootstrap,
         sync_for(workspace_id, "restored"),
         copies=a_bucket_holding_the_three(),
@@ -1454,7 +1638,7 @@ def test_an_erased_kept_span_stays_withheld_and_is_reported(
             },
         )
     connection.commit()
-    erased = index_connected_source(
+    erased = indexed(
         bootstrap, sync_for(workspace_id, "wiped"), copies=a_bucket_holding_the_three()
     )
 
@@ -1510,16 +1694,14 @@ def test_a_row_deleting_reason_empties_the_store_before_reading(
     def inodes_of(files: dict[str, tuple[int, int]]) -> dict[str, int]:
         return {name: inode for name, (inode, _) in files.items()}
 
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
     after_the_first = files_now()
     findings_standing = files_in(findings_directory)
     planted = connected_source_directory / "planted-before-the-wipe"
     planted.write_bytes(b"what the removal must take with it")
     first_read = detected_afresh_in(capsys.readouterr().out)
 
-    index_connected_source(
+    indexed(
         bootstrap,
         sync_for(workspace_id, "restored"),
         copies=a_bucket_holding_the_three(),
@@ -1528,7 +1710,7 @@ def test_a_row_deleting_reason_empties_the_store_before_reading(
     restored_read = detected_afresh_in(capsys.readouterr().out)
     stood = planted.exists()
 
-    index_connected_source(
+    indexed(
         bootstrap,
         sync_for(workspace_id, "rule-change"),
         copies=a_bucket_holding_the_three(),
@@ -1536,7 +1718,7 @@ def test_a_row_deleting_reason_empties_the_store_before_reading(
     after_the_rule_change = files_now()
     rule_change_read = detected_afresh_in(capsys.readouterr().out)
 
-    wiped = index_connected_source(
+    wiped = indexed(
         bootstrap, sync_for(workspace_id, "wiped"), copies=a_bucket_holding_the_three()
     )
     after_the_wipe = files_now()
@@ -1591,7 +1773,7 @@ def test_a_wipe_leaves_no_old_store_and_tracks_removals_again(
     old_store.mkdir(parents=True)
     (old_store / "data.mdb").write_bytes(b"an earlier release's tracking")
 
-    index_connected_source(
+    indexed(
         bootstrap, sync_for(workspace_id, "wiped"), copies=a_bucket_holding_the_three()
     )
     landed = {
@@ -1603,9 +1785,7 @@ def test_a_wipe_leaves_no_old_store_and_tracks_removals_again(
             (A_DELIVERY_NOTE_ID,),
         )
     connection.commit()
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
 
     assert old_store.exists() is False
     # The control: without both documents landed, the removal below would prove nothing.
@@ -1625,7 +1805,7 @@ def test_a_sync_with_an_unknown_reason_indexes_like_any_other(
     workspace_id = seed_the_connected_source(connection, documents=(AN_INVOICE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
 
-    outcome = index_connected_source(
+    outcome = indexed(
         bootstrap,
         sync_for(workspace_id, A_REASON_NO_DESCRIPTOR_DECLARES),
         copies=a_bucket_holding_the_three(),
@@ -1643,18 +1823,13 @@ def test_the_claimant_runs_an_unknown_reason_job_without_raising(
     connection, dsn = database
     workspace_id = seed_the_connected_source(connection, documents=())
     bootstrap = bootstrap_for(dsn, tmp_path)
+    # The job table's check refuses an undeclared reason, so the row holds a known
+    # one and the claimant reads the unknown one.
+    with connection.cursor() as cursor:
+        job = a_claimed_index_job(cursor, workspace_id, claimed_by=bootstrap.worker_id)
+    connection.commit()
 
-    outcome = sync(
-        bootstrap,
-        queue.ClaimedJob(
-            workspace_id=workspace_id,
-            id="01M2JOBAAAAAAAAAAAAAAAAAAA",
-            kind="index",
-            reason=A_REASON_NO_DESCRIPTOR_DECLARES,
-            subject_id=CONNECTED_SOURCE,
-            attempts=1,
-        ),
-    )
+    outcome = sync(bootstrap, replace(job, reason=A_REASON_NO_DESCRIPTOR_DECLARES))
 
     assert (outcome["documents"], outcome["passages"]) == (0, 0)
     assert outcome["lmdb_bytes"] > 0
@@ -1680,7 +1855,7 @@ def test_a_sync_dying_before_landing_leaves_only_the_verdict(
     # open, and the retry below opens the same one.
     refused = False
     try:
-        index_connected_source(bootstrap, sync_for(workspace_id), copies=bucket)
+        indexed(bootstrap, sync_for(workspace_id), copies=bucket)
     except BaseExceptionGroup as group:
         refused = group.subgroup(asyncpg.InsufficientPrivilegeError) is not None
 
@@ -1695,7 +1870,7 @@ def test_a_sync_dying_before_landing_leaves_only_the_verdict(
         connection.execute('GRANT INSERT ON "index".passage TO worker_rt')
         connection.commit()
 
-    retried = index_connected_source(
+    retried = indexed(
         bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
     )
 
@@ -1714,9 +1889,7 @@ def test_a_rule_change_relands_every_passage_the_reprocess_deleted(
     )
     bootstrap = bootstrap_for(dsn, tmp_path)
 
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
     landed = passage_rows_of(connection, workspace_id)
 
     with connection.cursor() as cursor:
@@ -1726,7 +1899,7 @@ def test_a_rule_change_relands_every_passage_the_reprocess_deleted(
     connection.commit()
     emptied = passage_rows_of(connection, workspace_id)
 
-    index_connected_source(
+    indexed(
         bootstrap,
         sync_for(workspace_id, "rule-change"),
         copies=a_bucket_holding_the_three(),
@@ -1752,14 +1925,10 @@ def test_rewrites_an_old_row_once_and_then_writes_nothing(
     stood_at = row_versions_of(connection, workspace_id)
     bootstrap = bootstrap_for(dsn, tmp_path)
 
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
     rewritten = row_versions_of(connection, workspace_id)
 
-    index_connected_source(
-        bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three()
-    )
+    indexed(bootstrap, sync_for(workspace_id), copies=a_bucket_holding_the_three())
 
     assert rewritten != stood_at
     assert row_versions_of(connection, workspace_id) == rewritten
