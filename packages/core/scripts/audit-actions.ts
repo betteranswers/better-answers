@@ -33,15 +33,14 @@ const headlineOf = (name: string): string => {
 };
 
 /** One line per action and key, which the formatter never rewraps however many keys an action has. */
-const detailKeyLines = (detailKeysOf: DetailKeysOf, sorted: readonly string[]): string[] =>
-  sorted.flatMap((name) =>
-    (detailKeysOf[name] ?? [])
-      .toSorted(byCodeUnit)
-      .map((key) => `  [${JSON.stringify(name)}, ${JSON.stringify(key)}],`),
+const detailKeyLines = (entries: readonly (readonly [string, readonly string[]])[]): string[] =>
+  entries.flatMap(([name, keys]) =>
+    keys.toSorted(byCodeUnit).map((key) => `  [${JSON.stringify(name)}, ${JSON.stringify(key)}],`),
   );
 
 export const renderAuditActions = (detailKeysOf: DetailKeysOf): string => {
-  const sorted = Object.keys(detailKeysOf).toSorted(byCodeUnit);
+  const entries = Object.entries(detailKeysOf).toSorted(([one], [other]) => byCodeUnit(one, other));
+  const sorted = entries.map(([name]) => name);
   return [
     `// Generated, never edited: ${GENERATE}`,
     "",
@@ -54,7 +53,7 @@ export const renderAuditActions = (detailKeysOf: DetailKeysOf): string => {
     "} as const satisfies Readonly<Record<(typeof DECLARED_ACTIONS)[number], string>>;",
     "",
     "export const DETAIL_KEYS = [",
-    ...detailKeyLines(detailKeysOf, sorted),
+    ...detailKeyLines(entries),
     "] as const satisfies readonly (readonly [(typeof DECLARED_ACTIONS)[number], string])[];",
     "",
   ].join("\n");
