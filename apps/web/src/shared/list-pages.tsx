@@ -1,7 +1,6 @@
-import type { ReactNode, RefObject } from "react";
+import { useDeferredValue, type ReactNode, type RefObject } from "react";
 
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { useReadSaid } from "@/shared/read-said.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { EmptyAction } from "@/shared/ui/kibo-ui/empty-action.tsx";
 import { PaginationCounter } from "@/shared/ui/kibo-ui/pagination-counter.tsx";
@@ -46,11 +45,28 @@ function StateAction(properties: {
   );
 }
 
+/**
+ * Words inside a live region as it mounts may go unread, so they fill one render after the region
+ * does, whoever mounts it.
+ */
+function SaidOnceMounted(properties: { readonly children: ReactNode }) {
+  const mounted = useDeferredValue(true, false);
+  return mounted ? properties.children : null;
+}
+
 export function ListState(properties: { readonly state: State }) {
   const { state } = properties;
   switch (state.kind) {
     case "loading":
-      return <EmptyAction title={<output>{state.words}</output>} />;
+      return (
+        <EmptyAction
+          title={
+            <output>
+              <SaidOnceMounted>{state.words}</SaidOnceMounted>
+            </output>
+          }
+        />
+      );
     case "empty":
       return <EmptyAction title={state.words} action={state.action} />;
     case "emptied":
@@ -67,7 +83,11 @@ export function ListState(properties: { readonly state: State }) {
     case "failed":
       return (
         <EmptyAction
-          title={<span role="alert">{state.words}</span>}
+          title={
+            <span role="alert">
+              <SaidOnceMounted>{state.words}</SaidOnceMounted>
+            </span>
+          }
           action={
             <StateAction onPress={state.onRetry} focusAfter={state.focusAfterRetry}>
               Retry
@@ -93,13 +113,12 @@ export function ListRead<Failure>(properties: {
   readonly children: ReactNode;
 }) {
   const { read } = properties;
-  const said = useReadSaid(read);
   if (read.error !== null) {
     return (
       <ListState
         state={{
           kind: "failed",
-          words: said.error === null ? "" : properties.failed(said.error),
+          words: properties.failed(read.error),
           onRetry: () => {
             read.refetch();
           },
@@ -108,11 +127,7 @@ export function ListRead<Failure>(properties: {
       />
     );
   }
-  if (read.isPending) {
-    return (
-      <ListState state={{ kind: "loading", words: said.isPending ? properties.loading : "" }} />
-    );
-  }
+  if (read.isPending) return <ListState state={{ kind: "loading", words: properties.loading }} />;
   return properties.children;
 }
 
