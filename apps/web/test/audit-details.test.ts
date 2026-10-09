@@ -40,4 +40,15 @@ describe("the audit log's detail labels", () => {
       "a kept-off detail key its action does not declare",
     ).toEqual([]);
   });
+
+  it("label no key that any action keeps off", () => {
+    const labelledAndKeptOff = Object.entries(KEPT_OFF_DETAIL_KEYS).flatMap(([action, keys]) =>
+      keys.filter((key) => LABELLED_DETAIL_KEYS.includes(key)).map((key) => said(action, key)),
+    );
+
+    expect(
+      labelledAndKeptOff,
+      "a detail key labelled in audit-details.ts that an action keeps off. A label shows its key for every action, so remove the key from every kept-off list, or drop the label.",
+    ).toEqual([]);
+  });
 });
