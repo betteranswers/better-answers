@@ -120,19 +120,44 @@ const commit = async (client: pg.PoolClient): Promise<void> => {
   }
 };
 
+const SETTLED =
+  "the transaction has settled: a query kept past its commit or rollback reaches no transaction";
+
+/**
+ * Refuses once the work settles, before the commit is sent: the pool hands the client on, so a kept
+ * `Tx` could query inside another's transaction.
+ */
+const lent = async <T>(client: pg.PoolClient, work: (tx: Tx) => Promise<T>): Promise<T> => {
+  let settled = false;
+  const query = new Proxy(client.query.bind(client), {
+    apply: (target, thisArg, args) =>
+      settled
+        ? Promise.reject(new Error(SETTLED))
+        : Function.prototype.apply.call(target, thisArg, args),
+  });
+  try {
+    return await work({ query });
+  } finally {
+    settled = true;
+  }
+};
+
+type Opening = "BEGIN" | "BEGIN READ ONLY";
+
 /**
  * Every door opens its transaction here, so a refusal after a write leaves nothing behind
  * whichever door the work came through.
  */
 const transaction = async <T>(
   door: PostgresDoor,
-  work: (client: pg.PoolClient) => Promise<T>,
+  work: (tx: Tx) => Promise<T>,
   refuses: (answer: T) => boolean = answersARefusal,
+  opening: Opening = "BEGIN",
 ): Promise<T> => {
   const client = await door.pool.connect();
   try {
-    await client.query("BEGIN");
-    const answer = await work(client);
+    await client.query(opening);
+    const answer = await lent(client, work);
     if (refuses(answer)) await rollbackQuietly(client);
     else await commit(client);
     return answer;
@@ -167,9 +192,9 @@ export const withScope = async <T>(
   workspaceId: string,
   work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
 ): Promise<T> =>
-  transaction(door, async (client) => {
-    await scopeTo(client, workspaceId);
-    return work(client, platform);
+  transaction(door, async (tx) => {
+    await scopeTo(tx, workspaceId);
+    return work(tx, platform);
   });
 
 /** A session lock outlives the connection's return to the pool, so it holds a connection alone. */
@@ -241,16 +266,14 @@ export const withIdentityWrite = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
   work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
-): Promise<T> => transaction(door, (client) => work(client, platform));
+): Promise<T> => transaction(door, (tx) => work(tx, platform));
 
-/* jscpd:ignore-start */
-/** The same transaction as withIdentityWrite: nothing stops its work from writing. */
+/** As withIdentityWrite, but read-only: a write inside the work fails at its own statement. */
 export const withIdentityRead = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
   work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
-): Promise<T> => transaction(door, (client) => work(client, platform));
-/* jscpd:ignore-end */
+): Promise<T> => transaction(door, (tx) => work(tx, platform), answersARefusal, "BEGIN READ ONLY");
 
 const MEMBER_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_revoked_at,
             m.credentials_revoked_at AS member_revoked_at,
@@ -304,6 +327,7 @@ const resolveClaims = async <T>(
     },
     work,
     query,
+    "BEGIN",
   );
 };
 
@@ -333,6 +357,7 @@ const withMemberQuery = async <T>(
   door: PostgresDoor,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
   query: string,
+  opening: Opening,
 ): Promise<Opened<T>> =>
   resolveScoped(
     door,
@@ -347,6 +372,7 @@ const withMemberQuery = async <T>(
     },
     work,
     query,
+    opening,
   );
 
 /**
@@ -358,17 +384,17 @@ export const withMember = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => withMemberQuery(principal, door, work, MEMBER_QUERY_HELD);
+): Promise<Opened<T>> => withMemberQuery(principal, door, work, MEMBER_QUERY_HELD, "BEGIN");
 
 /**
- * As withMember, but the rows are read, not held, so a long read never stalls another
- * Admin's role change or removal.
+ * As withMember, but read-only, and the rows are read, not held, so a long read never stalls
+ * another Admin's role change or removal.
  */
 export const withMemberUnheld = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => withMemberQuery(principal, door, work, MEMBER_QUERY);
+): Promise<Opened<T>> => withMemberQuery(principal, door, work, MEMBER_QUERY, "BEGIN READ ONLY");
 
 const resolveScoped = async <T>(
   door: PostgresDoor,
@@ -378,13 +404,14 @@ const resolveScoped = async <T>(
   refusalFor: (row: MemberRow | undefined) => Result<ResolvedMember, PrincipalRefusal>,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
   query: string,
+  opening: Opening,
 ): Promise<Opened<T>> =>
   transaction(
     door,
-    async (client): Promise<Opened<T>> => {
-      await scopeTo(client, workspaceId);
+    async (tx): Promise<Opened<T>> => {
+      await scopeTo(tx, workspaceId);
 
-      const member = await client.query<MemberRow>(query, [workspaceId, userId]);
+      const member = await tx.query<MemberRow>(query, [workspaceId, userId]);
       const resolved = refusalFor(member.rows[0]);
       if (!resolved.ok) return err(resolved.error);
 
@@ -399,9 +426,10 @@ const resolveScoped = async <T>(
         ),
         credentialIssuedAtMs,
       };
-      return ok(await work(principal, client));
+      return ok(await work(principal, tx));
     },
     (opened) => !opened.ok || answersARefusal(opened.value),
+    opening,
   );
 
 type ResolvedMember = MemberRow & { readonly role: Role };
@@ -450,8 +478,8 @@ export const withOperator = async <T>(
 
   return transaction(
     door,
-    async (client): Promise<Result<T, OperatorRefusal>> => {
-      const found = await client.query<OperatorRow>(
+    async (tx): Promise<Result<T, OperatorRefusal>> => {
+      const found = await tx.query<OperatorRow>(
         'SELECT id, operator, credentials_revoked_at AS revoked_at FROM "user" WHERE id = $1',
         [claims.userId],
       );
@@ -463,7 +491,7 @@ export const withOperator = async <T>(
         userId: boundarySchemas.user.select.shape.id.parse(row.id),
         credentialIssuedAtMs,
       };
-      return ok(await work(operator, client));
+      return ok(await work(operator, tx));
     },
     (opened) => !opened.ok || answersARefusal(opened.value),
   );
