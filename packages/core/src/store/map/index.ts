@@ -14,6 +14,7 @@ import {
   resolvedResource,
   SUPERSEDES_LABEL,
 } from "@better-answers/schema";
+import { linksAndMarksOf, proseOf } from "@better-answers/schema/concept-file";
 
 import { readableClause, readableParameters } from "../../access/index.ts";
 import type { PlatformPrincipal, Principal, UserPrincipal } from "../../kernel/index.ts";
@@ -55,96 +56,6 @@ export type WalkStep = {
 export const MAP_WALK_DEPTH = 4;
 
 export const MAP_WALK_ROW_LIMIT = 1_000;
-
-const LINK_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*(\S+)/gm;
-
-const LINK = /\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\[[^\]]*\]|\[[^\]]*\]|<[a-z][a-z0-9+.-]*:[^>\s]*>/gi;
-
-const FENCED_BLOCK = /^ {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$|(?![\s\S]))/gm;
-
-const blanked = (text: string): string => text.replaceAll(/[^\n]/g, " ");
-
-const laterRunsByLength = (
-  runs: readonly RegExpExecArray[],
-): ReadonlyMap<number, readonly number[]> => {
-  const queued = new Map<number, number[]>();
-  for (const [position, run] of runs.entries()) {
-    const queue = queued.get(run[0].length);
-    if (queue === undefined) queued.set(run[0].length, []);
-    else queue.push(position);
-  }
-  return queued;
-};
-
-const headAfter = (queue: readonly number[], from: number, at: number): number => {
-  let head = from;
-  while (head < queue.length) {
-    const position = queue[head];
-    if (position === undefined || position > at) break;
-    head += 1;
-  }
-  return head;
-};
-
-const blankedSpans = (body: string): string => {
-  const runs = [...body.matchAll(/`+/g)];
-  const queued = laterRunsByLength(runs);
-  const heads = new Map<number, number>();
-
-  const pieces: string[] = [];
-  let cursor = 0;
-
-  for (let at = 0; at < runs.length; at += 1) {
-    const opener = runs[at];
-    if (opener === undefined) continue;
-    const queue = queued.get(opener[0].length) ?? [];
-    const head = headAfter(queue, heads.get(opener[0].length) ?? 0, at);
-    heads.set(opener[0].length, head);
-    const closer = runs[queue[head] ?? -1];
-    if (closer === undefined) continue;
-    const end = closer.index + closer[0].length;
-    pieces.push(body.slice(cursor, opener.index), blanked(body.slice(opener.index, end)));
-    cursor = end;
-    at = queue[head] ?? at;
-  }
-  pieces.push(body.slice(cursor));
-  return pieces.join("");
-};
-
-const proseOf = (body: string): string => blankedSpans(body.replace(FENCED_BLOCK, blanked));
-
-const normalisedLabel = (label: string): string =>
-  label.trim().replaceAll(/\s+/g, " ").toLowerCase();
-
-const definitionsOf = (body: string): ReadonlyMap<string, string> => {
-  const definitions = new Map<string, string>();
-  for (const match of body.matchAll(LINK_DEFINITION)) {
-    const label = normalisedLabel(match[1] ?? "");
-    if (!definitions.has(label)) {
-      definitions.set(label, (match[2] ?? "").replace(/^</, "").replace(/>$/, ""));
-    }
-  }
-  return definitions;
-};
-
-const linkTargetOf = (
-  match: RegExpExecArray,
-  body: string,
-  definitions: ReadonlyMap<string, string>,
-): string | undefined => {
-  const text = match[0];
-  if (text.startsWith("<")) return text.slice(1, -1);
-  if (text.includes("](")) return /\]\(\s*<?([^)\s>]+)/.exec(text)?.[1];
-  const reference = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(text);
-  if (reference !== null) {
-    return definitions.get(
-      normalisedLabel((reference[2] === "" ? reference[1] : reference[2]) ?? ""),
-    );
-  }
-
-  if (body[match.index + text.length] === ":") return undefined;
-  return definitions.get(normalisedLabel(text.slice(1, -1)));
-};
 
 type OutgoingEdge = {
   readonly uid: string;
@@ -209,20 +120,17 @@ const sentenceAt = (body: string, index: number): string => {
 
 const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
   const prose = proseOf(concept.body);
-  const definitions = definitionsOf(prose);
-  const links = [...prose.matchAll(LINK)].flatMap((match, ordinal) => {
-    if (prose[match.index - 1] === "!") return [];
-    const raw = linkTargetOf(match, prose, definitions);
-    const target = raw === undefined ? undefined : targetOf(raw, concept.path);
+  const links = linksAndMarksOf(concept.body, concept.sources).links.flatMap((link) => {
+    const target = targetOf(link.target, concept.path);
     if (target === undefined) return [];
     return [
       {
         relation: "link" as const,
-        ordinal,
+        ordinal: link.ordinal,
         target,
-        section: sectionAt(prose, match.index),
+        section: sectionAt(prose, link.at),
 
-        sentence: sentenceAt(prose, match.index),
+        sentence: sentenceAt(prose, link.at),
       },
     ];
   });

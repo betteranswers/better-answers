@@ -3,6 +3,7 @@ import type { z } from "zod";
 import {
   AUDIENCE_EVERYONE,
   boundarySchemas,
+  citedSourcesOf,
   CONCEPT_DRAFT_STATUS,
   PUBLISHED_STATUSES,
   SENSITIVITY_DEFAULT,
@@ -349,7 +350,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
     kind: index.kind,
     path: index.path,
     body: index.body,
-    sources: index.sources.map(([resource, locator]) => ({ resource, locator })),
+    sources: citedSourcesOf(index.frontmatter?.["sources"]),
     publishedAt: index.publishedAt ?? null,
     ...visibility,
     status: index.status,

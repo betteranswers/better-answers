@@ -12,7 +12,8 @@
     "upload-media-types": { "form": "fixtured" },
     "citation": { "form": "fixtured" },
     "emptying-a-connected-source": { "form": "fixtured" },
-    "erasure-match": { "form": "fixtured" }
+    "erasure-match": { "form": "fixtured" },
+    "links": { "form": "fixtured" }
   },
   "fixtures": [
     { "agreement": "model-choice", "path": "model-choice/cases.json" },
@@ -30,6 +31,7 @@
       "path": "emptying-a-connected-source/cases.json"
     },
     { "agreement": "erasure-match", "path": "erasure-match/cases.json" },
+    { "agreement": "links", "path": "links/cases.json" },
     { "agreement": "cost-ledger", "path": "cost-ledger/rows.json" }
   ]
 }

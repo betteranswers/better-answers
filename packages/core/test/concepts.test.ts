@@ -736,6 +736,31 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
+  it("maps nothing from a citation mark, and shifts no ordinal", async () => {
+    const scenario = await arrange();
+
+    const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
+      frontmatter: {
+        title: "Expenses",
+        type: "Policy",
+        sources: [{ resource: "/sources/handbook.pdf", locator: "p.4", id: "HB-1" }],
+      },
+      body: [
+        "# Details",
+        "",
+        `Claims close in thirty days[^hb-1]. See [the product](./${filename}) for tiers.`,
+        "",
+        `[^hb-1]: ./${filename}`,
+      ].join("\n"),
+    }));
+
+    const edges = await db().pool.query(
+      "SELECT uid, to_uid FROM map_edge WHERE workspace_id = $1 AND label = 'LINKS_TO'",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([{ uid: `links_to:${policy.iri}:0`, to_uid: product.iri }]);
+  });
+
   it("keeps images, quoted code and protocol-relative targets off the map", async () => {
     const scenario = await arrange();
 
