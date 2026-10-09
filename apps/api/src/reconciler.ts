@@ -1,9 +1,12 @@
 import type { Logger } from "pino";
 
 import {
+  followSyncsInEveryWorkspace,
   RECONCILER,
   reconcileEveryWorkspace,
+  SYNC_CASCADE,
   type WorkspaceReconciled,
+  type WorkspaceSyncsFollowed,
 } from "@better-answers/core/concepts";
 import { attemptResult, err, ok, type Result } from "@better-answers/core/kernel";
 
@@ -59,6 +62,25 @@ const summaryOf = (outcomes: readonly WorkspaceReconciled[]) => {
   return { workspaces: outcomes.length, replayed, already_landed: alreadyLanded, stopped, refused };
 };
 
+const followedSummaryOf = (passes: readonly Result<WorkspaceSyncsFollowed, Error>[]) => {
+  let followed = 0;
+  let concepts = 0;
+  const skipped: { workspace_id: string; job_id: string; reason: string }[] = [];
+  const refused: { reason: string }[] = [];
+  for (const pass of passes) {
+    if (!pass.ok) {
+      refused.push({ reason: pass.error.message });
+      continue;
+    }
+    followed += pass.value.followed.length;
+    concepts += pass.value.followed.reduce((sum, sync) => sum + sync.concepts, 0);
+    for (const { jobId, reason } of pass.value.skipped) {
+      skipped.push({ workspace_id: pass.value.workspaceId, job_id: jobId, reason });
+    }
+  }
+  return { workspaces: passes.length, followed, concepts, skipped, refused };
+};
+
 export const startReconciler = (
   dependencies: ReconcilerDependencies,
 ): Result<Reconciler, ReconcilerRefusal> => {
@@ -73,7 +95,7 @@ export const startReconciler = (
     fetch: dependencies.fetch,
   });
 
-  const tick = async (): Promise<PingOutcome> => {
+  const reconciling = async (): Promise<PingOutcome> => {
     const pass = await attemptResult(() => reconcileEveryWorkspace(RECONCILER, doors));
     if (!pass.ok) {
       logger.error({ reason: pass.error.message }, "the reconciler tick failed");
@@ -89,6 +111,29 @@ export const startReconciler = (
       logger.debug(summary, "reconciler tick");
     }
     return "ok";
+  };
+
+  /** A sync it skips stays visible wider than its evidence, so the ping says so, not the log alone. */
+  const followingSyncs = async (): Promise<PingOutcome> => {
+    const pass = await attemptResult(() => followSyncsInEveryWorkspace(SYNC_CASCADE, postgres));
+    if (!pass.ok) {
+      logger.error({ reason: pass.error.message }, "the sync cascade tick failed");
+      return "fail";
+    }
+    const summary = followedSummaryOf(pass.value);
+    if (summary.skipped.length > 0 || summary.refused.length > 0) {
+      logger.warn(summary, "sync cascade tick");
+      return "fail";
+    }
+    if (summary.followed > 0) logger.info(summary, "sync cascade tick");
+    else logger.debug(summary, "sync cascade tick");
+    return "ok";
+  };
+
+  const tick = async (): Promise<PingOutcome> => {
+    const reconciled = await reconciling();
+    const followed = await followingSyncs();
+    return reconciled === "fail" || followed === "fail" ? "fail" : "ok";
   };
 
   /** A tick never awaits its ping, so a slow check cannot hold the next tick back. */

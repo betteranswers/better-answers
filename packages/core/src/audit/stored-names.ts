@@ -63,6 +63,7 @@ export const STORED_ACT_NAMES = [
   "platform.erasure.replayed",
   "people.person.sign_in_restored",
   "platform.audit_log.exported",
+  "platform.job.followed",
 ] as const;
 
 /**
@@ -103,6 +104,10 @@ export const STORED_DETAIL_KEYS = {
   findingId: "findingId",
   documentId: "documentId",
   connectedSourceId: "bindingId",
+  attempts: "attempts",
+  documents: "documents",
+  concepts: "concepts",
+  writeUps: "writeUps",
   findingCount: "findingCount",
   lawfulBasisRecorded: "lawfulBasisRecorded",
   privacyInformationUpdated: "privacyInformationUpdated",

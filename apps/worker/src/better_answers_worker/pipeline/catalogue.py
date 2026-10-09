@@ -195,10 +195,15 @@ def unreadable_catalogue(
         )
 
 
-def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) -> None:
+def reconcile_catalogue(
+    cursor: Cursor[Any], documents: Sequence[ReadDocument]
+) -> tuple[str, ...]:
     """Marks each document converted with its hash, key and
     version. Its sensitivity only narrows, except that a
-    lifted verdict returns it to the Admin's own narrowing."""
+    lifted verdict returns it to the Admin's own narrowing.
+    Answers the ids of the documents whose stored sensitivity
+    it changed, a NULL on either side included."""
+    moved: list[str] = []
     for document in documents:
         cursor.execute(
             "UPDATE source_document SET content_hash = %(content_hash)s,"
@@ -212,7 +217,8 @@ def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) 
             "   WHEN %(lifted)s THEN narrowed_to"
             "   WHEN sensitivity IS NULL THEN %(verdict)s::text"
             "   ELSE public.narrower_sensitivity(sensitivity, %(verdict)s::text) END"
-            " WHERE id = %(id)s",
+            " WHERE id = %(id)s"
+            " RETURNING old.sensitivity IS DISTINCT FROM new.sensitivity",
             {
                 "content_hash": document.redacted.content_hash,
                 "normalised_key": document.normalised_key,
@@ -223,3 +229,7 @@ def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) 
                 "id": document.source_document_id,
             },
         )
+        row = cursor.fetchone()
+        if row is not None and row[0]:
+            moved.append(document.source_document_id)
+    return tuple(moved)

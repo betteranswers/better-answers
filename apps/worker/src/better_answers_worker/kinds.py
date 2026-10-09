@@ -38,7 +38,7 @@ def sync(bootstrap: Bootstrap, job: queue.ClaimedJob) -> dict[str, Any]:
         connected_source_id=job.subject_id,
         reason=job.reason,
     )
-    return index_connected_source(bootstrap, sync).as_row()
+    return index_connected_source(bootstrap, sync, job=job).as_row()
 
 
 KINDS: dict[str, Handler] = {

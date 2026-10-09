@@ -52,6 +52,7 @@ from .passages import (
 from .rows import PASSAGE_TABLE, passage_rows, rows_of
 from .run import (
     REASONS_EMPTYING_THE_CONNECTED_SOURCE,
+    SENSITIVITY_MOVED_KEY,
     WIPED_REASON,
     IndexOutcome,
     index_connected_source,
@@ -74,6 +75,7 @@ __all__ = [
     "PDF_MEDIA_TYPE",
     "REASONS_EMPTYING_THE_CONNECTED_SOURCE",
     "SEAM_MS_PER_PAGE",
+    "SENSITIVITY_MOVED_KEY",
     "STORES_A_CONNECTED_SOURCE_HOLDS",
     "THE_MEMOS_IDENTITY",
     "TIMEOUT_MARGIN_MS",

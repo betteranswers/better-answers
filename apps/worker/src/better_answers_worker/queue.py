@@ -26,6 +26,10 @@ class ClaimedJob:
     attempts: int
 
 
+class ClaimLostError(RuntimeError):
+    """The worker's claim on its job is no longer live, so it may write nothing."""
+
+
 @contextmanager
 def scoped(
     connection: psycopg.Connection, workspace_id: str
@@ -73,6 +77,20 @@ def claim(
         subject_id=None if row[3] is None else str(row[3]),
         attempts=int(row[4]),
     )
+
+
+def hold_the_claim(cursor: psycopg.Cursor, job_id: str, worker_id: str) -> None:
+    """Locks the job's row `FOR KEY SHARE` until `cursor`'s transaction ends: no one
+    takes the claim while the worker writes under it, yet its heartbeat renews. Raises
+    `ClaimLostError` when the claim is not live: the job ended, its lease lapsed or
+    another worker holds it."""
+    cursor.execute(
+        "SELECT 1 FROM job WHERE id = %s AND claimed_by = %s AND status = 'claimed'"
+        " AND lease_expires_at > clock_timestamp() FOR KEY SHARE",
+        (job_id, worker_id),
+    )
+    if cursor.fetchone() is None:
+        raise ClaimLostError(job_id)
 
 
 def heartbeat(cursor: psycopg.Cursor, job_id: str, worker_id: str) -> bool:

@@ -44,6 +44,7 @@ const SPOKEN_AGREEMENTS = {
   "model-choice": "sql-function",
   queue: "sql-function",
   redaction: "fixtured",
+  "sync-sensitivity-moves": "fixtured",
   "upload-media-types": "fixtured",
 } as const;
 

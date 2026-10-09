@@ -13,6 +13,7 @@ import psycopg
 import pytest
 from structlog.testing import capture_logs
 
+from better_answers_worker import queue
 from better_answers_worker.config import Bootstrap, Engine, ObjectStore
 from better_answers_worker.pipeline import (
     CONNECTED_SOURCE_STORE,
@@ -304,13 +305,25 @@ def test_the_seam_answers_plain_numbers_and_opens_the_passage_store(
         reason="connected",
     )
 
-    outcome = index_connected_source(bootstrap_for(dsn, tmp_path), sync)
+    # The sync writes nothing to a connected source that is gone, so no claim on
+    # the job row is ever checked.
+    job = queue.ClaimedJob(
+        workspace_id=workspace_id,
+        id="01M2JOBAAAAAAAAAAAAAAAAAAA",
+        kind="index",
+        reason="connected",
+        subject_id="connected-source-one",
+        attempts=1,
+    )
+
+    outcome = index_connected_source(bootstrap_for(dsn, tmp_path), sync, job=job)
 
     assert outcome.as_row() == {
         "documents": 0,
         "passages": 0,
         "lmdb_bytes": outcome.lmdb_bytes,
         "restores_overridden_by_erasure": [],
+        "sensitivity_moved": [],
     }
     assert outcome.lmdb_bytes > 0
     assert (tmp_path / workspace_id / "connected-source-one").is_dir()

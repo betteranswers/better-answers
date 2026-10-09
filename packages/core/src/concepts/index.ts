@@ -143,6 +143,13 @@ export type {
 /** @public S5 */
 export type { SuggestionSummaryItem } from "./suggestions.ts";
 export { evidencePaneOf, cascadingVisibility, overrideConceptSensitivity } from "./visibility.ts";
+export {
+  followSyncs,
+  followSyncsInEveryWorkspace,
+  SYNC_CASCADE,
+  SYNC_CASCADE_ACTIONS,
+  type WorkspaceSyncsFollowed,
+} from "./sync-cascade.ts";
 /** @public S3 */
 export type {
   ConceptSensitivityOverridden,

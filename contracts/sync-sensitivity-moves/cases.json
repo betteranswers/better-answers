@@ -1,0 +1,82 @@
+{
+  "description": "sync-sensitivity-moves (ADR 0031, ADR 0044): what an index job's outcome says its sync moved, said once for both tiers. A concept's sensitivity is a column derived from the documents it cites, so every writer of a document's sensitivity must have the concepts citing it re-derived. The worker's sync is one such writer: its catalogue write narrows a document on a special-category verdict, and lifts it back to the Admin's own narrowing once every narrowing finding is dismissed (apps/worker/src/better_answers_worker/pipeline/catalogue.py). The derivation is the api's alone, so the worker names in its index job's outcome, under `key`, the id of each document whose stored sensitivity its catalogue write changed, and the api's tick re-derives the concepts citing them (packages/core/src/concepts/sync-cascade.ts). `moves` holds the worker to that rule: a document is named exactly when its stored sensitivity before the write differs from after it, a NULL included, and `after` is what the write stores. `readings` holds the api to how it reads a finished first attempt's outcome: an absent key is a sync that could not say what it moved, so the whole connected source is re-derived; a present, empty key moved nothing; a listed key moved those documents. A retried, failed or poisoned sync is the api's to read as the whole connected source whatever the key says, and is not this file's. Changing the key or either rule is a change to this file and to both tiers in one commit, which moves the contract's digest with it.",
+  "key": "sensitivity_moved",
+  "moves": [
+    {
+      "why": "a document with no sensitivity of its own takes the verdict, which is a move",
+      "stored": null,
+      "narrowed_to": null,
+      "verdict": "Restricted",
+      "lifted": false,
+      "after": "Restricted",
+      "named": true
+    },
+    {
+      "why": "a verdict narrower than the document narrows it",
+      "stored": "Internal",
+      "narrowed_to": null,
+      "verdict": "Restricted",
+      "lifted": false,
+      "after": "Restricted",
+      "named": true
+    },
+    {
+      "why": "a verdict the document already holds moves nothing",
+      "stored": "Restricted",
+      "narrowed_to": null,
+      "verdict": "Restricted",
+      "lifted": false,
+      "after": "Restricted",
+      "named": false
+    },
+    {
+      "why": "no verdict leaves the document as it stood",
+      "stored": "Internal",
+      "narrowed_to": null,
+      "verdict": null,
+      "lifted": false,
+      "after": "Internal",
+      "named": false
+    },
+    {
+      "why": "a lift to no narrowing of the Admin's own clears the document's sensitivity, which is a move",
+      "stored": "Restricted",
+      "narrowed_to": null,
+      "verdict": null,
+      "lifted": true,
+      "after": null,
+      "named": true
+    },
+    {
+      "why": "a lift to an Admin's narrowing the document already holds moves nothing",
+      "stored": "Restricted",
+      "narrowed_to": "Restricted",
+      "verdict": null,
+      "lifted": true,
+      "after": "Restricted",
+      "named": false
+    }
+  ],
+  "readings": [
+    {
+      "why": "an outcome without the key, from a worker before this agreement, could not say what it moved",
+      "outcome": { "documents": 2, "passages": 4, "lmdb_bytes": 0 },
+      "reads": { "whole_source": true }
+    },
+    {
+      "why": "a present, empty key moved nothing",
+      "outcome": { "documents": 2, "passages": 4, "lmdb_bytes": 0, "sensitivity_moved": [] },
+      "reads": { "documents": [] }
+    },
+    {
+      "why": "a listed key moved those documents",
+      "outcome": {
+        "documents": 2,
+        "passages": 4,
+        "lmdb_bytes": 0,
+        "sensitivity_moved": ["01J6D1AAAAAAAAAAAAAAAAAAAA", "01J6D2AAAAAAAAAAAAAAAAAAAA"]
+      },
+      "reads": { "documents": ["01J6D1AAAAAAAAAAAAAAAAAAAA", "01J6D2AAAAAAAAAAAAAAAAAAAA"] }
+    }
+  ]
+}
