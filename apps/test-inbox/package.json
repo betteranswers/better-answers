@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node ./node_modules/vitest/vitest.mjs run",
     "check": "node ../../scripts/check.mjs typecheck test",
-    "wrangler": "pnpm dlx wrangler@4.147.0",
+    "wrangler": "pnpm dlx wrangler@4.149.0",
     "deploy": "pnpm run wrangler deploy"
   },
   "devDependencies": {
