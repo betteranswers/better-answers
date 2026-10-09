@@ -37,14 +37,14 @@ import {
   type ListedInvitation,
   type SentInvitation,
 } from "./invitations-api.ts";
-import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
 import { UnsentEmails } from "./unsent-emails.tsx";
 
 /** Each status's list is read whole, so the browser pages it. */
 const PAGE_SIZE = 25;
 
-const NOTHING_IN_FOCUS = selectFirst("invitation");
+const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.invitation);
 
 const NO_ONE: readonly ListedInvitation[] = [];
 

@@ -1,5 +1,4 @@
 import type { Keystroke } from "@/shared/keystrokes.tsx";
-import { selectFirst } from "@/shared/outcome.tsx";
 
 export const PEOPLE_KEYSTROKES = {
   search: { key: "/", action: "Search everyone by name or address" },
@@ -10,10 +9,10 @@ export const PEOPLE_KEYSTROKES = {
   next: { key: "n", action: "Show the next page of people" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
-export const NO_PERSON_IN_FOCUS = selectFirst("person");
+export const SELECT_A_PERSON_FIRST = "Select a person first.";
 
 export const NAMES_WAITING_KEYSTROKES = {
   correct: { key: "c", action: "Correct the display name in focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
-export const NO_NAME_IN_FOCUS = selectFirst("name");
+export const SELECT_A_NAME_FIRST = "Select a name first.";

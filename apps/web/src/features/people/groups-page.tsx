@@ -23,7 +23,7 @@ import {
   type ListedGroup,
 } from "./groups-api.ts";
 import { inNameOrder, useMembers } from "./people-api.ts";
-import { GROUPS_KEYSTROKES } from "./people-state.ts";
+import { GROUPS_KEYSTROKES, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfGroupFailure } from "./refusal.tsx";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
@@ -159,7 +159,7 @@ function CreateGroupForm(properties: {
   );
 }
 
-const NOTHING_IN_FOCUS = selectFirst("group");
+const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.group);
 
 type Opened = { readonly groupId: string; readonly at: GroupOpenedAt };
 

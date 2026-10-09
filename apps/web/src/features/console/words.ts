@@ -1,7 +1,9 @@
 import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
+import { selectFirst } from "@/shared/outcome.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { NO_RESPONSE_TO_A_READ, SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 
+import { SELECT_A_NAME_FIRST, SELECT_A_PERSON_FIRST } from "./people-keystrokes.ts";
 import {
   NOT_THE_OPERATOR,
   ONLY_THE_OPERATOR,
@@ -10,6 +12,10 @@ import {
   SAID_OF_CORRECTING,
   SIGN_IN_TOO_OLD,
 } from "./refusal-words.ts";
+
+export const NO_PERSON_IN_FOCUS = selectFirst(SELECT_A_PERSON_FIRST);
+
+export const NO_NAME_IN_FOCUS = selectFirst(SELECT_A_NAME_FIRST);
 
 export const CONSOLE_CLOSED = "The console is better-answers support's alone";
 

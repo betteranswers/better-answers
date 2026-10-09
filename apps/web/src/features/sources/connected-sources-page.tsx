@@ -33,7 +33,7 @@ import {
   type ListedConnectedSource,
 } from "./sources-api.ts";
 import { REVIEW_HEADING, SOURCES_KEYSTROKES } from "./sources-state.ts";
-import { AUDIENCE_WORDS, NOTHING_CONNECTED } from "./words.ts";
+import { AUDIENCE_WORDS, NOTHING_CONNECTED, SELECT_A_CONNECTED_SOURCE_FIRST } from "./words.ts";
 
 const sources = menuGroupIn(CONTROL_CENTRE, "sources");
 
@@ -47,7 +47,7 @@ export const CONNECTED_SOURCES_TOOLBAR: PageToolbar = {
 
 const LISTED = Object.values(SOURCES_KEYSTROKES);
 
-const NOTHING_IN_FOCUS = selectFirst("connectedSource");
+const NOTHING_IN_FOCUS = selectFirst(SELECT_A_CONNECTED_SOURCE_FIRST);
 
 const waitsForItsSync = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",

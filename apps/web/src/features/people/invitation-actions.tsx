@@ -19,7 +19,7 @@ import {
 } from "./invitations-api.ts";
 import { MOST_AT_ONCE } from "./invite-addresses.ts";
 import { BULK_WORDS } from "./member-action-words.ts";
-import { PEOPLE_KEYSTROKES as KEY, shortcutOf } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST, shortcutOf } from "./people-state.ts";
 import { SAID_OF_TICKED_INVITATIONS } from "./refusal-words.ts";
 import { outcomeOfInvitationFailure, outcomeOfSendingFailure } from "./refusal.tsx";
 
@@ -41,7 +41,7 @@ type ActedList = {
 
 type Failure = Error | ApiError;
 
-const NOTHING_TICKED = selectFirst("invitation");
+const NOTHING_TICKED = selectFirst(PEOPLE_SELECT_FIRST.invitation);
 
 const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
 

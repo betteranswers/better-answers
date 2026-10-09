@@ -32,7 +32,7 @@ import {
   type BulkChanged,
   type Role,
 } from "./people-api.ts";
-import { PEOPLE_KEYSTROKES as KEY, shortcutOf } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST, shortcutOf } from "./people-state.ts";
 import { SAID_OF_TICKED_MEMBERS } from "./refusal-words.ts";
 import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
 import { useIncludesYou, useSelfActionHome } from "./self-action.tsx";
@@ -56,7 +56,7 @@ export type BulkList = {
   readonly mark: (refused: RefusedRows) => void;
 };
 
-const NOTHING_TICKED = selectFirst("member");
+const NOTHING_TICKED = selectFirst(PEOPLE_SELECT_FIRST.member);
 
 const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
 

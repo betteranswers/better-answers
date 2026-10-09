@@ -4,6 +4,9 @@ import type { ListedConnectedSource } from "./sources-api.ts";
 
 export { instantWords };
 
+/** Said when a row's keystroke is pressed and no connected source has held focus. */
+export const SELECT_A_CONNECTED_SOURCE_FIRST = "Select a connected source first.";
+
 type Meaning = { readonly word: string; readonly means: string };
 
 export const STATE_MEANS = {

@@ -15,10 +15,14 @@ import {
   NO_LONGER_LISTED,
   SELECTED_MEMBERS,
 } from "@/features/people/member-action-words.ts";
-import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import {
+  MEMBER_PAGE_KEYSTROKES,
+  PEOPLE_KEYSTROKES,
+  PEOPLE_SELECT_FIRST,
+} from "@/features/people/people-state.ts";
 import { SAID_OF_A_MEMBER, SAID_OF_TICKED_MEMBERS } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
-import { KEYSTROKE_WORDS, keystrokesOn, SELECT_FIRST } from "@/shared/keystroke-words.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, headingOf, pageNamed } from "@/shared/navigation.ts";
 import { NO_RESPONSE_TO_A_READ, SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
 
@@ -866,7 +870,7 @@ test.describe("a member's own page", () => {
     await skippedToMembers(page, request, "Calder Rolling");
 
     await page.keyboard.press(PEOPLE_KEYSTROKES.changeRole.key);
-    await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
+    await expect(membersRegion(page)).toContainText(PEOPLE_SELECT_FIRST.member);
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText("Open the member in focus");
@@ -1173,7 +1177,7 @@ test.describe("ending every sign-in and token a member holds here", () => {
     await skippedToMembers(page, request, "Nidd Presswork");
 
     await page.keyboard.press(PEOPLE_KEYSTROKES.endEverySignInAndToken.key);
-    await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
+    await expect(membersRegion(page)).toContainText(PEOPLE_SELECT_FIRST.member);
 
     await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
     await page.keyboard.press(PEOPLE_KEYSTROKES.endEverySignInAndToken.key);
@@ -1357,7 +1361,7 @@ test.describe("removing a member from their page", () => {
     await skippedToMembers(page, request, "Calder Presswork");
 
     await page.keyboard.press(PEOPLE_KEYSTROKES.remove.key);
-    await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
+    await expect(membersRegion(page)).toContainText(PEOPLE_SELECT_FIRST.member);
 
     await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
     await page.keyboard.press(PEOPLE_KEYSTROKES.remove.key);

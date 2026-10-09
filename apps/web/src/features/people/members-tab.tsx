@@ -44,7 +44,7 @@ import {
   type Opening,
 } from "./members-address.ts";
 import { useMembers, useRemovalOf, type ListedMember, type Role } from "./people-api.ts";
-import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
 import { ROLES } from "./role-meanings.ts";
 import { nameOf } from "./words.tsx";
@@ -54,7 +54,7 @@ const PAGE_SIZE = 25;
 
 const SEARCH_LABEL = "Search by name or address";
 
-const NOTHING_IN_FOCUS = selectFirst("member");
+const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.member);
 
 const NONE: ReadonlySet<string> = new Set();
 

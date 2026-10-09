@@ -11,11 +11,11 @@ import { Button } from "@/shared/ui/button.tsx";
 import { CorrectNameDialog } from "./correct-name-dialog.tsx";
 import { arrival, backToTheName, EVERYONE_PATH, NAMES_WAITING_PATH } from "./people-address.ts";
 import { useNamesWaiting, type NameWaiting } from "./people-api.ts";
-import { NAMES_WAITING_KEYSTROKES, NO_NAME_IN_FOCUS } from "./people-keystrokes.ts";
+import { NAMES_WAITING_KEYSTROKES } from "./people-keystrokes.ts";
 import { At } from "./person-words.tsx";
 import { SignInAgain } from "./sign-in-again.tsx";
 import { useCorrecting } from "./use-correcting.ts";
-import { correctWords, readRefused } from "./words.ts";
+import { correctWords, NO_NAME_IN_FOCUS, readRefused } from "./words.ts";
 
 const features = tableFeatures({});
 
