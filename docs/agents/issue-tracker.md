@@ -15,7 +15,7 @@ An issue is not the unit of build work: a plan in `docs/plans/` is. An issue tha
 
 | State | Meaning |
 |---|---|
-| Triage | New, and not yet looked at by the owner. An agent files a new issue here. An issue waiting on an answer stays here, with the question in a comment |
+| Triage | New, and not yet triaged. An agent files a new issue here. The owner or an agent moves it on: to Todo when it is next to build, to Backlog with what it waits on. An issue waiting on an owner ruling stays here, with the question in a comment |
 | Backlog | Held. The description's opening lines say what it waits on: an upstream release, a route block, an owner action |
 | Todo | Ready to build. Unassigned means an agent may take it; assigned to the owner means it is theirs |
 | In Progress, In Review | Being built; In Review once its pull request is open |

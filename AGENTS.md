@@ -111,7 +111,7 @@ Write every report, summary, or handoff to the user through the `ce-noslop` skil
 
 ### Triage
 
-A new issue lands in Linear's **Triage** state. The owner moves it to Todo when it is ready to build, or to Backlog with what it waits on. `docs/agents/issue-tracker.md` gives each state's meaning.
+A new issue lands in Linear's **Triage** state. The owner or an agent moves it to Todo when it is next to build, or to Backlog with what it waits on. An issue that waits on an owner ruling stays in Triage, with the question in a comment. `docs/agents/issue-tracker.md` gives each state's meaning.
 
 ### Domain docs
 
