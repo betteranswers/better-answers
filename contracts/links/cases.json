@@ -287,6 +287,86 @@
       ],
       "marks": [],
       "why": "A run of tildes or backticks opens a fenced block only where a line starts with it, so a run mid-line leaves the link after it in the prose."
+    },
+    {
+      "case": "adjacent marks are two marks, not a reference",
+      "body": "Approvals need two signatures.[^a][^b] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).\n\n[^a]: The staff handbook.\n[^b]: The finance manual.",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        },
+        {
+          "resource": "https://example.test/finance-manual",
+          "id": "b"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [
+        {
+          "mark": "[^a]",
+          "source": 0
+        },
+        {
+          "mark": "[^b]",
+          "source": 1
+        }
+      ],
+      "why": "Two marks written side by side cite two sources. Neither is the label of a reference link, so neither takes an ordinal."
+    },
+    {
+      "case": "a numeric source id is matched as written",
+      "body": "Claims close within 30 days.[^12] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": 12
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [
+        {
+          "mark": "[^12]",
+          "source": 0
+        }
+      ],
+      "why": "An id is read as JavaScript's String() writes it, so a number names the mark spelled with its digits."
+    },
+    {
+      "case": "only plain whitespace is trimmed from a label",
+      "body": "Claims close within 30 days.[^\ufeffa] Mileage is paid at cost.[^\u0085a] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [],
+      "why": "Space, tab, line feed, carriage return, form feed and vertical tab are the whitespace a label loses. A byte-order mark or a next-line character is part of the label, so neither label here names the source."
+    },
+    {
+      "case": "a definition starts only after a line feed",
+      "body": "Mileage follows the rates policy.[^b]\r[^b]: https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN\n\nRates are reviewed yearly.[^c]\u2028[^c]: https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+      "sources": [],
+      "links": [],
+      "marks": [],
+      "why": "A carriage return alone or a line separator does not start a line, so neither definition here defines anything, and both footnotes are plain text."
     }
   ]
 }

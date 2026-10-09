@@ -26,13 +26,16 @@ export type CitedSource = {
   readonly id: string | null;
 };
 
-const LINK_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*(\S+)/gm;
+/** Lines break at `\n` alone and whitespace is these six, so both tiers' regex engines read alike. */
+const LINK_DEFINITION = /(?<=^|\n) {0,3}\[([^\]]+)\]:[ \t\n\r\f\v]*([^ \t\n\r\f\v]+)/g;
 
-const LINK = /\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\[[^\]]*\]|\[[^\]]*\]|<[a-z][a-z0-9+.-]*:[^>\s]*>/gi;
+const LINK =
+  /\[[^\]]*\]\([^)]*\)|\[(?!\^)[^\]]*\]\[[^\]]*\]|\[[^\]]*\]|<[a-z][a-z0-9+.-]*:[^> \t\n\r\f\v]*>/gi;
 
 const FOOTNOTE = /^\[\^([^\]]*)\]$/;
 
-const FENCED_BLOCK = /^ {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$|(?![\s\S]))/gm;
+const FENCED_BLOCK =
+  /(?<=^|\n) {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:(?<=\n) {0,3}\1\2*[ \t]*(?=\n|(?![\s\S]))|(?![\s\S]))/g;
 
 const blanked = (text: string): string => text.replaceAll(/[^\n]/g, " ");
 
@@ -87,7 +90,11 @@ const blankedSpans = (body: string): string => {
 export const proseOf = (body: string): string => blankedSpans(body.replace(FENCED_BLOCK, blanked));
 
 const normalisedLabel = (label: string): string =>
-  label.trim().replaceAll(/\s+/g, " ").toLowerCase();
+  label
+    .split(/[ \t\n\r\f\v]+/)
+    .filter((word) => word !== "")
+    .join(" ")
+    .toLowerCase();
 
 const labelKey = (label: string): string =>
   label.startsWith("^") ? `^${normalisedLabel(label.slice(1))}` : normalisedLabel(label);
@@ -119,7 +126,7 @@ const linkTargetOf = (
 ): string | undefined => {
   const text = match[0];
   if (text.startsWith("<")) return text.slice(1, -1);
-  if (text.includes("](")) return /\]\(\s*<?([^)\s>]+)/.exec(text)?.[1];
+  if (text.includes("](")) return /\]\([ \t\n\r\f\v]*<?([^) \t\n\r\f\v>]+)/.exec(text)?.[1];
   const reference = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(text);
   if (reference !== null) {
     return definitions.get(labelKey((reference[2] === "" ? reference[1] : reference[2]) ?? ""));

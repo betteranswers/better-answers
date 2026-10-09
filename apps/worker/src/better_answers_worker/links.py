@@ -22,20 +22,26 @@ CONCEPT_DEPRECATED_STATUS = "deprecated"
 _IRI = re.compile(r"^https://better-answers\.com/c/[0-9A-HJKMNP-TV-Z]{26}$")
 
 
-_LINK_DEFINITION = re.compile(r"^ {0,3}\[([^\]]+)\]:\s*(\S+)", re.M)
+# Lines break at `\n` alone and whitespace is these six, so both tiers'
+# regex engines read alike.
+_LINK_DEFINITION = re.compile(
+    r"(?:^|(?<=\n)) {0,3}\[([^\]]+)\]:[ \t\n\r\f\v]*([^ \t\n\r\f\v]+)"
+)
 
 
 _FOOTNOTE = re.compile(r"^\[\^([^\]]*)\]$")
 
 
 _LINK = re.compile(
-    r"\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\[[^\]]*\]|\[[^\]]*\]|<[a-z][a-z0-9+.-]*:[^>\s]*>",
+    r"\[[^\]]*\]\([^)]*\)|\[(?!\^)[^\]]*\]\[[^\]]*\]|\[[^\]]*\]"
+    r"|<[a-z][a-z0-9+.-]*:[^> \t\n\r\f\v]*>",
     re.I,
 )
 
 
 _FENCED_BLOCK = re.compile(
-    r"^ {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$|(?![\s\S]))", re.M
+    r"(?:^|(?<=\n)) {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?"
+    r"(?:(?<=\n) {0,3}\1\2*[ \t]*(?=\n|(?![\s\S]))|(?![\s\S]))"
 )
 
 _BACKTICK_RUN = re.compile(r"`+")
@@ -43,6 +49,7 @@ _HEADING = re.compile(r"^\#{1,6}\s+(.*)$")
 _SENTENCE_BOUNDARY = re.compile(r"[.!?](?=\s|$)")
 _SCHEMED = re.compile(r"^[a-z][a-z0-9+.-]*:", re.I)
 _WHITESPACE = re.compile(r"\s+")
+_LABEL_SPACE = re.compile(r"[ \t\n\r\f\v]+")
 
 
 def _blank(text: str) -> str:
@@ -90,7 +97,7 @@ def prose_of(body: str) -> str:
 
 
 def _normalised_label(label: str) -> str:
-    return _WHITESPACE.sub(" ", label.strip()).lower()
+    return " ".join(word for word in _LABEL_SPACE.split(label) if word).lower()
 
 
 def _label_key(label: str) -> str:
@@ -130,7 +137,7 @@ def _sources_by_id(entries: Sequence[SourceEntry | str]) -> dict[str, int]:
     return by_id
 
 
-_INLINE_TARGET = re.compile(r"\]\(\s*<?([^)\s>]+)")
+_INLINE_TARGET = re.compile(r"\]\([ \t\n\r\f\v]*<?([^) \t\n\r\f\v>]+)")
 _REFERENCE = re.compile(r"^\[([^\]]*)\]\[([^\]]*)\]$")
 
 
