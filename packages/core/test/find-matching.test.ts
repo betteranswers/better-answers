@@ -60,7 +60,9 @@ const searching = async (
   limit = 10,
   after?: FindPosition,
 ): Promise<FindResult> =>
-  answered(await reading(person, (reader, tx) => find(reader, tx, { query, limit, after }, NOW)));
+  answered(
+    await reading(person, (reader, tx) => find(reader, tx, { query, limit, cursor: after }, NOW)),
+  );
 
 const titlesOf = (result: FindResult): readonly string[] =>
   result.matches.map((match) => match.title);
@@ -327,11 +329,11 @@ describe("find's pages", () => {
 });
 
 /** Runs `work` after a statement has failed, so every read it makes fails too. */
-const afterAFailedStatement = async <T>(
+const afterAFailedStatement = async <T, Refused>(
   person: UserPrincipal,
-  work: (reader: UserPrincipal, tx: Tx) => Promise<Result<T, Error>>,
-): Promise<Result<T, Error> | undefined> => {
-  let answered: Result<T, Error> | undefined;
+  work: (reader: UserPrincipal, tx: Tx) => Promise<Result<T, Refused>>,
+): Promise<Result<T, Refused> | undefined> => {
+  let answered: Result<T, Refused> | undefined;
   await expect(
     reading(person, async (reader, tx) => {
       await tx.query("SELECT 1 / 0").catch(() => undefined);
@@ -353,7 +355,7 @@ describe("a failed read", () => {
     const after = cursor === undefined ? undefined : findCursor.parse(cursor);
 
     const answered = await afterAFailedStatement(viewer, (reader, tx) =>
-      find(reader, tx, { query: QUESTION, limit: 10, after }, NOW),
+      find(reader, tx, { query: QUESTION, limit: 10, cursor: after }, NOW),
     );
 
     expect(answered?.ok).toBe(false);

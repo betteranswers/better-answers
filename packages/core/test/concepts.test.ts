@@ -1502,7 +1502,7 @@ describe("opening a concept by IRI", () => {
       frontmatter: {
         title: "Expenses",
         type: "Policy",
-        sources: [{ title: "Handbook", resource: "Handbook" }],
+        sources: [{ title: "Handbook", resource: "Handbook", locator: "p.4" }],
         status: "stable",
         iri: written.iri,
       },
@@ -1516,7 +1516,7 @@ describe("opening a concept by IRI", () => {
         rider: null,
       },
       trustWords: "Unverified",
-      evidence: [{ source: "Handbook" }],
+      evidence: [{ source: "Handbook", at: "p.4" }],
     });
   });
 
@@ -1690,8 +1690,8 @@ describe("opening a concept by IRI", () => {
     ]);
 
     expect(cited.ok && cited.value.found && cited.value.concept?.evidence).toStrictEqual([
-      { source: "Handbook" },
-      { source: "/sources/travel.pdf" },
+      { source: "Handbook", at: "p.4" },
+      { source: "/sources/travel.pdf", at: "p.9" },
       { source: "/sources/rates.csv" },
     ]);
     expect(uncited.ok && uncited.value.found && uncited.value.concept?.evidence).toEqual([]);

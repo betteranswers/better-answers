@@ -6,8 +6,13 @@ import {
   FEEDBACK_REASONS,
   FEEDBACK_VERDICTS,
   find,
+  findInput,
+  findOutputWith,
   giveFeedback,
   open,
+  openInput,
+  openOutputWith,
+  passageView,
   renderAnswer,
   renderFeedback,
   renderFind,
@@ -15,13 +20,13 @@ import {
   TRUST_RIDERS,
   TRUST_STATUSES,
   TRUST_TIERS,
+  type AnswerResult,
   type FindMatch,
   type FindResult,
   type OpenResult,
   type Trust,
 } from "@better-answers/core/answering";
 import { ok, parse, type Result } from "@better-answers/core/kernel";
-import { conceptFrontmatter, ids } from "@better-answers/schema";
 
 import { defineEntry, type Entry } from "./define.ts";
 
@@ -56,18 +61,22 @@ type WireMatch<Match> = Match extends { readonly trust: Trust }
   ? Omit<Match, "trust"> & { readonly trust: WireTrust }
   : Match;
 
-type WireFound = { readonly query: string; readonly hits: readonly WireMatch<FindMatch<string>>[] };
+type WireFound = {
+  readonly query: string;
+  readonly hits: readonly WireMatch<FindMatch<string>>[];
+  readonly nextCursor?: string;
+};
 
-const foundOnTheWire = (found: FindResult): WireFound => ({
-  query: found.query,
-  hits: found.matches.map((match) =>
+const foundOnTheWire = ({ matches, ...found }: FindResult): WireFound => ({
+  ...found,
+  hits: matches.map((match) =>
     match.layer === "bundles" ? { ...match, trust: wireTrust(match.trust) } : match,
   ),
 });
 
-const foundInCore = (found: WireFound): FindResult<string> => ({
-  query: found.query,
-  matches: found.hits.map((match) =>
+const foundInCore = ({ hits, ...found }: WireFound): FindResult<string> => ({
+  ...found,
+  matches: hits.map((match) =>
     match.layer === "bundles" ? { ...match, trust: coreTrust(match.trust) } : match,
   ),
 });
@@ -92,32 +101,7 @@ const wired = <Value, Wired, Refused>(
   wire: (value: Value) => Wired,
 ): Result<Wired, Refused> => (result.ok ? ok(wire(result.value)) : result);
 
-const passage = z.object({
-  locator: z.string(),
-  source: z.string(),
-  text: z.string(),
-  sensitivity: z.string(),
-});
-
-const match = z.discriminatedUnion("layer", [
-  z.object({
-    layer: z.literal("bundles"),
-    iri: z.string(),
-    kind: z.string(),
-    title: z.string(),
-    trust,
-    trustWords: z.string(),
-    bundle: z.string(),
-    tags: z.array(z.string()),
-  }),
-  z.object({
-    layer: z.literal("sources"),
-    kind: z.literal("document"),
-    title: z.string(),
-    locator: z.string(),
-    sensitivity: z.string(),
-  }),
-]);
+const found = findOutputWith(trust);
 
 const findEntry = defineEntry({
   name: "find",
@@ -125,13 +109,12 @@ const findEntry = defineEntry({
   description:
     "Search the company's knowledge and preview what it finds: one line per match. A concept carries its kind, title and trust state; a document nothing on the map covers carries its title, the sensitivity it is held under and the marker 'Not company knowledge'. Use `open` to read a match in full — a concept by its `iri`, a document by the `locator` on its line.",
   scopes: ["knowledge:read"],
-  input: z.object({
-    query: z.string().min(1).max(500).describe("What to look for, in the person's own words."),
-    limit: z.number().int().min(1).max(20).default(5).describe("How many matches to preview."),
-  }),
+  // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the answering slice's own schema; the emitted-schema test reads its keys
+  input: findInput,
   output: z.object({
-    query: z.string(),
-    hits: z.array(match),
+    query: found.shape.query,
+    hits: found.shape.matches,
+    nextCursor: found.shape.nextCursor,
   }),
   annotations: {
     readOnlyHint: true,
@@ -144,42 +127,50 @@ const findEntry = defineEntry({
   render: (found) => renderFind(foundInCore(found)),
 });
 
-const askEntry = defineEntry({
-  name: "ask",
-  title: "Ask the company's knowledge a question",
-  description:
-    "Ask a question and get the company's cited answer, verdict first. Every claim carries the concept it rests on. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised.",
-  scopes: ["knowledge:read"],
-  input: z.object({
-    question: z.string().min(1).max(2000).describe("The question, in the person's own words."),
-  }),
-  output: z.object({
-    verdict: z.enum(ANSWER_VERDICTS),
-    text: z.string(),
-    citations: z.array(z.object({ iri: z.string(), url: z.string() })),
-    conflicts: z.array(
-      z.object({
-        subject: z.string(),
-        values: z.array(z.object({ value: z.string(), evidence: z.string() })),
-      }),
-    ),
-    coverage: z.object({ asked: z.number().int(), answered: z.number().int() }),
-    unmappedPassages: z.array(passage),
-    map: z.discriminatedUnion("state", [
-      z.object({ state: z.literal("live") }),
-      z.object({ state: z.literal("as_of"), at: z.string() }),
-      z.object({ state: z.literal("unavailable_since"), since: z.string() }),
-    ]),
-  }),
-  annotations: {
-    readOnlyHint: true,
-    destructiveHint: false,
-    idempotentHint: false,
-    openWorldHint: false,
-  },
-  run: async (principal, tx, args) => ask(principal, tx, args),
-  render: renderAnswer,
+/** Core cites a concept by its page's path; an outside client can only open it under our origin. */
+const citedFrom = (origin: string, answer: AnswerResult): AnswerResult => ({
+  ...answer,
+  citations: answer.citations.map((citation) => ({ ...citation, url: `${origin}${citation.url}` })),
 });
+
+const askEntryAt = (origin: string) =>
+  defineEntry({
+    name: "ask",
+    title: "Ask the company's knowledge a question",
+    description:
+      "Ask a question and get the company's cited answer, verdict first. Every claim carries the concept it rests on. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised.",
+    scopes: ["knowledge:read"],
+    input: z.object({
+      question: z.string().min(1).max(2000).describe("The question, in the person's own words."),
+    }),
+    output: z.object({
+      verdict: z.enum(ANSWER_VERDICTS),
+      text: z.string(),
+      citations: z.array(z.object({ iri: z.string(), url: z.string() })),
+      conflicts: z.array(
+        z.object({
+          subject: z.string(),
+          values: z.array(z.object({ value: z.string(), evidence: z.string() })),
+        }),
+      ),
+      coverage: z.object({ asked: z.number().int(), answered: z.number().int() }),
+      unmappedPassages: z.array(passageView),
+      map: z.discriminatedUnion("state", [
+        z.object({ state: z.literal("live") }),
+        z.object({ state: z.literal("as_of"), at: z.string() }),
+        z.object({ state: z.literal("unavailable_since"), since: z.string() }),
+      ]),
+    }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    run: async (principal, tx, args) =>
+      wired(await ask(principal, tx, args), (answer) => citedFrom(origin, answer)),
+    render: renderAnswer,
+  });
 
 const openEntry = defineEntry({
   name: "open",
@@ -187,86 +178,17 @@ const openEntry = defineEntry({
   description:
     "The verbatim fetch: a concept by its `iri` (from a `find` match or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by its `locator`, which a document match and a citation both carry. Give one of the two. Each evidence item names its source in the concept's own words, and carries the `locator` of a passage or the `iri` of a concept that opens it only where there is one you may read: an imported concept's evidence often has neither, and an item with neither has nothing to open. Quote what comes back; do not summarise it.",
   scopes: ["knowledge:read"],
-  input: z
-    .object({
-      iri: z
-        .string()
-        .min(1)
-        .optional()
-        .describe("The concept's identity, as a `find` line or an `ask` citation gives it."),
-      locator: z
-        .string()
-        .min(1)
-        .optional()
-        .describe("The place of the passage a citation rests on, as the citation gives it."),
-    })
-    .refine((value) => (value.iri === undefined) !== (value.locator === undefined), {
-      message: "give an `iri` or a `locator`, not both and not neither",
-    }),
-  output: z.discriminatedUnion("found", [
-    z
-      .object({
-        found: z.literal(true),
-        concept: z
-          .object({
-            iri: z.string(),
-
-            frontmatter: conceptFrontmatter,
-            body: z.string(),
-            relations: z.array(
-              z.object({ kind: z.string(), target: z.string(), title: z.string() }),
-            ),
-            trust,
-            trustWords: z.string(),
-            evidence: z.array(
-              z.object({
-                id: z.string().exactOptional(),
-                source: z.string(),
-                locator: z
-                  .string()
-                  .regex(/\S/)
-                  .exactOptional()
-                  .describe("What opens the passage; absent where there is none you may read."),
-                iri: z
-                  .string()
-                  .exactOptional()
-                  .describe(
-                    "The concept this source names; absent where there is none you may read.",
-                  ),
-              }),
-            ),
-          })
-          .optional(),
-        passage: passage.optional(),
-      })
-
-      .refine((value) => (value.concept === undefined) !== (value.passage === undefined), {
-        message: "a found result carries a concept or a passage, never both or neither",
-      }),
-    z.object({
-      found: z.literal(false),
-      iri: z.string().optional(),
-      locator: z.string().optional(),
-    }),
-  ]),
+  // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the answering slice's own schema; the emitted-schema test reads its keys
+  input: openInput,
+  output: openOutputWith(trust),
   annotations: {
     readOnlyHint: true,
     destructiveHint: false,
     idempotentHint: true,
     openWorldHint: false,
   },
-  run: async (principal, tx, args, now) => {
-    if (args.iri === undefined) {
-      return wired(
-        await open(principal, tx, { locator: args.locator ?? "" }, now),
-        openedOnTheWire,
-      );
-    }
-    // No concept holds an iri that is malformed, so it answers as one nobody holds.
-    const iri = ids.conceptIri.safeParse(args.iri);
-    if (!iri.success) return ok(openedOnTheWire({ found: false, iri: args.iri }));
-    return wired(await open(principal, tx, { iri: iri.data }, now), openedOnTheWire);
-  },
+  run: async (principal, tx, args, now) =>
+    wired(await open(principal, tx, args, now), openedOnTheWire),
   render: (opened) => renderOpen(openedInCore(opened)),
 });
 
@@ -319,9 +241,10 @@ const giveFeedbackEntry = defineEntry({
   render: renderFeedback,
 });
 
-export const ENTRIES: readonly Entry<z.ZodObject, z.ZodType>[] = [
+/** `origin` is the product's public origin, which a citation's address is under. */
+export const entriesAt = (origin: string): readonly Entry<z.ZodObject, z.ZodType>[] => [
   findEntry,
-  askEntry,
+  askEntryAt(origin),
   openEntry,
   giveFeedbackEntry,
 ];
