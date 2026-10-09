@@ -1,6 +1,6 @@
 import { getTableColumns, is } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { PgTable } from "drizzle-orm/pg-core";
+import { jsonb, PgTable, pgTable } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { z } from "zod";
 
@@ -21,6 +21,7 @@ import {
   SUGGESTION_BODY_MAX,
   SUGGESTION_REASON_MAX,
 } from "../src/index.ts";
+import type { ids } from "../src/index.ts";
 import * as publicEntry from "../src/index.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
@@ -1249,215 +1250,670 @@ describe("the customType exception, per shape", () => {
     expect(update.safeParse({ content: "edited" }).success).toBe(true);
     expect(update.safeParse({ embedding: tooShort }).success).toBe(false);
   });
+
+  it("passage.select reads a row with or without search", () => {
+    const row = {
+      ...acceptedRows.passage[0],
+      sourceDocumentId: null,
+      locator: null,
+      ordinal: null,
+      charStart: null,
+      charEnd: null,
+    };
+    const select = boundarySchemas.passage.select;
+    expect(select.safeParse({ ...row, search: "any text" }).success).toBe(true);
+    expect(select.safeParse(row).success).toBe(true);
+  });
+
+  it("passage.insert and update carry no search key", () => {
+    expect(Object.keys(boundarySchemas.passage.insert.shape)).not.toContain("search");
+    expect(Object.keys(boundarySchemas.passage.update.shape)).not.toContain("search");
+  });
 });
 
 describe("5 — the inferred type is pinned", () => {
-  type Expect<T extends true> = T;
   type Equal<A, B> =
     (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+  type NoneOf<T extends never> = T;
 
-  type WorkspaceId = string & z.core.$brand<"WorkspaceId">;
-  type UserId = string & z.core.$brand<"UserId">;
+  // Spelled out, not read off `ids`: an id's type comes from the column it is pinned against.
+  type Branded<Brand extends string> = string & z.core.$brand<Brand>;
+  type WorkspaceId = Branded<"WorkspaceId">;
+  type UserId = Branded<"UserId">;
+  type GroupId = Branded<"GroupId">;
+  type ConnectedSourceId = Branded<"ConnectedSourceId">;
+  type WriteUpId = Branded<"WriteUpId">;
+  type AuditEventId = Branded<"AuditEventId">;
+  type AccessRequestId = Branded<"AccessRequestId">;
+  type ConceptIri = Branded<"ConceptIri">;
 
-  type _workspaceSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.workspace.select>,
-      {
-        id: WorkspaceId;
-        name: string;
-        shortName: string;
-        logo: string | null;
-        createdAt: Date;
-        metadata: string | null;
-      }
-    >
+  type PinnedIds = {
+    workspaceId: WorkspaceId;
+    userId: UserId;
+    groupId: GroupId;
+    connectedSourceId: ConnectedSourceId;
+    writeUpId: WriteUpId;
+    auditEventId: AuditEventId;
+    accessRequestId: AccessRequestId;
+    conceptIri: ConceptIri;
+  };
+  type _idsCarryThePinnedBrands = NoneOf<
+    {
+      [K in keyof typeof ids]: Equal<z.output<(typeof ids)[K]>, PinnedIds[K]> extends true
+        ? never
+        : K;
+    }[keyof typeof ids]
   >;
-  type _modelChoiceSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.modelChoice.select>,
-      {
-        id: string;
-        workspaceId: WorkspaceId;
-        purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
-        provider: string;
-        model: string;
-        dimensions: number | null;
-        retentionTail: string | null;
-      }
-    >
-  >;
-  type _workspaceConfigSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.workspaceConfig.select>,
-      { workspaceId: WorkspaceId; key: string; value: string; updatedAt: Date }
-    >
-  >;
-  type _memberSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.member.select>,
-      {
-        id: string;
-        workspaceId: WorkspaceId;
-        userId: UserId;
-        role: "Admin" | "Editor" | "Viewer";
-        createdAt: Date;
-        credentialsRevokedAt: Date | null;
-      }
-    >
-  >;
-  type _userSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.user.select>,
-      {
-        id: UserId;
-        name: string;
-        email: string;
-        emailVerified: boolean;
-        image: string | null;
-        createdAt: Date;
-        updatedAt: Date;
-        credentialsRevokedAt: Date | null;
-        operator: boolean;
-        authenticatorEnabled: boolean;
-        passkeyOfferDismissedAt: Date | null;
-        recoveryCodesAcknowledged: boolean;
-        restoreRequiredAt: Date | null;
-        promotedAt: Date | null;
-      }
-    >
-  >;
-  type GroupId = string & z.core.$brand<"GroupId">;
-  type _groupSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.group.select>,
-      {
-        id: GroupId;
-        workspaceId: WorkspaceId;
-        name: string;
-        origin: "admin-curated" | "audience-minted";
-        createdAt: Date;
-      }
-    >
-  >;
-  type _groupMemberSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.groupMember.select>,
-      { workspaceId: WorkspaceId; groupId: GroupId; userId: UserId; addedAt: Date }
-    >
-  >;
-  type _sessionSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.session.select>,
-      {
-        id: string;
-        expiresAt: Date;
-        token: string;
-        createdAt: Date;
-        updatedAt: Date;
-        ipAddress: string | null;
-        userAgent: string | null;
-        userId: string;
-        activeWorkspaceId: string | null;
-        secondFactorConfirmedAt: Date | null;
-        pendingSince: Date | null;
-        setupGrantedAt: Date | null;
-      }
-    >
-  >;
-  type _invitationSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.invitation.select>,
-      {
-        id: string;
-        workspaceId: string;
-        email: string;
-        role: string | null;
-        status: string;
-        expiresAt: Date;
-        createdAt: Date;
-        inviterId: string;
-      }
-    >
-  >;
-  type _mcpCallCounterSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.mcpCallCounter.select>,
-      { workspaceId: WorkspaceId; tokenId: string; windowStart: Date; count: number }
-    >
-  >;
-  type _testWorkspaceMarkSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.testWorkspaceMark.select>,
-      { workspaceId: WorkspaceId; testingDomain: string }
-    >
-  >;
-  type _invitationEmailCounterSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.invitationEmailCounter.select>,
-      { workspaceId: WorkspaceId; key: string; windowStart: Date; count: number }
-    >
-  >;
-  type AuditEventId = string & z.core.$brand<"AuditEventId">;
+
+  // The wrapper's type for an unrefined jsonb column, read off a table outside the registry.
+  const jsonProbe = createSelectSchema(pgTable("json_probe", { value: jsonb("value").notNull() }));
+  type UnrefinedJson = z.infer<typeof jsonProbe>["value"];
+
   type Family = "people" | "knowledge" | "sources" | "platform";
-  type _auditEventSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.auditEvent.select>,
-      {
-        id: AuditEventId;
-        workspaceId: WorkspaceId;
-        action: `${Family}.${string}.${string}`;
-        family: Family;
-        actor: string;
-        subjectKind: string;
-        subjectId: string;
-        at: Date;
-        detail: Record<string, string | number | boolean | Record<string, string | null>[]> | null;
-        batchId: string | null;
-      }
-    >
-  >;
-  type AccessRequestId = string & z.core.$brand<"AccessRequestId">;
-  type _accessRequestSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.accessRequest.select>,
-      {
-        id: AccessRequestId;
-        workspaceId: WorkspaceId;
-        requesterId: UserId;
-        reason: string;
-        status: "waiting" | "approved" | "declined";
-        createdAt: Date;
-        decidedBy: UserId | null;
-        decidedAt: Date | null;
-        invitationId: string | null;
-      }
-    >
-  >;
-  type _ingressCounterSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.ingressCounter.select>,
-      { scope: "ip" | "email" | "person" | "link"; key: string; windowStart: Date; count: number }
-    >
-  >;
-  type _passageSelect = Expect<
-    Equal<
-      z.infer<typeof boundarySchemas.passage.select>,
-      {
-        id: string;
-        workspaceId: WorkspaceId;
-        content: string;
-        embedding: number[] | null;
-        embeddingModelChoiceId: string | null;
-        connectedSourceId: string;
-        sourceDocumentId: string | null;
-        locator: string | null;
-        ordinal: number | null;
-        charStart: number | null;
-        charEnd: number | null;
-        search?: string | undefined;
-      }
-    >
-  >;
+  type AuditAction = `${Family}.${string}.${string}`;
+  type AuditDetail = Record<
+    string,
+    string | number | boolean | Record<string, string | null>[]
+  > | null;
+  type Sensitivity = "Public" | "Internal" | "Restricted";
+  type Frontmatter = Record<
+    string,
+    string | number | boolean | null | string[] | Record<string, string | number | boolean | null>[]
+  > | null;
+  type SubjectIdentifiers = { emails: string[]; names: string[]; other: string[] } | null;
+  type JobOutcomeScalar = string | number | boolean | null;
+  type JobOutcome = Record<
+    string,
+    JobOutcomeScalar | JobOutcomeScalar[] | Record<string, JobOutcomeScalar>[]
+  > | null;
+
+  type SelectShapes = {
+    workspace: {
+      id: WorkspaceId;
+      name: string;
+      shortName: string;
+      logo: string | null;
+      createdAt: Date;
+      metadata: string | null;
+    };
+    modelChoice: {
+      id: string;
+      workspaceId: WorkspaceId;
+      purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
+      provider: string;
+      model: string;
+      dimensions: number | null;
+      retentionTail: string | null;
+    };
+    workspaceConfig: { workspaceId: WorkspaceId; key: string; value: string; updatedAt: Date };
+    passage: {
+      id: string;
+      workspaceId: WorkspaceId;
+      content: string;
+      embedding: number[] | null;
+      embeddingModelChoiceId: string | null;
+      connectedSourceId: string;
+      sourceDocumentId: string | null;
+      locator: string | null;
+      ordinal: number | null;
+      charStart: number | null;
+      charEnd: number | null;
+      search?: string | undefined;
+    };
+    auditEvent: {
+      id: AuditEventId;
+      workspaceId: WorkspaceId;
+      action: AuditAction;
+      family: Family;
+      actor: string;
+      subjectKind: string;
+      subjectId: string;
+      at: Date;
+      detail: AuditDetail;
+      batchId: string | null;
+    };
+    identityAuditEvent: {
+      id: AuditEventId;
+      action: AuditAction;
+      family: Family;
+      actor: string;
+      subjectKind: string;
+      subjectId: string;
+      at: Date;
+      detail: AuditDetail;
+      batchId: string | null;
+    };
+    user: {
+      id: UserId;
+      name: string;
+      email: string;
+      emailVerified: boolean;
+      image: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      credentialsRevokedAt: Date | null;
+      operator: boolean;
+      authenticatorEnabled: boolean;
+      passkeyOfferDismissedAt: Date | null;
+      recoveryCodesAcknowledged: boolean;
+      restoreRequiredAt: Date | null;
+      promotedAt: Date | null;
+    };
+    member: {
+      id: string;
+      workspaceId: WorkspaceId;
+      userId: UserId;
+      role: "Admin" | "Editor" | "Viewer";
+      createdAt: Date;
+      credentialsRevokedAt: Date | null;
+    };
+    group: {
+      id: GroupId;
+      workspaceId: WorkspaceId;
+      name: string;
+      origin: "admin-curated" | "audience-minted";
+      createdAt: Date;
+    };
+    groupMember: { workspaceId: WorkspaceId; groupId: GroupId; userId: UserId; addedAt: Date };
+    mcpCallCounter: { workspaceId: WorkspaceId; tokenId: string; windowStart: Date; count: number };
+    invitationEmailCounter: {
+      workspaceId: WorkspaceId;
+      key: string;
+      windowStart: Date;
+      count: number;
+    };
+    ingressCounter: {
+      scope: "ip" | "email" | "person" | "link";
+      key: string;
+      windowStart: Date;
+      count: number;
+    };
+    contractStamp: { onlyRow: true; digest: string; stampedAt: Date };
+    sweepPass: {
+      id: string;
+      at: Date;
+      uploadSweep: "list" | "remove";
+      workspaces: number;
+      refused: number;
+      found: number;
+      removed: number;
+      generations: number;
+    };
+    session: {
+      id: string;
+      expiresAt: Date;
+      token: string;
+      createdAt: Date;
+      updatedAt: Date;
+      ipAddress: string | null;
+      userAgent: string | null;
+      userId: string;
+      activeWorkspaceId: string | null;
+      secondFactorConfirmedAt: Date | null;
+      pendingSince: Date | null;
+      setupGrantedAt: Date | null;
+    };
+    account: {
+      id: string;
+      accountId: string;
+      providerId: string;
+      userId: string;
+      accessToken: string | null;
+      refreshToken: string | null;
+      idToken: string | null;
+      accessTokenExpiresAt: Date | null;
+      refreshTokenExpiresAt: Date | null;
+      scope: string | null;
+      password: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+    verification: {
+      id: string;
+      identifier: string;
+      value: string;
+      expiresAt: Date;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+    jwks: {
+      id: string;
+      publicKey: string;
+      privateKey: string;
+      createdAt: Date;
+      expiresAt: Date | null;
+      alg: string | null;
+      crv: string | null;
+    };
+    invitation: {
+      id: string;
+      workspaceId: string;
+      email: string;
+      role: string | null;
+      status: string;
+      expiresAt: Date;
+      createdAt: Date;
+      inviterId: string;
+    };
+    oauthClient: {
+      id: string;
+      clientId: string;
+      clientSecret: string | null;
+      clientDiscoveryId: string | null;
+      disabled: boolean | null;
+      skipConsent: boolean | null;
+      enableEndSession: boolean | null;
+      subjectType: string | null;
+      scopes: string[] | null;
+      clientCredentialsScopes: string[] | null;
+      userId: string | null;
+      createdAt: Date | null;
+      updatedAt: Date | null;
+      name: string | null;
+      uri: string | null;
+      icon: string | null;
+      contacts: string[] | null;
+      tos: string | null;
+      policy: string | null;
+      softwareId: string | null;
+      softwareVersion: string | null;
+      softwareStatement: string | null;
+      redirectUris: string[];
+      postLogoutRedirectUris: string[] | null;
+      backchannelLogoutUri: string | null;
+      backchannelLogoutSessionRequired: boolean | null;
+      tokenEndpointAuthMethod: string | null;
+      applicationType: string | null;
+      jwks: string | null;
+      jwksUri: string | null;
+      grantTypes: string[] | null;
+      responseTypes: string[] | null;
+      requirePKCE: boolean | null;
+      dpopBoundAccessTokens: boolean | null;
+      referenceId: string | null;
+      metadata: UnrefinedJson;
+    };
+    oauthResource: {
+      id: string;
+      identifier: string;
+      name: string;
+      accessTokenTtl: number | null;
+      refreshTokenTtl: number | null;
+      signingAlgorithm: string | null;
+      signingKeyId: string | null;
+      allowedScopes: string[] | null;
+      customClaims: UnrefinedJson;
+      dpopBoundAccessTokensRequired: boolean | null;
+      disabled: boolean | null;
+      createdAt: Date | null;
+      updatedAt: Date | null;
+      policyVersion: number | null;
+      metadata: UnrefinedJson;
+    };
+    oauthClientResource: {
+      id: string;
+      clientId: string;
+      resourceId: string;
+      metadata: UnrefinedJson;
+      createdAt: Date | null;
+    };
+    oauthRefreshToken: {
+      id: string;
+      token: string;
+      clientId: string;
+      sessionId: string | null;
+      userId: string;
+      referenceId: string | null;
+      authorizationCodeId: string | null;
+      resources: string[] | null;
+      requestedUserInfoClaims: string[] | null;
+      expiresAt: Date;
+      createdAt: Date;
+      revoked: Date | null;
+      rotatedAt: Date | null;
+      rotationReplayResponse: string | null;
+      rotationReplayExpiresAt: Date | null;
+      authTime: Date | null;
+      confirmation: UnrefinedJson;
+      scopes: string[];
+    };
+    oauthAccessToken: {
+      id: string;
+      token: string;
+      clientId: string;
+      sessionId: string | null;
+      userId: string | null;
+      referenceId: string | null;
+      authorizationCodeId: string | null;
+      resources: string[] | null;
+      requestedUserInfoClaims: string[] | null;
+      refreshId: string | null;
+      expiresAt: Date;
+      createdAt: Date;
+      revoked: Date | null;
+      confirmation: UnrefinedJson;
+      scopes: string[];
+    };
+    oauthConsent: {
+      id: string;
+      clientId: string;
+      userId: string | null;
+      referenceId: string | null;
+      resources: string[] | null;
+      requestedUserInfoClaims: string[] | null;
+      scopes: string[];
+      createdAt: Date;
+      updatedAt: Date;
+    };
+    oauthClientAssertion: { id: string; expiresAt: Date };
+    rateLimit: { id: string; key: string; count: number; lastRequest: number };
+    authenticator: {
+      id: string;
+      secret: string;
+      backupCodes: string;
+      userId: string;
+      verified: boolean;
+      failedVerificationCount: number;
+      lockedUntil: Date | null;
+    };
+    passkey: {
+      id: string;
+      name: string | null;
+      publicKey: string;
+      userId: string;
+      credentialID: string;
+      counter: number;
+      deviceType: string;
+      backedUp: boolean;
+      transports: string | null;
+      createdAt: Date;
+      aaguid: string | null;
+    };
+    passkeyLastUse: { passkeyId: string; at: Date };
+    recoveryCode: { id: string; userId: string; codeHash: string; createdAt: Date };
+    secondFactorThrottle: {
+      userId: string;
+      kind: string;
+      failures: number;
+      waitUntil: Date | null;
+      noticedAt: Date | null;
+    };
+    workspaceLastActive: { workspaceId: string; userId: string; at: Date };
+    testWorkspaceMark: { workspaceId: WorkspaceId; testingDomain: string };
+    accessRequest: {
+      id: AccessRequestId;
+      workspaceId: WorkspaceId;
+      requesterId: UserId;
+      reason: string;
+      status: "waiting" | "approved" | "declined";
+      createdAt: Date;
+      decidedBy: UserId | null;
+      decidedAt: Date | null;
+      invitationId: string | null;
+    };
+    conceptIdentity: {
+      workspaceId: WorkspaceId;
+      iri: ConceptIri;
+      mergeKey: string;
+      mintedAt: Date;
+    };
+    conceptIndex: {
+      publishedAt: Date | null;
+      sensitivity: Sensitivity;
+      audience: "everyone" | "groups";
+      audienceGroups: GroupId[] | null;
+      workspaceId: WorkspaceId;
+      iri: ConceptIri;
+      path: string;
+      kind: string;
+      title: string;
+      frontmatter: Frontmatter;
+      body: string;
+      contentHash: string;
+      commitSha: string;
+      status: "draft" | "stable" | "deprecated" | "removed";
+      updatedAt: Date;
+    };
+    bundleCommit: {
+      workspaceId: WorkspaceId;
+      sha: string;
+      parentSha: string | null;
+      auditEventId: string;
+      actor: string;
+      committedAt: Date;
+    };
+    evidence: {
+      workspaceId: WorkspaceId;
+      sourceDocumentId: string;
+      locator: string;
+      resource: string;
+      contentVersion: string | null;
+      recordedAt: Date;
+    };
+    conceptVerification: {
+      id: string;
+      workspaceId: WorkspaceId;
+      iri: ConceptIri;
+      actor: string;
+      verifiedAt: Date;
+      contentHash: string | null;
+      origin: "platform" | "imported" | "citation-fix" | "erasure-rewrite";
+    };
+    mapGeneration: { workspaceId: WorkspaceId; liveGen: number };
+    mapNode: {
+      publishedAt: Date | null;
+      sensitivity: Sensitivity;
+      audience: "everyone" | "groups";
+      audienceGroups: GroupId[] | null;
+      workspaceId: WorkspaceId;
+      gen: number | null;
+      uid: string;
+      label: string;
+      kind: string | null;
+    };
+    mapEdge: {
+      publishedAt: Date | null;
+      sensitivity: Sensitivity;
+      audience: "everyone" | "groups";
+      audienceGroups: GroupId[] | null;
+      workspaceId: WorkspaceId;
+      gen: number | null;
+      uid: string;
+      label: string;
+      fromUid: string;
+      toUid: string;
+      fromKind: string | null;
+      toKind: string | null;
+      section: string | null;
+      sentence: string | null;
+    };
+    job: {
+      workspaceId: WorkspaceId;
+      id: string;
+      kind: "index" | "nightly-audit" | "full-rebuild";
+      subjectId: string | null;
+      reason:
+        | "connected"
+        | "dismissed"
+        | "drill"
+        | "erasure"
+        | "first-build"
+        | "model-choice-change"
+        | "reconciler"
+        | "restored"
+        | "rule-change"
+        | "upgrade"
+        | "wiped"
+        | null;
+      status: "queued" | "claimed" | "done" | "failed" | "poisoned";
+      attempts: number;
+      maxAttempts: number;
+      enqueuedAt: Date;
+      claimedBy: string | null;
+      claimedAt: Date | null;
+      leaseExpiresAt: Date | null;
+      heartbeatAt: Date | null;
+      finishedAt: Date | null;
+      outcome: JobOutcome;
+    };
+    suggestion: {
+      workspaceId: WorkspaceId;
+      id: string;
+      setId: string;
+      kind: "edit" | "promotion" | "suggested-concept" | "citation-fix";
+      status: "waiting" | "accepted" | "declined" | "returned";
+      proposer: string;
+      targetIri: ConceptIri | null;
+      decider: string | null;
+      reason: string | null;
+      proposedAt: Date;
+      decidedAt: Date | null;
+    };
+    conceptWriteRequest: {
+      workspaceId: WorkspaceId;
+      suggestionId: string;
+      mergeKey: string;
+      path: string;
+      conceptKind: string;
+      title: string;
+      frontmatter: Frontmatter;
+      body: string;
+      baseContentHash: string | null;
+    };
+    conceptEvidence: {
+      workspaceId: WorkspaceId;
+      iri: ConceptIri;
+      sourceDocumentId: string;
+      locator: string;
+    };
+    conceptSensitivityOverride: {
+      sensitivity: Sensitivity;
+      audience: "everyone" | "groups";
+      audienceGroups: GroupId[] | null;
+      workspaceId: WorkspaceId;
+      iri: ConceptIri;
+      actor: string;
+      auditEventId: string;
+      recordedAt: Date;
+    };
+    connectedSource: {
+      publishedAt: Date | null;
+      sensitivity: Sensitivity;
+      audience: "everyone" | "groups";
+      audienceGroups: GroupId[] | null;
+      workspaceId: WorkspaceId;
+      id: ConnectedSourceId;
+      createdAt: Date;
+      name: string;
+      connector: "upload";
+      destination: ("bundle" | "map" | "passage-index")[];
+      retentionClass: "keep" | "mirror" | "transient";
+      state: "received" | "indexing" | "indexed" | "published";
+      rulesInForce: { default_on: boolean; default_off: boolean } | null;
+    };
+    sourceDocument: {
+      workspaceId: WorkspaceId;
+      id: string;
+      connectedSourceId: ConnectedSourceId;
+      sourceSystemId: string;
+      title: string;
+      mediaType: string;
+      byteSize: number;
+      originalKey: string;
+      normalisedKey: string | null;
+      contentHash: string | null;
+      redactionVersion: string | null;
+      firstSeen: Date;
+      lastSeen: Date;
+      lastModified: Date | null;
+      goneAt: Date | null;
+      outcome: "converted" | "unreadable" | null;
+      unreadableReason: string | null;
+      sensitivity: Sensitivity | null;
+      narrowedTo: Sensitivity | null;
+    };
+    finding: {
+      workspaceId: WorkspaceId;
+      id: string;
+      documentId: string;
+      category: string;
+      tier: "always" | "default-on" | "default-off";
+      ruleId: string;
+      charStart: number;
+      charEnd: number;
+      score: number;
+      ruleVersion: string;
+      detectorPin: string;
+      reviewState: "unreviewed" | "kept-in-text" | "narrowed" | "dismissed";
+      reviewedBy: string | null;
+      reviewedAt: Date | null;
+      reviewReason: string | null;
+      restoredAt: Date | null;
+      restoredBy: string | null;
+      restoreReason: string | null;
+    };
+    subjectRequest: {
+      workspaceId: WorkspaceId;
+      id: string;
+      personId: string | null;
+      identifiers: SubjectIdentifiers;
+      kind: "access" | "erasure";
+      receivedAt: Date;
+      clockStartedAt: Date;
+      dueAt: Date;
+      extendedTo: Date | null;
+      answeredAt: Date | null;
+      answer: string | null;
+    };
+    erasureRequest: {
+      workspaceId: WorkspaceId;
+      id: string;
+      subjectRequestId: string;
+      pseudonym: string;
+      lockedAt: Date;
+      actions: Record<string, Record<string, string | number | boolean | null>> | null;
+      anchoredAt: Date;
+      beyondUseHourlyAt: Date;
+      beyondUseDailyAt: Date;
+      beyondUseWeeklyAt: Date;
+      beyondUseMonthlyAt: Date;
+      completedAt: Date | null;
+      report: string | null;
+    };
+    suppression: {
+      workspaceId: WorkspaceId;
+      erasureRequestId: string;
+      identifiers: SubjectIdentifiers;
+    };
+    writeUp: {
+      publishedAt: Date | null;
+      sensitivity: Sensitivity;
+      audience: "everyone" | "groups";
+      audienceGroups: GroupId[] | null;
+      workspaceId: WorkspaceId;
+      id: WriteUpId;
+      createdAt: Date;
+    };
+    writeUpInclude: {
+      workspaceId: WorkspaceId;
+      writeUpId: WriteUpId;
+      id: string;
+      ordinal: number;
+      iri: ConceptIri;
+    };
+  };
+
+  type Table = keyof typeof boundarySchemas;
+  type Mismatched = {
+    [K in Table]: K extends keyof SelectShapes
+      ? Equal<z.infer<(typeof boundarySchemas)[K]["select"]>, SelectShapes[K]> extends true
+        ? never
+        : K
+      : K;
+  }[Table];
+
+  type _noPinOutlivesItsTable = NoneOf<Exclude<keyof SelectShapes, Table>>;
+  type _everyTableHasAHoldingPin = NoneOf<Mismatched>;
 
   it("holds at compile time (the assertions above are types)", () => {
     expect(true).toBe(true);
