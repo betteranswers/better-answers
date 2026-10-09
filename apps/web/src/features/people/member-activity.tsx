@@ -2,6 +2,7 @@ import { useMemo, type RefObject } from "react";
 
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine } from "@/shared/outcome.tsx";
+import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { sentenceOf } from "./audit-sentences.ts";
@@ -32,7 +33,7 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
   };
 
   return (
-    <div className="border border-border">
+    <Card>
       <EventDays
         events={events}
         landing={landing}
@@ -59,7 +60,7 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
           keystroke: KEY.olderActivity,
         }}
       />
-    </div>
+    </Card>
   );
 }
 

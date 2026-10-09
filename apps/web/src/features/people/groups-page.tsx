@@ -8,6 +8,7 @@ import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
 import { Button } from "@/shared/ui/button.tsx";
+import { Card } from "@/shared/ui/card.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -247,7 +248,7 @@ function GroupList(properties: {
       </output>
       <OutcomeLine outcome={outcome} className="mt-2" />
 
-      <div className="mt-4 border border-border bg-card">
+      <Card className="mt-4">
         <CreateGroupForm
           fieldRef={fieldRef}
           onAsked={() => {
@@ -264,7 +265,7 @@ function GroupList(properties: {
           caption="Groups in this workspace, each with how many members it holds. A group's name opens it."
           empty={<EmptyState line={EMPTY_LINES.groups} className="px-4 py-10" />}
         />
-      </div>
+      </Card>
 
       {opened === undefined || openedGroup === undefined ? null : (
         <GroupSheet

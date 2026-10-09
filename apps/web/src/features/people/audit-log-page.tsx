@@ -10,6 +10,7 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
+import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { byWords, instantWords } from "@/shared/words.ts";
@@ -273,7 +274,7 @@ function AuditLogRegion() {
       </output>
       <OutcomeLine outcome={outcome} className="mt-2" />
 
-      <div className="mt-4 border border-border bg-card">
+      <Card className="mt-4">
         <FilterRow
           search={{
             label: WORDS.search,
@@ -314,7 +315,7 @@ function AuditLogRegion() {
             searchRef={searchRef}
           />
         </ListRead>
-      </div>
+      </Card>
     </section>
   );
 }

@@ -1395,7 +1395,7 @@ test.describe("a member's display name, flagged to better-answers support", () =
 
     await flagButton(page).focus();
     await clockTheNextKey(page, {
-      at: "//section[h3[normalize-space(.)='Display name']]//output",
+      at: "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Display name']]//output",
       reads: SENT_TO_THE_OPERATOR,
     });
     await page.keyboard.press("Enter");

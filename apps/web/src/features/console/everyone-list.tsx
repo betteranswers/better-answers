@@ -7,6 +7,7 @@ import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
+import { Card } from "@/shared/ui/card.tsx";
 import { counted } from "@/shared/words.ts";
 
 import { Pages, turnsOf, type PageTurns } from "./everyone-pages.tsx";
@@ -244,7 +245,7 @@ export function EveryoneList() {
       <ListSaid listed={listed} asked={asked} />
       <OutcomeLine outcome={outcome} className="mt-2" />
 
-      <div className="mt-4 border border-border bg-card">
+      <Card className="mt-4">
         <SearchField searchRef={searchRef} typed={typed} type={type} clear={clear} />
         {page === undefined ? null : (
           <>
@@ -266,7 +267,7 @@ export function EveryoneList() {
             />
           </>
         )}
-      </div>
+      </Card>
 
       <OpenedSheet
         opened={opened}

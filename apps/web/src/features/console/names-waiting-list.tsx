@@ -7,6 +7,7 @@ import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
+import { Card } from "@/shared/ui/card.tsx";
 
 import { CorrectNameDialog } from "./correct-name-dialog.tsx";
 import { arrival, backToTheName, EVERYONE_PATH, NAMES_WAITING_PATH } from "./people-address.ts";
@@ -235,13 +236,13 @@ export function NamesWaitingList(properties: {
       />
 
       {waiting === undefined ? null : (
-        <div className="mt-4 border border-border bg-card">
+        <Card className="mt-4">
           <GridTable
             table={table}
             caption="Every display name an Admin flagged and nobody has corrected since, the longest waiting first, with the workspaces that flagged it and when. Each row's action corrects the name."
             empty={<NothingWaits />}
           />
-        </div>
+        </Card>
       )}
 
       <DialogFor
