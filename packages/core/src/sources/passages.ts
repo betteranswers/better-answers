@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { SENSITIVITIES } from "@better-answers/schema";
+import { fullTextQuery, SENSITIVITIES } from "@better-answers/schema";
 
 import {
   narrower,
@@ -131,7 +131,7 @@ const wireLocatorOf = (row: {
 const MATCHING_ROWS = `SELECT c.source_document_id, c.char_start, c.char_end, c.sensitivity, d.title
      FROM "index".readable_passage c
      JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id
-    CROSS JOIN websearch_to_tsquery('english', $2) AS q
+    CROSS JOIN ${fullTextQuery("$2")} AS q
     WHERE c.workspace_id = $1
       AND c.search @@ q
       AND c.char_start IS NOT NULL

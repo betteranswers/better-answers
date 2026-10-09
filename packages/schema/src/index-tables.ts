@@ -2,6 +2,8 @@ import { sql } from "drizzle-orm";
 import { customType, integer, pgSchema, text } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
+import { FULL_TEXT_LANGUAGE, searchVector } from "./full-text-match.ts";
+
 export const indexSchema = pgSchema("index");
 
 export const EMBEDDING_DIMENSIONS = 1024;
@@ -13,10 +15,6 @@ const embeddingVector = customType<{ data: number[]; driverData: string }>({
   dataType: () => `vector(${EMBEDDING_DIMENSIONS})`,
   toDriver: (value) => JSON.stringify(value),
   fromDriver: (value) => embeddingValues.parse(JSON.parse(value)),
-});
-
-const searchVector = customType<{ data: string; driverData: string }>({
-  dataType: () => "tsvector",
 });
 
 export const passage = indexSchema.table("passage", {
@@ -38,5 +36,5 @@ export const passage = indexSchema.table("passage", {
 
   search: searchVector("search")
     .notNull()
-    .generatedAlwaysAs(sql`to_tsvector('english', content)`),
+    .generatedAlwaysAs(sql.raw(`to_tsvector(${FULL_TEXT_LANGUAGE}, content)`)),
 });
