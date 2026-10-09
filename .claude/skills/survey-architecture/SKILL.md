@@ -79,7 +79,7 @@ Apply the deletion test to anything that looks shallow. Ask whether deleting it 
 - the proposed shape, before and after
 - the test note
 - a recommendation strength: Strong, Worth exploring or Speculative
-- any decision doc it conflicts with, by path and as `ADR NNNN`, named only when the friction is real enough to reopen that decision
+- any decision it conflicts with, said in words with its doc's path beside them, named only when the friction is real enough to reopen that decision
 - open questions
 
 It also returns what it walked and found nothing in, with one line on why.

@@ -24,7 +24,7 @@ Caller counts are lower bounds; say so wherever one appears.
 
 ## One card per opportunity
 
-Use the words in `CONCEPTS.md` for the product's concepts, and the slice and door words of ADR 0029 for structure. Write "the concepts slice's face", not "the ConceptsService".
+Use the words in `CONCEPTS.md` for the product's concepts, and the slice and door words of the capability-slices decision (`docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`) for structure. Write "the concepts slice's face", not "the ConceptsService".
 
 - **Files:** the files and modules involved.
 - **Problem:** the friction, in terms of what is hard to change or to test.
@@ -33,7 +33,7 @@ Use the words in `CONCEPTS.md` for the product's concepts, and the slice and doo
 - **Before and after:** a diagram of each, side by side, wherever a picture helps the decision.
 - **Test note:** from the walk.
 - **Strength:** a badge reading Strong, Worth exploring or Speculative.
-- **Conflicts with:** the decision doc's path and `ADR NNNN`, with one line on why the friction justifies reopening it. Omit the field when there is no conflict.
+- **Conflicts with:** the decision in words and its doc's path, with one line on why the friction justifies reopening it. Omit the field when there is no conflict.
 - **Open questions:** what reading the code could not settle.
 
 Order the cards by strength. End with a **Top recommendation**: the one opportunity to take first, and why. After it, list the areas walked with nothing found, one line each.
