@@ -770,6 +770,10 @@ inside the same action: first every concept citing the evidence that moved, then
 including one of those concepts — two levels, the second reading what the first wrote, never a
 third — so a guide never reaches a reader its includes would not.
 
+A sync that narrows or lifts a document sets the same re-derivation off on the platform's next tick
+instead, because the sync runs outside any action: until that tick a concept citing the document
+keeps its old sensitivity.
+
 ### sensitivity override
 
 An Admin's recorded action that sets a concept's sensitivity and audience, whatever its evidence

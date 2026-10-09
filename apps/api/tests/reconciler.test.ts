@@ -1,8 +1,10 @@
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { initRepository } from "@better-answers/core/store/git";
 import { until } from "@better-answers/core/testing/postgres";
+import { ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
 
 import { openDoors, type Doors } from "../src/doors.ts";
 import { RECONCILER_INTERVAL_MS, startReconciler } from "../src/reconciler.ts";
@@ -15,6 +17,8 @@ const PING_URL = `https://hc-ping.com/${CHECK_UUID}`;
 
 const TICK_FAILED = "the reconciler tick failed";
 
+const FOLLOWING_FAILED = "the sync cascade tick failed";
+
 const saying = (logs: readonly LogLine[], msg: string): readonly LogLine[] =>
   logs.filter((line) => line["msg"] === msg);
 
@@ -23,12 +27,33 @@ const ticks = (logs: readonly LogLine[]): readonly LogLine[] => saying(logs, "re
 const skips = (logs: readonly LogLine[]): readonly LogLine[] =>
   saying(logs, "a reconciler tick was skipped: the previous one is still running");
 
+/** The sync cascade runs last, so its line ends a tick. */
 const finished = (logs: readonly LogLine[]): number =>
-  ticks(logs).length + saying(logs, TICK_FAILED).length;
+  saying(logs, "sync cascade tick").length + saying(logs, FOLLOWING_FAILED).length;
 
 type Pinged = { readonly url: string; readonly body: string };
 
 const answeredOk = async (): Promise<Response> => new Response("OK", { status: 200 });
+
+/** A sync that ended a minute ago and moved nothing, on a connected source no row names. */
+const syncThatMovedNothing = (client: PoolClient, workspaceId: string, id: string) => {
+  const at = new Date(Date.now() - 60_000);
+  return testData(client).job({
+    id,
+    workspaceId,
+    kind: "index",
+    subjectId: ulid(),
+    reason: "rule-change",
+    status: "done",
+    enqueuedAt: at,
+    attempts: 1,
+    claimedBy: "worker-1",
+    claimedAt: at,
+    heartbeatAt: at,
+    finishedAt: at,
+    outcome: { passages: 0, sensitivity_moved: [] },
+  });
+};
 
 describe("the periodic head check", () => {
   const app = appForSuite();
@@ -102,6 +127,64 @@ describe("the periodic head check", () => {
     expect(ticks(head.logs)).toHaveLength(1);
   });
 
+  it("follows a sync even where the reconciler refuses the workspace", async () => {
+    const bare = await app().provision();
+    const client = await app().database.superuser.connect();
+    try {
+      await syncThatMovedNothing(client, bare.workspaceId, ulid());
+    } finally {
+      client.release();
+    }
+    const head = watched({ pingUrl: undefined });
+
+    vi.advanceTimersByTime(RECONCILER_INTERVAL_MS);
+    await head.stop();
+
+    expect(ticks(head.logs)[0]).toMatchObject({
+      level: 40,
+      refused: expect.arrayContaining([
+        { workspace_id: bare.workspaceId, reason: "no-such-repository" },
+      ]),
+    });
+    expect(saying(head.logs, "sync cascade tick")).toEqual([
+      expect.objectContaining({ level: 30, followed: 1, concepts: 0, skipped: [], refused: [] }),
+    ]);
+  });
+
+  it("pings failure for a minute whose step skipped a sync", async () => {
+    const bare = await app().provision();
+    const jobId = ulid();
+    const name = `refuse_marker_${jobId.toLowerCase()}`;
+    const client = await app().database.superuser.connect();
+    try {
+      await syncThatMovedNothing(client, bare.workspaceId, jobId);
+      await client.query(
+        `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN
+           IF NEW.subject_id = '${jobId}' THEN RAISE EXCEPTION 'the marker is refused'; END IF;
+           RETURN NEW;
+         END $$`,
+      );
+      await client.query(
+        `CREATE TRIGGER ${name} BEFORE INSERT ON audit_event FOR EACH ROW EXECUTE FUNCTION ${name}()`,
+      );
+      const head = watched();
+
+      await head.tickTimes(2);
+      await head.stop();
+
+      expect(saying(head.logs, "sync cascade tick")[0]).toMatchObject({
+        level: 40,
+        skipped: [{ workspace_id: bare.workspaceId, job_id: jobId }],
+      });
+      expect(head.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);
+    } finally {
+      await client.query(`DROP TRIGGER IF EXISTS ${name} ON audit_event`);
+      await client.query(`DROP FUNCTION IF EXISTS ${name}()`);
+      client.release();
+    }
+  });
+
   it("never overlaps a tick, logging the skip and waiting", async () => {
     const head = watched({ pingUrl: undefined });
 
@@ -155,6 +238,7 @@ describe("the periodic head check", () => {
 
       await head.tick();
       expect(saying(head.logs, TICK_FAILED)).toEqual([expect.objectContaining({ level: 50 })]);
+      expect(saying(head.logs, FOLLOWING_FAILED)).toEqual([expect.objectContaining({ level: 50 })]);
       release();
       await head.tickTimes(3);
       await head.stop();

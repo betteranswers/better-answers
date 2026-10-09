@@ -43,6 +43,7 @@ A passage carries no pair of its own. It reads its connected source's through `i
 - It runs at write time: the governed write derives the row it lands.
 - A narrowing re-derives synchronously two levels down, in the narrowing action's own transaction: every concept citing the connected source's documents, then every write-up including them.
 - The map's copies of the columns are rewritten in that same transaction.
+- The worker's sync is the exception: it narrows or lifts a document outside any action of the api's, so the api's tick re-derives what it moved, two levels down and the map's copies with them, one transaction per sync (ADR 0023).
 
 **An empty intersection forces the unit Restricted, and is never stored.** It becomes *Restricted* for *everyone*, which the predicate reads as Admins alone. It is never stored as *groups* over an empty list.
 
@@ -68,3 +69,5 @@ A passage carries no pair of its own. It reads its connected source's through `i
 ## History
 
 The full record, with no amendments: `docs/archive/adr/0039-audience-word-and-group-ids.md`.
+
+Amended 09/10/2026 by the plan for BA-85 (`docs/plans/2026-10-09-1517-fix-sync-narrows-citing-concepts-plan.md`): a narrowing by the worker's sync re-derives on the api's tick, not in a transaction of its own.

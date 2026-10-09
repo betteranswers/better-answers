@@ -40,6 +40,7 @@ A sensitivity is derived:
 
 - Most restrictive among the connected sources of the evidence a concept cites, and among a write-up's includes.
 - Re-derived synchronously inside the narrowing action, two levels down: connected source, then concept, then write-up.
+- One writer is the exception: the worker's sync, which narrows a document on a special-category verdict and lifts it back after a dismissal. The worker cannot run the derivation, so its index job's outcome names the documents it moved (ADR 0031's `sync-sensitivity-moves`), and the api's tick re-derives their concepts and write-ups under a platform principal. A reader may still reach a concept the narrowed document refuses from the sync's catalogue write, through the rest of the sync, until one tick after its job ends or its claim lapses.
 - Audiences combine by intersection, with *everyone* the identity. An empty intersection forces Restricted (ADR 0039).
 - A unit resting on nothing takes its fallback: the writer's word on a creation, what the row holds on anything else.
 
@@ -51,6 +52,7 @@ The walk's timeout is set per statement, never on a role. Entry is by key, never
 - Every other store in the estate has two isolation controls. `workspace_id` in every `WHERE` gives the map its second.
 - A sensitivity is a record, not knowledge: a company marks documents confidential, not each unit of what it knows. So a sensitivity may be derived and recomputed.
 - A queued recompute reopens the leak for the length of the queue. One level only lets the guide-footnote leak survive.
+- The sync's exception accepts that leak for a bounded time because nothing narrower is open to it: the derivation is the api's alone, and the worker calls nothing in the api (ADR 0005). Its passages are hidden at once, because a passage's visibility is read through the document (ADR 0044); the concept row is what waits for the tick.
 - Generations, the debounce and the watermark bridged a second store the api could not write transactionally. That store is gone. Rebuild-equivalence and the nightly second parser keep the map derived.
 - A refusal after the commit would be the reconciler's finding, and the reconciler is for crashes.
 - A carried passage visibility was a copy five writers in two tiers kept equal by racing.
@@ -66,5 +68,7 @@ The walk's timeout is set per statement, never on a role. Entry is by key, never
 ## History
 
 The full record, with its seven amendments (among them T-055, T-078, T-113 and T-128): `docs/archive/adr/0023-graph-is-apache-age.md`. Its engine, Apache AGE with one map per workspace, is superseded by ADR 0032.
+
+Amended 09/10/2026 by the plan for BA-85 (`docs/plans/2026-10-09-1517-fix-sync-narrows-citing-concepts-plan.md`): the worker's sync is the one writer of a sensitivity whose cascade runs on the api's next tick rather than inside its own transaction.
 
 It superseded ADR 0021, which put the map on one shared Neo4j Community instance, rebuilt rather than backed up. That went because a JVM reserving about 3 GB for a map of tens of megabytes, a second stateful service that could not be backed up without stopping it, cost more than the port.
