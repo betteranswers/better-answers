@@ -1,10 +1,10 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { find } from "../src/answering/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
@@ -15,8 +15,7 @@ import {
   readRecallSet,
   recallAt,
   RECALL_DEPTH,
-  RECALL_SET,
-  type RecallSet,
+  theRecallSet,
 } from "./recall.ts";
 import { visibilitySuite } from "./sourced-concept.ts";
 import { answered } from "./suite-postgres.ts";
@@ -24,12 +23,6 @@ import { answered } from "./suite-postgres.ts";
 const { arrange, reading } = visibilitySuite();
 
 const NOW = new Date("2026-10-09T12:00:00.000Z");
-
-const theSet = async (): Promise<RecallSet> => {
-  const read = await readRecallSet(RECALL_SET);
-  if (!read.ok) throw new Error(`the recall set did not read: ${read.error.message}`);
-  return read.value;
-};
 
 /** `find`'s concept matches for `question`, best first, as `person` reads them. */
 const conceptsFound =
@@ -45,7 +38,7 @@ const conceptsFound =
 
 describe("recall at ten over the synthetic set", () => {
   it("reports find's recall beside the corpus size", async () => {
-    const set = await theSet();
+    const set = await theRecallSet();
     const scenario = await arrange();
     const landed = await landRecallSet(scenario, set);
 
@@ -68,6 +61,14 @@ describe("recall at ten over the synthetic set", () => {
 });
 
 describe("the recall set's reader", () => {
+  let scratch: string;
+
+  beforeAll(async () => {
+    scratch = await mkdtemp(join(tmpdir(), "recall-set-"));
+  });
+
+  afterAll(() => rm(scratch, { recursive: true }));
+
   it.each([
     ["a file that is not there", undefined],
     ["text that is not JSON", "{ groups: "],
@@ -76,8 +77,8 @@ describe("the recall set's reader", () => {
       "a group with no answers",
       JSON.stringify({ note: "", groups: [{ group: "empty", answers: [] }] }),
     ],
-  ])("refuses %s", async (_case, text) => {
-    const path = join(await mkdtemp(join(tmpdir(), "recall-set-")), "set.json");
+  ])("refuses %s", async (refused, text) => {
+    const path = join(scratch, `${refused.replaceAll(" ", "-")}.json`);
     if (text !== undefined) await writeFile(path, text);
 
     expect((await readRecallSet(path)).ok).toBe(false);
@@ -92,7 +93,7 @@ const CUSTOMER_BUNDLE = fileURLToPath(
 const RUN_OF_WORDS = 8;
 
 const wordsOf = (text: string): readonly string[] =>
-  text.toLowerCase().match(/[\p{L}\p{N}]+(?:'[\p{L}]+)?/gu) ?? [];
+  text.toLowerCase().match(/[\p{L}\p{N}]+(?:'\p{L}+)?/gu) ?? [];
 
 const phraseOf = (text: string): string => wordsOf(text).join(" ");
 
@@ -131,7 +132,7 @@ describe("the recall set's provenance", () => {
     );
     const bundle = await bundleWording(CUSTOMER_BUNDLE);
 
-    const borrowed = answersOf(await theSet()).flatMap(({ title, body, paraphrases }) =>
+    const borrowed = answersOf(await theRecallSet()).flatMap(({ title, body, paraphrases }) =>
       [
         ...[title, ...paraphrases].map((text) => [text, true] as const),
         [body, false] as const,

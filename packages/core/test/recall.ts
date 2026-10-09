@@ -49,6 +49,13 @@ export const readRecallSet = async (path: string): Promise<Result<RecallSet, Err
   return parsed.success ? ok(parsed.data) : err(new Error(z.prettifyError(parsed.error)));
 };
 
+/** The repository's set; throws when it does not read, as a suite's setup should. */
+export const theRecallSet = async (): Promise<RecallSet> => {
+  const read = await readRecallSet(RECALL_SET);
+  if (!read.ok) throw new Error(`the recall set did not read: ${read.error.message}`);
+  return read.value;
+};
+
 /** Writes every answer as a stable Internal `Answer` through `writeConcept`; each key's IRI. */
 export const landRecallSet = async (
   scenario: Scenario,

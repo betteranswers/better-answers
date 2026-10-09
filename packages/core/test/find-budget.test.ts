@@ -6,7 +6,7 @@ import { find, open, type FindResult, type OpenResult } from "../src/answering/i
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import { inMs, percentile, recordFigures } from "./figures.ts";
-import { landRecallSet, readRecallSet, RECALL_SET } from "./recall.ts";
+import { landRecallSet, theRecallSet } from "./recall.ts";
 import { conceptCiting, connectedSourceHolding, passageUnder } from "./sourced-concept.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -95,10 +95,9 @@ const sourcedAnswer = async (scenario: Scenario, cited: ConceptIri): Promise<Con
 };
 
 const landCorpus = async (): Promise<Corpus> => {
-  const set = await readRecallSet(RECALL_SET);
-  if (!set.ok) throw new Error(`the recall set did not read: ${set.error.message}`);
+  const set = await theRecallSet();
   const scenario = await arrange();
-  const landed = await landRecallSet(scenario, set.value);
+  const landed = await landRecallSet(scenario, set);
   const plain = landed.get("backup-frequency");
   if (plain === undefined) throw new Error("the corpus has no backup-frequency answer");
   return { scenario, plain, sourced: await sourcedAnswer(scenario, plain) };
@@ -163,6 +162,7 @@ const reported = async (
     0.5,
   );
   const waitedMs = reads.map((one) => one.waitedMs);
+  const readMs = reads.map((one) => one.readMs);
   await recordFigures(heading, [
     [
       "the read, in one-row reads at the median",
@@ -171,15 +171,7 @@ const reported = async (
     ["a caller's wait at the median", inMs(percentile(waitedMs, 0.5))],
     ["a caller's wait at p95", inMs(percentile(waitedMs, 0.95))],
     ["a caller's slowest wait", inMs(percentile(waitedMs, 1))],
-    [
-      "the slowest read",
-      inMs(
-        percentile(
-          reads.map((one) => one.readMs),
-          1,
-        ),
-      ),
-    ],
+    ["the slowest read", inMs(percentile(readMs, 1))],
   ]);
   return inOneRowReads;
 };
