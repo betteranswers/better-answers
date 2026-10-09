@@ -120,7 +120,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `askToJoin` | A person's ask to join a workspace by its short name, with a reason, through the members slice's own action and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own action and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* page |
 
-Thirty-one more helpers in the same module drive the browser rather than the harness:
+Thirty-two more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
@@ -155,6 +155,7 @@ Thirty-one more helpers in the same module drive the browser rather than the har
 | `saysItsSentenceNotItsWord` | Asserts an alert reads the sentence a feature's refusal table holds for a word, and that the word is nowhere on the page |
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
 | `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
+| `tokenColour` | A design-system token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
 
 The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one. `emailsSentTo` counts the emails the capture holds for an address, and the suite's

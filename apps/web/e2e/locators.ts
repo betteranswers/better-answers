@@ -220,3 +220,14 @@ export const refusedDigitsSelected = async (field: Locator): Promise<void> => {
   );
   expect(selected, "the refused digits are not selected for retyping").toEqual([0, 6]);
 };
+
+/** A design-system token as the browser paints it, so a check compares like with like. */
+export const tokenColour = (page: Page, token: string): Promise<string> =>
+  page.evaluate((name) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${name})`;
+    document.body.append(probe);
+    const painted = getComputedStyle(probe).color;
+    probe.remove();
+    return painted;
+  }, token);

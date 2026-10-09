@@ -45,6 +45,7 @@ import {
   signIn,
   signInHeading,
   theActionLandedWithinItsBudget,
+  tokenColour,
 } from "./harness.ts";
 
 const thePicker = (page: Page) =>
@@ -249,17 +250,6 @@ test("names the product in tab and banner, beside its logo", async ({ page }) =>
   await expect(banner.getByRole("img", { name: PRODUCT_NAME, includeHidden: true })).toBeVisible();
   await expect(banner.getByRole("img"), "the name would be heard twice").toHaveCount(0);
 });
-
-/** A design-system token as the browser paints it, so a check compares like with like. */
-const tokenColour = (page: Page, token: string) =>
-  page.evaluate((name) => {
-    const probe = document.createElement("span");
-    probe.style.color = `var(${name})`;
-    document.body.append(probe);
-    const painted = getComputedStyle(probe).color;
-    probe.remove();
-    return painted;
-  }, token);
 
 /** What the email step paints on its field and its two ways on. */
 const emailStepPaint = (page: Page) =>
