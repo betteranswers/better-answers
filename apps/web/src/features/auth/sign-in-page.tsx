@@ -228,7 +228,7 @@ function CodeStepActions(properties: {
       </Button>
       <Button
         type="button"
-        variant="link"
+        variant="outline"
         aria-keyshortcuts={CHANGE_ADDRESS.key}
         onClick={properties.onChangeAddress}
       >

@@ -7,6 +7,7 @@ import { PasskeyOffer } from "@/features/auth/passkey-offer.tsx";
 import { useUnsavedChangeSaid } from "@/features/auth/unsaved-change.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { HomeLine } from "@/features/people/self-action.tsx";
+import { GridPattern } from "@/shared/blueprint.tsx";
 import { BreadcrumbLastPartSlot } from "@/shared/breadcrumb-last-part.ts";
 import { ShellKeystrokes, ShellKeystrokesAction, type Keystroke } from "@/shared/keystrokes.tsx";
 import {
@@ -116,7 +117,7 @@ export function Frame(properties: {
         <div className="flex min-h-screen flex-col bg-background">
           <a
             href="#page"
-            className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-card focus:px-3 focus:py-2 focus:text-foreground"
+            className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-background focus:px-3 focus:py-2 focus:text-foreground"
           >
             Skip to the page
           </a>
@@ -253,7 +254,14 @@ function ToolbarAndPage(properties: {
       />
       {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
 
-      <main id={PAGE} aria-label="Page" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
+      <main
+        id={PAGE}
+        aria-label="Page"
+        tabIndex={-1}
+        className="relative isolate flex-1 px-4 py-6 md:px-8"
+      >
+        {/* Moved down by the pane's top padding, so the page starts on a line of the grid. */}
+        <GridPattern className="[background-position:0_calc(var(--spacing)*6)]" />
         {/* The page's width, not the prose measure: the design system's rule keeps text to it. */}
         <div data-page-content className="max-w-page">
           <HomeLine />

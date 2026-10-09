@@ -314,8 +314,10 @@ test("marks the open area in the rail, on any page", async ({ page, request }) =
   const fill = await paintedFill(page, CONTROL_CENTRE.name);
   expect(fill).not.toBe("rgba(0, 0, 0, 0)");
 
-  // Ink blue is kept for actions, and the open area is a place, so its fill stays ink.
-  expect(fill, "the open area took the accent").toBe(await tokenColour(page, "--foreground"));
+  // A place, not an action, and lighter than the primary button: the menu's open-page grey.
+  expect(fill, "the open area is not the open-page grey").toBe(
+    await tokenColour(page, "--surface-active"),
+  );
 });
 
 test("lists the open area's groups and pages, marking one", async ({ page, request }) => {

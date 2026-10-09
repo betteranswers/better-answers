@@ -350,7 +350,7 @@ export function AccountPage(properties: { readonly framed?: boolean }) {
       {sections}
 
       <div className="mt-10 flex flex-wrap items-center gap-2">
-        <Button asChild variant="link" className="px-0">
+        <Button asChild variant="outline">
           <Link to="/">{ACCOUNT_WORDS.goOn}</Link>
         </Button>
         <SignOutButton />

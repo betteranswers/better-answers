@@ -166,16 +166,13 @@ function BackToSignIn(properties: { readonly focused: boolean; readonly carried:
   );
 
   return (
-    <div className="mt-6 flex flex-wrap items-center gap-4">
+    <div className="mt-6 flex flex-wrap items-center gap-2">
       {/* A plain link: the router would re-serialise a signed query and break its signature. */}
-      <a
-        ref={focusedOnArrival}
-        href={back}
-        className="text-brand underline"
-        aria-keyshortcuts={BACK_TO_SIGN_IN.key}
-      >
-        {LINK_WORDS.backToSignIn}
-      </a>
+      <Button asChild variant="outline">
+        <a ref={focusedOnArrival} href={back} aria-keyshortcuts={BACK_TO_SIGN_IN.key}>
+          {LINK_WORDS.backToSignIn}
+        </a>
+      </Button>
       <KeystrokesAction page={KEYSTROKE_WORDS.thisPage} keystrokes={[BACK_TO_SIGN_IN]} />
     </div>
   );
