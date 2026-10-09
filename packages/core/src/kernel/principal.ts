@@ -1,19 +1,20 @@
 import type { z } from "zod";
 
-import type { boundarySchemas } from "@better-answers/schema";
+import type {
+  AccessRequestId,
+  AuditEventId,
+  boundarySchemas,
+  GroupId,
+  UserId,
+  WorkspaceId,
+} from "@better-answers/schema";
 
 import type { ProcessActorId } from "./actor.ts";
 import type { KernelRefusal } from "./vocabulary.ts";
 
-export type WorkspaceId = z.infer<typeof boundarySchemas.workspace.select>["id"];
-export type UserId = z.infer<typeof boundarySchemas.user.select>["id"];
+export type { AccessRequestId, AuditEventId, GroupId, UserId, WorkspaceId };
+
 export type Role = z.infer<typeof boundarySchemas.member.select>["role"];
-
-export type AuditEventId = z.infer<typeof boundarySchemas.auditEvent.select>["id"];
-
-export type AccessRequestId = z.infer<typeof boundarySchemas.accessRequest.select>["id"];
-
-export type GroupId = z.infer<typeof boundarySchemas.group.select>["id"];
 
 /**
  * A Principal outlives the transaction that resolved it only where an action opens its own; never
