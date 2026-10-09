@@ -26,7 +26,7 @@ const FIND_BUDGET_IN_ONE_ROW_READS = 60;
 const OPEN_BUDGET_IN_ONE_ROW_READS = 40;
 
 /** Five words, two of them shared by most of the corpus, so every run is read and ranked. */
-const BROAD_QUESTION = "how do I export Tallyloom ledger records to a spreadsheet";
+const BROAD_QUESTION = "how do I export Tallyloom invoicing records to a spreadsheet";
 const PAGE = 20;
 
 const HANDBOOK = "Retention follows the schedule the board set in March.";

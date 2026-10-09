@@ -876,7 +876,7 @@
           "title": "Video Calls",
           "body": "Internal meetings use one approved video tool. Meetings with customers can use the customer's tool if they prefer.",
           "paraphrases": [
-            "which video conferencing app do you use",
+            "which video conferencing tool do you use",
             "can we meet on our own conferencing platform"
           ]
         },
@@ -1019,7 +1019,7 @@
         {
           "key": "what-tallyloom-is",
           "title": "About Tallyloom",
-          "body": "Tallyloom is our business management suite. It brings ledgers, payroll, rotas, stock, fleet and the helpdesk into one place.",
+          "body": "Tallyloom is our business management suite. It brings invoicing, payroll, rotas, stock, fleet and the helpdesk into one place.",
           "paraphrases": ["what does your software do", "what is Tallyloom for"]
         },
         {
@@ -1029,10 +1029,10 @@
           "paraphrases": ["which web browsers work with the system"]
         },
         {
-          "key": "tallyloom-mobile-app",
-          "title": "Tallyloom Mobile App",
-          "body": "The Tallyloom app for phones covers approvals, rotas and expenses, and works on both major phone platforms.",
-          "paraphrases": ["is there a phone app", "can I use the suite on my mobile"]
+          "key": "tallyloom-mobile-application",
+          "title": "Tallyloom Mobile Application",
+          "body": "The Tallyloom application for phones covers approvals, rotas and expenses, and works on both major phone platforms.",
+          "paraphrases": ["is there a phone application", "can I use the suite on my mobile"]
         },
         {
           "key": "tallyloom-single-sign-on",
@@ -1059,7 +1059,7 @@
           "key": "tallyloom-webhooks",
           "title": "Tallyloom Webhooks",
           "body": "Tallyloom can call your own address whenever a record changes, signed so you can check the call came from us.",
-          "paraphrases": ["can the system notify our app when data changes"]
+          "paraphrases": ["can the system notify our own software when data changes"]
         },
         {
           "key": "tallyloom-full-export",
@@ -1112,14 +1112,14 @@
         {
           "key": "tallyloom-two-factor",
           "title": "Tallyloom Two-Factor Sign-In",
-          "body": "An Owner can require every Tallyloom user to set up an authenticator app before their first sign-in.",
+          "body": "An Owner can require every Tallyloom user to set up an authenticator application before their first sign-in.",
           "paraphrases": ["can we force MFA for our users"]
         },
         {
           "key": "tallyloom-offline",
           "title": "Tallyloom Offline Use",
-          "body": "The Tallyloom phone app keeps working without signal and sends its changes once it reconnects.",
-          "paraphrases": ["does the app work without internet"]
+          "body": "The Tallyloom phone application keeps working without signal and sends its changes once it reconnects.",
+          "paraphrases": ["does the phone version work without internet"]
         },
         {
           "key": "tallyloom-accounting-integrations",
@@ -1178,94 +1178,94 @@
       ]
     },
     {
-      "group": "ledger",
+      "group": "invoicing",
       "answers": [
         {
-          "key": "ledger-data-export",
-          "title": "Ledger Data Export",
-          "body": "In Tallyloom Ledger, a Manager can export invoices and journals as CSV or PDF from the Export menu. Large exports arrive by email as a download link.",
+          "key": "invoicing-data-export",
+          "title": "Invoicing Data Export",
+          "body": "In Tallyloom Invoicing, a Manager can export invoices and credit notes as CSV or PDF from the Export menu. Large exports arrive by email as a download link.",
           "paraphrases": [
             "how do I download our invoices as a spreadsheet",
-            "can ledger data be extracted to a file"
+            "can invoicing data be extracted to a file"
           ]
         },
         {
-          "key": "ledger-csv-import",
-          "title": "Ledger CSV Import",
-          "body": "Tallyloom Ledger imports invoices and journals from a CSV file. The import checks every row first and lists any it cannot read before anything is saved.",
+          "key": "invoicing-csv-import",
+          "title": "Invoicing CSV Import",
+          "body": "Tallyloom Invoicing imports invoices and credit notes from a CSV file. The import checks every row first and lists any it cannot read before anything is saved.",
           "paraphrases": ["can we upload invoices from a spreadsheet"]
         },
         {
-          "key": "ledger-approval-rules",
-          "title": "Ledger Approval Rules",
-          "body": "In Tallyloom Ledger, changes to invoices and journals above a set limit wait for the finance manager to approve them. The limit is set per team.",
+          "key": "invoicing-approval-rules",
+          "title": "Invoicing Approval Rules",
+          "body": "In Tallyloom Invoicing, changes to invoices and credit notes above a set limit wait for the finance manager to approve them. The limit is set per team.",
           "paraphrases": [
             "who signs off changes to invoices",
-            "does ledger need approval before changes go through"
+            "does invoicing need approval before changes go through"
           ]
         },
         {
-          "key": "ledger-notifications",
-          "title": "Ledger Notifications",
-          "body": "Tallyloom Ledger sends an email or app alert when an invoice becomes overdue. Each user chooses which alerts they receive.",
-          "paraphrases": ["how do I turn alerts on in ledger"]
+          "key": "invoicing-notifications",
+          "title": "Invoicing Notifications",
+          "body": "Tallyloom Invoicing sends an email or phone alert when an invoice becomes overdue. Each user chooses which alerts they receive.",
+          "paraphrases": ["how do I turn alerts on in invoicing"]
         },
         {
-          "key": "ledger-archiving",
-          "title": "Ledger Archiving",
-          "body": "Old invoices and journals in Tallyloom Ledger can be archived. Archived records leave the everyday lists but stay searchable and can be restored.",
+          "key": "invoicing-archiving",
+          "title": "Invoicing Archiving",
+          "body": "Old invoices and credit notes in Tallyloom Invoicing can be archived. Archived records leave the everyday lists but stay searchable and can be restored.",
           "paraphrases": [
             "can we hide old invoices without deleting them",
-            "how does archiving work in ledger"
+            "how does archiving work in invoicing"
           ]
         },
         {
-          "key": "ledger-permissions",
-          "title": "Ledger Permissions",
-          "body": "In Tallyloom Ledger, each role sees only the invoices and journals its teams own unless the finance manager grants wider access.",
+          "key": "invoicing-permissions",
+          "title": "Invoicing Permissions",
+          "body": "In Tallyloom Invoicing, each role sees only the invoices and credit notes its teams own unless the finance manager grants wider access.",
           "paraphrases": ["who can see invoices"]
         },
         {
-          "key": "ledger-change-history",
-          "title": "Ledger Change History",
-          "body": "Every change to invoices and journals in Tallyloom Ledger is kept in the record's history, showing who changed what and when.",
-          "paraphrases": ["can I see who edited invoices", "does ledger track edits"]
+          "key": "invoicing-change-history",
+          "title": "Invoicing Change History",
+          "body": "Every change to invoices and credit notes in Tallyloom Invoicing is kept in the record's history, showing who changed what and when.",
+          "paraphrases": ["can I see who edited invoices", "does invoicing track edits"]
         },
         {
-          "key": "ledger-retention",
-          "title": "Ledger Record Retention",
-          "body": "Tallyloom Ledger keeps invoices and journals for seven years and then deletes them, unless a legal hold applies.",
-          "paraphrases": ["what is the retention period for ledger records"]
+          "key": "invoicing-retention",
+          "title": "Invoicing Record Retention",
+          "body": "Tallyloom Invoicing keeps invoices and credit notes for seven years and then deletes them, unless a legal hold applies.",
+          "paraphrases": ["what is the retention period for invoicing records"]
         },
         {
-          "key": "ledger-bulk-edit",
-          "title": "Ledger Bulk Editing",
-          "body": "A Manager can select many invoices and journals in Tallyloom Ledger and change a field on all of them at once. The change can be undone for an hour.",
+          "key": "invoicing-bulk-edit",
+          "title": "Invoicing Bulk Editing",
+          "body": "A Manager can select many invoices and credit notes in Tallyloom Invoicing and change a field on all of them at once. The change can be undone for an hour.",
           "paraphrases": [
             "can I update lots of invoices at the same time",
-            "is there mass editing in ledger"
+            "is there mass editing in invoicing"
           ]
         },
         {
-          "key": "ledger-reports",
-          "title": "Ledger Reports",
-          "body": "Tallyloom Ledger comes with ready-made reports on cash flow and aged debt, and any report can be scheduled to arrive by email.",
+          "key": "invoicing-reports",
+          "title": "Invoicing Reports",
+          "body": "Tallyloom Invoicing comes with ready-made reports on cash flow and aged debt, and any report can be scheduled to arrive by email.",
           "paraphrases": ["can I get a report on aged debtors"]
         },
         {
-          "key": "ledger-mobile-access",
-          "title": "Ledger on Mobile",
-          "body": "The Tallyloom phone app shows Ledger, so staff can approve invoices away from a desk.",
+          "key": "invoicing-mobile-access",
+          "title": "Invoicing on Mobile",
+          "body": "The Tallyloom phone application shows Invoicing, so staff can approve invoices away from a desk.",
           "paraphrases": [
             "can staff approve invoices on their phone",
-            "is ledger available on mobile"
+            "is invoicing available on mobile"
           ]
         },
         {
-          "key": "ledger-integrations",
-          "title": "Ledger Integrations",
-          "body": "Tallyloom Ledger connects to bank feeds, so payments appear in the ledger without anyone typing them in again.",
-          "paraphrases": ["what does ledger integrate with"]
+          "key": "invoicing-integrations",
+          "title": "Invoicing Integrations",
+          "body": "Tallyloom Invoicing connects to bank feeds, so payments are matched to their invoices without anyone typing them in again.",
+          "paraphrases": ["what does invoicing integrate with"]
         }
       ]
     },
@@ -1296,7 +1296,7 @@
         {
           "key": "payroll-notifications",
           "title": "Payroll Notifications",
-          "body": "Tallyloom Payroll sends an email or app alert when a pay run is ready to check. Each user chooses which alerts they receive.",
+          "body": "Tallyloom Payroll sends an email or phone alert when a pay run is ready to check. Each user chooses which alerts they receive.",
           "paraphrases": [
             "will I get told when payroll is ready",
             "how do I turn alerts on in payroll"
@@ -1347,7 +1347,7 @@
         {
           "key": "payroll-mobile-access",
           "title": "Payroll on Mobile",
-          "body": "The Tallyloom phone app shows Payroll, so staff can read their payslips away from a desk.",
+          "body": "The Tallyloom phone application shows Payroll, so staff can read their payslips away from a desk.",
           "paraphrases": ["is payroll available on mobile"]
         },
         {
@@ -1388,7 +1388,7 @@
         {
           "key": "rota-notifications",
           "title": "Rota Notifications",
-          "body": "Tallyloom Rota sends an email or app alert when a shift is changed. Each user chooses which alerts they receive.",
+          "body": "Tallyloom Rota sends an email or phone alert when a shift is changed. Each user chooses which alerts they receive.",
           "paraphrases": ["will I get told when my shift changes"]
         },
         {
@@ -1436,7 +1436,7 @@
         {
           "key": "rota-mobile-access",
           "title": "Rota on Mobile",
-          "body": "The Tallyloom phone app shows Rota, so staff can swap shifts away from a desk.",
+          "body": "The Tallyloom phone application shows Rota, so staff can swap shifts away from a desk.",
           "paraphrases": ["can staff swap shifts on their phone", "is rota available on mobile"]
         },
         {
@@ -1474,7 +1474,7 @@
         {
           "key": "stockroom-notifications",
           "title": "Stockroom Notifications",
-          "body": "Tallyloom Stockroom sends an email or app alert when an item falls below its reorder level. Each user chooses which alerts they receive.",
+          "body": "Tallyloom Stockroom sends an email or phone alert when an item falls below its reorder level. Each user chooses which alerts they receive.",
           "paraphrases": [
             "will I get told when stock is running low",
             "how do I turn alerts on in stockroom"
@@ -1525,7 +1525,7 @@
         {
           "key": "stockroom-mobile-access",
           "title": "Stockroom on Mobile",
-          "body": "The Tallyloom phone app shows Stockroom, so staff can count stock away from a desk.",
+          "body": "The Tallyloom phone application shows Stockroom, so staff can count stock away from a desk.",
           "paraphrases": ["can staff count stock on their phone"]
         },
         {
@@ -1566,7 +1566,7 @@
         {
           "key": "fleet-notifications",
           "title": "Fleet Notifications",
-          "body": "Tallyloom Fleet sends an email or app alert when a vehicle is due a service. Each user chooses which alerts they receive.",
+          "body": "Tallyloom Fleet sends an email or phone alert when a vehicle is due a service. Each user chooses which alerts they receive.",
           "paraphrases": ["how do I turn alerts on in fleet"]
         },
         {
@@ -1614,7 +1614,7 @@
         {
           "key": "fleet-mobile-access",
           "title": "Fleet on Mobile",
-          "body": "The Tallyloom phone app shows Fleet, so staff can log journeys away from a desk.",
+          "body": "The Tallyloom phone application shows Fleet, so staff can log journeys away from a desk.",
           "paraphrases": ["can staff log journeys on their phone", "is fleet available on mobile"]
         },
         {
@@ -1652,7 +1652,7 @@
         {
           "key": "helpdesk-notifications",
           "title": "Helpdesk Notifications",
-          "body": "Tallyloom Helpdesk sends an email or app alert when a ticket is assigned. Each user chooses which alerts they receive.",
+          "body": "Tallyloom Helpdesk sends an email or phone alert when a ticket is assigned. Each user chooses which alerts they receive.",
           "paraphrases": [
             "will I get told when a ticket is given to me",
             "how do I turn alerts on in helpdesk"
@@ -1703,7 +1703,7 @@
         {
           "key": "helpdesk-mobile-access",
           "title": "Helpdesk on Mobile",
-          "body": "The Tallyloom phone app shows Helpdesk, so staff can answer tickets away from a desk.",
+          "body": "The Tallyloom phone application shows Helpdesk, so staff can answer tickets away from a desk.",
           "paraphrases": ["is helpdesk available on mobile"]
         },
         {
