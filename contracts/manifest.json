@@ -13,7 +13,8 @@
     "citation": { "form": "fixtured" },
     "emptying-a-connected-source": { "form": "fixtured" },
     "erasure-match": { "form": "fixtured" },
-    "links": { "form": "fixtured" }
+    "links": { "form": "fixtured" },
+    "sync-sensitivity-moves": { "form": "fixtured" }
   },
   "fixtures": [
     { "agreement": "model-choice", "path": "model-choice/cases.json" },
@@ -32,6 +33,7 @@
     },
     { "agreement": "erasure-match", "path": "erasure-match/cases.json" },
     { "agreement": "links", "path": "links/cases.json" },
+    { "agreement": "sync-sensitivity-moves", "path": "sync-sensitivity-moves/cases.json" },
     { "agreement": "cost-ledger", "path": "cost-ledger/rows.json" }
   ]
 }
