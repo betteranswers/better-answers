@@ -19,6 +19,7 @@ import {
   type Claims,
   type Principal,
   type Result,
+  type UserId,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
 import { enqueueJobIn, enqueueJobInput } from "../src/runs/index.ts";
@@ -29,7 +30,10 @@ import {
   openPostgres,
   readWorkspaceConfig,
   tablesPresent,
+  withIdentityRead,
+  withIdentityWrite,
   withMember,
+  withMemberUnheld,
   withOperator,
   withPrincipal,
   withScope,
@@ -207,6 +211,116 @@ describe("a door whose work answers a refusal after a write", () => {
       jobs: 1,
     });
     expect(answered).toEqual({ ok: true, value: "landed" });
+  });
+});
+
+const SETTLED = "the transaction has settled";
+
+describe("a Tx kept past its transaction", () => {
+  it.each(DOORS)("refuses a query once %s door commits", async (door) => {
+    const key = `probe-${ulid()}`;
+
+    const { seeded, answered } = await through(door, async (_principal, workspaceId, tx) => ({
+      later: () => configProbeWritten(tx, workspaceId, key),
+    }));
+
+    await expect(answered.later()).rejects.toThrow(SETTLED);
+    expect((await leftBehindIn(seeded.workspaceId, key))?.rows).toBe(0);
+  });
+
+  it.each(DOORS)("refuses a query once %s door rolls back", async (door) => {
+    const kept: { tx?: Tx } = {};
+
+    await expect(
+      through(door, async (_principal, _workspaceId, tx) => {
+        kept.tx = tx;
+        throw new Error(PROVOKED);
+      }),
+    ).rejects.toThrow(PROVOKED);
+
+    await expect(kept.tx?.query("SELECT 1")).rejects.toThrow(SETTLED);
+  });
+
+  it("refuses a query once the identity set's read door commits", async () => {
+    const answered = await withIdentityRead(
+      bootstrap,
+      openPostgres(db().runtimePool),
+      async (tx) => ({ later: () => tx.query("SELECT 1") }),
+    );
+
+    await expect(answered.later()).rejects.toThrow(SETTLED);
+  });
+
+  it("refuses a sibling branch's query after another branch threw", async () => {
+    const late: { query?: Promise<unknown> } = {};
+
+    await expect(
+      withScope(bootstrap, openPostgres(db().runtimePool), ulid(), (tx) => {
+        const throwing = tx.query("SELECT 1").then(() => {
+          throw new Error(PROVOKED);
+        });
+        const lagging = tx.query("SELECT pg_sleep(0.2)").then(() => {
+          late.query = tx.query("SELECT 1");
+          return late.query;
+        });
+        return Promise.all([throwing, lagging]);
+      }),
+    ).rejects.toThrow(PROVOKED);
+
+    await expect.poll(() => late.query !== undefined).toBe(true);
+    await expect(late.query).rejects.toThrow(SETTLED);
+  });
+});
+
+describe("a read door", () => {
+  const aPerson = async () => {
+    const client = await db().pool.connect();
+    try {
+      return await testData(client).user({});
+    } finally {
+      client.release();
+    }
+  };
+
+  const anIdentityEvent = async (tx: Tx, personId: UserId): Promise<string> => {
+    await recordFor(bootstrap, tx, {
+      id: ulid(),
+      actor: actorIdOfPerson(personId),
+      action: IDENTITY_PROBE.written,
+      subjectId: personId,
+      detail: {},
+    });
+    return "landed";
+  };
+
+  it("refuses the identity set's write at its statement", async () => {
+    const person = await aPerson();
+    const door = openPostgres(db().runtimePool);
+
+    await expect(
+      withIdentityRead(bootstrap, door, (tx) => anIdentityEvent(tx, person.id)),
+    ).rejects.toMatchObject({ code: "25006" });
+    expect(await withIdentityWrite(bootstrap, door, (tx) => anIdentityEvent(tx, person.id))).toBe(
+      "landed",
+    );
+  });
+
+  it("refuses a member's write at its statement", async () => {
+    const seeded = await seedMember({ role: "Admin" });
+    const door = openPostgres(db().runtimePool);
+    const admin = await adminOf(door, claimsFor(seeded));
+    const writing = (key: string) => async (member: UserPrincipal, tx: Tx) => {
+      await configProbeWritten(tx, member.workspaceId, key);
+      return "landed";
+    };
+
+    await expect(withMemberUnheld(admin, door, writing(`probe-${ulid()}`))).rejects.toMatchObject({
+      code: "25006",
+    });
+    expect(await withMember(admin, door, writing(`probe-${ulid()}`))).toEqual({
+      ok: true,
+      value: "landed",
+    });
   });
 });
 
