@@ -39,6 +39,7 @@ In v0.1 the entry step is full-text over the concept index alone. The S2a block 
 
 - A stored `tsvector` on the concept index, written in the governed write's transaction, so a concept is searchable at commit.
 - Title weighted first, tags and *Also known as* second, body third.
+- A concept that shares any of the question's words is an entry point, ranked first by how many of them it holds (owner, 09/10/2026). A question asked in plain words rarely repeats a concept's every word.
 - No model call on the entry step.
 
 The concept unit of the one index, with its vectors and its catch-up run, is the reserve block S8. It lands only when the answer tests' recall on the first customer's context wordings falls below the threshold S2b sets. When it lands, the worker writes the vector on a job whose row the governed write inserts, never inline and never at read.
