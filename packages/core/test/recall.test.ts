@@ -92,6 +92,9 @@ const CUSTOMER_BUNDLE = fileURLToPath(
 /** Eight words in a row shared with the bundle count as wording taken from it. */
 const RUN_OF_WORDS = 8;
 
+/** A title or paraphrase this long, found anywhere in the bundle's text, counts as taken from it. */
+const NAMED_WORDS = 5;
+
 const wordsOf = (text: string): readonly string[] =>
   text.toLowerCase().match(/[\p{L}\p{N}]+(?:'\p{L}+)?/gu) ?? [];
 
@@ -104,12 +107,17 @@ const runsOf = (text: string): readonly string[] => {
   );
 };
 
-type Wording = { readonly names: ReadonlySet<string>; readonly runs: ReadonlySet<string> };
+type Wording = {
+  readonly names: ReadonlySet<string>;
+  readonly runs: ReadonlySet<string>;
+  readonly texts: readonly string[];
+};
 
-/** Every title and heading in the bundle's Markdown as a phrase, and every run of its words. */
+/** The bundle's Markdown: its titles and headings as phrases, its runs of words, each file's words. */
 const bundleWording = async (root: string): Promise<Wording> => {
   const names = new Set<string>();
   const runs = new Set<string>();
+  const texts: string[] = [];
   const files = (await readdir(root, { recursive: true })).filter((file) => file.endsWith(".md"));
   for (const file of files) {
     const text = await readFile(join(root, file), "utf8");
@@ -117,12 +125,22 @@ const bundleWording = async (root: string): Promise<Wording> => {
       names.add(phraseOf(name ?? ""));
     }
     for (const run of runsOf(text)) runs.add(run);
+    texts.push(` ${phraseOf(text)} `);
   }
-  return { names, runs };
+  return { names, runs, texts };
+};
+
+const namedIn = (bundle: Wording, text: string): boolean => {
+  const phrase = phraseOf(text);
+  return (
+    bundle.names.has(phrase) ||
+    (wordsOf(text).length >= NAMED_WORDS &&
+      bundle.texts.some((held) => held.includes(` ${phrase} `)))
+  );
 };
 
 const borrowedFrom = (bundle: Wording, text: string, named: boolean): boolean =>
-  (named && bundle.names.has(phraseOf(text))) || runsOf(text).some((run) => bundle.runs.has(run));
+  (named && namedIn(bundle, text)) || runsOf(text).some((run) => bundle.runs.has(run));
 
 describe("the recall set's provenance", () => {
   it("takes no title, paraphrase or wording from the customer's bundle", async (context) => {

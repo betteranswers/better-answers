@@ -15,7 +15,7 @@ export const recordFigures = async (heading: string, figures: readonly Figure[])
     `\n${heading}: ${figures.map(([name, value]) => `${name} ${value}`).join("; ")}\n`,
   );
   const summary = process.env["GITHUB_STEP_SUMMARY"];
-  if (summary === undefined) return;
+  if (summary === undefined || summary === "") return;
   const rows = figures.map(([name, value]) => `| ${name} | ${value} |`);
   await appendFile(
     summary,

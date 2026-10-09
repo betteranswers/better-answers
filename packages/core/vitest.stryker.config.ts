@@ -28,6 +28,9 @@ export default mergeConfig(base, {
     // and whose annotations would name only killed mutants.
     reporters: ["default"],
 
+    // The budget and recall suites would append their figures to it once per mutant too.
+    env: { GITHUB_STEP_SUMMARY: "" },
+
     sequence: { sequencer: FailedThenShortest },
   },
 });
