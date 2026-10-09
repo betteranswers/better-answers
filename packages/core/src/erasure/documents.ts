@@ -1,3 +1,5 @@
+import { FULL_TEXT_LANGUAGE } from "@better-answers/schema";
+
 import type { PlatformPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { erasureMatchesIn, type SoughtIdentifier } from "./identifiers.ts";
@@ -7,7 +9,7 @@ import { erasureMatchesIn, type SoughtIdentifier } from "./identifiers.ts";
  * all its words.
  */
 const PROBE = `SELECT string_agg(probe::text, ' | ') AS probe
-     FROM (SELECT plainto_tsquery('english', word) AS probe
+     FROM (SELECT plainto_tsquery(${FULL_TEXT_LANGUAGE}, word) AS probe
              FROM unnest($1::text[]) AS word) AS words
     WHERE numnode(probe) > 0`;
 
