@@ -367,7 +367,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "sources",
     access: "read",
     reason:
-      "A repeated upload connect answers with what the first one bound rather than streaming a second copy: `FIRST_OUTCOME` in `packages/core/src/sources/connected-source.ts` joins the connected source's document to the audit event that recorded its binding, by subject and action, to hand back that event's id. A read of one row the same action wrote, never a write.",
+      "A repeated upload connect answers with what the first one bound rather than streaming a second copy: `FIRST_OUTCOME` in `packages/core/src/sources/connected-source.ts` joins the connected source's document to the audit event the first connect wrote, by subject and action, to hand back that event's id. A read of one row the same action wrote, never a write.",
   },
   {
     table: "public.concept_evidence",
