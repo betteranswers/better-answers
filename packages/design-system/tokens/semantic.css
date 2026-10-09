@@ -32,11 +32,11 @@
   --border-inverse: rgba(255, 255, 255, 0.14);
   --border-focus: var(--accent-600);
 
-  /* Controls */
-  --control-primary-bg: var(--grey-900);
-  --control-primary-bg-hover: var(--grey-800);
-  --control-primary-bg-active: var(--grey-950);
-  --control-primary-fg: var(--grey-0);
+  /* Controls. The primary button is the accent fill, the one solid object on the board. */
+  --control-primary-bg: var(--control-accent-bg);
+  --control-primary-bg-hover: var(--control-accent-bg-hover);
+  --control-primary-bg-active: var(--accent-800);
+  --control-primary-fg: var(--text-on-accent);
   --control-secondary-bg: var(--grey-0);
   --control-secondary-bg-hover: var(--grey-50);
   --control-secondary-bg-active: var(--grey-100);
@@ -98,10 +98,11 @@
   --border-strong: #3a3f47;
   --border-inverse: rgba(0, 0, 0, 0.2);
 
-  --control-primary-bg: #f4f5f6;
-  --control-primary-bg-hover: #ffffff;
-  --control-primary-bg-active: #dfe1e4;
-  --control-primary-fg: #0b0c0e;
+  /* Each step keeps white words at 4.5:1 or more; the accent's own dark hover does not. */
+  --control-primary-bg: var(--accent-500);
+  --control-primary-bg-hover: var(--accent-600);
+  --control-primary-bg-active: var(--accent-700);
+  --control-primary-fg: var(--text-on-accent);
   --control-secondary-bg: #16181c;
   --control-secondary-bg-hover: #1c1f24;
   --control-secondary-bg-active: #22262c;

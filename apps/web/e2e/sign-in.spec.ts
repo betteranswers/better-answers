@@ -250,6 +250,61 @@ test("names the product in tab and banner, beside its logo", async ({ page }) =>
   await expect(banner.getByRole("img"), "the name would be heard twice").toHaveCount(0);
 });
 
+/** A design-system token as the browser paints it, so a check compares like with like. */
+const tokenColour = (page: Page, token: string) =>
+  page.evaluate((name) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${name})`;
+    document.body.append(probe);
+    const painted = getComputedStyle(probe).color;
+    probe.remove();
+    return painted;
+  }, token);
+
+/** What the email step paints on its field and its two ways on. */
+const emailStepPaint = (page: Page) =>
+  Promise.all(
+    [
+      page.getByLabel(SIGN_IN_WORDS.emailField),
+      page.getByRole("button", { name: SIGN_IN_WORDS.passkey }),
+      page.getByRole("button", { name: SIGN_IN_WORDS.send }),
+    ].map((part) =>
+      part.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return [style.backgroundColor, style.borderColor, style.color].join(" ");
+      }),
+    ),
+  );
+
+test("keeps the sign-in page light under a dark OS", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/sign-in");
+  await expect(signInHeading(page)).toBeVisible();
+  const underLight = await emailStepPaint(page);
+
+  await page.emulateMedia({ colorScheme: "dark" });
+  expect(await emailStepPaint(page), "a dark OS repainted a light page").toEqual(underLight);
+});
+
+test("draws the outline edge hairline and the send ink blue", async ({ page }) => {
+  await page.goto("/sign-in");
+  const passkey = page.getByRole("button", { name: SIGN_IN_WORDS.passkey });
+  const send = page.getByRole("button", { name: SIGN_IN_WORDS.send });
+
+  await expect(passkey, "the outline button's edge is not the control edge").toHaveCSS(
+    "border-top-color",
+    await tokenColour(page, "--border-default"),
+  );
+  await expect(send, "the primary button is not the accent fill").toHaveCSS(
+    "background-color",
+    await tokenColour(page, "--accent-600"),
+  );
+  await expect(send, "the primary button's words are not white").toHaveCSS(
+    "color",
+    await tokenColour(page, "--text-on-accent"),
+  );
+});
+
 test("says a code is sent, wrong, or asked too often", async ({
   page,
   request,

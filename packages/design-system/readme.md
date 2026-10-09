@@ -131,8 +131,8 @@ so the substrate and the content agree. One grid per page, masked away from read
 
 **Colour.** A cool grey ramp carries everything structural — page `#fcfcfd`, cards
 `#ffffff`, lines `#dfe1e6`, text `#17191c`. One accent, **ink blue `#2e4bd4`**, and it is
-*interactive only*: links, focus rings, and the accent button at a gate. Four semantic
-hues — green `#137a52`, amber `#a55d09`, red `#c0362c`, violet `#6741c4` — appear only as a
+*interactive only*: links, focus rings, and the accent fill — the primary button, and the
+unmarked accent button on an action repeated per row. Four semantic hues — green `#137a52`, amber `#a55d09`, red `#c0362c`, violet `#6741c4` — appear only as a
 50-level tint plus a 700-level word, behind a label that already says the same thing.
 Dark theme is a full alias flip on `[data-theme="dark"]`, page `#0b0c0e`. Never a gradient,
 never a coloured left border, never colour as the only signal.

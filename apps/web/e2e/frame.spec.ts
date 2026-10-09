@@ -311,6 +311,17 @@ test("marks the open area in the rail, on any page", async ({ page, request }) =
 
   // A fill where the others have none reads in greyscale, so the mark is not colour alone.
   expect(await paintedFill(page, CONTROL_CENTRE.name)).not.toBe("rgba(0, 0, 0, 0)");
+
+  // Ink blue is kept for actions, and the open area is a place, so its fill stays ink.
+  const ink = await page.evaluate(() => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--foreground)";
+    document.body.append(probe);
+    const painted = getComputedStyle(probe).color;
+    probe.remove();
+    return painted;
+  });
+  expect(await paintedFill(page, CONTROL_CENTRE.name), "the open area took the accent").toBe(ink);
 });
 
 test("lists the open area's groups and pages, marking one", async ({ page, request }) => {
