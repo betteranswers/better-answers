@@ -9,7 +9,7 @@ import { writeConcept } from "../src/concepts/index.ts";
 import { attempt, err, ok, type Result } from "../src/kernel/index.ts";
 import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 
-export const RECALL_SET = fileURLToPath(new URL("./fixtures/recall-set.json", import.meta.url));
+const RECALL_SET = fileURLToPath(new URL("./fixtures/recall-set.json", import.meta.url));
 
 /** How far down a ranking the master `Answer` may sit and still count as recalled. */
 export const RECALL_DEPTH = 10;
