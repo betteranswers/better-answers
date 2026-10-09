@@ -27,7 +27,7 @@ export function WaitingTable(properties: {
       <Table>
         <TableCaption className="sr-only">{properties.caption}</TableCaption>
         <TableHeader>
-          <TableRow className="border-border hover:bg-transparent">
+          <TableRow className="hover:bg-transparent">
             {properties.columns.map((name) => (
               <TableHead key={name} scope="col">
                 {name}
@@ -55,7 +55,6 @@ export function WaitingRow<Item>(properties: {
   const { item, onHeld } = properties;
   return (
     <TableRow
-      className="border-border"
       onFocus={() => {
         onHeld(item);
       }}
