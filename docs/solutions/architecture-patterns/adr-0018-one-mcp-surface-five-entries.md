@@ -32,8 +32,8 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 
 - A concept match (`layer: "bundles"`) sits beside a document match (`layer: "sources"`), which the rendering marks *Not company knowledge*.
 - A document that a concept visible to the caller cites is left out.
-- The caller's limit is spent on the union, concepts first.
-- The two arms are ranked separately until S2a.
+- The caller's limit is spent on the union: concepts holding at least half the query's words first, then document matches, then the remaining concepts (owner, 09/10/2026).
+- The two arms share no score. Each is ranked on its own, first by how many of the query's words a row holds, then by its full-text rank.
 
 `open` takes one IRI or one wire locator.
 
@@ -47,8 +47,8 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 - `describe_estate`, the fifth entry, was dropped. All four others answered through the real claude.ai assistant with no orienting call first, and its budget could not be measured with no estate. `find` is the preview step an agent orients by.
 - The token from claude.ai carries no role, so the role is read per call, in the same transaction as the read it authorises.
 - A reader asking for five matches is asking to be handed five things. Running both arms to five would hand them ten.
-- A concept is the company's answer, and a raw passage is what there was no answer for. So concepts come first.
-- One ranking across the two layers needs a score both arms share. That is S2a's question.
+- A concept is the company's answer, and a raw passage is what there was no answer for. So a concept holding at least half the query's words comes first. Under any-word matching, a concept sharing one word is weaker evidence than a passage, and putting every such concept first would keep passages off the page (owner, 09/10/2026).
+- One ranking across the two layers would need a score both arms share. S2a kept the arms apart (09/10/2026), and S2b's recall measure may reopen it.
 - An imported bundle's `sources` entry often has no locator, since `sources[].locator` is a key the platform adds. An empty locator would be a passage `open` cannot fetch.
 
 ## Rejected

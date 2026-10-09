@@ -73,7 +73,8 @@ bulk commit. Never a file, never held to a closed set.
 
 ### Also known as
 
-A conventional body line naming a concept's other names.
+A conventional body line naming a concept's other names, written `Also known as: <name>, <name>`.
+Search weights it with the concept's tags.
 
 A confirmed alias lands there through an edit suggestion, and the merge key derives its names from
 it.
@@ -922,7 +923,8 @@ copy polished at spec time; the fixed rule is the routing, not the sentence).
 What a reader sees of a concept's cited evidence: one of three states off two counts —
 *included*, *partly included* or *not included* in their access.
 
-It leads with the reader's access, lists only the evidence they may open, names the Admin whose
+It leads with the reader's access, lists every source the concept cites — those the reader may open
+as links, the rest in the file's own words with no link — names the Admin whose
 *sensitivity override* put them in *shared beyond its evidence* where one has, and always says
 where to go next, so it is never a dead end. Never a trust signal.
 
