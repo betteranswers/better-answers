@@ -100,6 +100,10 @@ pre-push-gates:
       run: "{without-git-env} pnpm run insert-scan"
       fail_text: "run it alone with pnpm run insert-scan"
 
+    table-ownership-scan:
+      run: "{without-git-env} pnpm run table-ownership-scan"
+      fail_text: "run it alone with pnpm run table-ownership-scan"
+
     jscpd:
       run: "{without-git-env} pnpm run jscpd"
       fail_text: "run it alone with pnpm run jscpd"

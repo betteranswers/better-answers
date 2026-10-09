@@ -54,7 +54,7 @@ Every one of the four doors is real in a test, and none may be faked: `CODING_ST
 - Business logic has five callers: tRPC, the MCP surface, `/agent/v1`, a script and the reconciler. Four of them have no notion of an HTTP status code, which belongs at the transport.
 - A package is chosen over a directory for its export list: a declared, compiler-checked interface. It is not an import gate; the transport ban is a separate mechanism.
 - Per-glob overrides held only two of the five rules. A probe ran ten cases, and seven that should have failed passed.
-- One slice writing SQL against another slice's tables has no import statement, so no linter sees it. The checked-in table-ownership map, `packages/schema/src/table-ownership.ts`, is reviewed like the export list, and row-level security is the backstop.
+- One slice writing SQL against another slice's tables has no import statement, so no linter sees it. The checked-in table-ownership map, `packages/schema/src/table-ownership.ts`, is held to the code both ways by a scan in root `check`: each slice's SQL reads only the tables it owns or declares, and each declared read is one its slice makes. Row-level security is the backstop.
 - An `exports` entry nothing imports is interface nobody asked for.
 - A faked door tests the fake. The four doors are stores the platform deploys and can start.
 
