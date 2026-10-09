@@ -305,7 +305,7 @@ function JumpList(
       className="**:data-[slot=command-input-wrapper]:h-12 **:data-[slot=command-input-wrapper]:pr-12 [&_[cmdk-item]]:py-2"
     >
       <CommandInput value={typed} onValueChange={setTyped} placeholder={findWhat(kinds)} />
-      <output className="block border-b border-border px-3 py-2 text-sm text-muted-foreground empty:hidden">
+      <output className="block border-b border-border px-3 py-2 text-sm text-muted-foreground empty:sr-only">
         {lines.said}
       </output>
       <p role="alert" className="border-b border-border px-3 py-2 text-sm empty:hidden">

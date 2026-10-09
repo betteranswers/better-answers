@@ -178,7 +178,7 @@ test.describe("a group's actions", () => {
 
     await theActionLandedWithinItsBudget(page, "create a group");
     await expect(groupButton(page, "Site leads")).toBeFocused();
-    await expect(groupsRegion(page).getByRole("status")).toHaveText([
+    await expect(groupsRegion(page).getByRole("status").filter({ hasText: /\S/ })).toHaveText([
       "3 groups",
       "Site leads is created.",
     ]);
@@ -261,7 +261,7 @@ test.describe("a group's actions", () => {
     await expect(sheet).toHaveCount(0);
     await theActionLandedWithinItsBudget(page, "delete a group");
     await expect(groupRows(page)).toHaveCount(1);
-    await expect(groupsRegion(page).getByRole("status")).toHaveText([
+    await expect(groupsRegion(page).getByRole("status").filter({ hasText: /\S/ })).toHaveText([
       "1 group",
       "HR team is deleted.",
     ]);
@@ -282,7 +282,10 @@ test.describe("a group's actions", () => {
     await groupButton(page, "Bid writers").click();
     const sheet = sheetOf(page, "Bid writers");
     const members = sheet.getByRole("group", { name: "Members of Bid writers" });
-    const said = sheet.getByRole("region", { name: "Members" }).getByRole("status");
+    const said = sheet
+      .getByRole("region", { name: "Members" })
+      .getByRole("status")
+      .filter({ hasText: /\S/ });
     await expect(members.getByRole("checkbox")).toHaveCount(3);
     await expect(members.getByRole("checkbox", { checked: true })).toHaveCount(0);
 
@@ -366,9 +369,9 @@ test.describe("a group's actions", () => {
     const sheet = sheetOf(page, "Site leads");
     await expect(sheet.getByRole("checkbox", { name: "Priya Shah" })).toBeFocused();
     await page.keyboard.press("Space");
-    await expect(sheet.getByRole("region", { name: "Members" }).getByRole("status")).toHaveText(
-      "Priya Shah is in Site leads now.",
-    );
+    await expect(
+      sheet.getByRole("region", { name: "Members" }).getByRole("status").filter({ hasText: /\S/ }),
+    ).toHaveText("Priya Shah is in Site leads now.");
     await page.keyboard.press("Escape");
     await expect(groupButton(page, "Site leads")).toBeFocused();
     await expect(rowOf(page, "Site leads").getByRole("cell").nth(1)).toHaveText("1 member");
@@ -455,11 +458,15 @@ test.describe("a member's groups, on their row and their page", () => {
       reads: "Bid writers",
     });
     await page.keyboard.press("Space");
-    await expect(groups.getByRole("status")).toHaveText("Priya Shah is in Bid writers now.");
+    await expect(groups.getByRole("status").filter({ hasText: /\S/ })).toHaveText(
+      "Priya Shah is in Bid writers now.",
+    );
     await theActionLandedWithinItsBudget(page, "put a member in a group from their page");
 
     await picked.getByRole("checkbox", { name: "HR team" }).click();
-    await expect(groups.getByRole("status")).toHaveText("Priya Shah is out of HR team now.");
+    await expect(groups.getByRole("status").filter({ hasText: /\S/ })).toHaveText(
+      "Priya Shah is out of HR team now.",
+    );
     await expect(groups).toMatchAriaSnapshot(`
       - region "Groups":
         - heading "Groups" [level=3]
@@ -493,6 +500,7 @@ test.describe("a member's groups, on their row and their page", () => {
       - region "Groups":
         - /children: equal
         - heading "Groups" [level=3]
+        - status
         - paragraph: ${EMPTY_LINES.groups}
         - link "Create one on the Groups page"
     `);

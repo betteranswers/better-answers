@@ -1,5 +1,5 @@
 import { CatchBoundary, RouterContextProvider, createMemoryHistory } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FailedPage } from "@/app/failed-page.tsx";
@@ -45,10 +45,15 @@ const answerTrpc = (input: string | URL | Request): Promise<Response> => {
 
 const MODELS_AND_SPEND = "/models/models-and-spend";
 
+/** jsdom applies no stylesheet, so the band's empty alert counts as an alert here too. */
+const saying = () => screen.getAllByRole("alert").filter((alert) => alert.textContent !== "");
+
 const openModelChoicesWithABrokenRead = async () => {
   vi.stubGlobal("fetch", answerTrpc);
   const { rendered } = await openApp(MODELS_AND_SPEND);
-  await screen.findByRole("alert");
+  await waitFor(() => {
+    expect(saying()).toHaveLength(1);
+  });
   return rendered;
 };
 
@@ -66,13 +71,13 @@ describe("a page that throws", () => {
     const nav = screen.getByRole("navigation", { name: "Control Centre" });
     expect(within(nav).getByRole("link", { name: "Models and spend" })).toBeDefined();
 
-    expect(screen.getByRole("main").contains(screen.getByRole("alert"))).toBe(true);
+    expect(saying().map((alert) => screen.getByRole("main").contains(alert))).toEqual([true]);
   });
 
   it("says the page did not load, as an alert", async () => {
     await openModelChoicesWithABrokenRead();
 
-    const alert = screen.getByRole("alert");
+    const [alert = document.body] = saying();
     expect(within(alert).getByRole("heading", { level: 1 }).textContent).toBe(
       "This page didn't load",
     );

@@ -170,6 +170,7 @@ test.describe("the People page's Requests tab", () => {
       - region "Requests":
         - /children: equal
         - heading "Requests" [level=2]
+        - status
         - paragraph: ${EMPTY_LINES.requests}
     `);
     await expect(

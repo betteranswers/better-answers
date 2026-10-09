@@ -80,7 +80,7 @@ export function HomeLine() {
 
   // A status alone: this line never refuses, and the frame keeps it on every page.
   return (
-    <output className="mb-4 block text-muted-foreground empty:hidden">
+    <output className="mb-4 block text-muted-foreground empty:sr-only">
       {role === undefined ? null : homeNowSaid(role)}
     </output>
   );

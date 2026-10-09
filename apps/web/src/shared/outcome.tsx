@@ -8,8 +8,8 @@ export type Outcome =
 export const selectFirst = (line: string): Outcome => ({ tone: "said", words: line });
 
 /**
- * Both regions stand from the first render, because a live region inserted with its words already
- * inside is one a screen reader may never read.
+ * A polite region shown already holding its words may go unread, so the status stays in the tree
+ * while empty. Alerts are read when shown.
  */
 export function OutcomeLine(properties: {
   readonly outcome: Outcome | undefined;
@@ -19,7 +19,7 @@ export function OutcomeLine(properties: {
 
   return (
     <div className={properties.className}>
-      <output className="block text-muted-foreground empty:hidden">
+      <output className="block text-muted-foreground empty:sr-only">
         {outcome?.tone === "said" ? outcome.words : null}
       </output>
       {/* Not a paragraph: a refusal that names several items holds their list. */}
