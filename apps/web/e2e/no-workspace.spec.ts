@@ -22,11 +22,13 @@ import {
   keystrokesDismissed,
   keystrokesListed,
   landedAtHome,
+  markTheOperator,
   person,
   provision,
   quoted,
   signIn,
   signInHeading,
+  withAnAuthenticator,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -86,16 +88,14 @@ const lapsed = (search: string): string => {
   return `?${query.toString()}`;
 };
 
-test("tells a person from Claude it connects once they join", async ({
-  page,
-  request,
-  baseURL,
-}) => {
-  const email = anAddress("connecting");
-  await person(request, email);
-  const answered = invitationsAnswered(page);
-
-  await page.goto(claudesAuthorizeUrl(baseURL ?? ""));
+/** Signed in from Claude's request, so the no-workspace page still carries its signed query. */
+const landedConnecting = async (
+  page: Page,
+  request: APIRequestContext,
+  origin: string,
+  email: string,
+) => {
+  await page.goto(claudesAuthorizeUrl(origin));
   await expect(signInHeading(page, "connecting")).toBeVisible();
   await signIn(page, request, email);
 
@@ -105,6 +105,18 @@ test("tells a person from Claude it connects once they join", async ({
     landedAt(page).searchParams.get("sig"),
     "the picker dropped Claude's query",
   ).not.toBeNull();
+};
+
+test("tells a person from Claude it connects once they join", async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  const email = anAddress("connecting");
+  await person(request, email);
+  const answered = invitationsAnswered(page);
+
+  await landedConnecting(page, request, baseURL ?? "", email);
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${quoted(NO_WORKSPACE_HEADING)} [level=1]
@@ -115,6 +127,20 @@ test("tells a person from Claude it connects once they join", async ({
   `);
   await answered;
   await expect(invitations(page), "a person with none was shown invitations").toHaveCount(0);
+});
+
+test("keeps an operator connecting Claude on the no-workspace page", async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  const email = anAddress("operator");
+  await person(request, email);
+  await markTheOperator(request, email);
+  await withAnAuthenticator(request, email);
+
+  await landedConnecting(page, request, baseURL ?? "", email);
+  await expect(claudeLine(page)).toBeVisible();
 });
 
 test("says nothing of Claude or invitations to an ordinary arrival", async ({ page, request }) => {
