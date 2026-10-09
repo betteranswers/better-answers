@@ -20,7 +20,7 @@ import {
   signedOutDetour,
   signedOutOfAStep,
 } from "@/features/auth/auth-hooks.ts";
-import { backTo, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
+import { backTo, carriedFlow, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
 import { ChooseWorkspacePage } from "@/features/auth/choose-workspace-page.tsx";
 import { DisplayNamePage } from "@/features/auth/display-name-page.tsx";
 import { LinkPage } from "@/features/auth/link-page.tsx";
@@ -48,7 +48,7 @@ import { CodesPage, SetupPage } from "@/features/auth/setup-page.tsx";
 import { SignInPage } from "@/features/auth/sign-in-page.tsx";
 import { EveryonePage } from "@/features/console/everyone-page.tsx";
 import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
-import { mustSignInForTheConsole } from "@/features/console/operator.ts";
+import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
 import { AuditLogPage } from "@/features/people/audit-log-page.tsx";
 import { GroupsPage } from "@/features/people/groups-page.tsx";
@@ -214,11 +214,18 @@ const chooseWorkspaceRoute = createRoute({
   beforeLoad: ({ context, location }) => confirmedFirst(context, location),
 });
 
+/** The operator's home is the console's, unless a carried Claude flow waits on joining one. */
 const noWorkspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/no-workspace",
   component: NoWorkspacePage,
-  beforeLoad: ({ context, location }) => confirmedFirst(context, location),
+  beforeLoad: async ({ context, location, cause }) => {
+    await confirmedFirst(context, location);
+    if (carriedFlow(pageQuery()) !== "") return;
+    if (await isTheOperator(context.queryClient, context.api, cause === "enter")) {
+      throw redirect({ href: HOMES.operator.path, replace: true });
+    }
+  },
 });
 
 /** Outside the shell: the person joining is not yet a member of the workspace. */

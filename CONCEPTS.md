@@ -1838,7 +1838,7 @@ address names nothing they may see.
 It is Ask for an Editor or a Viewer, and People › Members for an Admin until Control Centre ›
 Overview is built. A role's home shows in the *icon rail* even before it is built, and then says
 plainly that it is on its way. The *console* has one home for everyone, Workspaces › Every
-workspace.
+workspace, which is where the *operator* lands while they belong to no workspace.
 
 ### icon rail
 
