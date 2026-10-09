@@ -204,4 +204,15 @@ describe("a searched list, its search settled into the address", () => {
     await at("/older?older.search=export");
     expect(router.state.location.searchStr).not.toContain("page");
   });
+
+  it("clears a list with no pages to a bare address", async () => {
+    const { at } = await openPages({ "/older": SearchedWithoutPages }, [
+      "/older?older.search=export&older.family=people",
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    await at("/older");
+    expect(box().value).toBe("");
+  });
 });

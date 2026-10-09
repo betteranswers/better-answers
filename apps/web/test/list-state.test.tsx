@@ -80,6 +80,19 @@ describe("a list's state, said after its region mounts", () => {
     expect(screen.queryByText("The rows")).toBeNull();
   });
 
+  it("mounts the alert empty when a pending read fails", () => {
+    const { seen, Seen } = regionsSeen("[role=alert]");
+    const { rerender } = render(<Seen>{listRead({ error: null, isPending: true })}</Seen>);
+    const before = seen.length;
+
+    rerender(
+      <Seen>{listRead({ error: new Error("the network is down"), isPending: false })}</Seen>,
+    );
+
+    expect(seen.slice(before).find((said) => said !== undefined)).toBe("");
+    expect(screen.getByRole("alert").textContent).toBe("No list: the network is down");
+  });
+
   it("draws the rows once the read has them", () => {
     render(listRead({ error: null, isPending: false }));
 

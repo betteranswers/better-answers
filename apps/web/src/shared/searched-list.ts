@@ -62,7 +62,7 @@ export const useSearchedList = <Fields extends SearchedFields>(
 ) => {
   const { state, write, writeHeld } = useListAddress(prefix, fields);
   const held = useMemo(() => HELD.parse(state), [state]);
-  const paged = "page" in fields;
+  const paged = Object.hasOwn(fields, "page");
   const [search, setSearch, flush] = useSettledSearch(held.search, (settled) => {
     writeHeld(
       paged

@@ -52,7 +52,8 @@ export const useListAddress = <Fields extends ListFields>(prefix: string, fields
 
   // Replaced, never pushed, so typing fills no history; read from the address at the write, so
   // two writes in one handler both land.
-  const writeEntries = (patch: readonly (readonly [string, unknown])[]): void => {
+  /** Names fields one by one, for a caller that knows some of them but not the list's whole shape. */
+  const writeHeld = (patch: readonly (readonly [string, unknown])[]): void => {
     void navigate({
       to: ".",
       search: (current: Query) => ({ ...current, ...written(prefix, defaults, patch) }),
@@ -61,12 +62,7 @@ export const useListAddress = <Fields extends ListFields>(prefix: string, fields
   };
 
   const write = (patch: Partial<AddressState<Fields>>): void => {
-    writeEntries(Object.entries(patch));
-  };
-
-  /** For ground that knows some fields by name but not the list's whole shape. */
-  const writeHeld = (patch: readonly (readonly [string, Held])[]): void => {
-    writeEntries(patch);
+    writeHeld(Object.entries(patch));
   };
 
   return { state, write, writeHeld };

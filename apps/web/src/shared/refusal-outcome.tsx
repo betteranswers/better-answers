@@ -49,7 +49,7 @@ const failureOutcome = (
     : refusalOutcome(featureWords, refusal.word, refusal.class);
 };
 
-/** A feature's words, bound once: its word first, then the class's, then no response. */
+/** A feature's words, named once: its word first, then the class's, then no response. */
 export const refusalsOf = (featureWords: SaidOfWord) => ({
   outcomeOfFailure: (failure: Error | ApiError, during: FailedDuring): Outcome =>
     failureOutcome(featureWords, failure, during),
