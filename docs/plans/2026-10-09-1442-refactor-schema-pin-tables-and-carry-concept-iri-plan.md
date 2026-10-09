@@ -12,7 +12,7 @@ execution: code
 
 ## Goal Capsule
 
-- **Objective:** S2a's schema and concept units can add `concept_index`'s second `customType` column and the concept reads knowing that a retyped column in any table, or a concept IRI passed where an unchecked string was, fails `typecheck` before it reaches a pull request.
+- **Objective:** S2a's schema and concept units can add `concept_index`'s second `customType` column and the concept reads knowing that a retyped column in any table, or a plain string passed where a concept IRI belongs, fails `typecheck` before it reaches a pull request.
 - **Means:** a mapped type over `boundarySchemas` that pins every table's select shape (KTD1), an additive `ids` module (KTD2), the `ConceptIri` brand at the mint and the concept reads (KTD3, KTD4), and the sources slice's cross-owner reads declared (KTD6).
 - **Product authority:**
   - Linear BA-77's acceptance list is authoritative for what this plan delivers.
