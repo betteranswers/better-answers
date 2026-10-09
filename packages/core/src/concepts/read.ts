@@ -90,8 +90,6 @@ type Resolved = {
   readonly item: EvidenceItem;
   readonly points: boolean;
   readonly opens: boolean;
-
-  readonly place: string | undefined;
 };
 
 type Doors = {
@@ -162,10 +160,9 @@ const resolvedOf = async (
   const cited = citedSourceOf(entry);
   if (cited === undefined) return ok(undefined);
   const source = labelOf(entry, cited.resource);
-  const place = placeOf(doors, cited.locator);
-  const named = namedItem(cited.id, source, place);
+  const named = namedItem(cited.id, source, placeOf(doors, cited.locator));
   const opening = openingNamed(doors, cited.locator, cited.resource);
-  if (opening === undefined) return ok({ entry, item: named, points: false, opens: false, place });
+  if (opening === undefined) return ok({ entry, item: named, points: false, opens: false });
   const opens = await opensFor(doors, opening);
   if (!opens.ok) return err(opens.error);
   return ok({
@@ -173,7 +170,6 @@ const resolvedOf = async (
     item: opens.value ? { ...named, ...opening } : named,
     points: true,
     opens: opens.value,
-    place,
   });
 };
 
@@ -215,11 +211,11 @@ const labelOnlyRecord = (
 const projectedSources = (
   resolved: readonly Resolved[],
 ): readonly string[] | readonly FrontmatterSource[] => {
-  const texts = resolved.flatMap(({ entry, item, opens, place }) =>
-    typeof entry === "string" ? [opens ? entry : labelOnlyText(item.source, place)] : [],
+  const texts = resolved.flatMap(({ entry, item, opens }) =>
+    typeof entry === "string" ? [opens ? entry : labelOnlyText(item.source, item.at)] : [],
   );
-  const records = resolved.flatMap(({ entry, item, opens, place }) =>
-    typeof entry === "string" ? [] : [opens ? entry : labelOnlyRecord(entry, item.source, place)],
+  const records = resolved.flatMap(({ entry, item, opens }) =>
+    typeof entry === "string" ? [] : [opens ? entry : labelOnlyRecord(entry, item.source, item.at)],
   );
   // The file parser holds a `sources` list to strings alone or records alone.
   return records.length === 0 ? texts : records;
