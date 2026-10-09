@@ -16,7 +16,7 @@ const outcomeOf = (correctName: CorrectName, was: string): Outcome | undefined =
   if (correctName.isSuccess) {
     return { tone: "said", words: correctedWords(was, correctName.data.displayName) };
   }
-  return correctName.isError ? correctingRefused(correctName.error) : undefined;
+  return correctName.isError ? correctingRefused(correctName.error, "action") : undefined;
 };
 
 const refusedOf = (correctName: CorrectName, personId: string): Refused | undefined => {
@@ -24,7 +24,7 @@ const refusedOf = (correctName: CorrectName, personId: string): Refused | undefi
   const byTheRule = refusalOf(correctName.error)?.class === "malformed";
   return {
     displayName: correctName.variables.displayName,
-    byTheRule: byTheRule ? correctingRefused(correctName.error) : undefined,
+    byTheRule: byTheRule ? correctingRefused(correctName.error, "action") : undefined,
   };
 };
 

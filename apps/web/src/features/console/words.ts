@@ -1,6 +1,5 @@
 import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
-import type { Outcome } from "@/shared/outcome.tsx";
-import { failureOutcome } from "@/shared/refusal-outcome.tsx";
+import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { NO_RESPONSE_TO_A_READ, SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 
 import {
@@ -29,11 +28,9 @@ export const readRefused = (failure: Error | ApiError): Said => {
 export const refusedAsStale = (failure: Error | ApiError | null): boolean =>
   failure !== null && refusalOf(failure)?.word === SIGN_IN_TOO_OLD;
 
-export const revocationRefused = (failure: Error | ApiError): Outcome =>
-  failureOutcome(SAID_OF_A_REVOCATION, failure);
+export const { outcomeOfFailure: revocationRefused } = refusalsOf(SAID_OF_A_REVOCATION);
 
-export const correctingRefused = (failure: Error | ApiError): Outcome =>
-  failureOutcome(SAID_OF_CORRECTING, failure);
+export const { outcomeOfFailure: correctingRefused } = refusalsOf(SAID_OF_CORRECTING);
 
 /** A person erased since their flag has no name left to own one. */
 const possessiveOf = (name: string): string => (name === "" ? "this person's" : `${name}'s`);

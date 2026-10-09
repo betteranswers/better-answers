@@ -137,7 +137,7 @@ const removalSaid = (
   removal: ReturnType<typeof useRemovalOf>,
 ): Outcome | undefined => {
   if (name === undefined || removal === undefined) return undefined;
-  if (removal.error !== null) return outcomeOfFailure(removal.error);
+  if (removal.error !== null) return outcomeOfFailure(removal.error, "action");
   return {
     tone: "said",
     words:

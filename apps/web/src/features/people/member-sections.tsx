@@ -117,7 +117,7 @@ function RolePicker(properties: {
           });
         },
         onError: (failure: Error | ApiError) => {
-          setOutcome(outcomeOfFailure(failure));
+          setOutcome(outcomeOfFailure(failure, "action"));
         },
       },
     );
@@ -198,7 +198,7 @@ function CredentialsRevoker(properties: {
           });
         },
         onError: (failure: Error | ApiError) => {
-          setOutcome(outcomeOfFailure(failure));
+          setOutcome(outcomeOfFailure(failure, "action"));
         },
       },
     );
@@ -250,7 +250,7 @@ function DisplayNameFlag(properties: {
       { personId: member.personId },
       {
         onError: (failure: Error | ApiError) => {
-          setOutcome(outcomeOfFailure(failure));
+          setOutcome(outcomeOfFailure(failure, "action"));
         },
       },
     );

@@ -130,7 +130,7 @@ function RequestList(properties: {
       { requestId: request.id },
       {
         onError: (failure) => {
-          onOutcome(outcomeOfRequestFailure(failure));
+          onOutcome(outcomeOfRequestFailure(failure, "action"));
         },
       },
     );
@@ -213,7 +213,7 @@ export function RequestsTab() {
           setOutcome(approvedOutcome(invited));
         },
         onError: (failure) => {
-          setOutcome(outcomeOfRequestFailure(failure));
+          setOutcome(outcomeOfRequestFailure(failure, "action"));
         },
       },
     );

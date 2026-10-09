@@ -131,7 +131,7 @@ function CreateGroupForm(properties: {
         onCreated(groupId, name);
       },
       (failure: Error) => {
-        onRefused(outcomeOfGroupFailure(failure));
+        onRefused(outcomeOfGroupFailure(failure, "action"));
       },
     );
   };
@@ -233,7 +233,7 @@ function GroupList(properties: {
         setOutcome({ tone: "said", words: `${group.name} is deleted.` });
       },
       (failure: Error) => {
-        setOutcome(outcomeOfGroupFailure(failure));
+        setOutcome(outcomeOfGroupFailure(failure, "action"));
       },
     );
   };

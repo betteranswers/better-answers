@@ -143,7 +143,7 @@ export const useInvitationActions = (list: ActedList) => {
       settled(
         () => undefined,
         (failure) => {
-          list.say(outcomeOfInvitationFailure(failure));
+          list.say(outcomeOfInvitationFailure(failure, "action"));
         },
       ),
     );

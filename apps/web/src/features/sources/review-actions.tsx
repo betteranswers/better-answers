@@ -100,7 +100,7 @@ const useBulkAction = (
       },
       onError: (failure) => {
         tick(ready);
-        setOutcome(outcomeOfFailure(failure));
+        setOutcome(outcomeOfFailure(failure, "action"));
       },
     });
   };

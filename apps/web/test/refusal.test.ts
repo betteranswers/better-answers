@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { createQueryClient } from "@/shared/api/query-client.ts";
+import { createQueryClient, type FailedDuring } from "@/shared/api/query-client.ts";
 import { refusalOf, type Refusal, type RefusalClass, type RefusalWord } from "@/shared/api/trpc.ts";
 
 import { carrying } from "./stubbed-api.ts";
@@ -12,6 +12,17 @@ const retryPolicy = () => {
 };
 
 const ATTEMPTS_ALREADY_MADE = 0;
+
+const NOT_ANSWERED = new Error("the network went away");
+
+/** A client that writes down how it heard each failure. */
+const hearing = () => {
+  const heard: FailedDuring[] = [];
+  const client = createQueryClient((_, during) => {
+    heard.push(during);
+  });
+  return { heard, client };
+};
 
 describe("the refusal the api sends the web", () => {
   it("reads the word and its class off a refused read", () => {
@@ -79,5 +90,33 @@ describe("what the web asks again", () => {
     const asked = retryPolicy()(ATTEMPTS_ALREADY_MADE, new Error("the network went away"));
 
     expect(asked).toBe(true);
+  });
+});
+
+describe("what the web hears of a failure", () => {
+  it("hears a failed read as a read", async () => {
+    const { heard, client } = hearing();
+
+    await client
+      .fetchQuery({
+        queryKey: ["a-read"],
+        queryFn: () => Promise.reject(NOT_ANSWERED),
+        retry: false,
+      })
+      .catch(() => undefined);
+
+    expect(heard).toEqual(["read"]);
+  });
+
+  it("hears a failed action as an action", async () => {
+    const { heard, client } = hearing();
+
+    await client
+      .getMutationCache()
+      .build(client, { mutationFn: () => Promise.reject(NOT_ANSWERED) })
+      .execute(undefined)
+      .catch(() => undefined);
+
+    expect(heard).toEqual(["action"]);
   });
 });

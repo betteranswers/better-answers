@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import type { Refusal, RefusalWord } from "@/shared/api/trpc.ts";
-import { failureOutcome, RefusedItemLines, refusalOutcome } from "@/shared/refusal-outcome.tsx";
+import { RefusedItemLines, refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { SAID_OF_CLASS, type SaidOfWord } from "@/shared/refusal-words.ts";
 
 import { carrying } from "./stubbed-api.ts";
@@ -25,9 +25,11 @@ const shown = (words: ReactNode): HTMLElement => render(<p>{words}</p>).containe
 
 const NETWORK_FAILURE = new Error("the network went away");
 
+const { outcomeOfFailure, refusedFor } = refusalsOf(A_FEATURES_WORDS);
+
 describe("the shared refusal template", () => {
   it("says what went wrong, then what to do", () => {
-    const outcome = refusalOutcome(A_FEATURES_WORDS, "last-admin", "precondition");
+    const outcome = refusedFor("last-admin", "precondition");
 
     expect(outcome.tone).toBe("refused");
     expect(shown(outcome.words).textContent).toBe(
@@ -38,7 +40,7 @@ describe("the shared refusal template", () => {
   it.each(Object.entries(SAID_OF_CLASS))(
     "says an unknown word by its class: %s",
     (refusalClass, said) => {
-      const outcome = failureOutcome(A_FEATURES_WORDS, refusedWith("a-new-word", refusalClass));
+      const outcome = outcomeOfFailure(refusedWith("a-new-word", refusalClass), "action");
 
       expect(shown(outcome.words).textContent).toBe(`${said.why} ${said.next}`);
     },
@@ -48,14 +50,14 @@ describe("the shared refusal template", () => {
     ["a known word", "last-admin"],
     ["an unknown word", "a-new-word"],
   ])("shows neither word nor code element for %s", (_, word) => {
-    const line = shown(failureOutcome(A_FEATURES_WORDS, refusedWith(word, "precondition")).words);
+    const line = shown(outcomeOfFailure(refusedWith(word, "precondition"), "action").words);
 
     expect(line.textContent).not.toContain(word);
     expect(line.querySelector("code")).toBeNull();
   });
 
   it("says a wordless failure got no response, and nothing saved", () => {
-    const outcome = failureOutcome(A_FEATURES_WORDS, NETWORK_FAILURE);
+    const outcome = outcomeOfFailure(NETWORK_FAILURE, "action");
 
     expect(outcome.tone).toBe("refused");
     expect(shown(outcome.words).textContent).toBe(
@@ -64,7 +66,7 @@ describe("the shared refusal template", () => {
   });
 
   it("says a read's wordless failure without claiming a save", () => {
-    const outcome = failureOutcome(A_FEATURES_WORDS, NETWORK_FAILURE, "read");
+    const outcome = outcomeOfFailure(NETWORK_FAILURE, "read");
 
     expect(shown(outcome.words).textContent).toBe(
       "No response, so nothing is shown. Try again in a moment.",

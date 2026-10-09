@@ -7,7 +7,7 @@ import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { failureOutcome, refusedWith } from "@/shared/refusal-outcome.tsx";
+import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
@@ -33,7 +33,8 @@ import { AUDIT_LOG_WORDS as WORDS } from "./audit-log-words.ts";
 import { headlineOf, sentenceOf } from "./audit-sentences.ts";
 import { personSaid } from "./audit-subjects.ts";
 import { EventDays, useLanding } from "./event-days.tsx";
-import { auditExportCeiling, SAID_OF_THE_AUDIT_LOG } from "./refusal-words.ts";
+import { auditExportCeiling } from "./refusal-words.ts";
+import { outcomeOfAuditLogFailure } from "./refusal.tsx";
 
 const system = menuGroupIn(CONTROL_CENTRE, "system");
 
@@ -201,7 +202,7 @@ const save = (csv: string, name: string): void => {
 const exportFailed = (failure: Error | ApiError): Outcome => {
   const liftsInSeconds = ceilingLiftsIn(failure);
   return liftsInSeconds === undefined
-    ? failureOutcome(SAID_OF_THE_AUDIT_LOG, failure)
+    ? outcomeOfAuditLogFailure(failure, "action")
     : refusedWith(auditExportCeiling(liftsInSeconds));
 };
 
@@ -300,7 +301,7 @@ function AuditLogRegion() {
         <ListRead
           read={auditLog}
           loading={WORDS.loading}
-          failed={(failure) => failureOutcome(SAID_OF_THE_AUDIT_LOG, failure, "read").words}
+          failed={(failure) => outcomeOfAuditLogFailure(failure, "read").words}
           focusAfterRetry={searchRef}
         >
           {/* Keyed, so a page of older events never lands its focus in another search's list. */}

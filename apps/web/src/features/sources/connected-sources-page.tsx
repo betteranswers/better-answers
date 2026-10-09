@@ -104,7 +104,7 @@ export function ConnectedSourcesPage() {
       setOutcome({ tone: "said", words: said(answer) });
     },
     onError: (failure: Error | ApiError) => {
-      setOutcome(outcomeOfFailure(failure));
+      setOutcome(outcomeOfFailure(failure, "action"));
     },
   });
 
