@@ -533,14 +533,14 @@ flowchart LR
 - **Files:**
   - Create: `apps/api/src/trpc/knowledge.ts`, `apps/api/tests/knowledge-procedures.test.ts`.
   - Modify: `apps/api/src/trpc/router.ts`.
-- **Approach:** use `queryProcedure.input(parsedBy(...)).query(answeredBy(...))` over U6's schemas. A refusal crosses through `crossing`, and an absent or withheld concept is one `NOT_FOUND`.
+- **Approach:** use `queryProcedure.input(parsedBy(...)).query(answeredBy(...))` over U6's schemas, so `knowledge.open` takes the IRI, as MCP `open` does. The web holds the ULID in its address and read key, and builds the IRI from it with `concept-file`'s mapping before it calls. A refusal crosses through `crossing`, and an absent or withheld concept is one `NOT_FOUND`.
 - **Patterns to follow:** `apps/api/src/trpc/router.ts`'s `sources`; `apps/api/tests/audit-log-procedures.test.ts`; the api's `trpc-router` and `error-handling` skills.
 - **Test scenarios:**
   - `knowledge.find`'s first page equals MCP `find`'s at the same limit.
   - `knowledge.find` pages through `nextCursor` to the end.
   - `knowledge.find` returns each concept match's trust words as text.
-  - `knowledge.open` by ULID returns the read with trust words as text.
-  - A malformed ULID is refused as malformed. An absent and a withheld concept give the same `NOT_FOUND`.
+  - `knowledge.open` by IRI returns the read with trust words as text.
+  - A malformed IRI is refused as malformed. An absent and a withheld concept give the same `NOT_FOUND`.
   - A signed-out request is refused.
 - **Verification:** api `check` passes, and `trpc-roads.test.ts` still pins the roads.
 
@@ -606,7 +606,7 @@ flowchart LR
   - Create: `apps/web/src/features/knowledge/concept-page.tsx`, `concept-body.tsx`, `apps/web/test/concept-body.test.tsx`, `apps/web/e2e/concept-page.spec.ts`.
   - Modify: `apps/web/package.json` (`react-markdown`, `remark-gfm`), `apps/web/src/shared/navigation.ts` (Search's `detail`), `apps/web/src/app/router.tsx` (`BUILT_DETAILS`), `apps/web/src/features/knowledge/evidence-panel.tsx`. The router throws at start when a page declares a `detail` with no `BUILT_DETAILS` entry, so both land here with the page.
 - **Approach:**
-  1. Parse the ULID at the route with `concept-file`'s pattern. A malformed, absent or withheld concept draws the one in-page *not found*, which names nothing and leads back to Search.
+  1. Parse the ULID at the route with `concept-file`'s pattern, and map it to the IRI `knowledge.open` takes. A malformed, absent or withheld concept draws the one in-page *not found*, which names nothing and leads back to Search.
   2. Keep the breadcrumb's last part empty until the read lands. While loading, reserve the heading region and draw no body. A failed read draws its own state with a retry, distinct from *not found*.
   3. Render the body by KTD10, and draw the panel and its keyboard path by KTD10.
   4. Make the page's way back carry the query in history state, as `membersAt` does.
