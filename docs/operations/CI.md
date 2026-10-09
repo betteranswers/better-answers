@@ -260,6 +260,14 @@ The method is the same at every severity; `IMAGE_VULNERABILITIES.md` says which 
 
 **Code scanning on the repository.** The workflow changes no repository setting. If code scanning refuses the upload until one is turned on, turning it on is the owner's call, as the repository's admin.
 
+## The `docker-hub-login` action
+
+`.github/actions/docker-hub-login/` logs a job in to Docker Hub before its suites pull an image. The suites' Postgres (`pgvector/pgvector`) and the images the api and worker legs build come from Docker Hub, and an anonymous pull counts against the runner address's limit, which GitHub's runners share with every other anonymous puller. On 09/10/2026 that limit refused the image to every suite in #649's merge group twice, and each time the pull request left the queue for no fault of its own (BA-96).
+
+**Every leg that starts a container calls it**: the five `full-` legs in `check.yml` and the Stryker leg in `mutation.yml`. It reads two repository secrets, `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, a read-only access token of that account. `build.yml` passes both to `check.yml` by name, as it passes the release its secrets, because a called workflow reads no secret it was not handed. A run that has neither, a fork's, warns and pulls anonymously as before, so the action never turns a missing secret into a red run.
+
+To rotate the token, make a new read-only access token on the Docker Hub account, then `gh secret set DOCKERHUB_TOKEN`, and revoke the old one.
+
 ## The `git-filter-repo` action
 
 `.github/actions/git-filter-repo/` installs the rewrite tool the erasure routine shells out to (ADR 0020), which `ubuntu-latest` does not carry. Without it a workspace's erasure suite fails on the runner while every machine it was written on is green, and there is no skip guard in that suite on purpose.

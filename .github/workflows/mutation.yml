@@ -108,6 +108,11 @@ jobs:
         working-directory: apps/worker
       - if: env.SELECTED == 'true'
         uses: ./.github/actions/git-filter-repo
+      - if: env.SELECTED == 'true'
+        uses: ./.github/actions/docker-hub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
       # The whole leg's results, not this shard's: a file the slicing moves to another shard keeps them.
       - name: the previous run's mutant results
         if: env.SELECTED == 'true'
