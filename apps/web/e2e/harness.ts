@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { z } from "zod";
 
-import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
+import type { AUDIENCES, REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
 import { CONFIRM_WORDS, SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
@@ -275,6 +275,41 @@ export const seedConnectedSources = (
   api: APIRequestContext,
   input: { workspaceId: string; connectedSources: readonly SeedConnectedSource[] },
 ) => ask(api, "/connected-sources", input, seededConnectedSources);
+
+type SeedCitedDocument = { readonly title: string; readonly passages: readonly string[] };
+
+type SeedConcept = {
+  readonly title: string;
+  readonly body: string;
+  readonly kind?: string;
+  readonly sensitivity?: Sensitivity;
+  readonly audience?: (typeof AUDIENCES)[number];
+  readonly groupMemberIds?: readonly string[];
+  readonly trust?: "unverified" | "machine-confirmed" | "human-reviewed";
+  readonly linksTo?: readonly string[];
+  readonly sources?: readonly SeedCitedDocument[];
+};
+
+const seededConcepts = z.object({
+  concepts: z.array(
+    z.object({
+      iri: z.string(),
+      title: z.string(),
+      path: z.string(),
+      documents: z.array(z.object({ documentId: z.string(), title: z.string() })),
+    }),
+  ),
+});
+
+/**
+ * Written in order by `userId`, an Admin; `linksTo` names earlier concepts, and `groupMemberIds` fill a
+ * `"groups"` audience's one group.
+ * @public S2a
+ */
+export const seedConcepts = (
+  api: APIRequestContext,
+  input: { workspaceId: string; userId: string; concepts: readonly SeedConcept[] },
+) => ask(api, "/concepts", input, seededConcepts);
 
 const syncMoved = z.object({ jobId: z.string() });
 

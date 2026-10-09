@@ -5,15 +5,24 @@ set -euo pipefail
 workspace=01M2SYNTHET1CAAAAAAAAAAAAA
 [ "${1:-}" != "--workspace-id" ] || { printf '%s\n' "${workspace}"; exit 0; }
 
-dsn="${1:-${STAGING_DATABASE_URL:-}}"
-[ -n "${dsn}" ] || {
-  printf 'usage: seed-synthetic.sh <owner DSN>, or STAGING_DATABASE_URL set as the drill sets it; seed-synthetic.sh --workspace-id prints the id alone\n' >&2
+usage() {
+  printf 'usage: seed-synthetic.sh <owner DSN> [--with-concepts], or STAGING_DATABASE_URL set as the drill sets it; seed-synthetic.sh --workspace-id prints the id alone\n' >&2
   exit 64
 }
+dsn="${1:-${STAGING_DATABASE_URL:-}}"
+[ -n "${dsn}" ] || usage
+# Never on staging: its synthetic repository is empty, and a commit git lacks makes the reconciler refuse the workspace.
+concepts=false
+case "${2:-}" in
+  "") ;;
+  --with-concepts) concepts=true ;;
+  *) usage ;;
+esac
 cases="$(cat "$(dirname "$0")/../contracts/document-passage/cases.json")"
 
 # Staging must never hold an invented person, nor the sort code this redacted case withholds: that is the seam's input, which no row holds.
-PGCLIENTENCODING=UTF8 psql "${dsn}" -v ON_ERROR_STOP=1 -qAt -v cases="${cases}" -v workspace="${workspace}" <<'SQL'
+PGCLIENTENCODING=UTF8 psql "${dsn}" -v ON_ERROR_STOP=1 -qAt -v cases="${cases}" -v workspace="${workspace}" \
+  -v concepts="${concepts}" <<'SQL'
 BEGIN;
 INSERT INTO workspace (id, name, short_name)
   VALUES (:'workspace', 'Synthetic fixture', 'synthetic')
@@ -43,10 +52,64 @@ INSERT INTO "index".passage
          c ->> 'locator', c ->> 'content'
     FROM fixture, jsonb_array_elements(d -> 'passages') AS c
   ON CONFLICT DO NOTHING;
-SELECT format('synthetic fixture present: workspace %s, short name synthetic, %s connected source, %s document, %s passages',
+\if :concepts
+-- Rows alone: no repository holds this commit or these files.
+\set commit 0000000000000000000000000000000000000000
+INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor)
+  VALUES (:'workspace', :'commit', '01M2SYNTHET1CC0MM1TAAAAAAA',
+          'process:better-answers-synthetic-seed')
+  ON CONFLICT DO NOTHING;
+-- The invoice answer cites a passage of the unpublished document, so it is Restricted as a write would derive it.
+CREATE TEMPORARY TABLE concept ON COMMIT DROP AS
+  SELECT 'https://better-answers.com/c/' || c.ulid AS iri, c.*
+    FROM fixture, LATERAL (VALUES
+      ('01M2SYNTHET1CC0NCEPTAAAAA1', 'answer:invoice-payment-terms', 'knowledge/invoice-payment-terms.md',
+       'Answer', 'Invoice payment terms', 'Restricted',
+       E'A synthetic fixture answer: an invoice is due on receipt.[^invoice]\n\nSee also [Order delivery times](order-delivery-times.md).\n',
+       jsonb_build_array(jsonb_build_object('id', 'invoice', 'title', 'invoice-2026-041.md',
+                                            'resource', 'invoice-2026-041.md',
+                                            'locator', d -> 'passages' -> 0 ->> 'locator'))),
+      ('01M2SYNTHET1CC0NCEPTAAAAA2', 'answer:order-delivery-times', 'knowledge/order-delivery-times.md',
+       'Answer', 'Order delivery times', 'Internal',
+       E'A synthetic fixture answer: delivery follows within ten working days of a signed order.[^terms]\n\nSee also [Invoice payment terms](invoice-payment-terms.md) and [Bid library](bid-library.md).\n',
+       jsonb_build_array(jsonb_build_object('id', 'terms', 'title', 'Synthetic order terms',
+                                            'resource', 'synthetic-order-terms.md'))),
+      ('01M2SYNTHET1CC0NCEPTAAAAA3', 'note:bid-library', 'knowledge/bid-library.md',
+       'Note', 'Bid library', 'Public',
+       E'A synthetic fixture note: the bid library holds the invoices and order terms this workspace answers from.\n\nSee also [Order delivery times](order-delivery-times.md).\n',
+       '[]'::jsonb)
+    ) AS c(ulid, merge_key, path, kind, title, sensitivity, body, sources);
+INSERT INTO concept_identity (workspace_id, iri, merge_key)
+  SELECT :'workspace', iri, merge_key FROM concept
+  ON CONFLICT DO NOTHING;
+INSERT INTO concept_index
+    (workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha, status, published_at,
+     sensitivity, audience)
+  SELECT :'workspace', iri, path, kind, title,
+         jsonb_build_object('iri', iri, 'title', title, 'type', kind, 'status', 'stable', 'sources', sources),
+         body, encode(sha256(convert_to(body, 'UTF8')), 'hex'), :'commit',
+         'stable', now(), sensitivity, 'everyone'
+    FROM concept
+  ON CONFLICT DO NOTHING;
+-- A source with a locator is a passage of the fixture's document; one without names nothing the platform holds.
+CREATE TEMPORARY TABLE cited ON COMMIT DROP AS
+  SELECT iri, d ->> 'source_document_id' AS document_id, s ->> 'locator' AS locator, s ->> 'resource' AS resource
+    FROM concept, fixture, jsonb_array_elements(sources) AS s
+   WHERE s ? 'locator';
+INSERT INTO evidence (workspace_id, source_document_id, locator, resource)
+  SELECT :'workspace', document_id, locator, resource FROM cited
+  ON CONFLICT DO NOTHING;
+INSERT INTO concept_evidence (workspace_id, iri, source_document_id, locator)
+  SELECT :'workspace', iri, document_id, locator FROM cited
+  ON CONFLICT DO NOTHING;
+\endif
+SELECT format('synthetic fixture present: workspace %s, short name synthetic, %s connected source, %s document, %s passages%s',
               :'workspace',
               (SELECT count(*) FROM connected_source WHERE workspace_id = :'workspace'),
               (SELECT count(*) FROM source_document WHERE workspace_id = :'workspace'),
-              (SELECT count(*) FROM "index".passage WHERE workspace_id = :'workspace'));
+              (SELECT count(*) FROM "index".passage WHERE workspace_id = :'workspace'),
+              CASE WHEN :'concepts'::boolean
+                   THEN format(', %s concepts', (SELECT count(*) FROM concept_index WHERE workspace_id = :'workspace'))
+                   ELSE '' END);
 COMMIT;
 SQL

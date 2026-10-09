@@ -95,9 +95,10 @@ the side that counts. Read the numbers off those files rather than from here.
 ## The harness's actions
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Eighteen actions
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Nineteen actions
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
-`apps/api/tests/harness-sources.ts` and the People three from `apps/api/tests/harness-people.ts`:
+`apps/api/tests/harness-sources.ts`, the People three from `apps/api/tests/harness-people.ts` and the
+Knowledge one from `apps/api/tests/harness-knowledge.ts`:
 
 | Action | What it does |
 | --- | --- |
@@ -119,6 +120,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `makeGroups` | Groups made by a named member through the members slice's own actions, one transaction each, every group holding the members `memberIds` names — the member's own actions on the audit log, and the groups the `Groups` page and a member's page start from |
 | `askToJoin` | A person's ask to join a workspace by its short name, with a reason, through the members slice's own action and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own action and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* page |
+| `seedConcepts` | Concepts a named Admin writes in order through the concepts slice's own write, so each is in the repository, the index and the map as a member's write leaves it. Each takes a kind and a sensitivity, links to concepts earlier in the list, and sources whose passages each get a citation mark. A trust tier other than `unverified` is a verification row written straight to the store, because the slice has no verify action. A `"groups"` audience is the Admin's own override to one group holding the members `groupMemberIds` names, and nobody outside that group reads the concept, its Admin included. It answers each concept's IRI, path and cited documents |
 
 Thirty-two more helpers in the same module drive the browser rather than the harness:
 
