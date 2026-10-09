@@ -129,6 +129,22 @@ describe("find's plan, as the api and under the passage's policy", () => {
     expect(found.indexes).toContain(`passage_${arranged.workspaceId}_search_gin`);
   });
 
+  it("keeps the partition's GIN index past a cursor", async () => {
+    const arranged = await arrangedWithInvoices();
+
+    const found = await planned(db(), arranged.admin, async (reader, tx) => {
+      const read = await findPassages(reader, tx, {
+        query: QUERY,
+        limit: 10,
+        after: { matched: 3, rank: 3, key: { sourceDocumentId: arranged.handbook, charStart: 0 } },
+      });
+      return read.ok ? ok(read.value.map(({ passage }) => passage)) : read;
+    });
+
+    expect(found.answer).toEqual(theHandbookFound(arranged));
+    expect(found.indexes).toContain(`passage_${arranged.workspaceId}_search_gin`);
+  });
+
   it("cannot use the GIN index unless the match is leakproof", async () => {
     const arranged = await arrangedWithInvoices();
 

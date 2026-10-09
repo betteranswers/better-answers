@@ -10,7 +10,12 @@ import {
   type FindResult,
 } from "../src/answering/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
-import { seededBy, visibilitySuite } from "./sourced-concept.ts";
+import {
+  connectedSourceHolding,
+  passageUnder,
+  seededBy,
+  visibilitySuite,
+} from "./sourced-concept.ts";
 import { documentLanded } from "./suite-documents.ts";
 import { answered } from "./suite-postgres.ts";
 
@@ -180,16 +185,23 @@ const PAST_THE_END =
 const pagesOf = async (
   person: UserPrincipal,
   limit: number,
+  labelled: (result: FindResult) => readonly string[] = titlesOf,
 ): Promise<readonly (readonly string[])[]> => {
   const pages: (readonly string[])[] = [];
   let after: FindPosition | undefined;
   do {
     const page = await searching(person, QUESTION, limit, after);
-    pages.push(titlesOf(page));
+    pages.push(labelled(page));
     after = page.nextCursor === undefined ? undefined : findCursor.parse(page.nextCursor);
   } while (after !== undefined);
   return pages;
 };
+
+const titlesOrLocatorsOf = (result: FindResult): readonly string[] =>
+  result.matches.map((match) => (match.layer === "bundles" ? match.title : match.locator));
+
+/** Two passages alike but for their span, so only the key orders them. */
+const ALIKE = "Audit logs, kept long.";
 
 describe("find's pages", () => {
   it("continues each run after the cursor, ending with no cursor", async () => {
@@ -224,6 +236,35 @@ describe("find's pages", () => {
       query: QUESTION,
       matches: [],
     });
+  });
+
+  it("continues the passage run after a cursor inside it", async () => {
+    const { workspaceId, viewer } = await arrange();
+    const twice = await connectedSourceHolding(db(), workspaceId);
+    for (const [ordinal, charStart] of [
+      [0, 0],
+      [1, ALIKE.length],
+    ] as const) {
+      await passageUnder(db(), workspaceId, twice, {
+        content: ALIKE,
+        ordinal,
+        charStart,
+        charEnd: charStart + ALIKE.length,
+      });
+    }
+    const once = await connectedSourceHolding(db(), workspaceId);
+    await passageUnder(db(), workspaceId, once, {
+      content: "Audit logs.",
+      ordinal: 0,
+      charStart: 0,
+      charEnd: 11,
+    });
+    await conceptLanded(workspaceId, { title: AUDIT_LOGS_RETENTION });
+
+    expect(await pagesOf(viewer, 2, titlesOrLocatorsOf)).toEqual([
+      [AUDIT_LOGS_RETENTION, `${twice.documentId}/chars:0-22`],
+      [`${twice.documentId}/chars:22-44`, `${once.documentId}/chars:0-11`],
+    ]);
   });
 
   it("pages past a withheld concept as past an absent one", async () => {

@@ -248,6 +248,18 @@ describe("the any-word rule over concept rows", () => {
     expect(matched.map(({ title }) => title)).toEqual(["Audit Logs", "O'Brien"]);
   });
 
+  it("matches a word whose parsed form keeps a quote", async () => {
+    const matched = await matchedOver(
+      [
+        ["See example.com/o'brien", UNRELATED],
+        ["Holiday policy", UNRELATED],
+      ],
+      "example.com/o'brien",
+    );
+
+    expect(matched).toEqual([{ title: "See example.com/o'brien", matched: 3, rank: 3 }]);
+  });
+
   it("matches nothing on stop words alone, and raises nothing", async () => {
     const matched = await matchedOver([["The policy", "It is what it is."]], "the and of it is");
 

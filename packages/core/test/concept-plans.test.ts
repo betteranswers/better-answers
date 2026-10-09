@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MARK_THE_MATCH_LEAKPROOF } from "@better-answers/schema";
+import { conceptIriOf, MARK_THE_MATCH_LEAKPROOF, ulid } from "@better-answers/schema";
 import { UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 
 import { findConcepts } from "../src/concepts/index.ts";
@@ -54,6 +54,23 @@ describe("the concept arm's plan, as the api under its policy", () => {
     const found = await matching(admin);
 
     expect(found.answer).toEqual([HOLIDAY]);
+    expect(found.indexes).toContain("concept_index_search_gin");
+  });
+
+  it("keeps the GIN index for weak matches past a cursor", async () => {
+    const { admin } = await arrangedWithInvoices();
+
+    const found = await planned(db(), admin, async (reader, tx) => {
+      const read = await findConcepts(reader, tx, {
+        query: "holiday policy grants",
+        strength: "weak",
+        limit: 10,
+        after: { matched: 3, rank: 3, key: conceptIriOf(ulid()) },
+      });
+      return read.ok ? ok(read.value.map(({ concept }) => concept.title)) : read;
+    });
+
+    expect(found.answer).toEqual([]);
     expect(found.indexes).toContain("concept_index_search_gin");
   });
 
