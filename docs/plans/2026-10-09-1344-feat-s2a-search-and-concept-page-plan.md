@@ -555,11 +555,11 @@ flowchart LR
 - **Requirements:** R1, R5.
 - **Dependencies:** U3.
 - **Files:**
-  - Modify: `apps/api/tests/harness-control.ts`, `apps/api/tests/harness-sources.ts` (or a new `harness-knowledge.ts`), `apps/web/e2e/harness.ts`, `deploy/seed-synthetic.sh`, `apps/api/tests/local-database.test.ts`, `.claude/skills/browser-suite/SKILL.md` (the action table).
+  - Modify: `apps/api/tests/harness-control.ts`, `apps/api/tests/harness-sources.ts` (or a new `harness-knowledge.ts`), `apps/web/e2e/harness.ts`, `deploy/seed-synthetic.sh`, `deploy/local-database.sh`, `apps/api/tests/local-database.test.ts`, `.claude/skills/browser-suite/SKILL.md` (the action table).
 - **Approach:**
   1. Add a `seedConcepts` harness action that lands concepts at a given sensitivity, audience, trust and kind, with links, sources and passages.
   2. Land them through `writeConcept`, so the generated column is real.
-  3. Grow the synthetic seed by its concept rows, idempotently.
+  3. Grow the synthetic seed by its concept rows, idempotently, in the local database alone: `local-database.sh` asks for them with `--with-concepts`, and the drill's call is unchanged. On staging the drill gives the synthetic workspace an empty repository, and the reconciler answers `history-diverged` for a workspace whose recorded `bundle_commit` git does not hold.
   4. Edit the skill table through `ce-skill-work`.
 - **Patterns to follow:** `seedConnectedSources` in `apps/api/tests/harness-sources.ts`; `packages/schema/test/factory.ts`.
 - **Test scenarios:**
