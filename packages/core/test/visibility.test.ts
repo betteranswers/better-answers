@@ -12,13 +12,14 @@ import {
 import { ask, find, open } from "../src/answering/index.ts";
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import {
+  cascadingVisibility,
   evidencePaneOf,
   overrideConceptSensitivity,
   writeConcept,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import { footnotesOf } from "../src/guides/index.ts";
-import { attempt, parse, type UserPrincipal } from "../src/kernel/index.ts";
+import { attempt, ok, parse, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   narrowConnectedSource,
   narrowConnectedSourceInput,
@@ -27,8 +28,9 @@ import {
   widenConnectedSource,
   widenConnectedSourceInput,
 } from "../src/sources/index.ts";
-import type { Folded, Tx } from "../src/store/postgres/index.ts";
+import { withScope, type Folded, type Tx } from "../src/store/postgres/index.ts";
 import { bundleHistory } from "./bundle.ts";
+import { bootstrap } from "./platform.ts";
 import {
   connectedSourceForGroups,
   connectedSourceHolding,
@@ -55,6 +57,7 @@ import {
   statementsWaitingOnALock,
   until,
   whileActionsWaitAt,
+  whileWritesAreRefused,
 } from "./suite-postgres.ts";
 import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -227,6 +230,31 @@ const besideAnOpenNarrowing = async <T>(
     holder.release();
   }
 };
+
+/** What a sync does to a document: its sensitivity moves, and nothing re-derives. */
+const documentNarrowedBySync = (tx: Pick<Tx, "query">, workspaceId: string, sourced: Sourced) =>
+  tx.query(
+    `UPDATE source_document SET sensitivity = 'Restricted'
+      WHERE workspace_id = $1 AND connected_source_id = $2 AND id = $3`,
+    [workspaceId, sourced.connectedSourceId, sourced.documentId],
+  );
+
+const platformCascade = (
+  scenario: Scenario,
+  sourced: Sourced,
+  write: (tx: Tx) => Promise<unknown>,
+) =>
+  withScope(bootstrap, scenario.postgres, scenario.workspaceId, (tx, platform) =>
+    cascadingVisibility(
+      platform,
+      tx,
+      { connectedSourceId: sourced.connectedSourceId },
+      async (tx) => {
+        await write(tx);
+        return ok("written");
+      },
+    ),
+  );
 
 const writeUpIncluding = (
   workspaceId: string,
@@ -591,12 +619,30 @@ const workspaceWithHrConnectedSource = async () => {
   return { scenario, hr, connectedSource };
 };
 
+/** A source whose document one concept cites, beside another source the cascade must leave. */
+const citedBesideAnother = async () => {
+  const scenario = await arrange();
+  const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+  const other = await connectedSourceHolding(db(), scenario.workspaceId);
+  const cited = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
+  return { scenario, connectedSource, other, cited };
+};
+
+const narrowedWriteUpAndUntouchedConcept = async (
+  workspaceId: string,
+  writeUp: string,
+  untouched: string,
+) => {
+  expect(await visibilityHeld(db().pool, "write_up", workspaceId, writeUp)).toEqual({
+    sensitivity: "Restricted",
+    ...EVERYONE,
+  });
+  expect(await heldRow(workspaceId, untouched)).toEqual({ sensitivity: "Internal", ...EVERYONE });
+};
+
 describe("narrowing a connected source", () => {
   it("cascades to citing concepts and write-ups, writing one audit event", async () => {
-    const scenario = await arrange();
-    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
-    const other = await connectedSourceHolding(db(), scenario.workspaceId);
-    const cited = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
+    const { scenario, connectedSource, other, cited } = await citedBesideAnother();
     const linked = await conceptCiting(scenario, scenario.editor, [connectedSource.documentId], {
       body: `See [the first note](/${cited.path}).`,
     });
@@ -628,14 +674,7 @@ describe("narrowing a connected source", () => {
     expect(await edgeVisibilityHeld(db().pool, scenario.workspaceId, linked.iri)).toEqual([
       { sensitivity: "Restricted", ...EVERYONE },
     ]);
-    expect(await visibilityHeld(db().pool, "write_up", scenario.workspaceId, writeUp)).toEqual({
-      sensitivity: "Restricted",
-      ...EVERYONE,
-    });
-    expect(await heldRow(scenario.workspaceId, untouched.iri)).toEqual({
-      sensitivity: "Internal",
-      ...EVERYONE,
-    });
+    await narrowedWriteUpAndUntouchedConcept(scenario.workspaceId, writeUp, untouched.iri);
 
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed"),
@@ -901,6 +940,27 @@ describe("narrowing a connected source", () => {
     ]);
   });
 
+  it("re-derives nothing when it refuses an unheld group", async () => {
+    const scenario = await arrange();
+    const connectedSource = await connectedSourceHolding(db(), scenario.workspaceId);
+    await conceptCiting(scenario, scenario.editor, [connectedSource.documentId]);
+    const elsewhere = await arrange();
+    const theirGroup = await groupNamed(db(), elsewhere, "HR", []);
+
+    const refused = await whileWritesAreRefused(db().pool, "concept_index", () =>
+      reading(scenario.admin, (admin, tx) =>
+        narrowingAsked(admin, tx, {
+          connectedSourceId: connectedSource.connectedSourceId,
+          sensitivity: "Internal",
+          audience: "groups",
+          audienceGroups: [theirGroup],
+        }),
+      ),
+    );
+
+    expect(refused).toEqual({ ok: false, error: "no-such-group" });
+  });
+
   const writeBesideAnOpenNarrowing = async (
     scenario: Scenario,
     connectedSourceId: string,
@@ -1093,6 +1153,51 @@ describe("narrowing a connected source", () => {
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed"),
     ).toHaveLength(2);
+  });
+
+  it("serialises an Admin's and a platform's cascade over one concept", async () => {
+    const scenario = await arrange();
+    const first = await connectedSourceHolding(db(), scenario.workspaceId);
+    const second = await connectedSourceHolding(db(), scenario.workspaceId, {
+      sensitivity: "Public",
+    });
+    const written = await conceptCiting(scenario, scenario.editor, [
+      first.documentId,
+      second.documentId,
+    ]);
+
+    await whileActionsWaitAt(
+      db().pool,
+      "concept_index",
+      "UPDATE",
+      async (release) => {
+        const narrowed = reading(scenario.admin, (admin, tx) =>
+          narrowingAsked(admin, tx, {
+            connectedSourceId: first.connectedSourceId,
+            sensitivity: "Restricted",
+            audience: "everyone",
+          }),
+        );
+        const cascaded = platformCascade(scenario, second, (tx) =>
+          documentNarrowedBySync(tx, scenario.workspaceId, second),
+        );
+        await until(async () => (await countWaitingOnLocks(db().pool)) >= 2);
+        expect(await statementsWaitingOnALock(db().pool)).toEqual(
+          expect.arrayContaining([
+            expect.stringContaining("UPDATE concept_index"),
+            expect.stringContaining("pg_advisory_xact_lock(hashtext('visibility-cascade')"),
+          ]),
+        );
+        await release();
+        expect(await narrowed).toMatchObject({ ok: true });
+        expect(await cascaded).toMatchObject({ ok: true, value: { concepts: [written.iri] } });
+      },
+      "together",
+    );
+
+    expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
+      bothAt({ sensitivity: "Restricted", ...EVERYONE }),
+    );
   });
 
   it("leaves nothing, passages included, when the transaction fails after it", async () => {
@@ -1594,6 +1699,26 @@ describe("narrowing documents", () => {
     expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
       bothAt({ sensitivity: "Restricted", ...EVERYONE }),
     );
+  });
+});
+
+describe("a cascade under a platform principal", () => {
+  it("re-derives the concepts citing a source's documents, and their write-ups", async () => {
+    const { scenario, connectedSource, other, cited } = await citedBesideAnother();
+    const untouched = await conceptCiting(scenario, scenario.editor, [other.documentId]);
+    const writeUp = await writeUpIncluding(scenario.workspaceId, [cited.iri]);
+    await documentNarrowedBySync(db().pool, scenario.workspaceId, connectedSource);
+
+    const cascaded = await platformCascade(scenario, connectedSource, async () => undefined);
+
+    expect(cascaded).toEqual({
+      ok: true,
+      value: { written: "written", concepts: [cited.iri], writeUps: [writeUp] },
+    });
+    expect(await rowAndNode(scenario.workspaceId, cited.iri)).toEqual(
+      bothAt({ sensitivity: "Restricted", ...EVERYONE }),
+    );
+    await narrowedWriteUpAndUntouchedConcept(scenario.workspaceId, writeUp, untouched.iri);
   });
 });
 

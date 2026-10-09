@@ -15,6 +15,7 @@ import { recomputeWriteUpsIncluding } from "../guides/index.ts";
 import {
   actorIdOf,
   attempt,
+  attemptResult,
   err,
   isActorId,
   ok,
@@ -22,7 +23,6 @@ import {
   ulid,
   type ActorId,
   type AdminUserPrincipal,
-  type GroupId,
   type Principal,
   type Result,
   type RoleRefusal,
@@ -178,22 +178,6 @@ const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> 
 };
 
 /**
- * Takes the workspace's cascade lock until the transaction ends, then answers whether the
- * workspace holds every group in `groupIds`.
- */
-export const openingACascadeOverHeldGroups = async (
-  admin: AdminUserPrincipal,
-  tx: Tx,
-  groupIds: readonly GroupId[],
-): Promise<Result<boolean, RoleRefusal | Error>> => {
-  const serialised = await attempt(() => serialisingCascades(admin, tx));
-  if (!serialised.ok) return err(serialised.error);
-  const groups = await attempt(() => holdsEveryGroup(admin, tx, groupIds));
-  if (!groups.ok) return err(groups.error);
-  return groups.value;
-};
-
-/**
  * Row first, citations after, the opposite order to conceptVisibilityFrom: waiting on the row
  * is what makes a re-write's citations the ones read.
  */
@@ -232,7 +216,7 @@ const recomputeConceptVisibility = async (
  * Recomputes each indexed concept citing the connected source's documents, or only those among
  * `documentIds`, and returns every one, whether or not its sensitivity moved.
  */
-export const recomputeVisibilitySourcedFrom = async (
+const recomputeVisibilitySourcedFrom = async (
   principal: Principal,
   tx: Tx,
   input: {
@@ -255,6 +239,61 @@ export const recomputeVisibilitySourcedFrom = async (
     if (visibility !== undefined) recomputed.push(iri);
   }
   return recomputed;
+};
+
+/**
+ * The concepts citing a connected source's documents, all of them or only `documentIds`, or the one
+ * concept an override names.
+ */
+type CascadeTarget =
+  | {
+      readonly connectedSourceId: string;
+      readonly documentIds?: readonly string[] | undefined;
+    }
+  | { readonly iri: string };
+
+type Cascaded<T> = {
+  readonly written: T;
+
+  readonly concepts: readonly string[];
+
+  readonly writeUps: readonly string[];
+};
+
+const conceptsRecomputed = async (
+  principal: Principal,
+  tx: Tx,
+  target: CascadeTarget,
+): Promise<readonly string[]> => {
+  if (!("iri" in target)) return recomputeVisibilitySourcedFrom(principal, tx, target);
+  await recomputeConceptVisibility(principal, tx, target.iri);
+  return [target.iri];
+};
+
+const rederived = async (principal: Principal, tx: Tx, target: CascadeTarget) => {
+  const concepts = await conceptsRecomputed(principal, tx, target);
+  const writeUps = await recomputeWriteUpsIncluding(principal, tx, { iris: concepts });
+  return { concepts, writeUps };
+};
+
+/**
+ * Takes the workspace's cascade lock, runs `write`, then recomputes the target's concepts and every
+ * write-up including them. A refusal from `write` comes back as it is, with nothing recomputed. The
+ * caller's own checks belong inside `write`, after the lock and before any row it locks.
+ */
+export const cascadingVisibility = async <T, E>(
+  principal: Principal,
+  tx: Tx,
+  target: CascadeTarget,
+  write: (tx: Tx) => Promise<Result<T, E>>,
+): Promise<Result<Cascaded<T>, E | Error>> => {
+  const serialised = await attempt(() => serialisingCascades(principal, tx));
+  if (!serialised.ok) return err(serialised.error);
+  const written = await write(tx);
+  if (!written.ok) return err(written.error);
+  const cascaded = await attempt(() => rederived(principal, tx, target));
+  if (!cascaded.ok) return err(cascaded.error);
+  return ok({ written: written.value, ...cascaded.value });
 };
 
 export type OverrideConceptSensitivityInput = {
@@ -295,9 +334,11 @@ export const overrideConceptSensitivity = async (
   const visibility = visibilityFrom(input);
   if (!iri.success || visibility === undefined) return err("malformed");
 
-  const opened = await openingTheOverride(admin.value, tx, iri.data, visibility);
-  if (!opened.ok) return err(opened.error);
-  return writeOverride(admin.value, tx, iri.data, visibility);
+  const cascaded = await cascadingVisibility(admin.value, tx, { iri: iri.data }, (tx) =>
+    writeOverride(admin.value, tx, iri.data, visibility),
+  );
+  if (!cascaded.ok) return err(cascaded.error);
+  return ok({ ...cascaded.value.written, writeUps: cascaded.value.writeUps });
 };
 
 const openingTheOverride = async (
@@ -306,7 +347,9 @@ const openingTheOverride = async (
   iri: string,
   visibility: Visibility,
 ): Promise<Result<undefined, OverrideConceptSensitivityRefusal>> => {
-  const groups = await openingACascadeOverHeldGroups(admin, tx, visibility.audienceGroups ?? []);
+  const groups = await attemptResult(() =>
+    holdsEveryGroup(admin, tx, visibility.audienceGroups ?? []),
+  );
   if (!groups.ok) return err(groups.error);
   const known = await attempt(() =>
     tx.query("SELECT 1 FROM concept_identity WHERE workspace_id = $1 AND iri = $2", [
@@ -325,7 +368,11 @@ const writeOverride = async (
   tx: Tx,
   iri: string,
   visibility: Visibility,
-): Promise<Result<ConceptSensitivityOverridden, Error>> => {
+): Promise<
+  Result<Omit<ConceptSensitivityOverridden, "writeUps">, OverrideConceptSensitivityRefusal>
+> => {
+  const opened = await openingTheOverride(admin, tx, iri, visibility);
+  if (!opened.ok) return err(opened.error);
   const auditEventId = ulid();
   const recorded = await attempt(() =>
     tx.query(
@@ -355,12 +402,7 @@ const writeOverride = async (
     subjectId: iri,
     detail: { iri, sensitivity: visibility.sensitivity, audience: visibility.audience },
   });
-  const cascaded = await attempt(async () => {
-    await recomputeConceptVisibility(admin, tx, iri);
-    return recomputeWriteUpsIncluding(admin, tx, { iris: [iri] });
-  });
-  if (!cascaded.ok) return err(cascaded.error);
-  return ok({ iri, auditEventId, visibility, writeUps: cascaded.value });
+  return ok({ iri, auditEventId, visibility });
 };
 
 type ReadableEvidence = {

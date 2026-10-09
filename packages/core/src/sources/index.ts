@@ -9,8 +9,17 @@ import {
   type AuditEvent,
   type AuditAction,
 } from "../audit/index.ts";
-import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
-import { attempt, err, ok, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
+import { cascadingVisibility } from "../concepts/index.ts";
+import {
+  attempt,
+  attemptResult,
+  err,
+  ok,
+  ulid,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
+import { holdsEveryGroup } from "../members/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import {
   adminOnConnectedSource,
@@ -19,7 +28,6 @@ import {
   CONNECTED_SOURCE_VISIBILITY,
   type ActingOnConnectedSource,
 } from "./admin-connected-source.ts";
-import { cascadeOverEvidence } from "./cascade.ts";
 import { holdsAnUnreviewedSpecialCategory } from "./review.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
@@ -169,40 +177,39 @@ type SensitivityAsked = {
   readonly next: Visibility;
 };
 
+type SensitivityChecked<A extends AuditAction, E> = (
+  asked: SensitivityAsked,
+  tx: Tx,
+) => Promise<Result<Pick<AuditEvent<A>, "action" | "detail">, E>>;
+
 /**
- * A narrowing and a widening both open the cascade before they lock the connected source, so the two queue
+ * Inside the cascade's lock, before the connected source's: a narrowing and a widening then queue
  * behind each other rather than deadlock.
  */
 const sensitivityAskedOf = async (
-  principal: UserPrincipal,
+  acting: ActingOnConnectedSource,
   tx: Tx,
-  input: z.output<ReturnType<typeof theSensitivityAsked>>,
+  next: Visibility,
 ): Promise<Result<SensitivityAsked, SensitivityHeldRefusal>> => {
-  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
-  if (!acting.ok) return err(acting.error);
-  const next = input.visibility;
-
-  const groups = await openingACascadeOverHeldGroups(
-    acting.value.admin,
-    tx,
-    next.audienceGroups ?? [],
+  const groups = await attemptResult(() =>
+    holdsEveryGroup(acting.admin, tx, next.audienceGroups ?? []),
   );
   if (!groups.ok) return err(groups.error);
-  const current = await connectedSourceNamed<ConnectedSourceRow>(acting.value, tx, {
+  const current = await connectedSourceNamed<ConnectedSourceRow>(acting, tx, {
     columns: "sensitivity, audience, audience_groups",
     lock: "for-update",
   });
   if (!current.ok) return err(current.error);
   if (!groups.value) return err("no-such-group");
-  return ok({ acting: acting.value, from: visibilityOf(current.value), next });
+  return ok({ acting, from: visibilityOf(current.value), next });
 };
 
-const sensitivitySet = async <A extends AuditAction>(
+const sensitivityWritten = async <A extends AuditAction>(
   acting: ActingOnConnectedSource,
   tx: Tx,
   next: Visibility,
   auditEvent: Pick<AuditEvent<A>, "action" | "detail">,
-): Promise<Result<ConnectedSourceSensitivitySet, Error>> => {
+): Promise<Result<string, Error>> => {
   const { admin, workspaceId, connectedSourceId } = acting;
   const written = await attempt(() =>
     tx.query(
@@ -215,26 +222,44 @@ const sensitivitySet = async <A extends AuditAction>(
 
   const auditEventId = ulid();
   await record(admin, tx, { id: auditEventId, subjectId: connectedSourceId, ...auditEvent });
-  const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { connectedSourceId }));
-  if (!cascaded.ok) return err(cascaded.error);
-  return ok({ connectedSourceId, auditEventId, visibility: next, ...cascaded.value });
+  return ok(auditEventId);
 };
 
-/**
- * `widening-refused` if the visibility asked is wider in sensitivity or audience, even when it is
- * narrower in the other.
- */
-export const narrowConnectedSource = async (
+/** `checked` refuses the move, or names the audit event that records it. */
+const sensitivitySet = async <A extends AuditAction, E>(
   principal: UserPrincipal,
   tx: Tx,
-  input: NarrowConnectedSourceInput,
-): Promise<Result<ConnectedSourceNarrowed, NarrowConnectedSourceRefusal>> => {
-  const asked = await sensitivityAskedOf(principal, tx, input);
-  if (!asked.ok) return err(asked.error);
-  const { acting, from, next } = asked.value;
-  if (widens(from, next)) return err("widening-refused");
+  input: z.output<ReturnType<typeof theSensitivityAsked>>,
+  checked: SensitivityChecked<A, E>,
+): Promise<Result<ConnectedSourceSensitivitySet, SensitivityHeldRefusal | E | Error>> => {
+  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
+  if (!acting.ok) return err(acting.error);
+  const { admin, connectedSourceId } = acting.value;
+  const next = input.visibility;
 
-  return sensitivitySet(acting, tx, next, {
+  const cascaded = await cascadingVisibility(
+    admin,
+    tx,
+    { connectedSourceId },
+    async (tx): Promise<Result<string, SensitivityHeldRefusal | E | Error>> => {
+      const asked = await sensitivityAskedOf(acting.value, tx, next);
+      if (!asked.ok) return err(asked.error);
+      const auditEvent = await checked(asked.value, tx);
+      if (!auditEvent.ok) return err(auditEvent.error);
+      return sensitivityWritten(acting.value, tx, next, auditEvent.value);
+    },
+  );
+  if (!cascaded.ok) return err(cascaded.error);
+  const { written: auditEventId, concepts, writeUps } = cascaded.value;
+  return ok({ connectedSourceId, auditEventId, visibility: next, concepts, writeUps });
+};
+
+const narrowing: SensitivityChecked<
+  typeof SOURCE_ACTIONS.narrowed,
+  SourceRefusal<"widening-refused">
+> = async ({ acting, from, next }) => {
+  if (widens(from, next)) return err("widening-refused");
+  return ok({
     action: SOURCE_ACTIONS.narrowed,
     detail: {
       [STORED_DETAIL_KEYS.connectedSourceId]: acting.connectedSourceId,
@@ -244,25 +269,17 @@ export const narrowConnectedSource = async (
   });
 };
 
-/**
- * `not-wider` unless the visibility asked is wider in sensitivity or audience and narrower in neither.
- * A document's own sensitivity is left alone: the derivation reads the narrower of it and the connected source's.
- */
-export const widenConnectedSource = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  input: WidenConnectedSourceInput,
-): Promise<Result<ConnectedSourceWidened, WidenConnectedSourceRefusal>> => {
-  const asked = await sensitivityAskedOf(principal, tx, input);
-  if (!asked.ok) return err(asked.error);
-  const { acting, from, next } = asked.value;
+const widening: SensitivityChecked<
+  typeof SOURCE_ACTIONS.widened,
+  SourceRefusal<"not-wider" | "special-category-unreviewed"> | Error
+> = async ({ acting, from, next }, tx) => {
   if (!widens(from, next) || widens(next, from)) return err("not-wider");
 
   const unreviewed = await holdsAnUnreviewedSpecialCategory(acting, tx);
   if (!unreviewed.ok) return err(unreviewed.error);
   if (unreviewed.value) return err("special-category-unreviewed");
 
-  return sensitivitySet(acting, tx, next, {
+  return ok({
     action: SOURCE_ACTIONS.widened,
     detail: {
       [STORED_DETAIL_KEYS.connectedSourceId]: acting.connectedSourceId,
@@ -273,3 +290,25 @@ export const widenConnectedSource = async (
     },
   });
 };
+
+/**
+ * `widening-refused` if the visibility asked is wider in sensitivity or audience, even when it is
+ * narrower in the other.
+ */
+export const narrowConnectedSource = (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: NarrowConnectedSourceInput,
+): Promise<Result<ConnectedSourceNarrowed, NarrowConnectedSourceRefusal>> =>
+  sensitivitySet(principal, tx, input, narrowing);
+
+/**
+ * `not-wider` unless the visibility asked is wider in sensitivity or audience and narrower in neither.
+ * A document's own sensitivity is left alone: the derivation reads the narrower of it and the connected source's.
+ */
+export const widenConnectedSource = (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: WidenConnectedSourceInput,
+): Promise<Result<ConnectedSourceWidened, WidenConnectedSourceRefusal>> =>
+  sensitivitySet(principal, tx, input, widening);
