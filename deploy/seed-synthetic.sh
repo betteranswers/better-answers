@@ -43,10 +43,57 @@ INSERT INTO "index".passage
          c ->> 'locator', c ->> 'content'
     FROM fixture, jsonb_array_elements(d -> 'passages') AS c
   ON CONFLICT DO NOTHING;
-SELECT format('synthetic fixture present: workspace %s, short name synthetic, %s connected source, %s document, %s passages',
+-- Rows alone: no repository holds this commit or these files, so an audit or a map rebuild names each concept's file missing.
+INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor)
+  VALUES (:'workspace', '0000000000000000000000000000000000000000', '01M2SYNTHET1CC0MM1TAAAAAAA',
+          'process:better-answers-synthetic-seed')
+  ON CONFLICT DO NOTHING;
+-- The invoice answer cites a passage of the unpublished document, so it is Restricted as a write would derive it.
+CREATE TEMPORARY TABLE concept ON COMMIT DROP AS
+  SELECT 'https://better-answers.com/c/' || c.ulid AS iri, c.*
+    FROM fixture, LATERAL (VALUES
+      ('01M2SYNTHET1CC0NCEPTAAAAA1', 'answer:invoice-payment-terms', 'knowledge/invoice-payment-terms.md',
+       'Answer', 'Invoice payment terms', 'Restricted',
+       E'A synthetic fixture answer: an invoice is due on receipt.[^invoice]\n\nSee also [Order delivery times](order-delivery-times.md).\n',
+       jsonb_build_array(jsonb_build_object('id', 'invoice', 'title', 'invoice-2026-041.md',
+                                            'resource', 'invoice-2026-041.md',
+                                            'locator', d -> 'passages' -> 0 ->> 'locator'))),
+      ('01M2SYNTHET1CC0NCEPTAAAAA2', 'answer:order-delivery-times', 'knowledge/order-delivery-times.md',
+       'Answer', 'Order delivery times', 'Internal',
+       E'A synthetic fixture answer: delivery follows within ten working days of a signed order.[^terms]\n\nSee also [Invoice payment terms](invoice-payment-terms.md) and [Bid library](bid-library.md).\n',
+       jsonb_build_array(jsonb_build_object('id', 'terms', 'title', 'Synthetic order terms',
+                                            'resource', 'synthetic-order-terms.md'))),
+      ('01M2SYNTHET1CC0NCEPTAAAAA3', 'note:bid-library', 'knowledge/bid-library.md',
+       'Note', 'Bid library', 'Public',
+       E'A synthetic fixture note: the bid library holds the invoices and order terms this workspace answers from.\n\nSee also [Order delivery times](order-delivery-times.md).\n',
+       '[]'::jsonb)
+    ) AS c(ulid, merge_key, path, kind, title, sensitivity, body, sources);
+INSERT INTO concept_identity (workspace_id, iri, merge_key)
+  SELECT :'workspace', iri, merge_key FROM concept
+  ON CONFLICT DO NOTHING;
+INSERT INTO concept_index
+    (workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha, status, published_at,
+     sensitivity, audience)
+  SELECT :'workspace', iri, path, kind, title,
+         jsonb_build_object('iri', iri, 'title', title, 'type', kind, 'status', 'stable', 'sources', sources),
+         body, encode(sha256(convert_to(body, 'UTF8')), 'hex'), '0000000000000000000000000000000000000000',
+         'stable', now(), sensitivity, 'everyone'
+    FROM concept
+  ON CONFLICT DO NOTHING;
+INSERT INTO evidence (workspace_id, source_document_id, locator, resource)
+  SELECT :'workspace', d ->> 'source_document_id', d -> 'passages' -> 0 ->> 'locator', 'invoice-2026-041.md'
+    FROM fixture
+  ON CONFLICT DO NOTHING;
+INSERT INTO concept_evidence (workspace_id, iri, source_document_id, locator)
+  SELECT :'workspace', iri, d ->> 'source_document_id', d -> 'passages' -> 0 ->> 'locator'
+    FROM concept, fixture
+   WHERE merge_key = 'answer:invoice-payment-terms'
+  ON CONFLICT DO NOTHING;
+SELECT format('synthetic fixture present: workspace %s, short name synthetic, %s connected source, %s document, %s passages, %s concepts',
               :'workspace',
               (SELECT count(*) FROM connected_source WHERE workspace_id = :'workspace'),
               (SELECT count(*) FROM source_document WHERE workspace_id = :'workspace'),
-              (SELECT count(*) FROM "index".passage WHERE workspace_id = :'workspace'));
+              (SELECT count(*) FROM "index".passage WHERE workspace_id = :'workspace'),
+              (SELECT count(*) FROM concept_index WHERE workspace_id = :'workspace'));
 COMMIT;
 SQL

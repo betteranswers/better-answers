@@ -211,6 +211,47 @@ describe("the local database", () => {
       expect(text).toContain("The sort code is [withheld]");
       expect(text).not.toMatch(/\b\d{2}[- ]?\d{2}[- ]?\d{2}\b/);
     });
+
+    it("holds three concepts, the Restricted one citing the document", async () => {
+      const concepts = await browse.query(
+        `SELECT iri, title, kind, sensitivity, audience, status FROM concept_index
+          WHERE workspace_id = $1 ORDER BY path`,
+        [SYNTHETIC_WORKSPACE],
+      );
+      const cited = await browse.query(
+        "SELECT iri, source_document_id, locator FROM concept_evidence WHERE workspace_id = $1",
+        [SYNTHETIC_WORKSPACE],
+      );
+
+      const concept = (title: string, kind: string, sensitivity: string, ulid: string) => ({
+        iri: `https://better-answers.com/c/${ulid}`,
+        title,
+        kind,
+        sensitivity,
+        audience: "everyone",
+        status: "stable",
+      });
+      expect(concepts.rows).toEqual([
+        concept("Bid library", "Note", "Public", "01M2SYNTHET1CC0NCEPTAAAAA3"),
+        concept("Invoice payment terms", "Answer", "Restricted", "01M2SYNTHET1CC0NCEPTAAAAA1"),
+        concept("Order delivery times", "Answer", "Internal", "01M2SYNTHET1CC0NCEPTAAAAA2"),
+      ]);
+      expect(cited.rows).toEqual([
+        {
+          iri: "https://better-answers.com/c/01M2SYNTHET1CC0NCEPTAAAAA1",
+          source_document_id: fixture.document.source_document_id,
+          locator: fixture.document.passages[0]?.locator,
+        },
+      ]);
+    });
+
+    it("matches a concept by a word of its body", async () => {
+      const matched = await browse.query(
+        "SELECT title FROM concept_index WHERE workspace_id = $1 AND search @@ to_tsquery('english', 'receipt')",
+        [SYNTHETIC_WORKSPACE],
+      );
+      expect(matched.rows).toEqual([{ title: "Invoice payment terms" }]);
+    });
   });
 
   describe("the synthetic seed, run where the local database runs it", () => {
@@ -229,7 +270,7 @@ describe("the local database", () => {
       );
       expect({ status: seeded.status, stderr: seeded.stderr }).toEqual({ status: 0, stderr: "" });
       expect(seeded.stdout).toContain(
-        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, short name synthetic, 1 connected source, 1 document, 3 passages`,
+        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, short name synthetic, 1 connected source, 1 document, 3 passages, 3 concepts`,
       );
     });
   });
@@ -260,10 +301,13 @@ describe("the local database", () => {
                 (SELECT count(*)::int FROM connected_source WHERE workspace_id = $2)
                   AS "connectedSources",
                 (SELECT count(*)::int FROM source_document WHERE workspace_id = $2) AS documents,
-                (SELECT count(*)::int FROM "index".passage WHERE workspace_id = $2) AS passages`,
+                (SELECT count(*)::int FROM "index".passage WHERE workspace_id = $2) AS passages,
+                (SELECT count(*)::int FROM concept_index WHERE workspace_id = $2) AS concepts`,
         [marker, SYNTHETIC_WORKSPACE],
       );
-      expect(held.rows).toEqual([{ marker: 1, connectedSources: 1, documents: 1, passages: 3 }]);
+      expect(held.rows).toEqual([
+        { marker: 1, connectedSources: 1, documents: 1, passages: 3, concepts: 3 },
+      ]);
     } finally {
       await reopened.end();
     }
