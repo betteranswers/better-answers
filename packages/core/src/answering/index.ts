@@ -1,3 +1,5 @@
+import type { ConceptIri } from "@better-answers/schema";
+
 import type { Frontmatter, FrontmatterValue } from "../concepts/index.ts";
 import { citedSource, conceptByIri, findConcepts, type OpenedConcept } from "../concepts/index.ts";
 import {
@@ -85,9 +87,10 @@ const ukLongDate = (iso: string): string => {
 
 export const NOT_COMPANY_KNOWLEDGE = "Not company knowledge";
 
-type ConceptMatch = {
+/** `Iri` is `string` where an iri is only read as text, as a renderer reads it. */
+type ConceptMatch<Iri extends string> = {
   readonly layer: "bundles";
-  readonly iri: string;
+  readonly iri: Iri;
   readonly kind: string;
   readonly title: string;
   readonly trust: Trust;
@@ -103,17 +106,17 @@ type DocumentMatch = {
   readonly sensitivity: string;
 };
 
-export type FindMatch = ConceptMatch | DocumentMatch;
+export type FindMatch<Iri extends string = ConceptIri> = ConceptMatch<Iri> | DocumentMatch;
 
-export type FindResult = {
+export type FindResult<Iri extends string = ConceptIri> = {
   readonly query: string;
-  readonly matches: readonly FindMatch[];
+  readonly matches: readonly FindMatch<Iri>[];
 };
 
 export type { FrontmatterValue } from "../concepts/index.ts";
 
-type ConceptView = {
-  readonly iri: string;
+type ConceptView<Iri extends string> = {
+  readonly iri: Iri;
   readonly frontmatter: Frontmatter;
   readonly body: string;
   readonly relations: readonly { readonly kind: string; readonly target: string }[];
@@ -132,18 +135,18 @@ type PassageView = {
 };
 
 export type OpenInput =
-  | { readonly iri: string; readonly locator?: undefined }
+  | { readonly iri: ConceptIri; readonly locator?: undefined }
   | { readonly locator: string; readonly iri?: undefined };
 
-export type OpenResult =
+export type OpenResult<Iri extends string = ConceptIri> =
   | {
       readonly found: true;
-      readonly concept?: ConceptView | undefined;
+      readonly concept?: ConceptView<Iri> | undefined;
       readonly passage?: PassageView | undefined;
     }
   | {
       readonly found: false;
-      readonly iri?: string | undefined;
+      readonly iri?: Iri | undefined;
       readonly locator?: string | undefined;
     };
 
@@ -220,7 +223,7 @@ export const find = async (
   return ok({
     query: input.query,
     matches: [
-      ...found.value.map((concept): ConceptMatch => ({
+      ...found.value.map((concept): ConceptMatch<ConceptIri> => ({
         layer: "bundles",
         iri: concept.iri,
         kind: concept.kind,
@@ -296,7 +299,7 @@ const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boo
   return midnight !== undefined && midnight + ONE_DAY_MS <= now.getTime();
 };
 
-const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
+const evidenceOf = (concept: OpenedConcept): ConceptView<ConceptIri>["evidence"] => {
   const sources = concept.frontmatter["sources"];
   if (!Array.isArray(sources)) return [];
 
@@ -395,17 +398,17 @@ export const giveFeedback = async (
   input: FeedbackInput,
 ): Promise<Result<FeedbackReceipt, never>> => ok({ outcome: "received", feedback: input });
 
-const findLine = (match: FindMatch): string =>
+const findLine = (match: FindMatch<string>): string =>
   match.layer === "bundles"
     ? `${match.kind} · ${match.title} · ${trustWords(match.trust)} · ${match.iri}`
     : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator}`;
 
-export const renderFind = (result: FindResult): string =>
+export const renderFind = (result: FindResult<string>): string =>
   result.matches.length === 0
     ? "Nothing in the company's knowledge matches that."
     : result.matches.map(findLine).join("\n");
 
-export const renderOpen = (result: OpenResult): string => {
+export const renderOpen = (result: OpenResult<string>): string => {
   if (!result.found) {
     return result.iri === undefined
       ? `No passage at ${result.locator ?? "that link"}.`

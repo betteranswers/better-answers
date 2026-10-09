@@ -9,7 +9,7 @@ import {
   openObjects,
 } from "@better-answers/core/store/objects";
 import { withScope } from "@better-answers/core/store/postgres";
-import { boundarySchemas, IDENTITY_SET, ulid } from "@better-answers/schema";
+import { boundarySchemas, IDENTITY_SET, ulid, type ConceptIri } from "@better-answers/schema";
 
 import { open, trustWords } from "../src/answering/index.ts";
 import {
@@ -297,7 +297,7 @@ const bundleNamingThePerson = async (named: { readonly byIdAlone?: boolean } = {
         committedAt: new Date(`2026-04-0${at + 2}T11:00:00.000Z`),
       });
     }
-    const rows: { readonly path: string; readonly iri: string }[] = [];
+    const rows: { readonly path: string; readonly iri: ConceptIri }[] = [];
     for (const [at, file] of files.entries()) {
       const indexed = await seed.conceptIndex({
         workspaceId: scenario.workspaceId,
@@ -320,14 +320,15 @@ const bundleNamingThePerson = async (named: { readonly byIdAlone?: boolean } = {
     return rows;
   });
   const [hashed, steady] = landed;
+  if (hashed === undefined || steady === undefined) throw new Error("two concepts did not land");
   return {
     scenario,
     email,
     person,
 
-    iri: hashed?.iri ?? "",
+    iri: hashed.iri,
 
-    steadyIri: steady?.iri ?? "",
+    steadyIri: steady.iri,
     before: shas,
     subjectRequestId,
   };
@@ -364,7 +365,7 @@ const indexedIn = async (workspaceId: string) => {
 
 const READ_AT = new Date("2026-06-02T09:00:00.000Z");
 
-const trustOf = async (scenario: Scenario, iri: string) => {
+const trustOf = async (scenario: Scenario, iri: ConceptIri) => {
   const read = await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
     open(principal, tx, { iri }, READ_AT),
   );

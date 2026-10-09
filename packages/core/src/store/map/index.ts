@@ -6,6 +6,7 @@ import {
   CONCEPT_NODE_LABEL,
   citedSourcesOf,
   type CitedSource,
+  type ConceptIri,
   type conceptFrontmatter,
   DERIVED_FROM_LABEL,
   IRI,
@@ -551,7 +552,7 @@ const walk = async (
 export const walkFrom = (
   principal: UserPrincipal,
   tx: Tx,
-  uid: string,
+  uid: ConceptIri,
 ): Promise<readonly WalkStep[]> => walk(WALK_FROM, principal, tx, uid);
 
 /** As walkFrom, against the edges' direction: the paths into `uid`. */

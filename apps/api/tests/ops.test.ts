@@ -45,6 +45,7 @@ import {
   conceptVerification,
   connectedSource,
   erasureRequest,
+  ids,
   mapEdge,
   mapGeneration,
   mapNode,
@@ -52,6 +53,7 @@ import {
   sourceDocument,
   suppression,
   ulid,
+  type ConceptIri,
 } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
@@ -3135,10 +3137,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return found.rows;
     };
 
-    const iriOf = async (app: TestApp, workspaceId: string, path: string): Promise<string> => {
+    const iriOf = async (app: TestApp, workspaceId: string, path: string): Promise<ConceptIri> => {
       const row = (await indexRowsOf(app, workspaceId)).find((each) => each.path === path);
       if (row === undefined) throw new Error(`no concept stands at ${path}`);
-      return row.iri;
+      return ids.conceptIri.parse(row.iri);
     };
 
     const REWRITTEN_LINES = [
@@ -3257,7 +3259,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("open follows a rewritten link to the concept it names", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
       await importing(app(), workspaceId, admin.email);
-      const opening = (iri: string) =>
+      const opening = (iri: ConceptIri) =>
         reading(app(), workspaceId, admin.id, (principal, tx) =>
           open(principal, tx, { iri }, IMPORTED_AT),
         );
@@ -3267,7 +3269,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
       if (!from.found) throw new Error("the linking concept did not open");
       const target = /\]\((https:\/\/[^)]+)\)/.exec(from.concept?.body ?? "")?.[1] ?? "";
-      const to = await opening(target);
+      const to = await opening(ids.conceptIri.parse(target));
 
       if (!to.found) throw new Error(`nothing stands at ${target}`);
       expect(to.concept?.frontmatter["title"]).toBe("Advanced plan");

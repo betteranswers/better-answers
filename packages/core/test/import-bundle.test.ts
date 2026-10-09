@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
+import { ids, type ConceptIri } from "@better-answers/schema";
 
 import { open, renderOpen } from "../src/answering/index.ts";
 import {
@@ -250,12 +251,12 @@ const authorOf = async (principal: UserPrincipal): Promise<string> => {
   return `${row.name} <${row.email}>`;
 };
 
-const irisByPath = async (workspaceId: string): Promise<ReadonlyMap<string, string>> => {
+const irisByPath = async (workspaceId: string): Promise<ReadonlyMap<string, ConceptIri>> => {
   const found = await db().pool.query<{ path: string; iri: string }>(
     "SELECT path, iri FROM concept_index WHERE workspace_id = $1",
     [workspaceId],
   );
-  return new Map(found.rows.map((row) => [row.path, row.iri]));
+  return new Map(found.rows.map((row) => [row.path, ids.conceptIri.parse(row.iri)]));
 };
 
 const filesAtHead = async (scenario: Scenario): Promise<ReadonlyMap<string, string>> => {
@@ -826,7 +827,8 @@ describe("an imported concept, opened", () => {
         }),
       }),
     );
-    const iri = (await irisByPath(scenario.workspaceId)).get(LINKED.supportHours) ?? "";
+    const iri = (await irisByPath(scenario.workspaceId)).get(LINKED.supportHours);
+    if (iri === undefined) throw new Error("the support hours concept did not land");
     return readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
       open(principal, tx, { iri }, new Date("2026-09-22T10:00:00.000Z")),
     );

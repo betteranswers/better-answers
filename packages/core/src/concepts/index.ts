@@ -4,9 +4,11 @@ import {
   boundarySchemas,
   CONCEPT_STABLE_STATUS,
   conceptIriOf,
+  ids,
   SUGGESTION_EDIT_KIND,
   SUGGESTION_SET_MAX,
   type BundleManifest,
+  type ConceptIri,
   type SENSITIVITIES,
 } from "@better-answers/schema";
 
@@ -225,7 +227,7 @@ export type WriteConceptInput = {
 };
 
 export type ConceptWritten = {
-  readonly iri: string;
+  readonly iri: ConceptIri;
 
   readonly sha: string;
 
@@ -1095,7 +1097,7 @@ type ConceptVerification = {
 };
 
 export type OpenedConcept = {
-  readonly iri: string;
+  readonly iri: ConceptIri;
   readonly path: string;
   readonly kind: string;
   readonly title: string;
@@ -1141,7 +1143,7 @@ const CONCEPT_SELECT = `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.
         WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
 
 const openedOf = (row: ConceptRow): OpenedConcept => ({
-  iri: row.iri,
+  iri: ids.conceptIri.parse(row.iri),
   path: row.path,
   kind: row.kind,
   title: row.title,
@@ -1154,22 +1156,20 @@ const openedOf = (row: ConceptRow): OpenedConcept => ({
 });
 
 /** `undefined` both when no concept holds the iri and when this principal may not read it. */
-export const conceptByIri = async (
+export const conceptByIri = (
   principal: UserPrincipal,
   tx: Tx,
   iri: string,
-): Promise<Result<OpenedConcept | undefined, Error>> => {
-  const found = await attempt(() =>
-    tx.query<ConceptRow>(`${CONCEPT_SELECT} AND c.iri = $4`, [
+): Promise<Result<OpenedConcept | undefined, Error>> =>
+  attempt(async () => {
+    const { rows } = await tx.query<ConceptRow>(`${CONCEPT_SELECT} AND c.iri = $4`, [
       principal.workspaceId,
       ...readableParameters(principal),
       iri,
-    ]),
-  );
-  if (!found.ok) return err(found.error);
-  const row = found.value.rows[0];
-  return ok(row === undefined ? undefined : openedOf(row));
-};
+    ]);
+    const row = rows[0];
+    return row === undefined ? undefined : openedOf(row);
+  });
 
 /**
  * Matches the trimmed query as literal text, ignoring case, in a readable concept's title or
@@ -1182,15 +1182,14 @@ export const findConcepts = async (
 ): Promise<Result<readonly OpenedConcept[], Error>> => {
   const query = input.query.trim();
   if (query === "" || input.limit < 1) return ok([]);
-  const found = await attempt(() =>
-    tx.query<ConceptRow>(
+  return attempt(async () => {
+    const { rows } = await tx.query<ConceptRow>(
       `${CONCEPT_SELECT} AND (c.title ILIKE $4 OR c.body ILIKE $4)
         ORDER BY c.title, c.iri LIMIT $5`,
       [principal.workspaceId, ...readableParameters(principal), containing(query), input.limit],
-    ),
-  );
-  if (!found.ok) return err(found.error);
-  return ok(found.value.rows.map(openedOf));
+    );
+    return rows.map(openedOf);
+  });
 };
 
 const verificationOf = (row: ConceptRow): ConceptVerification | undefined => {

@@ -1,7 +1,7 @@
 import pg from "pg";
 import { describe, expect, it } from "vitest";
 
-import { conceptIriOf, ulid } from "@better-answers/schema";
+import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { open } from "../src/answering/index.ts";
@@ -234,7 +234,7 @@ const verifiedBy = async (
 
 const now = new Date("2026-09-08T12:00:00.000Z");
 
-const trustOf = async (scenario: Scenario, iri: string) => {
+const trustOf = async (scenario: Scenario, iri: ConceptIri) => {
   const read = await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
     open(principal, tx, { iri }, now),
   );
