@@ -242,6 +242,7 @@ test.describe("connecting a document on the Sources page", () => {
       - region "Connected sources":
         - /children: equal
         - heading "Connected sources" [level=2]
+        - status
         - paragraph: ${NOTHING_CONNECTED}
     `);
     await expect(

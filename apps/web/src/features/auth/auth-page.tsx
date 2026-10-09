@@ -40,8 +40,8 @@ export function AuthPage(properties: { readonly title?: string; readonly childre
 }
 
 /**
- * Hidden while empty, so it can stand before its words: a live region inserted already holding
- * words may never be read.
+ * A polite region shown already holding its words may go unread, so a status stays in the tree
+ * while empty. Alerts are read when shown.
  */
 export function Outcome(properties: {
   readonly tone: "said" | "refused";
@@ -53,10 +53,10 @@ export function Outcome(properties: {
       id={properties.id}
       role={properties.tone === "refused" ? "alert" : "status"}
       className={cn(
-        "mt-4 empty:hidden",
+        "mt-4",
         properties.tone === "refused"
-          ? "border-l-2 border-destructive pl-3 text-destructive"
-          : "text-muted-foreground",
+          ? "border-l-2 border-destructive pl-3 text-destructive empty:hidden"
+          : "text-muted-foreground empty:sr-only",
       )}
     >
       {properties.children}

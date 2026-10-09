@@ -1447,7 +1447,7 @@ test.describe("a member's display name, flagged to better-answers support", () =
     await expect(displayNameRegion(page).getByRole("alert")).toHaveText(
       sentenceOf(SAID_OF_A_MEMBER["no-such-member"]),
     );
-    await expect(displayNameRegion(page).getByRole("status")).toHaveCount(0);
+    await expect(displayNameRegion(page).getByRole("status")).toHaveText("");
     await passesTheAccessibilityGate();
   });
 

@@ -95,10 +95,15 @@ function PersonMenu(properties: Pick<BandProperties, "person" | "signingOut" | "
   );
 }
 
-/** A row of its own across the band, standing hidden until it has something to say. */
+/**
+ * A row of its own across the band, taking no room until it has words. Never `hidden`: its status
+ * must stay in the tree.
+ */
 function BandOutcome(properties: { readonly outcome: Outcome | undefined; readonly rule: string }) {
   return (
-    <div hidden={properties.outcome === undefined} className={cn("px-5 py-2", properties.rule)}>
+    <div
+      className={properties.outcome === undefined ? "sr-only" : cn("px-5 py-2", properties.rule)}
+    >
       <OutcomeLine outcome={properties.outcome} />
     </div>
   );
