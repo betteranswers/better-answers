@@ -34,6 +34,7 @@ import {
   skipLinkReachesThePage,
   switcherOf,
   tabUntilFocused,
+  tokenColour,
 } from "./harness.ts";
 
 const SOURCES = menuGroupIn(CONTROL_CENTRE, "sources");
@@ -310,7 +311,11 @@ test("marks the open area in the rail, on any page", async ({ page, request }) =
   expect(marked).toBe(1);
 
   // A fill where the others have none reads in greyscale, so the mark is not colour alone.
-  expect(await paintedFill(page, CONTROL_CENTRE.name)).not.toBe("rgba(0, 0, 0, 0)");
+  const fill = await paintedFill(page, CONTROL_CENTRE.name);
+  expect(fill).not.toBe("rgba(0, 0, 0, 0)");
+
+  // Ink blue is kept for actions, and the open area is a place, so its fill stays ink.
+  expect(fill, "the open area took the accent").toBe(await tokenColour(page, "--foreground"));
 });
 
 test("lists the open area's groups and pages, marking one", async ({ page, request }) => {

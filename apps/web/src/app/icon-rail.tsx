@@ -40,11 +40,11 @@ export function IconRail(properties: {
                 // any of its pages.
                 aria-current={open ? "page" : undefined}
                 className={cn(
-                  // A fill and a bold glyph where the rest have neither, so greyscale
-                  // tells the open area apart.
+                  // An ink fill and a bold glyph where the rest have neither, so greyscale
+                  // tells the open area apart. The accent is for actions.
                   "flex h-10 items-center gap-2 px-2 transition-colors md:w-10 md:justify-center md:px-0",
                   open
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-foreground text-background"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )}
               >

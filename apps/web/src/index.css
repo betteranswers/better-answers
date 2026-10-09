@@ -15,6 +15,24 @@
 @import "@better-answers/design-system/tokens/fonts-hosted.css";
 
 /*
+ * The kit's `dark:` utilities follow the theme the tokens follow. Left to Tailwind they follow
+ * the machine's colour scheme, and a dark-mode machine paints dark fills over a light page.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * A border with no colour of its own is a hairline. Preflight leaves it `currentColor`, which
+ * draws every kit border in the text colour.
+ */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+}
+
+/*
  * The type scale is read from the tokens directly rather than through a Tailwind theme
  * value, because Tailwind's font-size namespace and the design system's type steps are
  * the same `--text-*` names (the bridge's §7 says why). Setting it once on the elements

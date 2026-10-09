@@ -23,10 +23,11 @@
  *    maps to our --surface-hover. Getting this backwards is the single most
  *    common way a re-skin ends up looking wrong.
  *
- * 2. shadcn's `primary` is the solid default button. Ours is near-black, not
- *    blue — the ink-blue button is a separate, rationed thing (see the
- *    registration marks guidance). So `primary` maps to near-black, and the
- *    accent button stays our own component.
+ * 2. shadcn's `primary` is the solid default button. Ours is the accent fill,
+ *    ink blue with white words, so `primary` maps to the primary control
+ *    tokens, which alias the accent. Everything else a kit fills with
+ *    `primary` takes ink blue too, so a fill that is not an action reads
+ *    `foreground` instead.
  */
 
 /* ---------------------------------------------------------------------------
@@ -42,7 +43,7 @@
   --popover: var(--surface-raised);
   --popover-foreground: var(--text-primary);
 
-  /* Solid default button — near-black, per our register */
+  /* Solid default button — the accent fill, per our register */
   --primary: var(--control-primary-bg);
   --primary-foreground: var(--control-primary-fg);
 

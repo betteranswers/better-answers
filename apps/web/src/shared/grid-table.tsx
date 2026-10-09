@@ -215,7 +215,7 @@ function GridRow<Features extends TableFeatures, Data extends RowData>(
   return (
     <TableRow
       data-state={ticked ? "selected" : undefined}
-      className="border-border data-[state=selected]:bg-[var(--surface-selected)]"
+      className="data-[state=selected]:bg-[var(--surface-selected)]"
       {...focusHandlersOf(properties.onRowFocus, row.original)}
     >
       {ticking === undefined ? null : (
@@ -273,7 +273,7 @@ export function GridTable<Features extends TableFeatures, Data extends RowData>(
       <TableCaption className="sr-only">{properties.caption}</TableCaption>
       <TableHeader className="bg-muted">
         {table.getHeaderGroups().map((group) => (
-          <TableRow key={group.id} className="border-border hover:bg-transparent">
+          <TableRow key={group.id} className="hover:bg-transparent">
             {ticking === undefined ? null : (
               <TableHead scope="col" className={cn(HEAD, "w-10")}>
                 <PageTick ids={rows.map((row) => row.id)} ticking={ticking} />
@@ -294,7 +294,7 @@ export function GridTable<Features extends TableFeatures, Data extends RowData>(
       </TableHeader>
       <TableBody>
         {rows.length === 0 ? (
-          <TableRow className="border-border hover:bg-transparent">
+          <TableRow className="hover:bg-transparent">
             <TableCell colSpan={columnCount(table, properties)} className="p-0 whitespace-normal">
               {properties.empty}
             </TableCell>

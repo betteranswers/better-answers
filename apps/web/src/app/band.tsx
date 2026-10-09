@@ -98,10 +98,7 @@ function PersonMenu(properties: Pick<BandProperties, "person" | "signingOut" | "
 /** A row of its own across the band, standing hidden until it has something to say. */
 function BandOutcome(properties: { readonly outcome: Outcome | undefined; readonly rule: string }) {
   return (
-    <div
-      hidden={properties.outcome === undefined}
-      className={cn("border-border px-5 py-2", properties.rule)}
-    >
+    <div hidden={properties.outcome === undefined} className={cn("px-5 py-2", properties.rule)}>
       <OutcomeLine outcome={properties.outcome} />
     </div>
   );
