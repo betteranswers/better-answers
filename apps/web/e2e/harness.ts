@@ -276,6 +276,41 @@ export const seedConnectedSources = (
   input: { workspaceId: string; connectedSources: readonly SeedConnectedSource[] },
 ) => ask(api, "/connected-sources", input, seededConnectedSources);
 
+type SeedCitedDocument = { readonly title: string; readonly passages: readonly string[] };
+
+type SeedConcept = {
+  readonly title: string;
+  readonly body: string;
+  readonly kind?: string;
+  readonly sensitivity?: Sensitivity;
+  readonly audience?: "everyone" | "groups";
+  readonly readers?: readonly string[];
+  readonly trust?: "unverified" | "machine-confirmed" | "human-reviewed";
+  readonly linksTo?: readonly string[];
+  readonly sources?: readonly SeedCitedDocument[];
+};
+
+const seededConcepts = z.object({
+  concepts: z.array(
+    z.object({
+      iri: z.string(),
+      title: z.string(),
+      path: z.string(),
+      documents: z.array(z.object({ documentId: z.string(), title: z.string() })),
+    }),
+  ),
+});
+
+/**
+ * Written in order by `userId`, an Admin; `linksTo` names earlier concepts, and `readers` fill a
+ * `"groups"` audience's one group.
+ * @public S2a
+ */
+export const seedConcepts = (
+  api: APIRequestContext,
+  input: { workspaceId: string; userId: string; concepts: readonly SeedConcept[] },
+) => ask(api, "/concepts", input, seededConcepts);
+
 const syncMoved = z.object({ jobId: z.string() });
 
 /**

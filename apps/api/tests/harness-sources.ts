@@ -82,7 +82,7 @@ type OverriddenSpan = {
   readonly char_end: number;
 };
 
-const inOneTransaction = async <T>(
+export const inOneTransaction = async <T>(
   app: TestApp,
   work: (client: PoolClient) => Promise<T>,
 ): Promise<T> => {
@@ -151,16 +151,19 @@ const seedFindings = async (
   return overridden;
 };
 
-const seedPassages = async (
+/** Answers each passage's locator, in order. */
+export const seedPassages = async (
   seed: TestData,
   workspaceId: string,
   connectedSourceId: string,
   documentId: string,
   passages: readonly string[],
-): Promise<void> => {
+): Promise<readonly string[]> => {
+  const locators: string[] = [];
   let charStart = 0;
   for (const [ordinal, content] of passages.entries()) {
     const charEnd = charStart + Array.from(content).length;
+    const locator = `chars:${charStart}-${charEnd}`;
     await seed.passage({
       workspaceId,
       connectedSourceId,
@@ -169,10 +172,12 @@ const seedPassages = async (
       ordinal,
       charStart,
       charEnd,
-      locator: `chars:${charStart}-${charEnd}`,
+      locator,
     });
+    locators.push(locator);
     charStart = charEnd;
   }
+  return locators;
 };
 
 const citationOf = async (seed: TestData, workspaceId: string, documentId: string) => {

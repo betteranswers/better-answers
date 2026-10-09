@@ -14,6 +14,7 @@ import { testData } from "@better-answers/schema/testing";
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import { authenticatorKeyOf, holdAnAuthenticator, savedRecoveryCodes } from "./factor-harness.ts";
+import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import {
   accessAsking,
   askToJoin,
@@ -227,6 +228,11 @@ export const harnessControl = (app: TestApp): Hono => {
   control.post(`${HARNESS_PREFIX}/syncs`, async (context) => {
     const asked = await readBody(context.req.raw, syncMoving);
     return context.json(await moveTheSync(app, asked));
+  });
+
+  control.post(`${HARNESS_PREFIX}/concepts`, async (context) => {
+    const asked = await readBody(context.req.raw, conceptsSeeding);
+    return context.json(await seedConcepts(app, asked));
   });
 
   // The ops command's own action under its own principal, so the mark lands as the owner's would.
