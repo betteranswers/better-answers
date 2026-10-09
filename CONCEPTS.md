@@ -1012,6 +1012,13 @@ the cited passage, shown beside the claim it supports.
 
 In a search match, the same unit shown as the match.
 
+### citation mark
+
+The mark in a concept's body that ties one claim to one of the concept's own sources: a footnote
+reference labelled by that source's id.
+
+Never a link: it opens the source beside the claim, and a footnote naming no source is not one.
+
 ### footnote
 
 The mark in a write-up's prose that ties one claim to one include: a footnote reference labelled

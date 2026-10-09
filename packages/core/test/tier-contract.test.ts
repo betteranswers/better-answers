@@ -38,6 +38,7 @@ const SPOKEN_AGREEMENTS = {
   "document-passage": "fixtured",
   "emptying-a-connected-source": "fixtured",
   "erasure-match": "fixtured",
+  links: "fixtured",
   "id-shape": "fixtured",
   "credential-envelope": "fixtured",
   "model-choice": "sql-function",

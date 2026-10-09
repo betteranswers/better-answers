@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./ulid": "./src/ulid.ts",
+    "./concept-file": "./src/concept-file.ts",
     "./code-unit": "./src/code-unit.ts",
     "./test-workspace": "./src/test-workspace.ts",
     "./test-inbox": "./src/test-inbox.ts",

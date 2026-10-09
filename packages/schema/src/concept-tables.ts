@@ -9,14 +9,13 @@ import {
   uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import { z } from "zod";
 
 import { ACTOR_ID_PATTERN } from "./actor-id.ts";
 import { listed, stamp } from "./column-helpers.ts";
+import { IRI, type CitedSource } from "./concept-file.ts";
 import { FULL_TEXT_LANGUAGE, searchVector } from "./full-text-match.ts";
 import { AUDIENCE_CHECK, SENSITIVITIES, SENSITIVITY_DEFAULT } from "./readable-columns.ts";
 import { sourceDocument } from "./source-tables.ts";
-import { ULID_CHARACTERS } from "./ulid.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -45,25 +44,9 @@ export const VERIFICATION_CITATION_FIX_ORIGIN =
 export const VERIFICATION_ERASURE_ORIGIN =
   "erasure-rewrite" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
-export const CONCEPT_IRI_PREFIX = "https://better-answers.com/c/";
-
-export const IRI = new RegExp(
-  `^${CONCEPT_IRI_PREFIX.replaceAll(".", String.raw`\.`)}${ULID_CHARACTERS}$`,
-);
-
-/** The registry's `iri` columns carry the same brand; this one cannot import the registry. */
-const MINTED_IRI = z.string().regex(IRI).brand<"ConceptIri">();
-
-/** `minted` is a fresh ULID, so a throw here is a broken invariant, not input to refuse. */
-export const conceptIriOf = (minted: string): z.output<typeof MINTED_IRI> =>
-  MINTED_IRI.parse(`${CONCEPT_IRI_PREFIX}${minted}`);
+export { CONCEPT_IRI_PREFIX, conceptIriOf, IRI, type CitedSource } from "./concept-file.ts";
 
 export const GIT_SHA = /^[0-9a-f]{40}$/;
-
-export type CitedSource = {
-  readonly resource: string;
-  readonly locator: string | null;
-};
 
 type SourceEntry = Readonly<Record<string, string | number | boolean | null>>;
 
@@ -72,17 +55,19 @@ const citedByText = (entry: string): CitedSource | undefined => {
   const resource = (hash === -1 ? entry : entry.slice(0, hash)).trim();
   return resource === ""
     ? undefined
-    : { resource, locator: hash === -1 ? null : entry.slice(hash + 1) };
+    : { resource, locator: hash === -1 ? null : entry.slice(hash + 1), id: null };
 };
 
 const citedByKeys = (entry: SourceEntry): CitedSource | undefined => {
   const resource = entry["resource"];
   if (typeof resource !== "string" || resource.trim() === "") return undefined;
   const locator = entry["locator"];
+  const id = entry["id"];
 
   return {
     resource: resource.trim(),
     locator: locator === undefined || locator === null ? null : String(locator),
+    id: id === undefined || id === null ? null : String(id),
   };
 };
 

@@ -169,10 +169,10 @@ def cited_source(entry: SourceEntry | str) -> tuple[str, str | None] | None:
         return None
     locator = entry.get("locator")
 
-    return resource_value.strip(), None if locator is None else _as_javascript(locator)
+    return resource_value.strip(), None if locator is None else as_javascript(locator)
 
 
-def _as_javascript(value: Scalar) -> str:
+def as_javascript(value: Scalar) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, int | float):

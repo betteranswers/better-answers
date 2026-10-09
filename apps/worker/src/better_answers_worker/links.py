@@ -1,7 +1,14 @@
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
-from .concept_file import Frontmatter, Scalar, cited_source, resolved_resource
+from .concept_file import (
+    Frontmatter,
+    Scalar,
+    SourceEntry,
+    as_javascript,
+    cited_source,
+    resolved_resource,
+)
 
 CONCEPT_NODE_LABEL = "Concept"
 LINKS_TO_LABEL = "LINKS_TO"
@@ -15,17 +22,26 @@ CONCEPT_DEPRECATED_STATUS = "deprecated"
 _IRI = re.compile(r"^https://better-answers\.com/c/[0-9A-HJKMNP-TV-Z]{26}$")
 
 
-_LINK_DEFINITION = re.compile(r"^ {0,3}\[([^\]]+)\]:\s*(\S+)", re.M)
+# Lines break at `\n` alone and whitespace is these six, so both tiers'
+# regex engines read alike.
+_LINK_DEFINITION = re.compile(
+    r"(?:^|(?<=\n)) {0,3}\[([^\]]+)\]:[ \t\n\r\f\v]*([^ \t\n\r\f\v]+)"
+)
+
+
+_FOOTNOTE = re.compile(r"^\[\^([^\]]*)\]$")
 
 
 _LINK = re.compile(
-    r"\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\[[^\]]*\]|\[[^\]]*\]|<[a-z][a-z0-9+.-]*:[^>\s]*>",
+    r"\[[^\]]*\]\([^)]*\)|\[(?!\^)[^\]]*\]\[[^\]]*\]|\[[^\]]*\]"
+    r"|<[a-z][a-z0-9+.-]*:[^> \t\n\r\f\v]*>",
     re.I,
 )
 
 
 _FENCED_BLOCK = re.compile(
-    r"^ {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$|(?![\s\S]))", re.M
+    r"(?:^|(?<=\n)) {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?"
+    r"(?:(?<=\n) {0,3}\1\2*[ \t]*(?=\n|(?![\s\S]))|(?![\s\S]))"
 )
 
 _BACKTICK_RUN = re.compile(r"`+")
@@ -33,6 +49,7 @@ _HEADING = re.compile(r"^\#{1,6}\s+(.*)$")
 _SENTENCE_BOUNDARY = re.compile(r"[.!?](?=\s|$)")
 _SCHEMED = re.compile(r"^[a-z][a-z0-9+.-]*:", re.I)
 _WHITESPACE = re.compile(r"\s+")
+_LABEL_SPACE = re.compile(r"[ \t\n\r\f\v]+")
 
 
 def _blank(text: str) -> str:
@@ -80,20 +97,52 @@ def prose_of(body: str) -> str:
 
 
 def _normalised_label(label: str) -> str:
-    return _WHITESPACE.sub(" ", label.strip()).lower()
+    return " ".join(word for word in _LABEL_SPACE.split(label) if word).lower()
+
+
+def _label_key(label: str) -> str:
+    if label.startswith("^"):
+        return "^" + _normalised_label(label[1:])
+    return _normalised_label(label)
 
 
 def _definitions_of(body: str) -> dict[str, str]:
     definitions: dict[str, str] = {}
     for found in _LINK_DEFINITION.finditer(body):
-        label = _normalised_label(found.group(1) or "")
+        label = _label_key(found.group(1) or "")
         if label not in definitions:
             definitions[label] = (found.group(2) or "").lstrip("<").rstrip(">")
     return definitions
 
 
-_INLINE_TARGET = re.compile(r"\]\(\s*<?([^)\s>]+)")
+def _cited_entries(frontmatter: Frontmatter) -> list[SourceEntry | str]:
+    sources = frontmatter.get("sources")
+    if not isinstance(sources, list):
+        return []
+    return [
+        entry
+        for entry in sources
+        if isinstance(entry, Mapping | str) and cited_source(entry) is not None
+    ]
+
+
+def _sources_by_id(entries: Sequence[SourceEntry | str]) -> dict[str, int]:
+    by_id: dict[str, int] = {}
+    for index, entry in enumerate(entries):
+        if isinstance(entry, str) or entry.get("id") is None:
+            continue
+        key = _normalised_label(as_javascript(entry.get("id")))
+        if key != "" and key not in by_id:
+            by_id[key] = index
+    return by_id
+
+
+_INLINE_TARGET = re.compile(r"\]\([ \t\n\r\f\v]*<?([^) \t\n\r\f\v>]+)")
 _REFERENCE = re.compile(r"^\[([^\]]*)\]\[([^\]]*)\]$")
+
+
+def _defines(found: re.Match[str], body: str) -> bool:
+    return found.end() < len(body) and body[found.end()] == ":"
 
 
 def _link_target_of(
@@ -108,12 +157,11 @@ def _link_target_of(
     reference = _REFERENCE.match(text)
     if reference is not None:
         label = reference.group(1) if reference.group(2) == "" else reference.group(2)
-        return definitions.get(_normalised_label(label or ""))
+        return definitions.get(_label_key(label or ""))
 
-    after = found.start() + len(text)
-    if after < len(body) and body[after] == ":":
+    if _defines(found, body):
         return None
-    return definitions.get(_normalised_label(text[1:-1]))
+    return definitions.get(_label_key(text[1:-1]))
 
 
 def _target_of(raw: str, from_path: str) -> tuple[str, str] | None:
@@ -161,6 +209,84 @@ def _sentence_at(body: str, index: int) -> str:
     return _WHITESPACE.sub(" ", _flattened_links(paragraph[start:end])).strip()
 
 
+class BodyLink:
+    __slots__ = ("at", "ordinal", "target")
+
+    def __init__(self, ordinal: int, at: int, target: str) -> None:
+        self.ordinal = ordinal
+        self.at = at
+        self.target = target
+
+
+class CitationMark:
+    __slots__ = ("at", "mark", "source")
+
+    def __init__(self, at: int, mark: str, source: int) -> None:
+        self.at = at
+        self.mark = mark
+        self.source = source
+
+
+_TEXT = ("text", None)
+
+
+def _footnote_reading(
+    found: re.Match[str],
+    prose: str,
+    definitions: dict[str, str],
+    sources_by_id: dict[str, int],
+) -> tuple[str, str | int | None] | None:
+    footnote = _FOOTNOTE.match(found.group(0))
+    if footnote is None:
+        return None
+    if _defines(found, prose):
+        return _TEXT
+    key = _normalised_label(footnote.group(1) or "")
+    if key in sources_by_id:
+        return "mark", sources_by_id[key]
+    target = definitions.get("^" + key)
+    return _TEXT if target is None else ("link", target)
+
+
+def _reading_of(
+    found: re.Match[str],
+    prose: str,
+    definitions: dict[str, str],
+    sources_by_id: dict[str, int],
+) -> tuple[str, str | int | None]:
+    if found.start() > 0 and prose[found.start() - 1] == "!":
+        return "link", None
+    footnote = _footnote_reading(found, prose, definitions, sources_by_id)
+    if footnote is not None:
+        return footnote
+    return "link", _link_target_of(found, prose, definitions)
+
+
+def links_and_marks_of(
+    body: str, frontmatter: Frontmatter
+) -> tuple[list[BodyLink], list[CitationMark]]:
+    """A link's ordinal counts every link in the prose, images and links
+    naming nothing included. A footnote naming a source is a citation mark,
+    resolving to the first `sources` entry with that id: it takes no ordinal.
+    Any other footnote is a link only when the body defines it."""
+    prose = prose_of(body)
+    definitions = _definitions_of(prose)
+    sources_by_id = _sources_by_id(_cited_entries(frontmatter))
+    links: list[BodyLink] = []
+    marks: list[CitationMark] = []
+    ordinal = 0
+    for found in _LINK.finditer(prose):
+        reading, value = _reading_of(found, prose, definitions, sources_by_id)
+        if reading == "mark" and isinstance(value, int):
+            marks.append(CitationMark(found.start(), found.group(0), value))
+        if reading != "link":
+            continue
+        if isinstance(value, str):
+            links.append(BodyLink(ordinal, found.start(), value))
+        ordinal += 1
+    return links, marks
+
+
 class OutgoingReference:
     """`target` is `('iri', iri)` or `('path', bundle path)`;
     `section` and `sentence` are None for lineage."""
@@ -185,27 +311,22 @@ class OutgoingReference:
 def references_of(
     body: str, frontmatter: Frontmatter, path: str
 ) -> list[OutgoingReference]:
-    """The body's links, images left out, then the `sources` entries
-    as lineage; a URL other than a concept IRI is dropped. A link's
-    ordinal counts every link in the prose, the dropped ones too."""
+    """The body's links, then the `sources` entries as lineage; a URL
+    other than a concept IRI is dropped."""
     prose = prose_of(body)
-    definitions = _definitions_of(prose)
 
     links: list[OutgoingReference] = []
-    for ordinal, found in enumerate(_LINK.finditer(prose)):
-        if found.start() > 0 and prose[found.start() - 1] == "!":
-            continue
-        raw = _link_target_of(found, prose, definitions)
-        target = None if raw is None else _target_of(raw, path)
+    for link in links_and_marks_of(body, frontmatter)[0]:
+        target = _target_of(link.target, path)
         if target is None:
             continue
         links.append(
             OutgoingReference(
                 "link",
-                ordinal,
+                link.ordinal,
                 target,
-                _section_at(prose, found.start()),
-                _sentence_at(prose, found.start()),
+                _section_at(prose, link.at),
+                _sentence_at(prose, link.at),
             )
         )
 
@@ -314,10 +435,13 @@ __all__ = [
     "DERIVED_FROM_LABEL",
     "LINKS_TO_LABEL",
     "SUPERSEDES_LABEL",
+    "BodyLink",
+    "CitationMark",
     "OutgoingEdge",
     "OutgoingReference",
     "ResolvedTarget",
     "Scalar",
+    "links_and_marks_of",
     "outgoing_edges",
     "prose_of",
     "references_of",

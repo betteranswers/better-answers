@@ -149,10 +149,10 @@ const buildTheMap = async (scenario: Scenario) => {
       "",
       "## Details",
       "",
-      `This is the first sentence. It names [an inline link](${superseded.iri}) and`,
+      `This is the first[^ HANDBOOK ] sentence. It names [an inline link](${superseded.iri}) and`,
       `[a full reference][full] and [a collapsed one][] and [a shortcut] and an autolink`,
       `<${derivedFrom.iri}> and [one nobody wrote](${unlanded}) and [one landing later](/${laterPath}).`,
-      "This is the third sentence.",
+      "This is the third sentence, after a footnote link.[^policy]",
       "",
       `A quoted \`[span link](${superseded.iri})\` asserts nothing, and neither does`,
       `![an image](${derivedFrom.iri}).`,
@@ -164,13 +164,15 @@ const buildTheMap = async (scenario: Scenario) => {
       `[full]: ${derivedFrom.iri}`,
       `[a collapsed one]: ${superseded.iri}`,
       `[a shortcut]: ${derivedFrom.iri}`,
+      `[^handbook]: ${derivedFrom.iri}`,
+      `[^policy]: ${derivedFrom.iri}`,
     ].join("\n"),
 
     frontmatter: {
       title: "The linker",
       type: "Note",
       sources: [
-        { resource: superseded.iri, locator: "p.1" },
+        { resource: superseded.iri, locator: "p.1", id: "handbook" },
         { resource: derivedFrom.iri, locator: "p.2" },
       ],
     },
@@ -256,9 +258,16 @@ describe("the worker's rebuild against the api's own map", () => {
 
       expect(linkerEdges.map((edge) => edge["label"]).toSorted()).toEqual([
         "DERIVED_FROM",
-        ...Array.from({ length: 7 }, () => "LINKS_TO"),
+        ...Array.from({ length: 8 }, () => "LINKS_TO"),
         "SUPERSEDES",
       ]);
+      expect(
+        linkerEdges
+          .flatMap((edge) => (edge["label"] === "LINKS_TO" ? [edge["uid"]] : []))
+          .toSorted(),
+      ).toEqual(
+        [0, 1, 2, 3, 4, 5, 6, 7].map((ordinal) => `links_to:${linker.iri}:${ordinal}`).toSorted(),
+      );
       const linked = linkerEdges.find((edge) => edge["label"] === "LINKS_TO");
       expect(linked?.["section"]).toBe("Details");
       expect(linked?.["sentence"]).toMatch(/^It names an inline link and/u);

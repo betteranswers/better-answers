@@ -1,0 +1,372 @@
+{
+  "description": "links (ADR 0031, ADR 0015): what a concept body's footnotes make of the map, said once for both tiers. The api derives a concept's LINKS_TO edges at every governed write (`packages/core/src/store/map/index.ts`) and the worker derives them again in the full rebuild (`apps/worker/src/better_answers_worker/links.py`); an edge's id carries its link's ordinal, so the two must count links alike or the rebuilt map and the live one name different edges. A footnote reference `[^label]` is a **citation mark** when its label, trimmed, with inner whitespace collapsed and compared without case, is the `id` of an entry in the concept's `sources` list. A mark resolves to the first entry carrying that id, whether or not the body holds a definition for it, and it is never a link: it makes no edge and takes no ordinal. A footnote reference whose label is no source id is a link when the body defines it, and it then takes an ordinal and makes an edge when its definition names a concept, as OKF allows. One with neither a source nor a definition is plain text: no edge, no ordinal, no error. A footnote definition line `[^label]: ...` is never a link and takes no ordinal. Everything else in the prose that today takes an ordinal still does. Only a record-form `sources` entry carries an `id`; a string-form entry carries none, so no mark resolves to it. Every case is read as the concept `citing` below, every target is a concept IRI no concept holds yet (so both tiers make the edge with no kind and no lookup), and no source's resource is a concept, so no case makes a lineage edge. `links` is every LINKS_TO edge the case makes, by ordinal and target, in ordinal order; `marks` is every citation mark, as written, with the index of the `sources` entry it resolves to, in body order. The TypeScript half drives the api's map write (`packages/core/test/links.contract.test.ts`) and the Python half the worker's edge derivation (`apps/worker/tests/test_links_contract.py`).",
+  "citing": {
+    "iri": "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
+    "path": "knowledge/expenses.md",
+    "kind": "Policy"
+  },
+  "cases": [
+    {
+      "case": "a source-id mark is no link and shifts no ordinal",
+      "body": "Claims close within 30 days.[^a] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN) for tiers.\n\n[^a]: https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [
+        {
+          "mark": "[^a]",
+          "source": 0
+        }
+      ],
+      "why": "The mark names a source, so even a definition that is a concept IRI makes no edge, and the ordinary link after it is the body's first link."
+    },
+    {
+      "case": "a footnote defined as a concept IRI and naming no source is a link",
+      "body": "Mileage follows the rates policy.[^b]\n\n[^b]: https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [],
+      "why": "OKF allows a footnote to link a concept; `b` is no source's id, so the footnote stays a link and takes the first ordinal."
+    },
+    {
+      "case": "a mark with no source and no definition is plain text",
+      "body": "Receipts are kept for six years.[^c] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [],
+      "why": "`c` names no source and the body defines nothing for it, so it is text: no edge, no ordinal, no error."
+    },
+    {
+      "case": "a repeated source id resolves to its first entry",
+      "body": "Approvals need a second signature.[^a]",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        },
+        {
+          "resource": "https://example.test/finance-manual",
+          "id": "a"
+        }
+      ],
+      "links": [],
+      "marks": [
+        {
+          "mark": "[^a]",
+          "source": 0
+        }
+      ],
+      "why": "Two entries share `a`; the mark resolves to the first of them, never the second."
+    },
+    {
+      "case": "a mark matches its source id ignoring case and spacing",
+      "body": "Audit logs are kept for a year.[^aud-047] Reviews run yearly.[^ AUD-047 ] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [
+        {
+          "resource": "https://example.test/security-policy",
+          "id": "SEC-001"
+        },
+        {
+          "resource": "https://example.test/audit-standard",
+          "id": "AUD-047",
+          "locator": "4.2"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [
+        {
+          "mark": "[^aud-047]",
+          "source": 1
+        },
+        {
+          "mark": "[^ AUD-047 ]",
+          "source": 1
+        }
+      ],
+      "why": "Reference labels are compared lower-cased and the customer's source ids are upper case, so a mark matches its id however its case or surrounding whitespace is written."
+    },
+    {
+      "case": "a source-id mark with no definition still resolves",
+      "body": "Expenses over 500 pounds need a director's approval.[^a]",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [],
+      "marks": [
+        {
+          "mark": "[^a]",
+          "source": 0
+        }
+      ],
+      "why": "A mark resolves through the `sources` list, not through a footnote definition, so a body that defines nothing for it still cites the source."
+    },
+    {
+      "case": "a string-form source carries no id for a mark",
+      "body": "Mileage is paid at the published rate.[^AUD-047] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": ["AUD-047"],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [],
+      "why": "A string-form entry names a resource and no id, so a mark spelling that resource resolves to nothing and is plain text."
+    },
+    {
+      "case": "a footnote definition line takes no ordinal",
+      "body": "Claims close within 30 days.[^a]\n\n[^a]: The staff handbook, section 4.\n\nSee [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN) for tiers.",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [
+        {
+          "mark": "[^a]",
+          "source": 0
+        }
+      ],
+      "why": "A definition placed between paragraphs is part of its footnote, not a link, so the link after it keeps the first ordinal."
+    },
+    {
+      "case": "every other link form keeps its ordinal, resolved or not",
+      "body": "![a diagram](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN) and [the regulator](https://example.test/regulator) back the rule.[^a] So do [nowhere], [inline](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN), [full][Price  Book], [collapsed][] and <https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP>, and so does a footnote link.[^rates]\n\n[price book]: https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN\n[collapsed]: https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP\n[^a]: The staff handbook.\n[^ Rates ]: https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 3,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        },
+        {
+          "ordinal": 4,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        },
+        {
+          "ordinal": 5,
+          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP"
+        },
+        {
+          "ordinal": 6,
+          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP"
+        },
+        {
+          "ordinal": 7,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [
+        {
+          "mark": "[^a]",
+          "source": 0
+        }
+      ],
+      "why": "An image, an external link and a label the body never defines each still take an ordinal and make no edge; only the citation mark and the footnote definitions take none. A full reference's label and a definition's are compared ignoring case and spacing. A footnote's definition is found the same way, however its label is spaced or cased."
+    },
+    {
+      "case": "quoted code holds no link and no mark",
+      "body": "A span `[^a]` and a longer one ``[quoted](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN)`` hold nothing, and `one` and `[two](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN)` hold nothing either.\n\n```md\n[fenced](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN) and [^a]\n```\n\nOnly [this one](https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP) maps.[^a]",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP"
+        }
+      ],
+      "marks": [
+        {
+          "mark": "[^a]",
+          "source": 0
+        }
+      ],
+      "why": "Code spans and fenced blocks are text, so neither a link nor a mark inside one counts, however many spans of one length a line holds, and the one link outside them takes the first ordinal."
+    },
+    {
+      "case": "a caret in an inline link or a reference is no mark",
+      "body": "See [^a](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN) and [the rates][^a].\n\n[^a]: https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        },
+        {
+          "ordinal": 1,
+          "to": "https://better-answers.com/c/01J6PPPPPPPPPPPPPPPPPPPPPP"
+        }
+      ],
+      "marks": [],
+      "why": "Only a bare footnote reference can be a citation mark. An inline link whose text starts with a caret, and a full reference whose label does, are links like any other, even where the label names a source."
+    },
+    {
+      "case": "a blank source id names no mark",
+      "body": "Claims close within 30 days.[^ ] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": " "
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [],
+      "why": "An id that is only whitespace is no id, so an empty footnote label resolves to nothing and is plain text."
+    },
+    {
+      "case": "a fence opens only at the start of a line",
+      "body": "Mileage is paid ~~~ at cost, see [the rates](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).\n~~~",
+      "sources": [],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [],
+      "why": "A run of tildes or backticks opens a fenced block only where a line starts with it, so a run mid-line leaves the link after it in the prose."
+    },
+    {
+      "case": "adjacent marks are two marks, not a reference",
+      "body": "Approvals need two signatures.[^a][^b] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).\n\n[^a]: The staff handbook.\n[^b]: The finance manual.",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        },
+        {
+          "resource": "https://example.test/finance-manual",
+          "id": "b"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [
+        {
+          "mark": "[^a]",
+          "source": 0
+        },
+        {
+          "mark": "[^b]",
+          "source": 1
+        }
+      ],
+      "why": "Two marks written side by side cite two sources. Neither is the label of a reference link, so neither takes an ordinal."
+    },
+    {
+      "case": "a numeric source id is matched as written",
+      "body": "Claims close within 30 days.[^12] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": 12
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [
+        {
+          "mark": "[^12]",
+          "source": 0
+        }
+      ],
+      "why": "An id is read as JavaScript's String() writes it, so a number names the mark spelled with its digits."
+    },
+    {
+      "case": "only plain whitespace is trimmed from a label",
+      "body": "Claims close within 30 days.[^\ufeffa] Mileage is paid at cost.[^\u0085a] See [the product](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN).",
+      "sources": [
+        {
+          "resource": "https://example.test/handbook",
+          "id": "a"
+        }
+      ],
+      "links": [
+        {
+          "ordinal": 0,
+          "to": "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
+        }
+      ],
+      "marks": [],
+      "why": "Space, tab, line feed, carriage return, form feed and vertical tab are the whitespace a label loses. A byte-order mark or a next-line character is part of the label, so neither label here names the source."
+    },
+    {
+      "case": "a definition starts only after a line feed",
+      "body": "Mileage follows the rates policy.[^b]\r[^b]: https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN\n\nRates are reviewed yearly.[^c]\u2028[^c]: https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN",
+      "sources": [],
+      "links": [],
+      "marks": [],
+      "why": "A carriage return alone or a line separator does not start a line, so neither definition here defines anything, and both footnotes are plain text."
+    }
+  ]
+}

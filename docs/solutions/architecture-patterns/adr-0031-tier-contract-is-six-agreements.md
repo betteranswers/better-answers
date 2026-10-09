@@ -1,5 +1,5 @@
 ---
-title: "The tier contract is thirteen agreements in three forms, each proved by both tiers' suites"
+title: "The tier contract is a list of agreements in three forms, each proved by both tiers' suites"
 date: 2026-09-24
 module: contracts
 problem_type: architecture_pattern
@@ -20,7 +20,7 @@ tags:
   - read-predicate
 ---
 
-# The tier contract is thirteen agreements in three forms, each proved by both tiers' suites
+# The tier contract is a list of agreements in three forms, each proved by both tiers' suites
 
 ## The decision
 
@@ -30,7 +30,7 @@ Every answer the api and the worker must hold alike is an agreement in the tier 
 - *fixtured*: a golden file in `contracts/` that both suites read.
 - *generated*: produced from one source by ADR 0028's mechanism, with golden rows.
 
-The agreements live in top-level `contracts/`, listed in `contracts/manifest.json`. Nothing imports the directory and nothing deploys it. There are thirteen:
+The agreements live in top-level `contracts/`, listed in `contracts/manifest.json`. Nothing imports the directory and nothing deploys it. The manifest names these:
 
 - `queue` (SQL functions): claim, lease, heartbeat, reaper, attempt count and poison threshold; the kinds a claimant runs, a job's subject and the run key.
 - `suggestions` (SQL function): submitting a suggestion set; what acceptance promises is fixtured.
@@ -45,6 +45,7 @@ The agreements live in top-level `contracts/`, listed in `contracts/manifest.jso
 - `citation`: the patterns each tier's comment gate refuses.
 - `emptying-a-connected-source`: the reasons on an index job that empty its connected source.
 - `erasure-match`: what counts as an occurrence of a suppressed identifier.
+- `links`: which of a concept body's footnotes are citation marks and which are links, and the ordinals the links take.
 
 All but the first four are fixtured.
 
@@ -74,4 +75,4 @@ The read predicate's logic is api-only. The worker's reads are a producer's read
 
 ## History
 
-The full record, first written as six agreements, with the amendments that admit and retire agreements and adopt the digest (T-074, T-120, T-127, T-128, T-137, T-165, T-274, T-275, T-283, T-316, T-345, T-376, T-377): `docs/archive/adr/0031-tier-contract-is-six-agreements.md`.
+The full record, first written as six agreements, with the amendments that admit and retire agreements and adopt the digest (T-074, T-120, T-127, T-128, T-137, T-165, T-274, T-275, T-283, T-316, T-345, T-376, T-377): `docs/archive/adr/0031-tier-contract-is-six-agreements.md`. S2a's plan admitted `links` (`docs/plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md`, KTD5).

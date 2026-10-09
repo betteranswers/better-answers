@@ -27,7 +27,7 @@ A write-up's prose (a guide section's Brief, a response) is stored as markdown. 
 - The include row carries the concept's IRI, the context wording chosen (its heading and the hash of that section's text), the concept's content hash at generation and the cited span.
 - Footnote definitions are never stored. They are rendered from the include rows every time the prose is shown, exported or copied.
 - Rows own what is included and markers own placement, reconciled at save. A marker whose label has no include row is refused before a version is written. An include with no marker is allowed and shown "not placed". Deleting a marker never deletes its row.
-- Two footnote kinds share one syntax, and the page always says which. An OKF source footnote in a concept body has its definition in the file. An include marker in a write-up has none.
+- Two footnote kinds share one syntax, and the page always says which. An OKF source footnote in a concept body is a citation mark: its label is the `id` of an entry in the file's `sources`, matched ignoring case and surrounding whitespace, and it resolves to the first such entry whether or not the file defines it. A citation mark is never a link and never a map edge. A concept-body footnote whose label is no source id is a link when the file defines it, as OKF allows. An include marker in a write-up has no definition.
 
 There is one stored form, markdown, for write-ups and concept bodies alike. There is one renderer: a pure function in `packages/` from prose, include rows and trust state to markdown. It has two profiles, one with trust words as text tags for the labelled export and one with none for the clipboard.
 
@@ -57,4 +57,4 @@ The gate that treats uncited text as below threshold is the Editor's.
 
 ## History
 
-The full record, with its one amendment (ticket 79, applied by T-001, making roles levels): `docs/archive/adr/0015-write-ups-cite-concepts-by-footnote.md`.
+The full record, with its one amendment (ticket 79, applied by T-001, making roles levels): `docs/archive/adr/0015-write-ups-cite-concepts-by-footnote.md`. S2a's plan made a concept body's source footnote a citation mark (`docs/plans/2026-10-09-1344-feat-s2a-search-and-concept-page-plan.md`, KTD5).
