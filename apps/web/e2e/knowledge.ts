@@ -167,6 +167,8 @@ type SeedConcept = {
   >;
 };
 
+const CONCEPTS = "/__harness/concepts";
+
 const seeded = z.object({
   concepts: z.array(
     z.object({
@@ -182,8 +184,9 @@ export const conceptsSeeded = async (
   api: APIRequestContext,
   input: { workspaceId: string; userId: string; concepts: readonly SeedConcept[] },
 ) => {
-  const answered = await api.post("/__harness/concepts", { data: input });
-  expect(answered.ok(), `/concepts answered ${String(answered.status())}`).toBe(true);
-  const { concepts } = seeded.parse(await answered.json());
+  const answered = await api.post(CONCEPTS, { data: input });
+  const body = await answered.text();
+  expect(answered.ok(), `${CONCEPTS} answered ${String(answered.status())}: ${body}`).toBe(true);
+  const { concepts } = seeded.parse(JSON.parse(body));
   return new Map(concepts.map((concept) => [concept.title, concept]));
 };

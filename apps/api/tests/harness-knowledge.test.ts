@@ -22,6 +22,21 @@ const conceptsSeeded = async (body: unknown) => {
   return landedConcepts.parse(await answered.json()).concepts;
 };
 
+/** What the harness answers a seed it refuses: the status, and the fields its schema named. */
+const seedRefused = async (concepts: readonly unknown[]) => {
+  const workspace = await app().provision();
+  const answered = await harnessControl(app()).request("/__harness/concepts", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      concepts,
+    }),
+  });
+  return { status: answered.status, said: await answered.json() };
+};
+
 /** One MCP call by `person`, over a token of their own. */
 const calledBy = async (person: { readonly email: string }, tool: string, args: Rpc) => {
   const client = app().client();
@@ -160,6 +175,54 @@ describe("the browser suite's knowledge harness", () => {
       { id: "source-1", source: "Quarry haul roads", iri: earlier?.iri },
       { id: "source-2", source: "Synthetic site rules", at: "p.4" },
     ]);
+  });
+
+  it("refuses a source naming a concept not seeded before it", async () => {
+    const refused = await seedRefused([
+      {
+        title: "Quarry haul roads",
+        body: "Synthetic haul roads are graded weekly.",
+        sources: [{ concept: "Quarry speed limits" }],
+      },
+      { title: "Quarry speed limits", body: "Synthetic haul roads carry a limit." },
+    ]);
+
+    expect(refused).toEqual({
+      status: 400,
+      said: { fields: [{ field: "concepts.0.sources.0.concept", rule: expect.any(String) }] },
+    });
+  });
+
+  it("refuses a page locator given together with a passage", async () => {
+    const refused = await seedRefused([
+      {
+        title: "Quarry speed limits",
+        body: "Synthetic haul roads carry a limit.",
+        sources: [{ title: "Synthetic site rules", at: "p.4", passages: ["Ten miles an hour."] }],
+      },
+    ]);
+
+    expect(refused).toEqual({
+      status: 400,
+      said: { fields: [{ field: "concepts.0.sources.0.at", rule: expect.any(String) }] },
+    });
+  });
+
+  it("refuses a document sensitivity that is no sensitivity word", async () => {
+    const refused = await seedRefused([
+      {
+        title: "Quarry blast times",
+        body: "The synthetic quarry blasts at noon.",
+        sources: [
+          { title: "Synthetic blast licence", passages: ["Noon blasts."], sensitivity: "Secret" },
+        ],
+      },
+    ]);
+
+    expect(refused).toEqual({
+      status: 400,
+      said: { fields: [{ field: "concepts.0.sources.0.sensitivity", rule: expect.any(String) }] },
+    });
   });
 
   it("lands the further frontmatter keys a concept is given", async () => {

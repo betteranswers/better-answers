@@ -12,20 +12,66 @@ import { actingIn, openTestGit, type TestApp } from "./harness.ts";
 
 const SUITE_VERIFIER = "process:better-answers-browser-suite";
 
-const aCitedDocument = z.object({
-  title: z.string().min(1),
-  /** The file's own words for the source, where they are not the document's title. */
-  label: z.string().min(1).optional(),
-  passages: z.array(z.string().min(1)).min(1),
-  /** Its connected source's own, where the document is held closer than the concept citing it. */
-  sensitivity: z.enum(SENSITIVITIES).optional(),
-});
+type SourceKeys = {
+  readonly title?: string | undefined;
+  readonly label?: string | undefined;
+  readonly passages?: readonly string[] | undefined;
+  readonly sensitivity?: string | undefined;
+  readonly concept?: string | undefined;
+  readonly at?: string | undefined;
+};
 
-/** A source naming a concept seeded before this one, by its title. */
-const aCitedConcept = z.object({ concept: z.string().min(1) });
+type Broken = readonly [field: keyof SourceKeys, rule: string];
 
-/** A source with a place of the file's own in it, such as `p.4`, which opens nothing. */
-const aCitedPlace = z.object({ title: z.string().min(1), at: z.string().min(1) });
+const given = (source: SourceKeys, fields: readonly (keyof SourceKeys)[]) =>
+  fields.filter((field) => source[field] !== undefined);
+
+const conceptRules = (source: SourceKeys): readonly Broken[] =>
+  given(source, ["title", "label", "passages", "sensitivity", "at"]).map((field) => [
+    field,
+    "a source naming a concept carries nothing else",
+  ]);
+
+const placeRules = (source: SourceKeys): readonly Broken[] => [
+  ...(source.passages === undefined
+    ? []
+    : [["at", "a place in a source opens nothing, so it comes with no passage"] as const]),
+  ...given(source, ["label", "sensitivity"]).map((field): Broken => [
+    field,
+    "only a document's passages take this",
+  ]),
+];
+
+const documentRules = (source: SourceKeys): readonly Broken[] =>
+  source.passages === undefined
+    ? [["passages", "a source names a document's passages, a concept or a place"]]
+    : [];
+
+/** One form alone, so a spec's mistake is refused by its field and never dropped unread. */
+const rulesBroken = (source: SourceKeys): readonly Broken[] => {
+  if (source.concept !== undefined) return conceptRules(source);
+  const untitled: readonly Broken[] =
+    source.title === undefined ? [["title", "a document or a place names its source"]] : [];
+  return [...untitled, ...(source.at === undefined ? documentRules(source) : placeRules(source))];
+};
+
+/** A document's passages, a concept seeded before this one, or a place such as `p.4` that opens nothing. */
+const aSource = z
+  .strictObject({
+    title: z.string().min(1).optional(),
+    /** The file's own words for a document, where they are not its title. */
+    label: z.string().min(1).optional(),
+    passages: z.array(z.string().min(1)).min(1).optional(),
+    /** Its connected source's own, where the document is held closer than the concept citing it. */
+    sensitivity: z.enum(SENSITIVITIES).optional(),
+    concept: z.string().min(1).optional(),
+    at: z.string().min(1).optional(),
+  })
+  .superRefine((source, context) => {
+    for (const [field, rule] of rulesBroken(source)) {
+      context.addIssue({ code: "custom", path: [field], message: rule });
+    }
+  });
 
 const aConcept = z.object({
   title: z.string().min(1),
@@ -36,18 +82,33 @@ const aConcept = z.object({
   groupMemberIds: z.array(z.string().min(1)).default([]),
   trust: z.enum(TRUST_TIERS).default("unverified"),
   linksTo: z.array(z.string().min(1)).default([]),
-  sources: z.array(z.union([aCitedDocument, aCitedConcept, aCitedPlace])).default([]),
+  sources: z.array(aSource).default([]),
   /** Further keys of the file's own, such as `tags` or `verified`. */
   frontmatter: conceptFrontmatter.default({}),
 });
 
 type AskedConcept = z.output<typeof aConcept>;
 
-export const conceptsSeeding = z.object({
-  workspaceId: z.string().min(1),
-  userId: z.string().min(1),
-  concepts: z.array(aConcept).min(1),
-});
+/** A source may name only a concept the same seed writes before it. */
+export const conceptsSeeding = z
+  .object({
+    workspaceId: z.string().min(1),
+    userId: z.string().min(1),
+    concepts: z.array(aConcept).min(1),
+  })
+  .superRefine((asked, context) => {
+    for (const [at, concept] of asked.concepts.entries()) {
+      const earlier = new Set(asked.concepts.slice(0, at).map((seeded) => seeded.title));
+      for (const [place, source] of concept.sources.entries()) {
+        if (source.concept === undefined || earlier.has(source.concept)) continue;
+        context.addIssue({
+          code: "custom",
+          path: ["concepts", at, "sources", place, "concept"],
+          message: "a source names a concept seeded before it in the same seed",
+        });
+      }
+    }
+  });
 
 /** `document` only where the source is a passage, which the write records as evidence. */
 type Citation = {
@@ -82,7 +143,12 @@ const fileOf = (title: string): string => `${shortNameOf(title)}.md`;
 
 type AskedSource = AskedConcept["sources"][number];
 
-type AskedDocument = z.output<typeof aCitedDocument>;
+type AskedDocument = {
+  readonly title: string;
+  readonly label?: string | undefined;
+  readonly passages: readonly string[];
+  readonly sensitivity?: Sensitivity | undefined;
+};
 
 type Sensitivity = AskedConcept["sensitivity"];
 
@@ -91,23 +157,20 @@ type Seeding = {
   readonly workspaceId: string;
   readonly concept: AskedConcept;
   readonly earlier: readonly SeededConcept[];
-  /** One published connected source for each sensitivity the concept's documents are held at. */
-  readonly connectedSources: ReadonlyMap<Sensitivity, string>;
+  /** The published connected source the concept's documents at one sensitivity are held in. */
+  readonly connectedSourceAt: (sensitivity: Sensitivity) => Promise<string>;
 };
 
-const heldAt = (concept: AskedConcept, source: AskedDocument): Sensitivity =>
-  source.sensitivity ?? concept.sensitivity;
-
-const connectedSourcesFor = async (
+/** One connected source for each sensitivity asked for, made when its first document is. */
+const connectedSourcesOf = (
   seed: Seeding["seed"],
   workspaceId: string,
   concept: AskedConcept,
-): Promise<Seeding["connectedSources"]> => {
-  const asked = new Set(
-    concept.sources.flatMap((source) => ("passages" in source ? [heldAt(concept, source)] : [])),
-  );
+): Seeding["connectedSourceAt"] => {
   const made = new Map<Sensitivity, string>();
-  for (const sensitivity of asked) {
+  return async (sensitivity) => {
+    const held = made.get(sensitivity);
+    if (held !== undefined) return held;
     const own = sensitivity === concept.sensitivity;
     const connectedSource = await seed.connectedSource({
       workspaceId,
@@ -117,8 +180,8 @@ const connectedSourcesFor = async (
       state: "published",
     });
     made.set(sensitivity, connectedSource.id);
-  }
-  return made;
+    return connectedSource.id;
+  };
 };
 
 type Unnumbered = Omit<Citation, "id">;
@@ -129,10 +192,9 @@ const passagesCited = async (
   source: AskedDocument,
 ): Promise<readonly Unnumbered[]> => {
   const { seed, workspaceId, concept } = seeding;
-  const connectedSourceId = seeding.connectedSources.get(heldAt(concept, source));
-  if (connectedSourceId === undefined) {
-    throw new Error(`${concept.title} has no connected source for ${source.title}`);
-  }
+  const connectedSourceId = await seeding.connectedSourceAt(
+    source.sensitivity ?? concept.sensitivity,
+  );
   const document = await seed.sourceDocument({
     workspaceId,
     connectedSourceId,
@@ -155,18 +217,20 @@ const passagesCited = async (
   }));
 };
 
-const conceptCited = (seeding: Seeding, title: string): Unnumbered => {
-  const named = seeding.earlier.find((seeded) => seeded.title === title);
-  if (named === undefined) {
-    throw new Error(`${seeding.concept.title} cites ${title}, not seeded before it`);
-  }
-  return { title, resource: named.iri };
-};
+/** The seed's schema has already refused a title no earlier concept carries. */
+const conceptCited = (seeding: Seeding, title: string): readonly Unnumbered[] =>
+  seeding.earlier
+    .filter((seeded) => seeded.title === title)
+    .slice(0, 1)
+    .map((named) => ({ title, resource: named.iri }));
 
+/** The schema holds a source to one form, so the two empty answers here are never reached. */
 const cited = async (seeding: Seeding, source: AskedSource): Promise<readonly Unnumbered[]> => {
-  if ("passages" in source) return passagesCited(seeding, source);
-  if ("concept" in source) return [conceptCited(seeding, source.concept)];
-  return [{ title: source.title, resource: source.title, locator: source.at }];
+  const { title, passages, concept, at } = source;
+  if (concept !== undefined) return conceptCited(seeding, concept);
+  if (title === undefined) return [];
+  if (passages !== undefined) return passagesCited(seeding, { ...source, title, passages });
+  return at === undefined ? [] : [{ title, resource: title, locator: at }];
 };
 
 /** The concept's sources in the order asked, each with the id its citation mark names. */
@@ -184,7 +248,7 @@ const citationsOf = async (
       workspaceId,
       concept,
       earlier,
-      connectedSources: await connectedSourcesFor(seed, workspaceId, concept),
+      connectedSourceAt: connectedSourcesOf(seed, workspaceId, concept),
     };
     const citations: Citation[] = [];
     for (const source of concept.sources) {
@@ -309,10 +373,7 @@ const sharedPastItsEvidence = async (
 
 const citesCloserHeldEvidence = (concept: AskedConcept): boolean =>
   concept.sources.some(
-    (source) =>
-      "passages" in source &&
-      source.sensitivity !== undefined &&
-      source.sensitivity !== concept.sensitivity,
+    (source) => source.sensitivity !== undefined && source.sensitivity !== concept.sensitivity,
   );
 
 const verified = async (
