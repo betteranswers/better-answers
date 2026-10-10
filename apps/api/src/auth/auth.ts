@@ -66,7 +66,6 @@ import {
 } from "../second-factor-gate.ts";
 import {
   ACCESS_TOKEN_LIFETIME_SECONDS,
-  BETTER_AUTH_RATE_LIMIT,
   CIMD_ALLOWED_CLIENT_HOSTS,
   CLIENT_IP_HEADER,
   EMAIL_CODE_LIFETIME_SECONDS,
@@ -567,13 +566,11 @@ export const createAuth = (deps: AuthDependencies) => {
      * code just expired read as wrong. The daily sweep deletes them.
      */
     verification: { disableCleanup: true },
-    rateLimit: {
-      enabled: true,
-      storage: "database",
-      window: BETTER_AUTH_RATE_LIMIT.window,
-      max: BETTER_AUTH_RATE_LIMIT.max,
-      customRules: { ...BETTER_AUTH_RATE_LIMIT.customRules },
-    },
+    /**
+     * The api counts every endpoint itself. The library counts a run of requests, not a
+     * window, and every page its handler is handed.
+     */
+    rateLimit: { enabled: false },
     advanced: {
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
       database: {

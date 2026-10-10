@@ -12,21 +12,24 @@ import {
 import { hasNoDisplayName } from "@better-answers/core/workspaces";
 
 import type { EmailSender } from "../email.ts";
-import { limitByIp, tooManyRequests } from "../ingress/limits.ts";
+import { countByAddress, limitByIp, tooManyRequests } from "../ingress/limits.ts";
 import { judged, pendingOr, SECOND_FACTOR_PENDING } from "../second-factor-gate.ts";
 import type { Auth } from "./auth.ts";
 import { mountTheAuthenticator } from "./authenticator.ts";
 import { mountTheConfirm } from "./confirm.ts";
 import {
-  BETTER_AUTH_RATE_LIMIT,
   DISCOVERY_CACHE_CONTROL,
   DISCOVERY_PATHS,
   EMAIL_CODE_EMAIL_RULE,
   EMAIL_CODE_LIFETIME_SECONDS,
+  EMAIL_CODE_SEND_IP_RULE,
+  EMAIL_CODE_SIGN_IN_IP_RULE,
+  IDENTITY_IP_RULE,
   MCP_SCOPES,
   OAUTH_IP_RULE,
   PAGE_IP_RULE,
   SEND_EMAIL_CODE_PATH,
+  SIGN_IN_BY_EMAIL_CODE_PATH,
   SIGN_IN_LINK_COOKIE,
   SIGN_IN_LINK_DESCRIBE_IP_RULE,
   SIGN_IN_LINK_DESCRIBE_PATH,
@@ -35,6 +38,7 @@ import {
   SIGN_IN_LINK_SIGN_IN_PATH,
   SIGN_IN_LINK_TOKEN_RULE,
 } from "./constants.ts";
+import { mountedPaths } from "./endpoints.ts";
 import {
   DEAD_LINK,
   hashOf,
@@ -271,8 +275,6 @@ const LINK_REFUSALS = {
   unanswered: { error: "unanswered" },
 } as const;
 
-const SIGN_IN_WINDOW_SECONDS = BETTER_AUTH_RATE_LIMIT.customRules["/sign-in/email-otp"].window;
-
 /** The library answers its own failure as a 500 response rather than throwing it. */
 const SERVER_FAILED = 500;
 
@@ -338,10 +340,6 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     use: LinkUse,
     answered: Response,
   ): Promise<Response> => {
-    if (answered.status === 429) {
-      const wait = Number(answered.headers.get("x-retry-after") ?? SIGN_IN_WINDOW_SECONDS);
-      return tooManyRequests(wait, "Too many sign-ins from this address; try again later.");
-    }
     if (answered.status >= SERVER_FAILED)
       return unanswered(context, `library ${String(answered.status)}`);
     if (!answered.ok) return context.json(LINK_REFUSALS.dead, 410);
@@ -361,12 +359,24 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
   };
 
   const signInBy = async (context: Context, token: string, use: LinkUse): Promise<Response> => {
+    const counted = await countByAddress(
+      deps,
+      EMAIL_CODE_SIGN_IN_IP_RULE,
+      "email-code-sign-in",
+      context.req.raw.headers,
+    );
+    if (!counted.allowed) {
+      return tooManyRequests(
+        counted.retryAfterSeconds,
+        "Too many sign-ins from this address; try again later.",
+      );
+    }
     const flowed = await attempt(() =>
       signingInByLink(() =>
         callFlow(
           auth,
           publicUrl,
-          "/sign-in/email-otp",
+          SIGN_IN_BY_EMAIL_CODE_PATH,
           flowHeaders(context.req.raw, publicUrl),
           linkSignInBody(use),
         ),
@@ -383,11 +393,11 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
   });
   routes.use(
     SIGN_IN_LINK_DESCRIBE_PATH,
-    limitByIp(door, SIGN_IN_LINK_DESCRIBE_IP_RULE, clock, "sign-in-link-read"),
+    limitByIp(deps, SIGN_IN_LINK_DESCRIBE_IP_RULE, "sign-in-link-read"),
   );
   routes.use(
     SIGN_IN_LINK_SIGN_IN_PATH,
-    limitByIp(door, SIGN_IN_LINK_SIGN_IN_IP_RULE, clock, "sign-in-link-sign-in"),
+    limitByIp(deps, SIGN_IN_LINK_SIGN_IN_IP_RULE, "sign-in-link-sign-in"),
   );
   routes.use("/sign-in-link/*", sameOriginOnly(publicUrl));
   routes.use("/sign-in-link/*", async (context, next) => {
@@ -415,6 +425,21 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     return signInBy(context, token, link.use);
   });
 };
+
+const takesOrSendsACode = (path: string): boolean =>
+  path === SIGN_IN_BY_EMAIL_CODE_PATH ||
+  path.startsWith("/email-otp/") ||
+  path.startsWith("/forget-password/");
+
+/** Another site can make a browser send any other method, so a post alone spends the count. */
+const countingPostsAlone =
+  (limit: MiddlewareHandler): MiddlewareHandler =>
+  (context, next) =>
+    context.req.method === "POST" ? limit(context, next) : next();
+
+/** The `oauth` group counts its own of Better Auth's endpoints, and nothing counts discovery. */
+const countedByItsOwnGroup = (path: string): boolean =>
+  !path.startsWith("/oauth2/") && path !== "/jwks" && !path.startsWith("/.well-known/");
 
 export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   const routes = new Hono();
@@ -453,8 +478,8 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
       }
     });
   }
-  routes.use("/oauth2/*", limitByIp(door, OAUTH_IP_RULE, clock, "oauth"));
-  routes.use("/jwks", limitByIp(door, OAUTH_IP_RULE, clock, "oauth"));
+  routes.use("/oauth2/*", limitByIp(deps, OAUTH_IP_RULE, "oauth"));
+  routes.use("/jwks", limitByIp(deps, OAUTH_IP_RULE, "oauth"));
   for (const path of [
     "/.well-known/oauth-protected-resource",
     "/.well-known/oauth-protected-resource/mcp",
@@ -462,15 +487,37 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     routes.get(path, (context) => context.json(prm));
   }
 
-  routes.use(SEND_EMAIL_CODE_PATH, sameOriginOnly(publicUrl));
+  const mounted = mountedPaths(auth);
+  /** Ahead of every count, so a post from another site spends none. */
+  for (const path of mounted.filter(takesOrSendsACode)) {
+    routes.use(path, sameOriginOnly(publicUrl));
+  }
   routes.use(SEND_EMAIL_CODE_PATH, limitCodesByEmail(door, clock));
+  const limitSignIns = countingPostsAlone(
+    limitByIp(deps, EMAIL_CODE_SIGN_IN_IP_RULE, "email-code-sign-in"),
+  );
+  const limitSends = countingPostsAlone(
+    limitByIp(deps, EMAIL_CODE_SEND_IP_RULE, "email-code-send"),
+  );
+  const limitIdentity = limitByIp(deps, IDENTITY_IP_RULE, "identity");
+  const limitOf = (path: string): MiddlewareHandler => {
+    if (path === SIGN_IN_BY_EMAIL_CODE_PATH) return limitSignIns;
+    return takesOrSendsACode(path) ? limitSends : limitIdentity;
+  };
+  /**
+   * Here, so the count by email refuses a send first. Read off the instance, so an endpoint
+   * an upgrade adds is counted too.
+   */
+  for (const path of mounted.filter(countedByItsOwnGroup)) {
+    routes.use(path, limitOf(path));
+  }
   routes.use(SEND_EMAIL_CODE_PATH, bindTheLink(publicUrl));
   mountTheSignInLink(routes, deps);
   mountTheAuthenticator(routes, deps);
   mountThePasskeys(routes, deps);
   mountTheConfirm(routes, deps);
 
-  routes.use("/consent", limitByIp(door, PAGE_IP_RULE, clock, "consent"));
+  routes.use("/consent", limitByIp(deps, PAGE_IP_RULE, "consent"));
   routes.use("/consent", sameOriginOnly(publicUrl));
   routes.use("/consent", navigationOnly);
 

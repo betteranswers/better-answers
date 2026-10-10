@@ -529,6 +529,9 @@ export type CounterOutcome = {
   readonly allowed: boolean;
 
   readonly retryAfterSeconds: number;
+
+  /** The window's count with this attempt in it: one past the rule's max is its first refusal. */
+  readonly count: number;
 };
 
 const windowStart = (rule: CounterRule, now: Date): Date =>
@@ -540,6 +543,7 @@ const outcome = (count: number, rule: CounterRule, start: Date, now: Date): Coun
     1,
     Math.ceil((start.getTime() + rule.windowMs - now.getTime()) / 1000),
   ),
+  count,
 });
 
 const countInWindow = async (

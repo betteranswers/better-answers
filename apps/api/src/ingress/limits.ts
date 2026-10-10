@@ -1,15 +1,17 @@
-import { isIPv6 } from "node:net";
+import { BlockList, isIPv4, isIPv6 } from "node:net";
 
 import type { MiddlewareHandler } from "hono";
+import type { Logger } from "pino";
 
 import type { Clock } from "@better-answers/core/kernel";
 import {
   consumeIngress,
+  type CounterOutcome,
   type CounterRule,
   type PostgresDoor,
 } from "@better-answers/core/store/postgres";
 
-import { CLIENT_IP_HEADER, UNKNOWN_CLIENT_IP } from "../auth/constants.ts";
+import { ANTHROPIC_EGRESS_RANGE, CLIENT_IP_HEADER, UNKNOWN_CLIENT_IP } from "../auth/constants.ts";
 
 const prefix64Of = (ipv6: string): string => {
   const canonical = new URL(`http://[${ipv6}]`).hostname.replace(/^\[|\]$/g, "");
@@ -50,6 +52,9 @@ export const tooManyRequests = (retryAfterSeconds: number, description: string):
 /** The route groups the api counts by client address. */
 export type AddressScope =
   | "consent"
+  | "email-code-send"
+  | "email-code-sign-in"
+  | "identity"
   | "mcp"
   | "oauth"
   | "passkey-sign-in"
@@ -61,20 +66,56 @@ export type AddressScope =
 export const addressKeyOf = (scope: AddressScope, headers: Headers): string =>
   `${scope}:${clientIpOf(headers)}`;
 
-export const limitByIp = (
-  door: PostgresDoor,
+const anthropicRange = new BlockList();
+anthropicRange.addSubnet(ANTHROPIC_EGRESS_RANGE.network, ANTHROPIC_EGRESS_RANGE.prefix);
+
+/** Whether a client key is an address in Anthropic's published range; a /64 or `unknown` is not. */
+export const inAnthropicRange = (clientKey: string): boolean =>
+  isIPv4(clientKey) && anthropicRange.check(clientKey);
+
+export type AddressCounter = {
+  readonly door: PostgresDoor;
+  readonly clock: Clock;
+  readonly logger: Logger;
+};
+
+/**
+ * A window's first refusal is logged and no later one, so a flood writes one line. The line
+ * never holds the address.
+ */
+export const countByAddress = async (
+  counter: AddressCounter,
   rule: CounterRule,
-  clock: Clock,
+  scope: AddressScope,
+  headers: Headers,
+): Promise<CounterOutcome> => {
+  const outcome = await consumeIngress(
+    counter.door,
+    "ip",
+    addressKeyOf(scope, headers),
+    rule,
+    counter.clock.now(),
+  );
+  if (outcome.count === rule.max + 1) {
+    counter.logger.child({ module: "ingress" }).info(
+      {
+        event: "ingress.address_ceiling_met",
+        group: scope,
+        anthropicRange: inAnthropicRange(clientIpOf(headers)),
+      },
+      "an address met its route group's ceiling",
+    );
+  }
+  return outcome;
+};
+
+export const limitByIp = (
+  counter: AddressCounter,
+  rule: CounterRule,
   scope: AddressScope,
 ): MiddlewareHandler => {
   return async (context, next) => {
-    const outcome = await consumeIngress(
-      door,
-      "ip",
-      addressKeyOf(scope, context.req.raw.headers),
-      rule,
-      clock.now(),
-    );
+    const outcome = await countByAddress(counter, rule, scope, context.req.raw.headers);
     if (!outcome.allowed) {
       return tooManyRequests(
         outcome.retryAfterSeconds,

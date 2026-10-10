@@ -4,6 +4,9 @@ export const CLIENT_IP_HEADER = "cf-connecting-ip";
 
 export const UNKNOWN_CLIENT_IP = "unknown";
 
+/** The range Anthropic publishes for Claude's servers, which call for every customer from it. */
+export const ANTHROPIC_EGRESS_RANGE = { network: "160.79.104.0", prefix: 21 } as const;
+
 export const ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 60;
 
 export const REFRESH_TOKEN_LIFETIME_SECONDS = 90 * 24 * 60 * 60;
@@ -33,6 +36,14 @@ export const PAGE_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
 export const EMAIL_CODE_EMAIL_RULE: CounterRule = { windowMs: 10 * 60_000, max: 5 };
 
 export const SEND_EMAIL_CODE_PATH = "/email-otp/send-verification-otp";
+
+export const SIGN_IN_BY_EMAIL_CODE_PATH = "/sign-in/email-otp";
+
+/** Behind the count by email. Every email-code endpoint but the sign-in spends it too. */
+export const EMAIL_CODE_SEND_IP_RULE: CounterRule = { windowMs: 10 * 60_000, max: 5 };
+
+/** A sign-in by the form and one by the link spend it alike. */
+export const EMAIL_CODE_SIGN_IN_IP_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
 
 export const SIGN_IN_PATH = "/sign-in";
 
@@ -114,6 +125,9 @@ export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max:
 
 export const TRPC_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
+/** A page load reads the session beside its tRPC calls, so this is tRPC's ceiling. */
+export const IDENTITY_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };
+
 export const MCP_TOKEN_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
 /** Each export reads up to 10,000 events, so an Admin's script cannot keep the database busy. */
@@ -127,30 +141,5 @@ export const ASK_TO_JOIN_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max
  * the time taken says neither.
  */
 export const ASK_TO_JOIN_ANSWER_FLOOR_MS = 250;
-
-export const BETTER_AUTH_RATE_LIMIT = {
-  window: 60,
-  max: 100,
-  customRules: {
-    "/email-otp/send-verification-otp": { window: 600, max: 5 },
-    "/email-otp/check-verification-otp": { window: 600, max: 10 },
-    "/sign-in/email-otp": { window: 600, max: 10 },
-    /**
-     * The link's page reaches the library's handler before the SPA serves it, and the library's
-     * own rule for `/sign-in*` allows three loads in ten seconds.
-     */
-    "/sign-in/link": { window: 60, max: 30 },
-    /** Discovery is counted by no limiter. The second is served only once `openid` is a scope. */
-    "/.well-known/oauth-authorization-server": false,
-    "/.well-known/openid-configuration": false,
-    /**
-     * `OAUTH_IP_RULE` alone counts these. The library's count grows until a window passes with
-     * no request, so a steady caller under our ceiling would meet it.
-     */
-    "/oauth2/*": false,
-    "/oauth2/*/*": false,
-    "/jwks": false,
-  },
-} as const;
 
 export const CIMD_ALLOWED_CLIENT_HOSTS = ["claude.ai"] as const;

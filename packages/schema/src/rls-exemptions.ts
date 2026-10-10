@@ -23,7 +23,8 @@ export const RLS_EXEMPTIONS = {
     "Its referenceId is what puts a workspace_id on a credential, so it is read before one exists.",
   "public.oauth_client_assertion":
     "Replay guard, read by assertion id at the token endpoint, pre-session.",
-  "public.rate_limit": "Better Auth's own limiter, keyed by request, running before sign-in.",
+  "public.rate_limit":
+    "Better Auth's own limiter, keyed by request. The api switches it off, so nothing writes here.",
   "public.authenticator":
     "A person's own second factor, across every workspace: read by person id at sign-in, before any workspace is known.",
   "public.passkey":

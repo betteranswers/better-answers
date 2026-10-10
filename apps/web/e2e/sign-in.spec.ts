@@ -66,19 +66,23 @@ const codeField = (page: Page) => page.getByLabel(SIGN_IN_WORDS.codeField, { exa
 const theSendsAnswer = (page: Page) =>
   page.waitForResponse((response) => new URL(response.url()).pathname === SEND_PATH);
 
-/** The per-email ceiling names its wait in one header, Better Auth's per-client one in the other. */
-const WAIT_HEADER = { perEmail: "retry-after", perClient: "x-retry-after" } as const;
-
-/** The wait the ceiling named, in whole seconds, from the header that ceiling answers with. */
-const waitNamedBy = async (
-  answered: ReturnType<typeof theSendsAnswer>,
-  ceiling: keyof typeof WAIT_HEADER,
-): Promise<number> => {
+/** The wait the ceiling named, in whole seconds. */
+const waitNamedBy = async (answered: ReturnType<typeof theSendsAnswer>): Promise<number> => {
   const response = await answered;
   expect(response.status(), "the send was not refused by a ceiling").toBe(429);
-  const waitSeconds = Number(response.headers()[WAIT_HEADER[ceiling]]);
+  const waitSeconds = Number(response.headers()["retry-after"]);
   expect(Number.isInteger(waitSeconds), "the ceiling's refusal named no wait").toBe(true);
   return waitSeconds;
+};
+
+/** A code asked for at the email step meets a ceiling, and the page says the wait it named. */
+const theSendIsRefusedNamingItsWait = async (page: Page, email: string): Promise<void> => {
+  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
+  const answered = theSendsAnswer(page);
+  await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
+
+  const said = sentenceOf(tooManyCodesAskedFor(await waitNamedBy(answered)));
+  await expect(page.getByRole("alert")).toHaveText(said);
 };
 
 /** From the email step the page shows to the code step, through the product's own page. */
@@ -336,12 +340,7 @@ test("says a code is sent, wrong, or asked too often", async ({
   await floodCodesTo(request, flooded, 6);
 
   await page.getByRole("button", { name: SIGN_IN_WORDS.otherAddress }).click();
-  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(flooded);
-  const answered = theSendsAnswer(page);
-  await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
-
-  const said = sentenceOf(tooManyCodesAskedFor(await waitNamedBy(answered, "perEmail")));
-  await expect(page.getByRole("alert")).toHaveText(said);
+  await theSendIsRefusedNamingItsWait(page, flooded);
   // Red words alone: the system never draws a coloured rule beside them.
   await expect(page.getByRole("alert")).toHaveCSS("border-left-width", "0px");
 });
@@ -387,12 +386,7 @@ test("names the wait when one client asks too many codes", async ({ page }) => {
     await page.request.post(SEND_PATH, { data: { email: anAddress("spread"), type: "sign-in" } });
   }
 
-  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(anAddress("sixth"));
-  const answered = theSendsAnswer(page);
-  await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
-
-  const said = sentenceOf(tooManyCodesAskedFor(await waitNamedBy(answered, "perClient")));
-  await expect(page.getByRole("alert")).toHaveText(said);
+  await theSendIsRefusedNamingItsWait(page, anAddress("sixth"));
 });
 
 const invitedTo = async (request: APIRequestContext, name: string): Promise<string> => {
@@ -488,7 +482,7 @@ test("names the wait when a new code meets the ceiling", async ({
   await page.keyboard.press("n");
   await theActionLandedWithinItsBudget(page, "send a new code");
 
-  const said = sentenceOf(tooManyCodesAskedFor(await waitNamedBy(answered, "perEmail")));
+  const said = sentenceOf(tooManyCodesAskedFor(await waitNamedBy(answered)));
   await expect(page.getByRole("alert")).toHaveText(said);
   await passesTheAccessibilityGate();
 

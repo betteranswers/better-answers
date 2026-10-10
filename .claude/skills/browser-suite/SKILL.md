@@ -70,20 +70,21 @@ then asks for one more in the browser, and what refuses it is the per-email ceil
 per-address one the flood would have filled for the page as well.
 
 Without an address of its own a caller shares one bucket with every other caller in the run: a
-long run trips a ceiling partway through, every spec after it fails for a reason that has nothing
-to do with what it was testing, and Better Auth logs that it could not tell the callers apart.
+long run trips a ceiling partway through, and every spec after it fails for a reason that has
+nothing to do with what it was testing.
 
 ### The ceilings a spec runs into
 
 - **Per email.** `EMAIL_CODE_EMAIL_RULE` in `apps/api/src/auth/constants.ts` — five in ten
   minutes, applied by `limitCodesByEmail` in `apps/api/src/auth/routes.ts` as Hono middleware on
-  `SEND_EMAIL_CODE_PATH`, ahead of Better Auth's own rule for that path. It keys on a hash of the
+  `SEND_EMAIL_CODE_PATH`, ahead of that path's count by client address. It keys on a hash of the
   address in the body, so which client asked makes no difference.
 - **Per client address.** `limitByIp` in `apps/api/src/ingress/limits.ts` reads `CLIENT_IP_HEADER`
-  and applies `OAUTH_IP_RULE`, `PAGE_IP_RULE`, `TRPC_IP_RULE` and
-  `MCP_UNAUTHENTICATED_IP_RULE`, all in `apps/api/src/auth/constants.ts`; Better Auth's own
-  limiter, configured there as `BETTER_AUTH_RATE_LIMIT`, keys on the same header. `MCP_TOKEN_RULE`
-  is the odd one out, counted against the bearer token rather than the caller's address.
+  and counts each route group apart. `AddressScope` there names the groups, and each group's rule
+  is in `apps/api/src/auth/constants.ts`. A code's send and a sign-in by code count over ten
+  minutes, and the rest over one. Better Auth's own limiter is off, so the api's counts are the
+  only ones. `MCP_TOKEN_RULE` is the odd one out, counted against the bearer token rather than
+  the caller's address.
 - **Per person.** `personCeiling` in `apps/api/src/trpc/base.ts` counts a signed-in person's calls
   to one procedure against a rule from the same constants file, `ASK_TO_JOIN_PERSON_RULE` for
   asking to join. Past it the call answers 429 with `Retry-After` and no refusal word. It keys on

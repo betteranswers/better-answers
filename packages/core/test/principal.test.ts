@@ -840,6 +840,29 @@ describe("the counters", () => {
 
     expect([first.allowed, second.allowed, otherScope.allowed]).toEqual([true, false, true]);
   });
+
+  it("answers the window's count with each attempt", async () => {
+    const door = openPostgres(db().runtimePool);
+    const rule = { windowMs: 60_000, max: 2 };
+    const key = `counted-${ulid()}`;
+    const at = new Date("2026-09-01T10:00:30Z");
+
+    const counted = [
+      await consumeIngress(door, "ip", key, rule, at),
+      await consumeIngress(door, "ip", key, rule, at),
+      await consumeIngress(door, "ip", key, rule, at),
+      await consumeIngress(door, "ip", key, rule, at),
+      await consumeIngress(door, "ip", key, rule, new Date("2026-09-01T10:01:00Z")),
+    ];
+
+    expect(counted.map(({ allowed, count }) => ({ allowed, count }))).toEqual([
+      { allowed: true, count: 1 },
+      { allowed: true, count: 2 },
+      { allowed: false, count: 3 },
+      { allowed: false, count: 4 },
+      { allowed: true, count: 1 },
+    ]);
+  });
 });
 
 describe("the operator resolver", () => {

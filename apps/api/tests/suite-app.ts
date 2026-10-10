@@ -29,8 +29,15 @@ export const appForSuite = (options: TestAppOptions = {}): (() => TestApp) => {
   };
 };
 
-/** Stopped while a test counts past a ceiling: on the wall clock its asks can straddle two fixed windows. */
-export const aStoppableClock = (): { readonly clock: Clock; readonly stopTheClock: () => void } => {
+/**
+ * Stopped while a test counts past a ceiling: on the wall clock its asks can straddle two fixed
+ * windows. Moved, it stays stopped.
+ */
+export const aStoppableClock = (): {
+  readonly clock: Clock;
+  readonly stopTheClock: () => void;
+  readonly moveTheClock: (byMs: number) => void;
+} => {
   const stopped: { at: number | undefined } = { at: undefined };
 
   afterEach(() => {
@@ -41,6 +48,9 @@ export const aStoppableClock = (): { readonly clock: Clock; readonly stopTheCloc
     clock: { now: () => new Date(stopped.at ?? Date.now()) },
     stopTheClock: () => {
       stopped.at = Date.now();
+    },
+    moveTheClock: (byMs) => {
+      stopped.at = (stopped.at ?? Date.now()) + byMs;
     },
   };
 };
