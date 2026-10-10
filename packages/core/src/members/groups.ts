@@ -4,10 +4,11 @@ import { boundarySchemas, CURATED_ORIGIN } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { action, declareActions, record, recordEach } from "../audit/index.ts";
-import { attempt, err, ok, requireAdmin, ulid } from "../kernel/index.ts";
+import { admit, ADMIN_ALONE, attempt, declareAction, err, ok, ulid } from "../kernel/index.ts";
 import type {
   AdminUserPrincipal,
   GroupId,
+  RefusalOf,
   Result,
   UserId,
   UserPrincipal,
@@ -39,12 +40,6 @@ const GROUP_NAME = boundarySchemas.group.insert.shape.name;
 const GROUP_ORIGIN = boundarySchemas.group.select.shape.origin;
 const PERSON_ID = boundarySchemas.user.select.shape.id;
 
-type AdminRefusal = MemberRefusal<"role-forbids">;
-
-type GuardRefusal = AdminRefusal | MemberRefusal<"malformed">;
-
-type TargetRefusal = GuardRefusal | MemberRefusal<"no-such-group">;
-
 /**
  * Each field is any text, so a name or an id the action cannot take reaches it and is refused in its
  * own word, `malformed`.
@@ -52,38 +47,68 @@ type TargetRefusal = GuardRefusal | MemberRefusal<"no-such-group">;
 export const createGroupInput = z.object({ name: z.string() });
 
 export type CreateGroupInput = z.output<typeof createGroupInput>;
-export type CreateGroupRefusal = GuardRefusal | MemberRefusal<"name-taken"> | Error;
+
+const createGroupAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: createGroupInput,
+  refuses: ["role-forbids", "malformed", "name-taken"],
+});
+
+export type CreateGroupRefusal = MemberRefusal<RefusalOf<typeof createGroupAction>> | Error;
 
 export const renameGroupInput = z.object({ groupId: z.string(), name: z.string() });
 
 export type RenameGroupInput = z.output<typeof renameGroupInput>;
-export type RenameGroupRefusal = TargetRefusal | MemberRefusal<"name-taken"> | Error;
+
+const renameGroupAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: renameGroupInput,
+  refuses: ["role-forbids", "malformed", "no-such-group", "name-taken"],
+});
+
+export type RenameGroupRefusal = MemberRefusal<RefusalOf<typeof renameGroupAction>> | Error;
 
 export const deleteGroupInput = z.object({ groupId: z.string() });
 
 export type DeleteGroupInput = z.output<typeof deleteGroupInput>;
-export type DeleteGroupRefusal = TargetRefusal | Error;
+
+const deleteGroupAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: deleteGroupInput,
+  refuses: ["role-forbids", "malformed", "no-such-group"],
+});
+
+export type DeleteGroupRefusal = MemberRefusal<RefusalOf<typeof deleteGroupAction>> | Error;
 
 export const groupMemberInput = z.object({ groupId: z.string(), userId: z.string() });
 
 export type GroupMemberInput = z.output<typeof groupMemberInput>;
-export type AddToGroupRefusal =
-  | TargetRefusal
-  | MemberRefusal<"no-such-member" | "already-in-group">
-  | Error;
-export type RemoveFromGroupRefusal = TargetRefusal | MemberRefusal<"not-in-group"> | Error;
+
+const addToGroupAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: groupMemberInput,
+  refuses: ["role-forbids", "malformed", "no-such-group", "no-such-member", "already-in-group"],
+});
+
+export type AddToGroupRefusal = MemberRefusal<RefusalOf<typeof addToGroupAction>> | Error;
+
+const removeFromGroupAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: groupMemberInput,
+  refuses: ["role-forbids", "malformed", "no-such-group", "not-in-group"],
+});
+
+export type RemoveFromGroupRefusal = MemberRefusal<RefusalOf<typeof removeFromGroupAction>> | Error;
 
 type GroupTarget = { readonly admin: AdminUserPrincipal; readonly groupId: GroupId };
 
 const groupTarget = (
-  principal: UserPrincipal,
+  admin: AdminUserPrincipal,
   groupId: string,
-): Result<GroupTarget, TargetRefusal> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
+): Result<GroupTarget, MemberRefusal<"malformed">> => {
   const parsed = GROUP_ID.safeParse(groupId);
   if (!parsed.success) return err("malformed");
-  return ok({ admin: admin.value, groupId: parsed.data });
+  return ok({ admin, groupId: parsed.data });
 };
 
 const nothingChanged = async <Own extends string>(
@@ -106,7 +131,7 @@ export const createGroup = async (
   tx: Tx,
   input: CreateGroupInput,
 ): Promise<Result<{ groupId: GroupId }, CreateGroupRefusal>> => {
-  const admin = requireAdmin(principal);
+  const admin = admit(createGroupAction, principal, input);
   if (!admin.ok) return err(admin.error);
 
   const row = boundarySchemas.group.insert.safeParse({
@@ -143,7 +168,9 @@ export const renameGroup = async (
   tx: Tx,
   input: RenameGroupInput,
 ): Promise<Result<{ groupId: GroupId }, RenameGroupRefusal>> => {
-  const target = groupTarget(principal, input.groupId);
+  const admitted = admit(renameGroupAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const target = groupTarget(admitted.value, input.groupId);
   if (!target.ok) return err(target.error);
   const name = GROUP_NAME.safeParse(input.name);
   if (!name.success) return err("malformed");
@@ -178,7 +205,9 @@ export const deleteGroup = async (
   tx: Tx,
   input: DeleteGroupInput,
 ): Promise<Result<{ groupId: GroupId }, DeleteGroupRefusal>> => {
-  const target = groupTarget(principal, input.groupId);
+  const admitted = admit(deleteGroupAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const target = groupTarget(admitted.value, input.groupId);
   if (!target.ok) return err(target.error);
   const { admin, groupId } = target.value;
 
@@ -203,10 +232,10 @@ export const deleteGroup = async (
 type MemberTarget = GroupTarget & { readonly userId: UserId };
 
 const memberTarget = (
-  principal: UserPrincipal,
+  admin: AdminUserPrincipal,
   input: GroupMemberInput,
-): Result<MemberTarget, TargetRefusal> => {
-  const target = groupTarget(principal, input.groupId);
+): Result<MemberTarget, MemberRefusal<"malformed">> => {
+  const target = groupTarget(admin, input.groupId);
   if (!target.ok) return err(target.error);
   const person = PERSON_ID.safeParse(input.userId);
   if (!person.success) return err("malformed");
@@ -241,15 +270,10 @@ export const addedToGroup = async (
   return added;
 };
 
-export const addToGroup = async (
-  principal: UserPrincipal,
+const groupAndMemberStand = async (
   tx: Tx,
-  input: GroupMemberInput,
-): Promise<Result<{ groupId: GroupId; userId: UserId }, AddToGroupRefusal>> => {
-  const target = memberTarget(principal, input);
-  if (!target.ok) return err(target.error);
-  const { admin, groupId, userId } = target.value;
-
+  { admin, groupId, userId }: MemberTarget,
+): Promise<Result<undefined, MemberRefusal<"no-such-group" | "no-such-member"> | Error>> => {
   const known = await attempt(() =>
     tx.query<{ holds_group: boolean; is_member: boolean }>(
       `SELECT EXISTS (SELECT 1 FROM "group" WHERE workspace_id = $1 AND id = $2) AS holds_group,
@@ -262,6 +286,22 @@ export const addToGroup = async (
   const row = known.value.rows[0];
   if (row?.holds_group !== true) return err("no-such-group");
   if (!row.is_member) return err("no-such-member");
+  return ok(undefined);
+};
+
+export const addToGroup = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: GroupMemberInput,
+): Promise<Result<{ groupId: GroupId; userId: UserId }, AddToGroupRefusal>> => {
+  const admitted = admit(addToGroupAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const target = memberTarget(admitted.value, input);
+  if (!target.ok) return err(target.error);
+  const { admin, groupId, userId } = target.value;
+
+  const standing = await groupAndMemberStand(tx, target.value);
+  if (!standing.ok) return err(standing.error);
 
   const added = await attempt(() => addedToGroup(admin, tx, { groupId, personIds: [userId] }));
   if (!added.ok) return err(added.error);
@@ -274,7 +314,9 @@ export const removeFromGroup = async (
   tx: Tx,
   input: GroupMemberInput,
 ): Promise<Result<{ groupId: GroupId; userId: UserId }, RemoveFromGroupRefusal>> => {
-  const target = memberTarget(principal, input);
+  const admitted = admit(removeFromGroupAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const target = memberTarget(admitted.value, input);
   if (!target.ok) return err(target.error);
   const { admin, groupId, userId } = target.value;
 
@@ -299,6 +341,12 @@ export const removeFromGroup = async (
   return ok({ groupId, userId });
 };
 
+const holdsEveryGroupAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.custom<readonly GroupId[]>(),
+  refuses: ["role-forbids"],
+});
+
 /**
  * True for an empty list, and a repeated id counts once. A failed query rejects rather than
  * answering an error.
@@ -307,8 +355,8 @@ export const holdsEveryGroup = async (
   principal: UserPrincipal,
   tx: Tx,
   groupIds: readonly GroupId[],
-): Promise<Result<boolean, AdminRefusal>> => {
-  const admin = requireAdmin(principal);
+): Promise<Result<boolean, MemberRefusal<RefusalOf<typeof holdsEveryGroupAction>>>> => {
+  const admin = admit(holdsEveryGroupAction, principal, groupIds);
   if (!admin.ok) return err(admin.error);
   const distinct = [...new Set(groupIds)];
   if (distinct.length === 0) return ok(true);
@@ -319,12 +367,20 @@ export const holdsEveryGroup = async (
   return ok(found.rows[0]?.held === distinct.length);
 };
 
+const listGroupsAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.object({}),
+  refuses: ["role-forbids"],
+});
+
 /** In name order. */
 export const listGroups = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<readonly GroupSummary[], AdminRefusal | Error>> => {
-  const admin = requireAdmin(principal);
+): Promise<
+  Result<readonly GroupSummary[], MemberRefusal<RefusalOf<typeof listGroupsAction>> | Error>
+> => {
+  const admin = admit(listGroupsAction, principal, {});
   if (!admin.ok) return err(admin.error);
 
   const listed = await attempt(async () => {

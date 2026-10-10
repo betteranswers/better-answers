@@ -11,6 +11,7 @@ import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { action, batchIdFor, declareActions, record } from "../audit/index.ts";
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   emailAddressOf,
@@ -49,8 +50,6 @@ export const MOST_AT_ONCE = 50;
 const ROLE = boundarySchemas.member.select.shape.role;
 
 export const INVITATION_ID = boundarySchemas.invitation.select.shape.id;
-
-export const ADMIN_ALONE = { role: "Admin", purposes: [] } as const;
 
 export const NO_SUCH_INVITATION =
   "no-such-invitation" satisfies MemberRefusal<"no-such-invitation">;

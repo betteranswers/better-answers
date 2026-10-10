@@ -9,6 +9,7 @@ import {
 
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
@@ -19,7 +20,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { boundValues, type Bind, type Tx } from "../store/postgres/index.ts";
-import { ADMIN_ALONE, WAITING_ROW, waitingOf, type WaitingInvitation } from "./invitations.ts";
+import { WAITING_ROW, waitingOf, type WaitingInvitation } from "./invitations.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const INVITATION_STATUSES = ["waiting", "accepted", "expired", "cancelled"] as const;

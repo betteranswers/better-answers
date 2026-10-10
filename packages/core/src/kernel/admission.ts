@@ -21,6 +21,9 @@ type RoleOrPurpose = {
   readonly purposes: readonly string[] | typeof EVERY_PURPOSE;
 };
 
+/** A person who is an Admin, and the platform for no purpose. */
+export const ADMIN_ALONE = { role: "Admin", purposes: [] } as const;
+
 /** No role and no purpose reaches an action that admits this. */
 export const OPERATOR_ALONE = { operator: true } as const;
 
