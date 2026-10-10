@@ -145,6 +145,8 @@ const API_ROUTES = {
   "POST /sign-in-link/describe": "open",
   "POST /sign-in-link/sign-in": "open",
   "GET /health": "open",
+  "GET /fonts/geist/*": "open",
+  "GET /fonts/geist-mono/*": "open",
   "GET /.well-known/oauth-protected-resource": "open",
   "GET /.well-known/oauth-protected-resource/mcp": "open",
 } as const;
