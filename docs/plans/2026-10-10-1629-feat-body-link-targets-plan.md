@@ -132,7 +132,7 @@ The projected rows are KTD1's statement. A row exists only for a target the read
 - **Files:** `packages/core/src/concepts/read.ts`, `packages/core/src/concepts/index.ts` (`ConceptRead` and `readConcept` only), `packages/core/src/store/map/index.ts` (export `targetOf`, nothing else), `packages/core/test/concept-read.test.ts`.
 - **Approach:**
   1. Read the body's links with `linksAndMarksOf` and the file's own cited sources, before the frontmatter is projected.
-  2. Run KTD1's statement once, binding the live generation and the workspace as `RELATIONS` does.
+  2. Run KTD1's statement once, scoped to the live generation and the workspace as `RELATIONS` is.
   3. Keep each link whose folded address names a row, in ordinal order.
 - **Patterns to follow:** `relationsOf` and `READABLE_CONCEPT` in `read.ts`; the `seededBy` and `targetsSeeded` arrangements in `concept-read.test.ts`; `linkedPair` in `packages/core/test/concepts.test.ts` for two concepts at chosen paths.
 - **Test scenarios:**
