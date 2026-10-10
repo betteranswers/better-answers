@@ -99,10 +99,12 @@ import {
   type WriteManifestRefusal,
 } from "./manifest.ts";
 import {
+  bodyLinksOf,
   paneOf,
   projectedFrontmatter,
   relationsOf,
   resolvedSourcesOf,
+  type BodyLink,
   type EvidencePane,
   type PassageNamer,
   type PassageReader,
@@ -1249,6 +1251,7 @@ export type ConceptRead = {
   readonly trustWords: string;
   readonly pane: EvidencePane;
   readonly relations: readonly Relation[];
+  readonly bodyLinks: readonly BodyLink[];
 };
 
 const sharerOfRow = (row: ReadRow) =>
@@ -1285,6 +1288,8 @@ export const readConcept = async (
   if (!sources.ok) return err(sources.error);
   const relations = await relationsOf(principal, tx, concept.iri);
   if (!relations.ok) return err(relations.error);
+  const bodyLinks = await bodyLinksOf(principal, tx, concept);
+  if (!bodyLinks.ok) return err(bodyLinks.error);
   const trust = trustOf(concept, reads.now);
   return ok({
     iri: concept.iri,
@@ -1294,6 +1299,7 @@ export const readConcept = async (
     trustWords: trustWords(trust),
     pane: paneOf(sources.value, sharerOfRow(row)),
     relations: relations.value,
+    bodyLinks: bodyLinks.value,
   });
 };
 
