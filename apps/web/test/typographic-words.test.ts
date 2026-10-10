@@ -104,13 +104,7 @@ const named = ({ file, line, text }: Refused): string => `${file}:${String(line)
 type Allowance = { readonly file: string; readonly declared: string; readonly why: string };
 
 /** Code no rule tells from words: a declaration, by its file and its name. */
-const CODE_NO_RULE_TELLS: readonly Allowance[] = [
-  {
-    file: "shared/theme-switch.ts",
-    declared: "FIRST_PAINT",
-    why: "a script the page's head runs before the first paint",
-  },
-];
+const CODE_NO_RULE_TELLS: readonly Allowance[] = [];
 
 const allows = (allowance: Allowance, refused: Refused): boolean =>
   allowance.file === refused.file && allowance.declared === refused.declared;
