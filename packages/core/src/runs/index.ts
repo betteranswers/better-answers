@@ -21,12 +21,12 @@ import {
 
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
   EVERY_PURPOSE,
   ok,
-  requireAdmin,
   ulid,
   type AdminUserPrincipal,
   type InputOf,
@@ -35,7 +35,6 @@ import {
   type PrincipalRefusal,
   type RefusalOf,
   type Result,
-  type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import {
@@ -246,18 +245,29 @@ export const enqueueJob = async (
 ): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> =>
   inWorkspace(principal, door, input.workspaceId, (tx) => enqueueJobIn(principal, tx, input));
 
-export type JobByIdRefusal = "no-such-job" | RoleRefusal | PrincipalRefusal;
+/** An Admin, or the platform acting for any purpose. */
+const ADMIN_OR_THE_PLATFORM = { role: "Admin", purposes: EVERY_PURPOSE } as const;
+
+type JobByIdInput = { readonly workspaceId: string; readonly jobId: string };
+
+const jobByIdAction = declareAction({
+  admits: ADMIN_OR_THE_PLATFORM,
+  input: z.custom<JobByIdInput>(),
+  refuses: ["role-forbids", "no-such-job"],
+});
+
+export type JobByIdRefusal = RefusalOf<typeof jobByIdAction> | PrincipalRefusal;
 
 /** A job in another workspace answers `no-such-job`, as a missing one does. */
 export const jobById = async (
   principal: Principal,
   door: PostgresDoor,
-  input: { readonly workspaceId: string; readonly jobId: string },
+  input: JobByIdInput,
 ): Promise<Result<JobState, JobByIdRefusal | Error>> => {
-  if (principal.kind !== "platform") {
-    const admin = requireAdmin(principal);
-    if (!admin.ok) return err(admin.error);
-    if (input.workspaceId !== principal.workspaceId) return err("no-such-job");
+  const admitted = admit(jobByIdAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  if (principal.kind !== "platform" && input.workspaceId !== principal.workspaceId) {
+    return err("no-such-job");
   }
   const read = await inWorkspace(principal, door, input.workspaceId, (tx) =>
     tx.query<JobRow>(
@@ -285,19 +295,16 @@ type OutcomeRow = { readonly outcome: OutcomeColumn };
 
 /** The outcome of the connected source's newest `done` sync; null when there is none or it has none. */
 export const latestIndexOutcomeIn = async (
-  principal: UserPrincipal,
+  admin: AdminUserPrincipal,
   tx: Tx,
   input: { readonly connectedSourceId: string },
-): Promise<Result<JobOutcome | null, RoleRefusal | Error>> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
-
+): Promise<Result<JobOutcome | null, Error>> => {
   const read = await attempt(() =>
     tx.query<OutcomeRow>(
       `SELECT outcome FROM job
         WHERE workspace_id = $1 AND kind = $2 AND subject_id = $3 AND status = $4
         ORDER BY finished_at DESC, id DESC LIMIT 1`,
-      [admin.value.workspaceId, INDEX_KIND, input.connectedSourceId, JOB_DONE_STATUS],
+      [admin.workspaceId, INDEX_KIND, input.connectedSourceId, JOB_DONE_STATUS],
     ),
   );
   if (!read.ok) return err(read.error);
@@ -404,8 +411,13 @@ const endedSyncOf = (row: EndedSyncRow): EndedSync => {
   };
 };
 
-const readsSyncs = (principal: Principal): Result<Principal, RoleRefusal> =>
-  principal.kind === "platform" ? ok(principal) : requireAdmin(principal);
+type EndedSyncsInput = { readonly workspaceId: string; readonly scan: SyncScan };
+
+const endedSyncsAction = declareAction({
+  admits: ADMIN_OR_THE_PLATFORM,
+  input: z.custom<EndedSyncsInput>(),
+  refuses: ["role-forbids"],
+});
 
 /**
  * Index jobs that ended, or whose claim lapsed, oldest first; never a queued job or a live claim.
@@ -414,9 +426,11 @@ const readsSyncs = (principal: Principal): Result<Principal, RoleRefusal> =>
 export const endedSyncs = async (
   principal: Principal,
   door: PostgresDoor,
-  input: { readonly workspaceId: string; readonly scan: SyncScan },
-): Promise<Result<readonly EndedSync[], RoleRefusal | PrincipalRefusal | Error>> => {
-  const reader = readsSyncs(principal);
+  input: EndedSyncsInput,
+): Promise<
+  Result<readonly EndedSync[], RefusalOf<typeof endedSyncsAction> | PrincipalRefusal | Error>
+> => {
+  const reader = admit(endedSyncsAction, principal, input);
   if (!reader.ok) return err(reader.error);
 
   const [statement, values] = scanOf(input.workspaceId, input.scan);
@@ -426,13 +440,25 @@ export const endedSyncs = async (
   return read.ok ? ok(read.value.rows.map(endedSyncOf)) : err(read.error);
 };
 
+type LockSyncInput = {
+  readonly workspaceId: string;
+  readonly jobId: string;
+  readonly attempts: number;
+};
+
+const lockSyncAction = declareAction({
+  admits: ADMIN_OR_THE_PLATFORM,
+  input: z.custom<LockSyncInput>(),
+  refuses: ["role-forbids"],
+});
+
 /** Locks the sync's job row until `tx` ends, so a claimant whose lease lapsed cannot write after it. */
 export const lockSyncIn = async (
   principal: Principal,
   tx: Tx,
-  input: { readonly workspaceId: string; readonly jobId: string; readonly attempts: number },
-): Promise<Result<void, RoleRefusal | Error>> => {
-  const locker = readsSyncs(principal);
+  input: LockSyncInput,
+): Promise<Result<void, RefusalOf<typeof lockSyncAction> | Error>> => {
+  const locker = admit(lockSyncAction, principal, input);
   if (!locker.ok) return err(locker.error);
 
   // A claim renewed or taken again since the listing is live: locking it would stall its heartbeat.
@@ -451,6 +477,12 @@ export const lockSyncIn = async (
 export const runsOfSubjectInput = z.object({ subjectId: SUBJECT_ID });
 
 export type RunsOfSubjectInput = z.output<typeof runsOfSubjectInput>;
+
+const runsOfSubjectAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: runsOfSubjectInput,
+  refuses: ["role-forbids"],
+});
 
 /**
  * Its outcome stays on the job row: a sync's outcome locates each overridden span, the
@@ -497,8 +529,8 @@ export const runsOfSubject = async (
   principal: UserPrincipal,
   tx: Tx,
   input: RunsOfSubjectInput,
-): Promise<Result<readonly SubjectRun[], RoleRefusal | Error>> => {
-  const admin = requireAdmin(principal);
+): Promise<Result<readonly SubjectRun[], RefusalOf<typeof runsOfSubjectAction> | Error>> => {
+  const admin = admit(runsOfSubjectAction, principal, input);
   if (!admin.ok) return err(admin.error);
 
   const read = await attempt(() =>
@@ -533,12 +565,20 @@ export const latestRunsOf = async (
 
 const AUDIT_FINDINGS = ["mismatched", "unparsed", "missing_row", "missing_file"] as const;
 
+const bundleHealthAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.object({}),
+  refuses: ["role-forbids"],
+});
+
 /** Read from the newest `done` nightly audit; an outcome that cannot be read is `mismatched`. */
 export const bundleHealth = async (
   principal: UserPrincipal,
   door: PostgresDoor,
-): Promise<Result<BundleHealth, RoleRefusal | PrincipalRefusal | Error>> => {
-  const admin = requireAdmin(principal);
+): Promise<
+  Result<BundleHealth, RefusalOf<typeof bundleHealthAction> | PrincipalRefusal | Error>
+> => {
+  const admin = admit(bundleHealthAction, principal, {});
   if (!admin.ok) return err(admin.error);
 
   const read = await attempt(() =>

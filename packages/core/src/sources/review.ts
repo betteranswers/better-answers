@@ -156,7 +156,7 @@ export const findingsOf = async (
   const standing = await connectedSourceNamed(acting.value, tx, { columns: "1", lock: "none" });
   if (!standing.ok) return err(standing.error);
 
-  const lastSync = await latestIndexOutcomeIn(principal, tx, { connectedSourceId });
+  const lastSync = await latestIndexOutcomeIn(acting.value.admin, tx, { connectedSourceId });
   if (!lastSync.ok) return err(lastSync.error);
   const named = overriddenSpansOf(lastSync.value);
   if (!named.ok) return err(named.error);
