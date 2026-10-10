@@ -231,7 +231,7 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 - **The recall measure moves here from S2b.** Recall at ten of the master `Answer` on a paraphrase of its question is measured over `find`'s entry points, on a synthetic paraphrase set kept in the repository and run in CI. It reports its figure and never fails the build. The 90 % threshold, and the rule that only C1's reading on the customer's own answer tests picks S8, stand as S2b's block states them. S2b reuses the same set and measure.
 - **No recall reading is taken on production here.** A variant wording is a section of its own concept's body, so a variant used as the question finds its concept by its own words.
 - **The owner is this block's only user on production before C1.** The acceptance includes one search there, signed in as a member of the first customer's workspace: *audit log retention* reaches *Audit Logs Retention*.
-- **The web units use Frame, Card and the registration mark from a design-system package** cut from BA-36's findings, and wait on it. The accent-filled primary button landed in #636.
+- **The web units use MarkedRegion, Card and the registration mark from a design-system package** cut from BA-36's findings, and wait on it. The accent-filled primary button landed in #636.
 - **A concept comes before document passages only when it holds at least half the query's words.** Weaker concept matches follow the passages. Without that, any-word matching would keep passages off Search for pages. This replaces "concepts first" in BA-35's lines above.
 - The jump-to *Search for …* row is built.
 

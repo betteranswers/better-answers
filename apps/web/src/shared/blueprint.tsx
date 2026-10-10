@@ -3,8 +3,11 @@ import type { ComponentProps, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/utils.ts";
 
-/** The marked primitive: no fill, one hairline, for a figure or a region rather than content. */
-export function Frame({
+/**
+ * The marked primitive: no fill, one hairline, for a figure or a region rather than content. Not
+ * the shell's frame.
+ */
+export function MarkedRegion({
   className,
   asChild = false,
   ...props
@@ -13,7 +16,7 @@ export function Frame({
 
   return (
     <Comp
-      data-slot="frame"
+      data-slot="marked-region"
       data-marks=""
       className={cn("border border-border", className)}
       {...props}

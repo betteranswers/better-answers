@@ -199,18 +199,19 @@ an empty state or drop zone.** Never on inputs, selects, tags, trust tags, badge
 rows, nav items, menu items, tooltips, toasts, anything under 32px tall, or anything inside
 a parent that already carries marks. A committing action *repeated per row* takes the
 unmarked `accent` fill rather than `primary`. **One marked level per stack, at most three
-marked objects per page** — if everything is registered, nothing is. `Frame` is the marked
+marked objects per page** — if everything is registered, nothing is. `MarkedRegion` is the marked
 primitive; `Card` takes `marks` as an opt-in. `styles.css` draws every mark from one rule on
 `data-marks`, and draws none inside a marked parent, so the nesting rule holds by itself. In the
-application `Frame` is `apps/web/src/shared/blueprint.tsx` and `Card` is
+application `MarkedRegion` is `apps/web/src/shared/blueprint.tsx` and `Card` is
 `apps/web/src/shared/ui/card.tsx`; the primary button marks itself in `--accent-300` at 32px and
 up, and its `accent` variant is the same fill unmarked.
 
 **Cards.** A 1px `--border-subtle` hairline, square corners, white surface, no shadow at
 rest. Header row (title + optional meta + right-aligned actions), body, optional sunken
 footer strip for provenance. No coloured accents, no left borders, no elevation on hover.
-A **`Frame`** is the transparent counterpart: no fill, one hairline, marks on — for a
-figure or a region rather than content.
+A **`MarkedRegion`** is the transparent counterpart: no fill, one hairline, marks on — for a
+figure or a region rather than content. *Frame* is the shell's word (`CONCEPTS.md`), so this
+primitive never takes it.
 
 **Shadows.** Five steps, all short and low-alpha. Only a dialog gets `--shadow-dialog`;
 everything else is xs or sm. A dropdown or popover uses md.
@@ -348,7 +349,7 @@ top of a registry primitive, because nothing off the shelf carries their meaning
 **`Citation`** (concept, source, locator, passage on one disclosure, ADR 0015),
 **`CoverageBar`**, **`SummaryList`** and **`Details`** (GOV.UK *semantics* without the
 GOV.UK brand), **`Icon`** (the Phosphor substitution in one file) and
-**`Frame`** (the blueprint object with its registration marks), which is built.
+**`MarkedRegion`** (the blueprint object with its registration marks), which is built.
 
 ### Foundation cards
 

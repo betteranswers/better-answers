@@ -31,31 +31,31 @@ const drawnBoard = async (page: Page, request: Parameters<typeof harnessDrawn>[1
 };
 
 test.describe("the blueprint's parts, drawn on one board", () => {
-  test("draws a frame transparent, hairlined and marked", async ({ page, request }) => {
+  test("draws a marked region transparent, hairlined and marked", async ({ page, request }) => {
     await drawnBoard(page, request);
-    const frame = page.getByRole("figure", { name: "Frame" });
+    const region = page.getByRole("figure", { name: "Marked region" });
 
-    await expect(frame).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await expect(frame).toHaveCSS("border-top-width", "1px");
-    const marks = await marksOf(frame);
-    expect(marks.content, "the frame draws no marks").not.toBe("none");
-    expect(marks.ink, "the frame's marks are not the mark colour").toContain(
+    await expect(region).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(region).toHaveCSS("border-top-width", "1px");
+    const marks = await marksOf(region);
+    expect(marks.content, "the marked region draws no marks").not.toBe("none");
+    expect(marks.ink, "the marked region's marks are not the mark colour").toContain(
       await tokenColour(page, "--border-default"),
     );
     // Centred on the hairline: three pixels of arm either side of the one-pixel line.
     expect([marks.top, marks.left]).toEqual(["-4px", "-4px"]);
   });
 
-  test("marks a card only when asked, never inside a frame", async ({ page, request }) => {
+  test("marks a card when asked, never inside a marked region", async ({ page, request }) => {
     await drawnBoard(page, request);
 
     expect((await marksOf(page.getByRole("region", { name: "Marked card" }))).content).not.toBe(
       "none",
     );
     expect((await marksOf(page.getByRole("region", { name: "Plain card" }))).content).toBe("none");
-    expect((await marksOf(page.getByRole("region", { name: "Card in a frame" }))).content).toBe(
-      "none",
-    );
+    expect(
+      (await marksOf(page.getByRole("region", { name: "Card in a marked region" }))).content,
+    ).toBe("none");
   });
 
   test("sinks a card's footer under a hairline", async ({ page, request }) => {
