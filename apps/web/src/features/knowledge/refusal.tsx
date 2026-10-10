@@ -1,5 +1,15 @@
-import { refusalsOf } from "@/shared/refusal-outcome.tsx";
+import type { ReactNode } from "react";
 
-import { SAID_OF_KNOWLEDGE } from "./refusal-words.ts";
+import { ceilingLiftsIn, type ApiError } from "@/shared/api/trpc.ts";
+import { refusalsOf, refusedWith } from "@/shared/refusal-outcome.tsx";
 
-export const { outcomeOfFailure } = refusalsOf(SAID_OF_KNOWLEDGE);
+import { readsCeiling, SAID_OF_KNOWLEDGE } from "./refusal-words.ts";
+
+const { outcomeOfFailure } = refusalsOf(SAID_OF_KNOWLEDGE);
+
+export const failedReadWords = (failure: Error | ApiError): ReactNode => {
+  const liftsInSeconds = ceilingLiftsIn(failure);
+  return liftsInSeconds === undefined
+    ? outcomeOfFailure(failure, "read").words
+    : refusedWith(readsCeiling(liftsInSeconds)).words;
+};

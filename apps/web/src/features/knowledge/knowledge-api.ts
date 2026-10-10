@@ -1,6 +1,7 @@
 import { skipToken, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { inferOutput } from "@trpc/tanstack-react-query";
 
+import { retryUnlessWaiting } from "@/shared/api/query-client.ts";
 import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { MATCHES_A_PAGE } from "./knowledge-state.ts";
@@ -22,7 +23,7 @@ export const useMatches = (query: string) => {
   return useInfiniteQuery(
     api.knowledge.find.infiniteQueryOptions(
       asksNothing(query) ? skipToken : { query, limit: MATCHES_A_PAGE },
-      { getNextPageParam: (page) => page.nextCursor },
+      { getNextPageParam: (page) => page.nextCursor, retry: retryUnlessWaiting },
     ),
   );
 };
@@ -31,5 +32,5 @@ export type Matches = ReturnType<typeof useMatches>;
 
 export const usePassage = (locator: string) => {
   const api = useTRPC();
-  return useQuery(api.knowledge.open.queryOptions({ locator }));
+  return useQuery(api.knowledge.open.queryOptions({ locator }, { retry: retryUnlessWaiting }));
 };

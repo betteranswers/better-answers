@@ -1,8 +1,9 @@
 import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
+import { z } from "zod";
 
 import { SEARCH_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { EVIDENCE_WORDS, SEARCH_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
-import { SAID_OF_KNOWLEDGE } from "@/features/knowledge/refusal-words.ts";
+import { readsCeiling, SAID_OF_KNOWLEDGE } from "@/features/knowledge/refusal-words.ts";
 import { HOMES, KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
 
@@ -61,6 +62,25 @@ const isAFindPastTheFirstPage = (url: URL): boolean =>
   isAFind(url) && (url.searchParams.get("input") ?? "").includes('"cursor"');
 
 const HANDBOOK = "Warehouse handbook";
+
+/** One more call than the person's knowledge reads may make in a minute. */
+const PAST_THE_READS_CEILING = 121;
+
+/** Batched calls fill the person's ceiling and leave the address's, which counts requests, clear. */
+const readsCeilingFilled = async (page: Page, read: string): Promise<void> => {
+  const asked = new URL(read);
+  const call = Object.values(
+    z.record(z.string(), z.unknown()).parse(JSON.parse(asked.searchParams.get("input") ?? "{}")),
+  )[0];
+  const batch = 41;
+  for (let sent = 0; sent < PAST_THE_READS_CEILING; sent += batch) {
+    const input = Object.fromEntries(Array.from({ length: batch }, (_, at) => [String(at), call]));
+    const path = Array.from({ length: batch }, () => "knowledge.find").join(",");
+    await page.request.get(
+      `/trpc/${path}?${new URLSearchParams({ batch: "1", input: JSON.stringify(input) }).toString()}`,
+    );
+  }
+};
 
 /** Five more than a page, so a second page follows the first. */
 const PALLET_PASSAGES = Array.from(
@@ -387,6 +407,21 @@ test.describe("the Knowledge Search page", () => {
 
     await searchBox(page).fill("the and of");
     await expect(said(page)).toHaveText(WORDS.noMatches("the and of"));
+  });
+
+  test("says the reads' ceiling and asks no more", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Ouse Stores", [handbookSeeded]);
+    const first = page.waitForRequest((sent) => isAFind(new URL(sent.url())));
+    await searched(page, "pallet");
+    await readsCeilingFilled(page, (await first).url());
+
+    const asked: string[] = [];
+    page.on("request", (sent) => {
+      if (isAFind(new URL(sent.url())) && sent.url().includes("forklift")) asked.push(sent.url());
+    });
+    await searchBox(page).fill("forklift");
+    await expect(alerted(page)).toHaveText(sentenceOf(readsCeiling(60)));
+    expect(asked, "the page asked again past the ceiling").toHaveLength(1);
   });
 
   test("offers a retry when the first read fails", async ({ page, request }) => {

@@ -15,7 +15,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet.tsx";
 
 import { usePassage } from "./knowledge-api.ts";
 import { EVIDENCE_WORDS, SEARCH_WORDS } from "./knowledge-words.ts";
-import { outcomeOfFailure } from "./refusal.tsx";
+import { failedReadWords } from "./refusal.tsx";
 
 /** A passage opened beside the page, and the control that opened it, where focus goes back. */
 export type Opened = {
@@ -66,7 +66,7 @@ function PassageRead(properties: {
     <ListRead
       read={passage}
       loading={EVIDENCE_WORDS.loading}
-      failed={(failure) => outcomeOfFailure(failure, "read").words}
+      failed={failedReadWords}
       focusAfterRetry={properties.heading}
     >
       <blockquote className="border-l border-border bg-muted px-4 py-3 [font-size:var(--text-base)] leading-relaxed whitespace-pre-line">
