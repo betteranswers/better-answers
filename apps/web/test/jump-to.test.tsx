@@ -267,6 +267,14 @@ describe("what jump-to offers to search", () => {
     ]);
   });
 
+  it("asks for no more than Search takes", () => {
+    const asked = offered(searchGroup(treeOf("Viewer"), `${"a".repeat(500)}bcd`, AT_ROOT));
+
+    expect(asked?.[1]).toEqual([
+      [`Search for “${"a".repeat(500)}”`, `/knowledge/search?search=${"a".repeat(500)}`],
+    ]);
+  });
+
   it("keeps Search's own query when asked from Search", () => {
     const onSearch = { pathname: "/knowledge/search", searchStr: "?knowledge.search=forklift" };
 

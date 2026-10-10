@@ -660,7 +660,7 @@ flowchart LR
 - **Requirements:** R1; KTD14.
 - **Dependencies:** U11.
 - **Files:**
-  - Modify: `apps/web/src/app/jump-to.tsx`, `apps/web/src/app/words.ts`, `apps/web/e2e/jump-to.spec.ts`, `apps/web/test/jump-to.test.tsx`, `apps/web/src/shared/address-ask.ts`, `apps/web/test/address-ask.test.tsx`, `CONCEPTS.md` (the *Jump to* entry).
+  - Modify: `apps/web/src/app/jump-to.tsx`, `apps/web/src/app/words.ts`, `apps/web/e2e/jump-to.spec.ts`, `apps/web/test/jump-to.test.tsx`, `apps/web/src/shared/address-ask.ts`, `apps/web/test/address-ask.test.tsx`, `apps/web/e2e/workspace-switcher.spec.ts` (its jump-to assertion), `CONCEPTS.md` (the *Jump to* entry).
 - **Approach:** build the row from `typed`, with its `to` set to `askingHere(here, "/knowledge/search", "search", typed)`. Show it only while Search is in the reader's tree, and keep it out of the "nothing matches" line. The row is listed last, under its area's heading, and asks for the typed text without the spaces around it. `askingHere` writes an ask that reads as JSON as its JSON string and `askedIn` reads it back, because the row is the first ask of free text and the router re-types such a value (found in U13).
 - **Patterns to follow:** `actionJumps` and `askingHere` in `apps/web/src/app/jump-to.tsx`.
 - **Test scenarios:**
@@ -670,6 +670,8 @@ flowchart LR
   - The row is absent for a reader whose tree holds no Search. Every workspace role sees Search, so the browser test's reader is the operator in the Console, and a unit test over the row's builder holds it for any tree without Search (found in U13).
   - The row is no match: the "nothing matches" line shows beside it, and Enter still takes the first match (found in U13).
   - An ask that reads as JSON, such as `1.50`, `1e3` or a phrase in quotation marks, reaches the page that takes it as it was typed (found in U13).
+  - A member who loads after the row took the selection takes it back, so Enter opens the member and not Search (found in U13's review).
+  - The row asks for no more than Search takes, 500 characters, and the arrow keys reach it (found in U13's review).
 - **Verification:** web `check` passes, including e2e.
 
 ---

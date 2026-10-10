@@ -65,6 +65,11 @@ const groupOf = (page: Page, name: string) => dialogOf(page).getByRole("group", 
 /** The row that takes what is typed to Search, listed under its area's name. */
 const searchRowOf = (page: Page) => groupOf(page, KNOWLEDGE.name).getByRole("option");
 
+const searchBoxOf = (page: Page) =>
+  page
+    .getByRole("region", { name: SEARCH.name })
+    .getByRole("searchbox", { name: SEARCH_WORDS.search });
+
 const saidIn = (page: Page) => dialogOf(page).getByRole("status");
 
 const refusedIn = (page: Page) => dialogOf(page).getByRole("alert");
@@ -254,12 +259,13 @@ test("lands on Search with the typed query and its matches", async ({ page, requ
   await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("audit logs")]);
   await page.keyboard.press("Enter");
 
-  const search = page.getByRole("region", { name: SEARCH.name });
-  await expect(search.getByRole("searchbox", { name: SEARCH_WORDS.search })).toHaveValue(
-    "audit logs",
-  );
+  await expect(searchBoxOf(page)).toHaveValue("audit logs");
   await expect(
-    search.getByRole("list", { name: SEARCH_WORDS.matches }).getByRole("listitem").first(),
+    page
+      .getByRole("region", { name: SEARCH.name })
+      .getByRole("list", { name: SEARCH_WORDS.matches })
+      .getByRole("listitem")
+      .first(),
   ).toContainText("Audit Logs Retention");
   await expect(dialogOf(page)).toHaveCount(0);
   await expect(page.getByRole("main")).toBeFocused();
@@ -267,6 +273,55 @@ test("lands on Search with the typed query and its matches", async ({ page, requ
   await expect(page).toHaveURL(
     new RegExp(`${SEARCH.path}\\?knowledge\\.search=audit(?:\\+|%20)logs$`),
   );
+});
+
+test("carries a typed number to Search as typed", async ({ page, request }) => {
+  await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+
+  await opened(page, "Control+k");
+  await typed(page, "1.50");
+  await searchRowOf(page).click();
+
+  await expect(searchBoxOf(page)).toHaveValue("1.50");
+  // The router quotes a string that reads as a number, and Search's own key holds it so.
+  await expect(page).toHaveURL(/knowledge\.search=%221\.50%22$/);
+  await page.reload();
+  await expect(searchBoxOf(page)).toHaveValue("1.50");
+});
+
+test("reaches the search row by the arrow keys", async ({ page, request }) => {
+  await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+
+  await opened(page, "Control+k");
+  await typed(page, "search");
+  await expect(optionOf(page, new RegExp(`^${SEARCH.name}`)).first()).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  // The list loops, so one step up from the first match is the last row.
+  await page.keyboard.press("ArrowUp");
+  await expect(searchRowOf(page)).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+
+  await expect(searchBoxOf(page)).toHaveValue("search");
+});
+
+test("opens a member who loads after the search row", async ({ page, request }) => {
+  const team = await anAdminWithATeam(page, request, "Hodder Valley Forge");
+  const held = Promise.withResolvers<void>();
+  await page.route(theMembersRead, async (route) => {
+    await held.promise;
+    await route.continue();
+  });
+
+  await opened(page, "Meta+k");
+  await typed(page, "priya");
+  await expect(searchRowOf(page)).toHaveAttribute("aria-selected", "true");
+  held.resolve();
+  await expect(optionOf(page, new RegExp(PRIYA))).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+
+  await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}/${team.priya.id}$`));
 });
 
 test("offers no search row with nothing typed", async ({ page, request }) => {

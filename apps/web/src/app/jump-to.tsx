@@ -1,6 +1,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
+import { QUERY_MAX } from "@/features/knowledge/knowledge-state.ts";
 import { MEMBERS_PAGE } from "@/features/people/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
 import { askingHere, type Here } from "@/shared/address-ask.ts";
@@ -32,6 +33,9 @@ import { nameOrAddress } from "@/shared/words.ts";
 import { findWhat, JUMP_TO, nothingMatches, searchFor } from "./words.ts";
 
 const SEARCH = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
+
+/** The search row's value, constant so the row keeps the selection while more is typed. */
+const SEARCH_ROW = "search";
 
 /** Where focus goes once chosen: a place hands it to the page, an action to its own dialog. */
 type Kind = "place" | "member" | "action";
@@ -154,15 +158,15 @@ export const matching = (groups: readonly JumpGroup[], typed: string): readonly 
 };
 
 /**
- * What is typed, asked of Search. Never a match, so it is listed apart, and only for a reader
- * whose tree holds Search.
+ * What is typed, as far as Search takes it. Never a match, so it is listed apart, and only where
+ * the reader's tree holds Search.
  */
 export const searchGroup = (
   tree: VisibleTree,
   typed: string,
   here: Here,
 ): JumpGroup | undefined => {
-  const words = typed.trim();
+  const words = typed.trim().slice(0, QUERY_MAX);
   if (words === "") return undefined;
   const place = placeAt(tree.areas, SEARCH.path);
   if (place === undefined) return undefined;
@@ -170,7 +174,7 @@ export const searchGroup = (
     heading: place.area.name,
     jumps: [
       jumpOf({
-        value: "search",
+        value: SEARCH_ROW,
         name: searchFor(words),
         said: undefined,
         icon: SEARCH.icon,
@@ -179,6 +183,24 @@ export const searchGroup = (
       }),
     ],
   };
+};
+
+/**
+ * The list keeps its selection while that row shows, so Enter would pass over a first match
+ * landing after the search row took it.
+ */
+const useSelected = (shown: readonly JumpGroup[]) => {
+  const [selected, setSelected] = useState("");
+  const first = shown[0]?.jumps[0]?.value;
+  const matches = first !== undefined;
+  const [matched, setMatched] = useState(matches);
+
+  if (matches !== matched) {
+    setMatched(matches);
+    if (matches && selected === SEARCH_ROW) setSelected(first);
+  }
+
+  return [selected, setSelected] as const;
 };
 
 /** `unasked` for a reader who may not see People, whose dialog reads no members. */
@@ -317,6 +339,7 @@ function JumpList(
   const shown = matching(every, typed);
   const search = searchGroup(properties.tree, typed, here);
   const listed = search === undefined ? shown : [...shown, search];
+  const [selected, setSelected] = useSelected(shown);
   const lines = linesOf(
     read,
     shown.reduce((count, group) => count + group.jumps.length, 0),
@@ -334,6 +357,8 @@ function JumpList(
     // The list is filtered here, so "Nothing matches" can wait on a read still loading.
     <Command
       label={JUMP_TO.name}
+      value={selected}
+      onValueChange={setSelected}
       shouldFilter={false}
       vimBindings={false}
       loop
