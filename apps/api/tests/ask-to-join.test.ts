@@ -94,6 +94,19 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     expect(await asksBy(person.id)).toEqual([]);
   });
 
+  it("keeps the ask's answer out of every cache", async () => {
+    const workspace = await app().provision();
+    const { client } = await aSignedInPerson();
+
+    const response = await client.json(REQUEST_ACCESS, {
+      shortName: workspace.shortName,
+      reason: REASON,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+
   it("books the ask to the session's person, never one named", async () => {
     const workspace = await app().provision();
     const { person, client } = await aSignedInPerson();
