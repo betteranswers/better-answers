@@ -68,11 +68,10 @@ test.describe("the blueprint's parts, drawn on one board", () => {
 
   test("lays the grid and the dots at their tokens' pitch", async ({ page, request }) => {
     await drawnBoard(page, request);
-    const module = await page.evaluate(() =>
-      getComputedStyle(document.documentElement).getPropertyValue("--grid-module").trim(),
-    );
-    const gap = await page.evaluate(() =>
-      getComputedStyle(document.documentElement).getPropertyValue("--dot-gap").trim(),
+    const [module, gap] = await page.evaluate(() =>
+      ["--grid-module", "--dot-gap"].map((token) =>
+        getComputedStyle(document.documentElement).getPropertyValue(token).trim(),
+      ),
     );
 
     const board = page.getByRole("region", { name: "Board" });

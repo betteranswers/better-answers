@@ -104,7 +104,7 @@ the pin.
 | File | Registry item | Item digest | File digest |
 | --- | --- | --- | --- |
 | `badge.tsx` | https://ui.shadcn.com/r/styles/new-york/badge.json | `ce3f01e6d6785477` | `051518194cec3127` |
-| `button.tsx` | https://ui.shadcn.com/r/styles/new-york/button.json | `4d8f39c3bd25e630` | `7af6cf444a7e3cdb` |
+| `button.tsx` | https://ui.shadcn.com/r/styles/new-york/button.json | `4d8f39c3bd25e630` | `bc8f8e980e3b97e7` |
 | `carousel.tsx` | https://ui.shadcn.com/r/styles/new-york/carousel.json | `07c286e6b8c6a125` | `8db57d96badd03aa` |
 | `collapsible.tsx` | https://ui.shadcn.com/r/styles/new-york/collapsible.json | `9e935a82f4d846cc` | `f3ce568d1ede383d` |
 | `command.tsx` | https://ui.shadcn.com/r/styles/new-york/command.json | `b2800b32e6dbfb40` | `aa5236bf5e2680fd` |

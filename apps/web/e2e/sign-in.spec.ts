@@ -46,6 +46,7 @@ import {
   signInHeading,
   theActionLandedWithinItsBudget,
   tokenColour,
+  drawnMarks,
 } from "./harness.ts";
 
 const thePicker = (page: Page) =>
@@ -329,19 +330,11 @@ test("says a code is sent, wrong, or asked too often", async ({
   await expect(page.getByRole("alert")).toHaveCSS("border-left-width", "0px");
 });
 
-/** The parts whose "+" is drawn, by their slot. */
-const markedIn = (page: Page) =>
-  page.evaluate(() =>
-    [...document.querySelectorAll<HTMLElement>("[data-marks]")]
-      .filter((marked) => getComputedStyle(marked, "::before").content !== "none")
-      .map((marked) => marked.dataset["slot"] ?? marked.tagName),
-  );
-
 test("frames the sign-in form in one marked card", async ({ page }) => {
   await page.goto("/sign-in");
   await expect(signInHeading(page)).toBeVisible();
 
-  expect(await markedIn(page), "the card stands for its primary button").toEqual(["card"]);
+  expect(await drawnMarks(page), "the card stands for its primary button").toEqual(["card"]);
   await expect(page.getByRole("button", { name: SIGN_IN_WORDS.send })).toHaveAttribute(
     "data-marks",
   );

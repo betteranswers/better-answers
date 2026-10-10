@@ -10,6 +10,7 @@ import {
   provision,
   signedInAtHome,
   skipLinkReachesThePage,
+  tokenPainted,
 } from "./harness.ts";
 
 /** WCAG 1.4.11: a focus indicator holds 3:1 against the colours next to it. */
@@ -46,7 +47,8 @@ const drawnFocus = (page: Page): Promise<Drawn | undefined> =>
   page.evaluate(() => {
     const focused = document.activeElement;
     if (!(focused instanceof HTMLElement) || focused === document.body) return undefined;
-    const opaque = (colour: string) => colour !== "rgba(0, 0, 0, 0)" && !colour.startsWith("rgba");
+    // A browser reports an opaque colour as `rgb()`, and anything see-through as `rgba()`.
+    const opaque = (colour: string) => !colour.startsWith("rgba");
     const surfaceBehind = (element: HTMLElement) => {
       let parent = element.parentElement;
       while (parent !== null && !opaque(getComputedStyle(parent).backgroundColor)) {
@@ -79,16 +81,6 @@ const drawnFocus = (page: Page): Promise<Drawn | undefined> =>
     };
   });
 
-const theToken = (page: Page): Promise<string> =>
-  page.evaluate(() => {
-    const probe = document.createElement("span");
-    probe.style.boxShadow = "var(--focus-ring)";
-    document.body.append(probe);
-    const painted = getComputedStyle(probe).boxShadow;
-    probe.remove();
-    return painted;
-  });
-
 /** Every stop of a keyboard walk, until focus comes back round to the first. */
 const walked = async (page: Page): Promise<readonly Drawn[]> => {
   const seen: Drawn[] = [];
@@ -104,7 +96,7 @@ const walked = async (page: Page): Promise<readonly Drawn[]> => {
 };
 
 const holdsTheRing = async (page: Page, stops: readonly Drawn[]): Promise<void> => {
-  const token = await theToken(page);
+  const token = await tokenPainted(page, "--focus-ring", "box-shadow");
   expect(stops.length, "the walk reached no control").toBeGreaterThan(2);
   for (const stop of stops) {
     expect(stop.shadow, `${stop.name} draws a ring that is not the token's`).toBe(token);

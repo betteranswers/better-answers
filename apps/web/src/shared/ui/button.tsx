@@ -38,11 +38,16 @@ const buttonVariants = cva(
   },
 );
 
+type ButtonVariants = VariantProps<typeof buttonVariants>;
+
+const MARKED_SIZES: ReadonlySet<ButtonVariants["size"]> = new Set(["default", "sm", "lg"]);
+
 /**
- * Under 32px a "+" is never drawn, and `accent` is the primary's fill unmarked, for an action
+ * Only the primary registers, and never under 32px. `accent` is its fill unmarked, for an action
  * repeated per row.
  */
-const MARKED_SIZES: ReadonlySet<string> = new Set(["default", "sm", "lg"]);
+const marksItself = (variant: ButtonVariants["variant"], size: ButtonVariants["size"]): boolean =>
+  variant === "default" && MARKED_SIZES.has(size ?? "default");
 
 function Button({
   className,
@@ -51,7 +56,7 @@ function Button({
   asChild = false,
   ...props
 }: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
+  ButtonVariants & {
     asChild?: boolean;
   }) {
   const Comp = asChild ? Slot.Root : "button";
@@ -61,7 +66,7 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      data-marks={variant === "default" && MARKED_SIZES.has(size ?? "") ? "" : undefined}
+      data-marks={marksItself(variant, size) ? "" : undefined}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

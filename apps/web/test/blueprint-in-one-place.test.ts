@@ -12,12 +12,17 @@ const sourceFiles = (directory: string): readonly string[] =>
     return /\.tsx?$/.test(entry.name) ? [path.relative(source, here)] : [];
   });
 
+const files = sourceFiles(source).map((file) => ({
+  file,
+  text: readFileSync(path.join(source, file), "utf8"),
+}));
+
 const writing = (pattern: RegExp): readonly string[] =>
-  sourceFiles(source).filter((file) => pattern.test(readFileSync(path.join(source, file), "utf8")));
+  files.filter(({ text }) => pattern.test(text)).map(({ file }) => file);
 
 describe("the blueprint's parts", () => {
   it("draws a card's surface in the card alone", () => {
-    expect(sourceFiles(source).length).toBeGreaterThan(0);
+    expect(files.length).toBeGreaterThan(0);
     expect(writing(/\bbg-card\b/)).toEqual(["shared/ui/card.tsx"]);
   });
 
