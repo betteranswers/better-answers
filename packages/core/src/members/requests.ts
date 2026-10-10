@@ -120,13 +120,13 @@ type Claim = {
   readonly email: string;
 };
 
-type ClaimRefusal = MemberRefusal<"malformed" | "no-such-request" | "already-decided">;
-
+/** Takes its face's admission as answered, and passes a refusal on before it reads a row. */
 const claimForDecision = async (
-  admin: AdminUserPrincipal,
+  admitted: Result<AdminUserPrincipal, MemberRefusal<"role-forbids">>,
   tx: Tx,
   wanted: string,
-): Promise<Result<Claim, ClaimRefusal | Error>> => {
+): Promise<Result<Claim, DecideRefusal | Error>> => {
+  if (!admitted.ok) return err(admitted.error);
   const requestId = boundarySchemas.accessRequest.select.shape.id.safeParse(wanted);
   if (!requestId.success) return err("malformed");
 
@@ -143,7 +143,7 @@ const claimForDecision = async (
   if (row === undefined) return err("no-such-request");
   if (row.status !== ACCESS_REQUEST_OPEN_STATUS) return err("already-decided");
   return ok({
-    admin,
+    admin: admitted.value,
     requestId: requestId.data,
     requesterId: boundarySchemas.user.select.shape.id.parse(row.requester_id),
     email: row.email,
@@ -216,8 +216,7 @@ export const approveRequest = async (
   input: ApproveRequestInput,
 ): Promise<Result<Approved, ApproveRefusal | Error>> => {
   const admitted = admit(approveRequestAction, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-  const claimed = await claimForDecision(admitted.value, tx, input.requestId);
+  const claimed = await claimForDecision(admitted, tx, input.requestId);
   if (!claimed.ok) return err(claimed.error);
   const { admin, requestId } = claimed.value;
 
@@ -263,15 +262,14 @@ export const declineRequest = async (
   input: DeclineRequestInput,
 ): Promise<Result<{ requestId: AccessRequestId }, DecideRefusal | Error>> => {
   const admitted = admit(declineRequestAction, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-  const claimed = await claimForDecision(admitted.value, tx, input.requestId);
+  const claimed = await claimForDecision(admitted, tx, input.requestId);
   if (!claimed.ok) return err(claimed.error);
-  const { admin, requestId } = claimed.value;
+  const { admin, requestId, requesterId } = claimed.value;
 
   const decided = await landDecision(admin, tx, requestId, {
     status: "declined",
     action: REQUEST_ACTIONS.declined,
-    detail: { requesterId: claimed.value.requesterId },
+    detail: { requesterId },
     invitationId: null,
   });
   if (!decided.ok) return err(decided.error);

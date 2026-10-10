@@ -102,13 +102,16 @@ export type RemoveFromGroupRefusal = MemberRefusal<RefusalOf<typeof removeFromGr
 
 type GroupTarget = { readonly admin: AdminUserPrincipal; readonly groupId: GroupId };
 
-const groupTarget = (
-  admin: AdminUserPrincipal,
-  groupId: string,
-): Result<GroupTarget, MemberRefusal<"malformed">> => {
+type Admitted = Result<AdminUserPrincipal, MemberRefusal<"role-forbids">>;
+
+type TargetRefusal = MemberRefusal<"role-forbids" | "malformed">;
+
+/** Takes its face's admission as answered, and passes a refusal on untouched. */
+const groupTarget = (admitted: Admitted, groupId: string): Result<GroupTarget, TargetRefusal> => {
+  if (!admitted.ok) return err(admitted.error);
   const parsed = GROUP_ID.safeParse(groupId);
   if (!parsed.success) return err("malformed");
-  return ok({ admin, groupId: parsed.data });
+  return ok({ admin: admitted.value, groupId: parsed.data });
 };
 
 const nothingChanged = async <Own extends string>(
@@ -168,9 +171,7 @@ export const renameGroup = async (
   tx: Tx,
   input: RenameGroupInput,
 ): Promise<Result<{ groupId: GroupId }, RenameGroupRefusal>> => {
-  const admitted = admit(renameGroupAction, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-  const target = groupTarget(admitted.value, input.groupId);
+  const target = groupTarget(admit(renameGroupAction, principal, input), input.groupId);
   if (!target.ok) return err(target.error);
   const name = GROUP_NAME.safeParse(input.name);
   if (!name.success) return err("malformed");
@@ -205,9 +206,7 @@ export const deleteGroup = async (
   tx: Tx,
   input: DeleteGroupInput,
 ): Promise<Result<{ groupId: GroupId }, DeleteGroupRefusal>> => {
-  const admitted = admit(deleteGroupAction, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-  const target = groupTarget(admitted.value, input.groupId);
+  const target = groupTarget(admit(deleteGroupAction, principal, input), input.groupId);
   if (!target.ok) return err(target.error);
   const { admin, groupId } = target.value;
 
@@ -232,10 +231,10 @@ export const deleteGroup = async (
 type MemberTarget = GroupTarget & { readonly userId: UserId };
 
 const memberTarget = (
-  admin: AdminUserPrincipal,
+  admitted: Admitted,
   input: GroupMemberInput,
-): Result<MemberTarget, MemberRefusal<"malformed">> => {
-  const target = groupTarget(admin, input.groupId);
+): Result<MemberTarget, TargetRefusal> => {
+  const target = groupTarget(admitted, input.groupId);
   if (!target.ok) return err(target.error);
   const person = PERSON_ID.safeParse(input.userId);
   if (!person.success) return err("malformed");
@@ -270,10 +269,15 @@ export const addedToGroup = async (
   return added;
 };
 
-const groupAndMemberStand = async (
+export const addToGroup = async (
+  principal: UserPrincipal,
   tx: Tx,
-  { admin, groupId, userId }: MemberTarget,
-): Promise<Result<undefined, MemberRefusal<"no-such-group" | "no-such-member"> | Error>> => {
+  input: GroupMemberInput,
+): Promise<Result<{ groupId: GroupId; userId: UserId }, AddToGroupRefusal>> => {
+  const target = memberTarget(admit(addToGroupAction, principal, input), input);
+  if (!target.ok) return err(target.error);
+  const { admin, groupId, userId } = target.value;
+
   const known = await attempt(() =>
     tx.query<{ holds_group: boolean; is_member: boolean }>(
       `SELECT EXISTS (SELECT 1 FROM "group" WHERE workspace_id = $1 AND id = $2) AS holds_group,
@@ -286,22 +290,6 @@ const groupAndMemberStand = async (
   const row = known.value.rows[0];
   if (row?.holds_group !== true) return err("no-such-group");
   if (!row.is_member) return err("no-such-member");
-  return ok(undefined);
-};
-
-export const addToGroup = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  input: GroupMemberInput,
-): Promise<Result<{ groupId: GroupId; userId: UserId }, AddToGroupRefusal>> => {
-  const admitted = admit(addToGroupAction, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-  const target = memberTarget(admitted.value, input);
-  if (!target.ok) return err(target.error);
-  const { admin, groupId, userId } = target.value;
-
-  const standing = await groupAndMemberStand(tx, target.value);
-  if (!standing.ok) return err(standing.error);
 
   const added = await attempt(() => addedToGroup(admin, tx, { groupId, personIds: [userId] }));
   if (!added.ok) return err(added.error);
@@ -314,9 +302,7 @@ export const removeFromGroup = async (
   tx: Tx,
   input: GroupMemberInput,
 ): Promise<Result<{ groupId: GroupId; userId: UserId }, RemoveFromGroupRefusal>> => {
-  const admitted = admit(removeFromGroupAction, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-  const target = memberTarget(admitted.value, input);
+  const target = memberTarget(admit(removeFromGroupAction, principal, input), input);
   if (!target.ok) return err(target.error);
   const { admin, groupId, userId } = target.value;
 
