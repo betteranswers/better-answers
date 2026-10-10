@@ -1143,6 +1143,19 @@ describe("who may open a suggestion set", () => {
     expect(byStranger).toEqual({ ok: false, error: "role-forbids" });
   });
 
+  it("shows a Viewer the set they raised", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.viewer, "edit", [requestFor()]);
+
+    const opened = await readingAs(db().runtimePool, scenario.viewer, (resolved, tx) =>
+      suggestionSetSummary(resolved, tx, set.setId),
+    );
+
+    expect(opened.ok && opened.value.map((item) => item.proposer)).toEqual([
+      `human:${scenario.viewer.userId}`,
+    ]);
+  });
+
   it("hides unreadable resolutions from a proposer, not the deciding Admin", async () => {
     const scenario = await arrange();
 

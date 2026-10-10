@@ -466,6 +466,24 @@ describe("what the slice's four actions answer", () => {
     expect(receipt).toEqual({ ok: true, value: { outcome: "received", feedback } });
   });
 
+  it("refuses feedback and ask a role outside the three", async () => {
+    const reader = await arrange();
+    // @ts-expect-error — a role no resolver hands out is the value each face must still refuse.
+    const stranger = (principal: UserPrincipal): UserPrincipal => ({ ...principal, role: "Owner" });
+
+    const receipt = await acting(reader, (principal, tx) =>
+      giveFeedback(stranger(principal), tx, { iri: "urn:x", verdict: "helpful" }),
+    );
+    const answered = await acting(reader, (principal, tx) =>
+      ask(stranger(principal), tx, { question: "When is the audit?" }),
+    );
+
+    expect([receipt, answered]).toEqual([
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "role-forbids" },
+    ]);
+  });
+
   it("answers a locator that is no address as not found", async () => {
     const reader = await arrange();
 

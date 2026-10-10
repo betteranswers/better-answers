@@ -4,13 +4,17 @@ import {
   type ArrowFunctionExpression,
   type CallExpression,
   type Declaration,
+  type Directive,
+  type ExportAllDeclaration,
   type ExportNamedDeclaration,
   type Expression,
   type Function as FunctionNode,
+  type ImportDeclaration,
   type ModuleExportName,
-  type ParamPattern,
+  type Program,
+  type Span,
   type Statement,
-  type TSType,
+  type TSTypeReference,
   Visitor,
 } from "oxc-parser";
 
@@ -53,37 +57,64 @@ type Module = {
   readonly whole: readonly string[];
 };
 
-const namesAPerson = (type: TSType): boolean => {
-  switch (type.type) {
-    case "TSTypeReference":
-      return type.typeName.type === "Identifier" && FITS_ANY_PERSON.has(type.typeName.name);
-    case "TSUnionType":
-    case "TSIntersectionType":
-      return type.types.some(namesAPerson);
-    case "TSParenthesizedType":
-      return namesAPerson(type.typeAnnotation);
-    default:
-      return false;
-  }
-};
+const within = (outer: Span, at: number): boolean => outer.start <= at && at < outer.end;
 
-const takesAPerson = (param: ParamPattern): boolean => {
-  if (param.type === "TSParameterProperty") return false;
-  const bound = param.type === "AssignmentPattern" ? param.left : param;
-  const annotation = bound.typeAnnotation?.typeAnnotation;
-  return annotation !== undefined && namesAPerson(annotation);
+const namesAPerson = ({ typeName }: TSTypeReference): boolean => {
+  if (typeName.type === "Identifier") return FITS_ANY_PERSON.has(typeName.name);
+  return typeName.type === "TSQualifiedName" && FITS_ANY_PERSON.has(typeName.right.name);
 };
 
 /** A declaration is passed by its name, as the lint that pairs the two reads it. */
 const passesADeclaration = ({ callee, arguments: [first] }: CallExpression): boolean =>
   callee.type === "Identifier" && callee.name === ADMIT && first?.type === "Identifier";
 
-const functionOf = (init: Expression | null): FunctionShape | undefined =>
-  init?.type === "ArrowFunctionExpression" || init?.type === "FunctionExpression"
-    ? init
-    : undefined;
+type Marks = {
+  readonly admissions: readonly number[];
 
-const declaredBy = (declaration: Declaration | Statement): readonly Declared[] => {
+  /** A person named in a callback's own parameters is that callback's to take, and is left out. */
+  readonly people: readonly number[];
+};
+
+const marksOf = (program: Program): Marks => {
+  const admissions: number[] = [];
+  const named: number[] = [];
+  const callbacks: Span[] = [];
+  new Visitor({
+    CallExpression: (node) => {
+      if (passesADeclaration(node)) admissions.push(node.start);
+    },
+    TSTypeReference: (node) => {
+      if (namesAPerson(node)) named.push(node.start);
+    },
+    TSFunctionType: (node) => {
+      callbacks.push(node);
+    },
+    TSConstructorType: (node) => {
+      callbacks.push(node);
+    },
+  }).visit(program);
+  return {
+    admissions,
+    people: named.filter((at) => !callbacks.some((callback) => within(callback, at))),
+  };
+};
+
+const functionOf = (init: Expression | null): FunctionShape | undefined => {
+  switch (init?.type) {
+    case "ArrowFunctionExpression":
+    case "FunctionExpression":
+      return init;
+    case "ParenthesizedExpression":
+    case "TSAsExpression":
+    case "TSNonNullExpression":
+    case "TSSatisfiesExpression":
+      return functionOf(init.expression);
+    default:
+      return undefined;
+  }
+};
+
+const declaredBy = (declaration: Declaration | Statement | Directive): readonly Declared[] => {
   if (declaration.type === "FunctionDeclaration") {
     const { id } = declaration;
     return id === null ? [] : [{ name: id.name, at: id.start, node: declaration }];
@@ -108,66 +139,129 @@ const listedBy = ({ exportKind, specifiers }: ExportNamedDeclaration): readonly 
         .filter((specifier) => specifier.exportKind !== "type")
         .map(({ exported, local }) => ({ name: nameOf(exported), local: nameOf(local) }));
 
-const moduleOf = (file: string, source: string): Module => {
-  const { program, lineOf } = parsedSource(file, source);
-  const admissions: number[] = [];
-  new Visitor({
-    CallExpression: (node) => {
-      if (passesADeclaration(node)) admissions.push(node.start);
-    },
-  }).visit(program);
+type Imported = { readonly local: string; readonly from: string };
 
-  const functions = new Map<string, Found>();
-  const exported = new Map<string, string>();
-  const named: ReExport[] = [];
-  const whole: string[] = [];
-
-  const declare = (declaration: Declaration | Statement, isExported: boolean): void => {
-    for (const { name, at, node } of declaredBy(declaration)) {
-      functions.set(name, {
-        file,
-        line: lineOf(at),
-        takesAPerson: node.params.some(takesAPerson),
-        admits: admissions.some((call) => node.start <= call && call < node.end),
-      });
-      if (isExported) exported.set(name, name);
-    }
-  };
-
-  const exportNamed = (statement: ExportNamedDeclaration): void => {
-    if (statement.declaration !== null) declare(statement.declaration, true);
-    const from = statement.source?.value;
-    for (const { name, local } of listedBy(statement)) {
-      if (from === undefined) exported.set(name, local);
-      else named.push({ name, local, from });
-    }
-  };
-
-  for (const statement of program.body) {
-    if (statement.type === "ExportNamedDeclaration") exportNamed(statement);
-    else if (statement.type !== "ExportAllDeclaration") declare(statement, false);
-    else if (statement.exportKind !== "type" && statement.exported === null) {
-      whole.push(statement.source.value);
-    }
-  }
-  const own = new Map<string, Found>();
-  for (const [name, local] of exported) {
-    const declared = functions.get(local);
-    if (declared !== undefined) own.set(name, declared);
-  }
-  return { own, named, whole };
-};
+const importedBy = ({
+  importKind,
+  source,
+  specifiers,
+}: ImportDeclaration): readonly (readonly [string, Imported])[] =>
+  importKind === "type"
+    ? []
+    : specifiers.flatMap((specifier) =>
+        specifier.type === "ImportSpecifier" && specifier.importKind !== "type"
+          ? [[specifier.local.name, { local: nameOf(specifier.imported), from: source.value }]]
+          : [],
+      );
 
 /** A re-export from another directory is that directory's own face to answer for. */
 const isBeside = (specifier: string): boolean => specifier.startsWith("./");
+
+type Reading = {
+  readonly file: string;
+  readonly lineOf: (offset: number) => number;
+  readonly marks: Marks;
+  readonly functions: Map<string, Found>;
+  readonly imports: Map<string, Imported>;
+
+  /** The exported name, then the name it goes by in the file. */
+  readonly exported: Map<string, string>;
+  readonly named: ReExport[];
+  readonly whole: string[];
+};
+
+const takesAPerson = ({ people }: Marks, { params, typeParameters }: FunctionShape): boolean =>
+  [...params, ...(typeParameters?.params ?? [])].some((typed) =>
+    people.some((at) => within(typed, at)),
+  );
+
+const declare = (
+  reading: Reading,
+  declaration: Declaration | Statement | Directive,
+  isExported: boolean,
+): void => {
+  const { file, lineOf, marks } = reading;
+  for (const { name, at, node } of declaredBy(declaration)) {
+    reading.functions.set(name, {
+      file,
+      line: lineOf(at),
+      takesAPerson: takesAPerson(marks, node),
+      admits: marks.admissions.some((call) => within(node, call)),
+    });
+    if (isExported) reading.exported.set(name, name);
+  }
+};
+
+const exportNamed = (reading: Reading, statement: ExportNamedDeclaration): void => {
+  if (statement.declaration !== null) declare(reading, statement.declaration, true);
+  const from = statement.source?.value;
+  for (const { name, local } of listedBy(statement)) {
+    if (from === undefined) reading.exported.set(name, local);
+    else reading.named.push({ name, local, from });
+  }
+};
+
+/** Silence on a form the reader does not follow would read as nothing exported. */
+const unread = (file: string, form: string): never => {
+  throw new Error(`${file} has ${form}, which the face reader does not follow`);
+};
+
+const exportWhole = (reading: Reading, statement: ExportAllDeclaration): void => {
+  if (statement.exportKind === "type" || !isBeside(statement.source.value)) return;
+  if (statement.exported !== null) unread(reading.file, "a namespace re-export");
+  reading.whole.push(statement.source.value);
+};
+
+const readStatement = (reading: Reading, statement: Statement | Directive): void => {
+  switch (statement.type) {
+    case "ImportDeclaration":
+      for (const [local, imported] of importedBy(statement)) reading.imports.set(local, imported);
+      break;
+    case "ExportNamedDeclaration":
+      exportNamed(reading, statement);
+      break;
+    case "ExportDefaultDeclaration":
+      unread(reading.file, "a default export");
+      break;
+    case "ExportAllDeclaration":
+      exportWhole(reading, statement);
+      break;
+    default:
+      declare(reading, statement, false);
+  }
+};
+
+const moduleOf = (file: string, source: string): Module => {
+  const { program, lineOf } = parsedSource(file, source);
+  const reading: Reading = {
+    file,
+    lineOf,
+    marks: marksOf(program),
+    functions: new Map(),
+    imports: new Map(),
+    exported: new Map(),
+    named: [],
+    whole: [],
+  };
+  for (const statement of program.body) readStatement(reading, statement);
+
+  const own = new Map<string, Found>();
+  for (const [name, local] of reading.exported) {
+    const declared = reading.functions.get(local);
+    const imported = reading.imports.get(local);
+    if (declared !== undefined) own.set(name, declared);
+    else if (imported !== undefined) reading.named.push({ name, ...imported });
+  }
+  return { own, named: reading.named.filter(({ from }) => isBeside(from)), whole: reading.whole };
+};
 
 const beside = (file: string, specifier: string): string =>
   path.posix.join(path.posix.dirname(file), specifier);
 
 /**
- * Reads a parameter's own annotation: a principal behind an alias goes unseen.
+ * A principal behind an alias goes unseen.
  *
- * @throws when a file does not parse or a re-export names none.
+ * @throws when a file does not parse or exports a form not followed.
  */
 export const facesAdmittingNobody = (
   sources: Sources,
@@ -184,10 +278,12 @@ export const facesAdmittingNobody = (
     const { own, named, whole } = moduleOf(file, source);
     const found = new Map(own);
     read.set(file, found);
-    for (const from of whole.filter(isBeside)) {
-      for (const [name, declared] of exportedFrom(beside(file, from))) found.set(name, declared);
+    for (const from of whole) {
+      for (const [name, declared] of exportedFrom(beside(file, from))) {
+        if (!found.has(name)) found.set(name, declared);
+      }
     }
-    for (const { name, local, from } of named.filter((one) => isBeside(one.from))) {
+    for (const { name, local, from } of named) {
       const declared = exportedFrom(beside(file, from)).get(local);
       if (declared !== undefined) found.set(name, declared);
     }

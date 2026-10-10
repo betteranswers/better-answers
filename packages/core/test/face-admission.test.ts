@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
+import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { facesAdmittingNobody } from "@better-answers/devtools/face-admission";
 
@@ -30,6 +32,18 @@ const STEPS: Readonly<Record<string, string>> = {
 };
 
 const NO_LISTED_STEP = "takes a person, admits nobody and is no listed step";
+
+const SRC = "./src/";
+
+/** What a transport can import: the faces the package's exports map names under `src`. */
+const exportedFaces = (): readonly string[] => {
+  const manifest = z
+    .object({ exports: z.record(z.string(), z.string()) })
+    .parse(JSON.parse(readFileSync(path.resolve(import.meta.dirname, "../package.json"), "utf8")));
+  return Object.values(manifest.exports)
+    .filter((target) => target.startsWith(SRC))
+    .map((target) => target.slice(SRC.length));
+};
 
 const directories = (): readonly string[] => [
   ...new Set(asSliceRelative(coreSourceFiles()).map((file) => file.split("/")[0] ?? file)),
@@ -65,6 +79,15 @@ describe("the faces of core, each admitting whoever it takes", () => {
     const inTree = directories();
 
     expect(HOLDS_NO_ACTION.filter((directory) => !inTree.includes(directory))).toEqual([]);
+  });
+
+  it("reads every face the package exports, or leaves it out", () => {
+    const read = (face: string): boolean => /^[^/]+\/index\.ts$/.test(face);
+    const leftOut = (face: string): boolean =>
+      HOLDS_NO_ACTION.some((directory) => face.startsWith(`${directory}/`));
+
+    expect(exportedFaces().filter((face) => !read(face) && !leftOut(face))).toEqual([]);
+    expect(exportedFaces()).toContain("answering/index.ts");
   });
 
   it("gives every step the action that admits for it", () => {

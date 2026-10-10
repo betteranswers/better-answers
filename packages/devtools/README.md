@@ -373,16 +373,22 @@ with no declaration at all, and whether a function is on a face is a fact about 
 face's `index.ts` exports, whether declared there, re-exported by name or re-exported whole, and
 names each function that takes a person and passes no declaration to `admit`.
 
-A parameter takes a person when its annotation names `UserPrincipal`, `Principal` or
-`AdmittedOf<…>`, alone or in a union or an intersection. The kernel's narrower names are left
-alone: only `admit` makes an `AdminUserPrincipal`, and the platform and the operator hold no role.
+A function takes a person when a parameter's annotation, or a type parameter's constraint, names
+`UserPrincipal`, `Principal` or `AdmittedOf<…>` anywhere but in a callback's own parameters. The
+kernel's narrower names are left alone: only `admit` makes an `AdminUserPrincipal`, and the
+platform and the operator hold no role. A function admits when its body calls `admit` with a
+declaration's name, as the lint reads it.
 
-**What it cannot see.** A principal behind a type alias or inside an object parameter, a face
-function built by a wrapper call, and a face that calls `admit` and then carries on with the
-principal it was handed. A re-export from another directory is left to that directory's face.
+**What it cannot see.** A principal behind a type alias or a renamed import, and a parameter with
+no annotation. A face function built by a wrapper call, assigned from another name, or held in an
+object or a class. A face whose `admit` sits after an early return or inside a function it never
+calls, one that shadows `admit`, and one that admits and then carries on with the principal it was
+handed. A re-export from another directory is left to that directory's face. A default export and
+a namespace re-export are not followed, so the reader throws on either.
 
 `packages/core/test/face-admission.test.ts` runs it over `packages/core/src` and compares what it
-names with the steps that suite lists, both ways. `test/face-admission.test.ts` holds each
+names with the steps that suite lists, both ways. It reads every directory but the four it names,
+and holds that each face in core's exports map is one of those directories' `index.ts`. `test/face-admission.test.ts` holds each
 condition over sources written in the test.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
