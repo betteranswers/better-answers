@@ -16,7 +16,7 @@ C4Container
   System_Boundary(platform, "Better Answers") {
     Container(web, "Single-page app", "Vite, React, TanStack Query", "Control Centre's six pages, Sources the first with its actions; sign-in, the workspace picker; tRPC only, plus the Better Auth client")
     Container(api, "api", "Hono on Node 24", "The one TypeScript deployable: tRPC, the MCP surface, the authorization server, the SPA's static build, pnpm ops, the head check, the daily sweep pass; logic from packages/core")
-    Container(worker, "worker", "Python 3.13, uv, psycopg, asyncpg, dulwich, boto3, cocoindex 1.0.24, Presidio 2.2.364 with GLiNER, spaCy and torch, anydoc 0.2.4, pdf-inspector 1.25.2; distroless/cc-debian13", "The work loop claiming nightly-audit, full-rebuild and index jobs; the sync is a cocoindex host with the redaction seam inside it")
+    Container(worker, "worker", "Python 3.13, uv, psycopg, asyncpg, dulwich, boto3, cocoindex 1.0.25, Presidio 2.2.364 with GLiNER, spaCy and torch, anydoc 0.2.4, pdf-inspector 1.25.2; distroless/cc-debian13", "The work loop claiming nightly-audit, full-rebuild and index jobs; the sync is a cocoindex host with the redaction seam inside it")
     Container(migrate, "migrate", "Drizzle over one journal", "One-shot on every release, ahead of api: every migration, then the contract digest stamped")
     Container(backup, "backup", "cron, pg_dump, age, rclone, git", "Hourly dumps; nightly the object-store mirror, one git bundle per repository and the push mirror")
 
