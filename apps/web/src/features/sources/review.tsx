@@ -2,10 +2,10 @@ import { useState, type ReactNode } from "react";
 
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
-import { Badge } from "@/shared/ui/badge.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
+import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import {
   Table,
   TableBody,
@@ -18,11 +18,7 @@ import {
 import { counted } from "@/shared/words.ts";
 
 import { outcomeOfFailure } from "./refusal.tsx";
-import {
-  DismissAsNotSpecialCategoryAction,
-  KeepInTextAction,
-  NarrowDocumentsAction,
-} from "./review-actions.tsx";
+import { ReviewActions, RuleWord } from "./review-actions.tsx";
 import {
   groupIsIn,
   groupKeyText,
@@ -39,7 +35,7 @@ import {
   SOURCES_KEYSTROKES,
   useTickedGroups,
 } from "./sources-state.ts";
-import { spokenWord } from "./words.ts";
+import { REVIEW_WORDS, sentenceCased } from "./words.ts";
 
 const NOTHING_FOUND = {
   received: "No sync has finished yet, so nothing has been found.",
@@ -51,7 +47,7 @@ const NOTHING_FOUND = {
 function Note(properties: { readonly tag: string; readonly children: ReactNode }) {
   return (
     <p className="mt-1">
-      <Badge variant="outline">{properties.tag}</Badge>{" "}
+      <Pill>{properties.tag}</Pill>{" "}
       <span className="text-muted-foreground">{properties.children}</span>
     </p>
   );
@@ -64,22 +60,16 @@ function GroupNotes(properties: {
   const { group, narrowedBySeam } = properties;
   return (
     <>
-      <Badge variant="outline">{group.sensitivity}</Badge>
+      <Pill>{group.sensitivity}</Pill>
       {narrowedBySeam ? (
-        <Note tag="Already narrowed">
-          A special category finding narrowed this document at the seam.
-        </Note>
+        <Note tag={REVIEW_WORDS.alreadyNarrowed.tag}>{REVIEW_WORDS.alreadyNarrowed.says}</Note>
       ) : null}
       {group.dismissed === 0 ? null : (
-        <Note tag="Dismissed">
-          {counted(group.dismissed, "span", "spans")} as not special category. The seam’s verdict
-          passes over a dismissed span, which stays withheld unless kept in text.
-        </Note>
+        <Note tag={REVIEW_WORDS.dismissed.tag}>{REVIEW_WORDS.dismissed.says(group.dismissed)}</Note>
       )}
       {group.overriddenByErasure === 0 ? null : (
-        <Note tag="Kept, still withheld">
-          {counted(group.overriddenByErasure, "kept span", "kept spans")} overridden by an erasure
-          request: an erasure outranks a keep.
+        <Note tag={REVIEW_WORDS.keptStillWithheld.tag}>
+          {REVIEW_WORDS.keptStillWithheld.says(group.overriddenByErasure)}
         </Note>
       )}
     </>
@@ -98,7 +88,7 @@ function PreviewPassages(properties: {
     <div aria-live="polite" className="mt-2">
       {said.isPending && properties.open ? <p>The passages are still loading.</p> : null}
       {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
-      {preview.data?.length === 0 ? <p>No passage has landed yet.</p> : null}
+      {preview.data?.length === 0 ? <p>{REVIEW_WORDS.noPassages}</p> : null}
       {preview.data === undefined || preview.data.length === 0 ? null : (
         <ol className="grid gap-2">
           {preview.data.map((passage) => (
@@ -198,14 +188,16 @@ function FindingsTable(properties: {
                   toggle(group);
                 }}
                 aria-keyshortcuts={SOURCES_KEYSTROKES.select.key}
-                aria-label={`Select ${spokenWord(group.category)} by ${group.ruleId} in ${group.title}`}
+                aria-label={REVIEW_WORDS.select(group)}
               />
             </TableCell>
             <TableCell>
-              {spokenWord(group.category)}
-              <span className="block text-muted-foreground">{spokenWord(group.tier)}</span>
+              {sentenceCased(group.category)}
+              <span className="block text-muted-foreground">{sentenceCased(group.tier)}</span>
             </TableCell>
-            <TableCell className="font-mono">{group.ruleId}</TableCell>
+            <TableCell className="whitespace-normal">
+              <RuleWord ruleId={group.ruleId} />
+            </TableCell>
             <TableCell className="whitespace-normal">{group.title}</TableCell>
             <TableCell className="text-right tabular-nums">{group.found}</TableCell>
             <TableCell className="whitespace-normal">
@@ -224,14 +216,11 @@ export function Review(properties: { readonly connectedSource: ListedConnectedSo
   const said = useReadSaid(findings);
 
   return (
-    <section aria-labelledby={REVIEW_HEADING} className="mt-8 border-t border-border pt-6">
-      <h2 id={REVIEW_HEADING} tabIndex={-1}>
-        Review of {connectedSource.name}
-      </h2>
-      <p className="mt-2 text-muted-foreground">
-        What the last sync found, per category and rule, counted. No value is shown: the three
-        actions take a group of findings, never what it found.
-      </p>
+    <section aria-labelledby={REVIEW_HEADING} className="mt-4 border-t border-border pt-4">
+      <h4 id={REVIEW_HEADING} tabIndex={-1} className="font-medium text-foreground">
+        {REVIEW_WORDS.heading(connectedSource.name)}
+      </h4>
+      <p className="mt-2 text-muted-foreground">{REVIEW_WORDS.lead}</p>
 
       <div aria-live="polite" className="mt-4">
         {said.isPending ? <p>The findings are still loading.</p> : null}
@@ -240,13 +229,7 @@ export function Review(properties: { readonly connectedSource: ListedConnectedSo
       </div>
       {findings.data === undefined || findings.data.length === 0 ? null : (
         <>
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-            <KeepInTextAction connectedSourceId={connectedSource.connectedSourceId} />
-            <NarrowDocumentsAction connectedSourceId={connectedSource.connectedSourceId} />
-            <DismissAsNotSpecialCategoryAction
-              connectedSourceId={connectedSource.connectedSourceId}
-            />
-          </div>
+          <ReviewActions connectedSourceId={connectedSource.connectedSourceId} />
           <FindingsTable connectedSource={connectedSource} groups={findings.data} />
         </>
       )}

@@ -1,6 +1,6 @@
 import type { SaidOfWord } from "@/shared/refusal-words.ts";
 
-import { UPLOAD_CAP_MB } from "./words.ts";
+import { STATE_WORDS, UPLOAD_CAP_MB } from "./words.ts";
 
 export const SAID_OF_A_CONNECTED_SOURCE = {
   "role-forbids": {
@@ -16,7 +16,7 @@ export const SAID_OF_A_CONNECTED_SOURCE = {
     next: "Review the connected source again.",
   },
   "no-such-finding": {
-    why: "This connected source holds no span of one of the ticked groups of findings.",
+    why: "This connected source holds no finding of one of the ticked groups of findings.",
     next: "Review the connected source again; its last sync may have moved on.",
   },
   "already-published": {
@@ -25,7 +25,7 @@ export const SAID_OF_A_CONNECTED_SOURCE = {
   },
   "not-indexed": {
     why: "The connected source’s sync has not finished.",
-    next: "Publish once its state reads indexed.",
+    next: `Publish once its state reads ${STATE_WORDS.indexed}.`,
   },
   "confirmation-missing": {
     why: "A publish needs all three confirmations.",

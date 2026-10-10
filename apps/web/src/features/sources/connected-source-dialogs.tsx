@@ -5,25 +5,11 @@ import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/ui/select.tsx";
 import { counted } from "@/shared/words.ts";
 
 import { connectedSourceHeadingId } from "./connected-source-list.tsx";
-import { outcomeOfFailure, whyAndNextOf } from "./refusal.tsx";
-import {
-  SENSITIVITIES,
-  EVERYONE,
-  NARROWEST,
-  useFindings,
-  type ListedConnectedSource,
-  type Sensitivity,
-} from "./sources-api.ts";
+import { outcomeOfFailure } from "./refusal.tsx";
+import { useFindings, type ListedConnectedSource } from "./sources-api.ts";
 import { AUDIENCE_WORDS, AUDITED_CATEGORIES, spokenWord } from "./words.ts";
 
 type DialogProperties<Asked> = {
@@ -55,7 +41,6 @@ type Confirmations = Readonly<Record<Confirmation, boolean>>;
 /** What the Audit log will call each action, in the words it shows there. */
 const ACTION_WORDS = {
   published: "Connected source published",
-  widened: "Connected source widened",
 } as const;
 
 function TheAuditRow(properties: {
@@ -179,9 +164,6 @@ export function PublishDialog(properties: DialogProperties<Confirmations>) {
   );
 }
 
-const narrowerThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
-  SENSITIVITIES.slice(0, SENSITIVITIES.indexOf(sensitivity));
-
 export const movedWords = (moved: {
   readonly concepts: readonly string[];
   readonly writeUps: readonly string[];
@@ -202,178 +184,3 @@ export const movedWords = (moved: {
     )}
   </>
 );
-
-function WordPicked<Word extends string>(properties: {
-  readonly label: string;
-  readonly value: Word;
-  readonly words: readonly Word[];
-  readonly said?: (word: Word) => string;
-  readonly onPick: (word: Word) => void;
-}) {
-  const { words, said = (word) => word } = properties;
-  const id = useId();
-
-  return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{properties.label}</Label>
-      <Select
-        value={properties.value}
-        onValueChange={(value) => {
-          const picked = words.find((word) => word === value);
-          if (picked !== undefined) properties.onPick(picked);
-        }}
-      >
-        <SelectTrigger id={id}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {words.map((word) => (
-            <SelectItem key={word} value={word}>
-              {said(word)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-export function NarrowDialog(properties: DialogProperties<Sensitivity>) {
-  const { connectedSource, onClose, onConfirm } = properties;
-  const narrower = narrowerThan(connectedSource.sensitivity);
-  const [sensitivity, setSensitivity] = useState<Sensitivity>(narrower[0] ?? NARROWEST);
-
-  return (
-    <ActionDialog
-      open
-      onOpenChange={closedBy(onClose)}
-      content={{ onCloseAutoFocus: toTheConnectedSource(connectedSource.connectedSourceId) }}
-      title={`Narrow ${connectedSource.name}`}
-      consequence="Every concept citing its documents, and every write-up including one of those concepts, moves with it in the same action. A narrowing never widens; widening it back is an action of its own."
-      commit={
-        <Button
-          onClick={() => {
-            onConfirm(sensitivity);
-          }}
-        >
-          Narrow {connectedSource.name} to {sensitivity}
-        </Button>
-      }
-    >
-      <WordPicked
-        label="Sensitivity"
-        value={sensitivity}
-        words={narrower}
-        onPick={setSensitivity}
-      />
-      <p className="text-sm text-muted-foreground">
-        It is {connectedSource.sensitivity} now. Its audience stays{" "}
-        {AUDIENCE_WORDS[connectedSource.audience].toLowerCase()}.
-      </p>
-    </ActionDialog>
-  );
-}
-
-type Audience = ListedConnectedSource["audience"];
-
-export type Widening = { readonly sensitivity: Sensitivity; readonly audience: Audience };
-
-const asWideOrWiderThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
-  SENSITIVITIES.slice(SENSITIVITIES.indexOf(sensitivity));
-
-/** The dialog opens on a widening, so the one click it asks for is never refused as not wider. */
-const firstWidening = (connectedSource: ListedConnectedSource): Widening => {
-  const wider = SENSITIVITIES[SENSITIVITIES.indexOf(connectedSource.sensitivity) + 1];
-  return wider === undefined
-    ? { sensitivity: connectedSource.sensitivity, audience: EVERYONE }
-    : { sensitivity: wider, audience: connectedSource.audience };
-};
-
-/**
- * The dialog offers no narrower sensitivity and no other groups, so a wider term is the whole
- * question.
- */
-const asksWider = (connectedSource: ListedConnectedSource, asked: Widening): boolean =>
-  SENSITIVITIES.indexOf(asked.sensitivity) > SENSITIVITIES.indexOf(connectedSource.sensitivity) ||
-  (asked.audience === EVERYONE && connectedSource.audience !== EVERYONE);
-
-const WIDENING_CONSEQUENCE = {
-  published:
-    "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every write-up including one, moves with it in the same action.",
-  unpublished:
-    "Nobody but an Admin reads it until you publish it, and the publish then releases the sensitivity you choose here.",
-};
-
-const ITS_OWN_SENSITIVITY_STANDS = "A document with a narrower sensitivity of its own keeps it.";
-
-export const sensitivityAndAudienceWords = (widening: Widening): string =>
-  `${widening.sensitivity} for ${AUDIENCE_WORDS[widening.audience].toLowerCase()}`;
-
-export function WidenDialog(properties: DialogProperties<Widening>) {
-  const { connectedSource, onClose, onConfirm } = properties;
-  const [asked, setAsked] = useState<Widening>(() => firstWidening(connectedSource));
-  const hintId = useId();
-  const wider = asksWider(connectedSource, asked);
-  const publication = connectedSource.publishedAt === null ? "unpublished" : "published";
-
-  return (
-    <ActionDialog
-      open
-      onOpenChange={closedBy(onClose)}
-      content={{
-        className: "max-h-[calc(100vh-2rem)] overflow-y-auto",
-        onCloseAutoFocus: toTheConnectedSource(connectedSource.connectedSourceId),
-      }}
-      title={`Widen ${connectedSource.name}`}
-      consequence={`${WIDENING_CONSEQUENCE[publication]} ${ITS_OWN_SENSITIVITY_STANDS}`}
-      commit={
-        <Button
-          disabled={!wider}
-          aria-describedby={hintId}
-          onClick={() => {
-            onConfirm(asked);
-          }}
-        >
-          Widen {connectedSource.name} to {sensitivityAndAudienceWords(asked)}
-        </Button>
-      }
-    >
-      <WordPicked
-        label="Sensitivity"
-        value={asked.sensitivity}
-        words={asWideOrWiderThan(connectedSource.sensitivity)}
-        onPick={(sensitivity) => {
-          setAsked({ ...asked, sensitivity });
-        }}
-      />
-
-      {connectedSource.audience === EVERYONE ? null : (
-        <WordPicked
-          label="Audience"
-          value={asked.audience}
-          words={[connectedSource.audience, EVERYONE]}
-          said={(audience) => AUDIENCE_WORDS[audience]}
-          onPick={(audience) => {
-            setAsked({ ...asked, audience });
-          }}
-        />
-      )}
-
-      <p className="text-sm text-muted-foreground">
-        It is {sensitivityAndAudienceWords(connectedSource)} now
-        {connectedSource.audience === EVERYONE ? ", and no audience is wider." : "."}
-      </p>
-
-      <TheAuditRow action="widened" connectedSource={connectedSource}>
-        <SummaryRow term="Sensitivity, from">{connectedSource.sensitivity}</SummaryRow>
-        <SummaryRow term="Sensitivity, to">{asked.sensitivity}</SummaryRow>
-        <SummaryRow term="Audience, from">{AUDIENCE_WORDS[connectedSource.audience]}</SummaryRow>
-        <SummaryRow term="Audience, to">{AUDIENCE_WORDS[asked.audience]}</SummaryRow>
-      </TheAuditRow>
-
-      <p id={hintId} className="text-sm text-muted-foreground">
-        {wider ? "One governed write, audited under your name." : whyAndNextOf("not-wider")}
-      </p>
-    </ActionDialog>
-  );
-}

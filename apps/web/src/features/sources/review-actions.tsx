@@ -29,7 +29,7 @@ import {
   useTickedGroups,
   type TickedGroups,
 } from "./sources-state.ts";
-import { spokenWord } from "./words.ts";
+import { REVIEW_WORDS, ruleWordOf, sentenceCased, SYNC_OF_A_DISMISSAL } from "./words.ts";
 
 type Settled<Answer> = {
   readonly onSuccess: (answer: Answer) => void;
@@ -110,8 +110,15 @@ const useBulkAction = (
 
 type BulkActionState = ReturnType<typeof useBulkAction>;
 
+type ActionProperties = {
+  readonly connectedSourceId: string;
+  /** The id of the line that says what enables the action, while no group is ticked. */
+  readonly enabledBy: string | undefined;
+};
+
 function BulkAction(properties: {
   readonly action: BulkActionState;
+  readonly enabledBy: string | undefined;
   readonly keystroke: Keystroke;
   readonly label: string;
   readonly refusedWhy?: string;
@@ -131,7 +138,7 @@ function BulkAction(properties: {
         className="h-auto min-h-8 justify-self-start py-1 text-left whitespace-normal"
         disabled={action.ready === undefined}
         aria-keyshortcuts={properties.keystroke.key}
-        aria-describedby={refusedWhy === undefined ? undefined : refusedWhyId}
+        aria-describedby={refusedWhy === undefined ? properties.enabledBy : refusedWhyId}
         onClick={action.show}
       >
         {properties.label}
@@ -147,13 +154,19 @@ function BulkAction(properties: {
   );
 }
 
+/** A rule the page has no word for shows its id, in the face every id takes. */
+export function RuleWord(properties: { readonly ruleId: string }) {
+  const word = ruleWordOf(properties.ruleId);
+  return word === properties.ruleId ? <span className="font-mono">{word}</span> : word;
+}
+
 function TickedList(properties: { readonly groups: readonly GroupOfFindings[] }) {
   return (
     <ul className="grid gap-1">
       {properties.groups.map((group) => (
         <li key={groupKeyText(group)}>
-          {spokenWord(group.category)} by <span className="font-mono">{group.ruleId}</span> in{" "}
-          {group.title}: {group.found} found
+          {sentenceCased(group.category)} by <RuleWord ruleId={group.ruleId} /> in {group.title}:{" "}
+          {group.found} found
         </li>
       ))}
     </ul>
@@ -202,23 +215,18 @@ function ReasonedDialog(properties: {
   );
 }
 
-export function KeepInTextAction(properties: { readonly connectedSourceId: string }) {
+function KeepInTextAction(properties: ActionProperties) {
   const action = useBulkAction(properties.connectedSourceId);
   const keep = useKeepInText();
+  const words = REVIEW_WORDS.keep;
   const groups = action.ready?.groups ?? [];
-  const named = counted(groups.length, "group of findings", "groups of findings");
-  /** Counted off the groups the review listed, so the page reads nothing of the spans kept. */
-  const spans = counted(
-    groups.reduce((sum, group) => sum + group.found, 0),
-    "span",
-    "spans",
-  );
+  /** Counted off the groups the review listed, so the page reads nothing of the findings kept. */
+  const findings = groups.reduce((sum, group) => sum + group.found, 0);
 
   const kept = (reason: string) => {
     action.command({
-      pending: `Keeping ${named} in text.`,
-      done: () =>
-        `Kept ${named} in text: ${spans} restored, and the sync that lets them back in is queued.`,
+      pending: words.pending(groups.length),
+      done: () => words.done(groups.length, findings),
       run: (ready, settled) => {
         keep.mutate(reasonedAsk(ready, reason), settled);
       },
@@ -228,13 +236,14 @@ export function KeepInTextAction(properties: { readonly connectedSourceId: strin
   return (
     <BulkAction
       action={action}
+      enabledBy={properties.enabledBy}
       keystroke={SOURCES_KEYSTROKES.keep}
-      label={action.ready === undefined ? "Keep in text" : `Keep ${named} in text`}
+      label={action.ready === undefined ? words.label : words.named(groups.length)}
       dialog={
         <ReasonedDialog
           action={action}
-          title={`Keep ${named} in text`}
-          consequence="Every span of each group goes back into its document’s text on the next sync, restored under your name with this reason. An erasure request still outranks a keep."
+          title={words.named(groups.length)}
+          consequence={words.consequence}
           onReason={kept}
         />
       }
@@ -242,7 +251,7 @@ export function KeepInTextAction(properties: { readonly connectedSourceId: strin
   );
 }
 
-export function NarrowDocumentsAction(properties: { readonly connectedSourceId: string }) {
+function NarrowDocumentsAction(properties: ActionProperties) {
   const action = useBulkAction(properties.connectedSourceId);
   const narrow = useNarrowDocuments();
   const groups = action.ready?.groups ?? [];
@@ -263,8 +272,9 @@ export function NarrowDocumentsAction(properties: { readonly connectedSourceId: 
   return (
     <BulkAction
       action={action}
+      enabledBy={properties.enabledBy}
       keystroke={SOURCES_KEYSTROKES.narrowDocuments}
-      label={action.ready === undefined ? "Narrow these documents" : `Narrow ${named}`}
+      label={action.ready === undefined ? REVIEW_WORDS.narrowDocuments.label : `Narrow ${named}`}
       dialog={
         <ActionDialog
           open={action.open}
@@ -295,23 +305,19 @@ function SyncStatus(properties: { readonly connectedSourceId: string; readonly j
   const sync = connectedSources.data?.find(
     (connectedSource) => connectedSource.connectedSourceId === properties.connectedSourceId,
   )?.lastSync;
-  return sync === undefined || sync === null || sync.jobId < properties.jobId
-    ? "queued"
-    : sync.status;
+  return SYNC_OF_A_DISMISSAL[
+    sync === undefined || sync === null || sync.jobId < properties.jobId ? "queued" : sync.status
+  ];
 }
 
 const isSpecialCategory = (group: GroupOfFindings): boolean => group.specialCategory;
 
-export function DismissAsNotSpecialCategoryAction(properties: {
-  readonly connectedSourceId: string;
-}) {
+function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
   const action = useBulkAction(properties.connectedSourceId, isSpecialCategory);
   const dismiss = useDismissAsNotSpecialCategory();
-  const named = counted(
-    action.ready?.groups.length ?? 0,
-    "group of findings",
-    "groups of findings",
-  );
+  const words = REVIEW_WORDS.dismiss;
+  const ticked = action.ready?.groups.length ?? 0;
+  const named = counted(ticked, "group of findings", "groups of findings");
 
   const dismissed = (reason: string) => {
     action.command<DismissedAsNotSpecialCategory>({
@@ -320,8 +326,8 @@ export function DismissAsNotSpecialCategoryAction(properties: {
         <>
           Dismissed {named} as not special category in{" "}
           {counted(answer.documentIds.length, "document", "documents")}. The sync that reads the
-          dismissal:{" "}
-          <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />.
+          dismissal <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />
+          .
         </>
       ),
       run: (ready, settled) => {
@@ -333,21 +339,45 @@ export function DismissAsNotSpecialCategoryAction(properties: {
   return (
     <BulkAction
       action={action}
+      enabledBy={properties.enabledBy}
       keystroke={SOURCES_KEYSTROKES.dismiss}
-      label={
-        action.ready === undefined
-          ? "Dismiss as not special category"
-          : `Dismiss ${named} as not special category`
-      }
+      label={action.ready === undefined ? words.label : words.named(ticked)}
       refusedWhy={whyAndNextOf("not-special-category")}
       dialog={
         <ReasonedDialog
           action={action}
-          title={`Dismiss ${named} as not special category`}
-          consequence="Every span of each group is reviewed as dismissed under your name with this reason, and the sync that reads the dismissal is queued. On that sync, a document whose every special category finding is dismissed goes back to the sensitivity an Admin narrowed it to, or to its connected source’s sensitivity if none did. The spans stay withheld unless kept in text."
+          title={words.named(ticked)}
+          consequence={words.consequence}
           onReason={dismissed}
         />
       }
     />
+  );
+}
+
+/** While no group is ticked, one line above the three says what enables them. */
+export function ReviewActions(properties: { readonly connectedSourceId: string }) {
+  const { connectedSourceId } = properties;
+  const [ticked] = useTickedGroups();
+  const selectFirstId = useId();
+  const enabledBy =
+    groupsTickedIn(ticked, connectedSourceId).length === 0 ? selectFirstId : undefined;
+
+  return (
+    <div className="mt-4 grid gap-2">
+      {enabledBy === undefined ? null : (
+        <p id={selectFirstId} className="text-sm text-muted-foreground">
+          {REVIEW_WORDS.selectFirst}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        <KeepInTextAction connectedSourceId={connectedSourceId} enabledBy={enabledBy} />
+        <NarrowDocumentsAction connectedSourceId={connectedSourceId} enabledBy={enabledBy} />
+        <DismissAsNotSpecialCategoryAction
+          connectedSourceId={connectedSourceId}
+          enabledBy={enabledBy}
+        />
+      </div>
+    </div>
   );
 }

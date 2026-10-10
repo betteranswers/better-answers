@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
@@ -11,16 +11,10 @@ import { useReadSaid } from "@/shared/read-said.ts";
 import { counted } from "@/shared/words.ts";
 
 import { ConnectAction } from "./connect-action.tsx";
-import {
-  sensitivityAndAudienceWords,
-  movedWords,
-  NarrowDialog,
-  PublishDialog,
-  WidenDialog,
-} from "./connected-source-dialogs.tsx";
-import { ConnectedSourceList } from "./connected-source-list.tsx";
+import { movedWords, PublishDialog } from "./connected-source-dialogs.tsx";
+import { connectedSourceHeadingId, ConnectedSourceList } from "./connected-source-list.tsx";
 import { outcomeOfFailure } from "./refusal.tsx";
-import { Review } from "./review.tsx";
+import { SensitivityPanel, type SensitivityChange } from "./sensitivity-panel.tsx";
 import {
   EVERYONE,
   NARROWEST,
@@ -33,8 +27,15 @@ import {
   type ConnectedSourceWidened,
   type ListedConnectedSource,
 } from "./sources-api.ts";
-import { REVIEW_HEADING, SOURCES_KEYSTROKES } from "./sources-state.ts";
-import { AUDIENCE_WORDS, NOTHING_CONNECTED, SELECT_A_CONNECTED_SOURCE_FIRST } from "./words.ts";
+import { REVIEW_HEADING, SENSITIVITY_FIELD, SOURCES_KEYSTROKES } from "./sources-state.ts";
+import {
+  AUDIENCE_WORDS,
+  NOTHING_CONNECTED,
+  SELECT_A_CONNECTED_SOURCE_FIRST,
+  sensitivityAndAudienceWords,
+  STATE_WORDS,
+  type SensitivityAndAudience,
+} from "./words.ts";
 
 const sources = menuGroupIn(CONTROL_CENTRE, "sources");
 
@@ -47,7 +48,7 @@ const waitsForItsSync = (connectedSource: ListedConnectedSource): Outcome => ({
   words:
     connectedSource.state === "published"
       ? `“${connectedSource.name}” is already published.`
-      : `“${connectedSource.name}” is ${connectedSource.state}: publishing waits for its sync to finish.`,
+      : `“${connectedSource.name}” is ${STATE_WORDS[connectedSource.state].toLowerCase()}: publishing waits for its sync to finish.`,
 });
 
 const narrowestAlready = (connectedSource: ListedConnectedSource): Outcome => ({
@@ -59,6 +60,112 @@ const nothingWider = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
   words: `“${connectedSource.name}” is ${sensitivityAndAudienceWords(connectedSource)}, and no sensitivity or audience is wider.`,
 });
+
+type Tell = (outcome: Outcome) => void;
+
+const settledSaying = <Answer,>(tell: Tell, said: (answer: Answer) => ReactNode) => ({
+  onSuccess: (answer: Answer) => {
+    tell({ tone: "said", words: said(answer) });
+  },
+  onError: (failure: Error | ApiError) => {
+    tell(outcomeOfFailure(failure, "action"));
+  },
+});
+
+const focusOn = (id: string) => {
+  document.getElementById(id)?.focus();
+};
+
+/** A keystroke pressed with nothing in focus has the page itself here, which takes no focus back. */
+const theControlInFocus = (): HTMLElement | null => {
+  const held = document.activeElement;
+  return held instanceof HTMLElement && held !== document.body ? held : null;
+};
+
+type Changing = { readonly change: SensitivityChange; readonly connectedSourceId: string };
+
+/** One narrowing or widening is open on the page at a time, drawn in its connected source's row. */
+const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tell) => {
+  const [changing, setChanging] = useState<Changing>();
+  const opener = useRef<HTMLElement>(null);
+  const narrowAction = useNarrowConnectedSource();
+  const widenAction = useWidenConnectedSource();
+  const connectedSource = listed.find(
+    (each) => each.connectedSourceId === changing?.connectedSourceId,
+  );
+
+  const open = (asked: Changing) => {
+    opener.current = theControlInFocus();
+    flushSync(() => {
+      setChanging(asked);
+    });
+    focusOn(SENSITIVITY_FIELD);
+  };
+
+  if (changing === undefined || connectedSource === undefined) return { open, panel: undefined };
+
+  const { connectedSourceId, name } = connectedSource;
+
+  /** Focus moves before the panel goes, or the button it stood on would take it along. */
+  const cancel = () => {
+    const from = opener.current;
+    from?.focus();
+    if (document.activeElement !== from) focusOn(connectedSourceHeadingId(connectedSourceId));
+    setChanging(undefined);
+  };
+
+  /** A change must read as taken within a tenth of a second, so the panel closes before the api answers. */
+  const commit = (asked: SensitivityAndAudience) => {
+    focusOn(connectedSourceHeadingId(connectedSourceId));
+    setChanging(undefined);
+    if (changing.change === "narrow") {
+      narrowAction.mutate(
+        {
+          connectedSourceId,
+          sensitivity: asked.sensitivity,
+          audience: connectedSource.audience,
+          audienceGroups: connectedSource.audienceGroups,
+        },
+        settledSaying(tell, (narrowed: ConnectedSourceNarrowed) => (
+          <>
+            Narrowed “{name}” to {narrowed.visibility.sensitivity}. {movedWords(narrowed)}
+          </>
+        )),
+      );
+      return;
+    }
+    widenAction.mutate(
+      {
+        connectedSourceId,
+        ...asked,
+        audienceGroups: asked.audience === EVERYONE ? null : connectedSource.audienceGroups,
+      },
+      settledSaying(tell, (widened: ConnectedSourceWidened) => (
+        <>
+          Widened “{name}” to {sensitivityAndAudienceWords(widened.visibility)}.{" "}
+          {movedWords(widened)}
+        </>
+      )),
+    );
+  };
+
+  return {
+    open,
+    panel: {
+      connectedSourceId,
+      part: (
+        <SensitivityPanel
+          key={`${changing.change} ${connectedSourceId}`}
+          change={changing.change}
+          connectedSource={connectedSource}
+          pending={narrowAction.isPending || widenAction.isPending}
+          onCancel={cancel}
+          onCommit={commit}
+        />
+      ),
+    },
+  };
+};
 
 function ListStatus(properties: {
   readonly connectedSources: ReturnType<typeof useConnectedSources>;
@@ -81,32 +188,25 @@ export function ConnectedSourcesPage() {
   const [inFocus, setInFocus] = useState<string>();
   const [reviewing, setReviewing] = useState<string>();
   const [publishing, setPublishing] = useState<string>();
-  const [narrowing, setNarrowing] = useState<string>();
-  const [widening, setWidening] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
   const publishAction = usePublish();
-  const narrowAction = useNarrowConnectedSource();
-  const widenAction = useWidenConnectedSource();
 
   const listed = connectedSources.data ?? [];
+  const sensitivity = useSensitivityPanel(listed, setOutcome);
   const connectedSourceOf = (connectedSourceId: string | undefined) =>
     listed.find((connectedSource) => connectedSource.connectedSourceId === connectedSourceId);
 
-  const settledSaying = <Answer,>(said: (answer: Answer) => ReactNode) => ({
-    onSuccess: (answer: Answer) => {
-      setOutcome({ tone: "said", words: said(answer) });
-    },
-    onError: (failure: Error | ApiError) => {
-      setOutcome(outcomeOfFailure(failure, "action"));
-    },
-  });
-
-  /** The review opens below the list, out of the reader's sight, so focus follows it there. */
+  /** The review may open beyond the fold of a long row, so focus follows it to its heading. */
   const review = (connectedSourceId: string) => {
     flushSync(() => {
       setReviewing(connectedSourceId);
     });
-    document.getElementById(REVIEW_HEADING)?.focus();
+    focusOn(REVIEW_HEADING);
+  };
+
+  const reviewOrClose = (connectedSourceId: string) => {
+    if (reviewing === connectedSourceId) setReviewing(undefined);
+    else review(connectedSourceId);
   };
 
   const publish = (connectedSource: ListedConnectedSource) => {
@@ -116,12 +216,14 @@ export function ConnectedSourcesPage() {
 
   const narrow = (connectedSource: ListedConnectedSource) => {
     if (connectedSource.sensitivity === NARROWEST) setOutcome(narrowestAlready(connectedSource));
-    else setNarrowing(connectedSource.connectedSourceId);
+    else
+      sensitivity.open({ change: "narrow", connectedSourceId: connectedSource.connectedSourceId });
   };
 
   const widen = (connectedSource: ListedConnectedSource) => {
     if (widestAlready(connectedSource)) setOutcome(nothingWider(connectedSource));
-    else setWidening(connectedSource.connectedSourceId);
+    else
+      sensitivity.open({ change: "widen", connectedSourceId: connectedSource.connectedSourceId });
   };
 
   /**
@@ -150,10 +252,7 @@ export function ConnectedSourcesPage() {
     if (connectedSource !== undefined) widen(connectedSource);
   });
 
-  const underReview = connectedSourceOf(reviewing);
   const toPublish = connectedSourceOf(publishing);
-  const toNarrow = connectedSourceOf(narrowing);
-  const toWiden = connectedSourceOf(widening);
 
   return (
     <>
@@ -179,18 +278,15 @@ export function ConnectedSourcesPage() {
             connectedSources={listed}
             actions={{
               onFocusConnectedSource: setInFocus,
-              onReview: review,
+              onReview: reviewOrClose,
               onPublish: publish,
               onNarrow: narrow,
               onWiden: widen,
             }}
+            open={{ reviewing, panel: sensitivity.panel }}
           />
         )}
       </section>
-
-      {underReview === undefined ? null : (
-        <Review key={underReview.connectedSourceId} connectedSource={underReview} />
-      )}
 
       {toPublish === undefined ? null : (
         <PublishDialog
@@ -204,60 +300,10 @@ export function ConnectedSourcesPage() {
             publishAction.mutate(
               { connectedSourceId: toPublish.connectedSourceId, confirmations },
               settledSaying(
+                setOutcome,
                 () =>
                   `Published “${toPublish.name}”: its passages reach ${AUDIENCE_WORDS[toPublish.audience].toLowerCase()} now, and the audit row is written.`,
               ),
-            );
-          }}
-        />
-      )}
-      {toNarrow === undefined ? null : (
-        <NarrowDialog
-          key={toNarrow.connectedSourceId}
-          connectedSource={toNarrow}
-          onClose={() => {
-            setNarrowing(undefined);
-          }}
-          onConfirm={(sensitivity) => {
-            setNarrowing(undefined);
-            narrowAction.mutate(
-              {
-                connectedSourceId: toNarrow.connectedSourceId,
-                sensitivity,
-                audience: toNarrow.audience,
-                audienceGroups: toNarrow.audienceGroups,
-              },
-              settledSaying((narrowed: ConnectedSourceNarrowed) => (
-                <>
-                  Narrowed “{toNarrow.name}” to {narrowed.visibility.sensitivity}.{" "}
-                  {movedWords(narrowed)}
-                </>
-              )),
-            );
-          }}
-        />
-      )}
-      {toWiden === undefined ? null : (
-        <WidenDialog
-          key={toWiden.connectedSourceId}
-          connectedSource={toWiden}
-          onClose={() => {
-            setWidening(undefined);
-          }}
-          onConfirm={(asked) => {
-            setWidening(undefined);
-            widenAction.mutate(
-              {
-                connectedSourceId: toWiden.connectedSourceId,
-                ...asked,
-                audienceGroups: asked.audience === EVERYONE ? null : toWiden.audienceGroups,
-              },
-              settledSaying((widened: ConnectedSourceWidened) => (
-                <>
-                  Widened “{toWiden.name}” to {sensitivityAndAudienceWords(widened.visibility)}.{" "}
-                  {movedWords(widened)}
-                </>
-              )),
             );
           }}
         />
