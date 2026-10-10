@@ -30,7 +30,7 @@ The MCP surface is built on MCP SDK v2, `@modelcontextprotocol/server`, in `apps
 - Each entry runs in a transaction of its own, opened as the entry's `readOnlyHint` declares. An entry that tells the host it only reads opens read-only, so a write on that transaction fails at its statement. Any other entry opens read-write. The server, `createServer` in `apps/api/src/server.ts`, hands the surface its entries, and an entry is handed no door. The gate counts the call in a read-write transaction of its own before any entry runs.
 - No MCP library type crosses into `packages/core`. The import-direction lint refuses `@modelcontextprotocol` there.
 - The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`.
-- `open` returns structured content: frontmatter, body, relations, trust state and evidence as fields. The human rendering is derived from it.
+- `open` returns structured content: frontmatter, body, relations, the concept each link in the body leads to, trust state and evidence as fields. The human rendering is derived from it.
 - An MCP App, when built, adds views over three of the entries and no further entry. It uses `@modelcontextprotocol/ext-apps` directly, with `apps/web`'s Vite React toolchain. `okf://` identifies a concept and `ui://` a view; both live on the wire and never in a file.
 - No concept is served as an MCP resource in v0.1. A `ui://` view resource is not a concept.
 
@@ -62,3 +62,5 @@ The platform builds no outbound connectors to third-party SaaS, no outbound OAut
 The full record, with its two amendments (the same-day correction to four entries, and T-184): `docs/archive/adr/0030-mcp-surface-stays-mcp-sdk-v2.md`.
 
 Amended 10/10/2026 on the owner's ruling, by the MCP entry door plan (`docs/plans/2026-10-10-1334-feat-mcp-entry-read-only-door-plan.md`, R1 and R5). An entry's transaction opens as its `readOnlyHint` declares. The read-only query road's plan left this surface unchanged and named the change as a follow-up (`docs/plans/2026-10-10-0123-feat-read-only-query-road-plan.md`). The follow-up waited for a decision of its own under the architecture review's decision 14 (`docs/plans/2026-10-08-2311-docs-architecture-review-before-s2-plan.md`), and the ruling is that decision.
+
+Amended 10/10/2026 by the body link plan (`docs/plans/2026-10-10-1629-feat-body-link-targets-plan.md`, R1 and R6). `open` also answers, for each link in a concept's body, the concept it leads to, where the reader may read it. A relative path in a body opens nothing for an outside client, and the answered IRI does.
