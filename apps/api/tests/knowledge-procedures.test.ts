@@ -15,6 +15,8 @@ const app = appForSuite();
 
 const QUERY = "heron";
 
+const ABSENT_IRI = "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ";
+
 const NESTING = "Heron nesting season";
 const FEEDING = "Heron feeding grounds";
 const SURVEY = "Heron survey dates";
@@ -54,6 +56,67 @@ const aWorkspaceOfHerons = async () => {
     return seeded.iri;
   };
   return { workspace, viewer, iriOf };
+};
+
+const HANDBOOK_TITLE = "The synthetic heron handbook";
+const MINUTES_LABEL = "Warden minutes";
+
+/** A concept citing an Internal handbook passage and a Restricted one of minutes, with a Viewer. */
+const aConceptCitingRestrictedMinutes = async () => {
+  const workspace = await app().provision();
+  const { workspaceId, admin } = workspace;
+  const viewer = await app().person();
+  await app().addMember(workspaceId, viewer.id, "Viewer");
+  const landed = (shape: DocumentShape) =>
+    documentLanded(app().database.superuser, workspaceId, shape);
+  const handbook = await landed({ title: HANDBOOK_TITLE, text: "Herons nest from March." });
+  const minutes = await landed({
+    title: "Synthetic warden minutes, March",
+    text: "The warden rings the herons each spring.",
+    sensitivity: "Restricted",
+  });
+  const git = openTestGit(app());
+  await initRepository(git, workspaceId);
+  const writer = await actingIn(app(), { workspaceId, userId: admin.id }, async (held) => held);
+  const written = await writeConcept(
+    writer,
+    { git, postgres: app().doors.postgres, clock: app().doors.clock },
+    {
+      mergeKey: "note:heron-nesting",
+      path: "knowledge/heron-nesting.md",
+      kind: "Note",
+      title: NESTING,
+      frontmatter: {
+        title: NESTING,
+        type: "Note",
+        sources: [
+          {
+            id: "HANDBOOK",
+            title: HANDBOOK_TITLE,
+            resource: "handbook",
+            locator: handbook.locator,
+          },
+          { id: "MINUTES", title: MINUTES_LABEL, resource: "minutes", locator: minutes.locator },
+        ],
+      },
+      body: "Herons nest from March.[^HANDBOOK] The warden rings them.[^MINUTES]\n",
+      message: "Record the heron nesting season",
+      author: { name: admin.name, email: admin.email },
+      expects: { head: await head(writer, git) },
+      status: "stable",
+      evidence: [
+        { sourceDocumentId: handbook.documentId, locator: handbook.locator, resource: "handbook" },
+      ],
+    },
+  );
+  if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
+  return {
+    iri: written.value.iri,
+    handbook: handbook.locator,
+    minutes: minutes.locator,
+    viewer,
+    admin,
+  };
 };
 
 /** The MCP edge names a verifier's keys its own way; core's are what the web reads. */
@@ -178,10 +241,9 @@ describe("knowledge.open over tRPC", () => {
   it("answers an absent and a withheld concept the same NOT_FOUND", async () => {
     const { viewer, iriOf } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), viewer.email);
-    const absentIri = "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 
     const withheld = rpcOf(await refusalOfCall(api.knowledge.open.query({ iri: iriOf(RINGING) })));
-    const absent = rpcOf(await refusalOfCall(api.knowledge.open.query({ iri: absentIri })));
+    const absent = rpcOf(await refusalOfCall(api.knowledge.open.query({ iri: ABSENT_IRI })));
 
     expect(withheld).toMatchObject({
       message: "not-found",
@@ -222,75 +284,12 @@ describe("knowledge.open over tRPC", () => {
   });
 });
 
-const HANDBOOK_TITLE = "The synthetic heron handbook";
-const MINUTES_LABEL = "Warden minutes";
-
-/** A concept citing an Internal handbook passage and a Restricted one of minutes, with a Viewer. */
-const aConceptCitingRestrictedMinutes = async () => {
-  const workspace = await app().provision();
-  const { workspaceId, admin } = workspace;
-  const viewer = await app().person();
-  await app().addMember(workspaceId, viewer.id, "Viewer");
-  const landed = (shape: DocumentShape) =>
-    documentLanded(app().database.superuser, workspaceId, shape);
-  const handbook = await landed({ title: HANDBOOK_TITLE, text: "Herons nest from March." });
-  const minutes = await landed({
-    title: "Synthetic warden minutes, March",
-    text: "The warden rings the herons each spring.",
-    sensitivity: "Restricted",
-  });
-  const git = openTestGit(app());
-  await initRepository(git, workspaceId);
-  const writer = await actingIn(app(), { workspaceId, userId: admin.id }, async (held) => held);
-  const written = await writeConcept(
-    writer,
-    { git, postgres: app().doors.postgres, clock: app().doors.clock },
-    {
-      mergeKey: "note:heron-nesting",
-      path: "knowledge/heron-nesting.md",
-      kind: "Note",
-      title: NESTING,
-      frontmatter: {
-        title: NESTING,
-        type: "Note",
-        sources: [
-          {
-            id: "HANDBOOK",
-            title: HANDBOOK_TITLE,
-            resource: "handbook",
-            locator: handbook.locator,
-          },
-          { id: "MINUTES", title: MINUTES_LABEL, resource: "minutes", locator: minutes.locator },
-        ],
-      },
-      body: "Herons nest from March.[^HANDBOOK] The warden rings them.[^MINUTES]\n",
-      message: "Record the heron nesting season",
-      author: { name: admin.name, email: admin.email },
-      expects: { head: await head(writer, git) },
-      status: "stable",
-      evidence: [
-        { sourceDocumentId: handbook.documentId, locator: handbook.locator, resource: "handbook" },
-      ],
-    },
-  );
-  if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
-  return {
-    iri: written.value.iri,
-    handbook: handbook.locator,
-    minutes: minutes.locator,
-    viewer,
-    admin,
-  };
-};
-
 describe("the knowledge router, signed out", () => {
   it("refuses find and open with no session", async () => {
     const { api } = webClientOf(app().client());
 
     const found = await refusalOfCall(api.knowledge.find.query({ query: QUERY }));
-    const opened = await refusalOfCall(
-      api.knowledge.open.query({ iri: "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ" }),
-    );
+    const opened = await refusalOfCall(api.knowledge.open.query({ iri: ABSENT_IRI }));
 
     expect(found).toMatchObject({ data: { httpStatus: 401, ...NO_SESSION_ANSWERED.error.data } });
     expect(opened).toMatchObject({ data: { httpStatus: 401, ...NO_SESSION_ANSWERED.error.data } });
