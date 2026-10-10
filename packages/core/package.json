@@ -42,8 +42,8 @@
     "check": "node ../../scripts/check.mjs typecheck test"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1146.0",
-    "@aws-sdk/lib-storage": "3.1146.0",
+    "@aws-sdk/client-s3": "3.1149.0",
+    "@aws-sdk/lib-storage": "3.1149.0",
     "@better-answers/schema": "workspace:*",
     "yaml": "2.9.1",
     "zod": "4.6.5"
@@ -53,11 +53,11 @@
     "@stryker-mutator/api": "10.0.0",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
-    "@types/node": "24.13.6",
+    "@types/node": "24.19.2",
     "@types/pg": "8.23.1",
-    "pg": "8.23.0",
-    "testcontainers": "12.1.0",
+    "pg": "8.23.1",
+    "testcontainers": "12.2.0",
     "typescript": "7.0.2",
-    "vitest": "5.0.1"
+    "vitest": "5.0.3"
   }
 }
