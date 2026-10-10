@@ -122,6 +122,11 @@ Knowledge one from `apps/api/tests/harness-knowledge.ts`:
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own action and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* page |
 | `seedConcepts` | Concepts a named Admin writes in order through the concepts slice's own write, so each is in the repository, the index and the map as a member's write leaves it. Each takes a kind and a sensitivity, links to concepts earlier in the list, and sources whose passages each get a citation mark. A trust tier other than `unverified` is a verification row written straight to the store, because the slice has no verify action. A `"groups"` audience is the Admin's own override to one group holding the members `groupMemberIds` names, and nobody outside that group reads the concept, its Admin included. It answers each concept's IRI, path and cited documents |
 
+A seed the harness cannot write answers 400 and writes nothing. A body or a row that a schema
+refuses names each field and its rule, and a write that trips a constraint names the constraint.
+The action's failure carries that answer, so the reason is read there and not in the server's log.
+Any other fault of the harness stays a 500.
+
 More helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
@@ -159,7 +164,7 @@ More helpers in the same module drive the browser rather than the harness:
 | `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
 | `tokenColour` | A design-system token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
 | `contrastBetween` | WCAG's contrast ratio between two painted `rgb()` colours, as `apps/web/e2e/focus-ring.spec.ts` measures each focus edge against the surface behind it |
-| `controlEdges` | Each enabled control found by its edge alone, with its fill, every side it or a wordless wrapper draws, and the colour behind it, composited as painted. The gate measures them with `contrastBetween` |
+| `controlEdges` | Each enabled control found by its edge alone, with its fill, every side it draws or a wordless wrapper draws within 8px of its own, and the colour behind it, each composited as painted through fills and every ancestor's opacity. The gate measures them with `contrastBetween` |
 
 The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one. `emailsSentTo` counts the emails the capture holds for an address, and the suite's
@@ -249,7 +254,8 @@ three things, of which automated rules are only one:
   decide because of what was painted behind the text. Axe's contrast rule reads words only, so the
   audit also refuses any enabled control a person finds by its edge alone — a field, a select, or
   a checkbox, radio or switch with no words of its own — whose edge and fill both sit under 3:1
-  against what is behind it. The audit runs in the page's own theme, then sets `data-theme` on `<html>` to
+  against what is behind it. The edge is measured as painted: a wordless wrapper's border counts
+  only on a side that hugs the field's own, and an ancestor's opacity dims it. The audit runs in the page's own theme, then sets `data-theme` on `<html>` to
   the other theme, audits again and puts the page's theme back, so every state a test leaves is
   held in dark as well as light. A failure names the theme it was found in. A spec about one theme
   keeps it on the browser under `THEME_KEPT_UNDER` from `apps/web/src/shared/theme-switch.ts`, as
@@ -266,14 +272,17 @@ three things, of which automated rules are only one:
 
 Ask for the `passesTheAccessibilityGate` fixture — called with no arguments — where the test does
 not end on the page it is about. The models-and-spend and failed-page specs walk on to other pages
-afterwards; every test in `apps/web/e2e/consent.spec.ts` ends at the assistant's own redirect, which
+afterwards; most tests in `apps/web/e2e/consent.spec.ts` end at the assistant's own redirect, which
 is another origin and no page of ours. A test that ends somewhere this product did not serve and
 audited nothing is refused by name, so an absence is a failure rather than a silence.
 
 `apps/web/e2e/models-and-spend.spec.ts` carries all three and is the model to copy.
-`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: eight of its twelve tests are
-`test.fail()`, so the run prints them with a ✘ and counts them passed — that is the gate firing
-where it should, and an `Expected to fail, but passed` there means the gate has stopped running.
+`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof. Each of its `test.fail()` tests
+draws one thing the gate must refuse, so the run prints it with a ✘ and counts it passed. That is
+the gate firing where it should. An `Expected to fail, but passed` there means the gate no longer
+refuses that thing. A new case prints exactly that on the gate as it was before the change it
+proves. One that already prints a ✘ there fails for another reason, as an undersized field fails
+axe's `target-size`.
 
 ## Running it
 
