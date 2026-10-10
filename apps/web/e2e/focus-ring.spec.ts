@@ -2,16 +2,17 @@ import type { Page } from "@playwright/test";
 
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   anAddress,
   contrastBetween,
+  paintedOver,
   provision,
   signedInAtHome,
   skipLinkReachesThePage,
   tabOpenedByKeyboard,
-  tokenColour,
   tokenPainted,
 } from "./harness.ts";
 
@@ -89,9 +90,18 @@ const drawnFocus = (page: Page, edge: string): Promise<Drawn | undefined> =>
     };
   }, edge);
 
+/** The token's outermost layer, its ink edge, in the theme in force. */
+const inkOf = async (page: Page): Promise<string> =>
+  (await tokenPainted(page, "--focus-ring", "box-shadow")).match(/rgba?\([^)]+\)/g)?.at(-1) ?? "";
+
+const inTheDark = (page: Page) =>
+  page.addInitScript((key) => {
+    localStorage.setItem(key, "dark");
+  }, THEME_KEPT_UNDER);
+
 /** Every stop of a keyboard walk, until focus comes back round to the first. */
 const walked = async (page: Page): Promise<readonly Drawn[]> => {
-  const edge = await tokenColour(page, "--accent-600");
+  const edge = await inkOf(page);
   const seen: Drawn[] = [];
   for (let stop = 0; stop < STOPS; stop += 1) {
     await page.keyboard.press("Tab");
@@ -121,41 +131,49 @@ const holdsTheRing = async (page: Page, stops: readonly Drawn[]): Promise<void> 
   }
 };
 
-test("shows focus at 3:1 on every sign-in page control", async ({ page }) => {
-  await page.goto("/sign-in");
-  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.send })).toBeVisible();
+for (const [theme, kept] of [
+  ["", false],
+  [" dark", true],
+] as const) {
+  test(`shows${theme} focus at 3:1 on every sign-in page control`, async ({ page }) => {
+    if (kept) await inTheDark(page);
+    await page.goto("/sign-in");
+    await expect(page.getByRole("button", { name: SIGN_IN_WORDS.send })).toBeVisible();
 
-  await holdsTheRing(page, await walked(page));
-});
+    await holdsTheRing(page, await walked(page));
+  });
 
-test("the primary button's ring holds 3:1 against its own fill", async ({ page }) => {
-  await page.goto("/sign-in");
-  const send = page.getByRole("button", { name: SIGN_IN_WORDS.send });
-  await send.focus();
-  await page.keyboard.press("Shift+Tab");
-  await page.keyboard.press("Tab");
-  await expect(send).toBeFocused();
-  await focusSettled(page);
+  test(`the primary button's${theme} ring holds 3:1 on its fill`, async ({ page }) => {
+    if (kept) await inTheDark(page);
+    await page.goto("/sign-in");
+    const send = page.getByRole("button", { name: SIGN_IN_WORDS.send });
+    await send.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(send).toBeFocused();
+    await focusSettled(page);
 
-  const drawn = await drawnFocus(page, await tokenColour(page, "--accent-600"));
-  expect(drawn, "the primary button took no focus").toBeDefined();
-  if (drawn === undefined) return;
-  expect(
-    contrastBetween(drawn.ring, drawn.fill),
-    "the ring disappears into the primary fill",
-  ).toBeGreaterThanOrEqual(NON_TEXT_CONTRAST);
-});
+    const drawn = await drawnFocus(page, await inkOf(page));
+    expect(drawn, "the primary button took no focus").toBeDefined();
+    if (drawn === undefined) return;
+    expect(
+      contrastBetween(paintedOver(drawn.ring, drawn.behind), drawn.fill),
+      "the ring disappears into the primary fill",
+    ).toBeGreaterThanOrEqual(NON_TEXT_CONTRAST);
+  });
 
-test("draws the token's ring on every shell page control", async ({ page, request }) => {
-  const email = anAddress("focus");
-  await provision(request, { name: "Calder Joinery", adminEmail: email });
-  await signedInAtHome(page, request, email);
-  await page.goto(MEMBERS.path);
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await skipLinkReachesThePage(page);
+  test(`draws the token's${theme} ring on every shell page control`, async ({ page, request }) => {
+    if (kept) await inTheDark(page);
+    const email = anAddress("focus");
+    await provision(request, { name: "Calder Joinery", adminEmail: email });
+    await signedInAtHome(page, request, email);
+    await page.goto(MEMBERS.path);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await skipLinkReachesThePage(page);
 
-  await holdsTheRing(page, await walked(page));
-});
+    await holdsTheRing(page, await walked(page));
+  });
+}
 
 test("keeps one ring on the invitations' counted switch", async ({ page, request }) => {
   const email = anAddress("focus");

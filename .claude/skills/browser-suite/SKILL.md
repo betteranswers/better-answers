@@ -159,6 +159,7 @@ More helpers in the same module drive the browser rather than the harness:
 | `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
 | `tokenColour` | A design-system token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
 | `contrastBetween` | WCAG's contrast ratio between two painted `rgb()` colours, as `apps/web/e2e/focus-ring.spec.ts` measures each focus edge against the surface behind it |
+| `controlEdges` | Each enabled control found by its edge alone, with its fill, every side it or a wordless wrapper draws, and the colour behind it, composited as painted. The gate measures them with `contrastBetween` |
 
 The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one. `emailsSentTo` counts the emails the capture holds for an address, and the suite's
@@ -245,7 +246,14 @@ three things, of which automated rules are only one:
   disabled look is the case. An endless animation, such as a spinner, is audited running. The
   audit also refuses a page that draws more than three registration marks. It sets the marks and
   the grid and dot textures aside while axe runs, and fails any contrast axe still could not
-  decide because of what was painted behind the text.
+  decide because of what was painted behind the text. Axe's contrast rule reads words only, so the
+  audit also refuses any enabled control a person finds by its edge alone — a field, a select, or
+  a checkbox, radio or switch with no words of its own — whose edge and fill both sit under 3:1
+  against what is behind it. The audit runs in the page's own theme, then sets `data-theme` on `<html>` to
+  the other theme, audits again and puts the page's theme back, so every state a test leaves is
+  held in dark as well as light. A failure names the theme it was found in. A spec about one theme
+  keeps it on the browser under `THEME_KEPT_UNDER` from `apps/web/src/shared/theme-switch.ts`, as
+  `apps/web/e2e/dark-theme.spec.ts` does.
 - **A keyboard traversal** reaching the page and each of its actions without a pointer:
   `apps/web/e2e/sign-in.spec.ts` for the three pages outside the shell,
   `apps/web/e2e/frame.spec.ts` for the band, the rail and the menu, and
@@ -263,7 +271,7 @@ is another origin and no page of ours. A test that ends somewhere this product d
 audited nothing is refused by name, so an absence is a failure rather than a silence.
 
 `apps/web/e2e/models-and-spend.spec.ts` carries all three and is the model to copy.
-`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: five of its nine tests are
+`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: seven of its eleven tests are
 `test.fail()`, so the run prints them with a ✘ and counts them passed — that is the gate firing
 where it should, and an `Expected to fail, but passed` there means the gate has stopped running.
 
@@ -408,6 +416,5 @@ The donor is Onyx's Playwright skill. Its practices that are ours too:
   there are three modules to import here, `./browser.ts`, `./harness.ts` and
   `./virtual-authenticator.ts`.
 - **Visual regression.** Out of scope for v0.1; the aria snapshot is the structural record instead.
-- **Theme runs.** No light/dark matrix.
 - **Long-running dev servers.** Onyx runs against `next dev` and a separate backend; Playwright
   starts the one process here and stops it, so a run reads the build the same way CI does.

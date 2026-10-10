@@ -281,3 +281,96 @@ export const contrastBetween = (one: string, other: string): number => {
   const [lighter, darker] = [luminance(one), luminance(other)].toSorted((a, b) => b - a);
   return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
 };
+
+export type ControlEdge = {
+  readonly control: string;
+  readonly edges: readonly string[];
+  readonly fill: string;
+  readonly behind: string;
+};
+
+/** A see-through `rgba()` colour as it paints over an opaque one. */
+export const paintedOver = (top: string, under: string): string => {
+  const [alpha = 1] = (/rgba\([^)]*?([\d.]+)\)$/.exec(top)?.slice(1) ?? []).map(Number);
+  const below = channels(under);
+  const mixed = channels(top).map((channel, at) =>
+    Math.round(channel * alpha + (below[at] ?? 0) * (1 - alpha)),
+  );
+  return `rgb(${mixed.join(", ")})`;
+};
+
+/** A wordless wrapper draws a field's edge too; a checkbox, radio or switch with words is found by them. */
+export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
+  page.evaluate(() => {
+    type Rgba = readonly [number, number, number, number];
+    const rgba = (colour: string): Rgba => {
+      const parts = /rgba?\(([^)]+)\)/.exec(colour)?.[1]?.split(/[ ,/]+/) ?? [];
+      const [red = 0, green = 0, blue = 0, alpha = 1] = parts
+        .filter((part) => part !== "")
+        .map(Number);
+      return [red, green, blue, alpha];
+    };
+    const over = (top: Rgba, under: Rgba): Rgba => {
+      const mix = (at: 0 | 1 | 2) => top[at] * top[3] + under[at] * (1 - top[3]);
+      return [mix(0), mix(1), mix(2), 1];
+    };
+    const painted = ([red, green, blue]: Rgba) =>
+      `rgb(${[red, green, blue].map((channel) => String(Math.round(channel))).join(", ")})`;
+    const fillOf = (element: Element) => rgba(getComputedStyle(element).backgroundColor);
+    const canvas = over(fillOf(document.documentElement), [255, 255, 255, 1]);
+    const behind = (node: Element | null): Rgba => {
+      const layers: Rgba[] = [];
+      for (let at = node; at !== null && layers.at(-1)?.[3] !== 1; at = at.parentElement) {
+        if (fillOf(at)[3] > 0) layers.push(fillOf(at));
+      }
+      return layers.toReversed().reduce((under, layer) => over(layer, under), canvas);
+    };
+    const sidesOf = (element: Element, fill: Rgba): string[] => {
+      const style = getComputedStyle(element);
+      return ["top", "right", "bottom", "left"]
+        .filter((side) => Number.parseFloat(style.getPropertyValue(`border-${side}-width`)) > 0)
+        .map((side) => painted(over(rgba(style.getPropertyValue(`border-${side}-color`)), fill)));
+    };
+    const words = (element: Element) => element.textContent.trim();
+    const seen = (control: HTMLElement): boolean =>
+      control.getBoundingClientRect().width > 1 &&
+      control.checkVisibility({ opacityProperty: true, visibilityProperty: true }) &&
+      control.closest("[aria-hidden=true], [inert]") === null &&
+      !control.matches(":disabled, [aria-disabled=true], [data-disabled]");
+    const nameOf = (control: HTMLElement) => {
+      const label = control instanceof HTMLInputElement ? control.labels?.[0]?.textContent : null;
+      const named =
+        control.getAttribute("aria-label") ?? label ?? control.getAttribute("placeholder");
+      const role = control.getAttribute("role");
+      return `${control.tagName.toLowerCase()}${role === null ? "" : `[role=${role}]`} "${(named ?? "").trim()}"`;
+    };
+    const measured = (control: HTMLElement) => {
+      const parent = control.parentElement;
+      const wrapper =
+        parent !== null && parent !== document.body && words(parent) === words(control)
+          ? parent
+          : undefined;
+      const back = behind((wrapper ?? control).parentElement);
+      const wrapperFill = wrapper === undefined ? back : over(fillOf(wrapper), back);
+      const fill = over(fillOf(control), wrapperFill);
+      const wrapperSides = wrapper === undefined ? [] : sidesOf(wrapper, wrapperFill);
+      return {
+        control: nameOf(control),
+        edges: [...sidesOf(control, fill), ...wrapperSides],
+        fill: painted(fill),
+        behind: painted(back),
+      };
+    };
+    const BY_EDGE =
+      "input:not([type=hidden], [type=checkbox], [type=radio], [type=button], [type=submit], [type=reset], [type=image], [type=file], [type=range], [type=color]), textarea, select, [role=combobox]";
+    const BY_EDGE_UNLESS_WORDED =
+      "input[type=checkbox], input[type=radio], [role=checkbox], [role=radio], [role=switch]";
+    return [
+      ...document.querySelectorAll<HTMLElement>(BY_EDGE),
+      ...[...document.querySelectorAll<HTMLElement>(BY_EDGE_UNLESS_WORDED)].filter(
+        (control) => words(control) === "",
+      ),
+    ]
+      .filter(seen)
+      .map(measured);
+  });
