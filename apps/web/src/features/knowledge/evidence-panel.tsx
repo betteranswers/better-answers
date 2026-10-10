@@ -73,9 +73,11 @@ const QUOTED =
 
 type PassageSource = Extract<OpenedSource, { readonly kind: "passage" }>;
 
-/** A match's title is the search's copy of it, so the read's own takes its place as it lands. */
+/** The read's own title takes the match's place as it lands, and a refused read gives the match's back. */
 function TitleRead(properties: { readonly locator: string; readonly until: string }) {
-  return usePassage(properties.locator).data?.passage?.source ?? properties.until;
+  const passage = usePassage(properties.locator);
+  if (passage.error !== null) return properties.until;
+  return passage.data?.passage?.source ?? properties.until;
 }
 
 /** The sensitivity is the read's own; the document's title stands under a concept's label for it. */
