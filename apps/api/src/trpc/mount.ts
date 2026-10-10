@@ -14,6 +14,9 @@ import { appRouter } from "./router.ts";
 
 export const TRPC_ENDPOINT = "/trpc";
 
+/** Every answer is one reader's, a refusal too: a kept not-found would outlive the grant ending it. */
+const UNCACHED = "private, no-store";
+
 type TrpcRoutesDependencies = {
   readonly auth: Auth;
   readonly doors: Doors;
@@ -51,9 +54,9 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
       }),
       responseMeta: ({ errors }) => {
         const met = errors.map((error) => error.cause).find((cause) => cause instanceof CeilingMet);
-        return met instanceof CeilingMet
-          ? { headers: { "retry-after": String(met.retryAfterSeconds) } }
-          : {};
+        const headers = new Headers({ "cache-control": UNCACHED });
+        if (met instanceof CeilingMet) headers.set("retry-after", String(met.retryAfterSeconds));
+        return { headers };
       },
     }),
   );

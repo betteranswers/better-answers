@@ -4,14 +4,23 @@ import { writeConcept } from "@better-answers/core/concepts";
 import { head, initRepository } from "@better-answers/core/store/git";
 import { documentLanded, type DocumentShape } from "@better-answers/core/testing/documents";
 
-import { connectAsHost } from "./flow.ts";
+import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
+import { connectAsHost, signIn } from "./flow.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import { actingIn, openTestGit } from "./harness.ts";
 import { calledTool, rpcListOf, rpcOf, structured, type Rpc } from "./mcp-call.ts";
-import { appForSuite } from "./suite-app.ts";
-import { NO_SESSION_ANSWERED, refusalOfCall, webClientOf, webSignedIn } from "./web-client.ts";
+import { appForSuite, aStoppableClock } from "./suite-app.ts";
+import {
+  NO_SESSION_ANSWERED,
+  refusalOfCall,
+  statusOf,
+  webClientOf,
+  webSignedIn,
+} from "./web-client.ts";
 
-const app = appForSuite();
+const { clock, stopTheClock } = aStoppableClock();
+
+const app = appForSuite({ clock });
 
 const QUERY = "heron";
 
@@ -342,5 +351,85 @@ describe("the knowledge router, signed out", () => {
 
     expect(found).toMatchObject({ data: { httpStatus: 401, ...NO_SESSION_ANSWERED.error.data } });
     expect(opened).toMatchObject({ data: { httpStatus: 401, ...NO_SESSION_ANSWERED.error.data } });
+  });
+});
+
+/** tRPC's own GET for one procedure, unbatched, as a browser or a cache in between sees it. */
+const readAt = (procedure: "find" | "open", input: Rpc): string =>
+  `${TRPC_ENDPOINT}/knowledge.${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
+
+describe("a knowledge read's answer over GET", () => {
+  it.each([
+    ["a found page", "find", { query: QUERY }, 200],
+    ["an absent concept", "open", { iri: ABSENT_IRI }, 404],
+  ] as const)("keeps %s out of every cache", async (_, procedure, input, status) => {
+    const { workspace } = await aWorkspaceOfHerons();
+    const { client } = await webSignedIn(app(), workspace.admin.email);
+
+    const response = await client.fetch(readAt(procedure, input));
+
+    expect(response.status).toBe(status);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("keeps a signed-out refusal out of every cache", async () => {
+    const response = await app()
+      .client()
+      .fetch(readAt("find", { query: QUERY }));
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+});
+
+/** MCP_TOKEN_RULE's numbers: one connection's calls a minute. */
+const READS_A_MINUTE = 120;
+
+const SHARED_ADDRESS = "203.0.113.118";
+
+const onTheWebAt = async (address: string, email: string) => {
+  const client = app().client(address);
+  await signIn(app(), client, email);
+  return { client, ...webClientOf(client) };
+};
+
+describe("the knowledge reads' per-person ceiling", () => {
+  it("refuses a person past it while their neighbour reads on", async () => {
+    const { workspace, viewer } = await aWorkspaceOfHerons();
+    const reader = await onTheWebAt(SHARED_ADDRESS, viewer.email);
+    const neighbour = await onTheWebAt(SHARED_ADDRESS, workspace.admin.email);
+    stopTheClock();
+
+    const statuses = await Promise.all(
+      Array.from({ length: READS_A_MINUTE }, () =>
+        statusOf(reader.api.knowledge.find.query({ query: QUERY })),
+      ),
+    );
+    const found = await reader.client.fetch(readAt("find", { query: QUERY }));
+    const neighbours = await statusOf(neighbour.api.knowledge.find.query({ query: QUERY }));
+
+    expect(statuses).toEqual(Array.from({ length: READS_A_MINUTE }, () => 200));
+    expect(reader.sent.length).toBeLessThan(READS_A_MINUTE);
+    expect(found.status).toBe(429);
+    const retryAfter = Number(found.headers.get("retry-after"));
+    expect(retryAfter).toBeGreaterThanOrEqual(1);
+    expect(retryAfter).toBeLessThanOrEqual(60);
+    expect(await found.json()).toMatchObject({
+      error: { data: { code: "TOO_MANY_REQUESTS", retryAfterSeconds: retryAfter } },
+    });
+    expect(neighbours).toBe(200);
+  });
+
+  it("counts find and open against the one budget", async () => {
+    const { viewer, iriOf } = await aWorkspaceOfHerons();
+    const { api } = await webSignedIn(app(), viewer.email);
+    stopTheClock();
+
+    await Promise.all(
+      Array.from({ length: READS_A_MINUTE }, () => api.knowledge.find.query({ query: QUERY })),
+    );
+    const opened = await refusalOfCall(api.knowledge.open.query({ iri: iriOf(NESTING) }));
+
+    expect(opened).toMatchObject({ data: { code: "TOO_MANY_REQUESTS", httpStatus: 429 } });
   });
 });

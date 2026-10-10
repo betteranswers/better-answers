@@ -225,9 +225,32 @@ const thrownIfFailed = <
   return ran;
 };
 
-const inTheResolversTransaction = (resolve: typeof withPrincipal) =>
+/** Past the ceiling the call answers 429 and when to ask again. */
+const consumeCeiling = async (
+  ctx: Pick<TrpcContext, "doors" | "clock" | "log">,
+  path: string,
+  key: string,
+  rule: CounterRule,
+): Promise<void> => {
+  const outcome = await attempt(() =>
+    consumeIngress(ctx.doors.postgres, "person", key, rule, ctx.clock.now()),
+  );
+  if (!outcome.ok) throw failed(ctx.log, consumeIngress.name, outcome.error);
+  if (!outcome.value.allowed) {
+    throw throttled(ctx.log, path, new CeilingMet(outcome.value.retryAfterSeconds));
+  }
+};
+
+/** One count per person that every procedure built on the road spends. */
+type RoadCeiling = { readonly budget: string; readonly rule: CounterRule };
+
+/** The count comes before the transaction, so a call held at its ceiling holds no connection. */
+const inTheResolversTransaction = (resolve: typeof withPrincipal, ceiling?: RoadCeiling) =>
   trpc.procedure.use(async ({ ctx, path, next }) => {
     const claims = await claimsOf(ctx, path);
+    if (ceiling !== undefined) {
+      await consumeCeiling(ctx, path, `${ceiling.budget}:${claims.userId}`, ceiling.rule);
+    }
 
     const resolved = await attempt(() =>
       resolve(ctx.doors.postgres, claims, async (principal, tx) =>
@@ -238,6 +261,10 @@ const inTheResolversTransaction = (resolve: typeof withPrincipal) =>
   });
 
 export const queryProcedure = inTheResolversTransaction(withPrincipalRead);
+
+/** As queryProcedure, its procedures counted together against `ceiling`. */
+export const queryCeiling = (ceiling: RoadCeiling) =>
+  inTheResolversTransaction(withPrincipalRead, ceiling);
 
 export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
 
@@ -281,32 +308,17 @@ export const personProcedure = trpc.procedure.use(async ({ ctx, path, next }) =>
   });
 });
 
-/** Counted per person and procedure; past the ceiling the call answers 429 and when to ask again. */
-const consumeCeiling = async (
-  ctx: Pick<TrpcContext, "doors" | "clock" | "log">,
-  path: string,
-  personId: string,
-  rule: CounterRule,
-): Promise<void> => {
-  const outcome = await attempt(() =>
-    consumeIngress(ctx.doors.postgres, "person", `${path}:${personId}`, rule, ctx.clock.now()),
-  );
-  if (!outcome.ok) throw failed(ctx.log, consumeIngress.name, outcome.error);
-  if (!outcome.value.allowed) {
-    throw throttled(ctx.log, path, new CeilingMet(outcome.value.retryAfterSeconds));
-  }
-};
-
+/** Counted per person and procedure. */
 export const personCeiling = (rule: CounterRule) =>
   personProcedure.use(async ({ ctx, path, next }) => {
-    await consumeCeiling(ctx, path, ctx.personId, rule);
+    await consumeCeiling(ctx, path, `${path}:${ctx.personId}`, rule);
     return next();
   });
 
 /** As personCeiling, for an action on the own-transaction road. */
 export const ownTransactionCeiling = (rule: CounterRule) =>
   ownTransactionProcedure.use(async ({ ctx, path, next }) => {
-    await consumeCeiling(ctx, path, ctx.principal.userId, rule);
+    await consumeCeiling(ctx, path, `${path}:${ctx.principal.userId}`, rule);
     return next();
   });
 
