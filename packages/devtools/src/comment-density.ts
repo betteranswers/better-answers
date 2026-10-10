@@ -54,6 +54,7 @@ const NEVER_WALKED = [
   "lifts",
   "node_modules",
   "playwright-report",
+  "skills",
   "test-results",
 ];
 

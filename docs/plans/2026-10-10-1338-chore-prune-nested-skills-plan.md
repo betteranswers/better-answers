@@ -16,7 +16,7 @@ execution: code
 - **Means:** `skills-lock.json` loses the 12 entries nothing here uses. The verdict table below names the folder each kept skill belongs under. `.gitignore` covers the one new folder, and `AGENTS.md` says where nested skills live.
 - **Authority:** BA-66's acceptance criteria and the owner's ruling of 10/10/2026 on the four root skills, then the Key Technical Decisions, then the table.
 - **Stop conditions:** a removal would need a tracked skill deleted, or a move would need the route spec, a C4 page or a workspace's `CODING_STANDARDS.md` rewritten. Neither happens here.
-- **Execution profile:** one pull request, `Fixes BA-66`. It changes no product code and no skill's text.
+- **Execution profile:** one pull request, `Fixes BA-66`. It changes no product code and no skill's text. One line of gate tooling changes, with its test (U3).
 - **Who finishes:** the build agent makes the tracked change, `ce-code-review` reviews it, and `ce-commit-push-pr` opens the pull request. The owner cleans the main checkout after the merge (*After the merge*, below).
 
 ---
@@ -29,7 +29,7 @@ Of the 51 entries in `skills-lock.json`, 12 go and 39 stay. Both tracked skills 
 
 ### Problem Frame
 
-A nested skill loads at the first `Read` or `Edit` under its app. `apps/api/.claude/skills/` holds 21, so each worktree subagent that reads an api file adds 21 entries to its parent session's skill list. Several of them describe frameworks this repository does not run. Others sit under an app whose files they do not serve: the Better Auth server skills are under `apps/web/`, while `betterAuth(...)` is configured in `apps/api/src/auth/auth.ts`, and the Coolify skills are under `apps/worker/`, while the compose files are under `deploy/`.
+A nested skill loads at the first `Read` or `Edit` under its app. `apps/api/.claude/skills/` holds 21, so each worktree subagent that reads an api file adds 21 entries to its parent session's skill list. Several of them describe frameworks this repository does not run. Others sit away from most of the files they serve: the Better Auth skills are under `apps/web/`, which holds the auth client, while `betterAuth(...)` and its plugins are configured in `apps/api/src/auth/`. The Coolify skills are under `apps/worker/`, while the compose files are under `deploy/`.
 
 BA-62's test, finished on 06/10/2026, showed that loading nested skills early changes nothing in a plan. So each skill is judged on one question: does this repository's code, or a block of `docs/specs/v01-route.md` still to build, give it work?
 
@@ -40,6 +40,7 @@ BA-62's test, finished on 06/10/2026, showed that loading nested skills early ch
 - R3. Each kept skill has a named folder: the one whose files it serves.
 - R4. `AGENTS.md` and every other tracked file name no skill that is gone.
 - R5. `.claude/hooks/provision-skills.sh` still runs clean.
+- R6. A gate reads the same lines on a developer's machine as in CI, whichever folder an installed skill sits in.
 
 ### Scope Boundaries
 
@@ -61,6 +62,9 @@ BA-62's test, finished on 06/10/2026, showed that loading nested skills early ch
 - KTD4. **`client-setup` and `links` stay under `apps/api/`.** They also serve `apps/web/src/shared/api/`, which holds the link chain. But `apps/api/CODING_STANDARDS.md` (*Follow this tier's tRPC skills*), the route spec's *The api's skills are read first* and `docs/architecture/c4-components-api.md` all place the links skill under `apps/api/.claude/skills/`, and `apps/api/tests/web-client.ts` builds a client. Moving them means rewriting those three documents, which is a stop condition. `react-query-setup` has no such tie and only `apps/web` depends on `@trpc/tanstack-react-query`, so it moves. Governs R3.
 - KTD5. **The Docker and knip skills stay at the root.** Dockerfiles sit in `apps/api/`, `apps/worker/` and `deploy/`, and `knip.config.ts` is at the root, so the root is the one folder above every file they serve. `first-principles` stays in `.agents/skills/` because `.claude/skills/survey-architecture/SKILL.md` reads it at that path. Governs R3.
 
+- KTD6. **The Better Auth skills go under `apps/api/`, where most of their files are.** They serve both tiers: the server in `apps/api/src/auth/` and the client in `apps/web/src/features/auth/auth-client.ts`. A skill sits in one folder. The server holds the configuration, the plugins, the rate limits and the origins, which is most of what the skills cover, so that is the folder. The cost is in *Calls kept for the owner*. Governs R3.
+- KTD7. **The density counter walks past a folder named `skills`.** `pnpm comment-density` measures `deploy/` and `.github/` as directories, YAML included, and cloc does not read `.gitignore`. The Coolify skills carry example compose files, so under `deploy/` they would be counted on a machine that holds them and not in CI. `packages/devtools/python/comment_gate.py` already skips `skills`, and the counter now does the same. Governs R6.
+
 ### The verdicts
 
 *Folder* is where the skill belongs. *Now* is where the main checkout holds it on 10/10/2026 when that differs, and *nowhere* means no checkout holds it.
@@ -79,7 +83,7 @@ BA-62's test, finished on 06/10/2026, showed that loading nested skills early ch
 | `service-oriented-architecture` | `apps/api/` | One api deployable serves one router. No gateway splits calls between services. |
 | `superjson` | nowhere | No transformer is set on the server or on any link. |
 | `email-and-password-best-practices` | `apps/web/` | `apps/api/src/auth/auth.ts` never sets `emailAndPassword`. People sign in with an email code or a passkey. |
-| `agent-auth-mcp` | nowhere | The route's *Out of Scope* names Agent Auth. The MCP surface authorizes through `@better-auth/oauth-provider`. |
+| `agent-auth-mcp` | nowhere | The route's *Out of Scope* names Agent Auth, which `VISION.md` holds for a stage after v0.1. The MCP surface authorizes through `@better-auth/oauth-provider`. |
 | `mcp` | nowhere | It covers MCP Apps built on json-render. json-render is in no manifest, and the route's *Out of Scope* names MCP Apps. |
 
 #### Kept (39)
@@ -92,7 +96,7 @@ BA-62's test, finished on 06/10/2026, showed that loading nested skills early ch
 | `repo-quality-sweep` | root, tracked | | Owner's ruling. |
 | `code-comments` | root, tracked | | Called in 3 of the 85 sessions since the move to Compound Engineering. |
 | `complexity-gate` | root, tracked | | Called in 2 of the 85. |
-| `mutation-testing` | root, tracked | | Called in 3 of the 85. `AGENTS.md` (*Mutation triage*) depends on it. |
+| `mutation-testing` | root, tracked | | Called in 3 of the 85. `docs/agents/workflow.md` says when it runs. |
 | `first-principles` | root | | Called in 4 of the 85, and `survey-architecture` reads it by path (KTD5). |
 | `docker-patterns` | root | | Three Dockerfiles and three compose files (KTD5). |
 | `multi-stage-dockerfile` | root | | The same. |
@@ -116,7 +120,7 @@ BA-62's test, finished on 06/10/2026, showed that loading nested skills early ch
 | `hono` | `apps/api/` | | Every route and middleware of the api. |
 | `resend` | `apps/api/`, tracked | | The api sends through Resend's SMTP relay (`apps/api/src/smtp.ts`). `AGENTS.md` names it. |
 | `email-best-practices` | `apps/api/`, tracked | | The emails the api sends. `AGENTS.md` names it. |
-| `better-auth-best-practices` | `apps/api/` | `apps/web/` | `betterAuth(...)` in `apps/api/src/auth/auth.ts`. |
+| `better-auth-best-practices` | `apps/api/` | `apps/web/` | `betterAuth(...)` in `apps/api/src/auth/auth.ts`. It also serves the client in `apps/web/src/features/auth/` (KTD6). |
 | `better-auth-security-best-practices` | `apps/api/` | `apps/web/` | The rate limits, origins and cookies of `apps/api/src/auth/`. |
 | `organization-best-practices` | `apps/api/` | `apps/web/` | The `organization` plugin in `auth.ts`. |
 | `two-factor-authentication-best-practices` | `apps/api/` | `apps/web/` | The `twoFactor` plugin in `auth.ts`. |
@@ -147,6 +151,7 @@ Each of these stays because the code does not settle it.
 - `pii-detection-pipeline`, `pii-in-unstructured`, `implementing-gdpr-data-subject-access-request`: the owner added them for the architecture pass of 10/09/2026, and no checkout holds them now. S0, which they informed, is done. They stay because O1's personal-data pages and each later connector pass through the same seam.
 - `fix-knip-unused-exports` and `knip-deadcode` overlap, and so do `docker-patterns` and `multi-stage-dockerfile`. Each has matching code, so all four stay. One of each pair may be enough.
 - `client-setup` and `links` under `apps/api/` (KTD4): a session that edits `apps/web/src/shared/api/link.ts` and reads no api file does not load them.
+- The Better Auth skills under `apps/api/` (KTD6): a session that edits `apps/web/src/features/auth/` and reads no api file does not load them. The owner put them under `apps/web/` on 04/10/2026, and leaving them there is the other defensible answer.
 - The Better Auth move leaves `apps/api/` at 22 nested skills, one more than today: it loses four and gains five. The count BA-66 quotes falls only if the owner drops some of the calls above.
 
 ### After the merge
@@ -165,9 +170,13 @@ A worktree made before the cleanup keeps the old folders until it is removed. Ru
 
 | Risk | Mitigation |
 | --- | --- |
-| `trpc-router` is the tRPC skills' entry, and its decision tree still points at siblings that are gone, such as `service-oriented-architecture` | It is an installed skill kept as upstream wrote it, so its text is not edited. A pointer to a missing skill fails where the reader can see it. The pull request's report says so |
+| `trpc-router` is the tRPC skills' entry, and its decision tree still points at eight siblings that are gone: four adapters, `superjson`, both Next.js skills and `service-oriented-architecture` | It is an installed skill kept as upstream wrote it, so its text is not edited. A pointer to a missing skill fails where the reader can see it. The pull request's report says so |
 | A reinstall from the lock lands every entry at the root, whatever this table says | That is true today and this change does not make it worse. KTD2 and `AGENTS.md` now say that placement is by hand |
-| A file under `deploy/.claude/skills/` reaches a gate that walks `deploy/`, or the backup image's build context | The folder is git-ignored, and CI's checkout holds no ignored file. The backup image copies two named scripts. The gates are run with the folder in place before the push (*Verification Contract*) |
+| A file under `deploy/.claude/skills/` reaches a gate that walks `deploy/`, or the backup image's build context | The density counter was the one gate that read it, and KTD7 closes that. `lint:workflows:shellcheck` finds `*.sh` under `deploy/` and neither Coolify skill holds one. The backup image copies two named scripts. The gates are run with the folder in place before the push (*Verification Contract*) |
+
+### Follow-up, not done here
+
+- `.claude/skills/ce-skill-work/references/new-skill.md` searches `apps/*/.claude/skills/` for a skill of the same name before a new one is made. It misses `.github/` today and will miss `deploy/`. It is a tracked skill, so the edit goes through `ce-skill-work` in its own change.
 
 ### Assumptions
 
@@ -180,7 +189,7 @@ A worktree made before the cleanup keeps the old folders until it is removed. Ru
 ### U1. Drop the 12 entries and record the placement
 
 - **Goal:** the lock names only kept skills, and the tracked files say where a nested skill lives.
-- **Requirements:** R1, R3, R4; KTD1 to KTD5.
+- **Requirements:** R1, R3, R4; KTD1 to KTD6.
 - **Dependencies:** none.
 - **Files:**
   - `skills-lock.json`: the 12 entries removed, nothing else touched.
@@ -200,6 +209,19 @@ A worktree made before the cleanup keeps the old folders until it is removed. Ru
 - **Test expectation:** none — git-ignored files only.
 - **Verification:** the hook exits 0, and the gates pass with `deploy/.claude/skills/` in place.
 
+### U3. Keep installed skills out of the density count
+
+- **Goal:** `pnpm comment-density` gives `deploy/` and `.github/` the same number with and without the skills installed under them.
+- **Requirements:** R6; KTD7.
+- **Dependencies:** none.
+- **Files:**
+  - `packages/devtools/src/comment-density.ts`: `skills` joins the folders the counter never walks.
+  - `packages/devtools/test/comment-density.test.ts`: the case below.
+- **Execution note:** write the case first and watch it fail.
+- **Test scenarios:**
+  - A YAML file under a directory's `.claude/skills/` is not counted, and the SQL beside it is.
+- **Verification:** the devtools `check` passes, and `pnpm comment-density` passes on the real tree.
+
 ---
 
 ## Verification Contract
@@ -209,7 +231,8 @@ A worktree made before the cleanup keeps the old folders until it is removed. Ru
 | `git diff` on `skills-lock.json` shows 72 deleted lines and none added | R1: 12 entries gone, 39 left, no other edit | U1 |
 | A search of tracked files for each removed name | R4 | U1 |
 | `.claude/hooks/provision-skills.sh <worktree>` exits 0 | R5 | U2 |
-| `pnpm check:gates` | Lint, shellcheck over `deploy/` and the comment gates, with the new folder present | U1, U2 |
+| `pnpm check:gates` | Lint, shellcheck over `deploy/` and the comment gates, with the new folder present | U1, U2, U3 |
+| `pnpm --filter @better-answers/devtools run check` | R6: the new case, types and the rest of the gate tooling's suites | U3 |
 | `pnpm check:docs` | The docs lane: this plan's form, the words test, and the provisioning tests | U1 |
 
 ---
@@ -219,7 +242,8 @@ A worktree made before the cleanup keeps the old folders until it is removed. Ru
 - `skills-lock.json` holds 39 entries, and each of the 12 removed has its reason in the table.
 - Each kept skill has a folder in the table, and `.gitignore` covers every folder the table names.
 - `AGENTS.md` names no skill that is gone and says where nested skills live.
-- The hook exits 0 on the worktree, and `check:gates` and `check:docs` pass on the pushed head.
+- The density counter skips installed skills, and a test holds it.
+- The hook exits 0 on the worktree, and `check:gates`, `check:docs` and the devtools `check` pass on the pushed head.
 - The report to the owner lists the calls kept for them and the five steps for the main checkout.
 
 ---

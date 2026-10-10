@@ -101,6 +101,16 @@ describe("the line counter reads what the ceiling is measured on", () => {
 
     expect(counted.map((one) => one.language)).toEqual(["TypeScript"]);
   });
+
+  it("walks past the skills installed beside a directory's files", () => {
+    const counted = cloc({
+      [`${WORKSPACE}/package.json`]: "{}",
+      [`${MIGRATIONS}/0000_substrate.sql`]: sqlWithRatio(2, 1),
+      [`${MIGRATIONS}/.claude/skills/probe/examples/after.yml`]: yamlWithRatio(4, 2),
+    });
+
+    expect(counted.map((one) => one.language)).toEqual(["SQL"]);
+  });
 });
 
 describe("the arm a file is measured under", () => {
