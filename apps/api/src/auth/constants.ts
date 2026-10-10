@@ -19,6 +19,15 @@ export const EMAIL_CODE_LIFETIME_SECONDS = 5 * 60;
 
 export const OAUTH_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
 
+/** What a client reads before it holds anything: constants, so counted by no limiter and kept. */
+export const DISCOVERY_PATHS = [
+  "/.well-known/oauth-protected-resource",
+  "/.well-known/oauth-protected-resource/mcp",
+  "/.well-known/oauth-authorization-server",
+] as const;
+
+export const DISCOVERY_CACHE_CONTROL = "public, max-age=300";
+
 export const PAGE_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
 
 export const EMAIL_CODE_EMAIL_RULE: CounterRule = { windowMs: 10 * 60_000, max: 5 };
@@ -131,6 +140,16 @@ export const BETTER_AUTH_RATE_LIMIT = {
      * own rule for `/sign-in*` allows three loads in ten seconds.
      */
     "/sign-in/link": { window: 60, max: 30 },
+    /** Discovery is counted by no limiter. The second is served only once `openid` is a scope. */
+    "/.well-known/oauth-authorization-server": false,
+    "/.well-known/openid-configuration": false,
+    /**
+     * `OAUTH_IP_RULE` alone counts these. The library's count grows until a window passes with
+     * no request, so a steady caller under our ceiling would meet it.
+     */
+    "/oauth2/*": false,
+    "/oauth2/*/*": false,
+    "/jwks": false,
   },
 } as const;
 

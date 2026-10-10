@@ -122,4 +122,14 @@ describe("the api serves the shell on app.", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ resource: expect.any(String) });
   });
+
+  it("keeps the shell under /.well-known/ from being kept as discovery", async () => {
+    const response = await app()
+      .client(undefined, APP_HOSTNAME)
+      .fetch("/.well-known/openid-configuration", asABrowserNavigates);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-cache");
+    await expect(response.text()).resolves.toContain(`<div id="root">`);
+  });
 });

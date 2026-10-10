@@ -3,12 +3,14 @@ import { z } from "zod";
 
 import {
   CONSENT_WORDS,
-  OAUTH_IP_RULE,
   OAUTH_SCOPES,
   REFRESH_TOKEN_LIFETIME_SECONDS,
   REFUSAL_PAGES,
+  mountedPaths,
   SEND_EMAIL_CODE_PATH,
 } from "../src/auth/index.ts";
+import type { AddressScope } from "../src/ingress/limits.ts";
+import { authOver } from "./auth-instance.ts";
 import {
   authorizeUrl,
   connectAsHost,
@@ -899,15 +901,72 @@ describe("the limits", () => {
     return statuses;
   };
 
-  /** Better Auth's own limiter refuses with a `message`, not this `error`. */
-  const isOurRefusal = async (answer: Response): Promise<boolean> =>
-    answer.status === 429 &&
-    refusal.safeParse(await answer.json()).data?.error === "too_many_requests";
-
   const refusedOnlyAtTheLast = (statuses: readonly number[]): void => {
     expect(statuses.slice(0, -1)).not.toContain(429);
     expect(statuses.at(-1)).toBe(429);
   };
+
+  type Client = ReturnType<TestApp["client"]>;
+
+  type Counted = {
+    readonly name: string;
+    readonly max: number;
+    readonly ask: (client: Client) => Promise<Response>;
+  };
+
+  /** Every count by client address, each with one request to a route it counts and its ceiling. */
+  const COUNTS = {
+    trpc: { name: "tRPC", max: 120, ask: (client) => client.fetch("/trpc/session.member") },
+    oauth: { name: "the OAuth paths", max: 60, ask: (client) => client.fetch("/oauth2/authorize") },
+    mcp: {
+      name: "a call with no bearer",
+      max: 60,
+      ask: (client) => client.json("/mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    },
+    consent: { name: "consent", max: 30, ask: (client) => client.fetch("/consent") },
+    "sign-in-link-read": {
+      name: "a sign-in link's read",
+      max: 30,
+      ask: (client) => client.json("/sign-in-link/describe", {}),
+    },
+    "sign-in-link-sign-in": {
+      name: "a sign-in by link",
+      max: 10,
+      ask: (client) => client.json("/sign-in-link/sign-in", {}),
+    },
+    "passkey-sign-in": {
+      name: "the passkey sign-in",
+      max: 30,
+      ask: (client) => client.json("/passkeys/sign-in-options", {}),
+    },
+  } satisfies Record<AddressScope, Counted>;
+
+  const ROUTES: readonly Counted[] = Object.values(COUNTS);
+
+  it.each(ROUTES)("counts $name apart from every other", async (flooded) => {
+    const client = app.client();
+    stopTheClock();
+
+    refusedOnlyAtTheLast(await onePast(() => flooded.ask(client), flooded.max));
+
+    const others: number[] = [];
+    for (const route of ROUTES.filter((route) => route !== flooded)) {
+      others.push((await route.ask(client)).status);
+    }
+    expect(others).not.toContain(429);
+    expect((await client.fetch("/.well-known/oauth-protected-resource/mcp")).status).toBe(200);
+  });
+
+  it("leaves a link's ten sign-ins after its thirty reads", async () => {
+    const client = app.client();
+    stopTheClock();
+
+    const reads = await onePast(() => client.json("/sign-in-link/describe", {}), 29);
+    const signIns = await onePast(() => client.json("/sign-in-link/sign-in", {}), 10);
+
+    expect(reads).not.toContain(429);
+    refusedOnlyAtTheLast(signIns);
+  });
 
   it("keys the page limit on CF-Connecting-IP alone, ignoring spoofed X-Forwarded-For", async () => {
     const client = app.client("203.0.113.10");
@@ -958,43 +1017,115 @@ describe("the limits", () => {
     expect([unparsed.status, addressless.status]).toEqual([400, 400]);
   });
 
-  it.each(["/.well-known/oauth-protected-resource", "/oauth2/authorize", "/jwks"])(
-    "limits %s per address, before Better Auth's own limiter",
-    async (path) => {
-      const client = app.client();
-      stopTheClock();
+  it.each([
+    "/.well-known/oauth-protected-resource",
+    "/.well-known/oauth-protected-resource/mcp",
+    "/.well-known/oauth-authorization-server",
+  ])("never refuses %s, served to be kept", async (path) => {
+    const client = app.client();
+    stopTheClock();
 
-      const refusedByUs: boolean[] = [];
-      for (let attempt = 0; attempt < OAUTH_IP_RULE.max; attempt += 1) {
-        refusedByUs.push(await isOurRefusal(await client.fetch(path)));
-      }
-      const past = await client.fetch(path);
+    const reads: { status: number; kept: string | null }[] = [];
+    for (let read = 0; read < 101; read += 1) {
+      const answer = await client.fetch(path);
+      reads.push({ status: answer.status, kept: answer.headers.get("cache-control") });
+    }
 
-      expect(refusedByUs).not.toContain(true);
-      expect(past.status).toBe(429);
-      expect(await past.json()).toMatchObject({ error: "too_many_requests" });
-    },
-  );
+    expect(new Set(reads.map((read) => JSON.stringify(read)))).toEqual(
+      new Set([JSON.stringify({ status: 200, kept: "public, max-age=300" })]),
+    );
+  });
 
-  it("lets Better Auth's database limiter refuse an email-code flood", async () => {
-    const client = app.client("203.0.113.40");
-    let attempt = 0;
+  it("serves no OpenID document, counted or kept", async () => {
+    const client = app.client();
 
-    const statuses = await onePast(
-      () =>
-        client.fetch("/email-otp/send-verification-otp", {
-          method: "POST",
-          headers: { "content-type": "application/json", origin: PUBLIC_URL },
-          body: JSON.stringify({
-            email: `flood-${(attempt += 1)}@example.invalid`,
-            type: "sign-in",
-          }),
-        }),
-      5,
+    const reads: { status: number; kept: string | null }[] = [];
+    for (let read = 0; read < 101; read += 1) {
+      const answer = await client.fetch("/.well-known/openid-configuration");
+      reads.push({ status: answer.status, kept: answer.headers.get("cache-control") });
+    }
+
+    expect(new Set(reads.map((read) => read.status))).toEqual(new Set([404]));
+    expect(reads.map((read) => read.kept)).not.toContain("public, max-age=300");
+  });
+
+  it("tells nobody to keep a discovery path's refusal", async () => {
+    const refused = await app.client().json("/.well-known/oauth-protected-resource/mcp", {});
+
+    expect(refused.status).toBe(404);
+    expect(refused.headers.get("cache-control")).toBeNull();
+  });
+
+  /** Each answers a 4xx of the library's own until the ceiling: none carries what it asks for. */
+  const OAUTH_PATHS = [
+    { path: "/oauth2/authorize", method: "GET" },
+    { path: "/oauth2/token", method: "POST" },
+    { path: "/jwks", method: "GET" },
+  ] as const;
+
+  /** The paths Better Auth holds a count for, for one address: its key is `address|path`. */
+  const countedByBetterAuth = async (ip: string): Promise<string[]> => {
+    const held = await app.database.superuser.query<{ key: string }>(
+      "SELECT key FROM rate_limit WHERE key LIKE $1 ORDER BY key",
+      [`${ip}|%`],
+    );
+    return held.rows.map((row) => row.key.slice(ip.length + 1));
+  };
+
+  it.each(OAUTH_PATHS)("refuses $path in our words at the 61st only", async ({ path, method }) => {
+    const client = app.client();
+    stopTheClock();
+
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      statuses.push((await client.fetch(path, { method })).status);
+    }
+    const past = await client.fetch(path, { method });
+
+    expect(statuses).not.toContain(429);
+    expect(past.status).toBe(429);
+    expect(Number(past.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(await past.json()).toMatchObject({ error: "too_many_requests" });
+    expect(await countedByBetterAuth(client.ip)).toEqual([]);
+  });
+
+  it("leaves Better Auth no count where the api counts", async () => {
+    const client = app.client();
+    const counted = mountedPaths(authOver(app)).filter(
+      (path) => path.startsWith("/oauth2/") || path === "/jwks",
     );
 
-    refusedOnlyAtTheLast(statuses);
-    const stored = await app.database.superuser.query("SELECT count(*)::int AS n FROM rate_limit");
-    expect(Number(stored.rows[0]?.n)).toBeGreaterThan(0);
+    for (const path of counted) await client.fetch(path);
+
+    expect(counted).toContain("/oauth2/end-session/confirm");
+    expect(await countedByBetterAuth(client.ip)).toEqual([]);
+  });
+
+  it("refuses a client registration outright, before any count", async () => {
+    const client = app.client();
+
+    const refused = await client.json("/oauth2/register", { redirect_uris: [CLAUDE_REDIRECT_URI] });
+
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ error: "access_denied" });
+    expect(await countedByBetterAuth(client.ip)).toEqual([]);
+  });
+
+  it("leaves an email-code flood to Better Auth's limiter and words", async () => {
+    const client = app.client("203.0.113.40");
+    const send = (attempt: number): Promise<Response> =>
+      client.json("/email-otp/send-verification-otp", {
+        email: `flood-${attempt}@example.invalid`,
+        type: "sign-in",
+      });
+
+    const statuses: number[] = [];
+    for (let attempt = 1; attempt <= 5; attempt += 1) statuses.push((await send(attempt)).status);
+    const past = await send(6);
+
+    expect(statuses).not.toContain(429);
+    expect(past.status).toBe(429);
+    expect(await past.json()).toEqual({ message: "Too many requests. Please try again later." });
+    expect(await countedByBetterAuth(client.ip)).toEqual(["/email-otp/send-verification-otp"]);
   });
 });

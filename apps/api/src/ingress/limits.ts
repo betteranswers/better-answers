@@ -47,22 +47,31 @@ export const tooManyRequests = (retryAfterSeconds: number, description: string):
     { status: 429, headers: { "retry-after": String(retryAfterSeconds) } },
   );
 
-/**
- * Every route left unscoped shares one count per address and minute. A `scope` counts its routes
- * apart, so they spend none of the others'.
- */
+/** The route groups the api counts by client address. */
+export type AddressScope =
+  | "consent"
+  | "mcp"
+  | "oauth"
+  | "passkey-sign-in"
+  | "sign-in-link-read"
+  | "sign-in-link-sign-in"
+  | "trpc";
+
+/** Under its route group's name, so one group's requests spend none of another's count. */
+export const addressKeyOf = (scope: AddressScope, headers: Headers): string =>
+  `${scope}:${clientIpOf(headers)}`;
+
 export const limitByIp = (
   door: PostgresDoor,
   rule: CounterRule,
   clock: Clock,
-  scope?: string,
+  scope: AddressScope,
 ): MiddlewareHandler => {
   return async (context, next) => {
-    const address = clientIpOf(context.req.raw.headers);
     const outcome = await consumeIngress(
       door,
       "ip",
-      scope === undefined ? address : `${scope}:${address}`,
+      addressKeyOf(scope, context.req.raw.headers),
       rule,
       clock.now(),
     );

@@ -19,6 +19,8 @@ import { mountTheAuthenticator } from "./authenticator.ts";
 import { mountTheConfirm } from "./confirm.ts";
 import {
   BETTER_AUTH_RATE_LIMIT,
+  DISCOVERY_CACHE_CONTROL,
+  DISCOVERY_PATHS,
   EMAIL_CODE_EMAIL_RULE,
   EMAIL_CODE_LIFETIME_SECONDS,
   MCP_SCOPES,
@@ -379,8 +381,14 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     context.res.headers.set("referrer-policy", "no-referrer");
     context.res.headers.set("cache-control", "no-store");
   });
-  routes.use(SIGN_IN_LINK_DESCRIBE_PATH, limitByIp(door, SIGN_IN_LINK_DESCRIBE_IP_RULE, clock));
-  routes.use(SIGN_IN_LINK_SIGN_IN_PATH, limitByIp(door, SIGN_IN_LINK_SIGN_IN_IP_RULE, clock));
+  routes.use(
+    SIGN_IN_LINK_DESCRIBE_PATH,
+    limitByIp(door, SIGN_IN_LINK_DESCRIBE_IP_RULE, clock, "sign-in-link-read"),
+  );
+  routes.use(
+    SIGN_IN_LINK_SIGN_IN_PATH,
+    limitByIp(door, SIGN_IN_LINK_SIGN_IN_IP_RULE, clock, "sign-in-link-sign-in"),
+  );
   routes.use("/sign-in-link/*", sameOriginOnly(publicUrl));
   routes.use("/sign-in-link/*", async (context, next) => {
     await next();
@@ -437,9 +445,16 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     bearer_methods_supported: ["header"],
     resource_documentation: `${publicUrl}/`,
   };
-  routes.use("/.well-known/*", limitByIp(door, OAUTH_IP_RULE, clock));
-  routes.use("/oauth2/*", limitByIp(door, OAUTH_IP_RULE, clock));
-  routes.use("/jwks", limitByIp(door, OAUTH_IP_RULE, clock));
+  for (const path of DISCOVERY_PATHS) {
+    routes.use(path, async (context, next) => {
+      await next();
+      if (context.res.status === 200) {
+        context.res.headers.set("cache-control", DISCOVERY_CACHE_CONTROL);
+      }
+    });
+  }
+  routes.use("/oauth2/*", limitByIp(door, OAUTH_IP_RULE, clock, "oauth"));
+  routes.use("/jwks", limitByIp(door, OAUTH_IP_RULE, clock, "oauth"));
   for (const path of [
     "/.well-known/oauth-protected-resource",
     "/.well-known/oauth-protected-resource/mcp",
@@ -455,7 +470,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   mountThePasskeys(routes, deps);
   mountTheConfirm(routes, deps);
 
-  routes.use("/consent", limitByIp(door, PAGE_IP_RULE, clock));
+  routes.use("/consent", limitByIp(door, PAGE_IP_RULE, clock, "consent"));
   routes.use("/consent", sameOriginOnly(publicUrl));
   routes.use("/consent", navigationOnly);
 

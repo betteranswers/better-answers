@@ -30,6 +30,7 @@ Better Auth runs in-process as a library. The api is its own OAuth 2.1 authoriza
 - Its tables are the identity set, keyed not scoped, with the platform's own rows about a person's sign-in: recovery codes and a passkey's last use. They are read by key before any workspace is known, so they carry no RLS policy, and a `workspace_id` only where their exemption says why. A person's last activity in a workspace is that workspace's own row, under RLS. The set is named in `packages/schema/src/identity-tables.ts`, and `packages/schema/test/rls.test.ts` holds the exemption both ways.
 - It shares one origin, `app.<apex>`, with the SPA's sign-in and the workspace picker.
 - CIMD only, allow-listed to `claude.ai`. Dynamic client registration stays off.
+- Its rate limiter is off for every path the api counts itself, `/oauth2/*` and `/jwks`, and for discovery, which nothing in the api counts (ADR 0034). It stays on for the rest, the email-code paths among them.
 - A person has one platform-minted id (ADR 0035). Revocation has two scopes: a workspace Admin's, in that workspace, and the operator's, everywhere.
 - A token's workspace is fixed at consent, as Better Auth's `referenceId`. A person who wants another workspace consents again.
 

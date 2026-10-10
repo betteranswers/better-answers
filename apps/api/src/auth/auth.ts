@@ -713,6 +713,19 @@ export const createAuth = (deps: AuthDependencies) => {
 
           clientRegistrationDefaultResources: [deps.mcpUrl],
           clientRegistrationAllowedResources: [deps.mcpUrl],
+
+          /**
+           * The api's own count by client address governs every `/oauth2/*` path, so a client
+           * meets one refusal, with `Retry-After`. Registration stays refused outright.
+           */
+          rateLimit: {
+            authorize: false,
+            token: false,
+            introspect: false,
+            revoke: false,
+            register: false,
+            userinfo: false,
+          },
           postLogin: {
             page: `${deps.publicUrl}/choose-workspace`,
 
