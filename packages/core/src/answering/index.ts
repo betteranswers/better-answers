@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { ConceptIri, MatchStrength } from "@better-answers/schema";
 
 import type { ConceptRead, Frontmatter } from "../concepts/index.ts";
@@ -13,6 +15,7 @@ import {
 } from "../concepts/index.ts";
 import {
   admit,
+  ANY_ROLE,
   declareAction,
   err,
   NOT_FOUND,
@@ -263,10 +266,8 @@ const mappedRun =
     return ok(read.value.map(({ match, position }) => ({ match: to(match), position })));
   };
 
-const READERS = { role: "Viewer", purposes: [] } as const;
-
 const findAction = declareAction({
-  admits: READERS,
+  admits: ANY_ROLE,
   input: findInput,
   refuses: ["role-forbids"],
 });
@@ -327,7 +328,7 @@ const documentMatchOf = (match: PassageMatch): DocumentMatch => ({
 });
 
 const openAction = declareAction({
-  admits: READERS,
+  admits: ANY_ROLE,
   input: openInput,
   refuses: ["role-forbids"],
 });
@@ -403,6 +404,14 @@ const termsOf = (question: string): readonly string[] =>
 const ASK_TERMS_AT_MOST = 8;
 const ASK_MATCHES_PER_TERM = 5;
 
+type AskInput = { readonly question: string };
+
+const askAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.custom<AskInput>(),
+  refuses: ["role-forbids"],
+});
+
 /**
  * Answers no question: the verdict is always `refuse`, and the citations are the concepts its
  * words find.
@@ -410,11 +419,14 @@ const ASK_MATCHES_PER_TERM = 5;
 export const ask = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: { readonly question: string },
-): Promise<Result<AnswerResult, Error>> => {
+  input: AskInput,
+): Promise<Result<AnswerResult, RefusalOf<typeof askAction> | Error>> => {
+  const admitted = admit(askAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+
   const named = new Map<string, OpenedConcept>();
   for (const term of termsOf(input.question)) {
-    const search = { principal, tx, query: term };
+    const search = { principal: admitted.value, tx, query: term };
     const found = await pageOf(
       [
         ["strong", conceptRun(search, "strong")],
@@ -442,12 +454,23 @@ export const ask = async (
   });
 };
 
+const giveFeedbackAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.custom<FeedbackInput>(),
+  refuses: ["role-forbids"],
+});
+
 /** Keeps nothing: the receipt echoes the input. */
 export const giveFeedback = async (
-  _principal: UserPrincipal,
+  principal: UserPrincipal,
   _tx: Tx,
   input: FeedbackInput,
-): Promise<Result<FeedbackReceipt, never>> => ok({ outcome: "received", feedback: input });
+): Promise<Result<FeedbackReceipt, RefusalOf<typeof giveFeedbackAction>>> => {
+  const admitted = admit(giveFeedbackAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+
+  return ok({ outcome: "received", feedback: input });
+};
 
 const findLine = (match: FindMatch<string>): string =>
   match.layer === "bundles"

@@ -217,6 +217,40 @@ describe("an action whose level is read from its input", () => {
     expectTypeOf<UserPrincipal & { readonly role: "Viewer" }>().not.toExtend<Writer>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Writer>();
   });
+
+  it("types the enqueue's person at any role", () => {
+    type Enqueuer = AdmittedOf<typeof enqueueJobAction>;
+
+    expectTypeOf<Extract<Enqueuer, UserPrincipal>["role"]>().toEqualTypeOf<Role>();
+    expectTypeOf<UserPrincipal & { readonly role: "Viewer" }>().toExtend<Enqueuer>();
+    expectTypeOf<PlatformPrincipal>().toExtend<Enqueuer>();
+  });
+
+  it("types a union of roles by the lowest it names", () => {
+    const lowerTwo = declareAction({
+      admits: (input: { readonly open: boolean }) => ({
+        role: input.open ? "Viewer" : "Editor",
+        purposes: [],
+      }),
+      input: z.custom<{ readonly open: boolean }>(),
+      refuses: ["role-forbids"],
+    });
+    const higherTwo = declareAction({
+      admits: (input: { readonly open: boolean }) => ({
+        role: input.open ? "Editor" : "Admin",
+        purposes: [],
+      }),
+      input: z.custom<{ readonly open: boolean }>(),
+      refuses: ["role-forbids"],
+    });
+
+    expectTypeOf<AdmittedOf<typeof lowerTwo>["role"]>().toEqualTypeOf<Role>();
+    expectTypeOf<AdmittedOf<typeof higherTwo>["role"]>().toEqualTypeOf<"Admin" | "Editor">();
+    expect([
+      admit(lowerTwo, person("Viewer"), { open: false }).ok,
+      admit(higherTwo, person("Editor"), { open: true }).ok,
+    ]).toEqual([false, true]);
+  });
 });
 
 describe("what a declaration will not let an action say", () => {

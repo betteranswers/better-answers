@@ -78,7 +78,7 @@ const AUDIT_EVENT_ROW = `id, workspace_id AS "workspaceId", action, family, acto
 
 /** Oldest first; `since` is inclusive. */
 export const eventsOfAction = async (
-  principal: Principal,
+  principal: PlatformPrincipal,
   tx: Tx,
   action: AuditAction,
   since?: Date,

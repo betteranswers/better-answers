@@ -28,6 +28,7 @@ tags:
 
 - It is declared beside its hand-written face function.
 - The face function admits before its first `await`. The lint rule `action-admits-before-await` holds it (`packages/devtools/lint-rules/rules/action-admits-before-await.ts`).
+- A face function that takes a person declares what it admits, even where every role may ask: it declares the kernel's `ANY_ROLE`. `packages/core/test/face-admission.test.ts` names one that passes no declaration to `admit`, and lists each step a face exports with the action that admits for it.
 - There is no action constructor: a constructed action left GitNexus answering a lower bound.
 - The name an audit event is recorded under is its *audit action*.
 
@@ -109,3 +110,5 @@ Amended 10/10/2026 by the read-only query road plan (`docs/plans/2026-10-10-0123
 Amended 10/10/2026 on the owner's ruling, by the MCP entry door plan (`docs/plans/2026-10-10-1334-feat-mcp-entry-read-only-door-plan.md`, R5). An MCP entry that declares `readOnlyHint: true` takes the read-only resolve too. The line above still holds for a mutation, an entry that declares the hint false, and the own-transaction road.
 
 Amended 10/10/2026 by the one admission declaration plan (`docs/plans/2026-10-10-1434-refactor-one-admission-declaration-plan.md`, R1, R6, R9 and R10). Every action that judged a role by hand is now declared beside its face function, so the rule above holds for all of them. The kernel's `requireAdmin` shorthand is gone, and a declaration no longer names an effect. An import's manifest commit refused as `stale-precondition` reaches the caller as that word and `pnpm ops` exits it as a conflict. One refused as malformed stays an error.
+
+Amended 10/10/2026 by the admission types plan (`docs/plans/2026-10-10-1702-fix-admission-types-and-face-admission-plan.md`, R1, R4, R6 and R11). A face that every role may ask for was typed by its parameter alone, and nothing held a new face to admit. Each of the eight now declares that level and admits, and a test over every face names a function that takes a person and admits nobody. A person of the three roles is answered as before. The kernel types an admitted person by the lowest role a declaration can name, where it read a union of roles as an Admin.

@@ -16,6 +16,7 @@ import {
   actorIdOf,
   admit,
   ADMIN_ALONE,
+  ANY_ROLE,
   attempt,
   declareAction,
   err,
@@ -28,7 +29,6 @@ import {
   type PrincipalRefusal,
   type RefusalOf,
   type Result,
-  type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { withRepositoryLock, type GitDoor } from "../store/git/index.ts";
@@ -107,6 +107,12 @@ const summaryItem = (row: SummaryRow): SuggestionSummaryItem => {
   };
 };
 
+const suggestionSetSummaryAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.custom<string>(),
+  refuses: ["role-forbids"],
+});
+
 /**
  * Refuses anyone but an Admin a set holding another person's suggestion. For anyone but an
  * Admin, `target` is null where they cannot read the concept the suggestion resolved to.
@@ -115,7 +121,13 @@ export const suggestionSetSummary = async (
   principal: UserPrincipal,
   tx: Tx,
   setId: string,
-): Promise<Result<readonly SuggestionSummaryItem[], RoleRefusal | Error>> => {
+): Promise<
+  Result<readonly SuggestionSummaryItem[], RefusalOf<typeof suggestionSetSummaryAction> | Error>
+> => {
+  const admitted = admit(suggestionSetSummaryAction, principal, setId);
+  if (!admitted.ok) return err(admitted.error);
+  const reader = admitted.value;
+
   const found = await attempt(() =>
     tx.query<SummaryRow>(
       `SELECT s.suggestion_id, s.kind, s.status, s.proposer, s.decider, s.reason,
@@ -126,13 +138,13 @@ export const suggestionSetSummary = async (
          LEFT JOIN concept_index c
                 ON c.iri = s.resolved_iri
                AND ($2 = 'Admin' OR (${readableClause("c", 2)}))`,
-      [setId, ...readableParameters(principal)],
+      [setId, ...readableParameters(reader)],
     ),
   );
   if (!found.ok) return err(found.error);
 
-  const mine = actorIdOf(principal);
-  if (principal.role !== "Admin" && found.value.rows.some((row) => row.proposer !== mine)) {
+  const mine = actorIdOf(reader);
+  if (reader.role !== "Admin" && found.value.rows.some((row) => row.proposer !== mine)) {
     return err("role-forbids");
   }
 
@@ -161,7 +173,15 @@ export type SuggestionSetSubmitted = {
   readonly suggestionIds: readonly string[];
 };
 
-export type SubmitSuggestionSetRefusal = PrincipalRefusal | "malformed" | "kind-forbids";
+const submitSuggestionSetAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.custom<SubmitSuggestionSetInput>(),
+  refuses: ["role-forbids", "malformed", "kind-forbids"],
+});
+
+export type SubmitSuggestionSetRefusal =
+  | RefusalOf<typeof submitSuggestionSetAction>
+  | PrincipalRefusal;
 
 /**
  * `malformed` also refuses an empty set and one over `SUGGESTION_SET_MAX`; `kind-forbids`
@@ -172,6 +192,9 @@ export const submitSuggestionSet = async (
   doors: { readonly postgres: PostgresDoor },
   input: SubmitSuggestionSetInput,
 ): Promise<Result<SuggestionSetSubmitted, SubmitSuggestionSetRefusal | Error>> => {
+  const admitted = admit(submitSuggestionSetAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+
   const kind = boundarySchemas.suggestion.insert.shape.kind.safeParse(input.kind);
   if (!kind.success) return err("malformed");
   if (!SUGGESTION_KINDS_FROM_THE_APP.some((allowed) => allowed === kind.data)) {
@@ -200,7 +223,7 @@ export const submitSuggestionSet = async (
   if (!payloads.success) return err("malformed");
 
   const submitted = await attempt(() =>
-    withMember(principal, doors.postgres, async (fresh, tx) => {
+    withMember(admitted.value, doors.postgres, async (fresh, tx) => {
       const landed = await tx.query<{ suggestion_id: string }>(
         "SELECT submitted AS suggestion_id FROM submit_suggestion_set($1, $2, $3, $4::jsonb) AS submitted",
         [
