@@ -64,20 +64,20 @@ dependencies = [
     # that proved *when* is the docblock on
     # `apps/worker/tests/test_pipeline_engine_environment.py`.
     # Bumping this pin re-runs both probes and re-dates both records in the same commit.
-    "cocoindex==1.0.24",
+    "cocoindex==1.0.25",
     # The driver the engine's Postgres target acquires its own connections through, and
     # the one the pipeline's per-workspace pool is built from. It is named here rather
     # than left to cocoindex's `postgres` extra, whose floor would let the driver move
     # underneath a pool whose connection init is the only thing keeping row-level
     # security in force over the rows a flow lands. Read from PyPI on 11/09/2026;
     # Apache-2.0.
-    "asyncpg==0.31.0",
+    "asyncpg==0.32.0",
     # The object store client the pipeline reads a landed copy with and writes the
     # normalised copy back through. It is this tier's own rather than the engine's S3
     # source, because the bytes are addressed by keys the document's catalogue row
     # already holds and nothing here walks a bucket. Read from PyPI on 06/10/2026;
     # Apache-2.0.
-    "boto3==1.43.108",
+    "boto3==1.43.111",
     # The two converters, one per media type (ADR 0013, amended 20/09/2026). `anydoc`
     # answers a `.docx` as GitHub-flavoured Markdown; `pdf-inspector` answers a PDF as
     # Markdown and classifies its pages first. Both are Rust extensions with no model in
