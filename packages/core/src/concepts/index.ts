@@ -783,7 +783,13 @@ export type BundleImported = ImportProgress & {
 const importBundleAction = declareAction({
   admits: EDITORS,
   input: z.custom<ImportBundleInput>(),
-  refuses: ["role-forbids", "no-such-repository", "manifest-taken", "class-unreadable"],
+  refuses: [
+    "role-forbids",
+    "no-such-repository",
+    "manifest-taken",
+    "class-unreadable",
+    "stale-precondition",
+  ],
 });
 
 export type ImportBundleRefusal =
@@ -829,8 +835,8 @@ const manifestRefusalOf = (refusal: WriteManifestRefusal | Error): ImportBundleR
   switch (refusal) {
     case "path-taken":
       return "manifest-taken";
+    // Only a defect in the import makes its manifest commit malformed, so no caller can act on it.
     case "malformed":
-    case "stale-precondition":
     case "malformed-path":
     case "malformed-message":
       return new Error(`the manifest commit was refused: ${refusal}`);

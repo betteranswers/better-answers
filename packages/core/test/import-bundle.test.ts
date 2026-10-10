@@ -15,7 +15,7 @@ import {
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
-import { bundleHistory, commitFacts, fileAtCommit } from "./bundle.ts";
+import { bundleHistory, commitFacts, fileAtCommit, holdMainRef } from "./bundle.ts";
 import { addressOf, holdingTable, isBlockedOnTable, readingAs, until } from "./suite-postgres.ts";
 import { doorsOf, memberOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -1107,5 +1107,20 @@ describe("what the import refuses before it writes anything", () => {
       verifications: "0",
       events: "1",
     });
+  });
+
+  it("answers a lost manifest commit in the git door's word", async () => {
+    const { scenario, verifiers } = await arranged();
+    const release = await holdMainRef(scenario.git, scenario.workspaceId);
+
+    const refused = await importing(scenario, scenario.editor, { tree: soundBundle(verifiers) });
+
+    expect(refused).toEqual({ ok: false, error: "stale-precondition" });
+    await nothingWritten(scenario);
+
+    await release();
+    const rerun = await importing(scenario, scenario.editor, { tree: soundBundle(verifiers) });
+
+    expect(rerun).toMatchObject({ ok: true, value: { manifest: "written", dryRun: false } });
   });
 });

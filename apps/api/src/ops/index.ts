@@ -231,7 +231,8 @@ exit codes: ${DONE} done · ${REFUSED} refused in no refusal word, stop · ${USA
   a refusal word exits with its class's code: ${Object.entries(EXIT_OF_CLASS)
     .map(([refusalClass, code]) => `${code} ${refusalClass}`)
     .join(" · ")}
-  a run that names the file or commit it stopped at exits ${REFUSED}, whatever word it names: import-bundle's unsound tree and stopped import, reconcile-watermark's stopped replay`;
+  a run that names the file or commit it stopped at exits ${REFUSED}, whatever word it names: import-bundle's unsound tree and stopped import, reconcile-watermark's stopped replay
+  an import whose manifest commit is refused as malformed exits ${REFUSED} too: only a defect in the import can cause it`;
 
 const bundleStore = (doors: Doors, purpose: string): Result<GitDoor, string> =>
   doorTold(
@@ -705,22 +706,26 @@ const UNSOUND_WORDS = {
 const linksOf = (rewritten: readonly ConceptRewritten[]): number =>
   rewritten.reduce((sum, concept) => sum + concept.links, 0);
 
+const importWordSaid = (word: Extract<ImportBundleRefusal, string>, email: string): string => {
+  switch (word) {
+    case "role-forbids":
+      return `${email} is a Viewer of this workspace; the import runs as an Admin or an Editor`;
+    case "manifest-taken":
+      return "a manifest with another bundle id already stands in this workspace's bundle";
+    case "no-such-repository":
+      return "this workspace has no bundle repository; provision it first";
+    case "class-unreadable":
+      return `${email} is not an Admin of this workspace, and a bundle landed Restricted is one only an Admin can read back for its second pass; run the import as an Admin`;
+    case "stale-precondition":
+      return "another writer moved this workspace's bundle while the import was writing its manifest; nothing was written, so run the import again";
+    default:
+      return word;
+  }
+};
+
 const importReason = (refusal: ImportBundleRefusal | Error, email: string): string => {
   if (refusal instanceof Error) return refusal.message;
-  if (typeof refusal === "string") {
-    switch (refusal) {
-      case "role-forbids":
-        return `${email} is a Viewer of this workspace; the import runs as an Admin or an Editor`;
-      case "manifest-taken":
-        return "a manifest with another bundle id already stands in this workspace's bundle";
-      case "no-such-repository":
-        return "this workspace has no bundle repository; provision it first";
-      case "class-unreadable":
-        return `${email} is not an Admin of this workspace, and a bundle landed Restricted is one only an Admin can read back for its second pass; run the import as an Admin`;
-      default:
-        return refusal;
-    }
-  }
+  if (typeof refusal === "string") return importWordSaid(refusal, email);
   if (refusal.kind === "unsound") {
     return `${refusal.file}: ${UNSOUND_WORDS[refusal.reason](refusal.about)}; nothing was written`;
   }
