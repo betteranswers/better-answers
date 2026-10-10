@@ -49,7 +49,7 @@ export const aMembersJourney = async (
   await test.step("The address to connect an assistant", () => askShowsThePublishedAddress(page));
 
   await test.step("The workspace switcher", () =>
-    theSwitcherListsOneWorkspace(page, workspace.name));
+    theSwitcherListsOneWorkspace(page, workspace.name, role));
 
   await test.step("Search", () => searchIsReached(page, gate));
 

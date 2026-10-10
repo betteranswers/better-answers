@@ -232,7 +232,7 @@ test("an Admin walks the Control Centre and leaves it unchanged", async ({
 
   await test.step("The workspace switcher", async () => {
     const { workspace } = await sessionMemberOf(page);
-    await theSwitcherListsOneWorkspace(page, workspace.name);
+    await theSwitcherListsOneWorkspace(page, workspace.name, "Admin");
     await gate();
   });
 

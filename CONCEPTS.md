@@ -1959,8 +1959,8 @@ pages and as the browser tab's icon. Its accessible name is `better-answers`.
 The control in the *top band*'s second cell naming the workspace being read and listing every
 workspace the person is a member of.
 
-Choosing one takes them to its *home*, and *All workspaces* opens the workspace picker. It lists the
-*console* to the operator alone.
+Each workspace is listed with the person's role there. Choosing one takes them to its *home*, and
+*All workspaces* opens the workspace picker. It lists the *console* to the operator alone.
 
 ### breadcrumb
 

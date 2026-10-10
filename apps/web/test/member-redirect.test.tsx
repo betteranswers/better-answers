@@ -24,42 +24,43 @@ const REFUSED_CODE = -32_001;
 
 const A_SESSION = { session: { activeOrganizationId: "w" }, user: { id: "p", name: "Ada" } };
 
+const WORKSPACES_READ = "person.workspaces";
+
 const TWO_WORKSPACES = [
-  { id: "w", name: "Northern Tooling" },
-  { id: "x", name: "Southern Castings" },
+  { workspace: { id: "w", name: "Northern Tooling" }, role: "Admin" },
+  { workspace: { id: "x", name: "Southern Castings" }, role: "Viewer" },
 ];
 
 let asked: string[] = [];
+
+/** The person's own list is answered with no workspace open, so no refusal of the member read reaches it. */
+const answerTo = (name: string, refusal: string | undefined, role: Role) => {
+  if (name === WORKSPACES_READ) return { result: { data: TWO_WORKSPACES } };
+  if (refusal === undefined) return { result: { data: { ...A_MEMBER, role } } };
+  return {
+    error: {
+      message: refusal,
+      code: REFUSED_CODE,
+      data: {
+        code: "UNAUTHORIZED",
+        httpStatus: 401,
+        path: name,
+        refusal: { word: refusal, class: "unauthenticated" },
+      },
+    },
+  };
+};
 
 /** The api answers a batch as one array with an entry per procedure, a refusal being an entry. */
 const answering =
   (refusal?: string, role: Role = "Admin") =>
   (input: string | URL | Request): Promise<Response> => {
     const { pathname } = addressOf(input);
-    if (!pathname.startsWith("/trpc/")) {
-      return answered(pathname === "/organization/list" ? TWO_WORKSPACES : A_SESSION);
-    }
+    if (!pathname.startsWith("/trpc/")) return answered(A_SESSION);
 
     const names = pathname.replace("/trpc/", "").split(",");
     asked.push(...names);
-    return answered(
-      names.map((name) =>
-        refusal === undefined
-          ? { result: { data: { ...A_MEMBER, role } } }
-          : {
-              error: {
-                message: refusal,
-                code: REFUSED_CODE,
-                data: {
-                  code: "UNAUTHORIZED",
-                  httpStatus: 401,
-                  path: name,
-                  refusal: { word: refusal, class: "unauthenticated" },
-                },
-              },
-            },
-      ),
-    );
+    return answered(names.map((name) => answerTo(name, refusal, role)));
   };
 
 /** The shell's one member read is dropped; the frame's read after it answers. */
@@ -81,6 +82,10 @@ const memberAsks = () => asked.filter((name) => name === "session.member").lengt
 const openAt = async (path: string, clients?: AppClients) => (await openApp(path, clients)).router;
 
 const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
+
+/** The tag a row's button is described by, which a screen reader says after the button's name. */
+const roleBeside = (button: HTMLElement) =>
+  document.getElementById(button.getAttribute("aria-describedby") ?? "")?.textContent;
 
 beforeEach(() => {
   asked = [];
@@ -108,6 +113,16 @@ describe("a person the api will not answer about", () => {
 
     expect(screen.getByText(PICKER_WORDS.reading)).toBeDefined();
     expect(router.state.location.href).toBe("/choose-workspace");
+  });
+
+  it("reads their role beside each workspace on the picker", async () => {
+    vi.stubGlobal("fetch", answering(NEEDS_A_PICK));
+
+    await openAt("/choose-workspace");
+    const northern = await screen.findByRole("button", { name: "Northern Tooling" });
+
+    expect(roleBeside(northern)).toBe("Admin");
+    expect(roleBeside(screen.getByRole("button", { name: "Southern Castings" }))).toBe("Viewer");
   });
 
   it("stays on the sign-in page when they went there", async () => {

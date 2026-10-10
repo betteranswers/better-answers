@@ -11,6 +11,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import type { inferOutput } from "@trpc/tanstack-react-query";
 import type { BetterFetchError } from "better-auth/client";
 import { useState } from "react";
 import { z } from "zod";
@@ -40,7 +41,6 @@ import type { Arrival } from "./sign-in-words.ts";
 const AUTH_KEYS = {
   all: ["auth"],
   session: ["auth", "session"],
-  workspaces: ["auth", "workspaces"],
 } as const;
 
 const unwrap = async <TData, TError>(
@@ -60,15 +60,22 @@ const sessionOptions = () =>
 /** Its `data` is null when this browser holds no session. */
 export const useSession = () => useQuery(sessionOptions());
 
-const listOrganizationsOptions = () =>
-  queryOptions({
-    queryKey: AUTH_KEYS.workspaces,
-    queryFn: () => unwrap(authClient.organization.list()),
-  });
+/** The person's own, read before any workspace is open, so it belongs to none of them. */
+const theWorkspaceList = (api: ApiProxy) => api.person.workspaces.pathFilter();
+
+type WorkspacesHeld = inferOutput<ApiProxy["person"]["workspaces"]>;
+
+/** One level, as the picker and the switcher both list a workspace: its name, then the role. */
+const withTheRole = (held: WorkspacesHeld) =>
+  held.map(({ workspace, role }) => ({ ...workspace, role }));
 
 /** `asked` false reads nothing yet, for a list shown only once a menu opens. */
-export const useListOrganizations = (asked = true) =>
-  useQuery({ ...listOrganizationsOptions(), enabled: asked });
+export const useWorkspacesHeld = (asked = true) => {
+  const api = useTRPC();
+  return useQuery(
+    api.person.workspaces.queryOptions(undefined, { enabled: asked, select: withTheRole }),
+  );
+};
 
 const wholeSeconds = z
   .string()
@@ -360,7 +367,7 @@ export const useAcceptInvitation = () => {
         forgetMember(queryClient, api);
         forgetTheWorkspaceLeft(queryClient, api);
         queryClient.removeQueries({ queryKey: AUTH_KEYS.session });
-        queryClient.removeQueries({ queryKey: AUTH_KEYS.workspaces });
+        queryClient.removeQueries(theWorkspaceList(api));
         void navigate(leavingFor(nextAfterJoining(pageQuery())));
       },
     }),
@@ -436,14 +443,15 @@ const setActiveOrganizationOptions = () =>
   });
 
 /**
- * The session's and the console's reads belong to no workspace, so a switch keeps them. Naming
- * these fails safe: one left off is read again.
+ * The session's, the console's and the workspace list's reads belong to no workspace, so a switch
+ * keeps them. One left off is read again.
  */
 const aboutTheWorkspace = (api: ApiProxy) => {
   const theirOwn = [
     { queryKey: AUTH_KEYS.all },
     api.session.pathFilter(),
     api.console.pathFilter(),
+    theWorkspaceList(api),
   ];
   return (query: Query) => !theirOwn.some((filters) => matchQuery(filters, query));
 };
@@ -470,7 +478,7 @@ export const useSetActiveOrganization = () => {
       forgetTheWorkspaceLeft(queryClient, api);
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session }),
-        queryClient.invalidateQueries({ queryKey: AUTH_KEYS.workspaces }),
+        queryClient.invalidateQueries(theWorkspaceList(api)),
       ]);
     },
   });

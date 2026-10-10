@@ -67,6 +67,9 @@ const theConsoleOffered = async (page: Page, workspaceName: string) => {
   return theConsole;
 };
 
+/** An item of the switcher reads its workspace's name, then the person's role there. */
+const listedAs = (name: string, role: "Admin" | "Viewer"): string => `${name} ${role}`;
+
 const listOf = (page: Page) => page.getByRole("region", { name: WORKSPACES_WORDS.heading });
 
 const searchOf = (page: Page) =>
@@ -189,7 +192,7 @@ test.describe("the way into the console", () => {
 
     await switcherOf(page, workspace.name).click();
     const menu = switcherMenuOf(page, workspace.name);
-    await expect(menu.getByRole("menuitemradio")).toHaveText([workspace.name]);
+    await expect(menu.getByRole("menuitemradio")).toHaveText([listedAs(workspace.name, "Admin")]);
     await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES]);
     await page.keyboard.press("Escape");
 
@@ -286,8 +289,11 @@ test.describe("the way into the console", () => {
 
     await switcherOf(page, CONSOLE.name).click();
     const menu = switcherMenuOf(page, CONSOLE.name);
-    // No workspace is open in the console, so the list reads in name order alone.
-    await expect(menu.getByRole("menuitemradio")).toHaveText([second.name, workspace.name]);
+    // No workspace is open in the console, so the list reads in name order, each role its own.
+    await expect(menu.getByRole("menuitemradio")).toHaveText([
+      listedAs(second.name, "Viewer"),
+      listedAs(workspace.name, "Admin"),
+    ]);
     await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES]);
     await passesTheAccessibilityGate();
 

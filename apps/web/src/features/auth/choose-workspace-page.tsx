@@ -1,19 +1,20 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
+import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { AccountLink } from "./account-link.tsx";
 import {
   hasADisplayName,
-  useListOrganizations,
   useOAuthContinue,
   useSession,
   useSetActiveOrganization,
+  useWorkspacesHeld,
   type ResumeAnswer,
   type SwitchRefused,
 } from "./auth-hooks.ts";
@@ -30,7 +31,7 @@ import { SignOutButton } from "./sign-out-button.tsx";
 import { NOT_CONNECTED, PICKER_ACTIONS, PICKER_WORDS } from "./workspace-words.ts";
 
 type Session = ReturnType<typeof useSession>;
-type Workspaces = ReturnType<typeof useListOrganizations>;
+type Workspaces = ReturnType<typeof useWorkspacesHeld>;
 type Workspace = NonNullable<Workspaces["data"]>[number];
 
 const TO_WORKSPACES: Keystroke = { key: "w", action: PICKER_ACTIONS.toWorkspaces };
@@ -102,7 +103,7 @@ export function ChooseWorkspacePage() {
   const carried = carriedFlow(pageQuery());
 
   const session = useSession();
-  const workspaces = useListOrganizations();
+  const workspaces = useWorkspacesHeld();
   const pick = useSetActiveOrganization();
   const resume = useOAuthContinue();
 
@@ -247,6 +248,37 @@ const outcomeOf = (standing: Standing): Outcome | undefined => {
   return pickOutcome(standing);
 };
 
+/** The role describes the button and stays out of its name, so a workspace is found by name alone. */
+function WorkspaceRow(properties: {
+  readonly workspace: Workspace;
+  readonly first: boolean;
+  readonly busy: boolean;
+  readonly onPick: (workspace: Workspace) => void;
+}) {
+  const { workspace } = properties;
+  const roleId = useId();
+
+  return (
+    <li className="col-span-2 grid grid-cols-subgrid items-center">
+      {/* Enabled while a pick is open, so a refused pick can hand focus to what is left. */}
+      <Button
+        type="button"
+        variant="outline"
+        className="h-auto min-h-8 w-full justify-start py-1.5 text-left wrap-anywhere whitespace-normal aria-disabled:opacity-50"
+        aria-disabled={properties.busy}
+        aria-describedby={roleId}
+        aria-keyshortcuts={properties.first ? TO_WORKSPACES.key : undefined}
+        onClick={() => {
+          if (!properties.busy) properties.onPick(workspace);
+        }}
+      >
+        {workspace.name}
+      </Button>
+      <Pill id={roleId}>{workspace.role}</Pill>
+    </li>
+  );
+}
+
 function WorkspaceList(properties: {
   readonly held: readonly Workspace[];
   readonly busy: boolean;
@@ -258,23 +290,16 @@ function WorkspaceList(properties: {
     <>
       <p className="mt-2 text-muted-foreground">{PICKER_WORDS.lead}</p>
 
-      <ul id={WORKSPACE_LIST} className="mt-6 flex flex-col gap-2">
+      {/* One grid for every row, so the buttons end on one line whatever each role's width. */}
+      <ul id={WORKSPACE_LIST} className="mt-6 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
         {properties.held.map((workspace, at) => (
-          <li key={workspace.id}>
-            {/* Enabled while a pick is open, so a refused pick can hand focus to what is left. */}
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full justify-start aria-disabled:opacity-50"
-              aria-disabled={properties.busy}
-              aria-keyshortcuts={at === 0 ? TO_WORKSPACES.key : undefined}
-              onClick={() => {
-                if (!properties.busy) properties.onPick(workspace);
-              }}
-            >
-              {workspace.name}
-            </Button>
-          </li>
+          <WorkspaceRow
+            key={workspace.id}
+            workspace={workspace}
+            first={at === 0}
+            busy={properties.busy}
+            onPick={properties.onPick}
+          />
         ))}
       </ul>
     </>

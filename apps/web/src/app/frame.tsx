@@ -203,7 +203,7 @@ export function WorkspaceFrame(properties: { readonly page?: Handed }) {
       here={
         held === undefined
           ? undefined
-          : { name: held.workspace.name, workspaceId: held.workspace.id }
+          : { name: held.workspace.name, workspaceId: held.workspace.id, role: held.role }
       }
       person={held === undefined ? undefined : { name: held.person.name, role: held.role }}
       // Offered to the operator alone: a way in anyone else would only be refused at.
