@@ -5,10 +5,13 @@ const DECLARE = "declareAction";
 
 const ADMIT = "admit";
 
+/** The two shorthands admit on their own call, so only `admit` names a declaration to pair. */
+const ADMITTING = new Set([ADMIT, "requireAdmin", "requireFreshSignIn"]);
+
 /** The visitors fire in source order, so whichever of the two lands first is the earlier one. */
 type Frame = {
   readonly first: "awaited" | "admitted" | undefined;
-  readonly admitted: ESTree.Node | undefined;
+  readonly admitted: ESTree.CallExpression | undefined;
 };
 
 const calleeName = (node: ESTree.CallExpression): string | undefined =>
@@ -27,7 +30,7 @@ export const actionAdmitsBeforeAwaitRule = defineRule({
         "A function that admits does so before it awaits, and a declared action is admitted by one.",
     },
     messages: {
-      late: "This function awaits before it admits: run `admit` first, so nothing is opened, read or written for a principal the action was never going to serve (the root `CODING_STANDARDS.md`).",
+      late: "This function awaits before it admits: run `{{name}}` first, so nothing is opened, read or written for a principal the action was never going to serve (the root `CODING_STANDARDS.md`).",
       unadmitted:
         "`{{name}}` declares what an action admits and no function here passes it to `admit`, so the declaration states a gate nothing runs (the root `CODING_STANDARDS.md`).",
     },
@@ -44,7 +47,8 @@ export const actionAdmitsBeforeAwaitRule = defineRule({
     const close = (): void => {
       const frame = frames.pop();
       if (frame?.first === "awaited" && frame.admitted !== undefined) {
-        context.report({ node: frame.admitted, messageId: "late" });
+        const name = calleeName(frame.admitted) ?? ADMIT;
+        context.report({ node: frame.admitted, messageId: "late", data: { name } });
       }
     };
 
@@ -54,7 +58,7 @@ export const actionAdmitsBeforeAwaitRule = defineRule({
       frames[frames.length - 1] = { ...frame, first: "awaited" };
     };
 
-    const noteAdmit = (node: ESTree.Node): void => {
+    const noteAdmit = (node: ESTree.CallExpression): void => {
       const frame = frames.at(-1);
       if (frame === undefined) return;
       frames[frames.length - 1] = {
@@ -74,8 +78,10 @@ export const actionAdmitsBeforeAwaitRule = defineRule({
       AwaitExpression: noteAwait,
 
       CallExpression(node) {
-        if (calleeName(node) !== ADMIT) return;
+        const name = calleeName(node);
+        if (name === undefined || !ADMITTING.has(name)) return;
         noteAdmit(node);
+        if (name !== ADMIT) return;
         const asked = namedFirstArgument(node);
         if (asked !== undefined) admitted.add(asked);
       },
