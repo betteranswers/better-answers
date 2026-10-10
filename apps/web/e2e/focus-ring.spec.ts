@@ -10,6 +10,8 @@ import {
   provision,
   signedInAtHome,
   skipLinkReachesThePage,
+  tabOpenedByKeyboard,
+  tokenColour,
   tokenPainted,
 } from "./harness.ts";
 
@@ -23,6 +25,7 @@ const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
 
 type Drawn = {
   readonly again: boolean;
+  readonly rings: number;
   readonly name: string;
   readonly shadow: string;
   readonly ring: string;
@@ -43,8 +46,8 @@ const focusSettled = (page: Page): Promise<void> =>
   });
 
 /** A part that draws its ring on an inner element, as the counted switch does, is read there. */
-const drawnFocus = (page: Page): Promise<Drawn | undefined> =>
-  page.evaluate(() => {
+const drawnFocus = (page: Page, edge: string): Promise<Drawn | undefined> =>
+  page.evaluate((inked) => {
     const focused = document.activeElement;
     if (!(focused instanceof HTMLElement) || focused === document.body) return undefined;
     // A browser reports an opaque colour as `rgb()`, and anything see-through as `rgba()`.
@@ -56,11 +59,15 @@ const drawnFocus = (page: Page): Promise<Drawn | undefined> =>
       }
       return parent === null ? "rgb(255, 255, 255)" : getComputedStyle(parent).backgroundColor;
     };
-    const drawing =
-      [focused, ...focused.querySelectorAll<HTMLElement>("*")].find(
-        (element) => getComputedStyle(element).boxShadow !== "none",
-      ) ?? focused;
-    const shadow = getComputedStyle(drawing).boxShadow;
+    // A ring is the element whose shadow carries the ink edge; a utility pads it with clear layers.
+    const ringed = [focused, ...focused.querySelectorAll<HTMLElement>("*")].filter((element) =>
+      getComputedStyle(element).boxShadow.includes(inked),
+    );
+    const drawing = ringed[0] ?? focused;
+    const shadow = getComputedStyle(drawing)
+      .boxShadow.split(/,(?![^(]*\))\s*/)
+      .filter((layer) => !layer.startsWith("rgba(0, 0, 0, 0)"))
+      .join(", ");
     const layers = (painted: string) => {
       const colours = painted.match(/rgba?\([^)]+\)/g) ?? [];
       return { ring: colours[0] ?? "", edge: colours.at(-1) ?? "" };
@@ -73,32 +80,34 @@ const drawnFocus = (page: Page): Promise<Drawn | undefined> =>
     const label = focused.getAttribute("aria-label") ?? focused.textContent;
     return {
       again,
+      rings: ringed.length,
       name: `${focused.tagName.toLowerCase()} "${label.trim().slice(0, 40)}"`,
       shadow,
       ...layers(shadow),
       fill: fill ?? behind,
       behind,
     };
-  });
+  }, edge);
 
 /** Every stop of a keyboard walk, until focus comes back round to the first. */
 const walked = async (page: Page): Promise<readonly Drawn[]> => {
+  const edge = await tokenColour(page, "--accent-600");
   const seen: Drawn[] = [];
   for (let stop = 0; stop < STOPS; stop += 1) {
     await page.keyboard.press("Tab");
     await focusSettled(page);
-    const drawn = await drawnFocus(page);
-    if (drawn === undefined) continue;
-    if (drawn.again) break;
-    seen.push(drawn);
+    const drawn = await drawnFocus(page, edge);
+    if (drawn?.again === true) return seen;
+    if (drawn !== undefined) seen.push(drawn);
   }
-  return seen;
+  throw new Error(`focus never came back round in ${String(STOPS)} stops, so some went unchecked`);
 };
 
 const holdsTheRing = async (page: Page, stops: readonly Drawn[]): Promise<void> => {
   const token = await tokenPainted(page, "--focus-ring", "box-shadow");
   expect(stops.length, "the walk reached no control").toBeGreaterThan(2);
   for (const stop of stops) {
+    expect(stop.rings, `${stop.name} draws ${String(stop.rings)} rings`).toBe(1);
     expect(stop.shadow, `${stop.name} draws a ring that is not the token's`).toBe(token);
     const edge = contrastBetween(stop.edge, stop.behind);
     test
@@ -126,7 +135,7 @@ test("the primary button's ring holds 3:1 against its own fill", async ({ page }
   await expect(send).toBeFocused();
   await focusSettled(page);
 
-  const drawn = await drawnFocus(page);
+  const drawn = await drawnFocus(page, await tokenColour(page, "--accent-600"));
   expect(drawn, "the primary button took no focus").toBeDefined();
   if (drawn === undefined) return;
   expect(
@@ -142,6 +151,16 @@ test("draws the token's ring on every shell page control", async ({ page, reques
   await page.goto(MEMBERS.path);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await skipLinkReachesThePage(page);
+
+  await holdsTheRing(page, await walked(page));
+});
+
+test("keeps one ring on the invitations' counted switch", async ({ page, request }) => {
+  const email = anAddress("focus");
+  await provision(request, { name: "Calder Glazing", adminEmail: email });
+  await signedInAtHome(page, request, email);
+  await tabOpenedByKeyboard(page, MEMBERS.path, "Invitations");
+  await expect(page.getByRole("radiogroup").first()).toBeVisible();
 
   await holdsTheRing(page, await walked(page));
 });

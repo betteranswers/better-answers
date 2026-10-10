@@ -135,7 +135,7 @@ the pin.
 | `kibo-ui/qr-code.tsx` | https://www.kibo-ui.com/r/qr-code.json | `b2e8c658e1d2042a` | `0be5a141250acb70` |
 | `item.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/item.json | `b8ad17f300d4de1d` | `ca3434e1a4223f13` |
 | `kibo-ui/banner.tsx` | https://www.kibo-ui.com/r/banner.json | `77b8679e257a6712` | `a7dd5fee14228771` |
-| `card.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/card.json | `c7ebaa49ba2a0613` | `692e3923b3917fd9` |
+| `card.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/card.json | `c7ebaa49ba2a0613` | `fb5eeec5da002628` |
 
 The Kibo UI patterns, each read at commit `3d63cdb15b79d972e3dc38a10997987672f9b263` of
 [shadcnblocks/kibo](https://github.com/shadcnblocks/kibo) (MIT), under `packages/patterns/`. The
@@ -374,6 +374,8 @@ The arrival edits on `card`:
 - `Card` takes `marks`, which sets `data-marks`, and `Card` and `CardTitle` take `asChild` as
   `Button` does, so a region keeps its element and a title its heading.
 - `CardFooter` is the sunken strip a card's provenance sits in, under a hairline.
+- `CardHeader` declares its second row only when it holds a description, so a header with a title
+  alone is one row and keeps no empty gap below the title.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the pages that use them carry the WCAG 2.2 AA
