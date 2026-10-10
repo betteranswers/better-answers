@@ -1,7 +1,13 @@
 import type { PoolClient } from "pg";
 import { z } from "zod";
 
-import { AUDIENCES, REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
+import {
+  AUDIENCES,
+  REDACTION_ALWAYS_TIER,
+  REDACTION_TIERS,
+  SENSITIVITIES,
+  UNREADABLE_REASON,
+} from "@better-answers/schema";
 import { testData, type TestData } from "@better-answers/schema/testing";
 
 import type { TestApp } from "./harness.ts";
@@ -16,6 +22,9 @@ const KEPT_BECAUSE = "The company's own business fact";
 
 const DISMISSED_BECAUSE = "The cue caught engineering prose, not health data";
 
+/** Each seeds a restored finding, which the store keeps on the always tier alone. */
+const RESTORED_BY = ["kept", "overriddenByErasure"] as const;
+
 const aFinding = z
   .object({
     category: z.string().min(1),
@@ -28,12 +37,28 @@ const aFinding = z
   })
   .refine((finding) => finding.dismissed <= finding.spans, {
     message: "a group has no more dismissed spans than it has spans",
+  })
+  .superRefine((finding, context) => {
+    if (finding.tier === REDACTION_ALWAYS_TIER) return;
+    for (const flag of RESTORED_BY) {
+      if (finding[flag]) {
+        context.addIssue({
+          code: "custom",
+          path: [flag],
+          message: `only an ${REDACTION_ALWAYS_TIER}-tier finding is restored to the text, which finding_restore_check holds`,
+        });
+      }
+    }
   });
 
 const aDocument = z.object({
   title: z.string().min(1),
   sensitivity: z.enum(SENSITIVITIES).nullable().default(null),
-  unreadableReason: z.string().min(1).nullable().default(null),
+  unreadableReason: z
+    .string()
+    .regex(UNREADABLE_REASON, "an unreadable reason is one word with no space, as NeedsOcrError is")
+    .nullable()
+    .default(null),
   passages: z.array(z.string().min(1)).default([]),
   findings: z.array(aFinding).default([]),
   cited: z.boolean().default(false),

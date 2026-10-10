@@ -38,7 +38,9 @@ const ask = async <T>(
   answer: z.ZodType<T>,
 ): Promise<T> => {
   const answered = await api.post(`${HARNESS}${path}`, { data: body });
-  expect(answered.ok(), `${path} answered ${answered.status()}`).toBe(true);
+  // A seed the harness will not write answers 400 with its reason, which belongs in the failure.
+  const why = answered.ok() ? "" : `: ${await answered.text()}`;
+  expect(answered.ok(), `${path} answered ${answered.status()}${why}`).toBe(true);
   return answer.parse(await answered.json());
 };
 
@@ -227,19 +229,31 @@ export const seedModelChoices = (
 
 type Sensitivity = (typeof SENSITIVITIES)[number];
 
+type RedactionTier = (typeof REDACTION_TIERS)[number];
+
+/** The store restores an always-tier finding alone, so no other tier is offered `kept` or an erasure's override. */
 type SeedFinding = {
   readonly category: string;
   readonly ruleId: string;
-  readonly tier: (typeof REDACTION_TIERS)[number];
   readonly spans: number;
-  readonly kept?: boolean;
-  readonly overriddenByErasure?: boolean;
   readonly dismissed?: number;
-};
+} & (
+  | {
+      readonly tier: "always";
+      readonly kept?: boolean;
+      readonly overriddenByErasure?: boolean;
+    }
+  | {
+      readonly tier: Exclude<RedactionTier, "always">;
+      readonly kept?: false;
+      readonly overriddenByErasure?: false;
+    }
+);
 
 type SeedDocument = {
   readonly title: string;
   readonly sensitivity?: Sensitivity;
+  /** One word with no space, as the worker's `NeedsOcrError` is. */
   readonly unreadableReason?: string;
   readonly passages?: readonly string[];
   readonly findings?: readonly SeedFinding[];

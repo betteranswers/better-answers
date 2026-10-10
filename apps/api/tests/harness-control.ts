@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { DatabaseError } from "pg";
 import { z } from "zod";
 
 import { ensureTestWorkspace } from "@better-answers/core/members";
@@ -126,16 +127,36 @@ const personIdOf = async (app: TestApp, email: string): Promise<string> => {
   return id;
 };
 
-const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> => {
-  const parsed = schema.safeParse(await request.json());
-  if (!parsed.success) throw new Error(`the harness was called wrongly: ${parsed.error.message}`);
-  return parsed.data;
+const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> =>
+  schema.parse(await request.json());
+
+/**
+ * The spec's own mistake, if `error` is one: the fields a schema refused, the harness's or the
+ * factory's, or the constraint a write tripped.
+ */
+const whyNotWritten = (error: Error) => {
+  if (error instanceof z.ZodError) {
+    return {
+      fields: error.issues.map((issue) => ({ field: issue.path.join("."), rule: issue.message })),
+    };
+  }
+  if (error instanceof DatabaseError && error.constraint !== undefined) {
+    return { constraint: error.constraint, said: error.message };
+  }
+  return undefined;
 };
 
 /** Routes under `/__harness` through which the browser suite drives the TestApp as a test would. */
 export const harnessControl = (app: TestApp): Hono => {
   const control = new Hono();
   const enrolled = enrolments(app);
+
+  // A spec's mistake answers 400 with its reason. Anything else is thrown on to the 500 that logs it.
+  control.onError((error, context) => {
+    const why = whyNotWritten(error);
+    if (why === undefined) throw error;
+    return context.json(why, 400);
+  });
 
   control.post(`${HARNESS_PREFIX}/workspaces`, async (context) => {
     const asked = await readBody(context.req.raw, provisioning);
