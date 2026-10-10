@@ -55,6 +55,25 @@ type TooBroad = { readonly word: ErasureRefusal<"identifier-too-broad">; readonl
     expect(wordsIn(source)).toEqual(["manifest-taken"]);
   });
 
+  it("names the words a declared action's `RefusalOf` resolves to", () => {
+    const source = `const findAction = declareAction({
+  admits: { role: "Viewer", purposes: [] },
+  input: findInput,
+  refuses: ["role-forbids", "invented-word"],
+  effect: "read",
+});
+export type FindRefusal = RefusalOf<typeof findAction> | Error;
+`;
+
+    expect(wordsIn(source)).toEqual(["role-forbids", "invented-word"]);
+  });
+
+  it("reads `refuses` alone among a declaration's keys", () => {
+    const source = `const findAction = declareAction({ effect: "read", refuses: [] });\n`;
+
+    expect(wordsIn(source)).toEqual([]);
+  });
+
   it("names no class a `…OfClass` type takes", () => {
     const source = `export type AdmissionRefusal = KernelRefusalOfClass<"forbidden" | "unauthenticated">;\n`;
 

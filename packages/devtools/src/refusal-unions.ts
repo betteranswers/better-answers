@@ -1,4 +1,10 @@
-import { type TSLiteralType, type TSType, type TSTypeReference, Visitor } from "oxc-parser";
+import {
+  type CallExpression,
+  type TSLiteralType,
+  type TSType,
+  type TSTypeReference,
+  Visitor,
+} from "oxc-parser";
 
 import { parsedSource } from "./parsed-source.ts";
 
@@ -38,11 +44,32 @@ const wordsOf = (type: TSType): readonly Found[] => {
   }
 };
 
+/**
+ * `RefusalOf<typeof …Action>` resolves to the declaration's `refuses` list, so the list is read
+ * where it is written; a syntax walk cannot resolve the alias.
+ */
+const refusesWords = ({ callee, arguments: [declaration] }: CallExpression): readonly Found[] => {
+  if (callee.type !== "Identifier" || callee.name !== "declareAction") return [];
+  if (declaration?.type !== "ObjectExpression") return [];
+  const refuses = declaration.properties.find(
+    (property) =>
+      property.type === "Property" &&
+      property.key.type === "Identifier" &&
+      property.key.name === "refuses",
+  );
+  if (refuses?.type !== "Property" || refuses.value.type !== "ArrayExpression") return [];
+  return refuses.value.elements.flatMap((element) =>
+    element?.type === "Literal" && typeof element.value === "string"
+      ? [{ word: element.value, offset: element.start }]
+      : [],
+  );
+};
+
 const isVocabulary = ({ typeName }: TSTypeReference): boolean =>
   typeName.type === "Identifier" && REFUSAL_TYPE.test(typeName.name);
 
 /**
- * Reads unexported aliases, and vocabulary arguments inside an object's `word`.
+ * Also reads unexported aliases, an object's `word`, and `refuses` lists.
  *
  * @throws when the file does not parse, which would otherwise read as naming no word.
  */
@@ -58,6 +85,9 @@ export const refusalWordsIn = (file: string, source: string): readonly UnionWord
     },
     TSTypeReference: (node) => {
       if (isVocabulary(node)) keep(argumentWords(node));
+    },
+    CallExpression: (node) => {
+      keep(refusesWords(node));
     },
   }).visit(program);
   return [...byOffset]
