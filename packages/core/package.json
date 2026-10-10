@@ -25,6 +25,7 @@
     "./testing/objects": "./test/suite-objects.ts",
     "./testing/warm-objects": "./test/warm-objects.ts",
     "./testing/postgres": "./test/suite-postgres.ts",
+    "./testing/bundle": "./test/bundle.ts",
     "./testing/bundle-root": "./test/bundle-root.ts",
     "./testing/documents": "./test/suite-documents.ts",
     "./testing/worker-process": "./test/worker-process.ts",

@@ -32,6 +32,7 @@ import {
   type Tx,
 } from "@better-answers/core/store/postgres";
 import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
+import { divergeHistory } from "@better-answers/core/testing/bundle";
 import { inputOf } from "@better-answers/core/testing/input";
 import { objectStoreForSuite, textOf } from "@better-answers/core/testing/objects";
 import {
@@ -531,6 +532,24 @@ const replayedAfterTheWindow = async (
   ]);
   return { workspaceId, admin, sha };
 };
+
+const restoreDrillNote = (
+  principal: UserPrincipal,
+  doors: ReturnType<typeof bundleDoors>,
+  admin: Provisioned["admin"],
+) =>
+  writeConcept(principal, doors, {
+    mergeKey: "note:restore-drill",
+    path: "knowledge/restore-drill.md",
+    kind: "Note",
+    title: "Restore drill",
+    frontmatter: { title: "Restore drill", type: "Note" },
+    body: "The rows are behind the bundle until the reconciler runs.",
+    message: "Record the restore drill note",
+    author: { name: admin.name, email: admin.email },
+    expects: { head: null },
+    status: "stable",
+  });
 
 const lostInTheWindow = async (
   app: TestApp,
@@ -1588,26 +1607,23 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("replays a missed commit and lands its concept's row", async () => {
-      const { workspaceId, sha } = await replayedAfterTheWindow(app(), (principal, doors, admin) =>
-        writeConcept(principal, doors, {
-          mergeKey: "note:restore-drill",
-          path: "knowledge/restore-drill.md",
-          kind: "Note",
-          title: "Restore drill",
-          frontmatter: { title: "Restore drill", type: "Note" },
-          body: "The rows are behind the bundle until the reconciler runs.",
-          message: "Record the restore drill note",
-          author: { name: admin.name, email: admin.email },
-          expects: { head: null },
-          status: "stable",
-        }),
-      );
+      const { workspaceId, sha } = await replayedAfterTheWindow(app(), restoreDrillNote);
 
       const landed = await app().database.superuser.query<{ path: string; commit_sha: string }>(
         "SELECT path, commit_sha FROM concept_index WHERE workspace_id = $1",
         [workspaceId],
       );
       expect(landed.rows).toEqual([{ path: "knowledge/restore-drill.md", commit_sha: sha }]);
+    });
+
+    it("refuses a diverged history, exiting as a precondition", async () => {
+      const { workspaceId } = await replayedAfterTheWindow(app(), restoreDrillNote);
+      await divergeHistory(openTestGit(app()), workspaceId);
+
+      const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(EXIT_OF_CLASS.precondition);
+      expect(run.lines).toEqual(["reconcile-watermark: REFUSED — history-diverged"]);
     });
 
     it("replays a missed manifest commit, landing its row, no concept", async () => {
