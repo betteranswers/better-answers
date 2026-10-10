@@ -30,7 +30,7 @@ The three issues share the browser suite. BA-98 gave the SPA its theme switch an
 ### Problem Frame
 
 - **The consent page.** The theme is kept on the browser, in `localStorage` under `better-answers.theme`, and falls back to the device's colour scheme. The SPA's head script, `FIRST_PAINT` in `apps/web/src/shared/theme-switch.ts`, sets `data-theme` on `<html>` before the first paint. The api renders `/consent` and the refusal pages itself (`apps/api/src/auth/pages.ts`), outside the SPA, and cannot read `localStorage`. A person who chose dark is taken from a dark sign-in page to a light consent page.
-- **The edge check.** `controlEdges` in `apps/web/e2e/locators.ts` counts the borders of a control's parent when the parent holds no words of its own. That is how Jump to's field is found by its row's rule. A census of the suite on `a687b8da` found the rule lent in one more place, the audit log's filter toolbar, whose bottom hairline sits 13px under its one select. That is a layout's border, not a field's edge, and it is harmless there only because the select has an edge of its own. The check also composites backgrounds up the DOM but not an ancestor's `opacity`, so a field in a dimmed container measures at full strength. No page dims a container around an enabled field today.
+- **The edge check.** `controlEdges` in `apps/web/e2e/locators.ts` counts the borders of a control's parent when the parent holds no words of its own. That is how Jump to's field is found by its row's rule. A census of the suite on `a687b8da` found the rule lent in one more place, the audit log's filter toolbar, whose bottom hairline sits 13px under its one select. That is a layout's border, not a field's edge, and it is harmless there only because the select has an edge of its own. The check also composites backgrounds up the DOM but not an ancestor's `opacity`, so a control in a dimmed container measures at full strength. No page dims a container around an enabled control today.
 - **The harness.** `POST /__harness/connected-sources` with `kept: true` on a `default-on` *finding* trips the `finding_restore_check` constraint. An `unreadableReason` with a space fails the factory's pattern. Both answered 500 with no reason, and `ask` in `apps/web/e2e/harness.ts` reports only the status, so the author went to the server's log.
 
 ### Requirements
@@ -97,7 +97,7 @@ BA-120:
 ### Assumptions
 
 - `vite.config.ts` loads a workspace package's TypeScript when it reads the head script. The web build proves it.
-- Hono keeps a mounted app's own error handler, so the harness's 400 holds behind `apps/api/tests/serve.ts`. A browser spec proves it.
+- Hono keeps a mounted router's own error handler, so the harness's 400 holds behind `apps/api/tests/serve.ts`. A browser spec proves it.
 
 ---
 
@@ -119,7 +119,7 @@ BA-120:
 - **Execution note:** test first.
 - **Test scenarios:**
   - Refuses two edgeless fields in a padded box whose own border is strong: `test.fail()`.
-  - Refuses a field with a control's true edge inside a box dimmed to a third: `test.fail()`.
+  - Refuses a wordless checkbox with a control's true edge inside a box dimmed to a third: `test.fail()`. Axe already refuses a dimmed field by its words, so a field would not show the edge check alone.
   - Passes an edgeless field whose row draws a strong rule a few pixels under it, as Jump to's does.
   - Existing: every spec still passes the gate, `jump-to.spec.ts` and `audit-log.spec.ts` among them.
 - **Verification:** the whole browser suite on port 3232.
@@ -156,7 +156,7 @@ BA-120:
   - `apps/api/src/auth/pages.ts`: the shell's head script.
   - `apps/api/tests/auth-pages.test.ts`: every page carries the script once, ahead of the stylesheet.
   - `apps/web/e2e/consent.spec.ts`: the dark consent page and the dark refusal pages.
-  - `apps/web/CODING_STANDARDS.md` and `apps/api/CODING_STANDARDS.md`: where the rule lives and who inlines it.
+  - `apps/web/CODING_STANDARDS.md`: where the rule lives and who inlines it.
 - **Patterns to follow:** `keptOnThisBrowser` in `apps/web/e2e/dark-theme.spec.ts`; the logo and stylesheet the shell already inlines.
 - **Test scenarios:**
   - A person who kept dark, on a light device, opens the consent page: `data-theme` is `dark`, the page paints the dark `--surface-page`, no SPA script is on the page, and the accessibility gate passes.

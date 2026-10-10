@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
 
 import { RAIL } from "@/app/words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
@@ -41,6 +41,22 @@ const paintsTheDarkPage = async (page: Page, light: string): Promise<void> => {
   const painted = await pagePainted(page);
   expect(painted).toBe(await tokenPainted(page, "--surface-page", "background-color"));
   expect(painted, "the dark theme painted the light page").not.toBe(light);
+};
+
+/** A new workspace's Admin, signed in and on the consent page Claude asked for. */
+const anAdminAtConsent = async (
+  page: Page,
+  api: APIRequestContext,
+  origin: string,
+  who: string,
+) => {
+  const email = anAddress(who);
+  const workspace = await provision(api, { name: `${who} Ltd`, adminEmail: email });
+  await page.goto("/sign-in");
+  await signIn(page, api, email);
+  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
+  await expect(consentHeading(page)).toBeVisible();
+  return workspace;
 };
 
 const connectedAt = async (page: Page): Promise<URL> => {
@@ -92,12 +108,7 @@ test("draws consent in the sign-in pages' card, faces and tokens", async ({
   request,
   baseURL,
 }) => {
-  const email = anAddress("drawn");
-  await provision(request, { name: "Drawn Ltd", adminEmail: email });
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent" }));
-  await expect(consentHeading(page)).toBeVisible();
+  await anAdminAtConsent(page, request, baseURL ?? "", "drawn");
 
   expect(await drawnMarks(page), "the card stands for its primary button").toEqual(["card"]);
   const geistLoaded = await page.evaluate(async () => {
@@ -139,12 +150,7 @@ test("draws consent, then its refusal, in the dark theme kept", async ({
   passesTheAccessibilityGate,
 }) => {
   await page.emulateMedia({ colorScheme: "light" });
-  const email = anAddress("keeps-dark");
-  const workspace = await provision(request, { name: "Keeps Dark Ltd", adminEmail: email });
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent" }));
-  await expect(consentHeading(page)).toBeVisible();
+  const workspace = await anAdminAtConsent(page, request, baseURL ?? "", "keeps-dark");
   expect(await themeOf(page), "a light device opened a dark page").toBe("light");
   const light = await pagePainted(page);
 
@@ -172,14 +178,9 @@ test("follows a dark device on consent when nothing is kept", async ({
   passesTheAccessibilityGate,
 }) => {
   await page.emulateMedia({ colorScheme: "dark" });
-  const email = anAddress("dark-device");
-  await provision(request, { name: "Dark Device Ltd", adminEmail: email });
   await catchClaudesRedirect(page);
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent" }));
+  await anAdminAtConsent(page, request, baseURL ?? "", "dark-device");
 
-  await expect(consentHeading(page)).toBeVisible();
   expect(await themeOf(page), "a dark device opened a light page").toBe("dark");
   await passesTheAccessibilityGate();
   await connectedAt(page);
