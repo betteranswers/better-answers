@@ -59,6 +59,19 @@ export const passageBecomes = (changed: Answer) =>
     return passage === undefined ? data : { ...data, passage: { ...passage, ...changed } };
   });
 
+/** A batch refused as the api refuses a call past a ceiling, with a minute to wait, so no test runs against the clock. */
+export const refusedAtACeiling = (route: Route): Promise<void> => {
+  const calls = new URL(route.request().url()).pathname.split(",");
+  const refusal = {
+    error: {
+      message: "Too many requests.",
+      code: -32_029,
+      data: { code: "TOO_MANY_REQUESTS", httpStatus: 429, retryAfterSeconds: 60 },
+    },
+  };
+  return route.fulfill({ status: 429, json: calls.map(() => refusal) });
+};
+
 /** Holds each request it names until `release`, so a test acts while the page still waits on it. */
 export const heldBack = async (page: Page, named: (url: URL) => boolean) => {
   const held = Promise.withResolvers<void>();
@@ -75,9 +88,12 @@ export const heldBack = async (page: Page, named: (url: URL) => boolean) => {
 export const windowRefocused = (page: Page): Promise<void> =>
   page.evaluate(async () => {
     window.dispatchEvent(new Event("visibilitychange"));
-    await new Promise((later) => {
-      setTimeout(later);
-    });
+    // Two tasks on: the query client resumes its paused actions first, and the api's client batches on a timer.
+    for (const _task of [1, 2]) {
+      await new Promise((later) => {
+        setTimeout(later);
+      });
+    }
     await fetch("/health");
   });
 

@@ -1,4 +1,4 @@
-import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
+import type { APIRequestContext, Locator, Page, Request, Route } from "@playwright/test";
 
 import { BROWSE, SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import {
@@ -33,6 +33,7 @@ import {
   matchesBecome,
   passageBecomes,
   readsCeilingFilled,
+  refusedAtACeiling,
   scrolledSideways,
   windowRefocused,
 } from "./knowledge.ts";
@@ -62,6 +63,15 @@ const asked = (query: string): string =>
 
 /** No document holds this id, so an open of a passage in it reads nothing. */
 const NO_SUCH_DOCUMENT = "01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
+
+/** The api's own refusal: the open is asked of a passage in a document nobody holds. */
+const asOfADocumentNobodyHolds = (route: Route): Promise<void> =>
+  route.continue({
+    url: route
+      .request()
+      .url()
+      .replace(/[0-9A-Z]{26}(?=(?:\/|%2F)chars)/, NO_SUCH_DOCUMENT),
+  });
 
 /** A page past the first names its cursor in the batched input. */
 const isAFindPastTheFirstPage = (url: URL): boolean =>
@@ -421,6 +431,9 @@ test.describe("the Knowledge Search page", () => {
     await searchBox(page).fill("forklift");
     await expect(panel, "a new search left the last one's passage open").toHaveCount(0);
     await expect(searchBox(page)).toBeFocused();
+    await expect(said(page), "a new search was said to have lost a passage").toHaveText(
+      WORDS.noMatches("forklift"),
+    );
   });
 
   test("says why a passage went unread, offering a retry", async ({ page, request }) => {
@@ -440,15 +453,7 @@ test.describe("the Knowledge Search page", () => {
   test("says a passage it cannot read is not there", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Holme Records", [handbookSeeded]);
     await searched(page, "pallet");
-    // The api's own refusal, asked for a passage in a document nobody holds.
-    await page.route(isAnOpen, (route) =>
-      route.continue({
-        url: route
-          .request()
-          .url()
-          .replace(/[0-9A-Z]{26}(?=(?:\/|%2F)chars)/, NO_SUCH_DOCUMENT),
-      }),
-    );
+    await page.route(isAnOpen, asOfADocumentNobodyHolds);
     await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
 
     const panel = passagePanel(page, HANDBOOK);
@@ -470,6 +475,17 @@ test.describe("the Knowledge Search page", () => {
     await expect(panel).toContainText(`${WORDS.notCompanyKnowledge} · Restricted`);
     await expect(panel, "the panel copied the match's sensitivity").not.toContainText("Internal");
     await expect(first).toContainText(`${WORDS.notCompanyKnowledge} · Internal`);
+
+    // The same passage refused on its next read: the title once read does not stand over the refusal.
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await page.unroute(isAnOpen);
+    await page.route(isAnOpen, asOfADocumentNobodyHolds);
+    await first.getByRole("button", { name: HANDBOOK }).click();
+    await expect(passagePanel(page, HANDBOOK).getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_KNOWLEDGE["not-found"]),
+    );
+    await expect(page.getByText(renamed), "a refused read kept its earlier title").toHaveCount(0);
   });
 
   for (const width of [1024, 1280]) {
@@ -512,6 +528,13 @@ test.describe("the Knowledge Search page", () => {
       await expect(matchesOf(page)).toHaveCount(A_PAGE - 2);
       await expect(said(page)).toHaveText(saidItLeft);
       await expect(searchBox(page), "focus was taken from where the reader put it").toBeFocused();
+
+      await searchBox(page).fill("forklift");
+      await expect(said(page)).toHaveText(WORDS.noMatches("forklift"));
+      await searchBox(page).fill("pallet");
+      await expect(said(page), "a search come back to still says a passage left").toHaveText(
+        WORDS.matched("pallet", true),
+      );
     });
   }
 
@@ -565,27 +588,47 @@ test.describe("the Knowledge Search page", () => {
     await readsCeilingFilled(page, (await first).url());
 
     const asked: string[] = [];
-    const opens: string[] = [];
     page.on("request", (sent) => {
       if (isAFind(new URL(sent.url())) && sent.url().includes("forklift")) asked.push(sent.url());
-      if (isAnOpen(new URL(sent.url()))) opens.push(sent.url());
     });
-
-    const opener = handbookMatches(page).first().getByRole("button", { name: HANDBOOK });
-    const panel = passagePanel(page, HANDBOOK);
-    await opener.click();
-    await expect(panel.getByRole("alert")).toHaveText(sentenceOf(readsCeiling(60)));
-    await page.keyboard.press("Escape");
-    await expect(panel).toHaveCount(0);
-    await opener.click();
-    await expect(panel.getByRole("alert")).toHaveText(sentenceOf(readsCeiling(60)));
-    await windowRefocused(page);
-    expect(opens, "the panel asked again while its wait ran").toHaveLength(1);
-
     await searchBox(page).fill("forklift");
     await expect(alerted(page)).toHaveText(sentenceOf(readsCeiling(60)));
     await windowRefocused(page);
     expect(asked, "the page asked again past the ceiling").toHaveLength(1);
+  });
+
+  test("asks a passage at its ceiling again only when pressed", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Ouse Records", [handbookSeeded]);
+    await searched(page, "pallet");
+    const panel = passagePanel(page, HANDBOOK);
+    const closed = async (): Promise<void> => {
+      await page.keyboard.press("Escape");
+      await expect(panel).toHaveCount(0);
+    };
+    // One passage is read before the ceiling and one never: a mount asks each again by its own road.
+    const read = handbookMatches(page).nth(1).getByRole("button", { name: HANDBOOK });
+    const unread = handbookMatches(page).first().getByRole("button", { name: HANDBOOK });
+    await read.click();
+    await expect(panel.getByRole("blockquote")).toContainText("Pallet bay");
+    await closed();
+    const opens: string[] = [];
+    page.on("request", (sent) => {
+      if (isAnOpen(new URL(sent.url()))) opens.push(sent.url());
+    });
+    await page.route(isAnOpen, refusedAtACeiling);
+
+    for (const opener of [unread, read]) {
+      await opener.click();
+      await expect(panel.getByRole("alert")).toHaveText(sentenceOf(readsCeiling(60)));
+      await closed();
+      await opener.click();
+      await expect(panel.getByRole("alert")).toHaveText(sentenceOf(readsCeiling(60)));
+      await closed();
+    }
+    await read.click();
+    await expect(panel.getByRole("alert")).toHaveText(sentenceOf(readsCeiling(60)));
+    await windowRefocused(page);
+    expect(opens, "a passage was asked for again while its wait ran").toHaveLength(2);
   });
 
   test("offers a retry when the first read fails", async ({ page, request }) => {
@@ -623,6 +666,10 @@ test.describe("the Knowledge Search page", () => {
     await searchRegion(page).getByRole("button", { name: "Retry" }).click();
     await expect(matchesOf(page)).toHaveCount(PALLET_PASSAGES.length);
     await expect(alerted(page)).toHaveCount(0);
+    await expect(
+      matchesOf(page).nth(A_PAGE),
+      "the retried page did not land focus on its first match",
+    ).toBeFocused();
   });
 
   test("renders matches within the list's budget", async ({ page, request }) => {
