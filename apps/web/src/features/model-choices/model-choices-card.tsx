@@ -1,9 +1,9 @@
 import { useReadSaid } from "@/shared/read-said.ts";
-import { Badge } from "@/shared/ui/badge.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
+import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { useWorkspaceModelChoices, type WorkspaceModelChoice } from "./list-model-choices.ts";
-import { MODEL_CHOICES_WORDS } from "./words.ts";
+import { MODEL_CHOICES_WORDS, providerWordOf } from "./words.ts";
 
 const PURPOSE_NAMES = {
   extraction: "Extraction",
@@ -29,7 +29,7 @@ function ModelChoiceFields(properties: { readonly modelChoice: WorkspaceModelCho
     <dl className="mt-1 flex flex-col gap-1 sm:flex-row sm:gap-8">
       <div className="flex gap-2">
         <dt className="text-muted-foreground">Provider</dt>
-        <dd>{provider}</dd>
+        <dd>{providerWordOf(provider)}</dd>
       </div>
       <div className="flex gap-2">
         <dt className="text-muted-foreground">Model</dt>
@@ -46,8 +46,7 @@ function FixedNote(properties: { readonly modelChoice: WorkspaceModelChoice }) {
   return (
     <>
       <p className="mt-2">
-        {/* The outline is decoration: a reader who cannot see it loses nothing. */}
-        <Badge variant="outline">{MODEL_CHOICES_WORDS.fixed}</Badge>{" "}
+        <Pill>{MODEL_CHOICES_WORDS.fixed}</Pill>{" "}
         {modelChoice.dimensions === null ? null : (
           <span className="text-muted-foreground">{modelChoice.dimensions} dimensions</span>
         )}
@@ -80,6 +79,12 @@ function ModelChoiceList(properties: { readonly modelChoices: readonly Workspace
   );
 }
 
+/** Said once for the card, however many purposes have no model choice. */
+function WhoSets(properties: { readonly modelChoices: readonly WorkspaceModelChoice[] }) {
+  if (properties.modelChoices.every(isSet)) return null;
+  return <p className="text-muted-foreground">{MODEL_CHOICES_WORDS.whoSets}</p>;
+}
+
 export function ModelChoicesCard() {
   const modelChoices = useWorkspaceModelChoices();
   const said = useReadSaid(modelChoices);
@@ -92,6 +97,7 @@ export function ModelChoicesCard() {
             <h2 id="model-choices">Model choices</h2>
           </CardTitle>
           <p className="text-muted-foreground">{MODEL_CHOICES_WORDS.lead}</p>
+          {modelChoices.data === undefined ? null : <WhoSets modelChoices={modelChoices.data} />}
         </CardHeader>
 
         <CardContent aria-live="polite">
