@@ -31,6 +31,8 @@ const calledBy = async (person: { readonly email: string }, tool: string, args: 
   return structured(await calledTool(client, accessToken, tool, args));
 };
 
+const evidenceOf = (opened: Rpc) => rpcListOf(rpcOf(opened["concept"])["evidence"]);
+
 const foundBy = async (person: { readonly email: string }, query: string) =>
   rpcListOf((await calledBy(person, "find", { query }))["hits"]).map((hit) => hit["iri"]);
 
@@ -90,5 +92,92 @@ describe("the browser suite's knowledge harness", () => {
     const passage = await calledBy(workspace.admin, "open", { locator: cited?.["locator"] });
 
     expect(passage).toMatchObject({ found: true, passage: { text: "Checked at six." } });
+  });
+
+  it("lands a readable concept citing a document a Viewer cannot", async () => {
+    const workspace = await app().provision();
+    const viewer = await app().person();
+    await app().addMember(workspace.workspaceId, viewer.id, "Viewer");
+    const [concept] = await conceptsSeeded({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      concepts: [
+        {
+          title: "Quarry blast times",
+          body: "The synthetic quarry blasts at noon.",
+          sources: [
+            { title: "Synthetic site notice", passages: ["Blasting is at noon."] },
+            {
+              title: "Synthetic blast licence",
+              passages: ["Licensed for noon blasts."],
+              sensitivity: "Restricted",
+            },
+          ],
+        },
+      ],
+    });
+
+    const forTheAdmin = evidenceOf(await calledBy(workspace.admin, "open", { iri: concept?.iri }));
+    const forTheViewer = evidenceOf(await calledBy(viewer, "open", { iri: concept?.iri }));
+
+    expect(forTheAdmin).toEqual([
+      { id: "source-1", source: "Synthetic site notice", locator: expect.any(String) },
+      { id: "source-2", source: "Synthetic blast licence", locator: expect.any(String) },
+    ]);
+    expect(forTheViewer).toEqual([
+      { id: "source-1", source: "Synthetic site notice", locator: expect.any(String) },
+      { id: "source-2", source: "Synthetic blast licence" },
+    ]);
+  });
+
+  it("lands a source naming a concept, and a page locator", async () => {
+    const workspace = await app().provision();
+    const [earlier, concept] = await conceptsSeeded({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      concepts: [
+        { title: "Quarry haul roads", body: "Synthetic haul roads are graded weekly." },
+        {
+          title: "Quarry speed limits",
+          body: "Synthetic haul roads carry a limit.",
+          sources: [{ concept: "Quarry haul roads" }, { title: "Synthetic site rules", at: "p.4" }],
+        },
+      ],
+    });
+
+    const evidence = evidenceOf(await calledBy(workspace.admin, "open", { iri: concept?.iri }));
+
+    expect(evidence).toEqual([
+      { id: "source-1", source: "Quarry haul roads", iri: earlier?.iri },
+      { id: "source-2", source: "Synthetic site rules", at: "p.4" },
+    ]);
+  });
+
+  it("lands the further frontmatter keys a concept is given", async () => {
+    const workspace = await app().provision();
+    const [concept] = await conceptsSeeded({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      concepts: [
+        {
+          title: "Quarry dust limits",
+          body: "Synthetic dust is damped down hourly.",
+          frontmatter: {
+            description: "How synthetic dust is kept down.",
+            tags: ["dust", "air"],
+            verified: [{ by: "process:synthetic-checker", at: "2026-03-03T09:41:00Z" }],
+          },
+        },
+      ],
+    });
+
+    const opened = await calledBy(workspace.admin, "open", { iri: concept?.iri });
+
+    expect(rpcOf(rpcOf(opened["concept"])["frontmatter"])).toMatchObject({
+      title: "Quarry dust limits",
+      description: "How synthetic dust is kept down.",
+      tags: ["dust", "air"],
+      verified: [{ by: "process:synthetic-checker", at: "2026-03-03T09:41:00Z" }],
+    });
   });
 });

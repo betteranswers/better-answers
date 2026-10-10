@@ -15,7 +15,20 @@ const SUITE_VERIFIER = "process:better-answers-browser-suite";
 const aCitedDocument = z.object({
   title: z.string().min(1),
   passages: z.array(z.string().min(1)).min(1),
+  /** Its connected source's own, where the document is held closer than the concept citing it. */
+  sensitivity: z.enum(SENSITIVITIES).optional(),
 });
+
+/** A source naming a concept seeded before this one, by its title. */
+const aCitedConcept = z.object({ concept: z.string().min(1) });
+
+/** A source with a place of the file's own in it, such as `p.4`, which opens nothing. */
+const aCitedPlace = z.object({ title: z.string().min(1), at: z.string().min(1) });
+
+const aFrontmatterEntry = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean(), z.null()]),
+);
 
 const aConcept = z.object({
   title: z.string().min(1),
@@ -26,7 +39,21 @@ const aConcept = z.object({
   groupMemberIds: z.array(z.string().min(1)).default([]),
   trust: z.enum(TRUST_TIERS).default("unverified"),
   linksTo: z.array(z.string().min(1)).default([]),
-  sources: z.array(aCitedDocument).default([]),
+  sources: z.array(z.union([aCitedDocument, aCitedConcept, aCitedPlace])).default([]),
+  /** Further keys of the file's own, such as `tags` or `verified`. */
+  frontmatter: z
+    .record(
+      z.string(),
+      z.union([
+        z.string(),
+        z.number(),
+        z.boolean(),
+        z.null(),
+        z.array(z.string()),
+        z.array(aFrontmatterEntry),
+      ]),
+    )
+    .default({}),
 });
 
 type AskedConcept = z.output<typeof aConcept>;
@@ -37,11 +64,13 @@ export const conceptsSeeding = z.object({
   concepts: z.array(aConcept).min(1),
 });
 
+/** `documentId` only where the source is a passage, which the write records as evidence. */
 type Citation = {
   readonly id: string;
-  readonly documentId: string;
   readonly title: string;
-  readonly locator: string;
+  readonly resource: string;
+  readonly locator?: string;
+  readonly documentId?: string;
 };
 
 type SeededConcept = {
@@ -66,55 +95,118 @@ const shortNameOf = (title: string): string =>
 /** Every concept sits directly under `knowledge/`, so a link names the file alone. */
 const fileOf = (title: string): string => `${shortNameOf(title)}.md`;
 
-/** One published connected source per concept, at its sensitivity; each passage is cited apart. */
+type AskedSource = AskedConcept["sources"][number];
+
+type Sensitivity = AskedConcept["sensitivity"];
+
+type Seeding = {
+  readonly seed: ReturnType<typeof testData>;
+  readonly workspaceId: string;
+  readonly concept: AskedConcept;
+  readonly earlier: readonly SeededConcept[];
+  /** One published connected source for each sensitivity the concept's documents are held at. */
+  readonly connectedSources: Map<Sensitivity, string>;
+};
+
+const connectedSourceAt = async (seeding: Seeding, sensitivity: Sensitivity): Promise<string> => {
+  const held = seeding.connectedSources.get(sensitivity);
+  if (held !== undefined) return held;
+  const { concept, workspaceId } = seeding;
+  const own = sensitivity === concept.sensitivity;
+  const made = await seeding.seed.connectedSource({
+    workspaceId,
+    name: own ? `${concept.title} sources` : `${concept.title} ${sensitivity} sources`,
+    sensitivity,
+    publishedAt: new Date(),
+    state: "published",
+  });
+  seeding.connectedSources.set(sensitivity, made.id);
+  return made.id;
+};
+
+type Unnumbered = Omit<Citation, "id">;
+
+/** Each passage is cited apart, by its document and its span in it. */
+const passagesCited = async (
+  seeding: Seeding,
+  source: z.output<typeof aCitedDocument>,
+): Promise<readonly Unnumbered[]> => {
+  const { seed, workspaceId, concept } = seeding;
+  const connectedSourceId = await connectedSourceAt(
+    seeding,
+    source.sensitivity ?? concept.sensitivity,
+  );
+  const document = await seed.sourceDocument({
+    workspaceId,
+    connectedSourceId,
+    title: source.title,
+    sourceSystemId: source.title,
+  });
+  const spans = await seedPassages(
+    seed,
+    workspaceId,
+    connectedSourceId,
+    document.id,
+    source.passages,
+  );
+  return spans.map((span) => ({
+    title: source.title,
+    resource: source.title,
+    locator: `${document.id}/${span}`,
+    documentId: document.id,
+  }));
+};
+
+const conceptCited = (seeding: Seeding, title: string): Unnumbered => {
+  const named = seeding.earlier.find((seeded) => seeded.title === title);
+  if (named === undefined) {
+    throw new Error(`${seeding.concept.title} cites ${title}, not seeded before it`);
+  }
+  return { title, resource: named.iri };
+};
+
+const cited = async (seeding: Seeding, source: AskedSource): Promise<readonly Unnumbered[]> => {
+  if ("passages" in source) return passagesCited(seeding, source);
+  if ("concept" in source) return [conceptCited(seeding, source.concept)];
+  return [{ title: source.title, resource: source.title, locator: source.at }];
+};
+
+/** The concept's sources in the order asked, each with the id its citation mark names. */
 const citationsOf = async (
   app: TestApp,
   workspaceId: string,
   concept: AskedConcept,
+  earlier: readonly SeededConcept[],
 ): Promise<readonly Citation[]> => {
   if (concept.sources.length === 0) return [];
   return inOneTransaction(app, async (client) => {
-    const seed = testData(client);
-    const connectedSource = await seed.connectedSource({
+    const seeding = {
+      seed: testData(client),
       workspaceId,
-      name: `${concept.title} sources`,
-      sensitivity: concept.sensitivity,
-      publishedAt: new Date(),
-      state: "published",
-    });
+      concept,
+      earlier,
+      connectedSources: new Map<Sensitivity, string>(),
+    };
     const citations: Citation[] = [];
     for (const source of concept.sources) {
-      const document = await seed.sourceDocument({
-        workspaceId,
-        connectedSourceId: connectedSource.id,
-        title: source.title,
-        sourceSystemId: source.title,
-      });
-      const locators = await seedPassages(
-        seed,
-        workspaceId,
-        connectedSource.id,
-        document.id,
-        source.passages,
-      );
-      for (const span of locators) {
-        const id = `source-${String(citations.length + 1)}`;
-        // A row keeps its span alone; a citation names the passage by its document too.
-        const locator = `${document.id}/${span}`;
-        citations.push({ id, documentId: document.id, title: source.title, locator });
+      for (const one of await cited(seeding, source)) {
+        citations.push({ id: `source-${String(citations.length + 1)}`, ...one });
       }
     }
     return citations;
   });
 };
 
-/** A citation mark per source after the body's own words, then a link to each concept it names. */
+/** A mark per source after the body's words, unless the body places it, then each concept it links. */
 const bodyOf = (
   concept: AskedConcept,
   citations: readonly Citation[],
   links: readonly SeededConcept[],
 ): string => {
-  const marks = citations.map((citation) => `[^${citation.id}]`).join("");
+  const marks = citations
+    .map((citation) => `[^${citation.id}]`)
+    .filter((mark) => !concept.body.includes(mark))
+    .join("");
   const named = links.map((link) => `[${link.title}](${fileOf(link.title)})`);
   const related = named.length === 0 ? "" : `\n\nSee also ${named.join(", ")}.`;
   return `${concept.body}${marks}${related}\n`;
@@ -138,7 +230,7 @@ const conceptWritten = async (
   earlier: readonly SeededConcept[],
 ) => {
   const { principal, git } = writer;
-  const citations = await citationsOf(app, principal.workspaceId, concept);
+  const citations = await citationsOf(app, principal.workspaceId, concept, earlier);
   const path = `knowledge/${fileOf(concept.title)}`;
   const written = await writeConcept(
     principal,
@@ -149,14 +241,12 @@ const conceptWritten = async (
       kind: concept.kind,
       title: concept.title,
       frontmatter: {
+        ...concept.frontmatter,
         title: concept.title,
         type: concept.kind,
-        sources: citations.map(({ id, title, locator }) => ({
-          id,
-          title,
-          resource: title,
-          locator,
-        })),
+        sources: citations.map(({ id, title, resource, locator }) =>
+          locator === undefined ? { id, title, resource } : { id, title, resource, locator },
+        ),
       },
       body: bodyOf(concept, citations, linkedFrom(concept, earlier)),
       message: `Record ${concept.title}`,
@@ -164,11 +254,11 @@ const conceptWritten = async (
       expects: { head: await head(principal, git) },
       status: "stable",
       sensitivity: concept.sensitivity,
-      evidence: citations.map(({ documentId, title, locator }) => ({
-        sourceDocumentId: documentId,
-        locator,
-        resource: title,
-      })),
+      evidence: citations.flatMap(({ documentId, resource, locator }) =>
+        documentId === undefined || locator === undefined
+          ? []
+          : [{ sourceDocumentId: documentId, locator, resource }],
+      ),
     },
   );
   if (!written.ok) throw new Error(`${concept.title} was refused: ${String(written.error)}`);
@@ -201,6 +291,31 @@ const narrowedToAGroup = async (
   );
 };
 
+/** The Admin's own override, to everyone at the concept's sensitivity: shared beyond its evidence. */
+const sharedPastItsEvidence = async (
+  app: TestApp,
+  writer: Writer,
+  concept: AskedConcept,
+  iri: string,
+) => {
+  const { workspaceId, userId } = writer.principal;
+  await actingIn(app, { workspaceId, userId }, (principal, tx) =>
+    overrideConceptSensitivity(principal, tx, {
+      iri,
+      sensitivity: concept.sensitivity,
+      audience: "everyone",
+    }),
+  );
+};
+
+const citesCloserHeldEvidence = (concept: AskedConcept): boolean =>
+  concept.sources.some(
+    (source) =>
+      "passages" in source &&
+      source.sensitivity !== undefined &&
+      source.sensitivity !== concept.sensitivity,
+  );
+
 const verified = async (
   app: TestApp,
   writer: Writer,
@@ -227,8 +342,15 @@ const seedConcept = async (
 ): Promise<SeededConcept> => {
   const written = await conceptWritten(app, writer, concept, earlier);
   if (concept.audience === "groups") await narrowedToAGroup(app, writer, concept, written.iri);
+  else if (citesCloserHeldEvidence(concept)) {
+    await sharedPastItsEvidence(app, writer, concept, written.iri);
+  }
   if (concept.trust !== "unverified") await verified(app, writer, concept, written);
-  const documents = new Map(written.citations.map(({ documentId, title }) => [documentId, title]));
+  const documents = new Map(
+    written.citations.flatMap(({ documentId, title }) =>
+      documentId === undefined ? [] : [[documentId, title] as const],
+    ),
+  );
   return {
     iri: written.iri,
     title: concept.title,
