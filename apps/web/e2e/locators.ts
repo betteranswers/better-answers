@@ -300,8 +300,8 @@ export const paintedOver = (top: string, under: string): string => {
 };
 
 /**
- * A wordless wrapper lends a field the sides that hug it; a worded checkbox, radio or switch is
- * found by its words. Opacity is composited.
+ * A wordless wrapper hugging a field lends its fill and hugging sides; a worded checkbox, radio or
+ * switch goes by its words. Opacity is composited.
  */
 export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
   page.evaluate(() => {
@@ -344,18 +344,20 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
       };
       return from(0, WHITE);
     };
-    /** The sides `element` draws; lent to a field, only those that hug the field's own. */
-    const sidesOf = (element: Element, lentTo?: Element): string[] => {
+    type Side = (typeof SIDES)[number];
+    const sidesHugging = (field: Element, around: Element): readonly Side[] => {
+      const own = field.getBoundingClientRect();
+      const box = around.getBoundingClientRect();
+      return SIDES.filter((side) => Math.abs(box[side] - own[side]) < HUGS_WITHIN_PX);
+    };
+    /** Those of `sides` that `element` draws. */
+    const sidesOf = (element: Element, sides: readonly Side[] = SIDES): string[] => {
       const style = getComputedStyle(element);
-      const box = element.getBoundingClientRect();
-      const field = lentTo?.getBoundingClientRect();
-      return SIDES.filter(
-        (side) =>
-          Number.parseFloat(style.getPropertyValue(`border-${side}-width`)) > 0 &&
-          (field === undefined || Math.abs(box[side] - field[side]) < HUGS_WITHIN_PX),
-      ).map((side) =>
-        painted(shownThrough(element, [rgba(style.getPropertyValue(`border-${side}-color`))])),
-      );
+      return sides
+        .filter((side) => Number.parseFloat(style.getPropertyValue(`border-${side}-width`)) > 0)
+        .map((side) =>
+          painted(shownThrough(element, [rgba(style.getPropertyValue(`border-${side}-color`))])),
+        );
     };
     const words = (element: Element) => element.textContent.trim();
     const seen = (control: HTMLElement): boolean =>
@@ -372,13 +374,16 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
     };
     const measured = (control: HTMLElement) => {
       const parent = control.parentElement;
-      const wrapper =
+      const wordless =
         parent !== null && parent !== document.body && words(parent) === words(control)
           ? parent
           : undefined;
+      const hugged = wordless === undefined ? [] : sidesHugging(control, wordless);
+      // A wordless parent no side of which hugs is a layout box: the field is measured against it.
+      const wrapper = hugged.length > 0 ? wordless : undefined;
       return {
         control: nameOf(control),
-        edges: [...sidesOf(control), ...(wrapper === undefined ? [] : sidesOf(wrapper, control))],
+        edges: [...sidesOf(control), ...(wrapper === undefined ? [] : sidesOf(wrapper, hugged))],
         fill: painted(shownThrough(control, [])),
         behind: painted(shownThrough((wrapper ?? control).parentElement, [])),
       };
