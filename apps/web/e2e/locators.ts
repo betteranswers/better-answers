@@ -303,12 +303,15 @@ export const paintedOver = (top: string, under: string): string => {
 export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
   page.evaluate(() => {
     type Rgba = readonly [number, number, number, number];
+    // A computed colour can be `oklab()` or `color()`, which Tailwind's `/50` writes; a canvas reads any.
+    const pixel = new OffscreenCanvas(1, 1).getContext("2d", { willReadFrequently: true });
     const rgba = (colour: string): Rgba => {
-      const parts = /rgba?\(([^)]+)\)/.exec(colour)?.[1]?.split(/[ ,/]+/) ?? [];
-      const [red = 0, green = 0, blue = 0, alpha = 1] = parts
-        .filter((part) => part !== "")
-        .map(Number);
-      return [red, green, blue, alpha];
+      if (pixel === null) throw new Error("the page has no canvas to read a colour with");
+      pixel.clearRect(0, 0, 1, 1);
+      pixel.fillStyle = colour;
+      pixel.fillRect(0, 0, 1, 1);
+      const [red = 0, green = 0, blue = 0, alpha = 0] = pixel.getImageData(0, 0, 1, 1).data;
+      return [red, green, blue, alpha / 255];
     };
     const over = (top: Rgba, under: Rgba): Rgba => {
       const mix = (at: 0 | 1 | 2) => top[at] * top[3] + under[at] * (1 - top[3]);

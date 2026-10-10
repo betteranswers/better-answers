@@ -271,7 +271,7 @@ is another origin and no page of ours. A test that ends somewhere this product d
 audited nothing is refused by name, so an absence is a failure rather than a silence.
 
 `apps/web/e2e/models-and-spend.spec.ts` carries all three and is the model to copy.
-`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: seven of its eleven tests are
+`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: eight of its twelve tests are
 `test.fail()`, so the run prints them with a ✘ and counts them passed — that is the gate firing
 where it should, and an `Expected to fail, but passed` there means the gate has stopped running.
 

@@ -81,6 +81,18 @@ const drawAFieldWithNoEdge = (): void => {
   document.querySelector("main")?.append(field);
 };
 
+/** A white-edged field on a see-through tint, as a hovered row paints it: lost in light alone. */
+const drawAFieldWithNoEdgeOnATint = (): void => {
+  const tint = document.createElement("div");
+  tint.style.cssText =
+    "padding: 8px; background: color-mix(in oklab, var(--muted) 50%, transparent)";
+  const field = document.createElement("input");
+  field.setAttribute("aria-label", "A field nobody can find on a tint");
+  field.style.cssText = "border: 1px solid var(--grey-0); background: transparent";
+  tint.append(field);
+  document.querySelector("main")?.append(tint);
+};
+
 const theSignInPage = async (page: Page): Promise<void> => {
   await page.goto("/sign-in");
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
@@ -154,4 +166,10 @@ test("refuses a field drawn with no edge to find", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
   await page.evaluate(drawAFieldWithNoEdge);
+});
+
+test("refuses a field with no edge on a see-through tint", async ({ page }) => {
+  test.fail();
+  await theSignInPage(page);
+  await page.evaluate(drawAFieldWithNoEdgeOnATint);
 });

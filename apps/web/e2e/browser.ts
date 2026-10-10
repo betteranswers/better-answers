@@ -110,12 +110,9 @@ const auditOf = async (page: Page): Promise<void> => {
   await auditIn(page, own ?? "light");
   const other = own === "dark" ? "light" : "dark";
   await themeSet(page, other);
-  try {
-    await auditIn(page, other);
-  } finally {
-    await themeSet(page, own);
-    await transitionsHaveEnded(page);
-  }
+  await auditIn(page, other);
+  await themeSet(page, own);
+  await transitionsHaveEnded(page);
 };
 
 export type BrowserFixtures = {
