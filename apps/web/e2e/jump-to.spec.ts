@@ -1,6 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { JUMP_TO, nothingMatches, searchFor } from "@/app/words.ts";
+import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import {
   ASK,
@@ -39,8 +40,6 @@ const MODELS_AND_SPEND = pageNamed(MODELS, "Models and spend");
 
 /** Declared and never built, so no reader may find it. */
 const SIGNALS = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Signals");
-
-const SEARCH = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
 
 const EVERY_WORKSPACE = pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every workspace");
 

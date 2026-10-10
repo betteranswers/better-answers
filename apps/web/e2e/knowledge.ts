@@ -1,4 +1,10 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import {
+  expect,
+  type APIRequestContext,
+  type Page,
+  type Response,
+  type Route,
+} from "@playwright/test";
 import { z } from "zod";
 
 import type { AUDIENCES, SENSITIVITIES } from "@better-answers/schema";
@@ -9,6 +15,71 @@ import { keystrokesDismissed, keystrokesListed } from "./harness.ts";
 export const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
 
 export const isAnOpen = (url: URL): boolean => url.pathname.includes("knowledge.open");
+
+type Answer = Readonly<Record<string, unknown>>;
+
+const anAnswer = z.record(z.string(), z.unknown());
+
+const batched = z.array(z.object({ result: z.object({ data: anAnswer }) }));
+
+/** The api's own answers changed on their way to the page; a batch can carry a find beside an open. */
+const answeredWith =
+  (changed: (data: Answer) => Answer) =>
+  async (route: Route): Promise<void> => {
+    const response = await route.fetch();
+    const answers = batched.parse(await response.json());
+    await route.fulfill({
+      response,
+      json: answers.map(({ result }) => ({ result: { data: changed(result.data) } })),
+    });
+  };
+
+const matchesIn = z.object({ matches: z.array(anAnswer) });
+
+const matchesOf = (data: Answer): readonly Answer[] | undefined =>
+  matchesIn.safeParse(data).data?.matches;
+
+/** The matches a `knowledge.find` answered with, as the page was sent them. */
+export const matchesAnswered = async (response: Response): Promise<readonly Answer[]> =>
+  batched.parse(await response.json()).flatMap(({ result }) => matchesOf(result.data) ?? []);
+
+/** A find's answer with its matches changed and the rest as the api sent it. */
+export const matchesBecome = (changed: (matches: readonly Answer[]) => readonly Answer[]) =>
+  answeredWith((data) => {
+    const matches = matchesOf(data);
+    return matches === undefined ? data : { ...data, matches: changed(matches) };
+  });
+
+const passageIn = z.object({ passage: anAnswer });
+
+/** An open's answer with some of its passage changed and the rest as the api sent it. */
+export const passageBecomes = (changed: Answer) =>
+  answeredWith((data) => {
+    const passage = passageIn.safeParse(data).data?.passage;
+    return passage === undefined ? data : { ...data, passage: { ...passage, ...changed } };
+  });
+
+/** Holds each request it names until `release`, so a test acts while the page still waits on it. */
+export const heldBack = async (page: Page, named: (url: URL) => boolean) => {
+  const held = Promise.withResolvers<void>();
+  const reached = Promise.withResolvers<void>();
+  await page.route(named, async (route) => {
+    reached.resolve();
+    await held.promise;
+    await route.continue();
+  });
+  return { reached: reached.promise, release: held.resolve };
+};
+
+/** The window taking focus again. Its own request leaves after any read that asked, so a count taken next holds it. */
+export const windowRefocused = (page: Page): Promise<void> =>
+  page.evaluate(async () => {
+    window.dispatchEvent(new Event("visibilitychange"));
+    await new Promise((later) => {
+      setTimeout(later);
+    });
+    await fetch("/health");
+  });
 
 /** One more call than the person's knowledge reads may make in a minute. */
 const PAST_THE_READS_CEILING = 121;

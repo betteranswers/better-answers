@@ -1,6 +1,7 @@
 import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
 
 import { BREADCRUMB } from "@/app/words.ts";
+import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import { CONCEPT_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import {
   CONCEPT_WORDS as WORDS,
@@ -8,7 +9,8 @@ import {
   SEARCH_WORDS,
 } from "@/features/knowledge/knowledge-words.ts";
 import { readsCeiling, SAID_OF_KNOWLEDGE } from "@/features/knowledge/refusal-words.ts";
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { MEMBERS_PAGE } from "@/features/people/members-address.ts";
+import { CONTROL_CENTRE } from "@/shared/navigation.ts";
 import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -17,8 +19,10 @@ import {
   anAddress,
   crumbOf,
   landedAtHome,
+  navOf,
   person,
   provision,
+  railOf,
   signIn,
   skipLinkReachesThePage,
   switcherMenuOf,
@@ -26,18 +30,16 @@ import {
 } from "./harness.ts";
 import {
   conceptsSeeded,
+  heldBack,
   isAFind,
   isAnOpen,
   listsItsKeystrokes,
   readsCeilingFilled,
   scrolledSideways,
+  windowRefocused,
 } from "./knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
-
-const browse = menuGroupIn(KNOWLEDGE, "browse");
-
-const SEARCH = pageNamed(browse, "Search");
 
 const COMMITTEE = "Audit Committee";
 
@@ -215,6 +217,14 @@ const atTheConcept = async (page: Page, seeded: Workspace, title: string): Promi
   const concept = conceptOf(page, title);
   await expect(concept).toBeVisible();
   return concept;
+};
+
+/** Back an entry at a time: the pages between are hidden from the reader by then. */
+const wentBackTo = async (page: Page, address: string): Promise<void> => {
+  for (let entries = 0; entries < 5 && !page.url().endsWith(address); entries += 1) {
+    await page.goBack();
+  }
+  await expect(page).toHaveURL(new RegExp(`${address}$`));
 };
 
 const edges = (drawn: Locator) =>
@@ -664,6 +674,54 @@ test.describe("the concept page", () => {
     expect(await page.content(), "the page left holds the concept").not.toContain(CLAIM);
   });
 
+  test("draws a self-demoted Admin nothing read before the change", async ({ page, request }) => {
+    const seeded = await aWorkspaceOfConcepts(request, "Esk Registry");
+    const successor = await person(request, anAddress("ada"), { displayName: "Ada Hartley" });
+    await addMember(request, {
+      workspaceId: seeded.workspace.workspaceId,
+      userId: successor.id,
+      role: "Admin",
+    });
+    await signedInAsTheAdmin(page, request, seeded);
+    await page.goto(asked("salary bands"));
+    await matchOf(page, SALARY).click();
+    await expect(conceptOf(page, SALARY)).toBeVisible();
+
+    // No fresh document from here on: what an Admin was given stays in the page's cache.
+    await railOf(page).getByRole("link", { name: CONTROL_CENTRE.name }).click();
+    await navOf(page, CONTROL_CENTRE).getByRole("link", { name: MEMBERS_PAGE.name }).click();
+    const people = page.getByRole("main");
+    await people.getByRole("link", { name: "Test person", exact: true }).click();
+    await people.getByRole("radio", { name: "Viewer", exact: true }).click();
+    await people.getByRole("button", { name: "Make Test person a Viewer" }).click();
+    await landedAtHome(page, "Viewer");
+
+    const open = await heldBack(page, isAnOpen);
+    const find = await heldBack(page, isAFind);
+    await wentBackTo(page, pageOf(seeded.concepts, SALARY));
+    await open.reached;
+    await expect(
+      page.getByRole("main").getByRole("status").filter({ hasText: WORDS.loading }),
+      "the concept was drawn before it was read again",
+    ).toBeVisible();
+    await expect(conceptOf(page, SALARY)).toHaveCount(0);
+    await expect(breadcrumb(page)).not.toContainText(SALARY);
+    open.release();
+    await expect(notFound(page)).toBeVisible();
+
+    await expect(wayBack(page)).toHaveAttribute("href", asked("salary bands"));
+    await wayBack(page).click();
+    await find.reached;
+    const said = page.getByRole("region", { name: SEARCH.name }).getByRole("status");
+    await expect(said, "the matches were drawn before they were read again").toHaveText(
+      SEARCH_WORDS.searching("salary bands"),
+    );
+    await expect(matchOf(page, SALARY)).toHaveCount(0);
+    find.release();
+    await expect(matchOf(page, CALENDAR)).toBeVisible();
+    expect(await page.content(), "the page draws what an Admin read").not.toContain(SALARY);
+  });
+
   test("says the reads' ceiling and asks no more", async ({ page, request }) => {
     const seeded = await aWorkspaceOfConcepts(request, "Ryedale Registers");
     await signedInAsTheAdmin(page, request, seeded);
@@ -680,6 +738,7 @@ test.describe("the concept page", () => {
       sentenceOf(readsCeiling(60)),
     );
     await expect(notFound(page)).toHaveCount(0);
+    await windowRefocused(page);
     expect(sent, "the page asked again past the ceiling").toHaveLength(1);
   });
 
