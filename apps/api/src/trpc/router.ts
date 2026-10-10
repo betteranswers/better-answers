@@ -37,6 +37,7 @@ import {
   router,
 } from "./base.ts";
 import { consoleRouter } from "./console.ts";
+import { knowledgeRouter } from "./knowledge.ts";
 import { membersRouter } from "./members.ts";
 import { personRouter } from "./person.ts";
 import { descriptorOf, uploadDoorsOf } from "./upload.ts";
@@ -57,6 +58,7 @@ export const appRouter = router({
   person: personRouter,
   console: consoleRouter,
   members: membersRouter,
+  knowledge: knowledgeRouter,
   modelChoices: router({
     list: queryProcedure.query(({ ctx }) =>
       crossing(ctx, listModelChoices.name, listModelChoices(ctx.principal, ctx.tx)),
