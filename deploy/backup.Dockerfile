@@ -13,7 +13,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 # The dockerfile manager sees `FROM` alone, so a version fetched by name ages in
 # silence. Each line below sits above its `ARG`.
 # renovate: datasource=github-releases depName=rclone/rclone
-ARG RCLONE_VERSION=v1.75.1
+ARG RCLONE_VERSION=v1.75.2
 RUN curl -fsSLo /tmp/rclone.zip "https://downloads.rclone.org/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip" \
  && unzip -j /tmp/rclone.zip '*/rclone' -d /usr/local/bin && chmod +x /usr/local/bin/rclone && rm /tmp/rclone.zip
 # renovate: datasource=github-releases depName=FiloSottile/age
