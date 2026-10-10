@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 
 export const SEARCH_KEYSTROKES = {
-  search: { key: "/", action: "Search this workspace's knowledge" },
+  search: { key: "/", action: "Search this workspace’s knowledge" },
   more: { key: "m", action: "Show more matches" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 

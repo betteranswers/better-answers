@@ -8,13 +8,13 @@ export const SAID_OF_KNOWLEDGE = {
     next: "Search again to see what is.",
   },
   malformed: {
-    why: "That search couldn't be read.",
+    why: "That search couldn’t be read.",
     next: "Change it and search again.",
   },
 } satisfies SaidOfWord;
 
 /** A ceiling crosses with no word, so the wait it names is what the page says. */
 export const readsCeiling = (liftsInSeconds: number): Said => ({
-  why: "You have searched and opened this workspace's knowledge too often this minute, so nothing new is shown.",
+  why: "You have searched and opened this workspace’s knowledge too often this minute, so nothing new is shown.",
   next: `Try again in ${minutesUntil(liftsInSeconds)}.`,
 });
