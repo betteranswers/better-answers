@@ -212,8 +212,32 @@ const marksDrawn =
     children: [...childrenDrawn(tree.children, { drawing, inLink: false }, true).nodes],
   });
 
+/** The parser percent-encodes what the file wrote plainly, so both sides are compared decoded. */
+const decoded = (address: string): string => {
+  try {
+    // Not `decodeURIComponent`: an encoded slash or hash is no slash or hash of the file's.
+    return decodeURI(address);
+  } catch {
+    // No percent-encoding of anything, so the address stands as the file wrote it.
+    return address;
+  }
+};
+
+/** A link the read answered: the address the body wrote, and the concept it leads to. */
+type AnsweredLink = { readonly address: string; readonly target: string };
+
+/** The concept page each answered address leads to; the address itself is never a destination. */
+const pagesByAddress = (bodyLinks: readonly AnsweredLink[]): ReadonlyMap<string, string> =>
+  new Map(
+    bodyLinks.flatMap(({ address, target }) => {
+      const page = conceptPageOf(target);
+      return page === undefined ? [] : [[decoded(address), page]];
+    }),
+  );
+
 type Held = {
   readonly cited: readonly Cited[];
+  readonly pages: ReadonlyMap<string, string>;
   readonly idOf: (mark: number) => string;
   readonly opening: MarkOpening | undefined;
   readonly headingsFrom: number;
@@ -273,11 +297,15 @@ const jumpWithinThePage = (event: MouseEvent<HTMLAnchorElement>): void => {
   (landing?.matches("a") === true ? landing : landing?.querySelector("a"))?.focus();
 };
 
+/** Where an answered address leads, else where a concept's own IRI does. */
+const pageOf = (held: Held | undefined, href: string): string | undefined =>
+  held?.pages.get(decoded(href)) ?? conceptPageOf(href);
+
 function BodyLink(properties: ComponentProps<"a"> & ExtraProps) {
   const { href, children, node } = properties;
   const held = useContext(Body);
   if (href === undefined) return children;
-  const page = conceptPageOf(href);
+  const page = pageOf(held, href);
   if (page !== undefined) {
     return (
       <Link to={page} className={LINK}>
@@ -376,12 +404,14 @@ const fragmentSafe = (id: string): string => id.replaceAll(/[^A-Za-z0-9_-]/g, ""
 export function ConceptBody(properties: {
   readonly body: string;
   readonly evidence: readonly Evidence[];
+  /** The body's links the read answered. Absent, every relative link is drawn as its words. */
+  readonly bodyLinks?: readonly AnsweredLink[];
   /** Absent where a mark opens nothing, as in the panel: one level only. */
   readonly opening?: MarkOpening;
   /** The heading level the body's own first level takes. */
   readonly headingsFrom?: number;
 }) {
-  const { body, evidence, opening, headingsFrom = 3 } = properties;
+  const { body, evidence, bodyLinks, opening, headingsFrom = 3 } = properties;
   const baseId = fragmentSafe(useId());
 
   const read = useMemo(() => {
@@ -392,7 +422,10 @@ export function ConceptBody(properties: {
     return { text: carrying(body, marks), marks };
   }, [body, evidence]);
 
+  const pages = useMemo(() => pagesByAddress(bodyLinks ?? []), [bodyLinks]);
+
   const held: Held = {
+    pages,
     cited: read.marks.map(({ source }) => ({
       source,
       label: evidence[source]?.source ?? "",

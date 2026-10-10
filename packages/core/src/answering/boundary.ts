@@ -120,6 +120,18 @@ export const openOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
             relations: z.array(
               z.object({ kind: z.string(), target: z.string(), title: z.string() }),
             ),
+            bodyLinks: z
+              .array(
+                z.object({
+                  ordinal: z.number().int().nonnegative(),
+                  address: z.string(),
+                  target: z.string(),
+                }),
+              )
+              .exactOptional()
+              .describe(
+                "Each link in the body that leads to a concept you may read: the `address` the body wrote, and the `target` to pass to `open` as `iri`. A link not listed here has nothing to open.",
+              ),
             trust,
             trustWords: z.string(),
             evidence: z.array(evidenceItem),

@@ -1,11 +1,13 @@
 import {
   citedSourceOf,
+  citedSourcesOf,
   ids,
+  LINKS_TO_LABEL,
   MAP_EDGE_LABELS,
   ULID_CHARACTERS,
   type ConceptIri,
 } from "@better-answers/schema";
-import { CONCEPT_IRI_PREFIX } from "@better-answers/schema/concept-file";
+import { CONCEPT_IRI_PREFIX, linksAndMarksOf } from "@better-answers/schema/concept-file";
 
 import { readableClause, readableParameters } from "../access/index.ts";
 import {
@@ -18,6 +20,7 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
+import { targetOf } from "../store/map/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import type { Frontmatter, FrontmatterSource } from "./file.ts";
 
@@ -312,6 +315,69 @@ export const relationsOf = (
       target: ids.conceptIri.parse(row.target),
       title: row.title,
     }));
+  });
+
+/** A link in the body, and the concept it leads to, which this reader may read. */
+export type BodyLink = {
+  readonly ordinal: number;
+  /** The link's address as the body wrote it. */
+  readonly address: string;
+  readonly target: ConceptIri;
+};
+
+/** Uncapped: the body's own links bound the rows, and a cap would decide which link has a target. */
+const LINKED = `SELECT t.iri, t.path
+    FROM map_generation g
+    JOIN map_edge e ON e.workspace_id = g.workspace_id AND e.gen = g.live_gen
+    JOIN concept_index t ON t.workspace_id = e.workspace_id AND t.iri = e.to_uid
+   WHERE g.workspace_id = $1 AND e.from_uid = $4 AND e.label = '${LINKS_TO_LABEL}'
+     AND ${readableClause("e", 2)}
+     AND ${readableClause("t", 2)}
+   GROUP BY t.iri, t.path`;
+
+/** The concepts the map links this one to that the reader may read, by IRI and by file. */
+type Linked = {
+  readonly iris: ReadonlySet<string>;
+  readonly byPath: ReadonlyMap<string, string>;
+};
+
+/** The body may be older or newer than the map's edges, so a link takes only a target it names. */
+const linkedBy = (linked: Linked, address: string, from: string): string | undefined => {
+  const named = targetOf(address, from);
+  if (named === undefined) return undefined;
+  if ("path" in named) return linked.byPath.get(named.path);
+  return linked.iris.has(named.iri) ? named.iri : undefined;
+};
+
+/**
+ * Each link in the body that the map leads to a concept this reader may read, in the body's order.
+ * A concept they may not read, one not written and an address naming none all answer no entry.
+ */
+export const bodyLinksOf = (
+  principal: UserPrincipal,
+  tx: Tx,
+  concept: {
+    readonly iri: ConceptIri;
+    readonly path: string;
+    readonly body: string;
+    readonly frontmatter: Frontmatter;
+  },
+): Promise<Result<readonly BodyLink[], Error>> =>
+  attempt(async () => {
+    const read = await tx.query<{ iri: string; path: string }>(LINKED, [
+      principal.workspaceId,
+      ...readableParameters(principal),
+      concept.iri,
+    ]);
+    const linked: Linked = {
+      iris: new Set(read.rows.map((row) => row.iri)),
+      byPath: new Map(read.rows.map((row) => [row.path, row.iri])),
+    };
+    const { links } = linksAndMarksOf(concept.body, citedSourcesOf(concept.frontmatter["sources"]));
+    return links.flatMap(({ ordinal, target: address }) => {
+      const iri = linkedBy(linked, address, concept.path);
+      return iri === undefined ? [] : [{ ordinal, address, target: ids.conceptIri.parse(iri) }];
+    });
   });
 
 const CONCEPT_PAGE = "/knowledge/search/";

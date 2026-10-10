@@ -8,7 +8,7 @@ import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { connectAsHost, signIn } from "./flow.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import { actingIn, openTestGit } from "./harness.ts";
-import { calledTool, rpcListOf, rpcOf, structured, type Rpc } from "./mcp-call.ts";
+import { calledTool, rendered, rpcListOf, rpcOf, structured, type Rpc } from "./mcp-call.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
 import {
   NO_SESSION_ANSWERED,
@@ -33,8 +33,8 @@ const RINGING = "Heron ringing records";
 
 const MALFORMED = { data: { httpStatus: 400, refusal: { word: "malformed", class: "malformed" } } };
 
-/** Four concepts naming herons, the last Restricted, in a workspace with a Viewer. */
-const aWorkspaceOfHerons = async () => {
+/** A workspace with a Viewer, holding the concepts its Admin wrote in the order given. */
+const aWorkspaceHolding = async (written: readonly Readonly<Record<string, unknown>>[]) => {
   const workspace = await app().provision();
   const viewer = await app().person();
   await app().addMember(workspace.workspaceId, viewer.id, "Viewer");
@@ -43,20 +43,7 @@ const aWorkspaceOfHerons = async () => {
     conceptsSeeding.parse({
       workspaceId: workspace.workspaceId,
       userId: workspace.admin.id,
-      concepts: [
-        {
-          title: NESTING,
-          body: "Herons nest on the synthetic reservoir island from March.",
-          trust: "machine-confirmed",
-        },
-        { title: FEEDING, body: "The heron feeds along the synthetic eastern shallows." },
-        { title: SURVEY, body: "Heron counts on the synthetic reservoir are taken each June." },
-        {
-          title: RINGING,
-          body: "Ringed heron records are kept by the synthetic warden.",
-          sensitivity: "Restricted",
-        },
-      ],
+      concepts: written,
     }),
   );
   const iriOf = (title: string): string => {
@@ -66,6 +53,36 @@ const aWorkspaceOfHerons = async () => {
   };
   return { workspace, viewer, iriOf };
 };
+
+const FEEDING_WRITTEN = {
+  title: FEEDING,
+  body: "The heron feeds along the synthetic eastern shallows.",
+};
+
+const RINGING_WRITTEN = {
+  title: RINGING,
+  body: "Ringed heron records are kept by the synthetic warden.",
+  sensitivity: "Restricted",
+};
+
+const NESTING_BODY = "Herons nest on the synthetic reservoir island from March.";
+
+/** Four concepts naming herons, the last Restricted, in a workspace with a Viewer. */
+const aWorkspaceOfHerons = () =>
+  aWorkspaceHolding([
+    { title: NESTING, body: NESTING_BODY, trust: "machine-confirmed" },
+    FEEDING_WRITTEN,
+    { title: SURVEY, body: "Heron counts on the synthetic reservoir are taken each June." },
+    RINGING_WRITTEN,
+  ]);
+
+/** Nesting, its body linking Feeding and the Restricted Ringing by their files, with a Viewer. */
+const aConceptLinkingTwo = () =>
+  aWorkspaceHolding([
+    FEEDING_WRITTEN,
+    RINGING_WRITTEN,
+    { title: NESTING, body: NESTING_BODY, linksTo: [FEEDING, RINGING] },
+  ]);
 
 const HANDBOOK_TITLE = "The synthetic heron handbook";
 const MINUTES_LABEL = "Warden minutes";
@@ -231,6 +248,51 @@ describe("knowledge.find over tRPC", () => {
         [RINGING, "Unverified"],
       ]),
     );
+  });
+});
+
+const mcpOpenedBy = async (person: { readonly email: string }, iri: string) => {
+  const client = app().client();
+  const { accessToken } = await connectAsHost(app(), client, person, {
+    scope: "knowledge:read offline_access",
+  });
+  return calledTool(client, accessToken, "open", { iri });
+};
+
+describe("a body's links over both transports", () => {
+  it("answers the same links over MCP and over tRPC", async () => {
+    const { viewer, iriOf } = await aConceptLinkingTwo();
+    const { api } = await webSignedIn(app(), viewer.email);
+
+    const overTrpc = await api.knowledge.open.query({ iri: iriOf(NESTING) });
+    const overMcp = structured(await mcpOpenedBy(viewer, iriOf(NESTING)));
+
+    const answered = [{ ordinal: 0, address: "heron-feeding-grounds.md", target: iriOf(FEEDING) }];
+    expect(overTrpc).toMatchObject({ concept: { bodyLinks: answered } });
+    expect(overMcp).toMatchObject({ concept: { bodyLinks: answered } });
+  });
+
+  it("gives the Viewer no IRI they may not read", async () => {
+    const { workspace, viewer, iriOf } = await aConceptLinkingTwo();
+    const { api } = await webSignedIn(app(), viewer.email);
+
+    const overTrpc = await api.knowledge.open.query({ iri: iriOf(NESTING) });
+    const opened = await mcpOpenedBy(viewer, iriOf(NESTING));
+    const seen = await mcpOpenedBy(workspace.admin, iriOf(NESTING));
+
+    const withheld = iriOf(RINGING).slice(-26);
+    for (const answer of [JSON.stringify(overTrpc), JSON.stringify(opened)]) {
+      expect(answer).not.toContain(withheld);
+    }
+    expect(rendered(opened).split("\n").slice(-2)).toEqual([
+      "Links in the body:",
+      `- heron-feeding-grounds.md · ${iriOf(FEEDING)}`,
+    ]);
+    expect(rendered(seen).split("\n").slice(-3)).toEqual([
+      "Links in the body:",
+      `- heron-feeding-grounds.md · ${iriOf(FEEDING)}`,
+      `- heron-ringing-records.md · ${iriOf(RINGING)}`,
+    ]);
   });
 });
 

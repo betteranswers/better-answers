@@ -87,11 +87,11 @@ const openedOnTheWire = (opened: OpenResult<string>) => {
   const { concept, ...rest } = opened;
   if (concept === undefined) return rest;
   // The pane's words are the web page's; MCP's view keeps to `open`'s schema.
-  const { iri, frontmatter, body, relations, trustWords, evidence } = concept;
+  const { iri, frontmatter, body, relations, bodyLinks, trustWords, evidence } = concept;
   const trusted = wireTrust(concept.trust);
   return {
     ...rest,
-    concept: { iri, frontmatter, body, relations, trust: trusted, trustWords, evidence },
+    concept: { iri, frontmatter, body, relations, bodyLinks, trust: trusted, trustWords, evidence },
   };
 };
 
@@ -182,7 +182,7 @@ const openEntry = defineEntry({
   name: "open",
   title: "Open a concept, or the passage a citation rests on",
   description:
-    "The verbatim fetch: a concept by its `iri` (from a `find` match or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by its `locator`, which a document match and a citation both carry. Give one of the two. Each evidence item names its source in the concept's own words, and carries the `locator` of a passage or the `iri` of a concept that opens it only where there is one you may read: an imported concept's evidence often has neither, and an item with neither has nothing to open. An item's `at` is the concept's own place in the source, such as a page, and opens nothing. Quote what comes back; do not summarise it.",
+    "The verbatim fetch: a concept by its `iri` (from a `find` match or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by its `locator`, which a document match and a citation both carry. Give one of the two. Each evidence item names its source in the concept's own words, and carries the `locator` of a passage or the `iri` of a concept that opens it only where there is one you may read: an imported concept's evidence often has neither, and an item with neither has nothing to open. An item's `at` is the concept's own place in the source, such as a page, and opens nothing. A link in the body that names another concept's file cannot be opened by its path: `bodyLinks` gives the `iri` to open for each one you may read. Quote what comes back; do not summarise it.",
   scopes: ["knowledge:read"],
   // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the answering slice's own schema; the emitted-schema test reads its keys
   input: openInput,

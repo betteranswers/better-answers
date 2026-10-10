@@ -402,3 +402,149 @@ describe("a concept's body", () => {
     expect(within(article).getByRole("link", { name: "Back to the claim" })).toBeDefined();
   });
 });
+
+const COMMITTEE = "01J6RRRRRRRRRRRRRRRRRRRRRR";
+
+const TO_THE_COMMITTEE = "../roles/audit-committee.md";
+
+type BodyLinks = NonNullable<Parameters<typeof ConceptBody>[0]["bodyLinks"]>;
+
+/** Each address answered with the committee's concept. */
+const answering = (...addresses: readonly string[]): BodyLinks =>
+  addresses.map((address) => ({ address, target: `https://better-answers.com/c/${COMMITTEE}` }));
+
+const drawnLinking = async (body: string, bodyLinks: BodyLinks) => {
+  await openPages(
+    {
+      "/": () => (
+        <article>
+          <ConceptBody body={body} evidence={[]} bodyLinks={bodyLinks} />
+        </article>
+      ),
+    },
+    ["/"],
+  );
+  return screen.getByRole("article");
+};
+
+const addressesIn = (article: HTMLElement): readonly (string | null)[] =>
+  within(article)
+    .queryAllByRole("link")
+    .map((link) => link.getAttribute("href"));
+
+describe("a body's links to other concepts", () => {
+  it("draws an answered relative link to its concept's page", async () => {
+    const article = await drawnLinking(
+      `See the [Audit Committee](${TO_THE_COMMITTEE}).`,
+      answering(TO_THE_COMMITTEE),
+    );
+
+    expect(
+      within(article).getByRole("link", { name: "Audit Committee" }).getAttribute("href"),
+    ).toBe("/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR");
+  });
+
+  it("draws an unanswered link beside it as its words", async () => {
+    const article = await drawnLinking(
+      `See the [Audit Committee](${TO_THE_COMMITTEE}) and [the rates](rates.md).`,
+      answering(TO_THE_COMMITTEE),
+    );
+
+    expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
+    expect(article.textContent).toBe("See the Audit Committee and the rates.");
+  });
+
+  it("draws both links of an address written twice", async () => {
+    const article = await drawnLinking(
+      `See [the committee](${TO_THE_COMMITTEE}), [again](${TO_THE_COMMITTEE}).`,
+      answering(TO_THE_COMMITTEE, TO_THE_COMMITTEE),
+    );
+
+    expect(addressesIn(article)).toEqual([
+      "/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR",
+      "/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR",
+    ]);
+  });
+
+  it("leaves an address's fragment off the page's address", async () => {
+    const article = await drawnLinking(
+      `See [its duties](${TO_THE_COMMITTEE}#duties).`,
+      answering(`${TO_THE_COMMITTEE}#duties`),
+    );
+
+    expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
+  });
+
+  it("matches an address holding a letter beyond ASCII", async () => {
+    const article = await drawnLinking("See [the team](équipe.md).", answering("équipe.md"));
+
+    expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
+  });
+
+  it("keeps an encoded slash apart from a written one", async () => {
+    const article = await drawnLinking(
+      "See [the first](roles%2Fboard.md) and [the second](roles/board.md).",
+      answering("roles/board.md"),
+    );
+
+    expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
+    expect(within(article).getByRole("link", { name: "the second" })).toBeDefined();
+  });
+
+  it("draws a reference link to the file its definition names", async () => {
+    const article = await drawnLinking(
+      "See [the board][b] and [its rates][r].\n\n[b]: ./board.md\n[r]: ./rates.md",
+      answering("./board.md"),
+    );
+
+    expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
+    expect(within(article).getByRole("link", { name: "the board" })).toBeDefined();
+    expect(article.textContent.trim()).toBe("See the board and its rates.");
+  });
+
+  it("draws the body when an address does not decode", async () => {
+    const article = await drawnLinking(
+      "See [the café](caf%E9.md), [the odd one](x%zz.md) and [the rates](100%.md).",
+      answering("100%.md"),
+    );
+
+    expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
+    expect(within(article).getByRole("link", { name: "the rates" })).toBeDefined();
+    expect(article.textContent).toBe("See the café, the odd one and the rates.");
+  });
+
+  it("ignores an entry whose target is no concept", async () => {
+    const article = await drawnLinking(
+      "See [the rates](rates.md) and [the regulator](https://example.test/regulator).",
+      [
+        { address: "rates.md", target: "https://example.test/rates" },
+        { address: "https://example.test/regulator", target: "javascript:alert(1)" },
+      ],
+    );
+
+    expect(addressesIn(article)).toEqual(["https://example.test/regulator"]);
+    expect(article.textContent).toBe("See the rates and the regulator.");
+  });
+
+  it("keeps an answered image as its alt text", async () => {
+    const article = await drawnLinking(
+      `![The committee's chart](${TO_THE_COMMITTEE})`,
+      answering(TO_THE_COMMITTEE),
+    );
+
+    expect(article.querySelectorAll("a, img, [src]")).toHaveLength(0);
+    expect(article.textContent).toBe("The committee's chart");
+  });
+
+  it("keeps a footnote defined as an answered path a jump", async () => {
+    const article = await drawnLinking(
+      `Mileage follows the rates policy.[^b]\n\n[^b]: ${TO_THE_COMMITTEE}`,
+      answering(TO_THE_COMMITTEE),
+    );
+
+    expect(addressesIn(article).filter((address) => !address?.startsWith("#"))).toEqual([]);
+    expect(within(article).getByRole("listitem").textContent.trim()).toBe(
+      "../roles/audit-committee.md Back to the claim",
+    );
+  });
+});

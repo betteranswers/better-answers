@@ -74,7 +74,8 @@ type OutgoingRef = {
   readonly sentence: string | null;
 };
 
-const targetOf = (raw: string, from: string): OutgoingRef["target"] | undefined => {
+/** What a link's address names from the file at `from`: a concept IRI, or a path in the bundle. */
+export const targetOf = (raw: string, from: string): OutgoingRef["target"] | undefined => {
   const bare = raw.split("#")[0] ?? "";
   if (bare === "") return undefined;
   if (IRI.test(bare)) return { iri: bare };

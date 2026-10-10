@@ -257,6 +257,15 @@ describe("era-independent", () => {
     );
   });
 
+  it("offers open's body links in its output schema", async () => {
+    const { client, token } = await connect();
+
+    const entry = (await listTools(client, token)).find((listed) => listed.name === "open");
+
+    expect(JSON.stringify(entry?.outputSchema)).toContain('"bodyLinks"');
+    expect(entry?.description).toContain("`bodyLinks` gives the `iri` to open");
+  });
+
   it("describes the two reads in the glossary's words", async () => {
     const { client, token } = await connect();
 

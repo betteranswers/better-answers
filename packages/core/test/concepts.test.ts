@@ -1508,6 +1508,7 @@ describe("opening a concept by IRI", () => {
       },
       body: input.body,
       relations: [],
+      bodyLinks: [],
       trust: {
         tier: "unverified",
         status: "current",

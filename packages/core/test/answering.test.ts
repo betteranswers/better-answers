@@ -1007,6 +1007,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
           },
           body: "The kingfisher rule is stated here.",
           relations: [{ kind: "CITES", target: cited, title: "Travel policy" }],
+          bodyLinks: [],
           trust: unverified,
           trustWords: "Unverified",
           evidence: [
@@ -1052,5 +1053,145 @@ describe("the two knowledge layers a search and a fetch reach", () => {
       success: true,
       data: { found: false, iri: "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ" },
     });
+  });
+});
+
+describe("the links in an opened concept's body", () => {
+  const now = new Date("2026-09-08T12:00:00.000Z");
+
+  const TO_TRAVEL_AND_THE_BOARD =
+    "Book through [the travel policy](./travel.md), [as it says](./travel.md), or ask [the board](./board.md).";
+
+  const TO_THE_BOARD = "Ask [the board](./board.md).";
+
+  type Seed = ReturnType<typeof testData>;
+
+  const seeded = async <T>(work: (seed: Seed) => Promise<T>): Promise<T> => {
+    const client = await db().pool.connect();
+    try {
+      return await work(testData(client));
+    } finally {
+      client.release();
+    }
+  };
+
+  /** Expenses at `path`, its body as given, and a link edge to each concept named. */
+  const expensesLinking = (
+    workspaceId: string,
+    path: string,
+    body: string,
+    linked: readonly string[],
+  ): Promise<ConceptIri> =>
+    seeded(async (seed) => {
+      const expenses = await seed.conceptIndex({ workspaceId, path, body });
+      for (const toUid of linked) await seed.mapEdge({ workspaceId, fromUid: expenses.iri, toUid });
+      return ids.conceptIri.parse(expenses.iri);
+    });
+
+  const indexed = (
+    workspaceId: string,
+    path: string,
+    sensitivity: "Internal" | "Restricted",
+  ): Promise<string> =>
+    seeded(async (seed) => (await seed.conceptIndex({ workspaceId, path, sensitivity })).iri);
+
+  const opened = async (reader: Awaited<ReturnType<typeof arrange>>, iri: ConceptIri) => {
+    const concept = await acting(reader, (principal, tx) => open(principal, tx, { iri }, now));
+    if (!concept.ok) throw new Error(`the open was refused: ${String(concept.error)}`);
+    return concept.value;
+  };
+
+  it("lists each answered address once, with its concept", async () => {
+    const reader = await arrange();
+    const travel = await indexed(reader.workspaceId, "knowledge/travel.md", "Internal");
+    const board = await indexed(reader.workspaceId, "knowledge/board.md", "Restricted");
+    const expenses = await expensesLinking(
+      reader.workspaceId,
+      "knowledge/expenses.md",
+      TO_TRAVEL_AND_THE_BOARD,
+      [travel, board],
+    );
+
+    const answer = await opened(reader, expenses);
+
+    expect(answer.found && answer.concept?.bodyLinks).toEqual([
+      { ordinal: 0, address: "./travel.md", target: travel },
+      { ordinal: 1, address: "./travel.md", target: travel },
+    ]);
+    expect(renderOpen(answer).split("\n").slice(-3)).toEqual([
+      "",
+      "Links in the body:",
+      `- ./travel.md · ${travel}`,
+    ]);
+  });
+
+  it("keeps the links through open's output schema", async () => {
+    const reader = await arrange();
+    const travel = await indexed(reader.workspaceId, "knowledge/travel.md", "Internal");
+    const expenses = await expensesLinking(
+      reader.workspaceId,
+      "knowledge/expenses.md",
+      TO_TRAVEL_AND_THE_BOARD,
+      [travel],
+    );
+
+    const parsed = openOutputWith(z.unknown()).parse(await opened(reader, expenses));
+
+    expect(parsed).toMatchObject({
+      concept: {
+        bodyLinks: [
+          { ordinal: 0, address: "./travel.md", target: travel },
+          { ordinal: 1, address: "./travel.md", target: travel },
+        ],
+      },
+    });
+  });
+
+  it("writes one text for a concept withheld and one unwritten", async () => {
+    const reader = await arrange();
+    const admin = await seeded(async (seed) => {
+      const member = await seed.member({ workspaceId: reader.workspaceId, role: "Admin" });
+      return { workspaceId: reader.workspaceId, userId: member.userId };
+    });
+    const board = await indexed(reader.workspaceId, "knowledge/held/board.md", "Restricted");
+    const toWithheld = await expensesLinking(
+      reader.workspaceId,
+      "knowledge/held/expenses.md",
+      TO_THE_BOARD,
+      [board],
+    );
+    const toNothing = await expensesLinking(
+      reader.workspaceId,
+      "knowledge/bare/expenses.md",
+      TO_THE_BOARD,
+      [],
+    );
+
+    const nothingToFollow = ["# Expenses", "", TO_THE_BOARD, "", "_Unverified_"].join("\n");
+    expect(renderOpen(await opened(reader, toWithheld))).toBe(nothingToFollow);
+    expect(renderOpen(await opened(reader, toNothing))).toBe(nothingToFollow);
+    expect(
+      renderOpen(await opened(admin, toWithheld))
+        .split("\n")
+        .slice(-2),
+    ).toEqual(["Links in the body:", `- ./board.md · ${board}`]);
+  });
+
+  it("writes no heading where no link is answered", () => {
+    expect(
+      renderOpen({
+        found: true,
+        concept: {
+          iri: "https://better-answers.com/c/01A",
+          frontmatter: { title: "Expenses", type: "Policy" },
+          body: TO_THE_BOARD,
+          relations: [],
+          bodyLinks: [],
+          trust: unverified,
+          trustWords: "Unverified",
+          evidence: [],
+        },
+      }),
+    ).toBe(["# Expenses", "", TO_THE_BOARD, "", "_Unverified_"].join("\n"));
   });
 });

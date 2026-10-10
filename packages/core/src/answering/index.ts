@@ -91,6 +91,12 @@ type ConceptView<Iri extends string> = {
     readonly target: Iri;
     readonly title: string;
   }[];
+  /** Each link in the body that leads to a concept the reader may read; `open` always answers it. */
+  readonly bodyLinks?: readonly {
+    readonly ordinal: number;
+    readonly address: string;
+    readonly target: Iri;
+  }[];
   readonly trust: Trust;
   readonly trustWords: string;
   readonly evidence: readonly Evidence<Iri>[];
@@ -133,7 +139,10 @@ export type OpenView<Iri extends string = ConceptIri> = Opened<Iri, ConceptView<
 /** The pane's words, which the web's concept page leads and ends its sources with. */
 type PaneWords = Pick<ConceptRead["pane"], "access" | "lead" | "next">;
 
-export type OpenResult<Iri extends string = ConceptIri> = Opened<Iri, ConceptView<Iri> & PaneWords>;
+export type OpenResult<Iri extends string = ConceptIri> = Opened<
+  Iri,
+  ConceptView<Iri> & PaneWords & Required<Pick<ConceptView<Iri>, "bodyLinks">>
+>;
 
 export type MapState =
   | { readonly state: "live" }
@@ -362,7 +371,16 @@ const conceptOpened = async (
   if (!concept.ok) return err(concept.error);
   if (concept.value === undefined) return ok({ found: false, iri: named });
 
-  const { iri, frontmatter, body, relations, trust, trustWords: words, pane } = concept.value;
+  const {
+    iri,
+    frontmatter,
+    body,
+    relations,
+    bodyLinks,
+    trust,
+    trustWords: words,
+    pane,
+  } = concept.value;
   return ok({
     found: true,
     concept: {
@@ -370,6 +388,7 @@ const conceptOpened = async (
       frontmatter,
       body,
       relations,
+      bodyLinks,
       trust,
       trustWords: words,
       evidence: pane.evidence,
@@ -517,6 +536,7 @@ const conceptText = (concept: ConceptView<string>): string => {
   const related = concept.relations.map(
     ({ kind, title: named, target }) => `- ${kind} · ${named} · ${target}`,
   );
+  const linked = new Map((concept.bodyLinks ?? []).map(({ address, target }) => [address, target]));
   return [
     `# ${title}`,
     "",
@@ -525,6 +545,10 @@ const conceptText = (concept: ConceptView<string>): string => {
     `_${concept.trustWords}_`,
     ...listed("Evidence:", evidence),
     ...listed("Related:", related),
+    ...listed(
+      "Links in the body:",
+      [...linked].map(([address, target]) => `- ${address} · ${target}`),
+    ),
   ].join("\n");
 };
 

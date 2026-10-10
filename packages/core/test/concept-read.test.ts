@@ -15,6 +15,7 @@ import type { Tx } from "../src/store/postgres/index.ts";
 import {
   conceptCiting,
   connectedSourceHolding,
+  groupNamed,
   overriddenBy,
   passageUnder,
   restrictedAndInternal,
@@ -167,6 +168,24 @@ const readAcross = async (
   );
   return { read: answered(read), wrote };
 };
+
+/** Reads `iri` with every statement holding `marker` failing, as that table's read would. */
+const readFailingAt = (reader: UserPrincipal, iri: ConceptIri, marker: string, failure: Error) =>
+  reading(reader, (principal, tx) =>
+    readingThrough(
+      principal,
+      new Proxy(tx, {
+        get: (target, key) =>
+          key === "query"
+            ? (statement: string, values?: unknown[]) =>
+                statement.includes(marker)
+                  ? Promise.reject(failure)
+                  : target.query(statement, values)
+            : Reflect.get(target, key),
+      }),
+      iri,
+    ),
+  );
 
 describe("the evidence pane", () => {
   it("answers a withheld concept exactly as one nobody minted", async () => {
@@ -677,21 +696,7 @@ describe("a concept's relations", () => {
     const entry = await noteNaming(scenario, []);
     const failure = new Error("the relations read failed");
 
-    const read = await reading(scenario.admin, (reader, tx) =>
-      readingThrough(
-        reader,
-        new Proxy(tx, {
-          get: (target, key) =>
-            key === "query"
-              ? (statement: string, values?: unknown[]) =>
-                  statement.includes("map_edge")
-                    ? Promise.reject(failure)
-                    : target.query(statement, values)
-              : Reflect.get(target, key),
-        }),
-        entry.iri,
-      ),
-    );
+    const read = await readFailingAt(scenario.admin, entry.iri, "map_edge", failure);
 
     expect(read).toEqual({ ok: false, error: failure });
   });
@@ -730,7 +735,331 @@ describe("a concept's relations", () => {
 
     expect(read?.relations.map(({ title }) => title)).toEqual(titles.slice(0, 25));
     expect(Object.keys(read ?? {}).toSorted()).toEqual(
-      ["body", "frontmatter", "iri", "pane", "relations", "trust", "trustWords"].toSorted(),
+      [
+        "body",
+        "bodyLinks",
+        "frontmatter",
+        "iri",
+        "pane",
+        "relations",
+        "trust",
+        "trustWords",
+      ].toSorted(),
     );
+  });
+});
+
+const EXPENSES = "knowledge/policies/expenses.md";
+
+const AUDIT_COMMITTEE = "knowledge/roles/audit-committee.md";
+
+const TO_THE_COMMITTEE = "See the [Audit Committee](../roles/audit-committee.md).";
+
+/** A stable Internal note at `path`, everyone's to read. */
+const noteAt = (scenario: Scenario, path: string, overrides: Partial<WriteConceptInput> = {}) =>
+  conceptCiting(scenario, scenario.editor, [], { sensitivity: "Internal", path, ...overrides });
+
+type SeededConcept = Parameters<Parameters<typeof seededBy>[1]>[0]["conceptIndex"];
+
+/** A concept seeded straight into the index, so no write derives an edge to it. */
+const indexedAt = (
+  scenario: Scenario,
+  path: string,
+  overrides: NonNullable<Parameters<SeededConcept>[0]> = {},
+) =>
+  seededBy(db(), async (seed) => {
+    const row = await seed.conceptIndex({
+      workspaceId: scenario.workspaceId,
+      path,
+      ...overrides,
+    });
+    return ids.conceptIri.parse(row.iri);
+  });
+
+type SeededEdge = Parameters<Parameters<typeof seededBy>[1]>[0]["mapEdge"];
+
+const edgeSeeded = (
+  scenario: Scenario,
+  fromUid: string,
+  toUid: string,
+  overrides: NonNullable<Parameters<SeededEdge>[0]> = {},
+) =>
+  seededBy(db(), (seed) =>
+    seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid, toUid, ...overrides }),
+  );
+
+/** Expenses, whose body links the board's file beside it, and the board seeded with no edge to it. */
+const expensesNamingTheBoard = async (
+  scenario: Scenario,
+  board: NonNullable<Parameters<SeededConcept>[0]> = {},
+) => ({
+  expenses: await noteAt(scenario, "knowledge/expenses.md", {
+    body: "See [the board](./board.md).",
+  }),
+  board: await indexedAt(scenario, "knowledge/board.md", board),
+});
+
+const linksFor = async (person: UserPrincipal, iri: ConceptIri) =>
+  (await readFor(person, iri))?.bodyLinks;
+
+describe("a body's links", () => {
+  it("answers a readable relative link at its ordinal", async () => {
+    const scenario = await arrange();
+    const committee = await noteAt(scenario, AUDIT_COMMITTEE);
+    const expenses = await noteAt(scenario, EXPENSES, {
+      body: `![A chart](chart.png) from [the site](https://example.test). ${TO_THE_COMMITTEE}`,
+    });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([
+      { ordinal: 2, address: "../roles/audit-committee.md", target: committee.iri },
+    ]);
+  });
+
+  it("answers nothing for a concept the reader may not read", async () => {
+    const scenario = await arrange();
+    const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
+    const committee = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
+      path: AUDIT_COMMITTEE,
+    });
+    const expenses = await noteAt(scenario, EXPENSES, { body: TO_THE_COMMITTEE });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([]);
+    expect(await linksFor(scenario.admin, expenses.iri)).toEqual([
+      { ordinal: 0, address: "../roles/audit-committee.md", target: committee.iri },
+    ]);
+  });
+
+  it("reads alike for a concept withheld and one never written", async () => {
+    const scenario = await arrange();
+    const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
+    await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
+      path: AUDIT_COMMITTEE,
+    });
+    const toWithheld = await noteAt(scenario, EXPENSES, { body: TO_THE_COMMITTEE });
+    const toNothing = await noteAt(scenario, "knowledge/draft/policies/expenses.md", {
+      body: TO_THE_COMMITTEE,
+    });
+
+    const withheld = await readFor(scenario.viewer, toWithheld.iri);
+    const absent = await readFor(scenario.viewer, toNothing.iri);
+
+    const nothingAnswered = { body: TO_THE_COMMITTEE, bodyLinks: [], relations: [] };
+    expect(withheld).toMatchObject(nothingAnswered);
+    expect(absent).toMatchObject(nothingAnswered);
+  });
+
+  it("answers a group's concept to its members alone", async () => {
+    const scenario = await arrange();
+    const members = await groupNamed(db(), scenario, "Board", [scenario.editor]);
+    const { expenses, board: forTheBoard } = await expensesNamingTheBoard(scenario, {
+      audience: "groups",
+      audienceGroups: [members],
+    });
+    await edgeSeeded(scenario, expenses.iri, forTheBoard);
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([]);
+    expect(await linksFor(scenario.admin, expenses.iri)).toEqual([]);
+    expect(await linksFor(scenario.editor, expenses.iri)).toEqual([
+      { ordinal: 0, address: "./board.md", target: forTheBoard },
+    ]);
+  });
+
+  it("answers an unpublished concept to nobody", async () => {
+    const scenario = await arrange();
+    const expenses = await noteAt(scenario, "knowledge/expenses.md", {
+      body: "See [the draft](./draft.md) and [the board](./board.md).",
+    });
+    const unpublished = await indexedAt(scenario, "knowledge/draft.md", {
+      status: "draft",
+      publishedAt: null,
+    });
+    const board = await indexedAt(scenario, "knowledge/board.md");
+    await edgeSeeded(scenario, expenses.iri, unpublished);
+    await edgeSeeded(scenario, expenses.iri, board);
+
+    expect(await linksFor(scenario.admin, expenses.iri)).toEqual([
+      { ordinal: 1, address: "./board.md", target: board },
+    ]);
+  });
+
+  it("stops answering a concept once an Admin restricts it", async () => {
+    const scenario = await arrange();
+    const committee = await noteAt(scenario, AUDIT_COMMITTEE);
+    const expenses = await noteAt(scenario, EXPENSES, { body: TO_THE_COMMITTEE });
+
+    const before = await linksFor(scenario.viewer, expenses.iri);
+    await overriddenTo(scenario, committee.iri, "Restricted");
+    const after = await linksFor(scenario.viewer, expenses.iri);
+
+    expect(before).toEqual([
+      { ordinal: 0, address: "../roles/audit-committee.md", target: committee.iri },
+    ]);
+    expect(after).toEqual([]);
+  });
+
+  it("answers a link whose concept was written after it", async () => {
+    const scenario = await arrange();
+    const expenses = await noteAt(scenario, EXPENSES, { body: TO_THE_COMMITTEE });
+
+    const before = await linksFor(scenario.viewer, expenses.iri);
+    const committee = await noteAt(scenario, AUDIT_COMMITTEE);
+    const after = await linksFor(scenario.viewer, expenses.iri);
+
+    expect(before).toEqual([]);
+    expect(after).toEqual([
+      { ordinal: 0, address: "../roles/audit-committee.md", target: committee.iri },
+    ]);
+  });
+
+  it("answers every link past twenty-five", async () => {
+    const scenario = await arrange();
+    const files = Array.from(
+      { length: 26 },
+      (_, at) => `target-${String(at + 1).padStart(2, "0")}.md`,
+    );
+    const targets: ConceptIri[] = [];
+    for (const file of files) {
+      targets.push(await indexedAt(scenario, `knowledge/${file}`, { title: file }));
+    }
+    const entry = await noteAt(scenario, "knowledge/entry.md", {
+      body: files.map((file, at) => `[${String(at)}](./${file})`).join(" "),
+    });
+
+    const read = await readFor(scenario.admin, entry.iri);
+
+    expect(read?.bodyLinks).toHaveLength(26);
+    expect(read?.bodyLinks.at(-1)).toEqual({
+      ordinal: 25,
+      address: "./target-26.md",
+      target: targets[25],
+    });
+    expect(read?.relations).toHaveLength(25);
+  });
+
+  it("answers nothing for an address that names no concept", async () => {
+    const scenario = await arrange();
+    const committee = await noteAt(scenario, AUDIT_COMMITTEE);
+    const expenses = await noteAt(scenario, EXPENSES, {
+      body: [
+        "[Out of the bundle](../../../outside.md)",
+        "[A text file](../notes.txt)",
+        "[Another host](//host.example/roles/audit-committee.md)",
+        "[Nobody's](https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN)",
+        "[The committee](../roles/audit-committee.md)",
+      ].join(", "),
+    });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([
+      { ordinal: 4, address: "../roles/audit-committee.md", target: committee.iri },
+    ]);
+  });
+
+  it("answers a repeated address twice, and an IRI as itself", async () => {
+    const scenario = await arrange();
+    const committee = await noteAt(scenario, AUDIT_COMMITTEE);
+    const expenses = await noteAt(scenario, EXPENSES, {
+      body: `[One](../roles/audit-committee.md#duties), [two](../roles/audit-committee.md) and [three](${committee.iri}).`,
+    });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([
+      { ordinal: 0, address: "../roles/audit-committee.md#duties", target: committee.iri },
+      { ordinal: 1, address: "../roles/audit-committee.md", target: committee.iri },
+      { ordinal: 2, address: committee.iri, target: committee.iri },
+    ]);
+  });
+
+  it("counts no citation mark among the links", async () => {
+    const scenario = await arrange();
+    const committee = await noteAt(scenario, AUDIT_COMMITTEE);
+    const expenses = await noteAt(scenario, EXPENSES, {
+      frontmatter: {
+        type: "Note",
+        sources: [{ id: "HB-1", resource: "/sources/handbook.pdf", locator: "p.4" }],
+      },
+      body: [
+        `Claims close in thirty days[^hb-1]. ${TO_THE_COMMITTEE}`,
+        "",
+        "[^hb-1]: ../roles/audit-committee.md",
+      ].join("\n"),
+    });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([
+      { ordinal: 0, address: "../roles/audit-committee.md", target: committee.iri },
+    ]);
+  });
+
+  it("answers nothing for an edge the link does not name", async () => {
+    const scenario = await arrange();
+    const expenses = await noteAt(scenario, "knowledge/expenses.md", {
+      body: "See [travel](./travel.md) and [the board](./board.md).",
+    });
+    const board = await indexedAt(scenario, "knowledge/board.md");
+    const elsewhere = await indexedAt(scenario, "knowledge/elsewhere.md");
+    await edgeSeeded(scenario, expenses.iri, board);
+    await edgeSeeded(scenario, expenses.iri, elsewhere);
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([
+      { ordinal: 1, address: "./board.md", target: board },
+    ]);
+  });
+
+  it("answers nothing from another concept's edge", async () => {
+    const scenario = await arrange();
+    const { expenses, board } = await expensesNamingTheBoard(scenario);
+    const travel = await noteAt(scenario, "knowledge/travel.md");
+    await edgeSeeded(scenario, travel.iri, board);
+
+    const before = await linksFor(scenario.viewer, expenses.iri);
+    await edgeSeeded(scenario, expenses.iri, board);
+    const after = await linksFor(scenario.viewer, expenses.iri);
+
+    expect(before).toEqual([]);
+    expect(after).toEqual([{ ordinal: 0, address: "./board.md", target: board }]);
+  });
+
+  it("answers nothing from an edge that is no link", async () => {
+    const scenario = await arrange();
+    const { expenses, board } = await expensesNamingTheBoard(scenario);
+    await edgeSeeded(scenario, expenses.iri, board, { label: "DERIVED_FROM" });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([]);
+  });
+
+  it("answers nothing from an edge outside the live generation", async () => {
+    const scenario = await arrange();
+    const expenses = await noteAt(scenario, "knowledge/expenses.md", {
+      body: "See [the board](./board.md), [travel](./travel.md) and [pay](./pay.md).",
+    });
+    const board = await indexedAt(scenario, "knowledge/board.md");
+    const travel = await indexedAt(scenario, "knowledge/travel.md");
+    const pay = await indexedAt(scenario, "knowledge/pay.md");
+    await edgeSeeded(scenario, expenses.iri, board);
+    await edgeSeeded(scenario, expenses.iri, travel, { gen: 2 });
+    await edgeSeeded(scenario, expenses.iri, pay, { gen: null });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([
+      { ordinal: 0, address: "./board.md", target: board },
+    ]);
+  });
+
+  it("answers nothing from an edge the reader may not read", async () => {
+    const scenario = await arrange();
+    const { expenses, board } = await expensesNamingTheBoard(scenario);
+    await edgeSeeded(scenario, expenses.iri, board, { sensitivity: "Restricted" });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([]);
+    expect(await linksFor(scenario.admin, expenses.iri)).toEqual([
+      { ordinal: 0, address: "./board.md", target: board },
+    ]);
+  });
+
+  it("answers a failed read of the edges as an error", async () => {
+    const scenario = await arrange();
+    const expenses = await noteAt(scenario, EXPENSES, { body: TO_THE_COMMITTEE });
+    const failure = new Error("the links read failed");
+
+    const read = await readFailingAt(scenario.admin, expenses.iri, "t.path", failure);
+
+    expect(read).toEqual({ ok: false, error: failure });
   });
 });
