@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CLIENT_IP_HEADER, UNKNOWN_CLIENT_IP } from "../src/auth/constants.ts";
-import { clientIpOf, clientKeyOf } from "../src/ingress/limits.ts";
+import { addressKeyOf, clientIpOf, clientKeyOf } from "../src/ingress/limits.ts";
 
 describe("the client key an address becomes", () => {
   it("keys every address in one IPv6 /64 alike, however spelt", () => {
@@ -37,5 +37,15 @@ describe("the client address a request names", () => {
       expect(clientIpOf(new Headers({ [CLIENT_IP_HEADER]: blank }))).toBe(UNKNOWN_CLIENT_IP);
     }
     expect(clientIpOf(new Headers())).toBe(UNKNOWN_CLIENT_IP);
+  });
+});
+
+describe("the count a request by address spends", () => {
+  it("is its route group's, for its address's key", () => {
+    const from = (address: string): Headers => new Headers({ [CLIENT_IP_HEADER]: address });
+
+    expect(addressKeyOf("oauth", from("203.0.113.9"))).toBe("oauth:203.0.113.9");
+    expect(addressKeyOf("mcp", from("2001:db8:85a3::1"))).toBe("mcp:2001:0db8:85a3:0000::/64");
+    expect(addressKeyOf("trpc", new Headers())).toBe("trpc:unknown");
   });
 });

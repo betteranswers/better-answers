@@ -38,7 +38,10 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
     return (headers) => (read ??= gated(headers));
   };
 
-  routes.use(`${TRPC_ENDPOINT}/*`, limitByIp(deps.doors.postgres, TRPC_IP_RULE, deps.doors.clock));
+  routes.use(
+    `${TRPC_ENDPOINT}/*`,
+    limitByIp(deps.doors.postgres, TRPC_IP_RULE, deps.doors.clock, "trpc"),
+  );
   routes.use(
     `${TRPC_ENDPOINT}/*`,
     trpcServer({

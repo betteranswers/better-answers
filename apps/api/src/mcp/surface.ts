@@ -35,7 +35,7 @@ import {
   MCP_UNAUTHENTICATED_IP_RULE,
 } from "../auth/constants.ts";
 import { bearerOf } from "../auth/verify.ts";
-import { clientIpOf, tooManyRequests } from "../ingress/limits.ts";
+import { addressKeyOf, tooManyRequests } from "../ingress/limits.ts";
 import { refusalLogged, refusalOf, type RefusalAnswer } from "../refusal.ts";
 import { crossing } from "./crossing.ts";
 import type { Entry } from "./entries/define.ts";
@@ -139,7 +139,7 @@ export const createMcpSurface = (
     const flood = await consumeIngress(
       deps.door,
       "ip",
-      clientIpOf(request.headers),
+      addressKeyOf("mcp", request.headers),
       MCP_UNAUTHENTICATED_IP_RULE,
       deps.clock.now(),
     );

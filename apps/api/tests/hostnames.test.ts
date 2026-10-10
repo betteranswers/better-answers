@@ -186,8 +186,8 @@ describe("each hostname reaches only its documented surface", () => {
     expect(app.emails.length).toBe(before);
 
     const counted = await app.database.superuser.query<{ n: number }>(
-      "SELECT count(*)::int AS n FROM ingress_counter WHERE key = $1",
-      [client.ip],
+      "SELECT count(*)::int AS n FROM ingress_counter WHERE key LIKE $1",
+      [`%${client.ip}`],
     );
     expect(counted.rows[0]?.n).toBe(0);
   });

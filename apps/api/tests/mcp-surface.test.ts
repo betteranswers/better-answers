@@ -14,11 +14,7 @@ import {
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
 
-import {
-  MCP_TOKEN_RULE,
-  MCP_UNAUTHENTICATED_IP_RULE,
-  PAGE_IP_RULE,
-} from "../src/auth/constants.ts";
+import { MCP_TOKEN_RULE, MCP_UNAUTHENTICATED_IP_RULE } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
 import type { TestClient } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
@@ -469,18 +465,6 @@ describe("a call with no bearer", () => {
     );
 
     expect(refused).toEqual(REFUSED_AT_THE_CEILING);
-  });
-
-  it("spends the one budget its address has on the pages", async () => {
-    const client = app().client();
-    stopTheClock();
-
-    for (let call = 1; call < PAGE_IP_RULE.max; call += 1) await unauthenticated(client);
-    const atTheCeiling = await client.fetch("/consent");
-    const pastIt = await client.fetch("/consent");
-
-    expect(atTheCeiling.status).not.toBe(429);
-    expect(pastIt.status).toBe(429);
   });
 });
 

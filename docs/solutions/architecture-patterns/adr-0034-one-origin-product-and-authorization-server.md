@@ -10,6 +10,7 @@ applies_when:
   - "Changing the session cookie, the trusted origins or the consent page"
   - "Adding or changing a sign-in method"
   - "Changing Cloudflare's rate-limit rules or plan"
+  - "Adding a route counted by client address, or changing what the api or Better Auth counts"
 tags:
   - adr-0034
   - origin
@@ -35,6 +36,9 @@ One origin, `app.<apex>`, carries the SPA, sign-in, the workspace picker, consen
 - Sign-in is an email code or Microsoft, never a password. The email also carries a sign-in link, a second secret that unlocks the same code. It signs in only the browser that asked, through two routes of the api's own that the hostname list names beside consent. No password or sign-up plugin is enabled, and `apps/api/tests/better-auth-endpoints.txt` snapshots the endpoints. Microsoft signs in through Better Auth's `microsoft` provider on one multi-tenant Entra registration the platform owns, and links only on an exact verified-email match.
 - The per-customer `sso` shape is a written trigger: the day a customer's IT asks to sign in against its own tenant.
 - Cloudflare meters rate-limit rules, not paths: Free 1, Pro 2, Business 5. The path groups are combined to fit. The zone moves to Pro before the first assistant credential exists. Until then the Cloudflare stage of `deploy/wizard-41.sh` passes on Free.
+- Behind Cloudflare's rules the api keeps its own counts, one per route group and client address: the OAuth paths with `/jwks`, consent, the sign-in link, tRPC, the MCP surface reached without a usable bearer, and the passkey sign-in. A burst on one group spends none of another's count.
+- The discovery documents under `/.well-known/` are counted by no limiter in the api, and each is served `Cache-Control: public, max-age=300`.
+- Better Auth's limiter counts no path the api counts. On `/oauth2/*` and `/jwks` a client meets one refusal, the api's: `too_many_requests` with `Retry-After`, at 60 a minute.
 - There is no public documentation site. The ops documents live in `docs/operations/`, unrendered.
 
 ## Why
@@ -44,6 +48,9 @@ One origin, `app.<apex>`, carries the SPA, sign-in, the workspace picker, consen
 - The issuer an assistant such as Claude registers against is the authorization server's origin. With no assistant credential yet, moving it cost nothing; later it would cost an assistant's connection.
 - A script running in the product's shell gains nothing by reading the consent page. A code lands only at Claude's redirect URI, and PKCE binds it to a verifier no script holds.
 - `__Host-` is undocumented in Better Auth and defends against cookie-tossing, which needs a subdomain that does not exist.
+- One count shared by every route made the smallest ceiling govern them all: ten requests of any kind from an address refused its sign-in by link, and sixty refused discovery and every OAuth path.
+- A count on a discovery read costs a Postgres write to protect a constant, and bounds the party that reads it most: Claude's servers, from Anthropic's shared range. RFC 9728 expects the document to be kept, and Cloudflare still counts the path.
+- Better Auth's count is no fixed window. It grows until a whole window passes with no request, so a steady caller under the api's ceiling met it first, in words no OAuth client reads and without `Retry-After`.
 - Claude and Notion were refused as sign-in methods, because neither is where a company's IT creates and removes people.
 
 ## Rejected
