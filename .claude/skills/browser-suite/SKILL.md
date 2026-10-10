@@ -124,13 +124,33 @@ Knowledge one from `apps/api/tests/harness-knowledge.ts`:
 | `makeGroups` | Groups made by a named member through the members slice's own actions, one transaction each, every group holding the members `memberIds` names — the member's own actions on the audit log, and the groups the `Groups` page and a member's page start from |
 | `askToJoin` | A person's ask to join a workspace by its short name, with a reason, through the members slice's own action and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own action and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* page |
-| `seedConcepts` | Concepts a named Admin writes in order through the concepts slice's own write, so each is in the repository, the index and the map as a member's write leaves it. Each takes a kind, a sensitivity and further frontmatter keys, and links to concepts earlier in the list. A source is a document's passages, a concept earlier in the list, or a place such as `p.4` that opens nothing; a document may take a label, the file's own name for it, apart from its title. Each source gets a citation mark `[^source-N]` after the body's last word, unless the body places that mark itself. A document may be held at a sensitivity of its own, and where that differs from the concept's the Admin's override shares the concept beyond its evidence. A trust tier other than `unverified` is a verification row written straight to the store, because the slice has no verify action. A `"groups"` audience is the Admin's own override to one group holding the members `groupMemberIds` names, and nobody outside that group reads the concept, its Admin included. It answers each concept's IRI, path and cited documents |
+| `seedConcepts` | Concepts a named Admin, or an Editor asking no override, writes in order through the concepts slice's own write, so each is in the repository, the index and the map as a member's write leaves it. Each takes a kind, a sensitivity and further frontmatter keys, and links to concepts earlier in the list. A source is a document's passages, a concept earlier in the list, or a place such as `p.4` that opens nothing; a document may take a label, the file's own name for it, apart from its title. Each source gets a citation mark `[^source-N]` after the body's last word, unless the body places that mark itself. A document may be held at a sensitivity of its own, and where that differs from the concept's the Admin's override shares the concept beyond its evidence. A trust tier other than `unverified` is a verification row written straight to the store, because the slice has no verify action. A `"groups"` audience is the Admin's own override to one group holding the members `groupMemberIds` names, and nobody outside that group reads the concept, its Admin included. It answers each concept's IRI, path and cited documents |
 
 A seed the harness cannot write answers 400. A body or a row that a schema refuses names each
 field and its rule, and a write that trips a constraint names the constraint. The action's failure
-carries that answer, so the reason is read there and not in the server's log. A body is checked
-before anything is written, and `seedConnectedSources` writes in one transaction, so a refused one
-leaves nothing behind. Any other fault of the harness stays a 500.
+carries that answer, so the reason is read there and not in the server's log. Any other fault of
+the harness stays a 500.
+
+A body is checked before anything is written. What a refusal after that leaves depends on who
+writes the rows:
+
+- **The harness writes them itself**, in one transaction, so a refused seed leaves nothing behind:
+  `seedModelChoices` and `seedConnectedSources`.
+- **A slice's own action writes them**, and each action opens a transaction of its own on the api's
+  connections, so a refusal part-way leaves what was written before it. `makeGroups` commits each
+  group and each member as it goes. `seedConcepts` commits each concept as it goes: its connected
+  sources, documents and passages, then a commit in the workspace's repository, then its rows.
+
+`seedConcepts` cannot be one transaction, so it reads the workspace before its first write and
+refuses there, with a 400 naming the field, what the body names that the store would refuse later: a
+writer who is a Viewer, an Editor's seed that asks for the Admin's override (a concept shared with a
+group, or one citing a document held at a sensitivity that differs from its own), a title whose file
+the workspace already holds, and, for a concept shared with a group, a group member who is no member
+of the workspace. An Editor's seed that asks no override lands, as the slice's write admits an
+Editor. A seed refused there writes nothing and makes no repository. Any other refusal at one
+concept leaves the concepts before it whole, in the repository, the index and the map. It may leave
+that concept's own connected sources, documents and passages, and the concept itself, written but
+not yet narrowed to its group, shared past its evidence or verified.
 
 More helpers in the same module drive the browser rather than the harness:
 
@@ -169,7 +189,7 @@ More helpers in the same module drive the browser rather than the harness:
 | `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
 | `tokenColour` | A design-system token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
 | `contrastBetween` | WCAG's contrast ratio between two painted `rgb()` colours, as `apps/web/e2e/focus-ring.spec.ts` measures each focus edge against the surface behind it |
-| `controlEdges` | Each enabled control found by its edge alone, with its fill, every side it draws or a wordless wrapper draws within 8px of its own, and the colour behind it, each composited as painted through fills and every ancestor's opacity. The gate measures them with `contrastBetween` |
+| `controlEdges` | Each enabled control found by its edge alone, with its fill, every side it draws and the colour behind it, each composited as painted through fills and every ancestor's opacity. A wordless wrapper with a side within 8px of the control's own lends its fill, and its border on each such side. One with no such side lends nothing, and its own fill is the colour behind the control. The gate measures them with `contrastBetween` |
 
 The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one. `emailsSentTo` counts the emails the capture holds for an address, and the suite's
@@ -262,8 +282,10 @@ three things, of which automated rules are only one:
   decide because of what was painted behind the text. Axe's contrast rule reads words only, so the
   audit also refuses any enabled control a person finds by its edge alone — a field, a select, or
   a checkbox, radio or switch with no words of its own — whose edge and fill both sit under 3:1
-  against what is behind it. The edge is measured as painted: a wordless wrapper's border counts
-  only on a side that hugs the field's own, and an ancestor's opacity dims it. The audit runs in the page's own theme, then sets `data-theme` on `<html>` to
+  against what is behind it. Both are measured as painted. A wordless wrapper's border counts only
+  on a side that hugs the field's own, and its fill only when one of its sides does. A wordless
+  box that hugs on no side is a layout's, so the field is measured against that box's own fill.
+  An ancestor's opacity dims edge and fill alike. The audit runs in the page's own theme, then sets `data-theme` on `<html>` to
   the other theme, audits again and puts the page's theme back, so every state a test leaves is
   held in dark as well as light. A failure names the theme it was found in. A spec about one theme
   keeps it on the browser under `THEME_KEPT_UNDER` from `apps/web/src/shared/theme-switch.ts`, as

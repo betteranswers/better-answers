@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ulid } from "@better-answers/schema/ulid";
 
 import { confirmWithTheAuthenticator } from "./flow.ts";
+import { askedOfTheHarness } from "./harness-asked.ts";
 import { harnessControl } from "./harness-control.ts";
 import { aPersonSignedIn, signedInByEmailOnly, signedInClient } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
@@ -98,25 +99,19 @@ describe("the browser suite's second-factor harness", () => {
   });
 });
 
-/** Mounted as `serve.ts` mounts it, so the answer is the one the browser suite reads. */
-const askedOfTheHarness = async (path: string, body: unknown) => {
-  const answered = await new Hono().route("/", harnessControl(app())).request(path, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const said: unknown = await answered.json();
-  return { status: answered.status, said };
-};
+const asked = (path: string, body: unknown) => askedOfTheHarness(app(), path, body);
 
 const aSeedOf = (workspaceId: string, document: Readonly<Record<string, unknown>>) => ({
   workspaceId,
   connectedSources: [{ name: "Scans", documents: [{ title: "Floor plan", ...document }] }],
 });
 
-const connectedSourcesIn = async (workspaceId: string): Promise<number> => {
+const heldIn = async (
+  table: "connected_source" | "model_choice",
+  workspaceId: string,
+): Promise<number> => {
   const counted = await app().database.superuser.query<{ held: number }>(
-    "SELECT count(*)::int AS held FROM connected_source WHERE workspace_id = $1",
+    `SELECT count(*)::int AS held FROM ${table} WHERE workspace_id = $1`,
     [workspaceId],
   );
   return counted.rows[0]?.held ?? 0;
@@ -127,7 +122,7 @@ describe("a seed the browser suite's harness cannot write", () => {
     const { workspaceId } = await app().provision();
     const finding = { category: "home-address", ruleId: "UK_HOME_ADDRESS", spans: 1 };
 
-    const answered = await askedOfTheHarness(
+    const answered = await asked(
       "/__harness/connected-sources",
       aSeedOf(workspaceId, { findings: [{ ...finding, tier: "default-on", kept: true }] }),
     );
@@ -143,13 +138,32 @@ describe("a seed the browser suite's harness cannot write", () => {
         ],
       },
     });
-    expect(await connectedSourcesIn(workspaceId)).toBe(0);
+    expect(await heldIn("connected_source", workspaceId)).toBe(0);
+  });
+
+  it("leaves no model choice when a seed's second is refused", async () => {
+    const { workspaceId } = await app().provision();
+    const answering = { purpose: "answering", provider: "anthropic" };
+
+    const answered = await asked("/__harness/model-choices", {
+      workspaceId,
+      modelChoices: [
+        { ...answering, model: "claude-sonnet-5" },
+        { ...answering, model: "claude-haiku-5" },
+      ],
+    });
+
+    expect(answered).toMatchObject({
+      status: 400,
+      said: { constraint: "model_choice_workspace_purpose_unique" },
+    });
+    expect(await heldIn("model_choice", workspaceId)).toBe(0);
   });
 
   it("answers 400 naming an unreadable reason that holds a space", async () => {
     const { workspaceId } = await app().provision();
 
-    const answered = await askedOfTheHarness(
+    const answered = await asked(
       "/__harness/connected-sources",
       aSeedOf(workspaceId, { unreadableReason: "No text layer" }),
     );
@@ -168,17 +182,14 @@ describe("a seed the browser suite's harness cannot write", () => {
   });
 
   it("answers 400 naming the field the store's own schema refuses", async () => {
-    const answered = await askedOfTheHarness(
-      "/__harness/connected-sources",
-      aSeedOf("no-such-workspace", {}),
-    );
+    const answered = await asked("/__harness/connected-sources", aSeedOf("no-such-workspace", {}));
 
     expect(answered.status).toBe(400);
     expect(answered.said).toMatchObject({ fields: [{ field: "workspaceId" }] });
   });
 
   it("answers 400 naming the constraint a write trips", async () => {
-    const answered = await askedOfTheHarness("/__harness/connected-sources", aSeedOf(ulid(), {}));
+    const answered = await asked("/__harness/connected-sources", aSeedOf(ulid(), {}));
 
     expect(answered.status).toBe(400);
     expect(answered.said).toMatchObject({ constraint: expect.stringMatching(/_fk$/) });
@@ -201,7 +212,7 @@ describe("a seed the browser suite's harness cannot write", () => {
   it("answers 400 naming the field another route's schema refuses", async () => {
     const { workspaceId, admin } = await app().provision();
 
-    const answered = await askedOfTheHarness("/__harness/members", {
+    const answered = await asked("/__harness/members", {
       workspaceId,
       userId: admin.id,
       role: "Owner",

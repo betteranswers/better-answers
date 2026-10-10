@@ -107,6 +107,18 @@ const drawEdgelessFieldsInABorderedBox = (): void => {
   document.querySelector("main")?.append(box);
 };
 
+/** An edgeless, see-through field in a filled box: the box's fill is the field's only where a side hugs. */
+const drawAnEdgelessFieldInAFilledBox = (padding: string): void => {
+  const box = document.createElement("div");
+  box.style.cssText = `padding: ${padding}; background: var(--text-primary)`;
+  const field = document.createElement("input");
+  field.setAttribute("aria-label", "A field in a filled box");
+  field.style.cssText =
+    "display: block; height: 32px; border: 1px solid transparent; background: transparent; color: var(--surface-page)";
+  box.append(field);
+  document.querySelector("main")?.append(box);
+};
+
 /** An edgeless field whose row draws a strong rule close under it, as Jump to's row does. */
 const drawAFieldOnItsRowsRule = (): void => {
   const row = document.createElement("div");
@@ -253,6 +265,17 @@ test("refuses fields that only a layout box's border surrounds", async ({ page }
   test.fail();
   await theSignInPage(page);
   await page.evaluate(drawEdgelessFieldsInABorderedBox);
+});
+
+test("refuses a field a filled box's sides stand off", async ({ page }) => {
+  test.fail();
+  await theSignInPage(page);
+  await page.evaluate(drawAnEdgelessFieldInAFilledBox, "9px");
+});
+
+test("finds a field by a filled box hugging one side", async ({ page }) => {
+  await theSignInPage(page);
+  await page.evaluate(drawAnEdgelessFieldInAFilledBox, "5px 9px 9px");
 });
 
 test("finds a field by the rule its row draws", async ({ page }) => {

@@ -162,6 +162,9 @@ const shortNameOf = (title: string): string =>
 /** Every concept sits directly under `knowledge/`, so a link names the file alone. */
 const fileOf = (title: string): string => `${shortNameOf(title)}.md`;
 
+const pathOf = (concept: Pick<AskedConcept, "title">): string =>
+  `knowledge/${fileOf(concept.title)}`;
+
 type AskedSource = AskedConcept["sources"][number];
 
 type AskedDocument = {
@@ -315,7 +318,7 @@ const conceptWritten = async (
 ) => {
   const { principal, git } = writer;
   const citations = await citationsOf(app, principal.workspaceId, concept, earlier);
-  const path = `knowledge/${fileOf(concept.title)}`;
+  const path = pathOf(concept);
   const written = await writeConcept(
     principal,
     { git, postgres: app.doors.postgres, clock: app.doors.clock },
@@ -392,10 +395,11 @@ const sharedPastItsEvidence = async (
   );
 };
 
+const heldCloser = (concept: AskedConcept, source: AskedSource): boolean =>
+  source.sensitivity !== undefined && source.sensitivity !== concept.sensitivity;
+
 const citesCloserHeldEvidence = (concept: AskedConcept): boolean =>
-  concept.sources.some(
-    (source) => source.sensitivity !== undefined && source.sensitivity !== concept.sensitivity,
-  );
+  concept.sources.some((source) => heldCloser(concept, source));
 
 const verified = async (
   app: TestApp,
@@ -450,22 +454,120 @@ const authorOf = async (app: TestApp, userId: string): Promise<Writer["author"]>
   return author;
 };
 
+type Asked = z.output<typeof conceptsSeeding>;
+
+type Refusal = { readonly path: readonly (string | number)[]; readonly message: string };
+
+/** The files the workspace holds among those this seed would write, and its members. */
+const heldAhead = async (app: TestApp, asked: Asked) => {
+  const { superuser } = app.database;
+  const { workspaceId, concepts } = asked;
+  const files = await superuser.query<{ held: string }>(
+    "SELECT path AS held FROM concept_index WHERE workspace_id = $1 AND path = ANY($2)",
+    [workspaceId, concepts.map(pathOf)],
+  );
+  const members = await superuser.query<{ held: string }>(
+    "SELECT user_id AS held FROM member WHERE workspace_id = $1",
+    [workspaceId],
+  );
+  return {
+    files: new Set(files.rows.map((row) => row.held)),
+    members: new Set(members.rows.map((row) => row.held)),
+  };
+};
+
+/** A title two concepts of one seed share is the schema's to refuse, from the body alone. */
+const titlesHeld = (asked: Asked, held: ReadonlySet<string>): readonly Refusal[] =>
+  asked.concepts.flatMap((concept, at) => {
+    const file = pathOf(concept);
+    return held.has(file)
+      ? [{ path: ["concepts", at, "title"], message: `the workspace already holds ${file}` }]
+      : [];
+  });
+
+/** Only a concept shared with a group makes one, so only its members are held to the workspace. */
+const strangersToTheWorkspace = (asked: Asked, members: ReadonlySet<string>): readonly Refusal[] =>
+  asked.concepts.flatMap((concept, at) =>
+    (concept.audience === "groups" ? concept.groupMemberIds : []).flatMap((memberId, nth) =>
+      members.has(memberId)
+        ? []
+        : [
+            {
+              path: ["concepts", at, "groupMemberIds", nth],
+              message:
+                "a group holds members of its workspace alone, which group_member_member_fk holds",
+            },
+          ],
+    ),
+  );
+
+/** Each of a concept's asks that `seedConcept` answers with the Admin's own override. */
+const overridesAsked = (asked: Asked): readonly Refusal[] =>
+  asked.concepts.flatMap((concept, at) => {
+    if (concept.audience === "groups") {
+      return [
+        {
+          path: ["concepts", at, "audience"],
+          message:
+            "narrowing a concept to a group is an Admin's override, and the writer is no Admin",
+        },
+      ];
+    }
+    return concept.sources.flatMap((source, nth) =>
+      heldCloser(concept, source)
+        ? [
+            {
+              path: ["concepts", at, "sources", nth, "sensitivity"],
+              message:
+                "sharing a concept that cites a document held at another sensitivity is an Admin's override, and the writer is no Admin",
+            },
+          ]
+        : [],
+    );
+  });
+
+/** The slice's write admits an Editor, as the product does; only an override asks for an Admin. */
+const writerRefused = (asked: Asked, writer: UserPrincipal): readonly Refusal[] => {
+  if (writer.role === "Admin") return [];
+  if (writer.role === "Editor") return overridesAsked(asked);
+  return [{ path: ["userId"], message: "a concept is written by an Editor or an Admin" }];
+};
+
 /**
- * Concepts written through the slice's own write under the member `userId` names, an Admin, in order:
- * a concept links only to one before it.
+ * The slice commits each concept as written, so no transaction spans the seed.
+ * @throws as a schema's `parse` does, for the 400.
+ */
+const refusedBeforeAnyWrite = async (
+  app: TestApp,
+  asked: Asked,
+  writer: UserPrincipal,
+): Promise<void> => {
+  const held = await heldAhead(app, asked);
+  const refusals = [
+    ...writerRefused(asked, writer),
+    ...titlesHeld(asked, held.files),
+    ...strangersToTheWorkspace(asked, held.members),
+  ];
+  if (refusals.length === 0) return;
+  throw new z.ZodRealError(
+    refusals.map(({ path, message }) => ({ code: "custom", path: [...path], message })),
+  );
+};
+
+/**
+ * Concepts written in order through the slice's own write, by the Admin or Editor `userId` names: a
+ * concept links only to one before it.
  */
 export const seedConcepts = async (
   app: TestApp,
-  asked: z.output<typeof conceptsSeeding>,
+  asked: Asked,
 ): Promise<{ readonly concepts: readonly SeededConcept[] }> => {
   const { workspaceId, userId } = asked;
   const git = openTestGit(app);
+  const principal = await actingIn(app, { workspaceId, userId }, async (resolved) => resolved);
+  await refusedBeforeAnyWrite(app, asked, principal);
   await initRepository(git, workspaceId);
-  const writer = {
-    principal: await actingIn(app, { workspaceId, userId }, async (principal) => principal),
-    author: await authorOf(app, userId),
-    git,
-  };
+  const writer = { principal, author: await authorOf(app, userId), git };
   const concepts: SeededConcept[] = [];
   for (const concept of asked.concepts) {
     concepts.push(await seedConcept(app, writer, concept, concepts));
