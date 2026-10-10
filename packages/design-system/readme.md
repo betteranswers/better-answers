@@ -130,11 +130,15 @@ metaphor: the layout is set on it and `GridPattern` draws the same pitch behind 
 so the substrate and the content agree. One grid per page, masked away from reader prose.
 
 **Colour.** A cool grey ramp carries everything structural — page `#fcfcfd`, cards
-`#ffffff`, lines `#dfe1e6`, text `#17191c`. One accent, **ink blue `#2e4bd4`**, and it is
+`#ffffff`, lines `#dfe1e6`, text `#17191c`. A field, checkbox or radio is found by its edge,
+so that edge is `--border-control` (`#727781`), 3:1 on every surface in both themes; every
+other line stays a hairline. One accent, **ink blue `#2e4bd4`**, and it is
 *interactive only*: links, focus rings, and the accent fill — the primary button, and the
 unmarked accent button on an action repeated per row. Four semantic hues — green `#137a52`, amber `#a55d09`, red `#c0362c`, violet `#6741c4` — appear only as a
 50-level tint plus a 700-level word, behind a label that already says the same thing.
-Dark theme is a full alias flip on `[data-theme="dark"]`, page `#0b0c0e`. Never a gradient,
+Dark theme is a full alias flip on `[data-theme="dark"]`, page `#0b0c0e`. The attribute goes
+on `<html>` and nowhere else, because the Tailwind bridge's aliases resolve at `:root`. A person
+picks light, dark or their device's on the Account page. Never a gradient,
 never a coloured left border, never colour as the only signal.
 
 **Type.** Geist for everything, Geist Mono for identity and machine strings (IRIs, commit
@@ -237,7 +241,7 @@ shadow change.
 **Press.** A 0.5px downward nudge on buttons and a one-step darker fill. Nothing shrinks.
 
 **Focus.** Always visible, never removed: a 2px `--accent-200` ring, with a 1px
-`--accent-600` edge drawn outside it. The edge meets the page and the ring meets the control, so
+`--accent-600` edge drawn outside it, `--accent-400` in dark. The edge meets the page and the ring meets the control, so
 one of them holds 3:1 whatever the control is filled with. The bridge gives every focusable
 element this ring over the kit's own. Keyboard order is the DOM order.
 
@@ -358,5 +362,5 @@ GOV.UK brand), **`Icon`** (the Phosphor substitution in one file) and
 3. **Logo.** Drawn to the owner's description of 30 September 2026: two square brackets with a square between them. `assets/logo.svg` is the logo unless the owner replaces it. The same decision made the name `better-answers` everywhere a person reads it.
 4. **Accent colour.** Ink blue `#2e4bd4` was chosen, not found. The source specifies no palette — only that colour never carries a signal alone.
 7. **Textures.** `GridPattern`, `DotPattern` and `NoiseTexture` are ports of the corresponding Magic UI components, retuned to these tokens rather than pulled from npm — the design system ships no build step. The application draws the first two from the same tokens without the npm items, whose SVGs take their pitch as numbers rather than the grid token.
-5. **Dark theme.** Authored on the reference styling's convention, not on evidence from the source.
+5. **Dark theme.** Authored on the reference styling's convention, not on evidence from the source. It is measured in the browser: the suite audits every page a test leaves in both themes, words at 4.5:1 and control edges at 3:1.
 6. **Page layouts.** Grounded in `CONCEPTS.md` and the ADRs (which name every page and its content) but not in any interface code, because none exists yet.

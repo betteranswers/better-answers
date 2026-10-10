@@ -172,8 +172,7 @@ how-it-is-written lint rules relaxed over this directory in `.oxlintrc.json`.
 - Four values moved onto the design system's tokens, because that half is the platform's
   (ADR 0033): the dialog overlay reads `--surface-scrim` and `--blur-scrim` rather than
   `bg-black/50`; the destructive badge and button read `--destructive-foreground` rather than
-  `text-white`; the destructive button's dark hover is darkened to hold WCAG AA against 14px
-  text; the default button and icon button sit on the 32px grid module (`--grid-module`).
+  `text-white`; the default button and icon button sit on the 32px grid module (`--grid-module`).
 
 T-037's arrival edits, on the two items it added:
 
@@ -379,6 +378,13 @@ The arrival edits on `card`:
 
 The edits made on 10 October 2026 for BA-98, which made the dark theme reachable:
 
+- `button.tsx`, `badge.tsx`, `checkbox.tsx`, `dropdown-menu.tsx`, `input.tsx`, `radio-group.tsx`,
+  `select.tsx` and `tabs.tsx`: every `dark:` utility removed. They were written against shadcn's
+  dark palette, and the design system's tokens already flip each colour they re-paint: kept, they
+  raised every field off the page and left a hovered destructive menu item under 4.5:1.
+- `button.tsx` and `badge.tsx`'s `link` variants, `item.tsx`'s and `empty.tsx`'s link hovers and
+  `ai-elements/sources.tsx` colour their words `text-brand` rather than `text-primary`. The
+  primary is a fill, and the dark primary fill under 13px words read 3.86:1 on the page.
 - `button.tsx`: the `outline` variant draws its edge in `--border-default`, since `--input` is
   now the 3:1 control edge, and a button is found by its words.
 - `command.tsx`: the input's row draws its rule in `--input`, the only edge Jump to's field has.
