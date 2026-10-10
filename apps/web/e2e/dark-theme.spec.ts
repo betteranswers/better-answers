@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import {
   ACCOUNT_ACTIONS,
@@ -156,4 +156,37 @@ test("draws the authenticator's code dark on light in dark", async ({ page, requ
     4.5,
   );
   expect(modules, "the code is drawn light on dark").toBe(await tokenColour(page, "--grey-900"));
+});
+
+/** A control's words and fill as painted, read through a canvas, which takes the `oklab()` a `/90` fill computes to. */
+const wordsAndFill = (control: Locator) =>
+  control.evaluate((node) => {
+    const pixel = new OffscreenCanvas(1, 1).getContext("2d", { willReadFrequently: true });
+    if (pixel === null) throw new Error("the page has no canvas to read a colour with");
+    const paint = (colours: readonly string[]) => {
+      pixel.clearRect(0, 0, 1, 1);
+      for (const colour of colours) {
+        pixel.fillStyle = colour;
+        pixel.fillRect(0, 0, 1, 1);
+      }
+      const [red = 0, green = 0, blue = 0] = pixel.getImageData(0, 0, 1, 1).data;
+      return `rgb(${String(red)}, ${String(green)}, ${String(blue)})`;
+    };
+    const page = getComputedStyle(document.documentElement).backgroundColor;
+    const style = getComputedStyle(node);
+    return { words: paint([style.color]), fill: paint([page, style.backgroundColor]) };
+  });
+
+test("keeps the hovered primary's words at 4.5:1 in dark", async ({ page }) => {
+  await keptOnThisBrowser(page, "dark");
+  await page.goto("/sign-in");
+  const send = page.getByRole("button", { name: SIGN_IN_WORDS.send });
+  await expect(send).toBeVisible();
+
+  await send.hover();
+  await send.evaluate(async (node) => {
+    await Promise.all(node.getAnimations().map(async (animation) => animation.finished));
+  });
+  const { words, fill } = await wordsAndFill(send);
+  expect(contrastBetween(words, fill), `${words} on ${fill}`).toBeGreaterThanOrEqual(4.5);
 });

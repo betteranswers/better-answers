@@ -55,7 +55,7 @@ No person can reach the dark theme: nothing in `apps/web` sets `data-theme`, and
 
 - **Default to the device.** A person who never chooses gets the theme their device asks for. `sign-in.spec.ts`'s "keeps the sign-in page light under a dark OS" came from d85f8cd6, which guarded against Tailwind's media-query `dark:` half-flipping a light page; following the device supersedes its reason. Governs R2. The owner may overturn this for light-unless-chosen.
 - **Kept on the browser, not the account.** A server-side preference would need a column on the person and a migration, and the sign-in pages would still have no person to read it from. The owner may overturn this. Governs R2.
-- **Control edges at 3:1 in light too.** The gate cannot check one theme and leave the other at 1.31:1, and a 1px line in a darker grey is still a hairline. This lands in its own commit so the owner can revert the light half. Governs R6.
+- **Control edges at 3:1 in light too.** The gate cannot check one theme and leave the other at 1.31:1, and a 1px line in a darker grey is still a hairline. It lands in its own commit, but one token serves both themes, so putting the light edges back also means exempting light from the gate's edge check. Governs R6.
 
 ### Scope Boundaries
 
@@ -99,7 +99,7 @@ U1 and U2 make the theme reachable. U3 makes the suite see both themes and produ
 
 - **Goal:** one module owns the theme. It reads the kept choice, resolves it against the device, writes `<html data-theme>`, follows the device and other tabs, and the head applies it before first paint.
 - **Requirements:** R2, R3, R4. KTD1 to KTD4.
-- **Files:** `apps/web/src/shared/theme.ts` (new: key, values, resolve, the head script's source, the store and hook), `apps/web/vite.config.ts` (inject the script), `apps/web/src/app/providers.tsx` (mount the follower), `apps/web/src/index.css` (`html` background from `--background`), `packages/design-system/tokens/tailwind-bridge.css` (drop `.dark`, rewrite §2's comment), `apps/web/test/theme.test.ts` (new), `apps/web/e2e/sign-in.spec.ts` (rewrite the dark-OS test).
+- **Files:** `apps/web/src/shared/theme-switch.ts` (new: key, resolve, the one writer of the attribute and the head script's source; it imports nothing, so `vite.config.ts` can read it), `apps/web/src/shared/theme.ts` (new: the store and hooks), `apps/web/vite.config.ts` (inject the script), `apps/web/src/app/providers.tsx` (mount the follower), `apps/web/src/index.css` (`html` background from `--background`), `packages/design-system/tokens/tailwind-bridge.css` (drop `.dark`, rewrite §2's comment), `apps/web/test/theme.test.ts` (new), `apps/web/e2e/sign-in.spec.ts` (rewrite the dark-OS test).
 - **Approach:** the head script and the hook share one resolve function's rule: a kept `light` or `dark` wins, otherwise the device. The script is tiny, guards a throwing store, and is placed before the stylesheet link.
 - **Test scenarios:**
   - The head script, run in jsdom with `dark` kept, sets `data-theme="dark"` on `<html>`. With nothing kept and the device dark, it sets dark. With a store that throws, it follows the device.
