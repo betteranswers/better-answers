@@ -1,7 +1,13 @@
-import { expect, type Page, type Response, type Route } from "@playwright/test";
+import {
+  expect,
+  type APIRequestContext,
+  type Page,
+  type Response,
+  type Route,
+} from "@playwright/test";
 import { z } from "zod";
 
-import { keystrokesDismissed, keystrokesListed } from "./harness.ts";
+import { keystrokesDismissed, keystrokesListed, seedConcepts } from "./harness.ts";
 
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 export const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
@@ -121,4 +127,13 @@ export const listsItsKeystrokes = async (
   const listed = await keystrokesListed(page, named);
   for (const keystroke of declared) await expect(listed).toContainText(keystroke.action);
   await keystrokesDismissed(page, listed);
+};
+
+/** The harness's `seedConcepts`, answering each concept it wrote by its title. */
+export const conceptsSeeded = async (
+  api: APIRequestContext,
+  input: Parameters<typeof seedConcepts>[1],
+) => {
+  const { concepts } = await seedConcepts(api, input);
+  return new Map(concepts.map((concept) => [concept.title, concept]));
 };
