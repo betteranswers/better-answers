@@ -100,16 +100,17 @@ describe("what jump-to lists", () => {
 
   it("lists a Viewer's Ask once, with no members or actions", () => {
     expect(outline(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT))).toEqual([
-      [JUMP_TO.groups.areas, ["Ask"]],
+      [JUMP_TO.groups.areas, ["Ask", "Knowledge"]],
+      [JUMP_TO.groups.pages, ["Search"]],
     ]);
   });
 
   it("lists an Admin's built pages, the invite action and members", () => {
     expect(outline(jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT))).toEqual([
-      [JUMP_TO.groups.areas, ["Control Centre"]],
+      [JUMP_TO.groups.areas, ["Knowledge", "Control Centre"]],
       [
         JUMP_TO.groups.pages,
-        ["Connected sources", "Models and spend", "Members", "Groups", "Audit log"],
+        ["Search", "Connected sources", "Models and spend", "Members", "Groups", "Audit log"],
       ],
       [JUMP_TO.groups.actions, [INVITE_A_PERSON.name]],
       [JUMP_TO.groups.members, ["Priya Shah", "new@example.test"]],

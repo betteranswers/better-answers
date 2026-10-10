@@ -51,6 +51,7 @@ import { EveryonePage } from "@/features/console/everyone-page.tsx";
 import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
 import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
+import { SearchPage } from "@/features/knowledge/search-page.tsx";
 import { AuditLogPage } from "@/features/people/audit-log-page.tsx";
 import { GroupsPage } from "@/features/people/groups-page.tsx";
 import { MemberPage } from "@/features/people/member-page.tsx";
@@ -95,6 +96,7 @@ type BuiltPage = { readonly draw: () => ReactElement; readonly toolbar?: PageToo
 
 /** The list decides which pages are built; this map only says by what, and with what in hand. */
 const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>([
+  ["/knowledge/search", { draw: SearchPage }],
   [
     "/sources/connected-sources",
     { draw: ConnectedSourcesPage, toolbar: CONNECTED_SOURCES_TOOLBAR },

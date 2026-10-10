@@ -94,7 +94,7 @@ export const ASK = {
   ],
 } as const satisfies Area;
 
-const KNOWLEDGE = {
+export const KNOWLEDGE = {
   id: "knowledge",
   name: "Knowledge",
   icon: "map",
@@ -108,7 +108,7 @@ const KNOWLEDGE = {
           name: "Search",
           path: "/knowledge/search",
           icon: "search",
-          built: false,
+          built: true,
           seenBy: EVERY_ROLE,
         },
         {

@@ -124,12 +124,13 @@ describe("the one navigation list", () => {
     ]);
   });
 
-  it("calls only today's eight pages built", () => {
+  it("calls only today's nine pages built", () => {
     expect(
       pagesOf([...AREAS, CONSOLE])
         .filter((each) => each.built)
         .map((each) => each.path),
     ).toEqual([
+      "/knowledge/search",
       "/sources/connected-sources",
       "/models/models-and-spend",
       "/people/members",
@@ -169,19 +170,23 @@ describe("the one navigation list", () => {
 
 describe("what each person is shown", () => {
   for (const role of ["Editor", "Viewer"] as const) {
-    it(`shows ${aRole(role)} Ask alone, at their home`, () => {
+    it(`shows ${aRole(role)} Ask, at their home, and Search`, () => {
       const shown = visibleTo(readerOf(role), AREAS);
 
-      expect(outline(shown.areas)).toEqual([["Ask", [[null, ["Ask"]]]]]);
+      expect(outline(shown.areas)).toEqual([
+        ["Ask", [[null, ["Ask"]]]],
+        ["Knowledge", [["Browse", ["Search"]]]],
+      ]);
       expect(shown.home).toBe(HOMES[role]);
       expect(shown.areas[0]?.opensAt).toBe(HOMES[role]);
     });
   }
 
-  it("shows an Admin Control Centre's built pages alone", () => {
+  it("shows an Admin Search and Control Centre's built pages", () => {
     const shown = visibleTo(readerOf("Admin"), AREAS);
 
     expect(outline(shown.areas)).toEqual([
+      ["Knowledge", [["Browse", ["Search"]]]],
       [
         "Control Centre",
         [
@@ -193,7 +198,7 @@ describe("what each person is shown", () => {
       ],
     ]);
     expect(shown.home).toBe(HOMES.Admin);
-    expect(shown.areas[0]?.opensAt).toBe(HOMES.Admin);
+    expect(shown.areas[1]?.opensAt).toBe(HOMES.Admin);
   });
 
   it("shows nothing and no home while the role is unknown", () => {
@@ -480,7 +485,7 @@ describe("an address the person may not see", () => {
     expect(asked.filter((path) => path.includes("members."))).toEqual([]);
   });
 
-  for (const path of ["/people/thresholds", "/suggestions/to-decide", "/knowledge/search"]) {
+  for (const path of ["/people/thresholds", "/suggestions/to-decide", "/knowledge/guides"]) {
     it(`shows an Admin the unbuilt ${path} as not found`, async () => {
       vi.stubGlobal("fetch", answeringAs("Admin"));
 

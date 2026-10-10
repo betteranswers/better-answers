@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
+import { useLandingLine, type Landing } from "@/shared/landing.ts";
 import { timeWords, weekdayWords } from "@/shared/words.ts";
 
 type Dated = { readonly id: string; readonly at: string };
@@ -14,15 +15,6 @@ const daysOf = <Event extends Dated>(events: readonly Event[]) => {
   return days;
 };
 
-/** Load more puts focus on the first line it brings, where reading resumes. */
-export const useLanding = () => {
-  const [landAt, setLandAt] = useState<number>();
-  const landed = useCallback(() => {
-    setLandAt(undefined);
-  }, []);
-  return { landAt, landed, landOn: setLandAt };
-};
-
 function Line(properties: {
   readonly at: string;
   readonly landsHere: boolean;
@@ -30,15 +22,7 @@ function Line(properties: {
   readonly children: ReactNode;
 }) {
   const { at, landsHere, onLanded } = properties;
-  // Taken as the line mounts, so focus waits for the page of older lines that brings it.
-  const land = useCallback(
-    (line: HTMLLIElement | null) => {
-      if (line === null || !landsHere) return;
-      line.focus();
-      onLanded();
-    },
-    [landsHere, onLanded],
-  );
+  const land = useLandingLine(landsHere, onLanded);
 
   return (
     <li ref={land} tabIndex={-1} className="flex items-baseline gap-x-3 px-4 py-2">
@@ -53,7 +37,7 @@ function Line(properties: {
 /** One heading a day, newest first, each event a line beneath its time. */
 export function EventDays<Event extends Dated>(properties: {
   readonly events: readonly Event[];
-  readonly landing: ReturnType<typeof useLanding>;
+  readonly landing: Landing;
   readonly line: (event: Event) => ReactNode;
 }) {
   const { events, landing, line } = properties;

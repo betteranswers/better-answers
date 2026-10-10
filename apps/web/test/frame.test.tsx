@@ -54,13 +54,13 @@ describe("the shell's regions", () => {
   it("names only an Admin's areas in the icon rail", async () => {
     await openAs("Admin", "/people/members");
 
-    expect(namesIn(rail())).toEqual(["Control Centre"]);
+    expect(namesIn(rail())).toEqual(["Knowledge", "Control Centre"]);
   });
 
-  it("names Ask alone in a Viewer's icon rail", async () => {
+  it("names Ask and Knowledge in a Viewer's icon rail", async () => {
     await openAs("Viewer", "/ask");
 
-    expect(namesIn(rail())).toEqual(["Ask"]);
+    expect(namesIn(rail())).toEqual(["Ask", "Knowledge"]);
   });
 
   it("names no area while the role is unknown", async () => {
@@ -188,7 +188,7 @@ describe("the shell's regions", () => {
     await openAs("Admin", "/system/not-a-page");
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_PAGE.heading);
-    expect(namesIn(rail())).toEqual(["Control Centre"]);
+    expect(namesIn(rail())).toEqual(["Knowledge", "Control Centre"]);
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
   });
