@@ -11,10 +11,28 @@ const RETRY_ATTEMPTS = 2;
 const worthAnotherAsk = (error: Error) => refusalOf(error) === undefined;
 
 /** A ceiling lifts only with time, so a read that met one is not asked again at once. */
-export const retryUnlessWaiting = (failureCount: number, error: Error | ApiError): boolean =>
+const retryUnlessWaiting = (failureCount: number, error: Error | ApiError): boolean =>
   ceilingLiftsIn(error) === undefined &&
   refusalOf(error) === undefined &&
   failureCount < RETRY_ATTEMPTS;
+
+type Held = {
+  readonly state: { readonly error: Error | ApiError | null; readonly errorUpdatedAt: number };
+};
+
+/** True of a read that met no ceiling, and of one whose wait has run out. */
+const waitedOut = ({ state }: Held): boolean => {
+  const liftsInSeconds = state.error === null ? undefined : ceilingLiftsIn(state.error);
+  return liftsInSeconds === undefined || state.errorUpdatedAt + liftsInSeconds * 1000 <= Date.now();
+};
+
+/** While a ceiling's wait runs, only its reader asks again: no retry, focus, reconnection or mount does. */
+export const WHILE_A_CEILING_HOLDS = {
+  retry: retryUnlessWaiting,
+  retryOnMount: waitedOut,
+  refetchOnWindowFocus: waitedOut,
+  refetchOnReconnect: waitedOut,
+} as const;
 
 /** A read saves nothing, so only a refused action leaves something unsaved. */
 export type FailedDuring = "read" | "action";
