@@ -107,9 +107,6 @@ export const TRPC_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
 export const MCP_TOKEN_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
-/** A person reading on the web spends what one connection does over MCP, find and open together. */
-export const KNOWLEDGE_READ_PERSON_RULE: CounterRule = MCP_TOKEN_RULE;
-
 /** Each export reads up to 10,000 events, so an Admin's script cannot keep the database busy. */
 export const AUDIT_EXPORT_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
