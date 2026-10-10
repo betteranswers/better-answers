@@ -8,12 +8,6 @@ const ADMIT = "admit";
 /** The two shorthands admit on their own call, so only `admit` names a declaration to pair. */
 const ADMITTING = new Set([ADMIT, "requireAdmin", "requireFreshSignIn"]);
 
-/** The visitors fire in source order, so whichever of the two lands first is the earlier one. */
-type Frame = {
-  readonly first: "awaited" | "admitted" | undefined;
-  readonly admitted: ESTree.CallExpression | undefined;
-};
-
 const calleeName = (node: ESTree.CallExpression): string | undefined =>
   node.callee.type === "Identifier" ? node.callee.name : undefined;
 
@@ -36,35 +30,21 @@ export const actionAdmitsBeforeAwaitRule = defineRule({
     },
   },
   createOnce(context) {
-    const frames: Frame[] = [];
+    /** Whether each open function has awaited yet; the visitors fire in source order. */
+    const awaited: boolean[] = [];
     const declared = new Map<string, ESTree.Node>();
     const admitted = new Set<string>();
 
     const open = (): void => {
-      frames.push({ first: undefined, admitted: undefined });
+      awaited.push(false);
     };
 
     const close = (): void => {
-      const frame = frames.pop();
-      if (frame?.first === "awaited" && frame.admitted !== undefined) {
-        const name = calleeName(frame.admitted) ?? ADMIT;
-        context.report({ node: frame.admitted, messageId: "late", data: { name } });
-      }
+      awaited.pop();
     };
 
     const noteAwait = (): void => {
-      const frame = frames.at(-1);
-      if (frame === undefined || frame.first !== undefined) return;
-      frames[frames.length - 1] = { ...frame, first: "awaited" };
-    };
-
-    const noteAdmit = (node: ESTree.CallExpression): void => {
-      const frame = frames.at(-1);
-      if (frame === undefined) return;
-      frames[frames.length - 1] = {
-        first: frame.first ?? "admitted",
-        admitted: frame.admitted ?? node,
-      };
+      if (awaited.length > 0) awaited[awaited.length - 1] = true;
     };
 
     return {
@@ -80,7 +60,7 @@ export const actionAdmitsBeforeAwaitRule = defineRule({
       CallExpression(node) {
         const name = calleeName(node);
         if (name === undefined || !ADMITTING.has(name)) return;
-        noteAdmit(node);
+        if (awaited.at(-1) === true) context.report({ node, messageId: "late", data: { name } });
         if (name !== ADMIT) return;
         const asked = namedFirstArgument(node);
         if (asked !== undefined) admitted.add(asked);
@@ -101,7 +81,7 @@ export const actionAdmitsBeforeAwaitRule = defineRule({
         }
         declared.clear();
         admitted.clear();
-        frames.length = 0;
+        awaited.length = 0;
       },
     };
   },

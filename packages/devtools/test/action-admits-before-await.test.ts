@@ -113,6 +113,19 @@ describe("the rule that a declared action admits before it awaits", () => {
     });
   });
 
+  it("refuses a late `admit`, though a shorthand came first", () => {
+    const mixed = `export const reprocess = async (principal, tx, input) => {
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return admin;
+  await tx.query("SELECT 1");
+  return admit(reprocessAction, principal, input);
+};
+`;
+    const output = lint.output(holding(mixed));
+
+    expect(output).toContain("run `admit` first");
+  });
+
   it("pairs a declaration with `admit` alone, never a shorthand's argument", () => {
     const both = `export const reprocess = async (principal, tx, input) => {
   const admin = requireAdmin(reprocessAction);
