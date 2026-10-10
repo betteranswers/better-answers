@@ -134,7 +134,7 @@ const aWorkspaceOfConcepts = async (api: APIRequestContext, name: string) => {
         frontmatter: {
           description: "How long audit logs are kept, and who decides.",
           tags: ["audit", "retention"],
-          verified: [{ by: "process:records-checker", at: "2026-03-03T09:41:00Z" }],
+          verified: [{ by: "process:records-verifier", at: "2026-03-03T09:41:00Z" }],
           review_cycle: "Yearly",
         },
       },

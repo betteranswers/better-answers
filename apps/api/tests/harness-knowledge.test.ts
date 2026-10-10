@@ -174,7 +174,7 @@ describe("the browser suite's knowledge harness", () => {
           frontmatter: {
             description: "How synthetic dust is kept down.",
             tags: ["dust", "air"],
-            verified: [{ by: "process:synthetic-checker", at: "2026-03-03T09:41:00Z" }],
+            verified: [{ by: "process:synthetic-verifier", at: "2026-03-03T09:41:00Z" }],
           },
         },
       ],
@@ -186,7 +186,7 @@ describe("the browser suite's knowledge harness", () => {
       title: "Quarry dust limits",
       description: "How synthetic dust is kept down.",
       tags: ["dust", "air"],
-      verified: [{ by: "process:synthetic-checker", at: "2026-03-03T09:41:00Z" }],
+      verified: [{ by: "process:synthetic-verifier", at: "2026-03-03T09:41:00Z" }],
     });
   });
 });

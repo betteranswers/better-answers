@@ -30,7 +30,7 @@ describe("what a concept page reads from a file's frontmatter", () => {
       type: "Answer",
       verified: [
         { by: "human:01JBZ6Q2V7Y9K3M5N8P0R2T4W6", at: "2026-03-03T09:41:00Z" },
-        { by: "process:records-checker", at: "2026-04-01T08:00:00Z" },
+        { by: "process:records-verifier", at: "2026-04-01T08:00:00Z" },
       ],
     });
 
