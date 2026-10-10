@@ -16,12 +16,12 @@ const partsOf = (address: string): readonly Part[] => {
 };
 
 /**
- * `<wbr>` adds no character, so a reader and a spec read the address itself. A part too long for
- * its line still breaks.
+ * `<wbr>` adds no character, so the address reads as itself. A part too long for its line breaks
+ * inside, rather than scroll the page sideways.
  */
 export function Address(properties: { readonly address: string; readonly className?: string }) {
   return (
-    <span className={cn("wrap-break-word", properties.className)}>
+    <span className={cn("wrap-anywhere", properties.className)}>
       {partsOf(properties.address).map((part) => (
         <Fragment key={part.from}>
           {part.from === 0 ? null : <wbr />}

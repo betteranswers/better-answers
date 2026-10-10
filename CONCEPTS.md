@@ -1833,10 +1833,11 @@ the page's frame with no *toolbar*. An address deeper than it names nothing.
 One *member*'s page, at the *detail address* beneath Members, opened from their row, its *row
 menu*, a Members keystroke or *Jump to*.
 
-A header names them, their address and their role, over three sections: **Access** (their role,
-their groups, when they joined, when every sign-in and token they held here was last ended, and the
-*display name* flag), their *Activity*, and **Remove and end every sign-in**, set apart last. A
-section has no address. A page naming no member says so and leads to Members.
+A header names them and their address, over three sections: **Access** (when they joined, when
+every sign-in and *personal token* they held here was last ended, their role and their groups, each
+shown once, where it is changed, and the *display name* flag), their *Activity*, and **Remove and
+end every sign-in**, set apart last. A section has no address. A page naming no member says so and
+leads to Members.
 
 ### home (of a role)
 

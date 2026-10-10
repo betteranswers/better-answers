@@ -12,7 +12,11 @@ export function GroupsReadSaid(properties: {
   const { error, isPending } = useReadSaid(properties);
   return (
     <>
-      <OutcomeLine outcome={error === null ? undefined : outcomeOfGroupFailure(error, "read")} />
+      {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
+      <OutcomeLine
+        outcome={error === null ? undefined : outcomeOfGroupFailure(error, "read")}
+        className="contents"
+      />
       <div aria-live="polite" className="empty:sr-only">
         {isPending ? <p>{GROUPS_LOADING}</p> : null}
       </div>

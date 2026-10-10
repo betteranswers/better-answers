@@ -69,6 +69,24 @@ const SHEET_COUNT = "//div[@role='dialog']//h2/following-sibling::p[1]";
 
 const LIST_COUNT = "//section[h2[normalize-space(.)='Groups']]/div/output";
 
+/** A group's label on a member's page, found only while the box beside it is ticked. */
+const tickedGroup = (name: string): string =>
+  `//fieldset//div[button[@role='checkbox'][@aria-checked='true']]//label[normalize-space(.)='${name}']`;
+
+/** A card's inner gap and a little over: text further beneath its header has a band above it. */
+const ONE_GAP_PX = 16;
+
+/** An empty outcome line that took a gap of its own would push the card's first text down. */
+const startsUnderItsHeader = async (card: Locator): Promise<void> => {
+  const header = await card.locator("[data-slot='card-header']").boundingBox();
+  const firstLine = await card.getByRole("paragraph").first().boundingBox();
+  const headerEnds = (header?.y ?? Number.NaN) + (header?.height ?? Number.NaN);
+  expect(
+    (firstLine?.y ?? Number.NaN) - headerEnds,
+    "an empty band stands above the card's first line of text",
+  ).toBeLessThanOrEqual(ONE_GAP_PX);
+};
+
 /** Another workspace's group is made alongside, so a list that leaked would show it. */
 const anAdminAtGroups = async (page: Page, api: APIRequestContext, workspaceName: string) => {
   const adminEmail = anAddress("admin");
@@ -303,6 +321,7 @@ test.describe("a group's actions", () => {
       .filter({ hasText: /\S/ });
     await expect(members.getByRole("checkbox")).toHaveCount(3);
     await expect(members.getByRole("checkbox", { checked: true })).toHaveCount(0);
+    await startsUnderItsHeader(sheet.getByRole("region", { name: "Members" }));
 
     const sam = members.getByRole("checkbox", { name: "Sam Okoro" });
     await sam.focus();
@@ -467,11 +486,9 @@ test.describe("a member's groups, on their row and their page", () => {
     await expect(bids).toBeFocused();
     await expect(bids).not.toBeChecked();
     await expect(picked.getByRole("checkbox", { name: "HR team" })).toBeChecked();
+    await startsUnderItsHeader(groups);
 
-    await clockTheNextKey(page, {
-      at: "//section[h2='Access']//dt[normalize-space(.)='Groups']/following-sibling::dd[1]",
-      reads: "Bid writers",
-    });
+    await clockTheNextKey(page, { at: tickedGroup("Bid writers"), reads: "Bid writers" });
     await page.keyboard.press("Space");
     await expect(groups.getByRole("status").filter({ hasText: /\S/ })).toHaveText(
       "Priya Shah is in Bid writers now.",

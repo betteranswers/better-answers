@@ -1,5 +1,6 @@
 import { useId, useState, type RefObject } from "react";
 
+import { Address } from "@/shared/address.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -10,7 +11,7 @@ import { outcomeOfGroupFailure } from "./refusal.tsx";
 type Choice = {
   readonly id: string;
   readonly label: string;
-  /** Read out after the label, as the box's description. */
+  /** A member's address, read out after the label as the box's description. */
   readonly detail: string | undefined;
   readonly checked: boolean;
 };
@@ -56,7 +57,8 @@ export function GroupChecklist(properties: {
 
   return (
     <>
-      <OutcomeLine outcome={outcome} />
+      {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
+      <OutcomeLine outcome={outcome} className="contents" />
       <fieldset ref={listRef} aria-describedby={ids.hint} className="grid gap-3">
         <legend className="sr-only">{legend}</legend>
         <p id={ids.hint} className="text-sm text-muted-foreground">
@@ -81,8 +83,8 @@ export function GroupChecklist(properties: {
                   {choice.label}
                 </Label>
                 {choice.detail === undefined ? null : (
-                  <span id={detailId} className="text-xs text-muted-foreground wrap-anywhere">
-                    {choice.detail}
+                  <span id={detailId} className="min-w-0 text-xs text-muted-foreground">
+                    <Address address={choice.detail} />
                   </span>
                 )}
               </div>

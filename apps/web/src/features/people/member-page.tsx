@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from "react";
 
+import { Address } from "@/shared/address.tsx";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { initialsOf } from "@/shared/initials.ts";
@@ -19,7 +20,6 @@ import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { PageHead } from "@/shared/page-head.tsx";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { MEMBER_PAGE_WORDS as WORDS } from "./member-action-words.ts";
 import { MemberActivity } from "./member-activity.tsx";
@@ -163,9 +163,10 @@ function MemberHeader(properties: {
         <h2 ref={titleRef} tabIndex={-1} className="wrap-anywhere">
           {nameOf(member)}
         </h2>
-        <p className="text-sm text-muted-foreground wrap-anywhere">{member.address}</p>
+        <p className="text-sm text-muted-foreground">
+          <Address address={member.address} />
+        </p>
       </div>
-      <Pill>{member.role}</Pill>
     </div>
   );
 }

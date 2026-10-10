@@ -13,6 +13,7 @@ import {
   INCLUDES_YOU,
   MEMBER_PAGE_WORDS,
   NO_LONGER_LISTED,
+  RECORDED,
   SELECTED_MEMBERS,
 } from "@/features/people/member-action-words.ts";
 import {
@@ -128,6 +129,26 @@ const COLUMN = { Person: 1, Role: 2, Groups: 3, Joined: 4 } as const;
 const cellOf = (page: Page, name: string, column: keyof typeof COLUMN): Locator =>
   rowOf(page, name).getByRole("cell").nth(COLUMN[column]);
 
+/** A text's lines as the browser draws them, each character placed by where its own box sits. */
+const renderedLines = (text: Locator): Promise<string[]> =>
+  text.evaluate((element) => {
+    const lines: { top: number; text: string }[] = [];
+    const range = document.createRange();
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const characters = node.textContent ?? "";
+      for (let at = 0; at < characters.length; at += 1) {
+        range.setStart(node, at);
+        range.setEnd(node, at + 1);
+        const { top } = range.getBoundingClientRect();
+        const line = lines.at(-1);
+        if (line !== undefined && Math.abs(line.top - top) < 1) line.text += characters.charAt(at);
+        else lines.push({ top, text: characters.charAt(at) });
+      }
+    }
+    return lines.map((line) => line.text);
+  });
+
 const memberLink = (page: Page, name: string): Locator =>
   membersRegion(page).getByRole("link", { name, exact: true });
 
@@ -150,6 +171,13 @@ const rolePicker = (page: Page): Locator => thePage(page).getByRole("radiogroup"
 
 const rolePickerRegion = (page: Page): Locator =>
   thePage(page).getByRole("region", { name: "Role", exact: true });
+
+/** The Role card's primary at rest, which names a change only once another role is picked. */
+const changeRoleButton = (page: Page): Locator =>
+  rolePickerRegion(page).getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole });
+
+/** The line under the Role card's primary, where the page says the role a member holds. */
+const THE_ROLE_HELD = "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Role']]//p";
 
 const removalOf = (page: Page): Locator =>
   thePage(page).getByRole("region", { name: "Removal", exact: true });
@@ -609,16 +637,22 @@ test.describe("a member's own page", () => {
       ).toHaveAccessibleDescription(meaning);
     }
     await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeChecked();
+    await expect(changeRoleButton(page)).toBeDisabled();
+    // The role is said where it is changed and nowhere else: its word stands alone as the radio's label.
     await expect(
-      thePage(page).getByRole("button", { name: "Make Priya Shah an Editor" }),
-    ).toBeDisabled();
+      thePage(page).getByText("Editor", { exact: true }),
+      "the role is said outside the Role card",
+    ).toHaveCount(1);
+    await expect(accessOf(page).getByRole("term")).toHaveText([
+      "Joined",
+      MEMBER_PAGE_WORDS.signInsAndTokensHere,
+    ]);
 
     await expect(thePage(page)).toMatchAriaSnapshot(`
       - main "Page":
         - heading "People" [level=1]
         - heading "Priya Shah" [level=2]
         - paragraph: /@/
-        - text: Editor
         - navigation "${MEMBER_PAGE_WORDS.sections}":
           - list:
             - listitem:
@@ -629,13 +663,9 @@ test.describe("a member's own page", () => {
               - link "${MEMBER_PAGE_WORDS.removeAndEndEverySignIn}"
         - region "${MEMBER_PAGE_WORDS.access}":
           - heading "${MEMBER_PAGE_WORDS.access}" [level=2]
-          - term: Role
-          - definition: Editor
-          - term: Groups
-          - definition: No group
           - term: Joined
           - definition: /\\d{4}/
-          - term: Sign-ins and tokens here
+          - term: ${quoted(MEMBER_PAGE_WORDS.signInsAndTokensHere)}
           - definition: Never ended
           - region "Role":
             - heading "Role" [level=3]
@@ -646,8 +676,8 @@ test.describe("a member's own page", () => {
               - text: Editor Checks concepts, asks question sets and saves Answers.
               - radio "Viewer"
               - text: Viewer Asks questions, flags answers and suggests changes.
-            - button "Make Priya Shah an Editor" [disabled]
-            - paragraph: Priya Shah is an Editor. Pick another role to change it.
+            - button "${MEMBER_PAGE_WORDS.changeRole}" [disabled]
+            - paragraph: ${quoted(MEMBER_PAGE_WORDS.holdsRole("Priya Shah", "Editor"))}
           - region "Groups":
             - heading "Groups" [level=3]
             - paragraph: ${EMPTY_LINES.groups}
@@ -662,10 +692,10 @@ test.describe("a member's own page", () => {
           - text: ${quoted(ACTIVITY_WORDS.none("Priya Shah"))}
         - region "${MEMBER_PAGE_WORDS.removeAndEndEverySignIn}":
           - heading "${MEMBER_PAGE_WORDS.removeAndEndEverySignIn}" [level=2]
-          - region "Sign-ins and tokens":
-            - heading "Sign-ins and tokens" [level=3]
-            - button "End every sign-in and token here"
-            - paragraph: Every session and token Priya Shah holds for this workspace is refused at once, and a fresh sign-in works. Recorded on the audit log under your name.
+          - region "${MEMBER_PAGE_WORDS.signInsAndTokens}":
+            - heading "${MEMBER_PAGE_WORDS.signInsAndTokens}" [level=3]
+            - button "${MEMBER_PAGE_WORDS.endEverySignInAndToken}"
+            - paragraph: ${quoted(`${MEMBER_PAGE_WORDS.endsAtOnce("Priya Shah")} ${RECORDED}`)}
           - region "Removal":
             - heading "Removal" [level=3]
             - paragraph: /Priya Shah loses access to this workspace/
@@ -796,7 +826,8 @@ test.describe("a member's own page", () => {
     await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
     const commit = thePage(page).getByRole("button", { name: "Make Sam Okoro an Editor" });
     await commit.focus();
-    await clockTheNextKey(page, { at: accessLine("Role"), reads: "Editor" });
+    const heldNow = MEMBER_PAGE_WORDS.holdsRole("Sam Okoro", "Editor");
+    await clockTheNextKey(page, { at: THE_ROLE_HELD, reads: heldNow });
     await page.keyboard.press("Enter");
 
     await expect(rolePickerRegion(page).getByRole("status")).toHaveText(
@@ -806,7 +837,8 @@ test.describe("a member's own page", () => {
     await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
 
     await page.reload();
-    await expect(accessOf(page).getByRole("definition").first()).toHaveText("Editor");
+    await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeChecked();
+    await expect(changeRoleButton(page)).toHaveAccessibleDescription(heldNow);
     await backToMembers(page);
     await expect(cellOf(page, "Sam Okoro", "Role")).toHaveText("Editor");
   });
@@ -826,8 +858,37 @@ test.describe("a member's own page", () => {
       table: SAID_OF_A_MEMBER,
       word: "last-admin",
     });
-    await expect(accessOf(page).getByRole("definition").first()).toHaveText("Admin");
     await passesTheAccessibilityGate();
+    // The card says the role held once the pick matches it, so the pick is put back to read it.
+    await thePage(page).getByRole("radio", { name: "Admin", exact: true }).click();
+    await expect(changeRoleButton(page)).toHaveAccessibleDescription(
+      MEMBER_PAGE_WORDS.holdsRole("Test person", "Admin"),
+    );
+  });
+
+  test("names a role change only once another role is picked", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Swale Chandlery");
+    await openedByName(page, "Priya Shah");
+
+    await expect(changeRoleButton(page)).toBeDisabled();
+    await expect(changeRoleButton(page)).toHaveAccessibleDescription(
+      MEMBER_PAGE_WORDS.holdsRole("Priya Shah", "Editor"),
+    );
+
+    await thePage(page).getByRole("radio", { name: "Viewer", exact: true }).click();
+    await expect(
+      rolePickerRegion(page).getByRole("button", {
+        name: MEMBER_PAGE_WORDS.makeRole("Priya Shah", "Viewer"),
+      }),
+    ).toBeEnabled();
+    await expect(
+      changeRoleButton(page),
+      "the primary still reads as at rest with another role picked",
+    ).toHaveCount(0);
+    await expect(rolePickerRegion(page).getByRole("button")).toHaveCount(1);
+
+    await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
+    await expect(changeRoleButton(page)).toBeDisabled();
   });
 
   test("demoting yourself says so, then lands on Editor's home", async ({ page, request }) => {
@@ -1135,10 +1196,10 @@ test.describe("a member's Activity", () => {
 const ENDED_AT = /Ended\s*\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
 
 const endButton = (page: Page): Locator =>
-  thePage(page).getByRole("button", { name: "End every sign-in and token here" });
+  thePage(page).getByRole("button", { name: MEMBER_PAGE_WORDS.endEverySignInAndToken });
 
 const credentialsRegion = (page: Page): Locator =>
-  thePage(page).getByRole("region", { name: "Sign-ins and tokens" });
+  thePage(page).getByRole("region", { name: MEMBER_PAGE_WORDS.signInsAndTokens });
 
 /** Priya is a member of a second workspace too, so a page that told of it would name it. */
 const anAdminWithAMemberOfTwo = async (page: Page, api: APIRequestContext) => {
@@ -1166,11 +1227,14 @@ test.describe("ending every sign-in and token a member holds here", () => {
     await expect(accessOf(page)).toContainText("Never ended");
     const revoke = endButton(page);
     await revoke.focus();
-    await clockTheNextKey(page, { at: accessLine("Sign-ins and tokens here"), reads: "Ended" });
+    await clockTheNextKey(page, {
+      at: accessLine(MEMBER_PAGE_WORDS.signInsAndTokensHere),
+      reads: "Ended",
+    });
     await page.keyboard.press("Enter");
 
     await expect(credentialsRegion(page).getByRole("status")).toContainText(
-      "Every sign-in and token Priya Shah held here has ended.",
+      MEMBER_PAGE_WORDS.everySignInEnded("Priya Shah"),
     );
     await theActionLandedWithinItsBudget(page, "revocation");
     await expect(revoke).toBeFocused();
@@ -1217,7 +1281,7 @@ test.describe("ending every sign-in and token a member holds here", () => {
     await expect(revoke).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(credentialsRegion(page).getByRole("status")).toContainText(
-      "Every sign-in and token Sam Okoro held here has ended.",
+      MEMBER_PAGE_WORDS.everySignInEnded("Sam Okoro"),
     );
     await expect(revoke).toBeFocused();
   });
@@ -1327,7 +1391,9 @@ test.describe("removing a member from their page", () => {
       sentenceOf(SAID_OF_A_MEMBER["last-admin"]),
     );
     await expect(page).toHaveURL(AT_A_MEMBER_PAGE);
-    await expect(accessOf(page).getByRole("definition").first()).toHaveText("Admin");
+    await expect(changeRoleButton(page)).toHaveAccessibleDescription(
+      MEMBER_PAGE_WORDS.holdsRole("Test person", "Admin"),
+    );
     await passesTheAccessibilityGate();
   });
 
@@ -2168,7 +2234,11 @@ test.describe("bulk actions on the members ticked", () => {
     await expect(box).toBeFocused();
     await page.keyboard.press("Space");
     await expect(box).toBeChecked();
-    await expect(accessOf(page).getByRole("definition").nth(1)).toHaveText("Site leads");
+    // The group is said where it is changed and nowhere else: its name stands alone as the box's label.
+    await expect(
+      thePage(page).getByText("Site leads", { exact: true }),
+      "the group is named outside its checklist",
+    ).toHaveCount(1);
     await backToMembers(page);
     await expect(cellOf(page, "Sam Okoro", "Groups")).toHaveText("Site leads");
   });
@@ -2195,5 +2265,24 @@ test.describe("bulk actions on the members ticked", () => {
     await page.getByRole("menuitemcheckbox", { name: "Groups" }).click();
     await page.keyboard.press("Escape");
     await expect(heads.filter({ hasText: /^Groups$/ })).toHaveCount(1);
+  });
+
+  test("wraps a long address between its parts at 390 pixels", async ({ page, request }) => {
+    const { workspaceId } = await anAdminAtPeople(page, request, "Ure Spinning");
+    // Dots and no hyphen in its first words, so a break inside them would be mid-word.
+    const long = anAddress("oliver.bannerman.accountspayable");
+    const made = await person(request, long, { displayName: "Oliver Bannerman" });
+    await addMember(request, { workspaceId, userId: made.id, role: "Viewer" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+
+    const address = cellOf(page, "Oliver Bannerman", "Person").getByText(long, { exact: true });
+    await expect(address).toBeVisible();
+    const lines = await renderedLines(address);
+    expect(lines.join(""), "the address reads as other text").toBe(long);
+    expect(lines.length, "the address fits one line, so no break is shown").toBeGreaterThan(1);
+    for (const line of lines.slice(0, -1)) {
+      expect(line, "a line of the address ends inside a word").toMatch(/[@.-]$/);
+    }
   });
 });

@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-table";
 import { createContext, useContext } from "react";
 
+import { Address } from "@/shared/address.tsx";
 import { RowLink } from "@/shared/grid-table.tsx";
 import { initialsOf } from "@/shared/initials.ts";
 import type { Said } from "@/shared/refusal-words.ts";
@@ -85,7 +86,8 @@ function PersonCell(properties: {
             displayName
           )}
         </RowLink>
-        <span className="text-xs text-muted-foreground wrap-anywhere">{address}</span>
+        {/* Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px. */}
+        <Address address={address} className="text-xs text-muted-foreground" />
         {refused === undefined ? null : (
           <span className="mt-1 flex flex-wrap items-center gap-1 text-xs">
             <Pill>Refused</Pill>

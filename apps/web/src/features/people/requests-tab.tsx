@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from "react";
 
+import { Address } from "@/shared/address.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
@@ -46,7 +47,8 @@ function Requester(properties: { readonly request: WaitingRequest }) {
       ) : (
         <span className="font-medium">{name}</span>
       )}
-      <span className="text-xs text-muted-foreground wrap-anywhere">{email}</span>
+      {/* Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px. */}
+      <Address address={email} className="text-xs text-muted-foreground" />
     </span>
   );
 }
