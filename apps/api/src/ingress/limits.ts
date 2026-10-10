@@ -53,7 +53,8 @@ export type AddressScope =
   | "mcp"
   | "oauth"
   | "passkey-sign-in"
-  | "sign-in-link"
+  | "sign-in-link-read"
+  | "sign-in-link-sign-in"
   | "trpc";
 
 /** Under its route group's name, so one group's requests spend none of another's count. */

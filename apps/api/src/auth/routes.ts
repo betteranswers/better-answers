@@ -383,11 +383,11 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
   });
   routes.use(
     SIGN_IN_LINK_DESCRIBE_PATH,
-    limitByIp(door, SIGN_IN_LINK_DESCRIBE_IP_RULE, clock, "sign-in-link"),
+    limitByIp(door, SIGN_IN_LINK_DESCRIBE_IP_RULE, clock, "sign-in-link-read"),
   );
   routes.use(
     SIGN_IN_LINK_SIGN_IN_PATH,
-    limitByIp(door, SIGN_IN_LINK_SIGN_IN_IP_RULE, clock, "sign-in-link"),
+    limitByIp(door, SIGN_IN_LINK_SIGN_IN_IP_RULE, clock, "sign-in-link-sign-in"),
   );
   routes.use("/sign-in-link/*", sameOriginOnly(publicUrl));
   routes.use("/sign-in-link/*", async (context, next) => {

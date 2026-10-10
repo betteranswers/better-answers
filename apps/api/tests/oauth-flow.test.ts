@@ -916,42 +916,32 @@ describe("the limits", () => {
 
   /** Every count by client address, each with one request to a route it counts and its ceiling. */
   const COUNTS = {
-    trpc: [{ name: "tRPC", max: 120, ask: (client) => client.fetch("/trpc/session.member") }],
-    oauth: [
-      { name: "the OAuth paths", max: 60, ask: (client) => client.fetch("/oauth2/authorize") },
-    ],
-    mcp: [
-      {
-        name: "a call with no bearer",
-        max: 60,
-        ask: (client) => client.json("/mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }),
-      },
-    ],
-    consent: [{ name: "consent", max: 30, ask: (client) => client.fetch("/consent") }],
-    "sign-in-link": [
-      {
-        name: "a sign-in link's read",
-        max: 30,
-        ask: (client) => client.json("/sign-in-link/describe", {}),
-      },
-      {
-        name: "a sign-in by link",
-        max: 10,
-        ask: (client) => client.json("/sign-in-link/sign-in", {}),
-      },
-    ],
-    "passkey-sign-in": [
-      {
-        name: "the passkey sign-in",
-        max: 30,
-        ask: (client) => client.json("/passkeys/sign-in-options", {}),
-      },
-    ],
-  } satisfies Record<AddressScope, readonly Counted[]>;
+    trpc: { name: "tRPC", max: 120, ask: (client) => client.fetch("/trpc/session.member") },
+    oauth: { name: "the OAuth paths", max: 60, ask: (client) => client.fetch("/oauth2/authorize") },
+    mcp: {
+      name: "a call with no bearer",
+      max: 60,
+      ask: (client) => client.json("/mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    },
+    consent: { name: "consent", max: 30, ask: (client) => client.fetch("/consent") },
+    "sign-in-link-read": {
+      name: "a sign-in link's read",
+      max: 30,
+      ask: (client) => client.json("/sign-in-link/describe", {}),
+    },
+    "sign-in-link-sign-in": {
+      name: "a sign-in by link",
+      max: 10,
+      ask: (client) => client.json("/sign-in-link/sign-in", {}),
+    },
+    "passkey-sign-in": {
+      name: "the passkey sign-in",
+      max: 30,
+      ask: (client) => client.json("/passkeys/sign-in-options", {}),
+    },
+  } satisfies Record<AddressScope, Counted>;
 
-  const ROUTES = Object.entries(COUNTS).flatMap(([scope, routes]) =>
-    routes.map((route) => ({ scope, ...route })),
-  );
+  const ROUTES: readonly Counted[] = Object.values(COUNTS);
 
   it.each(ROUTES)("counts $name apart from every other", async (flooded) => {
     const client = app.client();
@@ -960,21 +950,22 @@ describe("the limits", () => {
     refusedOnlyAtTheLast(await onePast(() => flooded.ask(client), flooded.max));
 
     const others: number[] = [];
-    for (const route of ROUTES.filter((route) => route.scope !== flooded.scope)) {
+    for (const route of ROUTES.filter((route) => route !== flooded)) {
       others.push((await route.ask(client)).status);
     }
     expect(others).not.toContain(429);
     expect((await client.fetch("/.well-known/oauth-protected-resource/mcp")).status).toBe(200);
   });
 
-  it("spends a link's sign-ins on its reads, as one group", async () => {
+  it("leaves a link's ten sign-ins after its thirty reads", async () => {
     const client = app.client();
     stopTheClock();
 
-    for (let read = 0; read < 10; read += 1) await client.json("/sign-in-link/describe", {});
-    const signIn = await client.json("/sign-in-link/sign-in", {});
+    const reads = await onePast(() => client.json("/sign-in-link/describe", {}), 29);
+    const signIns = await onePast(() => client.json("/sign-in-link/sign-in", {}), 10);
 
-    expect(signIn.status).toBe(429);
+    expect(reads).not.toContain(429);
+    refusedOnlyAtTheLast(signIns);
   });
 
   it("keys the page limit on CF-Connecting-IP alone, ignoring spoofed X-Forwarded-For", async () => {
