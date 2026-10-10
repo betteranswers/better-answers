@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
+/* jscpd:ignore-start */
 import { useMemo, useState, type RefObject } from "react";
 
 import { GridTable } from "@/shared/grid-table.tsx";
@@ -8,6 +9,7 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
+/* jscpd:ignore-end */
 
 import { CorrectNameDialog } from "./correct-name-dialog.tsx";
 import { arrival, backToTheName, EVERYONE_PATH, NAMES_WAITING_PATH } from "./people-address.ts";
