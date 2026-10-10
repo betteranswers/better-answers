@@ -26,10 +26,11 @@ const waitedOut = ({ state }: Held): boolean => {
   return liftsInSeconds === undefined || state.errorUpdatedAt + liftsInSeconds * 1000 <= Date.now();
 };
 
-/** While a ceiling's wait runs, only its reader asks again: no retry, focus, reconnection or mount does. */
+/** While a ceiling's wait runs, only its reader asks again. A mount has two roads: a read holding an answer, and one holding none. */
 export const WHILE_A_CEILING_HOLDS = {
   retry: retryUnlessWaiting,
   retryOnMount: waitedOut,
+  refetchOnMount: waitedOut,
   refetchOnWindowFocus: waitedOut,
   refetchOnReconnect: waitedOut,
 } as const;

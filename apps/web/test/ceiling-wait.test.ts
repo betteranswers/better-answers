@@ -11,43 +11,54 @@ const failedAtNoon = (error: Error | null) => ({ state: { error, errorUpdatedAt:
 
 const PAST_ITS_CEILING = failedAtNoon(carrying({ retryAfterSeconds: 30 }));
 
-/** Each way the page asks a held read again with no one pressing anything. */
-const UNASKED = ["retryOnMount", "refetchOnWindowFocus", "refetchOnReconnect"] as const;
+const { retry, ...unasked } = HOLDS;
+
+/** Each way the page asks a held read again with no one pressing anything: every hold but the retry. */
+const UNASKED = Object.entries(unasked);
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
 describe("a read that met a ceiling", () => {
-  it.each(UNASKED)("is not asked again by %s while its wait runs", (road) => {
-    vi.useFakeTimers({ now: NOON_MS + 29_999 });
-
-    expect(HOLDS[road](PAST_ITS_CEILING)).toBe(false);
+  it("is held on every road but the reader's own ask", () => {
+    expect(Object.keys(unasked).toSorted()).toEqual([
+      "refetchOnMount",
+      "refetchOnReconnect",
+      "refetchOnWindowFocus",
+      "retryOnMount",
+    ]);
   });
 
-  it.each(UNASKED)("is asked again by %s once its wait is over", (road) => {
+  it.each(UNASKED)("is not asked again by %s while its wait runs", (_, asksAgain) => {
+    vi.useFakeTimers({ now: NOON_MS + 29_999 });
+
+    expect(asksAgain(PAST_ITS_CEILING)).toBe(false);
+  });
+
+  it.each(UNASKED)("is asked again by %s once its wait is over", (_, asksAgain) => {
     vi.useFakeTimers({ now: NOON_MS + 30_000 });
 
-    expect(HOLDS[road](PAST_ITS_CEILING)).toBe(true);
+    expect(asksAgain(PAST_ITS_CEILING)).toBe(true);
   });
 
   it("is not retried at once", () => {
-    expect(HOLDS.retry(0, carrying({ retryAfterSeconds: 30 }))).toBe(false);
+    expect(retry(0, carrying({ retryAfterSeconds: 30 }))).toBe(false);
   });
 });
 
 describe("a read that met no ceiling", () => {
-  it.each(UNASKED)("is asked again by %s after a failure", (road) => {
+  it.each(UNASKED)("is asked again by %s after a failure", (_, asksAgain) => {
     vi.useFakeTimers({ now: NOON_MS });
 
-    expect(HOLDS[road](failedAtNoon(new TypeError("the network is down")))).toBe(true);
+    expect(asksAgain(failedAtNoon(new TypeError("the network is down")))).toBe(true);
   });
 
-  it.each(UNASKED)("is asked again by %s once it has answered", (road) => {
-    expect(HOLDS[road](failedAtNoon(null))).toBe(true);
+  it.each(UNASKED)("is asked again by %s once it has answered", (_, asksAgain) => {
+    expect(asksAgain(failedAtNoon(null))).toBe(true);
   });
 
   it("is retried after a failure with no word", () => {
-    expect(HOLDS.retry(0, new TypeError("the network is down"))).toBe(true);
+    expect(retry(0, new TypeError("the network is down"))).toBe(true);
   });
 });
