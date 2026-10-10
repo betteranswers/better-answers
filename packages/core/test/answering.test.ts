@@ -82,6 +82,15 @@ const unverified: Trust = {
 /** Core's own trust, handed to an output schema as an edge that renames nothing would. */
 const trust = z.custom<Trust>();
 
+const messagesOf = (parsed: { readonly error?: z.ZodError }): readonly string[] | undefined =>
+  parsed.error?.issues.map(({ message }) => message);
+
+/** Whether each field carries the words an MCP client's model reads beside it. */
+const described = (shape: Readonly<Record<string, z.ZodType>>): Readonly<Record<string, boolean>> =>
+  Object.fromEntries(
+    Object.entries(shape).map(([key, field]) => [key, (field.description ?? "").trim() !== ""]),
+  );
+
 describe("the answer's rendering", () => {
   it("puts the verdict first and the map's line second", () => {
     expect(renderAnswer(answer({})).split("\n").slice(0, 2)).toEqual([
@@ -501,6 +510,9 @@ describe("the boundary find and open are parsed at", () => {
       ok: false,
       error: { word: "malformed", fields: { query: "refused" } },
     });
+    expect(messagesOf(findInput.safeParse({ query: "audit\u0000logs" }))).toEqual([
+      "a query holds no NUL character",
+    ]);
   });
 
   it("holds a page to 1–20 matches, 5 when unasked", () => {
@@ -557,6 +569,24 @@ describe("the boundary find and open are parsed at", () => {
       ok: false,
       error: { word: "malformed", fields: { "": "refused" } },
     });
+    expect(messagesOf(openInput.safeParse(input))).toEqual([
+      "give an `iri` or a `locator`, not both and not neither",
+    ]);
+  });
+
+  it("describes every find and open input field", () => {
+    expect(described(findInput.shape)).toEqual({ query: true, limit: true, cursor: true });
+    expect(described(openInput.shape)).toEqual({ iri: true, locator: true });
+  });
+
+  it("describes an evidence item's at, locator and iri", () => {
+    const [found] = openOutputWith(trust).options;
+
+    expect(described(found.shape.concept.unwrap().shape.evidence.element.shape)).toMatchObject({
+      at: true,
+      locator: true,
+      iri: true,
+    });
   });
 
   it.each([
@@ -585,7 +615,7 @@ describe("the boundary find and open are parsed at", () => {
     const refused = openOutputWith(trust).safeParse({ found: true, ...held });
 
     expect(refused.success).toBe(false);
-    expect(refused.error?.issues.map(({ message }) => message)).toEqual([
+    expect(messagesOf(refused)).toEqual([
       "a found result carries a concept or a passage, never both or neither",
     ]);
   });
