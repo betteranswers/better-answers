@@ -173,6 +173,16 @@ const searched = async (page: Page, query: string): Promise<void> => {
 
 const handbookMatches = (page: Page) => matchesOf(page).filter({ hasText: HANDBOOK });
 
+/** The handbook searched, then Load more pressed with its page held back until `release`. */
+const moreAskedForAndHeld = async (page: Page) => {
+  await searched(page, "pallet");
+  await expect(matchesOf(page)).toHaveCount(A_PAGE);
+  const more = await heldBack(page, isAFindPastTheFirstPage);
+  await loadMore(page).click();
+  await more.reached;
+  return more;
+};
+
 test.describe("the Knowledge Search page", () => {
   test("writes the settled query to the address, kept by reload", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Calder Archives", [conceptsSeeded]);
@@ -246,12 +256,7 @@ test.describe("the Knowledge Search page", () => {
 
   test("leaves focus where the reader moved it while More loads", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Dales Records", [handbookSeeded]);
-    await searched(page, "pallet");
-    await expect(matchesOf(page)).toHaveCount(A_PAGE);
-
-    const more = await heldBack(page, isAFindPastTheFirstPage);
-    await loadMore(page).click();
-    await more.reached;
+    const more = await moreAskedForAndHeld(page);
     await searchBox(page).focus();
     more.release();
 
@@ -282,12 +287,7 @@ test.describe("the Knowledge Search page", () => {
 
   test("drops the old query's rows when More lands late", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Wharfe Stores", [conceptsSeeded, handbookSeeded]);
-    await searched(page, "pallet");
-    await expect(matchesOf(page)).toHaveCount(A_PAGE);
-
-    const more = await heldBack(page, isAFindPastTheFirstPage);
-    await loadMore(page).click();
-    await more.reached;
+    const more = await moreAskedForAndHeld(page);
 
     await searchBox(page).fill("forklift");
     await expect(said(page)).toHaveText(WORDS.matched("forklift", false));
