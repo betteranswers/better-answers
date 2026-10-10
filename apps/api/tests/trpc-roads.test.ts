@@ -28,6 +28,7 @@ import {
   queryProcedure,
   router,
 } from "../src/trpc/base.ts";
+import { knowledgeReadProcedure } from "../src/trpc/knowledge.ts";
 import { appRouter } from "../src/trpc/router.ts";
 import { capturingLogger, doorsFor } from "./harness.ts";
 import { appForSuite } from "./suite-app.ts";
@@ -315,9 +316,12 @@ const middlewaresOf = (procedure: object) => definitionOf.parse(Reflect.get(proc
 
 describe("every query the router serves", () => {
   it("runs on a road that opens no read-write transaction itself", () => {
-    const roads = [queryProcedure, personProcedure, operatorQueryProcedure].map(
-      (road) => middlewaresOf(road).middlewares[0],
-    );
+    const roads = [
+      queryProcedure,
+      knowledgeReadProcedure,
+      personProcedure,
+      operatorQueryProcedure,
+    ].map((road) => middlewaresOf(road).middlewares[0]);
 
     const queries = Object.entries(appRouter._def.procedures).filter(
       ([, procedure]) => middlewaresOf(procedure).type === "query",
