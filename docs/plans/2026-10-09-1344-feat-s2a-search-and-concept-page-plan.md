@@ -202,7 +202,7 @@ The design system specifies a registration mark, Frame, Card and an accent-fille
   - A citation mark that opens something is a button with `aria-expanded`, named *Source n: <the file's label>*. It opens a side panel beside the claim.
   - The panel is a non-modal variant of `shared/ui/sheet.tsx`, which today is a modal dialog with a scrim. The variant has `modal={false}` and no overlay, and the page behind it stays interactive and in the tab order. U11 adds the variant to `shared/ui`. Radix loops Tab inside a dialog even when it is not modal, so Tab off either end of the panel lands on the control that opened it, and pressing that control again moves focus back to the panel's heading (found in U11's review).
   - Focus moves to the panel's heading, and Escape returns it to the mark. Choosing a second mark while the panel is open replaces its content and moves focus to its heading.
-  - Where a panel beside the page would cover the page's content, the panel opens inline under the claim's paragraph instead of beside it, so nothing scrolls sideways at 320 px. That is below the `xl` breakpoint, which `--room-beside` in `apps/web/src/index.css` holds: at the shell's own narrow breakpoint the page's content is narrower than the panel (found in U11's review).
+  - Where a panel beside the page would cover the page's content, the panel opens inline under the claim's paragraph instead of beside it, so nothing scrolls sideways at 320 px. That is below the `xl` breakpoint, which `--room-beside` in `apps/web/src/index.css` holds. At the shell's own narrow breakpoint the page's content is narrower than the panel, so a panel beside it would hide the control that has focus, against WCAG 2.2's 2.4.11 Focus Not Obscured. From `xl` on, the page gives up the panel's width while one is open (found in U11's review).
   - A passage shows as its text, under its document's title. A concept shown in the panel shows its body with marks as plain text, plus a link to its own page: one level only.
   - Each entry in the page's sources list opens the same panel by the same rule.
   - The vendored AI Elements inline citation opens on hover and expects web URLs, so it is not used.
@@ -591,7 +591,7 @@ flowchart LR
   2. Key the list by the asked query, so a load in flight never lands in the new query's list.
   3. The live region speaks when a read lands, with no total.
   4. Each match shows its layer, its title, and its trust word or its sensitivity word with *Not company knowledge*. A concept's trust words come as text from `find` (KTD6).
-  5. A passage match shows its document's title and the passage's opening line. Choosing it opens the passage in the evidence panel (KTD10), which this unit builds and U12 reuses. A passage has no page of its own.
+  5. A passage match shows its document's title and *Not company knowledge* with its sensitivity word, and choosing it opens the passage's text in the evidence panel (KTD10), which this unit builds and U12 reuses. A passage has no page of its own. The row's opening line waits on `find` returning a snippet of the passage, which its document match does not carry yet (found in U11). A concept match is plain text until U12 adds its page.
   6. Draw four states with glossary words, each announced through the live region:
      - nothing asked;
      - no matches, one line naming the query with no total;
