@@ -1,5 +1,8 @@
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
+import { ulid } from "@better-answers/schema/ulid";
 
 import { confirmWithTheAuthenticator } from "./flow.ts";
 import { harnessControl } from "./harness-control.ts";
@@ -92,5 +95,119 @@ describe("the browser suite's second-factor harness", () => {
     await harnessAnswer("/__harness/pending-sessions/aged", admin.email, { userId: admin.id });
 
     expect(await (await pending.fetch("/get-session")).json()).toBeNull();
+  });
+});
+
+/** Mounted as `serve.ts` mounts it, so the answer is the one the browser suite reads. */
+const askedOfTheHarness = async (path: string, body: unknown) => {
+  const answered = await new Hono().route("/", harnessControl(app())).request(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const said: unknown = await answered.json();
+  return { status: answered.status, said };
+};
+
+const aSeedOf = (workspaceId: string, document: Readonly<Record<string, unknown>>) => ({
+  workspaceId,
+  connectedSources: [{ name: "Scans", documents: [{ title: "Floor plan", ...document }] }],
+});
+
+const connectedSourcesIn = async (workspaceId: string): Promise<number> => {
+  const counted = await app().database.superuser.query<{ held: number }>(
+    "SELECT count(*)::int AS held FROM connected_source WHERE workspace_id = $1",
+    [workspaceId],
+  );
+  return counted.rows[0]?.held ?? 0;
+};
+
+describe("a seed the browser suite's harness cannot write", () => {
+  it("answers 400 naming the flag a default-on finding cannot carry", async () => {
+    const { workspaceId } = await app().provision();
+    const finding = { category: "home-address", ruleId: "UK_HOME_ADDRESS", spans: 1 };
+
+    const answered = await askedOfTheHarness(
+      "/__harness/connected-sources",
+      aSeedOf(workspaceId, { findings: [{ ...finding, tier: "default-on", kept: true }] }),
+    );
+
+    expect(answered).toEqual({
+      status: 400,
+      said: {
+        fields: [
+          {
+            field: "connectedSources.0.documents.0.findings.0.kept",
+            rule: expect.stringContaining("finding_restore_check"),
+          },
+        ],
+      },
+    });
+    expect(await connectedSourcesIn(workspaceId)).toBe(0);
+  });
+
+  it("answers 400 naming an unreadable reason that holds a space", async () => {
+    const { workspaceId } = await app().provision();
+
+    const answered = await askedOfTheHarness(
+      "/__harness/connected-sources",
+      aSeedOf(workspaceId, { unreadableReason: "No text layer" }),
+    );
+
+    expect(answered).toEqual({
+      status: 400,
+      said: {
+        fields: [
+          {
+            field: "connectedSources.0.documents.0.unreadableReason",
+            rule: expect.stringContaining("no space"),
+          },
+        ],
+      },
+    });
+  });
+
+  it("answers 400 naming the field the store's own schema refuses", async () => {
+    const answered = await askedOfTheHarness(
+      "/__harness/connected-sources",
+      aSeedOf("no-such-workspace", {}),
+    );
+
+    expect(answered.status).toBe(400);
+    expect(answered.said).toMatchObject({ fields: [{ field: "workspaceId" }] });
+  });
+
+  it("answers 400 naming the constraint a write trips", async () => {
+    const answered = await askedOfTheHarness("/__harness/connected-sources", aSeedOf(ulid(), {}));
+
+    expect(answered.status).toBe(400);
+    expect(answered.said).toMatchObject({ constraint: expect.stringMatching(/_fk$/) });
+  });
+
+  it("leaves a fault of the harness's own a 500", async () => {
+    const { workspaceId } = await app().provision();
+
+    const answered = await new Hono()
+      .route("/", harnessControl(app()))
+      .request("/__harness/syncs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId, to: "done" }),
+      });
+
+    expect(answered.status).toBe(500);
+  });
+
+  it("answers 400 naming the field another route's schema refuses", async () => {
+    const { workspaceId, admin } = await app().provision();
+
+    const answered = await askedOfTheHarness("/__harness/members", {
+      workspaceId,
+      userId: admin.id,
+      role: "Owner",
+    });
+
+    expect(answered.status).toBe(400);
+    expect(answered.said).toMatchObject({ fields: [{ field: "role" }] });
   });
 });

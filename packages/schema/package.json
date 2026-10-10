@@ -13,6 +13,7 @@
     "./email-code": "./src/email-code.ts",
     "./email-address": "./src/email-address.ts",
     "./second-factor": "./src/second-factor.ts",
+    "./theme": "./src/theme.ts",
     "./testing": "./test/testing.ts",
     "./testing/apple-git": "./test/apple-git.ts",
     "./testing/authenticator-code": "./test/authenticator-code.ts",

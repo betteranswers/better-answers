@@ -1122,3 +1122,25 @@ test.describe("the Sources page's keystrokes", () => {
     await expect(connectedSource, "the choice did not survive a reload").toHaveCount(0);
   });
 });
+
+test("tells a spec why the harness refused its seed", async ({ page, request }) => {
+  const email = anAddress("admin");
+  const workspace = await provision(request, { name: "Aire Scanning", adminEmail: email });
+
+  await expect(
+    seedConnectedSources(request, {
+      workspaceId: workspace.workspaceId,
+      connectedSources: [
+        indexed("Scans", {
+          documents: [{ title: "Floor plan", unreadableReason: "No text layer" }],
+        }),
+      ],
+    }),
+    "the refused seed's failure names no field or rule",
+  ).rejects.toThrow(/answered 400.*unreadableReason.*no space/s);
+
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await nav(page).getByRole("link", { name: CONNECTED_SOURCES.name }).click();
+  await expect(connectedSourcesRegion(page).getByText(NOTHING_CONNECTED)).toBeVisible();
+});

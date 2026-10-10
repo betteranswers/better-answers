@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 
+import { FIRST_PAINT } from "@better-answers/schema/theme";
+
 import { escaped } from "../email-page.ts";
 import { PRODUCT_NAME } from "../product-name.ts";
 import { OAUTH_SCOPES, type OAuthScope, SIGN_IN_PATH } from "./constants.ts";
@@ -69,9 +71,13 @@ export const REFUSAL_PAGES = {
   },
 } as const satisfies Record<string, ReadNext | SignInNext>;
 
-/** The sign-in pages' frame: one marked card on the grid. The card's marks stand for its primary button's. */
+/**
+ * One marked card on the grid, its marks standing for its primary button's. The head script
+ * precedes the stylesheet, so the first paint is themed.
+ */
 const shell = (title: string, body: string): string => `<!doctype html>
-<html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en-GB"><head><meta charset="utf-8"><script>${FIRST_PAINT}</script>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escaped(title)} — ${PRODUCT_NAME}</title><style>${PAGE_STYLE}</style></head>
 <body data-grid-pattern><header><span aria-hidden="true">${LOGO}</span>${PRODUCT_NAME}</header>
 <main id="page"><div data-slot="card" data-marks><div data-slot="card-header"><h1>${escaped(title)}</h1></div>
