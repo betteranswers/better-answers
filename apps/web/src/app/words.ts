@@ -1,5 +1,6 @@
 import { ASK, type Page } from "@/shared/navigation.ts";
-import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
+import { NO_RESPONSE_TO_A_READ, sentenceOf, type Said } from "@/shared/refusal-words.ts";
+import { PRODUCT_NAME } from "@/shared/words.ts";
 
 export const FAILED_PAGE = {
   heading: "This page didn't load",
@@ -57,8 +58,29 @@ export const goHome = (home: Page | undefined): string =>
 
 /** A role's home says what that role will do there, not only that it is unbuilt. */
 const WHILE_UNBUILT: ReadonlyMap<Page, string> = new Map([
-  [ASK.home, "Ask in Claude for now. Your questions and their answers will be listed here."],
+  [
+    ASK.home,
+    "Ask through your assistant for now. Your questions and their answers will be listed here.",
+  ],
 ]);
 
 export const unbuiltLineOf = (home: Page): string =>
   WHILE_UNBUILT.get(home) ?? "This page is on its way.";
+
+/** Claude is the one assistant admitted. Revisit or remove once S2a's Search or S2b's Ask is built. */
+export const CONNECT_ASSISTANT = {
+  heading: "Connect Claude as your assistant",
+  steps: [
+    "In Claude, open “Settings”, then “Connectors”, and choose “Add custom connector”.",
+    `Name it ${PRODUCT_NAME}, give it this address, and choose “Add”.`,
+    "Choose “Connect”, sign in here if you're asked to, then choose “Connect” again.",
+  ],
+  copy: "Copy the address",
+  copied: "Address copied.",
+  asYou: "Claude will act as you, in this workspace.",
+} as const;
+
+export const ADDRESS_NOT_COPIED: Said = {
+  why: "The address wasn't copied.",
+  next: "Select it and copy it yourself.",
+};

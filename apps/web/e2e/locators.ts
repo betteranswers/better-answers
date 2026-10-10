@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { z } from "zod";
 
 import { BREADCRUMB, goHome, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts";
@@ -144,6 +145,15 @@ export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
   const home = HOMES[role];
   await expect(page).toHaveURL(new RegExp(`${home.path}$`));
   await expect(page.getByRole("heading", { level: 1, name: headingOf(home) })).toBeVisible();
+};
+
+/** A deployment whose page and published resource differ fails here. */
+export const askShowsTheServedAddress = async (page: Page): Promise<string> => {
+  const answer = await page.request.get("/.well-known/oauth-protected-resource/mcp");
+  expect(answer.ok(), `the protected-resource document answered ${answer.status()}`).toBe(true);
+  const { resource } = z.object({ resource: z.string() }).parse(await answer.json());
+  await expect(page.getByRole("main").getByText(resource, { exact: true })).toBeVisible();
+  return resource;
 };
 
 /** A page hidden from the role says what an address that never existed says. */
