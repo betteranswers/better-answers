@@ -5,6 +5,8 @@ import { RecoveryCodes } from "@/features/auth/recovery-codes.tsx";
 import { CODES_NOT_TICKED } from "@/features/auth/refusal-words.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
+import { clipboardAnswering } from "./clipboard-stand-in.ts";
+
 afterEach(cleanup);
 
 const CODES = [
@@ -39,21 +41,6 @@ const drawn = (onDone: (madeAt: string) => void = () => {}) =>
 const doneButton = () => screen.getByRole("button", { name: "Done" });
 
 const savedBox = () => screen.getByRole("checkbox", { name: "I have saved these codes" });
-
-/** The clipboard is the browser's, so a stand-in records what the page wrote to it. */
-const clipboardWritten = (): readonly string[] => {
-  const written: string[] = [];
-  Object.defineProperty(navigator, "clipboard", {
-    configurable: true,
-    value: {
-      writeText: (text: string) => {
-        written.push(text);
-        return Promise.resolve();
-      },
-    },
-  });
-  return written;
-};
 
 describe("the recovery codes block", () => {
   it("reads as a list of the ten codes", () => {
@@ -96,7 +83,7 @@ describe("the recovery codes block", () => {
   });
 
   it("copies the ten codes, one per line", async () => {
-    const written = clipboardWritten();
+    const written = clipboardAnswering(() => Promise.resolve());
     drawn();
 
     fireEvent.click(screen.getByRole("button", { name: "Copy codes" }));
