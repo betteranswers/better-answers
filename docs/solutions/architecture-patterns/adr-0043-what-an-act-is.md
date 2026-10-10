@@ -60,7 +60,7 @@ Each transport:
 
 **A transport never nests a transaction.** The base procedures:
 
-- A query resolves the member unlocked.
+- A query resolves the member unlocked, in a read-only transaction, so a write anywhere inside it fails at its statement. tRPC sends a query over GET, a method that promises no change, and Postgres holds the promise. A held row needs a read-write transaction, which is why a query's member is read and never held.
 - A mutation reads the member `FOR SHARE`.
 - An own-transaction procedure resolves the Principal in a short transaction, releases the connection, and hands the action the Principal and its doors.
 
@@ -97,3 +97,5 @@ The full record, with its four amendments (T-232, T-230, T-338, the T-027 and T-
 A refusal naming items came with the people layout rework (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD1), and a ceiling counted inside an action with its invitations (KTD11).
 
 Amended 08/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, U17 and R11). What an entry asks core to do is now an *action*, the reader's word, in the code and in this record. It is declared by `declareAction`, the lint rule is `action-admits-before-await`, and the name an audit event is recorded under is its *audit action*, held in the audit logs' `action` column since migration 0073. Stored action names, such as `sources.document.narrowed`, stay as they were written (R22). The filename keeps the old word so references still resolve (KTD14). The decision and every rule above stand.
+
+Amended 10/10/2026 by the read-only query road plan (`docs/plans/2026-10-10-0123-feat-read-only-query-road-plan.md`, R5). A query's transaction opens read-only, through a member resolve of its own; the resolver a mutation, an MCP entry or the own-transaction road takes stays read-write.

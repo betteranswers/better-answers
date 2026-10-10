@@ -6,7 +6,7 @@ import { z } from "zod";
 import { attempt, type Claims, type Clock, type Result } from "@better-answers/core/kernel";
 import {
   consumeIngress,
-  withPrincipal,
+  withPrincipalRead,
   type PostgresDoor,
 } from "@better-answers/core/store/postgres";
 import { hasNoDisplayName } from "@better-answers/core/workspaces";
@@ -198,7 +198,7 @@ const clientNameOf = async (auth: Auth, clientId: string, headers: Headers): Pro
 };
 
 const workspaceNameOf = async (door: PostgresDoor, claims: Claims): Promise<string> => {
-  const named = await withPrincipal(door, claims, async (_principal, tx) => {
+  const named = await withPrincipalRead(door, claims, async (_principal, tx) => {
     const row = await tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [
       claims.workspaceId,
     ]);
@@ -424,7 +424,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   };
 
   const holds = async (claims: Claims | undefined): Promise<boolean> =>
-    claims !== undefined && (await withPrincipal(door, claims, async () => true)).ok;
+    claims !== undefined && (await withPrincipalRead(door, claims, async () => true)).ok;
 
   /** Confirming first carries the signed query, so the flow resumes once the session is confirmed. */
   const confirmFirst = (context: Context): Response =>
@@ -519,7 +519,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     const claims = await claimsFrom(flowHeaders(context.req.raw, publicUrl));
     if (claims === undefined) return context.json({ error: "not_signed_in" }, 401);
     if (claims === PENDING) return context.json({ error: SECOND_FACTOR_PENDING }, 403);
-    const resolved = await withPrincipal(door, claims, async (principal) => ({
+    const resolved = await withPrincipalRead(door, claims, async (principal) => ({
       workspaceId: principal.workspaceId,
       userId: principal.userId,
       role: principal.role,
