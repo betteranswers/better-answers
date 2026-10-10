@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  forgetOnThisBrowser,
   inThisTab,
   keepInThisTab,
   keepOnThisBrowser,
@@ -37,6 +38,28 @@ export const unsavedChangeRefusedOn = (): string | undefined =>
 /** Said once: the page it names has lost a change only on the way straight back to it. */
 export const forgetTheUnsavedChange = (): void => {
   inThisTab()?.removeItem(UNSAVED_UNDER);
+};
+
+const OFFER_SHOWN_UNDER = "better-answers.passkey-offer-shown";
+
+const SHOWN = "shown";
+
+/** Shown in this page load, which holds when the browser refuses to keep the mark. */
+let offerShownHere = false;
+
+/** Kept on the browser, not the tab, so a second tab of the same sign-in stays quiet. */
+export const rememberThePasskeyOfferShown = (): void => {
+  offerShownHere = true;
+  keepOnThisBrowser(OFFER_SHOWN_UNDER, SHOWN);
+};
+
+export const passkeyOfferShown = (): boolean =>
+  offerShownHere || onThisBrowser()?.getItem(OFFER_SHOWN_UNDER) === SHOWN;
+
+/** Each sign-in is owed the offer once more. */
+export const forgetThePasskeyOfferShown = (): void => {
+  offerShownHere = false;
+  forgetOnThisBrowser(OFFER_SHOWN_UNDER);
 };
 
 const SIGNED_IN = "better-answers.signed-in";

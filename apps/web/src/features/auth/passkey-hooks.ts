@@ -17,7 +17,11 @@ import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { askOfOurRoute, type SignedIn } from "./auth-hooks.ts";
 import { useRereadTheSecondFactor } from "./second-factor-hooks.ts";
-import { announceTheSignIn, rememberTheSession } from "./session-memory.ts";
+import {
+  announceTheSignIn,
+  forgetThePasskeyOfferShown,
+  rememberTheSession,
+} from "./session-memory.ts";
 
 const ADD_OPTIONS_PATH = "/passkeys/add-options";
 
@@ -163,6 +167,7 @@ const chosenFromTheAutofill = async (
 
 const signedInHere = (): void => {
   rememberTheSession("held");
+  forgetThePasskeyOfferShown();
   announceTheSignIn();
 };
 

@@ -291,6 +291,19 @@ describe("the steps after a sign-in", () => {
     });
   });
 
+  it("owes the passkey offer again after a sign-in by link", async () => {
+    const shownUnder = "better-answers.passkey-offer-shown";
+    globalThis.localStorage.setItem(shownUnder, "shown");
+    signedInByLink(NOTHING_HELD);
+    await openAsAda("/sign-in/link#abc123");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+
+    await waitFor(() => {
+      expect(globalThis.localStorage.getItem(shownUnder)).toBeNull();
+    });
+  });
+
   it("lands a redirect to another origin on home", async () => {
     adasApi(() => CONFIRMED, new Map(), SHELL_READS);
 

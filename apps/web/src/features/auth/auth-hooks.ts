@@ -31,6 +31,7 @@ import { forgetMember, rereadMember } from "./member.ts";
 import { factorStepDue } from "./second-factor-steps.ts";
 import {
   announceTheSignIn,
+  forgetThePasskeyOfferShown,
   forgetTheUnsavedChange,
   rememberTheSession,
   sessionRemembered,
@@ -179,6 +180,7 @@ const signInEmailOtpOptions = () =>
     },
     onSuccess: () => {
       rememberTheSession("held");
+      forgetThePasskeyOfferShown();
       announceTheSignIn();
     },
   });
@@ -274,6 +276,7 @@ const signInByLinkOptions = () =>
     mutationFn: (token) => askOfOurRoute("/sign-in-link/sign-in", { token }, signedInByLink),
     onSuccess: () => {
       rememberTheSession("held");
+      forgetThePasskeyOfferShown();
       announceTheSignIn();
     },
   });
