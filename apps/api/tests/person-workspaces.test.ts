@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
+import { holdAnAuthenticator } from "./factor-harness.ts";
+import { confirmWithTheAuthenticator } from "./flow.ts";
+import { signedInByEmailOnly } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
-import { NO_SESSION_ANSWERED, webSignedIn } from "./web-client.ts";
+import { NO_SESSION_ANSWERED, refusalOfCall, webClientOf, webSignedIn } from "./web-client.ts";
 
 const app = appForSuite();
 
@@ -34,6 +37,23 @@ describe("reading a person's own workspaces over tRPC", () => {
     ]);
     expect(await asPriya.api.person.workspaces.query()).toEqual([
       { workspace: { id: ryedale.workspaceId, name: "Ryedale" }, role: "Editor" },
+    ]);
+  });
+
+  it("refuses a pending second factor, then answers once confirmed", async () => {
+    const thornby = await app().provision({ name: "Thornby" });
+    const key = await holdAnAuthenticator(app(), thornby.admin.id);
+    const client = await signedInByEmailOnly(app(), thornby.admin.email);
+    const { api } = webClientOf(client);
+
+    const whilePending = await refusalOfCall(api.person.workspaces.query());
+    await confirmWithTheAuthenticator(client, key);
+
+    expect(whilePending).toMatchObject({
+      data: { httpStatus: 412, refusal: { word: "second-factor-pending", class: "precondition" } },
+    });
+    expect(await api.person.workspaces.query()).toEqual([
+      { workspace: { id: thornby.workspaceId, name: "Thornby" }, role: "Admin" },
     ]);
   });
 
