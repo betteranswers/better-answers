@@ -657,6 +657,11 @@ flowchart LR
   - A footnote that names no source keeps its note under a *Footnotes* heading at the body's end, as `remark-gfm` draws it, so the page says which of ADR 0015's two footnote kinds each one is. Its links move focus between the claim and the note and add no history entry, so Back still leaves the page (found in U12).
   - A mark is carried through the markdown parser between angle brackets and two private-use characters, never as the parser's own footnote: `remark-gfm` reads neither a label with spaces nor a mark with no definition, and `contracts/links` holds both. The file's own text can write neither character, as itself or as a character reference, so a body cannot forge a mark (found in U12's review).
   - A passage match on Search shows the document's title and the *Not company knowledge* tag, but not the passage's opening line U11's approach names, because `find`'s document match carries no passage text. Several passages of one document then read alike until opened. The owner decides whether `find` gains the line, under the passage's own withholding (found in U11).
+- **Layout beyond the plan:** the page as built makes four choices the plan left open, and they stand (owner, 10/10/2026).
+  - The Verification list names each `verified` event by its date and *by a person* or *automatically*, never by a name. It does not copy the glossary's trust words, which stay a closed set on the trust tag.
+  - One closed disclosure, *Details from the file*, lists the file's remaining frontmatter keys under their own names, where the value is a word, a number, a boolean or a list of words, to every reader of the concept.
+  - The description and tags are drawn under the title.
+  - The page's keystrokes are `b` back to Search, `s` to the sources and `l` to the links.
 - **Verification:** web `check` passes, including e2e.
 
 ### U13. Jump-to's *Search for …* row
