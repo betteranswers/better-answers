@@ -32,7 +32,7 @@ import {
   type Tx,
   withIdentityRead,
   withIdentityWrite,
-  withPrincipal,
+  withPrincipalRead,
   withScope,
 } from "../store/postgres/index.ts";
 import { hasNoDisplayName } from "./display-name.ts";
@@ -671,7 +671,7 @@ export const principalOfMember = async (
   const userId = person.value.rows[0]?.id;
   if (userId === undefined) return err("not-a-member");
   const resolved = await attempt(() =>
-    withPrincipal(
+    withPrincipalRead(
       door,
       { workspaceId: workspace.data, userId, issuedAt: input.at },
       async (principal) => principal,

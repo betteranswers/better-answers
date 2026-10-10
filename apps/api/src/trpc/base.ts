@@ -22,6 +22,7 @@ import {
   withMember,
   withOperator,
   withPrincipal,
+  withPrincipalRead,
   type CounterRule,
   type Folded,
   type Tx,
@@ -235,7 +236,7 @@ const inTheResolversTransaction = (resolve: typeof withPrincipal) =>
     return settled(ctx, RESOLVER, resolved);
   });
 
-export const queryProcedure = inTheResolversTransaction(withPrincipal);
+export const queryProcedure = inTheResolversTransaction(withPrincipalRead);
 
 export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
 

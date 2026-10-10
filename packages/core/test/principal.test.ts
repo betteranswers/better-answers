@@ -36,6 +36,7 @@ import {
   withMemberUnheld,
   withOperator,
   withPrincipal,
+  withPrincipalRead,
   withScope,
   type Answered,
   type PostgresDoor,
@@ -305,14 +306,15 @@ describe("a read door", () => {
     );
   });
 
+  const writing = (key: string) => async (member: UserPrincipal, tx: Tx) => {
+    await configProbeWritten(tx, member.workspaceId, key);
+    return "landed";
+  };
+
   it("refuses a member's write at its statement", async () => {
     const seeded = await seedMember({ role: "Admin" });
     const door = openPostgres(db().runtimePool);
     const admin = await adminOf(door, claimsFor(seeded));
-    const writing = (key: string) => async (member: UserPrincipal, tx: Tx) => {
-      await configProbeWritten(tx, member.workspaceId, key);
-      return "landed";
-    };
 
     await expect(withMemberUnheld(admin, door, writing(`probe-${ulid()}`))).rejects.toMatchObject({
       code: "25006",
@@ -321,6 +323,53 @@ describe("a read door", () => {
       ok: true,
       value: "landed",
     });
+  });
+
+  it("refuses a write under resolved claims at its statement", async () => {
+    const seeded = await seedMember({ role: "Admin" });
+    const door = openPostgres(db().runtimePool);
+
+    await expect(
+      withPrincipalRead(door, claimsFor(seeded), writing(`probe-${ulid()}`)),
+    ).rejects.toMatchObject({ code: "25006" });
+    expect(await withPrincipal(door, claimsFor(seeded), writing(`probe-${ulid()}`))).toEqual({
+      ok: true,
+      value: "landed",
+    });
+  });
+});
+
+describe("the read-only Principal resolver", () => {
+  it.each([
+    [
+      "a non-member",
+      {},
+      (seeded: Seeded) => ({ workspaceId: seeded.otherWorkspaceId }),
+      "not-a-member",
+    ],
+    [
+      "a credential issued before the revocation",
+      { revokedAt: new Date("2026-09-01T12:00:00Z") },
+      () => ({ issuedAt: new Date("2026-09-01T11:59:59Z") }),
+      "credentials-revoked",
+    ],
+    [
+      "a role the member row does not hold",
+      { role: "Viewer" },
+      (): Partial<Claims> => ({ role: "Admin" }),
+      "role-disagrees",
+    ],
+    ["a malformed user id", {}, () => ({ userId: "" }), "malformed-claims"],
+  ] as const)("refuses %s", async (_which, seeding, claimed, refusal) => {
+    const seeded = await seedMember(seeding);
+
+    const resolved = await withPrincipalRead(
+      openPostgres(db().runtimePool),
+      claimsFor(seeded, claimed(seeded)),
+      async () => "reached",
+    );
+
+    expect(resolved).toEqual({ ok: false, error: refusal });
   });
 });
 
@@ -398,12 +447,15 @@ describe("a principal-scoped door's answer", () => {
 });
 
 describe("the Principal resolver", () => {
-  it("builds the Principal in the work's own transaction", async () => {
+  it.each([
+    ["withPrincipal", withPrincipal],
+    ["withPrincipalRead", withPrincipalRead],
+  ] as const)("builds the Principal in %s's own transaction", async (_door, resolve) => {
     const seeded = await seedMember({ role: "Editor" });
     const door = openPostgres(db().runtimePool);
     const claims = claimsFor(seeded);
 
-    const resolved = await withPrincipal(door, claims, async (principal, tx) => {
+    const resolved = await resolve(door, claims, async (principal, tx) => {
       const scope = await tx.query<{ ws: string }>("SELECT current_workspace_id() AS ws");
       return { principal, scope: scope.rows[0]?.ws };
     });

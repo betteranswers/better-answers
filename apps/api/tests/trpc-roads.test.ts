@@ -1,27 +1,34 @@
 import type { inferProcedureBuilderResolverOptions } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import type { Logger } from "pino";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
 import {
   err,
+  ok,
   type SecondFactorStanding,
   systemClock,
   type UserPrincipal,
 } from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
+import { configProbeWritten } from "@better-answers/schema/testing/probes";
 
 import type { Doors } from "../src/doors.ts";
 import type { Refusal, RefusalAnswer } from "../src/refusal.ts";
+import type { GatedSessionReader } from "../src/second-factor-gate.ts";
 import {
   crossing,
   mutationProcedure,
+  operatorProcedure,
   ownTransactionProcedure,
   personProcedure,
   queryProcedure,
   router,
 } from "../src/trpc/base.ts";
+import { appRouter } from "../src/trpc/router.ts";
 import { capturingLogger, doorsFor } from "./harness.ts";
+import { appForSuite } from "./suite-app.ts";
 
 type QueryContext = inferProcedureBuilderResolverOptions<typeof queryProcedure>["ctx"];
 type MutationContext = inferProcedureBuilderResolverOptions<typeof mutationProcedure>["ctx"];
@@ -72,6 +79,15 @@ const A_SIGNED_IN_PERSON = {
 
 const wire = z.object({ error: z.object({ data: z.object({ refusal: z.unknown() }) }) });
 
+const contextOf = (doors: Doors, log: Logger, readSession: GatedSessionReader) => ({
+  doors,
+  clock: systemClock(),
+  readSession,
+  headers: new Headers(),
+  log,
+  mail: { send: async () => {}, publicUrl: "https://app.example.test" },
+});
+
 /** A procedure whose action answers `answered`, asked as the web asks, through tRPC's own handler. */
 const refusalCrossing = async (
   answered: RefusalAnswer,
@@ -89,14 +105,8 @@ const refusalCrossing = async (
         crossing(ctx, "refuseTheSet", Promise.resolve(err(answered))),
       ),
     }),
-    createContext: () => ({
-      doors: NO_DATABASE,
-      clock: systemClock(),
-      readSession: async () => ({ ...A_SIGNED_IN_PERSON, standing }),
-      headers: new Headers(),
-      log: logger,
-      mail: { send: async () => {}, publicUrl: "https://app.example.test" },
-    }),
+    createContext: () =>
+      contextOf(NO_DATABASE, logger, async () => ({ ...A_SIGNED_IN_PERSON, standing })),
   });
   const { refusal } = wire.parse(await response.json()).error.data;
   return { status: response.status, refusal, logs };
@@ -173,5 +183,108 @@ describe("a pending session crossing tRPC", () => {
     const crossed = await refusalCrossing("no-such-member", "confirmed");
 
     expect(crossed.refusal).toStrictEqual({ word: "no-such-member", class: "absent" });
+  });
+});
+
+const app = appForSuite();
+
+/** One body on both member roads: the same write, through each road's own resolver. */
+const writingRoads = (key: string) => {
+  const probeWrite = async (principal: UserPrincipal, tx: Tx) => {
+    await configProbeWritten(tx, principal.workspaceId, key);
+    return ok("landed");
+  };
+  return router({
+    queried: queryProcedure.query(({ ctx }) =>
+      crossing(ctx, "probeWrite", probeWrite(ctx.principal, ctx.tx)),
+    ),
+    mutated: mutationProcedure.mutation(({ ctx }) =>
+      crossing(ctx, "probeWrite", probeWrite(ctx.principal, ctx.tx)),
+    ),
+  });
+};
+
+/** Asked as the web asks, as a workspace's Admin: a query over GET, a mutation over POST. */
+const askedAsAnAdmin = async (road: "queried" | "mutated") => {
+  const workspace = await app().provision();
+  const key = `probe-${workspace.workspaceId}`;
+  const { logger, logs } = capturingLogger();
+  const response = await fetchRequestHandler({
+    endpoint: "/trpc",
+    req: new Request(
+      `https://app.example.test/trpc/${road}`,
+      road === "queried"
+        ? { method: "GET" }
+        : { method: "POST", headers: { "content-type": "application/json" } },
+    ),
+    router: writingRoads(key),
+    createContext: () =>
+      contextOf(app().doors, logger, async () => ({
+        user: { id: workspace.admin.id, email: workspace.admin.email },
+        session: {
+          id: A_SIGNED_IN_PERSON.session.id,
+          createdAt: new Date(),
+          activeOrganizationId: workspace.workspaceId,
+        },
+        standing: "not-required",
+      })),
+  });
+  const written = await app().database.superuser.query(
+    "SELECT 1 FROM workspace_config WHERE workspace_id = $1 AND key = $2",
+    [workspace.workspaceId, key],
+  );
+  return { status: response.status, rows: written.rowCount, logs };
+};
+
+const failedLine = z.object({ action: z.string(), err: z.object({ code: z.string() }) });
+
+describe("a write on the member roads", () => {
+  it("fails at its statement on the query road, leaving nothing", async () => {
+    const { status, rows, logs } = await askedAsAnAdmin("queried");
+
+    expect([status, rows]).toEqual([500, 0]);
+    expect(
+      logs.filter((line) => line["event"] === "trpc.failed").map((line) => failedLine.parse(line)),
+    ).toEqual([{ action: "probeWrite", err: expect.objectContaining({ code: "25006" }) }]);
+  });
+
+  it("lands on the mutation road", async () => {
+    const { status, rows } = await askedAsAnAdmin("mutated");
+
+    expect([status, rows]).toEqual([200, 1]);
+  });
+});
+
+const definitionOf = z.object({ type: z.string().optional(), middlewares: z.array(z.unknown()) });
+
+/** A road and the procedures built on it carry their definitions, typed by tRPC's own internals. */
+const middlewaresOf = (procedure: object) => definitionOf.parse(Reflect.get(procedure, "_def"));
+
+describe("every query the router serves", () => {
+  it("runs on a road that opens no read-write member transaction", () => {
+    const roads = [queryProcedure, personProcedure, operatorProcedure].map(
+      (road) => middlewaresOf(road).middlewares[0],
+    );
+
+    const queries = Object.entries(appRouter._def.procedures).filter(
+      ([, procedure]) => middlewaresOf(procedure).type === "query",
+    );
+    const elsewhere = queries
+      .filter(([, procedure]) => !roads.includes(middlewaresOf(procedure).middlewares[0]))
+      .map(([path]) => path);
+
+    expect(queries.map(([path]) => path)).toContain("members.list");
+    expect(elsewhere).toEqual([]);
+  });
+
+  it("tells a query on the mutation road apart", () => {
+    const astray = mutationProcedure.query(() => "read");
+
+    expect(middlewaresOf(astray).middlewares[0]).toBe(
+      middlewaresOf(mutationProcedure).middlewares[0],
+    );
+    expect(middlewaresOf(astray).middlewares[0]).not.toBe(
+      middlewaresOf(queryProcedure).middlewares[0],
+    );
   });
 });

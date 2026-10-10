@@ -17,6 +17,7 @@ import {
   withIdentityRead,
   withIdentityWrite,
   withPrincipal,
+  withPrincipalRead,
   withScope,
   type PostgresDoor,
 } from "../store/postgres/index.ts";
@@ -157,7 +158,7 @@ const principalOf = async (
   personId: string,
   at: Date,
 ): Promise<Result<UserPrincipal, Error>> => {
-  const resolved = await withPrincipal(
+  const resolved = await withPrincipalRead(
     door,
     { workspaceId, userId: personId, issuedAt: at },
     async (principal) => principal,

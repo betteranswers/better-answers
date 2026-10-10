@@ -305,6 +305,7 @@ const resolveClaims = async <T>(
   claims: Claims,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
   query: string,
+  opening: Opening,
 ): Promise<Opened<T>> => {
   const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(claims.workspaceId);
   const userId = boundarySchemas.user.select.shape.id.safeParse(claims.userId);
@@ -327,7 +328,7 @@ const resolveClaims = async <T>(
     },
     work,
     query,
-    "BEGIN",
+    opening,
   );
 };
 
@@ -340,7 +341,14 @@ export const withPrincipal = async <T>(
   door: PostgresDoor,
   claims: Claims,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBER_QUERY);
+): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBER_QUERY, "BEGIN");
+
+/** As withPrincipal, but read-only: a write inside the work fails at its own statement. */
+export const withPrincipalRead = async <T>(
+  door: PostgresDoor,
+  claims: Claims,
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBER_QUERY, "BEGIN READ ONLY");
 
 /**
  * As withPrincipal, but the member and user rows stay held until commit, so a revocation cannot
@@ -350,7 +358,7 @@ export const withHeldPrincipal = async <T>(
   door: PostgresDoor,
   claims: Claims,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBER_QUERY_HELD);
+): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBER_QUERY_HELD, "BEGIN");
 
 const withMemberQuery = async <T>(
   principal: UserPrincipal,
