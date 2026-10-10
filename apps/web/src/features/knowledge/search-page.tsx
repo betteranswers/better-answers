@@ -63,13 +63,16 @@ const saidOf = (query: string, matches: Matches, shown: number): string => {
 
 const failedWords = (failure: Error | ApiError) => outcomeOfFailure(failure, "read").words;
 
+/** Takes a line of its own where the kind beside it leaves too little room. */
+const TITLE = "min-w-0 grow basis-48 font-medium break-words";
+
 /** The rest of the line beside its title: what it is, and its trust or sensitivity word. */
 function ConceptLine(properties: { readonly match: ConceptMatch }) {
   const { match } = properties;
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <Pill>{match.kind}</Pill>
-      <span className="min-w-0 flex-1 font-medium wrap-anywhere">{match.title}</span>
+      <span className={TITLE}>{match.title}</span>
       <Pill>{match.trustWords}</Pill>
     </div>
   );
@@ -95,7 +98,7 @@ function PassageLine(properties: { readonly match: PassageMatch; readonly openin
           id={openerId}
           variant="link"
           aria-expanded={opened !== undefined}
-          className="h-auto min-w-0 flex-1 justify-start px-0 text-left font-medium whitespace-normal wrap-anywhere"
+          className={`h-auto justify-start px-0 text-left whitespace-normal ${TITLE}`}
           onClick={() => {
             opening.onOpen({
               key,

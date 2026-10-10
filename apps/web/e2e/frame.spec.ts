@@ -58,7 +58,7 @@ const AN_ADMINS_PAGES = [
   [SYSTEM, pageNamed(SYSTEM, "Audit log")],
 ] as const;
 
-const AREA_NAMES = ["Control Centre"];
+const AREA_NAMES = ["Knowledge", "Control Centre"];
 
 const PAGE_NAMES = AN_ADMINS_PAGES.map(([, page]) => page.name);
 
