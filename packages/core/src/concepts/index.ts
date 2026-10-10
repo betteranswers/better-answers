@@ -269,10 +269,6 @@ export type ConceptWritten = {
   readonly contentHash: string;
 };
 
-/**
- * Two constants, never one object with a computed role: the kernel reads a union of roles as its
- * highest, typing every writer an Admin.
- */
 export const writeConceptAction = declareAction({
   admits: (input: WriteConceptInput) =>
     input.acceptance === undefined ? BUNDLE_WRITERS : ADMIN_ALONE,

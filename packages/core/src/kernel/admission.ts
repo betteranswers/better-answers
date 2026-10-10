@@ -45,14 +45,17 @@ const reaches = (held: Role, named: Role): boolean => {
 /**
  * `ROLES` runs from the highest down, so a named role is reached by itself and everything above.
  */
-type Reaching<
+type ReachingOne<
   Named extends Role,
   Rest extends readonly Role[] = typeof ROLES,
 > = Rest extends readonly [infer Head extends Role, ...infer Tail extends readonly Role[]]
   ? Head extends Named
     ? Head
-    : Head | Reaching<Named, Tail>
+    : Head | ReachingOne<Named, Tail>
   : never;
+
+/** A union of roles is reached by whoever reaches any of them, so by its lowest and above. */
+type Reaching<Named extends Role> = Named extends Role ? ReachingOne<Named> : never;
 
 type Admitted<A extends Admits> = A extends RoleOrPurpose
   ?
