@@ -171,7 +171,7 @@ Nothing is copied from `.env.local`: no workspace, test or compose file reads it
 
 ### Provisioning the skills
 
-`provision-skills.sh <worktree-path>` is the skills stage, and is runnable by hand. It copies every `.agents/skills` entry and `skills-lock.json` the primary checkout has and the worktree does not; reinstalls from the manifest when the copy left the worktree with nothing; and then verifies that every skill link — the root's at depth two and each workspace's at depth four — resolves inside the worktree. The worktrees, the installs and the dependency trees are pruned rather than merely excluded from the walk, so a large `node_modules` is never entered.
+`provision-skills.sh <worktree-path>` is the skills stage, and is runnable by hand. It copies every `.agents/skills` entry and `skills-lock.json` the primary checkout has and the worktree does not; reinstalls from the manifest when the copy left the worktree with nothing; and then verifies that every skill link — the root's at depth two and each nested folder's, down to depth four — resolves inside the worktree. The worktrees, the installs and the dependency trees are pruned rather than merely excluded from the walk, so a large `node_modules` is never entered.
 
 ## The `check` runner
 
