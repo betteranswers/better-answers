@@ -861,15 +861,14 @@ test("keeps a focused control clear of the fixed band", async ({ page, request }
 
   // Backwards, so each stop scrolls up to meet the band rather than rise from below it.
   await tabUntilFocused(page, last, 80);
-  for (let step = 0; step < 12; step += 1) {
+  const depth = () => page.evaluate(() => window.scrollY);
+  const from = await depth();
+  // Past the rows already in view: a walk that scrolls nothing meets no band.
+  for (let step = 0; step < 27; step += 1) {
     await page.keyboard.press("Shift+Tab");
     expect(await focusUnderTheBand(page), `stop ${step + 1} back sits under the band`).toBe(false);
   }
-
-  // The gate audits the page as it is left, and any depth can leave a row half under the band.
-  await page.evaluate(() => {
-    window.scrollTo(0, 0);
-  });
+  expect(await depth(), "the walk back scrolled nothing, so it met no band").toBeLessThan(from);
 });
 
 test("paints the shell in the page's own surface token", async ({ page, request }) => {

@@ -236,11 +236,6 @@ test.describe("the System group's Audit log page", () => {
     await expect(linesOf(page)).toHaveCount(55);
     await expect(said(page)).toHaveText("55 events matching “Crew”.");
     await expect(searchBox(page)).toHaveValue("Crew");
-
-    // The gate audits the page as it is left, and any depth can leave a row half under the band.
-    await page.evaluate(() => {
-      window.scrollTo(0, 0);
-    });
   });
 
   test("keeps the search through a change of family", async ({ page, request }) => {

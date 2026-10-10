@@ -252,7 +252,10 @@ three things, of which automated rules are only one:
   reported. A new spec is held to it by existing, and there is nothing to remember. Each audit
   first waits for every transition on the page to end, because axe reads a control part-way
   through its fade as a contrast nobody settles on. A refusal handing a button back from its
-  disabled look is the case. An endless animation, such as a spinner, is audited running. The
+  disabled look is the case. An endless animation, such as a spinner, is audited running. Each
+  audit reads the page from its top and scrolls it back afterwards: a row scrolled half under the
+  sticky band is how a sticky band works, and axe would refuse that row's control as a target the
+  band's own button partly covers. So where a spec leaves the page scrolled decides nothing. The
   audit also refuses a page that draws more than three registration marks. It sets the marks and
   the grid and dot textures aside while axe runs, and fails any contrast axe still could not
   decide because of what was painted behind the text. Axe's contrast rule reads words only, so the

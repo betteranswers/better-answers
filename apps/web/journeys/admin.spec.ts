@@ -167,10 +167,6 @@ const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
   await expect
     .poll(() => events.count(), { message: "Load more brought no older events" })
     .toBeGreaterThan(shown);
-  // The gate audits the page as it is left, and any depth can leave a row half under the band.
-  await page.evaluate(() => {
-    window.scrollTo(0, 0);
-  });
   await gate();
 };
 
