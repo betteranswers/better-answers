@@ -29,7 +29,13 @@ import {
   useTickedGroups,
   type TickedGroups,
 } from "./sources-state.ts";
-import { REVIEW_WORDS, ruleWordOf, sentenceCased, SYNC_OF_A_DISMISSAL } from "./words.ts";
+import {
+  groupsCounted,
+  REVIEW_WORDS,
+  ruleWordOf,
+  sentenceCased,
+  SYNC_OF_A_DISMISSAL,
+} from "./words.ts";
 
 type Settled<Answer> = {
   readonly onSuccess: (answer: Answer) => void;
@@ -317,7 +323,7 @@ function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
   const dismiss = useDismissAsNotSpecialCategory();
   const words = REVIEW_WORDS.dismiss;
   const ticked = action.ready?.groups.length ?? 0;
-  const named = counted(ticked, "group of findings", "groups of findings");
+  const named = groupsCounted(ticked);
 
   const dismissed = (reason: string) => {
     action.command<DismissedAsNotSpecialCategory>({

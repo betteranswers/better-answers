@@ -37,6 +37,8 @@ type ConnectedSourceActions = {
 /** What is open inside a row: one review, and one narrowing or widening, on the page at a time. */
 type OpenInARow = {
   readonly reviewing: string | undefined;
+  /** A bulk action of the open review waits on its answer, so a second press must not close it. */
+  readonly reviewHeld: boolean;
   readonly panel: { readonly connectedSourceId: string; readonly part: ReactNode } | undefined;
 };
 
@@ -111,6 +113,7 @@ function RowAction(properties: {
   readonly action: keyof typeof ROW_ACTIONS;
   readonly name: string;
   readonly expanded?: boolean;
+  readonly held?: boolean;
   readonly onFocus: () => void;
   readonly onPress: () => void;
 }) {
@@ -119,6 +122,9 @@ function RowAction(properties: {
       variant="outline"
       size="sm"
       aria-expanded={properties.expanded}
+      // Not `disabled`: a disabled button drops the focus the keyboard left on it.
+      aria-disabled={properties.held ? true : undefined}
+      className="aria-disabled:opacity-50"
       aria-keyshortcuts={SOURCES_KEYSTROKES[properties.action].key}
       onFocus={properties.onFocus}
       onClick={properties.onPress}
@@ -133,6 +139,7 @@ function RowActions(properties: {
   readonly connectedSource: ListedConnectedSource;
   readonly actions: ConnectedSourceActions;
   readonly reviewing: boolean;
+  readonly reviewHeld: boolean;
   readonly onFocus: () => void;
 }) {
   const { connectedSource, actions, onFocus } = properties;
@@ -144,6 +151,7 @@ function RowActions(properties: {
         action="review"
         name={name}
         expanded={properties.reviewing}
+        held={properties.reviewHeld}
         onFocus={onFocus}
         onPress={() => {
           actions.onReview(connectedSource.connectedSourceId);
@@ -187,6 +195,7 @@ function ConnectedSourceItem(properties: {
   readonly connectedSource: ListedConnectedSource;
   readonly actions: ConnectedSourceActions;
   readonly reviewing: boolean;
+  readonly reviewHeld: boolean;
   readonly panel: ReactNode;
 }) {
   const { connectedSource, actions } = properties;
@@ -209,6 +218,7 @@ function ConnectedSourceItem(properties: {
           connectedSource={connectedSource}
           actions={actions}
           reviewing={properties.reviewing}
+          reviewHeld={properties.reviewHeld}
           onFocus={focused}
         />
       </div>
@@ -249,6 +259,7 @@ export function ConnectedSourceList(properties: {
             connectedSource={connectedSource}
             actions={properties.actions}
             reviewing={open.reviewing === id}
+            reviewHeld={open.reviewHeld && open.reviewing === id}
             panel={open.panel?.connectedSourceId === id ? open.panel.part : null}
           />
         );

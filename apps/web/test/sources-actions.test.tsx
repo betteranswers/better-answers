@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
@@ -19,6 +19,7 @@ import {
   THE_CHANGE_BEFORE_IS_STILL_GOING,
 } from "@/features/sources/words.ts";
 import { ViewStateSlot } from "@/shared/page-toolbar.tsx";
+import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { addressOf, answered } from "./stubbed-api.ts";
 
@@ -240,20 +241,44 @@ const TO_PUBLIC = { sensitivity: "Public", audience: "groups" } as const;
 
 const ANSWERS: Readonly<Record<string, unknown>> = {
   "sources.list": [HANDBOOK, PRICE_BOOK],
-  "sources.findings": [],
   "sources.widen": { visibility: WIDENED, concepts: [], writeUps: [] },
 };
 
-/** The page over an api that answers the list at once and a widening once `held` lets it. */
-const atSources = (held: Promise<void> = Promise.resolve()) => {
+/** The api's refusal of a keep, as the tRPC client's batch carries it back. */
+const KEEP_REFUSED = {
+  error: {
+    message: "refused",
+    code: -32_600,
+    data: {
+      code: "BAD_REQUEST",
+      httpStatus: 400,
+      refusal: { word: "not-the-always-set", class: "inapplicable" },
+    },
+  },
+};
+
+const HELD: ReadonlySet<string> = new Set(["sources.widen", "sources.keepInText"]);
+
+/** Reads are answered at once; a widening is taken and a keep refused once `held` lets them. */
+const atSources = (
+  api: { readonly held?: Promise<void>; readonly findings?: readonly GroupOfFindings[] } = {},
+) => {
   const asked: string[] = [];
+  const answers: Readonly<Record<string, unknown>> = {
+    ...ANSWERS,
+    "sources.findings": api.findings ?? [],
+  };
   vi.stubGlobal("fetch", async (input: string | URL | Request) => {
     const { pathname } = addressOf(input);
     if (!pathname.startsWith("/trpc/")) return answered({});
     const names = pathname.replace("/trpc/", "").split(",");
     asked.push(...names);
-    if (names.includes("sources.widen")) await held;
-    return answered(names.map((name) => ({ result: { data: ANSWERS[name] } })));
+    if (names.some((name) => HELD.has(name))) await api.held;
+    return answered(
+      names.map((name) =>
+        name === "sources.keepInText" ? KEEP_REFUSED : { result: { data: answers[name] } },
+      ),
+    );
   });
   render(
     <Providers clients={createAppClients()}>
@@ -343,6 +368,37 @@ describe("a connected source's row", () => {
     expect(document.activeElement).toBe(review);
   });
 
+  it("holds its review open until a pending keep answers", async () => {
+    const answer = Promise.withResolvers<void>();
+    atSources({ held: answer.promise, findings: [BANK_DETAILS] });
+    const row = await rowOf("Staff handbook");
+    const review = rowAction(row, ROW_ACTIONS.review, "Staff handbook");
+    fireEvent.click(review);
+    const ticking = { name: REVIEW_WORDS.select(BANK_DETAILS) };
+    fireEvent.click(await row.findByRole("checkbox", ticking));
+    fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.keep.key });
+    const reason = screen.getByLabelText("Reason");
+    fireEvent.change(reason, { target: { value: "Printed on every invoice" } });
+    fireEvent.submit(reason);
+    // The hold is drawn a task after the keep is sent, as a second press would find it.
+    await waitFor(() => {
+      expect(review.getAttribute("aria-disabled")).toBe("true");
+    });
+
+    fireEvent.click(review);
+
+    expect(reviewOf("Staff handbook")).not.toBeNull();
+
+    answer.resolve();
+    expect(
+      await row.findByText(sentenceOf(SAID_OF_A_CONNECTED_SOURCE["not-the-always-set"])),
+    ).toBeDefined();
+    expect(row.getByRole("checkbox", ticking).getAttribute("aria-checked")).toBe("true");
+    await waitFor(() => {
+      expect(review.hasAttribute("aria-disabled")).toBe(false);
+    });
+  });
+
   it("closes one review as another's opens", async () => {
     atSources();
     const handbook = await rowOf("Staff handbook");
@@ -403,8 +459,23 @@ describe("widening a connected source in its row", () => {
     expect(document.activeElement).toBe(widen);
   });
 
+  it("keeps its opener when w is pressed again", async () => {
+    atSources();
+    const row = await rowOf("Staff handbook");
+    const widen = widenOpened(row);
+    const cancel = row.getByRole("button", { name: "Cancel" });
+    cancel.focus();
+
+    fireEvent.keyDown(cancel, { key: SOURCES_KEYSTROKES.widen.key });
+    expect(document.activeElement).toBe(row.getByRole("combobox", { name: "Sensitivity" }));
+    fireEvent.click(cancel);
+
+    expect(panelOf("widen", "Staff handbook")).toBeNull();
+    expect(document.activeElement).toBe(widen);
+  });
+
   it("commits at once, focus on the source's heading", async () => {
-    atSources(Promise.withResolvers<void>().promise);
+    atSources({ held: Promise.withResolvers<void>().promise });
     const row = await rowOf("Staff handbook");
     widenOpened(row);
 
@@ -419,7 +490,7 @@ describe("widening a connected source in its row", () => {
 
   it("asks nothing of a commit pressed while one is pending", async () => {
     const answer = Promise.withResolvers<void>();
-    const asked = atSources(answer.promise);
+    const asked = atSources({ held: answer.promise });
     const row = await rowOf("Staff handbook");
     widenOpened(row);
     fireEvent.click(commitTo(row, WIDENED));

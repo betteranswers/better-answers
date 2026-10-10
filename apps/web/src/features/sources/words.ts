@@ -246,7 +246,7 @@ export const SENSITIVITY_PANEL_WORDS = {
 export const THE_CHANGE_BEFORE_IS_STILL_GOING =
   "The change before this one is still going. Try again once it answers.";
 
-const groupsCounted = (groups: number): string =>
+export const groupsCounted = (groups: number): string =>
   counted(groups, "group of findings", "groups of findings");
 
 const findingsCounted = (findings: number): string => counted(findings, "finding", "findings");

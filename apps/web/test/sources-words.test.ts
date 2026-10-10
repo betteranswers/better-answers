@@ -128,28 +128,27 @@ describe("what a connected source's stored values read as", () => {
   });
 });
 
-/** The ids the worker's redaction descriptors raise. */
-const RULES_RAISED = [
-  "HEALTH_CUE",
-  "UK_BANK_ACCOUNT",
-  "UK_NHS",
-  "UK_NINO",
-  "DATE_OF_BIRTH",
-  "UK_HOME_ADDRESS",
-  "EMAIL_ADDRESS",
-  "PHONE_NUMBER",
-  "PERSON",
-  "JOB_TITLE",
-];
+/** Each id the worker's redaction descriptors raise, beside the word a reader meets. */
+const RULES_RAISED = {
+  HEALTH_CUE: "Health wording",
+  UK_BANK_ACCOUNT: "Sort code and account number",
+  UK_NHS: "NHS number",
+  UK_NINO: "National Insurance number",
+  DATE_OF_BIRTH: "Date of birth",
+  UK_HOME_ADDRESS: "Home address",
+  EMAIL_ADDRESS: "Personal email address",
+  PHONE_NUMBER: "Phone number",
+  PERSON: "Person’s name",
+  JOB_TITLE: "Job title",
+};
 
 describe("what a finding's rule reads as", () => {
-  it("gives every rule the worker raises a word", () => {
-    for (const ruleId of RULES_RAISED) {
-      const word = ruleWordOf(ruleId);
-      expect(word).not.toBe(ruleId);
-      expect(word).toMatch(/^\p{Lu}[\p{L}’ ]+$/v);
-    }
-    expect(new Set(RULES_RAISED.map(ruleWordOf)).size).toBe(RULES_RAISED.length);
+  it("gives every rule the worker raises its word", () => {
+    const read = Object.fromEntries(
+      Object.keys(RULES_RAISED).map((ruleId) => [ruleId, ruleWordOf(ruleId)]),
+    );
+
+    expect(read).toEqual(RULES_RAISED);
   });
 
   it("shows a rule it has not met as its id", () => {

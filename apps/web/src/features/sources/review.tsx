@@ -15,7 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui/table.tsx";
-import { counted } from "@/shared/words.ts";
 
 import { outcomeOfFailure } from "./refusal.tsx";
 import { ReviewActions, RuleWord } from "./review-actions.tsx";
@@ -35,7 +34,7 @@ import {
   SOURCES_KEYSTROKES,
   useTickedGroups,
 } from "./sources-state.ts";
-import { REVIEW_WORDS, sentenceCased } from "./words.ts";
+import { groupsCounted, REVIEW_WORDS, sentenceCased } from "./words.ts";
 
 const NOTHING_FOUND = {
   received: "No sync has finished yet, so nothing has been found.",
@@ -159,9 +158,9 @@ function FindingsTable(properties: {
   return (
     <Table>
       <TableCaption>
-        {counted(selected.length, "group of findings", "groups of findings")} selected. Select a
-        group with <kbd className="font-mono">{SOURCES_KEYSTROKES.select.key}</kbd>, then keep it in
-        text, narrow its document or dismiss it as not special category with the actions above.
+        {groupsCounted(selected.length)} selected. Select a group with{" "}
+        <kbd className="font-mono">{SOURCES_KEYSTROKES.select.key}</kbd>, then keep it in text,
+        narrow its document or dismiss it as not special category with the actions above.
       </TableCaption>
       <TableHeader>
         <TableRow>

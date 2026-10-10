@@ -18,6 +18,7 @@ import { SensitivityPanel, type SensitivityChange } from "./sensitivity-panel.ts
 import {
   EVERYONE,
   NARROWEST,
+  useBulkActionPending,
   useConnectedSources,
   useNarrowConnectedSource,
   usePublish,
@@ -94,8 +95,11 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
     (each) => each.connectedSourceId === changing?.connectedSourceId,
   );
 
+  /** Asked for again while open, the panel keeps its opener: focus may by then be inside it. */
   const open = (asked: Changing) => {
-    opener.current = theControlInFocus();
+    const openAlready =
+      changing?.change === asked.change && changing.connectedSourceId === asked.connectedSourceId;
+    if (!openAlready) opener.current = theControlInFocus();
     flushSync(() => {
       setChanging(asked);
     });
@@ -190,6 +194,7 @@ export function ConnectedSourcesPage() {
   const [publishing, setPublishing] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
   const publishAction = usePublish();
+  const reviewHeld = useBulkActionPending();
 
   const listed = connectedSources.data ?? [];
   const sensitivity = useSensitivityPanel(listed, setOutcome);
@@ -205,8 +210,8 @@ export function ConnectedSourcesPage() {
   };
 
   const reviewOrClose = (connectedSourceId: string) => {
-    if (reviewing === connectedSourceId) setReviewing(undefined);
-    else review(connectedSourceId);
+    if (reviewing !== connectedSourceId) review(connectedSourceId);
+    else if (!reviewHeld) setReviewing(undefined);
   };
 
   const publish = (connectedSource: ListedConnectedSource) => {
@@ -283,7 +288,7 @@ export function ConnectedSourcesPage() {
               onNarrow: narrow,
               onWiden: widen,
             }}
-            open={{ reviewing, panel: sensitivity.panel }}
+            open={{ reviewing, reviewHeld, panel: sensitivity.panel }}
           />
         )}
       </section>

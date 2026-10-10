@@ -12,10 +12,10 @@ import { outcomeOfFailure } from "./refusal.tsx";
 import { useFindings, type ListedConnectedSource } from "./sources-api.ts";
 import { AUDIENCE_WORDS, AUDITED_CATEGORIES, spokenWord } from "./words.ts";
 
-type DialogProperties<Asked> = {
+type DialogProperties = {
   readonly connectedSource: ListedConnectedSource;
   readonly onClose: () => void;
-  readonly onConfirm: (asked: Asked) => void;
+  readonly onConfirm: (confirmations: Confirmations) => void;
 };
 
 /** The action's own row may lose the control that opened it, so focus goes back to the connected source. */
@@ -38,13 +38,7 @@ type Confirmation = (typeof CONFIRMATIONS)[number]["field"];
 
 type Confirmations = Readonly<Record<Confirmation, boolean>>;
 
-/** What the Audit log will call each action, in the words it shows there. */
-const ACTION_WORDS = {
-  published: "Connected source published",
-} as const;
-
 function TheAuditRow(properties: {
-  readonly action: keyof typeof ACTION_WORDS;
   readonly connectedSource: ListedConnectedSource;
   readonly children: ReactNode;
 }) {
@@ -56,7 +50,7 @@ function TheAuditRow(properties: {
         What the audit row will carry
       </h3>
       <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-        <SummaryRow term="Action">{ACTION_WORDS[properties.action]}</SummaryRow>
+        <SummaryRow term="Action">Connected source published</SummaryRow>
         <SummaryRow term="Connected source">{properties.connectedSource.name}</SummaryRow>
         <SummaryRow term="By">You, at the instant the platform records it</SummaryRow>
         {properties.children}
@@ -76,7 +70,7 @@ function WhatTheRowCarries(properties: {
   }
 
   return (
-    <TheAuditRow action="published" connectedSource={properties.connectedSource}>
+    <TheAuditRow connectedSource={properties.connectedSource}>
       <SummaryRow term="Sensitivity">{properties.connectedSource.sensitivity}</SummaryRow>
       <SummaryRow term="Audience">{AUDIENCE_WORDS[properties.connectedSource.audience]}</SummaryRow>
       {CONFIRMATIONS.map((confirmation) => (
@@ -104,7 +98,7 @@ function WhatTheRowCarries(properties: {
   );
 }
 
-export function PublishDialog(properties: DialogProperties<Confirmations>) {
+export function PublishDialog(properties: DialogProperties) {
   const { connectedSource, onClose, onConfirm } = properties;
   const [ticked, setTicked] = useState<ReadonlySet<Confirmation>>(new Set());
   const hintId = useId();
