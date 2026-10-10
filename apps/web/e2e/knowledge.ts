@@ -64,7 +64,7 @@ export const refusedAtACeiling = (route: Route): Promise<void> => {
   return route.fulfill({ status: 429, json: calls.map(() => refusal) });
 };
 
-/** Holds each request it names until `release`, so a test acts while the page still waits on it. */
+/** Holds each request it names until `release`, so a test goes on while the page still waits on it. */
 export const heldBack = async (page: Page, named: (url: URL) => boolean) => {
   const held = Promise.withResolvers<void>();
   const reached = Promise.withResolvers<void>();
