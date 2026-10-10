@@ -18,7 +18,7 @@ execution: code
 - **Product authority:** Linear BA-109 is authoritative: its two acceptance criteria are R1 and R2.
 - **Stop conditions:** stop and report to the lead if either holds:
   - A console query, or code it calls, fails with SQLSTATE `25006` in the core or api suite. That is a read that writes: a finding to report, not a test to loosen.
-  - The change needs the member roads, the MCP surface or `standingAsOperator` edited.
+  - The change needs the member roads or the MCP surface edited.
 - **Execution profile:** one pull request, reversible.
 - **Who finishes:** `ce-work` builds; `/ce-code-review` reviews; `ce-commit-push-pr` opens the pull request. The lead merges.
 
@@ -38,7 +38,8 @@ BA-108 made a member's tRPC query read-only, because tRPC sends a query over GET
 
 **The door and the road**
 
-- R1. The console's `.query()` procedures run under an operator read door: the operator resolve, opened `BEGIN READ ONLY`. Only they use it. `withOperator` stays read-write, and the console's mutations stay on it.
+- R1. The console's `.query()` procedures run under an operator read door: the operator resolve, opened `BEGIN READ ONLY`. `withOperator` stays read-write, and the console's mutations stay on it.
+- R5. `standingAsOperator`, which only reads, resolves through the read door too, as BA-108 moved every read-only caller of the member resolver to its read door.
 
 **Proof**
 
@@ -55,12 +56,9 @@ BA-108 made a member's tRPC query read-only, because tRPC sends a query over GET
 ### Scope Boundaries
 
 - **Not in this package:**
-  - `standingAsOperator` in `packages/core/src/workspaces/operator.ts`. It only reads, but it runs under the person road, and BA-109's criterion keeps the read door to the console's queries.
   - ADR 0043's base-procedures list. It names the query, mutation and own-transaction roads and never the operator road, and no other record in `docs/solutions/architecture-patterns/` describes the operator road's transaction. There is nothing to amend; the pull request says so.
   - The operator resolver's log label, `OPERATOR_RESOLVER = "withOperator"` in `apps/api/src/trpc/base.ts`. It names both operator roads, as `RESOLVER` names both member roads.
   - The test harness's callers of `withOperator` (`apps/api/tests/harness.ts`, `packages/core/test/platform.ts`). They write, or serve writers.
-- **Deferred to Follow-Up Work:**
-  - `standingAsOperator` on the read door: a follow-up issue if the owner wants every resolve-only operator read on it.
 
 ### Sources
 
@@ -72,7 +70,7 @@ BA-108 made a member's tRPC query read-only, because tRPC sends a query over GET
 
 ## Planning Contract
 
-**Product Contract preservation:** BA-109's two acceptance criteria are R1 and R2; R3 and R4 carry the member road plan's pin and probe across.
+**Product Contract preservation:** BA-109's two acceptance criteria are R1 and R2; R3 and R4 carry the member road plan's pin and probe across. R5 was added on 10/10/2026 by the lead's decision on PR #670.
 
 ### Key Technical Decisions
 
@@ -140,7 +138,7 @@ BA-108 made a member's tRPC query read-only, because tRPC sends a query over GET
 
 ## Definition of Done
 
-- R1 to R4 hold, each shown by the gate the Verification Contract names.
-- `withOperatorRead`'s only caller in `apps/api/src` and `packages/core/src` is the operator query road.
+- R1 to R5 hold, each shown by the gate the Verification Contract names; R5 rests on the suites, since no test observes the opening of a transaction whose work only reads.
+- `withOperatorRead`'s callers in `apps/api/src` and `packages/core/src` are the operator query road and `standingAsOperator`.
 - The pull request body says ADR 0043 is unchanged and why, says the suites are the proof that no console query writes, and ends with its merge-risk line and `Fixes BA-109`.
 - No abandoned attempt, debug log or unused helper is left in the diff.

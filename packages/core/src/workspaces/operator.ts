@@ -16,7 +16,7 @@ import {
   type Tx,
   withIdentityRead,
   withIdentityWrite,
-  withOperator,
+  withOperatorRead,
 } from "../store/postgres/index.ts";
 import { promoting } from "./promotion.ts";
 import { hashOfTyped, mintOneTimeCode } from "./recovery-codes.ts";
@@ -218,7 +218,7 @@ export const standingAsOperator = async (
   claims: Pick<Claims, "userId" | "issuedAt">,
 ): Promise<Result<OperatorStanding, Error>> => {
   const resolved = await attempt(() =>
-    withOperator(door, claims, async (operator, tx) => {
+    withOperatorRead(door, claims, async (operator, tx) => {
       const found = await tx.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [
         operator.userId,
       ]);
