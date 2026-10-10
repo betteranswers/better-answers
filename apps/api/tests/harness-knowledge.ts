@@ -4,7 +4,7 @@ import { TRUST_TIERS } from "@better-answers/core/answering";
 import { overrideConceptSensitivity, writeConcept } from "@better-answers/core/concepts";
 import { actorIdOfPerson, type UserPrincipal } from "@better-answers/core/kernel";
 import { head, initRepository, type GitDoor } from "@better-answers/core/store/git";
-import { AUDIENCES, SENSITIVITIES } from "@better-answers/schema";
+import { AUDIENCES, conceptFrontmatter, SENSITIVITIES } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { inOneTransaction, seedPassages } from "./harness-sources.ts";
@@ -27,11 +27,6 @@ const aCitedConcept = z.object({ concept: z.string().min(1) });
 /** A source with a place of the file's own in it, such as `p.4`, which opens nothing. */
 const aCitedPlace = z.object({ title: z.string().min(1), at: z.string().min(1) });
 
-const aFrontmatterEntry = z.record(
-  z.string(),
-  z.union([z.string(), z.number(), z.boolean(), z.null()]),
-);
-
 const aConcept = z.object({
   title: z.string().min(1),
   kind: z.string().min(1).default("Answer"),
@@ -43,19 +38,7 @@ const aConcept = z.object({
   linksTo: z.array(z.string().min(1)).default([]),
   sources: z.array(z.union([aCitedDocument, aCitedConcept, aCitedPlace])).default([]),
   /** Further keys of the file's own, such as `tags` or `verified`. */
-  frontmatter: z
-    .record(
-      z.string(),
-      z.union([
-        z.string(),
-        z.number(),
-        z.boolean(),
-        z.null(),
-        z.array(z.string()),
-        z.array(aFrontmatterEntry),
-      ]),
-    )
-    .default({}),
+  frontmatter: conceptFrontmatter.default({}),
 });
 
 type AskedConcept = z.output<typeof aConcept>;

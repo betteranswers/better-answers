@@ -10,8 +10,6 @@ import { expect, test } from "./browser.ts";
 import {
   aMemberSignedInAt,
   anAddress,
-  keystrokesDismissed,
-  keystrokesListed,
   landedAtHome,
   navOf,
   provision,
@@ -21,7 +19,13 @@ import {
   signIn,
   skipLinkReachesThePage,
 } from "./harness.ts";
-import { isAFind, isAnOpen, readsCeilingFilled } from "./knowledge.ts";
+import {
+  isAFind,
+  isAnOpen,
+  listsItsKeystrokes,
+  readsCeilingFilled,
+  scrolledSideways,
+} from "./knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -358,10 +362,9 @@ test.describe("the Knowledge Search page", () => {
       await expect(inline).toContainText(PALLET_PASSAGES[0] ?? "");
       await expect(inline.getByRole("heading", { name: HANDBOOK })).toBeFocused();
       await expect(passagePanel(page, HANDBOOK)).toHaveCount(0);
-      const sideways = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      expect(await scrolledSideways(page), `the page scrolls sideways at ${String(width)} px`).toBe(
+        0,
       );
-      expect(sideways, `the page scrolls sideways at ${String(width)} px`).toBe(0);
 
       await page.keyboard.press("Escape");
       await expect(inline).toHaveCount(0);
@@ -467,10 +470,7 @@ test.describe("the Knowledge Search page", () => {
     await anAdminAtSearch(page, request, "Calder Records", [handbookSeeded]);
     await skipLinkReachesThePage(page);
 
-    const keystrokes = await keystrokesListed(page, SEARCH.name);
-    for (const keystroke of Object.values(KEY))
-      await expect(keystrokes).toContainText(keystroke.action);
-    await keystrokesDismissed(page, keystrokes);
+    await listsItsKeystrokes(page, SEARCH.name, Object.values(KEY));
 
     await page.keyboard.press(KEY.search.key);
     await expect(searchBox(page)).toBeFocused();

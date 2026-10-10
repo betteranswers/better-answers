@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import type { AUDIENCES, SENSITIVITIES } from "@better-answers/schema";
 
+import { keystrokesDismissed, keystrokesListed } from "./harness.ts";
+
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 export const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
 
@@ -25,6 +27,21 @@ export const readsCeilingFilled = async (page: Page, read: string): Promise<void
       `/trpc/${path}?${new URLSearchParams({ batch: "1", input: JSON.stringify(input) }).toString()}`,
     );
   }
+};
+
+/** How far the page scrolls sideways, which at every width is nowhere. */
+export const scrolledSideways = (page: Page): Promise<number> =>
+  page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+
+/** `?` lists each keystroke the page declares, and Escape hands focus back to its button. */
+export const listsItsKeystrokes = async (
+  page: Page,
+  named: string,
+  declared: readonly { readonly action: string }[],
+): Promise<void> => {
+  const listed = await keystrokesListed(page, named);
+  for (const keystroke of declared) await expect(listed).toContainText(keystroke.action);
+  await keystrokesDismissed(page, listed);
 };
 
 type Sensitivity = (typeof SENSITIVITIES)[number];

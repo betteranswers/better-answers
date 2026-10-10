@@ -31,6 +31,13 @@ const calledBy = async (person: { readonly email: string }, tool: string, args: 
   return structured(await calledTool(client, accessToken, tool, args));
 };
 
+const aWorkspaceWithAViewer = async () => {
+  const workspace = await app().provision();
+  const viewer = await app().person();
+  await app().addMember(workspace.workspaceId, viewer.id, "Viewer");
+  return { workspace, viewer };
+};
+
 const evidenceOf = (opened: Rpc) => rpcListOf(rpcOf(opened["concept"])["evidence"]);
 
 const foundBy = async (person: { readonly email: string }, query: string) =>
@@ -38,9 +45,7 @@ const foundBy = async (person: { readonly email: string }, query: string) =>
 
 describe("the browser suite's knowledge harness", () => {
   it("lands a Restricted concept find returns to Admins, not Viewers", async () => {
-    const workspace = await app().provision();
-    const viewer = await app().person();
-    await app().addMember(workspace.workspaceId, viewer.id, "Viewer");
+    const { workspace, viewer } = await aWorkspaceWithAViewer();
 
     const [restricted, internal] = await conceptsSeeded({
       workspaceId: workspace.workspaceId,
@@ -95,9 +100,7 @@ describe("the browser suite's knowledge harness", () => {
   });
 
   it("lands a readable concept citing a document a Viewer cannot", async () => {
-    const workspace = await app().provision();
-    const viewer = await app().person();
-    await app().addMember(workspace.workspaceId, viewer.id, "Viewer");
+    const { workspace, viewer } = await aWorkspaceWithAViewer();
     const [concept] = await conceptsSeeded({
       workspaceId: workspace.workspaceId,
       userId: workspace.admin.id,

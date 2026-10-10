@@ -16,8 +16,6 @@ import {
   addMember,
   anAddress,
   crumbOf,
-  keystrokesDismissed,
-  keystrokesListed,
   landedAtHome,
   person,
   provision,
@@ -26,7 +24,14 @@ import {
   switcherMenuOf,
   switcherOf,
 } from "./harness.ts";
-import { conceptsSeeded, isAFind, isAnOpen, readsCeilingFilled } from "./knowledge.ts";
+import {
+  conceptsSeeded,
+  isAFind,
+  isAnOpen,
+  listsItsKeystrokes,
+  readsCeilingFilled,
+  scrolledSideways,
+} from "./knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -696,10 +701,9 @@ test.describe("the concept page", () => {
       const drawn = await edges(inline);
       expect(drawn.top, "the panel is not under its claim").toBeGreaterThanOrEqual(claim.bottom);
       expect(drawn.bottom, "the panel is not above the next block").toBeLessThanOrEqual(next.top);
-      const sideways = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      expect(await scrolledSideways(page), `the page scrolls sideways at ${String(width)} px`).toBe(
+        0,
       );
-      expect(sideways, `the page scrolls sideways at ${String(width)} px`).toBe(0);
 
       await page.keyboard.press("Escape");
       await expect(inline).toHaveCount(0);
@@ -732,10 +736,7 @@ test.describe("the concept page", () => {
     expect(elapsedMs, "the concept rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
 
     await skipLinkReachesThePage(page);
-    const keystrokes = await keystrokesListed(page, SEARCH.name);
-    for (const keystroke of Object.values(KEY))
-      await expect(keystrokes).toContainText(keystroke.action);
-    await keystrokesDismissed(page, keystrokes);
+    await listsItsKeystrokes(page, SEARCH.name, Object.values(KEY));
 
     await page.keyboard.press(KEY.sources.key);
     await expect(sourcesOf(page).getByRole("heading", { name: WORDS.sources })).toBeFocused();

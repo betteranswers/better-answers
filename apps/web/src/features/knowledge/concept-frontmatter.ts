@@ -32,7 +32,7 @@ const VERIFIED = z.array(z.object({ by: z.string(), at: z.string() })).catch([])
 /** OKF's prefix for a person's actor id; any other verifier is a process. */
 const A_PERSON = "human:";
 
-export type VerifiedEvent = { readonly at: string; readonly byAPerson: boolean };
+type VerifiedEvent = { readonly at: string; readonly byAPerson: boolean };
 
 /** Who verified is said as a person or not: an actor's id is no word a reader meets. */
 export const verifiedEventsOf = (frontmatter: Frontmatter): readonly VerifiedEvent[] =>
