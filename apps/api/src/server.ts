@@ -15,6 +15,7 @@ import type { Doors } from "./doors.ts";
 import { routeByHostname, type PublicHostnames } from "./ingress/hostnames.ts";
 import { serveSpa } from "./ingress/spa.ts";
 import { logger as tierLogger } from "./logger.ts";
+import { entriesAt } from "./mcp/entries/index.ts";
 import { createMcpSurface } from "./mcp/surface.ts";
 import { createTrpcRoutes } from "./trpc/mount.ts";
 
@@ -120,6 +121,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
     logger,
     serverVersion: dependencies.serverVersion ?? "0.1.0",
     clock: doors.clock,
+    entries: entriesAt(dependencies.publicUrl),
   });
 
   server.all("/mcp", (context) => mcp(context.req.raw));

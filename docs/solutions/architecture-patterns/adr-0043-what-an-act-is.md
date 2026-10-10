@@ -66,6 +66,8 @@ Each transport:
 - A mutation reads the member `FOR SHARE`.
 - An own-transaction procedure resolves the Principal in a short transaction, releases the connection, and hands the action the Principal and its doors.
 
+An MCP entry's transaction opens as the entry's `readOnlyHint` declares: read-only where the entry tells the host it only reads, read-write otherwise (ADR 0030).
+
 Every Postgres door rolls back when its work answers a refusal or throws. A principal-scoped door answers its own refusal apart from its work's, and an action that wants one union calls `folded` on it. One composition root, `openDoors` in `apps/api/src/doors.ts`, opens the four doors and the Clock (ADR 0040) and states the pool's size.
 
 **Input is parsed once, at the entry**, by the kernel's `parse` (`packages/core/src/kernel/parse.ts`) over a schema the slice owns. Instants cross every wire as ISO-8601 text, with no transformer. The upload is a tRPC mutation over `application/octet-stream`, its descriptor travelling beside the bytes, with no exception to ADR 0006.
@@ -103,3 +105,5 @@ Amended 08/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossa
 Amended 10/10/2026 by the refusal catalogue plan (`docs/plans/2026-10-10-1241-refactor-one-refusal-catalogue-plan.md`, R1 and R9). The words were registered in a global list that each vocabulary filled as its module loaded. They are now composed in one catalogue, which a reader imports. The rule that a slice declares its word once is unchanged, and so is every word's class. `pnpm ops` exits an import's own word with its class.
 
 Amended 10/10/2026 by the read-only query road plan (`docs/plans/2026-10-10-0123-feat-read-only-query-road-plan.md`, R5). A query's transaction opens read-only, through a member resolve of its own; the resolver a mutation, an MCP entry or the own-transaction road takes stays read-write.
+
+Amended 10/10/2026 on the owner's ruling, by the MCP entry door plan (`docs/plans/2026-10-10-1334-feat-mcp-entry-read-only-door-plan.md`, R5). An MCP entry that declares `readOnlyHint: true` takes the read-only resolve too. The line above still holds for a mutation, an entry that declares the hint false, and the own-transaction road.

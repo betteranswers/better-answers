@@ -3,7 +3,7 @@ import { expect } from "vitest";
 import type { TestClient } from "./harness.ts";
 
 export const callMcp = (
-  client: TestClient,
+  client: Pick<TestClient, "fetch">,
   token: string,
   method: string,
   params: Readonly<Record<string, unknown>> = {},
@@ -31,9 +31,9 @@ export const rpcOf = (value: unknown): Rpc => (isRpc(value) ? value : {});
 export const rpcListOf = (value: unknown): readonly Rpc[] =>
   Array.isArray(value) ? value.filter(isRpc) : [];
 
-/** Fails the test when the call answers an error, or the tool reports one. */
-export const calledTool = async (
-  client: TestClient,
+/** The tool's own answer, a tool error included. Fails the test when the call answers an error. */
+export const toolAnswered = async (
+  client: Pick<TestClient, "fetch">,
   token: string,
   name: string,
   args: Rpc,
@@ -44,7 +44,17 @@ export const calledTool = async (
   const streamed = [...text.matchAll(/^data:(.*)$/gm)].at(-1)?.[1];
   const body = rpcOf(JSON.parse(streamed ?? text));
   expect(body["error"]).toBeUndefined();
-  const result = rpcOf(body["result"]);
+  return rpcOf(body["result"]);
+};
+
+/** Fails the test when the call answers an error, or the tool reports one. */
+export const calledTool = async (
+  client: TestClient,
+  token: string,
+  name: string,
+  args: Rpc,
+): Promise<Rpc> => {
+  const result = await toolAnswered(client, token, name, args);
   expect(result["isError"]).toBeFalsy();
   return result;
 };
