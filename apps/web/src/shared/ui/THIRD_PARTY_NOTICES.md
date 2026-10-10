@@ -388,6 +388,8 @@ The edits made on 10 October 2026 for BA-98, which made the dark theme reachable
 - `button.tsx`: the `outline` variant draws its edge in `--border-default`, since `--input` is
   now the 3:1 control edge, and a button is found by its words.
 - `command.tsx`: the input's row draws its rule in `--input`, the only edge Jump to's field has.
+- `kibo-ui/qr-code.tsx` draws its modules in `--grey-900` on `--grey-0`, not the page's ink on the
+  page: in dark those flip, and a scanner wants dark modules on a light field.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the pages that use them carry the WCAG 2.2 AA

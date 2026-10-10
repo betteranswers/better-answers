@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 import { act, cleanup, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FIRST_PAINT, THEME_KEPT_UNDER, themeShown } from "@/shared/theme-switch.ts";
-import { chooseTheme, useThemeChoice, useThemeFollowed } from "@/shared/theme.ts";
+import type * as ThemeStore from "@/shared/theme.ts";
 
 import { sourceFiles } from "./source-files.ts";
 
@@ -32,6 +32,14 @@ const firstPaint = () => {
   // oxlint-disable-next-line typescript/no-implied-eval -- the head script is a string by design, run here as the page runs it
   new Function(FIRST_PAINT)();
 };
+
+/** Fresh per test: the store holds the choice made in this tab. */
+let store: typeof ThemeStore;
+
+beforeEach(async () => {
+  vi.resetModules();
+  store = await import("@/shared/theme.ts");
+});
 
 afterEach(() => {
   cleanup();
@@ -92,8 +100,8 @@ describe("choosing a theme", () => {
   it("follows the device until a theme is chosen", () => {
     const device = aDevice(false);
     const { result } = renderHook(() => {
-      useThemeFollowed();
-      return useThemeChoice();
+      store.useThemeFollowed();
+      return store.useThemeChoice();
     });
     expect(result.current).toBe("device");
     expect(theme()).toBe("light");
@@ -104,7 +112,7 @@ describe("choosing a theme", () => {
     expect(theme()).toBe("dark");
 
     act(() => {
-      chooseTheme("light");
+      store.chooseTheme("light");
     });
     expect(result.current).toBe("light");
     expect(theme()).toBe("light");
@@ -121,24 +129,41 @@ describe("choosing a theme", () => {
     aDevice(true);
     localStorage.setItem(THEME_KEPT_UNDER, "light");
     const { result } = renderHook(() => {
-      useThemeFollowed();
-      return useThemeChoice();
+      store.useThemeFollowed();
+      return store.useThemeChoice();
     });
     expect(theme()).toBe("light");
 
     act(() => {
-      chooseTheme("device");
+      store.chooseTheme("device");
     });
     expect(result.current).toBe("device");
     expect(localStorage.getItem(THEME_KEPT_UNDER)).toBeNull();
     expect(theme()).toBe("dark");
   });
 
+  it("holds a picked theme the browser refuses to keep", () => {
+    aDevice(false);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    const { result } = renderHook(() => {
+      store.useThemeFollowed();
+      return store.useThemeChoice();
+    });
+
+    act(() => {
+      store.chooseTheme("dark");
+    });
+    expect(result.current).toBe("dark");
+    expect(theme()).toBe("dark");
+  });
+
   it("takes a theme chosen in another tab", () => {
     aDevice(false);
     const { result } = renderHook(() => {
-      useThemeFollowed();
-      return useThemeChoice();
+      store.useThemeFollowed();
+      return store.useThemeChoice();
     });
 
     act(() => {

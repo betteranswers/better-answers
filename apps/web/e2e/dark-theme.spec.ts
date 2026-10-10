@@ -1,11 +1,24 @@
 import type { Page } from "@playwright/test";
 
-import { ACCOUNT_HEADING, THEME_WORDS } from "@/features/auth/account-words.ts";
+import {
+  ACCOUNT_ACTIONS,
+  ACCOUNT_HEADING,
+  AUTHENTICATOR_WORDS,
+  THEME_WORDS,
+} from "@/features/auth/account-words.ts";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
 
 import { expect, test } from "./browser.ts";
-import { anAddress, provision, signedInAtHome, signInHeading, tokenColour } from "./harness.ts";
+import {
+  anAddress,
+  contrastBetween,
+  provision,
+  signedInAtHome,
+  signedInWithNoWorkspace,
+  signInHeading,
+  tokenColour,
+} from "./harness.ts";
 
 const themeOf = (page: Page) => page.evaluate(() => document.documentElement.dataset["theme"]);
 
@@ -121,4 +134,26 @@ test("paints the kept theme before the page's scripts run", async ({
   await page.unroute("**/assets/*.js");
   await page.goto("/sign-in");
   await expect(signInHeading(page)).toBeVisible();
+});
+
+/** `#rrggbb` as a browser paints it, so the suite's contrast reads it. */
+const paintedHex = (hex: string): string =>
+  `rgb(${[1, 3, 5].map((at) => String(Number.parseInt(hex.slice(at, at + 2), 16))).join(", ")})`;
+
+test("draws the authenticator's code dark on light in dark", async ({ page, request }) => {
+  await keptOnThisBrowser(page, "dark");
+  await signedInWithNoWorkspace(page, request, "theme-code");
+  await page.goto("/account");
+  await page.getByRole("button", { name: ACCOUNT_ACTIONS.setUp }).click();
+  const code = page.getByRole("img", { name: AUTHENTICATOR_WORDS.qrCode });
+  await expect(code).toBeVisible();
+
+  const [modules = "", field = ""] = await Promise.all([
+    code.locator("path[stroke]").first().getAttribute("stroke"),
+    code.locator("path[fill]").first().getAttribute("fill"),
+  ]).then((colours) => colours.map((colour) => paintedHex(colour ?? "")));
+  expect(contrastBetween(modules, field), "a scanner cannot read the code").toBeGreaterThanOrEqual(
+    4.5,
+  );
+  expect(modules, "the code is drawn light on dark").toBe(await tokenColour(page, "--grey-900"));
 });

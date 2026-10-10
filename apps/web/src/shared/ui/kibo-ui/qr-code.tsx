@@ -39,8 +39,9 @@ export const QRCode = ({
         const newSvg = await QR.toString(data, {
           type: "svg",
           color: {
-            dark: hexOr([foreground, tokenOf("--foreground")], "#000000"),
-            light: hexOr([background, tokenOf("--background")], "#ffffff"),
+            // A scanner wants dark modules on a light field, so the ramp's ink and white, which no theme flips.
+            dark: hexOr([foreground, tokenOf("--grey-900")], "#000000"),
+            light: hexOr([background, tokenOf("--grey-0")], "#ffffff"),
           },
           width: 200,
           errorCorrectionLevel: robustness,

@@ -12,7 +12,13 @@ import {
 /** A theme kept on this browser, or the device's. */
 export type ThemeChoice = Theme | "device";
 
-const kept = (): string | null => onThisBrowser()?.getItem(THEME_KEPT_UNDER) ?? null;
+/** The choice made in this tab, which holds when the browser refuses to keep it. */
+let chosenHere: ThemeChoice | undefined;
+
+const kept = (): string | null => {
+  if (chosenHere !== undefined) return chosenHere === "device" ? null : chosenHere;
+  return onThisBrowser()?.getItem(THEME_KEPT_UNDER) ?? null;
+};
 
 const choiceKept = (): ThemeChoice => {
   const theme = kept();
@@ -42,6 +48,7 @@ const subscribe = (listener: () => void) => {
 };
 
 export const chooseTheme = (choice: ThemeChoice): void => {
+  chosenHere = choice;
   if (choice === "device") forgetOnThisBrowser(THEME_KEPT_UNDER);
   else keepOnThisBrowser(THEME_KEPT_UNDER, choice);
   changed();
@@ -55,7 +62,9 @@ export const useThemeFollowed = (): void => {
     shown();
     const media = device();
     const fromAnotherTab = (event: StorageEvent) => {
-      if (event.key === THEME_KEPT_UNDER || event.key === null) changed();
+      if (event.key !== THEME_KEPT_UNDER && event.key !== null) return;
+      chosenHere = undefined;
+      changed();
     };
     media?.addEventListener("change", changed);
     window.addEventListener("storage", fromAnotherTab);
