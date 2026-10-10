@@ -1,4 +1,10 @@
-import { citedSourceOf, ids, MAP_EDGE_LABELS, type ConceptIri } from "@better-answers/schema";
+import {
+  citedSourceOf,
+  ids,
+  MAP_EDGE_LABELS,
+  ULID_CHARACTERS,
+  type ConceptIri,
+} from "@better-answers/schema";
 import { CONCEPT_IRI_PREFIX } from "@better-answers/schema/concept-file";
 
 import { readableClause, readableParameters } from "../access/index.ts";
@@ -19,6 +25,9 @@ import type { Frontmatter, FrontmatterSource } from "./file.ts";
 type EvidenceItem = {
   readonly id?: string;
   readonly source: string;
+
+  /** The file's own place in the source, such as `p.4`, which opens nothing. */
+  readonly at?: string;
   readonly locator?: string;
   readonly iri?: ConceptIri;
 };
@@ -130,6 +139,23 @@ const openingNamed = (
 const opensFor = (doors: Doors, opening: Opening): Promise<Result<boolean, Error>> =>
   "locator" in opening ? readsPassage(doors, opening.locator) : readsConcept(doors, opening.iri);
 
+/** Any run a document id could be, so a malformed passage address is never shown as a place. */
+const NAMES_A_DOCUMENT = new RegExp(ULID_CHARACTERS, "i");
+
+/** A locator with no passage address's shape, such as `p.4`: it names nothing a reader is kept from. */
+const placeOf = (doors: Doors, locator: string | null): string | undefined =>
+  locator === null ||
+  locator.trim() === "" ||
+  doors.namesPassage(locator) ||
+  NAMES_A_DOCUMENT.test(locator)
+    ? undefined
+    : locator;
+
+const namedItem = (id: string | null, source: string, place: string | undefined): EvidenceItem => {
+  const named = id === null ? { source } : { id, source };
+  return place === undefined ? named : { ...named, at: place };
+};
+
 const resolvedOf = async (
   doors: Doors,
   entry: SourceEntry,
@@ -137,7 +163,7 @@ const resolvedOf = async (
   const cited = citedSourceOf(entry);
   if (cited === undefined) return ok(undefined);
   const source = labelOf(entry, cited.resource);
-  const named: EvidenceItem = cited.id === null ? { source } : { id: cited.id, source };
+  const named = namedItem(cited.id, source, placeOf(doors, cited.locator));
   const opening = openingNamed(doors, cited.locator, cited.resource);
   if (opening === undefined) return ok({ entry, item: named, points: false, opens: false });
   const opens = await opensFor(doors, opening);
@@ -166,14 +192,22 @@ export const resolvedSourcesOf = async (
 };
 
 /** A resource holding `#` is closed with one, so the string never reads as resource and locator. */
-const labelOnlyText = (label: string): string => (label.includes("#") ? `${label}#` : label);
+const labelOnlyText = (label: string, place: string | undefined): string => {
+  if (place !== undefined) return `${label}#${place}`;
+  return label.includes("#") ? `${label}#` : label;
+};
 
-const labelOnlyRecord = (entry: FrontmatterSource, label: string): FrontmatterSource => {
+const labelOnlyRecord = (
+  entry: FrontmatterSource,
+  label: string,
+  place: string | undefined,
+): FrontmatterSource => {
   const kept: Record<string, FrontmatterSource[string]> = {};
   const { id, title } = entry;
   if (id !== undefined) kept["id"] = id;
   if (title === label) kept["title"] = label;
   kept["resource"] = label;
+  if (place !== undefined) kept["locator"] = place;
   return kept;
 };
 
@@ -181,18 +215,18 @@ const projectedSources = (
   resolved: readonly Resolved[],
 ): readonly string[] | readonly FrontmatterSource[] => {
   const texts = resolved.flatMap(({ entry, item, opens }) =>
-    typeof entry === "string" ? [opens ? entry : labelOnlyText(item.source)] : [],
+    typeof entry === "string" ? [opens ? entry : labelOnlyText(item.source, item.at)] : [],
   );
   const records = resolved.flatMap(({ entry, item, opens }) =>
-    typeof entry === "string" ? [] : [opens ? entry : labelOnlyRecord(entry, item.source)],
+    typeof entry === "string" ? [] : [opens ? entry : labelOnlyRecord(entry, item.source, item.at)],
   );
   // The file parser holds a `sources` list to strings alone or records alone.
   return records.length === 0 ? texts : records;
 };
 
 /**
- * The frontmatter with each source this reader cannot open cut to its label and id, and any entry
- * naming no resource left out. A `sources` that is no list is left out whole: it may hold a locator.
+ * The frontmatter with each source this reader cannot open cut to its label, id and any place, and
+ * any entry naming no resource left out. A `sources` that is no list is left out whole: it may hold a locator.
  */
 export const projectedFrontmatter = (
   frontmatter: Frontmatter,

@@ -1,16 +1,18 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import type { ConceptIri } from "@better-answers/schema";
+import { ids, type ConceptIri } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import {
   ask,
   find,
+  findInput,
   giveFeedback,
   mapWords,
   NOT_ANSWERED,
   NOT_COMPANY_KNOWLEDGE,
   open,
+  openInput,
   renderAnswer,
   renderFeedback,
   renderFind,
@@ -22,7 +24,7 @@ import {
   type OpenResult,
   type Trust,
 } from "../src/answering/index.ts";
-import type { Result, UserPrincipal } from "../src/kernel/index.ts";
+import { parse, type Result, type Role, type UserPrincipal } from "../src/kernel/index.ts";
 import type { Foldable, Folded, Tx } from "../src/store/postgres/index.ts";
 import {
   codePointsOf,
@@ -36,12 +38,14 @@ import { postgresForSuite, readingAs } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
-const arrange = async (): Promise<{ readonly workspaceId: string; readonly userId: string }> => {
+const arrange = async (
+  role: Role = "Viewer",
+): Promise<{ readonly workspaceId: string; readonly userId: string }> => {
   const client = await db().pool.connect();
   try {
     const seed = testData(client);
     const workspace = await seed.workspace();
-    const member = await seed.member({ workspaceId: workspace.id, role: "Viewer" });
+    const member = await seed.member({ workspaceId: workspace.id, role });
     return { workspaceId: workspace.id, userId: member.userId };
   } finally {
     client.release();
@@ -207,6 +211,30 @@ describe("the preview's rendering", () => {
       ].join("\n"),
     );
   });
+
+  it("writes out the cursor when more matches follow", () => {
+    expect(
+      renderFind({
+        query: "invoice",
+        matches: [
+          {
+            layer: "sources",
+            kind: "document",
+            title: "The bid library's invoice",
+            locator: "01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44",
+            sensitivity: "Internal",
+          },
+        ],
+        nextCursor: "eyJydW4iOiJ3ZWFrIn0",
+      }),
+    ).toBe(
+      [
+        "document · The bid library's invoice · Not company knowledge · Internal · 01J6DDDDDDDDDDDDDDDDDDDDDD/chars:0-44",
+        "",
+        "More follow: call find again with cursor eyJydW4iOiJ3ZWFrIn0",
+      ].join("\n"),
+    );
+  });
 });
 
 describe("open's and feedback's renderings", () => {
@@ -277,6 +305,7 @@ describe("open's and feedback's renderings", () => {
           evidence: [
             { id: "T-1", source: "Travel policy", iri: "https://better-answers.com/c/01B" },
             { id: "M-2", source: "The board's minutes" },
+            { id: "B-3", source: "Bid library", at: "p.4" },
           ],
         },
       }),
@@ -291,6 +320,7 @@ describe("open's and feedback's renderings", () => {
         "Evidence:",
         "- Travel policy (https://better-answers.com/c/01B)",
         "- The board's minutes",
+        "- Bid library, p.4",
         "",
         "Related:",
         "- LINKS_TO · Travel policy · https://better-answers.com/c/01B",
@@ -366,8 +396,8 @@ describe("what the slice's four actions answer", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
 
   it("hands every caller an outcome to read, not to catch", () => {
-    expectTypeOf(find).returns.resolves.toEqualTypeOf<Result<FindResult, Error>>();
-    expectTypeOf(open).returns.resolves.toEqualTypeOf<Result<OpenResult, Error>>();
+    expectTypeOf(find).returns.resolves.toEqualTypeOf<Result<FindResult, "role-forbids" | Error>>();
+    expectTypeOf(open).returns.resolves.toEqualTypeOf<Result<OpenResult, "role-forbids" | Error>>();
     expectTypeOf(ask).returns.resolves.toEqualTypeOf<Result<AnswerResult, Error>>();
     expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<Result<FeedbackReceipt, never>>();
   });
@@ -440,6 +470,87 @@ describe("what the slice's four actions answer", () => {
     ).rejects.toThrow("the transaction did not commit");
 
     expect(answered?.ok).toBe(false);
+  });
+
+  it.each(["Editor", "Viewer"] as const)("admits an %s to find and open", async (role) => {
+    const reader = await arrange(role);
+
+    const found = await acting(reader, (principal, tx) =>
+      find(principal, tx, { query: "expenses", limit: 10 }, now),
+    );
+    const opened = await acting(reader, (principal, tx) =>
+      open(principal, tx, { iri: ABSENT }, now),
+    );
+
+    expect(found).toEqual({ ok: true, value: { query: "expenses", matches: [] } });
+    expect(opened).toEqual({ ok: true, value: { found: false, iri: ABSENT } });
+  });
+});
+
+const ABSENT = ids.conceptIri.parse("https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ");
+
+describe("the boundary find and open are parsed at", () => {
+  it("refuses a query holding a NUL as malformed", () => {
+    expect(parse(findInput, { query: "audit\u0000logs" })).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { query: "refused" } },
+    });
+  });
+
+  it("holds a page to 1–20 matches, 5 when unasked", () => {
+    expect(parse(findInput, { query: "audit" })).toEqual({
+      ok: true,
+      value: { query: "audit", limit: 5 },
+    });
+    expect(parse(findInput, { query: "audit", limit: 21 })).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { limit: "too-big" } },
+    });
+    expect(parse(findInput, { query: "audit", limit: 0 })).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { limit: "too-small" } },
+    });
+  });
+
+  it.each([
+    ["not base64url", "not a cursor!", "bad-format"],
+    ["no position find hands out", "e30", "refused"],
+  ])("refuses a cursor that is %s", (_case, cursor, issue) => {
+    expect(parse(findInput, { query: "audit", cursor })).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { cursor: issue } },
+    });
+  });
+
+  it("reads a cursor back into the position it names", () => {
+    const cursor =
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6MSwicmFuayI6MC41LCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZaWlpaWlpaWlpaWlpaWlpaWlpaWlpaIn19";
+
+    expect(parse(findInput, { query: "audit", cursor })).toEqual({
+      ok: true,
+      value: {
+        query: "audit",
+        limit: 5,
+        cursor: { run: "weak", bound: { matched: 1, rank: 0.5, key: ABSENT } },
+      },
+    });
+  });
+
+  it("refuses a malformed iri as malformed", () => {
+    expect(parse(openInput, { iri: "not a concept iri" })).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { iri: "bad-format" } },
+    });
+  });
+
+  it.each([
+    ["both an iri and a locator", { iri: ABSENT, locator: "p.4" }],
+    ["neither an iri nor a locator", {}],
+  ])("refuses open given %s", (_case, input) => {
+    expect(parse(openInput, input)).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { "": "refused" } },
+    });
   });
 });
 

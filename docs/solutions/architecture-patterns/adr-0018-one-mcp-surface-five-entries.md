@@ -34,11 +34,15 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 - A document that a concept visible to the caller cites is left out.
 - The caller's limit is spent on the union: concepts holding at least half the query's words first, then document matches, then the remaining concepts (owner, 09/10/2026).
 - The two arms share no score. Each is ranked on its own, first by how many of the query's words a row holds, then by its full-text rank.
+- A page that more matches follow carries `nextCursor`, which the next call passes back as `cursor`.
 
 `open` takes one IRI or one wire locator.
 
 - A concept's evidence item carries its source.
 - It carries the locator that opens its passage only where the source gives one.
+- A locator with no passage address's shape, such as a page `p.4`, opens nothing. It reaches every reader as the item's `at` (owner, 09/10/2026).
+
+`ask` cites a concept by an absolute URL under the product's origin, because an outside client cannot open a relative path (owner, 09/10/2026).
 
 ## Why
 

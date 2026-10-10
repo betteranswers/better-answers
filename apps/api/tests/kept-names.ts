@@ -14,7 +14,7 @@ import "@better-answers/core/workspaces";
 import { STORED_ACT_NAMES } from "@better-answers/core/audit";
 import { refusalRegister } from "@better-answers/core/kernel";
 
-import { ENTRIES } from "../src/mcp/entries/index.ts";
+import { entriesAt } from "../src/mcp/entries/index.ts";
 import { readUnder } from "./tree-walk.ts";
 
 type ZodLike = {
@@ -71,7 +71,7 @@ const movedFromIn = (text: string): readonly string[] =>
  */
 export const keptNamesUnder = (root: string): Readonly<Record<string, readonly string[]>> => ({
   "refusal words": refusalRegister().map(({ word }) => word),
-  "MCP entries and schemas": ENTRIES.flatMap((entry) => [
+  "MCP entries and schemas": entriesAt("https://app.example").flatMap((entry) => [
     entry.name,
     ...entry.scopes,
     ...namesInSchema(entry.input),

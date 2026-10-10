@@ -11,11 +11,30 @@ import {
   type OpenedConcept,
   type Trust,
 } from "../concepts/index.ts";
-import { err, NOT_FOUND, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import {
+  admit,
+  declareAction,
+  err,
+  NOT_FOUND,
+  ok,
+  type RefusalOf,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
 import { findPassages, parseLocator, passageAt, type PassageMatch } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { findInput, openInput, type FindInput, type OpenInput } from "./boundary.ts";
 import { cursorOf, type FindPosition, type FindRun } from "./cursor.ts";
 
+export {
+  findInput,
+  findOutputWith,
+  openInput,
+  openOutputWith,
+  passageView,
+  type FindInput,
+  type OpenInput,
+} from "./boundary.ts";
 export { findCursor, type FindPosition } from "./cursor.ts";
 
 export {
@@ -81,6 +100,7 @@ type ConceptView<Iri extends string> = {
 type Evidence<Iri extends string> = {
   readonly id?: string;
   readonly source: string;
+  readonly at?: string;
   readonly locator?: string;
   readonly iri?: Iri;
 };
@@ -91,10 +111,6 @@ type PassageView = {
   readonly text: string;
   readonly sensitivity: string;
 };
-
-export type OpenInput =
-  | { readonly iri: ConceptIri; readonly locator?: undefined }
-  | { readonly locator: string; readonly iri?: undefined };
 
 export type OpenResult<Iri extends string = ConceptIri> =
   | {
@@ -239,22 +255,32 @@ const mappedRun =
     return ok(read.value.map(({ match, position }) => ({ match: to(match), position })));
   };
 
+const READERS = { role: "Viewer", purposes: [] } as const;
+
+const findAction = declareAction({
+  admits: READERS,
+  input: findInput,
+  refuses: ["role-forbids"],
+  effect: "read",
+});
+
+export type FindRefusal = RefusalOf<typeof findAction> | Error;
+
 /**
  * Concepts holding at least half the query's words, then passages, then concepts holding fewer,
- * `limit` to a page, after `after` when given. `now` decides which concepts are past their shelf
+ * `limit` to a page, after `cursor` when given. `now` decides which concepts are past their shelf
  * life.
  */
 export const find = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: {
-    readonly query: string;
-    readonly limit: number;
-    readonly after?: FindPosition | undefined;
-  },
+  input: FindInput,
   now: Date,
-): Promise<Result<FindResult, Error>> => {
-  const search = { principal, tx, query: input.query };
+): Promise<Result<FindResult, FindRefusal>> => {
+  const admitted = admit(findAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+
+  const search = { principal: admitted.value, tx, query: input.query };
   const toConcept = (concept: OpenedConcept) => conceptMatchOf(concept, now);
   const page = await pageOf<FindMatch>(
     [
@@ -263,7 +289,7 @@ export const find = async (
       ["weak", mappedRun(conceptRun(search, "weak"), toConcept)],
     ],
     input.limit,
-    input.after,
+    input.cursor,
   );
   if (!page.ok) return err(page.error);
   const { matches, next } = page.value;
@@ -293,31 +319,41 @@ const documentMatchOf = (match: PassageMatch): DocumentMatch => ({
   sensitivity: match.sensitivity,
 });
 
-/** A concept or passage that is not there answers `found: false`, not an error. */
-export const open = async (
-  principal: UserPrincipal,
+const openAction = declareAction({
+  admits: READERS,
+  input: openInput,
+  refuses: ["role-forbids"],
+  effect: "read",
+});
+
+export type OpenRefusal = RefusalOf<typeof openAction> | Error;
+
+const passageOpened = async (
+  reader: UserPrincipal,
   tx: Tx,
-  input: OpenInput,
+  asked: string,
+): Promise<Result<OpenResult, Error>> => {
+  const passage = await passageAt(reader, tx, asked);
+  if (!passage.ok) {
+    return passage.error === NOT_FOUND ? ok({ found: false, locator: asked }) : err(passage.error);
+  }
+  const { locator, title, text, sensitivity } = passage.value;
+  return ok({ found: true, passage: { locator, source: title, text, sensitivity } });
+};
+
+const conceptOpened = async (
+  reader: UserPrincipal,
+  tx: Tx,
+  named: ConceptIri,
   now: Date,
 ): Promise<Result<OpenResult, Error>> => {
-  if (input.iri === undefined) {
-    const passage = await passageAt(principal, tx, input.locator);
-    if (!passage.ok) {
-      return passage.error === NOT_FOUND
-        ? ok({ found: false, locator: input.locator })
-        : err(passage.error);
-    }
-    const { locator, title, text, sensitivity } = passage.value;
-    return ok({ found: true, passage: { locator, source: title, text, sensitivity } });
-  }
-
-  const concept = await readConcept(principal, tx, input.iri, {
-    passageAt: (locator) => passageAt(principal, tx, locator),
+  const concept = await readConcept(reader, tx, named, {
+    passageAt: (locator) => passageAt(reader, tx, locator),
     namesPassage: (locator) => parseLocator(locator).ok,
     now,
   });
   if (!concept.ok) return err(concept.error);
-  if (concept.value === undefined) return ok({ found: false, iri: input.iri });
+  if (concept.value === undefined) return ok({ found: false, iri: named });
 
   const { iri, frontmatter, body, relations, trust, trustWords: words, pane } = concept.value;
   return ok({
@@ -332,6 +368,21 @@ export const open = async (
       evidence: pane.evidence,
     },
   });
+};
+
+/** A concept or passage that is not there answers `found: false`, not an error. */
+export const open = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: OpenInput,
+  now: Date,
+): Promise<Result<OpenResult, OpenRefusal>> => {
+  const admitted = admit(openAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+
+  return input.iri === undefined
+    ? passageOpened(admitted.value, tx, input.locator)
+    : conceptOpened(admitted.value, tx, input.iri, now);
 };
 
 const termsOf = (question: string): readonly string[] =>
@@ -394,10 +445,14 @@ const findLine = (match: FindMatch<string>): string =>
     ? `${match.kind} · ${match.title} · ${match.trustWords} · ${match.iri}`
     : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator}`;
 
-export const renderFind = (result: FindResult<string>): string =>
-  result.matches.length === 0
-    ? "Nothing in the company's knowledge matches that."
-    : result.matches.map(findLine).join("\n");
+/** A client may read only the text, so the way to the next page is written out too. */
+export const renderFind = (result: FindResult<string>): string => {
+  if (result.matches.length === 0) return "Nothing in the company's knowledge matches that.";
+  const lines = result.matches.map(findLine);
+  return result.nextCursor === undefined
+    ? lines.join("\n")
+    : [...lines, "", `More follow: call find again with cursor ${result.nextCursor}`].join("\n");
+};
 
 export const renderOpen = (result: OpenResult<string>): string => {
   if (!result.found) {
@@ -422,9 +477,10 @@ const listed = (heading: string, lines: readonly string[]): readonly string[] =>
 const conceptText = (concept: ConceptView<string>): string => {
   const title =
     typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
-  const evidence = concept.evidence.map(({ source, locator, iri }) => {
+  const evidence = concept.evidence.map(({ source, at, locator, iri }) => {
+    const named = at === undefined ? source : `${source}, ${at}`;
     const opens = locator ?? iri;
-    return opens === undefined ? `- ${source}` : `- ${source} (${opens})`;
+    return opens === undefined ? `- ${named}` : `- ${named} (${opens})`;
   });
   const related = concept.relations.map(
     ({ kind, title: named, target }) => `- ${kind} · ${named} · ${target}`,

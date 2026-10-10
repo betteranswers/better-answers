@@ -35,7 +35,7 @@ import { bearerOf } from "../auth/verify.ts";
 import { clientIpOf, tooManyRequests } from "../ingress/limits.ts";
 import { refusalLogged, refusalOf, type RefusalAnswer } from "../refusal.ts";
 import { crossing } from "./crossing.ts";
-import { ENTRIES } from "./entries/index.ts";
+import { entriesAt } from "./entries/index.ts";
 
 export type McpSurfaceDependencies = {
   readonly door: PostgresDoor;
@@ -69,6 +69,7 @@ export const createMcpSurface = (
   const log = deps.logger.child({ module: "mcp" });
   const resourceMetadataUrl = `${deps.publicUrl}/.well-known/oauth-protected-resource/mcp`;
   const challengeOptions = { requiredScopes: [...MCP_SCOPES], resourceMetadataUrl };
+  const entries = entriesAt(deps.publicUrl);
 
   const buildServer = (context: McpRequestContext): McpServer => {
     const bearer = context.authInfo === undefined ? undefined : bearerOf(context.authInfo);
@@ -87,14 +88,14 @@ export const createMcpSurface = (
       },
     );
 
-    for (const entry of ENTRIES) {
+    for (const entry of entries) {
       if (!entry.scopes.every((scope) => scopes.has(scope))) continue;
       server.registerTool(
         entry.name,
         {
           title: entry.title,
           description: entry.description,
-          // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the one mount over ENTRIES; each input is checked at its own defineEntry
+          // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the one mount over the entries; each input is checked at its own defineEntry
           inputSchema: entry.input,
           outputSchema: entry.output,
           annotations: entry.annotations,

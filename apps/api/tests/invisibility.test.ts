@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeConcept } from "@better-answers/core/concepts";
 import type { UserPrincipal } from "@better-answers/core/kernel";
-import { initRepository } from "@better-answers/core/store/git";
+import { head, initRepository } from "@better-answers/core/store/git";
 import {
   codePointsOf,
   documentLanded,
@@ -30,6 +30,8 @@ const principalFor = (workspaceId: string, userId: string): Promise<UserPrincipa
 
 const TITLE = "Board remuneration";
 
+const CONCEPT_PREFIX = "https://better-answers.com/c/";
+
 type ConceptWrite = Omit<
   Parameters<typeof writeConcept>[2],
   "kind" | "author" | "expects" | "status"
@@ -41,13 +43,14 @@ const conceptWrittenIn = async (
 ): Promise<string> => {
   const git = openTestGit(app);
   await initRepository(git, workspace.workspaceId);
+  const writer = await principalFor(workspace.workspaceId, workspace.admin.id);
   const written = await writeConcept(
-    await principalFor(workspace.workspaceId, workspace.admin.id),
+    writer,
     { git, postgres: app.doors.postgres, clock: app.doors.clock },
     {
       kind: "Note",
       author: { name: workspace.admin.name, email: workspace.admin.email },
-      expects: { head: null },
+      expects: { head: await head(writer, git) },
       status: "stable",
       ...write,
     },
@@ -132,8 +135,12 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
     expect(JSON.stringify(asked)).not.toContain("remuneration is reviewed");
     expect(JSON.stringify(asked)).not.toContain("better-answers.com/c/");
 
-    expect(structured(seen)).toMatchObject({ verdict: "refuse", citations: [{ iri }] });
-    expect(rendered(seen)).toContain(iri);
+    const page = `https://app.example.test/knowledge/search/${iri.slice(CONCEPT_PREFIX.length)}`;
+    expect(structured(seen)).toMatchObject({
+      verdict: "refuse",
+      citations: [{ iri, url: page }],
+    });
+    expect(rendered(seen)).toContain(`${iri} — ${page}`);
   });
 
   it("opens as an unminted IRI, though the Admin opens it", async () => {
@@ -246,6 +253,43 @@ describe("the document layer through the MCP entries", () => {
       ].join("\n"),
     );
     expect(JSON.stringify(found)).not.toContain(COVERED_TITLE);
+  });
+
+  it("pages through nextCursor, each match once, none past the end", async () => {
+    const { iri, standalone, viewer } = await documentsAndTheConceptOverThem();
+
+    const first = await called(viewer.client, viewer.token, "find", { query: QUERY, limit: 1 });
+    const cursor = structured(first)["nextCursor"];
+    const second = await called(viewer.client, viewer.token, "find", {
+      query: QUERY,
+      limit: 1,
+      cursor,
+    });
+
+    expect(structured(first)).toEqual({
+      query: QUERY,
+      hits: [expect.objectContaining({ layer: "bundles", iri, title: COVERING_TITLE })],
+      nextCursor: expect.stringMatching(/^[\w-]+$/),
+    });
+    expect(rendered(first)).toBe(
+      [
+        `Note · ${COVERING_TITLE} · Unverified · ${iri}`,
+        "",
+        `More follow: call find again with cursor ${String(cursor)}`,
+      ].join("\n"),
+    );
+    expect(structured(second)).toEqual({
+      query: QUERY,
+      hits: [
+        {
+          layer: "sources",
+          kind: "document",
+          title: INVOICE_TITLE,
+          locator: standalone.locator,
+          sensitivity: "Internal",
+        },
+      ],
+    });
   });
 
   it("opens a wire locator's passage, with its document and sensitivity", async () => {
@@ -364,5 +408,127 @@ describe("a verified concept through the MCP entries", () => {
     expect(rpcOf(rpcListOf(structured(found)["hits"])[0])["trust"]).toEqual(trust);
     expect(rpcOf(structured(opened)["concept"])["trust"]).toEqual(trust);
     expect(rendered(opened)).toContain(`Verified by ${workspace.admin.name} · 1 June 2026`);
+  });
+});
+
+const KINGFISHER_TITLE = "Kingfisher review";
+const HANDBOOK_TITLE = "The kingfisher handbook";
+const MINUTES_LABEL = "Board minutes";
+const MINUTES_TITLE = "Minutes of the board, March 2026";
+const MINUTES_TEXT = "The board approved the kingfisher review in closed session.";
+const HERON_TITLE = "Heron policy";
+
+/** A concept citing a passage, Restricted minutes no evidence row holds, and a page. */
+const aConceptCitingRestrictedMinutes = async () => {
+  const workspace = await app.provision();
+  const viewer = await app.person();
+  await app.addMember(workspace.workspaceId, viewer.id, "Viewer");
+  const handbook = await documentLanded(app.database.superuser, workspace.workspaceId, {
+    title: HANDBOOK_TITLE,
+    text: COVERED_TEXT,
+  });
+  const minutes = await documentLanded(app.database.superuser, workspace.workspaceId, {
+    title: MINUTES_TITLE,
+    text: MINUTES_TEXT,
+    sensitivity: "Restricted",
+  });
+  const heron = await conceptWrittenIn(workspace, {
+    mergeKey: "note:heron-policy",
+    path: "knowledge/heron-policy.md",
+    title: HERON_TITLE,
+    frontmatter: { title: HERON_TITLE, type: "Note" },
+    body: "The heron rule is stated here.",
+    message: "Record the heron policy",
+    evidence: [
+      { sourceDocumentId: handbook.documentId, locator: handbook.locator, resource: "handbook" },
+    ],
+  });
+  const body = `The kingfisher review stands. See [${HERON_TITLE}](${heron}).`;
+  const iri = await conceptWrittenIn(workspace, {
+    mergeKey: "note:kingfisher-review",
+    path: "knowledge/kingfisher-review.md",
+    title: KINGFISHER_TITLE,
+    frontmatter: {
+      title: KINGFISHER_TITLE,
+      type: "Note",
+      sources: [
+        { id: "HANDBOOK", title: HANDBOOK_TITLE, resource: "handbook", locator: handbook.locator },
+        { id: "MINUTES", title: MINUTES_LABEL, resource: "minutes", locator: minutes.locator },
+        { id: "BID", title: "Bid library", resource: "../sources/bid-library.md", locator: "p.4" },
+      ],
+    },
+    body,
+    message: "Record the kingfisher review",
+    evidence: [
+      { sourceDocumentId: handbook.documentId, locator: handbook.locator, resource: "handbook" },
+    ],
+  });
+  return {
+    iri,
+    heron,
+    body,
+    handbook,
+    minutes,
+    viewer: await clientAndTokenFor(viewer),
+    admin: await clientAndTokenFor(workspace.admin),
+  };
+};
+
+describe("a concept citing Restricted minutes, opened over MCP", () => {
+  it("answers the Viewer the whole read, each source by id", async () => {
+    const { iri, heron, body, handbook, viewer } = await aConceptCitingRestrictedMinutes();
+
+    const opened = await called(viewer.client, viewer.token, "open", { iri });
+
+    expect(structured(opened)).toEqual({
+      found: true,
+      concept: {
+        iri,
+        frontmatter: {
+          iri,
+          title: KINGFISHER_TITLE,
+          type: "Note",
+          status: "stable",
+          sources: [
+            {
+              id: "HANDBOOK",
+              title: HANDBOOK_TITLE,
+              resource: "handbook",
+              locator: handbook.locator,
+            },
+            { id: "MINUTES", title: MINUTES_LABEL, resource: MINUTES_LABEL },
+            { id: "BID", title: "Bid library", resource: "Bid library", locator: "p.4" },
+          ],
+        },
+        body,
+        relations: [{ kind: "LINKS_TO", target: heron, title: HERON_TITLE }],
+        trust: {
+          tier: "unverified",
+          status: "current",
+          checkedBy: null,
+          checkedAt: null,
+          rider: null,
+        },
+        trustWords: "Unverified",
+        evidence: [
+          { id: "HANDBOOK", source: HANDBOOK_TITLE, locator: handbook.locator },
+          { id: "MINUTES", source: MINUTES_LABEL },
+          { id: "BID", source: "Bid library", at: "p.4" },
+        ],
+      },
+    });
+  });
+
+  it("gives the Viewer no locator, id or title of minutes", async () => {
+    const { iri, minutes, viewer, admin } = await aConceptCitingRestrictedMinutes();
+
+    const opened = await called(viewer.client, viewer.token, "open", { iri });
+    const seen = await called(admin.client, admin.token, "open", { iri });
+
+    for (const withheld of [minutes.locator, minutes.documentId, MINUTES_TITLE]) {
+      expect(JSON.stringify(structured(opened))).not.toContain(withheld);
+      expect(rendered(opened)).not.toContain(withheld);
+    }
+    expect(JSON.stringify(structured(seen))).toContain(minutes.locator);
   });
 });

@@ -174,6 +174,13 @@ const pastTheCeiling = async (max: number, send: () => Promise<Response>) => {
   };
 };
 
+const ABSENT = "https://better-answers.com/c/01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
+const loggedEvents = (from: number): readonly unknown[] =>
+  app()
+    .logs.slice(from)
+    .map((line) => line["event"]);
+
 const REFUSED_AT_THE_CEILING = {
   refusedBefore: 0,
   status: 429,
@@ -275,42 +282,58 @@ describe("era-independent", () => {
     expect(described.get("find")?.toLowerCase()).not.toContain("chunk");
   });
 
-  it("answers open in structured content and prose, foreign as absent", async () => {
+  it("answers open as absent in structured content and prose", async () => {
     const { client, token } = await connect();
 
-    const absent = await result(
+    const absent = await result(await callTool(client, token, "open", { iri: ABSENT }), toolCalled);
+
+    expect(absent.structuredContent).toEqual({ found: false, iri: ABSENT });
+    const text = firstText(absent);
+    expect(text).toBe(`No concept at ${ABSENT}.`);
+    expect(text).not.toBe(JSON.stringify(absent.structuredContent));
+    expect(text.length).toBeLessThan(150_000);
+  });
+
+  it("refuses a malformed iri before open runs", async () => {
+    const { client, token } = await connect();
+    const before = app().logs.length;
+
+    const refused = await result(
       await callTool(client, token, "open", { iri: "https://better-answers.com/c/01ABSENT" }),
       toolCalled,
     );
-    const foreign = await result(
-      await callTool(client, token, "open", { iri: "https://better-answers.com/c/01FOREIGN" }),
+
+    expect(refused.isError).toBe(true);
+    expect(refused.structuredContent).toBeUndefined();
+    expect(firstText(refused)).toContain("iri");
+    expect(loggedEvents(before)).not.toContain("mcp.refused");
+  });
+
+  it("refuses a query holding a NUL, never failing the read", async () => {
+    const { client, token } = await connect();
+    const before = app().logs.length;
+
+    const refused = await result(
+      await callTool(client, token, "find", { query: "audit\u0000logs" }),
       toolCalled,
     );
 
-    expect(absent.structuredContent).toEqual({
-      found: false,
-      iri: "https://better-answers.com/c/01ABSENT",
-    });
-    const text = firstText(absent);
-    expect(text).toBe("No concept at https://better-answers.com/c/01ABSENT.");
-    expect(text).not.toBe(JSON.stringify(absent.structuredContent));
-    expect(text.length).toBeLessThan(150_000);
-    expect(foreign.structuredContent).toEqual({
-      found: false,
-      iri: "https://better-answers.com/c/01FOREIGN",
-    });
+    expect(refused.isError).toBe(true);
+    expect(firstText(refused)).toContain("a query holds no NUL character");
+    expect(loggedEvents(before)).not.toContain("mcp.failed");
   });
 
-  it.each([
-    ["a malformed iri", "not a concept iri"],
-    ["an iri nothing holds", "https://better-answers.com/c/01ARZ3NDEKTSV4RRFFQ69G5FAV"],
-  ])("answers open as absent for %s", async (_case, iri) => {
+  it("refuses a cursor find never handed out", async () => {
     const { client, token } = await connect();
 
-    const opened = await result(await callTool(client, token, "open", { iri }), toolCalled);
+    const refused = await result(
+      await callTool(client, token, "find", { query: "audit", cursor: "e30" }),
+      toolCalled,
+    );
 
-    expect(opened.structuredContent).toEqual({ found: false, iri });
-    expect(firstText(opened)).toBe(`No concept at ${iri}.`);
+    expect(refused.isError).toBe(true);
+    expect(refused.structuredContent).toBeUndefined();
+    expect(firstText(refused)).toContain("not a cursor find handed out");
   });
 
   it("answers find, ask and give_feedback through the Principal", async () => {
@@ -402,7 +425,7 @@ describe("era-independent", () => {
   });
 
   it.each([
-    ["both an iri and a locator", { iri: "https://better-answers.com/c/01X", locator: "p.4" }],
+    ["both an iri and a locator", { iri: ABSENT, locator: "p.4" }],
     ["neither an iri nor a locator", {}],
   ])("refuses open given %s", async (_case, args) => {
     const { client, token } = await connect();
