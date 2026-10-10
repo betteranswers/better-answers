@@ -223,8 +223,9 @@ test("drops the left workspace's members when All workspaces picks another", asy
   const jumpTo = page.getByRole("dialog", { name: JUMP_TO.name });
   await jumpTo.getByRole("combobox", { name: JUMP_TO.name }).fill("Only In Esk");
   await expect(jumpTo.getByRole("status")).toHaveText(JUMP_TO.membersLoading);
+  // Search's row names what was typed, so a member is looked for under Members alone.
   await expect(
-    jumpTo.getByRole("option", { name: /Only In Esk/ }),
+    jumpTo.getByRole("group", { name: JUMP_TO.groups.members }),
     "jump-to offered the left workspace's members",
   ).toHaveCount(0);
 

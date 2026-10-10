@@ -10,10 +10,26 @@ const ASKED_BEFORE = {
   search: undefined,
 } as const satisfies Readonly<Record<Ask, string | undefined>>;
 
+/** Whether the router would read a value as JSON, and the string it would read where it is one. */
+type Read = { readonly asJson: boolean; readonly string: string | undefined };
+
+const readOf = (value: string): Read => {
+  try {
+    const read: unknown = JSON.parse(value);
+    return { asJson: true, string: typeof read === "string" ? read : undefined };
+  } catch {
+    // That it is no JSON is the whole answer, so the error says nothing more.
+    return { asJson: false, string: undefined };
+  }
+};
+
+/** The router re-types a value that reads as JSON, `1.50` to `1.5`, and carries its JSON string whole. */
+const written = (value: string): string => (readOf(value).asJson ? JSON.stringify(value) : value);
+
 export const askedIn = (query: URLSearchParams, ask: Ask): string | undefined => {
   const before = ASKED_BEFORE[ask];
   const asked = query.get(ask) ?? (before === undefined ? null : query.get(before));
-  return asked ?? undefined;
+  return asked === null ? undefined : (readOf(asked).string ?? asked);
 };
 
 export type Here = { readonly pathname: string; readonly searchStr: string };
@@ -26,13 +42,10 @@ const hrefOf = (path: string, query: URLSearchParams): string => {
   return words === "" ? path : `${path}?${words}`;
 };
 
-/**
- * The router re-types a value that reads as JSON, so only words and addresses are asked. Asking
- * another page drops the open page's query.
- */
+/** Asking another page drops the open page's query. */
 export const askingHere = (here: Here, path: string, ask: Ask, value: string): string => {
   const query = new URLSearchParams(here.pathname === path ? here.searchStr : "");
-  query.set(ask, value);
+  query.set(ask, written(value));
   return hrefOf(path, query);
 };
 

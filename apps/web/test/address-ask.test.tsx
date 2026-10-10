@@ -60,6 +60,24 @@ describe("a search another place asks of a page", () => {
   });
 });
 
+describe("a search that reads as JSON", () => {
+  it.each(["1e3", "1.50", "true", "null", '"audit logs"', '{"a": 1}', "[1, 2]", '"1e3"', " 7 "])(
+    "is taken as typed: %s",
+    async (typed) => {
+      const { router, at } = await openAt("/elsewhere");
+
+      await act(() =>
+        router.navigate({
+          href: askingHere({ pathname: "/elsewhere", searchStr: "" }, "/members", "search", typed),
+        }),
+      );
+      await at("/members");
+
+      expect(takenSoFar()).toBe(typed);
+    },
+  );
+});
+
 const ActionAndSearch = () => {
   const [taken, setTaken] = useState<readonly string[]>([]);
   useAsked("action", (value) => setTaken((before) => [...before, `action ${value}`]));
@@ -69,6 +87,21 @@ const ActionAndSearch = () => {
 
 const openActionAndSearchAt = (asked: string) =>
   openPages({ "/members": ActionAndSearch, "/elsewhere": () => null }, ["/elsewhere", asked]);
+
+describe("an ask as the address holds it", () => {
+  it("asks a JSON-looking value as its JSON string", () => {
+    const here = { pathname: "/elsewhere", searchStr: "" };
+
+    expect(askingHere(here, "/members", "search", "1.50")).toBe("/members?search=%221.50%22");
+    expect(askingHere(here, "/members", "search", "audit logs")).toBe("/members?search=audit+logs");
+  });
+
+  it("is read as typed from either form", () => {
+    expect(askedIn(new URLSearchParams("?search=%221.50%22"), "search")).toBe("1.50");
+    expect(askedIn(new URLSearchParams("?search=1.50"), "search")).toBe("1.50");
+    expect(askedIn(new URLSearchParams("?search=audit+logs"), "search")).toBe("audit logs");
+  });
+});
 
 describe("two asks in one address", () => {
   it("takes each once and clears both from the address", async () => {
