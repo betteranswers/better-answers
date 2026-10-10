@@ -6,6 +6,7 @@ import {
   OAUTH_SCOPES,
   REFRESH_TOKEN_LIFETIME_SECONDS,
   REFUSAL_PAGES,
+  CLIENT_IP_HEADER,
   mountedPaths,
   SEND_EMAIL_CODE_PATH,
 } from "../src/auth/index.ts";
@@ -1264,7 +1265,7 @@ describe("the limits", () => {
 
     for (const path of mountedPaths(authOver(app))) {
       const client = app.client();
-      await client.fetch(path.replaceAll(/:[a-z_]+/g, "any"));
+      await client.fetch(path.replaceAll(/:[a-z_]+/g, "any"), { method: "POST" });
       counts.push({ path, count: (await countedByTheApi(client.ip)).join(" and ") || "none" });
     }
     const heldByBetterAuth = await app.database.superuser.query("SELECT key FROM rate_limit");
@@ -1274,6 +1275,69 @@ describe("the limits", () => {
       expect.arrayContaining([...EMAIL_CODE_PATHS, "/oauth2/end-session/confirm"]),
     );
     expect(heldByBetterAuth.rows).toEqual([]);
+  });
+
+  const A_POST_BODY = JSON.stringify({
+    email: "nobody@example.invalid",
+    otp: "000000",
+    type: "sign-in",
+  });
+
+  /** A post as a form or a script elsewhere sends it: a foreign origin, or a sandboxed frame's. */
+  const postedFrom = (client: Client, path: string, origin: string): Promise<Response> =>
+    client.fetch(path, {
+      method: "POST",
+      headers: { origin, "sec-fetch-site": "cross-site", "content-type": "text/plain" },
+      body: A_POST_BODY,
+    });
+
+  /** Past the client, which names its own origin on any post that names none. */
+  const postedNamingNoOrigin = async (client: Client, path: string): Promise<Response> =>
+    app.server.request(
+      new Request(`${PUBLIC_URL}${path}`, {
+        method: "POST",
+        headers: { [CLIENT_IP_HEADER]: client.ip, "sec-fetch-site": "cross-site" },
+        body: A_POST_BODY,
+      }),
+    );
+
+  /** As an image or a link on another site asks, then as its form, frame or script posts. */
+  const askedFromAnotherSite = async (client: Client, path: string): Promise<number[]> => {
+    const statuses: number[] = [];
+    for (let asked = 0; asked < 11; asked += 1) {
+      const answers = [
+        await client.fetch(path, { headers: { "sec-fetch-site": "cross-site" } }),
+        await postedFrom(client, path, "https://elsewhere.example"),
+        await postedFrom(client, path, "null"),
+        await postedNamingNoOrigin(client, path),
+      ];
+      statuses.push(...answers.map((answer) => answer.status));
+    }
+    return statuses;
+  };
+
+  it.each(EMAIL_CODE_PATHS)("spends no count on another site's asks of %s", async (path) => {
+    const client = app.client();
+
+    const statuses = await askedFromAnotherSite(client, path);
+
+    expect(statuses).toEqual(Array.from({ length: 11 }, () => [404, 403, 403, 403]).flat());
+    expect(await countedByTheApi(client.ip)).toEqual([]);
+  });
+
+  it("counts its own page's asks after another site's flood", async () => {
+    const client = app.client();
+    stopTheClock();
+    await askedFromAnotherSite(client, SEND_EMAIL_CODE_PATH);
+    await askedFromAnotherSite(client, "/sign-in/email-otp");
+
+    const sent = await onePast(() => aSend(client), 5);
+    const tried = await onePast(() => COUNTS["email-code-sign-in"].ask(client), 10);
+
+    expect(sent).toEqual([200, 200, 200, 200, 200, 429]);
+    refusedOnlyAtTheLast(tried);
+    expect(await countedByTheApi(client.ip)).toEqual(["email-code-send", "email-code-sign-in"]);
+    expect(app.emails.filter((message) => message.to === "nobody@example.invalid")).toEqual([]);
   });
 
   it("answers no endpoint under a spelling it does not count", async () => {

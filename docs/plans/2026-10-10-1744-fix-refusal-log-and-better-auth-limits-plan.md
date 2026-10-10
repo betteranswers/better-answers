@@ -54,6 +54,7 @@ A signed-in person's browser calls `/get-session` on every page load, so an offi
 - R6. Every other endpoint Better Auth mounts, outside the `oauth` group and discovery, is counted by the api per client address in a fixed minute, under the route group `identity`, at 120 a minute.
 - R7. A request to a path Better Auth does not mount, which the api answers with the application's page, is counted by no limiter. A mounted path that Better Auth has closed is still counted under `identity`.
 - R8. Each path Better Auth mounts is counted by exactly one route group of the api, and a discovery document by none. A test fails when an upgrade mounts an email-code endpoint nobody has named.
+- R11. A request that a page on another site can make a person's browser send, by any method, spends nothing from the send's count or the sign-in's. A post from the product's own origin still counts.
 
 **Record**
 
@@ -69,6 +70,7 @@ A signed-in person's browser calls `/get-session` on every page load, so an offi
 - AE6. **Covers R5, R8.** Given one request to each path Better Auth mounts, each from an address of its own, then the sign-in by code has a count in its own group, every other email-code path in the send's, each discovery path in none, and Better Auth's table holds no row.
 - AE7. **Covers R5.** Given one address asks for six codes three minutes apart, each for another email, then all six are answered. Given it asks for six in one window, the sixth answers 429 with `error: "too_many_requests"` and `Retry-After`.
 - AE8. **Covers R5.** Given one address has tried ten codes at the form in one window, then its sign-in by a good link answers 429.
+- AE9. **Covers R11.** Given another site's page has an address ask an email-code endpoint eleven times with a GET and eleven times with a post, then the api holds no count for the address. Its own page's five sends are then answered and the sixth refused.
 
 ### Scope Boundaries
 
@@ -100,6 +102,7 @@ A signed-in person's browser calls `/get-session` on every page load, so an offi
 - KTD6. **The `identity` ceiling is 120 a minute, tRPC's.** A page load reads `/get-session` once beside its tRPC calls, so a lower ceiling would refuse the session read of an office that tRPC's own ceiling still serves.
 - KTD8. **The line is logged at `info` as `ingress.address_ceiling_met`.** A ceiling met is the limiter working, as `trpc.throttled` is, not a fault. The name sits beside `ingress.hostname_refused`.
 - KTD9. **A sign-in by link spends the sign-in by code's count before it calls the library.** The link's route calls the library's sign-in itself, past the api's router, so the route counts it. Under Better Auth the form and the link spent one count for an address, and the refusal keeps the words it had.
+- KTD11. **The two email-code counts sit behind the same-origin fence and count a post alone.** The fence already stood on the send. It now stands on every email-code endpoint, so a post from another site is refused before it is counted and never reaches the library. A GET is what an image or a link sends, and no email-code endpoint answers one, so it passes uncounted to the library's not-found. (session-settled: user-directed — chosen over leaving it as it was under Better Auth, whose limiter was spendable the same way: the count is now the api's own, and five asks from another site would cost an office its codes for a window.)
 - KTD10. **The email-code endpoints no browser calls share the send's count.** It is the tighter of the two, they send or take the same codes, and a group for endpoints nobody uses would be a third number to keep.
 
 ### Assumptions
@@ -178,7 +181,7 @@ A signed-in person's browser calls `/get-session` on every page load, so an offi
 ### U6. Count the email-code endpoints in the api
 
 - **Goal:** an office behind one address is refused a code only for more than the rule's count in one fixed window.
-- **Requirements:** R5, R8, AE6, AE7, AE8, KTD5, KTD9, KTD10.
+- **Requirements:** R5, R8, R11, AE6, AE7, AE8, AE9, KTD5, KTD9, KTD10, KTD11.
 - **Dependencies:** U3.
 - **Files:** `apps/api/src/auth/constants.ts`, `apps/api/src/auth/routes.ts`, `apps/api/src/ingress/limits.ts`, `apps/api/tests/oauth-flow.test.ts`, `apps/api/tests/sign-in-link.test.ts`.
 - **Approach:** the two groups join the suite's table of counts, each with its ten-minute window, so the tests that count apart and that read the logged line cover them.
@@ -188,7 +191,8 @@ A signed-in person's browser calls `/get-session` on every page load, so an offi
   - Covers AE7. Six codes asked from one address on a stopped clock: five answer 200 and the sixth is the api's 429, with no count held by Better Auth. This replaces the test that expected Better Auth's words.
   - Covers AE8. Ten wrong codes tried at the form from the address that asked for a link, then a sign-in by that link: 429 with the words a refused sign-in by link already had.
   - The two groups count apart from every other, and each logs its first refusal in a window once.
-- **Verification:** AE7's first scenario fails with the two paths put back on Better Auth's limiter, where the sixth is refused. AE8's fails with the link's count removed.
+  - Covers AE9. For each of the nine email-code endpoints: eleven GETs and eleven posts as another site sends them answer 404 and 403, and the address has no count. After such a flood of the send and of the sign-in, the address's own five sends are answered and its sixth refused, and its ten tries are answered and its eleventh refused.
+- **Verification:** AE7's first scenario fails with the two paths put back on Better Auth's limiter, where the sixth is refused. AE8's fails with the link's count removed. AE9's fails with every method counted, and again with the fence left on the send alone.
 
 ### U5. Record the rule
 

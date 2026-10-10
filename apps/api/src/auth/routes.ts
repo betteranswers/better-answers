@@ -427,7 +427,15 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
 };
 
 const takesOrSendsACode = (path: string): boolean =>
-  path.startsWith("/email-otp/") || path.startsWith("/forget-password/");
+  path === SIGN_IN_BY_EMAIL_CODE_PATH ||
+  path.startsWith("/email-otp/") ||
+  path.startsWith("/forget-password/");
+
+/** Another site can make a browser send any other method, so a post alone spends the count. */
+const countingPostsAlone =
+  (limit: MiddlewareHandler): MiddlewareHandler =>
+  (context, next) =>
+    context.req.method === "POST" ? limit(context, next) : next();
 
 /** The `oauth` group counts its own of Better Auth's endpoints, and nothing counts discovery. */
 const countedByItsOwnGroup = (path: string): boolean =>
@@ -479,10 +487,18 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     routes.get(path, (context) => context.json(prm));
   }
 
-  routes.use(SEND_EMAIL_CODE_PATH, sameOriginOnly(publicUrl));
+  const mounted = mountedPaths(auth);
+  /** Ahead of every count, so a post from another site spends none. */
+  for (const path of mounted.filter(takesOrSendsACode)) {
+    routes.use(path, sameOriginOnly(publicUrl));
+  }
   routes.use(SEND_EMAIL_CODE_PATH, limitCodesByEmail(door, clock));
-  const limitSignIns = limitByIp(deps, EMAIL_CODE_SIGN_IN_IP_RULE, "email-code-sign-in");
-  const limitSends = limitByIp(deps, EMAIL_CODE_SEND_IP_RULE, "email-code-send");
+  const limitSignIns = countingPostsAlone(
+    limitByIp(deps, EMAIL_CODE_SIGN_IN_IP_RULE, "email-code-sign-in"),
+  );
+  const limitSends = countingPostsAlone(
+    limitByIp(deps, EMAIL_CODE_SEND_IP_RULE, "email-code-send"),
+  );
   const limitIdentity = limitByIp(deps, IDENTITY_IP_RULE, "identity");
   const limitOf = (path: string): MiddlewareHandler => {
     if (path === SIGN_IN_BY_EMAIL_CODE_PATH) return limitSignIns;
@@ -492,7 +508,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
    * Here, so the count by email refuses a send first. Read off the instance, so an endpoint
    * an upgrade adds is counted too.
    */
-  for (const path of mountedPaths(auth).filter(countedByItsOwnGroup)) {
+  for (const path of mounted.filter(countedByItsOwnGroup)) {
     routes.use(path, limitOf(path));
   }
   routes.use(SEND_EMAIL_CODE_PATH, bindTheLink(publicUrl));
