@@ -1,21 +1,21 @@
 # Lift: `@better-auth/cimd/node` — `fetchClientMetadataResource`
 
-Upstream: https://github.com/better-auth/better-auth, package `@better-auth/cimd` 1.7.5, file `packages/cimd/src/node.ts` (published as `dist/node.mjs`).
-Upstream commit (tag `v1.7.5`): `5468e6bfcdff799848537cf5ad06ebab15aad9dd`.
+Upstream: https://github.com/better-auth/better-auth, package `@better-auth/cimd` 1.7.7, file `packages/cimd/src/node.ts` (published as `dist/node.mjs`).
+Upstream commit (tag `v1.7.7`): `db02f233918ad1233bf0753e437e1c0da353273d`.
 Snapshot digest (sha256 of the published `dist/node.mjs` this lift was written against): `fb03788e51d54dbd78dd2ce4f3fcc5b56a84546dd604f4e0532d8951a3712ba7`.
 Licence: MIT (ADR 0027; the notice text is below).
-Lifted: 2026-09-01, T-004. Refreshed onto 1.7.5: 2026-09-26, T-420, audited by the T-420 builder against the published `dist/node.mjs` and `src/node.ts` at the tag above.
+Lifted: 2026-09-01, T-004. Refreshed onto 1.7.5: 2026-09-26, T-420, audited by the T-420 builder against the published `dist/node.mjs` and `src/node.ts` at tag `v1.7.5`. Carried to 1.7.7: 2026-10-11, BA-147. The published `dist/node.mjs` of 1.7.7 has the digest above, byte for byte 1.7.5's, and `src/node.ts` has no commit after the one 1.7.5 shipped.
 
 ## Why it is lifted
 
-1.7.2 answered Node's `lookup` in the single-address form only, and 1.7.5 fixed that (better-auth/better-auth#10730). Two gaps remain in 1.7.5's transport, and a wrapper outside it cannot close either:
+1.7.2 answered Node's `lookup` in the single-address form only, and 1.7.5 fixed that (better-auth/better-auth#10730). Two gaps remain in 1.7.7's transport, and a wrapper outside it cannot close either:
 
 - **An out-of-range status crashes the process.** The transport builds the `Response` inside the request callback. `new Response` throws a `RangeError` for a status outside 200–599, such as `HTTP/1.1 999`, and nothing catches it there. better-auth/better-auth#11422.
 - **The address lookup ignores the abort signal.** The transport calls `dns/promises` `lookup` without the caller's signal, so a stalled resolver holds the fetch past the plugin's deadline. better-auth/better-auth#11423.
 
 ## What was changed
 
-The code is upstream 1.7.5's, with these differences only:
+The code is upstream 1.7.7's, with these differences only:
 
 - **The status guard.** Building the `Response` is wrapped. A throw destroys the response and rejects with a `TypeError`, as `fetch` does for a network error.
 - **The signal-aware lookup.** The signal is read before the lookup. An aborted signal refuses at once, and the lookup races the signal's `abort` and rejects with its reason. An abandoned lookup keeps its thread-pool thread until it settles, so it still counts against a bound of 32 lookups in flight, and a lookup past the bound is refused.

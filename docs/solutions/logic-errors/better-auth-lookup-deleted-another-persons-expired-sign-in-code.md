@@ -167,6 +167,8 @@ The api now clears it first (Linear BA-39). A `hooks.before` on `/sign-in/email-
 
 If a release stops deleting expired rows at lookup (read `findVerificationValue` in `dist/db/internal-adapter.mjs` of the installed version), the reason for `disableCleanup` is gone; the sweep pass still keeps the table small. If the api ever turns the deletion back on, the first test above fails and the bug returns, and this doc's audit rule no longer applies.
 
+Read against 1.7.7 on 11/10/2026 (BA-147): `dist/db/internal-adapter.mjs` is byte for byte 1.7.5's, so the deletion at lookup is still there and this doc stands. The baseline's line numbers are still 1.7.5's, and five of the files it cites changed (`plugins/email-otp/routes.mjs`, `api/routes/password.mjs`, `state.mjs`, `plugins/oauth-proxy/index.mjs`, `plugins/phone-number/routes.mjs`), so find a site by its name before trusting its number. 1.7.7 adds one `findVerificationValue` site, `plugins/magic-link/index.mjs:171`, in a plugin the api does not configure. Generic OAuth state and oauth-proxy now look their rows up under an `auth-state:` prefix.
+
 ## Related Issues
 
 - Linear BA-34, merged as #514. Linear BA-39 cleared the orphaned promotion lock that #514 had lengthened.

@@ -38,7 +38,7 @@ The seam, which `packages/core` never crosses:
 
 - No Better Auth type crosses into `packages/core`. A transport verifies a bearer and builds a `Principal`.
 - `better-auth` and `@better-auth/*` are imported only in `apps/api/src/auth/`, `apps/web/src/features/auth/` and the CIMD lift, `apps/api/lifts/better-auth-cimd-node/`. `.oxlintrc.json` enforces it, with rule tests in `apps/api/tests/lint-rules.test.ts` and `apps/web/test/lint-rules.test.ts`.
-- The CIMD lift runs on upstream 1.7.5's transport and carries two guards (better-auth/better-auth#11422, #11423). It goes when a release fixes both.
+- The CIMD lift runs on upstream 1.7.7's transport and carries two guards (better-auth/better-auth#11422, #11423). It goes when a release fixes both.
 
 The `organization` plugin:
 

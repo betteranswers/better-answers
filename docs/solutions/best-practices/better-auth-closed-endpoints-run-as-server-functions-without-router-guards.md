@@ -123,7 +123,7 @@ The schema fact saves a dead end. A field added through a plugin's `schema` opti
 - Adding a field to a plugin's model, or renaming one through a plugin's `schema` option.
 - Relying on `session.freshAge`, or changing it.
 - Adding a sign-in method, or assuming the library challenges a sign-in for the second factor.
-- Upgrading `better-auth` or `@better-auth/passkey`. Each line cited here is a 1.7.5 fact; re-read the ranges before trusting them.
+- Upgrading `better-auth` or `@better-auth/passkey`. Each line cited here is a 1.7.5 fact; re-read the ranges before trusting them. Read against 1.7.7 on 11/10/2026 (BA-147): the three files the retire condition names (`dist/api/index.mjs`, `dist/db/schema.mjs`, `dist/plugins/two-factor/index.mjs`) are byte for byte 1.7.5's, so this doc stands. The line numbers cited in `dist/api/rate-limiter/index.mjs` and `dist/api/routes/update-user.mjs` have moved.
 
 ## Examples
 
