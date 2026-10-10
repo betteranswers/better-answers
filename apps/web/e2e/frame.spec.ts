@@ -185,6 +185,40 @@ const focusAgainstTheBand = (page: Page) =>
 
 const focusUnderTheBand = async (page: Page) => (await focusAgainstTheBand(page)).under;
 
+/** Covered whole, a target cannot be pressed; covered in part, it is too small to press. */
+const halfUnderTheBand = (page: Page) =>
+  page.evaluate(() => {
+    const band = document.querySelector("header");
+    const content = document.querySelector("main");
+    if (band === null || content === null) return ["the band or the page is not drawn"];
+    const edge = band.getBoundingClientRect();
+    const between = (node: Element) =>
+      (band.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 &&
+      (node.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    const half = (box: DOMRect) => {
+      const crosses = box.top < edge.bottom && edge.top < box.bottom;
+      const inside = box.top >= edge.top && box.bottom <= edge.bottom;
+      return crosses && !inside;
+    };
+    return [...document.querySelectorAll("a[href], button, [role='tab'], input, select")]
+      .filter((node) => between(node) && node.closest("nav") === null)
+      .filter((node) => half(node.getBoundingClientRect()))
+      .map((node) => node.getAttribute("aria-label") ?? node.textContent);
+  });
+
+/** Taller by `grown` pixels at the foot of its content, answering how far the page can scroll. */
+const pageGrownBy = (page: Page, grown: number) =>
+  page.evaluate((height) => {
+    const id = "grown-by";
+    const spacer = document.getElementById(id) ?? document.createElement("div");
+    spacer.id = id;
+    spacer.style.height = `${String(height)}px`;
+    const content = document.querySelector("[data-page-content]");
+    if (content === null) throw new Error("the page's content is not drawn");
+    content.append(spacer);
+    return document.documentElement.scrollHeight - innerHeight;
+  }, grown);
+
 const overlapsTheBand = async (page: Page) => (await focusAgainstTheBand(page)).overlaps;
 
 /** Tab by tab to `target`, no stop on the way, nor `target` itself, sharing the band's box. */
@@ -647,6 +681,27 @@ test("moves focus from the skip link into the content", async ({ page, request }
   await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 
   await skipLinkReachesThePage(page);
+});
+
+test("leaves no target half under the band after skipping", async ({ page, request }) => {
+  await signedIn(page, request, "Swaledale Forge");
+  await page.goto(MODELS_AND_SPEND.path);
+  const offer = page.getByRole("region", { name: PASSKEY_WORDS.heading });
+  await expect(offer.getByRole("link", { name: PASSKEY_WORDS.add })).toBeVisible();
+  await expect(tabsOf(page).getByRole("tab")).toHaveText(TOOLBAR_TABS);
+  await skipLinkReachesThePage(page);
+
+  // Through a whole screen in steps shorter than any target, so no page height goes untried.
+  const screen = await page.evaluate(() => innerHeight);
+  for (let grown = 0; grown <= screen; grown += 4) {
+    const overflow = await pageGrownBy(page, grown);
+    // Scrolling from the first step on, the sweep would skip the shallow jumps that cut the head.
+    if (grown === 0) expect(overflow, "the page scrolls before it is grown").toBe(0);
+    await page.getByRole("link", { name: "Skip to the page" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("main")).toBeFocused();
+    expect(await halfUnderTheBand(page), `the page grown by ${String(grown)}px`).toEqual([]);
+  }
 });
 
 test("scrolls nothing sideways at 320 pixels, navigation open or closed", async ({

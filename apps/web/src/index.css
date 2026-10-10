@@ -90,6 +90,14 @@
     :root {
       scroll-padding-top: var(--band-drawn-h);
     }
+
+    /*
+     * A jump to the page lands at the column's top; a page too short to scroll its head away
+     * leaves it half under the band.
+     */
+    main {
+      scroll-margin-top: 100vh;
+    }
   }
 
   /* A part marked to print alone, such as a set of recovery codes, is all the printed page holds. */
