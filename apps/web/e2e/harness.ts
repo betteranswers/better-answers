@@ -290,8 +290,23 @@ export const seedConnectedSources = (
   input: { workspaceId: string; connectedSources: readonly SeedConnectedSource[] },
 ) => ask(api, "/connected-sources", input, seededConnectedSources);
 
-type SeedCitedDocument = { readonly title: string; readonly passages: readonly string[] };
+/** `label` is the file's own name for the source; `sensitivity` holds the document closer than its concept. */
+type SeedCitedDocument = {
+  readonly title: string;
+  readonly label?: string;
+  readonly passages: readonly string[];
+  readonly sensitivity?: Sensitivity;
+};
 
+/** A concept seeded earlier in the same list, by its title. */
+type SeedCitedConcept = { readonly concept: string };
+
+/** A place of the file's own in a source, such as `p.4`, which opens nothing. */
+type SeedCitedPlace = { readonly title: string; readonly at: string };
+
+type SeedFrontmatterEntry = Readonly<Record<string, string | number | boolean | null>>;
+
+/** A body that writes `[^source-N]` places that source's mark; the rest follow its last word. */
 type SeedConcept = {
   readonly title: string;
   readonly body: string;
@@ -301,7 +316,13 @@ type SeedConcept = {
   readonly groupMemberIds?: readonly string[];
   readonly trust?: "unverified" | "machine-confirmed" | "human-reviewed";
   readonly linksTo?: readonly string[];
-  readonly sources?: readonly SeedCitedDocument[];
+  readonly sources?: readonly (SeedCitedDocument | SeedCitedConcept | SeedCitedPlace)[];
+  readonly frontmatter?: Readonly<
+    Record<
+      string,
+      string | number | boolean | null | readonly string[] | readonly SeedFrontmatterEntry[]
+    >
+  >;
 };
 
 const seededConcepts = z.object({

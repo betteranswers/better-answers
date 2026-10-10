@@ -23,13 +23,13 @@ import {
   person,
   provision,
   railOf,
+  seedConcepts,
   signIn,
   skipLinkReachesThePage,
   switcherMenuOf,
   switcherOf,
 } from "./harness.ts";
 import {
-  conceptsSeeded,
   heldBack,
   isAFind,
   isAnOpen,
@@ -86,6 +86,15 @@ const RETENTION_BODY = [
 ].join("\n");
 
 const IRI_PREFIX = "https://better-answers.com/c/";
+
+/** Each concept the harness wrote, by its title. */
+const conceptsSeeded = async (
+  api: APIRequestContext,
+  input: Parameters<typeof seedConcepts>[1],
+) => {
+  const { concepts } = await seedConcepts(api, input);
+  return new Map(concepts.map((concept) => [concept.title, concept]));
+};
 
 type Seeded = Awaited<ReturnType<typeof conceptsSeeded>>;
 

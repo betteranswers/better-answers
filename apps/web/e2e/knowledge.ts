@@ -1,13 +1,5 @@
-import {
-  expect,
-  type APIRequestContext,
-  type Page,
-  type Response,
-  type Route,
-} from "@playwright/test";
+import { expect, type Page, type Response, type Route } from "@playwright/test";
 import { z } from "zod";
-
-import type { AUDIENCES, SENSITIVITIES } from "@better-answers/schema";
 
 import { keystrokesDismissed, keystrokesListed } from "./harness.ts";
 
@@ -129,64 +121,4 @@ export const listsItsKeystrokes = async (
   const listed = await keystrokesListed(page, named);
   for (const keystroke of declared) await expect(listed).toContainText(keystroke.action);
   await keystrokesDismissed(page, listed);
-};
-
-type Sensitivity = (typeof SENSITIVITIES)[number];
-
-/** `label` is the file's own name for the source; `sensitivity` holds the document closer than its concept. */
-type CitedDocument = {
-  readonly title: string;
-  readonly label?: string;
-  readonly passages: readonly string[];
-  readonly sensitivity?: Sensitivity;
-};
-
-/** A concept seeded earlier in the same list, by its title. */
-type CitedConcept = { readonly concept: string };
-
-/** A place of the file's own in a source, such as `p.4`, which opens nothing. */
-type CitedPlace = { readonly title: string; readonly at: string };
-
-type FrontmatterEntry = Readonly<Record<string, string | number | boolean | null>>;
-
-/** A body that writes `[^source-N]` places that source's mark; the rest follow its last word. */
-type SeedConcept = {
-  readonly title: string;
-  readonly body: string;
-  readonly kind?: string;
-  readonly sensitivity?: Sensitivity;
-  readonly audience?: (typeof AUDIENCES)[number];
-  readonly trust?: "unverified" | "machine-confirmed" | "human-reviewed";
-  readonly linksTo?: readonly string[];
-  readonly sources?: readonly (CitedDocument | CitedConcept | CitedPlace)[];
-  readonly frontmatter?: Readonly<
-    Record<
-      string,
-      string | number | boolean | null | readonly string[] | readonly FrontmatterEntry[]
-    >
-  >;
-};
-
-const CONCEPTS = "/__harness/concepts";
-
-const seeded = z.object({
-  concepts: z.array(
-    z.object({
-      iri: z.string(),
-      title: z.string(),
-      documents: z.array(z.object({ documentId: z.string(), title: z.string() })),
-    }),
-  ),
-});
-
-/** The harness's `seedConcepts` with every source it takes, answering each concept by its title. */
-export const conceptsSeeded = async (
-  api: APIRequestContext,
-  input: { workspaceId: string; userId: string; concepts: readonly SeedConcept[] },
-) => {
-  const answered = await api.post(CONCEPTS, { data: input });
-  const body = await answered.text();
-  expect(answered.ok(), `${CONCEPTS} answered ${String(answered.status())}: ${body}`).toBe(true);
-  const { concepts } = seeded.parse(JSON.parse(body));
-  return new Map(concepts.map((concept) => [concept.title, concept]));
 };
