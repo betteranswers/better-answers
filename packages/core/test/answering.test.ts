@@ -985,6 +985,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
           },
           body: "The kingfisher rule is stated here.",
           relations: [{ kind: "CITES", target: cited, title: "Travel policy" }],
+          bodyLinks: [],
           trust: unverified,
           trustWords: "Unverified",
           evidence: [
