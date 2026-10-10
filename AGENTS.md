@@ -71,7 +71,7 @@ Three rules that hold regardless of whether the skill was invoked:
 - `/survey-architecture` before a route block that the route spec holds behind an architecture review, starting with S2a and S2b. It gives that review its report of opportunities to start from.
 - `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so.
 
-Other skills live beside the code that uses them most, such as `apps/worker/.claude/skills/` and `apps/web/.claude/skills/`. If a task has a skill, use it for best practice: for example, hono for the api's routes and middleware, cocoindex for the worker and its pipeline, and better-auth for authentication. Production deploys only through `release.yml`, and the procedure, rollback included, is in `docs/operations/RUNBOOK.md` and `docs/operations/CI.md`; the coolify skills describe Coolify itself, not this release path.
+Other skills live in the `.claude/skills/` folder beside the files they serve, so they load when that work starts: tRPC, hono, better-auth and Resend under `apps/api/`, React and tRPC's React Query client under `apps/web/`, cocoindex under `apps/worker/`, the coolify skills under `deploy/`, and GitHub Actions under `.github/`. `skills-lock.json` records no folder, so an installed skill is put in its folder by hand in the main checkout, which each new worktree copies. If a task has a skill, use it for best practice: for example, hono for the api's routes and middleware, cocoindex for the worker and its pipeline, and better-auth for authentication. Production deploys only through `release.yml`, and the procedure, rollback included, is in `docs/operations/RUNBOOK.md` and `docs/operations/CI.md`; the coolify skills describe Coolify itself, not this release path.
 
 ## Agent skills
 

@@ -1,41 +1,11 @@
 {
   "version": 1,
   "skills": {
-    "adapter-aws-lambda": {
-      "source": "trpc/trpc",
-      "sourceType": "github",
-      "skillPath": "packages/server/skills/adapter-aws-lambda/SKILL.md",
-      "computedHash": "a4066ef46f1d647438fd4f8277e460a60fbbe9889e203a8fe57e42de3ca30ec5"
-    },
-    "adapter-express": {
-      "source": "trpc/trpc",
-      "sourceType": "github",
-      "skillPath": "packages/server/skills/adapter-express/SKILL.md",
-      "computedHash": "90778cb552693196c4b1365982c6c5490b81d0d27ed415882ce0355141c6afc3"
-    },
-    "adapter-fastify": {
-      "source": "trpc/trpc",
-      "sourceType": "github",
-      "skillPath": "packages/server/skills/adapter-fastify/SKILL.md",
-      "computedHash": "92ee8d150cbc2d9e22cf3ad184eeab87e43f1789f20213366336ababc15ef468"
-    },
     "adapter-fetch": {
       "source": "trpc/trpc",
       "sourceType": "github",
       "skillPath": "packages/server/skills/adapter-fetch/SKILL.md",
       "computedHash": "099cecb56164e995ffe503785e37e4f53c1404c78c33577a2b0f3302c92aba8f"
-    },
-    "adapter-standalone": {
-      "source": "trpc/trpc",
-      "sourceType": "github",
-      "skillPath": "packages/server/skills/adapter-standalone/SKILL.md",
-      "computedHash": "f7888dbcb32565568ecec37f5f3f40a0c1db057195220c13dba4e0e107fb2104"
-    },
-    "agent-auth-mcp": {
-      "source": "better-auth/agent-auth",
-      "sourceType": "github",
-      "skillPath": "skills/agent-auth-mcp/SKILL.md",
-      "computedHash": "b3c03dd1a57be9a3199e73157aa15c9b5d7210f253daaf4d42757f6611fb9bc6"
     },
     "auth": {
       "source": "trpc/trpc",
@@ -109,12 +79,6 @@
       "skillPath": "skills/docker-patterns/SKILL.md",
       "computedHash": "af6deba271429bcb5198a7e56a4f71f948509e06037e6a3210d0ad5f516eeb29"
     },
-    "email-and-password-best-practices": {
-      "source": "better-auth/skills",
-      "sourceType": "github",
-      "skillPath": "better-auth/emailAndPassword/SKILL.md",
-      "computedHash": "747d7f73bd9e2ec5317b8ef88dc70f97df716d00e3d02de4051feebaa48b062d"
-    },
     "email-best-practices": {
       "source": "resend/resend-skills",
       "sourceType": "github",
@@ -163,12 +127,6 @@
       "skillPath": "packages/client/skills/links/SKILL.md",
       "computedHash": "1a3b8d6ebed34539510683825ce88372b0bec28f01a75456c60bdc79568d41ec"
     },
-    "mcp": {
-      "source": "vercel-labs/json-render",
-      "sourceType": "github",
-      "skillPath": "skills/mcp/SKILL.md",
-      "computedHash": "8601f81c837895c306f30bf75ec494606f9213ae0c13d758c07059ff78540326"
-    },
     "middlewares": {
       "source": "trpc/trpc",
       "sourceType": "github",
@@ -186,18 +144,6 @@
       "sourceType": "github",
       "skillPath": "skills/mutation-testing/SKILL.md",
       "computedHash": "7b187f7c362047b4ce4fa8aa5e1f5c6e006ababd160e67d01aeca6b8ba0d27d5"
-    },
-    "nextjs-app-router": {
-      "source": "trpc/trpc",
-      "sourceType": "github",
-      "skillPath": "packages/next/skills/nextjs-app-router/SKILL.md",
-      "computedHash": "4590350d634d82de296ac22c62791a207b8b823d75bc2ec2af535b84abba20ab"
-    },
-    "nextjs-pages-router": {
-      "source": "trpc/trpc",
-      "sourceType": "github",
-      "skillPath": "packages/next/skills/nextjs-pages-router/SKILL.md",
-      "computedHash": "a2e01999274f17255b2e8bdf5cef750be5e5e2931b826d6522158ae637a4758e"
     },
     "non-json-content-types": {
       "source": "trpc/trpc",
@@ -228,12 +174,6 @@
       "sourceType": "github",
       "skillPath": "skills/privacy/pii-in-unstructured/SKILL.md",
       "computedHash": "4328046f7a49dd913c72fa515ee803554e95032edd1116cdf67b48a0a4cacf61"
-    },
-    "react-query-classic-migration": {
-      "source": "trpc/trpc",
-      "sourceType": "github",
-      "skillPath": "packages/tanstack-react-query/skills/react-query-classic-migration/SKILL.md",
-      "computedHash": "44fa9a4f8f6a445a9a886f61e5dc59ac843ef0afff40cfb5e0eafb9d8419152b"
     },
     "react-query-setup": {
       "source": "trpc/trpc",
@@ -271,23 +211,11 @@
       "skillPath": "packages/server/skills/server-side-calls/SKILL.md",
       "computedHash": "c6b3a9b12a4eaf8c7411cdf1b4858eb26321fa64ce9d61872190e69e0dd15b22"
     },
-    "service-oriented-architecture": {
-      "source": "trpc/trpc",
-      "sourceType": "github",
-      "skillPath": "packages/server/skills/service-oriented-architecture/SKILL.md",
-      "computedHash": "dec4ae563a1e5d8618f92f1e6a3153886e446dd225061398f159a058c514d5b4"
-    },
     "subscriptions": {
       "source": "trpc/trpc",
       "sourceType": "github",
       "skillPath": "packages/server/skills/subscriptions/SKILL.md",
       "computedHash": "9da7fc9d98616564a67d7ff567641b517cb321fefc281ac6ca245517a2ef71ad"
-    },
-    "superjson": {
-      "source": "trpc/trpc",
-      "sourceType": "github",
-      "skillPath": "packages/client/skills/superjson/SKILL.md",
-      "computedHash": "5722db005ca809452a11776bdbb4526df77af41613a474016c723f0ab9fa6ee0"
     },
     "trpc-router": {
       "source": "trpc/trpc",
