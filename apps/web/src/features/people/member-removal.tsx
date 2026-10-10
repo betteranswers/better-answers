@@ -93,7 +93,8 @@ export function MemberRemoval(properties: {
               </div>
             </fieldset>
           </CollapsibleContent>
-          <OutcomeLine outcome={properties.outcome} />
+          {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
+          <OutcomeLine outcome={properties.outcome} className="contents" />
         </Collapsible>
       </section>
     </Card>

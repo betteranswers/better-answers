@@ -4,6 +4,7 @@ import type { ApiError } from "@/shared/api/trpc.ts";
 import { ListState } from "@/shared/list-pages.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { readRefused } from "./words.ts";
 
@@ -67,6 +68,7 @@ export function NothingListed(properties: {
       state={{
         kind: "emptied",
         words: properties.noneMatch(search),
+        clearWords: CLEAR_WORDS.search,
         onClear: properties.onClear,
         focusAfterClear: properties.searchRef,
       }}

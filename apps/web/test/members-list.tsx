@@ -17,6 +17,7 @@ import { RowMenu } from "@/shared/row-menu.tsx";
 import { SelectionAction, SelectionBar } from "@/shared/selection-bar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 
 type Member = {
   readonly id: string;
@@ -193,7 +194,17 @@ const emptyOf = (narrowed: Narrowed, clear: () => void, focusAfterClear: FocusTa
     narrowed.search === ""
       ? "No one matches these filters."
       : `No one matches “${narrowed.search}”.`;
-  return <ListState state={{ kind: "emptied", words, onClear: clear, focusAfterClear }} />;
+  return (
+    <ListState
+      state={{
+        kind: "emptied",
+        words,
+        clearWords: CLEAR_WORDS.filters,
+        onClear: clear,
+        focusAfterClear,
+      }}
+    />
+  );
 };
 
 const matching = (members: readonly Member[], narrowed: Narrowed): Member[] =>

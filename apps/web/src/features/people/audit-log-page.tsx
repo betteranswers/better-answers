@@ -15,7 +15,7 @@ import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
-import { byWords, instantWords } from "@/shared/words.ts";
+import { byWords, CLEAR_WORDS, instantWords } from "@/shared/words.ts";
 
 import { detailLinesOf, type DetailLine } from "./audit-details.ts";
 import {
@@ -160,6 +160,7 @@ function NoneShown(properties: {
       state={{
         kind: "emptied",
         words: WORDS.noneNarrowed(asked),
+        clearWords: CLEAR_WORDS.filters,
         onClear: properties.onClear,
         focusAfterClear: properties.focusAfterClear,
       }}

@@ -227,17 +227,18 @@ export function NamesWaitingList() {
       <OutcomeLine outcome={said ?? correcting.outcome} className="mt-2" />
       <WayOn staleFor={correcting.staleFor} />
 
-      {waiting === undefined ? null : (
-        <Card className="mt-4">
-          <FilterRow
-            search={{
-              label: WORDS.search,
-              value: narrowed.typed,
-              onChange: narrowed.setTyped,
-              keystroke: NAMES_WAITING_KEYSTROKES.search,
-              inputRef: narrowed.searchRef,
-            }}
-          />
+      <Card className="mt-4">
+        {/* Drawn whatever the read says, so a refused read of it again takes no focus from the search. */}
+        <FilterRow
+          search={{
+            label: WORDS.search,
+            value: narrowed.typed,
+            onChange: narrowed.setTyped,
+            keystroke: NAMES_WAITING_KEYSTROKES.search,
+            inputRef: narrowed.searchRef,
+          }}
+        />
+        {waiting === undefined ? null : (
           <GridTable
             table={table}
             caption={WORDS.caption}
@@ -252,8 +253,8 @@ export function NamesWaitingList() {
               </NothingListed>
             }
           />
-        </Card>
-      )}
+        )}
+      </Card>
 
       <DialogFor
         picked={names.find((each) => each.personId === openFor)}

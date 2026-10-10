@@ -12,6 +12,7 @@ import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { useHiddenColumns } from "@/shared/wide-layout.ts";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import {
   InvitationBulkActions,
@@ -139,6 +140,7 @@ function NoneShown(properties: {
       state={{
         kind: "emptied",
         words: WORDS.noneMatch(narrowed.search),
+        clearWords: CLEAR_WORDS.search,
         onClear: narrowed.clear,
         focusAfterClear: properties.focusAfterClear,
       }}

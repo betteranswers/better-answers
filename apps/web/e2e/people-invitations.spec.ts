@@ -13,6 +13,7 @@ import { invitationsCeiling, SAID_OF_TICKED_INVITATIONS } from "@/features/peopl
 import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, INVITE_A_PERSON, pageNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -463,6 +464,29 @@ test.describe("the People page's Invitations tab", () => {
     await shownUnder(page, "expired");
     await expect(rowOf(page, old)).toHaveCount(1);
     await expect(page).toHaveURL(/invitations\.status=expired/);
+  });
+
+  test("clears a search that matched nothing, keeping its status", async ({ page, request }) => {
+    const lapsed = anAddress("lapsed");
+    await anAdminAtInvitations(page, request, "Arkengarth Smiths", (at) =>
+      invitedEach(request, at, [lapsed], anEightDayOldInvitation).then(() => undefined),
+    );
+    await openInvitations(page);
+    await shownUnder(page, "expired");
+    const search = invitationsRegion(page).getByRole("searchbox", {
+      name: INVITATIONS_WORDS.search,
+    });
+
+    const nobody = "nobody-at-this-address";
+    await search.fill(nobody);
+    await expect(invitationsRegion(page)).toContainText(INVITATIONS_WORDS.noneMatch(nobody));
+    await invitationsRegion(page).getByRole("button", { name: CLEAR_WORDS.search }).click();
+
+    await expect(search).toHaveValue("");
+    await expect(search).toBeFocused();
+    await expect(statusChoice(page, "expired")).toBeChecked();
+    await expect(page).toHaveURL(/invitations\.status=expired/);
+    await expect(rowOf(page, lapsed)).toHaveCount(1);
   });
 
   test("folds two spellings of one address into one email", async ({ page, request }) => {

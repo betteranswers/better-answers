@@ -20,6 +20,7 @@ import {
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { sentenceOf, SIGN_IN_AGAIN } from "@/shared/refusal-words.ts";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -322,7 +323,7 @@ test.describe("the console's Everyone page", () => {
     await expect(everyone(page)).toContainText(EVERYONE_WORDS.noneMatch(`nobody ${tag}`));
     await expect(personRows(page)).toHaveCount(1);
     await passesTheAccessibilityGate();
-    await everyone(page).getByRole("button", { name: "Clear filters" }).click();
+    await everyone(page).getByRole("button", { name: CLEAR_WORDS.search }).click();
 
     await expect(searchBox(page)).toHaveValue("");
     await expect(searchBox(page)).toBeFocused();
