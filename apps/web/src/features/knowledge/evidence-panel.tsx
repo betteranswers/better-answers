@@ -21,16 +21,15 @@ import { useConcept, usePassage, type Opening } from "./knowledge-api.ts";
 import { CONCEPT_WORDS, EVIDENCE_WORDS, SEARCH_WORDS } from "./knowledge-words.ts";
 import { failedReadWords } from "./refusal.tsx";
 
-/** `unmapped` is a match no concept rests on, which says so beside the sensitivity it already holds. */
+/** `unmapped` is a match no concept rests on, which the panel says beside the passage's sensitivity. */
 type OpenedSource =
-  | (Extract<Opening, { readonly kind: "passage" }> & {
-      readonly unmapped?: { readonly sensitivity: string };
-    })
+  | (Extract<Opening, { readonly kind: "passage" }> & { readonly unmapped?: true })
   | Extract<Opening, { readonly kind: "concept" }>;
 
 /** A source opened beside the page, and the control that opened it, where focus goes back. */
 export type Opened = {
   readonly key: string;
+  /** What its opener calls it, which names the panel until the read names the source itself. */
   readonly title: string;
   readonly source: OpenedSource;
   readonly openerId: string;
@@ -72,39 +71,44 @@ export type Heading = RefObject<HTMLHeadingElement | null>;
 const QUOTED =
   "border-l border-border bg-muted px-4 py-3 [font-size:var(--text-base)] leading-relaxed whitespace-pre-line";
 
-/** Under its document's title, wherever the heading above is the concept's own label for it. */
+type PassageSource = Extract<OpenedSource, { readonly kind: "passage" }>;
+
+/** A match's title is the search's copy of it, so the read's own takes its place as it lands. */
+function TitleRead(properties: { readonly locator: string; readonly until: string }) {
+  return usePassage(properties.locator).data?.passage?.source ?? properties.until;
+}
+
+/** The sensitivity is the read's own; the document's title stands under a concept's label for it. */
 function PassageRead(properties: {
   readonly opened: Opened;
-  readonly source: Extract<OpenedSource, { readonly kind: "passage" }>;
+  readonly source: PassageSource;
   readonly heading: Heading;
 }) {
   const { opened, source } = properties;
   const passage = usePassage(source.locator);
   const read = passage.data?.passage;
+  const unmapped = source.unmapped !== undefined;
   return (
-    <>
-      {source.unmapped === undefined ? null : (
+    <ListRead
+      read={passage}
+      loading={EVIDENCE_WORDS.loading}
+      failed={failedReadWords}
+      focusAfterRetry={properties.heading}
+    >
+      {read === undefined ? null : (
         <div>
-          <SensitivityTag sensitivity={source.unmapped.sensitivity} />
+          {unmapped ? (
+            <SensitivityTag sensitivity={read.sensitivity} />
+          ) : (
+            <Pill>{read.sensitivity}</Pill>
+          )}
         </div>
       )}
-      <ListRead
-        read={passage}
-        loading={EVIDENCE_WORDS.loading}
-        failed={failedReadWords}
-        focusAfterRetry={properties.heading}
-      >
-        {read === undefined || source.unmapped !== undefined ? null : (
-          <div>
-            <Pill>{read.sensitivity}</Pill>
-          </div>
-        )}
-        {read === undefined || read.source === opened.title ? null : (
-          <p className="font-medium wrap-anywhere">{read.source}</p>
-        )}
-        <blockquote className={QUOTED}>{read?.text}</blockquote>
-      </ListRead>
-    </>
+      {read === undefined || unmapped || read.source === opened.title ? null : (
+        <p className="font-medium wrap-anywhere">{read.source}</p>
+      )}
+      <blockquote className={QUOTED}>{read?.text}</blockquote>
+    </ListRead>
   );
 }
 
@@ -170,17 +174,23 @@ function PanelBody(properties: {
     heading.current = node;
     focusOnMount(node);
   }, []);
+  const title =
+    source.kind === "passage" && source.unmapped !== undefined ? (
+      <TitleRead locator={source.locator} until={opened.title} />
+    ) : (
+      opened.title
+    );
   return (
     <div className="flex flex-col gap-3">
       {at.kind === "sheet" ? (
         <SheetTitle asChild>
           <h2 ref={held} tabIndex={-1} className={HEADING}>
-            {opened.title}
+            {title}
           </h2>
         </SheetTitle>
       ) : (
         <h3 ref={held} id={at.headingId} tabIndex={-1} className={HEADING}>
-          {opened.title}
+          {title}
         </h3>
       )}
       {source.kind === "passage" ? (

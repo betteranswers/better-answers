@@ -1,5 +1,5 @@
 import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
-import { useId, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 
 import { useAsked } from "@/shared/address-ask.ts";
 import { FilterRow } from "@/shared/filter-row.tsx";
@@ -65,6 +65,12 @@ const saidOf = (query: string, matches: Matches, shown: number): string => {
   return shown === 0 ? WORDS.noMatches(query) : WORDS.matched(query, matches.hasNextPage);
 };
 
+type OpenedFor = Opened & { readonly query: string };
+
+/** Open for the search on the page, with its match still among the ones a re-read lists. */
+const stillListed = (opened: OpenedFor, query: string, shown: readonly Match[]): boolean =>
+  opened.query === query && shown.some((match) => keyOf(match) === opened.key);
+
 /** Takes a line of its own where the kind beside it leaves too little room. */
 const TITLE = "min-w-0 grow basis-48 font-medium break-words";
 
@@ -128,11 +134,7 @@ function PassageLine(properties: { readonly match: PassageMatch; readonly openin
               key,
               openerId,
               title: match.title,
-              source: {
-                kind: "passage",
-                locator: match.locator,
-                unmapped: { sensitivity: match.sensitivity },
-              },
+              source: { kind: "passage", locator: match.locator, unmapped: true },
             });
           }}
         >
@@ -284,8 +286,45 @@ const useReading = (query: string): Reading => {
   };
 };
 
+/**
+ * A passage closes as its match leaves the list: with its search, or when a re-read no longer
+ * lists it, which the page says.
+ */
+const useOpening = (
+  query: string,
+  shown: readonly Match[],
+  heading: RefObject<HTMLElement | null>,
+) => {
+  const [opened, setOpened] = useState<OpenedFor>();
+  const [leftIn, setLeftIn] = useState<string>();
+  if (opened !== undefined && !stillListed(opened, query, shown)) {
+    setOpened(undefined);
+    if (opened.query === query) setLeftIn(query);
+  }
+  const left = leftIn === query;
+  if (leftIn !== undefined && !left) setLeftIn(undefined);
+
+  // Focus that went with the panel has no opener to go back to, so it goes to the list's heading.
+  useEffect(() => {
+    if (left && document.activeElement === document.body) heading.current?.focus();
+  }, [left, heading]);
+
+  return {
+    opened,
+    left,
+    onOpen: (chosen: Omit<Opened, "pressed">) => {
+      setLeftIn(undefined);
+      setOpened((current) => ({ ...chosen, query, pressed: (current?.pressed ?? 0) + 1 }));
+    },
+    onClose: () => {
+      setOpened(undefined);
+    },
+  };
+};
+
 function SearchRegion() {
   const headingId = useId();
+  const heading = useRef<HTMLHeadingElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const { state, search, setSearch } = useSearchedList(SEARCH_LIST, SEARCH_FIELDS);
   useAsked("search", (asked) => {
@@ -296,20 +335,8 @@ function SearchRegion() {
   const shown = useMemo(() => matchesOf(matches.data), [matches.data]);
   const beside = useRoomBeside();
   const reading = useReading(query);
-  const [opened, setOpened] = useState<Opened & { readonly query: string }>();
-  // A passage opened for one search closes with it, as its match leaves the list.
-  if (opened !== undefined && opened.query !== query) setOpened(undefined);
-  const close = () => {
-    setOpened(undefined);
-  };
-  const opening: Opening = {
-    opened,
-    beside,
-    onOpen: (chosen) => {
-      setOpened((current) => ({ ...chosen, query, pressed: (current?.pressed ?? 0) + 1 }));
-    },
-    onClose: close,
-  };
+  const { opened, left, onOpen, onClose } = useOpening(query, shown, heading);
+  const opening: Opening = { opened, beside, onOpen, onClose };
 
   return (
     <section
@@ -317,7 +344,9 @@ function SearchRegion() {
       // Room for the panel beside the list, so it covers none of the matches.
       className={cn("mt-6", opened !== undefined && beside && "pr-[var(--container-md)]")}
     >
-      <h2 id={headingId}>{SEARCH_PAGE.name}</h2>
+      <h2 ref={heading} id={headingId} tabIndex={-1}>
+        {SEARCH_PAGE.name}
+      </h2>
       <Card marks className="mt-4">
         <FilterRow
           search={{
@@ -331,6 +360,7 @@ function SearchRegion() {
         />
         <output className="block px-4 py-3 text-muted-foreground empty:hidden">
           {saidOf(query, matches, shown.length)}
+          {left ? ` ${WORDS.passageLeft}` : null}
         </output>
         {/* Keyed, so a page landing late for the last search never reaches this one's list. */}
         <Results
@@ -343,7 +373,7 @@ function SearchRegion() {
           searchRef={searchRef}
         />
       </Card>
-      {opened === undefined || !beside ? null : <EvidenceSheet opened={opened} onClose={close} />}
+      {opened === undefined || !beside ? null : <EvidenceSheet opened={opened} onClose={onClose} />}
     </section>
   );
 }
