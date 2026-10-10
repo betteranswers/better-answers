@@ -8,7 +8,7 @@ import type { Tx } from "../src/store/postgres/index.ts";
 import { inMs, percentile, recordFigures } from "./figures.ts";
 import { landRecallSet, theRecallSet } from "./recall.ts";
 import { conceptCiting, connectedSourceHolding, passageUnder } from "./sourced-concept.ts";
-import { answered, readingAs } from "./suite-postgres.ts";
+import { answered, readingAs, runtimePoolFor } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
@@ -17,6 +17,8 @@ const NOW = new Date("2026-10-09T12:00:00.000Z");
 
 const IN_FLIGHT = 20;
 const ROUNDS = 5;
+
+const readers = runtimePoolFor(db, IN_FLIGHT);
 
 /**
  * Priced against a one-row read of `concept_index` on the same connection before it: load slows
@@ -118,7 +120,7 @@ const timed = async <T>(
 ): Promise<Timed<T>> => {
   const started = performance.now();
   const timing = answered(
-    await readingAs(db().runtimePool, reader, async (principal, tx) => {
+    await readingAs(readers(), reader, async (principal, tx) => {
       const oneRowStarted = performance.now();
       await tx.query("SELECT iri FROM concept_index WHERE workspace_id = $1 AND iri = $2", [
         principal.workspaceId,
@@ -209,6 +211,7 @@ describe("find and open under concurrent read load", () => {
       FIND_BUDGET_IN_ONE_ROW_READS,
     );
 
+    expect(readers().totalCount, "the connections the reads ran on").toBe(IN_FLIGHT);
     expect(reads.map(({ value }) => value.matches.length)).toEqual(
       Array.from({ length: IN_FLIGHT * ROUNDS }, () => PAGE),
     );
@@ -226,6 +229,7 @@ describe("find and open under concurrent read load", () => {
       OPEN_BUDGET_IN_ONE_ROW_READS,
     );
 
+    expect(readers().totalCount, "the connections the reads ran on").toBe(IN_FLIGHT);
     expect(reads.map(({ value }) => value.found)).toEqual(
       Array.from({ length: IN_FLIGHT * ROUNDS }, () => true),
     );
@@ -243,6 +247,7 @@ describe("find and open under concurrent read load", () => {
       OPEN_BUDGET_IN_ONE_ROW_READS,
     );
 
+    expect(readers().totalCount, "the connections the reads ran on").toBe(IN_FLIGHT);
     expect(reads.map(({ value }) => opensOf(value))).toEqual(
       Array.from({ length: IN_FLIGHT * ROUNDS }, (_unused, at) =>
         at % 2 === 0

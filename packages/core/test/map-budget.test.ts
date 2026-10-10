@@ -7,7 +7,7 @@ import { writeConcept, type WriteConceptInput } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
 import { inMs, percentile, recordFigures } from "./figures.ts";
-import { answered, readingAs } from "./suite-postgres.ts";
+import { answered, readingAs, runtimePoolFor } from "./suite-postgres.ts";
 import { runWorkerOnce } from "./worker-process.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -20,6 +20,8 @@ const EDGES = 159;
 
 const IN_FLIGHT = 20;
 const ROUNDS = 5;
+
+const readers = runtimePoolFor(db, IN_FLIGHT);
 
 /**
  * Priced against a one-row walk on the same connection before it: load slows both alike, a
@@ -84,7 +86,7 @@ type TimedWalk = {
 const timedWalk = async (map: DenseMap, reader: UserPrincipal): Promise<TimedWalk> => {
   const started = performance.now();
   const timed = answered(
-    await readingAs(db().runtimePool, reader, async (principal, tx) => {
+    await readingAs(readers(), reader, async (principal, tx) => {
       const oneRowStarted = performance.now();
       const oneRow = await walkFrom(principal, tx, map.leaf);
       const walkStarted = performance.now();
@@ -133,6 +135,7 @@ describe("the map under concurrent read load", () => {
       ["the slowest walk statement", inMs(percentile(walkMs, 1))],
     ]);
 
+    expect(readers().totalCount, "the connections the walks ran on").toBe(IN_FLIGHT);
     expect(walks.map((walked) => [walked.oneRowSteps, walked.walkSteps])).toEqual(
       Array.from({ length: IN_FLIGHT * ROUNDS }, () => [1, MAP_WALK_ROW_LIMIT]),
     );
