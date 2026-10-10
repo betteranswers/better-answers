@@ -37,7 +37,7 @@ type ConnectedSourceActions = {
 /** What is open inside a row: one review, and one narrowing or widening, on the page at a time. */
 type OpenInARow = {
   readonly reviewing: string | undefined;
-  /** A bulk action of the open review waits on its answer, so a second press must not close it. */
+  /** A bulk action waits on its answer, so no row's button opens, closes or replaces a review. */
   readonly reviewHeld: boolean;
   readonly panel: { readonly connectedSourceId: string; readonly part: ReactNode } | undefined;
 };
@@ -259,7 +259,7 @@ export function ConnectedSourceList(properties: {
             connectedSource={connectedSource}
             actions={properties.actions}
             reviewing={open.reviewing === id}
-            reviewHeld={open.reviewHeld && open.reviewing === id}
+            reviewHeld={open.reviewHeld}
             panel={open.panel?.connectedSourceId === id ? open.panel.part : null}
           />
         );

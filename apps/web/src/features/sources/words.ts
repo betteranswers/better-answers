@@ -246,6 +246,10 @@ export const SENSITIVITY_PANEL_WORDS = {
 export const THE_CHANGE_BEFORE_IS_STILL_GOING =
   "The change before this one is still going. Try again once it answers.";
 
+/** Said when a review is asked to open or close while a bulk action waits on its answer. */
+export const THE_ACTION_BEFORE_IS_STILL_GOING =
+  "The action before this one is still going. Try again once it answers.";
+
 export const groupsCounted = (groups: number): string =>
   counted(groups, "group of findings", "groups of findings");
 

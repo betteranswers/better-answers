@@ -35,6 +35,7 @@ import {
   SELECT_A_CONNECTED_SOURCE_FIRST,
   sensitivityAndAudienceWords,
   STATE_WORDS,
+  THE_ACTION_BEFORE_IS_STILL_GOING,
   type SensitivityAndAudience,
 } from "./words.ts";
 
@@ -43,6 +44,11 @@ const sources = menuGroupIn(CONTROL_CENTRE, "sources");
 const LISTED = Object.values(SOURCES_KEYSTROKES);
 
 const NOTHING_IN_FOCUS = selectFirst(SELECT_A_CONNECTED_SOURCE_FIRST);
+
+const A_BULK_ACTION_IS_STILL_GOING: Outcome = {
+  tone: "said",
+  words: THE_ACTION_BEFORE_IS_STILL_GOING,
+};
 
 const waitsForItsSync = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
@@ -89,17 +95,17 @@ type Changing = { readonly change: SensitivityChange; readonly connectedSourceId
 const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tell) => {
   const [changing, setChanging] = useState<Changing>();
   const opener = useRef<HTMLElement>(null);
+  const group = useRef<HTMLFieldSetElement>(null);
   const narrowAction = useNarrowConnectedSource();
   const widenAction = useWidenConnectedSource();
   const connectedSource = listed.find(
     (each) => each.connectedSourceId === changing?.connectedSourceId,
   );
 
-  /** Asked for again while open, the panel keeps its opener: focus may by then be inside it. */
+  /** A control inside the open panel goes when the panel does, so it never becomes the opener. */
   const open = (asked: Changing) => {
-    const openAlready =
-      changing?.change === asked.change && changing.connectedSourceId === asked.connectedSourceId;
-    if (!openAlready) opener.current = theControlInFocus();
+    const focused = theControlInFocus();
+    if (group.current?.contains(focused) !== true) opener.current = focused;
     flushSync(() => {
       setChanging(asked);
     });
@@ -162,6 +168,7 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
           key={`${changing.change} ${connectedSourceId}`}
           change={changing.change}
           connectedSource={connectedSource}
+          groupRef={group}
           pending={narrowAction.isPending || widenAction.isPending}
           onCancel={cancel}
           onCommit={commit}
@@ -209,9 +216,16 @@ export function ConnectedSourcesPage() {
     focusOn(REVIEW_HEADING);
   };
 
+  /** A bulk action answers through the review that sent it, so no review moves until it has. */
+  const heldAndSaid = (): boolean => {
+    if (reviewHeld) setOutcome(A_BULK_ACTION_IS_STILL_GOING);
+    return reviewHeld;
+  };
+
   const reviewOrClose = (connectedSourceId: string) => {
-    if (reviewing !== connectedSourceId) review(connectedSourceId);
-    else if (!reviewHeld) setReviewing(undefined);
+    if (heldAndSaid()) return;
+    if (reviewing === connectedSourceId) setReviewing(undefined);
+    else review(connectedSourceId);
   };
 
   const publish = (connectedSource: ListedConnectedSource) => {
@@ -242,7 +256,8 @@ export function ConnectedSourcesPage() {
   };
   useKeystroke(SOURCES_KEYSTROKES.review, () => {
     const connectedSource = connectedSourceInFocusOrTell();
-    if (connectedSource !== undefined) review(connectedSource.connectedSourceId);
+    if (connectedSource === undefined || heldAndSaid()) return;
+    review(connectedSource.connectedSourceId);
   });
   useKeystroke(SOURCES_KEYSTROKES.publish, () => {
     const connectedSource = connectedSourceInFocusOrTell();

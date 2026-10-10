@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type RefObject } from "react";
 
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -133,12 +133,14 @@ const OFFERS = {
 export function SensitivityPanel(properties: {
   readonly change: SensitivityChange;
   readonly connectedSource: ListedConnectedSource;
+  /** Lets the page tell a control inside the panel from the one that opened it. */
+  readonly groupRef: RefObject<HTMLFieldSetElement | null>;
   /** A second action sent before the first answers would drop the first one's answer. */
   readonly pending: boolean;
   readonly onCancel: () => void;
   readonly onCommit: (asked: SensitivityAndAudience) => void;
 }) {
-  const { change, connectedSource, onCommit } = properties;
+  const { change, connectedSource, groupRef, onCancel, onCommit } = properties;
   const offer = OFFERS[change];
   const words = SENSITIVITY_PANEL_WORDS[change];
   const [asked, setAsked] = useState(() => offer.opensOn(connectedSource));
@@ -152,6 +154,7 @@ export function SensitivityPanel(properties: {
 
   return (
     <fieldset
+      ref={groupRef}
       aria-describedby={consequenceId}
       className="mt-3 grid min-w-0 gap-3 border border-border p-3"
     >
@@ -197,7 +200,7 @@ export function SensitivityPanel(properties: {
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" onClick={properties.onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
         <Button

@@ -16,6 +16,7 @@ import {
   SENSITIVITY_PANEL_WORDS,
   sensitivityAndAudienceWords,
   STATE_WORDS,
+  THE_ACTION_BEFORE_IS_STILL_GOING,
   THE_CHANGE_BEFORE_IS_STILL_GOING,
 } from "@/features/sources/words.ts";
 import { ViewStateSlot } from "@/shared/page-toolbar.tsx";
@@ -316,6 +317,48 @@ const commitTo = (row: ReturnType<typeof within>, asked: typeof WIDENED | typeof
 const describedBy = (control: HTMLElement): string | undefined =>
   document.getElementById(control.getAttribute("aria-describedby") ?? "")?.textContent;
 
+const TICKING = { name: REVIEW_WORDS.select(BANK_DETAILS) };
+
+/** A keep sent from the handbook's review, its answer held and the hold already drawn. */
+const aKeepHeldPending = async () => {
+  const answer = Promise.withResolvers<void>();
+  atSources({ held: answer.promise, findings: [BANK_DETAILS] });
+  const row = await rowOf("Staff handbook");
+  const review = rowAction(row, ROW_ACTIONS.review, "Staff handbook");
+  fireEvent.click(review);
+  fireEvent.click(await row.findByRole("checkbox", TICKING));
+  fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.keep.key });
+  const reason = screen.getByLabelText("Reason");
+  fireEvent.change(reason, { target: { value: "Printed on every invoice" } });
+  fireEvent.submit(reason);
+  // The hold is drawn a task after the keep is sent, as a second press would find it.
+  await waitFor(() => {
+    expect(review.getAttribute("aria-disabled")).toBe("true");
+  });
+  return { answer, row, review };
+};
+
+/** Which reviews are drawn, and whether the page said why a held press did nothing. */
+const reviewsDrawn = () => ({
+  handbook: reviewOf("Staff handbook") !== null,
+  priceBook: reviewOf("Price book") !== null,
+  saidWhy: screen.queryByText(THE_ACTION_BEFORE_IS_STILL_GOING) !== null,
+});
+
+const HELD_AS_IT_WAS = { handbook: true, priceBook: false, saidWhy: true };
+
+/** The review that sent the keep is still drawn, so the refusal reaches it and its group. */
+const theKeepIsRefusedInItsReview = async (held: Awaited<ReturnType<typeof aKeepHeldPending>>) => {
+  held.answer.resolve();
+  expect(
+    await held.row.findByText(sentenceOf(SAID_OF_A_CONNECTED_SOURCE["not-the-always-set"])),
+  ).toBeDefined();
+  expect(held.row.getByRole("checkbox", TICKING).getAttribute("aria-checked")).toBe("true");
+  await waitFor(() => {
+    expect(held.review.hasAttribute("aria-disabled")).toBe(false);
+  });
+};
+
 describe("a connected source's row", () => {
   it("reads its stored values as words", async () => {
     atSources();
@@ -369,34 +412,37 @@ describe("a connected source's row", () => {
   });
 
   it("holds its review open until a pending keep answers", async () => {
-    const answer = Promise.withResolvers<void>();
-    atSources({ held: answer.promise, findings: [BANK_DETAILS] });
-    const row = await rowOf("Staff handbook");
-    const review = rowAction(row, ROW_ACTIONS.review, "Staff handbook");
-    fireEvent.click(review);
-    const ticking = { name: REVIEW_WORDS.select(BANK_DETAILS) };
-    fireEvent.click(await row.findByRole("checkbox", ticking));
-    fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.keep.key });
-    const reason = screen.getByLabelText("Reason");
-    fireEvent.change(reason, { target: { value: "Printed on every invoice" } });
-    fireEvent.submit(reason);
-    // The hold is drawn a task after the keep is sent, as a second press would find it.
-    await waitFor(() => {
-      expect(review.getAttribute("aria-disabled")).toBe("true");
+    const held = await aKeepHeldPending();
+
+    fireEvent.click(held.review);
+
+    expect(reviewsDrawn()).toEqual(HELD_AS_IT_WAS);
+    await theKeepIsRefusedInItsReview(held);
+  });
+
+  it("holds another row's Review press while a keep is pending", async () => {
+    const held = await aKeepHeldPending();
+    const theirs = rowAction(await rowOf("Price book"), ROW_ACTIONS.review, "Price book");
+
+    fireEvent.click(theirs);
+
+    expect(reviewsDrawn()).toEqual(HELD_AS_IT_WAS);
+    expect(theirs.getAttribute("aria-disabled")).toBe("true");
+    await theKeepIsRefusedInItsReview(held);
+  });
+
+  it("holds r in another row while a keep is pending", async () => {
+    const held = await aKeepHeldPending();
+    const priceBook = await rowOf("Price book");
+    // Flushed, so the row is the one in focus before the key is read.
+    act(() => {
+      rowAction(priceBook, ROW_ACTIONS.review, "Price book").focus();
     });
 
-    fireEvent.click(review);
+    fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.review.key });
 
-    expect(reviewOf("Staff handbook")).not.toBeNull();
-
-    answer.resolve();
-    expect(
-      await row.findByText(sentenceOf(SAID_OF_A_CONNECTED_SOURCE["not-the-always-set"])),
-    ).toBeDefined();
-    expect(row.getByRole("checkbox", ticking).getAttribute("aria-checked")).toBe("true");
-    await waitFor(() => {
-      expect(review.hasAttribute("aria-disabled")).toBe(false);
-    });
+    expect(reviewsDrawn()).toEqual(HELD_AS_IT_WAS);
+    await theKeepIsRefusedInItsReview(held);
   });
 
   it("closes one review as another's opens", async () => {
@@ -472,6 +518,23 @@ describe("widening a connected source in its row", () => {
 
     expect(panelOf("widen", "Staff handbook")).toBeNull();
     expect(document.activeElement).toBe(widen);
+  });
+
+  it("keeps its opener when another change replaces the panel", async () => {
+    atSources();
+    const row = await rowOf("Price book");
+    const narrow = rowAction(row, ROW_ACTIONS.narrow, "Price book");
+    narrow.focus();
+    fireEvent.click(narrow);
+    const cancel = row.getByRole("button", { name: "Cancel" });
+    cancel.focus();
+
+    fireEvent.keyDown(cancel, { key: SOURCES_KEYSTROKES.widen.key });
+    expect(panelOf("widen", "Price book")).not.toBeNull();
+    fireEvent.click(row.getByRole("button", { name: "Cancel" }));
+
+    expect(panelOf("widen", "Price book")).toBeNull();
+    expect(document.activeElement).toBe(narrow);
   });
 
   it("commits at once, focus on the source's heading", async () => {
