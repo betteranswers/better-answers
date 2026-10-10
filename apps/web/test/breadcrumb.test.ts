@@ -69,6 +69,12 @@ describe("the band's breadcrumb", () => {
     expect(partsAt("Admin", "/system/not-a-page")).toEqual([]);
   });
 
+  it("names the page's own part where no place is open", () => {
+    expect(partsAt("Admin", "/system/not-a-page", "No page at this address")).toEqual([
+      { name: "No page at this address", to: undefined },
+    ]);
+  });
+
   it("ends a member page on the person's name", () => {
     expect(partsAt("Admin", MEMBER_PAGE, "Priya Shah")).toEqual([
       { name: "Control Centre", to: "/people/members" },

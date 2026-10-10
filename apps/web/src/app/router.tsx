@@ -195,14 +195,14 @@ const codesRoute = createRoute({
   },
 });
 
-/** In the shell once a workspace is open; outside it otherwise, as a person in no workspace needs. */
-function AccountWhereHeld() {
-  const member = useMember();
+/** Framed once a workspace is open, and decided on arrival: a later read never swaps the page. */
+function AccountWhereHeld(): ReactElement {
+  const framed = accountRoute.useRouteContext({ select: (context) => context.framed });
 
-  return member.data === undefined ? (
-    <AccountPage />
-  ) : (
+  return framed ? (
     <WorkspaceFrame page={{ draw: <AccountPage framed />, name: ACCOUNT_HEADING }} />
+  ) : (
+    <AccountPage />
   );
 }
 
@@ -215,8 +215,8 @@ const accountRoute = createRoute({
     const elsewhere = await signedOutDetour(context.queryClient, location.href);
     if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
     await confirmedFirst(context, location);
-    // Read here, so the page draws in its frame from the first paint.
     await memberRefusal(context.queryClient, context.api);
+    return { framed: roleHeld(context.queryClient, context.api) !== undefined };
   },
 });
 

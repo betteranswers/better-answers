@@ -13,6 +13,7 @@ import {
   keystrokesDismissed,
   keystrokesListed,
   landedAtHome,
+  notFoundOfferingHome,
   person,
   provision,
   quoted,
@@ -39,9 +40,8 @@ const unknownPage = (page: Page) =>
 /** In the shell, past the skip link, the not-found's one link is the way home. */
 const homeOfferedInTheShell = async (page: Page, role: Role, audited: () => Promise<void>) => {
   const home = goHome(HOMES[role]);
-  await expect(unknownPage(page)).toBeVisible();
+  await notFoundOfferingHome(page, role);
   await expect(page.getByRole("navigation", { name: RAIL })).toBeVisible();
-  await expect(page.getByRole("link", { name: home })).toBeVisible();
   await audited();
   await skipLinkReachesThePage(page);
   await page.keyboard.press("Tab");
