@@ -829,23 +829,32 @@ describe("a body's links", () => {
     ]);
   });
 
-  it("reads alike for a concept withheld and one never written", async () => {
+  it("reads a withheld, an unwritten and a nameless link alike", async () => {
     const scenario = await arrange();
     const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
-    await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
-      path: AUDIT_COMMITTEE,
+    const board = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
+      path: "knowledge/held/board.md",
     });
-    const toWithheld = await noteAt(scenario, EXPENSES, { body: TO_THE_COMMITTEE });
-    const toNothing = await noteAt(scenario, "knowledge/draft/policies/expenses.md", {
-      body: TO_THE_COMMITTEE,
-    });
+    const body = "Ask [the board](../board.md).";
+    const asked = { title: "Expenses", frontmatter: { title: "Expenses", type: "Note" }, body };
+    const toWithheld = await noteAt(scenario, "knowledge/held/policies/expenses.md", asked);
+    const toUnwritten = await noteAt(scenario, "knowledge/bare/policies/expenses.md", asked);
+    const outOfTheBundle = await noteAt(scenario, "knowledge/expenses.md", asked);
 
-    const withheld = await readFor(scenario.viewer, toWithheld.iri);
-    const absent = await readFor(scenario.viewer, toNothing.iri);
+    const seen: string[] = [];
+    for (const { iri } of [toWithheld, toUnwritten, outOfTheBundle]) {
+      seen.push(
+        JSON.stringify(await readFor(scenario.viewer, iri)).replaceAll(iri, "this concept"),
+      );
+    }
 
-    const nothingAnswered = { body: TO_THE_COMMITTEE, bodyLinks: [], relations: [] };
-    expect(withheld).toMatchObject(nothingAnswered);
-    expect(absent).toMatchObject(nothingAnswered);
+    expect(seen[0]).toContain('"bodyLinks":[]');
+    expect(seen[0]).toContain('"relations":[]');
+    expect(seen[1]).toBe(seen[0]);
+    expect(seen[2]).toBe(seen[0]);
+    expect(await linksFor(scenario.admin, toWithheld.iri)).toEqual([
+      { ordinal: 0, address: "../board.md", target: board.iri },
+    ]);
   });
 
   it("answers a group's concept to its members alone", async () => {
