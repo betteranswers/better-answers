@@ -22,7 +22,7 @@ execution: code
   - A production `requireAdmin` or `requireFreshSignIn` site fails the widened lint and cannot be fixed without changing what the action admits.
   - The walk names a word whose class no remedy in the glossary's seven fits.
   - U6 of S2a lands first and adds refusal words to a union; rebase and register them before pushing.
-- **Execution profile:** one pull request, reversible. Three `ops` exit codes change (R5).
+- **Execution profile:** one pull request, reversible. Five `ops` exits move to their class's code (R5).
 - **Who finishes:** `ce-work` builds; `/ce-code-review` reviews; `ce-commit-push-pr` opens the pull request. The lead merges.
 - **Open blockers:** none.
 
@@ -32,7 +32,7 @@ execution: code
 
 ### Summary
 
-The admission lint treats `requireAdmin` and `requireFreshSignIn` as admitting calls. The refusal-word test reads the string literals of every `*Refusal` type alias under `packages/core/src`, outside the store doors, and holds them against the register both ways. Every word the walk finds is declared by a slice: concepts and runs gain vocabularies, and erasure declares three more words and exports its vocabulary. The api's `REFUSALS` spreads all of them, and `ops` refuses in registered words or an `Error`, never a bare string.
+The admission lint treats `requireAdmin` and `requireFreshSignIn` as admitting calls. The refusal-word test reads the string literals of every `*Refusal` type alias under `packages/core/src`, and every `*Refusal<…>` vocabulary's arguments wherever they are written, outside the store doors. It holds them against the register both ways. Every word the walk finds is declared by a slice: concepts and runs gain vocabularies, and erasure declares three more words and exports its vocabulary. The api's `REFUSALS` spreads all of them, and `ops` refuses in registered words or an `Error`, never a bare string.
 
 ### Problem Frame
 
@@ -74,6 +74,7 @@ The lint `action-admits-before-await` watches calls named `admit` only. About tw
   - Building the concepts slice's unions from its vocabulary (`ConceptRefusal<…>`). The walk holds the words; the unions stay bare, so U6's files are not touched.
   - The words a union takes through a type reference, such as `CommitRefusal`'s `stale-precondition`, `malformed-path` and `malformed-message` inside `WriteConceptRefusal`. A syntax walk does not resolve references, and the regex did not either. WP15 owns that.
   - `reconcile-watermark`'s `stopped` path, which reports a replay's word inside a sentence and exits 1 as a partial run, not a refusal.
+  - `import-bundle`'s refusals from the import itself (`class-unreadable`, `manifest-taken`, `role-forbids` and the rest), which it says in sentences and exits 1 without calling `refused`. Moving them to class codes is a follow-up issue, so this package's exit changes stay the ones `refused` makes.
 - **Coordination:** S2a's U6 (`feat/s2a-u6-boundary-mcp`) edits `answering/`, `concepts/read.ts`, `apps/api/src/mcp/entries` and `surface.ts`. This plan edits none of them. It adds `concepts/vocabulary.ts` and one export line in `concepts/index.ts`. Whichever merges second rebases, and a word U6 adds to a `*Refusal` union must be registered then.
 
 ### Assumptions
@@ -118,9 +119,9 @@ The lint `action-admits-before-await` watches calls named `admit` only. About tw
 
 ### Key Technical Decisions
 
-- KTD1. **The two calls note admission; only `admit` pairs with a declaration.** The rule's frame notes any of `admit`, `requireAdmin` and `requireFreshSignIn` as the admitting call. Only `admit`'s first argument feeds the `unadmitted` check, so a `requireAdmin(principal)` never counts `principal` as a declaration. The `late` message names the call it found. Governs R1.
+- KTD1. **Every admitting call lands before its function's first await; only `admit` pairs with a declaration.** The rule reports each of `admit`, `requireAdmin` and `requireFreshSignIn` made after the enclosing function has awaited, so a shorthand early in a function cannot excuse a late `admit`. Only `admit`'s first argument feeds the `unadmitted` check, so a `requireAdmin(principal)` never counts `principal` as a declaration. The `late` message names the call. Governs R1.
 - KTD2. **The walk is a devtools scan over sources, and core's test runs it.** `packages/devtools` gains `refusal-unions.ts`, taking `(file, source)` pairs and answering each word with the alias that names it. It parses through `parsedSource`, which throws on a file that does not parse rather than reading it as empty. Its own test proves the reading on fixture strings (AE2, AE3); `refusal-words.test.ts` runs it over core's slices. This follows `table-ownership-scan.ts` and `insert-scan.ts`. Governs R3.
-- KTD3. **A refusal type's words are the string literals it is built from.** The walk descends union and intersection members and type arguments. It never reads an object type's property types, which hold discriminators such as `kind: "stopped"`. It never reads the arguments of a `…OfClass` type, which are classes. `store/` is skipped: a store door's word is a defect a slice maps or passes on, never a refusal (the walk's existing `no-bucket` case). Governs R3.
+- KTD3. **A refusal type's words are the string literals it is built from.** The walk reads every `*Refusal` alias, and every `*Refusal<…>` vocabulary's arguments wherever written, so an object's `word: ErasureRefusal<"identifier-too-broad">` is read. Within either, it descends union and intersection members and type arguments. It never reads an object type's property types, which hold discriminators such as `kind: "stopped"`. It never reads the arguments of a `…OfClass` type, which are classes. `store/` is skipped: a store door's word is a defect a slice maps or passes on, never a refusal (the walk's existing `no-bucket` case). Governs R3.
 - KTD4. **Each slice's words register when its entry point loads.** `concepts/vocabulary.ts` and `runs/vocabulary.ts` follow `erasure/vocabulary.ts`, and `RefusalOwner` gains `concepts` and `runs`. Each slice's `index.ts` exports its vocabulary, which also loads it. Runs names its word in an exported `JobByIdRefusal`, so the walk sees it. Governs R4.
 - KTD5. **`refused` takes a word or an `Error`, and an optional sentence.** A caller that explains a word in a sentence passes both: the line keeps the sentence and the exit takes the word's class. A failure in no word is an `Error` and exits 1. No word is ever sent back to 1 as prose, because the usage text promises class codes for registered words. Governs R5.
 
@@ -129,10 +130,12 @@ The lint `action-admits-before-await` watches calls named `admit` only. About tw
 | Command | Refusal | Today | After |
 | --- | --- | --- | --- |
 | `reconcile-watermark` | `no-such-repository` | 1 | 9, precondition |
+| `reconcile-watermark` | `history-diverged` | 1 | 9, precondition |
 | `import-bundle` | `not-a-member`, said as "invite them first" | 1 | 4, unauthenticated |
 | `erasure-rehearsal` | `not-seeded`, said as "no synthetic subject stands" | 1 | 9, precondition |
+| `map-rebuild --wait`, `erasure-rehearsal --seed` | `no-such-job` | 1 | 6, absent |
 
-No script, workflow or runbook step reads these three exits.
+No script, workflow or runbook step reads these exits. The first four are asserted. `no-such-job` cannot be reached through the commands: each waits on the job it has just queued, under the platform principal.
 
 ---
 
@@ -152,7 +155,8 @@ No script, workflow or runbook step reads these three exits.
   - Covers AE1. A step with no declaration awaits, then calls `requireAdmin`: flagged, and the output names `requireAdmin`.
   - Covers AE1. The same step calling `requireAdmin` first, then awaiting: not flagged.
   - Covers AE1. The same pair for `requireFreshSignIn`.
-  - A `requireAdmin(principal)` in a file that declares an action and passes it to `admit` raises no `unadmitted` report naming `principal`.
+  - A function that calls `requireAdmin`, awaits, then calls `admit` is flagged, naming `admit`.
+  - A `requireAdmin(reprocessAction)` never counts as passing the declaration to `admit`.
 - **Verification:** the devtools suite passes; `pnpm check:gates` passes over the whole tree, so every production site already admits first.
 
 ### U2. The walk reads every refusal union
@@ -171,6 +175,7 @@ No script, workflow or runbook step reads these three exits.
   - A word inside a vocabulary helper's argument, `MemberRefusal<"last-admin">`, and inside `RefusedItems<…>`, is named.
   - Covers AE3. An object property's literal and a `KernelRefusalOfClass` argument are not named.
   - An alias whose name does not end in `Refusal` is not read; an unexported `*Refusal` alias is.
+  - A vocabulary's argument inside an object's `word` property is named, as in `IdentifierTooBroad` and `AddressRefused`.
   - A source that does not parse throws, naming its file.
   - Core: the register and the walked words match both ways, over the real tree.
 - **Verification:** both suites pass; with U3 reverted, the core test names the seventeen words.
@@ -193,11 +198,12 @@ No script, workflow or runbook step reads these three exits.
 - **Requirements:** R5; AE4; KTD5.
 - **Dependencies:** U3.
 - **Files:**
-  - Modify: `apps/api/src/ops/index.ts`
+  - Modify: `apps/api/src/ops/index.ts`, `packages/core/package.json` (testing export)
   - Test: `apps/api/tests/ops.test.ts`
 - **Approach:** narrow `refused`'s reason and add its optional sentence. `import-bundle` passes `not-a-member` with its sentence; `rehearsalReason` gives way to the sentence for `not-seeded`.
 - **Test scenarios:**
   - Covers AE4. `reconcile-watermark` with no repository exits `EXIT_OF_CLASS.precondition`, its line unchanged.
+  - `reconcile-watermark` over a diverged history exits `EXIT_OF_CLASS.precondition`, through core's `divergeHistory` helper, exported to suites as `@better-answers/core/testing/bundle`.
   - `import-bundle` for a non-member's email exits `EXIT_OF_CLASS.unauthenticated`, its line unchanged.
   - `erasure-rehearsal --run` where phase one never ran exits `EXIT_OF_CLASS.precondition`, in its own test and in the drill's table.
 - **Verification:** `pnpm check:api` passes.
@@ -220,5 +226,5 @@ No script, workflow or runbook step reads these three exits.
 
 - The lint flags an `await` before either call, and no production site.
 - The walk names every literal of every `*Refusal` alias in core's slices, and the register matches it both ways.
-- `ops` refuses in registered words or an `Error`; the three moved exits are asserted.
-- The pull request body ends with `Merge risk: reversible, three ops exit codes change` and `Fixes BA-79`.
+- `ops` refuses in registered words or an `Error`; every moved exit a command can reach is asserted.
+- The pull request body ends with `Merge risk: reversible, five ops exits move to their class's code` and `Fixes BA-79`.
