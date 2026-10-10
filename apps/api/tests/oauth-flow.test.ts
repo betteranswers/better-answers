@@ -2,7 +2,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
-  BETTER_AUTH_RATE_LIMIT,
   CONSENT_WORDS,
   OAUTH_SCOPES,
   REFRESH_TOKEN_LIFETIME_SECONDS,
@@ -914,12 +913,33 @@ describe("the limits", () => {
   type Counted = {
     readonly name: string;
     readonly max: number;
+    /** A minute, where none is named. */
+    readonly windowMs?: number;
     readonly ask: (client: Client) => Promise<Response>;
   };
+
+  const TEN_MINUTES_MS = 10 * MINUTE_MS;
+
+  let sends = 0;
+
+  /** A code asked for an address nobody else asks for, so the count by email never refuses it. */
+  const aSend = (client: Client): Promise<Response> =>
+    client.json(SEND_EMAIL_CODE_PATH, {
+      email: `send-${(sends += 1)}-${Date.now()}@example.invalid`,
+      type: "sign-in",
+    });
 
   /** Every count by client address, each with one request to a route it counts and its ceiling. */
   const COUNTS = {
     trpc: { name: "tRPC", max: 120, ask: (client) => client.fetch("/trpc/session.member") },
+    "email-code-send": { name: "a code's send", max: 5, windowMs: TEN_MINUTES_MS, ask: aSend },
+    "email-code-sign-in": {
+      name: "a sign-in by code",
+      max: 10,
+      windowMs: TEN_MINUTES_MS,
+      ask: (client) =>
+        client.json("/sign-in/email-otp", { email: "nobody@example.invalid", otp: "000000" }),
+    },
     identity: {
       name: "Better Auth's own endpoints",
       max: 120,
@@ -949,7 +969,9 @@ describe("the limits", () => {
     },
   } satisfies Record<AddressScope, Counted>;
 
-  const ROUTES = Object.entries(COUNTS).map(([group, counted]) => ({ group, ...counted }));
+  const ROUTES: readonly (Counted & { readonly group: string })[] = Object.entries(COUNTS).map(
+    ([group, counted]) => ({ group, ...counted }),
+  );
 
   /** What a count by address logged since `from`: each line whole, as the logger wrote it. */
   const ceilingsMetSince = (from: number) =>
@@ -969,21 +991,31 @@ describe("the limits", () => {
     expect((await client.fetch("/.well-known/oauth-protected-resource/mcp")).status).toBe(200);
   });
 
+  /** Stopped at a window's first instant, so a test can move to its last second and past it. */
+  const atAWindowsStart = (windowMs: number): void => {
+    stopTheClock();
+    moveTheClock(windowMs - (clock.now().getTime() % windowMs));
+  };
+
   it.each(ROUTES)("logs once a window for $name", async (counted) => {
     const client = app.client();
     const from = app.logs.length;
-    stopTheClock();
+    const windowMs = counted.windowMs ?? MINUTE_MS;
+    atAWindowsStart(windowMs);
 
     await onePast(() => counted.ask(client), counted.max - 1);
     const under = ceilingsMetSince(from).length;
     await counted.ask(client);
     const atTheFirst = ceilingsMetSince(from).length;
     for (let later = 0; later < 10; later += 1) await counted.ask(client);
-    const afterTen = ceilingsMetSince(from).length;
-    moveTheClock(MINUTE_MS);
+    moveTheClock(windowMs - 1000);
+    const inItsLastSecond = (await counted.ask(client)).status;
+    const afterEleven = ceilingsMetSince(from).length;
+    moveTheClock(1000);
     await onePast(() => counted.ask(client), counted.max);
 
-    expect([under, atTheFirst, afterTen]).toEqual([0, 1, 1]);
+    expect([under, atTheFirst, afterEleven]).toEqual([0, 1, 1]);
+    expect(inItsLastSecond).toBe(429);
     expect(ceilingsMetSince(from).map((line) => line["group"])).toEqual([
       counted.group,
       counted.group,
@@ -1207,7 +1239,7 @@ describe("the limits", () => {
     expect(await countedByTheApi(client.ip)).toEqual([]);
   });
 
-  /** Every path Better Auth's limiter keeps: each takes or sends an emailed code. */
+  /** Every endpoint that takes or sends an emailed code, as the installed release mounts them. */
   const EMAIL_CODE_PATHS = [
     "/email-otp/change-email",
     "/email-otp/check-verification-otp",
@@ -1220,45 +1252,28 @@ describe("the limits", () => {
     "/sign-in/email-otp",
   ];
 
-  const takesOrSendsACode = (path: string): boolean =>
-    path === "/sign-in/email-otp" ||
-    path.startsWith("/email-otp/") ||
-    path.startsWith("/forget-password/");
-
   const counterExpectedFor = (path: string): string => {
-    if (takesOrSendsACode(path)) return "Better Auth";
+    if (path === "/sign-in/email-otp") return "email-code-sign-in";
+    if (EMAIL_CODE_PATHS.includes(path)) return "email-code-send";
     if (path.startsWith("/.well-known/")) return "none";
     return path.startsWith("/oauth2/") || path === "/jwks" ? "oauth" : "identity";
   };
 
-  it("gives each path Better Auth mounts its one counter", async () => {
-    const counters: { path: string; counter: string }[] = [];
+  it("gives each path Better Auth mounts its one count", async () => {
+    const counts: { path: string; count: string }[] = [];
 
     for (const path of mountedPaths(authOver(app))) {
       const client = app.client();
-      const asked = path.replaceAll(/:[a-z_]+/g, "any");
-      await client.fetch(asked);
-      const theirs = (await countedByBetterAuth(client.ip)).map(() => "Better Auth");
-      const ours = await countedByTheApi(client.ip);
-      counters.push({ path, counter: [...theirs, ...ours].join(" and ") || "none" });
+      await client.fetch(path.replaceAll(/:[a-z_]+/g, "any"));
+      counts.push({ path, count: (await countedByTheApi(client.ip)).join(" and ") || "none" });
     }
+    const heldByBetterAuth = await app.database.superuser.query("SELECT key FROM rate_limit");
 
-    expect(counters).toEqual(
-      counters.map(({ path }) => ({ path, counter: counterExpectedFor(path) })),
+    expect(counts).toEqual(counts.map(({ path }) => ({ path, count: counterExpectedFor(path) })));
+    expect(counts.map(({ path }) => path)).toEqual(
+      expect.arrayContaining([...EMAIL_CODE_PATHS, "/oauth2/end-session/confirm"]),
     );
-    expect(
-      counters.filter(({ counter }) => counter === "Better Auth").map(({ path }) => path),
-    ).toEqual(EMAIL_CODE_PATHS);
-    expect(counters.map(({ path }) => path)).toContain("/oauth2/end-session/confirm");
-  });
-
-  it("keeps Better Auth's limiter on mounted paths only", () => {
-    const kept = Object.entries(BETTER_AUTH_RATE_LIMIT.customRules)
-      .filter(([, rule]) => rule !== false)
-      .map(([path]) => path);
-
-    expect(kept.toSorted()).toEqual(EMAIL_CODE_PATHS);
-    expect(mountedPaths(authOver(app))).toEqual(expect.arrayContaining(EMAIL_CODE_PATHS));
+    expect(heldByBetterAuth.rows).toEqual([]);
   });
 
   it("answers no endpoint under a spelling it does not count", async () => {
@@ -1277,21 +1292,44 @@ describe("the limits", () => {
     expect(asMounted.status).toBe(200);
   });
 
-  it("leaves an email-code flood to Better Auth's limiter and words", async () => {
-    const client = app.client("203.0.113.40");
-    const send = (attempt: number): Promise<Response> =>
-      client.json("/email-otp/send-verification-otp", {
-        email: `flood-${attempt}@example.invalid`,
-        type: "sign-in",
-      });
+  it("refuses a sixth code in one window, in our words", async () => {
+    const client = app.client();
+    stopTheClock();
+
+    const statuses = await onePast(() => aSend(client), 4);
+    const past = await aSend(client);
+
+    expect(statuses).toEqual([200, 200, 200, 200, 200]);
+    await isOursAlone(past, client.ip);
+  });
+
+  it("refuses by email before it counts the address", async () => {
+    const [filling, asking] = [app.client(), app.client()];
+    const email = `one-address-${Date.now()}@example.invalid`;
+    const sendTo = (client: Client): Promise<Response> =>
+      client.json(SEND_EMAIL_CODE_PATH, { email, type: "sign-in" });
+    stopTheClock();
+
+    await onePast(() => sendTo(filling), 4);
+    const refused = await sendTo(asking);
+    const others = await onePast(() => aSend(asking), 4);
+
+    expect(await refused.json()).toMatchObject({
+      error_description: "Too many codes requested for this address; try again later.",
+    });
+    expect(others).toEqual([200, 200, 200, 200, 200]);
+  });
+
+  it("answers a sixth code once the first window passes", async () => {
+    const client = app.client();
+    stopTheClock();
 
     const statuses: number[] = [];
-    for (let attempt = 1; attempt <= 5; attempt += 1) statuses.push((await send(attempt)).status);
-    const past = await send(6);
+    for (let send = 0; send < 6; send += 1) {
+      statuses.push((await aSend(client)).status);
+      moveTheClock(3 * MINUTE_MS);
+    }
 
-    expect(statuses).not.toContain(429);
-    expect(past.status).toBe(429);
-    expect(await past.json()).toEqual({ message: "Too many requests. Please try again later." });
-    expect(await countedByBetterAuth(client.ip)).toEqual(["/email-otp/send-verification-otp"]);
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 200]);
   });
 });

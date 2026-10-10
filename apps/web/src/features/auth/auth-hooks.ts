@@ -70,22 +70,14 @@ const listOrganizationsOptions = () =>
 export const useListOrganizations = (asked = true) =>
   useQuery({ ...listOrganizationsOptions(), enabled: asked });
 
-/** The per-email ceiling in front of Better Auth answers the first; Better Auth's own, the second. */
-const WAIT_HEADERS = ["retry-after", "x-retry-after"] as const;
-
 const wholeSeconds = z
   .string()
   .trim()
   .regex(/^\d+$/)
   .transform((seconds) => Number(seconds));
 
-const waitNamedBy = (response: Response): number | undefined => {
-  for (const header of WAIT_HEADERS) {
-    const named = wholeSeconds.safeParse(response.headers.get(header));
-    if (named.success) return named.data;
-  }
-  return undefined;
-};
+const waitNamedBy = (response: Response): number | undefined =>
+  wholeSeconds.safeParse(response.headers.get("retry-after")).data;
 
 const SERVER_FAILED = 500;
 

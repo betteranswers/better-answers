@@ -51,7 +51,7 @@ Better Auth checks `disabledPaths` in one place: the router's `onRequest`, which
 
 The 404 is not the only thing that lives in the router. A server-function call also skips:
 
-- The rate limiter, `onRequestRateLimit` (`dist/api/index.mjs:172-173`). That covers the library's default rules, every plugin's own rule and our `customRules` from `BETTER_AUTH_RATE_LIMIT` (`dist/api/rate-limiter/index.mjs:246-276`; `apps/api/src/auth/constants.ts:62-75`). The authenticator plugin ships a rule of 3 requests per 10 seconds for `/two-factor/*` (`dist/plugins/two-factor/index.mjs:338-344`). It never applies to `auth.api.verifyTOTP`.
+- The rate limiter, `onRequestRateLimit` (`dist/api/index.mjs:172-173`). That covers the library's default rules and every plugin's own rule (`dist/api/rate-limiter/index.mjs:246-276`). The authenticator plugin ships a rule of 3 requests per 10 seconds for `/two-factor/*` (`dist/plugins/two-factor/index.mjs:338-344`). It never applies to `auth.api.verifyTOTP`. Since 10/10/2026 the api switches that limiter off altogether (`rateLimit: { enabled: false }` in `auth.ts`) and counts each mounted endpoint itself, in Hono middleware in `apps/api/src/auth/routes.ts`. A server-function call skips that middleware just the same.
 - Every plugin's `onRequest` hook (`dist/api/index.mjs:174-181`).
 - `originCheckMiddleware` and every plugin's router `middlewares` (`dist/api/index.mjs:159-162`, built at `:92-112`). Our `disableOriginCheck: false` (`auth.ts:465`) does nothing for a server call.
 

@@ -52,6 +52,8 @@ export const tooManyRequests = (retryAfterSeconds: number, description: string):
 /** The route groups the api counts by client address. */
 export type AddressScope =
   | "consent"
+  | "email-code-send"
+  | "email-code-sign-in"
   | "identity"
   | "mcp"
   | "oauth"

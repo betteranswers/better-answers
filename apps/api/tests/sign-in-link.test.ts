@@ -260,6 +260,48 @@ describe("reading a link", () => {
 });
 
 describe("signing in through a link", () => {
+  it("spends no sign-in on a link another browser asked for", async () => {
+    const person = await app().person();
+    const { token } = await askedFor(app().client(), person.email);
+    const another = app().client();
+    stopTheClock();
+
+    const byLink: number[] = [];
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      byLink.push((await another.json(SIGN_IN_BY_LINK, { token })).status);
+    }
+    const byForm: number[] = [];
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const tried = await another.json("/sign-in/email-otp", {
+        email: "nobody@example.invalid",
+        otp: "000000",
+      });
+      byForm.push(tried.status);
+    }
+
+    expect(new Set(byLink)).toEqual(new Set([403]));
+    expect(byForm).not.toContain(429);
+  });
+
+  it("counts a link's sign-in among its address's sign-ins", async () => {
+    const person = await app().person();
+    const asking = app().client();
+    const { token } = await askedFor(asking, person.email);
+    stopTheClock();
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await asking.json("/sign-in/email-otp", { email: "nobody@example.invalid", otp: "000000" });
+    }
+
+    const refused = await asking.json(SIGN_IN_BY_LINK, { token });
+
+    expect(refused.status).toBe(429);
+    expect(Number(refused.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(await refused.json()).toEqual({
+      error: "too_many_requests",
+      error_description: "Too many sign-ins from this address; try again later.",
+    });
+  });
+
   it("signs in the asking browser after a scanner opened it", async () => {
     const person = await app().person();
     const asking = app().client();

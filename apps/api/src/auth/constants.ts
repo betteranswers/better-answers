@@ -37,6 +37,14 @@ export const EMAIL_CODE_EMAIL_RULE: CounterRule = { windowMs: 10 * 60_000, max: 
 
 export const SEND_EMAIL_CODE_PATH = "/email-otp/send-verification-otp";
 
+export const SIGN_IN_BY_EMAIL_CODE_PATH = "/sign-in/email-otp";
+
+/** Behind the count by email. Every email-code endpoint but the sign-in spends it too. */
+export const EMAIL_CODE_SEND_IP_RULE: CounterRule = { windowMs: 10 * 60_000, max: 5 };
+
+/** A sign-in by the form and one by the link spend it alike. */
+export const EMAIL_CODE_SIGN_IN_IP_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
+
 export const SIGN_IN_PATH = "/sign-in";
 
 /** The SPA's page a sign-in link opens; its token rides in the fragment, which no server sees. */
@@ -133,36 +141,5 @@ export const ASK_TO_JOIN_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max
  * the time taken says neither.
  */
 export const ASK_TO_JOIN_ANSWER_FLOOR_MS = 250;
-
-const theLibrarysOwnRule = <Rule>(_request: Request, rule: Rule): Rule => rule;
-
-/** Each path that takes or sends an emailed code is named: a prefix would count a path nothing answers. */
-export const BETTER_AUTH_RATE_LIMIT = {
-  customRules: {
-    "/email-otp/send-verification-otp": { window: 600, max: 5 },
-    "/email-otp/check-verification-otp": { window: 600, max: 10 },
-    "/sign-in/email-otp": { window: 600, max: 10 },
-    "/email-otp/verify-email": theLibrarysOwnRule,
-    "/email-otp/request-password-reset": theLibrarysOwnRule,
-    "/email-otp/reset-password": theLibrarysOwnRule,
-    "/email-otp/request-email-change": theLibrarysOwnRule,
-    "/email-otp/change-email": theLibrarysOwnRule,
-    "/forget-password/email-otp": theLibrarysOwnRule,
-    /**
-     * Last, so the rules above win. The library counts a run of requests, not a window, and
-     * every page its handler is handed.
-     */
-    "/**": false,
-  },
-} as const;
-
-const keptByBetterAuth: ReadonlySet<string> = new Set(
-  Object.entries(BETTER_AUTH_RATE_LIMIT.customRules)
-    .filter(([, rule]) => rule !== false)
-    .map(([path]) => path),
-);
-
-/** Better Auth's limiter counts these paths and no other. */
-export const countedByBetterAuth = (path: string): boolean => keptByBetterAuth.has(path);
 
 export const CIMD_ALLOWED_CLIENT_HOSTS = ["claude.ai"] as const;
