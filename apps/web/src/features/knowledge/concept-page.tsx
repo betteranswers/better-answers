@@ -333,7 +333,12 @@ function ConceptShown(properties: { readonly iri: string; readonly concept: Conc
           <Header concept={concept} titleId={titleId} />
         </div>
         <div className="mt-6">
-          <ConceptBody body={concept.body} evidence={concept.evidence} opening={opening} />
+          <ConceptBody
+            body={concept.body}
+            evidence={concept.evidence}
+            bodyLinks={concept.bodyLinks}
+            opening={opening}
+          />
         </div>
         <div className={INTERFACE}>
           <Sources concept={concept} opening={opening} heading={sources} />
