@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  dayOf,
   furtherKeysOf,
   kindOf,
   tagsOf,
@@ -37,6 +38,14 @@ describe("what a concept page reads from a file's frontmatter", () => {
       { at: "2026-03-03T09:41:00Z", byAPerson: true },
       { at: "2026-04-01T08:00:00Z", byAPerson: false },
     ]);
+  });
+
+  it("says an event's day in the UK long form", () => {
+    expect(dayOf({ at: "2026-03-03T09:41:00Z", byAPerson: true })).toBe("3 March 2026");
+  });
+
+  it("shows an unreadable date as the file wrote it", () => {
+    expect(dayOf({ at: "last Tuesday", byAPerson: false })).toBe("last Tuesday");
   });
 
   it("reads a malformed verified list as no events", () => {

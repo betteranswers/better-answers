@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useId, useRef, useState, type RefObject } from "react";
+import { useId, useRef, useState } from "react";
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
@@ -14,7 +14,6 @@ import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { useRoomBeside } from "@/shared/wide-layout.ts";
-import { dayWords } from "@/shared/words.ts";
 
 import {
   BROWSE,
@@ -23,18 +22,18 @@ import {
   OPENED_FROM,
   searchAt,
 } from "./concept-address.ts";
-import { ConceptBody, opensSomething, type MarkOpening } from "./concept-body.tsx";
+import { ConceptBody, LINK, type MarkOpening } from "./concept-body.tsx";
 import {
+  dayOf,
   descriptionOf,
   furtherKeysOf,
   kindOf,
   tagsOf,
   titleOf,
   verifiedEventsOf,
-  type VerifiedEvent,
 } from "./concept-frontmatter.ts";
-import { EvidenceInline, EvidenceSheet, type Opened } from "./evidence-panel.tsx";
-import { useConcept, type Concept, type Evidence } from "./knowledge-api.ts";
+import { EvidenceInline, EvidenceSheet, type Heading, type Opened } from "./evidence-panel.tsx";
+import { openingOf, useConcept, type Concept, type Evidence } from "./knowledge-api.ts";
 import { CONCEPT_KEYSTROKES as KEY } from "./knowledge-state.ts";
 import { CONCEPT_WORDS as WORDS, RELATION_WORDS } from "./knowledge-words.ts";
 import { SAID_OF_KNOWLEDGE } from "./refusal-words.ts";
@@ -42,19 +41,19 @@ import { failedReadWords } from "./refusal.tsx";
 
 const LISTED = Object.values(KEY);
 
-const LINK = "text-brand underline underline-offset-4";
-
-/** Search at the query its reader left, with focus back on the match this page was opened from. */
+/** Focus goes back to the match only where this page was opened from one: no other way here left a row. */
 const useWayBack = (iri: string | undefined) => {
   const navigate = useNavigate();
   const searchQuery = useRouterState({
     select: (state) => OPENED_FROM.safeParse(state.location.state).data?.searchQuery,
   });
   const href = searchAt(searchQuery);
+  const openedMatch =
+    iri === undefined || searchQuery === undefined ? undefined : conceptMatchKey(iri);
   const go = () => {
     void navigate({
       href,
-      state: (held) => (iri === undefined ? held : { ...held, openedMatch: conceptMatchKey(iri) }),
+      state: (held) => ({ ...held, searchQuery: undefined, openedMatch }),
     });
   };
   return { href, go };
@@ -69,14 +68,14 @@ function WayBack(properties: { readonly iri: string | undefined }) {
   );
 }
 
-/** One state for an address that is malformed, names no concept, or names one withheld. */
-function NoSuchConcept(properties: { readonly iri: string | undefined }) {
+/** One state for a malformed, absent or withheld address, whose way back carries nothing of it. */
+function NoSuchConcept() {
   return (
     <ListState
       state={{
         kind: "empty",
         words: sentenceOf(SAID_OF_KNOWLEDGE["not-found"]),
-        action: <WayBack iri={properties.iri} />,
+        action: <WayBack iri={undefined} />,
       }}
     />
   );
@@ -86,8 +85,6 @@ const namesNothing = (failure: Error | ApiError): boolean => {
   const word = refusalOf(failure)?.word;
   return word === "not-found" || word === "malformed";
 };
-
-type Heading = RefObject<HTMLHeadingElement | null>;
 
 const SECTION_HEADING = "[font-size:var(--text-md)] font-semibold";
 
@@ -121,11 +118,6 @@ function Header(properties: { readonly concept: Concept; readonly titleId: strin
   );
 }
 
-const sourceOpened = (item: Evidence): Opened["source"] | undefined => {
-  if (item.locator !== undefined) return { kind: "passage", locator: item.locator };
-  return item.iri === undefined ? undefined : { kind: "concept", iri: item.iri };
-};
-
 function SourceLine(properties: {
   readonly item: Evidence;
   readonly source: number;
@@ -140,7 +132,9 @@ function SourceLine(properties: {
         <span className="font-mono [font-size:var(--text-xs)] text-muted-foreground">
           [{source + 1}]
         </span>
-        {opensSomething(item) ? (
+        {openingOf(item) === undefined ? (
+          <span className="min-w-0 wrap-anywhere">{item.source}</span>
+        ) : (
           <Button
             id={openerId}
             variant="link"
@@ -152,8 +146,6 @@ function SourceLine(properties: {
           >
             {item.source}
           </Button>
-        ) : (
-          <span className="min-w-0 wrap-anywhere">{item.source}</span>
         )}
         {item.at === undefined ? null : (
           <span className="text-muted-foreground">{WORDS.place(item.at)}</span>
@@ -197,12 +189,6 @@ function Sources(properties: {
   );
 }
 
-const eventWords = (event: VerifiedEvent): string =>
-  WORDS.verifiedOn(
-    Number.isNaN(Date.parse(event.at)) ? event.at : dayWords(event.at),
-    event.byAPerson,
-  );
-
 function Verification(properties: { readonly concept: Concept }) {
   const headingId = useId();
   const events = verifiedEventsOf(properties.concept.frontmatter);
@@ -216,7 +202,7 @@ function Verification(properties: { readonly concept: Concept }) {
       ) : (
         <ul className="mt-2 grid gap-1">
           {events.map((event, at) => (
-            <li key={at}>{eventWords(event)}</li>
+            <li key={at}>{WORDS.verifiedOn(dayOf(event), event.byAPerson)}</li>
           ))}
         </ul>
       )}
@@ -317,7 +303,7 @@ function ConceptShown(properties: { readonly iri: string; readonly concept: Conc
     openerId: opened?.openerId,
     onOpen: ({ openerId, source }) => {
       const item = concept.evidence[source];
-      const opens = item === undefined ? undefined : sourceOpened(item);
+      const opens = openingOf(item);
       if (item === undefined || opens === undefined) return;
       setOpened((current) => ({
         key: String(source),
@@ -367,7 +353,7 @@ function ConceptRead(properties: { readonly iri: string; readonly heading: Headi
   const concept = useConcept(iri);
 
   if (concept.error !== null) {
-    if (namesNothing(concept.error)) return <NoSuchConcept iri={iri} />;
+    if (namesNothing(concept.error)) return <NoSuchConcept />;
     return (
       <ListState
         state={{
@@ -405,7 +391,7 @@ export function ConceptPage(properties: { readonly iri: string | undefined }) {
         {BROWSE.name}
       </h1>
       {iri === undefined ? (
-        <NoSuchConcept iri={iri} />
+        <NoSuchConcept />
       ) : (
         <ConceptRead key={iri} iri={iri} heading={heading} />
       )}

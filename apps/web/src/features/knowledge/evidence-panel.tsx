@@ -15,20 +15,18 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet.tsx";
 
 import { conceptPageOf } from "./concept-address.ts";
-import { ConceptBody } from "./concept-body.tsx";
+import { ConceptBody, LINK } from "./concept-body.tsx";
 import { kindOf, titleOf } from "./concept-frontmatter.ts";
-import { useConcept, usePassage } from "./knowledge-api.ts";
+import { useConcept, usePassage, type Opening } from "./knowledge-api.ts";
 import { CONCEPT_WORDS, EVIDENCE_WORDS, SEARCH_WORDS } from "./knowledge-words.ts";
 import { failedReadWords } from "./refusal.tsx";
 
 /** `unmapped` is a match no concept rests on, which says so beside the sensitivity it already holds. */
 type OpenedSource =
-  | {
-      readonly kind: "passage";
-      readonly locator: string;
+  | (Extract<Opening, { readonly kind: "passage" }> & {
       readonly unmapped?: { readonly sensitivity: string };
-    }
-  | { readonly kind: "concept"; readonly iri: string };
+    })
+  | Extract<Opening, { readonly kind: "concept" }>;
 
 /** A source opened beside the page, and the control that opened it, where focus goes back. */
 export type Opened = {
@@ -69,7 +67,7 @@ export function SensitivityTag(properties: { readonly sensitivity: string }) {
   );
 }
 
-type Heading = RefObject<HTMLHeadingElement | null>;
+export type Heading = RefObject<HTMLHeadingElement | null>;
 
 const QUOTED =
   "border-l border-border bg-muted px-4 py-3 [font-size:var(--text-base)] leading-relaxed whitespace-pre-line";
@@ -124,7 +122,7 @@ function CitedConcept(properties: {
   return (
     <ListRead
       read={concept}
-      loading={EVIDENCE_WORDS.loadingConcept}
+      loading={CONCEPT_WORDS.loading}
       failed={failedReadWords}
       focusAfterRetry={properties.heading}
     >
@@ -148,7 +146,7 @@ function CitedConcept(properties: {
       )}
       {page === undefined ? null : (
         <p>
-          <Link to={page} className="text-brand underline underline-offset-4">
+          <Link to={page} className={LINK}>
             {CONCEPT_WORDS.ownPage}
           </Link>
         </p>

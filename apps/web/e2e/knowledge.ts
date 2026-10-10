@@ -29,9 +29,10 @@ export const readsCeilingFilled = async (page: Page, read: string): Promise<void
 
 type Sensitivity = (typeof SENSITIVITIES)[number];
 
-/** A document's passages, each cited apart; `sensitivity` holds it closer than the concept citing it. */
+/** `label` is the file's own name for the source; `sensitivity` holds the document closer than its concept. */
 type CitedDocument = {
   readonly title: string;
+  readonly label?: string;
   readonly passages: readonly string[];
   readonly sensitivity?: Sensitivity;
 };

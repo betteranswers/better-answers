@@ -5,6 +5,7 @@ import {
   useId,
   useMemo,
   type ComponentProps,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 import Markdown, { type Components, type ExtraProps } from "react-markdown";
@@ -24,7 +25,7 @@ import {
 } from "@/shared/ui/table.tsx";
 
 import { conceptPageOf } from "./concept-address.ts";
-import type { Evidence } from "./knowledge-api.ts";
+import { openingOf, type Evidence } from "./knowledge-api.ts";
 import { CONCEPT_WORDS as WORDS } from "./knowledge-words.ts";
 
 type Element = NonNullable<ExtraProps["node"]>;
@@ -32,10 +33,6 @@ type Element = NonNullable<ExtraProps["node"]>;
 type Child = Element["children"][number];
 
 type Tree = { readonly type: "root"; readonly children: Child[] };
-
-/** A source opens only where the read gave what opens it, which it gives only to who may read it. */
-export const opensSomething = (item: Evidence | undefined): boolean =>
-  item !== undefined && (item.locator !== undefined || item.iri !== undefined);
 
 export type MarkOpening = {
   /** The control whose panel is open: one of this body's marks, or a control elsewhere on the page. */
@@ -45,22 +42,40 @@ export type MarkOpening = {
   readonly inline: ReactNode;
 };
 
-/** Private-use characters carry a mark's place through the parser, which reads them as text. */
-const CARRIED = /(\d+)/;
+const OPENS = "\uE000";
 
-const CARRIERS = /[]/g;
+const CLOSES = "\uE001";
 
-const carrierOf = (mark: number): string => `${String(mark)}`;
+/** Punctuation, as the mark's own bracket was, so emphasis before it closes and a bare address ends. */
+const carrierOf = (mark: number): string => `<${OPENS}${String(mark)}${CLOSES}>`;
+
+const CARRIED = new RegExp(`<${OPENS}(\\d+)${CLOSES}>`);
+
+/** The carrier's two characters, written out or as the character references the parser would decode. */
+const FORGED = new RegExp(`[${OPENS}${CLOSES}]|&#(?:x0*e00[01]|0*5734[45]);`, "gi");
+
+/** The file's own words can never carry a mark: only a place the one reader found does. */
+const unforged = (words: string): string => words.replaceAll(FORGED, "");
 
 type Placed = { readonly at: number; readonly mark: string };
 
-/** Last first, so each mark's place still counts from the body's own start. */
-const carrying = (body: string, marks: readonly Placed[]): string =>
-  marks.reduceRight(
-    (text, { at, mark }, place) =>
-      `${text.slice(0, at)}${carrierOf(place)}${text.slice(at + mark.length)}`,
-    body,
-  );
+/** Marks come in the body's order, each read from the body as the file wrote it. */
+const carrying = (body: string, marks: readonly Placed[]): string => {
+  const pieces: string[] = [];
+  let from = 0;
+  for (const [place, { at, mark }] of marks.entries()) {
+    pieces.push(unforged(body.slice(from, at)), carrierOf(place));
+    from = at + mark.length;
+  }
+  pieces.push(unforged(body.slice(from)));
+  return pieces.join("");
+};
+
+/** A destination that ends in a mark took the carrier with it; the address is the file's without it. */
+const CARRIED_IN_AN_ADDRESS = new RegExp(
+  `(?:<|%3C)(?:${OPENS}|%EE%80%80)\\d+(?:${CLOSES}|%EE%80%81)(?:>|%3E)`,
+  "gi",
+);
 
 type Cited = {
   readonly source: number;
@@ -166,10 +181,21 @@ const childrenDrawn = (children: readonly Child[], within: Within, flows: boolea
   };
 };
 
+const withItsOwnAddress = (link: Element): Element => {
+  const { href } = link.properties;
+  if (typeof href !== "string") return link;
+  return {
+    ...link,
+    properties: { ...link.properties, href: href.replaceAll(CARRIED_IN_AN_ADDRESS, "") },
+  };
+};
+
 const elementDrawn = (node: Element, within: Within): Drawn => {
-  const inside = { ...within, inLink: within.inLink || node.tagName === "a" };
+  const isALink = node.tagName === "a";
+  const inside = { ...within, inLink: within.inLink || isALink };
   const drawn = childrenDrawn(node.children, inside, FLOWS.has(node.tagName));
-  return { ...drawn, nodes: [{ ...node, children: [...drawn.nodes] }] };
+  const element = isALink ? withItsOwnAddress(node) : node;
+  return { ...drawn, nodes: [{ ...element, children: [...drawn.nodes] }] };
 };
 
 /** Raw HTML is drawn as the text the file wrote, so a mark inside it is still a mark. */
@@ -228,7 +254,7 @@ function InlinePanel() {
   return useContext(Body)?.opening?.inline ?? null;
 }
 
-const LINK = "text-brand underline underline-offset-4";
+export const LINK = "text-brand underline underline-offset-4";
 
 /** The file's own addresses on the web, and nothing a browser would run or resolve against this site. */
 const ON_THE_WEB = /^(?:https?:\/\/|mailto:)/i;
@@ -237,6 +263,14 @@ const ON_THE_WEB = /^(?:https?:\/\/|mailto:)/i;
 const footnoteJump = (node: Element | undefined): "down" | "back" | undefined => {
   if (node?.properties["dataFootnoteRef"] !== undefined) return "down";
   return node?.properties["dataFootnoteBackref"] === undefined ? undefined : "back";
+};
+
+/** Focus moves within the page and the address stays, so Back still leaves the page. */
+const jumpWithinThePage = (event: MouseEvent<HTMLAnchorElement>): void => {
+  event.preventDefault();
+  const id = decodeURIComponent(new URL(event.currentTarget.href).hash.slice(1));
+  const landing = document.getElementById(id);
+  (landing?.matches("a") === true ? landing : landing?.querySelector("a"))?.focus();
 };
 
 function BodyLink(properties: ComponentProps<"a"> & ExtraProps) {
@@ -259,6 +293,7 @@ function BodyLink(properties: ComponentProps<"a"> & ExtraProps) {
         id={properties.id}
         aria-describedby={jump === "down" ? held?.footnotesId : undefined}
         className={LINK}
+        onClick={jumpWithinThePage}
       >
         {children}
       </a>
@@ -350,19 +385,18 @@ export function ConceptBody(properties: {
   const baseId = fragmentSafe(useId());
 
   const read = useMemo(() => {
-    const clean = body.replaceAll(CARRIERS, "");
     const { marks } = linksAndMarksOf(
-      clean,
+      body,
       evidence.map((item) => ({ resource: item.source, locator: null, id: item.id ?? null })),
     );
-    return { text: carrying(clean, marks), marks };
+    return { text: carrying(body, marks), marks };
   }, [body, evidence]);
 
   const held: Held = {
     cited: read.marks.map(({ source }) => ({
       source,
       label: evidence[source]?.source ?? "",
-      opens: opening !== undefined && opensSomething(evidence[source]),
+      opens: opening !== undefined && openingOf(evidence[source]) !== undefined,
     })),
     idOf: (mark) => `${baseId}-mark-${String(mark)}`,
     opening,

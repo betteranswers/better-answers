@@ -18,6 +18,7 @@ import {
   crumbOf,
   keystrokesDismissed,
   keystrokesListed,
+  landedAtHome,
   person,
   provision,
   signIn,
@@ -44,6 +45,9 @@ const CALENDAR = "Audit Calendar";
 const POLICY = "Records policy";
 
 const MINUTES = "Board minutes";
+
+/** The Restricted document's own title, which the file's label for it does not say. */
+const MINUTES_DOCUMENT = "Closed session record, March";
 
 const STANDARD = "Retention standard";
 
@@ -113,7 +117,12 @@ const aWorkspaceOfConcepts = async (api: APIRequestContext, name: string) => {
         linksTo: [COMMITTEE],
         sources: [
           { title: POLICY, passages: [POLICY_PASSAGE] },
-          { title: MINUTES, passages: [MINUTES_PASSAGE], sensitivity: "Restricted" },
+          {
+            title: MINUTES_DOCUMENT,
+            label: MINUTES,
+            passages: [MINUTES_PASSAGE],
+            sensitivity: "Restricted",
+          },
           { concept: COMMITTEE },
           { title: STANDARD, at: "p.4" },
         ],
@@ -296,6 +305,10 @@ test.describe("the concept page", () => {
     const panel = panelOf(page, POLICY);
     await expect(panel).toContainText(POLICY_PASSAGE);
     await expect(panel.getByRole("heading", { name: POLICY })).toBeFocused();
+    await expect(panel, "a passage a concept rests on is company knowledge").not.toContainText(
+      SEARCH_WORDS.notCompanyKnowledge,
+    );
+    await expect(panel.getByText("Internal", { exact: true })).toBeVisible();
     await expect(mark).toHaveAttribute("aria-expanded", "true");
     const panelLeft = (await edges(panel)).left;
     await expect
@@ -334,6 +347,15 @@ test.describe("the concept page", () => {
 
     await page.keyboard.press("Escape");
     await expect(markOf(page, 1, POLICY)).toBeFocused();
+
+    await sourceLines(page).nth(1).getByRole("button", { name: MINUTES }).click();
+    const minutes = panelOf(page, MINUTES);
+    await expect(minutes).toContainText(MINUTES_PASSAGE);
+    await expect(minutes, "the panel does not name the passage's document").toContainText(
+      MINUTES_DOCUMENT,
+    );
+    await expect(minutes.getByText("Restricted", { exact: true })).toBeVisible();
+    await expect(minutes).not.toContainText(SEARCH_WORDS.notCompanyKnowledge);
   });
 
   test("opens a cited concept in the panel, one level only", async ({
@@ -353,6 +375,15 @@ test.describe("the concept page", () => {
     await expect(panel).toContainText("Unverified");
     await expect(panel.getByRole("button", { name: WORDS.sourceNamed(1, CHARTER) })).toHaveCount(0);
     await passesTheAccessibilityGate();
+
+    await panel.getByRole("link", { name: WORDS.ownPage }).focus();
+    await page.keyboard.press("Tab");
+    await expect(panel.getByRole("button", { name: EVIDENCE_WORDS.close })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(
+      markOf(page, 3, COMMITTEE),
+      "Tab off the concept's panel did not reach the page",
+    ).toBeFocused();
 
     await panel.getByRole("link", { name: WORDS.ownPage }).click();
     await expect(page).toHaveURL(new RegExp(`${pageOf(seeded.concepts, COMMITTEE)}$`));
@@ -379,16 +410,19 @@ test.describe("the concept page", () => {
 
     const withheld = seeded.concepts
       .get(RETENTION)
-      ?.documents.find((document) => document.title === MINUTES)?.documentId;
+      ?.documents.find((document) => document.title === MINUTES_DOCUMENT)?.documentId;
     expect(withheld, "the harness named no Restricted document").toEqual(expect.any(String));
     const drawn = await page.content();
     expect(drawn, "the page holds the withheld document's id").not.toContain(withheld);
+    expect(drawn, "the page holds the withheld document's title").not.toContain(MINUTES_DOCUMENT);
     expect(drawn, "the page holds the withheld passage").not.toContain(MINUTES_PASSAGE);
     await expect
       .poll(() => answers.length, { message: "the page read nothing" })
       .toBeGreaterThan(0);
-    expect(answers.join("\n"), "a read answered the withheld document's id").not.toContain(
-      withheld,
+    const answered = answers.join("\n");
+    expect(answered, "a read answered the withheld document's id").not.toContain(withheld);
+    expect(answered, "a read answered the withheld document's title").not.toContain(
+      MINUTES_DOCUMENT,
     );
   });
 
@@ -442,6 +476,32 @@ test.describe("the concept page", () => {
     expect(answers[0]?.body, "an absent and a withheld concept were answered apart").toBe(
       answers[1]?.body,
     );
+
+    await wayBack(page).click();
+    await expect(page.getByRole("searchbox", { name: SEARCH_WORDS.search })).toBeVisible();
+    const kept = await page.evaluate(() => JSON.stringify(history.state));
+    expect(kept, "the way back kept the withheld address in history").not.toContain(
+      withheld.slice(SEARCH.path.length + 1),
+    );
+  });
+
+  test("draws not found when the api calls the id malformed", async ({ page, request }) => {
+    const seeded = await aWorkspaceOfConcepts(request, "Holme Annals");
+    await signedInAsTheAdmin(page, request, seeded);
+    const ulid = pageOf(seeded.concepts, RETENTION).slice(SEARCH.path.length + 1);
+    // The api's own refusal: the page's well-formed ask reaches it with its id in lower case.
+    await page.route(isAnOpen, (route) =>
+      route.continue({ url: route.request().url().replace(ulid, ulid.toLowerCase()) }),
+    );
+    const answered = page.waitForResponse((response) => isAnOpen(new URL(response.url())));
+    await page.goto(pageOf(seeded.concepts, RETENTION));
+
+    expect(await (await answered).text(), "the api did not call the id malformed").toContain(
+      '"httpStatus":400',
+    );
+    await expect(notFound(page)).toBeVisible();
+    await expect(page.getByRole("article")).toHaveCount(0);
+    await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
   });
 
   test("sends a body's concept IRI link to its page", async ({ page, request }) => {
@@ -545,6 +605,27 @@ test.describe("the concept page", () => {
     await expect(matchOf(page, COMMITTEE), "the way back left focus off its row").toBeFocused();
   });
 
+  test("leaves focus in the box when its row never drew", async ({ page, request }) => {
+    const seeded = await aWorkspaceOfConcepts(request, "Ouse Annals");
+    await signedInAsTheAdmin(page, request, seeded);
+    await page.goto(asked("audit"));
+    await matchOf(page, RETENTION).click();
+    await expect(conceptOf(page, RETENTION)).toBeVisible();
+    // A fresh document holds no matches, so the way back must read them again, and cannot.
+    await page.reload();
+    await expect(conceptOf(page, RETENTION)).toBeVisible();
+    await page.route(isAFind, (route) => route.abort());
+    await wayBack(page).click();
+    await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
+    await page.unroute(isAFind);
+
+    const box = page.getByRole("searchbox", { name: SEARCH_WORDS.search });
+    await box.fill("audit logs");
+
+    await expect(matchOf(page, RETENTION)).toBeVisible();
+    await expect(box, "a row from the search left took focus from the box").toBeFocused();
+  });
+
   test("shows not found at its address after a workspace switch", async ({ page, request }) => {
     const seeded = await aWorkspaceOfConcepts(request, "Dales Registers");
     const other = await provision(request, { name: "Dales Annex" });
@@ -555,6 +636,7 @@ test.describe("the concept page", () => {
     });
     await signedInAsTheAdmin(page, request, seeded);
     await page.getByRole("button", { name: seeded.workspace.name, exact: true }).click();
+    await landedAtHome(page, "Admin");
     await page.goto(asked("audit"));
     await matchOf(page, RETENTION).click();
     await expect(crumbOf(page, RETENTION)).toBeVisible();
@@ -642,12 +724,12 @@ test.describe("the concept page", () => {
     await signedInAsTheAdmin(page, request, seeded);
 
     // A fresh document, so no read is already in the page's cache.
-    const started = Date.now();
+    const startedAtMs = Date.now();
     await page.goto(pageOf(seeded.concepts, RETENTION));
     await expect(conceptOf(page, RETENTION).getByText(CLAIM)).toBeVisible();
-    const elapsed = Date.now() - started;
-    test.info().annotations.push({ type: "concept page", description: `${elapsed} ms` });
-    expect(elapsed, "the concept rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
+    const elapsedMs = Date.now() - startedAtMs;
+    test.info().annotations.push({ type: "concept page", description: `${elapsedMs} ms` });
+    expect(elapsedMs, "the concept rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
 
     await skipLinkReachesThePage(page);
     const keystrokes = await keystrokesListed(page, SEARCH.name);

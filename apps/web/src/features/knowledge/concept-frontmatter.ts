@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { dayWords } from "@/shared/words.ts";
+
 import type { Concept } from "./knowledge-api.ts";
 import { CONCEPT_WORDS as WORDS } from "./knowledge-words.ts";
 
@@ -38,6 +40,10 @@ export const verifiedEventsOf = (frontmatter: Frontmatter): readonly VerifiedEve
     at,
     byAPerson: by.startsWith(A_PERSON),
   }));
+
+/** The UK long form; a date the file wrote no parser reads is shown as the file wrote it. */
+export const dayOf = (event: VerifiedEvent): string =>
+  Number.isNaN(Date.parse(event.at)) ? event.at : dayWords(event.at);
 
 /** Drawn elsewhere on the page, or an identity a reader never meets. */
 const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([

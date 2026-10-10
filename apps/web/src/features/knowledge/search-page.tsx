@@ -246,20 +246,24 @@ function Results(properties: {
 }
 
 /** Search's history entry keeps the match opened, for Back; the concept's keeps the query left. */
-const useReading = (): Reading => {
+const useReading = (query: string): Reading => {
   const router = useRouter();
   const navigate = useNavigate();
   const returned = useRouterState({
     select: (state) => RETURNED_TO.safeParse(state.location.state).data?.openedMatch,
   });
   // Taken as the page opens: marking the entry on the way out must move no focus.
-  const [key, setKey] = useState(returned);
+  const [returning, setReturning] = useState({ key: returned, query });
+  // A match the search returned to never drew is not waited for under the next one.
+  if (returning.key !== undefined && returning.query !== query) {
+    setReturning({ key: undefined, query });
+  }
 
   return {
     returning: {
-      key,
+      key: returning.key,
       landed: () => {
-        setKey(undefined);
+        setReturning({ key: undefined, query });
       },
     },
     onRead: (match, page) => {
@@ -269,10 +273,12 @@ const useReading = (): Reading => {
         search: true,
         replace: true,
         state: (held) => ({ ...held, openedMatch: keyOf(match) }),
-      }).then(() => {
-        // The browser's history folds a replace and a push in one task into one push.
-        router.history.flush();
-        return navigate({ href: page, state: (held) => ({ ...held, searchQuery }) });
+      });
+      // The browser's history folds a replace and a push in one task into one push.
+      router.history.flush();
+      void navigate({
+        href: page,
+        state: (held) => ({ ...held, openedMatch: undefined, searchQuery }),
       });
     },
   };
@@ -289,7 +295,7 @@ function SearchRegion() {
   const matches = useMatches(query);
   const shown = useMemo(() => matchesOf(matches.data), [matches.data]);
   const beside = useRoomBeside();
-  const reading = useReading();
+  const reading = useReading(query);
   const [opened, setOpened] = useState<Opened & { readonly query: string }>();
   // A passage opened for one search closes with it, as its match leaves the list.
   if (opened !== undefined && opened.query !== query) setOpened(undefined);

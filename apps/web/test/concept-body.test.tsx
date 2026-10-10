@@ -71,6 +71,42 @@ const marksIn = (article: HTMLElement): readonly (string | null)[] =>
     .queryAllByRole("button")
     .map((mark) => mark.getAttribute("aria-label"));
 
+/** The two private-use characters a mark is carried between, which no file may write its own. */
+const OPENS = String.fromCodePoint(0xe000);
+
+const CLOSES = String.fromCodePoint(0xe001);
+
+/** A body whose marks open a panel, drawn where the body puts it. */
+function Opening(properties: { readonly body: string }) {
+  const [openerId, setOpenerId] = useState<string>();
+  return (
+    <article>
+      <ConceptBody
+        body={properties.body}
+        evidence={HANDBOOK}
+        opening={{
+          openerId,
+          onOpen: (chosen) => {
+            setOpenerId(chosen.openerId);
+          },
+          inline: openerId === undefined ? undefined : <section>Clause 4.2</section>,
+        }}
+      />
+    </article>
+  );
+}
+
+/** The body's blocks as drawn, less every attribute, each mark as its number alone. */
+const blocksOf = (article: HTMLElement): string => {
+  const copy = article.firstElementChild?.cloneNode(true);
+  if (!(copy instanceof HTMLElement)) return "";
+  for (const mark of copy.querySelectorAll("sup")) mark.replaceWith(mark.textContent);
+  for (const element of copy.querySelectorAll("*")) {
+    for (const name of element.getAttributeNames()) element.removeAttribute(name);
+  }
+  return copy.innerHTML.replaceAll("\n", "");
+};
+
 const HANDBOOK = [
   { id: "a", source: "Staff handbook", locator: "01J6QQQQQQQQQQQQQQQQQQQQQQ/chars:0-9" },
 ];
@@ -137,40 +173,162 @@ describe("a concept's body", () => {
     expect(article.textContent).toBe("Claims close within 30 days.[1]");
   });
 
-  it("draws the open mark's panel under its own paragraph", async () => {
-    function Page() {
-      const [openerId, setOpenerId] = useState<string>();
-      return (
-        <article>
-          <ConceptBody
-            body={"Claims close within 30 days.[^a]\n\nMileage is paid at cost."}
-            evidence={HANDBOOK}
-            opening={{
-              openerId,
-              onOpen: (chosen) => {
-                setOpenerId(chosen.openerId);
-              },
-              inline:
-                openerId === undefined ? undefined : (
-                  <section aria-label="The passage">Clause 4.2</section>
-                ),
-            }}
-          />
-        </article>
-      );
-    }
-    await openPages({ "/": Page }, ["/"]);
-    const article = screen.getByRole("article");
-    const mark = within(article).getByRole("button");
+  it("keeps the open mark drawn as its panel opens", async () => {
+    await openPages(
+      {
+        "/": () => (
+          <Opening body={"Claims close within 30 days.[^a]\n\nMileage is paid at cost."} />
+        ),
+      },
+      ["/"],
+    );
+    const mark = screen.getByRole("button", { name: "Source 1: Staff handbook" });
     mark.focus();
 
     fireEvent.click(mark);
 
     expect(mark.getAttribute("aria-expanded")).toBe("true");
     expect(document.activeElement, "opening its panel drew the mark afresh").toBe(mark);
-    expect(
-      [...(article.firstElementChild?.children ?? [])].map((block) => block.textContent),
-    ).toEqual(["Claims close within 30 days.[1]", "Clause 4.2", "Mileage is paid at cost."]);
+  });
+
+  it.each([
+    [
+      "a paragraph",
+      "Claims close within 30 days.[^a]\n\nMileage is paid at cost.",
+      "<p>Claims close within 30 days.[1]</p><section>Clause 4.2</section><p>Mileage is paid at cost.</p>",
+    ],
+    [
+      "a list item's own words",
+      "- Kept seven years.[^a]\n- Deleted after.",
+      "<ul><li>Kept seven years.[1]<section>Clause 4.2</section></li><li>Deleted after.</li></ul>",
+    ],
+    [
+      "an item, above its nested list",
+      "- Kept seven years.[^a]\n  - Then deleted.",
+      "<ul><li>Kept seven years.[1]<section>Clause 4.2</section><ul><li>Then deleted.</li></ul></li></ul>",
+    ],
+    [
+      "a quoted paragraph",
+      "> Kept seven years.[^a]\n\nMileage is paid at cost.",
+      "<blockquote><p>Kept seven years.[1]</p><section>Clause 4.2</section></blockquote><p>Mileage is paid at cost.</p>",
+    ],
+  ])("puts the panel under %s", async (_, body, drawnAs) => {
+    await openPages({ "/": () => <Opening body={body} /> }, ["/"]);
+    fireEvent.click(screen.getByRole("button", { name: "Source 1: Staff handbook" }));
+
+    expect(blocksOf(screen.getByRole("article"))).toBe(drawnAs);
+  });
+
+  it("draws a table cell's panel under its whole table", async () => {
+    await openPages(
+      {
+        "/": () => (
+          <Opening
+            body={"| Rule | Kept |\n| --- | --- |\n| Audit logs | Seven years.[^a] |\n\nAfter."}
+          />
+        ),
+      },
+      ["/"],
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Source 1: Staff handbook" }));
+
+    const prose = screen.getByRole("article").firstElementChild;
+    expect([...(prose?.children ?? [])].map((block) => block.tagName)).toEqual([
+      "DIV",
+      "SECTION",
+      "P",
+    ]);
+    expect(prose?.querySelector("table section")).toBeNull();
+  });
+
+  it.each([
+    ["strong words", "**Kept for seven years.**[^a]", "strong", "Kept for seven years."],
+    ["underscored words", "_Kept for seven years._[^a]", "em", "Kept for seven years."],
+    ["quoted emphasis", '*"As agreed."*[^a]', "em", '"As agreed."'],
+    ["struck words", "~~The old rule.~~[^a]", "del", "The old rule."],
+    ["emphasis after it", "Kept.[^a]*(see the note)*", "em", "(see the note)"],
+  ])("keeps %s beside a mark", async (_, body, tag, words) => {
+    const article = await drawn(body, HANDBOOK);
+
+    expect(article.querySelector(tag)?.textContent).toBe(words);
+    expect(marksIn(article)).toEqual(["Source 1: Staff handbook"]);
+    expect(article.textContent).not.toMatch(/[*_~]/);
+  });
+
+  it.each([
+    [
+      "a bare web address",
+      "The rule is at https://example.test/rules[^a] for all staff.",
+      "https://example.test/rules",
+    ],
+    [
+      "a bare concept IRI",
+      `See https://better-answers.com/c/${PRODUCT}[^a] for tiers.`,
+      `/knowledge/search/${PRODUCT}`,
+    ],
+  ])("ends %s at the mark after it", async (_, body, address) => {
+    const article = await drawn(body, HANDBOOK);
+
+    expect(within(article).getByRole("link").getAttribute("href")).toBe(address);
+    expect(marksIn(article)).toEqual(["Source 1: Staff handbook"]);
+  });
+
+  it("keeps a link definition's address when a mark ends it", async () => {
+    const article = await drawn(
+      "See [the rules][rules].\n\n[rules]: https://example.test/rules[^a]",
+      HANDBOOK,
+    );
+
+    expect(within(article).getByRole("link", { name: "the rules" }).getAttribute("href")).toBe(
+      "https://example.test/rules",
+    );
+  });
+
+  it.each([
+    ["written out", `<${OPENS}0${CLOSES}>`],
+    ["as hexadecimal references", "&lt;&#xE000;0&#xe001;&gt;"],
+    ["as decimal references", "<&#57344;0&#0057345;>"],
+  ])("draws no mark for a forged carrier, %s", async (_, forged) => {
+    const article = await drawn(
+      `Claims close within 30 days.[^a] Forged here: ${forged}.`,
+      HANDBOOK,
+    );
+
+    expect(marksIn(article)).toEqual(["Source 1: Staff handbook"]);
+    expect(article.textContent).toBe("Claims close within 30 days.[1] Forged here: <0>.");
+  });
+
+  it("reads a label as written, carrier characters included", async () => {
+    const article = await drawn(`Claims close within 30 days.[^a${OPENS}]`, HANDBOOK);
+
+    expect(marksIn(article)).toEqual([]);
+    expect(article.textContent).toBe("Claims close within 30 days.[^a]");
+  });
+
+  it("moves between a footnote and its claim, address unchanged", async () => {
+    const { router } = await openPages(
+      {
+        "/": () => (
+          <article>
+            <ConceptBody
+              body={"Mileage follows the rates policy.[^b]\n\n[^b]: Reviewed each April."}
+              evidence={[]}
+            />
+          </article>
+        ),
+      },
+      ["/"],
+    );
+    const down = screen.getByRole("link", { name: "1" });
+    const back = screen.getByRole("link", { name: "Back to the claim" });
+
+    fireEvent.click(down);
+    expect(document.activeElement).toBe(back);
+    fireEvent.click(back);
+
+    expect(document.activeElement).toBe(down);
+    expect(router.state.location.hash).toBe("");
+    expect(router.history.length).toBe(1);
   });
 
   it("sends a concept IRI link to that concept's page", async () => {
@@ -182,6 +340,14 @@ describe("a concept's body", () => {
     expect(within(article).getByRole("link", { name: "the product" }).getAttribute("href")).toBe(
       `/knowledge/search/${PRODUCT}`,
     );
+  });
+
+  it("keeps a mail address the file wrote", async () => {
+    const article = await drawn("Ask [the records team](mailto:records@example.test).", []);
+
+    expect(
+      within(article).getByRole("link", { name: "the records team" }).getAttribute("href"),
+    ).toBe("mailto:records@example.test");
   });
 
   it("keeps a web link the file wrote, and no referrer", async () => {

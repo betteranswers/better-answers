@@ -15,7 +15,6 @@ export const SEARCH_WORDS = {
 
 export const EVIDENCE_WORDS = {
   loading: "The passage is still loading.",
-  loadingConcept: "The concept is still loading.",
   close: "Close",
 } as const;
 
