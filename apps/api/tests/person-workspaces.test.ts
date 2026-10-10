@@ -21,6 +21,22 @@ describe("reading a person's own workspaces over tRPC", () => {
     ]);
   });
 
+  it("answers each person their own workspaces, never another's", async () => {
+    const calder = await app().provision({ name: "Calder" });
+    const ryedale = await app().provision({ name: "Ryedale" });
+    const priya = await app().person();
+    await app().addMember(ryedale.workspaceId, priya.id, "Editor");
+    const asCaldersAdmin = await webSignedIn(app(), calder.admin.email);
+    const asPriya = await webSignedIn(app(), priya.email);
+
+    expect(await asCaldersAdmin.api.person.workspaces.query()).toEqual([
+      { workspace: { id: calder.workspaceId, name: "Calder" }, role: "Admin" },
+    ]);
+    expect(await asPriya.api.person.workspaces.query()).toEqual([
+      { workspace: { id: ryedale.workspaceId, name: "Ryedale" }, role: "Editor" },
+    ]);
+  });
+
   it("refuses a caller with no session", async () => {
     const response = await app().client().fetch(`${TRPC_ENDPOINT}/person.workspaces`);
 
