@@ -6,6 +6,7 @@ import { eventsSoughtNewestFirst } from "../audit/index.ts";
 import {
   actorIdOfPerson,
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
@@ -36,7 +37,7 @@ export const readActivityInput = z.object({
 export type ReadActivityInput = z.output<typeof readActivityInput>;
 
 const readActivityAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: readActivityInput,
   refuses: ["role-forbids"],
 });

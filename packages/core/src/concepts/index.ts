@@ -92,7 +92,12 @@ import {
   type StandingConcept,
   type Unsound,
 } from "./loader.ts";
-import { manifestAtHead, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
+import {
+  BUNDLE_WRITERS,
+  manifestAtHead,
+  writeManifest,
+  type WriteManifestRefusal,
+} from "./manifest.ts";
 import {
   paneOf,
   projectedFrontmatter,
@@ -264,14 +269,13 @@ export type ConceptWritten = {
   readonly contentHash: string;
 };
 
-const EDITORS = { role: "Editor", purposes: [] } as const;
-
 /**
  * Two constants, never one object with a computed role: the kernel reads a union of roles as its
  * highest, typing every writer an Admin.
  */
 export const writeConceptAction = declareAction({
-  admits: (input: WriteConceptInput) => (input.acceptance === undefined ? EDITORS : ADMIN_ALONE),
+  admits: (input: WriteConceptInput) =>
+    input.acceptance === undefined ? BUNDLE_WRITERS : ADMIN_ALONE,
   input: z.custom<WriteConceptInput>(),
   refuses: [
     "role-forbids",
@@ -782,7 +786,7 @@ export type BundleImported = ImportProgress & {
 };
 
 const importBundleAction = declareAction({
-  admits: EDITORS,
+  admits: BUNDLE_WRITERS,
   input: z.custom<ImportBundleInput>(),
   refuses: [
     "role-forbids",

@@ -5,6 +5,7 @@ import { boundarySchemas } from "@better-answers/schema";
 import { action, declareActions, record } from "../audit/index.ts";
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
@@ -34,7 +35,7 @@ export type EndEverySignInAndTokenHereInput = z.output<typeof endEverySignInAndT
 };
 
 const endEverySignInAndTokenHereAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: endEverySignInAndTokenHereInput,
   refuses: ["role-forbids", "no-such-member", "changed-meanwhile"],
 });

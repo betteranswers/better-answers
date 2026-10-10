@@ -62,8 +62,11 @@ export type ManifestWritten =
   | { readonly written: true; readonly sha: string; readonly auditEventId: string }
   | { readonly written: false };
 
+/** Whoever may write to the bundle: an Editor or above. */
+export const BUNDLE_WRITERS = { role: "Editor", purposes: [] } as const;
+
 const writeManifestAction = declareAction({
-  admits: { role: "Editor", purposes: [] },
+  admits: BUNDLE_WRITERS,
   input: z.custom<WriteManifestInput>(),
   refuses: ["role-forbids", "malformed", "path-taken"],
 });
