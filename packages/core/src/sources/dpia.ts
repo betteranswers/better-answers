@@ -4,7 +4,16 @@ import { z } from "zod";
 
 import { boundarySchemas, RULES_IN_FORCE_KEYS, type REDACTION_TIERS } from "@better-answers/schema";
 
-import { err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import {
+  admit,
+  ADMIN_ALONE,
+  declareAction,
+  err,
+  ok,
+  type RefusalOf,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
 import { listModelChoices, type LlmPurpose } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import {
@@ -90,7 +99,13 @@ export const dpiaReadInput = z.object({ connectedSourceId: CONNECTED_SOURCE_ID }
 
 export type DpiaReadInput = z.output<typeof dpiaReadInput>;
 
-export type DpiaInputRefusal = SourceRefusal<"role-forbids" | "no-such-binding"> | Error;
+const dpiaInputForAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: dpiaReadInput,
+  refuses: ["role-forbids", "no-such-binding"],
+});
+
+export type DpiaInputRefusal = SourceRefusal<RefusalOf<typeof dpiaInputForAction>> | Error;
 
 export type DpiaInputRead = {
   readonly document: DpiaInput;
@@ -139,11 +154,12 @@ export const dpiaInputFor = async (
   tx: Tx,
   input: DpiaReadInput,
 ): Promise<Result<DpiaInputRead, DpiaInputRefusal>> => {
-  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
-  if (!acting.ok) return err(acting.error);
-  const { admin, connectedSourceId } = acting.value;
+  const admitted = admit(dpiaInputForAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const acting = adminOnConnectedSource(admitted.value, input.connectedSourceId);
+  const { admin, connectedSourceId } = acting;
 
-  const read = await connectedSourceNamed<ConnectedSourceRow>(acting.value, tx, {
+  const read = await connectedSourceNamed<ConnectedSourceRow>(acting, tx, {
     columns: "sensitivity, audience, rules_in_force",
     lock: "none",
   });

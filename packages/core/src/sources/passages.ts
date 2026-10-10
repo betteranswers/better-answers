@@ -10,7 +10,18 @@ import {
   type Sensitivity,
 } from "../access/index.ts";
 import { evidenceForAReadableConcept } from "../concepts/index.ts";
-import { attempt, err, NOT_FOUND, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import {
+  admit,
+  ADMIN_ALONE,
+  attempt,
+  declareAction,
+  err,
+  NOT_FOUND,
+  ok,
+  type RefusalOf,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnConnectedSource, CONNECTED_SOURCE_ID } from "./admin-connected-source.ts";
 import { locatorOf, parseLocator, spanText, type LocatorRefusal } from "./passage-address.ts";
@@ -252,7 +263,13 @@ export const previewPassagesInput = z.object({
 
 export type PreviewPassagesInput = z.output<typeof previewPassagesInput>;
 
-type PreviewPassagesRefusal = SourceRefusal<"role-forbids"> | Error;
+const previewPassagesAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: previewPassagesInput,
+  refuses: ["role-forbids"],
+});
+
+type PreviewPassagesRefusal = SourceRefusal<RefusalOf<typeof previewPassagesAction>> | Error;
 
 /** `limit` is held to 20 at most. */
 export const previewPassages = async (
@@ -260,9 +277,10 @@ export const previewPassages = async (
   tx: Tx,
   input: PreviewPassagesInput,
 ): Promise<Result<readonly PreviewedPassage[], PreviewPassagesRefusal>> => {
-  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
-  if (!acting.ok) return err(acting.error);
-  const { admin, connectedSourceId } = acting.value;
+  const admitted = admit(previewPassagesAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const acting = adminOnConnectedSource(admitted.value, input.connectedSourceId);
+  const { admin, connectedSourceId } = acting;
 
   return attempt(async () => {
     const read = await tx.query<PreviewRow>(CONNECTED_SOURCE_PASSAGES, [

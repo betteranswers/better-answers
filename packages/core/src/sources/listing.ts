@@ -13,16 +13,19 @@ import {
 } from "@better-answers/schema";
 
 import {
+  admit,
+  ADMIN_ALONE,
   attempt,
+  declareAction,
   err,
   ok,
-  requireAdmin,
+  type RefusalOf,
   type Result,
-  type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { latestRunsOf, type SubjectRun } from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import type { SourceRefusal } from "./vocabulary.ts";
 
 type ConnectedSourceState = (typeof CONNECTED_SOURCE_STATES)[number];
 
@@ -59,7 +62,15 @@ export type ListedConnectedSource = Omit<ListedRow, "id" | "publishedAt"> & {
   readonly unreadableByReason: Readonly<Record<string, number>>;
 };
 
-export type ListConnectedSourcesRefusal = RoleRefusal | Error;
+const listConnectedSourcesAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.object({}),
+  refuses: ["role-forbids"],
+});
+
+export type ListConnectedSourcesRefusal =
+  | SourceRefusal<RefusalOf<typeof listConnectedSourcesAction>>
+  | Error;
 
 type UnreadableRow = {
   readonly connected_source_id: string;
@@ -111,7 +122,7 @@ export const listConnectedSources = async (
   principal: UserPrincipal,
   tx: Tx,
 ): Promise<Result<readonly ListedConnectedSource[], ListConnectedSourcesRefusal>> => {
-  const admin = requireAdmin(principal);
+  const admin = admit(listConnectedSourcesAction, principal, {});
   if (!admin.ok) return err(admin.error);
   const { workspaceId } = admin.value;
 

@@ -22,7 +22,19 @@ import {
   STORED_DETAIL_KEYS,
 } from "../audit/index.ts";
 import { cascadingVisibility } from "../concepts/index.ts";
-import { actorIdOf, attempt, err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import {
+  actorIdOf,
+  admit,
+  ADMIN_ALONE,
+  attempt,
+  declareAction,
+  err,
+  ok,
+  type AdminUserPrincipal,
+  type RefusalOf,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
 import { enqueueJobIn, syncRefused, latestIndexOutcomeIn, type JobOutcome } from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import {
@@ -57,7 +69,13 @@ export type GroupOfFindings = {
   readonly dismissed: number;
 };
 
-export type FindingsOfRefusal = SourceRefusal<"role-forbids" | "no-such-binding"> | Error;
+const findingsOfAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: findingsOfInput,
+  refuses: ["role-forbids", "no-such-binding"],
+});
+
+export type FindingsOfRefusal = SourceRefusal<RefusalOf<typeof findingsOfAction>> | Error;
 
 const SPECIAL_CATEGORIES = new Set<string>(
   REDACTION_CATEGORIES.filter((entry) => entry.specialCategory).map((entry) => entry.category),
@@ -149,14 +167,15 @@ export const findingsOf = async (
   tx: Tx,
   input: FindingsOfInput,
 ): Promise<Result<readonly GroupOfFindings[], FindingsOfRefusal>> => {
-  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
-  if (!acting.ok) return err(acting.error);
-  const { workspaceId, connectedSourceId } = acting.value;
+  const admitted = admit(findingsOfAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const acting = adminOnConnectedSource(admitted.value, input.connectedSourceId);
+  const { admin, workspaceId, connectedSourceId } = acting;
 
-  const standing = await connectedSourceNamed(acting.value, tx, { columns: "1", lock: "none" });
+  const standing = await connectedSourceNamed(acting, tx, { columns: "1", lock: "none" });
   if (!standing.ok) return err(standing.error);
 
-  const lastSync = await latestIndexOutcomeIn(acting.value.admin, tx, { connectedSourceId });
+  const lastSync = await latestIndexOutcomeIn(admin, tx, { connectedSourceId });
   if (!lastSync.ok) return err(lastSync.error);
   const named = overriddenSpansOf(lastSync.value);
   if (!named.ok) return err(named.error);
@@ -231,9 +250,13 @@ export const keepInTextInput = z.object({
 
 export type KeepInTextInput = z.output<typeof keepInTextInput>;
 
-export type KeepInTextRefusal =
-  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-finding" | "not-the-always-set">
-  | Error;
+const keepInTextAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: keepInTextInput,
+  refuses: ["role-forbids", "no-such-binding", "no-such-finding", "not-the-always-set"],
+});
+
+export type KeepInTextRefusal = SourceRefusal<RefusalOf<typeof keepInTextAction>> | Error;
 
 export type KeptInText = {
   readonly connectedSourceId: string;
@@ -287,12 +310,12 @@ type CommandedSpans = {
 
 type SpansRefusal<GroupRefusal> =
   | GroupRefusal
-  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-finding">
+  | SourceRefusal<"no-such-binding" | "no-such-finding">
   | Error;
 
 /** Every group is judged before the first read, so a refused one lands nothing beside it. */
 const spansCommanded = async <GroupRefusal extends string>(
-  principal: UserPrincipal,
+  admin: AdminUserPrincipal,
   tx: Tx,
   input: {
     readonly connectedSourceId: ConnectedSourceId;
@@ -300,8 +323,7 @@ const spansCommanded = async <GroupRefusal extends string>(
   },
   refusalOf: (groupOfFindings: GroupOfFindingsKey) => GroupRefusal | undefined,
 ): Promise<Result<CommandedSpans, SpansRefusal<GroupRefusal>>> => {
-  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
-  if (!acting.ok) return err(acting.error);
+  const acting = adminOnConnectedSource(admin, input.connectedSourceId);
 
   const groupsOfFindings = distinctGroupsOfFindings(input.groupsOfFindings);
   for (const groupOfFindings of groupsOfFindings) {
@@ -309,7 +331,7 @@ const spansCommanded = async <GroupRefusal extends string>(
     if (refused !== undefined) return err(refused);
   }
 
-  const standing = await connectedSourceNamed(acting.value, tx, {
+  const standing = await connectedSourceNamed(acting, tx, {
     columns: "1",
     lock: "for-update",
   });
@@ -317,12 +339,12 @@ const spansCommanded = async <GroupRefusal extends string>(
 
   const held = await spansOfGroups(
     tx,
-    acting.value.workspaceId,
-    acting.value.connectedSourceId,
+    acting.workspaceId,
+    acting.connectedSourceId,
     groupsOfFindings,
   );
   if (!held.ok) return err(held.error);
-  return ok({ acting: acting.value, spans: held.value });
+  return ok({ acting, spans: held.value });
 };
 
 const syncQueued = async (
@@ -363,7 +385,9 @@ export const keepInText = async (
   tx: Tx,
   input: KeepInTextInput,
 ): Promise<Result<KeptInText, KeepInTextRefusal>> => {
-  const commanded = await spansCommanded(principal, tx, input, (groupOfFindings) =>
+  const admitted = admit(keepInTextAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const commanded = await spansCommanded(admitted.value, tx, input, (groupOfFindings) =>
     groupOfFindings.tier === REDACTION_ALWAYS_TIER ? undefined : "not-the-always-set",
   );
   if (!commanded.ok) return err(commanded.error);
@@ -415,9 +439,13 @@ export const narrowDocumentsInput = z.object({
 
 export type NarrowDocumentsInput = z.output<typeof narrowDocumentsInput>;
 
-export type NarrowDocumentsRefusal =
-  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-document" | "widening-refused">
-  | Error;
+const narrowDocumentsAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: narrowDocumentsInput,
+  refuses: ["role-forbids", "no-such-binding", "no-such-document", "widening-refused"],
+});
+
+export type NarrowDocumentsRefusal = SourceRefusal<RefusalOf<typeof narrowDocumentsAction>> | Error;
 
 export type DocumentsNarrowed = {
   readonly connectedSourceId: string;
@@ -535,9 +563,10 @@ export const narrowDocuments = async (
   tx: Tx,
   input: NarrowDocumentsInput,
 ): Promise<Result<DocumentsNarrowed, NarrowDocumentsRefusal>> => {
-  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
-  if (!acting.ok) return err(acting.error);
-  const { admin, connectedSourceId } = acting.value;
+  const admitted = admit(narrowDocumentsAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const acting = adminOnConnectedSource(admitted.value, input.connectedSourceId);
+  const { admin, connectedSourceId } = acting;
 
   const next = input.sensitivity;
   const groupsOfFindings = distinctGroupsOfFindings(input.groupsOfFindings);
@@ -547,7 +576,7 @@ export const narrowDocuments = async (
     admin,
     tx,
     { connectedSourceId, documentIds: named },
-    (tx) => documentsNarrowedBy(acting.value, tx, groupsOfFindings, named, next),
+    (tx) => documentsNarrowedBy(acting, tx, groupsOfFindings, named, next),
   );
   if (!cascaded.ok) return err(cascaded.error);
   const { written, concepts, writeUps } = cascaded.value;
@@ -564,8 +593,14 @@ export const dismissAsNotSpecialCategoryInput = z.object({
 
 export type DismissAsNotSpecialCategoryInput = z.output<typeof dismissAsNotSpecialCategoryInput>;
 
+const dismissAsNotSpecialCategoryAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: dismissAsNotSpecialCategoryInput,
+  refuses: ["role-forbids", "no-such-binding", "no-such-finding", "not-special-category"],
+});
+
 export type DismissAsNotSpecialCategoryRefusal =
-  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-finding" | "not-special-category">
+  | SourceRefusal<RefusalOf<typeof dismissAsNotSpecialCategoryAction>>
   | Error;
 
 export type DismissedAsNotSpecialCategory = {
@@ -592,7 +627,9 @@ export const dismissAsNotSpecialCategory = async (
   tx: Tx,
   input: DismissAsNotSpecialCategoryInput,
 ): Promise<Result<DismissedAsNotSpecialCategory, DismissAsNotSpecialCategoryRefusal>> => {
-  const commanded = await spansCommanded(principal, tx, input, (groupOfFindings) =>
+  const admitted = admit(dismissAsNotSpecialCategoryAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const commanded = await spansCommanded(admitted.value, tx, input, (groupOfFindings) =>
     SPECIAL_CATEGORIES.has(groupOfFindings.category) ? undefined : "not-special-category",
   );
   if (!commanded.ok) return err(commanded.error);

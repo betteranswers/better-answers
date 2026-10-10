@@ -4,12 +4,9 @@ import {
   attempt,
   err,
   ok,
-  requireAdmin,
   type AdminUserPrincipal,
   type PlatformPrincipal,
   type Result,
-  type RoleRefusal,
-  type UserPrincipal,
   type WorkspaceId,
 } from "../kernel/index.ts";
 import type { Tx, TxRow } from "../store/postgres/index.ts";
@@ -39,13 +36,9 @@ export type PlatformOnConnectedSource = {
 };
 
 export const adminOnConnectedSource = (
-  principal: UserPrincipal,
+  admin: AdminUserPrincipal,
   connectedSourceId: ConnectedSourceId,
-): Result<ActingOnConnectedSource, RoleRefusal> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
-  return ok({ admin: admin.value, workspaceId: admin.value.workspaceId, connectedSourceId });
-};
+): ActingOnConnectedSource => ({ admin, workspaceId: admin.workspaceId, connectedSourceId });
 
 type ConnectedSourceRead = {
   readonly columns: string;
