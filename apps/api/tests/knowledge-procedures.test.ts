@@ -4,6 +4,7 @@ import { writeConcept } from "@better-answers/core/concepts";
 import { head, initRepository } from "@better-answers/core/store/git";
 import { documentLanded, type DocumentShape } from "@better-answers/core/testing/documents";
 
+import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { connectAsHost } from "./flow.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import { actingIn, openTestGit } from "./harness.ts";
@@ -342,5 +343,33 @@ describe("the knowledge router, signed out", () => {
 
     expect(found).toMatchObject({ data: { httpStatus: 401, ...NO_SESSION_ANSWERED.error.data } });
     expect(opened).toMatchObject({ data: { httpStatus: 401, ...NO_SESSION_ANSWERED.error.data } });
+  });
+});
+
+/** tRPC's own GET for one procedure, unbatched, as a browser or a cache in between sees it. */
+const readAt = (procedure: "find" | "open", input: Rpc): string =>
+  `${TRPC_ENDPOINT}/knowledge.${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
+
+describe("a knowledge read's answer over GET", () => {
+  it.each([
+    ["a found page", "find", { query: QUERY }, 200],
+    ["an absent concept", "open", { iri: ABSENT_IRI }, 404],
+  ] as const)("keeps %s out of every cache", async (_, procedure, input, status) => {
+    const { workspace } = await aWorkspaceOfHerons();
+    const { client } = await webSignedIn(app(), workspace.admin.email);
+
+    const response = await client.fetch(readAt(procedure, input));
+
+    expect(response.status).toBe(status);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("keeps a signed-out refusal out of every cache", async () => {
+    const response = await app()
+      .client()
+      .fetch(readAt("find", { query: QUERY }));
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 });

@@ -44,6 +44,14 @@ describe("the api serves the shell on app.", () => {
     await expect(response.text()).resolves.toContain("the page");
   });
 
+  it("keeps the build's own caching beside the transport's no-store", async () => {
+    const shell = await app().client(undefined, APP_HOSTNAME).fetch("/", asABrowserNavigates);
+    const asset = await app().client(undefined, APP_HOSTNAME).fetch("/assets/page.js");
+
+    expect(shell.headers.get("cache-control")).toBe("no-cache");
+    expect(asset.headers.get("cache-control")).toBeNull();
+  });
+
   it("answers a missing asset with 404, not the shell", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
