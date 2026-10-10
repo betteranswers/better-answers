@@ -87,7 +87,10 @@ to do with what it was testing, and Better Auth logs that it could not tell the 
 - **Per person.** `personCeiling` in `apps/api/src/trpc/base.ts` counts a signed-in person's calls
   to one procedure against a rule from the same constants file, `ASK_TO_JOIN_PERSON_RULE` for
   asking to join. Past it the call answers 429 with `Retry-After` and no refusal word. It keys on
-  the session's person, so a flood through the page's own `page.request` reaches it.
+  the session's person, so a flood through the page's own `page.request` reaches it. The knowledge
+  reads, `find` and `open`, share one count a person (`knowledgeReadProcedure` in
+  `apps/api/src/trpc/knowledge.ts`), which `readsCeilingFilled` in `apps/web/e2e/knowledge.ts`
+  fills.
 
 A spec that means to prove a ceiling names which of the three it is proving, and reaches it from
 the side that counts. Read the numbers off those files rather than from here.
@@ -120,7 +123,7 @@ Knowledge one from `apps/api/tests/harness-knowledge.ts`:
 | `makeGroups` | Groups made by a named member through the members slice's own actions, one transaction each, every group holding the members `memberIds` names — the member's own actions on the audit log, and the groups the `Groups` page and a member's page start from |
 | `askToJoin` | A person's ask to join a workspace by its short name, with a reason, through the members slice's own action and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own action and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* page |
-| `seedConcepts` | Concepts a named Admin writes in order through the concepts slice's own write, so each is in the repository, the index and the map as a member's write leaves it. Each takes a kind and a sensitivity, links to concepts earlier in the list, and sources whose passages each get a citation mark. A trust tier other than `unverified` is a verification row written straight to the store, because the slice has no verify action. A `"groups"` audience is the Admin's own override to one group holding the members `groupMemberIds` names, and nobody outside that group reads the concept, its Admin included. It answers each concept's IRI, path and cited documents |
+| `seedConcepts` | Concepts a named Admin writes in order through the concepts slice's own write, so each is in the repository, the index and the map as a member's write leaves it. Each takes a kind, a sensitivity and further frontmatter keys, and links to concepts earlier in the list. A source is a document's passages, a concept earlier in the list, or a place such as `p.4` that opens nothing. Each source gets a citation mark `[^source-N]` after the body's last word, unless the body places that mark itself. A document may be held at a sensitivity of its own, and where that differs from the concept's the Admin's override shares the concept beyond its evidence. A trust tier other than `unverified` is a verification row written straight to the store, because the slice has no verify action. A `"groups"` audience is the Admin's own override to one group holding the members `groupMemberIds` names, and nobody outside that group reads the concept, its Admin included. It answers each concept's IRI, path and cited documents. `seedConcepts` in `apps/web/e2e/harness.ts` sends a document's passages alone, and `conceptsSeeded` in `apps/web/e2e/knowledge.ts` sends every form |
 
 A seed the harness cannot write answers 400. A body or a row that a schema refuses names each
 field and its rule, and a write that trips a constraint names the constraint. The action's failure
