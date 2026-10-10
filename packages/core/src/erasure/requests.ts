@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 
 import {
   boundarySchemas,
@@ -8,13 +8,15 @@ import {
 
 import { action, declareActions, record, type DetailOf } from "../audit/index.ts";
 import {
+  admit,
+  ADMIN_ALONE,
   attempt,
+  declareAction,
   err,
   ok,
-  requireAdmin,
   ulid,
+  type RefusalOf,
   type Result,
-  type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
@@ -56,13 +58,25 @@ type IdentifierTooBroad = {
   readonly said: string;
 };
 
+const recordSubjectRequestAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.custom<RecordSubjectRequestInput>(),
+  refuses: ["role-forbids", "malformed", "identifier-too-broad"],
+});
+
+/** `identifier-too-broad` is answered beside what was said, never as a bare word. */
 export type RecordSubjectRequestRefusal =
-  | RoleRefusal
-  | ErasureRefusal<"malformed">
+  | Exclude<RefusalOf<typeof recordSubjectRequestAction>, IdentifierTooBroad["word"]>
   | IdentifierTooBroad
   | Error;
 
-export type ReadSubjectRequestRefusal = RoleRefusal | "malformed" | "no-such-request" | Error;
+const subjectRequestForAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.string(),
+  refuses: ["role-forbids", "malformed", "no-such-request"],
+});
+
+export type ReadSubjectRequestRefusal = RefusalOf<typeof subjectRequestForAction> | Error;
 
 const REQUEST_ID = boundarySchemas.subjectRequest.select.shape.id;
 
@@ -126,7 +140,7 @@ export const recordSubjectRequest = async (
   tx: Tx,
   input: RecordSubjectRequestInput,
 ): Promise<Result<SubjectRequestRecorded, RecordSubjectRequestRefusal>> => {
-  const admin = requireAdmin(principal);
+  const admin = admit(recordSubjectRequestAction, principal, input);
   if (!admin.ok) return err(admin.error);
   const { workspaceId } = admin.value;
 
@@ -187,7 +201,7 @@ export const subjectRequestFor = async (
   tx: Tx,
   id: string,
 ): Promise<Result<SubjectRequest, ReadSubjectRequestRefusal>> => {
-  const admin = requireAdmin(principal);
+  const admin = admit(subjectRequestForAction, principal, id);
   if (!admin.ok) return err(admin.error);
   const requestId = REQUEST_ID.safeParse(id);
   if (!requestId.success) return err("malformed");
