@@ -647,6 +647,10 @@ flowchart LR
   - A source whose locator is a page locator such as `p.4` shows it beside its label to every reader, as plain text that opens nothing. The projected frontmatter keeps it for a Viewer and an Admin alike (U6).
   - A concept the browser suite's harness seeds has a passage its citation mark opens: `seedConcepts` in `apps/api/tests/harness-knowledge.ts` cites each passage by its wire locator `<document>/chars:a-b`, and `harness-knowledge.test.ts` holds that an Admin opens it.
   - The page draws its *not found* from `knowledge.open`'s `not-found` refusal (404), which an absent and a withheld concept share, and from `malformed` (400) (U9).
+  - A concept match on Search opens the concept's page. U11 draws it as plain text, because the page and its route are U12's (found in U11).
+  - The evidence panel opens a concept as well as a passage. U11's `Opened` in `evidence-panel.tsx` names only a passage's locator, and its panel reads only `knowledge.open({ locator })` (found in U11).
+  - At the wide layout's narrowest width, the open panel leaves the cited claim in view. U11's panel is a fixed sheet up to 28rem wide over the page's right side, so it can cover a claim the page's prose measure puts there (found in U11).
+  - Escape inside the open panel closes it and focus returns to the mark. Escape with focus on the page behind it leaves it open, because the page stays live and Escape there is the focused control's (found in U11).
 - **Verification:** web `check` passes, including e2e.
 
 ### U13. Jump-to's *Search for …* row
@@ -661,6 +665,7 @@ flowchart LR
 - **Test scenarios:**
   - Typing *audit logs* and choosing *Search for "audit logs"* lands on Search with that query in the box and its matches shown.
   - With nothing typed, the row is absent.
+  - With only spaces typed, the row is absent, because Search asks nothing for spaces alone (found in U11).
   - The row is absent for a role that cannot see Search.
 - **Verification:** web `check` passes, including e2e.
 
