@@ -332,8 +332,7 @@ const LINKED = `SELECT t.iri, t.path
     JOIN concept_index t ON t.workspace_id = e.workspace_id AND t.iri = e.to_uid
    WHERE g.workspace_id = $1 AND e.from_uid = $4 AND e.label = '${LINKS_TO_LABEL}'
      AND ${readableClause("e", 2)}
-     AND ${readableClause("t", 2)}
-   GROUP BY t.iri, t.path`;
+     AND ${readableClause("t", 2)}`;
 
 type Linked = { readonly iri: string; readonly path: string };
 
