@@ -5,8 +5,8 @@ const DECLARE = "declareAction";
 
 const ADMIT = "admit";
 
-/** The two shorthands admit on their own call, so only `admit` names a declaration to pair. */
-const ADMITTING = new Set([ADMIT, "requireAdmin", "requireFreshSignIn"]);
+/** The shorthand admits on its own call, so only `admit` names a declaration to pair. */
+const ADMITTING = new Set([ADMIT, "requireFreshSignIn"]);
 
 const calleeName = (node: ESTree.CallExpression): string | undefined =>
   node.callee.type === "Identifier" ? node.callee.name : undefined;
