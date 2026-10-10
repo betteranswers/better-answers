@@ -675,6 +675,7 @@ flowchart LR
   - The row is absent for a reader whose tree holds no Search. Every workspace role sees Search, so the browser test's reader is the operator in the Console, and a unit test over the row's builder holds it for any tree without Search (found in U13).
   - The row is no match: the "nothing matches" line shows beside it, and Enter still takes the first match (found in U13).
   - An ask that reads as JSON, such as `1.50`, `1e3` or a phrase in quotation marks, reaches the page that takes it as it was typed (found in U13).
+  - A search written into the address by hand, such as `?search=audit` or `?search=1.5`, is still taken as written (found in U13).
   - A member who loads after the row took the selection takes it back, so Enter opens the member and not Search (found in U13's review).
   - The row asks for no more than Search takes, 500 characters, and the arrow keys reach it (found in U13's review).
 - **Verification:** web `check` passes, including e2e.

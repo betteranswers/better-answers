@@ -267,6 +267,16 @@ describe("what jump-to offers to search", () => {
     ]);
   });
 
+  it.each([
+    ["1.50", "%221.50%22"],
+    ["1e3", "%221e3%22"],
+    ['"audit logs"', "%22%5C%22audit+logs%5C%22%22"],
+  ])("asks for %s whole, though it reads as JSON", (typed, held) => {
+    const asked = searchGroup(treeOf("Viewer"), typed, AT_ROOT)?.jumps.map((jump) => jump.to);
+
+    expect(asked).toEqual([`/knowledge/search?search=${held}`]);
+  });
+
   it("asks for no more than Search takes", () => {
     const asked = offered(searchGroup(treeOf("Viewer"), `${"a".repeat(500)}bcd`, AT_ROOT));
 
