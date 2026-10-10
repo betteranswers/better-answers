@@ -163,8 +163,9 @@ export const searchGroup = (
   here: Here,
 ): JumpGroup | undefined => {
   const words = typed.trim();
+  if (words === "") return undefined;
   const place = placeAt(tree.areas, SEARCH.path);
-  if (words === "" || place === undefined) return undefined;
+  if (place === undefined) return undefined;
   return {
     heading: place.area.name,
     jumps: [
@@ -315,6 +316,7 @@ function JumpList(
   const every = jumpsIn(properties.tree, properties.members, here);
   const shown = matching(every, typed);
   const search = searchGroup(properties.tree, typed, here);
+  const listed = search === undefined ? shown : [...shown, search];
   const lines = linesOf(
     read,
     shown.reduce((count, group) => count + group.jumps.length, 0),
@@ -346,7 +348,7 @@ function JumpList(
         {lines.refused}
       </p>
       <CommandList label={JUMP_TO.list} className="max-h-[min(24rem,60vh)]">
-        {[...shown, ...(search === undefined ? [] : [search])].map((group) => (
+        {listed.map((group) => (
           <CommandGroup key={group.heading} heading={group.heading}>
             {group.jumps.map((jump) => (
               <JumpItem key={jump.value} jump={jump} onChoose={properties.onChoose} />
