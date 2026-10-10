@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
+import type { writeConceptAction } from "../src/concepts/index.ts";
 import {
   admit,
   declareAction,
@@ -194,6 +195,17 @@ describe("how fresh a sign-in the operator's writes ask for", () => {
   it("refuses in a word whose remedy is signing in again", () => {
     expect(KERNEL_REFUSALS["sign-in-too-old"]).toBe("unauthenticated");
     expectTypeOf<"sign-in-too-old">().toExtend<AdmissionRefusal>();
+  });
+});
+
+describe("an action whose level is read from its input", () => {
+  it("types a concept's writer as an Editor or above", () => {
+    type Writer = AdmittedOf<typeof writeConceptAction>;
+
+    expectTypeOf<UserPrincipal & { readonly role: "Editor" }>().toExtend<Writer>();
+    expectTypeOf<Writer>().not.toExtend<UserPrincipal & { readonly role: "Admin" }>();
+    expectTypeOf<UserPrincipal & { readonly role: "Viewer" }>().not.toExtend<Writer>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Writer>();
   });
 });
 

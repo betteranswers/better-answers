@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 
 import {
   boundarySchemas,
@@ -14,15 +14,19 @@ import { readableClause, readableParameters } from "../access/index.ts";
 import { action, declareActions, record, type AuditAction } from "../audit/index.ts";
 import {
   actorIdOf,
+  admit,
+  ADMIN_ALONE,
   attempt,
+  declareAction,
   err,
   isActorId,
   ok,
-  requireAdmin,
   ulid,
   type ActorId,
+  type AdminUserPrincipal,
   type Principal,
   type PrincipalRefusal,
+  type RefusalOf,
   type Result,
   type RoleRefusal,
   type UserPrincipal,
@@ -240,12 +244,13 @@ export type DecideSuggestionInput = {
   readonly reason: string;
 };
 
-export type DecideSuggestionRefusal =
-  | RoleRefusal
-  | PrincipalRefusal
-  | "malformed"
-  | "no-such-suggestion"
-  | "already-decided";
+const declineSuggestionAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.custom<DecideSuggestionInput>(),
+  refuses: ["role-forbids", "malformed", "no-such-suggestion", "already-decided"],
+});
+
+export type DecideSuggestionRefusal = RefusalOf<typeof declineSuggestionAction> | PrincipalRefusal;
 
 export type SuggestionDecided = {
   readonly suggestionId: string;
@@ -254,19 +259,17 @@ export type SuggestionDecided = {
 };
 
 const decide = async (
-  principal: UserPrincipal,
+  admin: AdminUserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: DecideSuggestionInput,
   decision: { readonly status: SuggestionStatus; readonly action: AuditAction },
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
   const reason = boundarySchemas.suggestion.insert.shape.reason.safeParse(input.reason);
   if (!reason.success || reason.data === null) return err("malformed");
 
-  const decided = await withRepositoryLock(principal, doors.git, () =>
+  const decided = await withRepositoryLock(admin, doors.git, () =>
     attempt(() =>
-      withMember(principal, doors.postgres, async (fresh, tx) => {
+      withMember(admin, doors.postgres, async (fresh, tx) => {
         const waiting = await tx.query<{ set_id: string; status: string }>(
           "SELECT set_id, status FROM suggestion WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
           [fresh.workspaceId, input.suggestionId],
@@ -308,22 +311,26 @@ const decide = async (
   return decided.ok ? folded(decided.value) : err(decided.error);
 };
 
-export const declineSuggestion = (
+export const declineSuggestion = async (
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: DecideSuggestionInput,
-): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> =>
-  decide(principal, doors, input, {
+): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> => {
+  const admitted = admit(declineSuggestionAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  return decide(admitted.value, doors, input, {
     status: SUGGESTION_DECLINED_STATUS,
     action: SUGGESTION_ACTIONS.declined,
   });
+};
 
+/** A step of an acceptance, for the Admin the acceptance admitted. */
 export const returnToProposer = (
-  principal: UserPrincipal,
+  admin: AdminUserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: DecideSuggestionInput,
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> =>
-  decide(principal, doors, input, {
+  decide(admin, doors, input, {
     status: SUGGESTION_RETURNED_STATUS,
     action: SUGGESTION_ACTIONS.returned,
   });

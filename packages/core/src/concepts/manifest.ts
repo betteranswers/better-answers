@@ -1,16 +1,20 @@
+import { z } from "zod";
+
 import { BUNDLE_MANIFEST_PATH, bundleManifest, type BundleManifest } from "@better-answers/schema";
 
 import { action, declareActions, record } from "../audit/index.ts";
 import {
   actorIdOf,
+  admit,
   attempt,
+  declareAction,
   err,
   ok,
   ulid,
   type Clock,
   type PrincipalRefusal,
+  type RefusalOf,
   type Result,
-  type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import {
@@ -58,12 +62,16 @@ export type ManifestWritten =
   | { readonly written: true; readonly sha: string; readonly auditEventId: string }
   | { readonly written: false };
 
+const writeManifestAction = declareAction({
+  admits: { role: "Editor", purposes: [] },
+  input: z.custom<WriteManifestInput>(),
+  refuses: ["role-forbids", "malformed", "path-taken"],
+});
+
 export type WriteManifestRefusal =
-  | RoleRefusal
+  | RefusalOf<typeof writeManifestAction>
   | PassedOnCommitRefusal
-  | PrincipalRefusal
-  | "malformed"
-  | "path-taken";
+  | PrincipalRefusal;
 
 /**
  * Reads the bundle's head against `manifest`: `absent` when no manifest stands, `standing` when
@@ -91,7 +99,8 @@ export const writeManifest = async (
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
   input: WriteManifestInput,
 ): Promise<Result<ManifestWritten, WriteManifestRefusal | Error>> => {
-  if (principal.role === "Viewer") return err("role-forbids");
+  const admitted = admit(writeManifestAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
   const manifest = bundleManifest.safeParse(input.manifest);
   if (!manifest.success) return err("malformed");
 

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { boundarySchemas } from "@better-answers/schema";
 
 import {
@@ -12,16 +14,18 @@ import { action, declareActions, record } from "../audit/index.ts";
 import { recomputeWriteUpsIncluding } from "../guides/index.ts";
 import {
   actorIdOf,
+  admit,
+  ADMIN_ALONE,
   attempt,
   attemptResult,
+  declareAction,
   err,
   ok,
-  requireAdmin,
   ulid,
   type AdminUserPrincipal,
   type Principal,
+  type RefusalOf,
   type Result,
-  type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
@@ -300,11 +304,14 @@ export type OverrideConceptSensitivityInput = {
   readonly audienceGroups?: readonly string[] | null | undefined;
 };
 
+const overrideConceptSensitivityAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.custom<OverrideConceptSensitivityInput>(),
+  refuses: ["role-forbids", "malformed", "no-such-concept", "no-such-group"],
+});
+
 export type OverrideConceptSensitivityRefusal =
-  | RoleRefusal
-  | "malformed"
-  | "no-such-concept"
-  | "no-such-group"
+  | RefusalOf<typeof overrideConceptSensitivityAction>
   | Error;
 
 export type ConceptSensitivityOverridden = {
@@ -324,7 +331,7 @@ export const overrideConceptSensitivity = async (
   tx: Tx,
   input: OverrideConceptSensitivityInput,
 ): Promise<Result<ConceptSensitivityOverridden, OverrideConceptSensitivityRefusal>> => {
-  const admin = requireAdmin(principal);
+  const admin = admit(overrideConceptSensitivityAction, principal, input);
   if (!admin.ok) return err(admin.error);
   const iri = OVERRIDE_IRI.safeParse(input.iri);
   const visibility = visibilityFrom(input);
