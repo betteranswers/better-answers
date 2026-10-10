@@ -69,7 +69,7 @@ const signInChannel = (): BroadcastChannel | undefined =>
   typeof BroadcastChannel === "undefined" ? undefined : new BroadcastChannel(SIGNED_IN);
 
 /** Tells every other browser tab, so one waiting on its code follows the sign-in. */
-export const announceTheSignIn = (): void => {
+const announceTheSignIn = (): void => {
   const channel = signInChannel();
   channel?.postMessage(null);
   channel?.close();
@@ -82,4 +82,11 @@ export const hearASignInElsewhere = (heard: () => void): (() => void) => {
   return () => {
     channel?.close();
   };
+};
+
+/** What every way of signing in leaves behind on this browser, and tells its other tabs. */
+export const signedInHere = (): void => {
+  rememberTheSession("held");
+  forgetThePasskeyOfferShown();
+  announceTheSignIn();
 };

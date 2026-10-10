@@ -1811,7 +1811,7 @@ its menu group where its area has them: Members, Connected sources, Audit log.
 Control Centre's are listed in its entry above, in the order the menu shows them. A person sees a
 page by their *role* or by owning a *collection* it serves. A page not built, or not theirs to see,
 appears nowhere, and its address shows the same **not-found page** as one that never existed,
-offering their *home*. A page that fails says "This page didn't load". A page may carry *tabs*. Not
+offering their *home*. A page that fails says "This page didn’t load". A page may carry *tabs*. Not
 a *view (of an MCP App)*.
 
 ### tab

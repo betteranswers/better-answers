@@ -859,6 +859,12 @@ test.describe("a member's own page", () => {
       word: "last-admin",
     });
     await passesTheAccessibilityGate();
+    // The refused pick stays, so the card still says which role they hold.
+    await expect(
+      thePage(page).getByRole("button", { name: "Make Test person a Viewer" }),
+    ).toHaveAccessibleDescription(
+      new RegExp(`${MEMBER_PAGE_WORDS.heldUntilChanged("Test person", "Admin")}$`),
+    );
     // The card says the role held once the pick matches it, so the pick is put back to read it.
     await thePage(page).getByRole("radio", { name: "Admin", exact: true }).click();
     await expect(changeRoleButton(page)).toHaveAccessibleDescription(

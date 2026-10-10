@@ -32,7 +32,10 @@ export function PageHead(properties: {
   return slot === null ? null : createPortal(head, slot);
 }
 
-/** An open tab already names its list, so there the heading is kept for a screen reader alone. */
+/**
+ * An open tab already names its list, so there the heading is a screen reader's, drawn only
+ * while the keyboard holds focus on it.
+ */
 export function ListHead(properties: {
   readonly heading: string;
   readonly headingId: string;
@@ -52,7 +55,7 @@ export function ListHead(properties: {
         id={headingId}
         ref={headingRef}
         tabIndex={headingRef === undefined ? undefined : -1}
-        className={cn(namedByATab && "sr-only")}
+        className={cn(namedByATab && "sr-only focus-visible:not-sr-only")}
       >
         {heading}
       </h2>

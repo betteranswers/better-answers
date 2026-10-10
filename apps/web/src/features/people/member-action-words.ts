@@ -28,6 +28,7 @@ export const MEMBER_PAGE_WORDS = {
   makeRole: (name: string, role: Role) => `Make ${name} ${aRole(role)}`,
   holdsRole: (name: string, role: Role) =>
     `${name} is ${aRole(role)}. Pick another role to change it.`,
+  heldUntilChanged: (name: string, role: Role) => `${name} is ${aRole(role)} now.`,
   signInsAndTokens: "Sign-ins and personal tokens",
   signInsAndTokensHere: "Sign-ins and personal tokens here",
   endEverySignInAndToken: "End every sign-in and token here",

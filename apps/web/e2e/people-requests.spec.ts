@@ -214,7 +214,10 @@ test.describe("the People page's Requests tab", () => {
     await page.keyboard.press("d");
     await expect(rowOf(page, "Dropped Ray")).toHaveCount(0);
     await theActionLandedWithinItsBudget(page, "decline");
-    await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
+    const landed = requestsRegion(page).getByRole("heading", { name: "Requests" });
+    await expect(landed).toBeFocused();
+    // The tab names the list, so its heading is hidden until the keyboard lands on it.
+    expect((await landed.boundingBox())?.width, "focus landed out of sight").toBeGreaterThan(1);
     await expect(saidIn(page)).toHaveText(
       "Declined the request from Dropped Ray. They may ask again.",
     );

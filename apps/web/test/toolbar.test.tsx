@@ -170,6 +170,7 @@ describe("the toolbar the open page fills", () => {
     const heading = await within(page).findByRole("heading", { level: 1, name: "Models" });
 
     expect(within(page).getByRole("tablist")).toBe(tabs());
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(heading.compareDocumentPosition(tabs()) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 });

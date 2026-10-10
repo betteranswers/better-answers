@@ -112,6 +112,17 @@ describe("the setup page", () => {
     expect(screen.getByRole("button", { name: "Add a passkey" })).toBeDefined();
   });
 
+  it("keeps focus when its keystroke hides the focused part", async () => {
+    await openedWithBothWays();
+    const add = screen.getByRole("button", { name: "Add a passkey" });
+    add.focus();
+
+    fireEvent.keyDown(add, { key: "s" });
+
+    expect(disclosure().getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(disclosure());
+  });
+
   it("replaces the factors after a recovery code, ending on codes", async () => {
     const asked = adasApi(
       () => ({ ...BOTH_HELD, thisSession: sessionStanding("setup", { setupGranted: true }) }),

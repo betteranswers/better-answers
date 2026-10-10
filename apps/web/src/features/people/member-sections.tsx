@@ -70,9 +70,11 @@ function AccessSummary(properties: { readonly member: ListedMember }) {
 /** The hint beside the commit, which says so when the action is on the reader themself. */
 const roleHint = (name: string, held: Role, unchanged: boolean, yourself: boolean): string => {
   if (unchanged) return WORDS.holdsRole(name, held);
+  // The role held is said here too: a refused change leaves the pick on a role they do not hold.
+  const heldNow = WORDS.heldUntilChanged(name, held);
   return yourself
-    ? `${INCLUDES_YOU} ${RECORDED} It holds from your next request.`
-    : `${RECORDED} It holds from their next request.`;
+    ? `${INCLUDES_YOU} ${RECORDED} It holds from your next request. ${heldNow}`
+    : `${RECORDED} It holds from their next request. ${heldNow}`;
 };
 
 function RolePicker(properties: {

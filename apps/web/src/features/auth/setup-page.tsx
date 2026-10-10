@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useEffectEvent, useId, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -48,6 +48,7 @@ import {
   PendingFrame,
   sessionOf,
   useArrivalFocus,
+  type FocusOnArrival,
   useGoingTo,
 } from "./second-factor-parts.tsx";
 import { CONFIRM_STEP, stepAfterTheCodes, stepAfterTheFactors } from "./second-factor-steps.ts";
@@ -193,17 +194,31 @@ function AuthenticatorInstead(properties: {
   readonly setup: Setup;
   readonly controls: string;
   readonly unavailable: boolean;
-  readonly buttonRef: Ref<HTMLButtonElement>;
+  /** Lands focus on arrival where no passkey can be made here. */
+  readonly onArrival: FocusOnArrival | null;
 }) {
-  const { setup, controls, unavailable, buttonRef } = properties;
+  const { setup, controls, unavailable, onArrival } = properties;
+  const own = useRef<HTMLButtonElement>(null);
+  const held = useCallback(
+    (button: HTMLButtonElement | null) => {
+      own.current = button;
+      onArrival?.(button);
+    },
+    [onArrival],
+  );
   const toggle = () => {
     if (!unavailable) setup.toggle();
   };
-  useKeystroke(SET_UP_INSTEAD, toggle);
+  // Focus first: the key may be pressed from inside the part that opening this hides.
+  useKeystroke(SET_UP_INSTEAD, () => {
+    if (unavailable) return;
+    own.current?.focus();
+    setup.toggle();
+  });
 
   return (
     <Button
-      ref={buttonRef}
+      ref={held}
       type="button"
       variant="outline"
       className="mt-6 aria-disabled:opacity-50"
@@ -270,7 +285,7 @@ function SetupWays(properties: {
         setup={setup}
         controls={setupId}
         unavailable={finishing}
-        buttonRef={here ? null : first}
+        onArrival={here ? null : first}
       />
       {setup.open ? (
         <AuthenticatorSetup
