@@ -62,6 +62,16 @@ const checkedThroughTheSession = async <T>(
   return { kind: "read", value: await readFrom(answered, procedure, data) };
 };
 
+const PROTECTED_RESOURCE = z.object({ resource: z.string() });
+
+/** The address the release publishes for an assistant to connect to, read as an assistant reads it. */
+export const publishedAddressOf = async (page: Page): Promise<string> => {
+  const answered = await page.request.get("/.well-known/oauth-protected-resource/mcp");
+  refusedTheRun(answered, "the read of the protected-resource document");
+  expect(answered.ok(), `the protected-resource document answered ${answered.status()}`).toBe(true);
+  return PROTECTED_RESOURCE.parse(await answered.json()).resource;
+};
+
 const SESSION_MEMBER = z.object({
   workspace: z.object({ name: z.string() }),
   person: z.object({ name: z.string() }),
