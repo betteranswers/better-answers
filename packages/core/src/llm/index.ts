@@ -1,6 +1,18 @@
+import { z } from "zod";
+
 import { llmPurpose } from "@better-answers/schema";
 
-import { attempt, err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import {
+  admit,
+  ANY_ROLE,
+  attempt,
+  declareAction,
+  err,
+  ok,
+  type RefusalOf,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 export const LLM_PURPOSES = llmPurpose.enumValues;
@@ -43,16 +55,27 @@ const modelChoiceOf = (
         retentionTail: row.retentionTail,
       };
 
+const listModelChoicesAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.object({}),
+  refuses: ["role-forbids"],
+});
+
 /** One model choice per purpose, in `LLM_PURPOSES` order; a purpose with none configured has nulls. */
 export const listModelChoices = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<readonly WorkspaceModelChoice[], Error>> => {
+): Promise<
+  Result<readonly WorkspaceModelChoice[], RefusalOf<typeof listModelChoicesAction> | Error>
+> => {
+  const admitted = admit(listModelChoicesAction, principal, {});
+  if (!admitted.ok) return err(admitted.error);
+
   const configured = await attempt(() =>
     tx.query<ModelChoiceRow>(
       `SELECT purpose, provider, model, dimensions, retention_tail AS "retentionTail"
          FROM model_choice WHERE workspace_id = $1`,
-      [principal.workspaceId],
+      [admitted.value.workspaceId],
     ),
   );
   if (!configured.ok) return err(configured.error);

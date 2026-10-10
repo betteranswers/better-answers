@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   derivedVisibility,
   readableClause,
@@ -8,10 +10,14 @@ import {
   type VisibilityRow,
 } from "../access/index.ts";
 import {
+  admit,
+  ANY_ROLE,
   attempt,
+  declareAction,
   err,
   ok,
   type Principal,
+  type RefusalOf,
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
@@ -89,6 +95,12 @@ export const recomputeWriteUpsIncluding = async (
   return moved;
 };
 
+const footnotesOfAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.custom<string>(),
+  refuses: ["role-forbids"],
+});
+
 /**
  * Undefined when the write-up is absent or the principal cannot read it. Otherwise only the
  * includes whose concept the principal reads, in the write-up's order.
@@ -97,13 +109,19 @@ export const footnotesOf = async (
   principal: UserPrincipal,
   tx: Tx,
   writeUpId: string,
-): Promise<Result<readonly Footnote[] | undefined, Error>> => {
-  const parameters = readableParameters(principal);
+): Promise<
+  Result<readonly Footnote[] | undefined, RefusalOf<typeof footnotesOfAction> | Error>
+> => {
+  const admitted = admit(footnotesOfAction, principal, writeUpId);
+  if (!admitted.ok) return err(admitted.error);
+  const reader = admitted.value;
+
+  const parameters = readableParameters(reader);
   const page = await attempt(() =>
     tx.query(
       `SELECT 1 FROM write_up p
         WHERE p.workspace_id = $1 AND p.id = $2 AND ${readableClause("p", 3)}`,
-      [principal.workspaceId, writeUpId, ...parameters],
+      [reader.workspaceId, writeUpId, ...parameters],
     ),
   );
   if (!page.ok) return err(page.error);
@@ -116,7 +134,7 @@ export const footnotesOf = async (
          JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
         WHERE i.workspace_id = $1 AND i.write_up_id = $2 AND ${readableClause("c", 3)}
         ORDER BY i.ordinal, i.id`,
-      [principal.workspaceId, writeUpId, ...parameters],
+      [reader.workspaceId, writeUpId, ...parameters],
     ),
   );
   if (!footnotes.ok) return err(footnotes.error);

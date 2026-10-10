@@ -413,8 +413,12 @@ describe("what the slice's four actions answer", () => {
   it("hands every caller an outcome to read, not to catch", () => {
     expectTypeOf(find).returns.resolves.toEqualTypeOf<Result<FindResult, "role-forbids" | Error>>();
     expectTypeOf(open).returns.resolves.toEqualTypeOf<Result<OpenResult, "role-forbids" | Error>>();
-    expectTypeOf(ask).returns.resolves.toEqualTypeOf<Result<AnswerResult, Error>>();
-    expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<Result<FeedbackReceipt, never>>();
+    expectTypeOf(ask).returns.resolves.toEqualTypeOf<
+      Result<AnswerResult, "role-forbids" | Error>
+    >();
+    expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<
+      Result<FeedbackReceipt, "role-forbids">
+    >();
   });
 
   it("answers the query and no matches when neither arm finds", async () => {

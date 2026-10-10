@@ -1,5 +1,5 @@
 import { action, declareIdentitySetActions, record, type EndedGrant } from "../audit/index.ts";
-import { ulid, type UserId, type UserPrincipal, type WorkspaceId } from "../kernel/index.ts";
+import { ulid, type AdminUserPrincipal, type UserId, type WorkspaceId } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /** The operator reads a person's ended grants from here, since no workspace's audit log is theirs. */
@@ -82,7 +82,7 @@ export const endTokens = async (tx: Tx, asked: TokensToEnd): Promise<TokensEnded
  * identity-set audit log, under the Admin. An action that ended none writes nothing here.
  */
 export const recordGrantsEndedHere = async (
-  admin: UserPrincipal,
+  admin: AdminUserPrincipal,
   tx: Tx,
   ended: { readonly personId: UserId; readonly grants: readonly EndedGrant[] },
 ): Promise<void> => {

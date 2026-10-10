@@ -29,6 +29,7 @@ import {
   actorIdOfPerson,
   admit,
   ADMIN_ALONE,
+  ANY_ROLE,
   attempt,
   declareAction,
   err,
@@ -1209,21 +1210,32 @@ const openedOf = (row: ConceptRow): OpenedConcept => ({
   verification: verificationOf(row),
 });
 
+const conceptByIriAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.custom<ConceptIri>(),
+  refuses: ["role-forbids"],
+});
+
 /** `undefined` both when no concept holds the iri and when this principal may not read it. */
-export const conceptByIri = (
+export const conceptByIri = async (
   principal: UserPrincipal,
   tx: Tx,
   iri: ConceptIri,
-): Promise<Result<OpenedConcept | undefined, Error>> =>
-  attempt(async () => {
+): Promise<Result<OpenedConcept | undefined, RefusalOf<typeof conceptByIriAction> | Error>> => {
+  const admitted = admit(conceptByIriAction, principal, iri);
+  if (!admitted.ok) return err(admitted.error);
+  const reader = admitted.value;
+
+  return attempt(async () => {
     const { rows } = await tx.query<ConceptRow>(`${CONCEPT_SELECT} AND c.iri = $4`, [
-      principal.workspaceId,
-      ...readableParameters(principal),
+      reader.workspaceId,
+      ...readableParameters(reader),
       iri,
     ]);
     const row = rows[0];
     return row === undefined ? undefined : openedOf(row);
   });
+};
 
 type ReadRow = ConceptRow & {
   readonly shared_by: string | null;

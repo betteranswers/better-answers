@@ -10,15 +10,20 @@ import {
   STORED_DETAIL_KEYS,
 } from "../audit/index.ts";
 import {
+  admit,
+  ANY_ROLE,
   attempt,
+  declareAction,
   err,
   ok,
   refusalFor,
   requireFreshSignIn,
+  type RefusalOf,
   type Result,
   ulid,
 } from "../kernel/index.ts";
 import type {
+  AdminUserPrincipal,
   OperatorPrincipal,
   PlatformPrincipal,
   PrincipalRefusal,
@@ -502,7 +507,7 @@ export type RevokeWorkspaceTokensInput = {
  * takes the principal its action admitted, and judges none.
  */
 export const endWorkspaceTokens = (
-  _admitted: PlatformPrincipal | UserPrincipal,
+  _admitted: PlatformPrincipal | AdminUserPrincipal,
   tx: Tx,
   input: { readonly workspaceId: WorkspaceId; readonly personId: UserId; readonly at: Date },
 ): Promise<TokensEnded> =>
@@ -623,14 +628,24 @@ export type Member = {
   readonly role: Role;
 };
 
-export type MemberReadRefusal = WorkspaceRefusal<"workspace-gone" | "person-gone">;
+const readMemberAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.object({}),
+  refuses: ["role-forbids", "workspace-gone", "person-gone"],
+});
+
+export type MemberReadRefusal = WorkspaceRefusal<RefusalOf<typeof readMemberAction>>;
 
 export const readMember = async (
   principal: UserPrincipal,
   tx: Tx,
 ): Promise<Result<Member, MemberReadRefusal | Error>> => {
+  const admitted = admit(readMemberAction, principal, {});
+  if (!admitted.ok) return err(admitted.error);
+  const member = admitted.value;
+
   const workspace = await attempt(() =>
-    tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [principal.workspaceId]),
+    tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [member.workspaceId]),
   );
   if (!workspace.ok) return err(workspace.error);
   const name = workspace.value.rows[0]?.name;
@@ -638,7 +653,7 @@ export const readMember = async (
 
   const person = await attempt(() =>
     tx.query<{ name: string; email: string }>('SELECT name, email FROM "user" WHERE id = $1', [
-      principal.userId,
+      member.userId,
     ]),
   );
   if (!person.ok) return err(person.error);
@@ -646,9 +661,9 @@ export const readMember = async (
   if (row === undefined) return err("person-gone");
 
   return ok({
-    workspace: { id: principal.workspaceId, name },
-    person: { id: principal.userId, name: row.name, email: row.email },
-    role: principal.role,
+    workspace: { id: member.workspaceId, name },
+    person: { id: member.userId, name: row.name, email: row.email },
+    role: member.role,
   });
 };
 
