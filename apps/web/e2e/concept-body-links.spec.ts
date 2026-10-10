@@ -1,6 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -13,8 +13,6 @@ import {
   tabUntilFocused,
 } from "./harness.ts";
 import { conceptsSeeded, isAnOpen } from "./knowledge.ts";
-
-const SEARCH = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
 
 const COMMITTEE = "Audit Committee";
 

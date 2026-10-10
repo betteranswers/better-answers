@@ -1,6 +1,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
+import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import { QUERY_MAX } from "@/features/knowledge/knowledge-state.ts";
 import { MEMBERS_PAGE } from "@/features/people/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
@@ -9,9 +10,6 @@ import { Icon, type IconName } from "@/shared/icon.tsx";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import {
   detailAt,
-  KNOWLEDGE,
-  menuGroupIn,
-  pageNamed,
   placeAt,
   pagesOf,
   type MenuGroup,
@@ -31,8 +29,6 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/
 import { nameOrAddress } from "@/shared/words.ts";
 
 import { findWhat, JUMP_TO, nothingMatches, searchFor } from "./words.ts";
-
-const SEARCH = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
 
 /** The search row's value, constant so the row keeps the selection while more is typed. */
 const SEARCH_ROW = "search";

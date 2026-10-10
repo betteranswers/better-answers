@@ -89,17 +89,41 @@ const openActionAndSearchAt = (asked: string) =>
   openPages({ "/members": ActionAndSearch, "/elsewhere": () => null }, ["/elsewhere", asked]);
 
 describe("an ask as the address holds it", () => {
-  it("asks a JSON-looking value as its JSON string", () => {
-    const here = { pathname: "/elsewhere", searchStr: "" };
+  const here = { pathname: "/elsewhere", searchStr: "" };
 
-    expect(askingHere(here, "/members", "search", "1.50")).toBe("/members?search=%221.50%22");
-    expect(askingHere(here, "/members", "search", "audit logs")).toBe("/members?search=audit+logs");
+  /** What was typed, and how the address holds it. */
+  const WHOLE = [
+    ["1.50", "%221.50%22"],
+    ["1e3", "%221e3%22"],
+    ['"audit logs"', "%22%5C%22audit+logs%5C%22%22"],
+  ] as const;
+
+  it.each(WHOLE)("asks %s as its JSON string", (typed, held) => {
+    expect(askingHere(here, "/members", "search", typed)).toBe(`/members?search=${held}`);
   });
 
-  it("is read as typed from either form", () => {
-    expect(askedIn(new URLSearchParams("?search=%221.50%22"), "search")).toBe("1.50");
-    expect(askedIn(new URLSearchParams("?search=1.50"), "search")).toBe("1.50");
+  it.each(WHOLE)("reads %s back from its JSON string", (typed, held) => {
+    expect(askedIn(new URLSearchParams(`?search=${held}`), "search")).toBe(typed);
+  });
+
+  it("asks plain words as they are", () => {
+    expect(askingHere(here, "/members", "search", "audit logs")).toBe("/members?search=audit+logs");
+    expect(askingHere(here, "/members", "action", "invite")).toBe("/members?action=invite");
+  });
+
+  it("is read as written where it was never quoted", () => {
+    expect(askedIn(new URLSearchParams("?search=1.5"), "search")).toBe("1.5");
     expect(askedIn(new URLSearchParams("?search=audit+logs"), "search")).toBe("audit logs");
+    expect(askedIn(new URLSearchParams("?action=invite"), "action")).toBe("invite");
+  });
+});
+
+describe("a search written into the address by hand", () => {
+  it.each(["audit", "1.5"])("is taken as written: %s", async (written) => {
+    const { at } = await openAt("/elsewhere", `/members?search=${written}`);
+
+    await at("/members");
+    expect(takenSoFar()).toBe(written);
   });
 });
 

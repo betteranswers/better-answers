@@ -1,7 +1,7 @@
 import { skipToken, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { inferOutput } from "@trpc/tanstack-react-query";
 
-import { retryUnlessWaiting } from "@/shared/api/query-client.ts";
+import { WHILE_A_CEILING_HOLDS } from "@/shared/api/query-client.ts";
 import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { MATCHES_A_PAGE } from "./knowledge-state.ts";
@@ -23,7 +23,7 @@ export const useMatches = (query: string) => {
   return useInfiniteQuery(
     api.knowledge.find.infiniteQueryOptions(
       asksNothing(query) ? skipToken : { query, limit: MATCHES_A_PAGE },
-      { getNextPageParam: (page) => page.nextCursor, retry: retryUnlessWaiting },
+      { getNextPageParam: (page) => page.nextCursor, ...WHILE_A_CEILING_HOLDS },
     ),
   );
 };
@@ -32,7 +32,7 @@ export type Matches = ReturnType<typeof useMatches>;
 
 export const usePassage = (locator: string) => {
   const api = useTRPC();
-  return useQuery(api.knowledge.open.queryOptions({ locator }, { retry: retryUnlessWaiting }));
+  return useQuery(api.knowledge.open.queryOptions({ locator }, WHILE_A_CEILING_HOLDS));
 };
 
 export type Concept = NonNullable<inferOutput<Api["knowledge"]["open"]>["concept"]>;
@@ -54,5 +54,5 @@ export const openingOf = (item: Evidence | undefined): Opening | undefined => {
 /** A refused read is never asked again: a withheld concept stays withheld, and a ceiling lifts with time. */
 export const useConcept = (iri: string) => {
   const api = useTRPC();
-  return useQuery(api.knowledge.open.queryOptions({ iri }, { retry: retryUnlessWaiting }));
+  return useQuery(api.knowledge.open.queryOptions({ iri }, WHILE_A_CEILING_HOLDS));
 };

@@ -1,6 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { JUMP_TO, nothingMatches, searchFor } from "@/app/words.ts";
+import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import {
   ASK,
@@ -39,8 +40,6 @@ const MODELS_AND_SPEND = pageNamed(MODELS, "Models and spend");
 
 /** Declared and never built, so no reader may find it. */
 const SIGNALS = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Signals");
-
-const SEARCH = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
 
 const EVERY_WORKSPACE = pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every workspace");
 
@@ -275,18 +274,33 @@ test("lands on Search with the typed query and its matches", async ({ page, requ
   );
 });
 
-test("carries a typed number to Search as typed", async ({ page, request }) => {
+for (const [what, words] of [
+  ["a decimal", "1.50"],
+  ["an exponent", "1e3"],
+  ["a quoted phrase", '"audit logs"'],
+] as const) {
+  test(`carries ${what} from jump-to to Search as typed`, async ({ page, request }) => {
+    await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+
+    await opened(page, "Control+k");
+    await typed(page, words);
+    await searchRowOf(page).click();
+
+    await expect(searchBoxOf(page)).toHaveValue(words);
+    // Search's own key holds it too, once the box has settled.
+    await expect(page).toHaveURL(/knowledge\.search=/);
+    await page.reload();
+    await expect(searchBoxOf(page)).toHaveValue(words);
+  });
+}
+
+test("takes a search written into the address by hand", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
 
-  await opened(page, "Control+k");
-  await typed(page, "1.50");
-  await searchRowOf(page).click();
-
-  await expect(searchBoxOf(page)).toHaveValue("1.50");
-  // The router quotes a string that reads as a number, and Search's own key holds it so.
-  await expect(page).toHaveURL(/knowledge\.search=%221\.50%22$/);
-  await page.reload();
-  await expect(searchBoxOf(page)).toHaveValue("1.50");
+  await page.goto(`${SEARCH.path}?search=audit`);
+  await expect(searchBoxOf(page)).toHaveValue("audit");
+  await page.goto(`${SEARCH.path}?search=1.5`);
+  await expect(searchBoxOf(page)).toHaveValue("1.5");
 });
 
 test("reaches the search row by the arrow keys", async ({ page, request }) => {

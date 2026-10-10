@@ -8,6 +8,8 @@ export const SEARCH_WORDS = {
   matched: (query: string, more: boolean): string =>
     more ? `Matches for ${quoted(query)}. More follow.` : `Matches for ${quoted(query)}.`,
   matches: "Matches",
+  /** True of a match re-ranked past the pages shown as of one withheld, so it says neither. */
+  passageLeft: "The passage you had open is no longer listed.",
   more: "More matches",
   document: "Document",
   notCompanyKnowledge: "Not company knowledge",

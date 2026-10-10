@@ -88,12 +88,21 @@ const HANDBOOK_TITLE = "The synthetic heron handbook";
 const MINUTES_LABEL = "Warden minutes";
 const MINUTES_TITLE = "Synthetic warden minutes, March";
 
-/** A concept citing an Internal handbook passage and a Restricted one of minutes, with a Viewer. */
-const aConceptCitingRestrictedMinutes = async () => {
-  const workspace = await app().provision();
-  const { workspaceId, admin } = workspace;
+/** A workspace with a Viewer, its Admin writing to a fresh repository through the doors a write takes. */
+const aWorkspaceBeingWritten = async () => {
+  const { workspaceId, admin } = await app().provision();
+  const git = openTestGit(app());
+  await initRepository(git, workspaceId);
+  const writer = await actingIn(app(), { workspaceId, userId: admin.id }, async (held) => held);
   const viewer = await app().person();
   await app().addMember(workspaceId, viewer.id, "Viewer");
+  const doors = { git, postgres: app().doors.postgres, clock: app().doors.clock };
+  return { workspaceId, admin, viewer, git, writer, doors };
+};
+
+/** A concept citing an Internal handbook passage and a Restricted one of minutes, with a Viewer. */
+const aConceptCitingRestrictedMinutes = async () => {
+  const { workspaceId, admin, viewer, git, writer, doors } = await aWorkspaceBeingWritten();
   const landed = (shape: DocumentShape) =>
     documentLanded(app().database.superuser, workspaceId, shape);
   const handbook = await landed({ title: HANDBOOK_TITLE, text: "Herons nest from March." });
@@ -102,40 +111,33 @@ const aConceptCitingRestrictedMinutes = async () => {
     text: "The warden rings the herons each spring.",
     sensitivity: "Restricted",
   });
-  const git = openTestGit(app());
-  await initRepository(git, workspaceId);
-  const writer = await actingIn(app(), { workspaceId, userId: admin.id }, async (held) => held);
-  const written = await writeConcept(
-    writer,
-    { git, postgres: app().doors.postgres, clock: app().doors.clock },
-    {
-      mergeKey: "note:heron-nesting",
-      path: "knowledge/heron-nesting.md",
-      kind: "Note",
+  const written = await writeConcept(writer, doors, {
+    mergeKey: "note:heron-nesting",
+    path: "knowledge/heron-nesting.md",
+    kind: "Note",
+    title: NESTING,
+    frontmatter: {
       title: NESTING,
-      frontmatter: {
-        title: NESTING,
-        type: "Note",
-        sources: [
-          {
-            id: "HANDBOOK",
-            title: HANDBOOK_TITLE,
-            resource: "handbook",
-            locator: handbook.locator,
-          },
-          { id: "MINUTES", title: MINUTES_LABEL, resource: "minutes", locator: minutes.locator },
-        ],
-      },
-      body: "Herons nest from March.[^HANDBOOK] The warden rings them.[^MINUTES]\n",
-      message: "Record the heron nesting season",
-      author: { name: admin.name, email: admin.email },
-      expects: { head: await head(writer, git) },
-      status: "stable",
-      evidence: [
-        { sourceDocumentId: handbook.documentId, locator: handbook.locator, resource: "handbook" },
+      type: "Note",
+      sources: [
+        {
+          id: "HANDBOOK",
+          title: HANDBOOK_TITLE,
+          resource: "handbook",
+          locator: handbook.locator,
+        },
+        { id: "MINUTES", title: MINUTES_LABEL, resource: "minutes", locator: minutes.locator },
       ],
     },
-  );
+    body: "Herons nest from March.[^HANDBOOK] The warden rings them.[^MINUTES]\n",
+    message: "Record the heron nesting season",
+    author: { name: admin.name, email: admin.email },
+    expects: { head: await head(writer, git) },
+    status: "stable",
+    evidence: [
+      { sourceDocumentId: handbook.documentId, locator: handbook.locator, resource: "handbook" },
+    ],
+  });
   if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
   return {
     iri: written.value.iri,
@@ -259,7 +261,75 @@ const mcpOpenedBy = async (person: { readonly email: string }, iri: string) => {
   return calledTool(client, accessToken, "open", { iri });
 };
 
+const ASKS_THE_BOARD = "Ask [the board](../board.md).";
+
+/** Three notes alike, whose link names a Restricted concept, a file nobody wrote, and a path outside the bundle. */
+const threeNotesAskingTheBoard = async () => {
+  const { admin, viewer, git, writer, doors } = await aWorkspaceBeingWritten();
+  const written = async (
+    name: string,
+    path: string,
+    concept: { readonly title: string; readonly body: string; readonly sensitivity: string },
+  ): Promise<string> => {
+    const landed = await writeConcept(writer, doors, {
+      mergeKey: `note:${name}`,
+      path,
+      kind: "Note",
+      title: concept.title,
+      frontmatter: { title: concept.title, type: "Note" },
+      body: concept.body,
+      message: `Record ${name}`,
+      author: { name: admin.name, email: admin.email },
+      expects: { head: await head(writer, git) },
+      status: "stable",
+      sensitivity: concept.sensitivity,
+      evidence: [],
+    });
+    if (!landed.ok) throw new Error(`the write was refused: ${String(landed.error)}`);
+    return landed.value.iri;
+  };
+  const board = await written("board", "knowledge/held/board.md", {
+    title: "The board",
+    body: "The board meets in closed session.",
+    sensitivity: "Restricted",
+  });
+  const expenses = { title: "Expenses", body: ASKS_THE_BOARD, sensitivity: "Internal" };
+  return {
+    admin,
+    viewer,
+    board,
+    notes: [
+      await written("held", "knowledge/held/policies/expenses.md", expenses),
+      await written("bare", "knowledge/bare/policies/expenses.md", expenses),
+      await written("top", "knowledge/expenses.md", expenses),
+    ],
+  };
+};
+
 describe("a body's links over both transports", () => {
+  it("answers three unanswerable links alike over MCP", async () => {
+    const { admin, viewer, board, notes } = await threeNotesAskingTheBoard();
+
+    const structures: string[] = [];
+    const texts: string[] = [];
+    for (const iri of notes) {
+      const opened = await mcpOpenedBy(viewer, iri);
+      structures.push(JSON.stringify(structured(opened)).replaceAll(iri, "this concept"));
+      texts.push(rendered(opened));
+    }
+    const seen = await mcpOpenedBy(admin, notes[0] ?? "");
+
+    expect(structures[0]).toContain('"bodyLinks":[]');
+    expect(structures[1]).toBe(structures[0]);
+    expect(structures[2]).toBe(structures[0]);
+    expect(texts).toEqual(
+      notes.map(() => ["# Expenses", "", ASKS_THE_BOARD, "", "_Unverified_"].join("\n")),
+    );
+    expect(structured(seen)).toMatchObject({
+      concept: { bodyLinks: [{ ordinal: 0, address: "../board.md", target: board }] },
+    });
+  });
+
   it("answers the same links over MCP and over tRPC", async () => {
     const { viewer, iriOf } = await aConceptLinkingTwo();
     const { api } = await webSignedIn(app(), viewer.email);

@@ -84,6 +84,8 @@ Not built, each judged and left out:
 - KTD4. **MCP's text lists each answered address once, as `- <address> · <iri>`, under a heading of its own that is absent when nothing is answered.** `openedOnTheWire` in `apps/api/src/mcp/entries/index.ts` picks the concept's fields by name, so it gains the field. Governs R3, R6.
 - KTD5. **The page matches a drawn link to an entry by address, with both sides percent-decoded.** The Markdown parser percent-encodes what the body's reader leaves as written, so an exact comparison would miss a non-ASCII address. Matching by position is ruled out: the nth anchor in the rendered tree is not ordinal n. A miss falls to words, and so does an address that does not decode: it is compared as written, on either side, and never fails the page. The destination is built from `target` through the web's `conceptPageOf`, and a fragment is dropped. Governs R7, R8.
 - KTD6. **A failed statement fails the read, as `relations` does.** Every other shortfall falls to no entry.
+- KTD7. **The answer grows with the body's own links and with nothing else, so it carries no cap.** An entry exists only for a link the body holds. One answered link adds 95 bytes and its address to the structured content, 122 bytes for `../roles/audit-committee.md`. It adds 62 bytes and its address to MCP's text, 89 bytes for that address, once however often the body repeats it. A body of 100 answered links therefore adds about 12 KB of structured content and 9 KB of text. The relations at their cap of 25 add about 2.8 KB and 2.2 KB. The S2a plan sized that cap so `open` on a large `Answer` stays well under an MCP client's response limit, and `apps/api/tests/mcp-surface.test.ts` holds an `open` text under 150,000 characters: 100 links are 6 % of that. The text is the smaller cost of the two, so it lists every answered address and summarises nothing. The structured field is never cut. Governs R5.
+- KTD8. **`open` gains one statement, inside its budget.** Core's budget test (`packages/core/test/find-budget.test.ts`) runs 20 reads in flight on a pool of 20 and prices each in one-row reads, against a budget of 40. It was run on this change and on the read before it, alternating on one machine, in two sittings of three runs each. A plain `open` read 4.3 to 4.9 against 4.1 to 4.6 in one sitting, and 3.7 to 4.7 against 2.6 to 3.2 in the other. `open` of the concept naming four sources, whose body links two concepts, read 8.2 to 10.5 against 7.3 to 8.5, and 8.4 to 11.2 against 6.5 to 8.2. So the statement costs a plain `open` 0.2 to 1.8 one-row reads at the median and the four-source one 0.7 to 3.0. The unit is itself a measured read and moves with the machine's load. That test also holds that the two links are answered in the read it times. Governs R1.
 
 ### High-Level Technical Design
 
@@ -129,7 +131,7 @@ The projected rows are KTD1's statement. A row exists only for a target the read
 - **Goal:** `readConcept` answers `bodyLinks` by KTD1 and KTD2.
 - **Requirements:** R1, R2, R3, R4, R5. Covers AE1.
 - **Dependencies:** none.
-- **Files:** `packages/core/src/concepts/read.ts`, `packages/core/src/concepts/index.ts` (`ConceptRead` and `readConcept` only), `packages/core/src/store/map/index.ts` (export `targetOf`, nothing else), `packages/core/test/concept-read.test.ts`.
+- **Files:** `packages/core/src/concepts/read.ts`, `packages/core/src/concepts/index.ts` (`ConceptRead` and `readConcept` only), `packages/core/src/store/map/index.ts` (export `targetOf`, nothing else), `packages/core/test/concept-read.test.ts`, `packages/core/test/find-budget.test.ts` (KTD8).
 - **Approach:**
   1. Read the body's links with `linksAndMarksOf` and the file's own cited sources, before the frontmatter is projected.
   2. Run KTD1's statement once, scoped to the live generation and the workspace as `RELATIONS` is.
@@ -139,7 +141,7 @@ The projected rows are KTD1's statement. A row exists only for a target the read
   - Answers a readable relative link at its ordinal: a body with an image, then an `https` link, then `[Audit Committee](../roles/audit-committee.md)` answers one entry with ordinal 2, that address and the target's IRI.
   - Answers a Viewer nothing for a concept they may not read, while an Admin's read of the same concept answers it.
   - Answers nothing for a target limited to a group the reader is not in, and nothing for a target that is not published, while a reader in the group is answered the first.
-  - Covers AE1. Reads alike for a target the reader may not read and one not written: two concepts with the same body, one linking a Restricted concept and one a path no concept holds, give a Viewer the same empty `bodyLinks` and the same `relations`.
+  - Covers AE1. Answers a Viewer the same bytes for a link to a Restricted concept, to a file nobody wrote and to a path outside the bundle: three concepts of one title and body, the concept's own IRI apart.
   - Stops answering a target once an Admin restricts it, with the citing concept untouched.
   - Answers a link whose target was written after it, with the citing concept untouched.
   - Answers every link past twenty-five: 26 relative links give an Admin 26 entries, the last with ordinal 25, beside 25 relations.
@@ -179,6 +181,7 @@ The projected rows are KTD1's statement. A row exists only for a target the read
   - Answers the Viewer the whole read over MCP, the body's link with its target among it (the existing literal gains the field).
   - Lists the key in the entry's emitted output schema.
   - Gives the Viewer no IRI of a Restricted target in the structured answer or the text, while the Admin's answer holds it.
+  - Answers a Viewer the same bytes over MCP, structured and text, for a link to a Restricted concept, to a file nobody wrote and to a path outside the bundle.
 - **Verification:** the scenarios pass, and the first fails with the field left out of `openedOnTheWire`.
 
 ### U4. Draw an answered link on the concept page

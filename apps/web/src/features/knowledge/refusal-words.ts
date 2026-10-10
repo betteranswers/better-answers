@@ -13,8 +13,8 @@ export const SAID_OF_KNOWLEDGE = {
   },
 } satisfies SaidOfWord;
 
-/** A ceiling crosses with no word, so the wait it names is what the page says. */
+/** A person's own ceiling and their address's cross alike, with no word, so this never says whose it was. */
 export const readsCeiling = (liftsInSeconds: number): Said => ({
-  why: "You have searched and opened this workspace’s knowledge too often this minute, so nothing new is shown.",
+  why: "Too much has been asked this minute, so nothing new is shown.",
   next: `Try again in ${minutesUntil(liftsInSeconds)}.`,
 });

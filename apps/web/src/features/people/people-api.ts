@@ -71,6 +71,12 @@ export const useMembers = () => {
 
 type Taken = { readonly before: readonly ListedMember[] | undefined };
 
+/** Each action on the list is asked of one person or of a ticked set. */
+const ASKED_OF = z.union([
+  z.object({ personId: z.string() }).transform((asked) => [asked.personId]),
+  z.object({ personIds: z.array(z.string()) }).transform((asked) => asked.personIds),
+]);
+
 /**
  * The list takes the action before the api answers, so it lands within 100 ms. The action may touch the
  * reader's own member row.
@@ -81,6 +87,7 @@ const useReconciledList = <Asked>(
   const api = useTRPC();
   const queryClient = useQueryClient();
   const activityReadAgain = useActivityReadAgain();
+  const readerId = useReaderId();
   const listKey = api.members.list.queryKey();
   // Callers spread these into `useMutation`: the React lint takes a callback passed through `mutationOptions` as called during render.
   return {
@@ -94,6 +101,12 @@ const useReconciledList = <Asked>(
     },
     onError: (_refusal: ApiError, _asked: Asked, taken: Taken | undefined) => {
       queryClient.setQueryData(listKey, taken?.before);
+    },
+    // Here, not on the page that asked: a reader gone from it before the answer still holds what they read.
+    onSuccess: <Answer>(_answer: Answer, asked: Asked) => {
+      if (readerId === undefined) return;
+      const own = ASKED_OF.safeParse(asked).data?.includes(readerId) === true;
+      if (own) void queryClient.resetQueries({ type: "inactive" });
     },
     onSettled: () => {
       activityReadAgain();

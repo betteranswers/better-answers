@@ -191,6 +191,10 @@ const opensOf = (result: OpenResult): readonly string[] =>
       ) ?? [])
     : [];
 
+/** The addresses of the body's links the read answers, in the body's order. */
+const linksOf = (result: OpenResult): readonly string[] =>
+  result.found ? (result.concept?.bodyLinks.map(({ address }) => address) ?? []) : [];
+
 describe("find and open under concurrent read load", () => {
   let corpus: Corpus;
 
@@ -254,6 +258,12 @@ describe("find and open under concurrent read load", () => {
           ? ["Retention handbook", "Backup Frequency"]
           : ["Retention handbook", "Board minutes", "Backup Frequency"],
       ),
+    );
+    expect(reads.map(({ value }) => linksOf(value))).toEqual(
+      Array.from({ length: IN_FLIGHT * ROUNDS }, () => [
+        "./security-log-retention.md",
+        "./backup-frequency.md",
+      ]),
     );
     expect(inOneRowReads, "open of four sources, in one-row reads, at the median").toBeLessThan(
       OPEN_BUDGET_IN_ONE_ROW_READS,
