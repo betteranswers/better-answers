@@ -95,7 +95,7 @@ import { doorTold, type Doors } from "../doors.ts";
 import type { Mail } from "../email.ts";
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import { isRefusalWord, refusalOf, type RefusalWord } from "../refusal.ts";
+import { refusalOf, type RefusalWord } from "../refusal.ts";
 
 const DONE = 0;
 const REFUSED = 1;
@@ -461,20 +461,22 @@ const sliceCommand = async (
 export const reasonOf = (reason: string | Error): string =>
   typeof reason === "string" ? reason : reason.message;
 
+/** A word said in a sentence still exits with its class's code: the wrapper reads the code alone. */
 const refused = (
   command: string,
   workspaceId: string,
-  reason: string | Error,
+  reason: RefusalWord | Error,
   io: OpsIo,
+  said?: string,
 ): number => {
-  if (!isRefusalWord(reason)) {
-    io.say(`${command}: REFUSED — ${reasonOf(reason)}`);
+  if (reason instanceof Error) {
+    io.say(`${command}: REFUSED — ${reason.message}`);
     return REFUSED;
   }
   const refusal = refusalOf(reason);
   const about =
     refusal.word === "malformed" ? `: --workspace ${workspaceId} is not a workspace id` : "";
-  io.say(`${command}: REFUSED — ${refusal.word}${about}`);
+  io.say(`${command}: REFUSED — ${said ?? `${refusal.word}${about}`}`);
   return EXIT_OF_CLASS[refusal.class];
 };
 
@@ -817,11 +819,11 @@ const importBundleCommand = async (
     at: doors.clock.now(),
   });
   if (!principal.ok) {
-    const reason =
+    const said =
       principal.error === "not-a-member"
         ? `${email} is not a member of workspace ${workspaceId}; invite them first`
-        : principal.error;
-    return refused("import-bundle", workspaceId, reason, io);
+        : undefined;
+    return refused("import-bundle", workspaceId, principal.error, io, said);
   }
   const started = doors.clock.now();
   const run = await importBundle(
@@ -838,10 +840,10 @@ const importBundleCommand = async (
   return DONE;
 };
 
-const rehearsalReason = (reason: RehearsalRefusal | Error): string | Error =>
+const rehearsalSaid = (reason: RehearsalRefusal | Error): string | undefined =>
   reason === "not-seeded"
     ? "no synthetic subject stands in this workspace — phase one (--seed) has not been run here, or its subject has already been erased"
-    : reason;
+    : undefined;
 
 const seedingToBeDumped = async (
   doors: Doors,
@@ -852,7 +854,7 @@ const seedingToBeDumped = async (
 ): Promise<number> => {
   const seeded = await seedSyntheticSubject(ERASURE, erasure, { workspaceId });
   if (!seeded.ok) {
-    return refused("erasure-rehearsal", workspaceId, rehearsalReason(seeded.error), io);
+    return refused("erasure-rehearsal", workspaceId, seeded.error, io, rehearsalSaid(seeded.error));
   }
   // A dump taken before the worker indexes the document holds no passage naming the subject,
   // and phase two would then prove nothing about the index.
@@ -918,7 +920,13 @@ const erasedToTheReport = async (
 ): Promise<number> => {
   const rehearsed = await rehearseErasure(ERASURE, erasure, { workspaceId });
   if (!rehearsed.ok) {
-    return refused("erasure-rehearsal", workspaceId, rehearsalReason(rehearsed.error), io);
+    return refused(
+      "erasure-rehearsal",
+      workspaceId,
+      rehearsed.error,
+      io,
+      rehearsalSaid(rehearsed.error),
+    );
   }
   const written = await writeTheReport(reportPath, rehearsed.value.report, io);
   if (written !== undefined) {

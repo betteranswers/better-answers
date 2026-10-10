@@ -894,7 +894,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         {
           command: "erasure-rehearsal",
           flags: ["--synthetic", "--run", "--report", "/dev/null"],
-          exitCode: 1,
+          exitCode: EXIT_OF_CLASS.precondition,
           first:
             "erasure-rehearsal: REFUSED — no synthetic subject stands in this workspace — phase one (--seed) has not been run here, or its subject has already been erased",
         },
@@ -1226,7 +1226,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         {},
       );
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(EXIT_OF_CLASS.precondition);
       expect(run.lines.join("\n")).toContain("no synthetic subject stands in this workspace");
     });
 
@@ -1571,7 +1571,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(EXIT_OF_CLASS.precondition);
       expect(run.lines).toEqual(["reconcile-watermark: REFUSED — no-such-repository"]);
     });
 
@@ -3524,7 +3524,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const run = await importing(app(), workspaceId, "nobody@acme.invalid");
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(EXIT_OF_CLASS.unauthenticated);
       expect(run.lines).toEqual([
         `import-bundle: REFUSED — nobody@acme.invalid is not a member of workspace ${workspaceId}; invite them first`,
       ]);
