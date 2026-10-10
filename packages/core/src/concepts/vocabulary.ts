@@ -1,4 +1,4 @@
-import type { Vocabulary } from "../kernel/index.ts";
+import type { RefusalWordFor, Vocabulary } from "../kernel/index.ts";
 
 /**
  * The concepts slice borrows `widening-refused` and `no-such-document` from sources, and
@@ -27,4 +27,16 @@ export const CONCEPT_REFUSALS = {
   // A person makes or restores the bundle repository, or reconciles its rewritten history, first.
   "no-such-repository": "precondition",
   "history-diverged": "precondition",
+
+  // The git door's commit words, which a governed write passes on as its own.
+  "stale-precondition": "conflict",
+  "malformed-path": "malformed",
+  "malformed-message": "malformed",
 } as const satisfies Vocabulary;
+
+type ConceptRefusal<W extends RefusalWordFor<typeof CONCEPT_REFUSALS>> = W;
+
+/** The git door's `CommitRefusal` restated word for word, so each word it answers is classed. */
+export type PassedOnCommitRefusal = ConceptRefusal<
+  "no-such-repository" | "stale-precondition" | "malformed-path" | "malformed-message"
+>;

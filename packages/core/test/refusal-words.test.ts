@@ -4,6 +4,11 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { refusalWordsIn } from "@better-answers/devtools/refusal-unions";
 
+import type {
+  AcceptSuggestionRefusal,
+  ImportBundleRefusal,
+  WriteConceptRefusal,
+} from "../src/concepts/index.ts";
 import {
   classesIn,
   REFUSAL_CLASSES,
@@ -33,6 +38,7 @@ import type {
 } from "../src/members/index.ts";
 import { REFUSAL_CATALOGUE } from "../src/refusals/index.ts";
 import type { ConnectUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
+import type { CommitRefusal } from "../src/store/git/index.ts";
 import type {
   AddMemberRefusal,
   AddPersonRefusal,
@@ -143,6 +149,9 @@ const CATALOGUED = {
   "unreadable-commit": "inapplicable by concepts",
   "no-such-repository": "precondition by concepts",
   "history-diverged": "precondition by concepts",
+  "stale-precondition": "conflict by concepts",
+  "malformed-path": "malformed by concepts",
+  "malformed-message": "malformed by concepts",
 
   "no-such-job": "absent by runs",
 };
@@ -244,6 +253,15 @@ describe("the refusal-word walk", () => {
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryCataloguedWord | Error
     >();
+  });
+
+  it("classes every word the git door's commit answers", () => {
+    expectTypeOf<CommitRefusal>().toExtend<WriteConceptRefusal>();
+    expectTypeOf<CommitRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<WriteConceptRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<AcceptSuggestionRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<Extract<ImportBundleRefusal, string>>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<CommitRefusal | "invented">().not.toExtend<EveryCataloguedWord>();
   });
 
   it("names each refused item in a catalogued word alone", () => {

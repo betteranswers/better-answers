@@ -48,7 +48,6 @@ import {
   commit as commitToBundle,
   withRepositoryLock,
   type CommitAuthor,
-  type CommitRefusal,
   type Committed,
   type GitDoor,
 } from "../store/git/index.ts";
@@ -110,6 +109,7 @@ import {
 } from "./suggestions.ts";
 import { trustOf, trustWords, type ConceptVerification, type Trust } from "./trust.ts";
 import { conceptVisibilityFrom } from "./visibility.ts";
+import type { PassedOnCommitRefusal } from "./vocabulary.ts";
 
 export {
   canonicalFrontmatter,
@@ -262,7 +262,7 @@ export type ConceptWritten = {
 
 export type WriteConceptRefusal =
   | RoleRefusal
-  | CommitRefusal
+  | PassedOnCommitRefusal
   | PrincipalRefusal
   | "malformed"
   | "path-taken"
