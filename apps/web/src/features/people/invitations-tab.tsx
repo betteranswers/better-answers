@@ -9,6 +9,7 @@ import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { RowMenu } from "@/shared/row-menu.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
+import { Card } from "@/shared/ui/card.tsx";
 import { useHiddenColumns } from "@/shared/wide-layout.ts";
 
 import {
@@ -257,7 +258,7 @@ function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingEle
       <OutcomeLine outcome={outcome} className="mt-2" />
       <UnsentEmails unsent={unsent} />
 
-      <div className="mt-4 border border-border bg-card">
+      <Card className="mt-4">
         <InvitationFilters
           narrowed={narrowed}
           searchRef={searchRef}
@@ -319,7 +320,7 @@ function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingEle
             }}
           />
         </ListRead>
-      </div>
+      </Card>
     </>
   );
 }

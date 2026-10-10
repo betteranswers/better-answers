@@ -45,7 +45,11 @@
   --control-danger-fg: var(--red-600);
   --control-disabled-bg: var(--grey-100);
   --control-disabled-fg: var(--grey-400);
-  --focus-ring: 0 0 0 var(--focus-ring-width) var(--accent-200), 0 0 0 1px var(--accent-600);
+  /* The first shadow paints on top, so the ink edge is drawn a pixel wider, where it meets the
+     page at 3:1 whatever fills the control. */
+  --focus-ring:
+    0 0 0 var(--focus-ring-width) var(--accent-200),
+    0 0 0 calc(var(--focus-ring-width) + 1px) var(--accent-600);
 
   /* Trust words — a tint behind a word that already says it */
   --trust-verified-bg: var(--green-50);
@@ -111,7 +115,9 @@
   --control-danger-fg: #f08078;
   --control-disabled-bg: #1b1e22;
   --control-disabled-fg: #5b6068;
-  --focus-ring: 0 0 0 var(--focus-ring-width) rgba(63, 98, 234, 0.4), 0 0 0 1px var(--accent-400);
+  --focus-ring:
+    0 0 0 var(--focus-ring-width) rgba(63, 98, 234, 0.4),
+    0 0 0 calc(var(--focus-ring-width) + 1px) var(--accent-400);
 
   --trust-verified-bg: rgba(19, 122, 82, 0.16);
   --trust-verified-fg: #5fc79b;

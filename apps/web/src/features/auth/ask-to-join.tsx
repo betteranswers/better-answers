@@ -12,6 +12,7 @@ import {
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import type { Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
+import { Card } from "@/shared/ui/card.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
@@ -52,18 +53,12 @@ const unansweredOf = (failure: Error | ApiError): Said => {
 /** Focus is moved here once the ask lands, so the answer is what a reader meets next. */
 function RequestSent() {
   return (
-    <div
-      id={SENT}
-      role="alert"
-      aria-labelledby={SENT_TITLE}
-      tabIndex={-1}
-      className="mt-4 border border-border p-3"
-    >
+    <Card id={SENT} role="alert" aria-labelledby={SENT_TITLE} tabIndex={-1} className="mt-4 p-3">
       <p id={SENT_TITLE} className="font-medium text-foreground">
         {ASK_TO_JOIN_WORDS.sent}
       </p>
       <p className="mt-1 text-muted-foreground">{ASK_TO_JOIN_WORDS.whatHappensNext}</p>
-    </div>
+    </Card>
   );
 }
 

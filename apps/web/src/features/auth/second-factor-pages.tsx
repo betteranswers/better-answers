@@ -4,6 +4,7 @@ import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
+import { Card } from "@/shared/ui/card.tsx";
 
 import { CodeRefused, isTooMany, SIGNED_OUT, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
 import { focusOn, Outcome } from "./auth-page.tsx";
@@ -241,7 +242,7 @@ function WhatCanConfirm(properties: { readonly held: SecondFactor }) {
   const { held } = properties;
   const leadId = useId();
   return (
-    <div className="mt-6 border border-border p-4">
+    <Card className="mt-6 p-4">
       <p id={leadId}>{PROMOTION_WORDS.lead}</p>
       <ul aria-labelledby={leadId} className="mt-2 flex flex-col gap-1">
         {held.passkeys.map((passkey) => (
@@ -250,7 +251,7 @@ function WhatCanConfirm(properties: { readonly held: SecondFactor }) {
         {authenticatorHeld(held) ? <li>{PROMOTION_WORDS.authenticator}</li> : null}
       </ul>
       <p className="mt-2 text-muted-foreground">{PROMOTION_WORDS.after}</p>
-    </div>
+    </Card>
   );
 }
 

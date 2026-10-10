@@ -8,6 +8,7 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { SheetPart } from "@/shared/sheet-part.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
+import { Card, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
@@ -126,51 +127,55 @@ function RolePicker(properties: {
   const unchanged = picked === member.role;
 
   return (
-    <section aria-labelledby={headingId} className="border border-border">
-      <h3 id={headingId} className="max-w-none border-b border-border px-4 py-2 font-medium">
-        Role
-      </h3>
-      <div className="grid gap-4 px-4 py-3">
-        <RadioGroup
-          ref={pickerRef}
-          aria-labelledby={headingId}
-          value={picked}
-          onValueChange={(value) => {
-            setPicked(roleOf(value) ?? picked);
-          }}
-        >
-          {ROLES.map((role) => (
-            <div key={role} className="flex items-start gap-3">
-              <RadioGroupItem
-                id={`${itemId}-${role}`}
-                value={role}
-                className="mt-0.5"
-                aria-describedby={`${itemId}-${role}-meaning`}
-              />
-              <div className="grid gap-0.5">
-                <Label htmlFor={`${itemId}-${role}`} className="font-medium">
-                  {role}
-                </Label>
-                <span id={`${itemId}-${role}-meaning`} className="text-xs text-muted-foreground">
-                  {ROLE_MEANINGS[role]}
-                </span>
+    <Card asChild>
+      <section aria-labelledby={headingId}>
+        <CardHeader className="border-b py-2">
+          <CardTitle asChild className="max-w-none font-medium">
+            <h3 id={headingId}>Role</h3>
+          </CardTitle>
+        </CardHeader>
+        <div className="grid gap-4 px-4 py-3">
+          <RadioGroup
+            ref={pickerRef}
+            aria-labelledby={headingId}
+            value={picked}
+            onValueChange={(value) => {
+              setPicked(roleOf(value) ?? picked);
+            }}
+          >
+            {ROLES.map((role) => (
+              <div key={role} className="flex items-start gap-3">
+                <RadioGroupItem
+                  id={`${itemId}-${role}`}
+                  value={role}
+                  className="mt-0.5"
+                  aria-describedby={`${itemId}-${role}-meaning`}
+                />
+                <div className="grid gap-0.5">
+                  <Label htmlFor={`${itemId}-${role}`} className="font-medium">
+                    {role}
+                  </Label>
+                  <span id={`${itemId}-${role}-meaning`} className="text-xs text-muted-foreground">
+                    {ROLE_MEANINGS[role]}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
-        </RadioGroup>
+            ))}
+          </RadioGroup>
 
-        <div className="flex flex-col items-start gap-2">
-          <Button disabled={unchanged} aria-describedby={hintId} onClick={commit}>
-            Make {name} {aRole(picked)}
-          </Button>
-          <p id={hintId} className="text-sm text-muted-foreground">
-            {roleHint(name, member.role, unchanged, yourself)}
-          </p>
+          <div className="flex flex-col items-start gap-2">
+            <Button disabled={unchanged} aria-describedby={hintId} onClick={commit}>
+              Make {name} {aRole(picked)}
+            </Button>
+            <p id={hintId} className="text-sm text-muted-foreground">
+              {roleHint(name, member.role, unchanged, yourself)}
+            </p>
+          </div>
+
+          <OutcomeLine outcome={outcome} />
         </div>
-
-        <OutcomeLine outcome={outcome} />
-      </div>
-    </section>
+      </section>
+    </Card>
   );
 }
 

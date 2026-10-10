@@ -30,6 +30,10 @@ The router carries a `defaultErrorComponent`, so a page that throws is caught in
 
 Every UI ticket carries that acceptance line. Every interactive element is a native control or has a role, a name and a focus order; an outcome is announced to assistive technology; a component follows GOV.UK Design System semantics — tag, details, notification banner, warning text, summary list — without the GOV.UK brand. The buyers are UK public bodies for whom this is law, and the first customer states it of its own products.
 
+## Draw the blueprint with its parts
+
+A page draws a card with `Card` (`shared/ui/card.tsx`), a framed region with `Frame` and the grid behind a page with `GridPattern` (`shared/blueprint.tsx`). A registration mark is `Card`'s `marks`, `Frame` or the primary button, and `packages/design-system/readme.md` rations them: one marked level per stack, three marked objects a page. `test/blueprint-in-one-place.test.ts` holds the first rule, and the browser suite's accessibility gate the count.
+
 ## Write the text on a page in the glossary's reader words
 
 Each thing a person meets has one word: the head of its entry in `CONCEPTS.md`. Write that word in every heading, label, message and empty state, and call a place with its own address a *page*. An entry marked `_Internal._` names something only the code meets, so its word stays in the code. `packages/design-system/readme.md` holds the voice, the trust words and the casing.

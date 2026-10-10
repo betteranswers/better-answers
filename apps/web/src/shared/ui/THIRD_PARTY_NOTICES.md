@@ -74,6 +74,12 @@ as the QR code's was. Neither brought a dependency: `item`'s `radix-ui` and `ban
 `@radix-ui/react-use-controllable-state` and `lucide-react` were already here. Their arrival edits
 are listed below with the others.
 
+BA-97 added shadcn's `card` on **10 October 2026**, for the card every page draws a card with.
+The file was written from the registry item as
+`https://ui.shadcn.com/r/styles/new-york-v4/card.json` served it that day, whose item digest the
+table names, as the banner's was. It brought no dependency. Its arrival edits are listed below
+with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -98,7 +104,7 @@ the pin.
 | File | Registry item | Item digest | File digest |
 | --- | --- | --- | --- |
 | `badge.tsx` | https://ui.shadcn.com/r/styles/new-york/badge.json | `ce3f01e6d6785477` | `051518194cec3127` |
-| `button.tsx` | https://ui.shadcn.com/r/styles/new-york/button.json | `4d8f39c3bd25e630` | `76bfc0a14e9c395d` |
+| `button.tsx` | https://ui.shadcn.com/r/styles/new-york/button.json | `4d8f39c3bd25e630` | `bc8f8e980e3b97e7` |
 | `carousel.tsx` | https://ui.shadcn.com/r/styles/new-york/carousel.json | `07c286e6b8c6a125` | `8db57d96badd03aa` |
 | `collapsible.tsx` | https://ui.shadcn.com/r/styles/new-york/collapsible.json | `9e935a82f4d846cc` | `f3ce568d1ede383d` |
 | `command.tsx` | https://ui.shadcn.com/r/styles/new-york/command.json | `b2800b32e6dbfb40` | `aa5236bf5e2680fd` |
@@ -106,14 +112,14 @@ the pin.
 | `dropdown-menu.tsx` | https://ui.shadcn.com/r/styles/new-york/dropdown-menu.json | `dbd4c0a23be34f27` | `4b09b5f51def7d8e` |
 | `hover-card.tsx` | https://ui.shadcn.com/r/styles/new-york/hover-card.json | `cd66337682527d0f` | `e4af8adfc11ca89e` |
 | `popover.tsx` | https://ui.shadcn.com/r/styles/new-york/popover.json | `112f3cc3836f6b37` | `cce1178282657cd3` |
-| `select.tsx` | https://ui.shadcn.com/r/styles/new-york/select.json | `574c730b6dc8b37e` | `57dc01beab6126fd` |
+| `select.tsx` | https://ui.shadcn.com/r/styles/new-york/select.json | `574c730b6dc8b37e` | `23c9db66c4eb66d8` |
 | `table.tsx` | https://ui.shadcn.com/r/styles/new-york/table.json | `0cf28e873dde65e0` | `0b594ca1376c7e6f` |
 | `tabs.tsx` | https://ui.shadcn.com/r/styles/new-york/tabs.json | `b608b427c8d64016` | `7729090ff447f666` |
 | `kibo-ui/combobox.tsx` | https://www.kibo-ui.com/r/combobox.json | `3d4a0d9e74228a9f` | `64900867375f3091` |
 | `kibo-ui/snippet.tsx` | https://www.kibo-ui.com/r/snippet.json | `eb643de82639a64e` | `fbf35ce84afabbf0` |
 | `ai-elements/sources.tsx` | https://registry.ai-sdk.dev/sources.json | `a698c945798c6e79` | `e7117ede42aa02ed` |
 | `ai-elements/inline-citation.tsx` | https://registry.ai-sdk.dev/inline-citation.json | `7ee8f5238d63b78f` | `618d35f1d1147d77` |
-| `input.tsx` | https://ui.shadcn.com/r/styles/new-york/input.json | `4d1a3b126cc62485` | `b1b9f3d7ab813dfe` |
+| `input.tsx` | https://ui.shadcn.com/r/styles/new-york/input.json | `4d1a3b126cc62485` | `210aa222c9f0a67e` |
 | `label.tsx` | https://ui.shadcn.com/r/styles/new-york/label.json | `ea924e70d496cbd6` | `ec7442bb079f9558` |
 | `tooltip.tsx` | https://ui.shadcn.com/r/styles/new-york/tooltip.json | `aef6ec3c142b054e` | `275fe11838d9edd6` |
 | `sheet.tsx` | https://ui.shadcn.com/r/styles/new-york/sheet.json | `f9d5c635be778573` | `bc0fc5ea77392c4a` |
@@ -129,6 +135,7 @@ the pin.
 | `kibo-ui/qr-code.tsx` | https://www.kibo-ui.com/r/qr-code.json | `b2e8c658e1d2042a` | `0be5a141250acb70` |
 | `item.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/item.json | `b8ad17f300d4de1d` | `ca3434e1a4223f13` |
 | `kibo-ui/banner.tsx` | https://www.kibo-ui.com/r/banner.json | `77b8679e257a6712` | `a7dd5fee14228771` |
+| `card.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/card.json | `c7ebaa49ba2a0613` | `fb5eeec5da002628` |
 
 The Kibo UI patterns, each read at commit `3d63cdb15b79d972e3dc38a10997987672f9b263` of
 [shadcnblocks/kibo](https://github.com/shadcnblocks/kibo) (MIT), under `packages/patterns/`. The
@@ -144,7 +151,7 @@ source file is listed.
 | | `empty/search/empty-search-2.tsx` | `fe2894413f5fe4d0` | |
 | | `empty/standard/empty-standard-6.tsx` | `25f2152a598a1fe5` | |
 | `kibo-ui/row-actions.tsx` | `dropdown-menu/actions/dropdown-menu-actions-2.tsx` | `58e26bf9f81588b0` | `6b15bd63236adbec` |
-| `kibo-ui/counted-switch.tsx` | `tabs/advanced/tabs-advanced-1.tsx` | `06e57ae8224ceace` | `b2bcfbc2d41b2d03` |
+| `kibo-ui/counted-switch.tsx` | `tabs/advanced/tabs-advanced-1.tsx` | `06e57ae8224ceace` | `4bcfd6e2c84fa4f9` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -345,6 +352,30 @@ The arrival edits on `banner`:
   Phosphor glyph the product's own pages draw.
 - `onChange` passes through an arrow that calls `onClose`, since the hook declares `onChange?:`
   without `| undefined` while `onClose?:` admits it.
+
+The edits made on 10 October 2026 for BA-97, which built the blueprint layer:
+
+- `kibo-ui/counted-switch.tsx`: the radio's `focus-visible:shadow-none` became important, since
+  the bridge's focus rule now outranks the kit's ring utilities, and the ring stays on the
+  segment's span.
+- `button.tsx`: the `default` variant, the primary, sets `data-marks` at the 32px sizes and up
+  and draws its marks in `--accent-300`, and a new `accent` variant is the same fill unmarked,
+  for a committing action repeated per row.
+- `input.tsx` and `select.tsx`: the field fills with the page surface rather than nothing, so the
+  grid behind a page does not run through a field.
+
+The arrival edits on `card`:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the file given this repository's format
+  and import order.
+- Square and flat, as the readme's cards are: no `rounded-xl` and no `shadow-sm`, a
+  `--border-subtle` hairline, and the padding on the parts rather than the root, so a table can
+  sit in a card edge to edge.
+- `Card` takes `marks`, which sets `data-marks`, and `Card` and `CardTitle` take `asChild` as
+  `Button` does, so a region keeps its element and a title its heading.
+- `CardFooter` is the sunken strip a card's provenance sits in, under a hairline.
+- `CardHeader` declares its second row only when it holds a description, so a header with a title
+  alone is one row and keeps no empty gap below the title.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the pages that use them carry the WCAG 2.2 AA

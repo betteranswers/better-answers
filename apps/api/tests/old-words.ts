@@ -299,7 +299,7 @@ const PASSAGE_SENSES: readonly Sense[] = [
   })),
   {
     sense: "a file the bundler emits, as Vite's build output names it",
-    within: "apps/web/e2e/list-parts.spec.ts",
+    within: "apps/web/e2e/drawn-parts.ts",
     written: /\bchunk\b/g,
   },
   {

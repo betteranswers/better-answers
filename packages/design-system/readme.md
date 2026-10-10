@@ -196,7 +196,11 @@ rows, nav items, menu items, tooltips, toasts, anything under 32px tall, or anyt
 a parent that already carries marks. A committing action *repeated per row* takes the
 unmarked `accent` fill rather than `primary`. **One marked level per stack, at most three
 marked objects per page** — if everything is registered, nothing is. `Frame` is the marked
-primitive; `Card` takes `marks` as an opt-in.
+primitive; `Card` takes `marks` as an opt-in. `styles.css` draws every mark from one rule on
+`data-marks`, and draws none inside a marked parent, so the nesting rule holds by itself. In the
+application `Frame` is `apps/web/src/shared/blueprint.tsx` and `Card` is
+`apps/web/src/shared/ui/card.tsx`; the primary button marks itself in `--accent-300` at 32px and
+up, and its `accent` variant is the same fill unmarked.
 
 **Cards.** A 1px `--border-subtle` hairline, square corners, white surface, no shadow at
 rest. Header row (title + optional meta + right-aligned actions), body, optional sunken
@@ -218,7 +222,9 @@ comes from a sunken surface (`#f7f8f9`) behind the rail, table headers and quote
 | `NoiseTexture` | `@magicui/noise-texture` | Dark and accent surfaces only, at 3.5–5%: the dark page, the dialog scrim, a full-bleed accent band. Never on a white card, never over reader prose, never above 5%. Off under `prefers-reduced-transparency`. |
 
 Texture is grain and substrate, not decoration. If a texture is legible as a pattern, it is
-turned up too far.
+turned up too far. `GridPattern` and `DotPattern` are built: each draws its texture as the
+background of the element it wraps, through `data-grid-pattern` and `data-dot-pattern` in
+`styles.css`. `NoiseTexture` waits for a dark or accent surface to land on.
 
 **Borders.** `--border-subtle` for internal divisions, `--border-default` for control
 edges, `--border-strong` for hover on an interactive container. 1px, never 2 — except the
@@ -230,8 +236,10 @@ shadow change.
 
 **Press.** A 0.5px downward nudge on buttons and a one-step darker fill. Nothing shrinks.
 
-**Focus.** Always visible, never removed: a 2px `--accent-200` ring plus a 1px
-`--accent-600` edge. Keyboard order is the DOM order.
+**Focus.** Always visible, never removed: a 2px `--accent-200` ring, with a 1px
+`--accent-600` edge drawn outside it. The edge meets the page and the ring meets the control, so
+one of them holds 3:1 whatever the control is filled with. The bridge gives every focusable
+element this ring over the kit's own. Keyboard order is the DOM order.
 
 **Motion.** 80–240ms, one curve (`cubic-bezier(.2,0,.13,1)`), fades and 4px rises only. No
 bounce, no spring, no parallax, no entrance choreography. Answers stream — that
@@ -294,7 +302,7 @@ in running text it takes the text's own face. The domain name is `better-answers
 
 ```
 package.json            the workspace package apps/web imports; wires the two self-hosted faces; exports ./assets/*
-styles.css              the token imports and the width rule — the one file consumers link
+styles.css              the token imports, the width rule, the mark and the two textures — the one file consumers link
 tokens/                 fonts · fonts-hosted · fonts-remote · colors · typography · spacing · radius · blueprint · elevation · motion · semantic · keyframes · tailwind-bridge
 guidelines/             foundation specimen cards
 assets/                 logo.svg, the logo
@@ -336,7 +344,7 @@ top of a registry primitive, because nothing off the shelf carries their meaning
 **`Citation`** (concept, source, locator, passage on one disclosure, ADR 0015),
 **`CoverageBar`**, **`SummaryList`** and **`Details`** (GOV.UK *semantics* without the
 GOV.UK brand), **`Icon`** (the Phosphor substitution in one file) and
-**`Frame`** (the blueprint object with its registration marks).
+**`Frame`** (the blueprint object with its registration marks), which is built.
 
 ### Foundation cards
 
@@ -349,6 +357,6 @@ GOV.UK brand), **`Icon`** (the Phosphor substitution in one file) and
 2. **Icons.** No icon set exists in the source. **Phosphor** — `@phosphor-icons/react` in the app, `@phosphor-icons/web` on a page — flagged above.
 3. **Logo.** Drawn to the owner's description of 30 September 2026: two square brackets with a square between them. `assets/logo.svg` is the logo unless the owner replaces it. The same decision made the name `better-answers` everywhere a person reads it.
 4. **Accent colour.** Ink blue `#2e4bd4` was chosen, not found. The source specifies no palette — only that colour never carries a signal alone.
-7. **Textures.** `GridPattern`, `DotPattern` and `NoiseTexture` are ports of the corresponding Magic UI components, retuned to these tokens rather than pulled from npm — the design system ships no build step. In an application, install `@magicui/grid-pattern`, `@magicui/dot-pattern` and `@magicui/noise-texture` and pass the same tokens.
+7. **Textures.** `GridPattern`, `DotPattern` and `NoiseTexture` are ports of the corresponding Magic UI components, retuned to these tokens rather than pulled from npm — the design system ships no build step. The application draws the first two from the same tokens without the npm items, whose SVGs take their pitch as numbers rather than the grid token.
 5. **Dark theme.** Authored on the reference styling's convention, not on evidence from the source.
 6. **Page layouts.** Grounded in `CONCEPTS.md` and the ADRs (which name every page and its content) but not in any interface code, because none exists yet.

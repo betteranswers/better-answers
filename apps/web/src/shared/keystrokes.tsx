@@ -166,7 +166,8 @@ export function KeystrokesAction(properties: {
       keystrokes={[...properties.keystrokes, LIST_THE_KEYSTROKES]}
     >
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" aria-keyshortcuts={LIST_THE_KEYSTROKES.key}>
+        {/* Outside the shell it sits in a row of secondary actions, which share one treatment. */}
+        <Button variant="outline" aria-keyshortcuts={LIST_THE_KEYSTROKES.key}>
           {KEYSTROKE_WORDS.button}
         </Button>
       </PopoverTrigger>

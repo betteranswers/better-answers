@@ -231,13 +231,53 @@ export const refusedDigitsSelected = async (field: Locator): Promise<void> => {
   expect(selected, "the refused digits are not selected for retyping").toEqual([0, 6]);
 };
 
-/** A design-system token as the browser paints it, so a check compares like with like. */
+/** A design-system token as the browser paints it in a property, so a check compares like with like. */
+export const tokenPainted = (page: Page, token: string, property: string): Promise<string> =>
+  page.evaluate(
+    ([name, painted]) => {
+      const probe = document.createElement("span");
+      probe.style.setProperty(painted, `var(${name})`);
+      document.body.append(probe);
+      const value = getComputedStyle(probe).getPropertyValue(painted);
+      probe.remove();
+      return value;
+    },
+    [token, property] as const,
+  );
+
 export const tokenColour = (page: Page, token: string): Promise<string> =>
-  page.evaluate((name) => {
-    const probe = document.createElement("span");
-    probe.style.color = `var(${name})`;
-    document.body.append(probe);
-    const painted = getComputedStyle(probe).color;
-    probe.remove();
-    return painted;
-  }, token);
+  tokenPainted(page, token, "color");
+
+/** The registration marks a person sees, by their part: a mark inside a marked parent is never drawn. */
+export const drawnMarks = (page: Page): Promise<readonly string[]> =>
+  page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("[data-marks]")]
+      .filter(
+        (marked) =>
+          marked.checkVisibility() && getComputedStyle(marked, "::before").content !== "none",
+      )
+      .map((marked) => marked.dataset["slot"] ?? marked.tagName.toLowerCase()),
+  );
+
+const channels = (colour: string): readonly number[] => {
+  const parts = /rgba?\(([^)]+)\)/
+    .exec(colour)?.[1]
+    ?.split(/[ ,/]+/)
+    .map(Number);
+  if (parts === undefined || parts.length < 3) throw new Error(`not an rgb() colour: ${colour}`);
+  return parts.slice(0, 3);
+};
+
+const luminance = (colour: string): number => {
+  const [red = 0, green = 0, blue = 0] = channels(colour).map((channel) => {
+    const share = channel / 255;
+    return share <= 0.040_45 ? share / 12.92 : ((share + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+};
+
+/** WCAG's contrast ratio between two painted `rgb()` colours, as a browser reports them. */
+export const contrastBetween = (one: string, other: string): number => {
+  const [lighter, darker] = [luminance(one), luminance(other)].toSorted((a, b) => b - a);
+  return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
+};

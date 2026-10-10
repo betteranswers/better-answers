@@ -1,5 +1,6 @@
 import { useReadSaid } from "@/shared/read-said.ts";
 import { Badge } from "@/shared/ui/badge.tsx";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
 
 import { useWorkspaceModelChoices, type WorkspaceModelChoice } from "./list-model-choices.ts";
 import { MODEL_CHOICES_WORDS } from "./words.ts";
@@ -84,17 +85,23 @@ export function ModelChoicesCard() {
   const said = useReadSaid(modelChoices);
 
   return (
-    <section aria-labelledby="model-choices" className="mt-6 border border-border bg-card p-4">
-      <h2 id="model-choices">Model choices</h2>
-      <p className="mt-2 text-muted-foreground">{MODEL_CHOICES_WORDS.lead}</p>
+    <Card asChild className="mt-6">
+      <section aria-labelledby="model-choices">
+        <CardHeader>
+          <CardTitle asChild>
+            <h2 id="model-choices">Model choices</h2>
+          </CardTitle>
+          <p className="text-muted-foreground">{MODEL_CHOICES_WORDS.lead}</p>
+        </CardHeader>
 
-      <div aria-live="polite" className="mt-4">
-        {said.isPending ? <p>{MODEL_CHOICES_WORDS.loading}</p> : null}
-        {said.error === null ? null : <p>{MODEL_CHOICES_WORDS.failed}</p>}
-        {modelChoices.data === undefined ? null : (
-          <ModelChoiceList modelChoices={modelChoices.data} />
-        )}
-      </div>
-    </section>
+        <CardContent aria-live="polite">
+          {said.isPending ? <p>{MODEL_CHOICES_WORDS.loading}</p> : null}
+          {said.error === null ? null : <p>{MODEL_CHOICES_WORDS.failed}</p>}
+          {modelChoices.data === undefined ? null : (
+            <ModelChoiceList modelChoices={modelChoices.data} />
+          )}
+        </CardContent>
+      </section>
+    </Card>
   );
 }

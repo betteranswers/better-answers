@@ -1,87 +1,23 @@
-import { fileURLToPath } from "node:url";
-
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
-import react from "@vitejs/plugin-react";
-import { build } from "vite";
 
 import { expect, test } from "./browser.ts";
+import { bundledHarness, harnessDrawn } from "./drawn-parts.ts";
 import { tabUntilFocused } from "./harness.ts";
-
-const ENTRY = "virtual:list-parts";
-
-/** The build hands a library's entry over as a path under its root, so the plugin claims either. */
-const RESOLVED_ENTRY = "\0list-parts";
-
-const HARNESS = fileURLToPath(new URL("../test/members-list.tsx", import.meta.url));
-
-/** No page draws every shared part yet, so the unit suite's Members list is drawn on its own. */
-const ENTRY_SOURCE = [
-  'import { createElement } from "react";',
-  'import { createRoot } from "react-dom/client";',
-  `import { MembersList } from ${JSON.stringify(HARNESS)};`,
-  'createRoot(document.getElementById("root")).render(createElement(MembersList, { pageSize: 2 }));',
-].join("\n");
-
-type Built = Awaited<ReturnType<typeof build>>;
-
-const entryCodeOf = (built: Built): string => {
-  for (const output of Array.isArray(built) ? built : [built]) {
-    if (!("output" in output)) continue;
-    const entry = output.output.find((chunk) => chunk.type === "chunk" && chunk.isEntry);
-    if (entry?.type === "chunk") return entry.code;
-  }
-  throw new Error("the list parts built no entry chunk");
-};
-
-/** One script the page runs, built the way the app's own build compiles its source. */
-const bundledParts = async (): Promise<string> =>
-  entryCodeOf(
-    await build({
-      configFile: false,
-      logLevel: "silent",
-      mode: "production",
-      define: { "process.env.NODE_ENV": JSON.stringify("production") },
-      plugins: [
-        react(),
-        {
-          name: "list-parts",
-          resolveId: (id) => (id.endsWith(ENTRY) ? RESOLVED_ENTRY : undefined),
-          load: (id) => (id === RESOLVED_ENTRY ? ENTRY_SOURCE : undefined),
-        },
-      ],
-      resolve: { alias: { "@": fileURLToPath(new URL("../src", import.meta.url)) } },
-      build: {
-        write: false,
-        minify: false,
-        lib: { entry: ENTRY, formats: ["iife"], name: "listParts" },
-      },
-    }),
-  );
 
 let parts: string | undefined;
 
 test.beforeAll(async () => {
-  parts = await bundledParts();
+  parts = await bundledHarness({
+    name: "list-parts",
+    file: new URL("../test/members-list.tsx", import.meta.url),
+    component: "MembersList",
+    props: { pageSize: 2 },
+  });
 });
 
-/** The served build's own stylesheets, so the parts are measured as a page draws them. */
-const servedStylesheets = async (request: APIRequestContext): Promise<string> => {
-  const served = await (await request.get("/")).text();
-  const links = served.match(/<link[^>]*rel="stylesheet"[^>]*>/g) ?? [];
-  expect(links, "the served build names no stylesheet").not.toHaveLength(0);
-  return links.join("");
-};
-
-/** In the shell's own pane, on the product's origin, so the accessibility gate audits the parts. */
+/** No page draws every shared part yet, so the unit suite's Members list is drawn on its own. */
 const drawn = async (page: Page, request: APIRequestContext) => {
-  const head = await servedStylesheets(request);
-  await page.goto("/health");
-  await page.setContent(
-    `<!doctype html><html lang="en-GB"><head><title>Members</title>${head}</head><body>` +
-      '<main class="px-4 py-6"><div data-page-content class="max-w-page"><div id="root"></div>' +
-      "</div></main></body></html>",
-  );
-  await page.addScriptTag({ content: parts ?? "" });
+  await harnessDrawn(page, request, { title: "Members", script: parts ?? "" });
   await expect(page.getByRole("table")).toBeVisible();
 };
 

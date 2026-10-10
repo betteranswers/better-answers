@@ -581,7 +581,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await revoke.click();
     await confirmation.getByRole("button", { name: "End every sign-in everywhere" }).focus();
     await clockTheNextKey(page, {
-      at: "//section[h3[normalize-space(.)='Sessions']]",
+      at: "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Sessions']]",
       reads: "No session is open.",
     });
     await page.keyboard.press("Enter");

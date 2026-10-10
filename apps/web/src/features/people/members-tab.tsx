@@ -4,12 +4,15 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefOb
 
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
+/* jscpd:ignore-start */
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { RowMenu } from "@/shared/row-menu.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
+import { Card } from "@/shared/ui/card.tsx";
+/* jscpd:ignore-end */
 import { useHiddenColumns } from "@/shared/wide-layout.ts";
 
 import { useGroups } from "./groups-api.ts";
@@ -362,7 +365,7 @@ function MemberList(properties: {
       <CountLine read={read} narrowed={narrowed} />
       <OutcomeLine outcome={outcome ?? returned} className="mt-2" />
 
-      <div className="mt-4 border border-border bg-card">
+      <Card className="mt-4">
         <MemberFilters
           narrowed={narrowed}
           searchRef={searchRef}
@@ -426,7 +429,7 @@ function MemberList(properties: {
             }}
           />
         </MembersRead>
-      </div>
+      </Card>
 
       <MemberBulkDialogs actions={actions} />
     </>

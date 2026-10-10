@@ -158,6 +158,7 @@ More helpers in the same module drive the browser rather than the harness:
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
 | `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
 | `tokenColour` | A design-system token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
+| `contrastBetween` | WCAG's contrast ratio between two painted `rgb()` colours, as `apps/web/e2e/focus-ring.spec.ts` measures each focus edge against the surface behind it |
 
 The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one. `emailsSentTo` counts the emails the capture holds for an address, and the suite's
@@ -224,8 +225,9 @@ Five more play Claude's part in its OAuth flow on the suite's own origin — `ap
   above.
 - **A shared part no page draws yet is bundled with Vite, not imported.** Playwright compiles
   every `.tsx` it loads with its own JSX runtime, so React cannot render a component a spec imports.
-  `apps/web/e2e/list-parts.spec.ts` builds a unit-suite harness through Vite from a virtual entry
-  and runs the script on the SPA's origin. The page carries only the served build's stylesheet, so
+  `apps/web/e2e/drawn-parts.ts` builds a unit-suite harness through Vite from a virtual entry
+  and draws it on the SPA's origin; `apps/web/e2e/list-parts.spec.ts` and
+  `apps/web/e2e/blueprint-parts.spec.ts` use it. The page carries only the served build's stylesheet, so
   a class that appears in the harness alone is missing from it, with no error.
 
 ## The accessibility gate
@@ -240,7 +242,10 @@ three things, of which automated rules are only one:
   reported. A new spec is held to it by existing, and there is nothing to remember. Each audit
   first waits for every transition on the page to end, because axe reads a control part-way
   through its fade as a contrast nobody settles on. A refusal handing a button back from its
-  disabled look is the case. An endless animation, such as a spinner, is audited running.
+  disabled look is the case. An endless animation, such as a spinner, is audited running. The
+  audit also refuses a page that draws more than three registration marks. It sets the marks and
+  the grid and dot textures aside while axe runs, and fails any contrast axe still could not
+  decide because of what was painted behind the text.
 - **A keyboard traversal** reaching the page and each of its actions without a pointer:
   `apps/web/e2e/sign-in.spec.ts` for the three pages outside the shell,
   `apps/web/e2e/frame.spec.ts` for the band, the rail and the menu, and
@@ -258,7 +263,7 @@ is another origin and no page of ours. A test that ends somewhere this product d
 audited nothing is refused by name, so an absence is a failure rather than a silence.
 
 `apps/web/e2e/models-and-spend.spec.ts` carries all three and is the model to copy.
-`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: two of its six tests are
+`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: five of its nine tests are
 `test.fail()`, so the run prints them with a ✘ and counts them passed — that is the gate firing
 where it should, and an `Expected to fail, but passed` there means the gate has stopped running.
 

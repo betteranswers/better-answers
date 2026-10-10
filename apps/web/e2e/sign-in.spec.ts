@@ -46,6 +46,7 @@ import {
   signInHeading,
   theActionLandedWithinItsBudget,
   tokenColour,
+  drawnMarks,
 } from "./harness.ts";
 
 const thePicker = (page: Page) =>
@@ -325,6 +326,42 @@ test("says a code is sent, wrong, or asked too often", async ({
 
   const said = sentenceOf(tooManyCodesAskedFor(await waitNamedBy(answered, "perEmail")));
   await expect(page.getByRole("alert")).toHaveText(said);
+  // Red words alone: the system never draws a coloured rule beside them.
+  await expect(page.getByRole("alert")).toHaveCSS("border-left-width", "0px");
+});
+
+test("frames the sign-in form in one marked card", async ({ page }) => {
+  await page.goto("/sign-in");
+  await expect(signInHeading(page)).toBeVisible();
+
+  expect(await drawnMarks(page), "the card stands for its primary button").toEqual(["card"]);
+  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.send })).toHaveAttribute(
+    "data-marks",
+  );
+});
+
+test("keeps the framed sign-in page inside 320 pixels", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto("/sign-in");
+  await expect(signInHeading(page)).toBeVisible();
+
+  const sideways = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(sideways, "the page scrolls sideways at 320px").toBe(0);
+});
+
+test("draws a row of secondary actions in one treatment", async ({ page, request }) => {
+  const email = anAddress("row");
+  await provision(request, { name: "Row", adminEmail: email });
+  await page.goto("/sign-in");
+  await sendTheFirstCode(page, email);
+
+  const row = page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }).locator("..");
+  const treatments = await row
+    .getByRole("button")
+    .evaluateAll((buttons) => [...new Set(buttons.map((button) => button.dataset["variant"]))]);
+  expect(treatments, "the row mixes its treatments").toEqual(["outline"]);
 });
 
 test("names the wait when one client asks too many codes", async ({ page }) => {

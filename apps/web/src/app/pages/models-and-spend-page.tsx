@@ -1,6 +1,7 @@
 import { ModelChoicesCard } from "@/features/model-choices/model-choices-card.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { useOpenTab, type PageToolbar } from "@/shared/page-toolbar.tsx";
+import { Card } from "@/shared/ui/card.tsx";
 
 const models = menuGroupIn(CONTROL_CENTRE, "models");
 
@@ -26,7 +27,9 @@ export function ModelsAndSpendPage() {
       <p className="mt-2 text-muted-foreground">{models.summary}</p>
 
       {open === SPEND ? (
-        <p className="mt-6 border border-border bg-card p-4">Spend is not built yet.</p>
+        <Card asChild className="mt-6 p-4">
+          <p>Spend is not built yet.</p>
+        </Card>
       ) : (
         <ModelChoicesCard />
       )}

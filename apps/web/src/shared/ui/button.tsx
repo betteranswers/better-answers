@@ -9,7 +9,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default:
+          "bg-primary text-primary-foreground [--mark-ink:var(--accent-300)] hover:bg-primary/90",
+        accent: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive dark:focus-visible:ring-destructive/40",
         outline:
@@ -36,6 +38,17 @@ const buttonVariants = cva(
   },
 );
 
+type ButtonVariants = VariantProps<typeof buttonVariants>;
+
+const MARKED_SIZES: ReadonlySet<ButtonVariants["size"]> = new Set(["default", "sm", "lg"]);
+
+/**
+ * Only the primary registers, and never under 32px. `accent` is its fill unmarked, for an action
+ * repeated per row.
+ */
+const marksItself = (variant: ButtonVariants["variant"], size: ButtonVariants["size"]): boolean =>
+  variant === "default" && MARKED_SIZES.has(size ?? "default");
+
 function Button({
   className,
   variant = "default",
@@ -43,7 +56,7 @@ function Button({
   asChild = false,
   ...props
 }: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
+  ButtonVariants & {
     asChild?: boolean;
   }) {
   const Comp = asChild ? Slot.Root : "button";
@@ -53,6 +66,7 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      data-marks={marksItself(variant, size) ? "" : undefined}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

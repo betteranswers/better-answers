@@ -2,12 +2,14 @@ import { useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
+import { GridPattern } from "@/shared/blueprint.tsx";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { Logo } from "@/shared/logo.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { NO_RESPONSE, SAID_OF_CLASS, SIGN_IN_AGAIN, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
+import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { leavingFor, pageQuery } from "./carried-flow.ts";
@@ -16,26 +18,32 @@ export const focusOn = (id: string) => {
   document.getElementById(id)?.focus();
 };
 
-/** With no title, the children's first heading is the page's `h1`. */
+/** The card's marks stand for its primary button's. With no title, the children's first heading is the `h1`. */
 export function AuthPage(properties: { readonly title?: string; readonly children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="px-4 py-5 md:px-8">
-        <p className="flex items-center gap-2 font-mono text-lg font-medium tracking-tight text-foreground">
-          <Logo />
-          {PRODUCT_NAME}
-        </p>
-      </header>
+    <GridPattern>
+      <div className="flex min-h-screen flex-col bg-background">
+        <header className="px-4 py-5 md:px-8">
+          <p className="flex items-center gap-2 font-mono text-lg font-medium tracking-tight text-foreground">
+            <Logo />
+            {PRODUCT_NAME}
+          </p>
+        </header>
 
-      <main id="page" className="flex-1 px-4 md:px-8">
-        <div className="max-w-measure">
-          {properties.title === undefined ? null : (
-            <h1 className="text-xl font-medium">{properties.title}</h1>
-          )}
-          {properties.children}
-        </div>
-      </main>
-    </div>
+        <main id="page" className="flex-1 px-4 pb-16 md:px-8">
+          <Card marks className="mx-auto mt-4 w-full max-w-measure md:mt-16">
+            {properties.title === undefined ? null : (
+              <CardHeader>
+                <CardTitle asChild className="text-xl font-medium">
+                  <h1>{properties.title}</h1>
+                </CardTitle>
+              </CardHeader>
+            )}
+            <CardContent>{properties.children}</CardContent>
+          </Card>
+        </main>
+      </div>
+    </GridPattern>
   );
 }
 
@@ -55,7 +63,7 @@ export function Outcome(properties: {
       className={cn(
         "mt-4",
         properties.tone === "refused"
-          ? "border-l-2 border-destructive pl-3 text-destructive empty:hidden"
+          ? "text-destructive empty:hidden"
           : "text-muted-foreground empty:sr-only",
       )}
     >

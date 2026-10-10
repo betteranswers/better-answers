@@ -212,6 +212,7 @@ function RenameAPasskey(properties: {
       <Button
         type="submit"
         size="sm"
+        variant="accent"
         className="aria-disabled:opacity-50"
         aria-disabled={renaming.isPending}
       >
