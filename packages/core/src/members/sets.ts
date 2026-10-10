@@ -15,7 +15,7 @@ type Named<Word extends string> = readonly (readonly [string, Word])[];
 export const namedEach = <Word extends string>(keys: readonly string[], word: Word): Named<Word> =>
   keys.map((key) => [key, word] as const);
 
-/** The set's word is its first item's in id order, so no new word joins the register. */
+/** The set's word is its first item's in id order, so no new word joins the catalogue. */
 export const refusedItemsOf = <Word extends string>(
   named: Named<Word>,
 ): RefusedItems<Word> | undefined => {

@@ -10,53 +10,52 @@ export const REFUSAL_CLASSES = [
 
 export type RefusalClass = (typeof REFUSAL_CLASSES)[number];
 
-export type RefusalOwner =
-  | "kernel"
-  | "sources"
-  | "members"
-  | "workspaces"
-  | "erasure"
-  | "concepts"
-  | "runs"
-  | "transport";
-
 export type Vocabulary = Readonly<Record<string, RefusalClass>>;
 
-export type RegisteredRefusal = {
+/** Each owner's vocabulary under the owner's name. */
+export type Catalogue = Readonly<Record<string, Vocabulary>>;
+
+export type WordIn<C extends Catalogue> = { [O in keyof C]: Extract<keyof C[O], string> }[keyof C];
+
+export type CataloguedRefusal = {
   readonly word: string;
   readonly class: RefusalClass;
-  readonly owner: RefusalOwner;
+  readonly owner: string;
 };
 
 const WORD = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
-const registered = new Map<string, RegisteredRefusal>();
-
-const declarationRefusal = (word: string): string | undefined => {
-  if (!WORD.test(word)) return `${word} is not a refusal word, which is lower case and hyphenated`;
-  if (registered.has(word)) return `${word} is declared twice`;
-  return undefined;
-};
-
 /**
- * Registers every word under `owner` and hands `words` back for a union to be built from. Nothing
- * registers unless every word does.
+ * Every word in `catalogue` with its class and owner, in the order declared.
  *
- * @throws on a word that is not lower case and hyphenated, or one any owner already declared.
+ * @throws on a word that is not lower case and hyphenated, or one two owners declare.
  */
-export const declareRefusals = <const V extends Vocabulary>(owner: RefusalOwner, words: V): V => {
-  for (const word of Object.keys(words)) {
-    const refusal = declarationRefusal(word);
-    if (refusal !== undefined) throw new Error(`refusal: ${refusal}`);
+export const refusalsIn = (catalogue: Catalogue): readonly CataloguedRefusal[] => {
+  const held = new Map<string, CataloguedRefusal>();
+  for (const [owner, vocabulary] of Object.entries(catalogue)) {
+    for (const [word, refusalClass] of Object.entries(vocabulary)) {
+      if (!WORD.test(word)) {
+        throw new Error(
+          `refusal: ${word} is not a refusal word, which is lower case and hyphenated`,
+        );
+      }
+      const first = held.get(word);
+      if (first !== undefined) {
+        throw new Error(`refusal: ${word} is declared twice, by ${first.owner} and by ${owner}`);
+      }
+      held.set(word, { word, class: refusalClass, owner });
+    }
   }
-  for (const [word, held] of Object.entries(words)) {
-    registered.set(word, { word, class: held, owner });
-  }
-  return words;
+  return [...held.values()];
 };
 
 /**
- * Every word declared so far, in the order declared. A slice's words are there only once its
- * module has loaded.
+ * For a transport to index. `Object.assign` over a spread answers `any`, so the return type is
+ * this function's own claim.
+ *
+ * @throws as `refusalsIn` does.
  */
-export const refusalRegister = (): readonly RegisteredRefusal[] => [...registered.values()];
+export const classesIn = <const C extends Catalogue>(
+  catalogue: C,
+): Readonly<Record<WordIn<C>, RefusalClass>> =>
+  Object.assign({}, ...refusalsIn(catalogue).map(({ word, class: held }) => ({ [word]: held })));

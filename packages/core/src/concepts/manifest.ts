@@ -19,12 +19,12 @@ import {
   fileAtHead,
   withRepositoryLock,
   type CommitAuthor,
-  type CommitRefusal,
   type GitDoor,
 } from "../store/git/index.ts";
 import { withMember, type PostgresDoor } from "../store/postgres/index.ts";
 import { scalarPairOf, type FrontmatterSource } from "./file.ts";
 import { landBundleCommit } from "./landing.ts";
+import type { PassedOnCommitRefusal } from "./vocabulary.ts";
 
 const MANIFEST_ACTIONS = declareActions("knowledge", {
   written: action("knowledge.manifest.written", { bundleId: "id", commitSha: "gitSha" }),
@@ -60,7 +60,7 @@ export type ManifestWritten =
 
 export type WriteManifestRefusal =
   | RoleRefusal
-  | CommitRefusal
+  | PassedOnCommitRefusal
   | PrincipalRefusal
   | "malformed"
   | "path-taken";

@@ -35,9 +35,11 @@ tags:
 
 **A refusal word** means one thing wherever it appears.
 
-- Its owning slice declares it once, and it is registered globally. The shared words (`malformed`, `role-forbids`, `not-found`) are the kernel's (`packages/core/src/kernel/vocabulary.ts`). The classes and the register are in `packages/core/src/kernel/refusal.ts`.
+- Its owning slice declares it once, in a vocabulary that is plain data. Importing a module registers nothing. The shared words (`malformed`, `role-forbids`, `not-found`) are the kernel's (`packages/core/src/kernel/vocabulary.ts`).
+- One module composes the catalogue: each owner's vocabulary under the owner's name (`packages/core/src/refusals/index.ts`). Every reader takes the words from it. A transport adds only its own, as the api adds its two (`apps/api/src/refusal.ts`).
+- The classes are in `packages/core/src/kernel/refusal.ts`, beside the function that reads a catalogue and throws on a word two owners declare.
 - It is classed by remedy: *unauthenticated*, *forbidden*, *absent*, *malformed*, *inapplicable*, *conflict* or *precondition*.
-- The register is append-only. A shipped word is never removed and never changes class.
+- The catalogue is append-only. A shipped word is never removed and never changes class.
 - `packages/core/test/refusal-words.test.ts` holds that every word is declared once, used and classed.
 
 **A refusal crosses each transport as `{ word, class }`**, through that transport's one crossing function. A malformed input adds its `fields`.
@@ -46,14 +48,14 @@ tags:
 
 - An item's key is an id the caller sent, or an address's position in the send. It is never an address or a name.
 - An item's word states a fact about this workspace alone, and its action lists it among its refusals.
-- The set's own word is the first refused item's word in id order. Its class picks the status, and no new word enters the register.
+- The set's own word is the first refused item's word in id order. Its class picks the status, and no new word enters the catalogue.
 - The items ride the refusal and never a success answer, so a refusal still never crosses as a value.
 
 Each transport:
 
 - Over tRPC it is a thrown error, typed through `AppRouter` (`apps/api/src/trpc/base.ts`). The error carries the items, and the web reads them as plain words.
 - MCP has its own (`apps/api/src/mcp/crossing.ts`). It answers the set's word alone and drops the items, since no action that names items is an entry.
-- `pnpm ops` maps each class to an exit code (`apps/api/src/ops/index.ts`). A command's refusal is a word, or a word beside the one thing the operator must change, such as the address the test workspace's fixture refused, and it exits with its word's class. An import's refusal that names the file it stopped at is no word, and exits as refused. No command's action names items, so items never reach it.
+- `pnpm ops` maps each class to an exit code (`apps/api/src/ops/index.ts`). A command's refusal is a word, or a word beside the one thing the operator must change, such as the address the test workspace's fixture refused, and it exits with its word's class. A run that names the file or commit it stopped at is no word, and exits as refused whatever word it names: an import's unsound tree or stopped file, and a reconcile's stopped replay. The usage text says so. No command's action names items, so items never reach it.
 - A refusal's log line holds its word and class, never an item's id.
 - A ceiling is no refusal, since time is its only remedy. An action counting one in its own transaction fails with the kernel's `CeilingMet` (`packages/core/src/kernel/ceiling.ts`), which rolls the count back. tRPC's crossing answers it 429 with `retryAfterSeconds`, as a ceiling met before the action does.
 - Procedures are written by hand, so the call graph stays whole.
@@ -97,5 +99,7 @@ The full record, with its four amendments (T-232, T-230, T-338, the T-027 and T-
 A refusal naming items came with the people layout rework (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD1), and a ceiling counted inside an action with its invitations (KTD11).
 
 Amended 08/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, U17 and R11). What an entry asks core to do is now an *action*, the reader's word, in the code and in this record. It is declared by `declareAction`, the lint rule is `action-admits-before-await`, and the name an audit event is recorded under is its *audit action*, held in the audit logs' `action` column since migration 0073. Stored action names, such as `sources.document.narrowed`, stay as they were written (R22). The filename keeps the old word so references still resolve (KTD14). The decision and every rule above stand.
+
+Amended 10/10/2026 by the refusal catalogue plan (`docs/plans/2026-10-10-1241-refactor-one-refusal-catalogue-plan.md`, R1 and R9). The words were registered in a global list that each vocabulary filled as its module loaded. They are now composed in one catalogue, which a reader imports. The rule that a slice declares its word once is unchanged, and so is every word's class. `pnpm ops` exits an import's own word with its class.
 
 Amended 10/10/2026 by the read-only query road plan (`docs/plans/2026-10-10-0123-feat-read-only-query-road-plan.md`, R5). A query's transaction opens read-only, through a member resolve of its own; the resolver a mutation, an MCP entry or the own-transaction road takes stays read-write.

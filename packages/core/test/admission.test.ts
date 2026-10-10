@@ -7,8 +7,8 @@ import {
   admit,
   declareAction,
   EVERY_PURPOSE,
+  KERNEL_REFUSALS,
   OPERATOR_ALONE,
-  refusalRegister,
   requireFreshSignIn,
   type AdmissionRefusal,
   type AdmittedOf,
@@ -83,9 +83,6 @@ const operatorsOnly = declareAction({
   effect: "read",
 });
 
-const classOf = (word: string): string | undefined =>
-  refusalRegister().find((entry) => entry.word === word)?.class;
-
 describe("what an action admits, from the principal and input alone", () => {
   it("admits only an Admin where the level is Admin", () => {
     const answered = (["Admin", "Editor", "Viewer"] as const).map(
@@ -127,7 +124,7 @@ describe("what an action admits, from the principal and input alone", () => {
     const refused = admit(adminsOnly, person("Viewer"), {});
 
     expect(refused).toEqual({ ok: false, error: "role-forbids" });
-    expect(classOf("role-forbids")).toBe("forbidden");
+    expect(KERNEL_REFUSALS["role-forbids"]).toBe("forbidden");
     expectTypeOf<"role-forbids">().toExtend<AdmissionRefusal>();
   });
 
@@ -137,7 +134,7 @@ describe("what an action admits, from the principal and input alone", () => {
     expectTypeOf<"malformed">().not.toExtend<AdmissionRefusal>();
     expectTypeOf<"not-found">().not.toExtend<AdmissionRefusal>();
 
-    expect(classOf("malformed")).toBe("malformed");
+    expect(KERNEL_REFUSALS["malformed"]).toBe("malformed");
   });
 });
 
@@ -174,7 +171,7 @@ describe("what an action admits of the operator", () => {
     expectTypeOf<ReturnType<typeof admit<typeof operatorsOnly>>>().toEqualTypeOf<
       Result<OperatorPrincipal, "not-the-operator">
     >();
-    expect(classOf("not-the-operator")).toBe("forbidden");
+    expect(KERNEL_REFUSALS["not-the-operator"]).toBe("forbidden");
   });
 });
 
@@ -199,7 +196,7 @@ describe("how fresh a sign-in the operator's writes ask for", () => {
   });
 
   it("refuses in a word whose remedy is signing in again", () => {
-    expect(classOf("sign-in-too-old")).toBe("unauthenticated");
+    expect(KERNEL_REFUSALS["sign-in-too-old"]).toBe("unauthenticated");
     expectTypeOf<"sign-in-too-old">().toExtend<AdmissionRefusal>();
   });
 });
@@ -248,7 +245,7 @@ describe("the two actions that carry a declaration today", () => {
         person("Viewer"),
       ].map((principal) => admit(reprocessConnectedSourceAction, principal, wipe).ok),
       refused: admit(reprocessConnectedSourceAction, processActor("reconciler"), wipe),
-      itsClass: classOf("role-forbids"),
+      itsClass: KERNEL_REFUSALS["role-forbids"],
     }).toEqual({
       admitted: [true, true, false, false, true, false, false],
       refused: { ok: false, error: "role-forbids" },

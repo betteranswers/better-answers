@@ -17,6 +17,7 @@
     "./members": "./src/members/index.ts",
     "./workspaces": "./src/workspaces/index.ts",
     "./sweeps": "./src/sweeps/index.ts",
+    "./refusals": "./src/refusals/index.ts",
     "./store/postgres": "./src/store/postgres/index.ts",
     "./store/git": "./src/store/git/index.ts",
     "./store/map": "./src/store/map/index.ts",

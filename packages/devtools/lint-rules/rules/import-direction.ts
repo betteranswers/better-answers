@@ -6,11 +6,13 @@ import type { ESTree } from "@oxlint/plugins";
 
 const CORE = "@better-answers/core";
 
-type Zone = "kernel" | "access" | "door" | "layer" | "slice" | "test";
+type Zone = "kernel" | "access" | "door" | "layer" | "slice" | "catalogue" | "test";
 
 const LAYERS = ["llm", "audit"] as const;
 
 const TOP_SLICE = "erasure";
+
+const CATALOGUE = "refusals";
 
 const MAP_DOOR = "src/store/map";
 
@@ -35,8 +37,12 @@ const ZONES = {
     reaches: new Set<Zone>(["kernel", "access", "door", "layer", "slice"]),
     clause: "a slice reaches another only through its face",
   },
+  catalogue: {
+    reaches: new Set<Zone>(["kernel", "slice"]),
+    clause: "the refusal catalogue imports kernel and each slice's face, and nothing else",
+  },
   test: {
-    reaches: new Set<Zone>(["kernel", "access", "door", "layer", "slice"]),
+    reaches: new Set<Zone>(["kernel", "access", "door", "layer", "slice", "catalogue"]),
     clause: "a test reaches a slice only through its face",
   },
 } satisfies Record<Zone, { readonly reaches: ReadonlySet<Zone>; readonly clause: string }>;
@@ -114,6 +120,7 @@ type Place = {
 const srcPlaceOf = (first: string, second: string | undefined, depth: number): Place => {
   const dir = `src/${first}`;
   if (first === "kernel" || first === "access") return { zone: first, dir, top: first };
+  if (first === CATALOGUE) return { zone: "catalogue", dir, top: first };
   if (first === "store") {
     const door = second !== undefined && depth > 3 ? `${dir}/${second}` : dir;
     return { zone: "door", dir: door, top: first };
@@ -160,7 +167,7 @@ const edgeOf = (pkg: CorePackage, importerFile: string, specifier: string): Edge
 };
 
 type Finding = {
-  readonly messageId: "direction" | "erasure" | "internal" | "unexported";
+  readonly messageId: "catalogue" | "direction" | "erasure" | "internal" | "unexported";
   readonly data?: Readonly<Record<string, string>>;
 };
 
@@ -181,8 +188,13 @@ const directionFinding = ({ importer, reached }: Edge): Finding | undefined => {
   };
 };
 
+const catalogueFinding = ({ importer, reached }: Edge): Finding | undefined =>
+  reached.zone === "catalogue" && importer.zone !== "test" ? { messageId: "catalogue" } : undefined;
+
+const ABOVE_ERASURE = new Set<Zone>(["catalogue", "test"]);
+
 const erasureFinding = ({ importer, reached }: Edge): Finding | undefined =>
-  reached.zone === "slice" && reached.top === TOP_SLICE && importer.zone !== "test"
+  reached.zone === "slice" && reached.top === TOP_SLICE && !ABOVE_ERASURE.has(importer.zone)
     ? { messageId: "erasure" }
     : undefined;
 
@@ -210,7 +222,10 @@ const faceFinding = (
 };
 
 const findingOf = (pkg: CorePackage, edge: Edge): Finding | undefined =>
-  directionFinding(edge) ?? erasureFinding(edge) ?? faceFinding(pkg, edge);
+  catalogueFinding(edge) ??
+  directionFinding(edge) ??
+  erasureFinding(edge) ??
+  faceFinding(pkg, edge);
 
 export const importDirectionRule = defineRule({
   meta: {
@@ -222,8 +237,10 @@ export const importDirectionRule = defineRule({
       transport:
         "packages/core is transport-agnostic: `{{specifier}}` is a transport or a transport's dependency. A status code, a Request or a Response belongs in apps/api; export a function and a typed error instead.",
       direction: "`{{fromDir}}` ({{from}}) may not import `{{toDir}}` ({{to}}): {{clause}}.",
+      catalogue:
+        "Nothing in core imports the refusal catalogue; it reads every slice's vocabulary, and only a test reaches it.",
       erasure:
-        "Nothing in core imports `erasure`; it sits at the top of the slice graph, and only a test reaches it.",
+        "Nothing in core imports `erasure` but the refusal catalogue; it sits at the top of the slice graph, and beyond the catalogue only a test reaches it.",
       internal:
         "`{{fromDir}}` ({{from}}) reaches `{{dir}}` only through its own index.ts, never `{{inside}}`. Export what you need from that face and import it from there.",
       unexported:

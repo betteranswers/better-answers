@@ -4,11 +4,17 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { refusalWordsIn } from "@better-answers/devtools/refusal-unions";
 
+import type {
+  AcceptSuggestionRefusal,
+  ImportBundleRefusal,
+  WriteConceptRefusal,
+} from "../src/concepts/index.ts";
 import {
-  declareRefusals,
+  classesIn,
   REFUSAL_CLASSES,
-  refusalRegister,
+  refusalsIn,
   type RefusedItems,
+  type WordIn,
 } from "../src/kernel/index.ts";
 import type {
   AcceptInvitationRefusal,
@@ -30,14 +36,15 @@ import type {
   EndEverySignInAndTokenHereRefusal,
   TestWorkspaceRefusal,
 } from "../src/members/index.ts";
+import { REFUSAL_CATALOGUE } from "../src/refusals/index.ts";
 import type { ConnectUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
+import type { CommitRefusal } from "../src/store/git/index.ts";
 import type {
   AddMemberRefusal,
   AddPersonRefusal,
   ProvisionRefusal,
   SetDisplayNameRefusal,
 } from "../src/workspaces/index.ts";
-import { loadEveryEntryPoint } from "./entry-points.ts";
 import { asSliceRelative, coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 
 const SEVEN_CLASSES = [
@@ -50,7 +57,7 @@ const SEVEN_CLASSES = [
   "precondition",
 ];
 
-const REGISTER = {
+const CATALOGUED = {
   malformed: "malformed by kernel",
   "role-forbids": "forbidden by kernel",
   "not-found": "absent by kernel",
@@ -142,11 +149,14 @@ const REGISTER = {
   "unreadable-commit": "inapplicable by concepts",
   "no-such-repository": "precondition by concepts",
   "history-diverged": "precondition by concepts",
+  "stale-precondition": "conflict by concepts",
+  "malformed-path": "malformed by concepts",
+  "malformed-message": "malformed by concepts",
 
   "no-such-job": "absent by runs",
 };
 
-type EveryRegisteredWord = keyof typeof REGISTER;
+type EveryCataloguedWord = WordIn<typeof REFUSAL_CATALOGUE>;
 
 /** A store door's word is a defect its slice maps or passes on, never a refusal. */
 const inASlice = (file: string): boolean =>
@@ -160,9 +170,12 @@ const wordsInRefusalUnions = (files: readonly string[]): ReadonlySet<string> =>
       .map(({ word }) => word),
   );
 
-const registerAsRead = (): Readonly<Record<string, string>> =>
+const catalogueAsRead = (): Readonly<Record<string, string>> =>
   Object.fromEntries(
-    refusalRegister().map(({ word, class: held, owner }) => [word, `${held} by ${owner}`]),
+    refusalsIn(REFUSAL_CATALOGUE).map(({ word, class: held, owner }) => [
+      word,
+      `${held} by ${owner}`,
+    ]),
   );
 
 describe("the refusal-word walk", () => {
@@ -170,17 +183,22 @@ describe("the refusal-word walk", () => {
     expect([...REFUSAL_CLASSES]).toEqual(SEVEN_CLASSES);
   });
 
-  it("holds one class and declaring slice for every union word", async () => {
-    await loadEveryEntryPoint();
+  it("holds one class and declaring slice for every union word", () => {
+    expect(catalogueAsRead()).toEqual(CATALOGUED);
+  });
 
-    expect(registerAsRead()).toEqual(REGISTER);
+  it("answers every word's class under one record", () => {
+    const classes = Object.fromEntries(
+      Object.entries(CATALOGUED).map(([word, said]) => [word, said.split(" by ")[0]]),
+    );
+
+    expect(classesIn(REFUSAL_CATALOGUE)).toEqual(classes);
   });
 
   it.skipIf(sourceTreeIsInstrumented())(
-    "matches the register and every refusal union's words both ways",
-    async () => {
-      await loadEveryEntryPoint();
-      const held = new Set(Object.keys(registerAsRead()));
+    "matches the catalogue and every refusal union's words both ways",
+    () => {
+      const held = new Set(Object.keys(catalogueAsRead()));
       const named = wordsInRefusalUnions(coreSourceFiles());
 
       expect([...held].filter((word) => !named.has(word))).toEqual([]);
@@ -189,21 +207,21 @@ describe("the refusal-word walk", () => {
     },
   );
 
-  it("refuses a second declaration of a registered word", async () => {
-    await loadEveryEntryPoint();
+  it("refuses a word a second owner declares, naming both", () => {
+    const restated = { ...REFUSAL_CATALOGUE, transport: { "no-such-binding": "absent" } } as const;
 
-    expect(() => declareRefusals("sources", { "no-such-binding": "absent" })).toThrow(
-      /no-such-binding is declared twice/,
+    expect(() => refusalsIn(restated)).toThrow(
+      "refusal: no-such-binding is declared twice, by sources and by transport",
     );
   });
 
   it("refuses a word that is not lower case and hyphenated", () => {
-    expect(() => declareRefusals("sources", { NoSuchThing: "absent" })).toThrow(
-      /NoSuchThing is not a refusal word/,
+    expect(() => refusalsIn({ sources: { NoSuchThing: "absent" } })).toThrow(
+      "refusal: NoSuchThing is not a refusal word, which is lower case and hyphenated",
     );
   });
 
-  it("builds a union from a registered word and no other", () => {
+  it("builds a union from a declared word and no other", () => {
     expectTypeOf<SourceRefusal<"no-such-binding">>().toEqualTypeOf<"no-such-binding">();
     // @ts-expect-error — a word no slice declared is no refusal word.
     expectTypeOf<SourceRefusal<"no-such-thing">>().toBeString();
@@ -211,47 +229,56 @@ describe("the refusal-word walk", () => {
     expectTypeOf<SourceRefusal<"no-bucket">>().toBeString();
   });
 
-  it("answers an action's union in registered words alone", () => {
-    expectTypeOf<ConnectUploadRefusal>().toExtend<EveryRegisteredWord | Error>();
-    expectTypeOf<ProvisionRefusal>().toExtend<EveryRegisteredWord>();
-    expectTypeOf<AddMemberRefusal>().toExtend<EveryRegisteredWord>();
-    expectTypeOf<AddPersonRefusal>().toExtend<EveryRegisteredWord>();
-    expectTypeOf<SetDisplayNameRefusal>().toExtend<EveryRegisteredWord>();
-    expectTypeOf<RequestAccessRefusal>().toExtend<EveryRegisteredWord>();
-    expectTypeOf<DecideRefusal>().toExtend<EveryRegisteredWord>();
-    expectTypeOf<ApproveRefusal>().toExtend<EveryRegisteredWord>();
-    expectTypeOf<ChangeRoleRefusal>().toExtend<EveryRegisteredWord | Error>();
-    expectTypeOf<ResendInvitationRefusal>().toExtend<EveryRegisteredWord | Error>();
-    expectTypeOf<CancelInvitationRefusal>().toExtend<EveryRegisteredWord | Error>();
-    expectTypeOf<ListInvitationsRefusal>().toExtend<EveryRegisteredWord | Error>();
-    expectTypeOf<EndEverySignInAndTokenHereRefusal>().toExtend<EveryRegisteredWord | Error>();
-    expectTypeOf<RemoveMemberRefusal>().toExtend<EveryRegisteredWord | Error>();
-    expectTypeOf<AcceptInvitationRefusal>().toExtend<EveryRegisteredWord>();
+  it("answers an action's union in catalogued words alone", () => {
+    expectTypeOf<ConnectUploadRefusal>().toExtend<EveryCataloguedWord | Error>();
+    expectTypeOf<ProvisionRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<AddMemberRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<AddPersonRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<SetDisplayNameRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<RequestAccessRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<DecideRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<ApproveRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<ChangeRoleRefusal>().toExtend<EveryCataloguedWord | Error>();
+    expectTypeOf<ResendInvitationRefusal>().toExtend<EveryCataloguedWord | Error>();
+    expectTypeOf<CancelInvitationRefusal>().toExtend<EveryCataloguedWord | Error>();
+    expectTypeOf<ListInvitationsRefusal>().toExtend<EveryCataloguedWord | Error>();
+    expectTypeOf<EndEverySignInAndTokenHereRefusal>().toExtend<EveryCataloguedWord | Error>();
+    expectTypeOf<RemoveMemberRefusal>().toExtend<EveryCataloguedWord | Error>();
+    expectTypeOf<AcceptInvitationRefusal>().toExtend<EveryCataloguedWord>();
     type AddressRefused = Extract<TestWorkspaceRefusal, { readonly address: string }>;
-    expectTypeOf<AddressRefused["word"]>().toExtend<EveryRegisteredWord>();
+    expectTypeOf<AddressRefused["word"]>().toExtend<EveryCataloguedWord>();
     expectTypeOf<Exclude<TestWorkspaceRefusal, AddressRefused>>().toExtend<
-      EveryRegisteredWord | Error
+      EveryCataloguedWord | Error
     >();
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
-      EveryRegisteredWord | Error
+      EveryCataloguedWord | Error
     >();
   });
 
-  it("names each refused item in a registered word alone", () => {
+  it("classes every word the git door's commit answers", () => {
+    expectTypeOf<CommitRefusal>().toExtend<WriteConceptRefusal>();
+    expectTypeOf<CommitRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<WriteConceptRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<AcceptSuggestionRefusal>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<Extract<ImportBundleRefusal, string>>().toExtend<EveryCataloguedWord>();
+    expectTypeOf<CommitRefusal | "invented">().not.toExtend<EveryCataloguedWord>();
+  });
+
+  it("names each refused item in a catalogued word alone", () => {
     expectTypeOf<RefusedItems<MemberRefusal<"last-admin" | "no-such-member">>>().toEqualTypeOf<{
       readonly word: "last-admin" | "no-such-member";
       readonly items: Readonly<Record<string, "last-admin" | "no-such-member">>;
     }>();
     expectTypeOf<RefusedItems<MemberRefusal<"last-admin">>>().toExtend<{
-      readonly word: EveryRegisteredWord;
-      readonly items: Readonly<Record<string, EveryRegisteredWord>>;
+      readonly word: EveryCataloguedWord;
+      readonly items: Readonly<Record<string, EveryCataloguedWord>>;
     }>();
     // @ts-expect-error — an item's word must be a word some slice declared.
     expectTypeOf<RefusedItems<MemberRefusal<"no-such-thing">>>().toBeObject();
   });
 
-  it("answers a bulk action's items in registered words alone", () => {
-    type Answered = EveryRegisteredWord | RefusedItems<EveryRegisteredWord> | Error;
+  it("answers a bulk action's items in catalogued words alone", () => {
+    type Answered = EveryCataloguedWord | RefusedItems<EveryCataloguedWord> | Error;
     expectTypeOf<BulkChangeRoleRefusal>().toExtend<Answered>();
     expectTypeOf<BulkRemoveMembersRefusal>().toExtend<Answered>();
     expectTypeOf<BulkAddToGroupRefusal>().toExtend<Answered>();

@@ -33,14 +33,15 @@ The tree is `apps/` over `packages/`: `apps/` is what deploys and `packages/` is
 - `access/` holds the read predicate, defined once with one SQL renderer.
 - `store/` holds the four doors, one per shared store, and is the only place a connection is made: `store/postgres`, `store/git`, `store/map` and `store/objects`. Each door is exported under its own name, such as `@better-answers/core/store/postgres`. There is no `store` barrel and no `./store` entry.
 - `llm/` and `audit/` are layers every slice may use.
-- A slice is the capability that owns a set of tables and the invariants over them. The slices today are `sources`, `concepts`, `answering`, `guides`, `erasure`, `runs`, `workspaces`, `members` and `sweeps`. `erasure` sits on top, and nothing imports it.
+- A slice is the capability that owns a set of tables and the invariants over them. The slices today are `sources`, `concepts`, `answering`, `guides`, `erasure`, `runs`, `workspaces`, `members` and `sweeps`. `erasure` sits on top, and no slice imports it.
+- `refusals/` holds the refusal catalogue, each slice's vocabulary under its owner's name (ADR 0043). It is no slice: it owns no table. It imports `kernel` and every slice's face, `erasure` included, and nothing in core but a test imports it.
 
 The import direction has five rules:
 
 1. `kernel` imports nothing else in core.
 2. `access` imports only `kernel`. `store` imports only `kernel`, except that `store/map` also imports `access`, so a traversal template cannot exist without the predicate.
 3. `llm` and `audit` import `kernel`, `access` and `store`, never a slice and never each other.
-4. A slice reaches another slice only through its face, never its internals. The slice graph is acyclic.
+4. A slice reaches another slice only through its face, never its internals. The slice graph is acyclic. The refusal catalogue reaches each slice the same way, and sits above the graph.
 5. Nothing in core imports a transport or a transport's dependency, such as `hono`, `@trpc`, `@modelcontextprotocol` or `better-auth`.
 
 All five are one rule in the repository's own lint plugin, `better-answers/import-direction`, in `packages/devtools/lint-rules/rules/import-direction.ts`. It places both ends of an import in a zone by position under the package whose `package.json` names `@better-answers/core`. A face is a directory's `index.ts` that `packages/core/package.json`'s `exports` map names, and a face the map does not name is refused. Inside a slice, the slice is the unit, so its own subdirectories reach each other freely. `import/no-cycle` holds rule 4's acyclic clause. `packages/core/test/import-direction.test.ts` holds each refusal where it fires and where it stays silent.
@@ -71,5 +72,7 @@ Every one of the four doors is real in a test, and none may be faked: `CODING_ST
 - The map door taking the rendered predicate as a parameter: a place a caller forgets.
 
 ## History
+
+Amended 10/10/2026 by the refusal catalogue plan (`docs/plans/2026-10-10-1241-refactor-one-refusal-catalogue-plan.md`, KTD1). `refusals/` is a zone of its own in the lint rule. Before it, nothing in core but a test imported `erasure`; the catalogue is now the one module that does.
 
 The full record, which retired the constitution's tenancy rule to ADR 0032 and whose tier-contract consequences ADR 0031 enacted and corrected, with its amendments (T-078, T-048, T-053, T-114, T-117, T-118, T-253): `docs/archive/adr/0029-apps-over-packages-capability-slices.md`.

@@ -227,10 +227,11 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             the company's bundle landed through the governed write, its verifications imported, its links rewritten to iris
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
     --dry-run      validate the tree and say what a run would do, writing nothing
-exit codes: ${DONE} done · ${REFUSED} refused in no registered word, stop · ${USAGE} usage, or a malformed argument · ${NOT_BUILT} the slice this needs has no tables yet
-  a refusal in a registered word exits with its class's code: ${Object.entries(EXIT_OF_CLASS)
+exit codes: ${DONE} done · ${REFUSED} refused in no refusal word, stop · ${USAGE} usage, or a malformed argument · ${NOT_BUILT} the slice this needs has no tables yet
+  a refusal word exits with its class's code: ${Object.entries(EXIT_OF_CLASS)
     .map(([refusalClass, code]) => `${code} ${refusalClass}`)
-    .join(" · ")}`;
+    .join(" · ")}
+  a run that names the file or commit it stopped at exits ${REFUSED}, whatever word it names: import-bundle's unsound tree and stopped import, reconcile-watermark's stopped replay`;
 
 const bundleStore = (doors: Doors, purpose: string): Result<GitDoor, string> =>
   doorTold(
@@ -727,6 +728,19 @@ const importReason = (refusal: ImportBundleRefusal | Error, email: string): stri
   return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, verifications ${verifications.recorded} recorded, ${counted(linksOf(rewritten), "link")} rewritten; what landed stays, and a rerun continues from there`;
 };
 
+/** A word exits with its class's code; an unsound tree and a stopped import are no one word's. */
+const importRefused = (
+  workspaceId: string,
+  refusal: ImportBundleRefusal | Error,
+  email: string,
+  io: OpsIo,
+): number => {
+  const said = importReason(refusal, email);
+  if (typeof refusal === "string") return refused("import-bundle", workspaceId, refusal, io, said);
+  io.say(`import-bundle: REFUSED — ${said}`);
+  return REFUSED;
+};
+
 type ImportAsked = {
   readonly from: string;
   readonly email: string;
@@ -832,10 +846,7 @@ const importBundleCommand = async (
     { tree: tree.value, sensitivity, dryRun },
   );
   const seconds = ((doors.clock.now().getTime() - started.getTime()) / 1_000).toFixed(1);
-  if (!run.ok) {
-    io.say(`import-bundle: REFUSED — ${importReason(run.error, email)}`);
-    return REFUSED;
-  }
+  if (!run.ok) return importRefused(workspaceId, run.error, email, io);
   sayImported(io, run.value, seconds);
   return DONE;
 };
@@ -1420,8 +1431,8 @@ const SLICELESS_COMMANDS = new Map<
 ]);
 
 /**
- * Resolves to the exit code: 0 done, 1 refused in no registered word, 2 usage, `NOT_BUILT`, or
- * a registered word's `EXIT_OF_CLASS` code.
+ * Resolves to the exit code: 0 done, 1 refused in no refusal word, 2 usage, `NOT_BUILT`, or a
+ * refusal word's `EXIT_OF_CLASS` code.
  */
 export const runOps = async (argv: readonly string[], doors: Doors, io: OpsIo): Promise<number> => {
   const [command, ...rest] = argv[0] === "--" ? argv.slice(1) : argv;
