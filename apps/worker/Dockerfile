@@ -42,7 +42,7 @@ FROM gcr.io/distroless/cc-debian13:nonroot@sha256:54df941ed0d06a1bd95ef5e0ce391f
 
 # The one pin of the Python image. The build stage makes the venv with its interpreter and
 # the `tree` stage hands that same interpreter to the runtime, so the two cannot drift.
-FROM python:3.13.15-slim-trixie@sha256:8d9d0b8bcf6506481eae4907c18f5e3e7902e629f5f6d684f9e7c32e85e3ddf0 AS interpreter
+FROM python:3.13.15-slim-trixie@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b AS interpreter
 
 FROM interpreter AS build
 COPY --from=uv /uv /uvx /usr/local/bin/
