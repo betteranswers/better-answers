@@ -129,7 +129,10 @@ Work the survived list; the score is secondary.
    user calibrates the triage rule this way; they may later delegate it). Once agreed, suppress with a reasoned
    annotation rather than a contrived test:
    `// Stryker disable next-line <MutatorName>: <why this is untestable/don't-care>`
-3. **Timeouts count as killed** (the mutant broke termination — tests caught it).
+3. **Timeout**: Stryker's score counts a timed-out mutant as killed, and triage
+   does not until a probe says so. A run's clock stops a slow mutant as
+   readily as one that loops, so a `Timeout` row is a hypothesis, probed like
+   a survivor (`docs/agents/mutation-triage.md`, *Controls*).
 
 Don't chase a 100% score; a handful of annotated equivalents is normal.
 Never gate CI on the score (`thresholds.break` stays `null`): a survivor the
