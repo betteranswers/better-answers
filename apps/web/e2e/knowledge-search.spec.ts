@@ -262,6 +262,12 @@ test.describe("the Knowledge Search page", () => {
     await expect(panel).toContainText(PALLET_PASSAGES[0] ?? "");
     await expect(panel.getByRole("heading", { name: HANDBOOK })).toBeFocused();
     await expect(opener).toHaveAttribute("aria-expanded", "true");
+    const panelLeft = await panel.evaluate((drawn) => drawn.getBoundingClientRect().left);
+    await expect
+      .poll(() => first.evaluate((row) => row.getBoundingClientRect().right), {
+        message: "the open panel covers the match beside it",
+      })
+      .toBeLessThanOrEqual(panelLeft);
     await expect(page).toHaveURL(/\/knowledge\/search\?/);
 
     await searchBox(page).click();

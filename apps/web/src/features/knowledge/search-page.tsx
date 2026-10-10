@@ -5,6 +5,7 @@ import type { ApiError } from "@/shared/api/trpc.ts";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
+import { cn } from "@/shared/lib/utils.ts";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { useSearchedList } from "@/shared/searched-list.ts";
@@ -235,7 +236,11 @@ function SearchRegion() {
   };
 
   return (
-    <section aria-labelledby={headingId} className="mt-6">
+    <section
+      aria-labelledby={headingId}
+      // Room for the panel beside the list, so it covers none of the matches.
+      className={cn("mt-6", opened !== undefined && beside && "pr-[var(--container-md)]")}
+    >
       <h2 id={headingId}>{SEARCH.name}</h2>
       <Card marks className="mt-4">
         <FilterRow
