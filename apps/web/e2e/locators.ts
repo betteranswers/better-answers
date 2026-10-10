@@ -299,10 +299,16 @@ export const paintedOver = (top: string, under: string): string => {
   return `rgb(${mixed.join(", ")})`;
 };
 
-/** A wordless wrapper draws a field's edge too; a checkbox, radio or switch with words is found by them. */
+/**
+ * A wordless wrapper lends a field the sides that hug it; a worded checkbox, radio or switch is
+ * found by its words. Opacity is composited.
+ */
 export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
   page.evaluate(() => {
     type Rgba = readonly [number, number, number, number];
+    const SIDES = ["top", "right", "bottom", "left"] as const;
+    /** A row's rule runs this close to its field; a layout's border stands off by its padding. */
+    const HUGS_WITHIN_PX = 8;
     // A computed colour can be `oklab()` or `color()`, which Tailwind's `/50` writes; a canvas reads any.
     const pixel = new OffscreenCanvas(1, 1).getContext("2d", { willReadFrequently: true });
     const rgba = (colour: string): Rgba => {
@@ -313,26 +319,43 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
       const [red = 0, green = 0, blue = 0, alpha = 0] = pixel.getImageData(0, 0, 1, 1).data;
       return [red, green, blue, alpha / 255];
     };
-    const over = (top: Rgba, under: Rgba): Rgba => {
-      const mix = (at: 0 | 1 | 2) => top[at] * top[3] + under[at] * (1 - top[3]);
+    /** `share` of `top` over the rest of `under`, which is opaque. */
+    const mixed = (top: Rgba, under: Rgba, share: number): Rgba => {
+      const mix = (at: 0 | 1 | 2) => top[at] * share + under[at] * (1 - share);
       return [mix(0), mix(1), mix(2), 1];
     };
+    const over = (top: Rgba, under: Rgba): Rgba => mixed(top, under, top[3]);
     const painted = ([red, green, blue]: Rgba) =>
       `rgb(${[red, green, blue].map((channel) => String(Math.round(channel))).join(", ")})`;
     const fillOf = (element: Element) => rgba(getComputedStyle(element).backgroundColor);
-    const canvas = over(fillOf(document.documentElement), [255, 255, 255, 1]);
-    const behind = (node: Element | null): Rgba => {
-      const layers: Rgba[] = [];
-      for (let at = node; at !== null && layers.at(-1)?.[3] !== 1; at = at.parentElement) {
-        if (fillOf(at)[3] > 0) layers.push(fillOf(at));
-      }
-      return layers.toReversed().reduce((under, layer) => over(layer, under), canvas);
+    const WHITE: Rgba = [255, 255, 255, 1];
+    /**
+     * `layers` on `element` as shown: a dimmed ancestor shows its share of all painted inside it,
+     * and what was behind it for the rest.
+     */
+    const shownThrough = (element: Element | null, layers: readonly Rgba[]): Rgba => {
+      const down: Element[] = [];
+      for (let at = element; at !== null; at = at.parentElement) down.unshift(at);
+      const from = (depth: number, under: Rgba): Rgba => {
+        const at = down[depth];
+        if (at === undefined) return layers.reduce((below, layer) => over(layer, below), under);
+        const inside = from(depth + 1, over(fillOf(at), under));
+        return mixed(inside, under, Number(getComputedStyle(at).opacity));
+      };
+      return from(0, WHITE);
     };
-    const sidesOf = (element: Element, fill: Rgba): string[] => {
+    /** The sides `element` draws; lent to a field, only those that hug the field's own. */
+    const sidesOf = (element: Element, lentTo?: Element): string[] => {
       const style = getComputedStyle(element);
-      return ["top", "right", "bottom", "left"]
-        .filter((side) => Number.parseFloat(style.getPropertyValue(`border-${side}-width`)) > 0)
-        .map((side) => painted(over(rgba(style.getPropertyValue(`border-${side}-color`)), fill)));
+      const box = element.getBoundingClientRect();
+      const field = lentTo?.getBoundingClientRect();
+      return SIDES.filter(
+        (side) =>
+          Number.parseFloat(style.getPropertyValue(`border-${side}-width`)) > 0 &&
+          (field === undefined || Math.abs(box[side] - field[side]) < HUGS_WITHIN_PX),
+      ).map((side) =>
+        painted(shownThrough(element, [rgba(style.getPropertyValue(`border-${side}-color`))])),
+      );
     };
     const words = (element: Element) => element.textContent.trim();
     const seen = (control: HTMLElement): boolean =>
@@ -353,15 +376,11 @@ export const controlEdges = (page: Page): Promise<readonly ControlEdge[]> =>
         parent !== null && parent !== document.body && words(parent) === words(control)
           ? parent
           : undefined;
-      const back = behind((wrapper ?? control).parentElement);
-      const wrapperFill = wrapper === undefined ? back : over(fillOf(wrapper), back);
-      const fill = over(fillOf(control), wrapperFill);
-      const wrapperSides = wrapper === undefined ? [] : sidesOf(wrapper, wrapperFill);
       return {
         control: nameOf(control),
-        edges: [...sidesOf(control, fill), ...wrapperSides],
-        fill: painted(fill),
-        behind: painted(back),
+        edges: [...sidesOf(control), ...(wrapper === undefined ? [] : sidesOf(wrapper, control))],
+        fill: painted(shownThrough(control, [])),
+        behind: painted(shownThrough((wrapper ?? control).parentElement, [])),
       };
     };
     const BY_EDGE =
