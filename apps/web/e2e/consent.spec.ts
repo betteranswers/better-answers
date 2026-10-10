@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import { RAIL } from "@/app/words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
+import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -28,6 +29,19 @@ const consentHeading = (page: Page) =>
 
 const displayNameHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: DISPLAY_NAME_WORDS.heading });
+
+const themeOf = (page: Page) => page.evaluate(() => document.documentElement.dataset["theme"]);
+
+/** The api's pages paint their surface on `<body>`, where the SPA paints `<html>`. */
+const pagePainted = (page: Page) =>
+  page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+const paintsTheDarkPage = async (page: Page, light: string): Promise<void> => {
+  expect(await themeOf(page), "the page ignored the theme kept").toBe("dark");
+  const painted = await pagePainted(page);
+  expect(painted).toBe(await tokenPainted(page, "--surface-page", "background-color"));
+  expect(painted, "the dark theme painted the light page").not.toBe(light);
+};
 
 const connectedAt = async (page: Page): Promise<URL> => {
   await page.getByRole("button", { name: "Connect" }).click();
@@ -116,6 +130,83 @@ test("draws consent in the sign-in pages' card, faces and tokens", async ({
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(sideways, "the page scrolls sideways at 320px").toBe(0);
+});
+
+test("draws consent, then its refusal, in the dark theme kept", async ({
+  page,
+  request,
+  baseURL,
+  passesTheAccessibilityGate,
+}) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  const email = anAddress("keeps-dark");
+  const workspace = await provision(request, { name: "Keeps Dark Ltd", adminEmail: email });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent" }));
+  await expect(consentHeading(page)).toBeVisible();
+  expect(await themeOf(page), "a light device opened a dark page").toBe("light");
+  const light = await pagePainted(page);
+
+  await page.evaluate((key) => {
+    localStorage.setItem(key, "dark");
+  }, THEME_KEPT_UNDER);
+  await page.reload();
+
+  await expect(consentHeading(page)).toBeVisible();
+  await paintsTheDarkPage(page, light);
+  await expect(page.locator("script[src]"), "the consent page loaded the SPA").toHaveCount(0);
+  await passesTheAccessibilityGate();
+
+  await endEverySignInAndToken(request, workspace.admin.id);
+  await page.getByRole("button", { name: "Connect" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
+  await paintsTheDarkPage(page, light);
+});
+
+test("follows a dark device on consent when nothing is kept", async ({
+  page,
+  request,
+  baseURL,
+  passesTheAccessibilityGate,
+}) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  const email = anAddress("dark-device");
+  await provision(request, { name: "Dark Device Ltd", adminEmail: email });
+  await catchClaudesRedirect(page);
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent" }));
+
+  await expect(consentHeading(page)).toBeVisible();
+  expect(await themeOf(page), "a dark device opened a light page").toBe("dark");
+  await passesTheAccessibilityGate();
+  await connectedAt(page);
+});
+
+test("draws a cross-site refusal in the dark theme kept", async ({ page, baseURL }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.addInitScript((key) => {
+    localStorage.setItem(key, "dark");
+  }, THEME_KEPT_UNDER);
+  await page.route("https://elsewhere.example/", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: `<!doctype html><title>Elsewhere</title><form method="post" action="${baseURL ?? ""}/consent"><button>Send</button></form>`,
+    }),
+  );
+  await page.goto("https://elsewhere.example/");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Nothing was connected" }),
+  ).toBeVisible();
+  expect(await themeOf(page), "the refusal ignored the theme kept").toBe("dark");
+  expect(await pagePainted(page)).toBe(
+    await tokenPainted(page, "--surface-page", "background-color"),
+  );
 });
 
 test("asks consent again only when the host asks for it", async ({

@@ -36,7 +36,7 @@ A page draws a card with `Card` (`shared/ui/card.tsx`), a framed region with `Fr
 
 ## Flip the theme on `<html>` alone
 
-`shared/theme-switch.ts` is the one writer of `data-theme`, and it writes it on `<html>`: the bridge's aliases resolve at `:root`, so the attribute anywhere below half-flips the page. A colour comes from a token that both themes set, never from a `dark:` utility or a `.dark` class. `test/theme.test.ts` holds the writer and the class, and the browser suite's accessibility gate holds every page a test leaves at 4.5:1 for words and 3:1 for control edges in both themes.
+`shared/theme-switch.ts` is the one writer of `data-theme`, and it writes it on `<html>`: the bridge's aliases resolve at `:root`, so the attribute anywhere below half-flips the page. Where the choice is kept and the head script that paints it before the first paint are `@better-answers/schema/theme`, which the api's own pages inline too, so the consent page follows the same rule. A colour comes from a token that both themes set, never from a `dark:` utility or a `.dark` class. `test/theme.test.ts` holds the writer and the class, and the browser suite's accessibility gate holds every page a test leaves at 4.5:1 for words and 3:1 for control edges in both themes.
 
 ## Write the text on a page in the glossary's reader words
 

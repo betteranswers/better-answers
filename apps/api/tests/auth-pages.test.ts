@@ -1,8 +1,16 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
+import { FIRST_PAINT } from "@better-answers/schema/theme";
+
 import { PAGE_STYLE, serveFaces } from "../src/auth/page-style.ts";
-import { CONSENT_WORDS, consentPage, REFUSAL_PAGES } from "../src/auth/pages.ts";
+import {
+  CONSENT_WORDS,
+  consentPage,
+  REFUSAL_PAGES,
+  refusedPage,
+  signInPage,
+} from "../src/auth/pages.ts";
 
 const CONSENTING = {
   clientName: "Claude",
@@ -62,6 +70,25 @@ describe("the consent page", () => {
 
   it("shows no straight quote or apostrophe", () => {
     expect(everyWordShown().filter((words) => /['"]/.test(words))).toEqual([]);
+  });
+});
+
+describe("the theme a person keeps", () => {
+  const pages = {
+    consent: consentPage("?sig=s", CONSENTING),
+    refused: refusedPage(REFUSAL_PAGES.crossSite),
+    signIn: signInPage(REFUSAL_PAGES.sessionEnded, "?sig=s"),
+  };
+
+  it.each(Object.entries(pages))("is painted by the web's script on the %s page", (_name, html) => {
+    const script = `<script>${FIRST_PAINT}</script>`;
+    expect(html.split(script)).toHaveLength(2);
+    expect(html.indexOf(script)).toBeLessThan(html.indexOf("<style>"));
+    expect(html.indexOf(script)).toBeLessThan(html.indexOf("</head>"));
+  });
+
+  it("is read by a script that closes no tag", () => {
+    expect(FIRST_PAINT).not.toContain("</");
   });
 });
 
