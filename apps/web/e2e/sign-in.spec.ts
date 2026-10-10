@@ -252,31 +252,6 @@ test("names the product in tab and banner, beside its logo", async ({ page }) =>
   await expect(banner.getByRole("img"), "the name would be heard twice").toHaveCount(0);
 });
 
-/** What the email step paints on its field and its two ways on. */
-const emailStepPaint = (page: Page) =>
-  Promise.all(
-    [
-      page.getByLabel(SIGN_IN_WORDS.emailField),
-      page.getByRole("button", { name: SIGN_IN_WORDS.passkey }),
-      page.getByRole("button", { name: SIGN_IN_WORDS.send }),
-    ].map((part) =>
-      part.evaluate((node) => {
-        const style = getComputedStyle(node);
-        return [style.backgroundColor, style.borderColor, style.color].join(" ");
-      }),
-    ),
-  );
-
-test("keeps the sign-in page light under a dark OS", async ({ page }) => {
-  await page.emulateMedia({ colorScheme: "light" });
-  await page.goto("/sign-in");
-  await expect(signInHeading(page)).toBeVisible();
-  const underLight = await emailStepPaint(page);
-
-  await page.emulateMedia({ colorScheme: "dark" });
-  expect(await emailStepPaint(page), "a dark OS repainted a light page").toEqual(underLight);
-});
-
 test("draws the outline edge hairline and the send ink blue", async ({ page }) => {
   await page.goto("/sign-in");
   const passkey = page.getByRole("button", { name: SIGN_IN_WORDS.passkey });

@@ -96,14 +96,14 @@
 
 /* ---------------------------------------------------------------------------
  * 2. Dark theme.
- * Our system switches on [data-theme="dark"]; shadcn and next-themes default
- * to a .dark class. Both are honoured so either mechanism works, and the two
- * can be mixed without a mismatch.
+ * One switch: [data-theme="dark"] on <html>. The aliases in §1 resolve on
+ * :root, so the attribute set on any element below it flips our tokens there
+ * and leaves every shadcn name light — a half-flipped page. shadcn's and
+ * next-themes' .dark class is not honoured, for the same reason.
  * Values come from our own dark aliases in tokens/semantic.css — this block
  * only re-points the shadcn names that differ from their light mapping.
  * ------------------------------------------------------------------------ */
-[data-theme="dark"],
-.dark {
+[data-theme="dark"] {
   --destructive: #e5645a;
   --destructive-foreground: #0b0c0e;
   --ring: var(--accent-400);

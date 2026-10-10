@@ -6,6 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
+import { FIRST_PAINT } from "./src/shared/theme-switch.ts";
 import { PRODUCT_NAME } from "./src/shared/words.ts";
 
 /**
@@ -73,9 +74,10 @@ const tabIcon = (): string => {
   return `data:image/svg+xml,${encodeURIComponent(icon)}`;
 };
 
-const theTab = (): Plugin => ({
-  name: "the-tab",
+const theHead = (): Plugin => ({
+  name: "the-head",
   transformIndexHtml: () => [
+    { tag: "script", children: FIRST_PAINT, injectTo: "head-prepend" },
     { tag: "title", children: PRODUCT_NAME, injectTo: "head" },
     {
       tag: "link",
@@ -86,7 +88,7 @@ const theTab = (): Plugin => ({
 });
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), theTab()],
+  plugins: [react(), tailwindcss(), theHead()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   build: {
     outDir: "dist",

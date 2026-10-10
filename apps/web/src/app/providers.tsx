@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { createQueryClient, type FailureHeard } from "@/shared/api/query-client.ts";
 import { createApiClient, TRPCProvider, type ApiClient } from "@/shared/api/trpc.ts";
+import { useThemeFollowed } from "@/shared/theme.ts";
 
 /** What hears a failure once a router can say where it leads: the router is made after the cache. */
 type FailureListener = {
@@ -46,6 +47,7 @@ export function Providers(properties: {
   readonly children: ReactNode;
 }) {
   const { queryClient, apiClient } = properties.clients;
+  useThemeFollowed();
 
   return (
     <QueryClientProvider client={queryClient}>

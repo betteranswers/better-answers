@@ -32,3 +32,11 @@ export const inThisTab = (): Storage | undefined => reached((browser) => browser
 export const keepInThisTab = (key: string, value: string): void => {
   kept(inThisTab(), key, value);
 };
+
+export const forgetOnThisBrowser = (key: string): void => {
+  try {
+    onThisBrowser()?.removeItem(key);
+  } catch {
+    // A refusing store keeps what it held; the choice shown is still the one made.
+  }
+};
