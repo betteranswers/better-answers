@@ -225,6 +225,39 @@ describe("the browser suite's knowledge harness", () => {
     });
   });
 
+  it.each([
+    [
+      "a link to a concept not seeded before it",
+      [
+        {
+          title: "Quarry haul roads",
+          body: "Synthetic haul roads are graded weekly.",
+          linksTo: ["Quarry speed limits"],
+        },
+        { title: "Quarry speed limits", body: "Synthetic haul roads carry a limit." },
+      ],
+      "concepts.0.linksTo.0",
+    ],
+    [
+      "a title two concepts of one seed carry",
+      [
+        { title: "Quarry speed limits", body: "Synthetic haul roads carry a limit." },
+        {
+          title: "Quarry speed limits",
+          body: "A second synthetic file under the first one's title.",
+        },
+      ],
+      "concepts.1.title",
+    ],
+  ])("refuses %s", async (_, concepts, field) => {
+    const refused = await seedRefused(concepts);
+
+    expect(refused).toEqual({
+      status: 400,
+      said: { fields: [{ field, rule: expect.any(String) }] },
+    });
+  });
+
   it("lands the further frontmatter keys a concept is given", async () => {
     const workspace = await app().provision();
     const [concept] = await conceptsSeeded({

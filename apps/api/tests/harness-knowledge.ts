@@ -108,6 +108,27 @@ export const conceptsSeeding = z
         });
       }
     }
+  })
+  // A link too names only a concept before it, and one seed gives a title to one concept.
+  .superRefine((asked, context) => {
+    for (const [at, concept] of asked.concepts.entries()) {
+      const earlier = new Set(asked.concepts.slice(0, at).map((seeded) => seeded.title));
+      if (earlier.has(concept.title)) {
+        context.addIssue({
+          code: "custom",
+          path: ["concepts", at, "title"],
+          message: "a seed gives each title to one concept",
+        });
+      }
+      for (const [place, title] of concept.linksTo.entries()) {
+        if (earlier.has(title)) continue;
+        context.addIssue({
+          code: "custom",
+          path: ["concepts", at, "linksTo", place],
+          message: "a concept links to one seeded before it in the same seed",
+        });
+      }
+    }
   });
 
 /** `document` only where the source is a passage, which the write records as evidence. */
