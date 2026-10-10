@@ -17,6 +17,7 @@ import {
   err,
   ok,
   type Claims,
+  type OperatorPrincipal,
   type Principal,
   type Result,
   type UserId,
@@ -35,6 +36,7 @@ import {
   withMember,
   withMemberUnheld,
   withOperator,
+  withOperatorRead,
   withPrincipal,
   withPrincipalRead,
   withScope,
@@ -853,84 +855,112 @@ describe("the operator resolver", () => {
     }
   };
 
-  const resolving = (userId: string, issuedAt = new Date()) =>
-    withOperator(openPostgres(db().runtimePool), { userId, issuedAt }, async (operator, tx) => {
-      const scope = await tx.query<{ scope: string | null }>(
-        "SELECT current_workspace_id() AS scope",
-      );
-      return { operator, scope: scope.rows[0]?.scope };
-    });
+  describe.each([
+    ["withOperator", withOperator],
+    ["withOperatorRead", withOperatorRead],
+  ] as const)("through %s", (_door, resolve) => {
+    const resolving = (userId: string, issuedAt = new Date()) =>
+      resolve(openPostgres(db().runtimePool), { userId, issuedAt }, async (operator, tx) => {
+        const scope = await tx.query<{ scope: string | null }>(
+          "SELECT current_workspace_id() AS scope",
+        );
+        return { operator, scope: scope.rows[0]?.scope };
+      });
 
-  it("resolves a marked person to the operator, in no workspace", async () => {
-    const person = await aPerson({ operator: true });
-    const issuedAt = new Date("2026-09-25T09:00:00.000Z");
+    it("resolves a marked person to the operator, in no workspace", async () => {
+      const person = await aPerson({ operator: true });
+      const issuedAt = new Date("2026-09-25T09:00:00.000Z");
 
-    expect(await resolving(person.id, issuedAt)).toEqual({
-      ok: true,
-      value: {
-        operator: {
-          kind: "operator",
-          userId: person.id,
-          credentialIssuedAtMs: Date.parse("2026-09-25T09:00:00.000Z"),
+      expect(await resolving(person.id, issuedAt)).toEqual({
+        ok: true,
+        value: {
+          operator: {
+            kind: "operator",
+            userId: person.id,
+            credentialIssuedAtMs: Date.parse("2026-09-25T09:00:00.000Z"),
+          },
+          scope: null,
         },
-        scope: null,
-      },
+      });
+    });
+
+    it("refuses a person without the mark", async () => {
+      const person = await aPerson();
+
+      expect(await resolving(person.id)).toEqual({ ok: false, error: "not-the-operator" });
+    });
+
+    it("refuses the operator's credentials issued before their revocation", async () => {
+      const person = await aPerson({
+        operator: true,
+        revokedAt: new Date("2026-09-25T10:00:00.000Z"),
+      });
+
+      expect([
+        await resolving(person.id, new Date("2026-09-25T09:59:59.999Z")),
+        (await resolving(person.id, new Date("2026-09-25T10:00:00.000Z"))).ok,
+      ]).toEqual([{ ok: false, error: "not-the-operator" }, true]);
+    });
+
+    it("refuses an id nobody holds, and a malformed one", async () => {
+      expect([await resolving(ulid()), await resolving("not-a-person")]).toEqual([
+        { ok: false, error: "not-the-operator" },
+        { ok: false, error: "not-the-operator" },
+      ]);
     });
   });
 
-  it("refuses a person without the mark", async () => {
-    const person = await aPerson();
+  /** Writes one identity-set row about the operator, then answers `answer`. */
+  const writingThen =
+    <Answer>(answer: Answer) =>
+    async (operator: OperatorPrincipal, tx: Tx): Promise<Answer> => {
+      await recordFor(bootstrap, tx, {
+        id: ulid(),
+        actor: actorIdOfPerson(operator.userId),
+        action: IDENTITY_PROBE.written,
+        subjectId: operator.userId,
+        detail: {},
+      });
+      return answer;
+    };
 
-    expect(await resolving(person.id)).toEqual({ ok: false, error: "not-the-operator" });
-  });
-
-  it("refuses the operator's credentials issued before their revocation", async () => {
-    const person = await aPerson({
-      operator: true,
-      revokedAt: new Date("2026-09-25T10:00:00.000Z"),
-    });
-
-    expect([
-      await resolving(person.id, new Date("2026-09-25T09:59:59.999Z")),
-      (await resolving(person.id, new Date("2026-09-25T10:00:00.000Z"))).ok,
-    ]).toEqual([{ ok: false, error: "not-the-operator" }, true]);
-  });
+  const rowsWrittenAbout = async (personId: string) =>
+    (
+      await db().pool.query(
+        "SELECT 1 FROM identity_audit_event WHERE subject_id = $1 AND action = $2",
+        [personId, IDENTITY_PROBE.written.name],
+      )
+    ).rowCount;
 
   it("rolls a refusal's writes back and commits a value's", async () => {
     const person = await aPerson({ operator: true });
-    const writingThen = <Answer>(answer: Answer) =>
-      withOperator(
-        openPostgres(db().runtimePool),
-        { userId: person.id, issuedAt: new Date() },
-        async (_operator, tx) => {
-          await recordFor(bootstrap, tx, {
-            id: ulid(),
-            actor: actorIdOfPerson(person.id),
-            action: IDENTITY_PROBE.written,
-            subjectId: person.id,
-            detail: {},
-          });
-          return answer;
-        },
-      );
+    const claims = { userId: person.id, issuedAt: new Date() };
+    const door = openPostgres(db().runtimePool);
 
-    const answers = [await writingThen(err(PROVOKED)), await writingThen(ok("landed"))];
+    const answers = [
+      await withOperator(door, claims, writingThen(err(PROVOKED))),
+      await withOperator(door, claims, writingThen(ok("landed"))),
+    ];
 
-    const written = await db().pool.query(
-      "SELECT 1 FROM identity_audit_event WHERE subject_id = $1 AND action = $2",
-      [person.id, IDENTITY_PROBE.written.name],
-    );
-    expect(written.rowCount).toBe(1);
+    expect(await rowsWrittenAbout(person.id)).toBe(1);
     expect(answers).toEqual([
       { ok: true, value: { ok: false, error: PROVOKED } },
       { ok: true, value: { ok: true, value: "landed" } },
     ]);
   });
 
-  it("refuses an id nobody holds, and a malformed one", async () => {
-    expect([await resolving(ulid()), await resolving("not-a-person")]).toEqual([
-      { ok: false, error: "not-the-operator" },
-      { ok: false, error: "not-the-operator" },
-    ]);
+  it("refuses a write on the read door at its statement", async () => {
+    const person = await aPerson({ operator: true });
+    const claims = { userId: person.id, issuedAt: new Date() };
+    const door = openPostgres(db().runtimePool);
+
+    await expect(withOperatorRead(door, claims, writingThen("landed"))).rejects.toMatchObject({
+      code: "25006",
+    });
+    expect(await rowsWrittenAbout(person.id)).toBe(0);
+    expect(await withOperator(door, claims, writingThen("landed"))).toEqual({
+      ok: true,
+      value: "landed",
+    });
   });
 });
