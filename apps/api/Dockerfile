@@ -85,8 +85,8 @@ RUN pnpm --filter @better-answers/web run build
 # `@better-answers/*` import would fail at load. A filtered install keeps them where they
 # are — real directories under `/app/packages`, reached by the symlink pnpm writes — and the
 # `...` suffix selects the api together with its workspace dependencies and nothing else:
-# those two, and `@better-answers/design-system`, whose logo `src/auth/pages.ts` reads through
-# its `exports` map as a file rather than importing it.
+# those two, and `@better-answers/design-system`, whose logo and stylesheet `src/auth/` reads
+# through its `exports` map as files rather than importing them.
 #
 # pnpm links an optional peer that any workspace brings and `--prod` installs it, so
 # `better-auth`'s peers on drizzle-kit, vitest and react would ship here with their build tooling,
@@ -217,8 +217,8 @@ RUN printf '\n# Set by apps/api/Dockerfile: an image never installs, and corepac
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=prod-deps /app/packages/core/node_modules ./packages/core/node_modules
-# The design system's dependencies are its two fonts, which the api never loads. The install
-# above keeps them in the store regardless, and this is the link `tests/image.test.ts` follows.
+# The design system's dependencies are its two faces, which `src/auth/page-style.ts` serves to
+# the api's own pages. This is also the link `tests/image.test.ts` follows.
 COPY --from=prod-deps /app/packages/design-system/node_modules ./packages/design-system/node_modules
 COPY --from=prod-deps /app/packages/schema/node_modules ./packages/schema/node_modules
 
@@ -229,9 +229,10 @@ COPY apps/api/src apps/api/src
 COPY apps/api/lifts apps/api/lifts
 COPY packages/core/package.json packages/core/
 COPY packages/core/src packages/core/src
-# The logo alone: `src/auth/pages.ts` inlines it, and the api reads nothing else of the package.
-COPY packages/design-system/package.json packages/design-system/
+# What the api's own pages inline: the logo, the stylesheet and the tokens it imports.
+COPY packages/design-system/package.json packages/design-system/styles.css packages/design-system/
 COPY packages/design-system/assets packages/design-system/assets
+COPY packages/design-system/tokens packages/design-system/tokens
 COPY packages/schema/package.json packages/schema/
 COPY packages/schema/src packages/schema/src
 # `migrationsFolder` (packages/schema/src/index.ts) is this directory; `pnpm migrate` reads it.

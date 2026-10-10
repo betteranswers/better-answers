@@ -9,6 +9,7 @@ import {
   createAuthRoutes,
   createTokenVerifier,
   type EmailSender,
+  serveFaces,
 } from "./auth/index.ts";
 import type { Doors } from "./doors.ts";
 import { routeByHostname, type PublicHostnames } from "./ingress/hostnames.ts";
@@ -135,6 +136,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
 
   const spa = serveSpa({ root: dependencies.webRoot, hostname: dependencies.hostnames.app });
   server.use("*", spa.assets);
+  serveFaces(server);
 
   server.all("/*", async (context) => {
     const answered = await auth.handler(context.req.raw);

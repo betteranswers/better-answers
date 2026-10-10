@@ -333,6 +333,8 @@ const COPIED_SOURCE: readonly string[] = [
   "packages/core/src",
   "packages/design-system",
   "packages/design-system/assets",
+  "packages/design-system/styles.css",
+  "packages/design-system/tokens",
   "packages/schema/migrations",
   "packages/schema/src",
 ];
