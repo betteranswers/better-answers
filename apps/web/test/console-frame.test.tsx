@@ -16,7 +16,7 @@ import {
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
-import { CLEAR_WORDS, PRODUCT_NAME } from "@/shared/words.ts";
+import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
 import { addressOf, answered } from "./stubbed-api.ts";
@@ -244,7 +244,7 @@ describe("the console's lists", () => {
 
     searchFor(list, WORKSPACES_WORDS.search, "nowhere");
     expect(within(list).getByText(WORKSPACES_WORDS.noneMatch("nowhere"))).toBeDefined();
-    fireEvent.click(within(list).getByRole("button", { name: CLEAR_WORDS.search }));
+    fireEvent.click(within(list).getByRole("button", { name: "Clear search" }));
     expect(rowsOf(list)).toHaveLength(2);
     expect(within(list).getByText(WORKSPACES_WORDS.counted(2))).toBeDefined();
   });
