@@ -47,35 +47,38 @@ dependencies = [
     # beneath it is the single exception. The wheels are abi3 against CPython 3.11, so
     # one wheel serves this tier's 3.13, and `cp311-abi3` covers manylinux_2_28 on
     # x86_64 and aarch64 as well as macOS arm64, which is every machine this repository
-    # builds on. Version read from PyPI's release metadata on 24/09/2026; Apache-2.0,
+    # builds on. Version read from PyPI's release metadata on 10/10/2026; Apache-2.0,
     # which is the arm this repository takes (ADR 0027).
     #
     # The engine also calls home, and the value that refuses that call is proved
     # against this version alone. `COCOINDEX_DISABLE_USAGE_TRACKING=1` is what stops
     # the native core reaching `cocoindex.gateway.scarf.sh`; the `ENV` at the end of
     # `apps/worker/Dockerfile` says why it is refused, and the image suite holds the
-    # three places that set it — image, deploy unit and CI runner — to each other. The
-    # run that proved the value, with its date, the engine version and both arms, is
-    # the docblock on `apps/worker/tests/test_image.py`'s
-    # `test_the_image_and_deploy_unit_refuse_the_engines_gateway_call`.
+    # three places that set it — image, deploy unit and CI runner — to each other, in
+    # `apps/worker/tests/test_image.py`'s
+    # `test_the_image_and_deploy_unit_refuse_the_engines_gateway_call`. The run that
+    # proved the value: on 10/10/2026, against 1.0.25, the engine was imported on its
+    # own, opened a store and ran two updates, through a proxy that wrote down every
+    # host it was asked for and reached none. Without the variable it asked for
+    # `cocoindex.gateway.scarf.sh:443` four times, and with it set to `1` not once.
     # A process none of the three started — this tier's gate on a laptop — is covered by
     # the pipeline package setting it ahead of its import of the engine, because the
-    # core looks once, as it is imported, and reads `RUST_LOG` the same way; the run
-    # that proved *when* is the docblock on
-    # `apps/worker/tests/test_pipeline_engine_environment.py`.
-    # Bumping this pin re-runs both probes and re-dates both records in the same commit.
+    # core looks once, as it is imported, and reads `RUST_LOG` the same way;
+    # `apps/worker/tests/test_pipeline_engine_environment.py` holds *when*.
+    # Bumping this pin re-runs that probe and that suite and re-dates this record in the
+    # same commit.
     "cocoindex==1.0.25",
     # The driver the engine's Postgres target acquires its own connections through, and
     # the one the pipeline's per-workspace pool is built from. It is named here rather
     # than left to cocoindex's `postgres` extra, whose floor would let the driver move
     # underneath a pool whose connection init is the only thing keeping row-level
-    # security in force over the rows a flow lands. Read from PyPI on 11/09/2026;
+    # security in force over the rows a flow lands. Read from PyPI on 10/10/2026;
     # Apache-2.0.
     "asyncpg==0.32.0",
     # The object store client the pipeline reads a landed copy with and writes the
     # normalised copy back through. It is this tier's own rather than the engine's S3
     # source, because the bytes are addressed by keys the document's catalogue row
-    # already holds and nothing here walks a bucket. Read from PyPI on 06/10/2026;
+    # already holds and nothing here walks a bucket. Read from PyPI on 10/10/2026;
     # Apache-2.0.
     "boto3==1.43.111",
     # The two converters, one per media type (ADR 0013, amended 20/09/2026). `anydoc`
