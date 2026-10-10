@@ -55,7 +55,7 @@ The shell and layout foundations plan (`docs/plans/2026-09-30-1959-feat-shell-an
 - `app/band.tsx`, which replaced `app/top-bar.tsx`, is the top band: the logo, the switcher with the navigation control, the breadcrumb, jump-to and the avatar menu.
 - `app/workspace-switcher.tsx` is the workspace switcher. It lists the console to the operator alone.
 - `app/breadcrumb.tsx` is the breadcrumb, read off the navigation list.
-- `app/jump-to.tsx` is jump-to, opened by ⌘K or Ctrl+K: the areas, pages, actions and members the person may see.
+- `app/jump-to.tsx` is jump-to, opened by ⌘K or Ctrl+K: the areas, pages, actions and members the person may see, and a last row that takes what was typed to Search.
 - `shared/keystrokes.tsx` holds the shell's keystrokes context, `ShellKeystrokes`, which lists the shell's keystrokes beside the open page's own. The rail's foot opens the list, or the band where the layout is narrow.
 - `app/pages/`, which replaced `app/views/`, and each feature's `*-page.tsx`, which replaced its `*-view.tsx`, are the pages. `shared/page-toolbar.tsx` replaced `shared/view-toolbar.tsx`.
 
