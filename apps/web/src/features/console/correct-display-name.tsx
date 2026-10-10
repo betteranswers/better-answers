@@ -4,13 +4,13 @@ import { OutcomeLine } from "@/shared/outcome.tsx";
 import { SheetPart } from "@/shared/sheet-part.tsx";
 
 import { CorrectNameDialog } from "./correct-name-dialog.tsx";
+import { correctWords } from "./correcting-words.ts";
 import { backTo } from "./people-address.ts";
 import type { ListedPerson } from "./people-api.ts";
 import { nameOf } from "./person-words.tsx";
 import { SheetActionButton } from "./sheet-action.tsx";
 import { SignInAgain } from "./sign-in-again.tsx";
 import { useCorrecting } from "./use-correcting.ts";
-import { correctWords } from "./words.ts";
 
 export function CorrectDisplayName(properties: {
   readonly person: ListedPerson;
@@ -31,7 +31,7 @@ export function CorrectDisplayName(properties: {
   return (
     <SheetPart title="Display name">
       <p id={consequenceId} className="text-muted-foreground">
-        Replaces {name}'s display name in every workspace they belong to, under the rule a person's
+        Replaces {name}’s display name in every workspace they belong to, under the rule a person’s
         own name follows, and ends any flag waiting on it. Recorded on the identity-set audit log
         under your name.
       </p>

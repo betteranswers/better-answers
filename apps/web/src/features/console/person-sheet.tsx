@@ -1,5 +1,6 @@
 import { useId, useRef, useState, type ReactNode, type RefObject } from "react";
 
+import { Address } from "@/shared/address.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { RowSheet } from "@/shared/row-sheet.tsx";
 import { SheetPart } from "@/shared/sheet-part.tsx";
@@ -22,7 +23,14 @@ import {
   type HeldSession,
   type ListedPerson,
 } from "./people-api.ts";
-import { At, grantStateOf, Instant, WorkspacesAndRoles, nameOf } from "./person-words.tsx";
+import {
+  At,
+  grantStateOf,
+  Instant,
+  nameOf,
+  PersonName,
+  WorkspacesAndRoles,
+} from "./person-words.tsx";
 import { readRefused } from "./words.ts";
 
 /** Where focus lands when the sheet opens: on the person, or straight on one of their actions. */
@@ -91,7 +99,7 @@ function GrantItem(properties: {
       <Collapsible className="mt-1">
         <CollapsibleTrigger asChild>
           <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-            More about {assistant}'s grant
+            More about {assistant}’s grant
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -233,10 +241,12 @@ export function PersonSheet(properties: {
       <SheetHeader className="border-b border-border">
         <SheetTitle asChild>
           <h2 ref={titleRef} tabIndex={-1} className="pr-8 wrap-anywhere">
-            {nameOf(person)}
+            <PersonName person={person} />
           </h2>
         </SheetTitle>
-        <SheetDescription className="wrap-anywhere">{person.email}</SheetDescription>
+        <SheetDescription>
+          <Address address={person.email} />
+        </SheetDescription>
       </SheetHeader>
       <div className="grid gap-4 px-4 pb-4">
         <SheetPart title="Workspaces">

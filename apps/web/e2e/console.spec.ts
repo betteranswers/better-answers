@@ -1,4 +1,4 @@
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
@@ -10,9 +10,11 @@ import {
 } from "@/features/auth/account-words.ts";
 import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
+import { WORKSPACES_WORDS } from "@/features/console/list-words.ts";
+import { WORKSPACES_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { CONSOLE, HOMES } from "@/shared/navigation.ts";
+import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
@@ -23,12 +25,15 @@ import {
   avatarOf,
   crumbOf,
   keyShown,
+  keystrokesDismissed,
+  keystrokesListed,
   landedAtHome,
   markTheOperator,
   navOf,
   person,
   personMenuOpened,
   provision,
+  quoted,
   railOf,
   signedInAtHome,
   signIn,
@@ -43,7 +48,11 @@ const LIST_BUDGET_MS = 1000;
 
 const EVERY_WORKSPACE = HOMES.operator.path;
 
-const CLOSED = "The console is better-answers support's alone";
+const WORKSPACES = menuGroupIn(CONSOLE, "workspaces");
+
+const COLUMNS = WORKSPACES_WORDS.columns;
+
+const CLOSED = "The console is better-answers support’s alone";
 
 const UK_DAY =
   /^\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
@@ -58,10 +67,25 @@ const theConsoleOffered = async (page: Page, workspaceName: string) => {
   return theConsole;
 };
 
-const listOf = (page: Page) => page.getByRole("region", { name: "Every workspace" });
+const listOf = (page: Page) => page.getByRole("region", { name: WORKSPACES_WORDS.heading });
 
-const itemOf = (page: Page, name: string) =>
-  listOf(page).getByRole("listitem", { name, exact: true });
+const searchOf = (page: Page) =>
+  listOf(page).getByRole("searchbox", { name: WORKSPACES_WORDS.search });
+
+/** The list's one count, which the head says and nothing else in the region repeats. */
+const countOf = (page: Page) => listOf(page).getByRole("status");
+
+/** The header row is a row too, so the workspaces are the rows with a cell. */
+const workspaceRows = (page: Page): Locator =>
+  listOf(page)
+    .getByRole("row")
+    .filter({ has: page.getByRole("cell") });
+
+/** A workspace's row, found by the disclosure it alone carries. */
+const rowOf = (page: Page, name: string): Locator =>
+  workspaceRows(page).filter({
+    has: page.getByRole("button", { name: WORKSPACES_WORDS.moreAbout(name), exact: true }),
+  });
 
 /**
  * The console lists every workspace the run provisioned, so a name another spec also uses would
@@ -241,10 +265,7 @@ test.describe("the way into the console", () => {
 });
 
 test.describe("the console's Workspaces page", () => {
-  test("lists each workspace's short name, members and provisioning day", async ({
-    page,
-    request,
-  }) => {
+  test("lists workspaces in a table, each id one disclosure in", async ({ page, request }) => {
     const workspace = await theOperator(page, request, "Dales Engineering");
     const acme = await provision(request, { name: aNameOfItsOwn("Acme Holdings") });
     const colleague = await person(request, anAddress("colleague"));
@@ -256,14 +277,62 @@ test.describe("the console's Workspaces page", () => {
 
     await page.goto(EVERY_WORKSPACE);
 
-    const theirs = itemOf(page, acme.name);
-    await expect(theirs.getByText("2 members", { exact: true })).toBeVisible();
-    await expect(theirs.getByRole("definition").first()).toHaveText(acme.shortName);
-    await expect(theirs.getByRole("definition").nth(1)).toHaveText(UK_DAY);
-    await expect(itemOf(page, workspace.name).getByText("1 member", { exact: true })).toBeVisible();
+    await expect(listOf(page).getByRole("columnheader")).toHaveText(Object.values(COLUMNS));
+    const theirs = rowOf(page, acme.name);
+    await expect(theirs.getByRole("cell").nth(1)).toHaveText(acme.shortName);
+    await expect(theirs.getByRole("cell").nth(2)).toHaveText("2 members");
+    await expect(theirs.getByRole("cell").nth(3)).toHaveText(UK_DAY);
+    await expect(rowOf(page, workspace.name).getByRole("cell").nth(2)).toHaveText("1 member");
 
-    await theirs.getByRole("button", { name: `More about ${acme.name}` }).click();
+    await expect(
+      listOf(page).getByText(acme.workspaceId, { exact: true }),
+      "a workspace's id shows before its disclosure opens",
+    ).toHaveCount(0);
+    await theirs.getByRole("button", { name: WORKSPACES_WORDS.moreAbout(acme.name) }).click();
     await expect(theirs.getByText(acme.workspaceId, { exact: true })).toBeVisible();
+  });
+
+  test("narrows by name or short name, saying when none match", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    const workspace = await theOperator(page, request, "Ribble Castings");
+    const other = await provision(request, { name: aNameOfItsOwn("Lune Bindery") });
+    await page.goto(EVERY_WORKSPACE);
+    await expect(rowOf(page, other.name)).toBeVisible();
+
+    const listed = await keystrokesListed(page, HOMES.operator.name);
+    await expect(listed.getByRole("definition")).toHaveText([
+      WORKSPACES_KEYSTROKES.search.action,
+      KEYSTROKE_WORDS.showTheList,
+      JUMP_TO.name,
+    ]);
+    await keystrokesDismissed(page, listed);
+
+    const shouted = workspace.name.toUpperCase();
+    await page.keyboard.press(WORKSPACES_KEYSTROKES.search.key);
+    await expect(searchOf(page)).toBeFocused();
+    await page.keyboard.type(shouted);
+    await expect(workspaceRows(page)).toHaveCount(1);
+    await expect(rowOf(page, workspace.name)).toBeVisible();
+    await expect(countOf(page)).toHaveText(WORKSPACES_WORDS.matching(1, shouted));
+
+    await searchOf(page).fill(other.shortName);
+    await expect(workspaceRows(page)).toHaveCount(1);
+    await expect(rowOf(page, other.name)).toBeVisible();
+
+    const nowhere = `nowhere ${workspace.shortName}`;
+    await searchOf(page).fill(nowhere);
+    await expect(listOf(page)).toContainText(WORKSPACES_WORDS.noneMatch(nowhere));
+    await expect(countOf(page)).toHaveText(WORKSPACES_WORDS.matching(0, nowhere));
+    await passesTheAccessibilityGate();
+    await listOf(page).getByRole("button", { name: "Clear filters" }).click();
+
+    await expect(searchOf(page)).toHaveValue("");
+    await expect(searchOf(page)).toBeFocused();
+    await expect(rowOf(page, workspace.name)).toBeVisible();
+    await expect(rowOf(page, other.name)).toBeVisible();
   });
 
   test("carries no control that provisions, renames or removes a workspace", async ({
@@ -272,15 +341,19 @@ test.describe("the console's Workspaces page", () => {
   }) => {
     const workspace = await theOperator(page, request, "Southern Castings");
     await page.goto(EVERY_WORKSPACE);
-    await expect(itemOf(page, workspace.name)).toBeVisible();
+    await expect(rowOf(page, workspace.name)).toBeVisible();
 
     const list = listOf(page);
+    await expect(list.getByRole("searchbox"), "the one field narrows the rows").toHaveCount(1);
     await expect(list.getByRole("textbox")).toHaveCount(0);
     await expect(list.getByRole("combobox")).toHaveCount(0);
     await expect(list.getByRole("checkbox")).toHaveCount(0);
     await expect(list.getByRole("link")).toHaveCount(0);
     const buttons = await list.getByRole("button").allTextContents();
-    expect(buttons.every((name) => name.startsWith("More about "))).toBe(true);
+    expect(
+      buttons.filter((name) => !name.startsWith(WORKSPACES_WORDS.moreAbout(""))),
+      "a button other than a row's disclosure and the column menu",
+    ).toEqual(["Columns"]);
   });
 
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
@@ -288,7 +361,7 @@ test.describe("the console's Workspaces page", () => {
 
     const started = Date.now();
     await page.goto(EVERY_WORKSPACE);
-    await expect(itemOf(page, workspace.name)).toBeVisible();
+    await expect(rowOf(page, workspace.name)).toBeVisible();
     const elapsed = Date.now() - started;
 
     test.info().annotations.push({ type: "workspaces list", description: `${elapsed} ms` });
@@ -298,7 +371,7 @@ test.describe("the console's Workspaces page", () => {
   test("says who may read the list once the mark clears", async ({ page, request }) => {
     const workspace = await theOperator(page, request, "Calder Pressings");
     await page.goto(EVERY_WORKSPACE);
-    await expect(itemOf(page, workspace.name)).toBeVisible();
+    await expect(rowOf(page, workspace.name)).toBeVisible();
 
     await markTheOperator(request, workspace.admin.email, "revoke");
     // A move between the console's own pages keeps its standing, so the list asks again alone.
@@ -307,7 +380,7 @@ test.describe("the console's Workspaces page", () => {
 
     await expect(listOf(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
     await expect(listOf(page)).not.toContainText(NOT_THE_OPERATOR);
-    await expect(listOf(page).getByRole("listitem")).toHaveCount(0);
+    await expect(listOf(page).getByRole("table")).toHaveCount(0);
   });
 
   test("closes the console on entry once the mark is cleared", async ({ page, request }) => {
@@ -351,26 +424,40 @@ test.describe("the console's Workspaces page", () => {
   });
 
   test("scrolls nothing sideways at 320 pixels", async ({ page, request }) => {
-    await theOperator(page, request, "Acme Joinery");
+    const workspace = await theOperator(page, request, "Acme Joinery");
     await page.setViewportSize({ width: 320, height: 720 });
     await page.goto(EVERY_WORKSPACE);
     await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
+    await expect(rowOf(page, workspace.name)).toBeVisible();
 
-    const room = await page.evaluate(() => ({
-      scrolls: document.documentElement.scrollWidth,
-      holds: document.documentElement.clientWidth,
-    }));
-    expect(room.scrolls).toBeLessThanOrEqual(room.holds);
+    // Four columns outrun a narrow window, so it opens on two and its menu shows the rest again.
+    await expect(listOf(page).getByRole("columnheader")).toHaveText([
+      COLUMNS.workspace,
+      COLUMNS.shortName,
+    ]);
+    const room = await page.evaluate(() => {
+      const table = document.querySelector("[data-slot=table-container]");
+      return {
+        page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        table: (table?.scrollWidth ?? 0) - (table?.clientWidth ?? 0),
+      };
+    });
+    expect(room, "the page or its table scrolls sideways").toEqual({ page: 0, table: 0 });
+
+    await listOf(page).getByRole("button", { name: "Columns" }).click();
+    await page.getByRole("menuitemcheckbox", { name: COLUMNS.memberCount }).click();
+    await page.keyboard.press("Escape");
+    await expect(rowOf(page, workspace.name).getByRole("cell").nth(2)).toHaveText("1 member");
   });
 
-  test("is keyboard-operable, sounds like a list and passes axe", async ({
+  test("is keyboard-operable, sounds like a table and passes axe", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     const workspace = await theOperator(page, request, "Pendle Toolworks");
     await page.goto(EVERY_WORKSPACE);
-    const ours = itemOf(page, workspace.name);
+    const ours = rowOf(page, workspace.name);
     await expect(ours).toBeVisible();
 
     await skipLinkReachesThePage(page);
@@ -403,21 +490,41 @@ test.describe("the console's Workspaces page", () => {
             - link "${CONSOLE.name}"
         - button "${KEYSTROKE_WORDS.button}"
     `);
-    await expect(ours).toMatchAriaSnapshot(`
-      - listitem "${workspace.name}":
-        - heading "${workspace.name}" [level=3]
-        - text: 1 member
-        - term: Short name
-        - definition:
-          - code: ${workspace.shortName}
-        - term: Provisioned
-        - definition: /\\d{1,2} [A-Z][a-z]+ \\d{4}/
-        - button "More about ${workspace.name}"
+
+    // The count is the whole platform's, so the page is read narrowed to this test's own row.
+    await page.keyboard.press(WORKSPACES_KEYSTROKES.search.key);
+    await expect(searchOf(page)).toBeFocused();
+    await page.keyboard.type(workspace.name);
+    await expect(workspaceRows(page)).toHaveCount(1);
+    await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
+      - main "Page":
+        - heading ${quoted(WORKSPACES.name)} [level=1]
+        - paragraph: ${quoted(WORKSPACES.summary)}
+        - region ${quoted(WORKSPACES_WORDS.heading)}:
+          - heading ${quoted(WORKSPACES_WORDS.heading)} [level=2]
+          - paragraph: ${quoted(WORKSPACES_WORDS.description)}
+          - status: ${quoted(WORKSPACES_WORDS.matching(1, workspace.name))}
+          - searchbox ${quoted(WORKSPACES_WORDS.search)}: ${quoted(workspace.name)}
+          - table:
+            - caption: ${quoted(WORKSPACES_WORDS.caption)}
+            - rowgroup:
+              - row ${quoted(Object.values(COLUMNS).join(" "))}:
+                - columnheader ${quoted(COLUMNS.workspace)}
+                - columnheader ${quoted(COLUMNS.shortName)}
+                - columnheader ${quoted(COLUMNS.memberCount)}
+                - columnheader ${quoted(COLUMNS.createdAt)}
+            - rowgroup:
+              - row /${workspace.name}/:
+                - cell /${workspace.name}/:
+                  - button ${quoted(WORKSPACES_WORDS.moreAbout(workspace.name))}
+                - cell ${quoted(workspace.shortName)}
+                - cell "1 member"
+                - cell /\\d{1,2} [A-Z][a-z]+ \\d{4}/
     `);
 
     await passesTheAccessibilityGate();
 
-    const more = ours.getByRole("button", { name: `More about ${workspace.name}` });
+    const more = ours.getByRole("button", { name: WORKSPACES_WORDS.moreAbout(workspace.name) });
     await more.focus();
     await page.keyboard.press("Enter");
     await expect(more).toHaveAttribute("aria-expanded", "true");

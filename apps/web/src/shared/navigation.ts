@@ -405,7 +405,7 @@ export const CONSOLE = {
       id: "people",
       name: "People",
       summary:
-        "Every person on the platform, the workspaces they belong to and their role in each, with the sessions and assistant access that can act as them.",
+        "The people on the platform, and the display names waiting on better-answers support.",
       movedFrom: ["/console/people"],
       pages: [
         {
