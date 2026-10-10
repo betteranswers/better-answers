@@ -36,7 +36,11 @@ const ROLE_FORBIDS = "role-forbids" satisfies AdmissionRefusal;
 
 const NOT_THE_OPERATOR = "not-the-operator" satisfies AdmissionRefusal;
 
-const reaches = (held: Role, named: Role): boolean => ROLES.indexOf(held) <= ROLES.indexOf(named);
+/** A role outside the three reaches nothing, whatever a caller's type says. */
+const reaches = (held: Role, named: Role): boolean => {
+  const at = ROLES.indexOf(held);
+  return at !== -1 && at <= ROLES.indexOf(named);
+};
 
 /**
  * `ROLES` runs from the highest down, so a named role is reached by itself and everything above.

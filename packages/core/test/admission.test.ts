@@ -117,6 +117,16 @@ describe("what an action admits, from the principal and input alone", () => {
     expectTypeOf(admitted.value).toExtend<UserPrincipal & { role: "Admin" }>();
   });
 
+  it("refuses a role outside the three, whatever level is asked", () => {
+    // @ts-expect-error — a role no resolver hands out is the value the gate must still refuse.
+    const stranger: UserPrincipal = { ...person("Admin"), role: "Owner" };
+
+    expect([admit(adminsOnly, stranger, {}), admit(everyone, stranger, {})]).toEqual([
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "role-forbids" },
+    ]);
+  });
+
   it("refuses in role-forbids, a word of the forbidden class", () => {
     const refused = admit(adminsOnly, person("Viewer"), {});
 
