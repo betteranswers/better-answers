@@ -332,15 +332,21 @@ const LINKED = `SELECT t.iri, t.path
     JOIN concept_index t ON t.workspace_id = e.workspace_id AND t.iri = e.to_uid
    WHERE g.workspace_id = $1 AND e.from_uid = $4 AND e.label = '${LINKS_TO_LABEL}'
      AND ${readableClause("e", 2)}
-     AND ${readableClause("t", 2)}`;
+     AND ${readableClause("t", 2)}
+   GROUP BY t.iri, t.path`;
 
-type Linked = { readonly iri: string; readonly path: string };
+/** The concepts the map links this one to that the reader may read, by IRI and by file. */
+type Linked = {
+  readonly iris: ReadonlySet<string>;
+  readonly byPath: ReadonlyMap<string, string>;
+};
 
 /** The body may be older or newer than the map's edges, so a link takes only a target it names. */
-const linkedBy = (linked: readonly Linked[], address: string, from: string): Linked | undefined => {
+const linkedBy = (linked: Linked, address: string, from: string): string | undefined => {
   const named = targetOf(address, from);
   if (named === undefined) return undefined;
-  return linked.find((row) => ("iri" in named ? row.iri === named.iri : row.path === named.path));
+  if ("path" in named) return linked.byPath.get(named.path);
+  return linked.iris.has(named.iri) ? named.iri : undefined;
 };
 
 /**
@@ -358,15 +364,19 @@ export const bodyLinksOf = (
   },
 ): Promise<Result<readonly BodyLink[], Error>> =>
   attempt(async () => {
-    const read = await tx.query<Linked>(LINKED, [
+    const read = await tx.query<{ iri: string; path: string }>(LINKED, [
       principal.workspaceId,
       ...readableParameters(principal),
       concept.iri,
     ]);
+    const linked: Linked = {
+      iris: new Set(read.rows.map((row) => row.iri)),
+      byPath: new Map(read.rows.map((row) => [row.path, row.iri])),
+    };
     const { links } = linksAndMarksOf(concept.body, citedSourcesOf(concept.frontmatter["sources"]));
     return links.flatMap(({ ordinal, target: address }) => {
-      const row = linkedBy(read.rows, address, concept.path);
-      return row === undefined ? [] : [{ ordinal, address, target: ids.conceptIri.parse(row.iri) }];
+      const iri = linkedBy(linked, address, concept.path);
+      return iri === undefined ? [] : [{ ordinal, address, target: ids.conceptIri.parse(iri) }];
     });
   });
 

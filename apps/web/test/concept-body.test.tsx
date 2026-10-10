@@ -481,6 +481,27 @@ describe("a body's links to other concepts", () => {
     expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
   });
 
+  it("keeps an encoded slash apart from a written one", async () => {
+    const article = await drawnLinking(
+      "See [the first](roles%2Fboard.md) and [the second](roles/board.md).",
+      answering("roles/board.md"),
+    );
+
+    expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
+    expect(within(article).getByRole("link", { name: "the second" })).toBeDefined();
+  });
+
+  it("draws a reference link to the file its definition names", async () => {
+    const article = await drawnLinking(
+      "See [the board][b] and [its rates][r].\n\n[b]: ./board.md\n[r]: ./rates.md",
+      answering("./board.md"),
+    );
+
+    expect(addressesIn(article)).toEqual(["/knowledge/search/01J6RRRRRRRRRRRRRRRRRRRRRR"]);
+    expect(within(article).getByRole("link", { name: "the board" })).toBeDefined();
+    expect(article.textContent.trim()).toBe("See the board and its rates.");
+  });
+
   it("draws the body when an address does not decode", async () => {
     const article = await drawnLinking(
       "See [the café](caf%E9.md), [the odd one](x%zz.md) and [the rates](100%.md).",

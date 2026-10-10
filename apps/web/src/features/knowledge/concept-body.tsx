@@ -215,7 +215,8 @@ const marksDrawn =
 /** The parser percent-encodes what the file wrote plainly, so both sides are compared decoded. */
 const decoded = (address: string): string => {
   try {
-    return decodeURIComponent(address);
+    // Not `decodeURIComponent`: an encoded slash or hash is no slash or hash of the file's.
+    return decodeURI(address);
   } catch {
     // No percent-encoding of anything, so the address stands as the file wrote it.
     return address;
