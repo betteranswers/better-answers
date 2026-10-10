@@ -1,6 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
-import { refusalOf } from "./trpc.ts";
+import { ceilingLiftsIn, refusalOf, type ApiError } from "./trpc.ts";
 
 const RETRY_ATTEMPTS = 2;
 
@@ -9,6 +9,12 @@ const RETRY_ATTEMPTS = 2;
  * any word is never asked again.
  */
 const worthAnotherAsk = (error: Error) => refusalOf(error) === undefined;
+
+/** A ceiling lifts only with time, so a read that met one is not asked again at once. */
+export const retryUnlessWaiting = (failureCount: number, error: Error | ApiError): boolean =>
+  ceilingLiftsIn(error) === undefined &&
+  refusalOf(error) === undefined &&
+  failureCount < RETRY_ATTEMPTS;
 
 /** A read saves nothing, so only a refused action leaves something unsaved. */
 export type FailedDuring = "read" | "action";

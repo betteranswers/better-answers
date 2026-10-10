@@ -1,7 +1,6 @@
 import { useId, useMemo, useRef, useState, type RefObject } from "react";
 
 import { useAsked } from "@/shared/address-ask.ts";
-import type { ApiError } from "@/shared/api/trpc.ts";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { useLanding, useLandingLine, type Landing } from "@/shared/landing.ts";
@@ -30,7 +29,7 @@ import {
   SEARCH_LIST,
 } from "./knowledge-state.ts";
 import { SEARCH_WORDS as WORDS } from "./knowledge-words.ts";
-import { outcomeOfFailure } from "./refusal.tsx";
+import { failedReadWords } from "./refusal.tsx";
 
 const browse = menuGroupIn(KNOWLEDGE, "browse");
 
@@ -61,8 +60,6 @@ const saidOf = (query: string, matches: Matches, shown: number): string => {
   if (matches.data === undefined) return "";
   return shown === 0 ? WORDS.noMatches(query) : WORDS.matched(query, matches.hasNextPage);
 };
-
-const failedWords = (failure: Error | ApiError) => outcomeOfFailure(failure, "read").words;
 
 /** Takes a line of its own where the kind beside it leaves too little room. */
 const TITLE = "min-w-0 grow basis-48 font-medium break-words";
@@ -176,7 +173,7 @@ function Results(properties: {
       <ListState
         state={{
           kind: "failed",
-          words: failedWords(matches.error),
+          words: failedReadWords(matches.error),
           onRetry: () => {
             void matches.refetch();
           },
@@ -200,7 +197,7 @@ function Results(properties: {
           label: WORDS.more,
           more: matches.hasNextPage,
           loading: matches.isFetchingNextPage,
-          failed: matches.isFetchNextPageError ? failedWords(matches.error) : undefined,
+          failed: matches.isFetchNextPageError ? failedReadWords(matches.error) : undefined,
           onMore: showMore,
           keystroke: KEY.more,
         }}
