@@ -486,7 +486,7 @@ describe("an address the person may not see", () => {
 
       const { router } = await openApp(path);
 
-      expect(heading()).toBe(UNKNOWN_PAGE.heading);
+      await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading });
       expect(router.state.location.pathname).toBe(path);
     });
   }

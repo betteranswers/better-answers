@@ -36,6 +36,20 @@ const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
 const unknownPage = (page: Page) =>
   page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading });
 
+/** In the shell, past the skip link, the not-found's one link is the way home. */
+const homeOfferedInTheShell = async (page: Page, role: Role, audited: () => Promise<void>) => {
+  const home = goHome(HOMES[role]);
+  await expect(unknownPage(page)).toBeVisible();
+  await expect(page.getByRole("navigation", { name: RAIL })).toBeVisible();
+  await expect(page.getByRole("link", { name: home })).toBeVisible();
+  await audited();
+  await skipLinkReachesThePage(page);
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: home })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await landedAtHome(page, role);
+};
+
 const personMenu = (page: Page, role: Role) =>
   page.getByRole("banner").getByRole("button", { name: `A ${role}`, exact: true });
 
@@ -58,15 +72,7 @@ for (const role of ROLES) {
 
     await page.goto("/not-a-page");
 
-    await expect(unknownPage(page)).toBeVisible();
-    await expect(page.getByRole("navigation", { name: RAIL })).toBeVisible();
-    await expect(page.getByRole("link", { name: goHome(home) })).toBeVisible();
-    await passesTheAccessibilityGate();
-    await skipLinkReachesThePage(page);
-    await page.keyboard.press("Tab");
-    await expect(page.getByRole("link", { name: goHome(home) })).toBeFocused();
-    await page.keyboard.press("Enter");
-    await landedAtHome(page, role);
+    await homeOfferedInTheShell(page, role, passesTheAccessibilityGate);
   });
 }
 
@@ -75,21 +81,12 @@ test("offers a Viewer's home from an unknown page, shell kept", async ({
   request,
   passesTheAccessibilityGate,
 }) => {
-  const home = HOMES.Viewer;
   await signedInAs(page, request, "Viewer");
   await landedAtHome(page, "Viewer");
 
   await page.goto("/system/not-a-page");
 
-  await expect(unknownPage(page)).toBeVisible();
-  await expect(page.getByRole("navigation", { name: RAIL })).toBeVisible();
-  await expect(page.getByRole("link", { name: goHome(home) })).toBeVisible();
-  await passesTheAccessibilityGate();
-  await skipLinkReachesThePage(page);
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: goHome(home) })).toBeFocused();
-  await page.keyboard.press("Enter");
-  await landedAtHome(page, "Viewer");
+  await homeOfferedInTheShell(page, "Viewer", passesTheAccessibilityGate);
 });
 
 for (const role of ["Editor", "Viewer"] as const) {

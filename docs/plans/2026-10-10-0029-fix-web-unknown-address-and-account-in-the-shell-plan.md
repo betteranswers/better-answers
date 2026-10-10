@@ -13,7 +13,7 @@ execution: code
 ## Goal Capsule
 
 - **Objective:** a person who reaches an address with no page, or opens their Account page, stays inside the product's frame and can move on without the browser's back button (BA-36's F6, F7, F8).
-- **Means:** the root's not-found draws in the shell when a member is signed in and in the sign-in pages' layout otherwise; every not-found names itself in the band; the way home takes the app's link style; Account draws in the shell when a workspace is open (KTD1 to KTD4).
+- **Means:** the root's not-found draws in the shell when a member is signed in and in the sign-in pages' layout otherwise; every not-found names itself in the band; the way home takes the product's link style; Account draws in the shell when a workspace is open (KTD1 to KTD4).
 - **Authority:** BA-99's acceptance criteria, then `packages/design-system/readme.md` (*Clarity*, *The shell*), then the units.
 - **Stop conditions:** drawing the shell around a page outside the shell's route needs the shell's route itself to change. Or a person in no workspace, or the operator in no workspace, loses their way to Account.
 - **Execution profile:** one pull request, stacked on BA-101's branch (`liam/ba-101-operator-console`) because both touch `apps/web/src/app/router.tsx`. `Fixes BA-99`, `Merge risk: reversible`. The merge is not armed.
@@ -25,7 +25,7 @@ execution: code
 
 ### Summary
 
-An unknown address such as `/nothing-here` draws inside the shell for a signed-in member, with the band naming the page *No page at this address* and a link to the member's home. Signed out, or in no workspace, it draws in the sign-in pages' layout with the logo, the same heading and one way on. Inside the shell, every not-found (a page hidden from the role, an address beneath a page, a console address) names itself in the breadcrumb, and its link looks like the app's other links. Account draws inside the shell for a member with a workspace open, and keeps today's layout for a person in no workspace.
+An unknown address such as `/nothing-here` draws inside the shell for a signed-in member, with the band naming the page *No page at this address* and a link to the member's home. Signed out, or in no workspace, it draws in the sign-in pages' layout with the logo, the same heading and one way on. Inside the shell, every not-found (a page hidden from the role, an address beneath a page, a console address) names itself in the breadcrumb, and its link looks like the product's other links. Account draws inside the shell for a member with a workspace open, and keeps today's layout for a person in no workspace.
 
 ### Problem Frame
 
@@ -38,7 +38,7 @@ BA-36's screen review found three dead ends (`docs/dogfood-reports/2026-10-09-ba
 ### Requirements
 
 - R1. An unknown address, signed in or out, draws a page with the logo and the same layout as its neighbours, saying what is missing and giving one way on.
-- R2. The not-found line inside the shell matches the app's link style, and the band shows where the person is.
+- R2. The not-found line inside the shell matches the product's link style, and the band shows where the person is.
 - R3. `/account` sits in the shell for a member with a workspace open, so they can move on without its foot link. A person in no workspace still reaches it as today.
 - R4. A browser test covers an unknown address signed in and signed out.
 
@@ -58,7 +58,7 @@ BA-36's screen review found three dead ends (`docs/dogfood-reports/2026-10-09-ba
 - KTD1. **The root's not-found branches on the member read.** A new component replaces the bare `UnknownPage` as `rootRoute`'s `notFoundComponent`. A member read that answers draws `WorkspaceFrame` around `UnknownPage`; a refusal draws `AuthPage` around it. A signed-out visitor's way on is *Sign in* (`/sign-in`), the one next action the readme's *Clarity* asks for. Anyone else refused (in no workspace, or a failed read) gets the existing way home (`/`), which the picker routes onward. The read is asked once (`retry: false`, as `memberRefusal` asks it), so nothing draws only while that one request is in flight; a read paused offline draws as a failed read. The failure detour leaves an unauthenticated read alone outside the pending pages, so a signed-out visitor stays on the page. *Sign in* is kept apart from the way home because a signed-out visitor has no home page yet, and the readme asks for a label naming the effect. Chosen over a catch-all route under the shell, which would send a signed-out visitor to sign-in without saying what was missing and would out-match the console's not-found. Governs R1.
 - KTD2. **`Frame` draws a page it is handed in place of the outlet.** `Frame` and `WorkspaceFrame` take an optional `page`, which `ToolbarAndPage` renders instead of `<Outlet />`, with an optional name the shell's keystroke list is titled by (a not-found keeps *this page*, as `home.spec.ts` asserts). That lets a page whose route sits outside the shell draw inside it without moving the route. Governs R1, R3.
 - KTD3. **A not-found names itself through the breadcrumb's last-part slot.** `UnknownPage` gives `UNKNOWN_PAGE.heading` through `useBreadcrumbLastPart`, and `partsOf` answers one current part when no place is open and a last part is given. The slot is the frame's, so the one change covers a hidden page, the shell's and the console's not-found and the root's. `GoHome`'s link becomes the kit's link button (`Button` `variant="link"`, as Account's foot link is), which drops the resting underline. Governs R2.
-- KTD4. **Account draws in the shell when a workspace is open.** `accountRoute.beforeLoad` warms the member read (`memberRefusal`) after the pending-session check, so the page draws its frame without a flash. Only a member read holding data draws `WorkspaceFrame` around Account, titled *Account*; a refusal, or a read asked again on mount, draws Account as today, so a person in no workspace sees no flash. In the shell, Account keeps its one `h1` and takes the shell's page width, names itself in the breadcrumb, registers its keystrokes with the shell (`usePageKeystrokes`, held steady while its keys are unchanged) rather than binding `?` a second time, and drops its foot row: the band's avatar menu holds *Sign out*, and the band and rail are the way on. The rail marks no area. The passkey offer the shell shows above every page does not draw on Account, the page its link opens (`passkeys.spec.ts` asserts it is absent there). Governs R3.
+- KTD4. **Account draws in the shell when a workspace is open.** `accountRoute.beforeLoad` warms the member read (`memberRefusal`) after the pending-session check, so the page draws its frame without a flash. Only a member read holding data draws `WorkspaceFrame` around Account, titled *Account*; a refusal, or a read asked again on mount, draws Account as today, so a person in no workspace sees no flash. In the shell, Account keeps its one `h1` and takes the shell's page width, names itself in the breadcrumb, registers its keystrokes with the shell (`usePageKeystrokes`, held steady while its keys are unchanged) rather than taking `?` a second time, and drops its foot row: the band's avatar menu holds *Sign out*, and the band and rail are the way on. The rail marks no area. The passkey offer the shell shows above every page does not draw on Account, the page its link opens (`passkeys.spec.ts` asserts it is absent there). Governs R3.
 
 ### Risks
 
@@ -79,7 +79,7 @@ BA-36's screen review found three dead ends (`docs/dogfood-reports/2026-10-09-ba
 
 ### U1. The shell draws a page it is handed, and a not-found names itself
 
-- **Goal:** inside the shell, every not-found shows in the breadcrumb and offers home in the app's link style; the frame can draw a page from outside its route.
+- **Goal:** inside the shell, every not-found shows in the breadcrumb and offers home in the product's link style; the frame can draw a page from outside its route.
 - **Requirements:** R2; KTD2, KTD3.
 - **Dependencies:** none.
 - **Files:**

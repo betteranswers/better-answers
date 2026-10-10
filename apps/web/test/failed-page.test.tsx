@@ -157,6 +157,8 @@ describe("a page that throws", () => {
 
     await openApp("/not-a-page");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_PAGE.heading);
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe(
+      UNKNOWN_PAGE.heading,
+    );
   });
 });
