@@ -3566,7 +3566,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.conflict);
       expect(run.lines).toEqual([
-        "import-bundle: REFUSED — another writer moved this workspace's bundle while the import was writing its manifest; nothing was written, so run the import again",
+        "import-bundle: REFUSED — this workspace's bundle could not be moved while the import was writing its manifest, because another writer moved it or holds its lock; nothing was written, so run the import again, and if it is refused the same way a lock was left on refs/heads/main",
       ]);
       expect(await commitsOf(app(), workspaceId)).toEqual([]);
     });

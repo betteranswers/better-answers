@@ -717,7 +717,7 @@ const importWordSaid = (word: Extract<ImportBundleRefusal, string>, email: strin
     case "class-unreadable":
       return `${email} is not an Admin of this workspace, and a bundle landed Restricted is one only an Admin can read back for its second pass; run the import as an Admin`;
     case "stale-precondition":
-      return "another writer moved this workspace's bundle while the import was writing its manifest; nothing was written, so run the import again";
+      return "this workspace's bundle could not be moved while the import was writing its manifest, because another writer moved it or holds its lock; nothing was written, so run the import again, and if it is refused the same way a lock was left on refs/heads/main";
     default:
       return word;
   }
