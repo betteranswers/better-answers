@@ -169,6 +169,24 @@ const readAcross = async (
   return { read: answered(read), wrote };
 };
 
+/** Reads `iri` with every statement holding `marker` failing, as that table's read would. */
+const readFailingAt = (reader: UserPrincipal, iri: ConceptIri, marker: string, failure: Error) =>
+  reading(reader, (principal, tx) =>
+    readingThrough(
+      principal,
+      new Proxy(tx, {
+        get: (target, key) =>
+          key === "query"
+            ? (statement: string, values?: unknown[]) =>
+                statement.includes(marker)
+                  ? Promise.reject(failure)
+                  : target.query(statement, values)
+            : Reflect.get(target, key),
+      }),
+      iri,
+    ),
+  );
+
 describe("the evidence pane", () => {
   it("answers a withheld concept exactly as one nobody minted", async () => {
     const scenario = await arrange();
@@ -678,21 +696,7 @@ describe("a concept's relations", () => {
     const entry = await noteNaming(scenario, []);
     const failure = new Error("the relations read failed");
 
-    const read = await reading(scenario.admin, (reader, tx) =>
-      readingThrough(
-        reader,
-        new Proxy(tx, {
-          get: (target, key) =>
-            key === "query"
-              ? (statement: string, values?: unknown[]) =>
-                  statement.includes("map_edge")
-                    ? Promise.reject(failure)
-                    : target.query(statement, values)
-              : Reflect.get(target, key),
-        }),
-        entry.iri,
-      ),
-    );
+    const read = await readFailingAt(scenario.admin, entry.iri, "map_edge", failure);
 
     expect(read).toEqual({ ok: false, error: failure });
   });
@@ -784,6 +788,17 @@ const edgeSeeded = (
     seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid, toUid, ...overrides }),
   );
 
+/** Expenses, whose body links the board's file beside it, and the board seeded with no edge to it. */
+const expensesNamingTheBoard = async (
+  scenario: Scenario,
+  board: NonNullable<Parameters<SeededConcept>[0]> = {},
+) => ({
+  expenses: await noteAt(scenario, "knowledge/expenses.md", {
+    body: "See [the board](./board.md).",
+  }),
+  board: await indexedAt(scenario, "knowledge/board.md", board),
+});
+
 const linksFor = async (person: UserPrincipal, iri: ConceptIri) =>
   (await readFor(person, iri))?.bodyLinks;
 
@@ -835,13 +850,10 @@ describe("a body's links", () => {
 
   it("answers a group's concept to its members alone", async () => {
     const scenario = await arrange();
-    const board = await groupNamed(db(), scenario, "Board", [scenario.editor]);
-    const expenses = await noteAt(scenario, "knowledge/expenses.md", {
-      body: "See [the board](./board.md).",
-    });
-    const forTheBoard = await indexedAt(scenario, "knowledge/board.md", {
+    const members = await groupNamed(db(), scenario, "Board", [scenario.editor]);
+    const { expenses, board: forTheBoard } = await expensesNamingTheBoard(scenario, {
       audience: "groups",
-      audienceGroups: [board],
+      audienceGroups: [members],
     });
     await edgeSeeded(scenario, expenses.iri, forTheBoard);
 
@@ -993,11 +1005,8 @@ describe("a body's links", () => {
 
   it("answers nothing from another concept's edge", async () => {
     const scenario = await arrange();
-    const expenses = await noteAt(scenario, "knowledge/expenses.md", {
-      body: "See [the board](./board.md).",
-    });
+    const { expenses, board } = await expensesNamingTheBoard(scenario);
     const travel = await noteAt(scenario, "knowledge/travel.md");
-    const board = await indexedAt(scenario, "knowledge/board.md");
     await edgeSeeded(scenario, travel.iri, board);
 
     const before = await linksFor(scenario.viewer, expenses.iri);
@@ -1010,10 +1019,7 @@ describe("a body's links", () => {
 
   it("answers nothing from an edge that is no link", async () => {
     const scenario = await arrange();
-    const expenses = await noteAt(scenario, "knowledge/expenses.md", {
-      body: "See [the board](./board.md).",
-    });
-    const board = await indexedAt(scenario, "knowledge/board.md");
+    const { expenses, board } = await expensesNamingTheBoard(scenario);
     await edgeSeeded(scenario, expenses.iri, board, { label: "DERIVED_FROM" });
 
     expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([]);
@@ -1038,10 +1044,7 @@ describe("a body's links", () => {
 
   it("answers nothing from an edge the reader may not read", async () => {
     const scenario = await arrange();
-    const expenses = await noteAt(scenario, "knowledge/expenses.md", {
-      body: "See [the board](./board.md).",
-    });
-    const board = await indexedAt(scenario, "knowledge/board.md");
+    const { expenses, board } = await expensesNamingTheBoard(scenario);
     await edgeSeeded(scenario, expenses.iri, board, { sensitivity: "Restricted" });
 
     expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([]);
@@ -1055,21 +1058,7 @@ describe("a body's links", () => {
     const expenses = await noteAt(scenario, EXPENSES, { body: TO_THE_COMMITTEE });
     const failure = new Error("the links read failed");
 
-    const read = await reading(scenario.admin, (reader, tx) =>
-      readingThrough(
-        reader,
-        new Proxy(tx, {
-          get: (target, key) =>
-            key === "query"
-              ? (statement: string, values?: unknown[]) =>
-                  statement.includes("t.path")
-                    ? Promise.reject(failure)
-                    : target.query(statement, values)
-              : Reflect.get(target, key),
-        }),
-        expenses.iri,
-      ),
-    );
+    const read = await readFailingAt(scenario.admin, expenses.iri, "t.path", failure);
 
     expect(read).toEqual({ ok: false, error: failure });
   });
