@@ -60,6 +60,7 @@ const aWorkspaceOfHerons = async () => {
 
 const HANDBOOK_TITLE = "The synthetic heron handbook";
 const MINUTES_LABEL = "Warden minutes";
+const MINUTES_TITLE = "Synthetic warden minutes, March";
 
 /** A concept citing an Internal handbook passage and a Restricted one of minutes, with a Viewer. */
 const aConceptCitingRestrictedMinutes = async () => {
@@ -71,7 +72,7 @@ const aConceptCitingRestrictedMinutes = async () => {
     documentLanded(app().database.superuser, workspaceId, shape);
   const handbook = await landed({ title: HANDBOOK_TITLE, text: "Herons nest from March." });
   const minutes = await landed({
-    title: "Synthetic warden minutes, March",
+    title: MINUTES_TITLE,
     text: "The warden rings the herons each spring.",
     sensitivity: "Restricted",
   });
@@ -114,6 +115,7 @@ const aConceptCitingRestrictedMinutes = async () => {
     iri: written.value.iri,
     handbook: handbook.locator,
     minutes: minutes.locator,
+    minutesDocumentId: minutes.documentId,
     viewer,
     admin,
   };
@@ -189,6 +191,19 @@ describe("knowledge.find over tRPC", () => {
     expect(refused).toMatchObject(MALFORMED);
   });
 
+  it("answers a Viewer no match for a Restricted concept", async () => {
+    const { viewer, iriOf } = await aWorkspaceOfHerons();
+    const { api } = await webSignedIn(app(), viewer.email);
+
+    const page = await api.knowledge.find.query({ query: QUERY, limit: 20 });
+
+    expect(page.matches.map((match) => (match.layer === "bundles" ? match.iri : ""))).toEqual(
+      expect.arrayContaining([NESTING, FEEDING, SURVEY].map(iriOf)),
+    );
+    expect(JSON.stringify(page)).not.toContain(iriOf(RINGING));
+    expect(JSON.stringify(page)).not.toContain(RINGING);
+  });
+
   it("answers each concept match's trust words as text", async () => {
     const { workspace } = await aWorkspaceOfHerons();
     const { api } = await webSignedIn(app(), workspace.admin.email);
@@ -254,7 +269,8 @@ describe("knowledge.open over tRPC", () => {
   });
 
   it("carries the pane's access, lead and next words beside evidence", async () => {
-    const { iri, handbook, minutes, viewer, admin } = await aConceptCitingRestrictedMinutes();
+    const { iri, handbook, minutes, minutesDocumentId, viewer, admin } =
+      await aConceptCitingRestrictedMinutes();
 
     const opened = await (await webSignedIn(app(), viewer.email)).api.knowledge.open.query({ iri });
     const seen = await (await webSignedIn(app(), admin.email)).api.knowledge.open.query({ iri });
@@ -270,6 +286,9 @@ describe("knowledge.open over tRPC", () => {
         ],
       },
     });
+    for (const withheld of [minutes, minutesDocumentId, MINUTES_TITLE]) {
+      expect(JSON.stringify(opened)).not.toContain(withheld);
+    }
     expect(seen).toMatchObject({
       concept: {
         access: "included",
@@ -281,6 +300,36 @@ describe("knowledge.open over tRPC", () => {
         ],
       },
     });
+  });
+
+  it("answers a readable passage by its locator", async () => {
+    const { handbook, viewer } = await aConceptCitingRestrictedMinutes();
+    const { api } = await webSignedIn(app(), viewer.email);
+
+    const opened = await api.knowledge.open.query({ locator: handbook });
+
+    expect(opened).toEqual({
+      found: true,
+      passage: {
+        locator: handbook,
+        source: HANDBOOK_TITLE,
+        text: "Herons nest from March.",
+        sensitivity: "Internal",
+      },
+    });
+  });
+
+  it("answers an absent and a withheld passage the same NOT_FOUND", async () => {
+    const { minutes, viewer } = await aConceptCitingRestrictedMinutes();
+    const { api } = await webSignedIn(app(), viewer.email);
+    const absentLocator = "01J6ZZZZZZZZZZZZZZZZZZZZZZ/chars:0-5";
+
+    const withheld = rpcOf(await refusalOfCall(api.knowledge.open.query({ locator: minutes })));
+    const absent = rpcOf(await refusalOfCall(api.knowledge.open.query({ locator: absentLocator })));
+
+    expect(withheld).toMatchObject({ message: "not-found", data: { httpStatus: 404 } });
+    expect([withheld["message"], withheld["data"]]).toEqual([absent["message"], absent["data"]]);
+    expect(JSON.stringify(withheld)).not.toContain(MINUTES_TITLE);
   });
 });
 
