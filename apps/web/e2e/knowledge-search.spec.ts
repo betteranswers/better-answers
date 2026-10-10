@@ -483,24 +483,35 @@ test.describe("the Knowledge Search page", () => {
       await expect(page.getByText(PALLET_PASSAGES[0] ?? "")).toBeVisible();
 
       // As the passage's document withheld or removed since: the next read of the list lacks it.
+      let withheld = 1;
       await page.route(
         isAFind,
-        matchesBecome((matches) => matches.slice(1)),
+        matchesBecome((matches) => matches.slice(withheld)),
       );
       await windowRefocused(page);
 
       await expect(matchesOf(page)).toHaveCount(A_PAGE - 1);
       await expect(heading, "the passage outlived its match").toHaveCount(0);
-      await expect(said(page)).toHaveText(`${WORDS.matched("pallet", true)} ${WORDS.passageLeft}`);
+      const saidItLeft = `${WORDS.matched("pallet", true)} ${WORDS.passageLeft}`;
+      await expect(said(page)).toHaveText(saidItLeft);
       await expect(
         searchRegion(page).getByRole("heading", { name: SEARCH.name }),
         "focus fell to the page with the passage",
       ).toBeFocused();
 
       await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
+      await expect(heading).toBeFocused();
       await expect(searchRegion(page), "the page still says a passage left").not.toContainText(
         WORDS.passageLeft,
       );
+
+      await searchBox(page).focus();
+      withheld = 2;
+      await windowRefocused(page);
+
+      await expect(matchesOf(page)).toHaveCount(A_PAGE - 2);
+      await expect(said(page)).toHaveText(saidItLeft);
+      await expect(searchBox(page), "focus was taken from where the reader put it").toBeFocused();
     });
   }
 
