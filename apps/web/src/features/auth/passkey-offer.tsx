@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
@@ -8,6 +8,8 @@ import { PASSKEY_WORDS } from "./account-words.ts";
 import { passkeysHere, useDismissPasskeyOffer } from "./passkey-hooks.ts";
 import { ADD_A_PASSKEY_BUTTON } from "./passkeys-part.tsx";
 import { useSecondFactorOnce, type SecondFactor } from "./second-factor-hooks.ts";
+
+const ACCOUNT = "/account";
 
 const offered = (held: SecondFactor | undefined): boolean =>
   held !== undefined && held.passkeys.length === 0 && !held.passkeyOfferDismissed;
@@ -20,7 +22,9 @@ type OfferProperties = { readonly onDismissed: () => void };
  */
 export function PasskeyOffer(properties: OfferProperties) {
   const [here] = useState(passkeysHere);
-  return here ? <OfferWhereHeld {...properties} /> : null;
+  // Account is where the offer leads, so it is not offered there again.
+  const onAccount = useRouterState({ select: (state) => state.location.pathname === ACCOUNT });
+  return here && !onAccount ? <OfferWhereHeld {...properties} /> : null;
 }
 
 /** Read only where the browser can use a passkey, so no other browser asks. */
@@ -34,7 +38,7 @@ function OfferWhereHeld(properties: OfferProperties) {
       <Banner className="max-w-page flex-wrap py-2">
         <BannerTitle>{PASSKEY_WORDS.offer}</BannerTitle>
         <BannerAction asChild>
-          <Link to="/account" hash={ADD_A_PASSKEY_BUTTON}>
+          <Link to={ACCOUNT} hash={ADD_A_PASSKEY_BUTTON}>
             {PASSKEY_WORDS.add}
           </Link>
         </BannerAction>

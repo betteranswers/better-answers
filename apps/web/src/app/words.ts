@@ -9,6 +9,7 @@ export const FAILED_PAGE = {
 
 export const UNKNOWN_PAGE = {
   heading: "No page at this address",
+  signIn: "Sign in",
 } as const;
 
 /** The menu beside it is named for the open area, so the rail needs a name apart. */

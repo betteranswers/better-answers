@@ -172,13 +172,16 @@ describe("the shell's regions", () => {
   it("says an unknown address names no page", async () => {
     await openApp("/not-a-page");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_PAGE.heading);
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe(
+      UNKNOWN_PAGE.heading,
+    );
   });
 
   it("sends a reader of unknown role home by the index", async () => {
     await openApp("/not-a-page");
 
-    expect(screen.getByRole("link", { name: goHome(undefined) }).getAttribute("href")).toBe("/");
+    const home = await screen.findByRole("link", { name: goHome(undefined) });
+    expect(home.getAttribute("href")).toBe("/");
   });
 
   it("says an unknown page names no place, rail kept", async () => {

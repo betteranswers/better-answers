@@ -27,6 +27,7 @@ import {
   addMember,
   anAddress,
   clockTheNextKey,
+  crumbOf,
   keyShown,
   keystrokesDismissed,
   keystrokesListed,
@@ -35,6 +36,7 @@ import {
   personMenuOpened,
   provision,
   quoted,
+  railOf,
   refusedDigitsSelected,
   saysItsSentenceNotItsWord,
   signIn,
@@ -322,6 +324,15 @@ test("a set replaced in another tab is refused at Done", async ({ page, context,
     word: "changed-meanwhile",
   });
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
+});
+
+test("a member's Account page sits inside the shell", async ({ page, request }) => {
+  await anEditorOnAccount(page, request);
+
+  await expect(railOf(page)).toBeVisible();
+  await expect(crumbOf(page, ACCOUNT_HEADING)).toBeVisible();
+  await expect(page.getByRole("link", { name: ACCOUNT_WORDS.goOn })).toHaveCount(0);
+  await keystrokesDismissed(page, await keystrokesListed(page, ACCOUNT_HEADING));
 });
 
 test("the operator reaches Account from the console's avatar menu", async ({ page, request }) => {

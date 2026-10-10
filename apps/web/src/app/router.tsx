@@ -15,6 +15,7 @@ import { z } from "zod";
 
 import { AcceptInvitationPage } from "@/features/auth/accept-invitation-page.tsx";
 import { AccountPage } from "@/features/auth/account-page.tsx";
+import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import {
   displayNameDetour,
   signedOutDetour,
@@ -86,7 +87,7 @@ import { WorkspaceFrame } from "./frame.tsx";
 import { MODELS_AND_SPEND_TOOLBAR, ModelsAndSpendPage } from "./pages/models-and-spend-page.tsx";
 import { UnbuiltPage } from "./pages/unbuilt-page.tsx";
 import type { AppClients } from "./providers.tsx";
-import { UnknownPage } from "./unknown-page.tsx";
+import { UnknownAddress, UnknownPage } from "./unknown-page.tsx";
 import { useHidden, useVisibleTree } from "./visible-tree.ts";
 import { ROLE_UNREAD } from "./words.ts";
 
@@ -139,7 +140,7 @@ const confirmedFirst = async (
 
 const rootRoute = createRootRouteWithContext<ShellContext>()({
   component: Outlet,
-  notFoundComponent: () => <UnknownPage />,
+  notFoundComponent: () => <UnknownAddress />,
 });
 
 const signInRoute = createRoute({
@@ -194,15 +195,28 @@ const codesRoute = createRoute({
   },
 });
 
-/** Outside the shell, so a person with no workspace and the operator reach it too. */
+/** Framed once a workspace is open, and decided on arrival: a later read never swaps the page. */
+function AccountWhereHeld(): ReactElement {
+  const framed = accountRoute.useRouteContext({ select: (context) => context.framed });
+
+  return framed ? (
+    <WorkspaceFrame page={{ draw: <AccountPage framed />, name: ACCOUNT_HEADING }} />
+  ) : (
+    <AccountPage />
+  );
+}
+
+/** Outside the shell's route, so a person with no workspace and the operator reach it too. */
 const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account",
-  component: AccountPage,
+  component: AccountWhereHeld,
   beforeLoad: async ({ context, location }) => {
     const elsewhere = await signedOutDetour(context.queryClient, location.href);
     if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
     await confirmedFirst(context, location);
+    await memberRefusal(context.queryClient, context.api);
+    return { framed: roleHeld(context.queryClient, context.api) !== undefined };
   },
 });
 

@@ -65,6 +65,18 @@ const RESTORED = refusing("restore-code-needed", "precondition", {
   rpc: -32_012,
 });
 
+/** Ada is in no workspace, so the Account page draws outside the shell. */
+const FORBIDDEN = refusing("forbidden", "forbidden", {
+  code: "FORBIDDEN",
+  httpStatus: 403,
+  rpc: -32_003,
+});
+
+const answerTo = (name: string, replace: () => unknown, read: () => unknown): unknown => {
+  if (name === "person.replaceRecoveryCodes") return replace();
+  return name === "person.secondFactor" ? { result: { data: read() } } : FORBIDDEN;
+};
+
 /** Ada's api: `replace` answers making codes, and `read` her second factor each time it is read. */
 const adasApi =
   (replace: () => unknown, read: () => unknown) =>
@@ -72,11 +84,7 @@ const adasApi =
     const { pathname } = addressOf(input);
     if (!pathname.startsWith("/trpc/")) return answered(SESSION);
     const names = pathname.replace("/trpc/", "").split(",");
-    return answered(
-      names.map((name) =>
-        name === "person.replaceRecoveryCodes" ? replace() : { result: { data: read() } },
-      ),
-    );
+    return answered(names.map((name) => answerTo(name, replace, read)));
   };
 
 /** The session is held before the page opens: the auth library's own read never settles here. */

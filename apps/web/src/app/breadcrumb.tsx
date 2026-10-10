@@ -34,14 +34,14 @@ const lastOnly = (parts: readonly Part[]): readonly Part[] =>
   parts.map((part, at) => (at === parts.length - 1 ? { ...part, to: undefined } : part));
 
 /**
- * Broadest first. `below` is the open tab, or the name a detail address's page gives: a person's
- * own, so never folded into a part above.
+ * Broadest first. `below` is the open tab or a name a page gives: a person's, never folded into a
+ * part above, or the page's own.
  */
 export const partsOf = (
   open: Place<VisibleArea> | undefined,
   below: string | undefined,
 ): readonly Part[] => {
-  if (open === undefined) return [];
+  if (open === undefined) return below === undefined ? [] : [{ name: below, to: undefined }];
   const beneath: readonly Part[] = below === undefined ? [] : [{ name: below, to: undefined }];
   return lastOnly(
     open.detail === undefined
