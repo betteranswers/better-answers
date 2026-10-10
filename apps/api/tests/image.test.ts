@@ -210,6 +210,7 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
           PROBE_REQUIRED: JSON.stringify([
             "@better-answers/core/kernel",
             "@better-answers/design-system/assets/logo.svg",
+            "@better-answers/design-system/styles.css",
             "@better-answers/schema",
           ]),
           PROBE_COMMANDS: JSON.stringify(["corepack", "npm", "npx", "pnpm"]),
