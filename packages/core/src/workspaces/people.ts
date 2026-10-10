@@ -34,7 +34,7 @@ type ListPeopleInput = z.output<typeof listPeopleInput>;
 
 type WorkspaceNamed = { readonly id: WorkspaceId; readonly name: string };
 
-type WorkspaceHeld = { readonly workspace: WorkspaceNamed; readonly role: Role };
+export type WorkspaceHeld = { readonly workspace: WorkspaceNamed; readonly role: Role };
 
 type PersonListed = {
   readonly id: UserId;
@@ -81,7 +81,8 @@ const pageOf = (tx: Tx, pattern: string, input: ListPeopleInput) =>
     [pattern, input.limit, input.offset],
   );
 
-const workspacesOf = async (
+/** Keyed by person id, each list in name order; a person who holds none has no entry. */
+export const workspacesOf = async (
   tx: Tx,
   personIds: readonly string[],
 ): Promise<ReadonlyMap<string, readonly WorkspaceHeld[]>> => {

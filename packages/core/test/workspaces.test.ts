@@ -12,6 +12,7 @@ import {
   type PlatformPrincipal,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
+import { endEverySignInAndTokenHere } from "../src/members/index.ts";
 import {
   openPostgres,
   type PostgresDoor,
@@ -28,6 +29,7 @@ import {
   personIdByEmail,
   provisionWorkspace,
   readMember,
+  readWorkspacesHeld,
   renameWorkspace,
   restoreSignIn,
   endEverySignInAndToken,
@@ -39,6 +41,7 @@ import {
   workspacesHeldBy,
 } from "../src/workspaces/index.ts";
 import { endedGrants, issuedCredentialsFor, OAUTH_CLIENT_ID } from "./identity-rows.ts";
+import { heldAs } from "./members-suite.ts";
 import {
   asANewOperator,
   bootstrap,
@@ -63,6 +66,12 @@ const db = postgresForSuite();
 const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const seedUser = (): Promise<string> => seedPerson(db().pool);
+
+/** The api's own principal for a read on the session's person. */
+const identity: PlatformPrincipal = {
+  kind: "platform",
+  actorId: "process:better-answers-identity",
+};
 
 const partitionExists = async (workspaceId: string): Promise<boolean> => {
   const found = await db().pool.query(
@@ -865,6 +874,96 @@ describe("the workspaces a person holds", () => {
   });
 });
 
+describe("a person's workspaces, each with their role there", () => {
+  const aPerson = async () => {
+    const email = addressOf("pat");
+    return { email, personId: await seedPerson(db().pool, { email }) };
+  };
+
+  /** A new workspace under its own Admin, which the person holding `email` joins at `role`. */
+  const joinedAs = async (name: string, email: string, role: "Admin" | "Editor" | "Viewer") => {
+    const workspace = await provisionedWorkspace(db(), name);
+    const added = await addMember(bootstrap, workspace.door, {
+      workspaceId: workspace.workspaceId,
+      email,
+      role,
+    });
+    expect(added.ok).toBe(true);
+    return workspace;
+  };
+
+  it("answers each workspace with its role, in name order", async () => {
+    const door = openPostgres(db().runtimePool);
+    const { email, personId } = await aPerson();
+    const beta = await joinedAs("Beta", email, "Admin");
+    const acme = await joinedAs("Acme", email, "Viewer");
+
+    expect(await readWorkspacesHeld(identity, door, { personId })).toEqual({
+      ok: true,
+      value: [
+        { workspace: { id: acme.workspaceId, name: "Acme" }, role: "Viewer" },
+        { workspace: { id: beta.workspaceId, name: "Beta" }, role: "Admin" },
+      ],
+    });
+  });
+
+  it("leaves out another person's workspace", async () => {
+    const door = openPostgres(db().runtimePool);
+    await provisionedWorkspace(db(), "Gamma");
+    const { email, personId } = await aPerson();
+    const theirs = await joinedAs("Delta", email, "Viewer");
+
+    const held = await readWorkspacesHeld(identity, door, { personId });
+
+    expect(held).toEqual({
+      ok: true,
+      value: [{ workspace: { id: theirs.workspaceId, name: "Delta" }, role: "Viewer" }],
+    });
+  });
+
+  it("answers a person who holds none an empty list", async () => {
+    const door = openPostgres(db().runtimePool);
+
+    expect(await readWorkspacesHeld(identity, door, { personId: await seedUser() })).toEqual({
+      ok: true,
+      value: [],
+    });
+  });
+
+  it("refuses a malformed person id before the statement", async () => {
+    const door = openPostgres(db().runtimePool);
+
+    expect(await readWorkspacesHeld(identity, door, { personId: "' OR true --" })).toEqual({
+      ok: false,
+      error: "malformed",
+    });
+  });
+
+  it("refuses the platform acting for a purpose it never names", async () => {
+    const door = openPostgres(db().runtimePool);
+
+    expect(await readWorkspacesHeld(bootstrap, door, { personId: await seedUser() })).toEqual({
+      ok: false,
+      error: "role-forbids",
+    });
+  });
+
+  it("still lists a workspace where the member's sign-ins were ended", async () => {
+    const door = openPostgres(db().runtimePool);
+    const { email, personId } = await aPerson();
+    const acme = await joinedAs("Acme", email, "Editor");
+    const ended = await heldAs(acme, acme.adminUserId, (admin, tx) =>
+      endEverySignInAndTokenHere(admin, tx, { personId: personIdOf(personId), at: new Date() }),
+    );
+    expect(ended.ok).toBe(true);
+
+    expect(await readWorkspacesHeld(identity, door, { personId })).toEqual({
+      ok: true,
+      value: [{ workspace: { id: acme.workspaceId, name: "Acme" }, role: "Editor" }],
+    });
+  });
+});
+
 describe("what the slice answers when the store cannot be reached", () => {
   const at = new Date("2026-09-05T12:00:00Z");
 
@@ -877,6 +976,7 @@ describe("what the slice answers when the store cannot be reached", () => {
         await revokeWorkspaceTokens(bootstrap, door, { workspaceId: ulid(), userId, at }),
       ],
       ["workspacesHeldBy", await workspacesHeldBy(bootstrap, door, userId)],
+      ["readWorkspacesHeld", await readWorkspacesHeld(identity, door, { personId: userId })],
       ["workspaceIdByShortName", await workspaceIdByShortName(bootstrap, door, "acme")],
       ["personIdByEmail", await personIdByEmail(bootstrap, door, "acme@example.invalid")],
       [
@@ -948,6 +1048,10 @@ describe("what the slice answers when the store cannot be reached", () => {
       await revokeWorkspaceTokens(bootstrap, door, { workspaceId: "not-a-ulid", userId: "x", at }),
     ).toEqual({ ok: false, error: "malformed" });
     expect(await workspacesHeldBy(bootstrap, door, "' OR true --")).toEqual({
+      ok: false,
+      error: "malformed",
+    });
+    expect(await readWorkspacesHeld(identity, door, { personId: "' OR true --" })).toEqual({
       ok: false,
       error: "malformed",
     });

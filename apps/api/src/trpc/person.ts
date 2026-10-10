@@ -13,6 +13,7 @@ import {
   acknowledgeRecoveryCodesInput,
   dismissPasskeyOffer,
   readSecondFactor,
+  readWorkspacesHeld,
   removeAuthenticator,
   removePasskey,
   removePasskeyInput,
@@ -93,6 +94,13 @@ export const personRouter = router({
         personId: ctx.personId,
         now: ctx.clock.now(),
       }),
+    ),
+  ),
+  workspaces: personProcedure.query(({ ctx }) =>
+    crossing(
+      ctx,
+      readWorkspacesHeld.name,
+      readWorkspacesHeld(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
     ),
   ),
   acceptInvitation: personProcedure
