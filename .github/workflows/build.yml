@@ -75,7 +75,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       # setup-uv saves nothing in a merge group, so without this main's entry is the nightly
       # mutation run's, a lockfile behind until then.
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         id: uv
         with:
           version-file: apps/worker/.tool-versions
@@ -180,7 +180,7 @@ jobs:
           package-manager-cache: false
       - if: matrix.probe-toolchain == 'node'
         run: pnpm install --frozen-lockfile --filter @better-answers/api...
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         if: matrix.probe-toolchain == 'python'
         with:
           version-file: apps/worker/.tool-versions
