@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Ten things live here.
+Eleven things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -363,6 +363,27 @@ The map is read from the tree the script runs in, so a throwaway tree carries it
 that read no file, or a map with no table, exits 2. `test/table-ownership-scan.test.ts` runs
 the script through the runner over a failing and a passing tree for each direction, a CTE
 named like a table, a file under no owner, and an owner nested in another's directory.
+
+## `src/face-admission.ts` — the face reader
+
+Holds that a face admits whoever it takes. The lint `action-admits-before-await` holds the
+order of an admission and that a declaration is passed to `admit`; it cannot see a face function
+with no declaration at all, and whether a function is on a face is a fact about two files.
+`facesAdmittingNobody` is handed a tree of sources and the face directories. It reads what each
+face's `index.ts` exports, whether declared there, re-exported by name or re-exported whole, and
+names each function that takes a person and passes no declaration to `admit`.
+
+A parameter takes a person when its annotation names `UserPrincipal`, `Principal` or
+`AdmittedOf<…>`, alone or in a union or an intersection. The kernel's narrower names are left
+alone: only `admit` makes an `AdminUserPrincipal`, and the platform and the operator hold no role.
+
+**What it cannot see.** A principal behind a type alias or inside an object parameter, a face
+function built by a wrapper call, and a face that calls `admit` and then carries on with the
+principal it was handed. A re-export from another directory is left to that directory's face.
+
+`packages/core/test/face-admission.test.ts` runs it over `packages/core/src` and compares what it
+names with the steps that suite lists, both ways. `test/face-admission.test.ts` holds each
+condition over sources written in the test.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 

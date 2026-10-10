@@ -275,6 +275,8 @@ Before an action opens a transaction or reads a row, it judges whether the princ
 
 It refuses in a word of the forbidden or unauthenticated class. A step takes the principal its action admitted and judges none.
 
+Declare what a face admits even where every role may ask. A test over each face names a function that takes a person and passes no declaration to `admit`, and a step a face exports is listed there with the action that admits for it.
+
 ## Audit
 
 ### Write an action and its audit event in one transaction
