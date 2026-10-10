@@ -604,6 +604,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
     expect(run.lines.join("\n")).toContain("REFUSED — malformed");
   });
 
+  it("says which runs exit 1 whatever word they name", async () => {
+    const run = await ops(app(), ["help"]);
+
+    expect(run.lines.join("\n")).toContain(
+      "a run that names the file or commit it stopped at exits 1, whatever word it names: import-bundle's unsound tree and stopped import, reconcile-watermark's stopped replay",
+    );
+  });
+
   it("gives each class its own code, telling refusals apart", () => {
     const codes = Object.values(EXIT_OF_CLASS);
 
@@ -3514,7 +3522,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const run = await importing(app(), workspaceId, viewer.email);
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(EXIT_OF_CLASS.forbidden);
       expect(run.lines).toEqual([
         `import-bundle: REFUSED — ${viewer.email} is a Viewer of this workspace; the import runs as an Admin or an Editor`,
       ]);
@@ -3528,7 +3536,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         flags: ["--sensitivity", "Restricted"],
       });
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(EXIT_OF_CLASS.forbidden);
       expect(run.lines).toEqual([
         `import-bundle: REFUSED — ${MONA} is not an Admin of this workspace, and a bundle landed Restricted is one only an Admin can read back for its second pass; run the import as an Admin`,
       ]);
