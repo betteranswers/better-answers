@@ -93,10 +93,10 @@ const drawAFieldWithNoEdgeOnATint = (): void => {
   document.querySelector("main")?.append(tint);
 };
 
-/** Edgeless fields in a padded box with a strong border of its own: a layout's edge, not a field's. */
+/** Edgeless fields in a box whose strong border stands a grid step off them: a layout's edge, not a field's. */
 const drawEdgelessFieldsInABorderedBox = (): void => {
   const box = document.createElement("div");
-  box.style.cssText = "padding: 24px; border: 1px solid var(--text-primary)";
+  box.style.cssText = "padding: 8px; border: 1px solid var(--text-primary)";
   for (const which of ["first", "second"]) {
     const field = document.createElement("input");
     field.setAttribute("aria-label", `The ${which} field nobody can find in a box`);
@@ -123,9 +123,9 @@ const drawAFieldOnItsRowsRule = (): void => {
  * A wordless checkbox, dimmed with its box: axe refuses a dimmed field by its words, so only a
  * wordless control shows the edge check alone.
  */
-const drawACheckboxInADimmedBox = (): void => {
+const drawAWordlessCheckbox = (dimmedTo: number): void => {
   const box = document.createElement("div");
-  box.style.opacity = "0.3";
+  box.style.opacity = String(dimmedTo);
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
   checkbox.setAttribute("aria-label", "A checkbox dimmed with its box");
@@ -227,8 +227,13 @@ test("finds a field by the rule its row draws", async ({ page }) => {
   await page.evaluate(drawAFieldOnItsRowsRule);
 });
 
+test("finds a wordless checkbox by its edge at full strength", async ({ page }) => {
+  await theSignInPage(page);
+  await page.evaluate(drawAWordlessCheckbox, 1);
+});
+
 test("refuses a checkbox whose edge is dimmed with its box", async ({ page }) => {
   test.fail();
   await theSignInPage(page);
-  await page.evaluate(drawACheckboxInADimmedBox);
+  await page.evaluate(drawAWordlessCheckbox, 0.3);
 });

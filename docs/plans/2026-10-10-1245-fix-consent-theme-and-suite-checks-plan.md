@@ -118,7 +118,8 @@ BA-120:
 - **Patterns to follow:** `drawAFieldWithNoEdgeOnATint` and its test in `accessibility-gate.spec.ts`.
 - **Execution note:** test first.
 - **Test scenarios:**
-  - Refuses two edgeless fields in a padded box whose own border is strong: `test.fail()`.
+  - Refuses two edgeless fields in a box whose strong border stands 9px off them: `test.fail()`.
+  - Passes the wordless checkbox of the next case at full strength, so that case fails by its dimming alone.
   - Refuses a wordless checkbox with a control's true edge inside a box dimmed to a third: `test.fail()`. Axe already refuses a dimmed field by its words, so a field would not show the edge check alone.
   - Passes an edgeless field whose row draws a strong rule a few pixels under it, as Jump to's does.
   - Existing: every spec still passes the gate, `jump-to.spec.ts` and `audit-log.spec.ts` among them.

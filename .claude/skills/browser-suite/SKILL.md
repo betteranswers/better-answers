@@ -122,10 +122,11 @@ Knowledge one from `apps/api/tests/harness-knowledge.ts`:
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own action and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* page |
 | `seedConcepts` | Concepts a named Admin writes in order through the concepts slice's own write, so each is in the repository, the index and the map as a member's write leaves it. Each takes a kind and a sensitivity, links to concepts earlier in the list, and sources whose passages each get a citation mark. A trust tier other than `unverified` is a verification row written straight to the store, because the slice has no verify action. A `"groups"` audience is the Admin's own override to one group holding the members `groupMemberIds` names, and nobody outside that group reads the concept, its Admin included. It answers each concept's IRI, path and cited documents |
 
-A seed the harness cannot write answers 400 and writes nothing. A body or a row that a schema
-refuses names each field and its rule, and a write that trips a constraint names the constraint.
-The action's failure carries that answer, so the reason is read there and not in the server's log.
-Any other fault of the harness stays a 500.
+A seed the harness cannot write answers 400. A body or a row that a schema refuses names each
+field and its rule, and a write that trips a constraint names the constraint. The action's failure
+carries that answer, so the reason is read there and not in the server's log. A body is checked
+before anything is written, and `seedConnectedSources` writes in one transaction, so a refused one
+leaves nothing behind. Any other fault of the harness stays a 500.
 
 More helpers in the same module drive the browser rather than the harness:
 

@@ -141,7 +141,7 @@ const whyNotWritten = (error: Error) => {
     };
   }
   if (error instanceof DatabaseError && error.constraint !== undefined) {
-    return { constraint: error.constraint, said: error.message };
+    return { constraint: error.constraint, said: error.message, detail: error.detail };
   }
   return undefined;
 };

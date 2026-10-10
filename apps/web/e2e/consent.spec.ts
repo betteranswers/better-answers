@@ -36,11 +36,13 @@ const themeOf = (page: Page) => page.evaluate(() => document.documentElement.dat
 const pagePainted = (page: Page) =>
   page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
-const paintsTheDarkPage = async (page: Page, light: string): Promise<void> => {
+/** Answers the colour painted. A token nothing declares paints transparent on both sides of the comparison. */
+const paintsTheDarkPage = async (page: Page): Promise<string> => {
   expect(await themeOf(page), "the page ignored the theme kept").toBe("dark");
   const painted = await pagePainted(page);
+  expect(painted, "the page's token resolves in dark").not.toBe("rgba(0, 0, 0, 0)");
   expect(painted).toBe(await tokenPainted(page, "--surface-page", "background-color"));
-  expect(painted, "the dark theme painted the light page").not.toBe(light);
+  return painted;
 };
 
 /** A new workspace's Admin, signed in and on the consent page Claude asked for. */
@@ -160,7 +162,7 @@ test("draws consent, then its refusal, in the dark theme kept", async ({
   await page.reload();
 
   await expect(consentHeading(page)).toBeVisible();
-  await paintsTheDarkPage(page, light);
+  expect(await paintsTheDarkPage(page), "dark painted the light page").not.toBe(light);
   await expect(page.locator("script[src]"), "the consent page loaded the SPA").toHaveCount(0);
   await passesTheAccessibilityGate();
 
@@ -168,7 +170,7 @@ test("draws consent, then its refusal, in the dark theme kept", async ({
   await page.getByRole("button", { name: "Connect" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
-  await paintsTheDarkPage(page, light);
+  expect(await paintsTheDarkPage(page), "dark painted the light page").not.toBe(light);
 });
 
 test("follows a dark device on consent when nothing is kept", async ({
@@ -204,10 +206,7 @@ test("draws a cross-site refusal in the dark theme kept", async ({ page, baseURL
   await expect(
     page.getByRole("heading", { level: 1, name: "Nothing was connected" }),
   ).toBeVisible();
-  expect(await themeOf(page), "the refusal ignored the theme kept").toBe("dark");
-  expect(await pagePainted(page)).toBe(
-    await tokenPainted(page, "--surface-page", "background-color"),
-  );
+  await paintsTheDarkPage(page);
 });
 
 test("asks consent again only when the host asks for it", async ({
