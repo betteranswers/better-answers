@@ -11,12 +11,14 @@ import {
   catchClaudesRedirect,
   CLAUDES_REDIRECT_URI,
   claudesAuthorizeUrl,
+  drawnMarks,
   landedAtHome,
   person,
   provision,
   endEverySignInAndToken,
   signIn,
   signInHeading,
+  tokenPainted,
 } from "./harness.ts";
 
 const landedAt = (page: Page): URL => new URL(page.url());
@@ -59,7 +61,7 @@ test("carries sign-in through consent to Claude's code on one origin", async ({
   await expect(page.getByRole("navigation", { name: RAIL })).toHaveCount(0);
 
   await expect(page.getByText(`Claude will act as you, at ${workspace.name}.`)).toBeVisible();
-  await expect(page.getByText("Read what you can see of the company's knowledge")).toBeVisible();
+  await expect(page.getByText("Read what you can see of the company’s knowledge")).toBeVisible();
   await expect(page.getByText("Stay connected until you disconnect it")).toBeVisible();
   await expect(page.getByText("hosted at claude.ai")).toBeVisible();
 
@@ -69,6 +71,51 @@ test("carries sign-in through consent to Claude's code on one origin", async ({
   expect(callback.searchParams.get("state")).toBe("state-from-the-host");
   expect(callback.searchParams.get("iss")).toBe(origin);
   expect(callback.searchParams.get("error")).toBeNull();
+});
+
+test("draws consent in the sign-in pages' card, faces and tokens", async ({
+  page,
+  request,
+  baseURL,
+}) => {
+  const email = anAddress("drawn");
+  await provision(request, { name: "Drawn Ltd", adminEmail: email });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent" }));
+  await expect(consentHeading(page)).toBeVisible();
+
+  expect(await drawnMarks(page), "the card stands for its primary button").toEqual(["card"]);
+  const geistLoaded = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return (
+      document.fonts.check('16px "Geist Variable"') &&
+      document.fonts.check('16px "Geist Mono Variable"')
+    );
+  });
+  expect(geistLoaded, "the api serves both faces").toBe(true);
+  await expect(consentHeading(page)).toHaveCSS("font-family", /^"Geist Variable"/);
+
+  const connect = page.getByRole("button", { name: "Connect" });
+  const fill = await tokenPainted(page, "--control-primary-bg", "background-color");
+  expect(fill, "the primary's token resolves").not.toBe("rgba(0, 0, 0, 0)");
+  await expect(connect).toHaveCSS("background-color", fill);
+  await expect(connect).toHaveCSS("border-radius", "0px");
+
+  const cancel = page.getByRole("button", { name: "Cancel" });
+  await expect(cancel).toHaveAttribute("data-variant", "outline");
+  await expect(cancel).toHaveCSS("border-top-width", "1px");
+
+  await page.keyboard.press("Tab");
+  await expect(connect).toBeFocused();
+  const ring = await tokenPainted(page, "--focus-ring", "box-shadow");
+  await expect(connect).toHaveCSS("box-shadow", ring);
+
+  await page.setViewportSize({ width: 320, height: 720 });
+  const sideways = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(sideways, "the page scrolls sideways at 320px").toBe(0);
 });
 
 test("asks consent again only when the host asks for it", async ({
