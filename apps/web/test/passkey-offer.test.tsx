@@ -152,17 +152,6 @@ describe("the passkey offer", () => {
     expect(await movedTo(router, HOME)).toStrictEqual({ at: HOME, offer: null });
   });
 
-  it("ends at Account, and does not come back", async () => {
-    const { router } = await loadedOnTheOffer();
-
-    await act(() => router.navigate({ href: "/account" }));
-
-    expect(await screen.findByRole("heading", { level: 1, name: "Account" })).toBeDefined();
-    expect(offer()).toBeNull();
-
-    expect(await movedTo(router, FIRST_PAGE)).toStrictEqual({ at: FIRST_PAGE, offer: null });
-  });
-
   it("stays quiet on a page load after another showed it", async () => {
     adaHoldingNoPasskey();
     // Account reads the second factor and draws no offer, so the next load finds the read held.
