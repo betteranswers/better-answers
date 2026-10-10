@@ -10,11 +10,11 @@ import {
 } from "@/features/auth/account-words.ts";
 import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { NAMES_WAITING_WORDS, WORKSPACES_WORDS } from "@/features/console/list-words.ts";
+import { WORKSPACES_WORDS } from "@/features/console/list-words.ts";
 import { WORKSPACES_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { CONSOLE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
+import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 import { CLEAR_WORDS, PRODUCT_NAME } from "@/shared/words.ts";
 
@@ -43,6 +43,7 @@ import {
   switcherOf,
   withAnAuthenticator,
 } from "./harness.ts";
+import { refusedFromNowOn } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -114,44 +115,6 @@ const anAdmin = async (page: Page, api: APIRequestContext, workspaceName: string
   await signedInAtHome(page, api, email);
   return workspace;
 };
-
-/** The two lists a search narrows in the browser, each with the read behind it. */
-const NARROWED_LISTS = [
-  { path: EVERY_WORKSPACE, words: WORKSPACES_WORDS, read: "console.workspaces.list" },
-  {
-    path: pageNamed(menuGroupIn(CONSOLE, "people"), "Names waiting").path,
-    words: NAMES_WAITING_WORDS,
-    read: "console.people.namesWaiting",
-  },
-];
-
-/** The api's refusal of a console read for want of the mark, as a batch carries one answer back. */
-const WITHOUT_THE_MARK = {
-  error: {
-    message: NOT_THE_OPERATOR,
-    code: -32_003,
-    data: {
-      code: "FORBIDDEN",
-      httpStatus: 403,
-      refusal: { word: NOT_THE_OPERATOR, class: "forbidden" },
-    },
-  },
-};
-
-/** The batch's other answers stay the api's own: a refused standing would close the whole console. */
-const refusedFromNowOn = (page: Page, read: string) =>
-  page.route(
-    (url) => url.pathname.includes(read),
-    async (route) => {
-      const answered = await route.fetch();
-      const reads = new URL(route.request().url()).pathname.replace("/trpc/", "").split(",");
-      const answers: readonly unknown[] = await answered.json();
-      await route.fulfill({
-        response: answered,
-        json: answers.map((answer, at) => (reads[at] === read ? WITHOUT_THE_MARK : answer)),
-      });
-    },
-  );
 
 test.describe("the way into the console", () => {
   test("offers the operator the console from the workspace switcher", async ({
@@ -427,6 +390,29 @@ test.describe("the console's Workspaces page", () => {
     await expect(listOf(page).getByRole("table")).toHaveCount(0);
   });
 
+  test("keeps Every workspace's search and focus through a refused re-read", async ({
+    page,
+    context,
+    request,
+  }) => {
+    await theOperator(page, request, "Colne Pressings");
+    await page.goto(EVERY_WORKSPACE);
+    await expect(listOf(page).getByRole("table")).toBeVisible();
+    await searchOf(page).fill("colne");
+    await expect(searchOf(page)).toBeFocused();
+
+    await refusedFromNowOn(page, "console.workspaces.list");
+    // The query library reads every list again as the network comes back.
+    await context.setOffline(true);
+    await context.setOffline(false);
+
+    await expect(listOf(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
+    await expect(listOf(page).getByRole("table")).toHaveCount(0);
+    await expect(searchOf(page)).toBeVisible();
+    await expect(searchOf(page)).toBeFocused();
+    await expect(searchOf(page)).toHaveValue("colne");
+  });
+
   test("closes the console on entry once the mark is cleared", async ({ page, request }) => {
     const workspace = await theOperator(page, request, "Rossendale Forge");
     // Offered from the standing read before the mark was cleared.
@@ -574,33 +560,4 @@ test.describe("the console's Workspaces page", () => {
     await expect(more).toHaveAttribute("aria-expanded", "true");
     await expect(ours.getByText(workspace.workspaceId, { exact: true })).toBeVisible();
   });
-});
-
-test.describe("a console list read again where it stands", () => {
-  for (const { path, words, read } of NARROWED_LISTS) {
-    test(`keeps ${words.heading}'s search and focus through a refused re-read`, async ({
-      page,
-      context,
-      request,
-    }) => {
-      await theOperator(page, request, "Colne Pressings");
-      await page.goto(path);
-      const list = page.getByRole("region", { name: words.heading });
-      const search = list.getByRole("searchbox", { name: words.search });
-      await expect(list.getByRole("table")).toBeVisible();
-      await search.fill("colne");
-      await expect(search).toBeFocused();
-
-      await refusedFromNowOn(page, read);
-      // The query library reads every list again as the network comes back.
-      await context.setOffline(true);
-      await context.setOffline(false);
-
-      await expect(list).toContainText(sentenceOf(ONLY_THE_OPERATOR));
-      await expect(list.getByRole("table")).toHaveCount(0);
-      await expect(search).toBeVisible();
-      await expect(search).toBeFocused();
-      await expect(search).toHaveValue("colne");
-    });
-  }
 });
