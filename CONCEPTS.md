@@ -1023,6 +1023,14 @@ reference labelled by that source's id.
 
 Never a link: it opens the source beside the claim, and a footnote naming no source is not one.
 
+### evidence panel
+
+_Internal._ where a *citation*'s source opens: beside the page where that leaves the page's own
+content in view, and otherwise beneath the claim or the *match* that opened it.
+
+The page behind it stays live and in the keyboard's order. Choosing what opened it again returns
+to it, and closing it returns the reader to what opened it.
+
 ### footnote
 
 The mark in a write-up's prose that ties one claim to one include: a footnote reference labelled
@@ -2232,5 +2240,7 @@ here lands one.
   never a page.
 - A *menu group* and a *group* are distinct: a menu group heads pages in the menu, and a group is
   one of members.
+- The *evidence pane* and the *evidence panel* are distinct: the pane lists a concept's sources and
+  the reader's access to them, and the panel is where one source opens beside its claim.
 - *Tenant* and *workspace* name one boundary: a page says *workspace*, and *tenant* is the same
   boundary said from the platform's side, never a second concept.

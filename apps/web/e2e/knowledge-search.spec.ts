@@ -276,7 +276,7 @@ test.describe("the Knowledge Search page", () => {
     await expect(opener).toBeFocused();
   });
 
-  test("puts the open panel in tab order after its opener", async ({
+  test("hands Tab from the open panel back to its opener", async ({
     page,
     request,
     passesTheAccessibilityGate,
