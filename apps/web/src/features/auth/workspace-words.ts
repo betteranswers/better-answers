@@ -10,6 +10,10 @@ export const PICKER_WORDS = {
   tryAgain: "Try again",
 } as const;
 
+export const PICKER_ACTIONS = {
+  toWorkspaces: "Go to your workspaces",
+} as const;
+
 export const NO_WORKSPACE_HEADING = "No workspace yet";
 
 /** Apart from the page's JSX, so the browser suite reads the words the no-workspace page shows. */

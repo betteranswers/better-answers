@@ -1,7 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState, type Ref } from "react";
 
-import { KeystrokesAction, type Keystroke } from "@/shared/keystrokes.tsx";
+import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { Button } from "@/shared/ui/button.tsx";
 
 import { ActionButton } from "./account-sections.tsx";
 import {
@@ -147,10 +148,10 @@ const useOnArrival = (run: () => void) => {
   }, []);
 };
 
+/** Listed open or closed: closing the authenticator is the way back to the passkey. */
 const keystrokesOf = (ready: boolean, open: boolean, keyShown: boolean): readonly Keystroke[] => {
   if (!ready) return [];
-  if (!open) return [SET_UP_INSTEAD];
-  return keyShown ? [COPY_KEY] : [];
+  return open && keyShown ? [SET_UP_INSTEAD, COPY_KEY] : [SET_UP_INSTEAD];
 };
 
 /** The authenticator's disclosure and its start live here, so the keystrokes list follows them. */
@@ -184,7 +185,43 @@ const useSetup = (standing: Standing | undefined, onNotGranted: () => void) => {
 
 type Setup = ReturnType<typeof useSetup>;
 
-/** A passkey first, where one can be made; the authenticator behind its disclosure. */
+/**
+ * Its keystroke hides the authenticator as well as showing it. Focusable while a setup finishes,
+ * so focus never drops as it waits.
+ */
+function AuthenticatorInstead(properties: {
+  readonly setup: Setup;
+  readonly controls: string;
+  readonly unavailable: boolean;
+  readonly buttonRef: Ref<HTMLButtonElement>;
+}) {
+  const { setup, controls, unavailable, buttonRef } = properties;
+  const toggle = () => {
+    if (!unavailable) setup.toggle();
+  };
+  useKeystroke(SET_UP_INSTEAD, toggle);
+
+  return (
+    <Button
+      ref={buttonRef}
+      type="button"
+      variant="outline"
+      className="mt-6 aria-disabled:opacity-50"
+      aria-disabled={unavailable}
+      aria-expanded={setup.open}
+      aria-controls={setup.open ? controls : undefined}
+      aria-keyshortcuts={SET_UP_INSTEAD.key}
+      onClick={toggle}
+    >
+      {SETUP_WORDS.authenticatorInstead}
+    </Button>
+  );
+}
+
+/**
+ * One choice: a passkey first, where one can be made, and the authenticator behind its disclosure,
+ * which takes the passkey's place while open.
+ */
 function SetupWays(properties: {
   readonly setup: Setup;
   readonly onCodes: (codes: readonly string[], madeAt: string) => void;
@@ -215,8 +252,9 @@ function SetupWays(properties: {
 
   return (
     <>
+      {/* Hidden, not unmounted: the name typed is kept, and focus stays on the button that hid it. */}
       {here ? (
-        <div className="mt-6">
+        <div className="mt-6" hidden={setup.open}>
           <p>{SETUP_WORDS.passkey}</p>
           <AddAPasskey
             id={passkeyId}
@@ -228,15 +266,11 @@ function SetupWays(properties: {
           />
         </div>
       ) : null}
-      <ActionButton
-        actionRef={here ? null : first}
+      <AuthenticatorInstead
+        setup={setup}
+        controls={setupId}
         unavailable={finishing}
-        label={SETUP_WORDS.authenticatorInstead}
-        className="mt-6"
-        expanded={setup.open}
-        controls={setup.open ? setupId : undefined}
-        keystroke={SET_UP_INSTEAD}
-        onAction={setup.toggle}
+        buttonRef={here ? null : first}
       />
       {setup.open ? (
         <AuthenticatorSetup

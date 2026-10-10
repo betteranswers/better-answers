@@ -10,6 +10,7 @@ import {
   ACTION_LANDED,
   AUTHENTICATOR_WORDS,
   codesLeft,
+  PASSKEY_WORDS,
   RECOVERY_CODE_WORDS,
 } from "@/features/auth/account-words.ts";
 import {
@@ -17,6 +18,7 @@ import {
   SAID_OF_SECOND_FACTOR,
   SETUP_CODE_WRONG,
 } from "@/features/auth/refusal-words.ts";
+import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, HOMES } from "@/shared/navigation.ts";
@@ -40,6 +42,7 @@ import {
   refusedDigitsSelected,
   saysItsSentenceNotItsWord,
   signIn,
+  signInByEmail,
   signedInAtHome,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
@@ -372,4 +375,75 @@ test("a signed-out visitor signs in and lands back on Account", async ({ page, r
   const listed = await keystrokesListed(page, ACCOUNT_HEADING);
   await expect(listed).toContainText(AUTHENTICATOR_WORDS.setUp);
   await keystrokesDismissed(page, listed);
+});
+
+const passkeyName = (page: Page) => page.getByLabel(PASSKEY_WORDS.nameField);
+
+const authenticatorInstead = (page: Page) =>
+  page.getByRole("button", { name: SETUP_WORDS.authenticatorInstead });
+
+/** Each accent-filled button a person can see, in the order the page reads. */
+const primaries = (page: Page) =>
+  page.getByRole("button").and(page.locator('[data-variant="default"]'));
+
+/** An Admin holding no factor, whose sign-in leaves them on the setup page's passkey form. */
+const anAdminOnSetup = async (page: Page, api: Parameters<typeof person>[0]): Promise<void> => {
+  const { admin } = await provision(api, { name: "Skipton Setups" });
+  await page.goto("/sign-in");
+  await signInByEmail(page, api, admin.email);
+  await expect(passkeyName(page)).toBeVisible();
+};
+
+test("setup shows one primary, whichever way is open", async ({
+  page,
+  request,
+  passesTheAccessibilityGate,
+}) => {
+  await anAdminOnSetup(page, request);
+  await expect(primaries(page)).toHaveText([SETUP_WORDS.addPasskey]);
+
+  await authenticatorInstead(page).click();
+
+  await expect(codeField(page)).toBeVisible();
+  await expect(primaries(page)).toHaveText([AUTHENTICATOR_WORDS.finish]);
+  await expect(passkeyName(page)).toBeHidden();
+  await expect(authenticatorInstead(page)).toBeFocused();
+  await passesTheAccessibilityGate();
+
+  await authenticatorInstead(page).click();
+
+  await expect(passkeyName(page)).toBeVisible();
+  await expect(primaries(page)).toHaveText([SETUP_WORDS.addPasskey]);
+  await expect(authenticatorInstead(page)).toBeFocused();
+});
+
+test("s opens and closes the authenticator on setup", async ({ page, request }) => {
+  await anAdminOnSetup(page, request);
+  await authenticatorInstead(page).focus();
+
+  await page.keyboard.press("s");
+
+  await expect(authenticatorInstead(page)).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("img", { name: AUTHENTICATOR_WORDS.qrCode })).toBeVisible();
+  const listed = await keystrokesListed(page, SETUP_WORDS.heading);
+  await expect(listed).toContainText(SETUP_WORDS.authenticatorInstead);
+  await expect(listed).toContainText(ACCOUNT_ACTIONS.copyKey);
+  await keystrokesDismissed(page, listed);
+
+  await page.keyboard.press("s");
+
+  await expect(authenticatorInstead(page)).toHaveAttribute("aria-expanded", "false");
+  await expect(passkeyName(page)).toBeVisible();
+});
+
+test("the passkey field and its button share one height", async ({ page, request }) => {
+  await anAdminOnSetup(page, request);
+
+  const [field, button] = await Promise.all([
+    passkeyName(page).boundingBox(),
+    page.getByRole("button", { name: SETUP_WORDS.addPasskey }).boundingBox(),
+  ]);
+
+  expect(field, "the passkey field has no box to measure").not.toBeNull();
+  expect(field?.height, "the passkey field and its button differ in height").toBe(button?.height);
 });

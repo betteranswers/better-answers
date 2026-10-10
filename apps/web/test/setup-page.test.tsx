@@ -35,6 +35,14 @@ const finishTheAuthenticator = async () => {
   fireEvent.change(field, { target: { value: "123456" } });
 };
 
+/** The setup page where a passkey can be made, drawn as far as its passkey field. */
+const openedWithBothWays = async () => {
+  withPasskeysHere();
+  adasApi(() => NOTHING_HELD, new Map([["/authenticator/start", answering(A_KEY)]]));
+  await openAsAda("/setup");
+  return screen.findByRole("textbox", { name: "Passkey name" });
+};
+
 describe("the setup page", () => {
   it("offers a first passkey, then the authenticator behind a disclosure", async () => {
     withPasskeysHere();
@@ -44,7 +52,7 @@ describe("the setup page", () => {
     );
     await openAsAda("/setup");
 
-    const name = await screen.findByRole("textbox", { name: "Name" });
+    const name = await screen.findByRole("textbox", { name: "Passkey name" });
     expect(heading().textContent).toBe("Set up a second factor");
     expect(document.activeElement).toBe(name);
     expect(screen.getByRole("button", { name: "Add a passkey" })).toBeDefined();
@@ -62,8 +70,46 @@ describe("the setup page", () => {
 
     expect(await screen.findByText("Scan this QR code with your authenticator.")).toBeDefined();
     expect(disclosure().getAttribute("aria-expanded")).toBe("true");
-    expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Passkey name" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Add a passkey" })).toBeNull();
+  });
+
+  it("collapses the passkey form while the authenticator is open", async () => {
+    const name = await openedWithBothWays();
+    fireEvent.change(name, { target: { value: "Work laptop" } });
+
+    fireEvent.click(disclosure());
+
+    expect(await screen.findByRole("button", { name: "Finish setup" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Add a passkey" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Passkey name" })).toBeNull();
+
+    fireEvent.click(disclosure());
+
+    expect(screen.queryByRole("button", { name: "Finish setup" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Add a passkey" })).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "Passkey name" })).toHaveProperty(
+      "value",
+      "Work laptop",
+    );
+  });
+
+  it("opens and closes the authenticator on its listed keystroke", async () => {
+    await openedWithBothWays();
+
+    fireEvent.keyDown(document.body, { key: "s" });
+
+    expect(disclosure().getAttribute("aria-expanded")).toBe("true");
+    fireEvent.keyDown(document.body, { key: "?" });
+    const listed = await screen.findByRole("dialog", {
+      name: "Keyboard shortcuts on Set up a second factor",
+    });
+    expect(within(listed).getByText("Set up an authenticator instead")).toBeDefined();
+
+    fireEvent.keyDown(document.body, { key: "s" });
+
+    expect(disclosure().getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("button", { name: "Add a passkey" })).toBeDefined();
   });
 
   it("replaces the factors after a recovery code, ending on codes", async () => {
@@ -112,13 +158,13 @@ describe("the setup page", () => {
 
     const field = await screen.findByRole("textbox", { name: "Restore code" });
     expect(document.activeElement).toBe(field);
-    expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Passkey name" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Set up an authenticator instead" })).toBeNull();
 
     fireEvent.change(field, { target: { value: "rstr-code-0000" } });
     fireEvent.click(screen.getByRole("button", { name: "Use code" }));
 
-    const name = await screen.findByRole("textbox", { name: "Name" });
+    const name = await screen.findByRole("textbox", { name: "Passkey name" });
     expect(document.activeElement).toBe(name);
     expect(disclosure()).toBeDefined();
     expect(screen.queryByRole("textbox", { name: "Restore code" })).toBeNull();

@@ -42,7 +42,7 @@ export const PASSKEY_WORDS = {
   none: `No passkeys yet. ${PASSKEY_SIGNS_YOU_IN}, with no email.`,
   noWebAuthn: "This browser can't add a passkey. Use another browser or device.",
   add: ADD_A_PASSKEY,
-  nameField: "Name",
+  nameField: "Passkey name",
   addCommit: "Add passkey",
   waiting: "Waiting for your device",
   notAdded: "No passkey was added.",

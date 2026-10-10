@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 
+import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -25,11 +26,16 @@ import {
   SOLE_PICK_REFUSED,
   WORKSPACES_UNREAD,
 } from "./refusal-words.ts";
-import { NOT_CONNECTED, PICKER_WORDS } from "./workspace-words.ts";
+import { SignOutButton } from "./sign-out-button.tsx";
+import { NOT_CONNECTED, PICKER_ACTIONS, PICKER_WORDS } from "./workspace-words.ts";
 
 type Session = ReturnType<typeof useSession>;
 type Workspaces = ReturnType<typeof useListOrganizations>;
 type Workspace = NonNullable<Workspaces["data"]>[number];
+
+const TO_WORKSPACES: Keystroke = { key: "w", action: PICKER_ACTIONS.toWorkspaces };
+
+const KEYSTROKES: readonly Keystroke[] = [TO_WORKSPACES];
 
 const WORKSPACE_LIST = "workspace-list";
 
@@ -246,12 +252,14 @@ function WorkspaceList(properties: {
   readonly busy: boolean;
   readonly onPick: (workspace: Workspace) => void;
 }) {
+  useKeystroke(TO_WORKSPACES, focusTheFirstWorkspace);
+
   return (
     <>
       <p className="mt-2 text-muted-foreground">{PICKER_WORDS.lead}</p>
 
       <ul id={WORKSPACE_LIST} className="mt-6 flex flex-col gap-2">
-        {properties.held.map((workspace) => (
+        {properties.held.map((workspace, at) => (
           <li key={workspace.id}>
             {/* Enabled while a pick is open, so a refused pick can hand focus to what is left. */}
             <Button
@@ -259,6 +267,7 @@ function WorkspaceList(properties: {
               variant="outline"
               className="w-full justify-start aria-disabled:opacity-50"
               aria-disabled={properties.busy}
+              aria-keyshortcuts={at === 0 ? TO_WORKSPACES.key : undefined}
               onClick={() => {
                 if (!properties.busy) properties.onPick(workspace);
               }}
@@ -316,8 +325,10 @@ function WorkspaceChoice(properties: {
         onCarryOn={properties.onCarryOn}
       />
       {listing ? (
-        <div className="mt-8">
+        <div className="mt-8 flex flex-wrap items-center gap-2">
           <AccountLink />
+          <SignOutButton />
+          <KeystrokesAction page={PICKER_WORDS.heading} keystrokes={KEYSTROKES} />
         </div>
       ) : null}
     </AuthPage>
