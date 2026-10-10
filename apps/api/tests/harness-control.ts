@@ -26,6 +26,7 @@ import {
 } from "./harness-people.ts";
 import {
   connectedSourcesSeeding,
+  inOneTransaction,
   syncMoving,
   moveTheSync,
   seedConnectedSources,
@@ -229,15 +230,12 @@ export const harnessControl = (app: TestApp): Hono => {
 
   control.post(`${HARNESS_PREFIX}/model-choices`, async (context) => {
     const asked = await readBody(context.req.raw, seeding);
-    const client = await app.database.superuser.connect();
-    try {
+    await inOneTransaction(app, async (client) => {
       const seed = testData(client);
       for (const modelChoice of asked.modelChoices) {
         await seed.modelChoice({ workspaceId: asked.workspaceId, ...modelChoice });
       }
-    } finally {
-      client.release();
-    }
+    });
     return context.json({ seeded: asked.modelChoices.length });
   });
 

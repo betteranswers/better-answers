@@ -1,8 +1,15 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { head } from "@better-answers/core/store/git";
+
 import { connectAsHost } from "./flow.ts";
+import { askedOfTheHarness } from "./harness-asked.ts";
 import { harnessControl } from "./harness-control.ts";
+import { actingIn, openTestGit } from "./harness.ts";
 import { calledTool, rpcListOf, rpcOf, structured, type Rpc } from "./mcp-call.ts";
 import { appForSuite } from "./suite-app.ts";
 
@@ -284,5 +291,179 @@ describe("the browser suite's knowledge harness", () => {
       tags: ["dust", "air"],
       verified: [{ by: "process:synthetic-verifier", at: "2026-03-03T09:41:00Z" }],
     });
+  });
+});
+
+const askedToSeed = (body: unknown) => askedOfTheHarness(app(), "/__harness/concepts", body);
+
+const heldIn = async (
+  table: "concept_index" | "connected_source" | "group",
+  workspaceId: string,
+): Promise<number> => {
+  const counted = await app().database.superuser.query<{ held: number }>(
+    `SELECT count(*)::int AS held FROM "${table}" WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  return counted.rows[0]?.held ?? 0;
+};
+
+type Provisioned = { readonly workspaceId: string; readonly admin: { readonly id: string } };
+
+const seedingBy = (workspace: Provisioned) => ({
+  workspaceId: workspace.workspaceId,
+  userId: workspace.admin.id,
+});
+
+/** The repository's commit on `main`, or null where it has none. */
+const headOf = async (workspace: Provisioned): Promise<string | null> =>
+  head(
+    await actingIn(app(), seedingBy(workspace), async (principal) => principal),
+    openTestGit(app()),
+  );
+
+/** Both stores, read as a refused seed leaves them. */
+const leftIn = async (workspace: Provisioned) => ({
+  concepts: await heldIn("concept_index", workspace.workspaceId),
+  connectedSources: await heldIn("connected_source", workspace.workspaceId),
+  groups: await heldIn("group", workspace.workspaceId),
+  repository: existsSync(path.join(openTestGit(app()).root, `${workspace.workspaceId}.git`)),
+  head: await headOf(workspace),
+});
+
+const NOTHING = { concepts: 0, connectedSources: 0, groups: 0, repository: false, head: null };
+
+const refusedNaming = (...fields: readonly (readonly [field: string, rule: string])[]) => ({
+  status: 400,
+  said: {
+    fields: fields.map(([field, rule]) => ({ field, rule: expect.stringContaining(rule) })),
+  },
+});
+
+const aMemberAt = async (workspace: Provisioned, role: "Editor" | "Viewer") => {
+  const member = await app().person();
+  await app().addMember(workspace.workspaceId, member.id, role);
+  return { workspaceId: workspace.workspaceId, userId: member.id };
+};
+
+const A_CITED_SOURCE = { title: "Synthetic spares list", passages: ["Two spare pumps."] };
+
+describe("a concepts seed the harness refuses before it writes", () => {
+  it("refuses a held title, and writes none of the seed", async () => {
+    const workspace = await app().provision();
+    await conceptsSeeded({
+      ...seedingBy(workspace),
+      concepts: [{ title: "Quarry pump checks", body: "Synthetic pumps are checked weekly." }],
+    });
+    const before = await headOf(workspace);
+
+    const answered = await askedToSeed({
+      ...seedingBy(workspace),
+      concepts: [
+        {
+          title: "Quarry pump spares",
+          body: "Two synthetic pumps are kept spare.",
+          sources: [A_CITED_SOURCE],
+        },
+        { title: "Quarry pump checks", body: "Synthetic pumps are checked daily." },
+      ],
+    });
+
+    expect(answered).toEqual(
+      refusedNaming(["concepts.1.title", "knowledge/quarry-pump-checks.md"]),
+    );
+    expect(await leftIn(workspace)).toEqual({
+      ...NOTHING,
+      concepts: 1,
+      repository: true,
+      head: before,
+    });
+  });
+
+  it("refuses a group member who is no member", async () => {
+    const workspace = await app().provision();
+    const outsider = await app().person();
+
+    const answered = await askedToSeed({
+      ...seedingBy(workspace),
+      concepts: [
+        {
+          title: "Quarry shift rota",
+          body: "Synthetic shifts change at six.",
+          groupMemberIds: [outsider.id],
+          sources: [A_CITED_SOURCE],
+        },
+        {
+          title: "Quarry pay bands",
+          body: "Synthetic pay bands are reviewed yearly.",
+          audience: "groups",
+          groupMemberIds: [workspace.admin.id, outsider.id],
+        },
+      ],
+    });
+
+    expect(answered).toEqual(
+      refusedNaming(["concepts.1.groupMemberIds.1", "group_member_member_fk"]),
+    );
+    expect(await leftIn(workspace)).toEqual(NOTHING);
+  });
+
+  it("refuses a Viewer as a seed's writer", async () => {
+    const workspace = await app().provision();
+
+    const answered = await askedToSeed({
+      ...(await aMemberAt(workspace, "Viewer")),
+      concepts: [{ title: "Quarry signage", body: "Synthetic signs are repainted yearly." }],
+    });
+
+    expect(answered).toEqual(refusedNaming(["userId", "Editor"]));
+    expect(await leftIn(workspace)).toEqual(NOTHING);
+  });
+
+  it("refuses an Editor's seed that asks an Admin's override", async () => {
+    const workspace = await app().provision();
+
+    const answered = await askedToSeed({
+      ...(await aMemberAt(workspace, "Editor")),
+      concepts: [
+        { title: "Quarry fencing", body: "Synthetic fences are walked weekly." },
+        {
+          title: "Quarry wage reviews",
+          body: "Synthetic wages are reviewed yearly.",
+          audience: "groups",
+          groupMemberIds: [workspace.admin.id],
+        },
+        {
+          title: "Quarry blast licences",
+          body: "Synthetic blasts are licensed yearly.",
+          sources: [A_CITED_SOURCE, { ...A_CITED_SOURCE, sensitivity: "Restricted" }],
+        },
+      ],
+    });
+
+    expect(answered).toEqual(
+      refusedNaming(
+        ["concepts.1.audience", "Admin"],
+        ["concepts.2.sources.1.sensitivity", "Admin"],
+      ),
+    );
+    expect(await leftIn(workspace)).toEqual(NOTHING);
+  });
+
+  it("lands an Editor's seed that asks no override", async () => {
+    const workspace = await app().provision();
+
+    const [concept] = await conceptsSeeded({
+      ...(await aMemberAt(workspace, "Editor")),
+      concepts: [
+        {
+          title: "Quarry signage",
+          body: "Synthetic signs are repainted yearly.",
+          sources: [A_CITED_SOURCE],
+        },
+      ],
+    });
+
+    expect(concept).toMatchObject({ title: "Quarry signage" });
+    expect(await leftIn(workspace)).toMatchObject({ concepts: 1, connectedSources: 1 });
   });
 });
