@@ -182,6 +182,59 @@ const memberOfTwoWorkspaces = async (
   return { first, second };
 };
 
+const LIST_BUDGET_MS = 1000;
+
+/** Matched by name anywhere in the path, because the tRPC client batches its reads. */
+const theWorkspacesRead = (url: URL): boolean => url.pathname.includes("person.workspaces");
+
+const rowsOf = (page: Page) => page.getByRole("main").getByRole("listitem");
+
+test("shows a member of two workspaces their role in each", async ({ page, request }) => {
+  const email = anAddress("roles");
+  const { first, second } = await memberOfTwoWorkspaces(request, email, {
+    first: "Acme Fabrication",
+    second: "Beta Fabrication",
+  });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+
+  await expect(page.getByRole("main").getByRole("list")).toMatchAriaSnapshot(`
+    - list:
+      - listitem:
+        - button ${quoted(first.name)}
+        - text: Admin
+      - listitem:
+        - button ${quoted(second.name)}
+        - text: Viewer
+  `);
+  const acme = page.getByRole("button", { name: first.name, exact: true });
+  await expect(acme, "a screen reader hears no role with the button").toHaveAccessibleDescription(
+    "Admin",
+  );
+
+  await acme.click();
+  await landedAtHome(page, "Admin");
+  await expect(page.getByRole("banner").getByText(first.name)).toBeVisible();
+});
+
+test("lists a member's workspaces within a second", async ({ page, request }) => {
+  const email = anAddress("listed");
+  await memberOfTwoWorkspaces(request, email, { first: "Timed Forgings", second: "Timed Fabrics" });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await expect(rowsOf(page)).toHaveCount(2);
+
+  // A fresh document, so no list is already in the page's cache.
+  const started = Date.now();
+  await page.goto("/choose-workspace");
+  await expect(rowsOf(page)).toHaveCount(2);
+  const elapsed = Date.now() - started;
+  test.info().annotations.push({ type: "workspace list", description: `${elapsed} ms` });
+  expect(elapsed, "the list of two workspaces rendered past its budget").toBeLessThan(
+    LIST_BUDGET_MS,
+  );
+});
+
 test("lands a sole member in the shell: workspace, person, role", async ({ page, request }) => {
   const email = anAddress("sole");
   const workspace = await provision(request, { name: "Acme Joinery", adminEmail: email });
@@ -250,7 +303,9 @@ test("ends the chooser with Account, Sign out and Keyboard shortcuts", async ({
       - button "Sign out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
-  await workspaces.last().focus();
+  await workspaces.first().focus();
+  await page.keyboard.press("Tab");
+  await expect(workspaces.last(), "a role tag took a stop between the workspaces").toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: ACCOUNT_HEADING })).toBeFocused();
   await page.keyboard.press("Tab");
@@ -822,7 +877,7 @@ test("separates an unread workspace list from no workspace, offering retry", asy
     second: "Second List Failure",
   });
 
-  await page.route("**/organization/list", (route) => route.abort());
+  await page.route(theWorkspacesRead, (route) => route.abort());
 
   await page.goto("/sign-in");
   await signIn(page, request, email);
@@ -832,7 +887,7 @@ test("separates an unread workspace list from no workspace, offering retry", asy
 
   await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toHaveCount(0);
 
-  await page.unroute("**/organization/list");
+  await page.unroute(theWorkspacesRead);
   await page.getByRole("button", { name: PICKER_WORDS.tryAgain }).click();
 
   /* jscpd:ignore-start */

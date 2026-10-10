@@ -168,7 +168,8 @@ function RolePicker(properties: {
             </p>
           </div>
 
-          <OutcomeLine outcome={outcome} />
+          {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
+          <OutcomeLine outcome={outcome} className="contents" />
         </div>
       </section>
     </Card>
@@ -224,7 +225,7 @@ function CredentialsRevoker(properties: {
         </p>
       </div>
 
-      <OutcomeLine outcome={outcome} />
+      <OutcomeLine outcome={outcome} className="contents" />
     </SheetPart>
   );
 }
@@ -279,7 +280,7 @@ function DisplayNameFlag(properties: {
               your name. While a flag from this workspace waits, another adds nothing.
             </p>
           </div>
-          <OutcomeLine outcome={outcome} />
+          <OutcomeLine outcome={outcome} className="contents" />
         </>
       )}
     </SheetPart>

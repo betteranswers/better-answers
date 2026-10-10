@@ -83,7 +83,7 @@ export function AuthenticatorCodeField(properties: {
         readOnly={readOnly}
         aria-describedby={describedBy}
         aria-invalid={wrong}
-        className="mt-2 max-w-48 font-mono tabular-nums"
+        className="mt-2 h-8 max-w-48 font-mono tabular-nums"
         value={digits.code}
         onChange={(event) => {
           digits.enter(event.target.value);

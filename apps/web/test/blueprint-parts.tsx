@@ -1,4 +1,4 @@
-import { DotPattern, Frame, GridPattern } from "@/shared/blueprint.tsx";
+import { DotPattern, GridPattern, MarkedRegion } from "@/shared/blueprint.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
 
@@ -7,14 +7,14 @@ export function BlueprintParts() {
   return (
     <GridPattern>
       <section aria-label="Board" className="grid gap-6 px-4 py-10">
-        <Frame asChild className="p-4">
-          <figure aria-label="Frame">
+        <MarkedRegion asChild className="p-4">
+          <figure aria-label="Marked region">
             A figure
             <Card asChild marks className="mt-4 p-4">
-              <section aria-label="Card in a frame">Inherits, never repeats</section>
+              <section aria-label="Card in a marked region">Inherits, never repeats</section>
             </Card>
           </figure>
-        </Frame>
+        </MarkedRegion>
         <Card asChild marks>
           <section aria-label="Marked card">
             <CardHeader>

@@ -15,6 +15,7 @@ import {
 } from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
+import { sentenceOf } from "@/shared/refusal-words.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
@@ -36,19 +37,31 @@ const NO_SESSION: Answer = {
   },
 };
 
+/** What the api answers a console read asked by a person without the mark. */
+const WITHOUT_THE_MARK: Answer = {
+  error: {
+    message: NOT_THE_OPERATOR,
+    code: -32_003,
+    data: {
+      code: "FORBIDDEN",
+      httpStatus: 403,
+      refusal: { word: NOT_THE_OPERATOR, class: "forbidden" },
+    },
+  },
+};
+
 /** The api answers a batch as one array, one entry per procedure it names; a read not `held` is empty. */
 const answering =
-  (standing: Answer, held: Readonly<Record<string, unknown>> = {}) =>
+  (standing: Answer, held: Readonly<Record<string, unknown>> = {}, refused?: string) =>
   (input: string | URL | Request) => {
     const { pathname } = addressOf(input);
     if (!pathname.startsWith("/trpc/")) return answered(null);
 
-    const names = pathname.replace("/trpc/", "").split(",");
-    return answered(
-      names.map((name) =>
-        name === "session.operator" ? standing : { result: { data: held[name] ?? [] } },
-      ),
-    );
+    const answerTo = (name: string): Answer => {
+      if (name === "session.operator") return standing;
+      return name === refused ? WITHOUT_THE_MARK : { result: { data: held[name] ?? [] } };
+    };
+    return answered(pathname.replace("/trpc/", "").split(",").map(answerTo));
   };
 
 const THE_OPERATOR: Answer = { result: { data: { operator: true, name: "Ada" } } };
@@ -109,6 +122,14 @@ const listAt = async (path: string, name: string, held: Readonly<Record<string, 
 const searchFor = (list: HTMLElement, label: string, typed: string): void => {
   fireEvent.change(within(list).getByRole("searchbox", { name: label }), {
     target: { value: typed },
+  });
+};
+
+/** The query library reads every list on the page again as the network comes back. */
+const readAgainInPlace = (): void => {
+  act(() => {
+    globalThis.dispatchEvent(new Event("offline"));
+    globalThis.dispatchEvent(new Event("online"));
   });
 };
 
@@ -223,9 +244,41 @@ describe("the console's lists", () => {
 
     searchFor(list, WORKSPACES_WORDS.search, "nowhere");
     expect(within(list).getByText(WORKSPACES_WORDS.noneMatch("nowhere"))).toBeDefined();
-    fireEvent.click(within(list).getByRole("button", { name: "Clear filters" }));
+    fireEvent.click(within(list).getByRole("button", { name: "Clear search" }));
     expect(rowsOf(list)).toHaveLength(2);
     expect(within(list).getByText(WORKSPACES_WORDS.counted(2))).toBeDefined();
+  });
+
+  it.each([
+    {
+      page: WORKSPACES_WORDS.heading,
+      path: EVERY_WORKSPACE,
+      words: WORKSPACES_WORDS,
+      read: "console.workspaces.list",
+      rows: [ACME, DALES],
+    },
+    {
+      page: NAMES_WAITING_WORDS.heading,
+      path: NAMES_WAITING_PAGE,
+      words: NAMES_WAITING_WORDS,
+      read: "console.people.namesWaiting",
+      rows: NAMES_WAITING,
+    },
+  ])("keeps the search of $page through a refused re-read", async (listed) => {
+    const { words, read } = listed;
+    const list = await listAt(listed.path, words.heading, { [read]: listed.rows });
+    const search = within(list).getByRole("searchbox", { name: words.search });
+    search.focus();
+    searchFor(list, words.search, "acme");
+
+    vi.stubGlobal("fetch", answering(THE_OPERATOR, {}, read));
+    readAgainInPlace();
+
+    expect(await within(list).findByText(sentenceOf(ONLY_THE_OPERATOR))).toBeDefined();
+    expect(within(list).queryByRole("table")).toBeNull();
+    expect(within(list).getByRole("searchbox", { name: words.search })).toBe(search);
+    expect(within(list).getByDisplayValue("acme")).toBe(search);
+    expect(document.activeElement).toBe(search);
   });
 
   it("narrows Names waiting by name or flagging workspace", async () => {

@@ -206,6 +206,12 @@ Five more play Claude's part in its OAuth flow on the suite's own origin — `ap
 | `claudeExchanges` | Exchanges the code at the redirect for tokens, which is when the grant's refresh token is minted, and answers that refresh token |
 | `claudeDisconnects` | Revokes that refresh token at `/oauth2/revoke`, as Claude does when the person disconnects it, so the authorization server ends the grant itself |
 
+One helper answers for the api. `refusedFromNowOn` in `apps/web/e2e/refused-read.ts` refuses one
+console procedure inside a tRPC batch, in the api's own words for a person without the operator's
+mark, and leaves the batch's other answers real. A spec uses it to meet a list's refused re-read
+while the console stays open, since clearing the mark itself closes the whole console.
+`apps/web/e2e/console.spec.ts` and `apps/web/e2e/console-people.spec.ts` are the worked examples.
+
 ## Writing a spec
 
 - **Locate by role and accessible name.** `getByRole`, `getByLabel`, `getByText`. Test ids appear

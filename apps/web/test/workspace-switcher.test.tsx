@@ -15,6 +15,7 @@ import { createAppClients, Providers } from "@/app/providers.tsx";
 import { WorkspaceSwitcher } from "@/app/workspace-switcher.tsx";
 import {
   SwitchRefused,
+  useAcceptInvitation,
   useSetActiveOrganization,
   useSwitchWorkspace,
 } from "@/features/auth/auth-hooks.ts";
@@ -33,15 +34,25 @@ const authServer = vi.hoisted(() => {
   return server;
 });
 
-type Switching = Parameters<typeof WorkspaceSwitcher>[0]["switching"];
+type Drawn = Parameters<typeof WorkspaceSwitcher>[0];
 
-const HOLME = { id: "h", name: "Holme Valley Tools", slug: "holme", createdAt: new Date() };
+type Switching = Drawn["switching"];
 
-const aSwitch = (pending: boolean): Switching => ({
+const HOLME = { id: "h", name: "Holme Valley Tools", role: "Viewer" };
+
+/** Where the switcher is drawn, and what its list has answered. */
+type Standing = Pick<Drawn, "here"> & Pick<Switching, "workspaces">;
+
+const IN_NORTHERN: Standing = {
+  here: { name: "Northern Tooling", workspaceId: "w", role: "Admin" },
+  workspaces: [HOLME],
+};
+
+const aSwitch = (pending: boolean, workspaces: Switching["workspaces"]): Switching => ({
   open: true,
   onOpenChange: () => undefined,
   pending,
-  workspaces: [HOLME],
+  workspaces,
   switchTo: () => undefined,
   outcome: undefined,
 });
@@ -54,15 +65,15 @@ const measuresNothing = class {
 };
 
 /** The switcher alone, open, over a router that can take each of its ways out. */
-const openTheMenu = async (pending: boolean) => {
+const openTheMenu = async (pending: boolean, standing: Standing = IN_NORTHERN) => {
   vi.stubGlobal("ResizeObserver", measuresNothing);
   const root = createRootRoute({
     component: () => (
       <>
         <WorkspaceSwitcher
-          here={{ name: "Northern Tooling", workspaceId: "w" }}
+          here={standing.here}
           offersTheConsole
-          switching={aSwitch(pending)}
+          switching={aSwitch(pending, standing.workspaces)}
         />
         <Outlet />
       </>
@@ -120,9 +131,49 @@ const renderTheHook = async <TResult,>(hook: () => TResult) => {
 /** The switch's hook, with the api's proxy beside it for reading and seeding the cache. */
 const switchHeld = () => renderTheHook(() => ({ switching: useSwitchWorkspace(), api: useTRPC() }));
 
+/** A hook over a cache that already holds the person's workspace list, as an opened menu leaves it. */
+const overTheListHeld = async <TResult,>(hook: () => TResult) => {
+  const { queryClient, result } = await renderTheHook(() => ({ held: hook(), api: useTRPC() }));
+  const listKey = result.current.api.person.workspaces.queryKey();
+  queryClient.setQueryData(listKey, []);
+  return { queryClient, result, listKey };
+};
+
+/** The join answers; every other read as Ada's, an Admin of Northern Tooling. */
+const answeringTheJoin = (input: Asked): Promise<Response> =>
+  addressOf(input).pathname.includes("person.acceptInvitation")
+    ? answered([{ result: { data: { workspaceId: HOLME.id } } }])
+    : answeringAs("Admin")(input);
+
+const itemsListed = () =>
+  screen.getAllByRole("menuitemradio").map((workspace) => workspace.textContent);
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+describe("the workspace switcher's list", () => {
+  it("says each workspace's role after its name, the open first", async () => {
+    await openTheMenu(false);
+
+    expect(itemsListed()).toEqual(["Northern Tooling Admin", "Holme Valley Tools Viewer"]);
+  });
+
+  it("says the open workspace's role before the list answers", async () => {
+    await openTheMenu(false, { ...IN_NORTHERN, workspaces: [] });
+
+    expect(itemsListed()).toEqual(["Northern Tooling Admin"]);
+  });
+
+  it("says each role from the list alone in the console", async () => {
+    await openTheMenu(false, {
+      here: { name: "Console", workspaceId: undefined },
+      workspaces: [HOLME],
+    });
+
+    expect(itemsListed()).toEqual(["Holme Valley Tools Viewer"]);
+  });
 });
 
 describe("the workspace switcher's ways out", () => {
@@ -194,5 +245,37 @@ describe("a switch that lands", () => {
     await vi.waitFor(() => expect(result.current.switching.isSuccess).toBe(true));
     expect(queryClient.getQueryData(consoleKey)).toEqual([]);
     expect(queryClient.getQueryData(membersKey)).toBeUndefined();
+  });
+});
+
+describe("the person's workspace list, held", () => {
+  it("stays through a switch, so the menu opens on it", async () => {
+    authServer.answer = answeringTheSwitch(() => answered({ id: HOLME.id }));
+    const { queryClient, result, listKey } = await overTheListHeld(useSwitchWorkspace);
+
+    act(() => result.current.held.mutate(HOLME));
+
+    await vi.waitFor(() => expect(result.current.held.isSuccess).toBe(true));
+    expect(queryClient.getQueryData(listKey)).toEqual([]);
+  });
+
+  it("stays through a pick, marked stale", async () => {
+    authServer.answer = answeringTheSwitch(() => answered({ id: HOLME.id }));
+    const { queryClient, result, listKey } = await overTheListHeld(useSetActiveOrganization);
+
+    act(() => result.current.held.mutate({ organizationId: HOLME.id }));
+
+    await vi.waitFor(() => expect(result.current.held.isSuccess).toBe(true));
+    expect(queryClient.getQueryState(listKey)).toMatchObject({ data: [], isInvalidated: true });
+  });
+
+  it("is dropped by a join, which adds a workspace", async () => {
+    authServer.answer = answeringTheJoin;
+    const { queryClient, result, listKey } = await overTheListHeld(useAcceptInvitation);
+
+    act(() => result.current.held.mutate({ invitationId: "i" }));
+
+    await vi.waitFor(() => expect(result.current.held.isSuccess).toBe(true));
+    expect(queryClient.getQueryState(listKey)).toBeUndefined();
   });
 });

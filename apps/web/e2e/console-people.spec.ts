@@ -20,6 +20,7 @@ import {
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { sentenceOf, SIGN_IN_AGAIN } from "@/shared/refusal-words.ts";
+import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -46,6 +47,7 @@ import {
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { refusedFromNowOn } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -322,7 +324,7 @@ test.describe("the console's Everyone page", () => {
     await expect(everyone(page)).toContainText(EVERYONE_WORDS.noneMatch(`nobody ${tag}`));
     await expect(personRows(page)).toHaveCount(1);
     await passesTheAccessibilityGate();
-    await everyone(page).getByRole("button", { name: "Clear filters" }).click();
+    await everyone(page).getByRole("button", { name: CLEAR_WORDS.search }).click();
 
     await expect(searchBox(page)).toHaveValue("");
     await expect(searchBox(page)).toBeFocused();
@@ -906,6 +908,29 @@ test.describe("the console's Names waiting page", () => {
     await expect(waitingSearch(page), "Escape cleared the search and lost its place").toBeFocused();
     await expect(waitingRowOf(page, name)).toBeVisible();
     await expect(waitingCount(page)).toBeVisible();
+  });
+
+  test("keeps Names waiting's search and focus through a refused re-read", async ({
+    page,
+    context,
+    request,
+  }) => {
+    await signedInAsTheOperator(page, request, aTag());
+    await page.goto(NAMES_WAITING_PAGE);
+    await expect(namesWaiting(page).getByRole("table")).toBeVisible();
+    await waitingSearch(page).fill("priya");
+    await expect(waitingSearch(page)).toBeFocused();
+
+    await refusedFromNowOn(page, "console.people.namesWaiting");
+    // The query library reads every list again as the network comes back.
+    await context.setOffline(true);
+    await context.setOffline(false);
+
+    await expect(namesWaiting(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
+    await expect(namesWaiting(page).getByRole("table")).toHaveCount(0);
+    await expect(waitingSearch(page)).toBeVisible();
+    await expect(waitingSearch(page)).toBeFocused();
+    await expect(waitingSearch(page)).toHaveValue("priya");
   });
 
   test("corrects a name behind a confirmation, within its budget", async ({

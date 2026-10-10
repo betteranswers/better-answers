@@ -1,5 +1,6 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { ALL_WORKSPACES } from "@/app/words.ts";
 import {
   ACCOUNT_HEADING,
   ACTION_LANDED,
@@ -16,7 +17,7 @@ import {
 import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
-import { KNOWLEDGE, menuGroupIn } from "@/shared/navigation.ts";
+import { ASK, KNOWLEDGE, menuGroupIn } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -35,6 +36,8 @@ import {
   signInHeading,
   signedInWithNoWorkspace,
   signOutFromTheShell,
+  switcherMenuOf,
+  switcherOf,
   tabUntilFocused,
 } from "./harness.ts";
 import { aVirtualAuthenticator, withoutWebAuthn } from "./virtual-authenticator.ts";
@@ -139,6 +142,22 @@ test("Escape puts a passkey's name back", async ({ page, request }) => {
   await page.keyboard.press("Escape");
 
   await expect(rowOf(page, name).getByRole("button", { name: PASSKEY_WORDS.rename })).toBeFocused();
+});
+
+test("a passkey's rename field and Save share one height", async ({ page, request }) => {
+  const { name } = await withAPasskey(page, request, "height");
+  const row = rowOf(page, name);
+  const renameField = row.getByRole("textbox", { name: PASSKEY_WORDS.nameField });
+  await row.getByRole("button", { name: PASSKEY_WORDS.rename }).click();
+  await expect(renameField).toBeVisible();
+
+  const [field, button] = await Promise.all([
+    renameField.boundingBox(),
+    row.getByRole("button", { name: PASSKEY_WORDS.save, exact: true }).boundingBox(),
+  ]);
+
+  expect(field, "the rename field has no box to measure").not.toBeNull();
+  expect(field?.height, "the rename field and Save differ in height").toBe(button?.height);
 });
 
 test("a passkey removed stops signing in", async ({ page, request }) => {
@@ -266,12 +285,17 @@ const signedInAgain = async (
   await read;
 };
 
-test("a Viewer is offered a passkey once per sign-in", async ({ page, request }) => {
-  const viewer = await aViewerOffered(page, request);
-
+/** On to another page, where the offer must not follow. */
+const movedOnWithoutTheOffer = async (page: Page): Promise<void> => {
   await railOf(page).getByRole("link", { name: KNOWLEDGE.name }).click();
   await expect(page.getByRole("heading", { level: 1, name: BROWSE.name })).toBeVisible();
   await expect(offerOf(page), "the offer followed the Viewer to the next page").toHaveCount(0);
+};
+
+test("a Viewer is offered a passkey once per sign-in", async ({ page, request }) => {
+  const viewer = await aViewerOffered(page, request);
+
+  await movedOnWithoutTheOffer(page);
 
   const read = secondFactorRead(page);
   await page.reload();
@@ -296,6 +320,55 @@ test("a dismissed offer stays away after the next sign-in", async ({ page, reque
   await signedInAgain(page, request, viewer);
   await expect(thePage(page)).toBeVisible();
   await expect(offerOf(page), "a dismissed offer came back with the next sign-in").toHaveCount(0);
+});
+
+/** A Viewer of two workspaces, each homed on Ask, offered a passkey on the home of the first. */
+const aViewerOfTwoOffered = async (page: Page, api: APIRequestContext) => {
+  await aVirtualAuthenticator(page);
+  const email = anAddress("offered-in-two");
+  const viewer = await person(api, email, { displayName: "Vera Offered" });
+  const first = await provision(api, { name: "Offered Here Ltd" });
+  const second = await provision(api, { name: "Offered There Ltd" });
+  await addMember(api, { role: "Viewer", userId: viewer.id, workspaceId: first.workspaceId });
+  await addMember(api, { role: "Viewer", userId: viewer.id, workspaceId: second.workspaceId });
+  await page.goto("/sign-in");
+  await signIn(page, api, email);
+  await page.getByRole("button", { name: first.name }).click();
+  await landedAtHome(page, "Viewer");
+  await expect(offerOf(page)).toBeVisible();
+  return { first, second };
+};
+
+test("a Viewer's offer survives a switch to the same address", async ({ page, request }) => {
+  const { first, second } = await aViewerOfTwoOffered(page, request);
+
+  await switcherOf(page, first.name).click();
+  await switcherMenuOf(page, first.name).getByRole("menuitemradio", { name: second.name }).click();
+
+  await expect(switcherOf(page, second.name)).toBeVisible();
+  await landedAtHome(page, "Viewer");
+  await expect(offerOf(page), "the offer ended as the switch drew its page again").toBeVisible();
+
+  await movedOnWithoutTheOffer(page);
+
+  await railOf(page).getByRole("link", { name: ASK.name, exact: true }).click();
+  await landedAtHome(page, "Viewer");
+  await expect(offerOf(page), "the offer came back with the Viewer").toHaveCount(0);
+});
+
+test("a Viewer's offer ends on a trip through All workspaces", async ({ page, request }) => {
+  const { first, second } = await aViewerOfTwoOffered(page, request);
+
+  await switcherOf(page, first.name).click();
+  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: ALL_WORKSPACES }).click();
+  // A pick drops the second factor's read, so the home it opens reads it again.
+  const read = secondFactorRead(page);
+  await page.getByRole("button", { name: second.name }).click();
+
+  await read;
+  await expect(switcherOf(page, second.name)).toBeVisible();
+  await landedAtHome(page, "Viewer");
+  await expect(offerOf(page), "the offer was drawn twice in one sign-in").toHaveCount(0);
 });
 
 test("the offer's link lands on the Account page's add", async ({ page, request }) => {

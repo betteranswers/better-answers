@@ -23,6 +23,9 @@ export const instantWords = (iso: string): string => `${timeWords(iso)} · ${day
 export const counted = (count: number, one: string, many: string): string =>
   `${count} ${count === 1 ? one : many}`;
 
+/** A list a search or a filter emptied names what its button clears: the search where it has that alone. */
+export const CLEAR_WORDS = { search: "Clear search", filters: "Clear filters" } as const;
+
 /** Rounded up, so the reader never asks again before a ceiling lifts. */
 export const minutesUntil = (seconds: number): string => {
   const minutes = Math.max(1, Math.ceil(seconds / 60));

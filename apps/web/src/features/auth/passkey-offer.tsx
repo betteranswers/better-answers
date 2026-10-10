@@ -15,7 +15,26 @@ const ACCOUNT = "/account";
 const offered = (held: SecondFactor | undefined): boolean =>
   held !== undefined && held.passkeys.length === 0 && !held.passkeyOfferDismissed;
 
-type OfferProperties = { readonly onDismissed: () => void };
+/** The page drawn, not the one asked for: a frame being left would draw the offer and spend it. */
+const useAddressDrawn = (): string | undefined =>
+  useRouterState({ select: (state) => state.matches.at(-1)?.pathname });
+
+/** The address the offer is drawn on, and how the offer says so as it draws. */
+export type OfferPlace = {
+  readonly heldAt: string | undefined;
+  readonly holdAt: (address: string) => void;
+};
+
+/** Held by the frame: a workspace's key draws the page beneath it afresh, and the offer with it. */
+export const useOfferPlace = (): OfferPlace => {
+  const drawn = useAddressDrawn();
+  const [heldAt, holdAt] = useState<string>();
+  // During render, setting only this hook's own state: any other address ends the offer for good.
+  if (heldAt !== undefined && heldAt !== drawn) holdAt(undefined);
+  return { heldAt, holdAt };
+};
+
+type OfferProperties = { readonly place: OfferPlace; readonly onDismissed: () => void };
 
 /**
  * Offered once per sign-in, on the first page that draws it, to a person holding no passkey. It
@@ -23,29 +42,33 @@ type OfferProperties = { readonly onDismissed: () => void };
  */
 export function PasskeyOffer(properties: OfferProperties) {
   const [here] = useState(passkeysHere);
-  // The page drawn, not the one asked for: a frame being left would draw the offer and spend it.
-  const drawn = useRouterState({ select: (state) => state.matches.at(-1)?.pathname });
+  const drawn = useAddressDrawn();
   // Account is where the offer leads, so it is not offered there again.
   if (!here || drawn === undefined || drawn === ACCOUNT) return null;
 
   // Keyed by the address, so each page arrives asking afresh whether the offer was shown.
-  return <OfferOnThisPage key={drawn} {...properties} />;
+  return <OfferOnThisPage key={drawn} address={drawn} {...properties} />;
 }
 
 /**
  * Read only where a passkey can be used, so no other browser asks. Only the page that first draws
  * the offer keeps it.
  */
-function OfferOnThisPage(properties: OfferProperties) {
-  const [unshownOnArrival] = useState(() => !passkeyOfferShown());
+function OfferOnThisPage(properties: OfferProperties & { readonly address: string }) {
+  const { address } = properties;
+  const { heldAt, holdAt } = properties.place;
+  // A page the frame draws again keeps the offer it was showing, whatever the browser's mark says.
+  const [owedOnArrival] = useState(() => heldAt === address || !passkeyOfferShown());
   const read = useSecondFactorOnce();
   const dismiss = useDismissPasskeyOffer();
-  const offering = unshownOnArrival && offered(read.data);
+  const offering = owedOnArrival && offered(read.data);
 
   // Marked as it draws, not as the frame mounts, so a person whose read is slow still sees it once.
   useEffect(() => {
-    if (offering) rememberThePasskeyOfferShown();
-  }, [offering]);
+    if (!offering) return;
+    rememberThePasskeyOfferShown();
+    holdAt(address);
+  }, [offering, address, holdAt]);
 
   if (!offering) return null;
 

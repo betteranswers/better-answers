@@ -27,8 +27,6 @@ const SWITCH_BUDGET_MS = 1000;
 
 const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
 
-const WORKSPACES_READ = "**/organization/list";
-
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const readOf =
   (procedure: string) =>
@@ -39,7 +37,12 @@ const MEMBER_READ = readOf("session.member");
 
 const MEMBERS_READ = readOf("members.list");
 
+const WORKSPACES_READ = readOf("person.workspaces");
+
 const workspacesIn = (menu: Locator): Locator => menu.getByRole("menuitemradio");
+
+/** An item reads its workspace's name, then the person's role there. */
+const listedAs = (name: string, role: "Admin" | "Viewer"): string => `${name} ${role}`;
 
 const switched = async (page: Page, from: string, to: string): Promise<void> => {
   await switcherOf(page, from).click();
@@ -106,7 +109,10 @@ test("lists the operator's workspaces and Console, others none", async ({ page, 
 
   await switcherOf(page, operator.first.name).click();
   const menu = switcherMenuOf(page, operator.first.name);
-  await expect(workspacesIn(menu)).toHaveText([operator.first.name, operator.second.name]);
+  await expect(workspacesIn(menu)).toHaveText([
+    listedAs(operator.first.name, "Admin"),
+    listedAs(operator.second.name, "Admin"),
+  ]);
   await expect(workspacesIn(menu).first()).toHaveAttribute("aria-checked", "true");
   await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES, CONSOLE.name]);
   await page.keyboard.press("Escape");
@@ -119,8 +125,53 @@ test("lists the operator's workspaces and Console, others none", async ({ page, 
   });
   await switcherOf(page, other.first.name).click();
   const theirs = switcherMenuOf(page, other.first.name);
-  await expect(workspacesIn(theirs)).toHaveText([other.first.name, other.second.name]);
+  await expect(workspacesIn(theirs)).toHaveText([
+    listedAs(other.first.name, "Admin"),
+    listedAs(other.second.name, "Admin"),
+  ]);
   await expect(theirs.getByRole("menuitem")).toHaveText([ALL_WORKSPACES]);
+});
+
+test("lists each workspace with the person's role, the open first", async ({ page, request }) => {
+  const { first, second } = await inTwoWorkspaces(
+    page,
+    request,
+    { first: "Acme Toolworks", second: "Beta Toolworks" },
+    "Viewer",
+  );
+
+  await switcherOf(page, first.name).click();
+
+  const menu = switcherMenuOf(page, first.name);
+  await expect(workspacesIn(menu)).toHaveText([
+    listedAs(first.name, "Admin"),
+    listedAs(second.name, "Viewer"),
+  ]);
+  await expect(workspacesIn(menu).first()).toHaveAttribute("aria-checked", "true");
+});
+
+test("opens the menu on the held list after a switch", async ({ page, request }) => {
+  const { first, second } = await inTwoWorkspaces(
+    page,
+    request,
+    { first: "Swale Ropery", second: "Ure Ropery" },
+    "Viewer",
+  );
+  await switched(page, first.name, second.name);
+  await landedAtHome(page, "Viewer");
+  await expect(switcherOf(page, second.name)).toBeVisible();
+  // Held, so what the menu lists is what the switch left in hand, not a fresh answer.
+  const release = await heldBack(page, WORKSPACES_READ);
+
+  await switcherOf(page, second.name).click();
+
+  const menu = switcherMenuOf(page, second.name);
+  const both = [listedAs(second.name, "Viewer"), listedAs(first.name, "Admin")];
+  await expect(workspacesIn(menu), "the switch dropped the list it held").toHaveText(both);
+  await expect(saidInTheBand(page), "the band says it reads a list it holds").toBeEmpty();
+
+  release();
+  await expect(workspacesIn(menu)).toHaveText(both);
 });
 
 test("switches to another workspace's home, reading its members", async ({ page, request }) => {
@@ -250,14 +301,19 @@ test("says it reads the list, filling the open menu", async ({
 
   await switcherOf(page, first.name).click();
   const menu = switcherMenuOf(page, first.name);
-  await expect(workspacesIn(menu)).toHaveText([first.name]);
+  await expect(workspacesIn(menu), "the open workspace waits on the list for its role").toHaveText([
+    listedAs(first.name, "Admin"),
+  ]);
   await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES, CONSOLE.name]);
   await expect(saidInTheBand(page)).toHaveText(PICKER_WORDS.reading);
   await passesTheAccessibilityGate();
 
   release();
 
-  await expect(workspacesIn(menu)).toHaveText([first.name, second.name]);
+  await expect(workspacesIn(menu)).toHaveText([
+    listedAs(first.name, "Admin"),
+    listedAs(second.name, "Admin"),
+  ]);
   await expect(menu).toBeVisible();
   await expect(saidInTheBand(page)).toBeEmpty();
 });
@@ -288,7 +344,9 @@ test("says a refused switch in the band, keeping the page", async ({
   await passesTheAccessibilityGate();
 
   await switcherOf(page, first.name).click();
-  await expect(workspacesIn(switcherMenuOf(page, first.name))).toHaveText([first.name]);
+  await expect(workspacesIn(switcherMenuOf(page, first.name))).toHaveText([
+    listedAs(first.name, "Admin"),
+  ]);
 });
 
 test("says a pending switch's refusal, holding others until it answers", async ({
@@ -318,7 +376,10 @@ test("says a pending switch's refusal, holding others until it answers", async (
   await expect(saidInTheBand(page), "opening the menu forgot the pending switch").toHaveText(
     PICKER_WORDS.opening,
   );
-  await expect(workspacesIn(menu)).toHaveText([first.name, second.name]);
+  await expect(workspacesIn(menu)).toHaveText([
+    listedAs(first.name, "Admin"),
+    listedAs(second.name, "Admin"),
+  ]);
   for (const workspace of await workspacesIn(menu).all()) {
     await expect(workspace).toHaveAttribute("aria-disabled", "true");
   }
@@ -477,5 +538,7 @@ test("says an unread list, and how to read it again", async ({ page, request }) 
   await expect(refusedInTheBand(page)).toHaveText(sentenceOf(SWITCHER_UNREAD), {
     timeout: 15_000,
   });
-  await expect(workspacesIn(switcherMenuOf(page, first.name))).toHaveText([first.name]);
+  await expect(workspacesIn(switcherMenuOf(page, first.name))).toHaveText([
+    listedAs(first.name, "Admin"),
+  ]);
 });

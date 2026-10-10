@@ -99,6 +99,7 @@ describe("what a procedure may answer the wire", () => {
       "person.requestAccess",
       "person.secondFactor",
       "person.setDisplayName",
+      "person.workspaces",
       "runs.ofSubject",
       "session.member",
       "session.operator",
@@ -120,6 +121,7 @@ describe("what a procedure may answer the wire", () => {
       | "person.requestAccess"
       | "person.invitation"
       | "person.invitations"
+      | "person.workspaces"
       | "person.acceptInvitation"
       | "person.secondFactor"
       | "person.renamePasskey"

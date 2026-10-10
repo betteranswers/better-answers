@@ -3,7 +3,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { useMember } from "@/features/auth/member.ts";
-import { PasskeyOffer } from "@/features/auth/passkey-offer.tsx";
+import { PasskeyOffer, useOfferPlace, type OfferPlace } from "@/features/auth/passkey-offer.tsx";
 import { useUnsavedChangeSaid } from "@/features/auth/unsaved-change.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { HomeLine } from "@/features/people/self-action.tsx";
@@ -103,6 +103,8 @@ export function Frame(properties: {
   const [pickedTab, pickTab] = useState<string>();
   // Given by a page at a detail address, which alone knows whose it is.
   const [lastPart, nameLastPart] = useState<string>();
+  // The frame's, not the page's: the workspace's key below draws the page, and its offer, afresh.
+  const offerPlace = useOfferPlace();
   // Once a role is held, so nothing is offered to a reader the shell cannot place.
   const offersJumpTo = visible.home !== undefined;
   const jumping = useJumping(offersJumpTo);
@@ -176,6 +178,7 @@ export function Frame(properties: {
                   region={region}
                   picked={[pickedTab, pickTab]}
                   handed={properties.page}
+                  offerPlace={offerPlace}
                 />
               </BreadcrumbLastPartSlot>
             </div>
@@ -200,7 +203,7 @@ export function WorkspaceFrame(properties: { readonly page?: Handed }) {
       here={
         held === undefined
           ? undefined
-          : { name: held.workspace.name, workspaceId: held.workspace.id }
+          : { name: held.workspace.name, workspaceId: held.workspace.id, role: held.role }
       }
       person={held === undefined ? undefined : { name: held.person.name, role: held.role }}
       // Offered to the operator alone: a way in anyone else would only be refused at.
@@ -243,6 +246,7 @@ function ToolbarAndPage(properties: {
   readonly region: Region | undefined;
   readonly picked: PickedTab;
   readonly handed: Handed | undefined;
+  readonly offerPlace: OfferPlace;
 }) {
   const { region } = properties;
   // Held in state, so the page's head draws once the place it draws into is on the page.
@@ -251,6 +255,7 @@ function ToolbarAndPage(properties: {
   return (
     <PageTabsRoot tabs={region?.toolbar.tabs} picked={properties.picked}>
       <PasskeyOffer
+        place={properties.offerPlace}
         onDismissed={() => {
           document.getElementById(PAGE)?.focus();
         }}

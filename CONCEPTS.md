@@ -1893,6 +1893,15 @@ count and the page's primary action.
 So a page reads where the person is, how many, then what they can do. A list under an open *tab*
 keeps its own heading for a screen reader alone, since the tab already names it.
 
+### marked region
+
+_Internal._ the design system's marked primitive: a transparent box with one hairline and a
+registration mark on each corner, drawn round a figure or a region of a page and never round
+content.
+
+Not the frame, which is the shell a workspace or the *console* is drawn in. The design system's
+readme rations the marks: one marked level in a stack, three marked objects on a page.
+
 ### selection bar
 
 The strip above a list that shows only while some of its rows are ticked.
@@ -1950,8 +1959,8 @@ pages and as the browser tab's icon. Its accessible name is `better-answers`.
 The control in the *top band*'s second cell naming the workspace being read and listing every
 workspace the person is a member of.
 
-Choosing one takes them to its *home*, and *All workspaces* opens the workspace picker. It lists the
-*console* to the operator alone.
+Each workspace is listed with the person's role there. Choosing one takes them to its *home*, and
+*All workspaces* opens the workspace picker. It lists the *console* to the operator alone.
 
 ### breadcrumb
 

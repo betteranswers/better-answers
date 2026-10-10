@@ -32,7 +32,7 @@ Every UI ticket carries that acceptance line. Every interactive element is a nat
 
 ## Draw the blueprint with its parts
 
-A page draws a card with `Card` (`shared/ui/card.tsx`), a framed region with `Frame` and the grid behind a page with `GridPattern` (`shared/blueprint.tsx`). A registration mark is `Card`'s `marks`, `Frame` or the primary button, and `packages/design-system/readme.md` rations them: one marked level per stack, three marked objects a page. `test/blueprint-in-one-place.test.ts` holds the first rule, and the browser suite's accessibility gate the count.
+A page draws a card with `Card` (`shared/ui/card.tsx`), a marked region with `MarkedRegion` and the grid behind a page with `GridPattern` (`shared/blueprint.tsx`). A registration mark is `Card`'s `marks`, `MarkedRegion` or the primary button, and `packages/design-system/readme.md` rations them: one marked level per stack, three marked objects a page. `test/blueprint-in-one-place.test.ts` holds the first rule, and the browser suite's accessibility gate the count.
 
 ## Flip the theme on `<html>` alone
 

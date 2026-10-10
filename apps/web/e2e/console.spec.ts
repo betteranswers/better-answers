@@ -16,7 +16,7 @@ import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
-import { PRODUCT_NAME } from "@/shared/words.ts";
+import { CLEAR_WORDS, PRODUCT_NAME } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -43,6 +43,7 @@ import {
   switcherOf,
   withAnAuthenticator,
 } from "./harness.ts";
+import { refusedFromNowOn } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -66,6 +67,9 @@ const theConsoleOffered = async (page: Page, workspaceName: string) => {
   await expect(theConsole).toBeVisible();
   return theConsole;
 };
+
+/** An item of the switcher reads its workspace's name, then the person's role there. */
+const listedAs = (name: string, role: "Admin" | "Viewer"): string => `${name} ${role}`;
 
 const listOf = (page: Page) => page.getByRole("region", { name: WORKSPACES_WORDS.heading });
 
@@ -151,7 +155,7 @@ test.describe("the way into the console", () => {
 
     await switcherOf(page, workspace.name).click();
     const menu = switcherMenuOf(page, workspace.name);
-    await expect(menu.getByRole("menuitemradio")).toHaveText([workspace.name]);
+    await expect(menu.getByRole("menuitemradio")).toHaveText([listedAs(workspace.name, "Admin")]);
     await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES]);
     await page.keyboard.press("Escape");
 
@@ -248,8 +252,11 @@ test.describe("the way into the console", () => {
 
     await switcherOf(page, CONSOLE.name).click();
     const menu = switcherMenuOf(page, CONSOLE.name);
-    // No workspace is open in the console, so the list reads in name order alone.
-    await expect(menu.getByRole("menuitemradio")).toHaveText([second.name, workspace.name]);
+    // No workspace is open in the console, so the list reads in name order, each role its own.
+    await expect(menu.getByRole("menuitemradio")).toHaveText([
+      listedAs(second.name, "Viewer"),
+      listedAs(workspace.name, "Admin"),
+    ]);
     await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES]);
     await passesTheAccessibilityGate();
 
@@ -327,7 +334,7 @@ test.describe("the console's Workspaces page", () => {
     await expect(listOf(page)).toContainText(WORKSPACES_WORDS.noneMatch(nowhere));
     await expect(countOf(page)).toHaveText(WORKSPACES_WORDS.matching(0, nowhere));
     await passesTheAccessibilityGate();
-    await listOf(page).getByRole("button", { name: "Clear filters" }).click();
+    await listOf(page).getByRole("button", { name: CLEAR_WORDS.search }).click();
 
     await expect(searchOf(page)).toHaveValue("");
     await expect(searchOf(page)).toBeFocused();
@@ -381,6 +388,29 @@ test.describe("the console's Workspaces page", () => {
     await expect(listOf(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
     await expect(listOf(page)).not.toContainText(NOT_THE_OPERATOR);
     await expect(listOf(page).getByRole("table")).toHaveCount(0);
+  });
+
+  test("keeps Every workspace's search and focus through a refused re-read", async ({
+    page,
+    context,
+    request,
+  }) => {
+    await theOperator(page, request, "Colne Pressings");
+    await page.goto(EVERY_WORKSPACE);
+    await expect(listOf(page).getByRole("table")).toBeVisible();
+    await searchOf(page).fill("colne");
+    await expect(searchOf(page)).toBeFocused();
+
+    await refusedFromNowOn(page, "console.workspaces.list");
+    // The query library reads every list again as the network comes back.
+    await context.setOffline(true);
+    await context.setOffline(false);
+
+    await expect(listOf(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
+    await expect(listOf(page).getByRole("table")).toHaveCount(0);
+    await expect(searchOf(page)).toBeVisible();
+    await expect(searchOf(page)).toBeFocused();
+    await expect(searchOf(page)).toHaveValue("colne");
   });
 
   test("closes the console on entry once the mark is cleared", async ({ page, request }) => {

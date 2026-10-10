@@ -203,7 +203,7 @@ function RenameAPasskey(properties: {
         readOnly={renaming.isPending}
         aria-describedby={said === undefined ? undefined : refusedId}
         aria-invalid={blank}
-        className="max-w-sm"
+        className="h-8 max-w-sm"
         value={name}
         onChange={(event) => {
           setName(event.target.value);

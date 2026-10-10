@@ -3,7 +3,7 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
 import { goHome } from "@/app/words.ts";
-import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
+import { MODEL_CHOICES_WORDS, providerWordOf } from "@/features/model-choices/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
 
@@ -23,17 +23,41 @@ const LIST_BUDGET_MS = 1000;
 
 const modelChoicesCard = (page: Page) => page.getByRole("region", { name: "Model choices" });
 
-const ANSWERING_AND_EMBEDDING: readonly SeedModelChoice[] = [
-  { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-  { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
+const ANSWERING: SeedModelChoice = {
+  purpose: "answering",
+  provider: "anthropic",
+  model: "claude-sonnet-5",
+};
+
+const EMBEDDING: SeedModelChoice = {
+  purpose: "embedding",
+  provider: "mistral",
+  model: "mistral-embed",
+};
+
+const ANSWERING_AND_EMBEDDING: readonly SeedModelChoice[] = [ANSWERING, EMBEDDING];
+
+const EVERY_PURPOSE: readonly SeedModelChoice[] = [
+  { purpose: "extraction", provider: "anthropic", model: "claude-haiku-5" },
+  { purpose: "enrichment", provider: "local", model: "llama-4" },
+  ANSWERING,
+  { purpose: "judging", provider: "anthropic", model: "claude-opus-5" },
+  EMBEDDING,
 ];
 
-const embeddingRow = (page: Page) =>
+const UNNAMED_PROVIDER = "acme-inference";
+
+const PURPOSES = ["Extraction", "Enrichment", "Answering", "Judging", "Embedding"] as const;
+
+const rowOf = (page: Page, purpose: (typeof PURPOSES)[number]) =>
   modelChoicesCard(page)
     .getByRole("listitem")
-    .filter({ has: page.getByRole("heading", { level: 3, name: "Embedding" }) });
+    .filter({ has: page.getByRole("heading", { level: 3, name: purpose }) });
 
-const PURPOSES = ["Extraction", "Enrichment", "Answering", "Judging", "Embedding"];
+const embeddingRow = (page: Page) => rowOf(page, "Embedding");
+
+const whoSetsLine = (page: Page) =>
+  modelChoicesCard(page).getByText(MODEL_CHOICES_WORDS.whoSets, { exact: true });
 
 const models = menuGroupIn(CONTROL_CENTRE, "models");
 
@@ -83,27 +107,54 @@ test.describe("the Models and spend page's model choices card", () => {
 
     const card = modelChoicesCard(page);
     await expect(card.getByRole("heading", { level: 3 })).toHaveText(PURPOSES);
-    await expect(card).toContainText("anthropic");
-    await expect(card).toContainText("claude-sonnet-5");
+    await expect(card).toContainText(providerWordOf(ANSWERING.provider));
+    await expect(card).toContainText(ANSWERING.model);
 
     const everything = page.locator("body");
     await expect(everything).not.toContainText("openai");
+    await expect(everything).not.toContainText(providerWordOf("openai"));
     await expect(everything).not.toContainText("gpt-5-not-mine");
     await expect(everything).not.toContainText("google");
+    await expect(everything).not.toContainText(providerWordOf("google"));
     await expect(everything).not.toContainText("gemini-not-mine");
     await expect(everything).not.toContainText(theirs.name);
   });
 
-  test("says which purposes have no model choice, keeping five rows", async ({ page, request }) => {
+  test("names a set purpose's provider, never by its stored id", async ({ page, request }) => {
     await signedInWith(page, request, {
-      name: "Acme Joinery",
-      modelChoices: [{ purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" }],
+      name: "Calderdale Patterns",
+      modelChoices: ANSWERING_AND_EMBEDDING,
     });
+
+    await expect(
+      rowOf(page, "Answering").getByText(providerWordOf(ANSWERING.provider), { exact: true }),
+    ).toBeVisible();
+    await expect(
+      embeddingRow(page).getByText(providerWordOf(EMBEDDING.provider), { exact: true }),
+    ).toBeVisible();
+
+    // Exact, because a model's id can hold its provider's: mistral-embed.
+    await expect(page.getByText(ANSWERING.provider, { exact: true })).toHaveCount(0);
+    await expect(page.getByText(EMBEDDING.provider, { exact: true })).toHaveCount(0);
+  });
+
+  test("shows a provider it cannot name as its stored id", async ({ page, request }) => {
+    await signedInWith(page, request, {
+      name: "Airedale Springs",
+      modelChoices: [{ purpose: "judging", provider: UNNAMED_PROVIDER, model: "acme-large" }],
+    });
+
+    await expect(rowOf(page, "Judging").getByText(UNNAMED_PROVIDER, { exact: true })).toBeVisible();
+  });
+
+  test("keeps five rows and says once who sets a model", async ({ page, request }) => {
+    await signedInWith(page, request, { name: "Acme Joinery", modelChoices: [ANSWERING] });
 
     const card = modelChoicesCard(page);
     await expect(card.getByRole("listitem")).toHaveCount(5);
     await expect(card.getByRole("heading", { level: 3 })).toHaveText(PURPOSES);
     await expect(card.getByText(MODEL_CHOICES_WORDS.unset, { exact: true })).toHaveCount(4);
+    await expect(whoSetsLine(page)).toHaveCount(1);
 
     const embedding = embeddingRow(page);
     await expect(embedding).toContainText(MODEL_CHOICES_WORDS.unset);
@@ -119,23 +170,30 @@ test.describe("the Models and spend page's model choices card", () => {
 
     const card = modelChoicesCard(page);
     await expect(card.getByText(MODEL_CHOICES_WORDS.noneSet, { exact: true })).toBeVisible();
+    await expect(whoSetsLine(page)).toBeVisible();
     await expect(card.getByRole("list")).toHaveCount(0);
     await expect(card.getByRole("heading", { level: 3 })).toHaveCount(0);
     await expect(card).not.toContainText(MODEL_CHOICES_WORDS.fixedReason);
+  });
+
+  test("omits who sets a model once every purpose has one", async ({ page, request }) => {
+    await signedInWith(page, request, { name: "Swaledale Gears", modelChoices: EVERY_PURPOSE });
+
+    const card = modelChoicesCard(page);
+    await expect(card.getByRole("listitem")).toHaveCount(5);
+    await expect(card.getByText(MODEL_CHOICES_WORDS.unset, { exact: true })).toHaveCount(0);
+    await expect(whoSetsLine(page)).toHaveCount(0);
   });
 
   test("says why the embedding model choice is fixed, with dimensions", async ({
     page,
     request,
   }) => {
-    await signedInWith(page, request, {
-      name: "Halifax Fabrication",
-      modelChoices: [{ purpose: "embedding", provider: "mistral", model: "mistral-embed" }],
-    });
+    await signedInWith(page, request, { name: "Halifax Fabrication", modelChoices: [EMBEDDING] });
 
     const embedding = embeddingRow(page);
-    await expect(embedding).toContainText("mistral");
-    await expect(embedding).toContainText("mistral-embed");
+    await expect(embedding).toContainText(providerWordOf(EMBEDDING.provider));
+    await expect(embedding).toContainText(EMBEDDING.model);
 
     await expect(embedding).toContainText(MODEL_CHOICES_WORDS.fixed);
 
@@ -209,6 +267,7 @@ test.describe("the Models and spend page's model choices card", () => {
       - region "Model choices":
         - heading "Model choices" [level=2]
         - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.lead)}
+        - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.whoSets)}
         - list:
           - listitem:
             - heading "Extraction" [level=3]
@@ -219,18 +278,18 @@ test.describe("the Models and spend page's model choices card", () => {
           - listitem:
             - heading "Answering" [level=3]
             - term: Provider
-            - definition: anthropic
+            - definition: ${JSON.stringify(providerWordOf(ANSWERING.provider))}
             - term: Model
-            - definition: claude-sonnet-5
+            - definition: ${ANSWERING.model}
           - listitem:
             - heading "Judging" [level=3]
             - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.unset)}
           - listitem:
             - heading "Embedding" [level=3]
             - term: Provider
-            - definition: mistral
+            - definition: ${JSON.stringify(providerWordOf(EMBEDDING.provider))}
             - term: Model
-            - definition: mistral-embed
+            - definition: ${EMBEDDING.model}
             - paragraph: ${JSON.stringify(`${MODEL_CHOICES_WORDS.fixed} ${EMBEDDING_DIMENSIONS} dimensions`)}
             - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.fixedReason)}
     `);

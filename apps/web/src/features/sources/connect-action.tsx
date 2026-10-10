@@ -21,7 +21,7 @@ import {
 import { outcomeOfFailure, refusedFor } from "./refusal.tsx";
 import { SENSITIVITIES, EVERYONE, NARROWEST, useConnect } from "./sources-api.ts";
 import { SOURCES_KEYSTROKES } from "./sources-state.ts";
-import { AUDIENCE_WORDS, UPLOAD_CAP_MB } from "./words.ts";
+import { AUDIENCE_WORDS, CONNECT_WORDS, UPLOAD_CAP_MB } from "./words.ts";
 
 const UPLOAD_BYTE_CAP = UPLOAD_CAP_MB * 1024 * 1024;
 
@@ -149,7 +149,7 @@ export function ConnectAction() {
         open={open}
         onOpenChange={setOpen}
         title="Connect a document"
-        consequence="The connected source starts unpublished: nobody but an Admin reads a word of it until you publish it. Its sync starts once the file lands."
+        consequence={CONNECT_WORDS.consequence}
         commit={
           <Button type="submit" form={ids.form} disabled={connect.isPending}>
             {connect.isPending ? "Connecting the document" : "Connect the document"}
@@ -192,7 +192,7 @@ export function ConnectAction() {
               </SelectContent>
             </Select>
             <p id={`${ids.audience}-hint`} className="text-sm text-muted-foreground">
-              Named groups are chosen here once the People page lists them.
+              {CONNECT_WORDS.audienceHint}
             </p>
           </div>
 

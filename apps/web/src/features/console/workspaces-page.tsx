@@ -138,18 +138,19 @@ function WorkspacesList() {
       />
       <ReadSaid read={listed} loading={WORDS.loading} />
 
-      {read === undefined ? null : (
-        <Card className="mt-4">
-          <FilterRow
-            search={{
-              label: WORDS.search,
-              value: narrowed.typed,
-              onChange: narrowed.setTyped,
-              keystroke: WORKSPACES_KEYSTROKES.search,
-              inputRef: narrowed.searchRef,
-            }}
-            columns={{ columns: HIDEABLE, hidden, onHiddenChange: setHidden }}
-          />
+      <Card className="mt-4">
+        {/* Drawn whatever the read says, so a refused read of it again takes no focus from the search. */}
+        <FilterRow
+          search={{
+            label: WORDS.search,
+            value: narrowed.typed,
+            onChange: narrowed.setTyped,
+            keystroke: WORKSPACES_KEYSTROKES.search,
+            inputRef: narrowed.searchRef,
+          }}
+          columns={{ columns: HIDEABLE, hidden, onHiddenChange: setHidden }}
+        />
+        {read === undefined ? null : (
           <GridTable
             table={table}
             caption={WORDS.caption}
@@ -165,8 +166,8 @@ function WorkspacesList() {
               </NothingListed>
             }
           />
-        </Card>
-      )}
+        )}
+      </Card>
     </section>
   );
 }

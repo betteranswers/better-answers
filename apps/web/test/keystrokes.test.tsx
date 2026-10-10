@@ -10,6 +10,13 @@ import {
   usePageKeystrokes,
   type Keystroke,
 } from "@/shared/keystrokes.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui/select.tsx";
 
 afterEach(() => {
   cleanup();
@@ -156,6 +163,25 @@ describe("the shell's keystrokes list", () => {
       "isConnected",
       true,
     );
+  });
+
+  it("leaves a key typed on a select’s trigger to it", () => {
+    render(
+      <AShell page="Members">
+        <Select defaultValue="Viewer">
+          <SelectTrigger aria-label="Role">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Viewer">Viewer</SelectItem>
+          </SelectContent>
+        </Select>
+      </AShell>,
+    );
+
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "?" });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("stops answering `?` once single-key keystrokes are turned off", () => {

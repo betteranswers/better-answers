@@ -447,3 +447,20 @@ test("the passkey field and its button share one height", async ({ page, request
   expect(field, "the passkey field has no box to measure").not.toBeNull();
   expect(field?.height, "the passkey field and its button differ in height").toBe(button?.height);
 });
+
+test("the authenticator's code field and its button share one height", async ({
+  page,
+  request,
+}) => {
+  await anAdminOnSetup(page, request);
+  await authenticatorInstead(page).click();
+  await expect(codeField(page)).toBeVisible();
+
+  const [field, button] = await Promise.all([
+    codeField(page).boundingBox(),
+    page.getByRole("button", { name: AUTHENTICATOR_WORDS.finish }).boundingBox(),
+  ]);
+
+  expect(field, "the code field has no box to measure").not.toBeNull();
+  expect(field?.height, "the code field and its button differ in height").toBe(button?.height);
+});

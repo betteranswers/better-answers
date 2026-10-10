@@ -1570,6 +1570,43 @@ test.describe("a member's display name, flagged to better-answers support", () =
   });
 });
 
+/** A card's inner gap and a little over: more beneath its last line is an empty band. */
+const ONE_GAP_PX = 16;
+
+/** Not a number where nothing is drawn, so a measure from it fails. */
+const bottomOf = async (drawn: Locator): Promise<number> => {
+  const box = await drawn.boundingBox();
+  return box === null ? Number.NaN : box.y + box.height;
+};
+
+/** An empty outcome line that took its own gap would hold the card open under its last line. */
+const endsUnderItsLastLine = async (card: Locator, lastLine: Locator): Promise<void> => {
+  const named = await card.getByRole("heading").innerText();
+  // Found by role, so it stands in the accessibility tree and its first outcome is announced.
+  await expect(card.getByRole("status"), `${named}: the empty outcome region`).toHaveText("");
+  const [cardEnds, lineEnds] = await Promise.all([bottomOf(card), bottomOf(lastLine)]);
+  expect(
+    cardEnds - lineEnds,
+    `${named}: an empty band stands under the card's last line`,
+  ).toBeLessThanOrEqual(ONE_GAP_PX);
+};
+
+test.describe("a member's page before any action's outcome", () => {
+  test("ends each card under its last line, its status standing", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Swale Bookbinders");
+    await openedByName(page, "Priya Shah");
+
+    for (const card of [rolePickerRegion(page), credentialsRegion(page), displayNameRegion(page)]) {
+      await endsUnderItsLastLine(card, card.getByRole("paragraph").last());
+    }
+    // Removal's confirmation is closed, so the button that opens it is the last line shown.
+    await endsUnderItsLastLine(
+      removalOf(page),
+      removalOf(page).getByRole("button", { name: "Remove Priya Shah", exact: true }),
+    );
+  });
+});
+
 test.describe("the People page's words", () => {
   // Every People area joins this test as it is built: the product's word is workspace.
   test("says workspace, never organisation, on every People page", async ({ page, request }) => {

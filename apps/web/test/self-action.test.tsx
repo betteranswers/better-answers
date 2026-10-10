@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
 import { useChangeRole, useReaderId } from "@/features/people/people-api.ts";
 import { HomeLine, useIncludesYou, useSelfActionHome } from "@/features/people/self-action.tsx";
-import { useTRPC } from "@/shared/api/trpc.ts";
+import { createApiProxy, useTRPC } from "@/shared/api/trpc.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 
@@ -96,7 +96,8 @@ const actingAt = async () => {
 };
 
 /** The chooser's list, as the band's switcher leaves it once its menu has been opened and shut. */
-const WORKSPACES_HELD = ["auth", "workspaces"];
+const workspacesHeldIn = (clients: AppClients) =>
+  createApiProxy(clients.apiClient, clients.queryClient).person.workspaces.queryKey();
 
 /** A search read as an Admin and left behind: no page shows it while People is open. */
 const MATCHES_HELD = [
@@ -169,7 +170,8 @@ describe("going home after an action on yourself", () => {
 
   it("sends a self-removed Admin in no workspace to the chooser", async () => {
     const { router, clients } = await actingAt();
-    clients.queryClient.setQueryData(WORKSPACES_HELD, [{ id: "w", name: "The workspace left" }]);
+    const held = workspacesHeldIn(clients);
+    clients.queryClient.setQueryData(held, []);
 
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the session has ended")));
     fireEvent.click(screen.getByRole("button", { name: "Removed myself" }));
@@ -177,7 +179,7 @@ describe("going home after an action on yourself", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe(CHOOSER));
     expect(await screen.findByText("Held: none")).toBeDefined();
     expect(
-      clients.queryClient.getQueryData(WORKSPACES_HELD),
+      clients.queryClient.getQueryData(held),
       "the chooser would open on the workspace left",
     ).toBeUndefined();
   });

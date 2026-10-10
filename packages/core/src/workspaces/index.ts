@@ -42,6 +42,7 @@ import {
 } from "../store/postgres/index.ts";
 import { hasNoDisplayName } from "./display-name.ts";
 import { endTokens, REVOKED_EVERYWHERE, type TokensEnded } from "./grants.ts";
+import { type WorkspaceHeld, workspacesOf } from "./people.ts";
 import { promoting } from "./promotion.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
@@ -581,6 +582,33 @@ export const workspacesHeldBy = async (
   );
   if (!held.ok) return err(held.error);
   return ok(held.value);
+};
+
+type ReadWorkspacesHeldInput = {
+  /** The session's own person, never one the request names. */
+  readonly personId: string;
+};
+
+/**
+ * In name order; empty, not refused, for an id no person holds. A workspace where the person's
+ * sign-ins were ended stays listed, since entering it is what refuses them.
+ */
+export const readWorkspacesHeld = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: ReadWorkspacesHeldInput,
+): Promise<Result<readonly WorkspaceHeld[], "malformed" | Error>> => {
+  const person = boundarySchemas.user.select.shape.id.safeParse(input.personId);
+  if (!person.success) return err("malformed");
+  const personId = person.data;
+
+  return attempt(() =>
+    withIdentityRead(
+      platform,
+      door,
+      async (tx) => (await workspacesOf(tx, [personId])).get(personId) ?? [],
+    ),
+  );
 };
 
 export const workspaceIds = async (

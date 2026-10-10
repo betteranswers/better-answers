@@ -41,7 +41,7 @@ const keystrokesAreOn = (): boolean => onThisBrowser()?.getItem(KEPT_UNDER) !== 
  * dialog or menu that control's.
  */
 const OWNED_ELSEWHERE =
-  'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
+  'input, textarea, select, [contenteditable="true"], [role="combobox"], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 
 const isThePages = (event: KeyboardEvent): boolean => {
   if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return false;

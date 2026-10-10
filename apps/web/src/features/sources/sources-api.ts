@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 
 import { uploadOptions, type UploadDescriptor } from "@/shared/api/link.ts";
@@ -226,6 +226,20 @@ export const useNarrowDocuments = () => {
       onSettled: (_narrowed, _refusal, asked) => reconcile(asked.connectedSourceId),
     }),
   );
+};
+
+/**
+ * A bulk action's answer reaches the page through the review that sent it, so that review stays
+ * drawn until the api has answered.
+ */
+export const useBulkActionPending = (): boolean => {
+  const api = useTRPC();
+  const keeping = useIsMutating({ mutationKey: api.sources.keepInText.mutationKey() });
+  const narrowing = useIsMutating({ mutationKey: api.sources.narrowDocuments.mutationKey() });
+  const dismissing = useIsMutating({
+    mutationKey: api.sources.dismissAsNotSpecialCategory.mutationKey(),
+  });
+  return keeping + narrowing + dismissing > 0;
 };
 
 export const useDismissAsNotSpecialCategory = () => {

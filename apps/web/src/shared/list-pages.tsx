@@ -14,6 +14,8 @@ type State =
   | {
       readonly kind: "emptied";
       readonly words: string;
+      /** What the button clears, since a list with a search alone has no filters. */
+      readonly clearWords: string;
       readonly onClear: () => void;
       readonly focusAfterClear: FocusTarget;
     }
@@ -75,7 +77,7 @@ export function ListState(properties: { readonly state: State }) {
           title={state.words}
           action={
             <StateAction onPress={state.onClear} focusAfter={state.focusAfterClear}>
-              Clear filters
+              {state.clearWords}
             </StateAction>
           }
         />

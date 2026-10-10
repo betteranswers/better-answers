@@ -1,28 +1,45 @@
+import type { ReactNode } from "react";
+
 import { SummaryRow as Row } from "@/shared/summary-row.tsx";
-import { Badge } from "@/shared/ui/badge.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
+import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { counted } from "@/shared/words.ts";
 
+import { Review } from "./review.tsx";
 import { NARROWEST, widestAlready, type ListedConnectedSource } from "./sources-api.ts";
 import { SOURCES_KEYSTROKES } from "./sources-state.ts";
 import {
   AUDIENCE_WORDS,
+  CONNECTOR_WORDS,
+  DESTINATIONS_TERM,
   destinationOf,
   instantWords,
   lastSyncedWords,
   NEEDS_OCR,
-  unreadableWordOf,
   retentionOf,
+  ROW_ACTIONS,
   STATE_MEANS,
+  STATE_WORDS,
+  unreadableCounted,
+  unreadableWordOf,
 } from "./words.ts";
 
-export type ConnectedSourceActions = {
+type ConnectedSourceActions = {
   readonly onFocusConnectedSource: (connectedSourceId: string) => void;
+  /** The row's button is a disclosure: a second press closes the review it opened. */
   readonly onReview: (connectedSourceId: string) => void;
   readonly onPublish: (connectedSource: ListedConnectedSource) => void;
   readonly onNarrow: (connectedSource: ListedConnectedSource) => void;
   readonly onWiden: (connectedSource: ListedConnectedSource) => void;
+};
+
+/** What is open inside a row: one review, and one narrowing or widening, on the page at a time. */
+type OpenInARow = {
+  readonly reviewing: string | undefined;
+  /** A bulk action waits on its answer, so no row's button opens, closes or replaces a review. */
+  readonly reviewHeld: boolean;
+  readonly panel: { readonly connectedSourceId: string; readonly part: ReactNode } | undefined;
 };
 
 export const connectedSourceHeadingId = (connectedSourceId: string): string =>
@@ -40,7 +57,7 @@ function MoreAbout(properties: {
   readonly onFocus: () => void;
 }) {
   const { connectedSource } = properties;
-  const wantingOcr = connectedSource.unreadableByReason[NEEDS_OCR] ?? 0;
+  const needingOcr = connectedSource.unreadableByReason[NEEDS_OCR] ?? 0;
 
   return (
     <Collapsible className="mt-2">
@@ -56,21 +73,13 @@ function MoreAbout(properties: {
       </CollapsibleTrigger>
       <CollapsibleContent>
         <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-          <Row term="State">
-            {connectedSource.state}: {STATE_MEANS[connectedSource.state]}
+          <Row term="State">{STATE_MEANS[connectedSource.state]}</Row>
+          <Row term={DESTINATIONS_TERM}>
+            {connectedSource.destination.map((word) => (
+              <p key={word}>{destinationOf(word).means}</p>
+            ))}
           </Row>
-          {connectedSource.destination.map((word) => {
-            const destination = destinationOf(word);
-            return (
-              <Row key={word} term="Destination">
-                {destination.word}: {destination.means}
-              </Row>
-            );
-          })}
-          <Row term="Retention">
-            {retentionOf(connectedSource.retentionClass).word}:{" "}
-            {retentionOf(connectedSource.retentionClass).means}
-          </Row>
+          <Row term="Retention">{retentionOf(connectedSource.retentionClass).means}</Row>
           <Row term="Documents">{connectedSource.documentCount}</Row>
           <Row term="Passages">{connectedSource.passageCount}</Row>
           <Row term="Published">
@@ -83,10 +92,7 @@ function MoreAbout(properties: {
               "None"
             ) : (
               <>
-                <p>
-                  {counted(connectedSource.unreadable.length, "document", "documents")} unreadable,{" "}
-                  {counted(wantingOcr, "wants", "want")} OCR.
-                </p>
+                <p>{unreadableCounted(connectedSource.unreadable.length, needingOcr)}</p>
                 <ul>
                   {connectedSource.unreadable.map((document) => (
                     <li key={document.documentId}>
@@ -103,13 +109,97 @@ function MoreAbout(properties: {
   );
 }
 
+function RowAction(properties: {
+  readonly action: keyof typeof ROW_ACTIONS;
+  readonly name: string;
+  readonly expanded?: boolean;
+  readonly held?: boolean;
+  readonly onFocus: () => void;
+  readonly onPress: () => void;
+}) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      aria-expanded={properties.expanded}
+      // Not `disabled`: a disabled button drops the focus the keyboard left on it.
+      aria-disabled={properties.held ? true : undefined}
+      className="aria-disabled:opacity-50"
+      aria-keyshortcuts={SOURCES_KEYSTROKES[properties.action].key}
+      onFocus={properties.onFocus}
+      onClick={properties.onPress}
+    >
+      {ROW_ACTIONS[properties.action]}
+      <span className="sr-only"> {properties.name}</span>
+    </Button>
+  );
+}
+
+function RowActions(properties: {
+  readonly connectedSource: ListedConnectedSource;
+  readonly actions: ConnectedSourceActions;
+  readonly reviewing: boolean;
+  readonly reviewHeld: boolean;
+  readonly onFocus: () => void;
+}) {
+  const { connectedSource, actions, onFocus } = properties;
+  const { name } = connectedSource;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <RowAction
+        action="review"
+        name={name}
+        expanded={properties.reviewing}
+        held={properties.reviewHeld}
+        onFocus={onFocus}
+        onPress={() => {
+          actions.onReview(connectedSource.connectedSourceId);
+        }}
+      />
+      {connectedSource.state === "indexed" ? (
+        <RowAction
+          action="publish"
+          name={name}
+          onFocus={onFocus}
+          onPress={() => {
+            actions.onPublish(connectedSource);
+          }}
+        />
+      ) : null}
+      {connectedSource.sensitivity === NARROWEST ? null : (
+        <RowAction
+          action="narrow"
+          name={name}
+          onFocus={onFocus}
+          onPress={() => {
+            actions.onNarrow(connectedSource);
+          }}
+        />
+      )}
+      {widestAlready(connectedSource) ? null : (
+        <RowAction
+          action="widen"
+          name={name}
+          onFocus={onFocus}
+          onPress={() => {
+            actions.onWiden(connectedSource);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 function ConnectedSourceItem(properties: {
   readonly connectedSource: ListedConnectedSource;
   readonly actions: ConnectedSourceActions;
+  readonly reviewing: boolean;
+  readonly reviewHeld: boolean;
+  readonly panel: ReactNode;
 }) {
   const { connectedSource, actions } = properties;
   const headingId = connectedSourceHeadingId(connectedSource.connectedSourceId);
-  const named = <span className="sr-only"> {connectedSource.name}</span>;
   /** Every control in the row names its connected source as the one in focus, for the keystrokes. */
   const focused = () => {
     actions.onFocusConnectedSource(connectedSource.connectedSourceId);
@@ -124,73 +214,30 @@ function ConnectedSourceItem(properties: {
         <h3 id={headingId} tabIndex={-1} className="font-medium text-foreground">
           {connectedSource.name}
         </h3>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            aria-keyshortcuts={SOURCES_KEYSTROKES.review.key}
-            onFocus={focused}
-            onClick={() => {
-              actions.onReview(connectedSource.connectedSourceId);
-            }}
-          >
-            Review{named}
-          </Button>
-          {connectedSource.state === "indexed" ? (
-            <Button
-              variant="outline"
-              size="sm"
-              aria-keyshortcuts={SOURCES_KEYSTROKES.publish.key}
-              onFocus={focused}
-              onClick={() => {
-                actions.onPublish(connectedSource);
-              }}
-            >
-              Publish{named}
-            </Button>
-          ) : null}
-          {connectedSource.sensitivity === NARROWEST ? null : (
-            <Button
-              variant="outline"
-              size="sm"
-              aria-keyshortcuts={SOURCES_KEYSTROKES.narrow.key}
-              onFocus={focused}
-              onClick={() => {
-                actions.onNarrow(connectedSource);
-              }}
-            >
-              Narrow{named}
-            </Button>
-          )}
-          {widestAlready(connectedSource) ? null : (
-            <Button
-              variant="outline"
-              size="sm"
-              aria-keyshortcuts={SOURCES_KEYSTROKES.widen.key}
-              onFocus={focused}
-              onClick={() => {
-                actions.onWiden(connectedSource);
-              }}
-            >
-              Widen{named}
-            </Button>
-          )}
-        </div>
+        <RowActions
+          connectedSource={connectedSource}
+          actions={actions}
+          reviewing={properties.reviewing}
+          reviewHeld={properties.reviewHeld}
+          onFocus={focused}
+        />
       </div>
 
-      <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-        <Row term="Connector">{connectedSource.connector}</Row>
+      <dl className="mt-2 grid grid-cols-[max-content_1fr] items-baseline gap-x-4 gap-y-1">
+        <Row term="Connector">{CONNECTOR_WORDS[connectedSource.connector]}</Row>
         <Row term="Sensitivity">
-          <Badge variant="outline">{connectedSource.sensitivity}</Badge>
+          <Pill>{connectedSource.sensitivity}</Pill>
         </Row>
         <Row term="Audience">{audienceWords(connectedSource)}</Row>
         <Row term="State">
-          <Badge variant="outline">{connectedSource.state}</Badge>
+          <Pill>{STATE_WORDS[connectedSource.state]}</Pill>
         </Row>
         <Row term="Last synced">{lastSyncedWords(connectedSource.lastSync)}</Row>
       </dl>
 
       <MoreAbout connectedSource={connectedSource} onFocus={focused} />
+      {properties.panel}
+      {properties.reviewing ? <Review connectedSource={connectedSource} /> : null}
     </li>
   );
 }
@@ -198,16 +245,25 @@ function ConnectedSourceItem(properties: {
 export function ConnectedSourceList(properties: {
   readonly connectedSources: readonly ListedConnectedSource[];
   readonly actions: ConnectedSourceActions;
+  readonly open: OpenInARow;
 }) {
+  const { open } = properties;
+
   return (
     <ul className="mt-4">
-      {properties.connectedSources.map((connectedSource) => (
-        <ConnectedSourceItem
-          key={connectedSource.connectedSourceId}
-          connectedSource={connectedSource}
-          actions={properties.actions}
-        />
-      ))}
+      {properties.connectedSources.map((connectedSource) => {
+        const id = connectedSource.connectedSourceId;
+        return (
+          <ConnectedSourceItem
+            key={id}
+            connectedSource={connectedSource}
+            actions={properties.actions}
+            reviewing={open.reviewing === id}
+            reviewHeld={open.reviewHeld}
+            panel={open.panel?.connectedSourceId === id ? open.panel.part : null}
+          />
+        );
+      })}
     </ul>
   );
 }

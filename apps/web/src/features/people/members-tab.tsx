@@ -15,7 +15,7 @@ import { SelectionBar } from "@/shared/selection-bar.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 /* jscpd:ignore-end */
 import { useHiddenColumns } from "@/shared/wide-layout.ts";
-import { counted } from "@/shared/words.ts";
+import { CLEAR_WORDS, counted } from "@/shared/words.ts";
 
 import { useGroups } from "./groups-api.ts";
 import { InviteAction } from "./invite-action.tsx";
@@ -281,6 +281,7 @@ function NoOneMatches(properties: {
           narrowed.search === ""
             ? "No one matches these filters."
             : `No one matches “${narrowed.search}”.`,
+        clearWords: CLEAR_WORDS.filters,
         onClear: narrowed.clear,
         focusAfterClear: properties.focusAfterClear,
       }}

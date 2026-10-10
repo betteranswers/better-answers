@@ -2,8 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import {
-  useListOrganizations,
   useSwitchWorkspace,
+  useWorkspacesHeld,
   type SwitchedTo,
 } from "@/features/auth/auth-hooks.ts";
 import { noLongerAMemberOf, PICK_REFUSED, SWITCHER_UNREAD } from "@/features/auth/refusal-words.ts";
@@ -22,15 +22,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu.tsx";
+import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { ALL_WORKSPACES } from "./words.ts";
 
-/** Where the band says the person is: a workspace, or the console, which is none. */
-export type Here = { readonly name: string; readonly workspaceId: string | undefined };
+/**
+ * Where the band says the person is: a workspace and their role in it, or the console, which is
+ * none.
+ */
+export type Here = {
+  readonly name: string;
+  readonly workspaceId: string | undefined;
+  readonly role?: string | undefined;
+};
 
 type Switching = ReturnType<typeof useSwitchWorkspace>;
 
-type Listed = ReturnType<typeof useListOrganizations>;
+type ListRead = ReturnType<typeof useWorkspacesHeld>;
+
+/** A workspace as the menu lists it, with the person's role there. */
+type Listed = SwitchedTo & { readonly role: string | undefined };
 
 const switchOutcome = (switching: Switching): Outcome | undefined => {
   if (switching.isPending) return { tone: "said", words: PICKER_WORDS.opening };
@@ -40,7 +51,7 @@ const switchOutcome = (switching: Switching): Outcome | undefined => {
 };
 
 /** A list already held stands through a failed read of it again, so only a first read speaks. */
-const listOutcome = (list: Listed): Outcome | undefined => {
+const listOutcome = (list: ListRead): Outcome | undefined => {
   if (list.data !== undefined) return undefined;
   if (list.isFetching) return { tone: "said", words: PICKER_WORDS.reading };
   return list.isError ? refusedWith(SWITCHER_UNREAD) : undefined;
@@ -54,8 +65,11 @@ export const useWorkspaceSwitch = () => {
   const [open, setOpen] = useState(false);
   const [gone, setGone] = useState<readonly string[]>([]);
   // Read on opening alone, so a page load says nothing in the band and asks nothing of the api.
-  const list = useListOrganizations(open);
+  const list = useWorkspacesHeld(open);
   const switching = useSwitchWorkspace();
+  const workspaces: readonly Listed[] = (list.data ?? []).filter(
+    (workspace) => !gone.includes(workspace.id),
+  );
 
   return {
     open,
@@ -65,7 +79,7 @@ export const useWorkspaceSwitch = () => {
       setOpen(opening);
     },
     pending: switching.isPending,
-    workspaces: (list.data ?? []).filter((workspace) => !gone.includes(workspace.id)),
+    workspaces,
     switchTo: (to: SwitchedTo) => {
       if (switching.isPending) return;
       switching.mutate(to, {
@@ -82,15 +96,17 @@ export const useWorkspaceSwitch = () => {
 type WorkspaceSwitch = ReturnType<typeof useWorkspaceSwitch>;
 
 /**
- * The open workspace first, shown while the list is read; the rest by name, which the api never
- * orders.
+ * The open workspace first, from what the frame holds, so it shows while the list is read; the
+ * rest by name.
  */
-const listedFrom = (here: Here, workspaces: readonly SwitchedTo[]): readonly SwitchedTo[] => {
+const listedFrom = (here: Here, workspaces: readonly Listed[]): readonly Listed[] => {
   const { workspaceId } = here;
   const others = workspaces
     .filter((workspace) => workspace.id !== workspaceId)
     .toSorted((one, other) => one.name.localeCompare(other.name, "en-GB"));
-  return workspaceId === undefined ? others : [{ id: workspaceId, name: here.name }, ...others];
+  return workspaceId === undefined
+    ? others
+    : [{ id: workspaceId, name: here.name, role: here.role }, ...others];
 };
 
 /**
@@ -114,6 +130,16 @@ function WayOut(properties: {
         {properties.children}
       </Link>
     </DropdownMenuItem>
+  );
+}
+
+/** Inside the item, after the name, so a person reads where they hold which role. */
+function RoleTag(properties: { readonly role: string | undefined }) {
+  if (properties.role === undefined) return null;
+  return (
+    <Pill variant="outline" className="ml-auto px-2 py-0.5">
+      {properties.role}
+    </Pill>
   );
 }
 
@@ -153,7 +179,8 @@ export function WorkspaceSwitcher(properties: {
               value={workspace.id}
               disabled={switching.pending}
             >
-              <span className="wrap-anywhere">{workspace.name}</span>
+              <span className="wrap-anywhere">{workspace.name}</span>{" "}
+              <RoleTag role={workspace.role} />
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
