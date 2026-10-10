@@ -35,9 +35,11 @@ tags:
 
 **A refusal word** means one thing wherever it appears.
 
-- Its owning slice declares it once, and it is registered globally. The shared words (`malformed`, `role-forbids`, `not-found`) are the kernel's (`packages/core/src/kernel/vocabulary.ts`). The classes and the register are in `packages/core/src/kernel/refusal.ts`.
+- Its owning slice declares it once, in a vocabulary that is plain data. Importing a module registers nothing. The shared words (`malformed`, `role-forbids`, `not-found`) are the kernel's (`packages/core/src/kernel/vocabulary.ts`).
+- One module composes the catalogue: each owner's vocabulary under the owner's name (`packages/core/src/refusals/index.ts`). Every reader takes the words from it. A transport adds only its own, as the api adds its two (`apps/api/src/refusal.ts`).
+- The classes are in `packages/core/src/kernel/refusal.ts`, beside the function that reads a catalogue and throws on a word two owners declare.
 - It is classed by remedy: *unauthenticated*, *forbidden*, *absent*, *malformed*, *inapplicable*, *conflict* or *precondition*.
-- The register is append-only. A shipped word is never removed and never changes class.
+- The catalogue is append-only. A shipped word is never removed and never changes class.
 - `packages/core/test/refusal-words.test.ts` holds that every word is declared once, used and classed.
 
 **A refusal crosses each transport as `{ word, class }`**, through that transport's one crossing function. A malformed input adds its `fields`.
@@ -97,5 +99,7 @@ The full record, with its four amendments (T-232, T-230, T-338, the T-027 and T-
 A refusal naming items came with the people layout rework (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD1), and a ceiling counted inside an action with its invitations (KTD11).
 
 Amended 08/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, U17 and R11). What an entry asks core to do is now an *action*, the reader's word, in the code and in this record. It is declared by `declareAction`, the lint rule is `action-admits-before-await`, and the name an audit event is recorded under is its *audit action*, held in the audit logs' `action` column since migration 0073. Stored action names, such as `sources.document.narrowed`, stay as they were written (R22). The filename keeps the old word so references still resolve (KTD14). The decision and every rule above stand.
+
+Amended 10/10/2026 by the refusal catalogue plan (`docs/plans/2026-10-10-1241-refactor-one-refusal-catalogue-plan.md`, R1 and R9). The words were registered in a global list that each vocabulary filled as its module loaded. They are now composed in one catalogue, which a reader imports. The rule that a slice declares its word once is unchanged, and so is every word's class. `pnpm ops` exits an import's own word with its class.
 
 Amended 10/10/2026 by the read-only query road plan (`docs/plans/2026-10-10-0123-feat-read-only-query-road-plan.md`, R5). A query's transaction opens read-only, through a member resolve of its own; the resolver a mutation, an MCP entry or the own-transaction road takes stays read-write.

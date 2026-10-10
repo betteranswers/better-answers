@@ -35,6 +35,7 @@ const MANIFEST = JSON.stringify({
     "./guides": "./src/guides/index.ts",
     "./answering": "./src/answering/index.ts",
     "./erasure": "./src/erasure/index.ts",
+    "./refusals": "./src/refusals/index.ts",
   },
 });
 
@@ -55,6 +56,7 @@ const POSTGRES_DOOR = `${CORE}/src/store/postgres/handle.ts`;
 const STORE_BARREL = `${CORE}/src/store/index.ts`;
 const LLM = `${CORE}/src/llm/model-choices.ts`;
 const AUDIT = `${CORE}/src/audit/index.ts`;
+const CATALOGUE = `${CORE}/src/refusals/index.ts`;
 const TEST = `${CORE}/test/concepts.test.ts`;
 const ROOT_FILE = `${CORE}/probe.ts`;
 
@@ -97,6 +99,7 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
       "@better-answers/core/guides/renderer.ts",
     ],
     ["a slice reaching a sibling's nested face", SLICE, "../guides/internal/index.ts"],
+    ["the catalogue reaching a slice's internal file", CATALOGUE, "../concepts/vocabulary.ts"],
   ],
   "is a face packages/core's exports map does not name": [
     ["a slice reaching an unmapped face", SLICE, "../store/objects/index.ts"],
@@ -110,6 +113,19 @@ const REFUSED: Readonly<Record<string, readonly (readonly [string, string, strin
     ["a slice importing erasure by its directory", SLICE, "../erasure"],
     ["a slice importing erasure's internal", SLICE, "../erasure/replay.ts"],
     ["a slice importing erasure by self-reference", SLICE, "@better-answers/core/erasure"],
+  ],
+  "Nothing in core imports the refusal catalogue": [
+    ["a slice importing the catalogue", SLICE, "../refusals/index.ts"],
+    ["a slice importing the catalogue by its directory", SLICE, "../refusals"],
+    ["a slice importing the catalogue by self-reference", SLICE, "@better-answers/core/refusals"],
+    ["kernel importing the catalogue", KERNEL, "../refusals/index.ts"],
+    ["a layer importing the catalogue", AUDIT, "../refusals/index.ts"],
+    ["a door importing the catalogue", POSTGRES_DOOR, "../../refusals/index.ts"],
+  ],
+  "the refusal catalogue imports kernel and each slice's face, and nothing else": [
+    ["the catalogue importing a door's face", CATALOGUE, "../store/postgres/index.ts"],
+    ["the catalogue importing a layer's face", CATALOGUE, "../audit/index.ts"],
+    ["the catalogue importing access's face", CATALOGUE, "../access/index.ts"],
   ],
   "kernel imports nothing else in core": [
     ["kernel importing a slice's face", KERNEL, "../concepts/index.ts"],
@@ -209,7 +225,11 @@ describe("the rule stays silent where the ADR allows the import", () => {
     ["a test importing a slice's face", TEST, "../src/concepts/index.ts"],
     ["a test importing kernel's face", TEST, "../src/kernel/index.ts"],
     ["a test importing a door's face by self-reference", TEST, "@better-answers/core/store/map"],
-    ["a test importing erasure — the one importer allowed to", TEST, "../src/erasure/index.ts"],
+    ["a test importing erasure", TEST, "../src/erasure/index.ts"],
+    ["a test importing the catalogue", TEST, "../src/refusals/index.ts"],
+    ["the catalogue importing kernel's face", CATALOGUE, "../kernel/index.ts"],
+    ["the catalogue importing a slice's face", CATALOGUE, "../concepts/index.ts"],
+    ["the catalogue importing erasure's face", CATALOGUE, "../erasure/index.ts"],
     ["a test importing its own sibling", TEST, "./suite-postgres.ts"],
     ["a test importing the devtools runner", TEST, "@better-answers/devtools/throwaway-tree"],
     ["a slice importing a third-party package", SLICE, "zod"],
@@ -257,6 +277,7 @@ const sourceDirectories = (under = ""): readonly string[] =>
 const zoneOf = (dir: string): string => {
   const [first] = dir.split("/");
   if (first === "kernel" || first === "access") return first;
+  if (first === "refusals") return "catalogue";
   if (first === "store") return "door";
   if (first === "llm" || first === "audit") return "layer";
   return "slice";

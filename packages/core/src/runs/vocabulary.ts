@@ -1,5 +1,5 @@
-import { declareRefusals } from "../kernel/index.ts";
+import type { Vocabulary } from "../kernel/index.ts";
 
-export const RUN_REFUSALS = declareRefusals("runs", {
+export const RUN_REFUSALS = {
   "no-such-job": "absent",
-});
+} as const satisfies Vocabulary;

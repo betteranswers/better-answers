@@ -1,6 +1,6 @@
-import { declareRefusals, type RefusalWordFor } from "../kernel/index.ts";
+import type { RefusalWordFor, Vocabulary } from "../kernel/index.ts";
 
-export const WORKSPACE_REFUSALS = declareRefusals("workspaces", {
+export const WORKSPACE_REFUSALS = {
   "no-such-user": "absent",
   "no-such-workspace": "absent",
 
@@ -44,6 +44,6 @@ export const WORKSPACE_REFUSALS = declareRefusals("workspaces", {
 
   // An Admin, or the operator, may hold no fewer than one: removing it waits on adding another.
   "last-second-factor": "precondition",
-});
+} as const satisfies Vocabulary;
 
 export type WorkspaceRefusal<W extends RefusalWordFor<typeof WORKSPACE_REFUSALS>> = W;

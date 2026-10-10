@@ -1,20 +1,7 @@
-// Every slice that declares refusals, imported so the register holds all of them.
-import "@better-answers/core/access";
-import "@better-answers/core/answering";
-import "@better-answers/core/audit";
-import "@better-answers/core/concepts";
-import "@better-answers/core/erasure";
-import "@better-answers/core/guides";
-import "@better-answers/core/llm";
-import "@better-answers/core/members";
-import "@better-answers/core/runs";
-import "@better-answers/core/sources";
-import "@better-answers/core/sweeps";
-import "@better-answers/core/workspaces";
 import { STORED_ACT_NAMES } from "@better-answers/core/audit";
-import { refusalRegister } from "@better-answers/core/kernel";
 
 import { entriesAt } from "../src/mcp/entries/index.ts";
+import { REFUSAL_WORDS } from "../src/refusal.ts";
 import { readUnder } from "./tree-walk.ts";
 
 type ZodLike = {
@@ -70,7 +57,7 @@ const movedFromIn = (text: string): readonly string[] =>
  * cannot drift from them.
  */
 export const keptNamesUnder = (root: string): Readonly<Record<string, readonly string[]>> => ({
-  "refusal words": refusalRegister().map(({ word }) => word),
+  "refusal words": REFUSAL_WORDS,
   "MCP entries and schemas": entriesAt("https://app.example").flatMap((entry) => [
     entry.name,
     ...entry.scopes,

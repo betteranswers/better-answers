@@ -1,10 +1,10 @@
-import { declareRefusals } from "../kernel/index.ts";
+import type { Vocabulary } from "../kernel/index.ts";
 
 /**
  * The concepts slice borrows `widening-refused` and `no-such-document` from sources, and
  * `already-decided` and `no-such-group` from members.
  */
-export const CONCEPT_REFUSALS = declareRefusals("concepts", {
+export const CONCEPT_REFUSALS = {
   "no-such-concept": "absent",
   "no-such-suggestion": "absent",
 
@@ -27,4 +27,4 @@ export const CONCEPT_REFUSALS = declareRefusals("concepts", {
   // A person makes or restores the bundle repository, or reconciles its rewritten history, first.
   "no-such-repository": "precondition",
   "history-diverged": "precondition",
-});
+} as const satisfies Vocabulary;

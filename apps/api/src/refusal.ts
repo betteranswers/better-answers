@@ -1,35 +1,20 @@
-import { CONCEPT_REFUSALS } from "@better-answers/core/concepts";
-import { ERASURE_REFUSALS } from "@better-answers/core/erasure";
 import {
-  declareRefusals,
-  KERNEL_REFUSALS,
+  classesIn,
   type FieldIssues,
   type Malformed,
   type RefusalClass,
   type RefusedItems,
 } from "@better-answers/core/kernel";
-import { MEMBER_REFUSALS } from "@better-answers/core/members";
-import { RUN_REFUSALS } from "@better-answers/core/runs";
-import { SOURCE_REFUSALS } from "@better-answers/core/sources";
-import { WORKSPACE_REFUSALS } from "@better-answers/core/workspaces";
+import { REFUSAL_CATALOGUE } from "@better-answers/core/refusals";
 
-const TRANSPORT_REFUSALS = declareRefusals("transport", {
-  "no-session": "unauthenticated",
-  "no-active-workspace": "unauthenticated",
+const REFUSALS = classesIn({
+  ...REFUSAL_CATALOGUE,
+  transport: { "no-session": "unauthenticated", "no-active-workspace": "unauthenticated" },
 });
 
-const REFUSALS = {
-  ...KERNEL_REFUSALS,
-  ...WORKSPACE_REFUSALS,
-  ...MEMBER_REFUSALS,
-  ...SOURCE_REFUSALS,
-  ...CONCEPT_REFUSALS,
-  ...ERASURE_REFUSALS,
-  ...RUN_REFUSALS,
-  ...TRANSPORT_REFUSALS,
-};
-
 export type RefusalWord = keyof typeof REFUSALS;
+
+export const REFUSAL_WORDS = Object.keys(REFUSALS);
 
 /** A malformed input is the kernel parse's own answer, which says which field and never the value. */
 export type RefusalAnswer = RefusalWord | Malformed | RefusedItems<RefusalWord>;

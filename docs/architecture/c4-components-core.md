@@ -27,12 +27,14 @@ C4Component
     Component(workspaces, "workspaces", "slice", "Provisioning and first member under the platform principal, the picker's read, the workspace list")
     Component(members, "members", "slice", "Groups and their members, access requests; the People actions at P1")
     Component(sweeps, "sweeps", "slice", "The daily sweep pass over every workspace under session lock 42; one sweep_pass row a pass")
+    Component(refusals, "refusals", "catalogue", "Each slice's refusal vocabulary under its owner's name: the one list of words a transport reads")
   }
 
   Rel(api, sources, "Calls")
   Rel(api, concepts, "Calls")
   Rel(api, answering, "Calls")
   Rel(api, erasure, "Calls")
+  Rel(api, refusals, "Reads every refusal word and its class from")
   Rel(api, runs, "Calls")
   Rel(api, workspaces, "Calls")
   Rel(api, llm, "Lists model choices through")
@@ -79,7 +81,8 @@ No entry calls `guides` or `members` yet: `guides` is reached as the cascade's s
 | `store/*` | `kernel`; `store/map` also `access` | another door, a slice |
 | `llm`, `audit` | `kernel`, `access`, the doors | a slice, each other |
 | a slice | `kernel`, `access`, the doors, `llm`, `audit`, another slice's face (`index.ts`) | another slice's internals or `*.store.ts`; the slice graph is acyclic |
-| `erasure` | every slice's face | — nothing in core imports erasure; only a test reaches it |
+| `erasure` | every slice's face | — no slice imports erasure; only the refusal catalogue and a test reach it |
+| `refusals` | `kernel`, every slice's face, `erasure` included | a door, a layer, `access`; nothing in core imports it, and only a test reaches it |
 | anything in core | — | a transport or a transport's dependency (rule 5) |
 
 Enforced by one plugin rule, `better-answers/import-direction` (`packages/devtools/lint-rules/rules/import-direction.ts`), which places both ends of an import in a zone by their position under `packages/core` and applies the table above with the rule number in its message, and by `import/no-cycle` for the acyclic clause (ADR 0029; T-113's finding F10, landed by T-114 and T-117). The rule walks `packages/core` alone: `apps/api` reaches a slice through `@better-answers/core/<slice>`, and a door's face where it composes (`doors.ts`), resolves a Principal (the tRPC base) or runs an ops command. The failure no linter sees — one slice writing SQL against another's tables — is caught by `packages/schema/src/table-ownership.ts`, the checked-in slice-to-tables map with its cross-owner exceptions, reviewed like an export list.

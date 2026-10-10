@@ -1,7 +1,7 @@
-import { declareRefusals, type RefusalWordFor } from "../kernel/index.ts";
+import type { RefusalWordFor, Vocabulary } from "../kernel/index.ts";
 import type { MemberRefusal } from "../members/index.ts";
 
-export const SOURCE_REFUSALS = declareRefusals("sources", {
+export const SOURCE_REFUSALS = {
   "no-such-binding": "absent",
   "no-such-document": "absent",
   "no-such-finding": "absent",
@@ -18,7 +18,7 @@ export const SOURCE_REFUSALS = declareRefusals("sources", {
   "not-special-category": "inapplicable",
   "widening-refused": "inapplicable",
   "not-wider": "inapplicable",
-});
+} as const satisfies Vocabulary;
 
 /** A connected source's audience names groups, which the members slice owns and declares. */
 type BorrowedFromMembers = MemberRefusal<"no-such-group">;

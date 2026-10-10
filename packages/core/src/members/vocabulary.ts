@@ -1,6 +1,6 @@
-import { declareRefusals, type RefusalWordFor } from "../kernel/index.ts";
+import type { RefusalWordFor, Vocabulary } from "../kernel/index.ts";
 
-export const MEMBER_REFUSALS = declareRefusals("members", {
+export const MEMBER_REFUSALS = {
   "no-such-group": "absent",
   "no-such-member": "absent",
   "not-in-group": "absent",
@@ -25,6 +25,6 @@ export const MEMBER_REFUSALS = declareRefusals("members", {
   // A test person is never the operator nor a member anywhere else: the remedy is another address.
   "operator-marked": "inapplicable",
   "member-elsewhere": "inapplicable",
-});
+} as const satisfies Vocabulary;
 
 export type MemberRefusal<W extends RefusalWordFor<typeof MEMBER_REFUSALS>> = W;
