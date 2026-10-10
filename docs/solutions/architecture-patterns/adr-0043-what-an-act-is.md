@@ -48,7 +48,7 @@ tags:
 
 - An item's key is an id the caller sent, or an address's position in the send. It is never an address or a name.
 - An item's word states a fact about this workspace alone, and its action lists it among its refusals.
-- The set's own word is the first refused item's word in id order. Its class picks the status, and no new word enters the register.
+- The set's own word is the first refused item's word in id order. Its class picks the status, and no new word enters the catalogue.
 - The items ride the refusal and never a success answer, so a refusal still never crosses as a value.
 
 Each transport:

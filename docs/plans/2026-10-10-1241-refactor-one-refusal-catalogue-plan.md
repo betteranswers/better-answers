@@ -116,7 +116,7 @@ After BA-79, `refused` exits a word with its class's code. `import-bundle` still
 - KTD2. **A vocabulary is plain data.** Each `vocabulary.ts` declares its record with `as const satisfies Vocabulary`. `declareRefusals`, the `Map` and `refusalRegister` go. A vocabulary keeps its shape, word to class, so `keyof typeof WORKSPACE_REFUSALS` and `RefusalWordFor` read as they do today. The owner is the catalogue's key and no longer an argument, so `RefusalOwner` goes. Governs R1, R2.
 - KTD3. **One kernel function reads a catalogue.** `refusalsIn(catalogue)` answers every word with its class and owner, in the order declared. It throws on a word two owners declare and on a word that is not lower case and hyphenated: the two checks `declareRefusals` made, now made where the words are read. `classesIn(catalogue)` answers the word-to-class record a transport indexes, typed from the catalogue. The api's boot reads it, so a duplicate still stops the api from starting. Governs R2, R3.
 - KTD4. **The api reads the catalogue and adds its own.** `apps/api/src/refusal.ts` calls `classesIn` over the catalogue's vocabularies and `transport`. `RefusalWord` stays `keyof typeof REFUSALS`. It exports the word list for `kept-names.ts`, whose twelve imports go. Governs R2, R4.
-- KTD5. **Concepts declares the git door's commit words and names them where the walk reads.** `concepts/vocabulary.ts` gains the three words and an alias, built from the vocabulary, that lists the four words a governed write passes on. `WriteConceptRefusal` and `WriteManifestRefusal` take that alias in place of `CommitRefusal`. A word the door adds then fails typecheck where concepts returns the door's answer, and `refusal-words.test.ts` asserts the door's union extends the alias. Following type references in the syntax walk was the alternative, and is rejected: it resolves names without imports, so two aliases of one name would be read as one. Governs R6, R7.
+- KTD5. **Concepts declares the git door's commit words and names them where the walk reads.** `concepts/vocabulary.ts` gains the three words and an alias, built from the vocabulary, that lists the four words a governed write passes on. `WriteConceptRefusal` and `WriteManifestRefusal` take that alias in place of `CommitRefusal`. A word the door adds then fails typecheck where concepts returns the door's answer, and `refusal-words.test.ts` asserts the door's union extends the write's and the catalogue's words. Following type references in the syntax walk was the alternative, and is rejected: it resolves names without imports, so two aliases of one name would be read as one. Governs R6, R7.
 - KTD6. **A word from the import exits by class; a run that names where it stopped exits 1.** `importBundleCommand` hands a string refusal to `refused` with `importReason`'s sentence. The `unsound` and `stopped` objects and an `Error` keep exit 1, and so does `reconcile-watermark`'s stopped replay: each names a file or a commit and what landed before it, which no one class's remedy covers. The usage text's line for exit 1 says this. Governs R8, R9.
 
 ### The Exit Codes That Move
@@ -129,7 +129,7 @@ After BA-79, `refused` exits a word with its class's code. `import-bundle` still
 | `import-bundle` | `no-such-repository` | 1 | 9, precondition |
 | `import-bundle` | a principal word from the import's own resolve (`not-a-member` and its four siblings) | 1 | 4, unauthenticated |
 
-The first two are asserted. `ce-work` confirms that no script, workflow or runbook step reads these exits before the pull request says so.
+The first two and `no-such-repository` are asserted. `ce-work` confirms that no script, workflow or runbook step reads these exits before the pull request says so.
 
 ---
 
@@ -170,9 +170,9 @@ The first two are asserted. `ce-work` confirms that no script, workflow or runbo
   - Test: `packages/core/test/refusal-words.test.ts`
 - **Approach:** the classes in *The New Words*. Run the web's typecheck as soon as the words exist, since they widen the `RefusalWord` the web infers.
 - **Test scenarios:**
-  - Covers AE4. The git door's `CommitRefusal` extends the alias concepts passes on, asserted as a type in `refusal-words.test.ts`.
+  - Covers AE4. The git door's `CommitRefusal` extends `WriteConceptRefusal` and the catalogue's words, asserted as types in `refusal-words.test.ts`.
   - The hand-kept table holds the three words with their classes, by concepts.
-  - `WriteConceptRefusal`, `WriteManifestRefusal`, `AcceptSuggestionRefusal`, `ReconcileRefusal` and the string part of `ImportBundleRefusal` extend the catalogue's words.
+  - `WriteConceptRefusal`, `AcceptSuggestionRefusal` and the string part of `ImportBundleRefusal`, the unions the concepts face exports, extend the catalogue's words.
 - **Verification:** core's check passes; with the three words removed from the vocabulary, typecheck fails at the alias and the walk names them.
 
 ### U3. import-bundle exits by class for the import's own words (BA-116)
@@ -188,6 +188,8 @@ The first two are asserted. `ce-work` confirms that no script, workflow or runbo
 - **Test scenarios:**
   - Covers AE5. `import-bundle --as` a Viewer exits `EXIT_OF_CLASS.forbidden`, its line unchanged.
   - `import-bundle --as` an Editor landing a Restricted bundle exits `EXIT_OF_CLASS.forbidden`, its line unchanged.
+  - `import-bundle` into a workspace with no bundle repository exits `EXIT_OF_CLASS.precondition`.
+  - `import-bundle` over a tree with no manifest exits 1, with its unsound line.
   - The usage text names `import-bundle` and `reconcile-watermark` on its line for exit 1.
 - **Verification:** `pnpm check:api` passes.
 

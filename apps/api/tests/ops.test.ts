@@ -3089,9 +3089,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return id;
     };
 
-    const bundleWorkspace = async (app: TestApp) => {
+    const bundleWorkspace = async (app: TestApp, { repository = true } = {}) => {
       const { workspaceId, admin } = await app.provision();
-      await initRepository(openTestGit(app), workspaceId);
+      if (repository) await initRepository(openTestGit(app), workspaceId);
       const mona = await verifierOf(app, MONA, "Mona Reviewer");
       const theo = await verifierOf(app, THEO, "Theo Approver");
       await app.addMember(workspaceId, mona, "Editor");
@@ -3539,6 +3539,30 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.exitCode).toBe(EXIT_OF_CLASS.forbidden);
       expect(run.lines).toEqual([
         `import-bundle: REFUSED — ${MONA} is not an Admin of this workspace, and a bundle landed Restricted is one only an Admin can read back for its second pass; run the import as an Admin`,
+      ]);
+      expect(await commitsOf(app(), workspaceId)).toEqual([]);
+    });
+
+    it("refuses a workspace with no bundle repository as a precondition", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app(), { repository: false });
+
+      const run = await importing(app(), workspaceId, admin.email);
+
+      expect(run.exitCode).toBe(EXIT_OF_CLASS.precondition);
+      expect(run.lines).toEqual([
+        "import-bundle: REFUSED — this workspace has no bundle repository; provision it first",
+      ]);
+    });
+
+    it("exits 1 for an unsound tree, classed by no word", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+      const from = await mkdtemp(path.join(tmpdir(), "bundle-"));
+
+      const run = await importing(app(), workspaceId, admin.email, { from });
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        "import-bundle: REFUSED — manifest.yaml: the tree has no manifest.yaml at its root; nothing was written",
       ]);
       expect(await commitsOf(app(), workspaceId)).toEqual([]);
     });
