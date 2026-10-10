@@ -38,7 +38,7 @@ The platform's navigation has four levels, and the code names them the same way:
 - A **page** has an address of its own and an icon in the menu.
 - A **tab** divides one page. It has no address.
 
-A page may also declare a **detail address**, one segment beneath its own, naming one of its rows. Members declares the first: a **member page** at `/people/members/<person>`. Search declares the second, which S2a builds: the **concept page** at `/knowledge/search/<ulid>`, opened by a match or a citation. A detail address is the page's place, not a fifth level:
+A page may also declare a **detail address**, one segment beneath its own, naming one of its rows. Members declares the first: a **member page** at `/people/members/<person>`. Search declares the second: the **concept page** at `/knowledge/search/<ulid>`, opened by a match or a citation. A detail address is the page's place, not a fifth level:
 
 - Nothing lists it. It is not in the rail, the menu, or jump-to's pages and actions. Jump-to's member results lead to it.
 - It is seen exactly where its page is seen, so a role that may not see Members gets the not-found page at a member page.
