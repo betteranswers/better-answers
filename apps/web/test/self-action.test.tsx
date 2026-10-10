@@ -97,6 +97,14 @@ const actingAt = async () => {
 /** The chooser's list, as the band's switcher leaves it once its menu has been opened and shut. */
 const WORKSPACES_HELD = ["auth", "workspaces"];
 
+/** A search read as an Admin and left behind: no page shows it while People is open. */
+const MATCHES_HELD = [
+  ["knowledge", "find"],
+  { input: { query: "salary bands" }, type: "infinite" },
+];
+
+const AS_AN_ADMIN = { pages: [{ matches: [{ title: "Audit Salary Bands" }] }], pageParams: [null] };
+
 describe("an action's confirmation", () => {
   it("says the set includes the reader, and only then", async () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
@@ -124,6 +132,20 @@ describe("going home after an action on yourself", () => {
     expect(history.length, "the move home pushed an entry of its own").toBe(2);
   });
 
+  it("drops what a self-demoted Admin read before the change", async () => {
+    const { router, clients } = await actingAt();
+    clients.queryClient.setQueryData(MATCHES_HELD, AS_AN_ADMIN);
+
+    vi.stubGlobal("fetch", answeringAs("Editor"));
+    fireEvent.click(screen.getByRole("button", { name: "Demoted myself" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Editor.path));
+    expect(
+      clients.queryClient.getQueryData(MATCHES_HELD),
+      "Search would open on the matches an Admin was shown",
+    ).toBeUndefined();
+  });
+
   it("sends a self-removed Admin in no workspace to the chooser", async () => {
     const { router, clients } = await actingAt();
     clients.queryClient.setQueryData(WORKSPACES_HELD, [{ id: "w", name: "The workspace left" }]);
@@ -140,7 +162,8 @@ describe("going home after an action on yourself", () => {
   });
 
   it("stays put, refusing in words, when the role is unread", async () => {
-    const { router } = await actingAt();
+    const { router, clients } = await actingAt();
+    clients.queryClient.setQueryData(MATCHES_HELD, AS_AN_ADMIN);
 
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
     fireEvent.click(screen.getByRole("button", { name: "Demoted myself" }));
@@ -155,5 +178,9 @@ describe("going home after an action on yourself", () => {
       screen.getByText("Held: Admin"),
       "the page lost the role it was drawn for",
     ).toBeDefined();
+    expect(
+      clients.queryClient.getQueryData(MATCHES_HELD),
+      "a read from before the change outlived it",
+    ).toBeUndefined();
   });
 });

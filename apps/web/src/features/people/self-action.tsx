@@ -49,11 +49,11 @@ export const useSelfActionHome = () => {
   const navigate = useNavigate();
 
   const goHome = async (change: OwnMemberChange): Promise<Outcome | undefined> => {
+    // What the reader may see has changed, so no read held from before answers a page they open next.
+    void queryClient.resetQueries({ type: "inactive" });
     if (change === "removed") {
       // Reset, not removed: the frame's mounted read never hears a removal and draws the old role.
       void queryClient.resetQueries(memberOf(api));
-      // The chooser decides on its first read, so a workspace list held from before must not answer it.
-      void queryClient.resetQueries({ type: "inactive" });
       // Not `/`: the session still names the workspace left, and the shell sends that refusal to sign-in.
       await navigate({ href: "/choose-workspace", replace: true });
       return undefined;
