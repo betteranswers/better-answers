@@ -230,6 +230,9 @@ describe("a concept's body", () => {
 
     expect(marksIn(article)).toEqual([]);
     expect(within(article).getByRole("heading", { name: "Footnotes" })).toBeDefined();
-    expect(within(article).getByRole("listitem").textContent).toContain("Reviewed each April.");
+    expect(within(article).getByRole("listitem").textContent.trim()).toBe(
+      "Reviewed each April. Back to the claim",
+    );
+    expect(within(article).getByRole("link", { name: "Back to the claim" })).toBeDefined();
   });
 });

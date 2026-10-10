@@ -233,12 +233,14 @@ const LINK = "text-brand underline underline-offset-4";
 /** The file's own addresses on the web, and nothing a browser would run or resolve against this site. */
 const ON_THE_WEB = /^(?:https?:\/\/|mailto:)/i;
 
-const jumpsToAFootnote = (node: Element | undefined): boolean =>
-  node?.properties["dataFootnoteRef"] !== undefined ||
-  node?.properties["dataFootnoteBackref"] !== undefined;
+/** A footnote's own link down to its note, or back up to the claim. */
+const footnoteJump = (node: Element | undefined): "down" | "back" | undefined => {
+  if (node?.properties["dataFootnoteRef"] !== undefined) return "down";
+  return node?.properties["dataFootnoteBackref"] === undefined ? undefined : "back";
+};
 
 function BodyLink(properties: ComponentProps<"a"> & ExtraProps) {
-  const { href, children, node, "aria-label": named } = properties;
+  const { href, children, node } = properties;
   const held = useContext(Body);
   if (href === undefined) return children;
   const page = conceptPageOf(href);
@@ -249,13 +251,13 @@ function BodyLink(properties: ComponentProps<"a"> & ExtraProps) {
       </Link>
     );
   }
-  if (jumpsToAFootnote(node)) {
+  const jump = footnoteJump(node);
+  if (jump !== undefined) {
     return (
       <a
         href={href}
         id={properties.id}
-        aria-label={named}
-        aria-describedby={named === undefined ? held?.footnotesId : undefined}
+        aria-describedby={jump === "down" ? held?.footnotesId : undefined}
         className={LINK}
       >
         {children}
@@ -356,20 +358,17 @@ export function ConceptBody(properties: {
     return { text: carrying(clean, marks), marks };
   }, [body, evidence]);
 
-  const held: Held = useMemo(
-    () => ({
-      cited: read.marks.map(({ source }) => ({
-        source,
-        label: evidence[source]?.source ?? "",
-        opens: opening !== undefined && opensSomething(evidence[source]),
-      })),
-      idOf: (mark) => `${baseId}-mark-${String(mark)}`,
-      opening,
-      headingsFrom,
-      footnotesId: `${baseId}-footnotes`,
-    }),
-    [read, evidence, opening, headingsFrom, baseId],
-  );
+  const held: Held = {
+    cited: read.marks.map(({ source }) => ({
+      source,
+      label: evidence[source]?.source ?? "",
+      opens: opening !== undefined && opensSomething(evidence[source]),
+    })),
+    idOf: (mark) => `${baseId}-mark-${String(mark)}`,
+    opening,
+    headingsFrom,
+    footnotesId: `${baseId}-footnotes`,
+  };
 
   const opened = held.cited.findIndex((_, mark) => opening?.openerId === held.idOf(mark));
   const drawing: Drawing = {
@@ -386,6 +385,7 @@ export function ConceptBody(properties: {
           remarkRehypeOptions={{
             footnoteLabel: WORDS.footnotes,
             footnoteLabelProperties: {},
+            footnoteBackContent: WORDS.backToTheClaim,
             clobberPrefix: `${baseId}-`,
           }}
           components={COMPONENTS}

@@ -111,7 +111,7 @@ function PassageRead(properties: {
 }
 
 /** One level only: its own marks are text, and its page is where they open. */
-function ConceptRead(properties: {
+function CitedConcept(properties: {
   readonly opened: Opened;
   readonly iri: string;
   readonly heading: Heading;
@@ -188,7 +188,7 @@ function PanelBody(properties: {
       {source.kind === "passage" ? (
         <PassageRead opened={opened} source={source} heading={heading} />
       ) : (
-        <ConceptRead
+        <CitedConcept
           opened={opened}
           iri={source.iri}
           heading={heading}

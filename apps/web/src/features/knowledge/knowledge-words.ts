@@ -28,6 +28,7 @@ export const CONCEPT_WORDS = {
   links: "Links",
   details: "Details from the file",
   footnotes: "Footnotes",
+  backToTheClaim: "Back to the claim",
   tags: "Tags",
   /** A citation mark and its entry in the sources list are named alike, by the file’s own label. */
   sourceNamed: (place: number, label: string): string => `Source ${place}: ${label}`,
