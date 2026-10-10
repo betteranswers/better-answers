@@ -150,10 +150,10 @@ dev = [
 # 0.12.17` was on every `uv sync` in CI, because the range was a year behind both builders.
 # The two that matter are named in one place each: `apps/worker/.tool-versions` is the uv CI
 # installs and `apps/worker/Dockerfile`'s `FROM ghcr.io/astral-sh/uv:` is the image's, and
-# both are 0.12.9. The floor is that version and the ceiling is the next minor, so a uv
-# Renovate moves within the 0.12 line stays inside it and a 0.13 is a bump somebody reads.
+# both are 0.13.0. The floor is that version and the ceiling is the next minor, so a uv
+# Renovate moves within the 0.13 line stays inside it and a 0.14 is a bump somebody reads.
 [build-system]
-requires = ["uv_build>=0.12.9,<0.13.0"]
+requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
 
 # The one pin for `cryptography`, and the only place in this tier carrying its version.

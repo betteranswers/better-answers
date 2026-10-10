@@ -3,8 +3,8 @@
 # its image needs nothing from the rest of the repository.
 #
 # Versions read: `python:3.13.15-slim-trixie` from Docker Hub on 24/09/2026 — 3.13 is what
-# `pyproject.toml` requires (`>=3.13,<3.14`) and `.python-version` names — uv 0.12.9
-# from astral-sh/uv's releases on 03/09/2026, and `gcr.io/distroless/cc-debian13:nonroot`
+# `pyproject.toml` requires (`>=3.13,<3.14`) and `.python-version` names — uv 0.13.0
+# from astral-sh/uv's releases on 10/10/2026, and `gcr.io/distroless/cc-debian13:nonroot`
 # from the gcr.io registry on 24/09/2026. Each is pinned by digest as well as by tag: the
 # tag is the label a person reads, the digest is what actually ships. Debian 13 (trixie)
 # rather than 12 for the reason `apps/api/Dockerfile` gives beside its own base image.
@@ -31,7 +31,7 @@
 # re-download but a worker that cannot load a model at all — which is why
 # `deploy/platform.compose.yaml` mounts the LMDB and the trees and nothing else, and why
 # `apps/worker/tests/test_image.py` holds that file to it.
-FROM ghcr.io/astral-sh/uv:0.12.9@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff AS uv
+FROM ghcr.io/astral-sh/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77ad87865e381d9917da55a168 AS uv
 
 # The runtime's base, named here because the `tree` stage reads its accounts before the
 # runtime stage builds on it. `cc` rather than Distroless's own `python3-debian13`: that
