@@ -188,6 +188,7 @@ export {
   type Trust,
   type TrustStatus,
 } from "./trust.ts";
+export { CONCEPT_REFUSALS } from "./vocabulary.ts";
 
 const CONCEPT_ACTIONS = declareActions("knowledge", {
   committed: action("knowledge.concept.committed", {

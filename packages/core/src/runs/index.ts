@@ -48,6 +48,8 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 
+export { RUN_REFUSALS } from "./vocabulary.ts";
+
 type JobKind = (typeof JOB_KINDS)[number];
 export type JobStatus = (typeof JOB_STATUSES)[number];
 export type RebuildReason = (typeof REBUILD_REASONS)[number];
@@ -245,12 +247,14 @@ export const enqueueJob = async (
 ): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> =>
   inWorkspace(principal, door, input.workspaceId, (tx) => enqueueJobIn(principal, tx, input));
 
+export type JobByIdRefusal = "no-such-job" | RoleRefusal | PrincipalRefusal;
+
 /** A job in another workspace answers `no-such-job`, as a missing one does. */
 export const jobById = async (
   principal: Principal,
   door: PostgresDoor,
   input: { readonly workspaceId: string; readonly jobId: string },
-): Promise<Result<JobState, "no-such-job" | RoleRefusal | PrincipalRefusal | Error>> => {
+): Promise<Result<JobState, JobByIdRefusal | Error>> => {
   if (principal.kind !== "platform") {
     const admin = requireAdmin(principal);
     if (!admin.ok) return err(admin.error);
