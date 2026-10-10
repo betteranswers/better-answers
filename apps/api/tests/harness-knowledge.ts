@@ -14,6 +14,8 @@ const SUITE_VERIFIER = "process:better-answers-browser-suite";
 
 const aCitedDocument = z.object({
   title: z.string().min(1),
+  /** The file's own words for the source, where they are not the document's title. */
+  label: z.string().min(1).optional(),
   passages: z.array(z.string().min(1)).min(1),
   /** Its connected source's own, where the document is held closer than the concept citing it. */
   sensitivity: z.enum(SENSITIVITIES).optional(),
@@ -64,13 +66,13 @@ export const conceptsSeeding = z.object({
   concepts: z.array(aConcept).min(1),
 });
 
-/** `documentId` only where the source is a passage, which the write records as evidence. */
+/** `document` only where the source is a passage, which the write records as evidence. */
 type Citation = {
   readonly id: string;
   readonly title: string;
   readonly resource: string;
   readonly locator?: string;
-  readonly documentId?: string;
+  readonly document?: { readonly documentId: string; readonly title: string };
 };
 
 type SeededConcept = {
@@ -97,6 +99,8 @@ const fileOf = (title: string): string => `${shortNameOf(title)}.md`;
 
 type AskedSource = AskedConcept["sources"][number];
 
+type AskedDocument = z.output<typeof aCitedDocument>;
+
 type Sensitivity = AskedConcept["sensitivity"];
 
 type Seeding = {
@@ -105,23 +109,33 @@ type Seeding = {
   readonly concept: AskedConcept;
   readonly earlier: readonly SeededConcept[];
   /** One published connected source for each sensitivity the concept's documents are held at. */
-  readonly connectedSources: Map<Sensitivity, string>;
+  readonly connectedSources: ReadonlyMap<Sensitivity, string>;
 };
 
-const connectedSourceAt = async (seeding: Seeding, sensitivity: Sensitivity): Promise<string> => {
-  const held = seeding.connectedSources.get(sensitivity);
-  if (held !== undefined) return held;
-  const { concept, workspaceId } = seeding;
-  const own = sensitivity === concept.sensitivity;
-  const made = await seeding.seed.connectedSource({
-    workspaceId,
-    name: own ? `${concept.title} sources` : `${concept.title} ${sensitivity} sources`,
-    sensitivity,
-    publishedAt: new Date(),
-    state: "published",
-  });
-  seeding.connectedSources.set(sensitivity, made.id);
-  return made.id;
+const heldAt = (concept: AskedConcept, source: AskedDocument): Sensitivity =>
+  source.sensitivity ?? concept.sensitivity;
+
+const connectedSourcesFor = async (
+  seed: Seeding["seed"],
+  workspaceId: string,
+  concept: AskedConcept,
+): Promise<Seeding["connectedSources"]> => {
+  const asked = new Set(
+    concept.sources.flatMap((source) => ("passages" in source ? [heldAt(concept, source)] : [])),
+  );
+  const made = new Map<Sensitivity, string>();
+  for (const sensitivity of asked) {
+    const own = sensitivity === concept.sensitivity;
+    const connectedSource = await seed.connectedSource({
+      workspaceId,
+      name: own ? `${concept.title} sources` : `${concept.title} ${sensitivity} sources`,
+      sensitivity,
+      publishedAt: new Date(),
+      state: "published",
+    });
+    made.set(sensitivity, connectedSource.id);
+  }
+  return made;
 };
 
 type Unnumbered = Omit<Citation, "id">;
@@ -129,13 +143,13 @@ type Unnumbered = Omit<Citation, "id">;
 /** Each passage is cited apart, by its document and its span in it. */
 const passagesCited = async (
   seeding: Seeding,
-  source: z.output<typeof aCitedDocument>,
+  source: AskedDocument,
 ): Promise<readonly Unnumbered[]> => {
   const { seed, workspaceId, concept } = seeding;
-  const connectedSourceId = await connectedSourceAt(
-    seeding,
-    source.sensitivity ?? concept.sensitivity,
-  );
+  const connectedSourceId = seeding.connectedSources.get(heldAt(concept, source));
+  if (connectedSourceId === undefined) {
+    throw new Error(`${concept.title} has no connected source for ${source.title}`);
+  }
   const document = await seed.sourceDocument({
     workspaceId,
     connectedSourceId,
@@ -149,11 +163,12 @@ const passagesCited = async (
     document.id,
     source.passages,
   );
+  const label = source.label ?? source.title;
   return spans.map((span) => ({
-    title: source.title,
-    resource: source.title,
+    title: label,
+    resource: label,
     locator: `${document.id}/${span}`,
-    documentId: document.id,
+    document: { documentId: document.id, title: source.title },
   }));
 };
 
@@ -180,12 +195,13 @@ const citationsOf = async (
 ): Promise<readonly Citation[]> => {
   if (concept.sources.length === 0) return [];
   return inOneTransaction(app, async (client) => {
+    const seed = testData(client);
     const seeding = {
-      seed: testData(client),
+      seed,
       workspaceId,
       concept,
       earlier,
-      connectedSources: new Map<Sensitivity, string>(),
+      connectedSources: await connectedSourcesFor(seed, workspaceId, concept),
     };
     const citations: Citation[] = [];
     for (const source of concept.sources) {
@@ -254,10 +270,10 @@ const conceptWritten = async (
       expects: { head: await head(principal, git) },
       status: "stable",
       sensitivity: concept.sensitivity,
-      evidence: citations.flatMap(({ documentId, resource, locator }) =>
-        documentId === undefined || locator === undefined
+      evidence: citations.flatMap(({ document, resource, locator }) =>
+        document === undefined || locator === undefined
           ? []
-          : [{ sourceDocumentId: documentId, locator, resource }],
+          : [{ sourceDocumentId: document.documentId, locator, resource }],
       ),
     },
   );
@@ -347,8 +363,8 @@ const seedConcept = async (
   }
   if (concept.trust !== "unverified") await verified(app, writer, concept, written);
   const documents = new Map(
-    written.citations.flatMap(({ documentId, title }) =>
-      documentId === undefined ? [] : [[documentId, title] as const],
+    written.citations.flatMap(({ document }) =>
+      document === undefined ? [] : [[document.documentId, document.title] as const],
     ),
   );
   return {

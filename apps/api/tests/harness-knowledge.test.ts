@@ -108,7 +108,8 @@ describe("the browser suite's knowledge harness", () => {
           sources: [
             { title: "Synthetic site notice", passages: ["Blasting is at noon."] },
             {
-              title: "Synthetic blast licence",
+              title: "Synthetic blast licence 2026",
+              label: "The blast licence",
               passages: ["Licensed for noon blasts."],
               sensitivity: "Restricted",
             },
@@ -118,16 +119,21 @@ describe("the browser suite's knowledge harness", () => {
     });
 
     const forTheAdmin = evidenceOf(await calledBy(workspace.admin, "open", { iri: concept?.iri }));
-    const forTheViewer = evidenceOf(await calledBy(viewer, "open", { iri: concept?.iri }));
+    const opened = await calledBy(viewer, "open", { iri: concept?.iri });
+    const licence = await calledBy(workspace.admin, "open", {
+      locator: forTheAdmin[1]?.["locator"],
+    });
 
     expect(forTheAdmin).toEqual([
       { id: "source-1", source: "Synthetic site notice", locator: expect.any(String) },
-      { id: "source-2", source: "Synthetic blast licence", locator: expect.any(String) },
+      { id: "source-2", source: "The blast licence", locator: expect.any(String) },
     ]);
-    expect(forTheViewer).toEqual([
+    expect(licence).toMatchObject({ passage: { source: "Synthetic blast licence 2026" } });
+    expect(evidenceOf(opened)).toEqual([
       { id: "source-1", source: "Synthetic site notice", locator: expect.any(String) },
-      { id: "source-2", source: "Synthetic blast licence" },
+      { id: "source-2", source: "The blast licence" },
     ]);
+    expect(JSON.stringify(opened)).not.toContain("Synthetic blast licence 2026");
   });
 
   it("lands a source naming a concept, and a page locator", async () => {
