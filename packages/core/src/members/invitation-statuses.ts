@@ -35,14 +35,12 @@ const listInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: listInvitationsInput,
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 const countInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: z.object({}),
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 export type ListInvitationsRefusal =

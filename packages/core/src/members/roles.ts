@@ -39,7 +39,6 @@ const changeRoleAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: changeRoleInput,
   refuses: ["role-forbids", "no-such-role", "no-such-member", "last-admin", "changed-meanwhile"],
-  effect: "write",
 });
 
 export type ChangeRoleRefusal =

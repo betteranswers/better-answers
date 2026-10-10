@@ -37,7 +37,6 @@ const endEverySignInAndTokenHereAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: endEverySignInAndTokenHereInput,
   refuses: ["role-forbids", "no-such-member", "changed-meanwhile"],
-  effect: "write",
 });
 
 export type EndEverySignInAndTokenHereRefusal =

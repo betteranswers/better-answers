@@ -60,7 +60,6 @@ type TooBroad = { readonly word: ErasureRefusal<"identifier-too-broad">; readonl
   admits: { role: "Viewer", purposes: [] },
   input: findInput,
   refuses: ["role-forbids", "invented-word"],
-  effect: "read",
 });
 export type FindRefusal = RefusalOf<typeof findAction> | Error;
 `;
@@ -69,7 +68,7 @@ export type FindRefusal = RefusalOf<typeof findAction> | Error;
   });
 
   it("reads `refuses` alone among a declaration's keys", () => {
-    const source = `const findAction = declareAction({ effect: "read", refuses: [] });\n`;
+    const source = `const findAction = declareAction({ admits: { role: "Viewer", purposes: ["reindex"] }, refuses: [] });\n`;
 
     expect(wordsIn(source)).toEqual([]);
   });

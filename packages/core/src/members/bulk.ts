@@ -51,7 +51,6 @@ const bulkChangeRoleAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: bulkChangeRoleInput,
   refuses: ["role-forbids", "no-such-role", "no-such-member", "last-admin", "changed-meanwhile"],
-  effect: "write",
 });
 
 /** Each person the move made hold a second factor for the first time. */
@@ -121,7 +120,6 @@ const bulkRemoveMembersAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: bulkRemoveMembersInput,
   refuses: ["role-forbids", "last-admin", "changed-meanwhile"],
-  effect: "write",
 });
 
 export type BulkRemoveMembersRefusal =
@@ -169,7 +167,6 @@ const bulkAddToGroupAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: bulkAddToGroupInput,
   refuses: ["role-forbids", "no-such-group", "no-such-member", "changed-meanwhile"],
-  effect: "write",
 });
 
 export type BulkAddToGroupRefusal =

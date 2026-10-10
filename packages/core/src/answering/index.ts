@@ -269,7 +269,6 @@ const findAction = declareAction({
   admits: READERS,
   input: findInput,
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 export type FindRefusal = RefusalOf<typeof findAction> | Error;
@@ -331,7 +330,6 @@ const openAction = declareAction({
   admits: READERS,
   input: openInput,
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 export type OpenRefusal = RefusalOf<typeof openAction> | Error;

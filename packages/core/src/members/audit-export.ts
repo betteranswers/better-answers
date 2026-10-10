@@ -50,7 +50,6 @@ const exportAuditLogAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: exportAuditLogInput,
   refuses: ["role-forbids"],
-  effect: "write",
 });
 
 export type ExportAuditLogRefusal =

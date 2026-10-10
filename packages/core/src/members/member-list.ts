@@ -22,7 +22,6 @@ const listMembersAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: z.object({}),
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 export type ListMembersRefusal = MemberRefusal<RefusalOf<typeof listMembersAction>> | Error;

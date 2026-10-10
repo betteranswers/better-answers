@@ -597,7 +597,6 @@ export const reprocessConnectedSourceAction = declareAction({
   admits: { role: "Admin", purposes: ["erasure", "reindex"] },
   input: reprocessConnectedSourceInput,
   refuses: ["role-forbids", "no-such-binding"],
-  effect: "write",
 });
 
 export type ReprocessConnectedSourceInput = InputOf<typeof reprocessConnectedSourceAction>;

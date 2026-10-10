@@ -59,28 +59,24 @@ const adminsOnly = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: nothing,
   refuses: ["role-forbids"],
-  effect: "write",
 });
 
 const everyone = declareAction({
   admits: { role: "Viewer", purposes: EVERY_PURPOSE },
   input: nothing,
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 const erasureOnly = declareAction({
   admits: { role: "Admin", purposes: ["erasure"] },
   input: nothing,
   refuses: ["role-forbids"],
-  effect: "write",
 });
 
 const operatorsOnly = declareAction({
   admits: OPERATOR_ALONE,
   input: nothing,
   refuses: ["not-the-operator"],
-  effect: "read",
 });
 
 describe("what an action admits, from the principal and input alone", () => {
@@ -208,22 +204,19 @@ describe("what a declaration will not let an action say", () => {
         admits: { role: "Admin", purposes: [] },
         input: nothing,
         refuses: ["role-forbids", "role-forbids"],
-        effect: "write",
       }),
     ).toThrow("listed twice");
   });
 });
 
-describe("the two actions that carry a declaration today", () => {
-  it("states what reprocessing a source admits, takes, answers and does", () => {
+describe("what two declared actions state, read from outside their slices", () => {
+  it("states what reprocessing a source admits and answers", () => {
     expect({
       admits: reprocessConnectedSourceAction.admits,
       refuses: reprocessConnectedSourceAction.refuses,
-      effect: reprocessConnectedSourceAction.effect,
     }).toEqual({
       admits: { role: "Admin", purposes: ["erasure", "reindex"] },
       refuses: ["role-forbids", "no-such-binding"],
-      effect: "write",
     });
   });
 
@@ -299,12 +292,5 @@ describe("the two actions that carry a declaration today", () => {
       admit(enqueueJobAction, person("Admin"), audit).ok,
       admit(enqueueJobAction, person("Editor"), audit).ok,
     ]).toEqual([true, true, false]);
-  });
-
-  it("declares both the enqueue and reprocessing as writes", () => {
-    expect([enqueueJobAction.effect, reprocessConnectedSourceAction.effect]).toEqual([
-      "write",
-      "write",
-    ]);
   });
 });

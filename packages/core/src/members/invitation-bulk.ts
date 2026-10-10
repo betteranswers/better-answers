@@ -54,14 +54,12 @@ const bulkResendInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: bulkInvitationsInput,
   refuses: [...ON_A_SET, OFF_TESTING_DOMAIN],
-  effect: "write",
 });
 
 const bulkCancelInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: bulkInvitationsInput,
   refuses: ON_A_SET,
-  effect: "write",
 });
 
 type SetRefusal<Item extends MemberRefusal<"no-such-invitation" | "off-testing-domain">> =

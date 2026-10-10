@@ -13,8 +13,6 @@ import type {
 import { err, ok, type Result } from "./result.ts";
 import type { KernelRefusalOfClass } from "./vocabulary.ts";
 
-export type Effect = "read" | "write";
-
 export const EVERY_PURPOSE = "every";
 
 type RoleOrPurpose = {
@@ -63,15 +61,12 @@ export type ActionDeclaration<
   Schema extends z.ZodType = z.ZodType,
   A extends Admits = Admits,
   Word extends string = string,
-  E extends Effect = Effect,
 > = {
   readonly admits: A | ((input: z.output<Schema>) => A);
 
   readonly input: Schema;
 
   readonly refuses: readonly Word[];
-
-  readonly effect: E;
 };
 
 export type InputOf<D extends ActionDeclaration> = z.output<D["input"]>;
@@ -98,10 +93,9 @@ export const declareAction = <
   Schema extends z.ZodType,
   const A extends Admits,
   const Word extends string,
-  const E extends Effect,
 >(
-  declaration: ActionDeclaration<Schema, A, Word, E>,
-): ActionDeclaration<Schema, A, Word, E> => {
+  declaration: ActionDeclaration<Schema, A, Word>,
+): ActionDeclaration<Schema, A, Word> => {
   const { refuses } = declaration;
   const twice = refuses.find((word) => refuses.indexOf(word) !== refuses.lastIndexOf(word));
   if (twice !== undefined) throw new Error(`admission: ${twice} is listed twice`);

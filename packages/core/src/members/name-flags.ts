@@ -55,7 +55,6 @@ const flagDisplayNameAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: flagDisplayNameInput,
   refuses: ["role-forbids", "no-such-member"],
-  effect: "write",
 });
 
 export type FlagDisplayNameRefusal = MemberRefusal<"role-forbids" | "no-such-member"> | Error;

@@ -39,7 +39,6 @@ const readActivityAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: readActivityInput,
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 export type ReadActivityRefusal = MemberRefusal<RefusalOf<typeof readActivityAction>> | Error;

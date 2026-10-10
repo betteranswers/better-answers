@@ -57,7 +57,6 @@ const readAuditLogAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: readAuditLogInput,
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 export type ReadAuditLogRefusal = MemberRefusal<RefusalOf<typeof readAuditLogAction>> | Error;

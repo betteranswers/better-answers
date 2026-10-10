@@ -140,7 +140,6 @@ export const enqueueJobAction = declareAction({
   }),
   input: enqueueJobInput,
   refuses: ["role-forbids", "malformed"],
-  effect: "write",
 });
 
 export type EnqueueJobInput = InputOf<typeof enqueueJobAction>;

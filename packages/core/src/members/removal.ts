@@ -31,7 +31,6 @@ const removeMemberAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: removeMemberInput,
   refuses: ["role-forbids", "no-such-member", "last-admin", "changed-meanwhile"],
-  effect: "write",
 });
 
 export type RemoveMemberRefusal =

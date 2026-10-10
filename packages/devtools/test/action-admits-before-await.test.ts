@@ -13,7 +13,6 @@ const DECLARATION = `const reprocessAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: schema,
   refuses: ["role-forbids"],
-  effect: "write",
 });
 `;
 
