@@ -97,8 +97,10 @@ const citationsOf = async (
         document.id,
         source.passages,
       );
-      for (const locator of locators) {
+      for (const span of locators) {
         const id = `source-${String(citations.length + 1)}`;
+        // A row keeps its span alone; a citation names the passage by its document too.
+        const locator = `${document.id}/${span}`;
         citations.push({ id, documentId: document.id, title: source.title, locator });
       }
     }
