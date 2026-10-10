@@ -6,11 +6,11 @@ export const LINK_WORDS = {
   checking: "Checking the link.",
   elsewhereTitle: "Enter this code where you started",
   elsewhere:
-    "This browser didn't ask to sign in, so it stays signed out. Type this code on the page that asked:",
+    "This browser didn’t ask to sign in, so it stays signed out. Type this code on the page that asked:",
   copy: "Copy code",
   copied: "Code copied.",
   warning: "Warning",
-  neverShare: "Never read this code to anyone, or type it into a page you didn't open yourself.",
+  neverShare: "Never read this code to anyone, or type it into a page you didn’t open yourself.",
   deadTitle: "This sign-in link no longer works",
   dead: "Each link works once, for five minutes.",
   backToSignIn: "Back to sign-in",
@@ -37,11 +37,11 @@ export const codeShown = (code: string): string => `${code.slice(0, 3)} ${code.s
 export const codeSpelled = (code: string): string => code.split("").join(" ");
 
 export const LINK_UNREAD: Said = {
-  why: "No response, so the link wasn't checked.",
+  why: "No response, so the link wasn’t checked.",
   next: "Try again in a moment.",
 };
 
 export const CODE_NOT_COPIED: Said = {
-  why: "The code wasn't copied.",
+  why: "The code wasn’t copied.",
   next: "Type it where you started.",
 };

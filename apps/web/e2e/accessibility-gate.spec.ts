@@ -135,6 +135,31 @@ const drawAWordlessCheckbox = (dimmedTo: number): void => {
   document.querySelector("main")?.append(box);
 };
 
+/** A band that stays put, and the page scrolled until its button half covers a control. */
+const scrollAControlHalfUnderABand = (): boolean => {
+  const band = document.createElement("header");
+  band.style.cssText =
+    "position: sticky; top: 0; z-index: 30; box-sizing: border-box; height: 48px; padding: 8px 0;";
+  const inTheBand = document.createElement("button");
+  inTheBand.textContent = "Jump to";
+  inTheBand.style.cssText = "display: block; width: 176px; height: 32px;";
+  band.append(inTheBand);
+  document.body.prepend(band);
+
+  const underIt = document.createElement("button");
+  underIt.textContent = "Details";
+  underIt.style.cssText = "display: block; width: 70px; height: 24px;";
+  const room = document.createElement("div");
+  room.style.height = "200vh";
+  document.body.append(underIt, room);
+
+  // Two pixels show below the band, so the band does not hide it whole, and its button covers the rest.
+  window.scrollBy(0, underIt.getBoundingClientRect().top - 26);
+  const covering = inTheBand.getBoundingClientRect();
+  const cut = underIt.getBoundingClientRect();
+  return cut.top < covering.bottom && cut.bottom > band.getBoundingClientRect().bottom;
+};
+
 const theSignInPage = async (page: Page): Promise<void> => {
   await page.goto("/sign-in");
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
@@ -173,6 +198,14 @@ test("audits a button once its fade from disabled has ended", async ({
   await theSignInPage(page);
   await page.evaluate(fadeAButtonBackFromItsDisabledLook);
   await passesTheAccessibilityGate();
+});
+
+test("passes a control scrolled half under a band that stays", async ({ page }) => {
+  await theSignInPage(page);
+  expect(
+    await page.evaluate(scrollAControlHalfUnderABand),
+    "the case left no control half under its band",
+  ).toBe(true);
 });
 
 test("audits beside a spinner that never stops turning", async ({ page }) => {

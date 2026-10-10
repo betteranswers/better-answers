@@ -32,10 +32,7 @@ export function PageTabsRoot(properties: {
 
   const openTab = openTabIn(properties.tabs, picked)?.id;
 
-  /**
-   * Inside the tabs root, so the slot spans the toolbar and the panel and both halves of a
-   * page see one value.
-   */
+  /** Inside the tabs root, so the slot spans every part of the page and each sees one value. */
   const spanned = <ViewStateSlot>{properties.children}</ViewStateSlot>;
 
   if (openTab === undefined) return spanned;
@@ -71,25 +68,20 @@ export function PagePanel(properties: { readonly children: ReactNode }) {
 }
 
 export function Toolbar(properties: { readonly name: string; readonly toolbar: PageToolbar }) {
-  const { tabs, actions } = properties.toolbar;
+  const { tabs } = properties.toolbar;
+  if (tabs === undefined || tabs.length === 0) return null;
 
   return (
-    // No `role="toolbar"`: it promises one tab stop and arrow keys across the band, which is
+    // No `role="toolbar"`: it promises one tab stop and arrow keys across the row, which is
     // the tab list's own contract.
-    <div className="flex min-h-12 flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-muted px-4 md:flex-nowrap md:px-5">
-      {tabs === undefined || tabs.length === 0 ? null : (
-        <TabsList variant="line" aria-label={properties.name}>
-          {tabs.map((tab) => (
-            <TabsTrigger key={tab.id} value={tab.id}>
-              {tab.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      )}
-
-      {actions === undefined ? null : (
-        <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>
-      )}
+    <div className="mt-4 flex border-b border-border">
+      <TabsList variant="line" aria-label={properties.name}>
+        {tabs.map((tab) => (
+          <TabsTrigger key={tab.id} value={tab.id}>
+            {tab.name}
+          </TabsTrigger>
+        ))}
+      </TabsList>
     </div>
   );
 }

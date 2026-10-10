@@ -5,6 +5,7 @@ import {
   tableFeatures,
 } from "@tanstack/react-table";
 
+import { Address } from "@/shared/address.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { isActable } from "./invitations-address.ts";
@@ -48,7 +49,8 @@ export const INVITATION_COLUMNS = column.columns([
   column.accessor("address", {
     id: "address",
     header: "Address",
-    cell: ({ getValue }) => <span className="font-medium wrap-anywhere">{getValue()}</span>,
+    // Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px.
+    cell: ({ getValue }) => <Address address={getValue()} className="font-medium" />,
   }),
   column.accessor("role", {
     id: ROLE.id,

@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
 
 import {
   ACCOUNT_HEADING,
@@ -16,17 +16,25 @@ import {
 import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
+import { KNOWLEDGE, menuGroupIn } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  addMember,
   aMemberSignedInAt,
   anAddress,
   emailsSentTo,
   landedAtHome,
+  person,
   provision,
+  railOf,
+  signedInAtHome,
+  signIn,
   signInByEmail,
+  signInHeading,
   signedInWithNoWorkspace,
+  signOutFromTheShell,
   tabUntilFocused,
 } from "./harness.ts";
 import { aVirtualAuthenticator, withoutWebAuthn } from "./virtual-authenticator.ts";
@@ -221,21 +229,73 @@ test("the email step reads email, send, then the passkey", async ({ page }) => {
   await expect(page.getByRole("button", { name: SIGN_IN_WORDS.passkey })).toBeFocused();
 });
 
-test("the offer shows on a shell page until dismissed", async ({ page, request }) => {
+/** Knowledge's first group, whose name heads the page its rail link opens. */
+const BROWSE = menuGroupIn(KNOWLEDGE, "browse");
+
+const offerOf = (page: Page) => page.getByText(PASSKEY_WORDS.offer);
+
+const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
+
+/** Asked for before the page loads or signs in, so an absence asserted after it is the read's answer. */
+const secondFactorRead = (page: Page) =>
+  page.waitForResponse((answer) => answer.url().includes("person.secondFactor"));
+
+/** A Viewer holding no passkey, on Ask from their sign-in, who signs in again by the address answered. */
+const aViewerOffered = async (page: Page, api: APIRequestContext) => {
   await aVirtualAuthenticator(page);
-  await aMemberSignedInAt(page, request, "Viewer", "/ask");
-  const offer = page.getByText(PASSKEY_WORDS.offer);
-  await expect(offer).toBeVisible();
+  const email = anAddress("offered");
+  const viewer = await person(api, email, { displayName: "Vera Offered" });
+  const workspace = await provision(api, { name: "Offered Once Ltd" });
+  await addMember(api, { role: "Viewer", userId: viewer.id, workspaceId: workspace.workspaceId });
+  await signedInAtHome(page, api, email, "Viewer");
+  await expect(offerOf(page)).toBeVisible();
+  return { email, name: viewer.name };
+};
+
+/** Through the avatar menu, so the sign-in after it happens in the page that showed the offer. */
+const signedInAgain = async (
+  page: Page,
+  api: APIRequestContext,
+  viewer: { readonly email: string; readonly name: string },
+): Promise<void> => {
+  await signOutFromTheShell(page, viewer.name);
+  await expect(signInHeading(page)).toBeVisible();
+  const read = secondFactorRead(page);
+  await signIn(page, api, viewer.email);
+  await landedAtHome(page, "Viewer");
+  await read;
+};
+
+test("a Viewer is offered a passkey once per sign-in", async ({ page, request }) => {
+  const viewer = await aViewerOffered(page, request);
+
+  await railOf(page).getByRole("link", { name: KNOWLEDGE.name }).click();
+  await expect(page.getByRole("heading", { level: 1, name: BROWSE.name })).toBeVisible();
+  await expect(offerOf(page), "the offer followed the Viewer to the next page").toHaveCount(0);
+
+  const read = secondFactorRead(page);
+  await page.reload();
+  await read;
+  await expect(thePage(page)).toBeVisible();
+  await expect(offerOf(page), "the offer came back on a reload").toHaveCount(0);
+
+  await signedInAgain(page, request, viewer);
+  await expect(offerOf(page), "the next sign-in was not offered a passkey").toBeVisible();
+});
+
+test("a dismissed offer stays away after the next sign-in", async ({ page, request }) => {
+  const viewer = await aViewerOffered(page, request);
   const dismissed = page.waitForResponse((answer) => answer.url().includes("dismissPasskeyOffer"));
 
   await page.getByRole("button", { name: PASSKEY_WORDS.dismissOffer }).click();
 
-  await expect(offer).toHaveCount(0);
-  await expect(page.getByRole("main", { name: "Page" })).toBeFocused();
+  await expect(offerOf(page)).toHaveCount(0);
+  await expect(thePage(page)).toBeFocused();
   expect((await dismissed).ok(), "the dismissal was not kept").toBe(true);
-  await page.reload();
-  await expect(page.getByRole("main", { name: "Page" })).toBeVisible();
-  await expect(offer).toHaveCount(0);
+
+  await signedInAgain(page, request, viewer);
+  await expect(thePage(page)).toBeVisible();
+  await expect(offerOf(page), "a dismissed offer came back with the next sign-in").toHaveCount(0);
 });
 
 test("the offer's link lands on the Account page's add", async ({ page, request }) => {

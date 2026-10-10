@@ -1,3 +1,4 @@
+import { Address } from "@/shared/address.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { instantWords, nameOrAddress } from "@/shared/words.ts";
 
@@ -5,6 +6,12 @@ import type { HeldGrant, ListedPerson } from "./people-api.ts";
 
 export const nameOf = (person: ListedPerson): string =>
   nameOrAddress(person.displayName, person.email);
+
+/** A person with no display name is named by their address, which breaks as an address does. */
+export function PersonName(properties: { readonly person: ListedPerson }) {
+  const { displayName, email } = properties.person;
+  return displayName === "" ? <Address address={email} /> : displayName;
+}
 
 /** Past its expiry a grant refreshes nothing, though no action ended it. */
 export const grantStateOf = (grant: HeldGrant, nowMs: number): "Expired" | "Live" =>

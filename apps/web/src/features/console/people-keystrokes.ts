@@ -12,7 +12,12 @@ export const PEOPLE_KEYSTROKES = {
 export const SELECT_A_PERSON_FIRST = "Select a person first.";
 
 export const NAMES_WAITING_KEYSTROKES = {
+  search: { key: "/", action: "Search the names waiting by name or workspace" },
   correct: { key: "c", action: "Correct the display name in focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const SELECT_A_NAME_FIRST = "Select a name first.";
+
+export const WORKSPACES_KEYSTROKES = {
+  search: { key: "/", action: "Search every workspace by name or short name" },
+} as const satisfies Readonly<Record<string, Keystroke>>;

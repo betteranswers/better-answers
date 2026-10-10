@@ -10,6 +10,7 @@ import {
 import { flushSync } from "react-dom";
 
 import { useAsked } from "@/shared/address-ask.ts";
+import { Address } from "@/shared/address.tsx";
 import { refusalOf } from "@/shared/api/trpc.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
@@ -155,7 +156,7 @@ function HeldRow(properties: {
       data-flagged={flag === undefined ? undefined : true}
       className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-2 py-1 last:border-b-0"
     >
-      <span className="min-w-40 flex-1 text-sm wrap-anywhere">{one.address}</span>
+      <Address address={one.address} className="min-w-40 flex-1 text-sm" />
       <Pill
         id={flagId}
         variant="outline"

@@ -6,8 +6,8 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
+import { correctingConsequence, correctWords } from "./correcting-words.ts";
 import type { Refused } from "./use-correcting.ts";
-import { correctingConsequence, correctWords } from "./words.ts";
 
 /**
  * `name` is how the dialog calls the person, which may be their address. The opener puts focus
@@ -61,7 +61,7 @@ export function CorrectNameDialog(properties: {
         />
         <p id={ids.hint} className="text-sm text-muted-foreground">
           One line of up to {DISPLAY_NAME_MAX_CHARACTERS} characters, with no &lt; or &gt;: the rule
-          a person's own name follows.
+          a person’s own name follows.
         </p>
         {byTheRule === undefined ? null : (
           <p id={ids.refused} className="text-sm">

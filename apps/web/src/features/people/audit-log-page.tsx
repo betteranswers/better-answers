@@ -1,5 +1,6 @@
 import { useId, useMemo, useRef, useState, type RefObject } from "react";
 
+import { Address } from "@/shared/address.tsx";
 import { ceilingLiftsIn, type ApiError } from "@/shared/api/trpc.ts";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { Icon } from "@/shared/icon.tsx";
@@ -8,12 +9,12 @@ import { useLanding } from "@/shared/landing.ts";
 import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { byWords, instantWords } from "@/shared/words.ts";
 
 import { detailLinesOf, type DetailLine } from "./audit-details.ts";
@@ -51,10 +52,10 @@ function DetailRow(properties: { readonly line: DetailLine }) {
   return (
     <>
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="wrap-anywhere">
+      <dd className="min-w-0 wrap-anywhere">
         {value}
         {address === undefined ? null : (
-          <span className="block text-muted-foreground">{address}</span>
+          <Address address={address} className="block text-muted-foreground" />
         )}
       </dd>
     </>
@@ -86,40 +87,62 @@ function DetailList(properties: { readonly event: ReadAuditEvent }) {
   );
 }
 
-function EventLine(properties: { readonly event: ReadAuditEvent }) {
-  const { event } = properties;
-  const address =
-    event.by.kind === "person"
-      ? personSaid(event.by.displayName, event.by.address).address
-      : undefined;
+/** The display names two actors among these events share, so each one's line says which. */
+const namesShared = (events: readonly ReadAuditEvent[]): ReadonlySet<string> => {
+  const addressesOf = new Map<string, Set<string>>();
+  for (const { by } of events) {
+    if (by.kind !== "person") continue;
+    addressesOf.set(by.displayName, (addressesOf.get(by.displayName) ?? new Set()).add(by.address));
+  }
+  return new Set([...addressesOf].filter(([, held]) => held.size > 1).map(([name]) => name));
+};
+
+/** An actor named by their address alone has none to add. */
+const addressAtRest = (
+  by: ReadAuditEvent["by"],
+  shared: ReadonlySet<string>,
+): string | undefined =>
+  by.kind === "person" && shared.has(by.displayName)
+    ? personSaid(by.displayName, by.address).address
+    : undefined;
+
+/** One line at rest: the sentence, then Details, whose list opens on a line of its own beneath. */
+function EventLine(properties: {
+  readonly event: ReadAuditEvent;
+  readonly address: string | undefined;
+}) {
+  const { event, address } = properties;
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="min-w-0 wrap-anywhere">{sentenceOf(event)}</span>
-        <Pill>{WORDS.families[event.family]}</Pill>
-      </div>
-      {/* Beneath the sentence that opens with the name, so two of one name are told apart at once. */}
-      {address === undefined ? null : (
-        <span className="text-xs text-muted-foreground wrap-anywhere">{address}</span>
-      )}
-      <Collapsible>
-        <CollapsibleTrigger asChild>
-          <Button variant="link" size="sm" className="group h-auto gap-1 self-start px-0">
-            {WORDS.details}
-            <span className="sr-only">
-              {WORDS.detailsOf(headlineOf(event.action), instantWords(event.at))}
-            </span>
-            <Icon
-              name="caret-down"
-              className="transition-transform group-data-[state=open]:rotate-180"
-            />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <DetailList event={event} />
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
+    <Collapsible className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3">
+      <span className="min-w-0 flex-1 wrap-anywhere">
+        {sentenceOf(event)}
+        {address === undefined ? null : (
+          <>
+            {" "}
+            <Address address={address} className="text-xs text-muted-foreground" />
+          </>
+        )}
+      </span>
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="link"
+          size="sm"
+          className="group -mx-1 h-auto min-h-6 gap-1 px-1 has-[>svg]:px-1"
+        >
+          {WORDS.details}
+          <span className="sr-only">
+            {WORDS.detailsOf(headlineOf(event.action), instantWords(event.at))}
+          </span>
+          <Icon
+            name="caret-down"
+            className="transition-transform group-data-[state=open]:rotate-180"
+          />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="basis-full">
+        <DetailList event={event} />
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -153,6 +176,7 @@ function Events(properties: {
 }) {
   const { auditLog, events } = properties;
   const landing = useLanding();
+  const shared = useMemo(() => namesShared(events), [events]);
 
   if (events.length === 0) {
     return (
@@ -171,7 +195,11 @@ function Events(properties: {
 
   return (
     <>
-      <EventDays events={events} landing={landing} line={(event) => <EventLine event={event} />} />
+      <EventDays
+        events={events}
+        landing={landing}
+        line={(event) => <EventLine event={event} address={addressAtRest(event.by, shared)} />}
+      />
       <ListPages
         pages={{
           kind: "more",
@@ -259,20 +287,23 @@ function AuditLogRegion() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id={headingId}>{WORDS.heading}</h2>
-        <ExportAction
-          asked={asked}
-          nothingMatches={auditLog.data !== undefined && events.length === 0}
-          say={setOutcome}
-        />
-      </div>
-      <p className="mt-1 text-muted-foreground">{WORDS.summary}</p>
-      <output className="mt-1 block text-muted-foreground empty:hidden">
-        {auditLog.data === undefined
-          ? ""
-          : WORDS.counted(asked, events.length, auditLog.hasNextPage)}
-      </output>
+      <ListHead
+        heading={WORDS.heading}
+        headingId={headingId}
+        description={WORDS.summary}
+        count={
+          auditLog.data === undefined
+            ? ""
+            : WORDS.counted(asked, events.length, auditLog.hasNextPage)
+        }
+        action={
+          <ExportAction
+            asked={asked}
+            nothingMatches={auditLog.data !== undefined && events.length === 0}
+            say={setOutcome}
+          />
+        }
+      />
       <OutcomeLine outcome={outcome} className="mt-2" />
 
       <Card className="mt-4">
@@ -326,8 +357,7 @@ export function AuditLogPage() {
 
   return (
     <>
-      <h1>{system.name}</h1>
-      <p className="mt-2 text-muted-foreground">{system.summary}</p>
+      <PageHead heading={system.name} summary={system.summary} />
       <AuditLogRegion />
     </>
   );

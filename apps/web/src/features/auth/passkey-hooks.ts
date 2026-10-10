@@ -17,7 +17,7 @@ import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { askOfOurRoute, type SignedIn } from "./auth-hooks.ts";
 import { useRereadTheSecondFactor } from "./second-factor-hooks.ts";
-import { announceTheSignIn, rememberTheSession } from "./session-memory.ts";
+import { signedInHere } from "./session-memory.ts";
 
 const ADD_OPTIONS_PATH = "/passkeys/add-options";
 
@@ -159,11 +159,6 @@ const chosenFromTheAutofill = async (
   const optionsJSON = await askToSignIn().catch(() => undefined);
   if (optionsJSON === undefined || !live()) return undefined;
   return startAuthentication({ optionsJSON, useBrowserAutofill: true }).catch(() => undefined);
-};
-
-const signedInHere = (): void => {
-  rememberTheSession("held");
-  announceTheSignIn();
 };
 
 /**

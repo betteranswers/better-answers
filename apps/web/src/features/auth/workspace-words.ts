@@ -10,13 +10,17 @@ export const PICKER_WORDS = {
   tryAgain: "Try again",
 } as const;
 
+export const PICKER_ACTIONS = {
+  toWorkspaces: "Go to your workspaces",
+} as const;
+
 export const NO_WORKSPACE_HEADING = "No workspace yet";
 
 /** Apart from the page's JSX, so the browser suite reads the words the no-workspace page shows. */
 export const NO_WORKSPACE_WORDS = {
   /** Claude's request lapses within minutes, and joining can take an Admin's day. */
   claudeAfterJoining:
-    "Claude can connect once you've joined a workspace. When you're in, connect again from Claude.",
+    "Claude can connect once you’ve joined a workspace. When you’re in, connect again from Claude.",
   invitations: "Your invitations",
   invitedAs,
   tryAgain: "Try again",
@@ -30,6 +34,6 @@ export const NO_WORKSPACE_ACTIONS = {
 
 /** A connection carried through sign-in that the picker could not hand back. */
 export const NOT_CONNECTED = {
-  heading: "You're signed in",
+  heading: "You’re signed in",
   carryOn: `Go to ${PRODUCT_NAME}`,
 } as const;

@@ -39,7 +39,7 @@ describe("an audit event's sentence", () => {
       detail: { previousRole: "Viewer", role: "Editor" },
     });
 
-    expect(sentenceOf(changed)).toBe("Hannah Wright changed Priya Shah's role to Editor");
+    expect(sentenceOf(changed)).toBe("Hannah Wright changed Priya Shah’s role to Editor");
   });
 
   it("says a deleted group for a group since deleted", () => {
@@ -185,7 +185,7 @@ describe("a second factor's audit sentence", () => {
       named: {},
     };
 
-    expect(sentenceOf(restored)).toBe("The platform restored Priya Shah's sign-in");
+    expect(sentenceOf(restored)).toBe("The platform restored Priya Shah’s sign-in");
   });
 });
 

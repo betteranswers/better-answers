@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
 import { Banner, BannerAction, BannerClose, BannerTitle } from "@/shared/ui/kibo-ui/banner.tsx";
@@ -8,6 +8,7 @@ import { PASSKEY_WORDS } from "./account-words.ts";
 import { passkeysHere, useDismissPasskeyOffer } from "./passkey-hooks.ts";
 import { ADD_A_PASSKEY_BUTTON } from "./passkeys-part.tsx";
 import { useSecondFactorOnce, type SecondFactor } from "./second-factor-hooks.ts";
+import { passkeyOfferShown, rememberThePasskeyOfferShown } from "./session-memory.ts";
 
 const ACCOUNT = "/account";
 
@@ -17,21 +18,36 @@ const offered = (held: SecondFactor | undefined): boolean =>
 type OfferProperties = { readonly onDismissed: () => void };
 
 /**
- * Offered once, above a frame's toolbar, to a person holding no passkey. It never takes focus or
- * announces itself as it arrives.
+ * Offered once per sign-in, on the first page that draws it, to a person holding no passkey. It
+ * never takes focus or announces itself.
  */
 export function PasskeyOffer(properties: OfferProperties) {
   const [here] = useState(passkeysHere);
+  // The page drawn, not the one asked for: a frame being left would draw the offer and spend it.
+  const drawn = useRouterState({ select: (state) => state.matches.at(-1)?.pathname });
   // Account is where the offer leads, so it is not offered there again.
-  const onAccount = useRouterState({ select: (state) => state.location.pathname === ACCOUNT });
-  return here && !onAccount ? <OfferWhereHeld {...properties} /> : null;
+  if (!here || drawn === undefined || drawn === ACCOUNT) return null;
+
+  // Keyed by the address, so each page arrives asking afresh whether the offer was shown.
+  return <OfferOnThisPage key={drawn} {...properties} />;
 }
 
-/** Read only where the browser can use a passkey, so no other browser asks. */
-function OfferWhereHeld(properties: OfferProperties) {
+/**
+ * Read only where a passkey can be used, so no other browser asks. Only the page that first draws
+ * the offer keeps it.
+ */
+function OfferOnThisPage(properties: OfferProperties) {
+  const [unshownOnArrival] = useState(() => !passkeyOfferShown());
   const read = useSecondFactorOnce();
   const dismiss = useDismissPasskeyOffer();
-  if (!offered(read.data)) return null;
+  const offering = unshownOnArrival && offered(read.data);
+
+  // Marked as it draws, not as the frame mounts, so a person whose read is slow still sees it once.
+  useEffect(() => {
+    if (offering) rememberThePasskeyOfferShown();
+  }, [offering]);
+
+  if (!offering) return null;
 
   return (
     <section aria-label={PASSKEY_WORDS.heading} className="px-4 pt-4 md:px-8">

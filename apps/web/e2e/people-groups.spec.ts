@@ -67,7 +67,25 @@ const countCellOf = (name: string): string => `//tr[td[1][normalize-space(.)='${
 /** What the open sheet says under its heading: a group's member count. */
 const SHEET_COUNT = "//div[@role='dialog']//h2/following-sibling::p[1]";
 
-const LIST_COUNT = "//section[h2[normalize-space(.)='Groups']]/output";
+const LIST_COUNT = "//section[h2[normalize-space(.)='Groups']]/div/output";
+
+/** A group's label on a member's page, found only while the box beside it is ticked. */
+const tickedGroup = (name: string): string =>
+  `//fieldset//div[button[@role='checkbox'][@aria-checked='true']]//label[normalize-space(.)='${name}']`;
+
+/** A card's inner gap and a little over: text further beneath its header has a band above it. */
+const ONE_GAP_PX = 16;
+
+/** An empty outcome line that took a gap of its own would push the card's first text down. */
+const startsUnderItsHeader = async (card: Locator): Promise<void> => {
+  const header = await card.locator("[data-slot='card-header']").boundingBox();
+  const firstLine = await card.getByRole("paragraph").first().boundingBox();
+  const headerEnds = (header?.y ?? Number.NaN) + (header?.height ?? Number.NaN);
+  expect(
+    (firstLine?.y ?? Number.NaN) - headerEnds,
+    "an empty band stands above the card's first line of text",
+  ).toBeLessThanOrEqual(ONE_GAP_PX);
+};
 
 /** Another workspace's group is made alongside, so a list that leaked would show it. */
 const anAdminAtGroups = async (page: Page, api: APIRequestContext, workspaceName: string) => {
@@ -110,7 +128,16 @@ test.describe("the People group's Groups page", () => {
       "aria-current",
       "page",
     );
-    await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+    // With no tabs to name the list, its own heading shows, under the page's.
+    await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
+      - main "Page":
+        - heading ${JSON.stringify(people.name)} [level=1]
+        - paragraph: ${JSON.stringify(people.summary)}
+        - region "Groups":
+          - heading "Groups" [level=2]
+          - status: 2 groups
+    `);
+    await expect(page.getByRole("tablist")).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("Una's crew");
     await expect(groupsRegion(page)).toMatchAriaSnapshot(`
       - region "Groups":
@@ -135,6 +162,12 @@ test.describe("the People group's Groups page", () => {
                 - button "HR team"
               - cell "2 members"
     `);
+    // A name alone does not say that its row opens, so each name carries a caret at rest.
+    for (const name of ["Bid writers", "HR team"]) {
+      const opens = groupsRegion(page).getByRole("button", { name, exact: true });
+      await expect(opens).toHaveAttribute("aria-haspopup", "dialog");
+      await expect(opens.locator("svg"), `${name} shows no cue that it opens`).toBeVisible();
+    }
     await passesTheAccessibilityGate();
   });
 
@@ -288,6 +321,7 @@ test.describe("a group's actions", () => {
       .filter({ hasText: /\S/ });
     await expect(members.getByRole("checkbox")).toHaveCount(3);
     await expect(members.getByRole("checkbox", { checked: true })).toHaveCount(0);
+    await startsUnderItsHeader(sheet.getByRole("region", { name: "Members" }));
 
     const sam = members.getByRole("checkbox", { name: "Sam Okoro" });
     await sam.focus();
@@ -452,11 +486,9 @@ test.describe("a member's groups, on their row and their page", () => {
     await expect(bids).toBeFocused();
     await expect(bids).not.toBeChecked();
     await expect(picked.getByRole("checkbox", { name: "HR team" })).toBeChecked();
+    await startsUnderItsHeader(groups);
 
-    await clockTheNextKey(page, {
-      at: "//section[h2='Access']//dt[normalize-space(.)='Groups']/following-sibling::dd[1]",
-      reads: "Bid writers",
-    });
+    await clockTheNextKey(page, { at: tickedGroup("Bid writers"), reads: "Bid writers" });
     await page.keyboard.press("Space");
     await expect(groups.getByRole("status").filter({ hasText: /\S/ })).toHaveText(
       "Priya Shah is in Bid writers now.",

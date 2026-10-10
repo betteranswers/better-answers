@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useId, useState, type RefObject } from "react";
 
+import { Address } from "@/shared/address.tsx";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { EmptyState } from "@/shared/empty-state.tsx";
 import { Icon } from "@/shared/icon.tsx";
@@ -9,7 +10,6 @@ import { SheetPart } from "@/shared/sheet-part.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
 import { instantWords } from "@/shared/words.ts";
@@ -18,7 +18,7 @@ import { EMPTY_LINES } from "./empty-lines.ts";
 import { GroupChecklist } from "./group-checklist.tsx";
 import { useGroups } from "./groups-api.ts";
 import { GroupsReadSaid } from "./groups-read.tsx";
-import { INCLUDES_YOU, RECORDED } from "./member-action-words.ts";
+import { INCLUDES_YOU, MEMBER_PAGE_WORDS as WORDS, RECORDED } from "./member-action-words.ts";
 import { MemberRemoval } from "./member-removal.tsx";
 import { GROUPS_PATH } from "./members-address.ts";
 import {
@@ -34,7 +34,7 @@ import {
 import { outcomeOfFailure } from "./refusal.tsx";
 import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
 import { useSelfActionHome } from "./self-action.tsx";
-import { CredentialsHere, Day, GroupPills, nameOf } from "./words.tsx";
+import { CredentialsHere, Day, nameOf } from "./words.tsx";
 
 /** The control each of the page's actions lands focus on, so a keystroke can reach any of them. */
 export type Landings = {
@@ -56,17 +56,11 @@ function AccessSummary(properties: { readonly member: ListedMember }) {
   const { member } = properties;
 
   return (
-    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
-      <SummaryRow term="Role">
-        <Pill>{member.role}</Pill>
-      </SummaryRow>
-      <SummaryRow term="Groups">
-        <GroupPills groups={member.groups} />
-      </SummaryRow>
+    <dl className="grid grid-cols-[fit-content(60%)_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
       <SummaryRow term="Joined">
         <Day instant={member.joinedAt} />
       </SummaryRow>
-      <SummaryRow term="Sign-ins and tokens here">
+      <SummaryRow term={WORDS.signInsAndTokensHere}>
         <CredentialsHere revokedAt={member.credentialsRevokedAt} />
       </SummaryRow>
     </dl>
@@ -75,10 +69,12 @@ function AccessSummary(properties: { readonly member: ListedMember }) {
 
 /** The hint beside the commit, which says so when the action is on the reader themself. */
 const roleHint = (name: string, held: Role, unchanged: boolean, yourself: boolean): string => {
-  if (unchanged) return `${name} is ${aRole(held)}. Pick another role to change it.`;
+  if (unchanged) return WORDS.holdsRole(name, held);
+  // The role held is said here too: a refused change leaves the pick on a role they do not hold.
+  const heldNow = WORDS.heldUntilChanged(name, held);
   return yourself
-    ? `${INCLUDES_YOU} ${RECORDED} It holds from your next request.`
-    : `${RECORDED} It holds from their next request.`;
+    ? `${INCLUDES_YOU} ${RECORDED} It holds from your next request. ${heldNow}`
+    : `${RECORDED} It holds from their next request. ${heldNow}`;
 };
 
 function RolePicker(properties: {
@@ -165,7 +161,7 @@ function RolePicker(properties: {
 
           <div className="flex flex-col items-start gap-2">
             <Button disabled={unchanged} aria-describedby={hintId} onClick={commit}>
-              Make {name} {aRole(picked)}
+              {unchanged ? WORDS.changeRole : WORDS.makeRole(name, picked)}
             </Button>
             <p id={hintId} className="text-sm text-muted-foreground">
               {roleHint(name, member.role, unchanged, yourself)}
@@ -199,7 +195,7 @@ function CredentialsRevoker(properties: {
         onSuccess: (revoked: CredentialsRevokedHere) => {
           setOutcome({
             tone: "said",
-            words: `Every sign-in and token ${name} held here has ended. Anything issued before ${instantWords(revoked.revokedAt)} is refused here; a fresh sign-in works.`,
+            words: `${WORDS.everySignInEnded(name)} ${WORDS.refusedFrom(instantWords(revoked.revokedAt))}`,
           });
         },
         onError: (failure: Error | ApiError) => {
@@ -210,7 +206,7 @@ function CredentialsRevoker(properties: {
   };
 
   return (
-    <SheetPart title="Sign-ins and tokens">
+    <SheetPart title={WORDS.signInsAndTokens}>
       <div className="flex flex-col items-start gap-2">
         <Button
           ref={revokeRef}
@@ -220,11 +216,10 @@ function CredentialsRevoker(properties: {
           aria-disabled={revoke.isPending}
           onClick={commit}
         >
-          End every sign-in and token here
+          {WORDS.endEverySignInAndToken}
         </Button>
         <p id={hintId} className="text-sm text-muted-foreground">
-          Every session and token {name} holds for this workspace is refused at once, and a fresh
-          sign-in works.{" "}
+          {WORDS.endsAtOnce(name)}{" "}
           {member.personId === readerId ? "Your own session here ends with it." : RECORDED}
         </p>
       </div>
@@ -264,8 +259,9 @@ function DisplayNameFlag(properties: {
   return (
     <SheetPart title="Display name">
       {member.displayName === "" ? (
-        <p className="text-sm text-muted-foreground wrap-anywhere">
-          {member.address} has given no display name yet, so there is none to flag.
+        <p className="min-w-0 text-sm text-muted-foreground">
+          <Address address={member.address} /> has given no display name yet, so there is none to
+          flag.
         </p>
       ) : (
         <>

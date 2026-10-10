@@ -1811,7 +1811,7 @@ its menu group where its area has them: Members, Connected sources, Audit log.
 Control Centre's are listed in its entry above, in the order the menu shows them. A person sees a
 page by their *role* or by owning a *collection* it serves. A page not built, or not theirs to see,
 appears nowhere, and its address shows the same **not-found page** as one that never existed,
-offering their *home*. A page that fails says "This page didn't load". A page may carry *tabs*. Not
+offering their *home*. A page that fails says "This page didn’t load". A page may carry *tabs*. Not
 a *view (of an MCP App)*.
 
 ### tab
@@ -1833,10 +1833,11 @@ the page's frame with no *toolbar*. An address deeper than it names nothing.
 One *member*'s page, at the *detail address* beneath Members, opened from their row, its *row
 menu*, a Members keystroke or *Jump to*.
 
-A header names them, their address and their role, over three sections: **Access** (their role,
-their groups, when they joined, when every sign-in and token they held here was last ended, and the
-*display name* flag), their *Activity*, and **Remove and end every sign-in**, set apart last. A
-section has no address. A page naming no member says so and leads to Members.
+A header names them and their address, over three sections: **Access** (when they joined, when
+every sign-in and *personal token* they held here was last ended, their role and their groups, each
+shown once, where it is changed, and the *display name* flag), their *Activity*, and **Remove and
+end every sign-in**, set apart last. A section has no address. A page naming no member says so and
+leads to Members.
 
 ### home (of a role)
 
@@ -1878,10 +1879,19 @@ the content, in a sheet titled *Menu*, and gives focus back when it closes.
 
 ### toolbar
 
-The region above a page's content carrying that page's tabs at one end and its actions at the
-other, filled by the page.
+The row under a page's first heading carrying that page's *tabs*, drawn by the frame.
 
-A page with neither gets no toolbar.
+A page without tabs gets no toolbar. It holds no action: a page's primary action is on its list's
+row, in the *page head*.
+
+### page head
+
+_Internal._ how every *page* opens: its first heading, which names its group, and the group's
+summary; then its *toolbar* where it has tabs; then one row for each list, holding the list's
+count and the page's primary action.
+
+So a page reads where the person is, how many, then what they can do. A list under an open *tab*
+keeps its own heading for a screen reader alone, since the tab already names it.
 
 ### selection bar
 
@@ -1911,8 +1921,8 @@ A destructive action sits last, apart. Not the *selection bar*.
 
 ### view-state slot
 
-_Internal._ the one place the open page writes what the actions on its toolbar must read, such as
-what a reader has ticked.
+_Internal._ the one place the open page writes what a part of it drawn outside its own panel must
+read, such as what a reader has ticked.
 
 It answers empty to any page but the one that wrote it, and it is emptied when the reader opens
 another tab.
@@ -1925,7 +1935,7 @@ rail and the menu, in three cells.
 Its three cells are the *logo* over the rail; the *workspace switcher* and the *navigation control*
 over the menu; then the *breadcrumb*, *Jump to* and the **avatar menu**, which shows the person's
 initials and opens to their name, their role and *Sign out*. It holds no page's actions: those are
-in the page's own *toolbar*. Hiding the menu moves nothing in it. Where the window is not wide it
+in the page's own *page head*. Hiding the menu moves nothing in it. Where the window is not wide it
 takes two rows, the breadcrumb alone on the second, and scrolls with the page.
 
 ### logo

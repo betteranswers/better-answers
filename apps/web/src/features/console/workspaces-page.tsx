@@ -1,18 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
+import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { useId } from "react";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
+import { FilterRow } from "@/shared/filter-row.tsx";
+import { GridTable } from "@/shared/grid-table.tsx";
+import { usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { CONSOLE, menuGroupIn } from "@/shared/navigation.ts";
-import { useReadSaid } from "@/shared/read-said.ts";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
+import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { Button } from "@/shared/ui/button.tsx";
+import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
+import { useHiddenColumns } from "@/shared/wide-layout.ts";
 import { counted, dayWords } from "@/shared/words.ts";
 
 import { Facts } from "./facts.tsx";
-import { readRefused } from "./words.ts";
+import { countOf, NothingListed, ReadSaid, useNarrowedRows } from "./list-parts.tsx";
+import { WORKSPACES_WORDS as WORDS } from "./list-words.ts";
+import { WORKSPACES_KEYSTROKES } from "./people-keystrokes.ts";
 
 type ListedWorkspace = inferOutput<
   ReturnType<typeof useTRPC>["console"]["workspaces"]["list"]
@@ -20,48 +26,36 @@ type ListedWorkspace = inferOutput<
 
 const workspaces = menuGroupIn(CONSOLE, "workspaces");
 
+const LISTED = Object.values(WORKSPACES_KEYSTROKES);
+
 const useWorkspaces = () => {
   const api = useTRPC();
   return useQuery(api.console.workspaces.list.queryOptions());
 };
 
-const TERM = "text-muted-foreground";
+const features = tableFeatures({});
 
-function WorkspaceItem(properties: { readonly workspace: ListedWorkspace }) {
+const column = createColumnHelper<typeof features, ListedWorkspace>();
+
+function WorkspaceCell(properties: { readonly workspace: ListedWorkspace }) {
   const { workspace } = properties;
-  const headingId = useId();
-
   return (
-    <li
-      aria-labelledby={headingId}
-      className="border-t border-border py-4 first:border-t-0 first:pt-0"
-    >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h3 id={headingId} className="font-medium text-foreground">
-          {workspace.name}
-        </h3>
-        <Pill>{counted(workspace.memberCount, "member", "members")}</Pill>
-      </div>
-
-      <Facts>
-        <dt className={TERM}>Short name</dt>
-        <dd>
-          <code className="font-mono break-all">{workspace.shortName}</code>
-        </dd>
-        <dt className={TERM}>Provisioned</dt>
-        <dd>{dayWords(workspace.createdAt)}</dd>
-      </Facts>
-
+    <div className="grid justify-items-start gap-0.5">
+      <span className="font-medium wrap-anywhere">{workspace.name}</span>
       {/* The one disclosure: what an ops command needs, never what the list is read for. */}
-      <Collapsible className="mt-2">
+      <Collapsible>
         <CollapsibleTrigger asChild>
-          <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-            More about {workspace.name}
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto px-0 text-left wrap-anywhere whitespace-normal"
+          >
+            {WORDS.moreAbout(workspace.name)}
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <Facts>
-            <dt className={TERM}>Workspace id</dt>
+            <dt className="text-muted-foreground">Workspace id</dt>
             <dd>
               <code className="font-mono break-all">{workspace.id}</code>
             </dd>
@@ -71,57 +65,119 @@ function WorkspaceItem(properties: { readonly workspace: ListedWorkspace }) {
           </p>
         </CollapsibleContent>
       </Collapsible>
-    </li>
+    </div>
   );
 }
 
-function ListState(properties: { readonly listed: ReturnType<typeof useWorkspaces> }) {
-  const { listed } = properties;
-  const said = useReadSaid(listed);
-  if (listed.isPending) return said.isPending ? <p>The workspaces are still loading.</p> : null;
-  if (listed.error !== null) {
-    return said.error === null ? null : (
-      <p>
-        <RefusalLine said={readRefused(said.error)} />
-      </p>
-    );
-  }
-  if (listed.data.length === 0) {
-    return (
-      <p>
-        No workspace is provisioned yet. The ops command <code>provision-workspace</code> makes the
-        first.
-      </p>
-    );
-  }
-  return <p>{counted(listed.data.length, "workspace", "workspaces")} on the platform.</p>;
+const HEADS = WORDS.columns;
+
+const columns = column.columns([
+  column.display({
+    id: "workspace",
+    header: HEADS.workspace,
+    cell: ({ row }) => <WorkspaceCell workspace={row.original} />,
+  }),
+  column.accessor("shortName", {
+    header: HEADS.shortName,
+    cell: ({ getValue }) => <code className="font-mono break-all">{getValue()}</code>,
+  }),
+  column.accessor("memberCount", {
+    header: HEADS.memberCount,
+    cell: ({ getValue }) => counted(getValue(), "member", "members"),
+  }),
+  column.accessor("createdAt", {
+    header: HEADS.createdAt,
+    cell: ({ getValue }) => dayWords(getValue()),
+  }),
+]);
+
+/** Every column but the workspace can hide, so a row always says which it is. */
+const HIDEABLE = [
+  { id: "shortName", label: HEADS.shortName },
+  { id: "memberCount", label: HEADS.memberCount },
+  { id: "createdAt", label: HEADS.createdAt },
+] as const;
+
+/** Four columns outrun a narrow window, so it opens on two; the rest can be shown again. */
+const NARROW_HIDES: ReadonlySet<string> = new Set(["memberCount", "createdAt"]);
+
+const NO_WORKSPACE: readonly ListedWorkspace[] = [];
+
+const wordsOf = (workspace: ListedWorkspace): string => `${workspace.name}\n${workspace.shortName}`;
+
+function NoneProvisioned() {
+  return (
+    <p className="px-4 py-10">
+      No workspace is provisioned yet. The ops command <code>provision-workspace</code> makes the
+      first.
+    </p>
+  );
+}
+
+function WorkspacesList() {
+  const headingId = useId();
+  const listed = useWorkspaces();
+  const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
+  // A refused read of it again leaves nothing listed: what it held may no longer be theirs.
+  const read = listed.error === null ? listed.data : undefined;
+  const narrowed = useNarrowedRows(read ?? NO_WORKSPACE, wordsOf);
+  const table = useTable({
+    features,
+    columns,
+    data: narrowed.shown,
+    getRowId: (workspace) => workspace.id,
+  });
+
+  return (
+    <section aria-labelledby={headingId} className="mt-6">
+      <ListHead
+        heading={WORDS.heading}
+        headingId={headingId}
+        description={WORDS.description}
+        count={read === undefined ? "" : countOf(WORDS, read.length, narrowed)}
+      />
+      <ReadSaid read={listed} loading={WORDS.loading} />
+
+      {read === undefined ? null : (
+        <Card className="mt-4">
+          <FilterRow
+            search={{
+              label: WORDS.search,
+              value: narrowed.typed,
+              onChange: narrowed.setTyped,
+              keystroke: WORKSPACES_KEYSTROKES.search,
+              inputRef: narrowed.searchRef,
+            }}
+            columns={{ columns: HIDEABLE, hidden, onHiddenChange: setHidden }}
+          />
+          <GridTable
+            table={table}
+            caption={WORDS.caption}
+            hidden={hidden}
+            empty={
+              <NothingListed
+                search={narrowed.search}
+                noneMatch={WORDS.noneMatch}
+                onClear={narrowed.clear}
+                searchRef={narrowed.searchRef}
+              >
+                <NoneProvisioned />
+              </NothingListed>
+            }
+          />
+        </Card>
+      )}
+    </section>
+  );
 }
 
 export function WorkspacesPage() {
-  const listed = useWorkspaces();
-  const listId = useId();
+  usePageKeystrokes(LISTED);
 
   return (
     <>
-      <h1>{workspaces.name}</h1>
-      <p className="mt-2 text-muted-foreground">{workspaces.summary}</p>
-
-      <section aria-labelledby={listId} className="mt-6">
-        <h2 id={listId}>Every workspace</h2>
-
-        <div aria-live="polite" className="mt-2 text-muted-foreground">
-          <ListState listed={listed} />
-        </div>
-
-        {/* A refused read of it again leaves nothing listed: what it held may no longer be theirs. */}
-        {listed.error !== null || listed.data === undefined || listed.data.length === 0 ? null : (
-          <ul className="mt-4">
-            {listed.data.map((workspace) => (
-              <WorkspaceItem key={workspace.id} workspace={workspace} />
-            ))}
-          </ul>
-        )}
-      </section>
+      <PageHead heading={workspaces.name} summary={workspaces.summary} />
+      <WorkspacesList />
     </>
   );
 }

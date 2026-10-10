@@ -24,7 +24,7 @@ export const SAID_OF_A_CONNECTED_SOURCE = {
     next: "Narrow it if it reaches too far.",
   },
   "not-indexed": {
-    why: "The connected source's sync has not finished.",
+    why: "The connected source’s sync has not finished.",
     next: "Publish once its state reads indexed.",
   },
   "confirmation-missing": {
@@ -64,7 +64,7 @@ export const SAID_OF_A_CONNECTED_SOURCE = {
     next: "Name the groups the People page lists.",
   },
   malformed: {
-    why: "Something in the form isn't valid, so nothing was saved.",
+    why: "Something in the form isn’t valid, so nothing was saved.",
     next: "Check each field and send it again.",
   },
 } satisfies SaidOfWord;

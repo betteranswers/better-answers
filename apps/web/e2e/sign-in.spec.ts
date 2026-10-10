@@ -1,6 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { z } from "zod";
 
+import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
 import {
   codeWrong,
@@ -17,7 +18,11 @@ import {
   SIGN_IN_WORDS,
   type CarriedOn,
 } from "@/features/auth/sign-in-words.ts";
-import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
+import {
+  NO_WORKSPACE_HEADING,
+  PICKER_ACTIONS,
+  PICKER_WORDS,
+} from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
@@ -32,6 +37,7 @@ import {
   codeSentTo,
   confirmedWhenAsked,
   invite,
+  keystrokesButton,
   keystrokesDismissed,
   keystrokesListed,
   landedAtHome,
@@ -218,6 +224,41 @@ test("scopes everything to the workspace a two-workspace member picks", async ({
   await expect(bar.getByText(second.name)).toBeVisible();
   await expect(bar.getByText(first.name)).toHaveCount(0);
   await expect(await personMenuOpened(page, first.admin.name)).toContainText("Viewer");
+});
+
+test("ends the chooser with Account, Sign out and Keyboard shortcuts", async ({
+  page,
+  request,
+}) => {
+  const email = anAddress("foot");
+  await memberOfTwoWorkspaces(request, email, { first: "Foot Forgings", second: "Foot Fabrics" });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  const workspaces = page.getByRole("main").getByRole("listitem").getByRole("button");
+  await expect(workspaces).toHaveCount(2);
+
+  await expect(page.getByRole("main")).toMatchAriaSnapshot(`
+    - main:
+      - heading ${quoted(PICKER_WORDS.heading)} [level=1]
+      - paragraph: ${quoted(PICKER_WORDS.lead)}
+      - list
+      - link ${quoted(ACCOUNT_HEADING)}
+      - button "Sign out"
+      - button ${quoted(KEYSTROKE_WORDS.button)}
+  `);
+  await workspaces.last().focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: ACCOUNT_HEADING })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(keystrokesButton(page)).toBeFocused();
+
+  const listed = await keystrokesListed(page, PICKER_WORDS.heading);
+  await expect(listed).toContainText(PICKER_ACTIONS.toWorkspaces);
+  await keystrokesDismissed(page, listed);
+  await page.keyboard.press("w");
+  await expect(workspaces.first()).toBeFocused();
 });
 
 test("offers one way on to a person in no workspace", async ({ page, request }) => {

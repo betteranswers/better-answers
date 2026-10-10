@@ -94,7 +94,7 @@ describe("a pending session meeting the gate", () => {
     const { router } = await openAsAda("/people/members");
 
     expect(router.state.location.href).toBe("/confirm?redirect=%2Fpeople%2Fmembers");
-    expect(heading()).toBe("Confirm it's you");
+    expect(heading()).toBe("Confirm it’s you");
   });
 
   it("sends a reader holding no factor to setup instead", async () => {
@@ -155,7 +155,7 @@ describe("a pending refusal heard mid-session", () => {
     const { router } = await openAsAda("/people/groups");
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Confirm it's you" }),
+      await screen.findByRole("heading", { level: 1, name: "Confirm it’s you" }),
     ).toBeDefined();
     expect(router.state.location.href).toBe("/confirm?redirect=%2Fpeople%2Fgroups");
   });
@@ -182,7 +182,7 @@ describe("a pending refusal heard mid-session", () => {
     fireEvent.change(field, { target: { value: "123456" } });
 
     expect(
-      await screen.findByText("You've confirmed. Your last change wasn't saved. Make it again."),
+      await screen.findByText("You’ve confirmed. Your last change wasn’t saved. Make it again."),
     ).toBeDefined();
     expect(router.state.location.pathname).toBe("/people/groups");
   });
@@ -291,6 +291,19 @@ describe("the steps after a sign-in", () => {
     });
   });
 
+  it("owes the passkey offer again after a sign-in by link", async () => {
+    const shownUnder = "better-answers.passkey-offer-shown";
+    globalThis.localStorage.setItem(shownUnder, "shown");
+    signedInByLink(NOTHING_HELD);
+    await openAsAda("/sign-in/link#abc123");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+
+    await waitFor(() => {
+      expect(globalThis.localStorage.getItem(shownUnder)).toBeNull();
+    });
+  });
+
   it("lands a redirect to another origin on home", async () => {
     adasApi(() => CONFIRMED, new Map(), SHELL_READS);
 
@@ -309,7 +322,7 @@ describe("the confirm page for a person just promoted", () => {
     await openAsAda("/confirm");
 
     const list = await screen.findByRole("list", {
-      name: "You've just been made an Admin. These can confirm your sign-in:",
+      name: "You’ve just been made an Admin. These can confirm your sign-in:",
     });
     expect([...list.querySelectorAll("li")].map((item) => item.textContent)).toEqual([
       "Passkey · MacBook · added 3 March 2026",
@@ -317,7 +330,7 @@ describe("the confirm page for a person just promoted", () => {
     ]);
     expect(
       screen.getByText(
-        "If one isn't yours, confirm with one that is, then remove it on your Account page. If none is, sign out and ask better-answers support to restore your sign-in.",
+        "If one isn’t yours, confirm with one that is, then remove it on your Account page. If none is, sign out and ask better-answers support to restore your sign-in.",
       ),
     ).toBeDefined();
     const code = screen.getByRole("textbox", { name: "Authenticator code" });
@@ -330,7 +343,7 @@ describe("the confirm page for a person just promoted", () => {
     await openAsAda("/confirm");
 
     await screen.findByRole("textbox", { name: "Authenticator code" });
-    expect(screen.queryByText(/You've just been made an Admin/)).toBeNull();
+    expect(screen.queryByText(/You’ve just been made an Admin/)).toBeNull();
   });
 
   it("names better-answers support as the operator's reason", async () => {
@@ -356,7 +369,7 @@ describe("the confirm page for a person just promoted", () => {
 
     expect(
       await screen.findByText(
-        "You're now an Admin of Northern Tooling. Admins must hold a passkey or an authenticator, and confirm with it at sign-in.",
+        "You’re now an Admin of Northern Tooling. Admins must hold a passkey or an authenticator, and confirm with it at sign-in.",
       ),
     ).toBeDefined();
   });
@@ -397,7 +410,7 @@ describe("a sign-in that ended while waiting on its second factor", () => {
     await openApp("/sign-in?redirect=%2Fpeople%2Fmembers");
 
     expect(
-      await screen.findByText("Your sign-in ended because it wasn't confirmed within an hour."),
+      await screen.findByText("Your sign-in ended because it wasn’t confirmed within an hour."),
     ).toBeDefined();
   });
 });

@@ -3,8 +3,9 @@ import { useState } from "react";
 import { refusalOf } from "@/shared/api/trpc.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 
+import { correctedWords } from "./correcting-words.ts";
 import { useCorrectDisplayName } from "./people-api.ts";
-import { correctedWords, correctingRefused, refusedAsStale } from "./words.ts";
+import { correctingRefused, refusedAsStale } from "./words.ts";
 
 type CorrectName = ReturnType<typeof useCorrectDisplayName>;
 

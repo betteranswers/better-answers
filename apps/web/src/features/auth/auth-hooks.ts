@@ -30,10 +30,10 @@ import {
 import { forgetMember, rereadMember } from "./member.ts";
 import { factorStepDue } from "./second-factor-steps.ts";
 import {
-  announceTheSignIn,
   forgetTheUnsavedChange,
   rememberTheSession,
   sessionRemembered,
+  signedInHere,
 } from "./session-memory.ts";
 import type { Arrival } from "./sign-in-words.ts";
 
@@ -177,10 +177,7 @@ const signInEmailOtpOptions = () =>
       // decides.
       return { displayNameGiven: answer !== null && hasADisplayName(answer.user.name) };
     },
-    onSuccess: () => {
-      rememberTheSession("held");
-      announceTheSignIn();
-    },
+    onSuccess: signedInHere,
   });
 
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
@@ -272,10 +269,7 @@ export type SignedInByLink = z.infer<typeof signedInByLink>;
 const signInByLinkOptions = () =>
   mutationOptions<SignedInByLink, Error, string>({
     mutationFn: (token) => askOfOurRoute("/sign-in-link/sign-in", { token }, signedInByLink),
-    onSuccess: () => {
-      rememberTheSession("held");
-      announceTheSignIn();
-    },
+    onSuccess: signedInHere,
   });
 
 export const useSignInByLink = () => useMutation(signInByLinkOptions());

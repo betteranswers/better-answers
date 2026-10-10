@@ -3,7 +3,7 @@ export const MODEL_CHOICES_WORDS = {
   noneSet: "No model is set for any purpose yet.",
   unset: "No model is set.",
   fixed: "Fixed",
-  fixedReason: "This model can't be changed.",
+  fixedReason: "This model can’t be changed.",
   loading: "The model choices are still loading.",
   failed: "The model choices did not load. Reload the page to try again.",
 } as const;

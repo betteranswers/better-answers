@@ -113,7 +113,7 @@ function WhatTheRowCarries(properties: {
         ))
       )}
       <SummaryRow term="DPIA input">
-        The hash of this connected source's DPIA input, taken at the click
+        The hash of this connected source’s DPIA input, taken at the click
       </SummaryRow>
     </TheAuditRow>
   );

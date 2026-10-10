@@ -24,6 +24,9 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
+/** Under two lines of text with a row's padding, so only an event on one line passes. */
+const ONE_LINE_PX = 48;
+
 const system = menuGroupIn(CONTROL_CENTRE, "system");
 
 const AUDIT_LOG = pageNamed(system, "Audit log");
@@ -138,9 +141,30 @@ test.describe("the System group's Audit log page", () => {
     );
     await expect(linesOf(page).nth(1)).toContainText("Priya Shah created the group Bid writers");
     await expect(linesOf(page).nth(2)).toContainText("The platform provisioned the workspace");
-    await expect(linesOf(page).nth(2)).toContainText(WORDS.families.platform);
 
     await expect(page.locator("body")).not.toContainText("Una Elsewhere");
+  });
+
+  test("draws each event on one line, naming no family", async ({ page, request }) => {
+    await anAdminAtTheAuditLog(page, request, "Derwent Joinery");
+    await expect(linesOf(page)).toHaveCount(3);
+
+    for (const line of await linesOf(page).all()) {
+      const box = await line.boundingBox();
+      expect(box?.height, "an event at rest is taller than one line").toBeLessThan(ONE_LINE_PX);
+    }
+    for (const family of Object.values(WORDS.families)) {
+      await expect(
+        linesOf(page).filter({ hasText: new RegExp(family) }),
+        `a line says ${family} at rest`,
+      ).toHaveCount(0);
+    }
+
+    // The filter says the family in the lines' place, and still narrows them by it.
+    await expect(familyFilter(page)).toHaveText(WORDS.everyFamily);
+    await pickFamily(page, WORDS.families.platform);
+    await expect(linesOf(page)).toHaveCount(1);
+    await expect(familyFilter(page)).toHaveText(WORDS.families.platform);
   });
 
   test("opens an event's detail, a sign-in address beneath each name", async ({
@@ -150,12 +174,18 @@ test.describe("the System group's Audit log page", () => {
     const { priya } = await anAdminAtTheAuditLog(page, request, "Aire Valley Tooling");
 
     const priyas = linesOf(page).nth(1);
+    await expect(priyas, "a name no other actor shares shows an address at rest").not.toContainText(
+      priya.email,
+    );
     const details = detailsOf(priyas);
     await expect(details).toHaveAttribute("aria-expanded", "false");
+    const restsAt = (await details.boundingBox())?.y;
+    expect(restsAt, "Details is not drawn on the event's line").toBeDefined();
     await details.click();
 
     await expect(details).toHaveAttribute("aria-expanded", "true");
     await expect(priyas.getByRole("definition").first()).toHaveText(`Priya Shah${priya.email}`);
+    expect((await details.boundingBox())?.y, "Details moved as its list opened").toBe(restsAt);
 
     const provisioned = linesOf(page).nth(2);
     await detailsOf(provisioned).click();
@@ -166,7 +196,7 @@ test.describe("the System group's Audit log page", () => {
   });
 
   test("tells apart two members of one name by their addresses", async ({ page, request }) => {
-    const { workspaceId } = await anAdminAtTheAuditLog(page, request, "Swale Tooling");
+    const { workspaceId, priya } = await anAdminAtTheAuditLog(page, request, "Swale Tooling");
     const addresses = [anAddress("sam"), anAddress("sam")];
     for (const [index, address] of addresses.entries()) {
       const sam = await person(request, address, { displayName: "Sam Okoro" });
@@ -185,6 +215,10 @@ test.describe("the System group's Audit log page", () => {
       );
       await expect(line.getByText(address ?? "", { exact: true })).toBeVisible();
     }
+    const priyas = linesOf(page).filter({ hasText: "Priya Shah created the group" });
+    await expect(priyas, "a name no other actor shares shows an address at rest").not.toContainText(
+      priya.email,
+    );
   });
 
   test("searches past the first page, and Load more keeps it", async ({ page, request }) => {

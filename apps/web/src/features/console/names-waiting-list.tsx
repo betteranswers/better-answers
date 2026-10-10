@@ -1,24 +1,26 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
-/* jscpd:ignore-start */
-import { useMemo, useState, type RefObject } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
+import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
+import { ListHead } from "@/shared/page-head.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
-/* jscpd:ignore-end */
 
 import { CorrectNameDialog } from "./correct-name-dialog.tsx";
+import { correctWords } from "./correcting-words.ts";
+import { countOf, NothingListed, ReadSaid, useNarrowedRows } from "./list-parts.tsx";
+import { NAMES_WAITING_WORDS as WORDS } from "./list-words.ts";
 import { arrival, backToTheName, EVERYONE_PATH, NAMES_WAITING_PATH } from "./people-address.ts";
 import { useNamesWaiting, type NameWaiting } from "./people-api.ts";
 import { NAMES_WAITING_KEYSTROKES } from "./people-keystrokes.ts";
 import { At } from "./person-words.tsx";
 import { SignInAgain } from "./sign-in-again.tsx";
 import { useCorrecting } from "./use-correcting.ts";
-import { correctWords, NO_NAME_IN_FOCUS, readRefused } from "./words.ts";
+import { NO_NAME_IN_FOCUS } from "./words.ts";
 
 const features = tableFeatures({});
 
@@ -106,22 +108,15 @@ const columnsFor = (actions: NameActions) =>
     }),
   ]);
 
-type Listed = ReturnType<typeof useNamesWaiting>;
-
-const countSaid = (listed: Listed): string => {
-  if (listed.data === undefined) return "The names waiting are still loading.";
-  const count = listed.data.length;
-  if (count === 0) return "No name waits to be corrected.";
-  return count === 1 ? "1 name waits to be corrected." : `${count} names wait to be corrected.`;
-};
+/** A name is found by itself or by a workspace that flagged it; the read carries no address. */
+const wordsOf = (waiting: NameWaiting): string =>
+  [waiting.displayName, ...waiting.flags.map((flag) => flag.workspace.name)].join("\n");
 
 function NothingWaits() {
   return (
     <div className="grid justify-items-start gap-1 px-4 py-10">
-      <p className="font-medium">Every flagged name is corrected.</p>
-      <p className="text-muted-foreground">
-        A name an Admin flags from their workspace's People page waits here until you correct it.
-      </p>
+      <p className="font-medium">{WORDS.noneWaiting}</p>
+      <p className="text-muted-foreground">{WORDS.whatWaits}</p>
       <Button asChild variant="outline" className="mt-3">
         <Link to={EVERYONE_PATH}>Find a person in Everyone</Link>
       </Button>
@@ -130,28 +125,13 @@ function NothingWaits() {
 }
 
 /** `staleFor` names the person refused over a sign-in too old; the way on takes focus. */
-function ListSaid(properties: {
-  readonly listed: Listed;
-  readonly outcome: Outcome | undefined;
-  readonly staleFor: string | undefined;
-}) {
-  const { listed, staleFor } = properties;
+function WayOn(properties: { readonly staleFor: string | undefined }) {
+  const { staleFor } = properties;
+  if (staleFor === undefined) return null;
   return (
-    <>
-      <output className="mt-1 block text-muted-foreground">
-        {listed.error === null ? (
-          countSaid(listed)
-        ) : (
-          <RefusalLine said={readRefused(listed.error)} />
-        )}
-      </output>
-      <OutcomeLine outcome={properties.outcome} className="mt-2" />
-      {staleFor === undefined ? null : (
-        <p className="mt-1">
-          <SignInAgain back={backToTheName(staleFor)} linkRef={focusOnArrival} />
-        </p>
-      )}
-    </>
+    <p className="mt-1">
+      <SignInAgain back={backToTheName(staleFor)} linkRef={focusOnArrival} />
+    </p>
   );
 }
 
@@ -185,10 +165,9 @@ function DialogFor(properties: {
 
 const NO_NAME: readonly NameWaiting[] = [];
 
-export function NamesWaitingList(properties: {
-  readonly headingRef: RefObject<HTMLHeadingElement | null>;
-}) {
-  const { headingRef } = properties;
+export function NamesWaitingList() {
+  const headingId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const listed = useNamesWaiting();
   const correcting = useCorrecting();
   const navigate = useNavigate();
@@ -199,17 +178,23 @@ export function NamesWaitingList(properties: {
   // A refused read leaves nothing listed: what it held may no longer be the reader's to see.
   const waiting = listed.error === null ? listed.data : undefined;
   const names = waiting ?? NO_NAME;
+  const narrowed = useNarrowedRows(names, wordsOf);
   const personToFocus = correcting.otherwiseRefusedFor ?? arrivedFor;
 
   const columns = useMemo(
     () => columnsFor({ correct: setOpenFor, focusedOn: setInFocus, personToFocus }),
     [personToFocus],
   );
-  const table = useTable({ features, columns, data: names, getRowId: (each) => each.personId });
+  const table = useTable({
+    features,
+    columns,
+    data: narrowed.shown,
+    getRowId: (each) => each.personId,
+  });
 
-  /** A letter pressed outside the list still needs a name, so the one last in focus stands. */
+  /** A letter pressed outside the list still needs a name it shows, so the one last in focus stands. */
   useKeystroke(NAMES_WAITING_KEYSTROKES.correct, () => {
-    const held = names.find((each) => each.personId === inFocus);
+    const held = narrowed.shown.find((each) => each.personId === inFocus);
     setSaid(held === undefined ? NO_NAME_IN_FOCUS : undefined);
     if (held !== undefined) setOpenFor(held.personId);
   });
@@ -230,19 +215,42 @@ export function NamesWaitingList(properties: {
   };
 
   return (
-    <>
-      <ListSaid
-        listed={listed}
-        outcome={said ?? correcting.outcome}
-        staleFor={correcting.staleFor}
+    <section aria-labelledby={headingId} className="mt-6">
+      <ListHead
+        heading={WORDS.heading}
+        headingId={headingId}
+        headingRef={headingRef}
+        description={WORDS.description}
+        count={waiting === undefined ? "" : countOf(WORDS, names.length, narrowed)}
       />
+      <ReadSaid read={listed} loading={WORDS.loading} />
+      <OutcomeLine outcome={said ?? correcting.outcome} className="mt-2" />
+      <WayOn staleFor={correcting.staleFor} />
 
       {waiting === undefined ? null : (
         <Card className="mt-4">
+          <FilterRow
+            search={{
+              label: WORDS.search,
+              value: narrowed.typed,
+              onChange: narrowed.setTyped,
+              keystroke: NAMES_WAITING_KEYSTROKES.search,
+              inputRef: narrowed.searchRef,
+            }}
+          />
           <GridTable
             table={table}
-            caption="Every display name an Admin flagged and nobody has corrected since, the longest waiting first, with the workspaces that flagged it and when. Each row's action corrects the name."
-            empty={<NothingWaits />}
+            caption={WORDS.caption}
+            empty={
+              <NothingListed
+                search={narrowed.search}
+                noneMatch={WORDS.noneMatch}
+                onClear={narrowed.clear}
+                searchRef={narrowed.searchRef}
+              >
+                <NothingWaits />
+              </NothingListed>
+            }
           />
         </Card>
       )}
@@ -256,6 +264,6 @@ export function NamesWaitingList(properties: {
         }}
         onFocusBack={focusBack}
       />
-    </>
+    </section>
   );
 }

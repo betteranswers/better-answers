@@ -234,13 +234,16 @@ test.describe("the Models and spend page's model choices card", () => {
             - paragraph: ${JSON.stringify(`${MODEL_CHOICES_WORDS.fixed} ${EMBEDDING_DIMENSIONS} dimensions`)}
             - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.fixedReason)}
     `);
-    // Equal children: the page holds its heading, its lead line and the card, nothing else.
+    // The heading and its lead line, then the tabs. Equal children: the panel holds the card alone.
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
+        - heading ${JSON.stringify(models.name)} [level=1]
+        - paragraph: ${JSON.stringify(models.summary)}
+        - tablist ${JSON.stringify(MODELS_AND_SPEND.name)}:
+          - tab "Model choices" [selected]
+          - tab "Spend"
         - tabpanel "Model choices":
           - /children: equal
-          - heading ${JSON.stringify(models.name)} [level=1]
-          - paragraph: ${JSON.stringify(models.summary)}
           - region "Model choices"
     `);
 

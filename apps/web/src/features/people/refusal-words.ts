@@ -90,7 +90,7 @@ export const SAID_OF_TICKED_INVITATIONS = {
     next: "Try again without it.",
   },
   "off-testing-domain": {
-    why: "Its address is off this workspace's testing domain, so nothing was sent.",
+    why: "Its address is off this workspace’s testing domain, so nothing was sent.",
     next: "Try again without it.",
   },
   "changed-meanwhile": {
@@ -119,7 +119,7 @@ export const SAID_OF_A_GROUP = {
     next: "Choose another name.",
   },
   malformed: {
-    why: "A group's name needs at least one letter or figure.",
+    why: "A group’s name needs at least one letter or figure.",
     next: "Give it a name.",
   },
   "no-such-group": {
@@ -150,7 +150,7 @@ export const SAID_OF_A_REQUEST = {
     next: "Read the list again.",
   },
   "no-such-request": {
-    why: "That request is no longer one of this workspace's.",
+    why: "That request is no longer one of this workspace’s.",
     next: "Read the list again.",
   },
   "no-such-role": {
@@ -162,7 +162,7 @@ export const SAID_OF_A_REQUEST = {
     next: "Decline the request instead.",
   },
   malformed: {
-    why: "That request couldn't be read, so nothing was decided.",
+    why: "That request couldn’t be read, so nothing was decided.",
     next: "Read the list again.",
   },
 } satisfies SaidOfWord;

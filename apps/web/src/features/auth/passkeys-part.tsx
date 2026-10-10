@@ -134,7 +134,7 @@ export function AddAPasskey(properties: {
         readOnly={pending}
         aria-describedby={said === undefined ? undefined : refusedId}
         aria-invalid={blank}
-        className="mt-2 max-w-sm"
+        className="mt-2 h-8 max-w-sm"
         value={name}
         onChange={(event) => {
           setName(event.target.value);

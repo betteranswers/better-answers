@@ -43,8 +43,10 @@ function GroupMembers(properties: {
 
   return (
     <SheetPart title="Members">
+      {/* Boxless, so the line takes none of its card's gaps while it is empty. */}
       <OutcomeLine
         outcome={said.error === null ? undefined : outcomeOfFailure(said.error, "read")}
+        className="contents"
       />
       {/* Not `empty:hidden`: a region out of the accessibility tree is not tracked, so its fill would go unread. */}
       <div aria-live="polite" className="empty:sr-only">
@@ -110,7 +112,7 @@ function RenameGroup(properties: {
 
   return (
     <SheetPart title="Rename">
-      <OutcomeLine outcome={outcome} />
+      <OutcomeLine outcome={outcome} className="contents" />
       <form onSubmit={submit} className="grid gap-3">
         <div className="grid gap-2">
           <Label htmlFor={ids.field}>Name</Label>

@@ -1,4 +1,5 @@
 import type { Role } from "@/shared/navigation.ts";
+import { aRole } from "@/shared/role-words.ts";
 import { counted } from "@/shared/words.ts";
 
 import type { Direction } from "./people-api.ts";
@@ -23,6 +24,19 @@ export const MEMBER_PAGE_WORDS = {
   access: "Access",
   activity: "Activity",
   removeAndEndEverySignIn: "Remove and end every sign-in",
+  changeRole: "Change role",
+  makeRole: (name: string, role: Role) => `Make ${name} ${aRole(role)}`,
+  holdsRole: (name: string, role: Role) =>
+    `${name} is ${aRole(role)}. Pick another role to change it.`,
+  heldUntilChanged: (name: string, role: Role) => `${name} is ${aRole(role)} now.`,
+  signInsAndTokens: "Sign-ins and personal tokens",
+  signInsAndTokensHere: "Sign-ins and personal tokens here",
+  endEverySignInAndToken: "End every sign-in and token here",
+  endsAtOnce: (name: string) =>
+    `Every session and token ${name} holds for this workspace is refused at once, and a fresh sign-in works.`,
+  everySignInEnded: (name: string) => `Every sign-in and token ${name} held here has ended.`,
+  refusedFrom: (at: string) =>
+    `Anything issued before ${at} is refused here; a fresh sign-in works.`,
   loading: "The member is still loading.",
   noSuchMember: "This page names no member of this workspace.",
   toMembers: "Go to Members",
@@ -35,9 +49,9 @@ export const ACTIVITY_WORDS = {
   none: (name: string) => `No actions by or to ${name} in this workspace yet.`,
   older: "Older activity",
   direction: {
-    by: (name: string) => `By ${name}`,
-    to: (name: string) => `To ${name}`,
-    both: (name: string) => `By and to ${name}`,
+    by: (name: string) => `Done by ${name}`,
+    to: (name: string) => `Done to ${name}`,
+    both: (name: string) => `Done by and to ${name}`,
   } satisfies Readonly<Record<Direction, (name: string) => string>>,
 } as const;
 

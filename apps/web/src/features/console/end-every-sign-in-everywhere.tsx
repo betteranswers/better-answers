@@ -22,7 +22,7 @@ const outcomeOf = (revocation: Revocation, name: string): Outcome | undefined =>
   if (revocation.isSuccess) {
     return {
       tone: "said",
-      words: `${name}'s sessions and assistant access ended at ${instantWords(revocation.data.revokedAt)}. They can sign in again.`,
+      words: `${name}’s sessions and assistant access ended at ${instantWords(revocation.data.revokedAt)}. They can sign in again.`,
     };
   }
   return revocation.isError ? revocationRefused(revocation.error, "action") : undefined;
@@ -47,7 +47,7 @@ export function EndEverySignInEverywhere(properties: {
   return (
     <SheetPart title="End every sign-in everywhere">
       <p id={consequenceId} className="text-muted-foreground">
-        Ends every session and every assistant's access {name} holds, in every workspace, at once.
+        Ends every session and every assistant’s access {name} holds, in every workspace, at once.
         They can sign in again afterwards. Recorded on the identity-set audit log under your name.
       </p>
       <SheetActionButton
@@ -73,7 +73,7 @@ export function EndEverySignInEverywhere(properties: {
           },
         }}
         title={`End every sign-in and token ${name} holds`}
-        consequence={`Every session and every assistant's access ${name} holds ends now, in every workspace they belong to. They can sign in and connect an assistant again afterwards; this page cannot undo it.`}
+        consequence={`Every session and every assistant’s access ${name} holds ends now, in every workspace they belong to. They can sign in and connect an assistant again afterwards; this page cannot undo it.`}
         commit={
           <Button variant="destructive" onClick={commit}>
             End every sign-in everywhere

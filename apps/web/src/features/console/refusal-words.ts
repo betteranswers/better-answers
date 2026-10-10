@@ -17,12 +17,12 @@ export const ONLY_THE_OPERATOR: Said = {
 
 /** A console read refused for anything but the mark or the session. */
 export const READ_REFUSED: Said = {
-  why: "This can't be shown to you.",
+  why: "This can’t be shown to you.",
   next: "Go back to your workspaces.",
 };
 
 export const STANDING_UNANSWERED: Said = {
-  why: "No response, so the console can't be shown.",
+  why: "No response, so the console can’t be shown.",
   next: "Try again in a moment.",
 };
 

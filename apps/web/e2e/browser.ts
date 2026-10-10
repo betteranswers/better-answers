@@ -104,8 +104,27 @@ const themeSet = (page: Page, theme: string | undefined): Promise<void> =>
     else document.documentElement.dataset["theme"] = next;
   }, theme);
 
+type Scrolled = readonly [left: number, top: number];
+
+/**
+ * A row scrolled half under the sticky band is how a sticky band works, not a target-size defect:
+ * the audit reads from the top.
+ */
+const returnedToItsTop = (page: Page): Promise<Scrolled> =>
+  page.evaluate((): Scrolled => {
+    const was = [window.scrollX, window.scrollY] as const;
+    window.scrollTo(0, 0);
+    return was;
+  });
+
+const scrolledBackTo = (page: Page, was: Scrolled): Promise<void> =>
+  page.evaluate(([left, top]) => {
+    window.scrollTo(left, top);
+  }, was);
+
 /** In the page's own theme, then in the other, so dark is held in every state a test leaves. */
 const auditOf = async (page: Page): Promise<void> => {
+  const was = await returnedToItsTop(page);
   const own = await themeOf(page);
   await auditIn(page, own ?? "light");
   const other = own === "dark" ? "light" : "dark";
@@ -113,6 +132,7 @@ const auditOf = async (page: Page): Promise<void> => {
   await auditIn(page, other);
   await themeSet(page, own);
   await transitionsHaveEnded(page);
+  await scrolledBackTo(page, was);
 };
 
 export type BrowserFixtures = {

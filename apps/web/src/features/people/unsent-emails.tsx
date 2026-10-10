@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
+import { Address } from "@/shared/address.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
@@ -57,7 +58,7 @@ export function UnsentEmails(properties: { readonly unsent: readonly SentInvitat
         <ul className="grid gap-1">
           {left.map((invitation) => (
             <li key={invitation.invitationId} className="flex flex-wrap items-center gap-2">
-              <span className="min-w-0 flex-1">{invitation.address}</span>
+              <Address address={invitation.address} className="min-w-0 flex-1" />
               <Button
                 size="sm"
                 variant="outline"

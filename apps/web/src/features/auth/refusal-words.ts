@@ -5,7 +5,7 @@ import { minutesUntil, PRODUCT_NAME } from "@/shared/words.ts";
 /** Said on the invitation page, of its read and of joining alike. */
 export const SAID_OF_ACCEPTING = {
   "no-such-invitation": {
-    why: "There's no invitation at this link.",
+    why: "There’s no invitation at this link.",
     next: "Ask the person who invited you to send a new one.",
   },
   "invitation-expired": {
@@ -21,27 +21,27 @@ export const SAID_OF_ACCEPTING = {
     next: "Open it from your workspaces.",
   },
   "no-display-name": {
-    why: "You haven't given a display name yet.",
+    why: "You haven’t given a display name yet.",
     next: "Type one, then join.",
   },
   malformed: {
-    why: "This invitation link isn't valid.",
+    why: "This invitation link isn’t valid.",
     next: "Open the link in the email again.",
   },
 } satisfies SaidOfWord;
 
 export const INVITATION_UNANSWERED: Said = {
-  why: "No response, so the invitation can't be shown.",
+  why: "No response, so the invitation can’t be shown.",
   next: "Try again in a moment.",
 };
 
 export const INVITATIONS_UNANSWERED: Said = {
-  why: "No response, so your invitations can't be shown.",
+  why: "No response, so your invitations can’t be shown.",
   next: "Try again in a moment.",
 };
 
 export const JOIN_UNANSWERED: Said = {
-  why: "No response, so you haven't joined.",
+  why: "No response, so you haven’t joined.",
   next: "Try again in a moment.",
 };
 
@@ -52,12 +52,12 @@ export const REASON_REFUSED: Said = {
 };
 
 export const ASK_REFUSED: Said = {
-  why: "Your request wasn't sent.",
+  why: "Your request wasn’t sent.",
   next: "Reload the page and ask again.",
 };
 
 export const ASK_UNANSWERED: Said = {
-  why: "No response, so your request wasn't sent.",
+  why: "No response, so your request wasn’t sent.",
   next: "Try again in a moment.",
 };
 
@@ -96,7 +96,7 @@ export const CODE_UNANSWERED: Said = {
 };
 
 const CODE_SPENT: Said = {
-  why: "That code can't be used any more.",
+  why: "That code can’t be used any more.",
   next: "Send a new code.",
 };
 
@@ -111,7 +111,7 @@ export const codeWrong = (triesLeft: number): Said =>
       };
 
 export const SIGN_IN_UNANSWERED: Said = {
-  why: "No response, so you aren't signed in.",
+  why: "No response, so you aren’t signed in.",
   next: "Try again in a moment.",
 };
 
@@ -120,7 +120,7 @@ export const noLongerAMember = (workspace: string): string =>
   `You are no longer a member of ${workspace}.`;
 
 /** A Try again button stands beside it. */
-export const WORKSPACES_UNREAD = "Your workspaces couldn't be read.";
+export const WORKSPACES_UNREAD = "Your workspaces couldn’t be read.";
 
 /** Said in the band, where opening the switcher again reads the list again. */
 export const SWITCHER_UNREAD: Said = {
@@ -135,17 +135,17 @@ export const noLongerAMemberOf = (workspace: string): Said => ({
 });
 
 export const PICK_REFUSED: Said = {
-  why: "That workspace didn't open.",
+  why: "That workspace didn’t open.",
   next: "Choose it again.",
 };
 
 export const SOLE_PICK_REFUSED: Said = {
-  why: "Your workspace didn't open.",
+  why: "Your workspace didn’t open.",
   next: "Reload the page to try again.",
 };
 
 export const CONNECTION_UNFINISHED: Said = {
-  why: "The connection couldn't be finished.",
+  why: "The connection couldn’t be finished.",
   next: "Start it again from the app you were connecting.",
 };
 
@@ -195,7 +195,7 @@ export const saidOfASecondFactorRefusal = (refusal: Refusal): Said =>
   saidOfRefusal(SAID_OF_SECOND_FACTOR, refusal.word, refusal.class);
 
 export const SETUP_CODE_WRONG: Said = {
-  why: "That code doesn't match.",
+  why: "That code doesn’t match.",
   next: "Enter the code your authenticator shows now. If it still fails, check your phone sets its time automatically.",
 };
 
@@ -211,7 +211,7 @@ export const AUTHENTICATOR_HELD: Said = {
 };
 
 export const SETUP_REFUSED: Said = {
-  why: "Your authenticator wasn't set up.",
+  why: "Your authenticator wasn’t set up.",
   next: "Reload the page and try again.",
 };
 
@@ -231,7 +231,7 @@ export const tooManySetupsStarted = (waitSeconds: number | undefined): Said => (
 });
 
 export const REMOVAL_UNANSWERED: Said = {
-  why: "No response, so your authenticator wasn't removed.",
+  why: "No response, so your authenticator wasn’t removed.",
   next: "Try again in a moment.",
 };
 
@@ -246,12 +246,12 @@ export const codesMadeTooOften = (liftsInSeconds: number | undefined): Said => (
 });
 
 export const CODES_NOT_TICKED: Said = {
-  why: "You haven't ticked that you've saved the codes.",
+  why: "You haven’t ticked that you’ve saved the codes.",
   next: "Save them, then tick the box.",
 };
 
 export const KEY_NOT_COPIED: Said = {
-  why: "The key wasn't copied.",
+  why: "The key wasn’t copied.",
   next: "Select it and copy it yourself.",
 };
 
@@ -261,7 +261,7 @@ export const PASSKEY_HELD: Said = {
 };
 
 export const PASSKEY_NOT_VERIFIED: Said = {
-  why: "Your device didn't check it was you, so no passkey was added.",
+  why: "Your device didn’t check it was you, so no passkey was added.",
   next: "Use a device with a fingerprint, face or PIN check.",
 };
 
@@ -271,7 +271,7 @@ export const PASSKEY_ASK_EXPIRED: Said = {
 };
 
 export const PASSKEY_NOT_ADDED: Said = {
-  why: "Your device's passkey couldn't be added.",
+  why: "Your device’s passkey couldn’t be added.",
   next: "Try again, or use another device.",
 };
 
@@ -287,12 +287,12 @@ export const tooManyPasskeysAdded = (waitSeconds: number | undefined): Said => (
 });
 
 export const RENAME_UNANSWERED: Said = {
-  why: "No response, so the passkey wasn't renamed.",
+  why: "No response, so the passkey wasn’t renamed.",
   next: "Try again in a moment.",
 };
 
 export const PASSKEY_REMOVAL_UNANSWERED: Said = {
-  why: "No response, so the passkey wasn't removed.",
+  why: "No response, so the passkey wasn’t removed.",
   next: "Try again in a moment.",
 };
 
@@ -303,12 +303,12 @@ export const PASSKEY_UNKNOWN: Said = {
 };
 
 export const PASSKEY_SIGN_IN_NOT_VERIFIED: Said = {
-  why: "Your device didn't check it was you, so you aren't signed in.",
+  why: "Your device didn’t check it was you, so you aren’t signed in.",
   next: "Use a device with a fingerprint, face or PIN check, or send a sign-in email.",
 };
 
 export const PASSKEY_SIGN_IN_REFUSED: Said = {
-  why: "That passkey didn't sign you in.",
+  why: "That passkey didn’t sign you in.",
   next: "Try again, or send a sign-in email.",
 };
 
@@ -318,7 +318,7 @@ export const tooManyPasskeySignIns = (waitSeconds: number | undefined): Said => 
 });
 
 export const CODES_NOT_COPIED: Said = {
-  why: "The codes weren't copied.",
+  why: "The codes weren’t copied.",
   next: "Select them and copy them yourself.",
 };
 
@@ -354,12 +354,12 @@ export const CONFIRM_UNANSWERED: Said = {
 };
 
 export const PASSKEY_NOT_YOURS: Said = {
-  why: "That passkey isn't one of yours.",
+  why: "That passkey isn’t one of yours.",
   next: "Use another passkey, or another way below.",
 };
 
 export const PASSKEY_CONFIRM_NOT_VERIFIED: Said = {
-  why: "Your device didn't check it was you, so nothing was confirmed.",
+  why: "Your device didn’t check it was you, so nothing was confirmed.",
   next: "Use a device with a fingerprint, face or PIN check, or another way below.",
 };
 
@@ -374,7 +374,7 @@ export const NO_PASSKEY_TO_CONFIRM: Said = {
 };
 
 export const PASSKEY_CONFIRM_REFUSED: Said = {
-  why: "Your passkey didn't confirm it's you.",
+  why: "Your passkey didn’t confirm it’s you.",
   next: "Try again, or use another way below.",
 };
 
@@ -396,8 +396,8 @@ export const RESTORE_CODE_WRONG: Said = {
 
 /** Said where a sign-in without the right to set up asks to, before the page moves on. */
 export const SETUP_NOT_GRANTED: Said = {
-  why: "This sign-in can't set up a new second factor.",
-  next: "Confirm it's you first.",
+  why: "This sign-in can’t set up a new second factor.",
+  next: "Confirm it’s you first.",
 };
 
 export const RESTORE_CODE_NEEDED: Said = SAID_OF_SECOND_FACTOR["restore-code-needed"];

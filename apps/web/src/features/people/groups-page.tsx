@@ -6,7 +6,9 @@ import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
+import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
+import { RowSheetButton } from "@/shared/row-sheet.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Input } from "@/shared/ui/input.tsx";
@@ -75,12 +77,9 @@ function GroupCell(properties: { readonly row: GroupRow; readonly actions: Group
   if (row.group === undefined) return <span className="font-medium">{row.name}</span>;
   const groupId = row.group.id;
   return (
-    <Button
+    <RowSheetButton
       ref={groupId === actions.landOn ? focusOnArrival : undefined}
       id={groupButtonId(groupId)}
-      variant="link"
-      aria-haspopup="dialog"
-      className="h-auto p-0 text-left font-medium whitespace-normal text-foreground"
       onFocus={() => {
         actions.focusedOn(groupId);
       }}
@@ -89,7 +88,7 @@ function GroupCell(properties: { readonly row: GroupRow; readonly actions: Group
       }}
     >
       {row.name}
-    </Button>
+    </RowSheetButton>
   );
 }
 
@@ -243,9 +242,6 @@ function GroupList(properties: {
 
   return (
     <>
-      <output className="mt-1 block text-muted-foreground">
-        {counted(groups.length, "group", "groups")}
-      </output>
       <OutcomeLine outcome={outcome} className="mt-2" />
 
       <Card className="mt-4">
@@ -262,7 +258,7 @@ function GroupList(properties: {
         />
         <GridTable
           table={table}
-          caption="Groups in this workspace, each with how many members it holds. A group's name opens it."
+          caption="Groups in this workspace, each with how many members it holds. A group’s name opens it."
           empty={<EmptyState line={EMPTY_LINES.groups} className="px-4 py-10" />}
         />
       </Card>
@@ -298,9 +294,12 @@ function GroupsSection() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      <h2 id={headingId} ref={headingRef} tabIndex={-1}>
-        Groups
-      </h2>
+      <ListHead
+        heading="Groups"
+        headingId={headingId}
+        headingRef={headingRef}
+        count={groups.data === undefined ? "" : counted(groups.data.length, "group", "groups")}
+      />
       <OutcomeLine
         outcome={said.error === null ? undefined : outcomeOfGroupFailure(said.error, "read")}
         className="mt-2"
@@ -320,8 +319,7 @@ export function GroupsPage() {
 
   return (
     <>
-      <h1>{people.name}</h1>
-      <p className="mt-2 text-muted-foreground">{people.summary}</p>
+      <PageHead heading={people.name} summary={people.summary} />
       <GroupsSection />
     </>
   );

@@ -12,7 +12,7 @@ import { useReaderId } from "./people-api.ts";
 import { roleOf } from "./role-meanings.ts";
 
 const ROLE_UNREAD = refusedWith({
-  why: "Your role changed, but it couldn't be read again.",
+  why: "Your role changed, but it couldn’t be read again.",
   next: "Reload the page in a moment.",
 });
 

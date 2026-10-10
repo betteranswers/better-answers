@@ -38,6 +38,12 @@ const NAMES_AN_ORGANISATION = /organi[sz]ation/i;
 
 const requestsRegion = (page: Page) => page.getByRole("region", { name: "Requests" });
 
+/** The region's outcome line: its count is a status too, and stands before it. */
+const saidIn = (page: Page): Locator => requestsRegion(page).getByRole("status").last();
+
+/** The output in the row under the Requests region's heading: the count of requests. */
+const THE_COUNT = "//section[h2='Requests']/div/output";
+
 /** The header row is a row too, so the requests are the rows with a cell. */
 const requestRows = (page: Page): Locator =>
   requestsRegion(page)
@@ -127,7 +133,7 @@ test.describe("the People page's Requests tab", () => {
 
     await expect(approving).toHaveCount(0);
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
-    await expect(requestsRegion(page).getByRole("status").first()).toContainText(
+    await expect(saidIn(page)).toContainText(
       `Approved. The invitation went to ${priya} as an Editor and lasts until`,
     );
     await expect(requestsRegion(page)).toContainText(EMPTY_LINES.requests);
@@ -171,12 +177,13 @@ test.describe("the People page's Requests tab", () => {
         - /children: equal
         - heading "Requests" [level=2]
         - status
+        - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
+        - status
         - paragraph: ${EMPTY_LINES.requests}
     `);
-    await expect(
-      invitingButtons(page),
-      "the toolbar's action is the one way to invite",
-    ).toHaveCount(1);
+    await expect(invitingButtons(page), "the head's action is the one way to invite").toHaveCount(
+      1,
+    );
     await expect(
       page.getByRole("button", { name: PEOPLE_KEYSTROKES.invite.action, exact: true }),
     ).toBeVisible();
@@ -201,14 +208,17 @@ test.describe("the People page's Requests tab", () => {
       page.getByRole("button", { name: "Approve the request from Dropped Ray" }),
     );
     await clockTheNextKey(page, {
-      at: "(//section[.//h2[.='Requests']]//output)[2]",
+      at: THE_COUNT,
       reads: "2 requests waiting",
     });
     await page.keyboard.press("d");
     await expect(rowOf(page, "Dropped Ray")).toHaveCount(0);
     await theActionLandedWithinItsBudget(page, "decline");
-    await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
-    await expect(requestsRegion(page).getByRole("status").first()).toHaveText(
+    const landed = requestsRegion(page).getByRole("heading", { name: "Requests" });
+    await expect(landed).toBeFocused();
+    // The tab names the list, so its heading is hidden until the keyboard lands on it.
+    expect((await landed.boundingBox())?.width, "focus landed out of sight").toBeGreaterThan(1);
+    await expect(saidIn(page)).toHaveText(
       "Declined the request from Dropped Ray. They may ask again.",
     );
 
@@ -241,14 +251,14 @@ test.describe("the People page's Requests tab", () => {
     );
     await passesTheAccessibilityGate();
     await clockTheNextKey(page, {
-      at: "(//section[.//h2[.='Requests']]//output)[2]",
+      at: THE_COUNT,
       reads: "1 request waiting",
     });
     await page.keyboard.press("Enter");
     await expect(approving).toHaveCount(0);
     await theActionLandedWithinItsBudget(page, "approve");
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
-    await expect(requestsRegion(page).getByRole("status").first()).toContainText(
+    await expect(saidIn(page)).toContainText(
       `Approved. The invitation went to ${kay} as an Editor`,
     );
     await expect(requestRows(page)).toHaveCount(1);
@@ -256,8 +266,9 @@ test.describe("the People page's Requests tab", () => {
     await expect(requestsRegion(page)).toMatchAriaSnapshot(`
       - region "Requests":
         - heading "Requests" [level=2]
-        - status: /Approved\\. The invitation went to/
         - status: 1 request waiting
+        - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
+        - status: /Approved\\. The invitation went to/
         - paragraph: /Declining sends them nothing, and they may ask again\\./
         - table:
           - caption: /Requests to join this workspace/

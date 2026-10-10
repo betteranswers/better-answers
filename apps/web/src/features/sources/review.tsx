@@ -72,8 +72,8 @@ function GroupNotes(properties: {
       ) : null}
       {group.dismissed === 0 ? null : (
         <Note tag="Dismissed">
-          {counted(group.dismissed, "span", "spans")} as not special category. The seam&apos;s
-          verdict passes over a dismissed span, which stays withheld unless kept in text.
+          {counted(group.dismissed, "span", "spans")} as not special category. The seam’s verdict
+          passes over a dismissed span, which stays withheld unless kept in text.
         </Note>
       )}
       {group.overriddenByErasure === 0 ? null : (

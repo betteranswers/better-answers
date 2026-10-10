@@ -160,7 +160,7 @@ describe("the Account page's passkeys", () => {
       ),
     ).toBeDefined();
     expect(
-      screen.getByText("This browser can't add a passkey. Use another browser or device."),
+      screen.getByText("This browser can’t add a passkey. Use another browser or device."),
     ).toBeDefined();
   });
 });
