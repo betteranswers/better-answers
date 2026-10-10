@@ -16,6 +16,8 @@ export type RefusalOwner =
   | "members"
   | "workspaces"
   | "erasure"
+  | "concepts"
+  | "runs"
   | "transport";
 
 export type Vocabulary = Readonly<Record<string, RefusalClass>>;

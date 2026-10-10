@@ -23,6 +23,7 @@ export type {
 } from "./routine.ts";
 export { deadlineOf, dueDateOf, recordSubjectRequest, subjectRequestFor } from "./requests.ts";
 export { suppressInTheWorkspace } from "./suppressions.ts";
+export { ERASURE_REFUSALS } from "./vocabulary.ts";
 export type {
   ReadSubjectRequestRefusal,
   RecordSubjectRequestInput,

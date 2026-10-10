@@ -83,4 +83,59 @@ describe("the rule that a declared action admits before it awaits", () => {
 
     expect(lint.flagged(holding(nested))).toEqual([FILE]);
   });
+
+  describe.each(["requireAdmin", "requireFreshSignIn"])("the shorthand `%s`", (shorthand) => {
+    const step = (body: string): Tree => ({ "step.ts": body });
+
+    it("refuses a step that awaits before it, naming the call", () => {
+      const late = `export const groups = async (principal, tx) => {
+  const rows = await tx.query("SELECT 1");
+  const admin = ${shorthand}(principal);
+  if (!admin.ok) return admin;
+  return rows;
+};
+`;
+      const output = lint.output(step(late));
+
+      expect(output).toContain("awaits before it admits");
+      expect(output).toContain(`run \`${shorthand}\` first`);
+    });
+
+    it("stays silent on a step that calls it, then awaits", () => {
+      const first = `export const groups = async (principal, tx) => {
+  const admin = ${shorthand}(principal);
+  if (!admin.ok) return admin;
+  return tx.query("SELECT 1");
+};
+`;
+
+      expect(lint.flagged(step(first))).toEqual([]);
+    });
+  });
+
+  it("refuses a late `admit`, though a shorthand came first", () => {
+    const mixed = `export const reprocess = async (principal, tx, input) => {
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return admin;
+  await tx.query("SELECT 1");
+  return admit(reprocessAction, principal, input);
+};
+`;
+    const output = lint.output(holding(mixed));
+
+    expect(output).toContain("run `admit` first");
+  });
+
+  it("pairs a declaration with `admit` alone, never a shorthand's argument", () => {
+    const both = `export const reprocess = async (principal, tx, input) => {
+  const admin = requireAdmin(reprocessAction);
+  if (!admin.ok) return admin;
+  return tx.query("SELECT 1");
+};
+`;
+    const output = lint.output(holding(both));
+
+    expect(output).toContain("`reprocessAction`");
+    expect(output).toContain("states a gate nothing runs");
+  });
 });

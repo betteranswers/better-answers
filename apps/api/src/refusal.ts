@@ -1,3 +1,5 @@
+import { CONCEPT_REFUSALS } from "@better-answers/core/concepts";
+import { ERASURE_REFUSALS } from "@better-answers/core/erasure";
 import {
   declareRefusals,
   KERNEL_REFUSALS,
@@ -7,6 +9,7 @@ import {
   type RefusedItems,
 } from "@better-answers/core/kernel";
 import { MEMBER_REFUSALS } from "@better-answers/core/members";
+import { RUN_REFUSALS } from "@better-answers/core/runs";
 import { SOURCE_REFUSALS } from "@better-answers/core/sources";
 import { WORKSPACE_REFUSALS } from "@better-answers/core/workspaces";
 
@@ -20,6 +23,9 @@ const REFUSALS = {
   ...WORKSPACE_REFUSALS,
   ...MEMBER_REFUSALS,
   ...SOURCE_REFUSALS,
+  ...CONCEPT_REFUSALS,
+  ...ERASURE_REFUSALS,
+  ...RUN_REFUSALS,
   ...TRANSPORT_REFUSALS,
 };
 
@@ -48,9 +54,6 @@ export const refusalOf = (answered: RefusalAnswer): Refusal =>
   typeof answered === "string"
     ? { word: answered, class: REFUSALS[answered] }
     : { word: answered.word, class: REFUSALS[answered.word], ...detailOf(answered) };
-
-export const isRefusalWord = (candidate: string | Error): candidate is RefusalWord =>
-  typeof candidate === "string" && Object.hasOwn(REFUSALS, candidate);
 
 /** Word and class alone, so a refusal naming items logs no id of the people it names. */
 export const refusalLogged = (refusal: Refusal) => ({
