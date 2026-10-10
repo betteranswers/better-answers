@@ -12,6 +12,14 @@ export const ACCOUNT_WORDS = {
   readingAgain: "Reading",
 } as const;
 
+export const THEME_WORDS = {
+  heading: "Theme",
+  device: "Match this device",
+  light: "Light",
+  dark: "Dark",
+  kept: "Kept on this browser.",
+} as const;
+
 const SET_UP = "Set up an authenticator";
 
 const ADD_A_PASSKEY = "Add a passkey";

@@ -2,6 +2,8 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
+import { THEME_WORDS } from "@/features/auth/account-words.ts";
+import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
 
 import { openApp } from "./open-app.tsx";
 import {
@@ -16,6 +18,8 @@ import { addressOf, answered } from "./stubbed-api.ts";
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
+  delete document.documentElement.dataset["theme"];
   vi.unstubAllGlobals();
   globalThis.history.replaceState(null, "", "/");
 });
@@ -158,6 +162,30 @@ describe("the Account page's passkeys", () => {
     expect(
       screen.getByText("This browser can't add a passkey. Use another browser or device."),
     ).toBeDefined();
+  });
+});
+
+describe("the Account page's theme", () => {
+  it("matches this device until a theme is picked", async () => {
+    await accountOpened(NO_SET);
+
+    const theme = await screen.findByRole("radiogroup", { name: THEME_WORDS.heading });
+    const device = screen.getByRole("radio", { name: THEME_WORDS.device });
+
+    expect(theme.getAttribute("aria-describedby")).not.toBeNull();
+    expect(device.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("paints and keeps the theme picked", async () => {
+    await accountOpened(NO_SET);
+
+    fireEvent.click(await screen.findByRole("radio", { name: THEME_WORDS.dark }));
+
+    expect(screen.getByRole("radio", { name: THEME_WORDS.dark }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
+    expect(document.documentElement.dataset["theme"]).toBe("dark");
+    expect(localStorage.getItem(THEME_KEPT_UNDER)).toBe("dark");
   });
 });
 

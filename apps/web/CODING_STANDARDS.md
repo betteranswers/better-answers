@@ -34,6 +34,10 @@ Every UI ticket carries that acceptance line. Every interactive element is a nat
 
 A page draws a card with `Card` (`shared/ui/card.tsx`), a framed region with `Frame` and the grid behind a page with `GridPattern` (`shared/blueprint.tsx`). A registration mark is `Card`'s `marks`, `Frame` or the primary button, and `packages/design-system/readme.md` rations them: one marked level per stack, three marked objects a page. `test/blueprint-in-one-place.test.ts` holds the first rule, and the browser suite's accessibility gate the count.
 
+## Flip the theme on `<html>` alone
+
+`shared/theme-switch.ts` is the one writer of `data-theme`, and it writes it on `<html>`: the bridge's aliases resolve at `:root`, so the attribute anywhere below half-flips the page. A colour comes from a token that both themes set, never from a `dark:` utility or a `.dark` class. `test/theme.test.ts` holds the writer and the class, and the browser suite's accessibility gate holds every page a test leaves at 4.5:1 for words and 3:1 for control edges in both themes.
+
 ## Write the text on a page in the glossary's reader words
 
 Each thing a person meets has one word: the head of its entry in `CONCEPTS.md`. Write that word in every heading, label, message and empty state, and call a place with its own address a *page*. An entry marked `_Internal._` names something only the code meets, so its word stays in the code. `packages/design-system/readme.md` holds the voice, the trust words and the casing.

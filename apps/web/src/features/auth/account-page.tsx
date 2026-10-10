@@ -53,6 +53,7 @@ import {
 } from "./second-factor-hooks.ts";
 import { READ_AGAIN, readUnanswered, SecondFactorRefused } from "./second-factor-parts.tsx";
 import { SignOutButton } from "./sign-out-button.tsx";
+import { ThemeSection } from "./theme-section.tsx";
 
 const SIGN_IN_HEADING = "sign-in-heading";
 
@@ -300,47 +301,50 @@ export function AccountPage(properties: { readonly framed?: boolean }) {
   const keystrokes = keystrokesOf(read, actions);
 
   const sections = (
-    <section aria-labelledby={SIGN_IN_HEADING} className="mt-8">
-      <h2 id={SIGN_IN_HEADING}>{ACCOUNT_WORDS.signIn}</h2>
-      <Outcome tone="said">{actions.said}</Outcome>
-      <SecondFactorRefused id={REFUSED} read={read} failure={failure} unanswered={unanswered} />
+    <>
+      <section aria-labelledby={SIGN_IN_HEADING} className="mt-8">
+        <h2 id={SIGN_IN_HEADING}>{ACCOUNT_WORDS.signIn}</h2>
+        <Outcome tone="said">{actions.said}</Outcome>
+        <SecondFactorRefused id={REFUSED} read={read} failure={failure} unanswered={unanswered} />
 
-      <PasskeysSection
-        held={read.data}
-        here={passkeysHere()}
-        addOpen={actions.addOpen}
-        suggestedName={actions.suggestedName}
-        removing={actions.removePasskey.isPending}
-        landsAt={actions.landsAt}
-        onAddOpen={actions.toggleAdd}
-        onAdded={actions.passkeyAdded}
-        onRenamed={actions.passkeyRenamed}
-        onRemove={actions.removeAPasskey}
-      />
-      <AuthenticatorSection
-        held={read.data}
-        setupOpen={actions.setupOpen}
-        routes={actions.routes}
-        starting={actions.starting}
-        finishing={actions.finishing}
-        removing={actions.remove.isPending}
-        landsAt={actions.landsAt}
-        onSetUp={actions.toggleSetup}
-        onFinished={actions.finished}
-        onRemove={actions.removeTheAuthenticator}
-      />
-      <RecoveryCodesSection
-        held={read.data}
-        inHand={actions.inHand}
-        address={address}
-        making={actions.make.isPending}
-        acknowledging={actions.acknowledge.isPending}
-        acknowledgeFailure={saidOfAcknowledging(actions.acknowledge.error)}
-        landsAt={actions.landsAt}
-        onMake={actions.makeCodes}
-        onDone={actions.done}
-      />
-    </section>
+        <PasskeysSection
+          held={read.data}
+          here={passkeysHere()}
+          addOpen={actions.addOpen}
+          suggestedName={actions.suggestedName}
+          removing={actions.removePasskey.isPending}
+          landsAt={actions.landsAt}
+          onAddOpen={actions.toggleAdd}
+          onAdded={actions.passkeyAdded}
+          onRenamed={actions.passkeyRenamed}
+          onRemove={actions.removeAPasskey}
+        />
+        <AuthenticatorSection
+          held={read.data}
+          setupOpen={actions.setupOpen}
+          routes={actions.routes}
+          starting={actions.starting}
+          finishing={actions.finishing}
+          removing={actions.remove.isPending}
+          landsAt={actions.landsAt}
+          onSetUp={actions.toggleSetup}
+          onFinished={actions.finished}
+          onRemove={actions.removeTheAuthenticator}
+        />
+        <RecoveryCodesSection
+          held={read.data}
+          inHand={actions.inHand}
+          address={address}
+          making={actions.make.isPending}
+          acknowledging={actions.acknowledge.isPending}
+          acknowledgeFailure={saidOfAcknowledging(actions.acknowledge.error)}
+          landsAt={actions.landsAt}
+          onMake={actions.makeCodes}
+          onDone={actions.done}
+        />
+      </section>
+      <ThemeSection />
+    </>
   );
   if (properties.framed === true)
     return <InTheShell keystrokes={keystrokes}>{sections}</InTheShell>;

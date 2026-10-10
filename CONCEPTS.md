@@ -1951,6 +1951,14 @@ see People, each opening their *member page*, and the actions their role may tak
 a person*, listed under the headings Areas, Pages, Actions and Members. Knowledge joins it with S2a's
 retrieval; until then it is not a search.
 
+### theme
+
+Whether every page is drawn light or dark, which a person picks on their *Account* page as *Match
+this device*, *Light* or *Dark*.
+
+*Match this device* follows the device's own setting and changes with it, and is what a person gets
+until they pick. The choice is remembered on the browser it was made on, not on the account.
+
 ### promotion
 
 An Editor's proposal that an answer or a response become an `Answer` concept — the button is *Save

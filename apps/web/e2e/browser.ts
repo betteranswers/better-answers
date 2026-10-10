@@ -3,7 +3,7 @@ import { expect, test as base, type Page } from "@playwright/test";
 
 import { holdTitle } from "@better-answers/schema/testing/test-title";
 
-import { drawnMarks } from "./locators.ts";
+import { contrastBetween, controlEdges, drawnMarks } from "./locators.ts";
 
 let issued = 0;
 
@@ -60,12 +60,22 @@ const undecidedBehind = (check: { readonly data: unknown }): boolean => {
   );
 };
 
-const auditOf = async (page: Page): Promise<void> => {
+/** WCAG 1.4.11's floor for what tells a person a control is there. */
+const CONTROL_EDGE = 3;
+
+const faintEdges = async (page: Page): Promise<readonly string[]> =>
+  (await controlEdges(page)).flatMap(({ control, edges, fill, behind }) => {
+    const ratio = Math.max(...[fill, ...edges].map((painted) => contrastBetween(painted, behind)));
+    return ratio < CONTROL_EDGE ? [`${control} at ${ratio.toFixed(2)}:1`] : [];
+  });
+
+const auditIn = async (page: Page, theme: string): Promise<void> => {
   await transitionsHaveEnded(page);
+  const where = `${page.url()} in ${theme}`;
   const marked = await drawnMarks(page);
   expect(
     marked.length,
-    `${page.url()} marks ${String(marked.length)} objects: ${marked.join(" ")}`,
+    `${where} marks ${String(marked.length)} objects: ${marked.join(" ")}`,
   ).toBeLessThanOrEqual(MOST_MARKED);
 
   const aside = await page.addStyleTag({ content: TEXTURES_ASIDE });
@@ -74,13 +84,35 @@ const auditOf = async (page: Page): Promise<void> => {
     style.parentNode?.removeChild(style);
   });
 
-  expect(audit.violations, `axe found violations on ${page.url()}`).toEqual([]);
+  expect(audit.violations, `axe found violations on ${where}`).toEqual([]);
   const undecided = audit.incomplete
     .filter((result) => result.id === "color-contrast")
     .flatMap((result) => result.nodes)
     .filter((node) => node.any.some(undecidedBehind))
     .map((node) => node.target.join(" "));
-  expect(undecided, `axe could not decide contrast over a texture on ${page.url()}`).toEqual([]);
+  expect(undecided, `axe could not decide contrast over a texture on ${where}`).toEqual([]);
+  expect(await faintEdges(page), `controls drawn under 3:1 on ${where}`).toEqual([]);
+};
+
+/** The switch the page itself throws; undefined on a page with no theme of ours. */
+const themeOf = (page: Page): Promise<string | undefined> =>
+  page.evaluate(() => document.documentElement.dataset["theme"]);
+
+const themeSet = (page: Page, theme: string | undefined): Promise<void> =>
+  page.evaluate((next) => {
+    if (next === undefined) delete document.documentElement.dataset["theme"];
+    else document.documentElement.dataset["theme"] = next;
+  }, theme);
+
+/** In the page's own theme, then in the other, so dark is held in every state a test leaves. */
+const auditOf = async (page: Page): Promise<void> => {
+  const own = await themeOf(page);
+  await auditIn(page, own ?? "light");
+  const other = own === "dark" ? "light" : "dark";
+  await themeSet(page, other);
+  await auditIn(page, other);
+  await themeSet(page, own);
+  await transitionsHaveEnded(page);
 };
 
 export type BrowserFixtures = {
