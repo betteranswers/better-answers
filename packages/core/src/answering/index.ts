@@ -1,6 +1,6 @@
 import type { ConceptIri, MatchStrength } from "@better-answers/schema";
 
-import type { Frontmatter } from "../concepts/index.ts";
+import type { ConceptRead, Frontmatter } from "../concepts/index.ts";
 import {
   conceptPageOf,
   findConcepts,
@@ -112,10 +112,10 @@ type PassageView = {
   readonly sensitivity: string;
 };
 
-export type OpenResult<Iri extends string = ConceptIri> =
+type Opened<Iri extends string, View> =
   | {
       readonly found: true;
-      readonly concept?: ConceptView<Iri> | undefined;
+      readonly concept?: View | undefined;
       readonly passage?: PassageView | undefined;
     }
   | {
@@ -123,6 +123,14 @@ export type OpenResult<Iri extends string = ConceptIri> =
       readonly iri?: Iri | undefined;
       readonly locator?: string | undefined;
     };
+
+/** What MCP and the renderer read of an open. */
+export type OpenView<Iri extends string = ConceptIri> = Opened<Iri, ConceptView<Iri>>;
+
+/** The pane's words, which the web's concept page leads and ends its sources with. */
+type PaneWords = Pick<ConceptRead["pane"], "access" | "lead" | "next">;
+
+export type OpenResult<Iri extends string = ConceptIri> = Opened<Iri, ConceptView<Iri> & PaneWords>;
 
 export type MapState =
   | { readonly state: "live" }
@@ -366,6 +374,9 @@ const conceptOpened = async (
       trust,
       trustWords: words,
       evidence: pane.evidence,
+      access: pane.access,
+      lead: pane.lead,
+      next: pane.next,
     },
   });
 };
@@ -454,7 +465,7 @@ export const renderFind = (result: FindResult<string>): string => {
     : [...lines, "", `More follow: call find again with cursor ${result.nextCursor}`].join("\n");
 };
 
-export const renderOpen = (result: OpenResult<string>): string => {
+export const renderOpen = (result: OpenView<string>): string => {
   if (!result.found) {
     return result.iri === undefined
       ? `No passage at ${result.locator ?? "that link"}.`

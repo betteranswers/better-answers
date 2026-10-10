@@ -645,6 +645,8 @@ flowchart LR
   - A citation mark resolves to the evidence item at the index `linksAndMarksOf` gives it over the projected frontmatter's `sources`. The projection keeps every entry naming a resource, in order, so the index holds.
   - The sources list leads with the pane's access words and ends with where to go next. A concept whose sources name no passage address and no concept says it has no passage to open, never that access withholds one. A page locator such as `p.4` names no passage address.
   - A source whose locator is a page locator such as `p.4` shows it beside its label to every reader, as plain text that opens nothing. The projected frontmatter keeps it for a Viewer and an Admin alike (U6).
+  - A concept the browser suite's harness seeds has a passage its citation mark opens. Today `seedConcepts` in `apps/api/tests/harness-knowledge.ts` cites each passage by the row's own `chars:a-b` and not by the wire locator `<document>/chars:a-b`, so `knowledge.open` says the concept names its sources but none has a passage to open (found in U9).
+  - The page draws its *not found* from `knowledge.open`'s `not-found` refusal (404), which an absent and a withheld concept share, and from `malformed` (400) (U9).
 - **Verification:** web `check` passes, including e2e.
 
 ### U13. Jump-to's *Search for …* row

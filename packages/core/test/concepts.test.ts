@@ -1517,6 +1517,9 @@ describe("opening a concept by IRI", () => {
       },
       trustWords: "Unverified",
       evidence: [{ source: "Handbook", at: "p.4" }],
+      access: "included",
+      lead: "This concept names its sources, but none of them has a passage to open.",
+      next: "Read the concept as it stands.",
     });
   });
 

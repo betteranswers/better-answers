@@ -24,6 +24,7 @@ import {
   type FindMatch,
   type FindResult,
   type OpenResult,
+  type OpenView,
   type Trust,
 } from "@better-answers/core/answering";
 import { ok, parse, type Result } from "@better-answers/core/kernel";
@@ -84,14 +85,19 @@ const foundInCore = ({ hits, ...found }: WireFound): FindResult<string> => ({
 const openedOnTheWire = (opened: OpenResult<string>) => {
   if (!opened.found) return opened;
   const { concept, ...rest } = opened;
-  return concept === undefined
-    ? rest
-    : { ...rest, concept: { ...concept, trust: wireTrust(concept.trust) } };
+  if (concept === undefined) return rest;
+  // The pane's words are the web page's; MCP's view keeps to `open`'s schema.
+  const { iri, frontmatter, body, relations, trustWords, evidence } = concept;
+  const trusted = wireTrust(concept.trust);
+  return {
+    ...rest,
+    concept: { iri, frontmatter, body, relations, trust: trusted, trustWords, evidence },
+  };
 };
 
 type WireOpened = ReturnType<typeof openedOnTheWire>;
 
-const openedInCore = (opened: WireOpened): OpenResult<string> => {
+const openedInCore = (opened: WireOpened): OpenView<string> => {
   if (!opened.found || !("concept" in opened)) return opened;
   return { ...opened, concept: { ...opened.concept, trust: coreTrust(opened.concept.trust) } };
 };
