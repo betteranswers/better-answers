@@ -6,17 +6,19 @@ import { action, declareActions, record, recordFor } from "../audit/index.ts";
 import type { DetailOf, AuditAction } from "../audit/index.ts";
 import {
   actorIdOfPerson,
+  admit,
+  ADMIN_ALONE,
   attempt,
+  declareAction,
   err,
   ok,
   refusalFor,
-  requireAdmin,
   type AccessRequestId,
   type AdminUserPrincipal,
   type PlatformPrincipal,
+  type RefusalOf,
   type Result,
   type Role,
-  type RoleRefusal,
   type UserId,
   type UserPrincipal,
   ulid,
@@ -110,12 +112,6 @@ export const requestAccess = async (
 
 type AccessRequestStatus = z.infer<typeof boundarySchemas.accessRequest.select>["status"];
 
-export type DecideRefusal = MemberRefusal<
-  "role-forbids" | "malformed" | "no-such-request" | "already-decided"
->;
-
-export type ApproveRefusal = DecideRefusal | MemberRefusal<"no-such-role" | "off-testing-domain">;
-
 type Claim = {
   readonly admin: AdminUserPrincipal;
   readonly requestId: AccessRequestId;
@@ -124,13 +120,13 @@ type Claim = {
   readonly email: string;
 };
 
+/** Takes its face's admission as answered, and passes a refusal on before it reads a row. */
 const claimForDecision = async (
-  principal: UserPrincipal,
+  admitted: Result<AdminUserPrincipal, MemberRefusal<"role-forbids">>,
   tx: Tx,
   wanted: string,
 ): Promise<Result<Claim, DecideRefusal | Error>> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
+  if (!admitted.ok) return err(admitted.error);
   const requestId = boundarySchemas.accessRequest.select.shape.id.safeParse(wanted);
   if (!requestId.success) return err("malformed");
 
@@ -147,7 +143,7 @@ const claimForDecision = async (
   if (row === undefined) return err("no-such-request");
   if (row.status !== ACCESS_REQUEST_OPEN_STATUS) return err("already-decided");
   return ok({
-    admin: admin.value,
+    admin: admitted.value,
     requestId: requestId.data,
     requesterId: boundarySchemas.user.select.shape.id.parse(row.requester_id),
     email: row.email,
@@ -191,6 +187,21 @@ export const approveRequestInput = z.object({
 
 export type ApproveRequestInput = z.output<typeof approveRequestInput> & { readonly now: Date };
 
+const approveRequestAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: approveRequestInput,
+  refuses: [
+    "role-forbids",
+    "malformed",
+    "no-such-request",
+    "already-decided",
+    "no-such-role",
+    "off-testing-domain",
+  ],
+});
+
+export type ApproveRefusal = MemberRefusal<RefusalOf<typeof approveRequestAction>>;
+
 /** The invitation the approval minted, which the transport emails once the approval commits. */
 export type Approved = InvitationToSend & { readonly requestId: AccessRequestId };
 
@@ -204,7 +215,8 @@ export const approveRequest = async (
   tx: Tx,
   input: ApproveRequestInput,
 ): Promise<Result<Approved, ApproveRefusal | Error>> => {
-  const claimed = await claimForDecision(principal, tx, input.requestId);
+  const admitted = admit(approveRequestAction, principal, input);
+  const claimed = await claimForDecision(admitted, tx, input.requestId);
   if (!claimed.ok) return err(claimed.error);
   const { admin, requestId } = claimed.value;
 
@@ -236,19 +248,28 @@ export const declineRequestInput = z.object({ requestId: z.string() });
 
 export type DeclineRequestInput = z.output<typeof declineRequestInput>;
 
+const declineRequestAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: declineRequestInput,
+  refuses: ["role-forbids", "malformed", "no-such-request", "already-decided"],
+});
+
+export type DecideRefusal = MemberRefusal<RefusalOf<typeof declineRequestAction>>;
+
 export const declineRequest = async (
   principal: UserPrincipal,
   tx: Tx,
   input: DeclineRequestInput,
 ): Promise<Result<{ requestId: AccessRequestId }, DecideRefusal | Error>> => {
-  const claimed = await claimForDecision(principal, tx, input.requestId);
+  const admitted = admit(declineRequestAction, principal, input);
+  const claimed = await claimForDecision(admitted, tx, input.requestId);
   if (!claimed.ok) return err(claimed.error);
-  const { admin, requestId } = claimed.value;
+  const { admin, requestId, requesterId } = claimed.value;
 
   const decided = await landDecision(admin, tx, requestId, {
     status: "declined",
     action: REQUEST_ACTIONS.declined,
-    detail: { requesterId: claimed.value.requesterId },
+    detail: { requesterId },
     invitationId: null,
   });
   if (!decided.ok) return err(decided.error);
@@ -263,12 +284,23 @@ export type WaitingRequest = {
   readonly askedAt: Date;
 };
 
+const listWaitingRequestsAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.object({}),
+  refuses: ["role-forbids"],
+});
+
 /** Oldest first. */
 export const listWaitingRequests = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<readonly WaitingRequest[], RoleRefusal | Error>> => {
-  const admin = requireAdmin(principal);
+): Promise<
+  Result<
+    readonly WaitingRequest[],
+    MemberRefusal<RefusalOf<typeof listWaitingRequestsAction>> | Error
+  >
+> => {
+  const admin = admit(listWaitingRequestsAction, principal, {});
   if (!admin.ok) return err(admin.error);
 
   const waiting = await attempt(() =>

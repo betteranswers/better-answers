@@ -12,7 +12,6 @@ import {
   ok,
   type PlatformPrincipal,
   refusalFor,
-  requireAdmin,
   type Result,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
@@ -50,24 +49,6 @@ describe("the actor a record names", () => {
     // @ts-expect-error — an actor id no code minted is the shape the audit trail rests on.
     const composed: ActorId = "priya@example.com";
     expect(composed).toBe("priya@example.com");
-  });
-});
-
-describe("the guard on an action only an Admin may perform", () => {
-  it("lets an Admin through with the role narrowed to Admin", () => {
-    const admin = person("Admin");
-    const guarded = requireAdmin(admin);
-
-    expect(guarded).toEqual({ ok: true, value: admin });
-    if (guarded.ok) expectTypeOf(guarded.value.role).toEqualTypeOf<"Admin">();
-  });
-
-  it("refuses an Editor with role-forbids", () => {
-    expect(requireAdmin(person("Editor"))).toEqual({ ok: false, error: "role-forbids" });
-  });
-
-  it("refuses a Viewer with role-forbids too", () => {
-    expect(requireAdmin(person("Viewer"))).toEqual({ ok: false, error: "role-forbids" });
   });
 });
 

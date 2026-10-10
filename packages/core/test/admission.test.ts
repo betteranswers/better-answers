@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
+import type { writeConceptAction } from "../src/concepts/index.ts";
 import {
   admit,
   declareAction,
@@ -59,28 +60,24 @@ const adminsOnly = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: nothing,
   refuses: ["role-forbids"],
-  effect: "write",
 });
 
 const everyone = declareAction({
   admits: { role: "Viewer", purposes: EVERY_PURPOSE },
   input: nothing,
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 const erasureOnly = declareAction({
   admits: { role: "Admin", purposes: ["erasure"] },
   input: nothing,
   refuses: ["role-forbids"],
-  effect: "write",
 });
 
 const operatorsOnly = declareAction({
   admits: OPERATOR_ALONE,
   input: nothing,
   refuses: ["not-the-operator"],
-  effect: "read",
 });
 
 describe("what an action admits, from the principal and input alone", () => {
@@ -118,6 +115,16 @@ describe("what an action admits, from the principal and input alone", () => {
     if (!admitted.ok) throw new Error(`an Admin was refused: ${admitted.error}`);
     expect(admitted.value.role).toBe("Admin");
     expectTypeOf(admitted.value).toExtend<UserPrincipal & { role: "Admin" }>();
+  });
+
+  it("refuses a role outside the three, whatever level is asked", () => {
+    // @ts-expect-error — a role no resolver hands out is the value the gate must still refuse.
+    const stranger: UserPrincipal = { ...person("Admin"), role: "Owner" };
+
+    expect([admit(adminsOnly, stranger, {}), admit(everyone, stranger, {})]).toEqual([
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "role-forbids" },
+    ]);
   });
 
   it("refuses in role-forbids, a word of the forbidden class", () => {
@@ -201,6 +208,17 @@ describe("how fresh a sign-in the operator's writes ask for", () => {
   });
 });
 
+describe("an action whose level is read from its input", () => {
+  it("types a concept's writer as an Editor or above", () => {
+    type Writer = AdmittedOf<typeof writeConceptAction>;
+
+    expectTypeOf<UserPrincipal & { readonly role: "Editor" }>().toExtend<Writer>();
+    expectTypeOf<Writer>().not.toExtend<UserPrincipal & { readonly role: "Admin" }>();
+    expectTypeOf<UserPrincipal & { readonly role: "Viewer" }>().not.toExtend<Writer>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Writer>();
+  });
+});
+
 describe("what a declaration will not let an action say", () => {
   it("refuses an action declaring one word twice", () => {
     expect(() =>
@@ -208,22 +226,19 @@ describe("what a declaration will not let an action say", () => {
         admits: { role: "Admin", purposes: [] },
         input: nothing,
         refuses: ["role-forbids", "role-forbids"],
-        effect: "write",
       }),
     ).toThrow("listed twice");
   });
 });
 
-describe("the two actions that carry a declaration today", () => {
-  it("states what reprocessing a source admits, takes, answers and does", () => {
+describe("what two declared actions state, read from outside their slices", () => {
+  it("states what reprocessing a source admits and answers", () => {
     expect({
       admits: reprocessConnectedSourceAction.admits,
       refuses: reprocessConnectedSourceAction.refuses,
-      effect: reprocessConnectedSourceAction.effect,
     }).toEqual({
       admits: { role: "Admin", purposes: ["erasure", "reindex"] },
       refuses: ["role-forbids", "no-such-binding"],
-      effect: "write",
     });
   });
 
@@ -299,12 +314,5 @@ describe("the two actions that carry a declaration today", () => {
       admit(enqueueJobAction, person("Admin"), audit).ok,
       admit(enqueueJobAction, person("Editor"), audit).ok,
     ]).toEqual([true, true, false]);
-  });
-
-  it("declares both the enqueue and reprocessing as writes", () => {
-    expect([enqueueJobAction.effect, reprocessConnectedSourceAction.effect]).toEqual([
-      "write",
-      "write",
-    ]);
   });
 });

@@ -32,7 +32,7 @@ import {
   type Tx,
 } from "@better-answers/core/store/postgres";
 import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
-import { divergeHistory } from "@better-answers/core/testing/bundle";
+import { divergeHistory, holdMainRef } from "@better-answers/core/testing/bundle";
 import { inputOf } from "@better-answers/core/testing/input";
 import { objectStoreForSuite, textOf } from "@better-answers/core/testing/objects";
 import {
@@ -609,6 +609,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     expect(run.lines.join("\n")).toContain(
       "a run that names the file or commit it stopped at exits 1, whatever word it names: import-bundle's unsound tree and stopped import, reconcile-watermark's stopped replay",
+    );
+    expect(run.lines.join("\n")).toContain(
+      "an import whose manifest commit is refused as malformed exits 1 too: only a defect in the import can cause it",
     );
   });
 
@@ -3552,6 +3555,20 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         "import-bundle: REFUSED — this workspace has no bundle repository; provision it first",
       ]);
+    });
+
+    it("exits as a conflict when another writer holds the bundle", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+      const release = await holdMainRef(openTestGit(app()), workspaceId);
+
+      const run = await importing(app(), workspaceId, admin.email);
+      await release();
+
+      expect(run.exitCode).toBe(EXIT_OF_CLASS.conflict);
+      expect(run.lines).toEqual([
+        "import-bundle: REFUSED — this workspace's bundle could not be moved while the import was writing its manifest, because another writer moved it or holds its lock; nothing was written, so run the import again, and if it is refused the same way a lock was left on refs/heads/main",
+      ]);
+      expect(await commitsOf(app(), workspaceId)).toEqual([]);
     });
 
     it("exits 1 for an unsound tree, classed by no word", async () => {

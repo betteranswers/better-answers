@@ -5,6 +5,7 @@ import { boundarySchemas } from "@better-answers/schema";
 import { batchIdFor } from "../audit/index.ts";
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
@@ -48,10 +49,9 @@ export const bulkChangeRoleInput = z.object({ personIds: TICKED, role: z.string(
 export type BulkChangeRoleInput = z.output<typeof bulkChangeRoleInput>;
 
 const bulkChangeRoleAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: bulkChangeRoleInput,
   refuses: ["role-forbids", "no-such-role", "no-such-member", "last-admin", "changed-meanwhile"],
-  effect: "write",
 });
 
 /** Each person the move made hold a second factor for the first time. */
@@ -118,10 +118,9 @@ export type BulkRemoveMembersInput = z.output<typeof bulkRemoveMembersInput> & {
 };
 
 const bulkRemoveMembersAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: bulkRemoveMembersInput,
   refuses: ["role-forbids", "last-admin", "changed-meanwhile"],
-  effect: "write",
 });
 
 export type BulkRemoveMembersRefusal =
@@ -166,10 +165,9 @@ export const bulkAddToGroupInput = z.object({
 export type BulkAddToGroupInput = z.output<typeof bulkAddToGroupInput>;
 
 const bulkAddToGroupAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: bulkAddToGroupInput,
   refuses: ["role-forbids", "no-such-group", "no-such-member", "changed-meanwhile"],
-  effect: "write",
 });
 
 export type BulkAddToGroupRefusal =

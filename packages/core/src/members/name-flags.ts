@@ -5,6 +5,7 @@ import { boundarySchemas } from "@better-answers/schema";
 import { action, declareActions, declareIdentitySetActions, record } from "../audit/index.ts";
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   attemptResult,
   declareAction,
@@ -52,10 +53,9 @@ export const flagDisplayNameInput = z.object({
 export type FlagDisplayNameInput = z.output<typeof flagDisplayNameInput>;
 
 const flagDisplayNameAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: flagDisplayNameInput,
   refuses: ["role-forbids", "no-such-member"],
-  effect: "write",
 });
 
 export type FlagDisplayNameRefusal = MemberRefusal<"role-forbids" | "no-such-member"> | Error;

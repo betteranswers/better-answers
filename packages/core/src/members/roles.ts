@@ -5,6 +5,7 @@ import { boundarySchemas } from "@better-answers/schema";
 import { action, declareActions, record } from "../audit/index.ts";
 import {
   admit,
+  ADMIN_ALONE,
   declareAction,
   err,
   ok,
@@ -36,10 +37,9 @@ export const changeRoleInput = memberKeyed.extend({ role: z.string() });
 export type ChangeRoleInput = z.output<typeof changeRoleInput>;
 
 const changeRoleAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: changeRoleInput,
   refuses: ["role-forbids", "no-such-role", "no-such-member", "last-admin", "changed-meanwhile"],
-  effect: "write",
 });
 
 export type ChangeRoleRefusal =

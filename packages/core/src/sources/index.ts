@@ -11,11 +11,16 @@ import {
 } from "../audit/index.ts";
 import { cascadingVisibility } from "../concepts/index.ts";
 import {
+  admit,
+  ADMIN_ALONE,
   attempt,
   attemptResult,
+  declareAction,
   err,
   ok,
   ulid,
+  type AdminUserPrincipal,
+  type RefusalOf,
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
@@ -134,18 +139,30 @@ export const widenConnectedSourceInput = theSensitivityAsked();
 
 export type WidenConnectedSourceInput = z.output<typeof widenConnectedSourceInput>;
 
+const narrowConnectedSourceAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: narrowConnectedSourceInput,
+  refuses: ["role-forbids", "no-such-binding", "no-such-group", "widening-refused"],
+});
+
 export type NarrowConnectedSourceRefusal =
-  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-group" | "widening-refused">
+  | SourceRefusal<RefusalOf<typeof narrowConnectedSourceAction>>
   | Error;
 
+const widenConnectedSourceAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: widenConnectedSourceInput,
+  refuses: [
+    "role-forbids",
+    "no-such-binding",
+    "no-such-group",
+    "not-wider",
+    "special-category-unreviewed",
+  ],
+});
+
 export type WidenConnectedSourceRefusal =
-  | SourceRefusal<
-      | "role-forbids"
-      | "no-such-binding"
-      | "no-such-group"
-      | "not-wider"
-      | "special-category-unreviewed"
-    >
+  | SourceRefusal<RefusalOf<typeof widenConnectedSourceAction>>
   | Error;
 
 type ConnectedSourceSensitivitySet = {
@@ -228,14 +245,13 @@ const sensitivityWritten = async <A extends AuditAction>(
 
 /** `checked` refuses the move, or names the audit event that records it. */
 const sensitivitySet = async <A extends AuditAction, E>(
-  principal: UserPrincipal,
+  admin: AdminUserPrincipal,
   tx: Tx,
   input: z.output<ReturnType<typeof theSensitivityAsked>>,
   checked: SensitivityChecked<A, E>,
 ): Promise<Result<ConnectedSourceSensitivitySet, SensitivityHeldRefusal | E | Error>> => {
-  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
-  if (!acting.ok) return err(acting.error);
-  const { admin, connectedSourceId } = acting.value;
+  const acting = adminOnConnectedSource(admin, input.connectedSourceId);
+  const { connectedSourceId } = acting;
   const next = input.visibility;
 
   const cascaded = await cascadingVisibility(
@@ -243,11 +259,11 @@ const sensitivitySet = async <A extends AuditAction, E>(
     tx,
     { connectedSourceId },
     async (tx): Promise<Result<string, SensitivityHeldRefusal | E | Error>> => {
-      const asked = await sensitivityAskedOf(acting.value, tx, next);
+      const asked = await sensitivityAskedOf(acting, tx, next);
       if (!asked.ok) return err(asked.error);
       const auditEvent = await checked(asked.value, tx);
       if (!auditEvent.ok) return err(auditEvent.error);
-      return sensitivityWritten(acting.value, tx, next, auditEvent.value);
+      return sensitivityWritten(acting, tx, next, auditEvent.value);
     },
   );
   if (!cascaded.ok) return err(cascaded.error);
@@ -296,20 +312,26 @@ const widening: SensitivityChecked<
  * `widening-refused` if the visibility asked is wider in sensitivity or audience, even when it is
  * narrower in the other.
  */
-export const narrowConnectedSource = (
+export const narrowConnectedSource = async (
   principal: UserPrincipal,
   tx: Tx,
   input: NarrowConnectedSourceInput,
-): Promise<Result<ConnectedSourceNarrowed, NarrowConnectedSourceRefusal>> =>
-  sensitivitySet(principal, tx, input, narrowing);
+): Promise<Result<ConnectedSourceNarrowed, NarrowConnectedSourceRefusal>> => {
+  const admitted = admit(narrowConnectedSourceAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  return sensitivitySet(admitted.value, tx, input, narrowing);
+};
 
 /**
  * `not-wider` unless the visibility asked is wider in sensitivity or audience and narrower in neither.
  * A document's own sensitivity is left alone: the derivation reads the narrower of it and the connected source's.
  */
-export const widenConnectedSource = (
+export const widenConnectedSource = async (
   principal: UserPrincipal,
   tx: Tx,
   input: WidenConnectedSourceInput,
-): Promise<Result<ConnectedSourceWidened, WidenConnectedSourceRefusal>> =>
-  sensitivitySet(principal, tx, input, widening);
+): Promise<Result<ConnectedSourceWidened, WidenConnectedSourceRefusal>> => {
+  const admitted = admit(widenConnectedSourceAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  return sensitivitySet(admitted.value, tx, input, widening);
+};

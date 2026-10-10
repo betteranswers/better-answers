@@ -16,6 +16,7 @@ import {
 } from "../audit/index.ts";
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
@@ -54,10 +55,9 @@ export const readAuditLogInput = z.object({
 export type ReadAuditLogInput = z.output<typeof readAuditLogInput>;
 
 const readAuditLogAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: readAuditLogInput,
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 export type ReadAuditLogRefusal = MemberRefusal<RefusalOf<typeof readAuditLogAction>> | Error;

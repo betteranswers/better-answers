@@ -5,6 +5,7 @@ import { INVITATION_CANCELLED_STATUS, INVITATION_WAITING_STATUS } from "@better-
 import { recordEach } from "../audit/index.ts";
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
@@ -19,7 +20,6 @@ import {
 import { refusalOfDeadlock, type Tx } from "../store/postgres/index.ts";
 import { waitingCounted } from "./invitation-ceilings.ts";
 import {
-  ADMIN_ALONE,
   expiryFrom,
   INVITATION_ACTIONS,
   INVITATION_ID,
@@ -54,14 +54,12 @@ const bulkResendInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: bulkInvitationsInput,
   refuses: [...ON_A_SET, OFF_TESTING_DOMAIN],
-  effect: "write",
 });
 
 const bulkCancelInvitationsAction = declareAction({
   admits: ADMIN_ALONE,
   input: bulkInvitationsInput,
   refuses: ON_A_SET,
-  effect: "write",
 });
 
 type SetRefusal<Item extends MemberRefusal<"no-such-invitation" | "off-testing-domain">> =

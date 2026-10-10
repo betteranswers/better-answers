@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -91,6 +91,20 @@ export const emptyRootCommit = async (
 
 export const divergeHistory = (door: GitDoor, workspaceId: string): Promise<string> =>
   emptyRootCommit(door, workspaceId, "elsewhere");
+
+/**
+ * Leaves the lock a writer in another process holds while it moves `main`, so the next ref move
+ * here loses. Hands back the release.
+ */
+export const holdMainRef = async (
+  door: GitDoor,
+  workspaceId: string,
+): Promise<() => Promise<void>> => {
+  const lock = path.join(gitDirOf(door, workspaceId), "refs", "heads", "main.lock");
+  await mkdir(path.dirname(lock), { recursive: true });
+  await writeFile(lock, "");
+  return () => rm(lock);
+};
 
 export type CommitFacts = {
   readonly sha: string;

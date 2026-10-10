@@ -1,7 +1,7 @@
 import type { z } from "zod";
 
 import { action, declareActions, record } from "../audit/index.ts";
-import { admit, declareAction, err, ok, ulid } from "../kernel/index.ts";
+import { admit, ADMIN_ALONE, declareAction, err, ok, ulid } from "../kernel/index.ts";
 import type {
   AdminUserPrincipal,
   AdmittedOf,
@@ -28,10 +28,9 @@ export type RemoveMemberInput = z.output<typeof removeMemberInput> & {
 };
 
 const removeMemberAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: removeMemberInput,
   refuses: ["role-forbids", "no-such-member", "last-admin", "changed-meanwhile"],
-  effect: "write",
 });
 
 export type RemoveMemberRefusal =

@@ -23,11 +23,11 @@ import {
 import { cascadingVisibility } from "../concepts/index.ts";
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
   ok,
-  requireAdmin,
   ulid,
   type AdminUserPrincipal,
   type AdmittedOf,
@@ -171,9 +171,16 @@ export type ConnectUploadInput = ConnectUploadFields & {
   readonly body: ReadableStream<Uint8Array>;
 };
 
+/** The stream travels beside these fields, which are all an entry parses. */
+const connectUploadAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: connectUploadFields,
+  refuses: ["role-forbids", "no-such-group", "media-type-refused", "too-large"],
+});
+
 export type ConnectUploadRefusal =
   | PrincipalRefusal
-  | SourceRefusal<"role-forbids" | "no-such-group" | "media-type-refused" | "too-large">
+  | SourceRefusal<RefusalOf<typeof connectUploadAction>>
   | Error;
 
 type ConnectUploadDoors = { readonly postgres: PostgresDoor; readonly objects: ObjectDoor };
@@ -327,7 +334,7 @@ export const connectUpload = async (
   doors: ConnectUploadDoors,
   input: ConnectUploadInput,
 ): Promise<Result<UploadBound, ConnectUploadRefusal>> => {
-  const admin = requireAdmin(principal);
+  const admin = admit(connectUploadAction, principal, input);
   if (!admin.ok) return err(admin.error);
   const { workspaceId } = admin.value;
 
@@ -421,14 +428,20 @@ export type PublishConnectedSourceInput = z.output<typeof publishConnectedSource
   readonly publishedAt: Date;
 };
 
+const publishConnectedSourceAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: publishConnectedSourceInput,
+  refuses: [
+    "role-forbids",
+    "no-such-binding",
+    "not-indexed",
+    "already-published",
+    "confirmation-missing",
+  ],
+});
+
 export type PublishConnectedSourceRefusal =
-  | SourceRefusal<
-      | "role-forbids"
-      | "no-such-binding"
-      | "not-indexed"
-      | "already-published"
-      | "confirmation-missing"
-    >
+  | SourceRefusal<RefusalOf<typeof publishConnectedSourceAction>>
   | Error;
 
 export type ConnectedSourcePublished = {
@@ -571,16 +584,17 @@ export const publishConnectedSource = async (
   tx: Tx,
   input: PublishConnectedSourceInput,
 ): Promise<Result<ConnectedSourcePublished, PublishConnectedSourceRefusal>> => {
-  const acting = adminOnConnectedSource(principal, input.connectedSourceId);
-  if (!acting.ok) return err(acting.error);
-  const { admin, connectedSourceId } = acting.value;
+  const admitted = admit(publishConnectedSourceAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const acting = adminOnConnectedSource(admitted.value, input.connectedSourceId);
+  const { admin, connectedSourceId } = acting;
 
   if (!CONFIRMATIONS.every((named) => input.confirmations[named] === true)) {
     return err("confirmation-missing");
   }
 
   const cascaded = await cascadingVisibility(admin, tx, { connectedSourceId }, (tx) =>
-    publishWritten(acting.value, tx, input),
+    publishWritten(acting, tx, input),
   );
   if (!cascaded.ok) return err(cascaded.error);
   return ok({ connectedSourceId, ...cascaded.value.written });
@@ -597,7 +611,6 @@ export const reprocessConnectedSourceAction = declareAction({
   admits: { role: "Admin", purposes: ["erasure", "reindex"] },
   input: reprocessConnectedSourceInput,
   refuses: ["role-forbids", "no-such-binding"],
-  effect: "write",
 });
 
 export type ReprocessConnectedSourceInput = InputOf<typeof reprocessConnectedSourceAction>;

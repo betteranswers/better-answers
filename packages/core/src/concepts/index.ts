@@ -27,19 +27,23 @@ import { action, batchIdFor, declareActions, record } from "../audit/index.ts";
 import {
   actorIdOf,
   actorIdOfPerson,
+  admit,
+  ADMIN_ALONE,
   attempt,
+  declareAction,
   err,
   isActorId,
   ok,
   PERSON_PREFIX,
   personOfActor,
   refusalFor,
-  requireAdmin,
   ulid,
+  type AdminUserPrincipal,
+  type AdmittedOf,
   type Clock,
   type PrincipalRefusal,
+  type RefusalOf,
   type Result,
-  type RoleRefusal,
   type UserId,
   type UserPrincipal,
 } from "../kernel/index.ts";
@@ -88,7 +92,12 @@ import {
   type StandingConcept,
   type Unsound,
 } from "./loader.ts";
-import { manifestAtHead, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
+import {
+  BUNDLE_WRITERS,
+  manifestAtHead,
+  writeManifest,
+  type WriteManifestRefusal,
+} from "./manifest.ts";
 import {
   paneOf,
   projectedFrontmatter,
@@ -260,22 +269,34 @@ export type ConceptWritten = {
   readonly contentHash: string;
 };
 
-export type WriteConceptRefusal =
-  | RoleRefusal
-  | PassedOnCommitRefusal
-  | PrincipalRefusal
-  | "malformed"
-  | "path-taken"
-  | "merge-key-taken"
-  | "rename-refused"
-  | "reclassification-refused"
-  | "widening-refused"
-  | "no-such-concept"
-  | "no-such-document"
-  | "already-decided"
-  | "resolution-moved";
+/**
+ * Two constants, never one object with a computed role: the kernel reads a union of roles as its
+ * highest, typing every writer an Admin.
+ */
+export const writeConceptAction = declareAction({
+  admits: (input: WriteConceptInput) =>
+    input.acceptance === undefined ? BUNDLE_WRITERS : ADMIN_ALONE,
+  input: z.custom<WriteConceptInput>(),
+  refuses: [
+    "role-forbids",
+    "malformed",
+    "no-such-concept",
+    "no-such-document",
+    "already-decided",
+    "merge-key-taken",
+    "resolution-moved",
+    "stale-precondition",
+    "rename-refused",
+    "path-taken",
+    "reclassification-refused",
+    "widening-refused",
+  ],
+});
 
-const mayWrite = (principal: UserPrincipal): boolean => principal.role !== "Viewer";
+export type WriteConceptRefusal =
+  | RefusalOf<typeof writeConceptAction>
+  | PassedOnCommitRefusal
+  | PrincipalRefusal;
 
 const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
   const named = { ...input.frontmatter };
@@ -288,17 +309,6 @@ const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
 
 type WriteDoors = { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock };
 
-const requestRefusalOf = (
-  principal: UserPrincipal,
-  input: WriteConceptInput,
-): WriteConceptRefusal | undefined => {
-  if (!mayWrite(principal)) return "role-forbids";
-  if (input.acceptance === undefined) return undefined;
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return admin.error;
-  return "base" in input.expects ? undefined : "malformed";
-};
-
 /**
  * Commits one concept file under the repository lock, then writes its rows and audit event in
  * one transaction. An `iri` edits a concept that must already stand; an `acceptance` asks for
@@ -309,9 +319,18 @@ export const writeConcept = async (
   doors: WriteDoors,
   input: WriteConceptInput,
 ): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
-  const refused = requestRefusalOf(principal, input);
-  if (refused !== undefined) return err(refused);
+  const admitted = admit(writeConceptAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  if (input.acceptance !== undefined && !("base" in input.expects)) return err("malformed");
+  return commitConcept(admitted.value, doors, input);
+};
 
+/** The write once admitted: nothing below judges who asked. */
+const commitConcept = async (
+  principal: AdmittedOf<typeof writeConceptAction>,
+  doors: WriteDoors,
+  input: WriteConceptInput,
+): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
   const iri = input.iri ?? conceptIriOf(ulid());
   const frontmatter = fileFrontmatterOf(input, iri);
   const { contentHash, sources } = hashedFileOf(frontmatter, input.body, input.path);
@@ -618,6 +637,14 @@ type Prepared = {
 const acceptanceMessage = (title: string): string =>
   `Accept the suggested change to ${title.replaceAll(/\s+/gu, " ").trim()}`;
 
+type AcceptSuggestionsInput = { readonly decisions: readonly AcceptanceDecision[] };
+
+const acceptSuggestionsAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: z.custom<AcceptSuggestionsInput>(),
+  refuses: ["role-forbids", "malformed"],
+});
+
 /**
  * Accepts each decision on its own, in order: one refused leaves the rest to go ahead. A
  * suggestion whose concept moved or went stale goes back to its proposer. Two or more decisions
@@ -626,11 +653,14 @@ const acceptanceMessage = (title: string): string =>
 export const acceptSuggestions = async (
   principal: UserPrincipal,
   doors: WriteDoors,
-  input: { readonly decisions: readonly AcceptanceDecision[] },
+  input: AcceptSuggestionsInput,
 ): Promise<
-  Result<readonly AcceptanceOutcome[], RoleRefusal | PrincipalRefusal | "malformed" | Error>
+  Result<
+    readonly AcceptanceOutcome[],
+    RefusalOf<typeof acceptSuggestionsAction> | PrincipalRefusal | Error
+  >
 > => {
-  const admin = requireAdmin(principal);
+  const admin = admit(acceptSuggestionsAction, principal, input);
   if (!admin.ok) return err(admin.error);
 
   const decisions = ACCEPTANCE_DECISIONS.safeParse(input.decisions);
@@ -639,7 +669,7 @@ export const acceptSuggestions = async (
   const batchId = batchIdFor(decisions.data.length);
   const outcomes: AcceptanceOutcome[] = [];
   for (const decision of decisions.data) {
-    outcomes.push(await acceptOne(principal, doors, decision, batchId));
+    outcomes.push(await acceptOne(admin.value, doors, decision, batchId));
   }
   return ok(outcomes);
 };
@@ -709,7 +739,7 @@ const returnedToProposerOn = (
 };
 
 const acceptOne = async (
-  principal: UserPrincipal,
+  principal: AdminUserPrincipal,
   doors: WriteDoors,
   decision: AcceptanceDecision,
   batchId: string | undefined,
@@ -755,12 +785,21 @@ export type BundleImported = ImportProgress & {
   readonly dryRun: boolean;
 };
 
+const importBundleAction = declareAction({
+  admits: BUNDLE_WRITERS,
+  input: z.custom<ImportBundleInput>(),
+  refuses: [
+    "role-forbids",
+    "no-such-repository",
+    "manifest-taken",
+    "class-unreadable",
+    "stale-precondition",
+  ],
+});
+
 export type ImportBundleRefusal =
-  | RoleRefusal
+  | RefusalOf<typeof importBundleAction>
   | PrincipalRefusal
-  | "no-such-repository"
-  | "manifest-taken"
-  | "class-unreadable"
   | ({ readonly kind: "unsound" } & Unsound)
   | {
       readonly kind: "stopped";
@@ -801,8 +840,8 @@ const manifestRefusalOf = (refusal: WriteManifestRefusal | Error): ImportBundleR
   switch (refusal) {
     case "path-taken":
       return "manifest-taken";
+    // Only a defect in the import makes its manifest commit malformed, so no caller can act on it.
     case "malformed":
-    case "stale-precondition":
     case "malformed-path":
     case "malformed-message":
       return new Error(`the manifest commit was refused: ${refusal}`);
@@ -1096,7 +1135,8 @@ export const importBundle = async (
   doors: WriteDoors,
   input: ImportBundleInput,
 ): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
-  if (!mayWrite(principal)) return err("role-forbids");
+  const admitted = admit(importBundleAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
   const sensitivity = input.sensitivity ?? IMPORT_SENSITIVITY_DEFAULT;
 
   // The second pass reads back what the first landed; a sensitivity the runner cannot read would stop

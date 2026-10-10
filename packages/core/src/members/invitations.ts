@@ -11,6 +11,7 @@ import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { action, batchIdFor, declareActions, record } from "../audit/index.ts";
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   emailAddressOf,
@@ -50,8 +51,6 @@ const ROLE = boundarySchemas.member.select.shape.role;
 
 export const INVITATION_ID = boundarySchemas.invitation.select.shape.id;
 
-export const ADMIN_ALONE = { role: "Admin", purposes: [] } as const;
-
 export const NO_SUCH_INVITATION =
   "no-such-invitation" satisfies MemberRefusal<"no-such-invitation">;
 
@@ -72,7 +71,6 @@ const inviteMembersAction = declareAction({
     "off-testing-domain",
     "changed-meanwhile",
   ],
-  effect: "write",
 });
 
 export const invitationInput = z.object({ invitationId: z.string() });
@@ -89,14 +87,12 @@ const resendInvitationAction = declareAction({
   admits: ADMIN_ALONE,
   input: invitationInput,
   refuses: [...ON_AN_INVITATION, OFF_TESTING_DOMAIN],
-  effect: "write",
 });
 
 const cancelInvitationAction = declareAction({
   admits: ADMIN_ALONE,
   input: invitationInput,
   refuses: ON_AN_INVITATION,
-  effect: "write",
 });
 
 /** Borrowed from the workspaces slice, whose word it is: joining refuses a member in it too. */

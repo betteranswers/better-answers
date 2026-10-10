@@ -3,6 +3,7 @@ import type { z } from "zod";
 import { action, declareActions, type DetailOf, record, type Matched } from "../audit/index.ts";
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
@@ -47,10 +48,9 @@ export const exportAuditLogInput = readAuditLogInput.pick({ family: true, search
 export type ExportAuditLogInput = z.output<typeof exportAuditLogInput>;
 
 const exportAuditLogAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: exportAuditLogInput,
   refuses: ["role-forbids"],
-  effect: "write",
 });
 
 export type ExportAuditLogRefusal =

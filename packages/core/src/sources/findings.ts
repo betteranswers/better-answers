@@ -5,11 +5,14 @@ import { boundarySchemas, REDACTION_ALWAYS_TIER } from "@better-answers/schema";
 import { action, declareActions, record } from "../audit/index.ts";
 import {
   actorIdOf,
+  admit,
+  ADMIN_ALONE,
   attempt,
+  declareAction,
   err,
   ok,
-  requireAdmin,
   ulid,
+  type RefusalOf,
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
@@ -38,9 +41,13 @@ export const restoreFindingInput = z.object({
 
 export type RestoreFindingInput = z.output<typeof restoreFindingInput>;
 
-export type FindingRestoreRefusal =
-  | SourceRefusal<"role-forbids" | "no-such-finding" | "not-the-always-set">
-  | Error;
+const restoreFindingAction = declareAction({
+  admits: ADMIN_ALONE,
+  input: restoreFindingInput,
+  refuses: ["role-forbids", "no-such-finding", "not-the-always-set"],
+});
+
+export type FindingRestoreRefusal = SourceRefusal<RefusalOf<typeof restoreFindingAction>> | Error;
 
 export type FindingRestored = {
   readonly findingId: string;
@@ -54,7 +61,7 @@ export const restoreFinding = async (
   tx: Tx,
   input: RestoreFindingInput,
 ): Promise<Result<FindingRestored, FindingRestoreRefusal>> => {
-  const admin = requireAdmin(principal);
+  const admin = admit(restoreFindingAction, principal, input);
   if (!admin.ok) return err(admin.error);
   const { findingId, reason } = input;
   const { workspaceId } = admin.value;

@@ -13,8 +13,6 @@ import type {
 import { err, ok, type Result } from "./result.ts";
 import type { KernelRefusalOfClass } from "./vocabulary.ts";
 
-export type Effect = "read" | "write";
-
 export const EVERY_PURPOSE = "every";
 
 type RoleOrPurpose = {
@@ -22,6 +20,9 @@ type RoleOrPurpose = {
 
   readonly purposes: readonly string[] | typeof EVERY_PURPOSE;
 };
+
+/** A person who is an Admin, and the platform for no purpose. */
+export const ADMIN_ALONE = { role: "Admin", purposes: [] } as const;
 
 /** No role and no purpose reaches an action that admits this. */
 export const OPERATOR_ALONE = { operator: true } as const;
@@ -35,7 +36,11 @@ const ROLE_FORBIDS = "role-forbids" satisfies AdmissionRefusal;
 
 const NOT_THE_OPERATOR = "not-the-operator" satisfies AdmissionRefusal;
 
-const reaches = (held: Role, named: Role): boolean => ROLES.indexOf(held) <= ROLES.indexOf(named);
+/** A role outside the three reaches nothing, whatever a caller's type says. */
+const reaches = (held: Role, named: Role): boolean => {
+  const at = ROLES.indexOf(held);
+  return at !== -1 && at <= ROLES.indexOf(named);
+};
 
 /**
  * `ROLES` runs from the highest down, so a named role is reached by itself and everything above.
@@ -63,15 +68,13 @@ export type ActionDeclaration<
   Schema extends z.ZodType = z.ZodType,
   A extends Admits = Admits,
   Word extends string = string,
-  E extends Effect = Effect,
 > = {
   readonly admits: A | ((input: z.output<Schema>) => A);
 
+  /** The schema an entry parses with; `z.custom<T>()` where no entry parses the input yet. */
   readonly input: Schema;
 
   readonly refuses: readonly Word[];
-
-  readonly effect: E;
 };
 
 export type InputOf<D extends ActionDeclaration> = z.output<D["input"]>;
@@ -98,10 +101,9 @@ export const declareAction = <
   Schema extends z.ZodType,
   const A extends Admits,
   const Word extends string,
-  const E extends Effect,
 >(
-  declaration: ActionDeclaration<Schema, A, Word, E>,
-): ActionDeclaration<Schema, A, Word, E> => {
+  declaration: ActionDeclaration<Schema, A, Word>,
+): ActionDeclaration<Schema, A, Word> => {
   const { refuses } = declaration;
   const twice = refuses.find((word) => refuses.indexOf(word) !== refuses.lastIndexOf(word));
   if (twice !== undefined) throw new Error(`admission: ${twice} is listed twice`);

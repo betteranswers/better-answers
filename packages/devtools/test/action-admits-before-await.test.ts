@@ -13,7 +13,6 @@ const DECLARATION = `const reprocessAction = declareAction({
   admits: { role: "Admin", purposes: [] },
   input: schema,
   refuses: ["role-forbids"],
-  effect: "write",
 });
 `;
 
@@ -84,7 +83,8 @@ describe("the rule that a declared action admits before it awaits", () => {
     expect(lint.flagged(holding(nested))).toEqual([FILE]);
   });
 
-  describe.each(["requireAdmin", "requireFreshSignIn"])("the shorthand `%s`", (shorthand) => {
+  describe("the shorthand `requireFreshSignIn`", () => {
+    const shorthand = "requireFreshSignIn";
     const step = (body: string): Tree => ({ "step.ts": body });
 
     it("refuses a step that awaits before it, naming the call", () => {
@@ -115,8 +115,8 @@ describe("the rule that a declared action admits before it awaits", () => {
 
   it("refuses a late `admit`, though a shorthand came first", () => {
     const mixed = `export const reprocess = async (principal, tx, input) => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return admin;
+  const fresh = requireFreshSignIn(principal, new Date());
+  if (!fresh.ok) return fresh;
   await tx.query("SELECT 1");
   return admit(reprocessAction, principal, input);
 };
@@ -128,8 +128,8 @@ describe("the rule that a declared action admits before it awaits", () => {
 
   it("pairs a declaration with `admit` alone, never a shorthand's argument", () => {
     const both = `export const reprocess = async (principal, tx, input) => {
-  const admin = requireAdmin(reprocessAction);
-  if (!admin.ok) return admin;
+  const fresh = requireFreshSignIn(reprocessAction);
+  if (!fresh.ok) return fresh;
   return tx.query("SELECT 1");
 };
 `;

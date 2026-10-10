@@ -4,6 +4,7 @@ import { boundarySchemas } from "@better-answers/schema";
 
 import {
   admit,
+  ADMIN_ALONE,
   attempt,
   declareAction,
   err,
@@ -19,10 +20,9 @@ import type { MemberRefusal } from "./vocabulary.ts";
 export const memberKeyed = z.object({ personId: boundarySchemas.user.select.shape.id });
 
 const listMembersAction = declareAction({
-  admits: { role: "Admin", purposes: [] },
+  admits: ADMIN_ALONE,
   input: z.object({}),
   refuses: ["role-forbids"],
-  effect: "read",
 });
 
 export type ListMembersRefusal = MemberRefusal<RefusalOf<typeof listMembersAction>> | Error;
