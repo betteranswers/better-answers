@@ -100,7 +100,9 @@ const walked = async (page: Page): Promise<readonly Drawn[]> => {
     if (drawn?.again === true) return seen;
     if (drawn !== undefined) seen.push(drawn);
   }
-  throw new Error(`focus never came back round in ${String(STOPS)} stops, so some went unchecked`);
+  throw new Error(
+    `focus never came back round in ${String(STOPS)} stops, so the controls past them were never measured`,
+  );
 };
 
 const holdsTheRing = async (page: Page, stops: readonly Drawn[]): Promise<void> => {
