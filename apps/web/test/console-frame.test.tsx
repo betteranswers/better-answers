@@ -1,12 +1,18 @@
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, renderHook, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RAIL } from "@/app/words.ts";
+import { correctWords } from "@/features/console/correcting-words.ts";
+import { useAsking } from "@/features/console/everyone-search.tsx";
 import {
   EVERYONE_WORDS,
   NAMES_WAITING_WORDS,
   WORKSPACES_WORDS,
 } from "@/features/console/list-words.ts";
+import {
+  NAMES_WAITING_KEYSTROKES,
+  SELECT_A_NAME_FIRST,
+} from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
@@ -109,6 +115,7 @@ const searchFor = (list: HTMLElement, label: string, typed: string): void => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("the console's shell", () => {
@@ -237,6 +244,26 @@ describe("the console's lists", () => {
     expect(within(list).getByText(NAMES_WAITING_WORDS.noneMatch("nobody"))).toBeDefined();
   });
 
+  it("keeps the correct keystroke off a name the search hid", async () => {
+    const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_WORDS.heading, {
+      "console.people.namesWaiting": NAMES_WAITING,
+    });
+    const toCorrectPriya = correctWords("Priya Shah");
+    const pressCorrect = () => {
+      fireEvent.keyDown(document.body, { key: NAMES_WAITING_KEYSTROKES.correct.key });
+    };
+    fireEvent.focus(within(list).getByRole("button", { name: toCorrectPriya }));
+
+    searchFor(list, NAMES_WAITING_WORDS.search, "sam");
+    pressCorrect();
+    expect(within(list).getByText(SELECT_A_NAME_FIRST)).toBeDefined();
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    searchFor(list, NAMES_WAITING_WORDS.search, "");
+    pressCorrect();
+    expect(await screen.findByRole("dialog", { name: toCorrectPriya })).toBeDefined();
+  });
+
   it("keeps the description of Everyone off Names waiting", async () => {
     const people = menuGroupIn(CONSOLE, "people");
     await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_WORDS.heading, {
@@ -269,5 +296,33 @@ describe("the console's lists", () => {
     expect(screen.getByRole("main").textContent.split(EVERYONE_WORDS.description)).toHaveLength(2);
     expect(search.getAttribute("placeholder")).toBe(EVERYONE_WORDS.search);
     expect(within(list).queryByText(EVERYONE_WORDS.search)).toBeNull();
+  });
+});
+
+describe("what the search on Everyone asks the api", () => {
+  it("asks for everyone at once when its box empties", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useAsking("tom"));
+
+    act(() => {
+      result.current.type("priya");
+    });
+    expect(result.current.asked, "a key asked before its pause").toEqual({
+      search: "tom",
+      offset: 0,
+    });
+
+    act(() => {
+      result.current.type("");
+    });
+    expect(result.current.asked).toEqual({ search: "", offset: 0 });
+
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(result.current.asked, "the dropped pause asked after all").toEqual({
+      search: "",
+      offset: 0,
+    });
   });
 });
