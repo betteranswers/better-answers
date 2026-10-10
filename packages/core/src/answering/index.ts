@@ -88,7 +88,7 @@ type ConceptView<Iri extends string> = {
     readonly target: Iri;
     readonly title: string;
   }[];
-  /** Each link in the body that leads to a concept the reader may read; core always answers it. */
+  /** Each link in the body that leads to a concept the reader may read; `open` always answers it. */
   readonly bodyLinks?: readonly {
     readonly ordinal: number;
     readonly address: string;
@@ -136,7 +136,10 @@ export type OpenView<Iri extends string = ConceptIri> = Opened<Iri, ConceptView<
 /** The pane's words, which the web's concept page leads and ends its sources with. */
 type PaneWords = Pick<ConceptRead["pane"], "access" | "lead" | "next">;
 
-export type OpenResult<Iri extends string = ConceptIri> = Opened<Iri, ConceptView<Iri> & PaneWords>;
+export type OpenResult<Iri extends string = ConceptIri> = Opened<
+  Iri,
+  ConceptView<Iri> & PaneWords & Required<Pick<ConceptView<Iri>, "bodyLinks">>
+>;
 
 export type MapState =
   | { readonly state: "live" }

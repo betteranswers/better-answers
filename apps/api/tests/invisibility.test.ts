@@ -502,6 +502,7 @@ describe("a concept citing Restricted minutes, opened over MCP", () => {
         },
         body,
         relations: [{ kind: "LINKS_TO", target: heron, title: HERON_TITLE }],
+        bodyLinks: [{ ordinal: 0, address: heron, target: heron }],
         trust: {
           tier: "unverified",
           status: "current",
