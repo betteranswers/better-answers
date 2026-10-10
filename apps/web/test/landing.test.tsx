@@ -103,6 +103,17 @@ describe("where focus goes when Load more's page lands", () => {
     expect(document.activeElement).toBe(searchBox());
   });
 
+  it("lands when the window comes back to the same control", () => {
+    render(<Lines />);
+
+    askedForMore();
+    // As a browser does for the control that held focus when its window is brought to the front again.
+    fireEvent.focusIn(screen.getByRole("button", { name: "Load more" }));
+    thePageLands();
+
+    expect(document.activeElement?.textContent).toBe("line 3");
+  });
+
   it("lands again on the next page asked for", () => {
     render(<Lines />);
 
