@@ -11,7 +11,7 @@ import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { useWideLayout } from "@/shared/wide-layout.ts";
+import { useRoomBeside } from "@/shared/wide-layout.ts";
 
 import { EvidenceInline, EvidenceSheet, SensitivityTag, type Opened } from "./evidence-panel.tsx";
 import {
@@ -66,7 +66,6 @@ const failedWords = (failure: Error | ApiError) => outcomeOfFailure(failure, "re
 /** Takes a line of its own where the kind beside it leaves too little room. */
 const TITLE = "min-w-0 grow basis-48 font-medium break-words";
 
-/** The rest of the line beside its title: what it is, and its trust or sensitivity word. */
 function ConceptLine(properties: { readonly match: ConceptMatch }) {
   const { match } = properties;
   return (
@@ -80,8 +79,8 @@ function ConceptLine(properties: { readonly match: ConceptMatch }) {
 
 type Opening = {
   readonly opened: Opened | undefined;
-  readonly wide: boolean;
-  readonly onOpen: (opened: Opened) => void;
+  readonly beside: boolean;
+  readonly onOpen: (chosen: Omit<Opened, "pressed">) => void;
   readonly onClose: () => void;
 };
 
@@ -113,7 +112,7 @@ function PassageLine(properties: { readonly match: PassageMatch; readonly openin
         </Button>
         <SensitivityTag sensitivity={match.sensitivity} />
       </div>
-      {opened === undefined || opening.wide ? null : (
+      {opened === undefined || opening.beside ? null : (
         <EvidenceInline opened={opened} onClose={opening.onClose} />
       )}
     </>
@@ -213,23 +212,24 @@ function SearchRegion() {
   const headingId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
   const { state, search, setSearch } = useSearchedList(SEARCH_LIST, SEARCH_FIELDS);
-  useAsked("search", setSearch);
+  useAsked("search", (asked) => {
+    setSearch(asked.slice(0, QUERY_MAX));
+  });
   const query = state.search;
   const matches = useMatches(query);
   const shown = useMemo(() => matchesOf(matches.data), [matches.data]);
-  const wide = useWideLayout();
+  const beside = useRoomBeside();
   const [opened, setOpened] = useState<Opened & { readonly query: string }>();
   // A passage opened for one search closes with it, as its match leaves the list.
   if (opened !== undefined && opened.query !== query) setOpened(undefined);
-  const open = opened?.query === query ? opened : undefined;
   const close = () => {
     setOpened(undefined);
   };
   const opening: Opening = {
-    opened: open,
-    wide,
+    opened,
+    beside,
     onOpen: (chosen) => {
-      setOpened({ ...chosen, query });
+      setOpened((current) => ({ ...chosen, query, pressed: (current?.pressed ?? 0) + 1 }));
     },
     onClose: close,
   };
@@ -261,7 +261,7 @@ function SearchRegion() {
           searchRef={searchRef}
         />
       </Card>
-      {open === undefined || !wide ? null : <EvidenceSheet opened={open} onClose={close} />}
+      {opened === undefined || !beside ? null : <EvidenceSheet opened={opened} onClose={close} />}
     </section>
   );
 }

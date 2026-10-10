@@ -1,7 +1,8 @@
 import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
 
-import { SEARCH_KEYSTROKES as KEY, MATCHES_A_PAGE } from "@/features/knowledge/knowledge-state.ts";
-import { SEARCH_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
+import { SEARCH_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
+import { EVIDENCE_WORDS, SEARCH_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
+import { SAID_OF_KNOWLEDGE } from "@/features/knowledge/refusal-words.ts";
 import { HOMES, KNOWLEDGE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
 
@@ -9,6 +10,7 @@ import { expect, test } from "./browser.ts";
 import {
   aMemberSignedInAt,
   anAddress,
+  keystrokesDismissed,
   keystrokesListed,
   landedAtHome,
   navOf,
@@ -21,6 +23,9 @@ import {
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
+
+/** The read gives at most 20 matches a page. */
+const A_PAGE = 20;
 
 const browse = menuGroupIn(KNOWLEDGE, "browse");
 
@@ -37,6 +42,8 @@ const loadMore = (page: Page) => searchRegion(page).getByRole("button", { name: 
 
 const said = (page: Page) => searchRegion(page).getByRole("status");
 
+const alerted = (page: Page) => searchRegion(page).getByRole("alert");
+
 const passagePanel = (page: Page, title: string) => page.getByRole("dialog", { name: title });
 
 const asked = (query: string): string =>
@@ -44,15 +51,20 @@ const asked = (query: string): string =>
 
 const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
 
+const isAnOpen = (url: URL): boolean => url.pathname.includes("knowledge.open");
+
+/** No document holds this id, so an open of a passage in it reads nothing. */
+const NO_SUCH_DOCUMENT = "01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
+
 /** A page past the first names its cursor in the batched input. */
 const isAFindPastTheFirstPage = (url: URL): boolean =>
   isAFind(url) && (url.searchParams.get("input") ?? "").includes('"cursor"');
 
 const HANDBOOK = "Warehouse handbook";
 
-/** One more than a page, so a second page follows the first. */
+/** Five more than a page, so a second page follows the first. */
 const PALLET_PASSAGES = Array.from(
-  { length: MATCHES_A_PAGE + 5 },
+  { length: A_PAGE + 5 },
   (_, index) => `Pallet bay ${index + 1} takes stock wrapped and labelled before it is racked.`,
 );
 
@@ -151,8 +163,12 @@ test.describe("the Knowledge Search page", () => {
     });
     await page.goto(SEARCH.path);
 
-    await expect(searchRegion(page).getByRole("status")).toHaveText(WORDS.nothingAsked);
+    await expect(said(page)).toHaveText(WORDS.nothingAsked);
     await expect(matchesOf(page)).toHaveCount(0);
+
+    await searchBox(page).fill("   ");
+    await expect(page).toHaveURL(/knowledge\.search=(?:\+|%20){3}/);
+    await expect(said(page)).toHaveText(WORDS.nothingAsked);
     expect(finds, "the page asked for matches with nothing asked").toHaveLength(0);
   });
 
@@ -171,13 +187,13 @@ test.describe("the Knowledge Search page", () => {
     await anAdminAtSearch(page, request, "Dales Stores", [handbookSeeded]);
 
     await searched(page, "pallet");
-    await expect(matchesOf(page)).toHaveCount(MATCHES_A_PAGE);
+    await expect(matchesOf(page)).toHaveCount(A_PAGE);
     await expect(said(page)).toHaveText(WORDS.matched("pallet", true));
     await loadMore(page).click();
 
     await expect(matchesOf(page)).toHaveCount(PALLET_PASSAGES.length);
     await expect(
-      matchesOf(page).nth(MATCHES_A_PAGE),
+      matchesOf(page).nth(A_PAGE),
       "focus did not land on the first new match",
     ).toBeFocused();
     await expect(loadMore(page)).toHaveCount(0);
@@ -186,7 +202,7 @@ test.describe("the Knowledge Search page", () => {
   test("drops the old query's rows when More lands late", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Wharfe Stores", [conceptsSeeded, handbookSeeded]);
     await searched(page, "pallet");
-    await expect(matchesOf(page)).toHaveCount(MATCHES_A_PAGE);
+    await expect(matchesOf(page)).toHaveCount(A_PAGE);
 
     const held = Promise.withResolvers<void>();
     const reachedTheRoute = Promise.withResolvers<void>();
@@ -200,10 +216,18 @@ test.describe("the Knowledge Search page", () => {
 
     await searchBox(page).fill("forklift");
     await expect(said(page)).toHaveText(WORDS.matched("forklift", false));
+    const landed = page.waitForResponse((answered) =>
+      isAFindPastTheFirstPage(new URL(answered.url())),
+    );
     held.resolve();
+    await landed;
+    await page.evaluate(() => new Promise((drawn) => requestAnimationFrame(drawn)));
 
     await expect(matchesOf(page)).toHaveText([/Forklift Licences/]);
     await expect(handbookMatches(page)).toHaveCount(0);
+    // The late page landed in its own search's list, which the next visit to it shows whole.
+    await searchBox(page).fill("pallet");
+    await expect(matchesOf(page)).toHaveCount(PALLET_PASSAGES.length);
   });
 
   test("shows a Viewer no Restricted match and no count", async ({ page, request }) => {
@@ -219,9 +243,7 @@ test.describe("the Knowledge Search page", () => {
     await expect(matchesOf(page).filter({ hasText: "Audit Salary Bands" })).toHaveCount(0);
 
     await page.goto(asked("salary bands"));
-    await expect(searchRegion(page).getByRole("status")).toHaveText(
-      WORDS.noMatches("salary bands"),
-    );
+    await expect(said(page)).toHaveText(WORDS.noMatches("salary bands"));
     await expect(page.locator("body"), "the page shows a number").not.toContainText(/\d/);
   });
 
@@ -244,6 +266,9 @@ test.describe("the Knowledge Search page", () => {
 
     await searchBox(page).click();
     await expect(panel, "the page behind the panel closed it").toBeVisible();
+    await opener.focus();
+    await page.keyboard.press("Escape");
+    await expect(panel, "Escape on the page closed the panel").toBeVisible();
 
     await panel.getByRole("heading", { name: HANDBOOK }).focus();
     await page.keyboard.press("Escape");
@@ -251,32 +276,111 @@ test.describe("the Knowledge Search page", () => {
     await expect(opener).toBeFocused();
   });
 
-  test("opens a passage inline beneath its match at 320 px", async ({ page, request }) => {
-    await anAdminAtSearch(page, request, "Holme Stores", [handbookSeeded]);
-    await page.setViewportSize({ width: 320, height: 720 });
+  test("puts the open panel in tab order after its opener", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtSearch(page, request, "Swale Stores", [handbookSeeded]);
     await searched(page, "pallet");
+    const opener = handbookMatches(page).first().getByRole("button", { name: HANDBOOK });
+    await opener.click();
+    const panel = passagePanel(page, HANDBOOK);
+    const heading = panel.getByRole("heading", { name: HANDBOOK });
+    await expect(heading).toBeFocused();
+    await passesTheAccessibilityGate();
 
-    const first = handbookMatches(page).first();
-    await first.getByRole("button", { name: HANDBOOK }).click();
+    await page.keyboard.press("Tab");
+    await expect(panel.getByRole("button", { name: EVIDENCE_WORDS.close })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(opener, "Tab off the panel did not reach the page").toBeFocused();
+    await expect(panel).toBeVisible();
 
-    const inline = first.getByRole("region", { name: HANDBOOK });
-    await expect(inline).toContainText(PALLET_PASSAGES[0] ?? "");
-    await expect(inline.getByRole("heading", { name: HANDBOOK })).toBeFocused();
-    const sideways = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(sideways, "the page scrolls sideways at 320 px").toBe(0);
+    await opener.press("Enter");
+    await expect(heading).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(opener).toBeFocused();
+
+    await searchBox(page).fill("forklift");
+    await expect(panel, "a new search left the last one's passage open").toHaveCount(0);
+    await expect(searchBox(page)).toBeFocused();
   });
+
+  test("says why a passage went unread, offering a retry", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Wharfe Records", [handbookSeeded]);
+    await searched(page, "pallet");
+    await page.route(isAnOpen, (route) => route.abort());
+    await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
+
+    const panel = passagePanel(page, HANDBOOK);
+    await expect(panel.getByRole("alert")).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
+    await page.unroute(isAnOpen);
+    await panel.getByRole("button", { name: "Retry" }).click();
+    await expect(panel).toContainText(PALLET_PASSAGES[0] ?? "");
+    await expect(panel.getByRole("heading", { name: HANDBOOK })).toBeFocused();
+  });
+
+  test("says a passage it cannot read is not there", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Holme Records", [handbookSeeded]);
+    await searched(page, "pallet");
+    // The api's own refusal, asked for a passage in a document nobody holds.
+    await page.route(isAnOpen, (route) =>
+      route.continue({
+        url: route
+          .request()
+          .url()
+          .replace(/[0-9A-Z]{26}(?=(?:\/|%2F)chars)/, NO_SUCH_DOCUMENT),
+      }),
+    );
+    await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
+
+    const panel = passagePanel(page, HANDBOOK);
+    await expect(panel.getByRole("alert")).toHaveText(sentenceOf(SAID_OF_KNOWLEDGE["not-found"]));
+    await expect(panel).not.toContainText(PALLET_PASSAGES[0] ?? "");
+  });
+
+  for (const width of [320, 1024]) {
+    test(`opens a passage inline beneath its match at ${String(width)} px`, async ({
+      page,
+      request,
+    }) => {
+      await anAdminAtSearch(page, request, `Holme Stores ${String(width)}`, [handbookSeeded]);
+      await page.setViewportSize({ width, height: 720 });
+      await searched(page, "pallet");
+
+      const first = handbookMatches(page).first();
+      const opener = first.getByRole("button", { name: HANDBOOK });
+      await opener.click();
+      const inline = first.getByRole("region", { name: HANDBOOK });
+      await expect(inline).toContainText(PALLET_PASSAGES[0] ?? "");
+      await expect(inline.getByRole("heading", { name: HANDBOOK })).toBeFocused();
+      await expect(passagePanel(page, HANDBOOK)).toHaveCount(0);
+      const sideways = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(sideways, `the page scrolls sideways at ${String(width)} px`).toBe(0);
+
+      await page.keyboard.press("Escape");
+      await expect(inline).toHaveCount(0);
+      await expect(opener).toBeFocused();
+      await expect(opener).toHaveAttribute("aria-expanded", "false");
+
+      await opener.click();
+      await inline.getByRole("button", { name: EVIDENCE_WORDS.close }).click();
+      await expect(inline).toHaveCount(0);
+      await expect(opener).toBeFocused();
+    });
+  }
 
   test("says nothing matches, for stop words alone too", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Ouse Archives", [conceptsSeeded]);
 
     await searchBox(page).fill("zzz-nowhere");
-    await expect(searchRegion(page).getByRole("status")).toHaveText(WORDS.noMatches("zzz-nowhere"));
+    await expect(said(page)).toHaveText(WORDS.noMatches("zzz-nowhere"));
     await expect(matchesOf(page)).toHaveCount(0);
 
     await searchBox(page).fill("the and of");
-    await expect(searchRegion(page).getByRole("status")).toHaveText(WORDS.noMatches("the and of"));
+    await expect(said(page)).toHaveText(WORDS.noMatches("the and of"));
   });
 
   test("offers a retry when the first read fails", async ({ page, request }) => {
@@ -285,31 +389,34 @@ test.describe("the Knowledge Search page", () => {
 
     await searchBox(page).fill("pallet");
     // The query asks twice more before it answers, as it does of any failure with no word.
-    await expect(searchRegion(page).getByRole("alert")).toHaveText(
-      sentenceOf(NO_RESPONSE_TO_A_READ),
-    );
+    await expect(alerted(page)).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
     await page.unroute(isAFind);
     await searchRegion(page).getByRole("button", { name: "Retry" }).click();
-    await expect(matchesOf(page)).toHaveCount(MATCHES_A_PAGE);
-    await expect(searchRegion(page).getByRole("alert")).toHaveCount(0);
+    await expect(matchesOf(page)).toHaveCount(A_PAGE);
+    await expect(alerted(page)).toHaveCount(0);
   });
 
   test("keeps the shown rows when More fails, and retries it", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Aire Stores", [handbookSeeded]);
     await searched(page, "pallet");
-    await expect(matchesOf(page)).toHaveCount(MATCHES_A_PAGE);
+    await expect(matchesOf(page)).toHaveCount(A_PAGE);
     await page.route(isAFindPastTheFirstPage, (route) => route.abort());
 
     await loadMore(page).click();
-    await expect(searchRegion(page).getByRole("alert")).toHaveText(
-      sentenceOf(NO_RESPONSE_TO_A_READ),
-    );
-    await expect(matchesOf(page)).toHaveCount(MATCHES_A_PAGE);
+    await expect(alerted(page)).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
+    await expect(matchesOf(page)).toHaveCount(A_PAGE);
+
+    // A retry that fails again says so again: the alert leaves while it runs.
+    const retry = searchRegion(page).getByRole("button", { name: "Retry" });
+    await retry.click();
+    await expect(alerted(page)).toHaveCount(0);
+    await expect(alerted(page)).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
+    await expect(retry).toBeFocused();
 
     await page.unroute(isAFindPastTheFirstPage);
     await searchRegion(page).getByRole("button", { name: "Retry" }).click();
     await expect(matchesOf(page)).toHaveCount(PALLET_PASSAGES.length);
-    await expect(searchRegion(page).getByRole("alert")).toHaveCount(0);
+    await expect(alerted(page)).toHaveCount(0);
   });
 
   test("renders matches within the list's budget", async ({ page, request }) => {
@@ -318,7 +425,7 @@ test.describe("the Knowledge Search page", () => {
     // A fresh document, so no page of matches is already in the page's cache.
     const started = Date.now();
     await page.goto(asked("pallet"));
-    await expect(matchesOf(page)).toHaveCount(MATCHES_A_PAGE);
+    await expect(matchesOf(page)).toHaveCount(A_PAGE);
     const elapsed = Date.now() - started;
 
     test.info().annotations.push({ type: "search", description: `${elapsed} ms` });
@@ -345,14 +452,13 @@ test.describe("the Knowledge Search page", () => {
     const keystrokes = await keystrokesListed(page, SEARCH.name);
     for (const keystroke of Object.values(KEY))
       await expect(keystrokes).toContainText(keystroke.action);
-    await page.keyboard.press("Escape");
-    await expect(keystrokes).toHaveCount(0);
+    await keystrokesDismissed(page, keystrokes);
 
     await page.keyboard.press(KEY.search.key);
     await expect(searchBox(page)).toBeFocused();
     await page.keyboard.type("pallet");
     await expect(page).toHaveURL(/knowledge\.search=pallet/);
-    await expect(matchesOf(page)).toHaveCount(MATCHES_A_PAGE);
+    await expect(matchesOf(page)).toHaveCount(A_PAGE);
 
     await page.keyboard.press("Tab");
     const opener = handbookMatches(page).first().getByRole("button", { name: HANDBOOK });
@@ -366,7 +472,7 @@ test.describe("the Knowledge Search page", () => {
 
     await page.keyboard.press(KEY.more.key);
     await expect(matchesOf(page)).toHaveCount(PALLET_PASSAGES.length);
-    await expect(matchesOf(page).nth(MATCHES_A_PAGE)).toBeFocused();
+    await expect(matchesOf(page).nth(A_PAGE)).toBeFocused();
 
     await expect(searchRegion(page)).toMatchAriaSnapshot(`
       - region "${SEARCH.name}":
@@ -396,7 +502,7 @@ test.describe("the Knowledge Search page", () => {
       await expect(page).toHaveURL(new RegExp(`${SEARCH.path}$`));
       await expect(page.getByRole("heading", { level: 1, name: browse.name })).toBeVisible();
       await expect(navOf(page, KNOWLEDGE).getByRole("link")).toHaveText([SEARCH.name]);
-      await expect(searchRegion(page).getByRole("status")).toHaveText(WORDS.nothingAsked);
+      await expect(said(page)).toHaveText(WORDS.nothingAsked);
     });
   }
 });

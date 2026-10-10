@@ -33,5 +33,3 @@ export const usePassage = (locator: string) => {
   const api = useTRPC();
   return useQuery(api.knowledge.open.queryOptions({ locator }));
 };
-
-export type PassageRead = ReturnType<typeof usePassage>;

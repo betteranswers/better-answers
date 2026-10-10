@@ -78,6 +78,17 @@
     }
   }
 
+  /* Below this a panel beside the page would cover the page's content, so it opens inline. */
+  :root {
+    --room-beside: 1;
+  }
+
+  @media (width < theme(--breakpoint-xl)) {
+    :root {
+      --room-beside: 0;
+    }
+  }
+
   /*
    * The band's whole height, which its outcome row grows. The wide band measures itself into it;
    * until then, and when narrow, it is the token's.

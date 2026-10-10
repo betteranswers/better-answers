@@ -234,8 +234,8 @@ function LoadMore(properties: { readonly more: More }) {
   };
   return (
     <nav aria-label={label} className={BAND}>
-      {/* Its slot stays when empty, so the button keeps its node, and focus, as it turns to Retry. */}
-      {failed === undefined ? null : (
+      {/* Unmounted while loading, so a repeat failure is heard again; its slot keeps the button, and focus. */}
+      {failed === undefined || loading ? null : (
         <p role="alert" className="mb-2">
           <SaidOnceMounted>{failed}</SaidOnceMounted>
         </p>

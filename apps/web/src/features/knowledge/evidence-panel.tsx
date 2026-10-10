@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useEffectEvent, useId, useRef, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useId,
+  useRef,
+  type KeyboardEvent as KeyPress,
+  type RefObject,
+} from "react";
 
 import { ListRead } from "@/shared/list-pages.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -16,6 +24,8 @@ export type Opened = {
   readonly title: string;
   readonly sensitivity: string;
   readonly openerId: string;
+  /** Counts its opener's presses, so pressing it again brings focus back to the panel. */
+  readonly pressed: number;
 };
 
 /** Mounted afresh for each source, so a second one chosen with the panel open takes focus too. */
@@ -25,6 +35,18 @@ const focusOnMount = (heading: HTMLHeadingElement | null): void => {
 
 const returnFocus = (opened: Opened): void => {
   document.getElementById(opened.openerId)?.focus();
+};
+
+const TABBABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Radix loops Tab inside a dialog that is not modal too, so Tab off either end leaves it. */
+const tabsOff = (event: KeyPress<HTMLElement>): boolean => {
+  if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return false;
+  const tabbable = [...event.currentTarget.querySelectorAll<HTMLElement>(TABBABLE)];
+  const at = document.activeElement;
+  if (event.shiftKey) return at === tabbable[0] || !tabbable.some((each) => each === at);
+  return at === tabbable.at(-1);
 };
 
 export function SensitivityTag(properties: { readonly sensitivity: string }) {
@@ -120,12 +142,22 @@ export function EvidenceSheet(properties: {
         onInteractOutside={(event) => {
           event.preventDefault();
         }}
+        // Beside its opener in the tab order: Tab off the panel lands on the match that opened it.
+        onKeyDown={(event) => {
+          if (!tabsOff(event)) return;
+          event.preventDefault();
+          returnFocus(opened);
+        }}
         // Escape is the panel's only while focus is in it; elsewhere it is the control's own.
         onEscapeKeyDown={(event) => {
           if (!content.current?.contains(document.activeElement)) event.preventDefault();
         }}
       >
-        <PanelBody key={opened.key} opened={opened} at={{ kind: "sheet" }} />
+        <PanelBody
+          key={`${opened.key}:${String(opened.pressed)}`}
+          opened={opened}
+          at={{ kind: "sheet" }}
+        />
       </SheetContent>
     </Sheet>
   );
@@ -160,7 +192,11 @@ export function EvidenceInline(properties: {
 
   return (
     <section ref={region} aria-labelledby={headingId} className="mt-3 border-t border-border pt-3">
-      <PanelBody key={opened.key} opened={opened} at={{ kind: "inline", headingId }} />
+      <PanelBody
+        key={`${opened.key}:${String(opened.pressed)}`}
+        opened={opened}
+        at={{ kind: "inline", headingId }}
+      />
       <Button variant="outline" size="sm" className="mt-3" onClick={close}>
         {EVIDENCE_WORDS.close}
       </Button>
