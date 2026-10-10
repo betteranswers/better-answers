@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  BETTER_AUTH_RATE_LIMIT,
   CONSENT_WORDS,
   OAUTH_SCOPES,
   REFRESH_TOKEN_LIFETIME_SECONDS,
@@ -43,7 +44,9 @@ import { webSignedIn } from "./web-client.ts";
 const json = async <T>(response: Response, shape: z.ZodType<T>): Promise<T> =>
   shape.parse(await response.json());
 
-const { clock, stopTheClock } = aStoppableClock();
+const { clock, stopTheClock, moveTheClock } = aStoppableClock();
+
+const MINUTE_MS = 60_000;
 
 let app: TestApp;
 
@@ -917,6 +920,11 @@ describe("the limits", () => {
   /** Every count by client address, each with one request to a route it counts and its ceiling. */
   const COUNTS = {
     trpc: { name: "tRPC", max: 120, ask: (client) => client.fetch("/trpc/session.member") },
+    identity: {
+      name: "Better Auth's own endpoints",
+      max: 120,
+      ask: (client) => client.fetch("/get-session"),
+    },
     oauth: { name: "the OAuth paths", max: 60, ask: (client) => client.fetch("/oauth2/authorize") },
     mcp: {
       name: "a call with no bearer",
@@ -941,7 +949,11 @@ describe("the limits", () => {
     },
   } satisfies Record<AddressScope, Counted>;
 
-  const ROUTES: readonly Counted[] = Object.values(COUNTS);
+  const ROUTES = Object.entries(COUNTS).map(([group, counted]) => ({ group, ...counted }));
+
+  /** What a count by address logged since `from`: each line whole, as the logger wrote it. */
+  const ceilingsMetSince = (from: number) =>
+    app.logs.slice(from).filter((line) => line["event"] === "ingress.address_ceiling_met");
 
   it.each(ROUTES)("counts $name apart from every other", async (flooded) => {
     const client = app.client();
@@ -955,6 +967,59 @@ describe("the limits", () => {
     }
     expect(others).not.toContain(429);
     expect((await client.fetch("/.well-known/oauth-protected-resource/mcp")).status).toBe(200);
+  });
+
+  it.each(ROUTES)("logs once a window for $name", async (counted) => {
+    const client = app.client();
+    const from = app.logs.length;
+    stopTheClock();
+
+    await onePast(() => counted.ask(client), counted.max - 1);
+    const under = ceilingsMetSince(from).length;
+    await counted.ask(client);
+    const atTheFirst = ceilingsMetSince(from).length;
+    for (let later = 0; later < 10; later += 1) await counted.ask(client);
+    const afterTen = ceilingsMetSince(from).length;
+    moveTheClock(MINUTE_MS);
+    await onePast(() => counted.ask(client), counted.max);
+
+    expect([under, atTheFirst, afterTen]).toEqual([0, 1, 1]);
+    expect(ceilingsMetSince(from).map((line) => line["group"])).toEqual([
+      counted.group,
+      counted.group,
+    ]);
+  });
+
+  it("logs whether the address is Anthropic's, and never the address", async () => {
+    const theirs = app.client("160.79.104.1");
+    const another = app.client("160.79.112.1");
+    const from = app.logs.length;
+    stopTheClock();
+
+    await onePast(() => theirs.fetch("/oauth2/token", { method: "POST" }), 60);
+    await onePast(() => another.fetch("/oauth2/token", { method: "POST" }), 60);
+    await onePast(() => theirs.json("/mcp", { jsonrpc: "2.0", id: 1, method: "tools/list" }), 60);
+
+    const lines = ceilingsMetSince(from);
+    expect(lines.map(({ group, anthropicRange }) => ({ group, anthropicRange }))).toEqual([
+      { group: "oauth", anthropicRange: true },
+      { group: "oauth", anthropicRange: false },
+      { group: "mcp", anthropicRange: true },
+    ]);
+    expect(Object.keys(lines[0] ?? {}).toSorted()).toEqual([
+      "anthropicRange",
+      "event",
+      "group",
+      "hostname",
+      "level",
+      "module",
+      "msg",
+      "pid",
+      "time",
+    ]);
+    const everyLine = JSON.stringify(app.logs.slice(from));
+    expect(everyLine).not.toContain(theirs.ip);
+    expect(everyLine).not.toContain(another.ip);
   });
 
   it("leaves a link's ten sign-ins after its thirty reads", async () => {
@@ -1072,6 +1137,14 @@ describe("the limits", () => {
     return held.rows.map((row) => row.key.slice(ip.length + 1));
   };
 
+  /** The api's refusal, with its wait, and no count of Better Auth's for the address. */
+  const isOursAlone = async (past: Response, ip: string): Promise<void> => {
+    expect(past.status).toBe(429);
+    expect(Number(past.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(await past.json()).toMatchObject({ error: "too_many_requests" });
+    expect(await countedByBetterAuth(ip)).toEqual([]);
+  };
+
   it.each(OAUTH_PATHS)("refuses $path in our words at the 61st only", async ({ path, method }) => {
     const client = app.client();
     stopTheClock();
@@ -1083,22 +1156,7 @@ describe("the limits", () => {
     const past = await client.fetch(path, { method });
 
     expect(statuses).not.toContain(429);
-    expect(past.status).toBe(429);
-    expect(Number(past.headers.get("retry-after"))).toBeGreaterThan(0);
-    expect(await past.json()).toMatchObject({ error: "too_many_requests" });
-    expect(await countedByBetterAuth(client.ip)).toEqual([]);
-  });
-
-  it("leaves Better Auth no count where the api counts", async () => {
-    const client = app.client();
-    const counted = mountedPaths(authOver(app)).filter(
-      (path) => path.startsWith("/oauth2/") || path === "/jwks",
-    );
-
-    for (const path of counted) await client.fetch(path);
-
-    expect(counted).toContain("/oauth2/end-session/confirm");
-    expect(await countedByBetterAuth(client.ip)).toEqual([]);
+    await isOursAlone(past, client.ip);
   });
 
   it("refuses a client registration outright, before any count", async () => {
@@ -1109,6 +1167,114 @@ describe("the limits", () => {
     expect(refused.status).toBe(403);
     expect(await refused.json()).toMatchObject({ error: "access_denied" });
     expect(await countedByBetterAuth(client.ip)).toEqual([]);
+  });
+
+  /** The route group the api counted an address under, if any. */
+  const countedByTheApi = async (ip: string): Promise<string[]> => {
+    const held = await app.database.superuser.query<{ key: string }>(
+      "SELECT key FROM ingress_counter WHERE scope = 'ip' AND key LIKE $1 ORDER BY key",
+      [`%:${ip}`],
+    );
+    return held.rows.map((row) => row.key.slice(0, -(ip.length + 1)));
+  };
+
+  it("refuses a steady session read at its ceiling only", async () => {
+    const client = app.client();
+    const read = (): Promise<Response> => client.fetch("/get-session");
+    stopTheClock();
+
+    const first = await onePast(read, 109);
+    moveTheClock(MINUTE_MS);
+    const second = await onePast(read, 119);
+    const past = await read();
+
+    expect([...first, ...second]).not.toContain(429);
+    await isOursAlone(past, client.ip);
+  });
+
+  it("refuses no page, however often it is loaded", async () => {
+    const client = app.client();
+
+    const signIn = await onePast(() => client.fetch("/sign-in"), 4);
+    const another = await onePast(() => client.fetch("/sources"), 100);
+    const besideAnEndpoint = [
+      await client.fetch("/email-otp/no-such-path"),
+      await client.fetch("/forget-password/no-such-path"),
+    ].map((answer) => answer.status);
+
+    expect([...signIn, ...another, ...besideAnEndpoint]).not.toContain(429);
+    expect(await countedByBetterAuth(client.ip)).toEqual([]);
+    expect(await countedByTheApi(client.ip)).toEqual([]);
+  });
+
+  /** Every path Better Auth's limiter keeps: each takes or sends an emailed code. */
+  const EMAIL_CODE_PATHS = [
+    "/email-otp/change-email",
+    "/email-otp/check-verification-otp",
+    "/email-otp/request-email-change",
+    "/email-otp/request-password-reset",
+    "/email-otp/reset-password",
+    "/email-otp/send-verification-otp",
+    "/email-otp/verify-email",
+    "/forget-password/email-otp",
+    "/sign-in/email-otp",
+  ];
+
+  const takesOrSendsACode = (path: string): boolean =>
+    path === "/sign-in/email-otp" ||
+    path.startsWith("/email-otp/") ||
+    path.startsWith("/forget-password/");
+
+  const counterExpectedFor = (path: string): string => {
+    if (takesOrSendsACode(path)) return "Better Auth";
+    if (path.startsWith("/.well-known/")) return "none";
+    return path.startsWith("/oauth2/") || path === "/jwks" ? "oauth" : "identity";
+  };
+
+  it("gives each path Better Auth mounts its one counter", async () => {
+    const counters: { path: string; counter: string }[] = [];
+
+    for (const path of mountedPaths(authOver(app))) {
+      const client = app.client();
+      const asked = path.replaceAll(/:[a-z_]+/g, "any");
+      await client.fetch(asked);
+      const theirs = (await countedByBetterAuth(client.ip)).map(() => "Better Auth");
+      const ours = await countedByTheApi(client.ip);
+      counters.push({ path, counter: [...theirs, ...ours].join(" and ") || "none" });
+    }
+
+    expect(counters).toEqual(
+      counters.map(({ path }) => ({ path, counter: counterExpectedFor(path) })),
+    );
+    expect(
+      counters.filter(({ counter }) => counter === "Better Auth").map(({ path }) => path),
+    ).toEqual(EMAIL_CODE_PATHS);
+    expect(counters.map(({ path }) => path)).toContain("/oauth2/end-session/confirm");
+  });
+
+  it("keeps Better Auth's limiter on mounted paths only", () => {
+    const kept = Object.entries(BETTER_AUTH_RATE_LIMIT.customRules)
+      .filter(([, rule]) => rule !== false)
+      .map(([path]) => path);
+
+    expect(kept.toSorted()).toEqual(EMAIL_CODE_PATHS);
+    expect(mountedPaths(authOver(app))).toEqual(expect.arrayContaining(EMAIL_CODE_PATHS));
+  });
+
+  it("answers no endpoint under a spelling it does not count", async () => {
+    const client = app.client();
+
+    const spelt = [
+      await client.fetch("/get-session/"),
+      await client.fetch("//get-session"),
+      await client.fetch("/GET-SESSION"),
+    ].map((answer) => answer.status);
+    const counted = await countedByTheApi(client.ip);
+    const asMounted = await client.fetch("/get-session");
+
+    expect(spelt).toEqual([404, 404, 404]);
+    expect(counted).toEqual([]);
+    expect(asMounted.status).toBe(200);
   });
 
   it("leaves an email-code flood to Better Auth's limiter and words", async () => {

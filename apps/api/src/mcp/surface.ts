@@ -16,7 +16,6 @@ import type { z } from "zod";
 import { err, type Clock } from "@better-answers/core/kernel";
 import {
   consumeCall,
-  consumeIngress,
   folded,
   readWorkspaceConfig,
   withPrincipal,
@@ -35,7 +34,7 @@ import {
   MCP_UNAUTHENTICATED_IP_RULE,
 } from "../auth/constants.ts";
 import { bearerOf } from "../auth/verify.ts";
-import { addressKeyOf, tooManyRequests } from "../ingress/limits.ts";
+import { countByAddress, tooManyRequests } from "../ingress/limits.ts";
 import { refusalLogged, refusalOf, type RefusalAnswer } from "../refusal.ts";
 import { crossing } from "./crossing.ts";
 import type { Entry } from "./entries/define.ts";
@@ -136,13 +135,7 @@ export const createMcpSurface = (
   });
 
   const flooded = async (request: Request): Promise<Response | undefined> => {
-    const flood = await consumeIngress(
-      deps.door,
-      "ip",
-      addressKeyOf("mcp", request.headers),
-      MCP_UNAUTHENTICATED_IP_RULE,
-      deps.clock.now(),
-    );
+    const flood = await countByAddress(deps, MCP_UNAUTHENTICATED_IP_RULE, "mcp", request.headers);
     return flood.allowed ? undefined : tooManyRequests(flood.retryAfterSeconds, CEILING_MESSAGE);
   };
 

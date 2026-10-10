@@ -570,8 +570,6 @@ export const createAuth = (deps: AuthDependencies) => {
     rateLimit: {
       enabled: true,
       storage: "database",
-      window: BETTER_AUTH_RATE_LIMIT.window,
-      max: BETTER_AUTH_RATE_LIMIT.max,
       customRules: { ...BETTER_AUTH_RATE_LIMIT.customRules },
     },
     advanced: {

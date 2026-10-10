@@ -40,7 +40,11 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
 
   routes.use(
     `${TRPC_ENDPOINT}/*`,
-    limitByIp(deps.doors.postgres, TRPC_IP_RULE, deps.doors.clock, "trpc"),
+    limitByIp(
+      { door: deps.doors.postgres, clock: deps.doors.clock, logger: deps.logger },
+      TRPC_IP_RULE,
+      "trpc",
+    ),
   );
   routes.use(
     `${TRPC_ENDPOINT}/*`,

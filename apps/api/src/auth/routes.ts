@@ -19,10 +19,12 @@ import { mountTheAuthenticator } from "./authenticator.ts";
 import { mountTheConfirm } from "./confirm.ts";
 import {
   BETTER_AUTH_RATE_LIMIT,
+  countedByBetterAuth,
   DISCOVERY_CACHE_CONTROL,
   DISCOVERY_PATHS,
   EMAIL_CODE_EMAIL_RULE,
   EMAIL_CODE_LIFETIME_SECONDS,
+  IDENTITY_IP_RULE,
   MCP_SCOPES,
   OAUTH_IP_RULE,
   PAGE_IP_RULE,
@@ -35,6 +37,7 @@ import {
   SIGN_IN_LINK_SIGN_IN_PATH,
   SIGN_IN_LINK_TOKEN_RULE,
 } from "./constants.ts";
+import { mountedPaths } from "./endpoints.ts";
 import {
   DEAD_LINK,
   hashOf,
@@ -383,11 +386,11 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
   });
   routes.use(
     SIGN_IN_LINK_DESCRIBE_PATH,
-    limitByIp(door, SIGN_IN_LINK_DESCRIBE_IP_RULE, clock, "sign-in-link-read"),
+    limitByIp(deps, SIGN_IN_LINK_DESCRIBE_IP_RULE, "sign-in-link-read"),
   );
   routes.use(
     SIGN_IN_LINK_SIGN_IN_PATH,
-    limitByIp(door, SIGN_IN_LINK_SIGN_IN_IP_RULE, clock, "sign-in-link-sign-in"),
+    limitByIp(deps, SIGN_IN_LINK_SIGN_IN_IP_RULE, "sign-in-link-sign-in"),
   );
   routes.use("/sign-in-link/*", sameOriginOnly(publicUrl));
   routes.use("/sign-in-link/*", async (context, next) => {
@@ -415,6 +418,13 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     return signInBy(context, token, link.use);
   });
 };
+
+/** Better Auth's endpoints that its own limiter does not keep and no other route group counts. */
+const countedAsIdentity = (path: string): boolean =>
+  !countedByBetterAuth(path) &&
+  !path.startsWith("/oauth2/") &&
+  path !== "/jwks" &&
+  !path.startsWith("/.well-known/");
 
 export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   const routes = new Hono();
@@ -453,8 +463,13 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
       }
     });
   }
-  routes.use("/oauth2/*", limitByIp(door, OAUTH_IP_RULE, clock, "oauth"));
-  routes.use("/jwks", limitByIp(door, OAUTH_IP_RULE, clock, "oauth"));
+  routes.use("/oauth2/*", limitByIp(deps, OAUTH_IP_RULE, "oauth"));
+  routes.use("/jwks", limitByIp(deps, OAUTH_IP_RULE, "oauth"));
+  /** Read off the instance, so an endpoint a plugin adds on an upgrade is counted too. */
+  const limitIdentity = limitByIp(deps, IDENTITY_IP_RULE, "identity");
+  for (const path of mountedPaths(auth).filter(countedAsIdentity)) {
+    routes.use(path, limitIdentity);
+  }
   for (const path of [
     "/.well-known/oauth-protected-resource",
     "/.well-known/oauth-protected-resource/mcp",
@@ -470,7 +485,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   mountThePasskeys(routes, deps);
   mountTheConfirm(routes, deps);
 
-  routes.use("/consent", limitByIp(door, PAGE_IP_RULE, clock, "consent"));
+  routes.use("/consent", limitByIp(deps, PAGE_IP_RULE, "consent"));
   routes.use("/consent", sameOriginOnly(publicUrl));
   routes.use("/consent", navigationOnly);
 
