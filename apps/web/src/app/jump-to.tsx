@@ -8,6 +8,9 @@ import { Icon, type IconName } from "@/shared/icon.tsx";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import {
   detailAt,
+  KNOWLEDGE,
+  menuGroupIn,
+  pageNamed,
   placeAt,
   pagesOf,
   type MenuGroup,
@@ -26,7 +29,9 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui/dialog.tsx";
 import { nameOrAddress } from "@/shared/words.ts";
 
-import { findWhat, JUMP_TO, nothingMatches } from "./words.ts";
+import { findWhat, JUMP_TO, nothingMatches, searchFor } from "./words.ts";
+
+const SEARCH = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
 
 /** Where focus goes once chosen: a place hands it to the page, an action to its own dialog. */
 type Kind = "place" | "member" | "action";
@@ -146,6 +151,33 @@ export const matching = (groups: readonly JumpGroup[], typed: string): readonly 
       jumps: group.jumps.filter((jump) => terms.every((term) => jump.words.includes(term))),
     }))
     .filter((group) => group.jumps.length > 0);
+};
+
+/**
+ * What is typed, asked of Search. Never a match, so it is listed apart, and only for a reader
+ * whose tree holds Search.
+ */
+export const searchGroup = (
+  tree: VisibleTree,
+  typed: string,
+  here: Here,
+): JumpGroup | undefined => {
+  const words = typed.trim();
+  const place = placeAt(tree.areas, SEARCH.path);
+  if (words === "" || place === undefined) return undefined;
+  return {
+    heading: place.area.name,
+    jumps: [
+      jumpOf({
+        value: "search",
+        name: searchFor(words),
+        said: undefined,
+        icon: SEARCH.icon,
+        to: askingHere(here, SEARCH.path, "search", words),
+        kind: "place",
+      }),
+    ],
+  };
 };
 
 /** `unasked` for a reader who may not see People, whose dialog reads no members. */
@@ -279,8 +311,10 @@ function JumpList(
   const [typed, setTyped] = useState("");
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const searchStr = useRouterState({ select: (state) => state.location.searchStr });
-  const every = jumpsIn(properties.tree, properties.members, { pathname, searchStr });
+  const here = { pathname, searchStr };
+  const every = jumpsIn(properties.tree, properties.members, here);
   const shown = matching(every, typed);
+  const search = searchGroup(properties.tree, typed, here);
   const lines = linesOf(
     read,
     shown.reduce((count, group) => count + group.jumps.length, 0),
@@ -312,7 +346,7 @@ function JumpList(
         {lines.refused}
       </p>
       <CommandList label={JUMP_TO.list} className="max-h-[min(24rem,60vh)]">
-        {shown.map((group) => (
+        {[...shown, ...(search === undefined ? [] : [search])].map((group) => (
           <CommandGroup key={group.heading} heading={group.heading}>
             {group.jumps.map((jump) => (
               <JumpItem key={jump.value} jump={jump} onChoose={properties.onChoose} />

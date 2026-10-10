@@ -1,9 +1,10 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { jumpsIn, linesOf, matching, type JumpGroup } from "@/app/jump-to.tsx";
+import { jumpsIn, linesOf, matching, searchGroup, type JumpGroup } from "@/app/jump-to.tsx";
 import { findWhat, JUMP_TO, nothingMatches } from "@/app/words.ts";
 import {
+  CONSOLE,
   INVITE_A_PERSON,
   readerOf,
   AREAS,
@@ -227,6 +228,51 @@ describe("what typing leaves", () => {
 
   it("finds nothing by an unbuilt page's name", () => {
     expect(matching(jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT), "Signals")).toEqual([]);
+  });
+});
+
+describe("what jump-to offers to search", () => {
+  /** Each row's name and where it leads, under its heading. */
+  const offered = (group: JumpGroup | undefined) =>
+    group === undefined
+      ? undefined
+      : [group.heading, group.jumps.map((jump) => [jump.name, jump.to])];
+
+  it("asks Search for what was typed", () => {
+    expect(offered(searchGroup(treeOf("Viewer"), "audit logs", AT_ROOT))).toEqual([
+      "Knowledge",
+      [["Search for “audit logs”", "/knowledge/search?search=audit+logs"]],
+    ]);
+  });
+
+  it("offers no search with nothing typed", () => {
+    expect(searchGroup(treeOf("Viewer"), "", AT_ROOT)).toBeUndefined();
+  });
+
+  it("offers no search for spaces alone", () => {
+    expect(searchGroup(treeOf("Viewer"), "  \t ", AT_ROOT)).toBeUndefined();
+  });
+
+  it("offers no search to a reader with no Search", () => {
+    const operators = visibleTo(readerOf("operator"), [CONSOLE]);
+
+    expect(searchGroup(treeOf("Admin", STUB), "audit logs", AT_ROOT)).toBeUndefined();
+    expect(searchGroup(operators, "audit logs", AT_ROOT)).toBeUndefined();
+  });
+
+  it("drops the spaces around what was typed", () => {
+    expect(offered(searchGroup(treeOf("Admin"), "  audit logs ", AT_ROOT))).toEqual([
+      "Knowledge",
+      [["Search for “audit logs”", "/knowledge/search?search=audit+logs"]],
+    ]);
+  });
+
+  it("keeps Search's own query when asked from Search", () => {
+    const onSearch = { pathname: "/knowledge/search", searchStr: "?knowledge.search=forklift" };
+
+    expect(offered(searchGroup(treeOf("Editor"), "audit", onSearch))?.[1]).toEqual([
+      ["Search for “audit”", "/knowledge/search?knowledge.search=forklift&search=audit"],
+    ]);
   });
 });
 

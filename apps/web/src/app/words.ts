@@ -45,6 +45,9 @@ export const JUMP_TO = {
 
 export const nothingMatches = (typed: string): string => `Nothing matches “${typed}”.`;
 
+/** The one row that leaves the list: it takes what is typed to Knowledge's Search. */
+export const searchFor = (typed: string): string => `Search for “${typed}”`;
+
 const EITHER = new Intl.ListFormat("en-GB", { type: "disjunction" });
 
 /** Names only the kinds this reader can find, so a Viewer is not promised members. */
@@ -68,7 +71,7 @@ const WHILE_UNBUILT: ReadonlyMap<Page, string> = new Map([
 export const unbuiltLineOf = (home: Page): string =>
   WHILE_UNBUILT.get(home) ?? "This page is on its way.";
 
-/** Claude is the one assistant admitted. Revisit or remove once S2a's Search or S2b's Ask is built. */
+/** Claude is the one assistant admitted. Revisit or remove once S2b's Ask is built. */
 export const CONNECT_ASSISTANT = {
   heading: "Connect Claude as your assistant",
   steps: [

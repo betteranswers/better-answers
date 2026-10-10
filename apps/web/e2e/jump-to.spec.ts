@@ -1,9 +1,12 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { JUMP_TO, nothingMatches } from "@/app/words.ts";
+import { JUMP_TO, nothingMatches, searchFor } from "@/app/words.ts";
+import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import {
   ASK,
+  CONSOLE,
   CONTROL_CENTRE,
+  KNOWLEDGE,
   menuGroupIn,
   headingOf,
   INVITE_A_PERSON,
@@ -16,8 +19,11 @@ import {
   aMemberSignedInAt,
   anAddress,
   clockTheNextKey,
+  markTheOperator,
   person,
   provision,
+  seedConcepts,
+  signedInAtHome,
   signIn,
 } from "./harness.ts";
 
@@ -33,6 +39,10 @@ const MODELS_AND_SPEND = pageNamed(MODELS, "Models and spend");
 
 /** Declared and never built, so no reader may find it. */
 const SIGNALS = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Signals");
+
+const SEARCH = pageNamed(menuGroupIn(KNOWLEDGE, "browse"), "Search");
+
+const EVERY_WORKSPACE = pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every workspace");
 
 const NARROW = { width: 320, height: 720 };
 
@@ -52,6 +62,9 @@ const optionOf = (page: Page, name: string | RegExp) =>
 
 const groupOf = (page: Page, name: string) => dialogOf(page).getByRole("group", { name });
 
+/** The row that takes what is typed to Search, listed under its area's name. */
+const searchRowOf = (page: Page) => groupOf(page, KNOWLEDGE.name).getByRole("option");
+
 const saidIn = (page: Page) => dialogOf(page).getByRole("status");
 
 const refusedIn = (page: Page) => dialogOf(page).getByRole("alert");
@@ -69,6 +82,16 @@ const memberRows = (page: Page): Locator =>
 
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const theMembersRead = (url: URL) => url.pathname.includes("members.list");
+
+/** Signed in on a page that reads no members, so jump-to's own read is the first. */
+const signedInOffMembers = async (page: Page, api: APIRequestContext, email: string) => {
+  await page.goto("/sign-in");
+  await signIn(page, api, email);
+  await page.goto(MODELS_AND_SPEND.path);
+  await expect(
+    page.getByRole("heading", { level: 1, name: headingOf(MODELS_AND_SPEND) }),
+  ).toBeVisible();
+};
 
 type Teammate = { readonly address: string; readonly id: string };
 
@@ -90,12 +113,7 @@ const anAdminWithATeam = async (page: Page, api: APIRequestContext, name: string
   const [priya, tom] = joined;
   if (priya === undefined || tom === undefined) throw new Error("the team was joined");
   const team: Team = { priya, tom };
-  await page.goto("/sign-in");
-  await signIn(page, api, email);
-  await page.goto(MODELS_AND_SPEND.path);
-  await expect(
-    page.getByRole("heading", { level: 1, name: headingOf(MODELS_AND_SPEND) }),
-  ).toBeVisible();
+  await signedInOffMembers(page, api, email);
   return team;
 };
 
@@ -121,7 +139,8 @@ test("hides People from a Viewer, reading no members", async ({ page, request })
   await typed(page, "people");
 
   await expect(saidIn(page)).toHaveText(nothingMatches("people"));
-  await expect(dialogOf(page).getByRole("option")).toHaveCount(0);
+  // Search's row is no match, so it stands beside the line that says nothing matches.
+  await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("people")]);
   await expect(groupOf(page, JUMP_TO.groups.members)).toHaveCount(0);
   await expect(inputOf(page)).toHaveAttribute("placeholder", /^Find a page$/);
   expect(membersReads, "a Viewer's jump-to asked for the members").toEqual([]);
@@ -215,6 +234,86 @@ test("lands an Admin on the member they chose", async ({ page, request }) => {
   await expect(memberPageNaming(page, TOM)).toHaveCount(0);
 });
 
+test("lands on Search with the typed query and its matches", async ({ page, request }) => {
+  const email = anAddress("jump-to");
+  const workspace = await provision(request, { name: "Lune Valley Records", adminEmail: email });
+  await seedConcepts(request, {
+    workspaceId: workspace.workspaceId,
+    userId: workspace.admin.id,
+    concepts: [
+      {
+        title: "Audit Logs Retention",
+        body: "We keep audit logs for seven years, then delete them.",
+      },
+    ],
+  });
+  await signedInOffMembers(page, request, email);
+
+  await opened(page, "Meta+k");
+  await typed(page, "audit logs");
+  await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("audit logs")]);
+  await page.keyboard.press("Enter");
+
+  const search = page.getByRole("region", { name: SEARCH.name });
+  await expect(search.getByRole("searchbox", { name: SEARCH_WORDS.search })).toHaveValue(
+    "audit logs",
+  );
+  await expect(
+    search.getByRole("list", { name: SEARCH_WORDS.matches }).getByRole("listitem").first(),
+  ).toContainText("Audit Logs Retention");
+  await expect(dialogOf(page)).toHaveCount(0);
+  await expect(page.getByRole("main")).toBeFocused();
+  // Search takes the ask off the address and keeps the query under its own key.
+  await expect(page).toHaveURL(
+    new RegExp(`${SEARCH.path}\\?knowledge\\.search=audit(?:\\+|%20)logs$`),
+  );
+});
+
+test("offers no search row with nothing typed", async ({ page, request }) => {
+  await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+
+  await opened(page, "Control+k");
+  await expect(optionOf(page, ASK.name)).toBeVisible();
+  await expect(searchRowOf(page)).toHaveCount(0);
+
+  await typed(page, "audit");
+  await expect(searchRowOf(page)).toHaveText([searchFor("audit")]);
+  await typed(page, "");
+  await expect(optionOf(page, ASK.name)).toBeVisible();
+  await expect(searchRowOf(page)).toHaveCount(0);
+});
+
+test("offers no search row for spaces alone", async ({ page, request }) => {
+  await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
+
+  await opened(page, "Control+k");
+  await typed(page, "audit");
+  await expect(searchRowOf(page)).toHaveCount(1);
+  await typed(page, "   ");
+
+  await expect(optionOf(page, ASK.name)).toBeVisible();
+  await expect(searchRowOf(page)).toHaveCount(0);
+  await expect(saidIn(page)).toBeEmpty();
+});
+
+test("offers the operator in the console no search row", async ({ page, request }) => {
+  const email = anAddress("operator");
+  await provision(request, { name: "Lune Valley Pressings", adminEmail: email });
+  await markTheOperator(request, email);
+  await signedInAtHome(page, request, email);
+  await page.goto(EVERY_WORKSPACE.path);
+  await expect(
+    page.getByRole("heading", { level: 1, name: headingOf(EVERY_WORKSPACE) }),
+  ).toBeVisible();
+
+  await opened(page, "Meta+k");
+  await expect(optionOf(page, EVERY_WORKSPACE.name)).toBeVisible();
+  await typed(page, "audit logs");
+
+  await expect(saidIn(page)).toHaveText(nothingMatches("audit logs"));
+  await expect(dialogOf(page).getByRole("option")).toHaveCount(0);
+});
+
 test("finds nothing by an unbuilt page's name", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Nidderdale Forge");
 
@@ -223,7 +322,7 @@ test("finds nothing by an unbuilt page's name", async ({ page, request }) => {
   await typed(page, SIGNALS.name);
 
   await expect(saidIn(page)).toHaveText(nothingMatches(SIGNALS.name));
-  await expect(dialogOf(page).getByRole("option")).toHaveCount(0);
+  await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor(SIGNALS.name)]);
 });
 
 test("draws the list within its second, timed in the page", async ({ page, request }) => {
@@ -259,7 +358,7 @@ test("keeps pages and actions through a held, then failed, read", async ({ page,
   await expect(saidIn(page)).toHaveText(JUMP_TO.membersLoading);
 
   await typed(page, "zzz");
-  await expect(dialogOf(page).getByRole("option")).toHaveCount(0);
+  await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("zzz")]);
   await expect(saidIn(page)).toHaveText(JUMP_TO.membersLoading);
 
   held.resolve();
