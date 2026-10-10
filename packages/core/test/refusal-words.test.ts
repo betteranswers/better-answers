@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, expectTypeOf, it } from "vitest";
 
+import { refusalWordsIn } from "@better-answers/devtools/refusal-unions";
+
 import {
   declareRefusals,
   REFUSAL_CLASSES,
@@ -36,7 +38,7 @@ import type {
   SetDisplayNameRefusal,
 } from "../src/workspaces/index.ts";
 import { loadEveryEntryPoint } from "./entry-points.ts";
-import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
+import { asSliceRelative, coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 
 const SEVEN_CLASSES = [
   "unauthenticated",
@@ -123,25 +125,40 @@ const REGISTER = {
   "last-second-factor": "precondition by workspaces",
 
   "identifier-too-broad": "inapplicable by erasure",
+  "not-an-erasure": "inapplicable by erasure",
+  "not-seeded": "precondition by erasure",
+  "no-address": "precondition by erasure",
+
+  "no-such-concept": "absent by concepts",
+  "no-such-suggestion": "absent by concepts",
+  "path-taken": "conflict by concepts",
+  "merge-key-taken": "conflict by concepts",
+  "manifest-taken": "conflict by concepts",
+  "resolution-moved": "conflict by concepts",
+  "kind-forbids": "forbidden by concepts",
+  "class-unreadable": "forbidden by concepts",
+  "rename-refused": "inapplicable by concepts",
+  "reclassification-refused": "inapplicable by concepts",
+  "unreadable-commit": "inapplicable by concepts",
+  "no-such-repository": "precondition by concepts",
+  "history-diverged": "precondition by concepts",
+
+  "no-such-job": "absent by runs",
 };
 
 type EveryRegisteredWord = keyof typeof REGISTER;
 
-const ALIAS = /\btype \w+ =([^;]*);/g;
-const BUILT_FROM_A_VOCABULARY = /\b(?:Kernel|Member|Source|Workspace|Erasure)Refusal</;
-const QUOTED = /"([a-z][a-z0-9-]*)"/g;
+/** A store door's word is a defect its slice maps or passes on, never a refusal. */
+const inASlice = (file: string): boolean =>
+  !(asSliceRelative([file])[0] ?? "").startsWith("store/");
 
-const wordsInConvertedUnions = (files: readonly string[]): ReadonlySet<string> => {
-  const named = new Set<string>();
-  for (const file of files) {
-    for (const alias of readFileSync(file, "utf8").matchAll(ALIAS)) {
-      const union = alias[1] ?? "";
-      if (!BUILT_FROM_A_VOCABULARY.test(union)) continue;
-      for (const word of union.matchAll(QUOTED)) named.add(word[1] ?? "");
-    }
-  }
-  return named;
-};
+const wordsInRefusalUnions = (files: readonly string[]): ReadonlySet<string> =>
+  new Set(
+    files
+      .filter(inASlice)
+      .flatMap((file) => refusalWordsIn(file, readFileSync(file, "utf8")))
+      .map(({ word }) => word),
+  );
 
 const registerAsRead = (): Readonly<Record<string, string>> =>
   Object.fromEntries(
@@ -160,11 +177,11 @@ describe("the refusal-word walk", () => {
   });
 
   it.skipIf(sourceTreeIsInstrumented())(
-    "matches the register and the actions' union words both ways",
+    "matches the register and every refusal union's words both ways",
     async () => {
       await loadEveryEntryPoint();
       const held = new Set(Object.keys(registerAsRead()));
-      const named = wordsInConvertedUnions(coreSourceFiles());
+      const named = wordsInRefusalUnions(coreSourceFiles());
 
       expect([...held].filter((word) => !named.has(word))).toEqual([]);
       expect([...named].filter((word) => !held.has(word))).toEqual([]);

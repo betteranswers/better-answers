@@ -15,6 +15,7 @@
     "./oxlint-config": "./src/oxlint-config.ts",
     "./parsed-source": "./src/parsed-source.ts",
     "./paths": "./src/paths.ts",
+    "./refusal-unions": "./src/refusal-unions.ts",
     "./root-commands": "./src/root-commands.ts",
     "./table-ownership-scan": "./src/table-ownership-scan.ts",
     "./throwaway-tree": "./src/throwaway-tree.ts",
