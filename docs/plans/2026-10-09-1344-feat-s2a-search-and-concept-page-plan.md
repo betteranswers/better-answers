@@ -619,13 +619,14 @@ flowchart LR
 - **Requirements:** R1, R7; KTD6, KTD10, KTD11; AE1 (page half), AE3.
 - **Dependencies:** U11.
 - **Files:**
-  - Create: `apps/web/src/features/knowledge/concept-page.tsx`, `concept-body.tsx`, `apps/web/test/concept-body.test.tsx`, `apps/web/e2e/concept-page.spec.ts`.
-  - Modify: `apps/web/package.json` (`react-markdown`, `remark-gfm`), `apps/web/src/shared/navigation.ts` (Search's `detail`), `apps/web/src/app/router.tsx` (`BUILT_DETAILS`), `apps/web/src/features/knowledge/evidence-panel.tsx`. The router throws at start when a page declares a `detail` with no `BUILT_DETAILS` entry, so both land here with the page.
+  - Create: `apps/web/src/features/knowledge/concept-page.tsx`, `concept-body.tsx`, `concept-address.ts`, `concept-frontmatter.ts`, `apps/web/test/concept-body.test.tsx`, `apps/web/test/concept-frontmatter.test.ts`, `apps/web/e2e/concept-page.spec.ts`, `apps/web/e2e/knowledge.ts` (what the two Knowledge specs share).
+  - Modify: `apps/web/package.json` (`react-markdown` 10.1.0 and `remark-gfm` 4.0.1, pinned exact; each version read from the npm registry on 10/10/2026 and the API from Context7's `/remarkjs/react-markdown`), `apps/web/src/shared/navigation.ts` (Search's `detail`), `apps/web/src/app/router.tsx` (`BUILT_DETAILS`), `apps/web/src/features/knowledge/evidence-panel.tsx`, `search-page.tsx` (a concept match opens its page). The router throws at start when a page declares a `detail` with no `BUILT_DETAILS` entry, so both land here with the page.
+  - Modify, found in U12: `apps/api/tests/harness-knowledge.ts` and its test (the sources below), `.claude/skills/browser-suite/SKILL.md` (the `seedConcepts` row), `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md` (the concept page is built).
 - **Approach:**
   1. Parse the ULID at the route with `concept-file`'s pattern, and map it to the IRI `knowledge.open` takes. A malformed, absent or withheld concept draws the one in-page *not found*, which names nothing and leads back to Search.
   2. Keep the breadcrumb's last part empty until the read lands. While loading, reserve the heading region and draw no body. A failed read draws its own state with a retry, distinct from *not found*.
   3. Render the body by KTD10, and draw the panel and its keyboard path by KTD10.
-  4. Make the page's way back carry the query in history state, as `membersAt` does.
+  4. Make the page's way back carry the query in history state, as `membersAt` does. Search's own history entry keeps the match that was opened, so Back and the page's way back both return focus to its row (found in U12).
 - **Patterns to follow:** `apps/web/src/features/people/member-page.tsx` (`NoSuchMember`, `useBreadcrumbLastPart`); `apps/web/src/shared/ui/sheet.tsx`.
 - **Test scenarios:**
   - Opening a match shows the concept's title, body, sources, verified events, links and trust words.
@@ -640,7 +641,7 @@ flowchart LR
   - A sources-list entry opens the same panel as its citation mark.
   - A failed read shows its retry state, not *not found*.
   - Back returns to Search at the query left, with focus on the opened row.
-  - After a workspace switch, the page's address shows *not found*, asserted on what is drawn.
+  - After a workspace switch, the page's address shows *not found*, asserted on what is drawn. The switch itself goes to the reader's home, so the spec comes Back to the concept's address within the same document (found in U12).
   - The page renders under its budget and passes the accessibility gate.
   - A citation mark resolves to the evidence item at the index `linksAndMarksOf` gives it over the projected frontmatter's `sources`. The projection keeps every entry naming a resource, in order, so the index holds.
   - The sources list leads with the pane's access words and ends with where to go next. A concept whose sources name no passage address and no concept says it has no passage to open, never that access withholds one. A page locator such as `p.4` names no passage address.
@@ -651,6 +652,10 @@ flowchart LR
   - The evidence panel opens a concept as well as a passage. U11's `Opened` in `evidence-panel.tsx` names only a passage's locator, and its panel reads only `knowledge.open({ locator })` (found in U11).
   - At `xl`, the narrowest width where the panel opens beside the page, it leaves the cited claim in view. U11's panel is a fixed sheet up to 28rem wide over the page's right side, so it can cover a claim the page's prose measure puts there (found in U11).
   - Escape inside the open panel closes it and focus returns to the mark. Escape with focus on the page behind it leaves it open, because the page stays live and Escape there is the focused control's (found in U11).
+  - The browser suite's harness seeded a source only as a document's passage, held at its concept's own sensitivity. `seedConcepts` now also takes a document held closer than the concept citing it and labelled apart from its title (AE3), a source naming an earlier concept, a source with a page locator, and further frontmatter keys such as `verified` (found in U12).
+  - A body's link to another concept's file, the relative link OKF writes, draws as its words alone: `open` names no target for a link by its place in the body, so the page cannot tell where it leads. The Links section lists that concept from `open`'s relations. Giving the body's own link its target is a change to `open` (found in U12; for Linear).
+  - A footnote that names no source keeps its note under a *Footnotes* heading at the body's end, as `remark-gfm` draws it, so the page says which of ADR 0015's two footnote kinds each one is. Its links move focus between the claim and the note and add no history entry, so Back still leaves the page (found in U12).
+  - A mark is carried through the markdown parser between angle brackets and two private-use characters, never as the parser's own footnote: `remark-gfm` reads neither a label with spaces nor a mark with no definition, and `contracts/links` holds both. The file's own text can write neither character, as itself or as a character reference, so a body cannot forge a mark (found in U12's review).
   - A passage match on Search shows the document's title and the *Not company knowledge* tag, but not the passage's opening line U11's approach names, because `find`'s document match carries no passage text. Several passages of one document then read alike until opened. The owner decides whether `find` gains the line, under the passage's own withholding (found in U11).
 - **Verification:** web `check` passes, including e2e.
 

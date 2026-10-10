@@ -110,6 +110,7 @@ export const KNOWLEDGE = {
           icon: "search",
           built: true,
           seenBy: EVERY_ROLE,
+          detail: { param: "concept" },
         },
         {
           name: "Guides",

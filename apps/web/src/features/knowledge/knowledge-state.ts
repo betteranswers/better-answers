@@ -7,6 +7,12 @@ export const SEARCH_KEYSTROKES = {
   more: { key: "m", action: "Show more matches" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
+export const CONCEPT_KEYSTROKES = {
+  back: { key: "b", action: "Go back to Search" },
+  sources: { key: "s", action: "Go to the concept’s sources" },
+  links: { key: "l", action: "Go to the concept’s links" },
+} as const satisfies Readonly<Record<string, Keystroke>>;
+
 export const SEARCH_LIST = "knowledge";
 
 /** The read refuses a longer query, so neither the box nor an old address may hold one. */

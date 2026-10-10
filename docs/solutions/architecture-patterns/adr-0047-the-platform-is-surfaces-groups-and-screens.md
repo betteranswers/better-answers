@@ -38,7 +38,7 @@ The platform's navigation has four levels, and the code names them the same way:
 - A **page** has an address of its own and an icon in the menu.
 - A **tab** divides one page. It has no address.
 
-A page may also declare a **detail address**, one segment beneath its own, naming one of its rows. Members declares the first: a **member page** at `/people/members/<person>`. Search declares the second, which S2a builds: the **concept page** at `/knowledge/search/<ulid>`, opened by a match or a citation. A detail address is the page's place, not a fifth level:
+A page may also declare a **detail address**, one segment beneath its own, naming one of its rows. Members declares the first: a **member page** at `/people/members/<person>`. Search declares the second: the **concept page** at `/knowledge/search/<ulid>`, opened by a match or a citation. A detail address is the page's place, not a fifth level:
 
 - Nothing lists it. It is not in the rail, the menu, or jump-to's pages and actions. Jump-to's member results lead to it.
 - It is seen exactly where its page is seen, so a role that may not see Members gets the not-found page at a member page.
@@ -120,7 +120,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
 | Ask | none; the home says it is on its way | New question, Your questions (S2b) | none yet |
-| Knowledge | Search | The concept page, Search's detail (S2a). Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
+| Knowledge | Search, and the concept page, its detail | Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of actions an agent takes as the person |
