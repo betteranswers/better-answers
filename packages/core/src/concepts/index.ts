@@ -39,6 +39,7 @@ import {
   refusalFor,
   ulid,
   type AdminUserPrincipal,
+  type AdmittedOf,
   type Clock,
   type PrincipalRefusal,
   type RefusalOf,
@@ -322,7 +323,7 @@ export const writeConcept = async (
 
 /** The write once admitted: nothing below judges who asked. */
 const commitConcept = async (
-  principal: UserPrincipal,
+  principal: AdmittedOf<typeof writeConceptAction>,
   doors: WriteDoors,
   input: WriteConceptInput,
 ): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {

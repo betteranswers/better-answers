@@ -67,6 +67,7 @@ export type ActionDeclaration<
 > = {
   readonly admits: A | ((input: z.output<Schema>) => A);
 
+  /** The schema an entry parses with; `z.custom<T>()` where no entry parses the input yet. */
   readonly input: Schema;
 
   readonly refuses: readonly Word[];
