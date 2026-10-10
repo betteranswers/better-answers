@@ -31,6 +31,8 @@
   --border-strong: var(--grey-300);
   --border-inverse: rgba(255, 255, 255, 0.14);
   --border-focus: var(--accent-600);
+  /* What tells a person a field, checkbox or radio is there: 3:1 on every surface, both themes. */
+  --border-control: var(--grey-500);
 
   /* Controls. The primary button is the accent fill, the one solid object on the board. */
   --control-primary-bg: var(--control-accent-bg);

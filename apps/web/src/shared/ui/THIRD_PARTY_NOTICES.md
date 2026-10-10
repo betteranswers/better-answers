@@ -377,6 +377,12 @@ The arrival edits on `card`:
 - `CardHeader` declares its second row only when it holds a description, so a header with a title
   alone is one row and keeps no empty gap below the title.
 
+The edits made on 10 October 2026 for BA-98, which made the dark theme reachable:
+
+- `button.tsx`: the `outline` variant draws its edge in `--border-default`, since `--input` is
+  now the 3:1 control edge, and a button is found by its words.
+- `command.tsx`: the input's row draws its rule in `--input`, the only edge Jump to's field has.
+
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the pages that use them carry the WCAG 2.2 AA
 line and are tested with a keyboard and a screen reader.

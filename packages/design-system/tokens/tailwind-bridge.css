@@ -63,7 +63,7 @@
   --destructive-foreground: #ffffff;
 
   --border: var(--border-subtle);
-  --input: var(--border-default);
+  --input: var(--border-control);
   --ring: var(--accent-600);
 
   /* Sidebar contract (shadcn sidebar block, Kibo layouts) */
