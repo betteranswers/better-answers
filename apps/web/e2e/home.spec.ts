@@ -11,7 +11,7 @@ import {
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
-import { CONTROL_CENTRE, headingOf, HOMES, type Role } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, headingOf, HOMES, KNOWLEDGE, type Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -99,7 +99,7 @@ test("offers a Viewer's home from an unknown page, shell kept", async ({
 });
 
 for (const role of ["Editor", "Viewer"] as const) {
-  test(`shows ${aRole(role)} Ask alone, on its way`, async ({ page, request }) => {
+  test(`shows ${aRole(role)} Ask on its way, and Knowledge`, async ({ page, request }) => {
     const home = HOMES[role];
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
@@ -110,6 +110,8 @@ for (const role of ["Editor", "Viewer"] as const) {
           - /children: equal
           - listitem:
             - link ${quoted(home.name)}
+          - listitem:
+            - link ${quoted(KNOWLEDGE.name)}
     `);
     await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toHaveCount(0);
     const address = await askShowsTheServedAddress(page);

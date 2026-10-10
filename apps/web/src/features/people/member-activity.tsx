@@ -1,12 +1,13 @@
 import { useMemo, type RefObject } from "react";
 
+import { useLanding } from "@/shared/landing.ts";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine } from "@/shared/outcome.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { sentenceOf } from "./audit-sentences.ts";
-import { EventDays, useLanding } from "./event-days.tsx";
+import { EventDays } from "./event-days.tsx";
 import { ACTIVITY_WORDS as WORDS } from "./member-action-words.ts";
 import { useActivity, type ActivityEvent, type ListedMember } from "./people-api.ts";
 import { MEMBER_PAGE_KEYSTROKES as KEY } from "./people-state.ts";

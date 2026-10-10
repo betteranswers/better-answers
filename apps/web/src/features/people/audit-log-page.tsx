@@ -4,6 +4,7 @@ import { ceilingLiftsIn, type ApiError } from "@/shared/api/trpc.ts";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
+import { useLanding } from "@/shared/landing.ts";
 import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -33,7 +34,7 @@ import {
 import { AUDIT_LOG_WORDS as WORDS } from "./audit-log-words.ts";
 import { headlineOf, sentenceOf } from "./audit-sentences.ts";
 import { personSaid } from "./audit-subjects.ts";
-import { EventDays, useLanding } from "./event-days.tsx";
+import { EventDays } from "./event-days.tsx";
 import { auditExportCeiling } from "./refusal-words.ts";
 import { outcomeOfAuditLogFailure } from "./refusal.tsx";
 

@@ -65,7 +65,7 @@ The utilities sit at the rail's foot: Keyboard shortcuts today, and help and set
 | Area | Group | Pages (built today in bold) | Seen by |
 |---|---|---|---|
 | Ask | (none) | New question · Your questions | every role (home of Editor and Viewer) |
-| Knowledge | Browse · Curation | Search · Guides · All knowledge · Due for verification · Conflicts · Kinds · Collections and owners · Exports | Browse: every role. Curation: Admins and owners |
+| Knowledge | Browse · Curation | **Search** · Guides · All knowledge · Due for verification · Conflicts · Kinds · Collections and owners · Exports | Browse: every role. Curation: Admins and owners |
 | Inbox | (none) | Waiting on you | Admins and owners |
 | Control Centre | Overview | Overview | Admin |
 | | Suggestions | To decide | Admin |
@@ -120,7 +120,7 @@ Control Centre's groups keep root addresses, `/<group>/<page>`, so today's addre
 | Area | Built | v0.1 | Next, Then and Later |
 |---|---|---|---|
 | Ask | none; the home says it is on its way | New question, Your questions (S2b) | none yet |
-| Knowledge | none | Search, with the concept page as its detail (S2a). Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
+| Knowledge | Search | The concept page, Search's detail (S2a). Guides, All knowledge, Kinds, Collections and owners (S3; S7 renames kinds). Due for verification, Conflicts (V1). Exports | What changed in your collections since your last visit. A map explorer. Imported bundles |
 | The work area | none | Question sets (S6) | Next: opportunities, submissions, outcomes, recurring questionnaires. Then: renewal packs, account briefs, case studies. Later: content drafts |
 | Briefings | none | none | Then: sector news, account signals, competitor activity |
 | Inbox | none | Waiting on you, which S5 and V1 need and no block names | Then: approvals of actions an agent takes as the person |

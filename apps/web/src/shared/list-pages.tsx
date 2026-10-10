@@ -151,6 +151,8 @@ type More = {
   readonly label: string;
   readonly more: boolean;
   readonly loading: boolean;
+  /** Why the last load failed: the rows stay, and the button asks for the same page again. */
+  readonly failed?: ReactNode;
   readonly onMore: () => void;
   readonly keystroke?: Keystroke;
 };
@@ -225,13 +227,19 @@ function MoreOn(properties: { readonly keystroke: Keystroke; readonly onMore: ()
 }
 
 function LoadMore(properties: { readonly more: More }) {
-  const { label, more, loading, onMore, keystroke } = properties.more;
+  const { label, more, loading, failed, onMore, keystroke } = properties.more;
   if (!more) return null;
   const load = () => {
     if (!loading) onMore();
   };
   return (
     <nav aria-label={label} className={BAND}>
+      {/* Unmounted while loading, so a repeat failure is heard again; its slot keeps the button, and focus. */}
+      {failed === undefined || loading ? null : (
+        <p role="alert" className="mb-2">
+          <SaidOnceMounted>{failed}</SaidOnceMounted>
+        </p>
+      )}
       <Button
         variant="outline"
         size="sm"
@@ -240,7 +248,7 @@ function LoadMore(properties: { readonly more: More }) {
         className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
         onClick={load}
       >
-        Load more
+        {failed === undefined ? "Load more" : "Retry"}
       </Button>
       {keystroke === undefined ? null : <MoreOn keystroke={keystroke} onMore={load} />}
     </nav>

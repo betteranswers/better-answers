@@ -1,5 +1,5 @@
 import { FAILED_PAGE, goHome, RAIL, ROLE_UNREAD } from "@/app/words.ts";
-import { CONTROL_CENTRE, HOMES } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -60,6 +60,7 @@ test("offers a way out, shell intact, when a page throws", async ({
 
   await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
   await expect(page.getByRole("navigation", { name: RAIL }).getByRole("link")).toHaveText([
+    KNOWLEDGE.name,
     CONTROL_CENTRE.name,
   ]);
   const navigation = page.getByRole("navigation", { name: CONTROL_CENTRE.name });
