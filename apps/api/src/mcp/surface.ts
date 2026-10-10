@@ -8,8 +8,10 @@ import {
   type AuthInfo,
   type McpRequestContext,
   type OAuthTokenVerifier,
+  type ToolAnnotations,
 } from "@modelcontextprotocol/server";
 import type { Logger } from "pino";
+import type { z } from "zod";
 
 import { err, type Clock } from "@better-answers/core/kernel";
 import {
@@ -18,6 +20,7 @@ import {
   folded,
   readWorkspaceConfig,
   withPrincipal,
+  withPrincipalRead,
   type PostgresDoor,
 } from "@better-answers/core/store/postgres";
 import {
@@ -35,7 +38,7 @@ import { bearerOf } from "../auth/verify.ts";
 import { clientIpOf, tooManyRequests } from "../ingress/limits.ts";
 import { refusalLogged, refusalOf, type RefusalAnswer } from "../refusal.ts";
 import { crossing } from "./crossing.ts";
-import { entriesAt } from "./entries/index.ts";
+import type { Entry } from "./entries/define.ts";
 
 export type McpSurfaceDependencies = {
   readonly door: PostgresDoor;
@@ -46,6 +49,7 @@ export type McpSurfaceDependencies = {
   readonly serverVersion: string;
 
   readonly clock: Clock;
+  readonly entries: readonly Entry<z.ZodObject, z.ZodType>[];
 };
 
 const THE_BEARER = "the bearer";
@@ -63,13 +67,19 @@ const refused = (): OAuthError =>
 const toolsListTtlOf = (authInfo: AuthInfo | undefined): number =>
   Number(authInfo?.extra?.["toolsListTtlMs"] ?? TOOLS_LIST_TTL_MS_DEFAULT);
 
+/**
+ * The door an entry's transaction opens through. Only a declared `true` opens read-only: the
+ * host reads an absent hint as a tool that writes.
+ */
+export const doorOf = ({ readOnlyHint }: ToolAnnotations): typeof withPrincipal =>
+  readOnlyHint === true ? withPrincipalRead : withPrincipal;
+
 export const createMcpSurface = (
   deps: McpSurfaceDependencies,
 ): ((request: Request) => Promise<Response>) => {
   const log = deps.logger.child({ module: "mcp" });
   const resourceMetadataUrl = `${deps.publicUrl}/.well-known/oauth-protected-resource/mcp`;
   const challengeOptions = { requiredScopes: [...MCP_SCOPES], resourceMetadataUrl };
-  const entries = entriesAt(deps.publicUrl);
 
   const buildServer = (context: McpRequestContext): McpServer => {
     const bearer = context.authInfo === undefined ? undefined : bearerOf(context.authInfo);
@@ -88,7 +98,7 @@ export const createMcpSurface = (
       },
     );
 
-    for (const entry of entries) {
+    for (const entry of deps.entries) {
       if (!entry.scopes.every((scope) => scopes.has(scope))) continue;
       server.registerTool(
         entry.name,
@@ -108,7 +118,7 @@ export const createMcpSurface = (
               bearer === undefined
                 ? err<RefusalAnswer>("no-session")
                 : folded(
-                    await withPrincipal(deps.door, bearer.claims, (principal, tx) =>
+                    await doorOf(entry.annotations)(deps.door, bearer.claims, (principal, tx) =>
                       entry.run(principal, tx, args, deps.clock.now()),
                     ),
                   ),
