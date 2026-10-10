@@ -991,6 +991,34 @@ describe("a body's links", () => {
     ]);
   });
 
+  it("answers nothing from another concept's edge", async () => {
+    const scenario = await arrange();
+    const expenses = await noteAt(scenario, "knowledge/expenses.md", {
+      body: "See [the board](./board.md).",
+    });
+    const travel = await noteAt(scenario, "knowledge/travel.md");
+    const board = await indexedAt(scenario, "knowledge/board.md");
+    await edgeSeeded(scenario, travel.iri, board);
+
+    const before = await linksFor(scenario.viewer, expenses.iri);
+    await edgeSeeded(scenario, expenses.iri, board);
+    const after = await linksFor(scenario.viewer, expenses.iri);
+
+    expect(before).toEqual([]);
+    expect(after).toEqual([{ ordinal: 0, address: "./board.md", target: board }]);
+  });
+
+  it("answers nothing from an edge that is no link", async () => {
+    const scenario = await arrange();
+    const expenses = await noteAt(scenario, "knowledge/expenses.md", {
+      body: "See [the board](./board.md).",
+    });
+    const board = await indexedAt(scenario, "knowledge/board.md");
+    await edgeSeeded(scenario, expenses.iri, board, { label: "DERIVED_FROM" });
+
+    expect(await linksFor(scenario.viewer, expenses.iri)).toEqual([]);
+  });
+
   it("answers nothing from an edge outside the live generation", async () => {
     const scenario = await arrange();
     const expenses = await noteAt(scenario, "knowledge/expenses.md", {
