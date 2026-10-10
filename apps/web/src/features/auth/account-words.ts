@@ -40,7 +40,7 @@ export const ACCOUNT_ACTIONS = {
 export const PASSKEY_WORDS = {
   heading: "Passkeys",
   none: `No passkeys yet. ${PASSKEY_SIGNS_YOU_IN}, with no email.`,
-  noWebAuthn: "This browser can't add a passkey. Use another browser or device.",
+  noWebAuthn: "This browser can’t add a passkey. Use another browser or device.",
   add: ADD_A_PASSKEY,
   nameField: "Passkey name",
   addCommit: "Add passkey",
@@ -65,7 +65,7 @@ export const passkeyDates = (createdAt: string, lastUsedAt: string | null): stri
     lastUsedAt === null ? PASSKEY_WORDS.notUsed : `Last used ${instantWords(lastUsedAt)}`
   }`;
 
-export const removePasskeyTitle = (name: string): string => `Remove the passkey "${name}"`;
+export const removePasskeyTitle = (name: string): string => `Remove the passkey “${name}”`;
 
 /** In the order a user agent is read: Edge names Chrome, and Chrome names Safari. */
 const BROWSERS = [
@@ -125,7 +125,7 @@ export const RECOVERY_CODE_WORDS = {
   replaceCommit: "Make new codes",
   saveHeading: "Save your recovery codes",
   saveLine:
-    "If you lose your passkey and authenticator, each code signs you in once. This is the only time they're shown.",
+    "If you lose your passkey and authenticator, each code signs you in once. This is the only time they’re shown.",
   replacedLine: "These replace the codes shown before, which no longer work.",
   list: "Recovery codes",
   copy: "Copy codes",
@@ -145,10 +145,10 @@ const noticeTo = (address: string): string => `A notice is on its way to ${addre
 
 /** Said once an action lands, with the notice every change of a second factor sends. */
 export const ACTION_LANDED = {
-  passkeyAdded: (name: string, address: string) => `Passkey "${name}" added. ${noticeTo(address)}`,
-  passkeyRenamed: (name: string) => `Passkey renamed "${name}".`,
+  passkeyAdded: (name: string, address: string) => `Passkey “${name}” added. ${noticeTo(address)}`,
+  passkeyRenamed: (name: string) => `Passkey renamed “${name}”.`,
   passkeyRemoved: (name: string, address: string) =>
-    `Passkey "${name}" removed. ${noticeTo(address)}`,
+    `Passkey “${name}” removed. ${noticeTo(address)}`,
   setUp: (address: string) => `${AUTHENTICATOR_WORDS.held} ${noticeTo(address)}`,
   removed: (address: string) => `Authenticator removed. ${noticeTo(address)}`,
   made: (address: string) => `Recovery codes made. ${noticeTo(address)}`,

@@ -8,7 +8,7 @@ type EmailStep = { readonly title: string; readonly hint: string };
 
 const CODE_LIFETIME = "five minutes";
 
-const WHAT_COMES = "You'll get an email with a sign-in link and a six-digit code.";
+const WHAT_COMES = "You’ll get an email with a sign-in link and a six-digit code.";
 
 const HINT = `Enter your work email address. ${WHAT_COMES}`;
 
@@ -24,7 +24,7 @@ export const SIGN_IN_WORDS = {
   arrived: {
     "signed-out": "You have signed out.",
     "session-ended": "Your session has ended.",
-    "confirm-timed-out": "Your sign-in ended because it wasn't confirmed within an hour.",
+    "confirm-timed-out": "Your sign-in ended because it wasn’t confirmed within an hour.",
   } satisfies Record<Arrival, string>,
   emailField: "Email address",
   send: "Send sign-in email",

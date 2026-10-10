@@ -20,7 +20,7 @@ export const NO_WORKSPACE_HEADING = "No workspace yet";
 export const NO_WORKSPACE_WORDS = {
   /** Claude's request lapses within minutes, and joining can take an Admin's day. */
   claudeAfterJoining:
-    "Claude can connect once you've joined a workspace. When you're in, connect again from Claude.",
+    "Claude can connect once you’ve joined a workspace. When you’re in, connect again from Claude.",
   invitations: "Your invitations",
   invitedAs,
   tryAgain: "Try again",
@@ -34,6 +34,6 @@ export const NO_WORKSPACE_ACTIONS = {
 
 /** A connection carried through sign-in that the picker could not hand back. */
 export const NOT_CONNECTED = {
-  heading: "You're signed in",
+  heading: "You’re signed in",
   carryOn: `Go to ${PRODUCT_NAME}`,
 } as const;

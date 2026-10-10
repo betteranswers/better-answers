@@ -3,7 +3,7 @@ import { NO_RESPONSE_TO_A_READ, sentenceOf, type Said } from "@/shared/refusal-w
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
 export const FAILED_PAGE = {
-  heading: "This page didn't load",
+  heading: "This page didn’t load",
   said: "Your other pages still work.",
   retry: "Try this page again",
 } as const;
@@ -40,7 +40,7 @@ export const JUMP_TO = {
   kinds: { page: "a page", member: "a member", action: "an action" },
   membersLoading: "The members are still loading.",
   membersUnread:
-    "The members didn't load, so none are listed. Close this and open it again to retry.",
+    "The members didn’t load, so none are listed. Close this and open it again to retry.",
 } as const;
 
 export const nothingMatches = (typed: string): string => `Nothing matches “${typed}”.`;
@@ -77,7 +77,7 @@ export const CONNECT_ASSISTANT = {
   steps: [
     "In Claude, open “Settings”, then “Connectors”, and choose “Add custom connector”.",
     `Name it ${PRODUCT_NAME}, give it this address, and choose “Add”.`,
-    "Choose “Connect”, sign in here if you're asked to, then choose “Connect” again.",
+    "Choose “Connect”, sign in here if you’re asked to, then choose “Connect” again.",
   ],
   copy: "Copy the address",
   copied: "Address copied.",
@@ -85,6 +85,6 @@ export const CONNECT_ASSISTANT = {
 } as const;
 
 export const ADDRESS_NOT_COPIED: Said = {
-  why: "The address wasn't copied.",
+  why: "The address wasn’t copied.",
   next: "Select it and copy it yourself.",
 };

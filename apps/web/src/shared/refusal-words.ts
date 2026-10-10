@@ -13,18 +13,18 @@ export const SIGN_IN_AGAIN = "Sign in again";
 export const SAID_OF_CLASS = {
   unauthenticated: { why: "Your session has ended.", next: `${SIGN_IN_AGAIN}.` },
   forbidden: {
-    why: "Your role doesn't allow this.",
+    why: "Your role doesn’t allow this.",
     next: "Ask an Admin of this workspace to do it.",
   },
   absent: {
-    why: "What you acted on isn't here any more.",
+    why: "What you acted on isn’t here any more.",
     next: "Reload the page to see what is.",
   },
   malformed: {
-    why: "What you sent couldn't be read, so nothing was saved.",
+    why: "What you sent couldn’t be read, so nothing was saved.",
     next: "Check it and try again.",
   },
-  inapplicable: { why: "This can't be done here.", next: "Choose something else to do." },
+  inapplicable: { why: "This can’t be done here.", next: "Choose something else to do." },
   conflict: {
     why: "This changed while you were working on it.",
     next: "Reload the page and try again.",

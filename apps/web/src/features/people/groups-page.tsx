@@ -258,7 +258,7 @@ function GroupList(properties: {
         />
         <GridTable
           table={table}
-          caption="Groups in this workspace, each with how many members it holds. A group's name opens it."
+          caption="Groups in this workspace, each with how many members it holds. A group’s name opens it."
           empty={<EmptyState line={EMPTY_LINES.groups} className="px-4 py-10" />}
         />
       </Card>

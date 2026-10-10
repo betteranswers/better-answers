@@ -167,7 +167,7 @@ test.describe("the Sources page's list of connected sources", () => {
       "searchable: Its passages are found by search and opened by the readers it is published to.",
     );
     await expect(handbook).toContainText(
-      "keep: The platform holds the record; nothing leaves without an Admin's action.",
+      "keep: The platform holds the record; nothing leaves without an Admin’s action.",
     );
     await expect(page.locator("main")).not.toContainText(AN_ID);
   });
@@ -365,7 +365,7 @@ const SUPPLIER_FORMS: SeedConnectedSource = indexed("Supplier forms", {
 const HEALTH_CUE_BOX = "Select special category by HEALTH_CUE in Staff survey";
 
 const A_DISMISSED_SPAN =
-  "Dismissed 1 span as not special category. The seam's verdict passes over a dismissed span, which stays withheld unless kept in text.";
+  "Dismissed 1 span as not special category. The seam’s verdict passes over a dismissed span, which stays withheld unless kept in text.";
 
 /**
  * Two documents as a sync leaves them after a dismissal: one lifted to its connected source's sensitivity, one
@@ -810,7 +810,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
         - term: Findings, job title
         - definition: "0"
         - term: DPIA input
-        - definition: The hash of this connected source's DPIA input, taken at the click
+        - definition: The hash of this connected source’s DPIA input, taken at the click
     `);
 
     await expect(dialog.getByRole("checkbox", { name: "Lawful basis recorded" })).toBeFocused();

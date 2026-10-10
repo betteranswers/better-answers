@@ -147,7 +147,7 @@ describe("going home after an action on yourself", () => {
 
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toBe(
-        "Your role changed, but it couldn't be read again. Reload the page in a moment.",
+        "Your role changed, but it couldn’t be read again. Reload the page in a moment.",
       ),
     );
     expect(router.state.location.pathname).toBe(MEMBERS);

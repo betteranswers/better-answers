@@ -391,6 +391,11 @@ The edits made on 10 October 2026 for BA-98, which made the dark theme reachable
 - `kibo-ui/qr-code.tsx` draws its modules in `--grey-900` on `--grey-0`, not the page's ink on the
   page: in dark those flip, and a scanner wants dark modules on a light field.
 
+The edit made on 10 October 2026 for BA-121, which made every shown word typographic:
+
+- `kibo-ui/combobox.tsx`: `ComboboxCreateNew`'s own words put what was typed in “ ” rather than
+  straight quotes, as the design system's readme asks of every symbol in the interface.
+
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the pages that use them carry the WCAG 2.2 AA
 line and are tested with a keyboard and a screen reader.

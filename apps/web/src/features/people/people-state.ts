@@ -48,15 +48,15 @@ export const shortcutOf = (keystroke: Keystroke): string => `Shift+${keystroke.k
  * the Audit log's for older events.
  */
 export const MEMBER_PAGE_KEYSTROKES = {
-  changeRole: { key: "c", action: "Change this member's role" },
-  changeGroups: { key: "g", action: "Change this member's groups" },
-  flagName: { key: "f", action: "Flag this member's display name" },
+  changeRole: { key: "c", action: "Change this member’s role" },
+  changeGroups: { key: "g", action: "Change this member’s groups" },
+  flagName: { key: "f", action: "Flag this member’s display name" },
   endEverySignInAndToken: {
     key: "v",
     action: "End every sign-in and token this member holds here",
   },
   remove: { key: "d", action: "Remove this member" },
-  olderActivity: { key: "o", action: "Show this member's older activity" },
+  olderActivity: { key: "o", action: "Show this member’s older activity" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const GROUPS_KEYSTROKES = {

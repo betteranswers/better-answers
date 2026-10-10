@@ -57,7 +57,7 @@ describe("the confirm page", () => {
 
     await openAsAda("/confirm");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Confirm it's you");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Confirm it’s you");
     expect(controls().map((control) => control.textContent)).toEqual(["Sign out"]);
   });
 

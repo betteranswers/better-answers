@@ -11,11 +11,11 @@ export const ASK_TO_JOIN_WORDS = {
   shortName: "Workspace short name",
   forExample: "For example,",
   reason: "Why you are asking",
-  reasonHint: `The workspace's Admins read this. Up to ${REASON_MAX_CHARACTERS.toLocaleString("en-GB")} characters.`,
+  reasonHint: `The workspace’s Admins read this. Up to ${REASON_MAX_CHARACTERS.toLocaleString("en-GB")} characters.`,
   ask: "Ask to join",
   asking: "Asking",
   sent: "Request sent",
   /** One sentence for every short name, so the answer can't tell a customer from a stranger. */
   whatHappensNext:
-    "If that workspace exists, its Admins will see your request. You'll get an invitation by email if one approves.",
+    "If that workspace exists, its Admins will see your request. You’ll get an invitation by email if one approves.",
 } as const;

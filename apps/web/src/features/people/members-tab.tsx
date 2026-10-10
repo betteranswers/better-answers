@@ -397,7 +397,7 @@ function MemberList(properties: {
           >
             <GridTable
               table={table}
-              caption="Members of this workspace, each with their address, role, groups and the day they joined. A member's name opens them; a tick selects them for an action on every member selected."
+              caption="Members of this workspace, each with their address, role, groups and the day they joined. A member’s name opens them; a tick selects them for an action on every member selected."
               ticking={{
                 ticked,
                 onTickedChange: setTicked,

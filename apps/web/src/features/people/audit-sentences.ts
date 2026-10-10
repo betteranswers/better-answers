@@ -39,7 +39,7 @@ const person = (subject: Subject | undefined): string => {
   return subject?.kind === "former-member" ? GONE_WORDS["former-member"] : "a person";
 };
 
-const possessive = (subject: Subject | undefined): string => `${person(subject)}'s`;
+const possessive = (subject: Subject | undefined): string => `${person(subject)}’s`;
 
 const group = (subject: Subject): string =>
   subject?.kind === "group" ? `the group ${subject.name}` : GONE_WORDS["deleted-group"];
@@ -90,7 +90,7 @@ const SENTENCES = {
   "knowledge.concept.class_overridden": ({ by, subject }) =>
     `${by} overrode the sensitivity of ${conceptNamed(subject)}`,
   "knowledge.concept.committed": ({ by, subject }) => `${by} saved ${conceptNamed(subject)}`,
-  "knowledge.manifest.written": ({ by }) => `${by} updated the knowledge base's description`,
+  "knowledge.manifest.written": ({ by }) => `${by} updated the knowledge base’s description`,
   "knowledge.suggestion.accepted": ({ by, named }) =>
     `${by} accepted a suggestion, saved as ${conceptNamed(namedIn(named, "iri"))}`,
   "knowledge.suggestion.declined": ({ by }) => `${by} declined a suggestion`,
@@ -169,7 +169,7 @@ const SENTENCES = {
   "platform.job.followed": ({ by }) => `${by} updated who can see concepts after a sync`,
   "platform.reconciler.replayed": ({ by }) => `${by} re-applied a change to the knowledge base`,
   "platform.workspace.marked": ({ by }) =>
-    `${by} kept the workspace's invitations to its testing domain`,
+    `${by} kept the workspace’s invitations to its testing domain`,
   "platform.workspace.provisioned": ({ by }) => `${by} provisioned the workspace`,
   "platform.workspace.renamed": ({ by }) => `${by} renamed the workspace`,
   "sources.binding.bound": ({ by, subject }) => `${by} added ${connectedSourceNamed(subject)}`,
