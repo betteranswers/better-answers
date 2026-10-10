@@ -51,6 +51,8 @@ import { EveryonePage } from "@/features/console/everyone-page.tsx";
 import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
 import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
+import { CONCEPT_IRI } from "@/features/knowledge/concept-address.ts";
+import { ConceptPage } from "@/features/knowledge/concept-page.tsx";
 import { SearchPage } from "@/features/knowledge/search-page.tsx";
 import { AuditLogPage } from "@/features/people/audit-log-page.tsx";
 import { GroupsPage } from "@/features/people/groups-page.tsx";
@@ -118,6 +120,7 @@ type BuiltDetail = {
 
 /** The list declares each detail address; this map says what draws it, keyed by its page. */
 const BUILT_DETAILS: ReadonlyMap<string, BuiltDetail> = new Map<PagePath, BuiltDetail>([
+  ["/knowledge/search", { value: CONCEPT_IRI, draw: (iri) => <ConceptPage iri={iri} /> }],
   ["/people/members", { value: PERSON_ID, draw: (personId) => <MemberPage personId={personId} /> }],
 ]);
 

@@ -34,3 +34,14 @@ export const usePassage = (locator: string) => {
   const api = useTRPC();
   return useQuery(api.knowledge.open.queryOptions({ locator }, { retry: retryUnlessWaiting }));
 };
+
+export type Concept = NonNullable<inferOutput<Api["knowledge"]["open"]>["concept"]>;
+
+/** One of a concept's sources as its reader may see it: `locator` or `iri` only where it opens. */
+export type Evidence = Concept["evidence"][number];
+
+/** A refused read is never asked again: a withheld concept stays withheld, and a ceiling lifts with time. */
+export const useConcept = (iri: string) => {
+  const api = useTRPC();
+  return useQuery(api.knowledge.open.queryOptions({ iri }, { retry: retryUnlessWaiting }));
+};

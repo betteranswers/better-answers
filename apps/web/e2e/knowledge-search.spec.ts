@@ -1,5 +1,4 @@
 import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
-import { z } from "zod";
 
 import { SEARCH_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
 import { EVIDENCE_WORDS, SEARCH_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
@@ -22,6 +21,7 @@ import {
   signIn,
   skipLinkReachesThePage,
 } from "./harness.ts";
+import { isAFind, isAnOpen, readsCeilingFilled } from "./knowledge.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -50,10 +50,6 @@ const passagePanel = (page: Page, title: string) => page.getByRole("dialog", { n
 const asked = (query: string): string =>
   `${SEARCH.path}?${new URLSearchParams({ "knowledge.search": query }).toString()}`;
 
-const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
-
-const isAnOpen = (url: URL): boolean => url.pathname.includes("knowledge.open");
-
 /** No document holds this id, so an open of a passage in it reads nothing. */
 const NO_SUCH_DOCUMENT = "01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
 
@@ -62,25 +58,6 @@ const isAFindPastTheFirstPage = (url: URL): boolean =>
   isAFind(url) && (url.searchParams.get("input") ?? "").includes('"cursor"');
 
 const HANDBOOK = "Warehouse handbook";
-
-/** One more call than the person's knowledge reads may make in a minute. */
-const PAST_THE_READS_CEILING = 121;
-
-/** Batched calls fill the person's ceiling and leave the address's, which counts requests, clear. */
-const readsCeilingFilled = async (page: Page, read: string): Promise<void> => {
-  const asked = new URL(read);
-  const call = Object.values(
-    z.record(z.string(), z.unknown()).parse(JSON.parse(asked.searchParams.get("input") ?? "{}")),
-  )[0];
-  const batch = 41;
-  for (let sent = 0; sent < PAST_THE_READS_CEILING; sent += batch) {
-    const input = Object.fromEntries(Array.from({ length: batch }, (_, at) => [String(at), call]));
-    const path = Array.from({ length: batch }, () => "knowledge.find").join(",");
-    await page.request.get(
-      `/trpc/${path}?${new URLSearchParams({ batch: "1", input: JSON.stringify(input) }).toString()}`,
-    );
-  }
-};
 
 /** Five more than a page, so a second page follows the first. */
 const PALLET_PASSAGES = Array.from(
