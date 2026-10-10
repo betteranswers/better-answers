@@ -32,7 +32,7 @@ The design system's stylesheet gains the registration mark, the grid substrate a
 
 ### Problem Frame
 
-BA-36's review found no page carrying the blueprint register (F1): the `--mark-*` and `--grid-*` tokens ship and nothing reads them, and there is no `card.tsx`. The sign-in pages sit top-left with most of the viewport empty (F2) and use three treatments in one row of secondary actions (F3). The rail's open area is the heaviest object on every page (F15). The sign-in refusal has a coloured left border, which the system bans (F30). The kit's 3px half-alpha focus ring is about 2.3:1 against the page, under WCAG 1.4.11's 3:1, and the system's own token, written as it is, paints its 2px pale ring over its 1px ink edge, so binding it as written would measure worse (F31). S2a's web units wait on this package.
+BA-36's review found no page carrying the blueprint register (F1): the `--mark-*` and `--grid-*` tokens ship and nothing reads them, and there is no `card.tsx`. The sign-in pages sit top-left with most of the viewport empty (F2) and use three treatments in one row of secondary actions (F3). The rail's open area is the heaviest object on every page (F15). The sign-in refusal has a coloured left border, which the system bans (F30). The kit's 3px half-alpha focus ring is about 2.3:1 against the page, under WCAG 1.4.11's 3:1, and the system's own token, written as it is, paints its 2px pale ring over its 1px ink edge, so making it win as written would measure worse (F31). S2a's web units wait on this package.
 
 ### Requirements
 
