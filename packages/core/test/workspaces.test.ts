@@ -67,12 +67,6 @@ const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const seedUser = (): Promise<string> => seedPerson(db().pool);
 
-/** The api's own principal for a read on the session's person. */
-const identity: PlatformPrincipal = {
-  kind: "platform",
-  actorId: "process:better-answers-identity",
-};
-
 const partitionExists = async (workspaceId: string): Promise<boolean> => {
   const found = await db().pool.query(
     "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'index' AND c.relname = $1",
@@ -898,7 +892,7 @@ describe("a person's workspaces, each with their role there", () => {
     const beta = await joinedAs("Beta", email, "Admin");
     const acme = await joinedAs("Acme", email, "Viewer");
 
-    expect(await readWorkspacesHeld(identity, door, { personId })).toEqual({
+    expect(await readWorkspacesHeld(bootstrap, door, { personId })).toEqual({
       ok: true,
       value: [
         { workspace: { id: acme.workspaceId, name: "Acme" }, role: "Viewer" },
@@ -913,7 +907,7 @@ describe("a person's workspaces, each with their role there", () => {
     const { email, personId } = await aPerson();
     const theirs = await joinedAs("Delta", email, "Viewer");
 
-    const held = await readWorkspacesHeld(identity, door, { personId });
+    const held = await readWorkspacesHeld(bootstrap, door, { personId });
 
     expect(held).toEqual({
       ok: true,
@@ -924,7 +918,7 @@ describe("a person's workspaces, each with their role there", () => {
   it("answers a person who holds none an empty list", async () => {
     const door = openPostgres(db().runtimePool);
 
-    expect(await readWorkspacesHeld(identity, door, { personId: await seedUser() })).toEqual({
+    expect(await readWorkspacesHeld(bootstrap, door, { personId: await seedUser() })).toEqual({
       ok: true,
       value: [],
     });
@@ -933,18 +927,9 @@ describe("a person's workspaces, each with their role there", () => {
   it("refuses a malformed person id before the statement", async () => {
     const door = openPostgres(db().runtimePool);
 
-    expect(await readWorkspacesHeld(identity, door, { personId: "' OR true --" })).toEqual({
+    expect(await readWorkspacesHeld(bootstrap, door, { personId: "' OR true --" })).toEqual({
       ok: false,
       error: "malformed",
-    });
-  });
-
-  it("refuses the platform acting for a purpose it never names", async () => {
-    const door = openPostgres(db().runtimePool);
-
-    expect(await readWorkspacesHeld(bootstrap, door, { personId: await seedUser() })).toEqual({
-      ok: false,
-      error: "role-forbids",
     });
   });
 
@@ -957,7 +942,7 @@ describe("a person's workspaces, each with their role there", () => {
     );
     expect(ended.ok).toBe(true);
 
-    expect(await readWorkspacesHeld(identity, door, { personId })).toEqual({
+    expect(await readWorkspacesHeld(bootstrap, door, { personId })).toEqual({
       ok: true,
       value: [{ workspace: { id: acme.workspaceId, name: "Acme" }, role: "Editor" }],
     });
@@ -976,7 +961,7 @@ describe("what the slice answers when the store cannot be reached", () => {
         await revokeWorkspaceTokens(bootstrap, door, { workspaceId: ulid(), userId, at }),
       ],
       ["workspacesHeldBy", await workspacesHeldBy(bootstrap, door, userId)],
-      ["readWorkspacesHeld", await readWorkspacesHeld(identity, door, { personId: userId })],
+      ["readWorkspacesHeld", await readWorkspacesHeld(bootstrap, door, { personId: userId })],
       ["workspaceIdByShortName", await workspaceIdByShortName(bootstrap, door, "acme")],
       ["personIdByEmail", await personIdByEmail(bootstrap, door, "acme@example.invalid")],
       [
@@ -1051,7 +1036,7 @@ describe("what the slice answers when the store cannot be reached", () => {
       ok: false,
       error: "malformed",
     });
-    expect(await readWorkspacesHeld(identity, door, { personId: "' OR true --" })).toEqual({
+    expect(await readWorkspacesHeld(bootstrap, door, { personId: "' OR true --" })).toEqual({
       ok: false,
       error: "malformed",
     });

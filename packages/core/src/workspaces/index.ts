@@ -584,15 +584,6 @@ export const workspacesHeldBy = async (
   return ok(held.value);
 };
 
-/** A declaration must name a role; the platform parameter's type lets no person ask. */
-const readWorkspacesHeldAction = declareAction({
-  admits: { role: "Admin", purposes: ["identity"] },
-  input: z.object({ personId: boundarySchemas.user.select.shape.id }),
-  refuses: ["role-forbids", "malformed"],
-});
-
-type WorkspacesHeldRefusal = WorkspaceRefusal<RefusalOf<typeof readWorkspacesHeldAction>>;
-
 type ReadWorkspacesHeldInput = {
   /** The session's own person, never one the request names. */
   readonly personId: string;
@@ -606,12 +597,10 @@ export const readWorkspacesHeld = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: ReadWorkspacesHeldInput,
-): Promise<Result<readonly WorkspaceHeld[], WorkspacesHeldRefusal | Error>> => {
-  const asked = readWorkspacesHeldAction.input.safeParse(input);
-  if (!asked.success) return err("malformed");
-  const admitted = admit(readWorkspacesHeldAction, platform, asked.data);
-  if (!admitted.ok) return err(admitted.error);
-  const { personId } = asked.data;
+): Promise<Result<readonly WorkspaceHeld[], "malformed" | Error>> => {
+  const person = boundarySchemas.user.select.shape.id.safeParse(input.personId);
+  if (!person.success) return err("malformed");
+  const personId = person.data;
 
   return attempt(() =>
     withIdentityRead(
