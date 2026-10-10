@@ -17,6 +17,7 @@ import { cn } from "@/shared/lib/utils.ts";
 import { ListState } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
+import { PageHead } from "@/shared/page-head.tsx";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
@@ -336,9 +337,7 @@ export function MemberPage(properties: { readonly personId: string | undefined }
 
   return (
     <>
-      <h1 ref={heading} tabIndex={-1}>
-        {people.name}
-      </h1>
+      <PageHead heading={people.name} headingRef={heading} />
       {personId === undefined ? (
         <NoSuchMember />
       ) : (

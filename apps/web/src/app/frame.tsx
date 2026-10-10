@@ -20,6 +20,7 @@ import {
   type VisibleArea,
   type VisibleTree,
 } from "@/shared/navigation.ts";
+import { PageHeadSlot } from "@/shared/page-head.tsx";
 import { isFilled, type PageTab, type PageToolbar } from "@/shared/page-toolbar.tsx";
 import { useWideLayout } from "@/shared/wide-layout.ts";
 
@@ -244,6 +245,8 @@ function ToolbarAndPage(properties: {
   readonly handed: Handed | undefined;
 }) {
   const { region } = properties;
+  // Held in state, so the page's head draws once the place it draws into is on the page.
+  const [headSlot, holdHeadSlot] = useState<HTMLElement | null>(null);
 
   return (
     <PageTabsRoot tabs={region?.toolbar.tabs} picked={properties.picked}>
@@ -252,7 +255,6 @@ function ToolbarAndPage(properties: {
           document.getElementById(PAGE)?.focus();
         }}
       />
-      {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
 
       <GridPattern>
         {/* The grid moves down by the top padding, so the page starts on one of its lines. */}
@@ -265,9 +267,14 @@ function ToolbarAndPage(properties: {
           {/* The page's width, not the prose measure: the design system's rule keeps text to it. */}
           <div data-page-content className="max-w-page">
             <HomeLine />
-            <PagePanel>
-              {properties.handed === undefined ? <Outlet /> : properties.handed.draw}
-            </PagePanel>
+            {/* The page's head leads its tabs, which stand outside the panel a tab redraws. */}
+            <div ref={holdHeadSlot} />
+            {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
+            <PageHeadSlot value={headSlot}>
+              <PagePanel>
+                {properties.handed === undefined ? <Outlet /> : properties.handed.draw}
+              </PagePanel>
+            </PageHeadSlot>
           </div>
         </main>
       </GridPattern>

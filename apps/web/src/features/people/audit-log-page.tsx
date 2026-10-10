@@ -8,6 +8,7 @@ import { useLanding } from "@/shared/landing.ts";
 import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -259,20 +260,23 @@ function AuditLogRegion() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id={headingId}>{WORDS.heading}</h2>
-        <ExportAction
-          asked={asked}
-          nothingMatches={auditLog.data !== undefined && events.length === 0}
-          say={setOutcome}
-        />
-      </div>
-      <p className="mt-1 text-muted-foreground">{WORDS.summary}</p>
-      <output className="mt-1 block text-muted-foreground empty:hidden">
-        {auditLog.data === undefined
-          ? ""
-          : WORDS.counted(asked, events.length, auditLog.hasNextPage)}
-      </output>
+      <ListHead
+        heading={WORDS.heading}
+        headingId={headingId}
+        description={WORDS.summary}
+        count={
+          auditLog.data === undefined
+            ? ""
+            : WORDS.counted(asked, events.length, auditLog.hasNextPage)
+        }
+        action={
+          <ExportAction
+            asked={asked}
+            nothingMatches={auditLog.data !== undefined && events.length === 0}
+            say={setOutcome}
+          />
+        }
+      />
       <OutcomeLine outcome={outcome} className="mt-2" />
 
       <Card className="mt-4">
@@ -326,8 +330,7 @@ export function AuditLogPage() {
 
   return (
     <>
-      <h1>{system.name}</h1>
-      <p className="mt-2 text-muted-foreground">{system.summary}</p>
+      <PageHead heading={system.name} summary={system.summary} />
       <AuditLogRegion />
     </>
   );

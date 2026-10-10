@@ -2,13 +2,11 @@ import type { ComponentType } from "react";
 
 import { usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
+import { PageHead } from "@/shared/page-head.tsx";
 import { useOpenTab, type PageTab, type PageToolbar } from "@/shared/page-toolbar.tsx";
-import { counted } from "@/shared/words.ts";
 
 import { InvitationsTab } from "./invitations-tab.tsx";
-import { InviteAction } from "./invite-action.tsx";
 import { MembersTab } from "./members-tab.tsx";
-import { useMembers } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
 import { RequestsTab } from "./requests-tab.tsx";
 
@@ -75,25 +73,8 @@ const useTheOpenTab = (): Tab => {
   return TABS.find((candidate) => candidate.id === openTab) ?? MEMBERS;
 };
 
-/** The workspace's size, said beside the action that grows it, whichever tab is open. */
-function MemberCount() {
-  const members = useMembers();
-  if (members.data === undefined) return null;
-  return (
-    <span className="text-sm text-muted-foreground tabular-nums">
-      {counted(members.data.length, "member", "members")}
-    </span>
-  );
-}
-
 export const MEMBERS_TOOLBAR: PageToolbar = {
   tabs: TABS.map(({ id, name }) => ({ id, name })),
-  actions: (
-    <>
-      <MemberCount />
-      <InviteAction />
-    </>
-  ),
 };
 
 export function MembersPage() {
@@ -103,8 +84,7 @@ export function MembersPage() {
 
   return (
     <>
-      <h1>{people.name}</h1>
-      <p className="mt-2 text-muted-foreground">{people.summary}</p>
+      <PageHead heading={people.name} summary={people.summary} />
       <Content />
     </>
   );

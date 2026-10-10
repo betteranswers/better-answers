@@ -67,7 +67,7 @@ const countCellOf = (name: string): string => `//tr[td[1][normalize-space(.)='${
 /** What the open sheet says under its heading: a group's member count. */
 const SHEET_COUNT = "//div[@role='dialog']//h2/following-sibling::p[1]";
 
-const LIST_COUNT = "//section[h2[normalize-space(.)='Groups']]/output";
+const LIST_COUNT = "//section[h2[normalize-space(.)='Groups']]/div/output";
 
 /** Another workspace's group is made alongside, so a list that leaked would show it. */
 const anAdminAtGroups = async (page: Page, api: APIRequestContext, workspaceName: string) => {
@@ -110,7 +110,16 @@ test.describe("the People group's Groups page", () => {
       "aria-current",
       "page",
     );
-    await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+    // With no tabs to name the list, its own heading shows, under the page's.
+    await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
+      - main "Page":
+        - heading ${JSON.stringify(people.name)} [level=1]
+        - paragraph: ${JSON.stringify(people.summary)}
+        - region "Groups":
+          - heading "Groups" [level=2]
+          - status: 2 groups
+    `);
+    await expect(page.getByRole("tablist")).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("Una's crew");
     await expect(groupsRegion(page)).toMatchAriaSnapshot(`
       - region "Groups":
@@ -135,6 +144,12 @@ test.describe("the People group's Groups page", () => {
                 - button "HR team"
               - cell "2 members"
     `);
+    // A name alone does not say that its row opens, so each name carries a caret at rest.
+    for (const name of ["Bid writers", "HR team"]) {
+      const opens = groupsRegion(page).getByRole("button", { name, exact: true });
+      await expect(opens).toHaveAttribute("aria-haspopup", "dialog");
+      await expect(opens.locator("svg"), `${name} shows no cue that it opens`).toBeVisible();
+    }
     await passesTheAccessibilityGate();
   });
 

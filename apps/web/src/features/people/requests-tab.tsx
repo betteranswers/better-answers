@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
 
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
+import { ListHead } from "@/shared/page-head.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -9,6 +10,7 @@ import { TableCell } from "@/shared/ui/table.tsx";
 import { ApproveRequest } from "./approve-request.tsx";
 import { EMPTY_LINES } from "./empty-lines.ts";
 import { approvedOutcome } from "./invitation-words.ts";
+import { InviteAction } from "./invite-action.tsx";
 import type { Role } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfRequestFailure } from "./refusal.tsx";
@@ -146,9 +148,6 @@ function RequestList(properties: {
 
   return (
     <>
-      <output className="mt-1 block text-muted-foreground empty:hidden">
-        {requests.length === 0 ? null : countOf(requests)}
-      </output>
       {requests.length === 0 ? (
         <NothingWaiting line={EMPTY_LINES.requests} />
       ) : (
@@ -221,10 +220,16 @@ export function RequestsTab() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      {/* Focusable, so a decided row's focus lands here rather than on the page. */}
-      <h2 id={headingId} ref={heading} tabIndex={-1}>
-        Requests
-      </h2>
+      {/* Its heading is focusable, so a decided row's focus lands there rather than on the page. */}
+      <ListHead
+        heading="Requests"
+        headingId={headingId}
+        headingRef={heading}
+        count={
+          requests.data === undefined || requests.data.length === 0 ? "" : countOf(requests.data)
+        }
+        action={<InviteAction />}
+      />
       <OutcomeLine outcome={readRefused ?? outcome} className="mt-2" />
       <div aria-live="polite">
         {said.isPending ? <p className="mt-2">The requests are still loading.</p> : null}

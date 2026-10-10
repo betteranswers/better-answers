@@ -6,8 +6,9 @@ import { EmptyState } from "@/shared/empty-state.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
-import type { PageToolbar } from "@/shared/page-toolbar.tsx";
+import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
+import { counted } from "@/shared/words.ts";
 
 import { ConnectAction } from "./connect-action.tsx";
 import {
@@ -36,14 +37,6 @@ import { REVIEW_HEADING, SOURCES_KEYSTROKES } from "./sources-state.ts";
 import { AUDIENCE_WORDS, NOTHING_CONNECTED, SELECT_A_CONNECTED_SOURCE_FIRST } from "./words.ts";
 
 const sources = menuGroupIn(CONTROL_CENTRE, "sources");
-
-/**
- * The three bulk actions sit beside the findings they command, in the review: five actions in the band
- * scroll a 320px page sideways.
- */
-export const CONNECTED_SOURCES_TOOLBAR: PageToolbar = {
-  actions: <ConnectAction />,
-};
 
 const LISTED = Object.values(SOURCES_KEYSTROKES);
 
@@ -164,11 +157,19 @@ export function ConnectedSourcesPage() {
 
   return (
     <>
-      <h1>{sources.name}</h1>
-      <p className="mt-2 text-muted-foreground">{sources.summary}</p>
+      <PageHead heading={sources.name} summary={sources.summary} />
 
       <section aria-labelledby={listId} className="mt-6">
-        <h2 id={listId}>Connected sources</h2>
+        <ListHead
+          heading="Connected sources"
+          headingId={listId}
+          count={
+            listed.length === 0
+              ? ""
+              : counted(listed.length, "connected source", "connected sources")
+          }
+          action={<ConnectAction />}
+        />
         <OutcomeLine outcome={outcome} className="mt-2" />
 
         <ListStatus connectedSources={connectedSources} />

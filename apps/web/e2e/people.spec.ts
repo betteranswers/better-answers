@@ -154,8 +154,8 @@ const rolePickerRegion = (page: Page): Locator =>
 const removalOf = (page: Page): Locator =>
   thePage(page).getByRole("region", { name: "Removal", exact: true });
 
-/** The one output the Members region holds as a child of its own: the count of people. */
-const THE_COUNT = "//section[h2='Members']/output";
+/** The output in the row under the Members region's heading: the count of members. */
+const THE_COUNT = "//section[h2='Members']/div/output";
 
 /** A member page's summary line, by its term, in the Access section. */
 const accessLine = (term: string): string =>
@@ -367,11 +367,42 @@ test.describe("the People group's Members page", () => {
     );
   });
 
+  test("opens Members with its heading, tabs, count, then action", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Ribble Castings");
+    await expect(memberRows(page)).toHaveCount(3);
+
+    const main = page.getByRole("main", { name: "Page" });
+    await expect(main).toMatchAriaSnapshot(`
+      - main "Page":
+        - heading ${JSON.stringify(people.name)} [level=1]
+        - paragraph: ${JSON.stringify(people.summary)}
+        - tablist ${JSON.stringify(MEMBERS.name)}:
+          - tab "Members" [selected]
+          - tab "Invitations"
+          - tab "Requests"
+        - tabpanel "Members":
+          - region "Members":
+            - heading "Members" [level=2]
+            - status: 3 members
+            - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
+            - searchbox "Search by name or address"
+    `);
+    await expect(main.getByText(/\b3 (members|people)\b/), "the count is said twice").toHaveCount(
+      1,
+    );
+
+    // The open tab names the list, so the list's own heading is kept for a screen reader alone.
+    const heading = membersRegion(page).getByRole("heading", { level: 2, name: "Members" });
+    expect((await heading.boundingBox())?.width, "the tab's name shows twice").toBeLessThanOrEqual(
+      1,
+    );
+  });
+
   test("shows an Admin each member's details, and no one else's", async ({ page, request }) => {
     const { admin, joined, stranger } = await anAdminAtPeople(page, request, "Aire Valley Tooling");
 
     await expect(memberRows(page)).toHaveCount(3);
-    await expect(membersRegion(page).getByText("3 people", { exact: true })).toBeVisible();
+    await expect(membersRegion(page).getByText("3 members", { exact: true })).toBeVisible();
     for (const member of joined) {
       await expect(rowOf(page, member.displayName)).toContainText(member.email);
       await expect(cellOf(page, member.displayName, "Role")).toHaveText(member.role);
@@ -395,11 +426,11 @@ test.describe("the People group's Members page", () => {
     if (sam === undefined) throw new Error("Sam Okoro was joined");
 
     await searchBox(page).fill("PRIY");
-    await clockTheSearch(page, "1 of 3 people match “PRIYA”.");
+    await clockTheSearch(page, "1 of 3 members match “PRIYA”.");
     await searchBox(page).press("A");
     await expect(memberRows(page)).toHaveCount(1);
     await expect(rowOf(page, "Priya Shah")).toBeVisible();
-    await expect(membersRegion(page).getByText("1 of 3 people match “PRIYA”.")).toBeVisible();
+    await expect(membersRegion(page).getByText("1 of 3 members match “PRIYA”.")).toBeVisible();
     await theSearchLandedWithinItsBudget(page);
 
     await searchBox(page).fill(sam.email.slice(0, 12));
@@ -464,7 +495,8 @@ test.describe("the People group's Members page", () => {
     await expect(membersRegion(page)).toMatchAriaSnapshot(`
       - region "Members":
         - heading "Members" [level=2]
-        - status: 3 people
+        - status: 3 members
+        - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
         - searchbox "Search by name or address"
         - combobox "Filter by role": Any role
         - button "Columns"
@@ -1237,7 +1269,7 @@ test.describe("removing a member from their page", () => {
     await passesTheAccessibilityGate();
 
     await confirm.focus();
-    await clockTheNextKey(page, { at: THE_COUNT, reads: "2 people" });
+    await clockTheNextKey(page, { at: THE_COUNT, reads: "2 members" });
     await page.keyboard.press("Enter");
 
     await expect(page).toHaveURL(sorted);
@@ -1738,7 +1770,9 @@ test.describe("bulk actions on the members ticked", () => {
     await membersRegion(page).getByRole("combobox", { name: "Filter by group" }).click();
     await page.getByRole("option", { name: "Site leads", exact: true }).click();
     await expect(names).toHaveText(["Sam Okoro"]);
-    await expect(membersRegion(page).getByText("1 of 3 people match these filters.")).toBeVisible();
+    await expect(
+      membersRegion(page).getByText("1 of 3 members match these filters."),
+    ).toBeVisible();
     await membersRegion(page).getByRole("combobox", { name: "Filter by group" }).click();
     await page.getByRole("option", { name: "Any group", exact: true }).click();
     await expect(names).toHaveCount(3);

@@ -6,6 +6,7 @@ import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
+import { ListHead } from "@/shared/page-head.tsx";
 import { RowMenu } from "@/shared/row-menu.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
@@ -38,12 +39,15 @@ import {
   type ListedInvitation,
   type SentInvitation,
 } from "./invitations-api.ts";
+import { InviteAction } from "./invite-action.tsx";
 import { PEOPLE_KEYSTROKES as KEY, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
 import { UnsentEmails } from "./unsent-emails.tsx";
 
 /** Each status's list is read whole, so the browser pages it. */
 const PAGE_SIZE = 25;
+
+const INVITATIONS_HEADING = "Invitations";
 
 const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.invitation);
 
@@ -203,7 +207,10 @@ const rowMenuOf =
   };
 
 /** Ticks and an action's outcome are the page's; what narrows the rows is the address's. */
-function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingElement | null> }) {
+function InvitationList(properties: {
+  readonly headingId: string;
+  readonly heading: RefObject<HTMLHeadingElement | null>;
+}) {
   const { heading } = properties;
   const narrowed = useNarrowedInvitations();
   const { read, listed, state } = narrowed;
@@ -252,9 +259,13 @@ function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingEle
 
   return (
     <>
-      <output className="mt-1 block text-muted-foreground empty:hidden">
-        {read.data === undefined ? "" : countSaid(narrowed)}
-      </output>
+      <ListHead
+        heading={INVITATIONS_HEADING}
+        headingId={properties.headingId}
+        headingRef={heading}
+        count={read.data === undefined ? "" : countSaid(narrowed)}
+        action={<InviteAction />}
+      />
       <OutcomeLine outcome={outcome} className="mt-2" />
       <UnsentEmails unsent={unsent} />
 
@@ -331,11 +342,8 @@ export function InvitationsTab() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      {/* Focusable, so focus lands here when an action takes the row it was in. */}
-      <h2 id={headingId} ref={heading} tabIndex={-1}>
-        Invitations
-      </h2>
-      <InvitationList heading={heading} />
+      {/* Its heading is focusable, so focus lands there when an action takes the row it was in. */}
+      <InvitationList headingId={headingId} heading={heading} />
     </section>
   );
 }

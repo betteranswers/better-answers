@@ -1878,10 +1878,19 @@ the content, in a sheet titled *Menu*, and gives focus back when it closes.
 
 ### toolbar
 
-The region above a page's content carrying that page's tabs at one end and its actions at the
-other, filled by the page.
+The row under a page's first heading carrying that page's *tabs*, drawn by the frame.
 
-A page with neither gets no toolbar.
+A page without tabs gets no toolbar. It holds no action: a page's primary action is on its list's
+row, in the *page head*.
+
+### page head
+
+_Internal._ how every *page* opens: its first heading, which names its group, and the group's
+summary; then its *toolbar* where it has tabs; then one row for each list, holding the list's
+count and the page's primary action.
+
+So a page reads where the person is, how many, then what they can do. A list under an open *tab*
+keeps its own heading for a screen reader alone, since the tab already names it.
 
 ### selection bar
 
@@ -1911,8 +1920,8 @@ A destructive action sits last, apart. Not the *selection bar*.
 
 ### view-state slot
 
-_Internal._ the one place the open page writes what the actions on its toolbar must read, such as
-what a reader has ticked.
+_Internal._ the one place the open page writes what a part of it drawn outside its own panel must
+read, such as what a reader has ticked.
 
 It answers empty to any page but the one that wrote it, and it is emptied when the reader opens
 another tab.
@@ -1925,7 +1934,7 @@ rail and the menu, in three cells.
 Its three cells are the *logo* over the rail; the *workspace switcher* and the *navigation control*
 over the menu; then the *breadcrumb*, *Jump to* and the **avatar menu**, which shows the person's
 initials and opens to their name, their role and *Sign out*. It holds no page's actions: those are
-in the page's own *toolbar*. Hiding the menu moves nothing in it. Where the window is not wide it
+in the page's own *page head*. Hiding the menu moves nothing in it. Where the window is not wide it
 takes two rows, the breadcrumb alone on the second, and scrolls with the page.
 
 ### logo

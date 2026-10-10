@@ -25,11 +25,6 @@ const A_TABBED_PAGE: PageToolbar = {
     { id: "connected-sources-all", name: "All" },
     { id: "connected-sources-gone", name: "Gone at source" },
   ],
-  actions: (
-    <button type="button" className="border border-border px-3">
-      Add a connected source
-    </button>
-  ),
 };
 
 const ANOTHER_TABBED_PAGE: PageToolbar = {
@@ -40,8 +35,8 @@ const ANOTHER_TABBED_PAGE: PageToolbar = {
 };
 
 /**
- * One helper of the feature's own, called by its content and by its actions: the shared slot
- * never learns the type.
+ * One helper of the feature's own, called by its content and by a part outside its panel: the
+ * shared slot never learns the type.
  */
 const useTickedGroups = viewStateOf<number>("/connected-sources/review");
 
@@ -84,19 +79,15 @@ const A_REVIEW_VIEW: PageToolbar = {
     { id: "review-open", name: "Open" },
     { id: "review-done", name: "Done" },
   ],
-  /** Built once, the way a route's static data is, and live on every render all the same. */
-  actions: (
-    <>
-      <NarrowAction />
-      <AnotherPagesAction />
-    </>
-  ),
 };
 
+/** The actions stand beside the panel, so a page that throws leaves them drawn over its slot. */
 const drawReview = (throwsOnATick: boolean) =>
   render(
     <PageTabsRoot tabs={A_REVIEW_VIEW.tabs}>
       <Toolbar name="Review" toolbar={A_REVIEW_VIEW} />
+      <NarrowAction />
+      <AnotherPagesAction />
       <PagePanel>
         <CatchBoundary
           getResetKey={() => "the panel's own subtree"}
@@ -165,38 +156,25 @@ describe("the toolbar the open page fills", () => {
     expect(within(panel).getByRole("region", { name: "Model choices" })).toBeDefined();
   });
 
-  it("draws no toolbar or panel without tabs or actions", async () => {
+  it("draws no toolbar or panel without tabs", async () => {
     await shellAt("/ask");
 
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("tabpanel")).toBeNull();
   });
 
-  it("draws a page's tabs before its actions in the toolbar", () => {
-    render(
-      <PageTabsRoot tabs={A_TABBED_PAGE.tabs}>
-        <Toolbar name="Connected sources" toolbar={A_TABBED_PAGE} />
-        <PagePanel>
-          <p>The connected sources.</p>
-        </PagePanel>
-      </PageTabsRoot>,
-    );
+  it("draws a page's first heading before its tabs", async () => {
+    await shellAt(MODELS_AND_SPEND);
 
-    const list = screen.getByRole("tablist", { name: "Connected sources" });
-    const action = screen.getByRole("button", { name: "Add a connected source" });
+    const page = screen.getByRole("main");
+    const heading = await within(page).findByRole("heading", { level: 1, name: "Models" });
 
-    expect(list.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
-  });
-
-  it("draws only the actions for a page without tabs", () => {
-    render(<Toolbar name="Connected sources" toolbar={{ actions: A_TABBED_PAGE.actions }} />);
-
-    expect(screen.getByRole("button", { name: "Add a connected source" })).toBeDefined();
-    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(within(page).getByRole("tablist")).toBe(tabs());
+    expect(heading.compareDocumentPosition(tabs()) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 });
 
-describe("the slot a page writes and its actions read", () => {
+describe("the slot a page writes and its other parts read", () => {
   it("gives an action what its own page wrote, not another's", () => {
     drawReview(false);
 

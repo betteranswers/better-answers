@@ -299,6 +299,20 @@ const signedIn = async (page: Page, api: Parameters<typeof provision>[0], name: 
   return workspace;
 };
 
+/** Asked for before signing in, so it is the first page the frame draws and the passkey offer's. */
+const signedInAtModelsAndSpend = async (
+  page: Page,
+  api: Parameters<typeof provision>[0],
+  name: string,
+) => {
+  const email = anAddress("shell");
+  const workspace = await provision(api, { name, adminEmail: email });
+  await page.goto(MODELS_AND_SPEND.path);
+  await signIn(page, api, email);
+  await expect(page).toHaveURL(new RegExp(`${MODELS_AND_SPEND.path}$`));
+  return workspace;
+};
+
 /** Drawn before anything is measured or pressed, so the narrow shell is what answers. */
 const narrowAtModelsAndSpend = async (
   page: Page,
@@ -595,8 +609,7 @@ test("sizes the band's cells to the rail and nav below", async ({ page, request 
 });
 
 test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, request }) => {
-  const workspace = await signedIn(page, request, "Dales Engineering");
-  await page.goto(MODELS_AND_SPEND.path);
+  const workspace = await signedInAtModelsAndSpend(page, request, "Dales Engineering");
   const rail = railOf(page);
   await expect(rail.getByRole("link", { name: CONTROL_CENTRE.name })).toHaveAttribute(
     "aria-current",
@@ -639,7 +652,7 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
     await expect(navOf(page, CONTROL_CENTRE).getByRole("link", { name })).toBeFocused();
   }
 
-  // An Admin holding no passkey is offered one above the toolbar.
+  // An Admin holding no passkey is offered one above the first page they reach.
   const offer = page.getByRole("region", { name: PASSKEY_WORDS.heading });
   await page.keyboard.press("Tab");
   await expect(offer.getByRole("link", { name: PASSKEY_WORDS.add })).toBeFocused();
@@ -684,8 +697,7 @@ test("moves focus from the skip link into the content", async ({ page, request }
 });
 
 test("leaves no target half under the band after skipping", async ({ page, request }) => {
-  await signedIn(page, request, "Swaledale Forge");
-  await page.goto(MODELS_AND_SPEND.path);
+  await signedInAtModelsAndSpend(page, request, "Swaledale Forge");
   const offer = page.getByRole("region", { name: PASSKEY_WORDS.heading });
   await expect(offer.getByRole("link", { name: PASSKEY_WORDS.add })).toBeVisible();
   await expect(tabsOf(page).getByRole("tab")).toHaveText(TOOLBAR_TABS);
@@ -853,6 +865,11 @@ test("keeps a focused control clear of the fixed band", async ({ page, request }
     await page.keyboard.press("Shift+Tab");
     expect(await focusUnderTheBand(page), `stop ${step + 1} back sits under the band`).toBe(false);
   }
+
+  // The gate audits the page as it is left, and any depth can leave a row half under the band.
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+  });
 });
 
 test("paints the shell in the page's own surface token", async ({ page, request }) => {
@@ -893,12 +910,12 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
       - tab "Spend"
   `);
 
-  // The region is the shell's own, between the band and the content and inside neither.
-  const bar = await topOf(bandOf(page));
-  const toolbar = await topOf(tabs);
-  const content = await topOf(page.getByRole("main"));
-  expect(bar).toBeLessThan(toolbar);
-  expect(toolbar).toBeLessThan(content);
+  // The tabs are the shell's own, inside the page: under its first heading, over the open panel.
+  const main = page.getByRole("main");
+  await expect(main.getByRole("tablist")).toHaveCount(1);
+  const heading = main.getByRole("heading", { level: 1, name: ITS_HEADING });
+  expect(await inDocumentOrder(page, [heading, tabs, main.getByRole("tabpanel")])).toBe(true);
+  expect(await topOf(heading)).toBeLessThan(await topOf(tabs));
 
   // The arrows and the selection are the registry's, so the shell rolls no keyboard of its own.
   await tabs.getByRole("tab", { name: "Model choices" }).click();
@@ -911,7 +928,7 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
   await expect(modelChoicesCardOf(page)).toBeVisible();
 });
 
-test("draws no toolbar over a page without tabs or actions", async ({ page, request }) => {
+test("draws no toolbar over a page without tabs", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
   await expect(
     page.getByRole("heading", { level: 1, name: headingOf(HOMES.Viewer) }),

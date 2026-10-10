@@ -247,8 +247,30 @@ test.describe("the People page's Invitations tab", () => {
     await expect(
       invitationsRegion(page).getByText(INVITATIONS_WORDS.counted("waiting", 1), { exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("main").getByText(/\d+ members?\b/),
+      "the members' count shows on Invitations",
+    ).toHaveCount(0);
     await countedUnder(page, "waiting", 1);
     expect(await emailsSentTo(request, address), "the invitation's one email").toBe(1);
+  });
+
+  test("opens the invite dialog by keystroke from each tab", async ({ page, request }) => {
+    await anAdminAtInvitations(page, request, "Nidd Presswork");
+
+    for (const name of ["Members", "Invitations", "Requests"]) {
+      const tab = page.getByRole("tab", { name });
+      await tab.click();
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+      await expect(inviteAction(page)).toBeVisible();
+      await tab.blur();
+
+      await page.keyboard.press(PEOPLE_KEYSTROKES.invite.key);
+      await expect(addressField(page), `i opened no dialog on ${name}`).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(inviteDialog(page)).toHaveCount(0);
+      await expect(inviteAction(page), `focus left the action on ${name}`).toBeFocused();
+    }
   });
 
   test("an empty tab says so in one line, inviting once", async ({ page, request }) => {
@@ -273,10 +295,9 @@ test.describe("the People page's Invitations tab", () => {
             - row:
               - cell "${EMPTY_LINES.invitations}"
     `);
-    await expect(
-      invitingButtons(page),
-      "the toolbar's action is the one way to invite",
-    ).toHaveCount(1);
+    await expect(invitingButtons(page), "the head's action is the one way to invite").toHaveCount(
+      1,
+    );
     await expect(inviteAction(page)).toBeVisible();
   });
 

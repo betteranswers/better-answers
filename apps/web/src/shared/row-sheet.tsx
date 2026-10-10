@@ -1,6 +1,30 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
+import { Icon } from "@/shared/icon.tsx";
+import { cn } from "@/shared/lib/utils.ts";
+import { Button } from "@/shared/ui/button.tsx";
 import { Sheet, SheetContent } from "@/shared/ui/sheet.tsx";
+
+/** The row's own name, with a caret at rest: a name alone does not say that the row opens. */
+export function RowSheetButton(
+  properties: Omit<ComponentProps<typeof Button>, "variant" | "aria-haspopup">,
+) {
+  const { className, children, ...button } = properties;
+  return (
+    <Button
+      {...button}
+      variant="link"
+      aria-haspopup="dialog"
+      className={cn(
+        "h-auto gap-1 p-0 text-left font-medium whitespace-normal text-foreground",
+        className,
+      )}
+    >
+      {children}
+      <Icon name="caret-right" className="text-muted-foreground" />
+    </Button>
+  );
+}
 
 /**
  * A row's detail over its list. No Radix trigger opened it, so closing hands focus back to the

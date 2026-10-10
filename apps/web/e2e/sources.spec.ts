@@ -37,6 +37,9 @@ const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.
 const connectedSourcesRegion = (page: Page) =>
   page.getByRole("region", { name: "Connected sources" });
 
+/** The region's outcome line: its count and the connect action's progress are statuses before it. */
+const saidIn = (page: Page): Locator => connectedSourcesRegion(page).getByRole("status").last();
+
 const connectedSourceNamed = (page: Page, name: string): Locator =>
   connectedSourcesRegion(page)
     .getByRole("listitem")
@@ -243,11 +246,14 @@ test.describe("connecting a document on the Sources page", () => {
         - /children: equal
         - heading "Connected sources" [level=2]
         - status
+        - status
+        - button "Connect a document"
+        - status
         - paragraph: ${NOTHING_CONNECTED}
     `);
     await expect(
       page.getByRole("button", { name: /^connect/i }),
-      "the toolbar's action is the one way to connect",
+      "the head's action is the one way to connect",
     ).toHaveCount(1);
     await passesTheAccessibilityGate();
     await skipLinkReachesThePage(page);
@@ -958,7 +964,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await page.keyboard.press("Enter");
     await theActionLandedWithinItsBudget(page, "widen");
 
-    await expect(connectedSourcesRegion(page).getByRole("status")).toContainText(
+    await expect(saidIn(page)).toContainText(
       "Widened “Tender answers” to Internal for everyone in the workspace. 1 concept and 1 write-up moved with it.",
     );
     await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
@@ -1015,7 +1021,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
 
     // The row reads widened before the api answers, and a late answer overwrites the next
     // `w`'s sentence.
-    await expect(connectedSourcesRegion(page).getByRole("status")).toHaveText(
+    await expect(saidIn(page)).toHaveText(
       "Widened “Price book” to Public for everyone in the workspace. 0 concepts and 0 write-ups moved with it.",
     );
     await expect(audienceOf).toHaveText("Everyone in the workspace");
@@ -1026,7 +1032,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       .getByRole("button", { name: "Review Price book" })
       .focus();
     await page.keyboard.press("w");
-    await expect(connectedSourcesRegion(page).getByRole("status")).toHaveText(
+    await expect(saidIn(page)).toHaveText(
       "“Price book” is Public for everyone in the workspace, and no sensitivity or audience is wider.",
     );
   });

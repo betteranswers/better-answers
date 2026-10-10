@@ -67,7 +67,9 @@ test("offers a way out, shell intact, when a page throws", async ({
   await expect(navigation.getByRole("link", { name: "Audit log" })).toBeVisible();
 
   await skipLinkReachesThePage(page);
-  // The open tab's panel is the first stop inside the content, so the way out is the next one.
+  // The tabs lead the content, then the open tab's panel, so the way out is the stop after it.
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("tab", { name: "Model choices" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("tabpanel")).toBeFocused();
   await page.keyboard.press("Tab");

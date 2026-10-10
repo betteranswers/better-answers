@@ -6,6 +6,7 @@ import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
+import { RowSheetButton } from "@/shared/row-sheet.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { counted } from "@/shared/words.ts";
@@ -40,11 +41,8 @@ function PersonCell(properties: {
   const unnamed = person.displayName === "";
   return (
     <div className="grid justify-items-start gap-0.5">
-      <Button
+      <RowSheetButton
         id={personButtonId(person.id)}
-        variant="link"
-        aria-haspopup="dialog"
-        className="h-auto p-0 text-left font-medium whitespace-normal text-foreground"
         onFocus={() => {
           actions.focusedOn(person.id);
         }}
@@ -54,7 +52,7 @@ function PersonCell(properties: {
       >
         {unnamed ? <span className="text-muted-foreground">No display name yet</span> : null}
         {unnamed ? null : person.displayName}
-      </Button>
+      </RowSheetButton>
       <span className="text-xs wrap-anywhere text-muted-foreground">{person.email}</span>
     </div>
   );

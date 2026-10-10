@@ -8,14 +8,17 @@ import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
+import { ListHead } from "@/shared/page-head.tsx";
 import { RowMenu } from "@/shared/row-menu.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 /* jscpd:ignore-end */
 import { useHiddenColumns } from "@/shared/wide-layout.ts";
+import { counted } from "@/shared/words.ts";
 
 import { useGroups } from "./groups-api.ts";
+import { InviteAction } from "./invite-action.tsx";
 import {
   MEMBER_PAGE_WORDS,
   MEMBERS_LOADING,
@@ -55,6 +58,8 @@ import { nameOf } from "./words.tsx";
 /** The members read returns the whole workspace, so the browser pages it. */
 const PAGE_SIZE = 25;
 
+const MEMBERS_HEADING = "Members";
+
 const SEARCH_LABEL = "Search by name or address";
 
 const NOTHING_IN_FOCUS = selectFirst(PEOPLE_SELECT_FIRST.member);
@@ -66,8 +71,7 @@ const NO_ONE: readonly ListedMember[] = [];
 /** Person and role are what a narrow window has room for; the rest can be shown again. */
 const NARROW_HIDES: ReadonlySet<string> = new Set(["groups", "joined"]);
 
-const countOfPeople = (count: number): string =>
-  count === 1 ? "1 person" : `${String(count)} people`;
+const countOfMembers = (count: number): string => counted(count, "member", "members");
 
 type Narrowing = {
   readonly search: string;
@@ -79,8 +83,8 @@ const isNarrowed = (narrowing: Narrowing): boolean =>
   narrowing.search !== "" || narrowing.role !== undefined || narrowing.group !== undefined;
 
 const saidOfCount = (shown: number, total: number, narrowing: Narrowing): string => {
-  if (!isNarrowed(narrowing)) return countOfPeople(total);
-  const of = `${String(shown)} of ${countOfPeople(total)} match`;
+  if (!isNarrowed(narrowing)) return countOfMembers(total);
+  const of = `${String(shown)} of ${countOfMembers(total)} match`;
   return narrowing.search === "" ? `${of} these filters.` : `${of} “${narrowing.search}”.`;
 };
 
@@ -284,20 +288,6 @@ function NoOneMatches(properties: {
   );
 }
 
-function CountLine(properties: {
-  readonly read: ReturnType<typeof useMembers>;
-  readonly narrowed: Narrowed;
-}) {
-  const { read, narrowed } = properties;
-  return (
-    <output className="mt-1 block text-muted-foreground">
-      {read.data === undefined
-        ? ""
-        : saidOfCount(narrowed.data.length, read.data.length, narrowed.narrowing)}
-    </output>
-  );
-}
-
 /** A ticked person the list has since lost is still named by the action that refused them. */
 const namedIn =
   (listed: readonly ListedMember[]) =>
@@ -309,6 +299,7 @@ const namedIn =
 /** Ticks and an action's outcome are the page's; what narrows the rows is the address's. */
 function MemberList(properties: {
   readonly read: ReturnType<typeof useMembers>;
+  readonly headingId: string;
   readonly heading: RefObject<HTMLHeadingElement | null>;
 }) {
   const { read, heading } = properties;
@@ -362,7 +353,17 @@ function MemberList(properties: {
 
   return (
     <>
-      <CountLine read={read} narrowed={narrowed} />
+      <ListHead
+        heading={MEMBERS_HEADING}
+        headingId={properties.headingId}
+        headingRef={heading}
+        count={
+          read.data === undefined
+            ? ""
+            : saidOfCount(narrowed.data.length, read.data.length, narrowed.narrowing)
+        }
+        action={<InviteAction />}
+      />
       <OutcomeLine outcome={outcome ?? returned} className="mt-2" />
 
       <Card className="mt-4">
@@ -471,10 +472,7 @@ export function MembersTab() {
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      <h2 id={headingId} ref={heading} tabIndex={-1}>
-        Members
-      </h2>
-      <MemberList read={members} heading={heading} />
+      <MemberList read={members} headingId={headingId} heading={heading} />
     </section>
   );
 }

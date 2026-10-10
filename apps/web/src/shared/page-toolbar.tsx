@@ -4,16 +4,11 @@ export type PageTab = { readonly id: string; readonly name: string };
 
 export type PageToolbar = {
   readonly tabs?: readonly PageTab[] | undefined;
-  /**
-   * A route's static data is built once, so an action carries its own behaviour and reads the
-   * page's own state from the slot below.
-   */
-  readonly actions?: ReactNode | undefined;
 };
 
-/** An empty bar above a page's content is the defect this guards. */
+/** An empty row under a page's heading is the defect this guards. */
 export const isFilled = (toolbar: PageToolbar | undefined): toolbar is PageToolbar =>
-  (toolbar?.tabs ?? []).length > 0 || toolbar?.actions !== undefined;
+  (toolbar?.tabs ?? []).length > 0;
 
 const OpenTab = createContext<string | undefined>(undefined);
 
