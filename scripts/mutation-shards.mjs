@@ -13,7 +13,7 @@ export const legs = new Map([
     {
       root: path.join(repositoryRoot, "packages/core"),
       mutate: coreStryker.mutate,
-      // Each of these files alone outruns a shard's 120-minute ceiling.
+      // Each of these files alone outran a shard's ceiling when it was 120 minutes.
       split: new Map([
         ["src/store/git/index.ts", 4],
         ["src/store/map/index.ts", 2],

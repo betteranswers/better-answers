@@ -1212,6 +1212,7 @@ export type ConceptRead = {
 };
 
 const sharerOfRow = (row: ReadRow) =>
+  // Stryker disable next-line ConditionalExpression,LogicalOperator: the override's actor and recorded_at are NOT NULL in one joined row; hides the condition → true, killed in concept-read.test.ts
   row.shared_by === null || row.shared_at === null
     ? undefined
     : { actor: row.shared_by, at: row.shared_at };

@@ -10,7 +10,7 @@ on:
         type: boolean
         default: false
       ceiling-minutes:
-        description: "Minutes before each shard is cancelled, its checkpoint kept; empty is 120, and 350 at most, since a hosted job is terminated at 360"
+        description: "Minutes before each shard is cancelled, its checkpoint kept; empty is 180, and 350 at most, since a hosted job is terminated at 360"
         type: number
       shards:
         description: "The shards to run, as leg-number pairs with commas and no spaces, such as core-1,api-2; empty runs every shard, and a shard not named keeps its files' previous results"
@@ -30,7 +30,7 @@ jobs:
     name: stryker (${{ matrix.name }} ${{ matrix.shard }} of ${{ matrix.of }})
     runs-on: ubuntu-26.04
     # A dispatch hands its inputs over as strings, and the timeout refuses anything but a number.
-    timeout-minutes: ${{ fromJSON(inputs.ceiling-minutes || '120') }}
+    timeout-minutes: ${{ fromJSON(inputs.ceiling-minutes || '180') }}
     # A job's `if` cannot read the matrix, so a shard a dispatch did not name skips every step.
     env:
       SELECTED: ${{ !inputs.shards || contains(format(',{0},', inputs.shards), format(',{0}-{1},', matrix.name, matrix.shard)) }}

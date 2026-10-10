@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
+import { z } from "zod";
 
 import { ids, type ConceptIri } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
@@ -7,12 +8,14 @@ import {
   ask,
   find,
   findInput,
+  findOutputWith,
   giveFeedback,
   mapWords,
   NOT_ANSWERED,
   NOT_COMPANY_KNOWLEDGE,
   open,
   openInput,
+  openOutputWith,
   renderAnswer,
   renderFeedback,
   renderFind,
@@ -75,6 +78,18 @@ const unverified: Trust = {
   verifiedAt: null,
   rider: null,
 };
+
+/** Core's own trust, handed to an output schema as an edge that renames nothing would. */
+const trust = z.custom<Trust>();
+
+const messagesOf = (parsed: { readonly error?: z.ZodError }): readonly string[] | undefined =>
+  parsed.error?.issues.map(({ message }) => message);
+
+/** Whether each field carries the words an MCP client's model reads beside it. */
+const described = (shape: Readonly<Record<string, z.ZodType>>): Readonly<Record<string, boolean>> =>
+  Object.fromEntries(
+    Object.entries(shape).map(([key, field]) => [key, (field.description ?? "").trim() !== ""]),
+  );
 
 describe("the answer's rendering", () => {
   it("puts the verdict first and the map's line second", () => {
@@ -495,6 +510,9 @@ describe("the boundary find and open are parsed at", () => {
       ok: false,
       error: { word: "malformed", fields: { query: "refused" } },
     });
+    expect(messagesOf(findInput.safeParse({ query: "audit\u0000logs" }))).toEqual([
+      "a query holds no NUL character",
+    ]);
   });
 
   it("holds a page to 1–20 matches, 5 when unasked", () => {
@@ -551,6 +569,55 @@ describe("the boundary find and open are parsed at", () => {
       ok: false,
       error: { word: "malformed", fields: { "": "refused" } },
     });
+    expect(messagesOf(openInput.safeParse(input))).toEqual([
+      "give an `iri` or a `locator`, not both and not neither",
+    ]);
+  });
+
+  it("describes every find and open input field", () => {
+    expect(described(findInput.shape)).toEqual({ query: true, limit: true, cursor: true });
+    expect(described(openInput.shape)).toEqual({ iri: true, locator: true });
+  });
+
+  it("describes an evidence item's at, locator and iri", () => {
+    const [found] = openOutputWith(trust).options;
+
+    expect(described(found.shape.concept.unwrap().shape.evidence.element.shape)).toMatchObject({
+      at: true,
+      locator: true,
+      iri: true,
+    });
+  });
+
+  it.each([
+    ["no concept and no passage", {}],
+    [
+      "a concept and a passage",
+      {
+        concept: {
+          iri: "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ",
+          frontmatter: { title: "Kingfisher policy", type: "Policy" },
+          body: "The kingfisher rule is stated here.",
+          relations: [],
+          trust: unverified,
+          trustWords: "Unverified",
+          evidence: [],
+        },
+        passage: {
+          locator: "01J6ZZZZZZZZZZZZZZZZZZZZZZ/chars:0-44",
+          source: "The bid library's invoice",
+          text: "The kingfisher invoice was settled in March.",
+          sensitivity: "Internal",
+        },
+      },
+    ],
+  ])("refuses a found result of %s", (_case, held) => {
+    const refused = openOutputWith(trust).safeParse({ found: true, ...held });
+
+    expect(refused.success).toBe(false);
+    expect(messagesOf(refused)).toEqual([
+      "a found result carries a concept or a passage, never both or neither",
+    ]);
   });
 });
 
@@ -602,6 +669,58 @@ describe("the two knowledge layers a search and a fetch reach", () => {
         locator: document.locator,
       });
       return indexed.iri;
+    } finally {
+      client.release();
+    }
+  };
+
+  /**
+   * A Policy naming a passage of `handbook`, a page and a second concept as its sources, with a
+   * map edge to that concept.
+   */
+  const conceptOfThreeSources = async (
+    workspaceId: string,
+    handbook: LandedDocument,
+  ): Promise<{ readonly iri: ConceptIri; readonly cited: ConceptIri }> => {
+    const client = await db().pool.connect();
+    try {
+      const seed = testData(client);
+      const cited = await seed.conceptIndex({
+        workspaceId,
+        kind: "Policy",
+        title: "Travel policy",
+        publishedAt: PUBLISHED_AT,
+        sensitivity: "Internal",
+      });
+      const indexed = await seed.conceptIndex({
+        workspaceId,
+        kind: "Policy",
+        title: CONCEPT_TITLE,
+        body: CONCEPT_BODY,
+        frontmatter: {
+          title: CONCEPT_TITLE,
+          type: "Policy",
+          sources: [
+            {
+              id: "S-1",
+              title: HANDBOOK_TITLE,
+              resource: "documents/handbook",
+              locator: handbook.locator,
+            },
+            { title: "Bid library", resource: "../sources/bid-library.md", locator: "p.4" },
+            { title: "Travel policy", resource: cited.iri },
+          ],
+        },
+        publishedAt: PUBLISHED_AT,
+        sensitivity: "Internal",
+      });
+      await seed.mapEdge({
+        workspaceId,
+        label: "CITES",
+        fromUid: indexed.iri,
+        toUid: cited.iri,
+      });
+      return { iri: indexed.iri, cited: cited.iri };
     } finally {
       client.release();
     }
@@ -793,6 +912,123 @@ describe("the two knowledge layers a search and a fetch reach", () => {
           sensitivity: "Internal",
         },
       },
+    });
+  });
+
+  it("keeps a two-layer search whole through find's output schema", async () => {
+    const reader = await arrange();
+    const { invoice, iri } = await aDocumentEachWay(reader);
+
+    const found = await searching(reader);
+
+    expect(findOutputWith(trust).safeParse(found.ok && found.value)).toEqual({
+      success: true,
+      data: {
+        query: "kingfisher",
+        matches: [
+          {
+            layer: "bundles",
+            iri,
+            kind: "Policy",
+            title: "Kingfisher policy",
+            trust: unverified,
+            trustWords: "Unverified",
+            bundle: "knowledge",
+            tags: [],
+          },
+          {
+            layer: "sources",
+            kind: "document",
+            title: "The bid library's invoice",
+            locator: invoice.locator,
+            sensitivity: "Internal",
+          },
+        ],
+      },
+    });
+  });
+
+  it("drops only the pane's words from an opened concept", async () => {
+    const reader = await arrange();
+    const handbook = await documentHolding(reader.workspaceId, {
+      title: HANDBOOK_TITLE,
+      text: HANDBOOK_TEXT,
+    });
+    const { iri, cited } = await conceptOfThreeSources(reader.workspaceId, handbook);
+
+    const opened = await acting(reader, (principal, tx) => open(principal, tx, { iri }, now));
+
+    expect(opened.ok && opened.value.found && opened.value.concept).toMatchObject({
+      access: "included",
+      lead: "Based on your current access, the evidence is included.",
+      next: "Open a source to read the passage the concept rests on.",
+    });
+    expect(openOutputWith(trust).safeParse(opened.ok && opened.value)).toEqual({
+      success: true,
+      data: {
+        found: true,
+        concept: {
+          iri,
+          frontmatter: {
+            title: "Kingfisher policy",
+            type: "Policy",
+            sources: [
+              {
+                id: "S-1",
+                title: "The covered handbook",
+                resource: "documents/handbook",
+                locator: handbook.locator,
+              },
+              { title: "Bid library", resource: "Bid library", locator: "p.4" },
+              { title: "Travel policy", resource: cited },
+            ],
+          },
+          body: "The kingfisher rule is stated here.",
+          relations: [{ kind: "CITES", target: cited, title: "Travel policy" }],
+          trust: unverified,
+          trustWords: "Unverified",
+          evidence: [
+            { id: "S-1", source: "The covered handbook", locator: handbook.locator },
+            { source: "Bid library", at: "p.4" },
+            { source: "Travel policy", iri: cited },
+          ],
+        },
+      },
+    });
+  });
+
+  it("keeps an opened passage and both not-found answers whole", async () => {
+    const reader = await arrange();
+    const invoice = await documentHolding(reader.workspaceId, {
+      title: INVOICE_TITLE,
+      text: INVOICE_TEXT,
+    });
+
+    const [passage, noPassage, noConcept] = await Promise.all([
+      opening(reader, invoice.locator),
+      opening(reader, "not an address at all"),
+      acting(reader, (principal, tx) => open(principal, tx, { iri: ABSENT }, now)),
+    ]);
+
+    expect(openOutputWith(trust).safeParse(passage.ok && passage.value)).toEqual({
+      success: true,
+      data: {
+        found: true,
+        passage: {
+          locator: invoice.locator,
+          source: "The bid library's invoice",
+          text: "The kingfisher invoice was settled in March.",
+          sensitivity: "Internal",
+        },
+      },
+    });
+    expect(openOutputWith(trust).safeParse(noPassage.ok && noPassage.value)).toEqual({
+      success: true,
+      data: { found: false, locator: "not an address at all" },
+    });
+    expect(openOutputWith(trust).safeParse(noConcept.ok && noConcept.value)).toEqual({
+      success: true,
+      data: { found: false, iri: "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ" },
     });
   });
 });

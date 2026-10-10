@@ -1,8 +1,9 @@
-import type pg from "pg";
+import pg from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, expect } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 import {
+  endPool,
   openMigratedPostgres,
   testData,
   type MigratedPostgres,
@@ -59,6 +60,32 @@ export const postgresForEachCase = (): (() => MigratedPostgres) => {
   return () => {
     if (db === undefined) throw new Error("the case's Postgres was read before it started");
     return db;
+  };
+};
+
+/**
+ * A pool as `app_rt` holding a connection per read, never reaped while idle: the suite's own
+ * `runtimePool` holds five, and a sixth read waits.
+ */
+export const runtimePoolFor = (db: () => MigratedPostgres, reads: number): (() => pg.Pool) => {
+  let pool: pg.Pool | undefined;
+
+  beforeAll(() => {
+    pool = new pg.Pool({
+      connectionString: db().connectionUri,
+      max: reads,
+      idleTimeoutMillis: 0,
+      options: "-c role=app_rt",
+    });
+  });
+
+  afterAll(async () => {
+    if (pool !== undefined) await endPool(pool);
+  });
+
+  return () => {
+    if (pool === undefined) throw new Error("the readers' pool was read before it opened");
+    return pool;
   };
 };
 

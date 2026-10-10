@@ -2,7 +2,7 @@
 
 Four skills here come from https://github.com/jspiro/skills, which is under the MIT licence: `code-comments`, `complexity-gate`, `mutation-testing` and `repo-quality-sweep`. Each was copied from that repository's `skills/<name>/` folder. `skills-lock.json` names the source of each one.
 
-`code-comments` and `repo-quality-sweep` carry the owner's edits. The other two match upstream.
+All four carry the owner's edits.
 
 The notice sits in this file, not in each skill's folder. A licence file inside a folder would change that folder's hash in `skills-lock.json`.
 

@@ -119,6 +119,7 @@ const readsPassage = async (doors: Doors, locator: string): Promise<Result<boole
 };
 
 const labelOf = (entry: SourceEntry, resource: string): string => {
+  // Stryker disable next-line ConditionalExpression,StringLiteral: a string entry has no title, read or not; hides → true and "title" → "", both killed in concept-read.test.ts
   const title = typeof entry === "string" ? undefined : entry["title"];
   return typeof title === "string" && title.trim() !== "" ? title : resource;
 };
@@ -161,6 +162,7 @@ const resolvedOf = async (
   entry: SourceEntry,
 ): Promise<Result<Resolved | undefined, Error>> => {
   const cited = citedSourceOf(entry);
+  // Stryker disable next-line ConditionalExpression: the insert boundary refuses an entry naming no resource, so none reaches this; hides → true, killed in import-bundle.test.ts
   if (cited === undefined) return ok(undefined);
   const source = labelOf(entry, cited.resource);
   const named = namedItem(cited.id, source, placeOf(doors, cited.locator));
@@ -186,6 +188,7 @@ export const resolvedSourcesOf = async (
   for (const entry of Array.isArray(sources) ? sources : []) {
     const one = await resolvedOf(doors, entry);
     if (!one.ok) return err(one.error);
+    // Stryker disable next-line ConditionalExpression: the insert boundary refuses an entry naming no resource, so none is undefined here; hides → false, killed in answering.test.ts
     if (one.value !== undefined) resolved.push(one.value);
   }
   return ok(resolved);
@@ -215,6 +218,7 @@ const projectedSources = (
   resolved: readonly Resolved[],
 ): readonly string[] | readonly FrontmatterSource[] => {
   const texts = resolved.flatMap(({ entry, item, opens }) =>
+    // Stryker disable next-line ConditionalExpression,ArrayDeclaration: the text list is returned only when no entry is a record; hides → false and the first list → [], killed in concept-read.test.ts
     typeof entry === "string" ? [opens ? entry : labelOnlyText(item.source, item.at)] : [],
   );
   const records = resolved.flatMap(({ entry, item, opens }) =>
@@ -233,6 +237,7 @@ export const projectedFrontmatter = (
   resolved: readonly Resolved[],
 ): Frontmatter => {
   const { sources, ...rest } = frontmatter;
+  // Stryker disable next-line ConditionalExpression: with no sources key, rest holds the same frontmatter; hides → true, killed in concept-read.test.ts
   if (sources === undefined) return frontmatter;
   return Array.isArray(sources) ? { ...rest, sources: projectedSources(resolved) } : rest;
 };
