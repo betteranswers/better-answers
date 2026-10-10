@@ -16,7 +16,14 @@ import {
 } from "@better-answers/core/workspaces";
 
 import type { RefusalAnswer } from "../refusal.ts";
-import { crossing, given, operatorProcedure, parsedBy, router } from "./base.ts";
+import {
+  crossing,
+  given,
+  operatorMutationProcedure,
+  operatorQueryProcedure,
+  parsedBy,
+  router,
+} from "./base.ts";
 
 type AsTheOperator = {
   readonly log: Logger;
@@ -52,32 +59,32 @@ const writtenNow =
 
 export const consoleRouter = router({
   people: router({
-    list: operatorProcedure.input(parsedBy(listPeopleInput)).query(({ ctx, input }) =>
+    list: operatorQueryProcedure.input(parsedBy(listPeopleInput)).query(({ ctx, input }) =>
       crossing(
         ctx,
         listPeople.name,
         given(input, (asked) => listPeople(ctx.operator, ctx.tx, asked)),
       ),
     ),
-    inspect: operatorProcedure.input(parsedBy(inspectPersonInput)).query(({ ctx, input }) =>
+    inspect: operatorQueryProcedure.input(parsedBy(inspectPersonInput)).query(({ ctx, input }) =>
       crossing(
         ctx,
         inspectPerson.name,
         given(input, (asked) => inspectPerson(ctx.operator, ctx.tx, asked)),
       ),
     ),
-    endEverySignInAndToken: operatorProcedure
+    endEverySignInAndToken: operatorMutationProcedure
       .input(parsedBy(endEverySignInAndTokenInput))
       .mutation(writtenNow(endEverySignInAndToken)),
-    namesWaiting: operatorProcedure.query(({ ctx }) =>
+    namesWaiting: operatorQueryProcedure.query(({ ctx }) =>
       crossing(ctx, listNamesWaiting.name, listNamesWaiting(ctx.operator, ctx.tx)),
     ),
-    correctDisplayName: operatorProcedure
+    correctDisplayName: operatorMutationProcedure
       .input(parsedBy(correctDisplayNameInput))
       .mutation(writtenNow(correctDisplayName)),
   }),
   workspaces: router({
-    list: operatorProcedure.query(({ ctx }) =>
+    list: operatorQueryProcedure.query(({ ctx }) =>
       crossing(ctx, listWorkspaces.name, listWorkspaces(ctx.operator, ctx.tx)),
     ),
   }),
