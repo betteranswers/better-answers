@@ -7,7 +7,7 @@ import type { Tx } from "@better-answers/core/store/postgres";
 import { ulid } from "@better-answers/schema";
 
 import { runOps } from "../src/ops/index.ts";
-import type { operatorProcedure } from "../src/trpc/base.ts";
+import type { operatorMutationProcedure, operatorQueryProcedure } from "../src/trpc/base.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { appRouter } from "../src/trpc/router.ts";
 import { connectAsHost, refresh, revokeAtEndpoint, signIn } from "./flow.ts";
@@ -23,7 +23,11 @@ const IDENTITY_ACTOR = "process:better-answers-identity";
 
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
-type OperatorContext = inferProcedureBuilderResolverOptions<typeof operatorProcedure>["ctx"];
+type OperatorContext = inferProcedureBuilderResolverOptions<typeof operatorQueryProcedure>["ctx"];
+
+type OperatorMutationContext = inferProcedureBuilderResolverOptions<
+  typeof operatorMutationProcedure
+>["ctx"];
 
 type WebApi = Awaited<ReturnType<typeof webSignedIn>>["api"];
 
@@ -301,6 +305,7 @@ describe("the console, the operator's alone", () => {
     expectTypeOf<OperatorContext["tx"]>().toEqualTypeOf<Tx>();
     expectTypeOf<OperatorContext["doors"]>().toEqualTypeOf<undefined>();
     expectTypeOf<OperatorContext>().not.toHaveProperty("principal");
+    expectTypeOf<OperatorMutationContext>().toEqualTypeOf<OperatorContext>();
     expectTypeOf<OperatorPrincipal>().not.toExtend<Principal>();
   });
 

@@ -21,6 +21,7 @@ import {
   withHeldPrincipal,
   withMember,
   withOperator,
+  withOperatorRead,
   withPrincipal,
   withPrincipalRead,
   type CounterRule,
@@ -313,18 +314,23 @@ export const ownTransactionCeiling = (rule: CounterRule) =>
  * Built from the session alone: this surface reads no bearer, so a token never becomes the
  * operator.
  */
-export const operatorProcedure = trpc.procedure.use(async ({ ctx, path, next }) => {
-  const { user, session } = await sessionOf(ctx, path);
+const inTheOperatorsTransaction = (resolve: typeof withOperator) =>
+  trpc.procedure.use(async ({ ctx, path, next }) => {
+    const { user, session } = await sessionOf(ctx, path);
 
-  const resolved = await attempt(() =>
-    withOperator(
-      ctx.doors.postgres,
-      // The row's own creation: the library's refresh moves only its update and expiry, so the
-      // hour the operator's writes allow runs from the sign-in itself.
-      { userId: user.id, issuedAt: session.createdAt },
-      async (operator, tx) =>
-        thrownIfFailed(await next({ ctx: { operator, tx, doors: undefined } })),
-    ),
-  );
-  return settled(ctx, OPERATOR_RESOLVER, resolved);
-});
+    const resolved = await attempt(() =>
+      resolve(
+        ctx.doors.postgres,
+        // The row's own creation: the library's refresh moves only its update and expiry, so the
+        // hour the operator's writes allow runs from the sign-in itself.
+        { userId: user.id, issuedAt: session.createdAt },
+        async (operator, tx) =>
+          thrownIfFailed(await next({ ctx: { operator, tx, doors: undefined } })),
+      ),
+    );
+    return settled(ctx, OPERATOR_RESOLVER, resolved);
+  });
+
+export const operatorQueryProcedure = inTheOperatorsTransaction(withOperatorRead);
+
+export const operatorMutationProcedure = inTheOperatorsTransaction(withOperator);

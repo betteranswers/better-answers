@@ -1,4 +1,4 @@
-import type { inferProcedureBuilderResolverOptions } from "@trpc/server";
+import type { AnyRouter, inferProcedureBuilderResolverOptions } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import type { Logger } from "pino";
 import { describe, expect, expectTypeOf, it } from "vitest";
@@ -7,6 +7,7 @@ import { z } from "zod";
 import {
   err,
   ok,
+  type OperatorPrincipal,
   type SecondFactorStanding,
   systemClock,
   type UserPrincipal,
@@ -20,7 +21,8 @@ import type { GatedSessionReader } from "../src/second-factor-gate.ts";
 import {
   crossing,
   mutationProcedure,
-  operatorProcedure,
+  operatorMutationProcedure,
+  operatorQueryProcedure,
   ownTransactionProcedure,
   personProcedure,
   queryProcedure,
@@ -204,12 +206,11 @@ const writingRoads = (key: string) => {
   });
 };
 
-/** Asked as the web asks, as a workspace's Admin: a query over GET, a mutation over POST. */
-const askedAsAnAdmin = async (road: "queried" | "mutated") => {
-  const workspace = await app().provision();
-  const key = `probe-${workspace.workspaceId}`;
-  const { logger, logs } = capturingLogger();
-  const response = await fetchRequestHandler({
+type Road = "queried" | "mutated";
+
+/** Asked as the web asks: a query over GET, a mutation over POST. */
+const askedOver = (road: Road, roads: AnyRouter, readSession: GatedSessionReader, log: Logger) =>
+  fetchRequestHandler({
     endpoint: "/trpc",
     req: new Request(
       `https://app.example.test/trpc/${road}`,
@@ -217,18 +218,32 @@ const askedAsAnAdmin = async (road: "queried" | "mutated") => {
         ? { method: "GET" }
         : { method: "POST", headers: { "content-type": "application/json" } },
     ),
-    router: writingRoads(key),
-    createContext: () =>
-      contextOf(app().doors, logger, async () => ({
-        user: { id: workspace.admin.id, email: workspace.admin.email },
-        session: {
-          id: A_SIGNED_IN_PERSON.session.id,
-          createdAt: new Date(),
-          activeOrganizationId: workspace.workspaceId,
-        },
-        standing: "not-required",
-      })),
+    router: roads,
+    createContext: () => contextOf(app().doors, log, readSession),
   });
+
+const signedInAs =
+  (person: { readonly id: string; readonly email: string }, workspaceId: string) => async () => ({
+    user: { id: person.id, email: person.email },
+    session: {
+      id: A_SIGNED_IN_PERSON.session.id,
+      createdAt: new Date(),
+      activeOrganizationId: workspaceId,
+    },
+    standing: "not-required" as const,
+  });
+
+/** Asked as a workspace's Admin. */
+const askedAsAnAdmin = async (road: Road) => {
+  const workspace = await app().provision();
+  const key = `probe-${workspace.workspaceId}`;
+  const { logger, logs } = capturingLogger();
+  const response = await askedOver(
+    road,
+    writingRoads(key),
+    signedInAs(workspace.admin, workspace.workspaceId),
+    logger,
+  );
   const written = await app().database.superuser.query(
     "SELECT 1 FROM workspace_config WHERE workspace_id = $1 AND key = $2",
     [workspace.workspaceId, key],
@@ -238,9 +253,47 @@ const askedAsAnAdmin = async (road: "queried" | "mutated") => {
 
 const failedLine = z.object({ action: z.string(), err: z.object({ code: z.string() }) });
 
-describe("a write on the member roads", () => {
+/** One body on both operator roads: the operator renames themselves, which needs no workspace. */
+const operatorWritingRoads = (name: string) => {
+  const probeWrite = async (operator: OperatorPrincipal, tx: Tx) => {
+    await tx.query('UPDATE "user" SET name = $2 WHERE id = $1', [operator.userId, name]);
+    return ok("landed");
+  };
+  return router({
+    queried: operatorQueryProcedure.query(({ ctx }) =>
+      crossing(ctx, "probeWrite", probeWrite(ctx.operator, ctx.tx)),
+    ),
+    mutated: operatorMutationProcedure.mutation(({ ctx }) =>
+      crossing(ctx, "probeWrite", probeWrite(ctx.operator, ctx.tx)),
+    ),
+  });
+};
+
+/** Asked as the operator: a workspace's Admin who carries the mark. */
+const askedAsTheOperator = async (road: Road) => {
+  const workspace = await app().provision();
+  await app().markOperator(workspace.admin.email, "grant");
+  const name = `probe-${workspace.workspaceId}`;
+  const { logger, logs } = capturingLogger();
+  const response = await askedOver(
+    road,
+    operatorWritingRoads(name),
+    signedInAs(workspace.admin, workspace.workspaceId),
+    logger,
+  );
+  const written = await app().database.superuser.query(
+    'SELECT 1 FROM "user" WHERE id = $1 AND name = $2',
+    [workspace.admin.id, name],
+  );
+  return { status: response.status, rows: written.rowCount, logs };
+};
+
+describe.each([
+  ["member", askedAsAnAdmin],
+  ["operator", askedAsTheOperator],
+] as const)("a write on the %s roads", (_side, asked) => {
   it("fails at its statement on the query road, leaving nothing", async () => {
-    const { status, rows, logs } = await askedAsAnAdmin("queried");
+    const { status, rows, logs } = await asked("queried");
 
     expect([status, rows]).toEqual([500, 0]);
     expect(
@@ -249,7 +302,7 @@ describe("a write on the member roads", () => {
   });
 
   it("lands on the mutation road", async () => {
-    const { status, rows } = await askedAsAnAdmin("mutated");
+    const { status, rows } = await asked("mutated");
 
     expect([status, rows]).toEqual([200, 1]);
   });
@@ -261,8 +314,8 @@ const definitionOf = z.object({ type: z.string().optional(), middlewares: z.arra
 const middlewaresOf = (procedure: object) => definitionOf.parse(Reflect.get(procedure, "_def"));
 
 describe("every query the router serves", () => {
-  it("runs on a road that opens no read-write member transaction", () => {
-    const roads = [queryProcedure, personProcedure, operatorProcedure].map(
+  it("runs on a road that opens no read-write transaction itself", () => {
+    const roads = [queryProcedure, personProcedure, operatorQueryProcedure].map(
       (road) => middlewaresOf(road).middlewares[0],
     );
 
@@ -273,18 +326,19 @@ describe("every query the router serves", () => {
       .filter(([, procedure]) => !roads.includes(middlewaresOf(procedure).middlewares[0]))
       .map(([path]) => path);
 
-    expect(queries.map(([path]) => path)).toContain("members.list");
+    expect(queries.map(([path]) => path)).toEqual(
+      expect.arrayContaining(["members.list", "console.workspaces.list"]),
+    );
     expect(elsewhere).toEqual([]);
   });
 
-  it("tells a query on the mutation road apart", () => {
-    const astray = mutationProcedure.query(() => "read");
+  it.each([
+    ["member", mutationProcedure, queryProcedure],
+    ["operator", operatorMutationProcedure, operatorQueryProcedure],
+  ] as const)("tells a query on the %s mutation road apart", (_side, mutationRoad, queryRoad) => {
+    const astray = mutationRoad.query(() => "read");
 
-    expect(middlewaresOf(astray).middlewares[0]).toBe(
-      middlewaresOf(mutationProcedure).middlewares[0],
-    );
-    expect(middlewaresOf(astray).middlewares[0]).not.toBe(
-      middlewaresOf(queryProcedure).middlewares[0],
-    );
+    expect(middlewaresOf(astray).middlewares[0]).toBe(middlewaresOf(mutationRoad).middlewares[0]);
+    expect(middlewaresOf(astray).middlewares[0]).not.toBe(middlewaresOf(queryRoad).middlewares[0]);
   });
 });

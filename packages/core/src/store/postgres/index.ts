@@ -472,15 +472,11 @@ const carriesTheMark = (
   row.operator &&
   (row.revoked_at === null || credentialIssuedAtMs >= row.revoked_at.getTime());
 
-/**
- * Resolves a signed-in person to the operator, then runs `work` as them in one transaction scoped
- * to no workspace. Refuses `not-the-operator` to anyone else: a person without the mark, credentials
- * issued before their revocation, an id no person holds.
- */
-export const withOperator = async <T>(
+const resolveOperator = async <T>(
   door: PostgresDoor,
   claims: Pick<Claims, "userId" | "issuedAt">,
   work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
+  opening: Opening,
 ): Promise<Result<T, OperatorRefusal>> => {
   const credentialIssuedAtMs = claims.issuedAt.getTime();
 
@@ -502,8 +498,27 @@ export const withOperator = async <T>(
       return ok(await work(operator, tx));
     },
     (opened) => !opened.ok || answersARefusal(opened.value),
+    opening,
   );
 };
+
+/**
+ * Resolves a signed-in person to the operator, then runs `work` as them in one transaction scoped
+ * to no workspace. Refuses `not-the-operator` to anyone else: a person without the mark, credentials
+ * issued before their revocation, an id no person holds.
+ */
+export const withOperator = async <T>(
+  door: PostgresDoor,
+  claims: Pick<Claims, "userId" | "issuedAt">,
+  work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
+): Promise<Result<T, OperatorRefusal>> => resolveOperator(door, claims, work, "BEGIN");
+
+/** As withOperator, but read-only: a write inside the work fails at its own statement. */
+export const withOperatorRead = async <T>(
+  door: PostgresDoor,
+  claims: Pick<Claims, "userId" | "issuedAt">,
+  work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
+): Promise<Result<T, OperatorRefusal>> => resolveOperator(door, claims, work, "BEGIN READ ONLY");
 
 export type CounterRule = {
   readonly windowMs: number;
