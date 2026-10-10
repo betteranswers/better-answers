@@ -1956,8 +1956,9 @@ The finder the *top band* opens by click, ⌘K or Ctrl+K, to go somewhere in one
 
 It holds the *areas* and *pages* the person may see, the workspace's members for a person who may
 see People, each opening their *member page*, and the actions their role may take, such as *Invite
-a person*, listed under the headings Areas, Pages, Actions and Members. Knowledge joins it with S2a's
-retrieval; until then it is not a search.
+a person*, listed under the headings Areas, Pages, Actions and Members. It matches those names alone
+and is not a search. Once something is typed, a last row under the heading Knowledge, *Search for
+“…”*, takes the typed words to Search, for a person who may see Search.
 
 ### theme
 
