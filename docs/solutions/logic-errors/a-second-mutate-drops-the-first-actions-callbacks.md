@@ -75,6 +75,7 @@ The callbacks are lost only when a second `mutate()` reaches the same observer b
 - Put behaviour that must run for every request (cache reconciliation, re-reads) in the options given to `useMutation`, where a later call cannot drop it.
 - Mark the control `aria-disabled` rather than `disabled` while pending, so keyboard focus is not thrown back to the page.
 - A spec for any action that lands somewhere or marks rows should press twice with the first answer held back.
+- Unmounting the component that holds the observer drops the same callbacks, with no second call at all: the observer runs per-call options only while it has listeners. A control that closes or replaces a part whose action is pending is held until the answer arrives. On Connected sources the Review button is `aria-disabled` while one of the review's three bulk actions is pending (`useBulkActionPending` in `apps/web/src/features/sources/sources-api.ts`); opening another source's review still replaces the first and is not held.
 
 ## Related Issues
 
