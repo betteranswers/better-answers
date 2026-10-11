@@ -1,16 +1,17 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { RAIL } from "@/app/words.ts";
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
-import { CONTROL_CENTRE, HOMES } from "@/shared/navigation.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
 import {
   ADA,
   adaAnAdmin,
   adaAt,
+  adminsAreaOffered,
   drawnWithNoWorkspace,
   FORBIDDEN,
   GRACE,
@@ -34,12 +35,6 @@ const CALDER = { id: "c", name: "Calder Pressings" };
 const NOT_A_MEMBER = refusedWith("not-a-member", "unauthenticated", 401);
 
 const SET_ACTIVE = "/organization/set-active";
-
-/** An Admin's own area, which the rail offers no other role. */
-const adminsAreaOffered = () =>
-  within(screen.getByRole("navigation", { name: RAIL })).queryByRole("link", {
-    name: CONTROL_CENTRE.name,
-  });
 
 const MEMBER_PAGE = memberPageOf(ADA.personId);
 

@@ -10,7 +10,7 @@ import { HomeLine } from "@/features/people/self-action.tsx";
 import { GridPattern } from "@/shared/blueprint.tsx";
 import { BreadcrumbLastPartSlot } from "@/shared/breadcrumb-last-part.ts";
 import { ShellKeystrokes, ShellKeystrokesAction, type Keystroke } from "@/shared/keystrokes.tsx";
-import { useMember } from "@/shared/member.ts";
+import { leftFor, useMember } from "@/shared/member.ts";
 import {
   EVERY_AREA,
   placeAt,
@@ -35,7 +35,13 @@ import { Menu } from "./menu.tsx";
 import { NavigationButton, NavigationSheet, useNavigationSheet } from "./navigation-control.tsx";
 import { openTabIn, PagePanel, PageTabsRoot, Toolbar, type PickedTab } from "./toolbar.tsx";
 import { useArrivalTakenOnceRead, useHidden, VisibleTreeContext } from "./visible-tree.ts";
-import { useWorkspaceSwitch, WorkspaceSwitcher, type Here } from "./workspace-switcher.tsx";
+import { switchedInAnotherTab } from "./words.ts";
+import {
+  useWorkspaceSwitch,
+  WorkspaceSwitcher,
+  type Here,
+  type WorkspaceSwitch,
+} from "./workspace-switcher.tsx";
 
 type Region = { readonly name: string; readonly toolbar: PageToolbar };
 
@@ -84,11 +90,35 @@ const listNameOf = (
   open: Place<VisibleArea> | undefined,
 ): string | undefined => handed?.name ?? open?.page.name;
 
-/** The band has one line: the switcher's own outcome leads, and the unsaved note comes last. */
-const useBandOutcome = (switching: Outcome | undefined, pathname: string): Outcome | undefined => {
-  const switchedElsewhere = useSwitchedElsewhereSaid();
+/** Kept to the history entry, as a refused tab's is, so it goes at the person's next move. */
+const useSwitchedInAnotherTabSaid = (here: Here | undefined): Outcome | undefined => {
+  const entry = useRouterState({ select: (state) => state.location.state.__TSR_key });
+  const now = here?.workspaceId;
+  const [held, setHeld] = useState(now);
+  const [saidAt, setSaidAt] = useState<string>();
+  if (now !== held) {
+    setHeld(now);
+    setSaidAt(leftFor(held, now) ? entry : undefined);
+  }
+  return here !== undefined && saidAt !== undefined && saidAt === entry
+    ? { tone: "said", words: switchedInAnotherTab(here.name) }
+    : undefined;
+};
+
+/**
+ * The band has one line: the switcher's own outcome leads, a refused tab's precedes a returning
+ * tab's, and the unsaved note comes last.
+ */
+const useBandOutcome = (
+  switching: WorkspaceSwitch,
+  here: Here | undefined,
+  pathname: string,
+): Outcome | undefined => {
+  const refusedElsewhere = useSwitchedElsewhereSaid();
+  // No workspace while a switch pressed here is pending, so the answer after it is a first read.
+  const readElsewhere = useSwitchedInAnotherTabSaid(switching.pending ? undefined : here);
   const unsaved = useUnsavedChangeSaid(pathname);
-  return switching ?? switchedElsewhere ?? unsaved;
+  return switching.outcome ?? refusedElsewhere ?? readElsewhere ?? unsaved;
 };
 
 /** A place hidden from the reader is no place here, so it draws as one that never existed. */
@@ -120,7 +150,7 @@ export function Frame(properties: {
 
   const open = placeAt(visible.areas, pathname);
   const region = useRegion(visible, pathname);
-  const outcome = useBandOutcome(switching.outcome, pathname);
+  const outcome = useBandOutcome(switching, here, pathname);
   useArrivalTakenOnceRead(visible);
 
   return (

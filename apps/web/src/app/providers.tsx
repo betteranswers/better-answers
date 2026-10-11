@@ -1,6 +1,7 @@
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
+import { forgetAWorkspaceLeftElsewhere } from "@/features/auth/auth-hooks.ts";
 import { createQueryClient, type FailureHeard } from "@/shared/api/query-client.ts";
 import {
   createApiClient,
@@ -43,13 +44,11 @@ export type AppClients = {
 export const createAppClients = (): AppClients => {
   const failures = aFailureListener();
   const queryClient = createQueryClient(failures.heard);
-  // The member read's key comes from a proxy over the client this link belongs to, so the proxy is
-  // made at the first send.
-  let api: ApiProxy | undefined;
-  const apiClient: ApiClient = createApiClient(() => {
-    api ??= createApiProxy(apiClient, queryClient);
-    return workspaceHeld(queryClient, api);
-  });
+  // The member read's key comes from a proxy over the client this link belongs to, so the link
+  // reads the proxy only at a send.
+  const apiClient: ApiClient = createApiClient(() => workspaceHeld(queryClient, api));
+  const api: ApiProxy = createApiProxy(apiClient, queryClient);
+  forgetAWorkspaceLeftElsewhere(queryClient, api);
   return { queryClient, apiClient, failures };
 };
 

@@ -17,7 +17,13 @@ import { useState } from "react";
 import { z } from "zod";
 
 import { useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
-import { forgetMember, memberChanged } from "@/shared/member.ts";
+import {
+  forgetMember,
+  leftFor,
+  memberChanged,
+  memberOptions,
+  workspaceHeld,
+} from "@/shared/member.ts";
 
 import { authClient } from "./auth-client.ts";
 import {
@@ -462,6 +468,21 @@ const aboutTheWorkspace = (api: ApiProxy) => {
  */
 const forgetTheWorkspaceLeft = (queryClient: QueryClient, api: ApiProxy) => {
   queryClient.removeQueries({ predicate: aboutTheWorkspace(api) });
+};
+
+/**
+ * Another tab moved the session. The reads go as the cache hears the answer, before the frame
+ * draws a page under it.
+ */
+export const forgetAWorkspaceLeftElsewhere = (queryClient: QueryClient, api: ApiProxy): void => {
+  const member = { queryKey: memberOptions(api).queryKey, exact: true };
+  let held = workspaceHeld(queryClient, api);
+  queryClient.getQueryCache().subscribe(({ query }) => {
+    if (!matchQuery(member, query)) return;
+    const was = held;
+    held = workspaceHeld(queryClient, api);
+    if (leftFor(was, held)) forgetTheWorkspaceLeft(queryClient, api);
+  });
 };
 
 /**

@@ -35,8 +35,8 @@ export const SAID_OF_CLASS = {
 /** Said the same on every surface, so no feature words it and its class’s reload is never said. */
 const SAID_ON_EVERY_SURFACE = {
   "workspace-switched": {
-    why: "You changed workspace in another tab, so nothing was done here.",
-    next: "Check which workspace this tab shows before you do it again.",
+    why: "You switched workspace in another tab, so that didn’t go through.",
+    next: "This tab now shows the workspace you switched to.",
   },
 } satisfies SaidOfWord;
 

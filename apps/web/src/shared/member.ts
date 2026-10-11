@@ -30,6 +30,13 @@ export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
 export const workspaceHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.workspace.id;
 
+/**
+ * A first read, a read after a drop or a reset, and another role in the same workspace are no
+ * change of workspace.
+ */
+export const leftFor = (held: string | undefined, now: string | undefined): boolean =>
+  held !== undefined && now !== undefined && now !== held;
+
 export const NEEDS_A_PICK: RefusalWord = "no-active-workspace";
 
 export const NO_SESSION: RefusalWord = "no-session";

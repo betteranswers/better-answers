@@ -8,23 +8,27 @@ import {
   MEMBERS_LOADING,
 } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
-import { HOMES, type Role } from "@/shared/navigation.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
 import {
   ADA,
   adaAnAdmin,
-  adaAt,
   band,
   drawnWithNoWorkspace,
   GRACE,
+  HEDY,
+  heldBack,
   HOLME,
   LOST,
   NORTHERN,
   openAt,
+  openTab,
   read,
   refusedWith,
+  switchedInAnotherTab,
   switcher,
+  tickOf,
   type Api,
 } from "./two-workspaces.ts";
 
@@ -36,14 +40,11 @@ placedWithoutMeasuring();
 const SWITCHED = refusedWith("workspace-switched", "conflict", 409);
 
 const SAID =
-  "You changed workspace in another tab, so nothing was done here. Check which workspace this tab shows before you do it again.";
+  "You switched workspace in another tab, so that didn’t go through. This tab now shows the workspace you switched to.";
 
 const MEMBERS = HOMES.Admin.path;
 
 const GRACES_PAGE = memberPageOf(GRACE.personId);
-
-/** In Holme Valley Tools only, so a row of hers is never one of the workspace left. */
-const HEDY = { ...ADA, personId: "01JHEDY000000000000000000A", displayName: "Hedy" };
 
 /** Waiting in Northern Tooling only. */
 const KAYS = {
@@ -54,24 +55,6 @@ const KAYS = {
   invitedAt: "2026-10-01T09:00:00.000Z",
   expiresAt: "2026-10-08T09:00:00.000Z",
   invitedBy: ADA.displayName,
-};
-
-/** Another tab points the session at Holme Valley Tools, where Ada holds `role`. */
-const switchedInAnotherTab = (api: Api, role: Role, members = [ADA, HEDY]) => {
-  api.set("session.member", () => adaAt(role, HOLME));
-  api.set("members.list", () => read(members));
-  api.set("members.invitations", () => read([]));
-};
-
-/** An answer the api gives only once the test lets it; `asked` settles when the request arrives. */
-const heldBack = (api: Api, procedure: string, answer: unknown) => {
-  const asked = Promise.withResolvers<void>();
-  const held = Promise.withResolvers<void>();
-  api.set(procedure, () => {
-    asked.resolve();
-    return held.promise.then(() => answer);
-  });
-  return { asked: asked.promise, resolve: held.resolve };
 };
 
 /** Grace's page under Northern Tooling, drawn as far as her role. */
@@ -86,14 +69,6 @@ const changeGracesRole = () => {
   fireEvent.click(
     screen.getByRole("button", { name: MEMBER_PAGE_WORDS.makeRole(GRACE.displayName, "Editor") }),
   );
-};
-
-const tickOf = (name: string) => screen.queryByRole("checkbox", { name: `Select ${name}` });
-
-const openTab = (name: string) => {
-  const tab = screen.getByRole("tab", { name });
-  // The registry's tabs open on a press, never on a click.
-  fireEvent.mouseDown(tab);
 };
 
 /** The band names the session's workspace and says why the tab moved. */

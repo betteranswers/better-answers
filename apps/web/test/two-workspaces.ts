@@ -1,9 +1,9 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
-import { FAILED_PAGE } from "@/app/words.ts";
-import type { Role } from "@/shared/navigation.ts";
+import { FAILED_PAGE, RAIL } from "@/app/words.ts";
+import { CONTROL_CENTRE, type Role } from "@/shared/navigation.ts";
 
 import { openApp } from "./open-app.tsx";
 import { server, type Asked } from "./stub-server.ts";
@@ -24,6 +24,9 @@ export const ADA = {
 };
 
 export const GRACE = { ...ADA, personId: "01JGRACE00000000000000000A", displayName: "Grace" };
+
+/** In Holme Valley Tools only, so a row of hers is never one of the workspace left. */
+export const HEDY = { ...ADA, personId: "01JHEDY000000000000000000A", displayName: "Hedy" };
 
 const A_SESSION = {
   session: { activeOrganizationId: NORTHERN.id },
@@ -78,6 +81,24 @@ export const adaAnAdmin = (): Api =>
     ],
   ]);
 
+/** Another tab points the session at Holme Valley Tools, where Ada holds `role`. */
+export const switchedInAnotherTab = (api: Api, role: Role, members = [ADA, HEDY]) => {
+  api.set("session.member", () => adaAt(role, HOLME));
+  api.set("members.list", () => read(members));
+  api.set("members.invitations", () => read([]));
+};
+
+/** An answer the api gives only once the test lets it; `asked` settles when the request arrives. */
+export const heldBack = (api: Api, procedure: string, answer: unknown) => {
+  const asked = Promise.withResolvers<void>();
+  const held = Promise.withResolvers<void>();
+  api.set(procedure, () => {
+    asked.resolve();
+    return held.promise.then(() => answer);
+  });
+  return { asked: asked.promise, resolve: held.resolve };
+};
+
 /**
  * A turn of the event loop later, as a network answers: sooner, the answer lands before the frame
  * hears its member read change.
@@ -107,6 +128,20 @@ export const switcher = (workspace = NORTHERN) =>
 
 export const switcherDrawn = (workspace = NORTHERN) =>
   band().queryByRole("button", { name: workspace.name });
+
+export const tickOf = (name: string) => screen.queryByRole("checkbox", { name: `Select ${name}` });
+
+export const openTab = (name: string) => {
+  const tab = screen.getByRole("tab", { name });
+  // The registry's tabs open on a press, never on a click.
+  fireEvent.mouseDown(tab);
+};
+
+/** An Admin's own area, which the rail offers no other role. */
+export const adminsAreaOffered = () =>
+  within(screen.getByRole("navigation", { name: RAIL })).queryByRole("link", {
+    name: CONTROL_CENTRE.name,
+  });
 
 /** The frame after a member read that failed: no name of the workspace left, and a way to retry. */
 export const drawnWithNoWorkspace = async () => {
