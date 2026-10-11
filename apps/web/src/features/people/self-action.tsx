@@ -1,9 +1,10 @@
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
-import { HOMES, type Role } from "@/shared/navigation.ts";
+import { useTRPC } from "@/shared/api/trpc.ts";
+import { memberChanged } from "@/shared/member.ts";
+import { HOMES } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 
@@ -26,22 +27,6 @@ export const useIncludesYou = (personIds: readonly string[]): string | undefined
   return readerId !== undefined && personIds.includes(readerId) ? INCLUDES_YOU : undefined;
 };
 
-const memberOf = (api: ApiProxy) => ({
-  queryKey: api.session.member.queryKey(),
-  exact: true,
-});
-
-/** `refetchQueries` resolves on a failed or paused read too, so only a settled answer counts. */
-const roleReadAgain = async (
-  queryClient: QueryClient,
-  api: ApiProxy,
-): Promise<Role | undefined> => {
-  const member = memberOf(api);
-  await queryClient.refetchQueries(member);
-  const read = queryClient.getQueryState(member.queryKey);
-  return read?.status === "success" && read.fetchStatus === "idle" ? read.data?.role : undefined;
-};
-
 /** The reader can no longer see the page the action was taken on, so each move replaces it. */
 export const useSelfActionHome = () => {
   const api = useTRPC();
@@ -52,15 +37,16 @@ export const useSelfActionHome = () => {
     // What the reader may see has changed, so no read held from before answers a page they open next.
     void queryClient.resetQueries({ type: "inactive" });
     if (change === "removed") {
-      // Reset, not removed: the frame's mounted read never hears a removal and draws the old role.
-      void queryClient.resetQueries(memberOf(api));
+      // No member is left to read, so the held answer goes unread.
+      void memberChanged(queryClient, api, { readAgain: false, ifUnread: "reset" });
       // Not `/`: the session still names the workspace left, and the shell sends that refusal to sign-in.
       await navigate({ href: "/choose-workspace", replace: true });
       return undefined;
     }
-    const role = await roleReadAgain(queryClient, api);
     // The held answer stays: dropping it would leave the page with no role to draw.
-    if (role === undefined) return ROLE_UNREAD;
+    const member = await memberChanged(queryClient, api, { readAgain: true, ifUnread: "keep" });
+    if (member === undefined) return ROLE_UNREAD;
+    const { role } = member;
     await navigate({
       href: HOMES[role].path,
       replace: true,

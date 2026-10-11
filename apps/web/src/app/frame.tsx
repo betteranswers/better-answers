@@ -2,7 +2,6 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
-import { useMember } from "@/features/auth/member.ts";
 import { PasskeyOffer, useOfferPlace, type OfferPlace } from "@/features/auth/passkey-offer.tsx";
 import { useUnsavedChangeSaid } from "@/features/auth/unsaved-change.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
@@ -10,6 +9,7 @@ import { HomeLine } from "@/features/people/self-action.tsx";
 import { GridPattern } from "@/shared/blueprint.tsx";
 import { BreadcrumbLastPartSlot } from "@/shared/breadcrumb-last-part.ts";
 import { ShellKeystrokes, ShellKeystrokesAction, type Keystroke } from "@/shared/keystrokes.tsx";
+import { useMember } from "@/shared/member.ts";
 import {
   EVERY_AREA,
   placeAt,

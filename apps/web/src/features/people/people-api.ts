@@ -9,6 +9,7 @@ import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 
 import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
+import { memberOptions, useMember } from "@/shared/member.ts";
 
 import { roleOf } from "./role-meanings.ts";
 
@@ -112,7 +113,7 @@ const useReconciledList = <Asked>(
       activityReadAgain();
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: listKey }),
-        queryClient.invalidateQueries({ queryKey: api.session.member.queryKey() }),
+        queryClient.invalidateQueries({ queryKey: memberOptions(api).queryKey }),
       ]);
     },
   };
@@ -147,10 +148,7 @@ export const useEndEverySignInAndToken = () => {
 };
 
 /** The shell's own read of who is signed in, and where, shared rather than asked again. */
-const useHeldMember = () => {
-  const api = useTRPC();
-  return useQuery(api.session.member.queryOptions(undefined, { refetchOnMount: false })).data;
-};
+const useHeldMember = () => useMember().data;
 
 export const useReaderId = (): string | undefined => useHeldMember()?.person.id;
 

@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 
-import { useRole } from "@/features/auth/member.ts";
+import { useRole } from "@/shared/member.ts";
 import { HOMES, type Page } from "@/shared/navigation.ts";
 import { Button } from "@/shared/ui/button.tsx";
 

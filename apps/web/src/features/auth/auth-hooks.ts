@@ -17,6 +17,7 @@ import { useState } from "react";
 import { z } from "zod";
 
 import { useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
+import { forgetMember, memberChanged } from "@/shared/member.ts";
 
 import { authClient } from "./auth-client.ts";
 import {
@@ -28,7 +29,6 @@ import {
   nextAfterSignIn,
   pageQuery,
 } from "./carried-flow.ts";
-import { forgetMember, rereadMember } from "./member.ts";
 import { factorStepDue } from "./second-factor-steps.ts";
 import {
   forgetTheUnsavedChange,
@@ -498,7 +498,7 @@ export const useSwitchWorkspace = () => {
     mutationFn: (workspace) => setActiveWorkspace(workspace.id),
     onSuccess: async () => {
       forgetTheWorkspaceLeft(queryClient, api);
-      await rereadMember(queryClient, api);
+      await memberChanged(queryClient, api, { readAgain: true, ifUnread: "reset" });
       void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
       await navigate({ href: "/", replace: true });
     },

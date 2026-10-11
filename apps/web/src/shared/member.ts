@@ -2,10 +2,8 @@ import { useQuery, type QueryClient } from "@tanstack/react-query";
 
 import { refusalOf, useTRPC, type ApiProxy, type RefusalWord } from "@/shared/api/trpc.ts";
 
-import { rememberTheSession } from "./session-memory.ts";
-
 /** The route has read this before the shell mounts, so a read on mount would be the second. */
-const memberOptions = (api: ApiProxy) =>
+export const memberOptions = (api: ApiProxy) =>
   api.session.member.queryOptions(undefined, { refetchOnMount: false });
 
 export const useMember = () => {
@@ -48,12 +46,12 @@ const wordSendingThemOn = (error: Error): RefusalWord | undefined => {
 export const memberRefusal = async (
   queryClient: QueryClient,
   api: ApiProxy,
+  onRead: () => void,
 ): Promise<RefusalWord | undefined> => {
   try {
     // A read that failed for anything else is the shell's own query to retry and report.
     await queryClient.ensureQueryData({ ...memberOptions(api), retry: false });
-    // Answered, so not pending: a session ending from here ended for some other reason.
-    rememberTheSession("held");
+    onRead();
     return undefined;
   } catch (error) {
     return error instanceof Error ? wordSendingThemOn(error) : undefined;
@@ -66,15 +64,30 @@ export const forgetMember = (queryClient: QueryClient, api: ApiProxy) => {
 };
 
 /**
- * In place, so the shell moves straight to the new answer. A failed or paused read keeps the left
- * workspace's answer, which is dropped.
+ * What a caller does about the answer held once the reader's own member has changed. Neither has
+ * a default.
  */
-export const rereadMember = async (queryClient: QueryClient, api: ApiProxy) => {
+type MemberChange = {
+  /** False where no member is left to read. */
+  readonly readAgain: boolean;
+  /** Unread, the answer held is the one from before the change. */
+  readonly ifUnread: "reset" | "keep";
+};
+
+/** In place, so the shell moves straight to the new answer. Undefined when the member is unread. */
+export const memberChanged = async (
+  queryClient: QueryClient,
+  api: ApiProxy,
+  change: MemberChange,
+) => {
   const filters = { queryKey: memberOptions(api).queryKey, exact: true };
-  await queryClient.refetchQueries(filters);
-  const read = queryClient.getQueryState(filters.queryKey);
-  // Reset, not removed: the frame's mounted read never hears a removal and goes on drawing it.
-  if (read?.status !== "success" || read.fetchStatus !== "idle") {
-    void queryClient.resetQueries(filters);
+  if (change.readAgain) {
+    await queryClient.refetchQueries(filters);
+    const read = queryClient.getQueryState(filters.queryKey);
+    // `refetchQueries` resolves on a failed or paused read too, so only a settled answer counts.
+    if (read?.status === "success" && read.fetchStatus === "idle") return read.data;
   }
+  // Reset, not removed: the frame's mounted read never hears a removal and goes on drawing it.
+  if (change.ifUnread === "reset") void queryClient.resetQueries(filters);
+  return undefined;
 };
