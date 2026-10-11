@@ -8,6 +8,7 @@ import {
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 
+import { takenFrom, type Undo } from "@/shared/api/optimistic.ts";
 import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
 import { memberOptions, useMember } from "@/shared/member.ts";
 
@@ -70,8 +71,6 @@ export const useMembers = () => {
   return useQuery(api.members.list.queryOptions());
 };
 
-type Taken = { readonly before: readonly ListedMember[] | undefined };
-
 /** Each action on the list is asked of one person or of a ticked set. */
 const ASKED_OF = z.union([
   z.object({ personId: z.string() }).transform((asked) => [asked.personId]),
@@ -92,16 +91,16 @@ const useReconciledList = <Asked>(
   const listKey = api.members.list.queryKey();
   // Callers spread these into `useMutation`: the React lint takes a callback passed through `mutationOptions` as called during render.
   return {
-    onMutate: async (asked: Asked): Promise<Taken> => {
+    onMutate: async (asked: Asked): Promise<Undo> => {
       await queryClient.cancelQueries({ queryKey: listKey });
-      const before = queryClient.getQueryData(listKey);
+      const taken = takenFrom(queryClient, listKey);
       queryClient.setQueryData(listKey, (listed) =>
         listed === undefined ? listed : reshape(listed, asked),
       );
-      return { before };
+      return taken;
     },
-    onError: (_refusal: ApiError, _asked: Asked, taken: Taken | undefined) => {
-      queryClient.setQueryData(listKey, taken?.before);
+    onError: (_refusal: ApiError, _asked: Asked, taken: Undo | undefined) => {
+      taken?.undo();
     },
     // Here, not on the page that asked: a reader gone from it before the answer still holds what they read.
     onSuccess: <Answer>(_answer: Answer, asked: Asked) => {
@@ -129,7 +128,7 @@ export const useChangeRole = () => {
       );
     },
   );
-  return useMutation({ ...api.members.changeRole.mutationOptions<Taken>(), ...reconciled });
+  return useMutation({ ...api.members.changeRole.mutationOptions<Undo>(), ...reconciled });
 };
 
 /** The instant shown at once is the browser's; the list read after the answer holds the api's. */
@@ -142,7 +141,7 @@ export const useEndEverySignInAndToken = () => {
     );
   });
   return useMutation({
-    ...api.members.endEverySignInAndToken.mutationOptions<Taken>(),
+    ...api.members.endEverySignInAndToken.mutationOptions<Undo>(),
     ...reconciled,
   });
 };
@@ -165,7 +164,7 @@ export const useRemoveMember = () => {
   const reconciled = useReconciledList((listed, asked: { readonly personId: string }) =>
     listed.filter((member) => member.personId !== asked.personId),
   );
-  const options = { ...api.members.remove.mutationOptions<Taken>(), ...reconciled };
+  const options = { ...api.members.remove.mutationOptions<Undo>(), ...reconciled };
   const removal = useMutation(
     workspaceId === undefined ? options : { ...options, meta: { workspaceId } },
   );
@@ -213,7 +212,7 @@ export const useBulkChangeRole = () => {
       ticked(member) && role !== undefined ? { ...member, role } : member,
     );
   });
-  return useMutation({ ...api.members.bulkChangeRole.mutationOptions<Taken>(), ...reconciled });
+  return useMutation({ ...api.members.bulkChangeRole.mutationOptions<Undo>(), ...reconciled });
 };
 
 /** A group's member count moves with these actions, so the groups are read again beside the list. */
@@ -231,7 +230,7 @@ export const useBulkRemove = () => {
     return listed.filter((member) => !ticked(member));
   });
   return useMutation({
-    ...api.members.bulkRemove.mutationOptions<Taken>(),
+    ...api.members.bulkRemove.mutationOptions<Undo>(),
     ...reconciled,
     onSettled: () => Promise.all([reconciled.onSettled(), groupsReadAgain()]),
   });
@@ -261,7 +260,7 @@ export const useBulkAddToGroup = () => {
     return listed.map((member) => (ticked(member) ? join(member) : member));
   });
   return useMutation({
-    ...api.members.bulkAddToGroup.mutationOptions<Taken>(),
+    ...api.members.bulkAddToGroup.mutationOptions<Undo>(),
     ...reconciled,
     onSettled: () => Promise.all([reconciled.onSettled(), groupsReadAgain()]),
   });

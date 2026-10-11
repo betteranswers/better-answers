@@ -36,6 +36,9 @@ export const NO_SESSION: RefusalWord = "no-session";
 
 export const SECOND_FACTOR_PENDING: RefusalWord = "second-factor-pending";
 
+/** An action named a workspace the session has left, so the tab that sent it is stale. */
+export const WORKSPACE_SWITCHED: RefusalWord = "workspace-switched";
+
 /** Only what the reader answers by signing in again, or by confirming it's them, sends them on. */
 const wordSendingThemOn = (error: Error): RefusalWord | undefined => {
   const refusal = refusalOf(error);

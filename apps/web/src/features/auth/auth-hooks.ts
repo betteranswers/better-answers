@@ -487,9 +487,16 @@ export const useSetActiveOrganization = () => {
 export type SwitchedTo = { readonly id: string; readonly name: string };
 
 /**
- * The member is read again in place, not dropped, so the band blanks between the two only
- * when that read fails or waits.
+ * Whichever tab moved the session. The reads go before the first wait, so a rollback still on
+ * its way finds them gone.
  */
+export const followTheSession = async (queryClient: QueryClient, api: ApiProxy): Promise<void> => {
+  forgetTheWorkspaceLeft(queryClient, api);
+  // In place, not dropped, so the band blanks between the two only when the read fails or waits.
+  await memberChanged(queryClient, api, { readAgain: true, ifUnread: "reset" });
+  void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
+};
+
 export const useSwitchWorkspace = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();
@@ -497,9 +504,7 @@ export const useSwitchWorkspace = () => {
   return useMutation<unknown, SwitchRefused, SwitchedTo>({
     mutationFn: (workspace) => setActiveWorkspace(workspace.id),
     onSuccess: async () => {
-      forgetTheWorkspaceLeft(queryClient, api);
-      await memberChanged(queryClient, api, { readAgain: true, ifUnread: "reset" });
-      void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
+      await followTheSession(queryClient, api);
       await navigate({ href: "/", replace: true });
     },
   });

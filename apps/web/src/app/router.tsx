@@ -41,6 +41,7 @@ import {
 import { rememberTheSession } from "@/features/auth/session-memory.ts";
 import { CodesPage, SetupPage } from "@/features/auth/setup-page.tsx";
 import { SignInPage } from "@/features/auth/sign-in-page.tsx";
+import { homeAfterASwitchElsewhere } from "@/features/auth/switched-elsewhere.ts";
 import { EveryonePage } from "@/features/console/everyone-page.tsx";
 import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
 import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
@@ -313,7 +314,8 @@ const indexRoute = createRoute({
   path: "/",
   beforeLoad: ({ context }) => {
     const { role } = memberOf(context);
-    if (role !== undefined) throw redirect({ href: HOMES[role].path, replace: true });
+    // The entry's state goes on with it: a tab landed here is told why at its home.
+    if (role !== undefined) throw redirect({ href: HOMES[role].path, replace: true, state: true });
   },
   component: function HomeUnread() {
     const { home } = useVisibleTree();
@@ -532,14 +534,17 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
 
   const router =
     history === undefined ? createRouter(options) : createRouter({ ...options, history });
-  clients.failures.answeredBy(
-    detouringOn(context, {
-      at: () => ({ ...leftFrom(router.latestLocation), pathname: router.latestLocation.pathname }),
-      go: (href) => {
-        void router.navigate(leavingFor(href));
-      },
-    }),
-  );
+  const detour = detouringOn(context, {
+    at: () => ({ ...leftFrom(router.latestLocation), pathname: router.latestLocation.pathname }),
+    go: (href) => {
+      void router.navigate(leavingFor(href));
+    },
+  });
+  clients.failures.answeredBy((failure, during) => {
+    const home = homeAfterASwitchElsewhere(failure, context);
+    if (home === undefined) detour(failure, during);
+    else void home.then((to) => router.navigate(to));
+  });
   return router;
 };
 

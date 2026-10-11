@@ -3,6 +3,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { PasskeyOffer, useOfferPlace, type OfferPlace } from "@/features/auth/passkey-offer.tsx";
+import { useSwitchedElsewhereSaid } from "@/features/auth/switched-elsewhere.ts";
 import { useUnsavedChangeSaid } from "@/features/auth/unsaved-change.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { HomeLine } from "@/features/people/self-action.tsx";
@@ -20,6 +21,7 @@ import {
   type VisibleArea,
   type VisibleTree,
 } from "@/shared/navigation.ts";
+import type { Outcome } from "@/shared/outcome.tsx";
 import { PageHeadSlot } from "@/shared/page-head.tsx";
 import { isFilled, type PageTab, type PageToolbar } from "@/shared/page-toolbar.tsx";
 import { useWideLayout } from "@/shared/wide-layout.ts";
@@ -82,6 +84,13 @@ const listNameOf = (
   open: Place<VisibleArea> | undefined,
 ): string | undefined => handed?.name ?? open?.page.name;
 
+/** The band has one line: the switcher's own outcome leads, and the unsaved note comes last. */
+const useBandOutcome = (switching: Outcome | undefined, pathname: string): Outcome | undefined => {
+  const switchedElsewhere = useSwitchedElsewhereSaid();
+  const unsaved = useUnsavedChangeSaid(pathname);
+  return switching ?? switchedElsewhere ?? unsaved;
+};
+
 /** A place hidden from the reader is no place here, so it draws as one that never existed. */
 export function Frame(properties: {
   readonly visible: VisibleTree;
@@ -111,7 +120,7 @@ export function Frame(properties: {
 
   const open = placeAt(visible.areas, pathname);
   const region = useRegion(visible, pathname);
-  const unsaved = useUnsavedChangeSaid(pathname);
+  const outcome = useBandOutcome(switching.outcome, pathname);
   useArrivalTakenOnceRead(visible);
 
   return (
@@ -156,7 +165,7 @@ export function Frame(properties: {
             keystrokes={<ShellKeystrokesAction at="band" />}
             signingOut={signingOut}
             onSignOut={signOut}
-            outcome={switching.outcome ?? unsaved}
+            outcome={outcome}
           />
 
           <NavigationSheet sheet={sheet} wide={wide} areas={visible.areas} open={open} />
