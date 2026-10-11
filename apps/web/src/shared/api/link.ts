@@ -1,6 +1,8 @@
 import { httpBatchLink, httpLink, isNonJsonSerializable, splitLink } from "@trpc/client";
 import type { OperationContext } from "@trpc/client";
 
+import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+
 /**
  * The bytes are the mutation's input, so this rides beside them where the router's types never
  * reach; the api harness holds the pair.
@@ -52,6 +54,8 @@ const uploadHeadersOf = (context: OperationContext): Headers => {
 
 type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch"> & {
   readonly uploadFetch?: Parameters<typeof httpLink>[0]["fetch"];
+  /** Asked at each send, and undefined while the tab holds no member read. */
+  readonly heldWorkspace: () => string | undefined;
 };
 
 /**
@@ -60,11 +64,24 @@ type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch">
  */
 const BATCH_URL_CEILING = 2083;
 
-export const apiLink = ({ uploadFetch, ...options }: ApiLinkOptions) => {
+export const apiLink = ({ uploadFetch, heldWorkspace, ...options }: ApiLinkOptions) => {
   const uploading = uploadFetch === undefined ? options : { ...options, fetch: uploadFetch };
+  const namingTheWorkspace = (sent: Headers): Headers => {
+    const headers = new Headers(sent);
+    const held = heldWorkspace();
+    if (held !== undefined) headers.set(TAB_WORKSPACE_HEADER, held);
+    return headers;
+  };
   return splitLink({
     condition: (op) => isNonJsonSerializable(op.input),
-    true: httpLink({ ...uploading, headers: ({ op }) => uploadHeadersOf(op.context) }),
-    false: httpBatchLink({ ...options, maxURLLength: BATCH_URL_CEILING }),
+    true: httpLink({
+      ...uploading,
+      headers: ({ op }) => namingTheWorkspace(uploadHeadersOf(op.context)),
+    }),
+    false: httpBatchLink({
+      ...options,
+      maxURLLength: BATCH_URL_CEILING,
+      headers: () => namingTheWorkspace(new Headers()),
+    }),
   });
 };

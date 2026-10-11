@@ -42,9 +42,9 @@ export const ceilingLiftsIn = (error: Error | ApiError): number | undefined => {
 
 export const { TRPCProvider, useTRPC, useTRPCClient } = createTRPCContext<AppRouter>();
 
-export const createApiClient = () =>
+export const createApiClient = (heldWorkspace: () => string | undefined) =>
   createTRPCClient<AppRouter>({
-    links: [apiLink({ url: TRPC_ENDPOINT, uploadFetch: sentWithProgress })],
+    links: [apiLink({ url: TRPC_ENDPOINT, uploadFetch: sentWithProgress, heldWorkspace })],
   });
 
 export type ApiClient = ReturnType<typeof createApiClient>;

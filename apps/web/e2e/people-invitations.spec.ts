@@ -1,5 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
   INVITATIONS_WORDS,
@@ -133,8 +135,18 @@ const unsentIn = (where: Locator): Locator =>
   where.getByRole("region", { name: INVITATIONS_WORDS.unsent });
 
 /** The action as the page's own tRPC client would send it, under the Admin's session. */
-const actedAside = async (page: Page, action: string, input: unknown): Promise<number> =>
-  (await page.request.post(`/trpc/members.${action}`, { data: input })).status();
+const actedAside = async (
+  page: Page,
+  { workspaceId }: AtInvitations,
+  action: string,
+  input: unknown,
+): Promise<number> => {
+  const answered = await page.request.post(`/trpc/members.${action}`, {
+    data: input,
+    headers: { [TAB_WORKSPACE_HEADER]: workspaceId },
+  });
+  return answered.status();
+};
 
 type AtInvitations = {
   readonly workspaceId: string;
@@ -598,11 +610,11 @@ test.describe("the People page's Invitations tab", () => {
   test("names when to try again past an address's email ceiling", async ({ page, request }) => {
     const capped = anAddress("capped");
     let invitationId = "";
-    await anAdminAtInvitations(page, request, "Kex Gill Stone", async (at) => {
+    const here = await anAdminAtInvitations(page, request, "Kex Gill Stone", async (at) => {
       [invitationId = ""] = await invitedEach(request, at, [capped]);
     });
     for (let resent = 0; resent < 5; resent += 1) {
-      expect(await actedAside(page, "resendInvitation", { invitationId })).toBe(200);
+      expect(await actedAside(page, here, "resendInvitation", { invitationId })).toBe(200);
     }
     await openInvitations(page);
 
@@ -700,14 +712,14 @@ test.describe("the People page's Invitations tab", () => {
   test("bulk Cancel counts a row cancelled meanwhile as skipped", async ({ page, request }) => {
     const [ana, ben] = [anAddress("ana"), anAddress("ben")];
     let ids: string[] = [];
-    await anAdminAtInvitations(page, request, "Coverdale Leather", async (at) => {
+    const here = await anAdminAtInvitations(page, request, "Coverdale Leather", async (at) => {
       ids = await invitedEach(request, at, [ana, ben]);
     });
     await openInvitations(page);
 
     await tickOf(page, ana).check();
     await tickOf(page, ben).check();
-    expect(await actedAside(page, "cancelInvitation", { invitationId: ids[0] })).toBe(200);
+    expect(await actedAside(page, here, "cancelInvitation", { invitationId: ids[0] })).toBe(200);
     await page.keyboard.press(`Shift+${PEOPLE_KEYSTROKES.cancelSelected.key}`);
 
     await expect(saidInTheTab(page, INVITATIONS_WORDS.bulk.cancelled(1, 1))).toBeVisible();
@@ -734,7 +746,7 @@ test.describe("the People page's Invitations tab", () => {
   test("a refused bulk Resend names a row not shown", async ({ page, request }) => {
     const [gone, kept] = [anAddress("gone"), anAddress("kept")];
     let ids: string[] = [];
-    await anAdminAtInvitations(page, request, "Arkengarthdale Lead", async (at) => {
+    const here = await anAdminAtInvitations(page, request, "Arkengarthdale Lead", async (at) => {
       ids = await invitedEach(request, at, [gone, kept]);
     });
     await openInvitations(page);
@@ -745,7 +757,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(page.getByRole("toolbar", { name: INVITATIONS_WORDS.selected })).toContainText(
       "2 invitations selected, 2 not shown.",
     );
-    expect(await actedAside(page, "cancelInvitation", { invitationId: ids[0] })).toBe(200);
+    expect(await actedAside(page, here, "cancelInvitation", { invitationId: ids[0] })).toBe(200);
     await selectionAction(page, INVITATIONS_WORDS.resend).click();
 
     const refusal = invitationsRegion(page).getByRole("alert");

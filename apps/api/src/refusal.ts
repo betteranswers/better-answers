@@ -9,7 +9,11 @@ import { REFUSAL_CATALOGUE } from "@better-answers/core/refusals";
 
 const REFUSALS = classesIn({
   ...REFUSAL_CATALOGUE,
-  transport: { "no-session": "unauthenticated", "no-active-workspace": "unauthenticated" },
+  transport: {
+    "no-session": "unauthenticated",
+    "no-active-workspace": "unauthenticated",
+    "workspace-switched": "conflict",
+  },
 });
 
 export type RefusalWord = keyof typeof REFUSALS;

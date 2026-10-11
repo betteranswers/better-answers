@@ -26,6 +26,10 @@ export const useRole = () => {
 export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(memberOptions(api).queryKey)?.role;
 
+/** The workspace the band names, which each request names in turn. */
+export const workspaceHeld = (queryClient: QueryClient, api: ApiProxy) =>
+  queryClient.getQueryData(memberOptions(api).queryKey)?.workspace.id;
+
 export const NEEDS_A_PICK: RefusalWord = "no-active-workspace";
 
 export const NO_SESSION: RefusalWord = "no-session";

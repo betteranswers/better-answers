@@ -1,6 +1,8 @@
 import { createTRPCClient } from "@trpc/client";
 import { z } from "zod";
 
+import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
+
 // A path, not a package: the web already depends on the api, and an edge back is a cycle the
 // api's image would install.
 import {
@@ -11,6 +13,7 @@ import {
 } from "../../web/src/shared/api/link.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import type { AppRouter } from "../src/trpc/router.ts";
+import { setActiveWorkspace } from "./flow.ts";
 import type { TestApp, TestClient } from "./harness.ts";
 import { signedInClient } from "./provoke.ts";
 
@@ -32,16 +35,21 @@ const forwarded = (init: LinkInit): RequestInit => ({
   signal: init?.signal ?? null,
 });
 
+const memberAnswered = z.object({
+  result: z.object({ data: z.object({ workspace: z.object({ id: z.string() }) }) }),
+});
+
 /**
  * The web's own link and wrapper, never a copy, so a field renamed on one side alone refuses the
  * upload here.
  */
-export const webClientOf = (client: TestClient) => {
+export const webClientOf = (client: TestClient, held?: string) => {
   const sent: Sent[] = [];
   const api = createTRPCClient<AppRouter>({
     links: [
       apiLink({
         url: `${client.origin}${TRPC_ENDPOINT}`,
+        heldWorkspace: () => held,
         fetch: async (url, init) => {
           const asked = new URL(url);
           sent.push({
@@ -57,13 +65,38 @@ export const webClientOf = (client: TestClient) => {
   return { api, sent };
 };
 
+/** A tab whose member read has answered: it names that workspace even after the session moves. */
+export const webTabOf = async (client: TestClient) => {
+  const answered = await client.fetch(`${TRPC_ENDPOINT}/session.member`);
+  const read = memberAnswered.safeParse(await answered.json());
+  return webClientOf(client, read.success ? read.data.result.data.workspace.id : undefined);
+};
+
 /**
  * `api` is the web's own tRPC client over the signed-in `client`; `sent` records each request
  * `api` made.
  */
 export const webSignedIn = async (app: TestApp, email: string) => {
   const client = await signedInClient(app, email);
-  return { client, ...webClientOf(client) };
+  return { client, ...(await webTabOf(client)) };
+};
+
+const sessionMovedTo = async (client: TestClient, workspaceId: string): Promise<void> => {
+  const moved = await setActiveWorkspace(client, workspaceId);
+  if (moved.status !== 200) throw new Error(`the switch answered ${moved.status}`);
+};
+
+/** `stale` read its member in `from` before the session moved to `to`; the person is in both. */
+export const aTabLeftBehind = async (
+  app: TestApp,
+  email: string,
+  moved: { readonly from: string; readonly to: string },
+) => {
+  const client = await signedInClient(app, email);
+  await sessionMovedTo(client, moved.from);
+  const { api: stale } = await webTabOf(client);
+  await sessionMovedTo(client, moved.to);
+  return { client, stale };
 };
 
 export const anAdminOnTheWeb = async (app: TestApp) => {
@@ -90,8 +123,22 @@ export const NO_SESSION_ANSWERED = {
   error: { data: { refusal: { word: "no-session", class: "unauthenticated" } } },
 } as const;
 
-export const uploadHeaders = (descriptor: UploadDescriptor): Headers => {
+/** A mutation posted past the link by a tab holding `held`, for a test that reads the raw answer. */
+export const postedFromATab = (
+  client: TestClient,
+  path: string,
+  body: unknown,
+  held: string,
+): Promise<Response> =>
+  client.fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json", [TAB_WORKSPACE_HEADER]: held },
+    body: JSON.stringify(body),
+  });
+
+export const uploadHeaders = (descriptor: UploadDescriptor, held: string): Headers => {
   const headers = new Headers(uploadOptions(descriptor).context.upload);
   headers.set("content-type", "application/octet-stream");
+  headers.set(TAB_WORKSPACE_HEADER, held);
   return headers;
 };

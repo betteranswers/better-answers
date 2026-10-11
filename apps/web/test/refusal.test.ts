@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { createQueryClient, type FailedDuring } from "@/shared/api/query-client.ts";
 import { refusalOf, type Refusal, type RefusalClass, type RefusalWord } from "@/shared/api/trpc.ts";
+import { SAID_OF_CLASS, saidOfRefusal, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { carrying } from "./stubbed-api.ts";
 
@@ -49,6 +50,7 @@ describe("the refusal the api sends the web", () => {
   it("infers every word the api registered from the router", () => {
     expectTypeOf<"no-session">().toExtend<RefusalWord>();
     expectTypeOf<"no-active-workspace">().toExtend<RefusalWord>();
+    expectTypeOf<"workspace-switched">().toExtend<RefusalWord>();
     expectTypeOf<"no-such-workspace">().toExtend<RefusalWord>();
     expectTypeOf<"credentials-revoked">().toExtend<RefusalWord>();
     expectTypeOf<"role-forbids">().toExtend<RefusalWord>();
@@ -69,6 +71,16 @@ describe("the refusal the api sends the web", () => {
       | "precondition"
     >();
     expectTypeOf<Refusal["word"]>().toEqualTypeOf<RefusalWord>();
+  });
+});
+
+describe("an action refused because the workspace was switched", () => {
+  it("is said in its own words, never its class's", () => {
+    const said = saidOfRefusal({}, "workspace-switched", "conflict");
+
+    expect(said).not.toEqual(SAID_OF_CLASS.conflict);
+    expect(sentenceOf(said)).toContain("another tab");
+    expect(sentenceOf(said).toLowerCase()).not.toContain("reload");
   });
 });
 

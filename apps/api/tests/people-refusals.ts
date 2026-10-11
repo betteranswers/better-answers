@@ -1,6 +1,6 @@
 import type { TestApp } from "./harness.ts";
-import { sessionPointedAt } from "./provoke.ts";
-import { refusalOfCall, webSignedIn } from "./web-client.ts";
+import { sessionPointedAt, signedInClient } from "./provoke.ts";
+import { refusalOfCall, webClientOf, webSignedIn } from "./web-client.ts";
 
 type WebApi = Awaited<ReturnType<typeof webSignedIn>>["api"];
 
@@ -41,9 +41,10 @@ export const anAdminOfElsewherePointedAt = async (
   workspaceId: string,
 ): Promise<WebApi> => {
   const elsewhere = await app.provision();
-  const { api } = await webSignedIn(app, elsewhere.admin.email);
+  const client = await signedInClient(app, elsewhere.admin.email);
   await sessionPointedAt(app, elsewhere.admin.id, workspaceId);
-  return api;
+  // Naming the session's workspace, so the refusal heard is of who asks and not of a stale tab.
+  return webClientOf(client, workspaceId).api;
 };
 
 /** An Admin of another workspace, their session pointed here: each People procedure refuses them. */

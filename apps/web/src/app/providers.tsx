@@ -2,7 +2,14 @@ import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 import { createQueryClient, type FailureHeard } from "@/shared/api/query-client.ts";
-import { createApiClient, TRPCProvider, type ApiClient } from "@/shared/api/trpc.ts";
+import {
+  createApiClient,
+  createApiProxy,
+  TRPCProvider,
+  type ApiClient,
+  type ApiProxy,
+} from "@/shared/api/trpc.ts";
+import { workspaceHeld } from "@/shared/member.ts";
 import { useThemeFollowed } from "@/shared/theme.ts";
 
 /** What hears a failure once a router can say where it leads: the router is made after the cache. */
@@ -35,11 +42,15 @@ export type AppClients = {
  */
 export const createAppClients = (): AppClients => {
   const failures = aFailureListener();
-  return {
-    queryClient: createQueryClient(failures.heard),
-    apiClient: createApiClient(),
-    failures,
-  };
+  const queryClient = createQueryClient(failures.heard);
+  // The member read's key comes from a proxy over the client this link belongs to, so the proxy is
+  // made at the first send.
+  let api: ApiProxy | undefined;
+  const apiClient: ApiClient = createApiClient(() => {
+    api ??= createApiProxy(apiClient, queryClient);
+    return workspaceHeld(queryClient, api);
+  });
+  return { queryClient, apiClient, failures };
 };
 
 export function Providers(properties: {

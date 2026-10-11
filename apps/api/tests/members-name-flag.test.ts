@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { EmailMessage } from "../src/email.ts";
 import { startApp, type TestApp } from "./harness.ts";
-import { displayNameHeldBy, sessionPointedAt, whileCommitsAreRefused } from "./provoke.ts";
+import { anAdminOfElsewherePointedAt } from "./people-refusals.ts";
+import { displayNameHeldBy, whileCommitsAreRefused } from "./provoke.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
@@ -218,9 +219,7 @@ describe("who may flag a display name", () => {
 
   it("refuses an Admin of another workspace pointed at this one", async () => {
     const { workspace, person } = await aWorkspaceWithAFlaggable();
-    const elsewhere = await app.provision();
-    const { api } = await webSignedIn(app, elsewhere.admin.email);
-    await sessionPointedAt(app, elsewhere.admin.id, workspace.workspaceId);
+    const api = await anAdminOfElsewherePointedAt(app, workspace.workspaceId);
 
     const refused = await refusalOfCall(
       api.members.flagDisplayName.mutate({ personId: person.id }),
