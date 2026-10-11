@@ -49,7 +49,7 @@ Separately, the member read has four production copies of its key, the logic for
 - R2. One shared function owns what a member change does to the held member. Each caller is named with what it does when the re-read fails: a switch resets, a self-removal resets with no re-read, and a self-demotion keeps the held answer and says the role is unread.
 - R3. `memberRefusal` moves with the member read.
 - R4. The audit words move to `apps/web/src/shared/`: `sentenceOf`, `headlineOf`, `detailLinesOf`, `EventDays`, the generated actions file, and what those import. The audit log page stays under `apps/web/src/features/people/`.
-- R5. BA-81 changes no behaviour. Tests rendered through the app's own router cover a member removed, reset and re-read, and assert on what the page draws.
+- R5. BA-81 changes no behaviour. Tests rendered through the web's own router cover a member removed, reset and re-read, and assert on what the page draws.
 
 **Actions bound to the tab's workspace (BA-50)**
 
@@ -228,7 +228,7 @@ sequenceDiagram
   - A mutation naming the session's workspace runs as before.
   - A query naming another workspace, or none, is answered as before.
   - A mutation on the person's road and one on the operator's road run with no header.
-  - Covers R9. Walking the app router, every mutation on a workspace road is refused when its header names another workspace.
+  - Covers R9. Walking the api's router, every mutation on a workspace road is refused when its header names another workspace.
 - **Verification:** `IMAGE_PROBE_DEFERRED=true pnpm check:api` and `apps/web/e2e/people-invitations.spec.ts` pass, and the count of test files edited for the header alone is reported in the pull request.
 
 ### U4. A refused tab does what a switch does
@@ -246,7 +246,7 @@ sequenceDiagram
   4. Two refusals in flight run the step once in effect: the second finds nothing to drop and the same home.
 - **Patterns to follow:** `detouringOn` and `detourAfter` in `apps/web/src/features/auth/pending-refusal.ts` for acting on a word at the app-level hearing; `useSwitchWorkspace` for the tail; `HomeLine` and `switchOutcome` for a sentence that outlives a navigation.
 - **Test scenarios:**
-  - Covers AE1. A member page's action is refused `workspace-switched`: the app lands at home, the band names the session's workspace and says the action was not done.
+  - Covers AE1. A member page's action is refused `workspace-switched`: the tab lands at home, the band names the session's workspace and says the action was not done.
   - The refusal lands after the person has left the page that asked: the same end.
   - The member re-read fails after the refusal: the frame draws no name of the workspace left.
   - Two actions refused, the second held back until the tab is home, then Members opened with its read held back: no row of the workspace left is drawn.
@@ -261,7 +261,7 @@ sequenceDiagram
 - **Requirements:** R12. Implements KTD9 and the third Key Decision.
 - **Dependencies:** U1, U4 (the band's slot and its order).
 - **Files:**
-  - modify: `apps/web/src/features/auth/auth-hooks.ts`, the file under `apps/web/src/shared/api/` that builds the query client or the app's providers, `apps/web/src/app/frame.tsx`, `apps/web/src/app/words.ts`
+  - modify: `apps/web/src/features/auth/auth-hooks.ts`, the file under `apps/web/src/shared/api/` that builds the query client or the web's providers, `apps/web/src/app/frame.tsx`, `apps/web/src/app/words.ts`
   - test: a new app-rendered test under `apps/web/test/`
 - **Approach:**
   1. State the condition in the code that holds it. A first read, a read after `forgetMember` or after a reset, and the same workspace with another role are not a change.
