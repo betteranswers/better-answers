@@ -47,7 +47,7 @@ Put the new entry where cloc cannot read it as inside a comment: above the first
 
 ```js
 ignore: [
-  "apps/web/src/features/people/audit-actions.ts",
+  "apps/web/src/shared/audit/audit-actions.ts",
 
   "apps/web/src/shared/ui/**",
 

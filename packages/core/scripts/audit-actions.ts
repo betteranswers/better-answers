@@ -8,7 +8,7 @@ import { loadEveryEntryPoint } from "../test/entry-points.ts";
 /** The web never imports core, so it reads the actions core declares from this copy. */
 export const AUDIT_ACTIONS_MODULE = path.resolve(
   import.meta.dirname,
-  "../../../apps/web/src/features/people/audit-actions.ts",
+  "../../../apps/web/src/shared/audit/audit-actions.ts",
 );
 
 const GENERATE = "pnpm --filter @better-answers/core run generate:audit-actions";

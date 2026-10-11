@@ -10,7 +10,7 @@ export const jscpdConfig = {
   minTokens: 50,
   threshold: 0,
   ignore: [
-    "apps/web/src/features/people/audit-actions.ts",
+    "apps/web/src/shared/audit/audit-actions.ts",
 
     "apps/worker/src/better_answers_worker/schema_view.py",
 
