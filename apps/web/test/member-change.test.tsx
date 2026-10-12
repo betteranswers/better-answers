@@ -12,6 +12,7 @@ import {
   adaAnAdmin,
   adaAt,
   adminsAreaOffered,
+  aRefusalAnswer,
   drawnWithNoWorkspace,
   FORBIDDEN,
   GRACE,
@@ -19,7 +20,6 @@ import {
   LOST,
   openAt,
   read,
-  refusedWith,
   switcher,
   switcherDrawn,
   type Api,
@@ -32,7 +32,7 @@ placedWithoutMeasuring();
 const CALDER = { id: "c", name: "Calder Pressings" };
 
 /** What the api answers every read of a workspace the session names and the person has left. */
-const NOT_A_MEMBER = refusedWith("not-a-member", "unauthenticated", 401);
+const NOT_A_MEMBER = aRefusalAnswer("not-a-member", "unauthenticated", 401);
 
 const SET_ACTIVE = "/organization/set-active";
 

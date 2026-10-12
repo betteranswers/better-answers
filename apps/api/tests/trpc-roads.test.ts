@@ -32,11 +32,10 @@ import {
 import { knowledgeReadProcedure } from "../src/trpc/knowledge.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { appRouter } from "../src/trpc/router.ts";
-import { setActiveWorkspace } from "./flow.ts";
 import { capturingLogger, doorsFor } from "./harness.ts";
 import { signedInClient } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
-import { postedFromATab } from "./web-client.ts";
+import { postedFromATab, sessionMovedTo } from "./web-client.ts";
 
 type QueryContext = inferProcedureBuilderResolverOptions<typeof queryProcedure>["ctx"];
 type MutationContext = inferProcedureBuilderResolverOptions<typeof mutationProcedure>["ctx"];
@@ -390,7 +389,7 @@ const switchedAway = async () => {
   const here = await app().provision();
   await app().addMember(here.workspaceId, left.admin.id, "Admin");
   const client = await signedInClient(app(), left.admin.email);
-  expect((await setActiveWorkspace(client, here.workspaceId)).status).toBe(200);
+  await sessionMovedTo(client, here.workspaceId);
   return { client, left };
 };
 

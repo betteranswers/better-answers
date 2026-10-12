@@ -1,5 +1,6 @@
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
 import {
+  hashKey,
   matchQuery,
   mutationOptions,
   queryOptions,
@@ -475,10 +476,10 @@ const forgetTheWorkspaceLeft = (queryClient: QueryClient, api: ApiProxy) => {
  * draws a page under it.
  */
 export const forgetAWorkspaceLeftElsewhere = (queryClient: QueryClient, api: ApiProxy): void => {
-  const member = { queryKey: memberOptions(api).queryKey, exact: true };
+  const memberHash = hashKey(memberOptions(api).queryKey);
   let held = workspaceHeld(queryClient, api);
   queryClient.getQueryCache().subscribe(({ query }) => {
-    if (!matchQuery(member, query)) return;
+    if (query.queryHash !== memberHash) return;
     const was = held;
     held = workspaceHeld(queryClient, api);
     if (leftFor(was, held)) forgetTheWorkspaceLeft(queryClient, api);

@@ -81,7 +81,7 @@ export const webSignedIn = async (app: TestApp, email: string) => {
   return { client, ...(await webTabOf(client)) };
 };
 
-const sessionMovedTo = async (client: TestClient, workspaceId: string): Promise<void> => {
+export const sessionMovedTo = async (client: TestClient, workspaceId: string): Promise<void> => {
   const moved = await setActiveWorkspace(client, workspaceId);
   if (moved.status !== 200) throw new Error(`the switch answered ${moved.status}`);
 };

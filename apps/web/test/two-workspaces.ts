@@ -35,7 +35,7 @@ const A_SESSION = {
 
 export const read = (data: unknown) => ({ result: { data } });
 
-export const refusedWith = (word: string, refusalClass: string, httpStatus: number) => ({
+export const aRefusalAnswer = (word: string, refusalClass: string, httpStatus: number) => ({
   error: {
     message: word,
     code: -32_001,
@@ -44,7 +44,7 @@ export const refusedWith = (word: string, refusalClass: string, httpStatus: numb
 });
 
 /** What the stub answers a read no test names, so a page draws its own state. */
-export const FORBIDDEN = refusedWith("forbidden", "forbidden", 403);
+export const FORBIDDEN = aRefusalAnswer("forbidden", "forbidden", 403);
 
 /** A read that failed in no word, which sends the reader nowhere. */
 export const LOST = {
@@ -82,7 +82,7 @@ export const adaAnAdmin = (): Api =>
   ]);
 
 /** Another tab points the session at Holme Valley Tools, where Ada holds `role`. */
-export const switchedInAnotherTab = (api: Api, role: Role, members = [ADA, HEDY]) => {
+export const aSwitchInAnotherTab = (api: Api, role: Role, members = [ADA, HEDY]) => {
   api.set("session.member", () => adaAt(role, HOLME));
   api.set("members.list", () => read(members));
   api.set("members.invitations", () => read([]));

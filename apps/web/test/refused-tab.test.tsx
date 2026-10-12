@@ -14,6 +14,8 @@ import { placedWithoutMeasuring } from "./measuring.ts";
 import {
   ADA,
   adaAnAdmin,
+  aRefusalAnswer,
+  aSwitchInAnotherTab,
   band,
   drawnWithNoWorkspace,
   GRACE,
@@ -25,8 +27,6 @@ import {
   openAt,
   openTab,
   read,
-  refusedWith,
-  switchedInAnotherTab,
   switcher,
   tickOf,
   type Api,
@@ -37,7 +37,7 @@ await vi.hoisted(() => import("./stub-server.ts"));
 placedWithoutMeasuring();
 
 /** What the api answers an action from a tab whose workspace the session has left. */
-const SWITCHED = refusedWith("workspace-switched", "conflict", 409);
+const SWITCHED = aRefusalAnswer("workspace-switched", "conflict", 409);
 
 const SAID =
   "You switched workspace in another tab, so that didn’t go through. This tab now shows the workspace you switched to.";
@@ -81,7 +81,7 @@ describe("a tab whose workspace the session has left", () => {
   it("lands a refused tab home, its band saying why", async () => {
     const api = adaAnAdmin();
     const router = await openGracesPage(api);
-    switchedInAnotherTab(api, "Viewer");
+    aSwitchInAnotherTab(api, "Viewer");
     api.set("members.changeRole", () => SWITCHED);
 
     changeGracesRole();
@@ -98,7 +98,7 @@ describe("a tab whose workspace the session has left", () => {
 
     changeGracesRole();
     await router.navigate({ to: "/people/groups" });
-    switchedInAnotherTab(api, "Viewer");
+    aSwitchInAnotherTab(api, "Viewer");
     refusal.resolve();
 
     await landedInHolme();
@@ -122,7 +122,7 @@ describe("a tab whose workspace the session has left", () => {
     api.set("members.changeRole", () => SWITCHED);
     const second = heldBack(api, "members.endEverySignInAndToken", SWITCHED);
     const router = await openGracesPage(api);
-    switchedInAnotherTab(api, "Admin");
+    aSwitchInAnotherTab(api, "Admin");
 
     fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.endEverySignInAndToken }));
     // Sent apart: two actions in one request are answered together, so both would be held back.
@@ -156,7 +156,7 @@ describe("a tab whose workspace the session has left", () => {
     });
     fireEvent.click(screen.getByRole("menuitem", { name: INVITATIONS_WORDS.cancel }));
     openTab("Members");
-    switchedInAnotherTab(api, "Admin");
+    aSwitchInAnotherTab(api, "Admin");
     refusal.resolve();
     await landedInHolme();
 
@@ -174,7 +174,7 @@ describe("a tab whose workspace the session has left", () => {
   it("stays put on another refusal of class conflict", async () => {
     const api = adaAnAdmin();
     const router = await openGracesPage(api);
-    api.set("members.changeRole", () => refusedWith("changed-meanwhile", "conflict", 409));
+    api.set("members.changeRole", () => aRefusalAnswer("changed-meanwhile", "conflict", 409));
 
     changeGracesRole();
 
@@ -193,7 +193,7 @@ describe("a tab whose workspace the session has left", () => {
     api.set("members.bulkChangeRole", () => SWITCHED);
     await openAt(MEMBERS, api);
     fireEvent.click(await screen.findByRole("checkbox", { name: `Select ${GRACE.displayName}` }));
-    switchedInAnotherTab(api, "Admin", [ADA, GRACE, HEDY]);
+    aSwitchInAnotherTab(api, "Admin", [ADA, GRACE, HEDY]);
 
     fireEvent.click(screen.getByRole("button", { name: BULK_WORDS.changeRole.action }));
     fireEvent.click(

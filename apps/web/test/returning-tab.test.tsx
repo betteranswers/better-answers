@@ -12,6 +12,7 @@ import {
   adaAnAdmin,
   adaAt,
   adminsAreaOffered,
+  aSwitchInAnotherTab,
   band,
   GRACE,
   HEDY,
@@ -20,7 +21,6 @@ import {
   openAt,
   openTab,
   read,
-  switchedInAnotherTab,
   switcher,
   switcherDrawn,
   tickOf,
@@ -46,7 +46,7 @@ const said = () => band().getByRole("status").textContent;
 /** The session moves to Holme Valley Tools as this tab's own request for it is answered. */
 const movingTheSession = (api: Api, request: string, answer: unknown) => {
   api.set(request, () => {
-    switchedInAnotherTab(api, "Viewer");
+    aSwitchInAnotherTab(api, "Viewer");
     return answer;
   });
 };
@@ -98,7 +98,7 @@ describe("a tab shown again after a switch in another tab", () => {
     const api = adaAnAdmin();
     const router = await openAt(GRACES_PAGE, api);
     await screen.findByRole("radio", { name: "Admin", checked: true });
-    switchedInAnotherTab(api, "Admin", [ADA, { ...GRACE, role: "Viewer" }]);
+    aSwitchInAnotherTab(api, "Admin", [ADA, { ...GRACE, role: "Viewer" }]);
 
     shownAgain();
 
