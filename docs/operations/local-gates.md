@@ -36,11 +36,11 @@ The root `prepare` script runs `lefthook install`, and pnpm runs `prepare` after
 
 ## The pre-push hook
 
-Before a push that carries commits to a branch leaves the machine, the hook runs every step root `check:gates` names and the four prose suites `check:docs` adds to them: `check:docs:api`, `check:docs:core`, `check:docs:devtools` and `check:docs:web`. `format:check` is in both scripts and runs once. In a sample of 30 failed pull requests, about half failed on one of these, and CI took five to nine minutes to say so. The merge queue is the only full CI run, so this hook is where a pull request hears about them first.
+Before a push that carries commits to a branch leaves the machine, the hook runs every step root `check:gates` names and the three prose suites `check:docs` adds to them: `check:docs:core`, `check:docs:devtools` and `check:docs:web`. `format:check` is in both scripts and runs once. In a sample of 30 failed pull requests, about half failed on one of these, and CI took five to nine minutes to say so. The merge queue is the only full CI run, so this hook is where a pull request hears about them first.
 
 Each step is a command of its own, and the commands run in parallel. A failure therefore names its gate, and `LEFTHOOK_EXCLUDE` can skip one gate and keep the rest. The list repeats the steps the two scripts name, and `packages/devtools/test/lefthook-config.test.ts` holds it to them in both directions: a gate added to either script fails that suite until the hook runs it too. The same file pushes through the real `lefthook.yml` in a throwaway repository, with a stand-in `pnpm`, from the main checkout and from a linked worktree.
 
-Measured on the owner's machine (the same one as above) with every gate passing, the whole hook took 22s to 23s over three runs, where `check:gates` and `check:docs` one after the other take about 30s. `check:docs:api` is the slowest command and sets the wait. The api and core suites start Postgres in Docker, as every vitest run in those two workspaces does, so the hook needs Docker running.
+Measured on the owner's machine (the same one as above) with every gate passing, the whole hook took 20s to 24s over three runs on 12/10/2026, where `check:gates` and `check:docs` one after the other take about 37s. `check:docs:devtools` is the slowest command and sets the wait. The core suite starts Postgres in Docker, as every vitest run in that workspace does, so the hook needs Docker running.
 
 A failed gate stops the push. The gates' summary names each failure with the command that runs it alone, and the hook's own summary under it marks `gates` failed:
 
@@ -68,7 +68,7 @@ The gates live in a second hook, `pre-push-gates`, because lefthook hands git's 
 | --- | --- |
 | `git push --no-verify` | the whole hook, once |
 | `LEFTHOOK_EXCLUDE=knip git push` | one gate |
-| `LEFTHOOK_EXCLUDE=knip,check:docs:api git push` | several, comma-separated |
+| `LEFTHOOK_EXCLUDE=knip,check:docs:core git push` | several, comma-separated |
 
 `LEFTHOOK=0` skips it as it skips the pre-commit hook. `pnpm exec lefthook run pre-push-gates` runs every gate without pushing. `lefthook run pre-push` by hand would wait on stdin for lines only git sends.
 

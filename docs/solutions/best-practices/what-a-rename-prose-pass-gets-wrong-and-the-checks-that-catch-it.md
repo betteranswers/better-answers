@@ -18,7 +18,7 @@ symptoms:
   - "A keep rule matched inside file paths and class names such as auth-screen, so moved files kept their old imports"
   - "The pass turned a Python local into two words, a movedFrom address into one that no longer redirects, and a gerund into a noun"
   - "The pass rewrote contract fixture prose after both stamps were generated, and the tier's digest test failed"
-  - "A two-word phrase wrapped at a comment's line break passed the words test"
+  - "A two-word phrase wrapped at a comment's line break got past a line-by-line search"
 root_cause: missing_workflow_step
 resolution_type: workflow_improvement
 related_components:
@@ -36,7 +36,7 @@ tags:
 
 ## Context
 
-A rename that spans the tree replaces the old word with a pattern over every tracked file, holding each sense it must keep behind a keep rule. BA-29 ran eleven such passes, U7 to U17 of `docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`. Each mistake below got past the pass. tsc, the contract digest test and code review caught most of them, and reading a word diff by hand caught the rest. Several left no old word behind, so the words test could never have seen them. Adding the old word's row to the words test is the sibling doc (Related).
+A rename that spans the tree replaces the old word with a pattern over every tracked file, holding each sense it must keep behind a keep rule. BA-29 ran eleven such passes, U7 to U17 of `docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`. Each mistake below got past the pass. tsc, the contract digest test and code review caught most of them, and reading a word diff by hand caught the rest. Several left no old word behind, so no search for the old word finds them.
 
 ## Guidance
 
@@ -46,9 +46,9 @@ A rename that spans the tree replaces the old word with a pattern over every tra
 
 **2. Hold every stored and wire name.** Anything a browser, a database, a URL or another program stores or sends keeps its name (R22): localStorage and sessionStorage keys, cookie names, query-string and router keys, header names, CSS custom properties and design tokens, and any string that names one of them, such as a test title. U7's pass renamed the menu's localStorage key `better-answers.secondary-nav`, so every reader who had hidden the menu would have seen it again, and turned the test title "the page's own surface token" (the colour token `--surface-page`) into "area token". A test cannot protect a stored key by spelling it out: the same pass rewrites the test's literal too. Only a keep rule keeps it.
 
-Leave out of the pass every path the words test carves out (`CARVED_OUT` in `apps/api/tests/avoid-words.test.ts`: migrations and their snapshots, `docs/archive/`, plans and dogfood reports dated before 2026-10-08, the stored-names register, lifted code) and every generated file, such as `apps/web/src/shared/audit/audit-actions.ts`. They hold stored history or are regenerated, and no test fails when a pass rewrites them.
+Leave out of the pass migrations and their snapshots, `docs/archive/`, completed plans and dogfood reports, the stored-names register, lifted code and every generated file, such as `apps/web/src/shared/audit/audit-actions.ts`. They hold stored history or are regenerated, and no test fails when a pass rewrites them.
 
-**3. A word inside longer names in other senses.** With *domain* to *collection*, a pass that matches the word at camel humps and joiners rewrites `testingDomain`, `domainOf`, `OFF_TESTING_DOMAIN` and the stored column `testing_domain`; *hit* to *match* rewrites `reconcilerHits`. None of them meant the reader's word, and the column would change with no migration. Narrow the pass to the files that write the renamed sense, or give the longer names an unanchored keep rule. Then grep the word's own trees for longer names that do mean it: the words test's one-sense row matches the whole word only.
+**3. A word inside longer names in other senses.** With *domain* to *collection*, a pass that matches the word at camel humps and joiners rewrites `testingDomain`, `domainOf`, `OFF_TESTING_DOMAIN` and the stored column `testing_domain`; *hit* to *match* rewrites `reconcilerHits`. None of them meant the reader's word, and the column would change with no migration. Narrow the pass to the files that write the renamed sense, or give the longer names an unanchored keep rule. Then grep the word's own trees for longer names that do mean it, since a whole-word search misses them.
 
 ### Keep rules
 
@@ -83,16 +83,16 @@ git diff --word-diff=plain -U0 origin/main...HEAD -- . | rg '^\+\+\+ |\[-[^]]*[S
 
 Run it for each pair. It shows the hand rewordings next to the replacements, so a reviewer checks both in one read.
 
-**9. Grep multi-word phrases across line breaks.** The words test reads a file line by line, so a two-word phrase wrapped at a comment's line break passes it. U7 left "navigation and secondary" at the end of one line and "nav, never list or sidebar" at the start of the next. Grep with line breaks and comment marks allowed between the words:
+**9. Grep multi-word phrases across line breaks.** A line-by-line search misses a two-word phrase wrapped at a comment's line break. U7 left "navigation and secondary" at the end of one line and "nav, never list or sidebar" at the start of the next. Grep with line breaks and comment marks allowed between the words:
 
 ```sh
 rg -U -n -i 'secondary[\s*/#]+nav' -g '!docs/archive/**' -g '!docs/{plans,dogfood-reports}/2026-0[1-9]-*' \
-  -g '!docs/{plans,dogfood-reports}/2026-10-0[1-7]-*' -g '!apps/api/tests/old-words.ts' -g '!docs/solutions/best-practices/*renam*'
+  -g '!docs/{plans,dogfood-reports}/2026-10-0[1-7]-*' -g '!docs/solutions/best-practices/*renam*'
 ```
 
-The globs leave out files the words test also skips: the archive, plans and dogfood reports dated before 2026-10-08, the list, and the rename learnings, which quote the words a rename removes.
+The globs leave out the archive, plans and dogfood reports dated before 2026-10-08, and the rename learnings, which quote the words a rename removes.
 
-**10. Leave a fixture under `contracts/` as written.** Both tiers read those fixtures, and the api tier's contract digest is computed from them (`packages/schema/test/contract-digest.test.ts`). Rewording one moves the digest for wording alone; give the old word a sense on its row in the words test instead. When a fixture must change, regenerate both stamps after the pass, never before it: U11's pass reworded fixture prose after the stamps were generated, and the worker's hand-edited-digest test failed.
+**10. Leave a fixture under `contracts/` as written.** Both tiers read those fixtures, and the api tier's contract digest is computed from them (`packages/schema/test/contract-digest.test.ts`). Rewording one moves the digest for wording alone, so the old word stays in the fixture. When a fixture must change, regenerate both stamps after the pass, never before it: U11's pass reworded fixture prose after the stamps were generated, and the worker's hand-edited-digest test failed.
 
 **11. A noun that grows a word pushes test titles past their cap.** `MOST_WORDS = 10` (`packages/schema/test/test-title.ts`), and the Python suite holds the same cap. *Binding* to *connected source* put about sixty titles over it. Run every suite's title check before committing.
 
@@ -125,8 +125,6 @@ const KEPT_UNDER = "better-answers.menu";
 const KEPT_UNDER = "better-answers.secondary-nav";
 ```
 
-The `secondary nav` row in `apps/api/tests/old-words.ts` carries the same sense, scoped to `apps/web/`.
-
 **A collision word doubled in prose.**
 
 ```ts
@@ -137,6 +135,5 @@ The `secondary nav` row in `apps/api/tests/old-words.ts` carries the same sense,
 
 ## Related
 
-- `docs/solutions/best-practices/how-a-rename-sweep-lands-a-word-in-the-words-test.md`: adding the old word's row to the words test, and widening it when the code follows in a block's rename batch.
 - `docs/solutions/best-practices/renaming-a-table-drizzle-kit-will-not-generate-so-the-migration-and-snapshot-are-written-by-hand.md`: the migration a rename of a stored name needs.
 - `docs/solutions/architecture-patterns/adr-0047-the-platform-is-surfaces-groups-and-screens.md`: what a moved or unbuilt address shows.

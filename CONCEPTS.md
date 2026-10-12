@@ -11,8 +11,7 @@ Compound Engineering's skills add, refine, fold and retire entries under their o
 `CONCEPTS.md`, and each edit is reviewed in its pull request. Four exceptions to those rules hold
 here. The `_Internal._` mark stays where it opens a definition. The file carries no lines of words
 to avoid, and an entry that absorbs another does not name the word it replaced, so an agent reads
-only the word to write: the words test holds the old words it refuses, and the retired words are
-kept outside the repository. A name the platform does not own keeps its code form in an entry, a
+only the word to write. The retired words are kept outside the repository. A name the platform does not own keeps its code form in an entry, a
 value on the MCP wire included. A rule scoped to v0.1 keeps that scope.
 
 Each entry is a `###` heading under its cluster: a definition of one sentence, then a paragraph for

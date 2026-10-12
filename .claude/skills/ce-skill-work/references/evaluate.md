@@ -1,6 +1,6 @@
 # Validating a skill change
 
-Mechanical contracts (frontmatter, paths, greppable invariants, parity, script behavior) go in a test the docs lane runs, `pnpm run check:docs`, which CI runs too. `packages/devtools/test/ci/docs-lane.test.ts` lists each suite in the lane and what it reads: `provision-skills.test.ts` holds which skills git tracks, `apps/web/test/browser-suite-skill.test.ts` holds every path the browser-suite skill names, and `apps/api/tests/avoid-words.test.ts` holds the words of every tracked text file, skills included. A new contract test that reads a skill gets its row there. Prose behavior — routing judgment, restraint, cross-model outcomes — is evaluated with a model and is best-effort evidence, not a CI job. Read the guide's "Evaluate proportionally" section for sizing.
+Mechanical contracts (frontmatter, paths, greppable invariants, parity, script behavior) go in a test the docs lane runs, `pnpm run check:docs`, which CI runs too. `packages/devtools/test/ci/docs-lane.test.ts` lists each suite in the lane and what it reads: `provision-skills.test.ts` holds the design-system skill's link and the pixel-perfect plugin's tracked licence files, and `apps/web/test/browser-suite-skill.test.ts` holds every path the browser-suite skill names. A new contract test that reads a skill gets its row there. Prose behavior — routing judgment, restraint, cross-model outcomes — is evaluated with a model and is best-effort evidence, not a CI job. Read the guide's "Evaluate proportionally" section for sizing.
 
 ## When an eval is required
 
