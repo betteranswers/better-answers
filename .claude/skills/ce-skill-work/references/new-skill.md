@@ -32,7 +32,7 @@ Contrast pairs:
 
 ## Repo inventory (all in the same change)
 
-A skill git tracks needs: its `!` exception in `.gitignore` beside the others, its name in the lists `packages/devtools/test/ci/provision-skills.test.ts` holds of the tracked skills, and a line in `AGENTS.md` (*Skills*) when an agent must know to reach for it. A skill copied or adapted from a third party also needs its source, licence and the owner's edits in the `THIRD_PARTY_NOTICES.md` beside it, and its entry in `skills-lock.json` when the skills CLI installs it. A test that reads the skill gets its row in `packages/devtools/test/ci/docs-lane.test.ts`. Run `pnpm run check:docs`.
+A skill git tracks needs its `!` exception in `.gitignore` beside the others, and a line in `AGENTS.md` (*Skills*) when an agent must know to reach for it. A skill copied or adapted from a third party also needs its source, licence and the owner's edits in the `THIRD_PARTY_NOTICES.md` beside it, and its entry in `skills-lock.json` when the skills CLI installs it. A test that reads the skill gets its row in `packages/devtools/test/ci/docs-lane.test.ts`. Run `pnpm run check:docs`.
 
 ## Validate
 

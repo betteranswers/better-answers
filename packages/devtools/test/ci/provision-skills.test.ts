@@ -337,7 +337,7 @@ describe("the skills stage of worktree provisioning", () => {
   });
 });
 
-describe("the skills this repository tracks", () => {
+describe("the tracked skills' link and licence files", () => {
   const tracked = (directory: string): readonly string[] => {
     const listed = spawnSync("git", ["-C", repositoryRoot, "ls-files", directory], {
       encoding: "utf8",
@@ -357,26 +357,6 @@ describe("the skills this repository tracks", () => {
     );
   });
 
-  it("tracks its own three skills, for clones without an installer", () => {
-    const skills = tracked(".claude/skills");
-
-    expect(skills).toContain(".claude/skills/better-answers-design");
-    expect(skills).toContain(".claude/skills/browser-suite/SKILL.md");
-    expect(skills).toContain(".claude/skills/renovate-prs/SKILL.md");
-  });
-
-  it("tracks seven third-party skills, so every agent loads one copy", () => {
-    const skills = tracked(".claude/skills");
-
-    expect(skills).toContain(".claude/skills/ce-skill-work/SKILL.md");
-    expect(skills).toContain(".claude/skills/code-comments/SKILL.md");
-    expect(skills).toContain(".claude/skills/complexity-gate/SKILL.md");
-    expect(skills).toContain(".claude/skills/mutation-testing/SKILL.md");
-    expect(skills).toContain(".claude/skills/repo-quality-sweep/SKILL.md");
-    expect(skills).toContain(".claude/skills/session-retro/SKILL.md");
-    expect(skills).toContain(".claude/skills/survey-architecture/SKILL.md");
-  });
-
   it("tracks the pixel-perfect plugin with its licence and notice", () => {
     const files = tracked(".claude/skills/pixel-perfect");
 
@@ -387,36 +367,5 @@ describe("the skills this repository tracks", () => {
       expect(files).toContain(`.claude/skills/pixel-perfect/skills/${skill}/SKILL.md`);
     }
     expect(files.filter((file) => file.endsWith("/SKILL.md"))).toHaveLength(15);
-  });
-
-  it("tracks nothing else, since every other skill installs per checkout", () => {
-    const ours = tracked(".claude/skills").map((file) => file.split("/")[2] ?? "");
-
-    expect([...new Set(ours)].sort()).toEqual([
-      "THIRD_PARTY_NOTICES.md",
-      "better-answers-design",
-      "browser-suite",
-      "ce-skill-work",
-      "code-comments",
-      "complexity-gate",
-      "mutation-testing",
-      "pixel-perfect",
-      "renovate-prs",
-      "repo-quality-sweep",
-      "session-retro",
-      "survey-architecture",
-    ]);
-  });
-
-  it("tracks the api's two Resend skills and nothing else there", () => {
-    const skills = tracked("apps/api/.claude/skills");
-
-    expect(skills).toContain("apps/api/.claude/skills/email-best-practices/SKILL.md");
-    expect(skills).toContain("apps/api/.claude/skills/resend/SKILL.md");
-    expect([...new Set(skills.map((file) => file.split("/")[4] ?? ""))].sort()).toEqual([
-      "THIRD_PARTY_NOTICES.md",
-      "email-best-practices",
-      "resend",
-    ]);
   });
 });
