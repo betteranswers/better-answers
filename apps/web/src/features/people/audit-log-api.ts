@@ -1,13 +1,11 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
+import type { inferInput } from "@trpc/tanstack-react-query";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
 
 type Api = ReturnType<typeof useTRPC>;
 
 type AuditLogProcedure = Api["members"]["auditLog"];
-
-export type ReadAuditEvent = inferOutput<AuditLogProcedure>["events"][number];
 
 export type Family = NonNullable<inferInput<AuditLogProcedure>["family"]>;
 

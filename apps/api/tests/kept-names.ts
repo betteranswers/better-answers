@@ -69,7 +69,7 @@ export const keptNamesUnder = (root: string): Readonly<Record<string, readonly s
     .filter((line) => line.startsWith("/")),
   "the stored-names register": STORED_ACT_NAMES,
   "stored action names": matchesIn(
-    readUnder(root, "apps/web/src/features/people/audit-actions.ts"),
+    readUnder(root, "apps/web/src/shared/audit/audit-actions.ts"),
     QUOTED_ACTION,
   ),
   "old page addresses": movedFromIn(readUnder(root, "apps/web/src/shared/navigation.ts")),

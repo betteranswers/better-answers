@@ -18,7 +18,14 @@ import {
 } from "./people-suite.ts";
 import { whileCommitsAreRefused } from "./provoke.ts";
 import { aStoppableClock } from "./suite-app.ts";
-import { refusalOfCall, statusOf, webSignedIn } from "./web-client.ts";
+import {
+  aTabLeftBehind,
+  postedFromATab,
+  refusalOfCall,
+  statusOf,
+  webSignedIn,
+  webTabOf,
+} from "./web-client.ts";
 
 const unreachable = new Set<string>();
 
@@ -268,12 +275,17 @@ describe("inviting several addresses over tRPC", () => {
 
 describe("the per-address ceiling over tRPC", () => {
   it("refuses a send past it whole, minting and emailing nothing", async () => {
-    const { api, client } = await anAdmin();
+    const { api, client, workspace } = await anAdmin();
     const ana = anAddress("ana");
     const ben = anAddress("ben");
 
     const statuses = await sentToTheCeiling(api, ana);
-    const refused = await client.json(INVITE, { addresses: [ben, ana], role: "Viewer" });
+    const refused = await postedFromATab(
+      client,
+      INVITE,
+      { addresses: [ben, ana], role: "Viewer" },
+      workspace.workspaceId,
+    );
 
     expect(statuses).toEqual(TO_THE_CEILING);
     expect(refused.status).toBe(429);
@@ -306,6 +318,25 @@ describe("the per-address ceiling over tRPC", () => {
     expect(refused).toMatchObject({ data: { httpStatus: 429, code: "TOO_MANY_REQUESTS" } });
     expect(emailsTo(app(), toBen.address)).toHaveLength(1);
     expect(await api.members.invitations.query()).toEqual(before);
+  });
+
+  it("answers a stale tab the refusal, never the ceiling", async () => {
+    const acme = await app().provision({ name: "Acme" });
+    const beta = await app().provision({ name: "Beta" });
+    await app().addMember(beta.workspaceId, acme.admin.id, "Admin");
+    const { client, stale } = await aTabLeftBehind(app(), acme.admin.email, {
+      from: acme.workspaceId,
+      to: beta.workspaceId,
+    });
+    const ana = anAddress("ana");
+    const statuses = await sentToTheCeiling((await webTabOf(client)).api, ana);
+
+    const refused = await refusalOfCall(inviting(stale, [ana]));
+
+    expect(statuses).toEqual(TO_THE_CEILING);
+    expect(refused).toMatchObject({
+      data: { httpStatus: 409, refusal: { word: "workspace-switched", class: "conflict" } },
+    });
   });
 });
 

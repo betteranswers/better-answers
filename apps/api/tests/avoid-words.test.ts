@@ -594,7 +594,7 @@ describe("a word its rename lands", () => {
 
   it("keeps a stored act name the generated list has lost", () => {
     const tree = plantedTree({
-      "apps/web/src/features/people/audit-actions.ts": `export const DECLARED_ACTIONS = ["sources.connected_source.bound"] as const;`,
+      "apps/web/src/shared/audit/audit-actions.ts": `export const DECLARED_ACTIONS = ["sources.connected_source.bound"] as const;`,
       "apps/web/src/shared/navigation.ts": `movedFrom: ["/sources"],`,
       "apps/api/tests/better-auth-endpoints.txt": "/sign-in/email",
     });
@@ -605,7 +605,7 @@ describe("a word its rename lands", () => {
 
   it("keeps every older address a page lists", () => {
     const tree = plantedTree({
-      "apps/web/src/features/people/audit-actions.ts": `export const DECLARED_ACTIONS = [] as const;`,
+      "apps/web/src/shared/audit/audit-actions.ts": `export const DECLARED_ACTIONS = [] as const;`,
       "apps/web/src/shared/navigation.ts": [
         `movedFrom: ["/system/old-name"],`,
         `movedFrom: [`,
@@ -727,7 +727,7 @@ describe("a word its rename lands", () => {
     const navigation = "apps/web/src/shared/navigation.ts";
     const files = {
       [navigation]: `name: "${tokens}",\nname: "Personal ${tokens.toLowerCase()}",`,
-      "apps/web/src/features/people/audit-details.ts": `${tokens.toLowerCase()}: "${tokens}",`,
+      "apps/web/src/shared/audit/audit-details.ts": `${tokens.toLowerCase()}: "${tokens}",`,
     };
 
     expect(linesOver(files, [rowOf(tokens)])).toEqual([`${navigation}:1: name: "${tokens}",`]);

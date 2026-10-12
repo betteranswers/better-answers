@@ -25,13 +25,6 @@ import { backTo, carriedFlow, leavingFor, pageQuery } from "@/features/auth/carr
 import { ChooseWorkspacePage } from "@/features/auth/choose-workspace-page.tsx";
 import { DisplayNamePage } from "@/features/auth/display-name-page.tsx";
 import { LinkPage } from "@/features/auth/link-page.tsx";
-import {
-  memberRefusal,
-  NEEDS_A_PICK,
-  roleHeld,
-  SECOND_FACTOR_PENDING,
-  useMember,
-} from "@/features/auth/member.ts";
 import { NoWorkspacePage } from "@/features/auth/no-workspace-page.tsx";
 import { detourAfter } from "@/features/auth/pending-refusal.ts";
 import { ConfirmPage, RecoveryPage } from "@/features/auth/second-factor-pages.tsx";
@@ -45,8 +38,10 @@ import {
   SETUP_STEP,
   type LeftFrom,
 } from "@/features/auth/second-factor-steps.ts";
+import { rememberTheSession } from "@/features/auth/session-memory.ts";
 import { CodesPage, SetupPage } from "@/features/auth/setup-page.tsx";
 import { SignInPage } from "@/features/auth/sign-in-page.tsx";
+import { homeAfterASwitchElsewhere } from "@/features/auth/switched-elsewhere.ts";
 import { EveryonePage } from "@/features/console/everyone-page.tsx";
 import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
 import { isTheOperator, mustSignInForTheConsole } from "@/features/console/operator.ts";
@@ -62,6 +57,13 @@ import { MEMBERS_TOOLBAR, MembersPage } from "@/features/people/members-page.tsx
 import { ConnectedSourcesPage } from "@/features/sources/connected-sources-page.tsx";
 import type { FailedDuring } from "@/shared/api/query-client.ts";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
+import {
+  memberRefusal,
+  NEEDS_A_PICK,
+  roleHeld,
+  SECOND_FACTOR_PENDING,
+  useMember,
+} from "@/shared/member.ts";
 import {
   CONSOLE,
   hides,
@@ -194,6 +196,11 @@ const codesRoute = createRoute({
   },
 });
 
+/** Answered, so not pending: a session ending from here ended for some other reason. */
+const sessionHeld = (): void => {
+  rememberTheSession("held");
+};
+
 /** Framed once a workspace is open, and decided on arrival: a later read never swaps the page. */
 function AccountWhereHeld(): ReactElement {
   const framed = accountRoute.useRouteContext({ select: (context) => context.framed });
@@ -214,7 +221,7 @@ const accountRoute = createRoute({
     const elsewhere = await signedOutDetour(context.queryClient, location.href);
     if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
     await confirmedFirst(context, location);
-    await memberRefusal(context.queryClient, context.api);
+    await memberRefusal(context.queryClient, context.api, sessionHeld);
     return { framed: roleHeld(context.queryClient, context.api) !== undefined };
   },
 });
@@ -277,7 +284,7 @@ const shellRoute = createRoute({
   notFoundComponent: () => <UnknownPage />,
   // The sign-in page and the picker are this route's siblings, so this never runs on them.
   beforeLoad: async ({ context, location }) => {
-    const refusal = await memberRefusal(context.queryClient, context.api);
+    const refusal = await memberRefusal(context.queryClient, context.api, sessionHeld);
     if (refusal === undefined) return;
 
     throw redirect(await shellDetour(context, location, refusal));
@@ -307,11 +314,13 @@ const indexRoute = createRoute({
   path: "/",
   beforeLoad: ({ context }) => {
     const { role } = memberOf(context);
-    if (role !== undefined) throw redirect({ href: HOMES[role].path, replace: true });
+    // The entry's state goes on with it: a tab landed here is told why at its home.
+    if (role !== undefined) throw redirect({ href: HOMES[role].path, replace: true, state: true });
   },
   component: function HomeUnread() {
     const { home } = useVisibleTree();
-    return home === undefined ? <RoleUnread /> : <Navigate to={home.path} replace />;
+    // State goes on from here as well: a role read late takes this road home.
+    return home === undefined ? <RoleUnread /> : <Navigate to={home.path} replace state />;
   },
 });
 
@@ -526,14 +535,17 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
 
   const router =
     history === undefined ? createRouter(options) : createRouter({ ...options, history });
-  clients.failures.answeredBy(
-    detouringOn(context, {
-      at: () => ({ ...leftFrom(router.latestLocation), pathname: router.latestLocation.pathname }),
-      go: (href) => {
-        void router.navigate(leavingFor(href));
-      },
-    }),
-  );
+  const detour = detouringOn(context, {
+    at: () => ({ ...leftFrom(router.latestLocation), pathname: router.latestLocation.pathname }),
+    go: (href) => {
+      void router.navigate(leavingFor(href));
+    },
+  });
+  clients.failures.answeredBy((failure, during) => {
+    const home = homeAfterASwitchElsewhere(failure, context);
+    if (home === undefined) detour(failure, during);
+    else void home.then((to) => router.navigate(to));
+  });
   return router;
 };
 

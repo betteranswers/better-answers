@@ -2,7 +2,7 @@ import { byWords, counted, nameOrAddress } from "@/shared/words.ts";
 
 import { HEADLINES, type DECLARED_ACTIONS } from "./audit-actions.ts";
 import { namedIn } from "./audit-details.ts";
-import type { ReadAuditEvent } from "./audit-log-api.ts";
+import type { ReadAuditEvent } from "./audit-event.ts";
 import { GONE_WORDS, removedWords, THING_NOUNS, type Thing } from "./audit-subjects.ts";
 
 export type SaidEvent = Pick<ReadAuditEvent, "action" | "by" | "subject" | "detail" | "named">;

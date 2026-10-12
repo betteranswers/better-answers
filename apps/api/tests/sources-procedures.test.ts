@@ -10,7 +10,7 @@ import { ulid } from "@better-answers/schema";
 import { POSTGRES_POOL_MAX } from "../src/doors.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { UPLOAD_DESCRIPTOR_HEADERS } from "../src/trpc/upload.ts";
-import { actingIn, startApp, type TestApp, type TestClient } from "./harness.ts";
+import { actingIn, startApp, type TestApp } from "./harness.ts";
 import {
   revocationHeldOpen,
   seededIn,
@@ -158,13 +158,13 @@ const connectedSourcesIn = async (workspaceId: string): Promise<number> => {
 };
 
 const uploadRaw = (
-  client: TestClient,
+  { client, workspace }: Pick<Awaited<ReturnType<typeof anAdmin>>, "client" | "workspace">,
   descriptor: UploadDescriptor,
   body: ReadableStream<Uint8Array>,
 ): Promise<Response> =>
   client.fetch(`${TRPC_ENDPOINT}/sources.connect`, {
     method: "POST",
-    headers: uploadHeaders(descriptor),
+    headers: uploadHeaders(descriptor, workspace.workspaceId),
     body,
     duplex: "half",
   });
@@ -311,11 +311,11 @@ describe("the upload, one mutation over the split link", () => {
   });
 
   it("refuses a declared oversize file before its body is read", async () => {
-    const { workspace, client } = await anAdmin();
+    const admin = await anAdmin();
     const { held, body } = heldOpenBody();
 
     const response = await uploadRaw(
-      client,
+      admin,
       handbookDescribed({ byteSize: UPLOAD_BYTE_CAP + 1 }),
       body,
     );
@@ -323,24 +323,24 @@ describe("the upload, one mutation over the split link", () => {
     expect(response.status).toBe(422);
     expect(await refusalIn(response)).toEqual({ word: "too-large", class: "inapplicable" });
     expect(held.ended).toBe(false);
-    expect(await connectedSourcesIn(workspace.workspaceId)).toBe(0);
+    expect(await connectedSourcesIn(admin.workspace.workspaceId)).toBe(0);
   });
 
   it("refuses a body passing the cap mid-stream, before its end", async () => {
-    const { workspace, client } = await anAdmin();
+    const admin = await anAdmin();
     const { body, sent, total } = pastTheCap();
 
-    const response = await uploadRaw(client, handbookDescribed(), body);
+    const response = await uploadRaw(admin, handbookDescribed(), body);
 
     expect(response.status).toBe(422);
     expect(await refusalIn(response)).toEqual({ word: "too-large", class: "inapplicable" });
     expect(sent.bytes).toBeLessThan(total);
-    expect(await connectedSourcesIn(workspace.workspaceId)).toBe(0);
+    expect(await connectedSourcesIn(admin.workspace.workspaceId)).toBe(0);
   }, 180_000);
 
   it("refuses missing or unreadable descriptor fields by name alone", async () => {
     const { workspace, client } = await anAdmin();
-    const headers = uploadHeaders(handbookDescribed());
+    const headers = uploadHeaders(handbookDescribed(), workspace.workspaceId);
     headers.delete("x-upload-file-name");
     headers.set("x-upload-byte-size", "%E0%A4%A");
 
@@ -362,7 +362,7 @@ describe("the upload, one mutation over the split link", () => {
 
 describe("ten concurrent uploads, whose action opens its own transaction", () => {
   it("holds at most one pooled connection each, none while streaming", async () => {
-    const { client } = await anAdmin();
+    const admin = await anAdmin();
     const { pool } = app.doors.postgres;
     const watched = { held: 0, peak: 0 };
     const acquired = () => {
@@ -376,7 +376,7 @@ describe("ten concurrent uploads, whose action opens its own transaction", () =>
     pool.on("release", released);
     try {
       const bodies = Array.from({ length: UPLOADS_AT_ONCE }, () => heldOpenBody());
-      const answers = bodies.map(({ body }) => uploadRaw(client, handbookDescribed(), body));
+      const answers = bodies.map(({ body }) => uploadRaw(admin, handbookDescribed(), body));
 
       await until(async () => bodies.every(({ held }) => held.asked > 0));
       const heldWhileStreaming = watched.held;

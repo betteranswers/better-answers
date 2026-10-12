@@ -1,5 +1,5 @@
 import type { DECLARED_ACTIONS } from "./audit-actions.ts";
-import type { ReadAuditEvent } from "./audit-log-api.ts";
+import type { ReadAuditEvent } from "./audit-event.ts";
 import { GONE_WORDS, personSaid, removedWords } from "./audit-subjects.ts";
 
 type DeclaredAction = (typeof DECLARED_ACTIONS)[number];

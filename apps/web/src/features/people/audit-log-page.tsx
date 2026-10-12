@@ -2,6 +2,11 @@ import { useId, useMemo, useRef, useState, type RefObject } from "react";
 
 import { Address } from "@/shared/address.tsx";
 import { ceilingLiftsIn, type ApiError } from "@/shared/api/trpc.ts";
+import { detailLinesOf, type DetailLine } from "@/shared/audit/audit-details.ts";
+import type { ReadAuditEvent } from "@/shared/audit/audit-event.ts";
+import { headlineOf, sentenceOf } from "@/shared/audit/audit-sentences.ts";
+import { personSaid } from "@/shared/audit/audit-subjects.ts";
+import { EventDays } from "@/shared/audit/event-days.tsx";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
@@ -17,14 +22,7 @@ import { Card } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { byWords, CLEAR_WORDS, instantWords } from "@/shared/words.ts";
 
-import { detailLinesOf, type DetailLine } from "./audit-details.ts";
-import {
-  useAuditLog,
-  useExportAuditLog,
-  type Asked,
-  type AuditLog,
-  type ReadAuditEvent,
-} from "./audit-log-api.ts";
+import { useAuditLog, useExportAuditLog, type Asked, type AuditLog } from "./audit-log-api.ts";
 import {
   AUDIT_LOG_FIELDS,
   AUDIT_LOG_KEYSTROKES as KEY,
@@ -33,9 +31,6 @@ import {
   SEARCH_MAX,
 } from "./audit-log-state.ts";
 import { AUDIT_LOG_WORDS as WORDS } from "./audit-log-words.ts";
-import { headlineOf, sentenceOf } from "./audit-sentences.ts";
-import { personSaid } from "./audit-subjects.ts";
-import { EventDays } from "./event-days.tsx";
 import { auditExportCeiling } from "./refusal-words.ts";
 import { outcomeOfAuditLogFailure } from "./refusal.tsx";
 

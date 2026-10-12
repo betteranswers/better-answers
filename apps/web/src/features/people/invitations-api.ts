@@ -1,6 +1,7 @@
-import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 
+import { takenFrom, type Undo } from "@/shared/api/optimistic.ts";
 import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
 
 import { useActivityReadAgain } from "./people-api.ts";
@@ -34,9 +35,8 @@ export const useInvitationCounts = () => {
   return useQuery(api.members.invitationCounts.queryOptions());
 };
 
-type Snapshot = {
-  readonly before: readonly (readonly [QueryKey, ListedInvitation[] | undefined])[];
-};
+/** One for each status's list an action took rows from. */
+type Snapshot = { readonly taken: readonly Undo[] };
 
 /** Every settled action reads each status and the counts again; an action is a line of its Admin's Activity. */
 const useReconcile = () => {
@@ -65,20 +65,20 @@ const useMoving = () => {
         ? api.members.invitations.pathFilter()
         : { queryKey: api.members.invitations.queryKey({ status: only }) };
     await queryClient.cancelQueries(filter);
-    const before = queryClient.getQueriesData<ListedInvitation[]>(filter);
+    const taken = queryClient
+      .getQueriesData(filter)
+      .map(([queryKey]) => takenFrom(queryClient, queryKey));
     const leaving = new Set(invitationIds);
     queryClient.setQueriesData<ListedInvitation[]>(filter, (rows) =>
       rows?.filter((invitation) => !leaving.has(invitation.invitationId)),
     );
-    return { before };
+    return { taken };
   };
 
   return <Asked>(leaving: (asked: Asked) => readonly string[], only?: InvitationStatus) => ({
     onMutate: (asked: Asked) => without(leaving(asked), only),
     onError: (_refusal: ApiError, _asked: Asked, snapshot: Snapshot | undefined) => {
-      for (const [queryKey, rows] of snapshot?.before ?? []) {
-        queryClient.setQueryData(queryKey, rows);
-      }
+      for (const { undo } of snapshot?.taken ?? []) undo();
     },
     onSettled: () => reconcile(),
   });

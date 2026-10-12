@@ -37,7 +37,7 @@ tags:
 **A refusal word** means one thing wherever it appears.
 
 - Its owning slice declares it once, in a vocabulary that is plain data. Importing a module registers nothing. The shared words (`malformed`, `role-forbids`, `not-found`) are the kernel's (`packages/core/src/kernel/vocabulary.ts`).
-- One module composes the catalogue: each owner's vocabulary under the owner's name (`packages/core/src/refusals/index.ts`). Every reader takes the words from it. A transport adds only its own, as the api adds its two (`apps/api/src/refusal.ts`).
+- One module composes the catalogue: each owner's vocabulary under the owner's name (`packages/core/src/refusals/index.ts`). Every reader takes the words from it. A transport adds only its own, as the api adds its three (`apps/api/src/refusal.ts`).
 - The classes are in `packages/core/src/kernel/refusal.ts`, beside the function that reads a catalogue and throws on a word two owners declare.
 - It is classed by remedy: *unauthenticated*, *forbidden*, *absent*, *malformed*, *inapplicable*, *conflict* or *precondition*.
 - The catalogue is append-only. A shipped word is never removed and never changes class.
@@ -112,3 +112,5 @@ Amended 10/10/2026 on the owner's ruling, by the MCP entry door plan (`docs/plan
 Amended 10/10/2026 by the one admission declaration plan (`docs/plans/2026-10-10-1434-refactor-one-admission-declaration-plan.md`, R1, R6, R9 and R10). Every action that judged a role by hand is now declared beside its face function, so the rule above holds for all of them. The kernel's `requireAdmin` shorthand is gone, and a declaration no longer names an effect. An import's manifest commit refused as `stale-precondition` reaches the caller as that word and `pnpm ops` exits it as a conflict. One refused as malformed stays an error.
 
 Amended 10/10/2026 by the admission types plan (`docs/plans/2026-10-10-1702-fix-admission-types-and-face-admission-plan.md`, R1, R4, R6 and R11). A face that every role may ask for was typed by its parameter alone, and nothing held a new face to admit. Each of the eight now declares that level and admits, and a test over every face names a function that takes a person and admits nobody. A person of the three roles is answered as before. The kernel types an admitted person by the lowest role a declaration can name, where it read a union of roles as an Admin.
+
+Amended 11/10/2026 by the workspace-bound actions plan (`docs/plans/2026-10-11-2213-fix-workspace-bound-actions-and-shared-member-plan.md`, R7 to R9). The api's transport adds a third word, `workspace-switched`, of class *conflict*. A tab names the workspace it holds in a request header, and the two workspace roads refuse a mutation that names another workspace, or none. They judge it straight after the session's own words, before any ceiling, the principal and the parse. A query is never refused this way, and the person's and the operator's roads are not checked. Core gains no word and no input field.

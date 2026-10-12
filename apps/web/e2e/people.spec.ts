@@ -4,7 +4,6 @@ import { BREADCRUMB, JUMP_TO, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { headlineOf, sentenceOf as saidOfAction } from "@/features/people/audit-sentences.ts";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
   ACTIVITY_WORDS,
@@ -23,6 +22,7 @@ import {
 } from "@/features/people/people-state.ts";
 import { SAID_OF_A_MEMBER, SAID_OF_TICKED_MEMBERS } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
+import { headlineOf, sentenceOf as saidOfAction } from "@/shared/audit/audit-sentences.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, headingOf, pageNamed } from "@/shared/navigation.ts";
 import { NO_RESPONSE_TO_A_READ, SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";

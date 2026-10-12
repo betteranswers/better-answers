@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { DETAIL_KEYS } from "@/features/people/audit-actions.ts";
-import { KEPT_OFF_DETAIL_KEYS, LABELLED_DETAIL_KEYS } from "@/features/people/audit-details.ts";
+import { DETAIL_KEYS } from "@/shared/audit/audit-actions.ts";
+import { KEPT_OFF_DETAIL_KEYS, LABELLED_DETAIL_KEYS } from "@/shared/audit/audit-details.ts";
 
 const said = (action: string, key: string): string => `${action} ${key}`;
 

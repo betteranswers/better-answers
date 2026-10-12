@@ -93,7 +93,7 @@ export const useWorkspaceSwitch = () => {
   };
 };
 
-type WorkspaceSwitch = ReturnType<typeof useWorkspaceSwitch>;
+export type WorkspaceSwitch = ReturnType<typeof useWorkspaceSwitch>;
 
 /**
  * The open workspace first, from what the frame holds, so it shows while the list is read; the

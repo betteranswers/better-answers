@@ -1,4 +1,4 @@
-import { initTRPC, TRPCError } from "@trpc/server";
+import { initTRPC, TRPCError, type TRPCProcedureType } from "@trpc/server";
 import type { Logger } from "pino";
 import type { z } from "zod";
 
@@ -28,6 +28,7 @@ import {
   type Folded,
   type Tx,
 } from "@better-answers/core/store/postgres";
+import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 
 import { sessionClaims } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
@@ -198,6 +199,23 @@ const claimsOf = async (ctx: TrpcContext, path: string): Promise<Claims> => {
   return claims;
 };
 
+/**
+ * One browser holds one session, so a tab left behind by a switch would act in the session's new
+ * workspace. A read changes nothing.
+ */
+const claimsInTheTabsWorkspace = async (
+  ctx: TrpcContext,
+  path: string,
+  type: TRPCProcedureType,
+): Promise<Claims> => {
+  const claims = await claimsOf(ctx, path);
+
+  if (type === "mutation" && ctx.headers.get(TAB_WORKSPACE_HEADER) !== claims.workspaceId) {
+    throw refused(ctx.log, path, "workspace-switched");
+  }
+  return claims;
+};
+
 const settled = <Ran>(
   ctx: TrpcContext,
   resolver: string,
@@ -246,8 +264,8 @@ type RoadCeiling = { readonly budget: string; readonly rule: CounterRule };
 
 /** The count comes before the transaction, so a call held at its ceiling holds no connection. */
 const inTheResolversTransaction = (resolve: typeof withPrincipal, ceiling?: RoadCeiling) =>
-  trpc.procedure.use(async ({ ctx, path, next }) => {
-    const claims = await claimsOf(ctx, path);
+  trpc.procedure.use(async ({ ctx, path, type, next }) => {
+    const claims = await claimsInTheTabsWorkspace(ctx, path, type);
     if (ceiling !== undefined) {
       await consumeCeiling(ctx, path, `${ceiling.budget}:${claims.userId}`, ceiling.rule);
     }
@@ -272,8 +290,8 @@ export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
  * A Principal outlives the transaction that resolved it only here; never the request, and the
  * action's own door re-judges it.
  */
-export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, path, next }) => {
-  const claims = await claimsOf(ctx, path);
+export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, path, type, next }) => {
+  const claims = await claimsInTheTabsWorkspace(ctx, path, type);
 
   const resolved = await attempt(() =>
     withPrincipal(ctx.doors.postgres, claims, async (principal) => principal),

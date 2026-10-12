@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { DECLARED_ACTIONS } from "@/features/people/audit-actions.ts";
-import { detailLinesOf } from "@/features/people/audit-details.ts";
+import { DECLARED_ACTIONS } from "@/shared/audit/audit-actions.ts";
+import { detailLinesOf } from "@/shared/audit/audit-details.ts";
 import {
   ACTIONS_HEADED,
   ACTIONS_SAID,
   headlineOf,
   sentenceOf,
   type SaidEvent,
-} from "@/features/people/audit-sentences.ts";
+} from "@/shared/audit/audit-sentences.ts";
 
 const HANNAH = {
   kind: "person",

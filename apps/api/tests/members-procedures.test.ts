@@ -21,7 +21,7 @@ import {
   whileAuditRowsVanish,
   type HeldRevocation,
 } from "./provoke.ts";
-import { refusalOfCall, webClientOf, webSignedIn } from "./web-client.ts";
+import { aTabLeftBehind, refusalOfCall, webClientOf, webSignedIn, webTabOf } from "./web-client.ts";
 
 let app: TestApp;
 
@@ -731,5 +731,126 @@ describe.each([
 ])("who may %s", (_verb, ask) => {
   it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
     expect(await refusalToAMemberAt(app, role, ask)).toMatchObject(ROLE_FORBIDS_ANSWERED);
+  });
+});
+
+const WORKSPACE_SWITCHED = {
+  data: { httpStatus: 409, refusal: { word: "workspace-switched", class: "conflict" } },
+} as const;
+
+/**
+ * A tab that read Acme before its session moved to Beta. Its Admin and Sam are in both, so an
+ * unrefused action lands in Beta.
+ */
+const aTabLeftInAcme = async (roleInBeta: "Admin" | "Editor" = "Admin") => {
+  const acme = await app.provision({ name: "Acme" });
+  const beta = await app.provision({ name: "Beta" });
+  const sam = await app.person(undefined, "Sam Okoro");
+  await app.addMember(acme.workspaceId, sam.id, "Viewer");
+  await app.addMember(beta.workspaceId, sam.id, "Viewer");
+  await app.addMember(beta.workspaceId, acme.admin.id, roleInBeta);
+  const moved = { from: acme.workspaceId, to: beta.workspaceId };
+  return { acme, beta, sam, ...(await aTabLeftBehind(app, acme.admin.email, moved)) };
+};
+
+type LeftInAcme = Awaited<ReturnType<typeof aTabLeftInAcme>>;
+
+const samsRoles = ({ acme, beta, sam }: LeftInAcme) =>
+  Promise.all([roleHeldBy(acme.workspaceId, sam.id), roleHeldBy(beta.workspaceId, sam.id)]);
+
+const countOf = async (sql: string, value: string): Promise<number | undefined> =>
+  (await app.database.superuser.query<{ held: number }>(sql, [value])).rows[0]?.held;
+
+describe("an action from a tab left in another workspace", () => {
+  it("refuses a removal, keeping the member in both workspaces", async () => {
+    const left = await aTabLeftInAcme();
+
+    const refused = await refusalOfCall(
+      left.stale.members.remove.mutate({ personId: left.sam.id }),
+    );
+
+    expect(refused).toMatchObject(WORKSPACE_SWITCHED);
+    expect(await samsRoles(left)).toEqual(["Viewer", "Viewer"]);
+  });
+
+  it("refuses a ticked set's removal, removing nobody", async () => {
+    const left = await aTabLeftInAcme();
+
+    const refused = await refusalOfCall(
+      left.stale.members.bulkRemove.mutate({ personIds: [left.sam.id] }),
+    );
+
+    expect(refused).toMatchObject(WORKSPACE_SWITCHED);
+    expect(await samsRoles(left)).toEqual(["Viewer", "Viewer"]);
+  });
+
+  it("refuses an invitation, inviting nobody to either workspace", async () => {
+    const { stale } = await aTabLeftInAcme();
+    const address = `invited-${Date.now()}@client.example`;
+
+    const refused = await refusalOfCall(
+      stale.members.invite.mutate({ addresses: [address], role: "Viewer" }),
+    );
+
+    expect(refused).toMatchObject(WORKSPACE_SWITCHED);
+    expect(
+      await countOf("SELECT count(*)::int AS held FROM invitation WHERE email = $1", address),
+    ).toBe(0);
+    expect(app.emails.filter((message) => message.to === address)).toEqual([]);
+  });
+
+  it("refuses a new group, making none in either workspace", async () => {
+    const { stale } = await aTabLeftInAcme();
+    const name = `Bid writers ${Date.now()}`;
+
+    const refused = await refusalOfCall(stale.members.createGroup.mutate({ name }));
+
+    expect(refused).toMatchObject(WORKSPACE_SWITCHED);
+    expect(await countOf('SELECT count(*)::int AS held FROM "group" WHERE name = $1', name)).toBe(
+      0,
+    );
+  });
+
+  it("says so before judging the person's role there", async () => {
+    const left = await aTabLeftInAcme("Editor");
+
+    const refused = await refusalOfCall(
+      left.stale.members.changeRole.mutate({ personId: left.sam.id, role: "Editor" }),
+    );
+
+    expect(refused).toMatchObject(WORKSPACE_SWITCHED);
+    expect(await samsRoles(left)).toEqual(["Viewer", "Viewer"]);
+  });
+
+  it("refuses an action that names no workspace", async () => {
+    const { workspace, viewer } = await aWorkspaceOfThree();
+    const { client } = await webSignedIn(app, workspace.admin.email);
+
+    const refused = await refusalOfCall(
+      webClientOf(client).api.members.remove.mutate({ personId: viewer.id }),
+    );
+
+    expect(refused).toMatchObject(WORKSPACE_SWITCHED);
+    expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
+  });
+
+  it("runs an action from a tab opened after the switch", async () => {
+    const left = await aTabLeftInAcme();
+    const { api } = await webTabOf(left.client);
+
+    await api.members.remove.mutate({ personId: left.sam.id });
+
+    expect(await samsRoles(left)).toEqual(["Viewer", undefined]);
+  });
+
+  it("answers a read naming another workspace, or none", async () => {
+    const { beta, client, stale } = await aTabLeftInAcme();
+
+    const read = await Promise.all([
+      stale.session.member.query(),
+      webClientOf(client).api.session.member.query(),
+    ]);
+
+    expect(read.map((member) => member.workspace.id)).toEqual([beta.workspaceId, beta.workspaceId]);
   });
 });

@@ -4,7 +4,7 @@ import type { Clock } from "@better-answers/core/kernel";
 
 import { askToJoin } from "./harness-people.ts";
 import { startApp, type TestApp } from "./harness.ts";
-import { sessionPointedAt } from "./provoke.ts";
+import { anAdminOfElsewherePointedAt } from "./people-refusals.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
 export const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -84,9 +84,4 @@ export const answeredToAnAdminPointedHere = async (
   app: TestApp,
   workspaceId: string,
   call: (api: Api) => Promise<unknown>,
-): Promise<unknown> => {
-  const elsewhere = await app.provision();
-  const { api } = await webSignedIn(app, elsewhere.admin.email);
-  await sessionPointedAt(app, elsewhere.admin.id, workspaceId);
-  return refusalOfCall(call(api));
-};
+): Promise<unknown> => refusalOfCall(call(await anAdminOfElsewherePointedAt(app, workspaceId)));

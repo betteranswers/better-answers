@@ -15,7 +15,7 @@ import { PUBLIC_URL, type TestClient } from "./harness.ts";
 import type { PasskeyDevice } from "./passkey-device.ts";
 import { passkeyAddedOn, setUpOn, signedInByEmailOnly } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
-import { refusalOfCall, webClientOf } from "./web-client.ts";
+import { refusalOfCall, webClientOf, webTabOf } from "./web-client.ts";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -68,7 +68,8 @@ const sessionRowsOf = async (personId: string) =>
 const madeAnAdminBy = async (adminEmail: string, personId: string): Promise<void> => {
   const adminClient = await signedInByEmailOnly(app(), adminEmail);
   await confirmedByTheHarness(app(), adminClient);
-  await apiOf(adminClient).members.changeRole.mutate({ personId, role: "Admin" });
+  const { api } = await webTabOf(adminClient);
+  await api.members.changeRole.mutate({ personId, role: "Admin" });
 };
 
 describe("an Admin's sign-in", () => {

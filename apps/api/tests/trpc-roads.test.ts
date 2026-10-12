@@ -13,6 +13,7 @@ import {
   type UserPrincipal,
 } from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
+import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 
 import type { Doors } from "../src/doors.ts";
@@ -29,9 +30,12 @@ import {
   router,
 } from "../src/trpc/base.ts";
 import { knowledgeReadProcedure } from "../src/trpc/knowledge.ts";
+import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { appRouter } from "../src/trpc/router.ts";
 import { capturingLogger, doorsFor } from "./harness.ts";
+import { signedInClient } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
+import { postedFromATab, sessionMovedTo } from "./web-client.ts";
 
 type QueryContext = inferProcedureBuilderResolverOptions<typeof queryProcedure>["ctx"];
 type MutationContext = inferProcedureBuilderResolverOptions<typeof mutationProcedure>["ctx"];
@@ -82,11 +86,16 @@ const A_SIGNED_IN_PERSON = {
 
 const wire = z.object({ error: z.object({ data: z.object({ refusal: z.unknown() }) }) });
 
-const contextOf = (doors: Doors, log: Logger, readSession: GatedSessionReader) => ({
+const contextOf = (
+  doors: Doors,
+  log: Logger,
+  readSession: GatedSessionReader,
+  headers = new Headers(),
+) => ({
   doors,
   clock: systemClock(),
   readSession,
-  headers: new Headers(),
+  headers,
   log,
   mail: { send: async () => {}, publicUrl: "https://app.example.test" },
 });
@@ -209,8 +218,15 @@ const writingRoads = (key: string) => {
 
 type Road = "queried" | "mutated";
 
+type Asking = {
+  readonly readSession: GatedSessionReader;
+  readonly log: Logger;
+  /** The workspace the tab names, where it names one. */
+  readonly held?: string;
+};
+
 /** Asked as the web asks: a query over GET, a mutation over POST. */
-const askedOver = (road: Road, roads: AnyRouter, readSession: GatedSessionReader, log: Logger) =>
+const askedOver = (road: Road, roads: AnyRouter, { readSession, log, held }: Asking) =>
   fetchRequestHandler({
     endpoint: "/trpc",
     req: new Request(
@@ -220,7 +236,13 @@ const askedOver = (road: Road, roads: AnyRouter, readSession: GatedSessionReader
         : { method: "POST", headers: { "content-type": "application/json" } },
     ),
     router: roads,
-    createContext: () => contextOf(app().doors, log, readSession),
+    createContext: () =>
+      contextOf(
+        app().doors,
+        log,
+        readSession,
+        new Headers(held === undefined ? {} : { [TAB_WORKSPACE_HEADER]: held }),
+      ),
   });
 
 const signedInAs =
@@ -239,12 +261,11 @@ const askedAsAnAdmin = async (road: Road) => {
   const workspace = await app().provision();
   const key = `probe-${workspace.workspaceId}`;
   const { logger, logs } = capturingLogger();
-  const response = await askedOver(
-    road,
-    writingRoads(key),
-    signedInAs(workspace.admin, workspace.workspaceId),
-    logger,
-  );
+  const response = await askedOver(road, writingRoads(key), {
+    readSession: signedInAs(workspace.admin, workspace.workspaceId),
+    log: logger,
+    held: workspace.workspaceId,
+  });
   const written = await app().database.superuser.query(
     "SELECT 1 FROM workspace_config WHERE workspace_id = $1 AND key = $2",
     [workspace.workspaceId, key],
@@ -276,12 +297,10 @@ const askedAsTheOperator = async (road: Road) => {
   await app().markOperator(workspace.admin.email, "grant");
   const name = `probe-${workspace.workspaceId}`;
   const { logger, logs } = capturingLogger();
-  const response = await askedOver(
-    road,
-    operatorWritingRoads(name),
-    signedInAs(workspace.admin, workspace.workspaceId),
-    logger,
-  );
+  const response = await askedOver(road, operatorWritingRoads(name), {
+    readSession: signedInAs(workspace.admin, workspace.workspaceId),
+    log: logger,
+  });
   const written = await app().database.superuser.query(
     'SELECT 1 FROM "user" WHERE id = $1 AND name = $2',
     [workspace.admin.id, name],
@@ -344,5 +363,76 @@ describe("every query the router serves", () => {
 
     expect(middlewaresOf(astray).middlewares[0]).toBe(middlewaresOf(mutationRoad).middlewares[0]);
     expect(middlewaresOf(astray).middlewares[0]).not.toBe(middlewaresOf(queryRoad).middlewares[0]);
+  });
+});
+
+const MUTATIONS = Object.entries(appRouter._def.procedures).filter(
+  ([, procedure]) => middlewaresOf(procedure).type === "mutation",
+);
+
+const ROADS_NAMING_NO_WORKSPACE = [personProcedure, operatorMutationProcedure].map(
+  (road) => middlewaresOf(road).middlewares[0],
+);
+
+const namesNoWorkspace = (procedure: object): boolean =>
+  ROADS_NAMING_NO_WORKSPACE.includes(middlewaresOf(procedure).middlewares[0]);
+
+const answeredWord = z.object({
+  error: z
+    .object({ data: z.object({ refusal: z.object({ word: z.string() }).optional() }) })
+    .optional(),
+});
+
+/** An Admin of two workspaces whose session names the second, as after a switch in another tab. */
+const switchedAway = async () => {
+  const left = await app().provision();
+  const here = await app().provision();
+  await app().addMember(here.workspaceId, left.admin.id, "Admin");
+  const client = await signedInClient(app(), left.admin.email);
+  await sessionMovedTo(client, here.workspaceId);
+  return { client, left };
+};
+
+describe("every mutation the router serves", () => {
+  it("is refused on a workspace road, its tab naming another", async () => {
+    const { client, left } = await switchedAway();
+    const paths = MUTATIONS.filter(([, procedure]) => !namesNoWorkspace(procedure)).map(
+      ([path]) => path,
+    );
+
+    // Asked with no input, so only a road that judges ahead of the parse answers the word.
+    const words: (readonly [string, string | undefined])[] = [];
+    for (const path of paths) {
+      const answered = await postedFromATab(
+        client,
+        `${TRPC_ENDPOINT}/${path}`,
+        {},
+        left.workspaceId,
+      );
+      words.push([path, answeredWord.parse(await answered.json()).error?.data.refusal?.word]);
+    }
+
+    expect(paths).toEqual(
+      expect.arrayContaining(["members.remove", "members.invite", "sources.connect"]),
+    );
+    expect(words).toEqual(paths.map((path) => [path, "workspace-switched"]));
+  });
+
+  it("never asks the person's or operator's road for a workspace", async () => {
+    const { client } = await switchedAway();
+    const paths = MUTATIONS.filter(([, procedure]) => namesNoWorkspace(procedure)).map(
+      ([path]) => path,
+    );
+
+    const words: (string | undefined)[] = [];
+    for (const path of paths) {
+      const answered = await client.json(`${TRPC_ENDPOINT}/${path}`, {});
+      words.push(answeredWord.parse(await answered.json()).error?.data.refusal?.word);
+    }
+
+    expect(paths).toEqual(
+      expect.arrayContaining(["person.setDisplayName", "console.people.correctDisplayName"]),
+    );
+    expect(words).not.toContain("workspace-switched");
   });
 });

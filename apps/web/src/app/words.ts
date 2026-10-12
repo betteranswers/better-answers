@@ -25,6 +25,10 @@ export const BREADCRUMB = "Breadcrumb";
 /** The switcher's way to the whole list of a person's workspaces. */
 export const ALL_WORKSPACES = "All workspaces";
 
+/** Said of a switch this tab only read of: nothing was refused, so nothing is left to redo. */
+export const switchedInAnotherTab = (workspace: string): string =>
+  `You switched to ${workspace} in another browser tab.`;
+
 /** Said by the one toggle in the band, which names the state it would move to. */
 export const TOGGLE = {
   hide: "Hide the menu",

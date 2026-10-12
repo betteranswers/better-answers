@@ -32,6 +32,14 @@ export const SAID_OF_CLASS = {
   precondition: { why: "Something else has to happen first.", next: "Try again once it has." },
 } satisfies Record<RefusalClass, Said>;
 
+/** Said the same on every surface, so no feature words it and its class’s reload is never said. */
+const SAID_ON_EVERY_SURFACE = {
+  "workspace-switched": {
+    why: "You switched workspace in another browser tab, so that didn’t go through.",
+    next: "This one now shows the workspace you switched to.",
+  },
+} satisfies SaidOfWord;
+
 /** An action the api sent no word with: the network's failure, or an answer nothing could read. */
 export const NO_RESPONSE: Said = {
   why: "No response, so nothing was saved.",
@@ -48,6 +56,6 @@ export const saidOfRefusal = (
   featureWords: SaidOfWord,
   word: RefusalWord,
   refusalClass: RefusalClass,
-): Said => featureWords[word] ?? SAID_OF_CLASS[refusalClass];
+): Said => ({ ...SAID_ON_EVERY_SURFACE, ...featureWords })[word] ?? SAID_OF_CLASS[refusalClass];
 
 export const sentenceOf = (said: Said): string => `${said.why} ${said.next}`;

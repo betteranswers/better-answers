@@ -1,5 +1,6 @@
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
 import {
+  hashKey,
   matchQuery,
   mutationOptions,
   queryOptions,
@@ -17,6 +18,13 @@ import { useState } from "react";
 import { z } from "zod";
 
 import { useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
+import {
+  forgetMember,
+  leftFor,
+  memberChanged,
+  memberOptions,
+  workspaceHeld,
+} from "@/shared/member.ts";
 
 import { authClient } from "./auth-client.ts";
 import {
@@ -28,7 +36,6 @@ import {
   nextAfterSignIn,
   pageQuery,
 } from "./carried-flow.ts";
-import { forgetMember, rereadMember } from "./member.ts";
 import { factorStepDue } from "./second-factor-steps.ts";
 import {
   forgetTheUnsavedChange,
@@ -465,6 +472,21 @@ const forgetTheWorkspaceLeft = (queryClient: QueryClient, api: ApiProxy) => {
 };
 
 /**
+ * Another tab moved the session. The reads go as the cache hears the answer, before the frame
+ * draws a page under it.
+ */
+export const forgetAWorkspaceLeftElsewhere = (queryClient: QueryClient, api: ApiProxy): void => {
+  const memberHash = hashKey(memberOptions(api).queryKey);
+  let held = workspaceHeld(queryClient, api);
+  queryClient.getQueryCache().subscribe(({ query }) => {
+    if (query.queryHash !== memberHash) return;
+    const was = held;
+    held = workspaceHeld(queryClient, api);
+    if (leftFor(was, held)) forgetTheWorkspaceLeft(queryClient, api);
+  });
+};
+
+/**
  * A pick drops the member read held and every read of the workspace left, and marks the held
  * session and workspace list stale.
  */
@@ -487,9 +509,16 @@ export const useSetActiveOrganization = () => {
 export type SwitchedTo = { readonly id: string; readonly name: string };
 
 /**
- * The member is read again in place, not dropped, so the band blanks between the two only
- * when that read fails or waits.
+ * Whichever tab moved the session. The reads go before the first wait, so a rollback still on
+ * its way finds them gone.
  */
+export const followTheSession = async (queryClient: QueryClient, api: ApiProxy): Promise<void> => {
+  forgetTheWorkspaceLeft(queryClient, api);
+  // In place, not dropped, so the band blanks between the two only when the read fails or waits.
+  await memberChanged(queryClient, api, { readAgain: true, ifUnread: "reset" });
+  void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
+};
+
 export const useSwitchWorkspace = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();
@@ -497,9 +526,7 @@ export const useSwitchWorkspace = () => {
   return useMutation<unknown, SwitchRefused, SwitchedTo>({
     mutationFn: (workspace) => setActiveWorkspace(workspace.id),
     onSuccess: async () => {
-      forgetTheWorkspaceLeft(queryClient, api);
-      await rereadMember(queryClient, api);
-      void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
+      await followTheSession(queryClient, api);
       await navigate({ href: "/", replace: true });
     },
   });

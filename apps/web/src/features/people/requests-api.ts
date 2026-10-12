@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferOutput } from "@trpc/tanstack-react-query";
 
+import { takenFrom, type Undo } from "@/shared/api/optimistic.ts";
 import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
 
 export type WaitingRequest = inferOutput<ReturnType<typeof useTRPC>["members"]["requests"]>[number];
@@ -21,20 +22,20 @@ const useLeavesAtOnce = () => {
   const queryKey = api.members.requests.queryKey();
   return {
     optimistic: {
-      onMutate: async (asked: { readonly requestId: string }) => {
+      onMutate: async (asked: { readonly requestId: string }): Promise<Undo> => {
         await queryClient.cancelQueries({ queryKey });
-        const before = queryClient.getQueryData(queryKey);
+        const taken = takenFrom(queryClient, queryKey);
         queryClient.setQueryData(queryKey, (listed) =>
           listed?.filter((request) => request.id !== asked.requestId),
         );
-        return { before };
+        return taken;
       },
       onError: (
         _refusal: ApiError,
         _asked: { readonly requestId: string },
-        taken: { readonly before: WaitingRequest[] | undefined } | undefined,
+        taken: Undo | undefined,
       ) => {
-        queryClient.setQueryData(queryKey, taken?.before);
+        taken?.undo();
       },
     },
     reconcile: () => queryClient.invalidateQueries({ queryKey }),

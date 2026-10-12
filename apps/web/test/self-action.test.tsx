@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, renderHook, screen, waitFor } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -6,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
 import { useChangeRole, useReaderId } from "@/features/people/people-api.ts";
 import { HomeLine, useIncludesYou, useSelfActionHome } from "@/features/people/self-action.tsx";
-import { createApiProxy, useTRPC } from "@/shared/api/trpc.ts";
+import { createApiProxy } from "@/shared/api/trpc.ts";
+import { useMember } from "@/shared/member.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 
@@ -25,8 +25,7 @@ const wrapperOf = (clients: AppClients) =>
 
 /** The member read as the frame draws it: one read, mounted across every move between pages. */
 function FrameRole() {
-  const api = useTRPC();
-  const held = useQuery(api.session.member.queryOptions(undefined, { refetchOnMount: false }));
+  const held = useMember();
   return <p>{`Held: ${held.data?.role ?? "none"}`}</p>;
 }
 
