@@ -342,6 +342,7 @@ pnpm --filter @better-answers/web exec playwright test --list
 
 This workspace's `check` runs types, the vitest suite and then the whole browser suite, so a
 spec left broken fails `check:web` and the root `check` with it. Lint is the root's `check:gates`.
+The merge queue runs the browser suite as three shards of `check:web:e2e`, with three workers each.
 
 `test.only` is allowed while debugging and refused under CI by `forbidOnly`: the
 specs import `test` from the fixture module, so oxlint's vitest rules never see them and this is
@@ -377,7 +378,7 @@ below, is a request of the journeys' own, made only under that source.
 | | The browser suite | The journeys |
 | --- | --- | --- |
 | The server | Playwright starts `apps/api/tests/serve.ts` | None: the base URL is `PUBLIC_URL`, and the config refuses to load without an http or https address |
-| Workers | Fully parallel | One, one journey at a time |
+| Workers | Fully parallel; three under CI | One, one journey at a time |
 | Projects | `chromium` | `preflight`, which signs nobody in, then `roles`, which depends on it |
 | Retries | One, under CI | None: each Send spends a ceiling the release, a rerun and the owner share |
 | `test.only` | Refused under CI | Refused everywhere: a focused journey would run alone and report `held` |
