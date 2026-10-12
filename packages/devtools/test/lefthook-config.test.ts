@@ -403,13 +403,13 @@ describe("the pre-push hook over a throwaway repository", () => {
     const pushing = hookedRepository("two-fail");
 
     const pushed = pushFrom(pushing, pushing.root, "main", {
-      env: { PNPM_STUB_FAILS: "knip,check:docs:api" },
+      env: { PNPM_STUB_FAILS: "knip,check:docs:core" },
     });
 
     expect(pushed.status).not.toBe(0);
     expect(originHas(pushing, "main")).toBe(false);
     expect(pushed.said).toContain(runAlone("knip"));
-    expect(pushed.said).toContain(runAlone("check:docs:api"));
+    expect(pushed.said).toContain(runAlone("check:docs:core"));
     expect(pushed.said).not.toContain(runAlone("lint"));
     expect(ranBy(pushing)).toHaveLength(pushedSteps().length);
   });
@@ -515,13 +515,13 @@ describe("the pre-push hook over a throwaway repository", () => {
     {
       bypass: "LEFTHOOK_EXCLUDE",
       directory: "exclude",
-      options: { env: { PNPM_STUB_FAILS: "check:docs:api", LEFTHOOK_EXCLUDE: "check:docs:api" } },
+      options: { env: { PNPM_STUB_FAILS: "check:docs:core", LEFTHOOK_EXCLUDE: "check:docs:core" } },
       ran: pushedSteps().length - 1,
     },
     {
       bypass: "--no-verify",
       directory: "no-verify",
-      options: { env: { PNPM_STUB_FAILS: "check:docs:api" }, flags: ["--no-verify"] },
+      options: { env: { PNPM_STUB_FAILS: "check:docs:core" }, flags: ["--no-verify"] },
       ran: 0,
     },
   ])("lets a failing gate's push through when $bypass skips it", ({ directory, options, ran }) => {

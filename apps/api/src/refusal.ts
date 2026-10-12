@@ -18,8 +18,6 @@ const REFUSALS = classesIn({
 
 export type RefusalWord = keyof typeof REFUSALS;
 
-export const REFUSAL_WORDS = Object.keys(REFUSALS);
-
 /** A malformed input is the kernel parse's own answer, which says which field and never the value. */
 export type RefusalAnswer = RefusalWord | Malformed | RefusedItems<RefusalWord>;
 

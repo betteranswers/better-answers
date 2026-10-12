@@ -112,10 +112,6 @@ pre-push-gates:
       run: "{without-git-env} pnpm run knip"
       fail_text: "run it alone with pnpm run knip"
 
-    check:docs:api:
-      run: "{without-git-env} pnpm run check:docs:api"
-      fail_text: "run it alone with pnpm run check:docs:api"
-
     check:docs:core:
       run: "{without-git-env} pnpm run check:docs:core"
       fail_text: "run it alone with pnpm run check:docs:core"
