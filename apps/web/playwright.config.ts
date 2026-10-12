@@ -17,6 +17,9 @@ export default defineConfig({
   // A retry keeps one flake from ejecting a merge-queue entry, and the flaky report names it.
   // On a developer's machine a failure stays a failure.
   retries: inCi ? 1 : 0,
+
+  // Three of the runner's four cores: the api, Postgres and the browser's own processes take the fourth.
+  ...(inCi ? { workers: 3 } : {}),
   reporter: [["list"], ["./e2e/flaky-report.ts"]],
   use: { baseURL, trace: "on-first-retry" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

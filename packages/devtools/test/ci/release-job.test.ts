@@ -1085,7 +1085,7 @@ describe("the journeys a release runs", () => {
     const journeysSeconds =
       (msOf("PREFLIGHT_TIMEOUT_MS") + roles * msOf("ROLE_JOURNEY_TIMEOUT_MS")) / 1000;
 
-    // An install and Chromium took about five minutes in check.yml's full-web; twice that.
+    // An install and Chromium took about five minutes in check.yml's web leg; twice that.
     expect(roles).toBe(3);
     expect(journeysSeconds + 10 * 60).toBeLessThanOrEqual(
       jobOf("journeys")["timeout-minutes"] * 60,
