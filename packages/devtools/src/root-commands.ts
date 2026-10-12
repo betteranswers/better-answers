@@ -3,8 +3,6 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { byCodeUnit } from "@better-answers/schema/code-unit";
-
 import { repositoryRoot, workspacePackages } from "./paths.ts";
 
 const manifest = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) });
@@ -29,16 +27,13 @@ export const lintFlags = (): readonly string[] => {
   return flags;
 };
 
-/**
- * The paths `comment-gate:python` hands its checker, once each and sorted; throws when it
- * names no `.py` checker.
- */
-export const pythonGateRoots = (): readonly string[] => {
-  const [, checker, ...roots] = provableCommand("comment-gate:python");
+/** The `.py` file `comment-gate:python` runs; throws when it names none. */
+export const pythonGateChecker = (): string => {
+  const [, checker] = provableCommand("comment-gate:python");
   if (checker === undefined || !checker.endsWith(".py")) {
     throw new Error("`comment-gate:python` runs no checker this reading can find");
   }
-  return [...new Set(roots)].sort(byCodeUnit);
+  return checker;
 };
 
 /** Both fields are optional, so a manifest missing either reads as a workspace without it. */
