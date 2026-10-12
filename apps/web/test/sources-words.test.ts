@@ -65,7 +65,6 @@ describe("what a connected source's last sync says", () => {
 });
 
 describe("what a destination says", () => {
-  // The words test cannot see this label: a reader string equal to the kept wire value is skipped.
   it("names the bundle destination the knowledge base", () => {
     expect(destinationOf("bundle").word).toBe("knowledge base");
   });
