@@ -403,12 +403,6 @@ type ProseSuite = {
 
 const PROSE_SUITES: readonly ProseSuite[] = [
   {
-    file: "apps/api/tests/avoid-words.test.ts",
-    reads:
-      "apps/api/tests/old-words.ts and CONCEPTS.md's heads and marks, then every tracked text file outside its carve-outs",
-    inTheLane: "check:docs:api",
-  },
-  {
     file: "packages/devtools/test/ci/deploy-tree.test.ts",
     reads:
       "the deploy tree, every workflow under .github/workflows, deploy/RELEASES.md and docs/operations/{RUNBOOK,SECRETS,coolify}.md",
@@ -416,7 +410,8 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   },
   {
     file: "packages/devtools/test/ci/provision-skills.test.ts",
-    reads: "the tracked SKILL.md files, packages/design-system/SKILL.md through its symlink",
+    reads:
+      "packages/design-system/SKILL.md through its symlink, and which of the pixel-perfect plugin's files git tracks",
     inTheLane: "check:docs:devtools",
   },
   {
