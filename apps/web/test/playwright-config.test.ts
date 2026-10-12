@@ -35,6 +35,14 @@ describe("the browser suite's configuration", () => {
     expect((await configUnder(undefined)).retries).toBe(0);
   });
 
+  it("runs three workers when it runs in CI", async () => {
+    expect((await configUnder("true")).workers).toBe(3);
+  });
+
+  it("keeps Playwright's own worker count on a developer's machine", async () => {
+    expect((await configUnder(undefined)).workers).toBeUndefined();
+  });
+
   it("hands every run to the flaky report", async () => {
     expect((await configUnder("true")).reporter).toContainEqual(["./e2e/flaky-report.ts"]);
   });
