@@ -1,7 +1,7 @@
 ---
 title: "cloc counts the lines between two glob strings in a JS config as a block comment"
 date: 2026-10-04
-last_updated: 2026-10-08
+last_updated: 2026-10-12
 category: integration-issues
 module: repository
 problem_type: integration_issue
@@ -58,7 +58,7 @@ The same entry placed after `"apps/worker/src/better_answers_worker/schema_view.
 
 ## Why This Works
 
-The gate runs cloc (`clocArgv` in `packages/devtools/src/comment-density.ts:62`) over the root tool configuration files, which the gates script names as one unit: `commitlint.config.mjs`, `cubic.yaml`, `jscpd.config.mjs`, `knip.config.ts`, `lefthook.yml` and `pnpm-workspace.yaml`. cloc strips C-style comments by pattern, not by parsing the language, so `/**` and `*/` inside string literals count. Run directly, cloc 2.06 reports two comment lines for this file:
+Since 12/10/2026 the gate measures workspaces only, so the root tool configuration files are no longer counted. The trap remains for any TypeScript file a workspace holds, as the last point under Prevention shows. When this was found, the gate ran cloc (`clocArgv` in `packages/devtools/src/comment-density.ts`) over the root tool configuration files, which the gates script named as one unit: `commitlint.config.mjs`, `cubic.yaml`, `jscpd.config.mjs`, `knip.config.ts`, `lefthook.yml` and `pnpm-workspace.yaml`. cloc strips C-style comments by pattern, not by parsing the language, so `/**` and `*/` inside string literals count. Run directly, cloc 2.06 reports two comment lines for this file:
 
 ```js
 export const c = {
@@ -74,13 +74,13 @@ and one when `"plain/entry.ts"` comes first. A line placed above the first `/**`
 
 ## Prevention
 
-- When the comment-density gate fails on a root tool configuration file and the diff adds no comment, look for glob strings with `/**` or `*/` around the lines you added before you look for a comment to delete.
-- In `jscpd.config.mjs`, `knip.config.ts` and the other files of that unit, add a plain entry above the first `/**`-shaped glob in its list, or next to another plain entry outside the glob spans.
+- When the comment-density gate fails and the diff adds no comment, look for glob strings with `/**` or `*/` around the lines you added before you look for a comment to delete.
+- In a TypeScript file a workspace holds, add a plain entry above the first `/**`-shaped glob in its list, or next to another plain entry outside the glob spans.
 - Do not raise the ceiling or add a comment to rebalance the ratio. The miscount is in where the line sits, and moving the line fixes it.
 - Moving fixes a plain entry, not the globs themselves. cloc strips each span from `/**` to the next `*/` and joins what is left, so of globs on consecutive lines only the first counts as code. `jscpd.config.mjs` still reports five of its six glob lines as comment with every plain entry above them.
 - In a string no code reads, such as a test table's description, write a path without its glob. One row of `packages/devtools/test/ci/docs-lane.test.ts` named `.github/workflows/*.yml` in prose, and cloc counted the 133 lines from there to the next doc block's `*/` as comment.
 
 ## Related
 
-- `docs/solutions/architecture-patterns/adr-0045-coding-rule-is-one-imperative.md` names the density ceiling as the volume backstop and the only gate on a configuration file's comments.
+- `docs/solutions/architecture-patterns/adr-0045-coding-rule-is-one-imperative.md` names the density ceiling as the volume backstop.
 - Found while adding the generated audit action list to the duplication gate's ignore list on branch `feat/audit-log-rebuild-and-words` (BA-49); its pull request was not yet open when this was written.

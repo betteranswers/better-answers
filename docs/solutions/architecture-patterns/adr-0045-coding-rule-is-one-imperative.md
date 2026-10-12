@@ -51,8 +51,10 @@ No suite holds the form now. The review reads the rules in whatever shape they t
 - A rule that names its gate repeats it. The gate already names the rule's file in the message a reader hits.
 - With one lint config, `pnpm lint`, the pre-commit hook and an editor all show a breach as it is written.
 - `string-cites-nothing` is its own rule because it polices text a person reads, which is not a comment.
-- The density ceiling is the volume backstop, and the only gate on a config file's comments.
+- The density ceiling is the volume backstop for each workspace's TypeScript and Python. No gate reads a config file's comments; review holds them.
 
 ## History
 
 The full record, with its one amendment (T-384): `docs/archive/adr/0045-coding-rule-is-one-imperative.md`.
+
+Amended 12/10/2026 by the comment gates plan (`docs/plans/2026-10-12-1241-chore-one-holder-per-comment-rule-plan.md`, KTD5). The density ceiling measures workspaces only, so a config file, a shell script and a migration have no comment gate. The Claude Code hook that re-ran the comment gates on each written file is removed; the pre-commit hook now runs the Python gate and lints root scripts.
