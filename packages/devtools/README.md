@@ -147,8 +147,8 @@ workspace's vitest config names it in `setupFiles`, which the suite also holds.
 
 What `pnpm lint:workflows` cannot hold as a tool is held here: a join between two files, such as
 a workflow and the root manifest, or a compose file and a script, and a workflow step, a deploy
-script or a `.claude/hooks` script run under stubs. `test/comment-gate-hook.test.ts` and
-`test/lefthook-config.test.ts` sit beside the gates they prove.
+script or a `.claude/hooks` script run under stubs. `test/lefthook-config.test.ts` sits beside
+the gates it proves.
 
 Three modules serve them. `src/workflows.ts` reads `.github/workflows`, `build.yml`'s image legs
 among them. `src/root-commands.ts` reads the root manifest's scripts and the gates each runner
@@ -176,7 +176,7 @@ both ways and over the committed tree.
 ## The comment gate — three parts, all in root `check`
 
 The comment rules are held in three places. `.oxlintrc.json` holds them for TypeScript, a
-Python check holds them for `.py` files, and a density ceiling holds each unit. Each part prints
+Python check holds them for `.py` files, and a density ceiling holds each workspace. Each part prints
 the rule it holds in its message. Each is proved through the runner above, both ways.
 
 The config holds every comment rule at error, so `pnpm lint`, the pre-commit hook and an
@@ -217,7 +217,7 @@ touching lines, and its docstrings. A docstring on a public module-level functio
 dropped by its opening text before blocks are grouped, so it cannot lend a paragraph its
 exemption. A suppression's reason is a block of its own. It is prose and counts, whether it
 follows a second `#` or the codes of a `noqa` or a `type: ignore` directly. A docstring is exempt only when it opens with a
-notice. A comment in YAML, shell, TOML or SQL is the density ceiling's alone.
+notice. No gate reads a comment in YAML, shell, TOML or SQL.
 
 | Part | What runs it | Its suite |
 | --- | --- | --- |
@@ -229,27 +229,11 @@ All three are root `check` steps, ahead of the tiers, and landed green with no b
 `test/comment-lint.test.ts` runs each comment rule at the setting the root config holds it, with
 the `lint` script's flags: one fixture refused and one accepted per rule.
 
-The ceiling measures two kinds of unit. A positional argument is a root of workspaces: each
-directory under it carrying a `package.json` or a `pyproject.toml` is one workspace, measured
-on TypeScript and Python, split into a source arm and a test arm with a ceiling each.
-`--directory <path>`, repeatable, names one directory measured as a single number under the
-source ceiling, on those two languages and the config tree's beside them — shell, YAML, TOML,
-SQL and JavaScript. The longest path wins where a directory sits inside a workspace, so
-`--directory packages/schema/migrations` gives the SQL a number of its own rather than one the
-TypeScript eight times its size decides. The report names a directory the way it names a
-workspace, and a named directory the counter read no file in is refused, never called clean.
-Root `check` names the two workspace roots, `packages/schema/migrations`, `.github`, `deploy`,
-`.claude/hooks`, `scripts`, and the root tool configuration as one named unit; the ceiling is the
-only gate on a config file's comments. A config file inside a workspace and outside every named
-directory is measured by nothing: `apps/worker/pyproject.toml` and
-`packages/devtools/python/ruff.toml`.
-
-`.claude/hooks/comment-gate-hook.sh` runs the lint and the Python check at write time over the
-file an edit touched, and hands their message straight back. For a TypeScript file it runs the
-root config with the `lint` script's flag, anywhere in the tree the root run walks. It refuses the
-edit only on a comment rule's line; another rule's finding is left to `check`. Its suite checks
-that the hook hands the Python check only `.py` files, the one type it reads. Skills are walked
-past wherever they sit, being prose no comment gate reads.
+The ceiling measures workspaces. A positional argument is a root of workspaces: each directory
+under it carrying a `package.json` or a `pyproject.toml` is one workspace, measured on
+TypeScript and Python, split into a source arm and a test arm with a ceiling each. Root `check`
+names the two workspace roots. A comment in a config file, a shell script or a migration is
+measured by nothing, and review holds it.
 
 The counter is **cloc**, pinned at `2.6.0-cloc`, which carries upstream cloc `2.06` — the
 number a behaviour is compared against. **Read the pin off the registry's `latest` tag and

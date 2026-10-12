@@ -14,8 +14,8 @@ pre-commit:
       stage_fixed: true
 
     oxlint:
-      glob: "*.{ts,tsx}"
-      run: pnpm exec oxlint --report-unused-disable-directives-severity=error {staged_files}
+      glob: "*.{ts,tsx,mjs,js}"
+      run: pnpm exec oxlint --report-unused-disable-directives-severity=error --no-error-on-unmatched-pattern {staged_files}
 
     ruff-format:
       glob: "*.py"
@@ -27,6 +27,11 @@ pre-commit:
       glob: "*.py"
       root: apps/worker/
       run: uv run --frozen --only-group dev ruff check {staged_files}
+
+    # From the root, because the gate reads a file's place from its repository path.
+    comment-gate-python:
+      glob: "*.py"
+      run: python3 packages/devtools/python/comment_gate.py {staged_files}
 
     # The worker's locked actionlint, so a commit and CI read a workflow with one version.
     actionlint:

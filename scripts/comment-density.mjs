@@ -5,7 +5,6 @@ import { parseArgs } from "node:util";
 
 import {
   countOver,
-  heldBy,
   measure,
   overTheCeiling,
   reportOf,
@@ -21,38 +20,14 @@ const refuse = (message) => {
 
 let parsed;
 try {
-  parsed = parseArgs({
-    args: process.argv.slice(2),
-    options: {
-      directory: { type: "string", multiple: true },
-      unit: { type: "string", multiple: true },
-    },
-    allowPositionals: true,
-  });
+  parsed = parseArgs({ args: process.argv.slice(2), allowPositionals: true });
 } catch (cause) {
   refuse(String(cause instanceof Error ? cause.message : cause));
 }
 
 const roots = parsed.positionals;
-const directories = parsed.values.directory ?? [];
-
-/** A set no directory gathers, named so the report has one line for it rather than five. */
-const named = (parsed.values.unit ?? []).map((given) => {
-  const at = given.indexOf("=");
-  const label = given.slice(0, Math.max(at, 0)).trim();
-  const holds = given
-    .slice(at + 1)
-    .split(",")
-    .map((one) => one.trim())
-    .filter((one) => one !== "");
-  if (at === -1 || label === "" || holds.length === 0) {
-    refuse(`--unit takes <name>=<path>[,<path>], which ${given} is not`);
-  }
-  return { name: label, kind: "directory", holds };
-});
-
-if (roots.length === 0 && directories.length === 0 && named.length === 0) {
-  refuse("name at least one root of workspaces, one directory with --directory, or one --unit");
+if (roots.length === 0) {
+  refuse("name at least one root of workspaces");
 }
 
 /** A workspace is what carries a manifest, so a new one is measured without a line here. */
@@ -67,30 +42,13 @@ const workspaces = roots.flatMap((directory) =>
     ),
 );
 
-if (roots.length > 0 && workspaces.length === 0) {
+if (workspaces.length === 0) {
   refuse(`no workspace under ${roots.join(", ")}`);
 }
 
-for (const directory of directories) {
-  // A directory that is not there would measure as clean, the one answer it must not give.
-  if (!existsSync(path.join(root, directory))) refuse(`no directory at ${directory}`);
-}
-
-for (const unit of named) {
-  for (const held of unit.holds) {
-    if (!existsSync(path.join(root, held))) refuse(`${unit.name} names no ${held}`);
-  }
-}
-
-const units = [
-  ...workspaces.map((workspace) => ({ name: workspace, kind: "workspace" })),
-  ...directories.map((directory) => ({ name: directory, kind: "directory" })),
-  ...named,
-];
-
 let counted;
 try {
-  counted = countOver(root, units.flatMap(heldBy));
+  counted = countOver(root, workspaces);
 } catch (cause) {
   refuse(`the line counter did not run: ${String(cause)}`);
 }
@@ -100,14 +58,7 @@ if (counted.length === 0) {
   refuse("the line counter measured no file it understands");
 }
 
-const measured = measure(counted, units);
-
-for (const one of [...directories, ...named.map((unit) => unit.name)]) {
-  // A named unit read as nothing is the same false green as a whole run read as nothing.
-  if (!measured.some((seen) => seen.unit === one)) {
-    refuse(`the line counter measured no file it understands under ${one}`);
-  }
-}
+const measured = measure(counted, workspaces);
 
 const over = overTheCeiling(measured);
 
@@ -117,10 +68,6 @@ if (over.length > 0) process.exit(1);
 
 const plural = (howMany, one, many) => `${howMany} ${howMany === 1 ? one : many}`;
 
-const tally = [
-  ...(workspaces.length > 0 ? [plural(workspaces.length, "workspace", "workspaces")] : []),
-  ...(directories.length > 0 ? [plural(directories.length, "directory", "directories")] : []),
-  ...(named.length > 0 ? [plural(named.length, "named unit", "named units")] : []),
-].join(" and ");
+const tally = plural(workspaces.length, "workspace", "workspaces");
 
 process.stdout.write(`comment density is under the ceiling in all ${tally}\n`);

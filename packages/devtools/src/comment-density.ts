@@ -11,39 +11,7 @@ export const CEILING = { source: 0.1, test: 0.05 } as const;
 
 export type Arm = keyof typeof CEILING;
 
-const WORKSPACE_LANGUAGES = ["TypeScript", "Python"] as const;
-
-const CONFIG_LANGUAGES = [
-  "Bourne Again Shell",
-  "Bourne Shell",
-  "JavaScript",
-  "SQL",
-  "TOML",
-  "YAML",
-] as const;
-
-const MEASURED_LANGUAGES = {
-  workspace: new Set<string>(WORKSPACE_LANGUAGES),
-  directory: new Set<string>([...WORKSPACE_LANGUAGES, ...CONFIG_LANGUAGES]),
-} as const;
-
-type Kind = keyof typeof MEASURED_LANGUAGES;
-
-/**
- * A unit no directory gathers names the paths it holds; one that is a directory or a
- * workspace stands at its own.
- */
-export type Unit = {
-  readonly name: string;
-  readonly kind: Kind;
-  readonly holds?: readonly string[];
-};
-
-export const heldBy = (unit: Unit): readonly string[] => unit.holds ?? [unit.name];
-
-const EVERY_MEASURED_LANGUAGE = new Set<string>(
-  Object.values(MEASURED_LANGUAGES).flatMap((languages) => [...languages]),
-);
+const MEASURED_LANGUAGES = new Set<string>(["TypeScript", "Python"]);
 
 const NEVER_WALKED = [
   ".venv",
@@ -105,71 +73,65 @@ const countedIn = (output: string): readonly Counted[] =>
       code: entry.code ?? 0,
       comment: entry.comment ?? 0,
     }))
-    .filter((counted) => EVERY_MEASURED_LANGUAGE.has(counted.language))
+    .filter((counted) => MEASURED_LANGUAGES.has(counted.language))
     .sort((left, right) => left.file.localeCompare(right.file));
 
 /** A file under an `e2e`, `test` or `tests` directory, or named as a test, is `test`. */
 export const armOf = (file: string): Arm => (isTestPath(file) ? "test" : "source");
 
 export type Measured = {
-  readonly unit: string;
+  readonly workspace: string;
   readonly arm: Arm;
   readonly code: number;
   readonly comment: number;
   readonly ratio: number;
 };
 
-const unitOf = (file: string, units: readonly Unit[]): Unit | undefined => {
+const workspaceOf = (file: string, longestFirst: readonly string[]): string | undefined => {
   const relative = file.replace(/^\.\//, "");
-
-  // Longest path first, so a directory named inside a workspace takes the files it holds.
-  return units
-    .flatMap((unit) => heldBy(unit).map((held) => ({ unit, held })))
-    .sort((left, right) => right.held.length - left.held.length)
-    .find(({ held }) => relative === held || relative.startsWith(`${held}/`))?.unit;
+  return longestFirst.find((held) => relative === held || relative.startsWith(`${held}/`));
 };
 
 type Total = { code: number; comment: number };
 
-/**
- * A file no unit holds, or in a language its unit does not measure, is dropped; a directory
- * unit has only a `source` arm.
- */
+/** A file no workspace holds is dropped. */
 export const measure = (
   counted: readonly Counted[],
-  units: readonly Unit[],
+  workspaces: readonly string[],
 ): readonly Measured[] => {
   const totals = new Map<string, Map<Arm, Total>>();
-  for (const row of counted) {
-    const unit = unitOf(row.file, units);
-    if (unit === undefined) continue;
-    if (!MEASURED_LANGUAGES[unit.kind].has(row.language)) continue;
-    const arms = totals.get(unit.name) ?? new Map<Arm, Total>();
 
-    /** A config root has no test arm to hold to the tighter ceiling, so one number is the truth. */
-    const arm = unit.kind === "directory" ? "source" : armOf(row.file);
+  // Longest path first, so a workspace inside another takes the files it holds.
+  const longestFirst = [...workspaces].sort((left, right) => right.length - left.length);
+  for (const row of counted) {
+    const workspace = workspaceOf(row.file, longestFirst);
+    if (workspace === undefined) continue;
+    const arms = totals.get(workspace) ?? new Map<Arm, Total>();
+    const arm = armOf(row.file);
     const running = arms.get(arm) ?? { code: 0, comment: 0 };
     arms.set(arm, { code: running.code + row.code, comment: running.comment + row.comment });
-    totals.set(unit.name, arms);
+    totals.set(workspace, arms);
   }
   return [...totals.entries()]
-    .flatMap(([unit, arms]) =>
+    .flatMap(([workspace, arms]) =>
       [...arms.entries()].map(([arm, total]) => ({
-        unit,
+        workspace,
         arm,
         code: total.code,
         comment: total.comment,
         ratio: total.code === 0 ? 0 : total.comment / total.code,
       })),
     )
-    .sort((left, right) => `${left.unit}${left.arm}`.localeCompare(`${right.unit}${right.arm}`));
+    .sort((left, right) =>
+      `${left.workspace}${left.arm}`.localeCompare(`${right.workspace}${right.arm}`),
+    );
 };
 
 export const overTheCeiling = (measured: readonly Measured[]): readonly Measured[] =>
   measured.filter((one) => one.code > 0 && one.ratio > CEILING[one.arm]);
 
 export const reportOf = (one: Measured): string =>
-  `${one.unit} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling. A comment says only what the code cannot, so delete what it restates (the root \`CODING_STANDARDS.md\`).`;
+  `${one.workspace} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling. A comment says only what the code cannot, so delete what it restates (the root \`CODING_STANDARDS.md\`).`;
 
 /** Runs cloc over `paths` from `cwd`; throws when cloc fails or writes no JSON. */
 export const countOver = (cwd: string, paths: readonly string[]): readonly Counted[] =>

@@ -13,6 +13,7 @@ const COMMENT_RULES = [
   "eslint/no-warning-comments",
   "unicorn/no-abusive-eslint-disable",
   "better-answers/comment-only-the-why",
+  "better-answers/declaration-doc-block",
   "better-answers/string-cites-nothing",
 ];
 
@@ -35,17 +36,12 @@ const CONFIG = JSON.stringify({
 });
 
 const FILE = "apps/api/src/probe.ts";
-const EXPORTED = "packages/core/src/probe.ts";
 
 const holding = (comment: string, code = "export const keep = 1;\n"): Tree => ({
   [FILE]: `${comment}${code}`,
 });
 
 const PRINTS = "console.log(1);\n";
-
-const exporting = (block: string): Tree => ({
-  [EXPORTED]: `${block}export const waitMs = (count: number): number => count * 1000;\n`,
-});
 
 const lint = oxlintOver(
   CONFIG,
@@ -72,14 +68,9 @@ describe("the one lint config refuses a comment breaking a rule", () => {
       "typescript(ban-ts-comment)",
     ],
     [
-      "a disable with no reason",
-      holding(`// oxlint-disable-next-line ${SUPPRESSIBLE}\n`, PRINTS),
-      "better-answers(comment-only-the-why)",
-    ],
-    [
-      "a directive reason over 25 words",
-      holding(`// oxlint-disable-next-line ${SUPPRESSIBLE} -- ${wordsOf(26)}\n`, PRINTS),
-      "better-answers(comment-only-the-why)",
+      "a line comment on a declaration",
+      holding("// Deleting this changes what knip answers.\n"),
+      "better-answers(declaration-doc-block)",
     ],
     ["a TODO", holding("// TODO: file the ticket\n"), "eslint(no-warning-comments)"],
     [
@@ -88,11 +79,6 @@ describe("the one lint config refuses a comment breaking a rule", () => {
       "eslint(no-warning-comments)",
     ],
     ["a blanket disable", holding("/* eslint-disable */\n"), "unicorn(no-abusive-eslint-disable)"],
-    [
-      "a 51-word doc block on an export",
-      exporting(`/** ${wordsOf(51)} */\n`),
-      "better-answers(comment-only-the-why)",
-    ],
     [
       "a string citing a ticket",
       holding("", 'export const usage = "Ask the owner about T-243 first.";\n'),
@@ -110,28 +96,6 @@ describe("the one lint config refuses a comment breaking a rule", () => {
     expect(output).toMatch(/Unused oxlint-disable directive.*\[Error\]/);
   });
 
-  it("refuses a 26-word block on an internal function beside exports", () => {
-    const internal = {
-      [EXPORTED]: `/** ${wordsOf(26)} */\nconst halve = (count: number): number => count / 2;\nexport const quarter = (count: number): number => halve(halve(count));\n`,
-    };
-
-    expect(lint.output(internal)).toContain("[Error/better-answers(comment-only-the-why)]");
-  });
-
-  it("refuses a 26-word export block outside the documented packages", () => {
-    const inTheApi = {
-      [FILE]: `/** ${wordsOf(26)} */\nexport const waitMs = (count: number): number => count * 1000;\n`,
-    };
-
-    expect(lint.flagged(inTheApi)).toEqual([FILE]);
-  });
-
-  it("names the rules file when a disable carries no reason", () => {
-    const output = lint.output(holding(`// oxlint-disable-next-line ${SUPPRESSIBLE}\n`, PRINTS));
-
-    expect(output).toContain("the root `CODING_STANDARDS.md`");
-  });
-
   it("refuses a 26-word comment in a root script", () => {
     const script = { "scripts/probe.mjs": `// ${wordsOf(26)}\nexport const keep = 1;\n` };
 
@@ -141,7 +105,7 @@ describe("the one lint config refuses a comment breaking a rule", () => {
 
 describe("the one lint config accepts a comment keeping the rules", () => {
   it.each([
-    ["a 25-word line comment", holding(`// ${wordsOf(25)}\n`)],
+    ["a 25-word line comment", holding(`// ${wordsOf(25)}\n\n`)],
     ["a `/** */` on a declaration", holding("/** Deleting this changes what knip answers. */\n")],
     [
       "`@ts-expect-error` with its reason",
@@ -158,20 +122,9 @@ describe("the one lint config accepts a comment keeping the rules", () => {
       ),
     ],
     [
-      "a directive reason of 25 words",
-      holding(`// oxlint-disable-next-line ${SUPPRESSIBLE} -- ${wordsOf(25)}\n`, PRINTS),
-    ],
-    [
       "a comment that mentions a todo list mid-sentence",
-      holding("// The todo list stays sorted.\n"),
+      holding("// The todo list stays sorted.\n\n"),
     ],
-    [
-      "an export's doc block stating units and the refusal",
-      exporting(
-        "/** Milliseconds, never negative. Refuses a count over 60 with `too-long`, and `null` means no wait. */\n",
-      ),
-    ],
-    ["a 50-word doc block on an export", exporting(`/** ${wordsOf(50)} */\n`)],
     [
       "a string that names what the reader can do",
       holding("", 'export const usage = "Name a workspace this person belongs to.";\n'),

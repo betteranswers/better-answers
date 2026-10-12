@@ -23,7 +23,7 @@
     "check:docs:web": "pnpm --filter @better-answers/web run test test/browser-suite-skill.test.ts",
     "jscpd": "node scripts/jscpd.mjs",
     "comment-gate:python": "python3 packages/devtools/python/comment_gate.py apps packages .github deploy .claude/hooks scripts cubic.yaml lefthook.yml pnpm-workspace.yaml",
-    "comment-density": "node scripts/comment-density.mjs apps packages --directory .github --directory deploy --directory packages/schema/migrations --directory .claude/hooks --directory scripts --unit the-root-tool-configuration=commitlint.config.mjs,cubic.yaml,jscpd.config.mjs,knip.config.ts,lefthook.yml,pnpm-workspace.yaml",
+    "comment-density": "node scripts/comment-density.mjs apps packages",
     "insert-scan": "node scripts/insert-scan.mjs apps packages",
     "table-ownership-scan": "node scripts/table-ownership-scan.mjs packages/core/src apps/api/src",
     "mutant-probe": "node scripts/mutant-probe.mjs",

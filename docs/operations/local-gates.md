@@ -29,8 +29,9 @@ The root `prepare` script runs `lefthook install`, and pnpm runs `prepare` after
 ### What each command is for
 
 - `oxfmt` writes, and `stage_fixed` puts what it wrote into the commit, so a formatting-only CI failure cannot happen and no second commit is needed to fix it. `--no-error-on-unmatched-pattern` is what makes handing over the whole staged set safe.
-- `oxlint` runs the one lint config over the staged TypeScript, with the flag root `lint` passes, so a disable that suppresses nothing is refused at commit too.
+- `oxlint` runs the one lint config over the staged TypeScript and root scripts (`.ts`, `.tsx`, `.mjs`, `.js`), with the flag root `lint` passes, so a disable that suppresses nothing is refused at commit too. `--no-error-on-unmatched-pattern` lets through a commit whose only staged script the lint config ignores.
 - `ruff-format` and `ruff-check` give both tiers the same first word. `root: apps/worker/` makes the staged paths relative to the worker, which is where `uv` finds the locked environment ruff lives in. `--only-group dev` syncs ruff's group and not the worker's own dependencies, so a commit never fetches torch: on Linux that comes from PyTorch's CPU wheel host, which a sandboxed clone may not reach.
+- `comment-gate-python` runs the checker root `comment-gate:python` runs, over the staged `.py` files. It carries no `root:`, because the checker reads a file's place, such as `apps/worker/src/`, from its repository path.
 - `actionlint` runs the command root `lint:workflows` runs, over the staged workflows alone. It and the shellcheck it runs over each `run:` step come from the worker's locked dev group, so a commit and CI read a workflow with the same versions. The first run builds actionlint's Python package, which downloads the release from GitHub and checks it against the hash the package carries. uv caches the build after that.
 - The five `*-typecheck` commands are every workspace with a `typecheck` script but the design system, which has neither a `tsconfig.json` nor a `scripts` block. `root:` is what scopes each command to its own workspace's staged files, so these five never see each other's changes.
 
@@ -87,15 +88,7 @@ The `commit-msg` hook runs commitlint over every commit's message. Its config, `
 
 ## The Claude Code hooks
 
-`.claude/settings.json` wires three scripts under `.claude/hooks/`.
-
-### The write-time comment gate
-
-`comment-gate-hook.sh` runs the comment gates root `check` runs over the one file an agent has just written. It forwards each gate's own message rather than restating it. Exit 2 is the only code whose stderr reaches the model; every other outcome exits 0, so a machine without the tooling refuses no edit.
-
-For a TypeScript file it runs root `lint`: the root config, `.oxlintrc.json`, with the `lint` script's flag, over any file the root run walks. It refuses the edit only on a comment rule's line, and leaves another rule's finding to `check`. For a Python file it runs the Python gate, over the roots that gate walks: `apps/`, `packages/`, `scripts/`, `.claude/hooks/`, `.github/`, `deploy/` and three root tool-configuration files.
-
-`packages/devtools/test/comment-gate-hook.test.ts` holds the hook's roots to the Python gate's command in both directions. It also proves, through the hook, each comment rule the root config holds.
+`.claude/settings.json` wires three scripts under `.claude/hooks/`: the two worktree hooks and the doc watcher's cap.
 
 ### Creating and removing a worktree
 

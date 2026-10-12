@@ -9,7 +9,7 @@ import { parse } from "yaml";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
-import { rootScripts } from "@better-answers/devtools/root-commands";
+import { pythonGateChecker, rootScripts } from "@better-answers/devtools/root-commands";
 import {
   gitIn,
   runsOverThrowawayTree,
@@ -24,6 +24,7 @@ const read = (relative: string): string =>
 const command = z.object({
   run: z.string().optional(),
   root: z.string().optional(),
+  glob: z.string().optional(),
 });
 type Command = z.infer<typeof command>;
 const hook = z.object({ commands: z.record(z.string(), command).optional() }).optional();
@@ -45,6 +46,9 @@ const runOf = (name: string): string => {
   if (command?.run === undefined) throw new Error(`no \`${name}\` command in lefthook.yml`);
   return command.run;
 };
+
+const extensionsOf = (name: string): readonly string[] =>
+  (/\{([^}]+)\}/.exec(commands()[name]?.glob ?? "")?.[1] ?? "").split(",");
 
 const binaryManifest = z.object({
   bin: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
@@ -183,6 +187,20 @@ describe("the pre-commit hook", () => {
 
   it.each(rootScriptCommands())("runs `%s` as the root script %s runs it", (command, script) => {
     expect(runOf(command)).toBe(`${rootScripts()[script] ?? ""} {staged_files}`);
+  });
+
+  it("runs the Python gate's checker over the staged files", () => {
+    expect(runOf("comment-gate-python")).toBe(`python3 ${pythonGateChecker()} {staged_files}`);
+    expect(commands()["comment-gate-python"]).toMatchObject({ glob: "*.py" });
+    expect(commands()["comment-gate-python"]).not.toHaveProperty("root");
+  });
+
+  it("lints a staged `.mjs` or `.js` file", () => {
+    expect(extensionsOf("oxlint")).toEqual(expect.arrayContaining(["ts", "tsx", "mjs", "js"]));
+  });
+
+  it("lets through a commit of only ignored scripts", () => {
+    expect(runOf("oxlint")).toContain("--no-error-on-unmatched-pattern");
   });
 });
 
