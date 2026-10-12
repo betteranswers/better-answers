@@ -587,16 +587,23 @@ const NARROWED: Readonly<Record<string, readonly string[]>> = {
     "check:core:typecheck",
     "check:core:suite",
     "check:api",
-    "check:web",
+    "check:web:typecheck",
+    "check:web:test",
+    "check:web:e2e",
   ],
 };
 
 /** A workspace whose suite is sharded runs its check as the steps it names, each a root script. */
 const RUN_BY_STEP: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   "packages/core": { typecheck: "check:core:typecheck", test: "check:core:suite" },
+  "apps/web": { typecheck: "check:web:typecheck", test: "check:web:test", e2e: "check:web:e2e" },
 };
 
-const SHARDED_LEG = "full-core";
+/** Each sharded leg, in the workflow's order, and the one root script it slices. */
+const SHARDED_LEGS: Readonly<Record<string, string>> = {
+  "full-core": "check:core:suite",
+  "full-web-browser": "check:web:e2e",
+};
 
 const manifestAt = (directory: string): { readonly name: string; readonly check: string } => {
   const { name, scripts } = z
@@ -1027,9 +1034,9 @@ describe("how the legs narrow check:workspaces", () => {
   });
 });
 
-describe("the sharded leg of check.yml", () => {
-  it("numbers its shards 1 to N, one per job", () => {
-    const strategy = checkJobs()[SHARDED_LEG]?.strategy;
+describe("the sharded legs of check.yml", () => {
+  it.each(Object.keys(SHARDED_LEGS))("numbers %s's shards 1 to N, one per job", (leg) => {
+    const strategy = checkJobs()[leg]?.strategy;
     const shards = strategy?.matrix["shard"] ?? [];
 
     expect(
@@ -1040,7 +1047,7 @@ describe("the sharded leg of check.yml", () => {
     expect(shards, "a gap or a repeat leaves some files unrun").toEqual(
       shards.map((_, at) => at + 1),
     );
-    expect(stepsOfJob(SHARDED_LEG).flatMap((one) => Object.entries(one.env ?? {}))).toEqual([
+    expect(stepsOfJob(leg).flatMap((one) => Object.entries(one.env ?? {}))).toEqual([
       ["SHARD", "${{ matrix.shard }}/${{ strategy.job-total }}"],
     ]);
     expect(
@@ -1049,16 +1056,18 @@ describe("the sharded leg of check.yml", () => {
     ).toBe(false);
   });
 
-  it("runs its sharded script alone, and no other leg shards", () => {
+  it("runs each sharded script alone, and no other leg shards", () => {
     const slicing = Object.keys(checkJobs()).filter((job) =>
       stepsOfJob(job).some((one) => SHARD_ARGUMENT.test((one.run ?? "").trim())),
     );
 
-    expect(slicing).toEqual([SHARDED_LEG]);
-    expect(
-      gatesOf(SHARDED_LEG),
-      "a gate beside the shard runs once per shard, where one run would do",
-    ).toEqual([RUN_BY_STEP["packages/core"]?.["test"]]);
+    expect(slicing).toEqual(Object.keys(SHARDED_LEGS));
+    for (const [leg, script] of Object.entries(SHARDED_LEGS)) {
+      expect(
+        gatesOf(leg),
+        "a gate beside the shard runs once per shard, where one run would do",
+      ).toEqual([script]);
+    }
   });
 });
 
@@ -1088,7 +1097,14 @@ type VerdictCase = {
 const PROVED_NOTHING = "proved nothing";
 
 /** A matrix leg is one entry in `needs`, its result the shards' together. */
-const FULL_LEGS = ["full-root", SHARDED_LEG, "full-api", "full-web", "full-worker"];
+const FULL_LEGS = [
+  "full-root",
+  "full-core",
+  "full-api",
+  "full-web-unit",
+  "full-web-browser",
+  "full-worker",
+];
 
 const VERDICTS: readonly VerdictCase[] = [
   {

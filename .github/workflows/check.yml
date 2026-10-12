@@ -272,11 +272,38 @@ jobs:
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller || needs.lane.outputs.images == 'no' }}
           IMAGE_CACHE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
-  full-web:
+  full-web-unit:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The journeys' fixtures are tested through a real browser.
+      - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
+      - run: pnpm check:web:unit
+
+  # Playwright deals tests to the shards, not files, because the suite is fully parallel.
+  full-web-browser:
+    needs: lane
+    if: ${{ needs.lane.outputs.lane == 'full' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    strategy:
+      # Cancelling the other shards would hide their failures until this one's were fixed.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      TRACE_ARTIFACT: browser-traces-shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -292,14 +319,14 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
-      - run: pnpm check:web
+      - run: pnpm check:web:e2e --shard="${SHARD}"
         env:
-          TRACE_ARTIFACT: browser-traces-attempt-${{ github.run_attempt }}
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
       # Not failure(): a flake passes on its retry, and its trace is the one worth reading.
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: browser-traces-attempt-${{ github.run_attempt }}
+          name: ${{ env.TRACE_ARTIFACT }}
           path: apps/web/test-results/
           if-no-files-found: ignore
           retention-days: 7
@@ -448,7 +475,8 @@ jobs:
         full-root,
         full-core,
         full-api,
-        full-web,
+        full-web-unit,
+        full-web-browser,
         full-worker,
         pr-title,
         pr-lockfile,
