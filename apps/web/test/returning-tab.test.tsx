@@ -1,10 +1,11 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { switchedInAnotherTab } from "@/app/words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { MEMBERS_LOADING } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
 import {
@@ -31,9 +32,11 @@ await vi.hoisted(() => import("./stub-server.ts"));
 
 placedWithoutMeasuring();
 
-const SAID = `You switched to ${HOLME.name} in another tab.`;
+const SAID = switchedInAnotherTab(HOLME.name);
 
 const MEMBERS = HOMES.Admin.path;
+
+const GROUPS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Groups");
 
 const GRACES_PAGE = memberPageOf(GRACE.personId);
 
@@ -106,6 +109,23 @@ describe("a tab shown again after a switch in another tab", () => {
     expect(await screen.findByRole("radio", { name: "Viewer", checked: true })).toBeDefined();
     expect(router.state.location.pathname).toBe(GRACES_PAGE);
     expect(said()).toBe(SAID);
+  });
+
+  it("says it no longer once the person moves on", async () => {
+    const api = adaAnAdmin();
+    const router = await openAt(MEMBERS, api);
+    aSwitchInAnotherTab(api, "Admin");
+    shownAgain();
+    await waitFor(() => expect(said()).toBe(SAID));
+
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: CONTROL_CENTRE.name })).getByRole("link", {
+        name: GROUPS.name,
+      }),
+    );
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(GROUPS.path));
+    expect(said()).toBe("");
   });
 
   it("keeps the list when only the role changes", async () => {

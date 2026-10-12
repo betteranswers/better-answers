@@ -319,7 +319,8 @@ const indexRoute = createRoute({
   },
   component: function HomeUnread() {
     const { home } = useVisibleTree();
-    return home === undefined ? <RoleUnread /> : <Navigate to={home.path} replace />;
+    // State goes on from here as well: a role read late takes this road home.
+    return home === undefined ? <RoleUnread /> : <Navigate to={home.path} replace state />;
   },
 });
 

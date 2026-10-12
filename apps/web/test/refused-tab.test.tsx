@@ -1,6 +1,7 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { FAILED_PAGE, RAIL } from "@/app/words.ts";
 import { INVITATIONS_WORDS } from "@/features/people/invitation-words.ts";
 import {
   BULK_WORDS,
@@ -8,7 +9,8 @@ import {
   MEMBERS_LOADING,
 } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
-import { HOMES } from "@/shared/navigation.ts";
+import { HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
+import { saidOfRefusal, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
 import {
@@ -39,8 +41,7 @@ placedWithoutMeasuring();
 /** What the api answers an action from a tab whose workspace the session has left. */
 const SWITCHED = aRefusalAnswer("workspace-switched", "conflict", 409);
 
-const SAID =
-  "You switched workspace in another tab, so that didn’t go through. This tab now shows the workspace you switched to.";
+const SAID = sentenceOf(saidOfRefusal({}, "workspace-switched", "conflict"));
 
 const MEMBERS = HOMES.Admin.path;
 
@@ -77,14 +78,29 @@ const landedInHolme = async () => {
   await waitFor(() => expect(band().getByRole("alert").textContent).toBe(SAID));
 };
 
+/** Refused once another browser tab took the session to Holme Valley Tools, Ada a Viewer there. */
+const refusedAfterASwitch = async () => {
+  const api = adaAnAdmin();
+  const router = await openGracesPage(api);
+  aSwitchInAnotherTab(api, "Viewer");
+  api.set("members.changeRole", () => SWITCHED);
+  changeGracesRole();
+  return router;
+};
+
+/** Refused while the member read fails, so no role is held to take the tab home. */
+const refusedWithTheMemberUnread = async () => {
+  const api = adaAnAdmin();
+  const router = await openGracesPage(api);
+  api.set("session.member", () => LOST);
+  api.set("members.changeRole", () => SWITCHED);
+  changeGracesRole();
+  return { api, router };
+};
+
 describe("a tab whose workspace the session has left", () => {
   it("lands a refused tab home, its band saying why", async () => {
-    const api = adaAnAdmin();
-    const router = await openGracesPage(api);
-    aSwitchInAnotherTab(api, "Viewer");
-    api.set("members.changeRole", () => SWITCHED);
-
-    changeGracesRole();
+    const router = await refusedAfterASwitch();
 
     await landedInHolme();
     expect(router.state.location.pathname).toBe(HOMES.Viewer.path);
@@ -106,15 +122,36 @@ describe("a tab whose workspace the session has left", () => {
   });
 
   it("draws no name of the workspace left when unread", async () => {
-    const api = adaAnAdmin();
-    const router = await openGracesPage(api);
-    api.set("session.member", () => LOST);
-    api.set("members.changeRole", () => SWITCHED);
-
-    changeGracesRole();
+    const { router } = await refusedWithTheMemberUnread();
 
     await drawnWithNoWorkspace();
     expect(router.state.location.pathname).toBe("/");
+  });
+
+  it("keeps the sentence when the member read answers later", async () => {
+    const { api, router } = await refusedWithTheMemberUnread();
+    await drawnWithNoWorkspace();
+    expect(router.state.location.pathname).toBe("/");
+
+    aSwitchInAnotherTab(api, "Viewer");
+    fireEvent.click(screen.getByRole("button", { name: FAILED_PAGE.retry }));
+
+    await landedInHolme();
+    expect(router.state.location.pathname).toBe(HOMES.Viewer.path);
+  });
+
+  it("says it no longer once the person moves on", async () => {
+    const router = await refusedAfterASwitch();
+    await landedInHolme();
+
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: RAIL })).getByRole("link", {
+        name: KNOWLEDGE.name,
+      }),
+    );
+
+    await waitFor(() => expect(router.state.location.pathname).not.toBe(HOMES.Viewer.path));
+    expect(band().getByRole("alert").textContent).toBe("");
   });
 
   it("draws no row of the workspace left, refused twice", async () => {

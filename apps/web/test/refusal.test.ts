@@ -79,7 +79,7 @@ describe("an action refused because the workspace was switched", () => {
     const said = saidOfRefusal({}, "workspace-switched", "conflict");
 
     expect(said).not.toEqual(SAID_OF_CLASS.conflict);
-    expect(sentenceOf(said)).toContain("another tab");
+    expect(sentenceOf(said)).toContain("another browser tab");
     expect(sentenceOf(said).toLowerCase()).not.toContain("reload");
   });
 });
