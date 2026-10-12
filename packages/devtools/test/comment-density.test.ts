@@ -102,10 +102,10 @@ describe("the ceiling over a throwaway tree", () => {
     const over = overTheCeiling(measure(cloc(OVER), [WORKSPACE]));
 
     expect(over).toHaveLength(1);
-    expect(over[0]?.unit).toBe(WORKSPACE);
+    expect(over[0]?.workspace).toBe(WORKSPACE);
     expect(over[0]?.arm).toBe("source");
     expect(
-      reportOf(over[0] ?? { unit: "", arm: "source", code: 0, comment: 0, ratio: 0 }),
+      reportOf(over[0] ?? { workspace: "", arm: "source", code: 0, comment: 0, ratio: 0 }),
     ).toContain("0.50 comment lines per code line, over the 0.10 ceiling");
   });
 
@@ -124,7 +124,7 @@ describe("the ceiling over a throwaway tree", () => {
   it("leaves a workspace blind to the SQL beside it", () => {
     const measured = measure(cloc(DILUTED_OVER), [WORKSPACE]);
 
-    expect(measured.map((one) => one.unit)).toEqual([WORKSPACE]);
+    expect(measured.map((one) => one.workspace)).toEqual([WORKSPACE]);
     expect(measured[0]?.comment).toBe(1);
     expect(overTheCeiling(measured)).toEqual([]);
   });

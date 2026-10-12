@@ -80,20 +80,16 @@ const countedIn = (output: string): readonly Counted[] =>
 export const armOf = (file: string): Arm => (isTestPath(file) ? "test" : "source");
 
 export type Measured = {
-  readonly unit: string;
+  readonly workspace: string;
   readonly arm: Arm;
   readonly code: number;
   readonly comment: number;
   readonly ratio: number;
 };
 
-const workspaceOf = (file: string, workspaces: readonly string[]): string | undefined => {
+const workspaceOf = (file: string, longestFirst: readonly string[]): string | undefined => {
   const relative = file.replace(/^\.\//, "");
-
-  // Longest path first, so a workspace inside another takes the files it holds.
-  return [...workspaces]
-    .sort((left, right) => right.length - left.length)
-    .find((held) => relative === held || relative.startsWith(`${held}/`));
+  return longestFirst.find((held) => relative === held || relative.startsWith(`${held}/`));
 };
 
 type Total = { code: number; comment: number };
@@ -104,8 +100,11 @@ export const measure = (
   workspaces: readonly string[],
 ): readonly Measured[] => {
   const totals = new Map<string, Map<Arm, Total>>();
+
+  // Longest path first, so a workspace inside another takes the files it holds.
+  const longestFirst = [...workspaces].sort((left, right) => right.length - left.length);
   for (const row of counted) {
-    const workspace = workspaceOf(row.file, workspaces);
+    const workspace = workspaceOf(row.file, longestFirst);
     if (workspace === undefined) continue;
     const arms = totals.get(workspace) ?? new Map<Arm, Total>();
     const arm = armOf(row.file);
@@ -114,23 +113,25 @@ export const measure = (
     totals.set(workspace, arms);
   }
   return [...totals.entries()]
-    .flatMap(([unit, arms]) =>
+    .flatMap(([workspace, arms]) =>
       [...arms.entries()].map(([arm, total]) => ({
-        unit,
+        workspace,
         arm,
         code: total.code,
         comment: total.comment,
         ratio: total.code === 0 ? 0 : total.comment / total.code,
       })),
     )
-    .sort((left, right) => `${left.unit}${left.arm}`.localeCompare(`${right.unit}${right.arm}`));
+    .sort((left, right) =>
+      `${left.workspace}${left.arm}`.localeCompare(`${right.workspace}${right.arm}`),
+    );
 };
 
 export const overTheCeiling = (measured: readonly Measured[]): readonly Measured[] =>
   measured.filter((one) => one.code > 0 && one.ratio > CEILING[one.arm]);
 
 export const reportOf = (one: Measured): string =>
-  `${one.unit} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling. A comment says only what the code cannot, so delete what it restates (the root \`CODING_STANDARDS.md\`).`;
+  `${one.workspace} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling. A comment says only what the code cannot, so delete what it restates (the root \`CODING_STANDARDS.md\`).`;
 
 /** Runs cloc over `paths` from `cwd`; throws when cloc fails or writes no JSON. */
 export const countOver = (cwd: string, paths: readonly string[]): readonly Counted[] =>
