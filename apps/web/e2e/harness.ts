@@ -10,7 +10,7 @@ import { CONFIRM_WORDS, SETUP_WORDS } from "@/features/auth/second-factor-words.
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 
-import { landedAtHome } from "./locators.ts";
+import { landedAtHome, switcherOf } from "./locators.ts";
 
 export * from "./locators.ts";
 
@@ -524,6 +524,26 @@ export const signedInAtHome = async (
   await page.goto("/sign-in");
   await signIn(page, api, email);
   await landedAtHome(page, role);
+};
+
+/** The Admin of `first`, holding `role` in `second`, signed in and reading `first`. */
+export const inTwoWorkspaces = async (
+  page: Page,
+  api: APIRequestContext,
+  names: { readonly first: string; readonly second: string },
+  role: "Admin" | "Viewer" = "Admin",
+) => {
+  const email = anAddress("switching");
+  const first = await provision(api, { name: names.first, adminEmail: email });
+  const second = await provision(api, { name: names.second });
+  await addMember(api, { workspaceId: second.workspaceId, userId: first.admin.id, role });
+
+  await page.goto("/sign-in");
+  await signIn(page, api, email);
+  await page.getByRole("button", { name: first.name, exact: true }).click();
+  await landedAtHome(page, "Admin");
+  await expect(switcherOf(page, first.name)).toBeVisible();
+  return { email, first, second };
 };
 
 /** From the sign-in page to the no-workspace page, as a person in no workspace arrives. */

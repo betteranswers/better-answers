@@ -10,15 +10,15 @@ import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
+  inTwoWorkspaces,
   landedAtHome,
   markTheOperator,
   navOf,
   person,
-  provision,
   railOf,
   removeMember,
-  signIn,
   signOutFromTheShell,
+  switched,
   switcherMenuOf,
   switcherOf,
 } from "./harness.ts";
@@ -44,11 +44,6 @@ const workspacesIn = (menu: Locator): Locator => menu.getByRole("menuitemradio")
 /** An item reads its workspace's name, then the person's role there. */
 const listedAs = (name: string, role: "Admin" | "Viewer"): string => `${name} ${role}`;
 
-const switched = async (page: Page, from: string, to: string): Promise<void> => {
-  await switcherOf(page, from).click();
-  await workspacesIn(switcherMenuOf(page, from)).filter({ hasText: to }).click();
-};
-
 /** Standing while empty, so the regions are found before they have anything to say. */
 const saidInTheBand = (page: Page): Locator =>
   page.getByRole("banner").getByRole("status", { includeHidden: true });
@@ -64,26 +59,6 @@ const aMemberOnlyOf = async (api: APIRequestContext, workspaceId: string, name: 
   const member = await person(api, anAddress("only"), { displayName: name });
   await addMember(api, { workspaceId, userId: member.id, role: "Viewer" });
   return member.id;
-};
-
-/** The Admin of `first`, holding `role` in `second`, signed in and reading `first`. */
-const inTwoWorkspaces = async (
-  page: Page,
-  api: APIRequestContext,
-  names: { readonly first: string; readonly second: string },
-  role: "Admin" | "Viewer" = "Admin",
-) => {
-  const email = anAddress("switching");
-  const first = await provision(api, { name: names.first, adminEmail: email });
-  const second = await provision(api, { name: names.second });
-  await addMember(api, { workspaceId: second.workspaceId, userId: first.admin.id, role });
-
-  await page.goto("/sign-in");
-  await signIn(page, api, email);
-  await page.getByRole("button", { name: first.name, exact: true }).click();
-  await landedAtHome(page, "Admin");
-  await expect(switcherOf(page, first.name)).toBeVisible();
-  return { email, first, second };
 };
 
 /** Held until the returned call, so the page meets the read while it is still pending. */

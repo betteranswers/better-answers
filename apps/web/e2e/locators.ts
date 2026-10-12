@@ -33,6 +33,12 @@ export const switcherOf = (page: Page, here: string): Locator =>
 export const switcherMenuOf = (page: Page, here: string): Locator =>
   page.getByRole("menu", { name: here });
 
+/** Picks `to` in the switcher's menu and waits for nothing, so a spec meets the switch pending. */
+export const switched = async (page: Page, from: string, to: string): Promise<void> => {
+  await switcherOf(page, from).click();
+  await switcherMenuOf(page, from).getByRole("menuitemradio").filter({ hasText: to }).click();
+};
+
 export const railOf = (page: Page): Locator => page.getByRole("navigation", { name: RAIL });
 
 /** The menu, named for the open area. */
