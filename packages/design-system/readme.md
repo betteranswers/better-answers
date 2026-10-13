@@ -46,7 +46,8 @@ The areas the rail lists, each holding groups of pages (§4, *The shell*):
 - **Control Centre** — the one Admin area, in eight groups: Overview, Suggestions,
   Sources, Models, Questions, People, Personal data and System.
 
-The avatar menu in the band holds the person's name, their role and "Sign out".
+The avatar menu in the band holds the person's name, their role and the item that signs them
+out.
 
 ## 3. Content fundamentals
 
@@ -66,55 +67,126 @@ two: *· imported* and *· source moved on*. A verifier who has since been erase
 "Verified by a former member". A colour sits only behind a word that already says the same
 thing. *Restricted* is a sensitivity value, one of three with Internal and Public.
 
-**Tone: precise, confident, grounded.** Name the number, state it plainly, and show the
-evidence. Say what is true and what is missing, in a level voice. Write for a bid writer
-under deadline.
-
-- *Precise* — the count, the date, the name: "Three passages mention it."
-- *Confident* — state what is known. Where something is uncertain, say what is missing.
-- *Grounded* — attach every claim to something a reader can open.
-
-Lines in that tone:
-
-- "Nothing on the map answers this. Three passages mention it."
-- "One governed write. Audited under your name."
-- "Verified by Priya Shah · 3 March 2026"
+**What a sentence is for.** A person on a page came to do something, and a sentence there
+helps them do it. It is short and ordinary: the sentence they have already read in other
+products, saying no more than they need to carry on. The web takes its wording from Kibo UI's
+patterns (§6). Use Kibo's own string where one fits the product, and write a sentence in the
+same manner where Kibo has none. A Kibo string that names a thing takes the glossary's word
+for it, so Kibo's "Remove Team Member" is "Remove Member" here. Kibo's emoji and joke messages
+are left out. New text follows this section even where older text beside it does not.
 
 British spelling and UK conventions throughout.
 
-**Person.** The second person for what the reader does ("you asked", "your questions"), and
-the third person for everything else. The Audit log's actor column names the platform's own
-actions "the platform": it names an actor and addresses no one.
+Kibo's strings, by kind of text. A line that names a group, a workspace or a member had Kibo's
+"project", "team" or "team member" in that place, and "everything in it" stands for Kibo's "all
+projects and data". The web has no toast. A done message shows in a page's outcome line and
+takes Kibo's done alert form, and a refusal shows as an alert.
 
-**Casing.** Sentence case everywhere — headings, buttons, tabs, table headers (the only
-upper-case is the micro-label at 11px with 0.06em tracking). Proper nouns keep their case:
-Control Centre, Admin, Editor, Viewer, Answer (the concept kind), Restricted, Internal, Public.
+| Kind of text | Reads |
+| --- | --- |
+| Error alert | "There was a problem processing your request. Please try again." |
+| Done alert | "Your changes have been saved successfully." |
+| Empty state | "No results found" with "Try adjusting your filters to see more results." |
+| Empty state | "No groups yet" with "Get started by creating your first group." |
+| Field message | "Please enter a valid email address.", "Verification code must be 6 characters." |
+| Field help | "Must be at least 8 characters long.", "This will be visible to all members." |
+| Dialog description | "Add a new member to your workspace with a specific role." |
+| Confirmation | "Leave Workspace" with "Are you sure you want to leave this workspace? You will need to be re-invited to access it again." |
+| Confirmation | "Remove Member" with "Are you sure you want to remove this member from the workspace? They will lose access to everything in it." |
+| Verification | "We've sent a 6-digit code to your email address. Please enter it below." |
 
-**Consequence before the click.** Every action states its effect in its label or the line
-beside it, in view before the reader clicks: "Accept 12 concepts", "Save as an Answer", "One
-governed write."
+Three of Kibo's habits come with them:
+
+- An instruction in an alert or a field message takes "Please": "Please try again.", "Please
+  enter a valid email address."
+- A done message says "successfully": "Your changes have been saved successfully."
+- Where no specific error is written, a stock sentence stands (*Refusals*, below).
+
+An empty state takes an action only where the page offers no other way to take it.
+
+**Person.** The second person for what the reader does ("you asked", "your questions"). The
+platform may be "we" where a sentence says what it did or could not do: "We've sent a 6-digit
+code to your email address." The third person for everything else. The Audit log's actor column
+names the platform's own actions "the platform": it names an actor and addresses no one.
+
+**Casing.** Each kind of text takes the casing Kibo gives it. Kibo's patterns hold no page
+heading and no navigation, so a page's heading and a name in the navigation take the card
+title's casing. In Title Case an article, a conjunction and a short preposition stay in lower
+case unless they come first or last, as in "Mark as Complete", and a word that is part of the
+verb keeps its capital, as in "Sign In Again".
+
+| Kind of text | Casing | Examples |
+| --- | --- | --- |
+| Page heading, card title, a name in the navigation | Title Case | "Audit Log", "Personal Data", "Recovery Codes" |
+| Dialog, sheet and drawer title | Title Case | "Leave Workspace", "Remove Member", "Edit Profile" |
+| Button, a confirmation's buttons included | Title Case | "Save Changes", "View Details", "Go Back", "Keep Member" |
+| Menu item | Title Case | "View Details", "Mark as Complete", "Add Tags" |
+| Tab | Title Case | "Personal Info", "Audit Log" |
+| Table header | Title Case | "IP Address", "Display Name" |
+| Form field label and legend | Title Case | "Display Name", "Email Address", "Personal Information" |
+| Tick box and switch label | Sentence case | "Remember me", "Email notifications" |
+| Empty state title | Sentence case, no full stop | "No results found", "No groups yet" |
+| Description, help text, tooltip | Sentence case, with a full stop | "This will be displayed publicly.", "Must be at least 8 characters long." |
+| Alert, done message, field message | Sentence case | "Your changes have been saved successfully.", "Please enter a valid email address." |
+
+Proper nouns keep their case in every kind of text: Control Centre, Admin, Editor, Viewer,
+Answer (the concept kind), Restricted, Internal, Public. A trust word is written as the closed
+set writes it. Any other glossary word keeps its wording and takes the casing of the kind of
+text it stands in, so the *Audit log* page's tab reads "Audit Log".
+
+Casing is typed into each string by hand. A style or a function that recases a label would
+recase a person's name, a workspace's name or an address inside it. The 11px micro-label is
+the one text a style sets in upper case (§4).
+
+**Consequence before the click.** A button's label is short: its verb, with the kind of thing
+where the verb alone would not say enough. "Remove", "Save Changes", "Go Back". A person's or a
+thing's own name goes in the confirmation's own name, which is a dialog's title or an inline
+group's legend. What the action will do goes in the text that describes the control, in view
+before the reader clicks: "This action cannot be undone." That text keeps a fact the reader
+needs and nothing else on the page shows, and so does a done message. The "Remove Member"
+confirmation above, opened on one member, is named "Remove Sam Okoro". It keeps its
+description, and its buttons are "Keep Member" and "Remove". Where a list repeats one action on
+every row, each control's accessible name carries its row's name.
+
+**Refusals.** A person reads a refusal (`CONCEPTS.md`) as a sentence. It is the stock sentence
+for its kind, and the table names each by its key:
+
+| Key | Answers | Sentence |
+| --- | --- | --- |
+| Session | class *unauthenticated* | Your session has expired. Please sign in again. |
+| Permission | class *forbidden* | You don't have permission to do this. |
+| Gone | class *absent* | This is no longer available. Please reload the page. |
+| Invalid | class *malformed* | Please check your entries and try again. |
+| Unavailable | class *inapplicable* | This action isn't available. |
+| Changed | class *conflict* | This has changed since you opened it. Please reload the page. |
+| Not yet | class *precondition* | This can't be done yet. |
+| General | a failure that is neither a refusal nor a missing response and has no sentence of its own, such as a status the page has no branch for | Something went wrong. Please try again. |
+| Try again | no response to an action that is safe to repeat | There was a problem processing your request. Please try again. |
+| Unconfirmed | no response to an action that is not safe to repeat, such as one that spends a code or would make a second set of recovery codes | We couldn't confirm that. Please reload the page to check. |
+| Not loaded | no response to a read | This didn't load. Please try again. |
+| Wait | too many attempts | Too many attempts. Please try again in 2 minutes. With no wait sent: Too many attempts. Please try again later. |
+| Copy | a failed copy | Couldn't copy. Please select it and copy it manually. |
+
+A refusal is one sentence, with a second only where the reader has something to do or needs a
+fact to do it. It has a sentence of its own only when the reader can act and the stock sentence
+would not tell them how, or when the stock sentence would leave them unaware of something the
+page did for them:
+
+- "This code has expired. Please request a new one."
+- "Verification code is incorrect. 2 tries left."
+- "Your role has changed. Please reload the page."
+
+The wait sentence names nobody, because the limit reached is not always the reader's own. An
+alert may say what the button beside it says: Kibo's own error alert pairs "Please try again"
+with a Retry button.
 
 **Dates and numbers.** UK long form — 3 March 2026; with time, 09:41 · 30 August 2026.
 Money as £1,240.00. Relative time only under a minute.
 
-**Symbols.** Only typographic Unicode symbols appear, in the interface, in empty states and
-in documentation: ·, —, ’, “ ” and ✕ on a dismiss control.
-
-**Clarity.** A page answers three questions, in order: where am I, what happened, what do I
-do next. Say those, then stop.
-
-- Say what to do. Explain a rule only where the reader needs it to act.
-- Use the reader's words, and explain a term where the reader first meets it.
-- Give one next action, its label naming the effect: "Join Acme".
-- Give the heading, the body and the button each something new to say.
-- An empty state says what is missing, in one line. Add an action only where the page offers
-  no other way to take it.
-- A consequence line states the one thing the reader would regret not knowing: that it can't
-  be undone, or who will see it. What the platform records belongs in the Audit log.
-- An error says what went wrong, then what to do. Name who can fix it only when the reader
-  can't. Lead with words, and put any code after them.
-- Make the outcome the subject: "Nothing was saved."
-- Turn stacked conditions into two short sentences.
+**Symbols.** The only symbols beside the words are ·, — and ✕ on a dismiss control, in the
+interface, in empty states and in documentation. An apostrophe or a quotation mark stays as
+its source has it, straight or curly: a string taken from a Kibo pattern keeps its straight
+marks, and text already in the tree keeps the marks it has.
 
 ## 4. Visual foundations
 
@@ -330,12 +402,19 @@ registry component comes out in this styling with no edit to the component file.
 
 shadcn · Kibo UI · AI Elements.
 
-Three registries, one rule: they own behaviour — keyboard, focus, ARIA, virtualisation,
-streaming. We own meaning — the trust words, the citation unit, the register, the marks,
-and every word on a page. Where the two meet, take theirs and skin it. The auth pages
+Three registries, one rule. They own behaviour: keyboard, focus, ARIA, virtualisation and
+streaming. We own meaning: the trust words, the citation unit, the register and the marks.
+Where the two meet, take theirs and skin it. The web's wording follows Kibo UI's patterns (§3),
+and in it the trust words and the glossary's words stay the platform's own. The auth pages
 are the platform's own, on the auth module's hooks over the better-auth client (ADR 0033,
 amended 2026-09-05); Better Auth's client says *organization* throughout and the module's word map
 says *workspace*; that map is not optional.
+
+**Start from a Kibo UI pattern.** Build a page, a dialog or an empty state from a pattern where
+one fits, and keep its wording (§3). The patterns are shown by kind at
+<https://www.kibo-ui.com/patterns>. A pattern is a demonstration file and no registry item, so
+the CLI cannot install it. Copy it by hand into `apps/web/src/shared/ui/kibo-ui/` and give it a
+row in `apps/web/src/shared/ui/THIRD_PARTY_NOTICES.md`, which says what a pattern's row holds.
 
 **A pill is Kibo UI's Pill** (owner, 25/09/2026; <https://www.kibo-ui.com/components/pill>).
 Every pill a page shows — a role, a group, an invitation's state, a count — is that

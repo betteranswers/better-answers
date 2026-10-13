@@ -28,7 +28,8 @@ The interface is Tailwind v4. Its theme is the design system's tokens, read thro
 
 - In a page, a colour, a size or a radius that is not a theme value from the tokens is a defect. The bridge is the one place a literal may stand, and only where a token cannot reach. A page reads a type step as `var(--text-lg)`, because the design system owns the `--text-*` names.
 - Components come from three shadcn registries: shadcn for the primitives, Kibo UI for the composed pieces, and Vercel AI Elements for answers. They arrive as source in this repository, and each is reviewed before it lands.
-- The registries own behaviour: keyboard handling, focus, ARIA wiring, virtualisation and streaming. The platform owns meaning: the trust words, the citation unit, the register, the glossary's vocabulary and every sentence a reader sees. Where the two meet, we take their component, skin it, and keep the meaning in ours.
+- The registries own behaviour: keyboard handling, focus, ARIA wiring, virtualisation and streaming. The platform owns meaning: the trust words, the citation unit, the register and the glossary's vocabulary. Where the two meet, we take their component, skin it, and keep the meaning in ours.
+- The web's wording follows Kibo UI's patterns: their strings where one fits the product, their casing for each kind of text, and sentences written in the same manner where Kibo has none. In that wording the trust words and the glossary's words stay the platform's own. `packages/design-system/readme.md` holds the rule and its examples.
 - The design system's own components are deleted. Its tokens, stylesheet and bridge stay.
 - The components live in `apps/web/src/shared/ui/`, with `kibo-ui/` and `ai-elements/` beside the shadcn primitives. `apps/web/components.json` records the registries and aliases.
 - Four rules that judge how a component is written are off over `apps/web/src/shared/ui/**` alone, in `.oxlintrc.json`. Every import rule, the accessibility rule at the page and the anti-slop rules stay on.
@@ -58,3 +59,5 @@ The interface is Tailwind v4. Its theme is the design system's tokens, read thro
 ## History
 
 The full record, with its three amendments (T-036, T-037, T-046): `docs/archive/adr/0033-ui-kit-is-tailwind-v4.md`.
+
+Amended 13/10/2026 by the web wording plan (`docs/plans/2026-10-13-1101-fix-web-wording-and-stock-refusals-plan.md`, R5 and R7). The platform's meaning took in the wording of each page, written to its own rules. The web's wording now follows Kibo UI's patterns, and the platform keeps the trust words and the glossary's words. The registries still own behaviour, and no component's source changes by this.
