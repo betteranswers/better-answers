@@ -59,7 +59,7 @@ const INSTANT_WORDS = String.raw`\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}`;
 
 const INSTANT = new RegExp(`^${INSTANT_WORDS}$`);
 
-const REVOKE = "End every sign-in and token Priya Shah holds";
+const REVOKE = "End Every Sign-In and Token";
 
 const CORRECT_A_NAME = "console.people.correctDisplayName";
 
@@ -117,7 +117,8 @@ const regionOf = (sheet: Locator, name: string): Locator =>
 /** One item for each session the person holds open. */
 const sessionsOf = (sheet: Locator): Locator => regionOf(sheet, "Sessions").getByRole("listitem");
 
-const confirmationOf = (page: Page): Locator => page.getByRole("dialog", { name: REVOKE });
+const confirmationOf = (page: Page): Locator =>
+  page.getByRole("dialog", { name: `${REVOKE} for Priya Shah` });
 
 /** A workspace whose Admin carries the mark. */
 const theOperatorsWorkspace = async (api: APIRequestContext, tag: string) => {
@@ -190,7 +191,14 @@ const dialogToCorrect = (page: Page, name: string): Locator =>
   page.getByRole("dialog", { name: correctWords(name) });
 
 const nameFieldOf = (dialog: Locator): Locator =>
-  dialog.getByRole("textbox", { name: "Display name" });
+  dialog.getByRole("textbox", { name: "Display Name" });
+
+/** A name saved from a sheet: its part says so, and focus is back on its action. */
+const savedInTheSheet = async (sheet: Locator): Promise<void> => {
+  const part = regionOf(sheet, "Display Name");
+  await expect(part.getByRole("status")).toHaveText(/\S/);
+  await expect(part.getByRole("button", { name: "Correct Display Name" })).toBeFocused();
+};
 
 /**
  * Opens on the name as it stands, described by its rule and its consequence; Cancel hands focus
@@ -267,8 +275,8 @@ const priyaFlagged = async (page: Page, api: APIRequestContext, tag: string) => 
 /** From the key that saves to the list holding the name no more. */
 const clockTheRowLeaving = (page: Page, name: string) =>
   clockTheNextKey(page, {
-    at: `//section[h2[normalize-space(.)='Names waiting']][not(.//td[normalize-space(.)='${name}'])]`,
-    reads: "Names waiting",
+    at: `//section[h2[normalize-space(.)='Names Waiting']][not(.//td[normalize-space(.)='${name}'])]`,
+    reads: "Names Waiting",
   });
 
 /** The operator lands on Everyone, searched for her. */
@@ -362,22 +370,22 @@ test.describe("the console's Everyone page", () => {
 
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
 
-    const paging = everyone(page).getByRole("navigation", { name: "Pages of people" });
+    const paging = everyone(page).getByRole("navigation", { name: "Pages of People" });
     await expect(personRows(page)).toHaveCount(50);
     await expect(paging).toHaveText(THE_FIRST_PAGE);
-    await expect(paging.getByRole("button", { name: "Previous page" })).toHaveAttribute(
+    await expect(paging.getByRole("button", { name: "Previous Page" })).toHaveAttribute(
       "aria-disabled",
       "true",
     );
 
-    const next = paging.getByRole("button", { name: "Next page" });
+    const next = paging.getByRole("button", { name: "Next Page" });
     await next.click();
     await expect(personRows(page)).toHaveCount(1);
     await expect(paging).toHaveText(THE_LAST_PAGE);
     await expect(next).toHaveAttribute("aria-disabled", "true");
     await expect(next).toBeFocused();
 
-    await paging.getByRole("button", { name: "Previous page" }).click();
+    await paging.getByRole("button", { name: "Previous Page" }).click();
     await expect(personRows(page)).toHaveCount(50);
 
     // A turn past either end moves nowhere, and the list's outcome says so.
@@ -454,10 +462,10 @@ test.describe("the console's Everyone page", () => {
           - table:
             - caption
             - rowgroup:
-              - row "Person Workspaces and roles Last sign-in":
+              - row "Person Workspaces and Roles Last Sign-In":
                 - columnheader "Person"
-                - columnheader "Workspaces and roles"
-                - columnheader "Last sign-in"
+                - columnheader "Workspaces and Roles"
+                - columnheader "Last Sign-In"
             - rowgroup:
               - row /Priya Shah/:
                 - cell /Priya Shah/:
@@ -506,7 +514,7 @@ test.describe("the console's Everyone page", () => {
 
     await page.keyboard.press("c");
     await expect(
-      sheetOf(page, "Priya Shah").getByRole("button", { name: correctWords("Priya Shah") }),
+      sheetOf(page, "Priya Shah").getByRole("button", { name: "Correct Display Name" }),
     ).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(priya).toBeFocused();
@@ -534,11 +542,11 @@ test.describe("a person, opened from Everyone as a sheet", () => {
           - heading "Workspaces" [level=3]
           - list:
             - listitem: ${operators.name} Editor
-        - region "Sign-in":
-          - heading "Sign-in" [level=3]
-          - term: Last sign-in
+        - region "Sign-In":
+          - heading "Sign-In" [level=3]
+          - term: Last Sign-In
           - definition: /\\d{2}:\\d{2} · \\d{1,2} [A-Z][a-z]+ \\d{4}/
-          - term: Every sign-in and token ended
+          - term: Every Sign-In and Token Ended
           - definition: /^\\D+$/
         - region "Sessions":
           - heading "Sessions" [level=3]
@@ -548,12 +556,12 @@ test.describe("a person, opened from Everyone as a sheet", () => {
             - listitem:
               - term: Began
               - definition: /\\d{4}/
-              - term: Last used
+              - term: Last Used
               - definition: /\\d{4}/
               - term: Expires
               - definition: /\\d{4}/
-        - region "Assistant access":
-          - heading "Assistant access" [level=3]
+        - region "Assistant Access":
+          - heading "Assistant Access" [level=3]
           - list:
             - listitem "Claude":
               - heading "Claude" [level=4]
@@ -561,20 +569,20 @@ test.describe("a person, opened from Everyone as a sheet", () => {
               - definition: ${operators.name}
               - term: Issued
               - definition: /\\d{4}/
-              - term: Last used
+              - term: Last Used
               - definition: /\\d{4}/
-              - button "More about Claude’s grant"
-        - region "Display name":
-          - heading "Display name" [level=3]
+              - button "More About Claude’s Grant"
+        - region "Display Name":
+          - heading "Display Name" [level=3]
           - paragraph
-          - button ${quoted(correctWords("Priya Shah"))}
-        - region "End every sign-in everywhere":
-          - heading "End every sign-in everywhere" [level=3]
+          - button "Correct Display Name"
+        - region "End Every Sign-In Everywhere":
+          - heading "End Every Sign-In Everywhere" [level=3]
           - paragraph
           - button "${REVOKE}"
         - button "Close"
     `);
-    for (const action of [correctWords("Priya Shah"), REVOKE]) {
+    for (const action of ["Correct Display Name", REVOKE]) {
       await expect(
         sheet.getByRole("button", { name: action }),
         `“${action}” does not say whom it acts on`,
@@ -582,9 +590,9 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     }
     await passesTheAccessibilityGate();
 
-    const grant = regionOf(sheet, "Assistant access").getByRole("listitem", { name: "Claude" });
+    const grant = regionOf(sheet, "Assistant Access").getByRole("listitem", { name: "Claude" });
     await expect(grant.getByText("Live", { exact: true })).toBeVisible();
-    await grant.getByRole("button", { name: "More about Claude’s grant" }).click();
+    await grant.getByRole("button", { name: "More About Claude’s Grant" }).click();
     await expect(grant).toContainText("https://claude.ai/oauth/mcp-oauth-client-metadata");
 
     await page.keyboard.press("Escape");
@@ -602,7 +610,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     const sheet = await openPriya(page, tag);
 
-    const grant = regionOf(sheet, "Assistant access").getByRole("listitem", { name: "Claude" });
+    const grant = regionOf(sheet, "Assistant Access").getByRole("listitem", { name: "Claude" });
     await expect(grant).toMatchAriaSnapshot(`
       - listitem "Claude":
         - heading "Claude" [level=4]
@@ -612,11 +620,11 @@ test.describe("a person, opened from Everyone as a sheet", () => {
         - definition: /\\d{4}/
         - term: Ended
         - definition: /\\d{4}/
-        - term: Ended by
+        - term: Ended By
         - definition: /\\S/
-        - term: Ended in
+        - term: Ended In
         - definition: ${operators.name}
-        - button "More about Claude’s grant"
+        - button "More About Claude’s Grant"
     `);
     for (const someone of ["Priya Shah", operators.admin.name]) {
       await expect(grant, `the grant says ${someone} ended it`).not.toContainText(someone);
@@ -633,7 +641,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     const { operators } = await priyaConnected(page, request, baseURL, tag);
     const sheet = await openPriya(page, tag);
     const revoke = sheet.getByRole("button", { name: REVOKE });
-    const grant = regionOf(sheet, "Assistant access").getByRole("listitem", { name: "Claude" });
+    const grant = regionOf(sheet, "Assistant Access").getByRole("listitem", { name: "Claude" });
     await expect(grant).toBeVisible();
 
     await revoke.click();
@@ -646,7 +654,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(sessionsOf(sheet)).toHaveCount(1);
 
     await revoke.click();
-    await confirmation.getByRole("button", { name: "End every sign-in everywhere" }).focus();
+    await confirmation.getByRole("button", { name: "End Every Sign-In Everywhere" }).focus();
     await clockTheNextKey(page, {
       at: "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Sessions']][not(.//li)]",
       reads: "Sessions",
@@ -655,7 +663,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     await expect(sessionsOf(sheet)).toHaveCount(0);
     await theActionLandedWithinItsBudget(page, "end every sign-in everywhere");
-    await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("status")).toHaveText(
+    await expect(regionOf(sheet, "End Every Sign-In Everywhere").getByRole("status")).toHaveText(
       ENDED_AT,
     );
     await expect(revoke).toBeFocused();
@@ -669,14 +677,14 @@ test.describe("a person, opened from Everyone as a sheet", () => {
         - definition: /\\d{4}/
         - term: Ended
         - definition: /\\d{4}/
-        - term: Ended by
+        - term: Ended By
         - definition: ${operators.admin.name}
-        - term: Ended in
+        - term: Ended In
         - definition: /^(?!${operators.name}$).+/
-        - button "More about Claude’s grant"
+        - button "More About Claude’s Grant"
     `;
     await expect(grant).toMatchAriaSnapshot(endedEverywhere);
-    await expect(regionOf(sheet, "Sign-in").getByRole("definition").nth(1)).toHaveText(INSTANT);
+    await expect(regionOf(sheet, "Sign-In").getByRole("definition").nth(1)).toHaveText(INSTANT);
 
     await page.reload();
     await personButton(page, "Priya Shah").click();
@@ -693,11 +701,11 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await sheet.getByRole("button", { name: REVOKE }).click();
     const refused = refusalAnswering(page, "console.people.endEverySignInAndToken");
     await confirmationOf(page)
-      .getByRole("button", { name: "End every sign-in everywhere" })
+      .getByRole("button", { name: "End Every Sign-In Everywhere" })
       .click();
 
     expect(await refused).toMatchObject({ word: SIGN_IN_TOO_OLD });
-    await saysARefusal(regionOf(sheet, "End every sign-in everywhere").getByRole("alert"));
+    await saysARefusal(regionOf(sheet, "End Every Sign-In Everywhere").getByRole("alert"));
     await expect(sessionsOf(sheet)).toHaveCount(1);
 
     await sheet.getByRole("link", { name: "Sign in again" }).click();
@@ -710,9 +718,9 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(revoke).toBeFocused();
     await revoke.press("Enter");
     await confirmationOf(page)
-      .getByRole("button", { name: "End every sign-in everywhere" })
+      .getByRole("button", { name: "End Every Sign-In Everywhere" })
       .click();
-    await expect(regionOf(again, "End every sign-in everywhere").getByRole("status")).toHaveText(
+    await expect(regionOf(again, "End Every Sign-In Everywhere").getByRole("status")).toHaveText(
       ENDED_AT,
     );
     await expect(sessionsOf(again)).toHaveCount(0);
@@ -743,11 +751,11 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(confirmation.getByRole("button", { name: "Cancel" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(
-      confirmation.getByRole("button", { name: "End every sign-in everywhere" }),
+      confirmation.getByRole("button", { name: "End Every Sign-In Everywhere" }),
     ).toBeFocused();
     await page.keyboard.press("Enter");
 
-    await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("status")).toHaveText(
+    await expect(regionOf(sheet, "End Every Sign-In Everywhere").getByRole("status")).toHaveText(
       ENDED_AT,
     );
     await expect(sessionsOf(sheet)).toHaveCount(0);
@@ -762,8 +770,8 @@ test.describe("a person, opened from Everyone as a sheet", () => {
   }) => {
     await priyaListed(page, request, aTag());
     await personButton(page, "Priya Shah").click();
-    const correct = regionOf(sheetOf(page, "Priya Shah"), "Display name").getByRole("button", {
-      name: correctWords("Priya Shah"),
+    const correct = regionOf(sheetOf(page, "Priya Shah"), "Display Name").getByRole("button", {
+      name: "Correct Display Name",
     });
 
     const dialog = await correctingCancelled(page, correct, "Priya Shah", {
@@ -773,7 +781,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await correct.click();
     await nameFieldOf(dialog).fill("Priya Sharma");
     await clockTheNextKey(page, {
-      at: "(//div[@role='dialog'][.//h3[normalize-space(.)='Display name']]//h2)[1]",
+      at: "(//div[@role='dialog'][.//h3[normalize-space(.)='Display Name']]//h2)[1]",
       reads: "Priya Sharma",
     });
     await page.keyboard.press("Enter");
@@ -781,9 +789,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     const renamed = sheetOf(page, "Priya Sharma");
     await expect(renamed.getByRole("heading", { level: 2 })).toHaveText("Priya Sharma");
     await theActionLandedWithinItsBudget(page, "correct display name");
-    const part = regionOf(renamed, "Display name");
-    await expect(part.getByRole("status")).toHaveText(/\S/);
-    await expect(part.getByRole("button", { name: correctWords("Priya Sharma") })).toBeFocused();
+    await savedInTheSheet(renamed);
 
     await page.keyboard.press("Escape");
     await expect(personButton(page, "Priya Sharma")).toBeFocused();
@@ -798,8 +804,8 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await person(request, anAddress("priya"), { displayName: flagged });
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await personButton(page, flagged).click();
-    const correct = regionOf(sheetOf(page, flagged), "Display name").getByRole("button", {
-      name: correctWords(flagged),
+    const correct = regionOf(sheetOf(page, flagged), "Display Name").getByRole("button", {
+      name: "Correct Display Name",
     });
 
     await correct.click();
@@ -813,9 +819,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
         .getByRole("status", { includeHidden: true })
         .first(),
     ).toHaveText(/\b1\b/);
-    const part = regionOf(sheetOf(page, "Priya Shah"), "Display name");
-    await expect(part.getByRole("status")).toHaveText(/\S/);
-    await expect(part.getByRole("button", { name: correctWords("Priya Shah") })).toBeFocused();
+    await savedInTheSheet(sheetOf(page, "Priya Shah"));
     await page.keyboard.press("Escape");
     await expect(searchBox(page)).toBeFocused();
   });
@@ -824,8 +828,8 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     const { operators } = await priyaListed(page, request, aTag());
     await ageTheSignIn(request, operators.admin.id);
     await personButton(page, "Priya Shah").click();
-    const part = regionOf(sheetOf(page, "Priya Shah"), "Display name");
-    await part.getByRole("button", { name: correctWords("Priya Shah") }).click();
+    const part = regionOf(sheetOf(page, "Priya Shah"), "Display Name");
+    await part.getByRole("button", { name: "Correct Display Name" }).click();
     await nameFieldOf(dialogToCorrect(page, "Priya Shah")).fill("Priya Sharma");
     const refused = refusalAnswering(page, CORRECT_A_NAME);
     await page.keyboard.press("Enter");
@@ -836,20 +840,20 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
     await signIn(page, request, operators.admin.email);
 
-    const again = regionOf(sheetOf(page, "Priya Shah"), "Display name").getByRole("button", {
-      name: correctWords("Priya Shah"),
+    const again = regionOf(sheetOf(page, "Priya Shah"), "Display Name").getByRole("button", {
+      name: "Correct Display Name",
     });
     await expect(again).toBeFocused();
     await again.press("Enter");
     await nameFieldOf(dialogToCorrect(page, "Priya Shah")).fill("Priya Sharma");
     await page.keyboard.press("Enter");
     await expect(
-      regionOf(sheetOf(page, "Priya Sharma"), "Display name").getByRole("status"),
+      regionOf(sheetOf(page, "Priya Sharma"), "Display Name").getByRole("status"),
     ).toHaveText(/\S/);
   });
 });
 
-test.describe("the console's Names waiting page", () => {
+test.describe("the console's Names Waiting page", () => {
   test("lists each flagged name with its flags, within budget", async ({ page, request }) => {
     const tag = aTag();
     const { operators, priya, name } = await priyaFlagged(page, request, tag);
@@ -885,9 +889,9 @@ test.describe("the console's Names waiting page", () => {
           - table:
             - caption
             - rowgroup:
-              - row "Person Flagged by Actions":
+              - row "Person Flagged By Actions":
                 - columnheader "Person"
-                - columnheader "Flagged by"
+                - columnheader "Flagged By"
                 - columnheader "Actions"
             - rowgroup:
               - row /${name}/:
@@ -901,7 +905,7 @@ test.describe("the console's Names waiting page", () => {
     `);
   });
 
-  test("says what Names waiting is, apart from Everyone", async ({ page, request }) => {
+  test("says what Names Waiting is, apart from Everyone", async ({ page, request }) => {
     await signedInAsTheOperator(page, request, aTag());
     await page.goto(NAMES_WAITING_PAGE);
 
@@ -910,14 +914,14 @@ test.describe("the console's Names waiting page", () => {
     const descriptions = thePage(page).locator("h2 + p");
     await expect(summary).toHaveText(/\S/);
     await expect(namesWaiting(page).locator("h2 + p")).toHaveText(/\S/);
-    await expect(descriptions, "Names waiting describes more than itself").toHaveCount(1);
+    await expect(descriptions, "Names Waiting describes more than itself").toHaveCount(1);
     const theGroups = await summary.innerText();
     const ofNamesWaiting = await descriptions.innerText();
 
     await navOf(page, CONSOLE).getByRole("link", { name: EVERYONE.name }).click();
     await expect(everyone(page).locator("h2 + p")).toHaveText(/\S/);
     await expect(descriptions, "Everyone describes more than itself").toHaveCount(1);
-    await expect(descriptions, "Everyone is described as Names waiting is").not.toHaveText(
+    await expect(descriptions, "Everyone is described as Names Waiting is").not.toHaveText(
       ofNamesWaiting,
     );
     await expect(summary, "the two pages of one group lead with different lines").toHaveText(
@@ -967,7 +971,7 @@ test.describe("the console's Names waiting page", () => {
     await expect(waitingCount(page)).toHaveText(/\d/);
   });
 
-  test("keeps Names waiting's search and focus through a refused re-read", async ({
+  test("keeps Names Waiting's search and focus through a refused re-read", async ({
     page,
     context,
     request,
@@ -1015,7 +1019,7 @@ test.describe("the console's Names waiting page", () => {
     await expect(waitingRowOf(page, name)).toHaveCount(0);
     await theActionLandedWithinItsBudget(page, "correct display name");
     await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
-    await expect(namesWaiting(page).getByRole("heading", { name: "Names waiting" })).toBeFocused();
+    await expect(namesWaiting(page).getByRole("heading", { name: "Names Waiting" })).toBeFocused();
 
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await expect(personButton(page, corrected)).toBeVisible();
@@ -1032,7 +1036,7 @@ test.describe("the console's Names waiting page", () => {
     const dialog = dialogToCorrect(page, name);
     await nameFieldOf(dialog).fill("Priya <priya@acme.invalid>");
     const refused = refusalAnswering(page, CORRECT_A_NAME);
-    await dialog.getByRole("button", { name: "Save the name" }).click();
+    await dialog.getByRole("button", { name: "Save Changes" }).click();
 
     expect(await refused).toMatchObject({ word: "display-name-angle-bracket" });
     const alert = namesWaiting(page).getByRole("alert");

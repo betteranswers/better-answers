@@ -5,10 +5,12 @@ import { ACTIVITY_WORDS, MEMBER_PAGE_WORDS } from "@/features/people/member-acti
 const AMARA = "Amara Okafor";
 
 describe("the Role card's words", () => {
-  it("names the change with the member and the role's article", () => {
-    expect(MEMBER_PAGE_WORDS.makeRole(AMARA, "Viewer")).toContain(AMARA);
-    expect(MEMBER_PAGE_WORDS.makeRole(AMARA, "Viewer")).toMatch(/\ba Viewer\b/);
-    expect(MEMBER_PAGE_WORDS.makeRole(AMARA, "Editor")).toMatch(/\ban Editor\b/);
+  it("names the role picked, and tells the reader's own apart", () => {
+    const theirs = MEMBER_PAGE_WORDS.changesTheirRole("Viewer");
+    const yours = MEMBER_PAGE_WORDS.changesYourRole("Viewer");
+
+    for (const said of [theirs, yours]) expect(said).toMatch(/\bViewer\b/);
+    expect(yours).not.toBe(theirs);
   });
 
   it("names the role held, at rest and beside another pick", () => {

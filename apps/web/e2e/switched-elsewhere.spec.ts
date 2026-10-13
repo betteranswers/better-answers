@@ -175,7 +175,7 @@ test.describe("an action from a tab left in another workspace", () => {
     const answered = refusalAnswering(page, "members.bulkChangeRole");
     await page
       .getByRole("dialog", { name: BULK_WORDS.changeRole.title(2) })
-      .getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") })
+      .getByRole("button", { name: BULK_WORDS.changeRole.action, exact: true })
       .click();
     expect(await answered).toMatchObject(SWITCHED);
 

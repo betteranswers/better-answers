@@ -1,6 +1,6 @@
 /** Apart from `words.tsx` and its JSX, so the browser suite reads the lines the pages show. */
 export const EMPTY_LINES = {
-  groups: "No groups yet.",
-  invitations: "Nobody is waiting to join.",
-  requests: "Nobody is asking to join.",
+  groups: "No groups yet",
+  invitations: "No invitations waiting",
+  requests: "No requests waiting",
 } as const;

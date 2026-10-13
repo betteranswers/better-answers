@@ -57,7 +57,7 @@ const requestRows = (page: Page): Locator =>
 const rowOf = (page: Page, name: string): Locator => requestRows(page).filter({ hasText: name });
 
 const approveDialog = (page: Page, name: string) =>
-  page.getByRole("dialog", { name: `Approve the request from ${name}` });
+  page.getByRole("dialog", { name: `Approve Request from ${name}` });
 
 /** A role select is described by its role's meaning, so a pick shows in a description that changed. */
 const describedAfresh = async (select: Locator, pick: () => Promise<void>): Promise<void> => {
@@ -139,7 +139,7 @@ test.describe("the People page's Requests tab", () => {
     await expect(countIn(page)).toHaveText(/\b1\b/);
 
     await rowOf(page, "Priya Shah")
-      .getByRole("button", { name: "Approve the request from Priya Shah" })
+      .getByRole("button", { name: "Approve Request from Priya Shah" })
       .click();
     const approving = approveDialog(page, "Priya Shah");
     await expect(approving, "the dialog names no address to email").toContainText(priya);
@@ -149,7 +149,7 @@ test.describe("the People page's Requests tab", () => {
       await page.getByRole("option", { name: "Editor" }).click();
     });
     await expect(role).toHaveText("Editor");
-    await approving.getByRole("button", { name: "Approve and send the invitation" }).click();
+    await approving.getByRole("button", { name: "Approve", exact: true }).click();
 
     await expect(approving).toHaveCount(0);
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
@@ -224,7 +224,7 @@ test.describe("the People page's Requests tab", () => {
 
     await tabUntilFocused(
       page,
-      page.getByRole("button", { name: "Approve the request from Dropped Ray" }),
+      page.getByRole("button", { name: "Approve Request from Dropped Ray" }),
     );
     await clockTheNextKey(page, {
       at: THE_COUNT,
@@ -251,7 +251,7 @@ test.describe("the People page's Requests tab", () => {
 
     await tabUntilFocused(
       page,
-      page.getByRole("button", { name: "Decline the request from Approved Kay" }),
+      page.getByRole("button", { name: "Decline Request from Approved Kay" }),
     );
     await page.keyboard.press("a");
     const approving = approveDialog(page, "Approved Kay");
@@ -259,15 +259,12 @@ test.describe("the People page's Requests tab", () => {
     await page.keyboard.press("Escape");
     await expect(approving).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "Decline the request from Approved Kay" }),
+      page.getByRole("button", { name: "Decline Request from Approved Kay" }),
     ).toBeFocused();
     await page.keyboard.press("a");
     const role = approving.getByRole("combobox", { name: "Role" });
     await describedAfresh(role, () => editorPickedByKeyboard(page, role));
-    await tabUntilFocused(
-      page,
-      approving.getByRole("button", { name: "Approve and send the invitation" }),
-    );
+    await tabUntilFocused(page, approving.getByRole("button", { name: "Approve", exact: true }));
     await passesTheAccessibilityGate();
     await clockTheNextKey(page, {
       at: THE_COUNT,
@@ -303,8 +300,8 @@ test.describe("the People page's Requests tab", () => {
               - cell "Waiting"
               - cell /\\d{4}/
               - cell:
-                - button "Approve the request from Kept Lee"
-                - button "Decline the request from Kept Lee"
+                - button "Approve Request from Kept Lee"
+                - button "Decline Request from Kept Lee"
     `);
   });
 
@@ -316,7 +313,7 @@ test.describe("the People page's Requests tab", () => {
     await anAdminAtRequests(page, request, "Aire Valley Tooling", [{ displayName: "Priya Shah" }]);
     await openRequests(page);
     await rowOf(page, "Priya Shah")
-      .getByRole("button", { name: "Approve the request from Priya Shah" })
+      .getByRole("button", { name: "Approve Request from Priya Shah" })
       .click();
     const approving = approveDialog(page, "Priya Shah");
     await expect(approving.getByRole("combobox", { name: "Role" })).toBeVisible();
@@ -325,14 +322,14 @@ test.describe("the People page's Requests tab", () => {
     await elsewhere.goto(MEMBERS_PAGE);
     await openRequests(elsewhere);
     await rowOf(elsewhere, "Priya Shah")
-      .getByRole("button", { name: "Decline the request from Priya Shah" })
+      .getByRole("button", { name: "Decline Request from Priya Shah" })
       .click();
     await expect(requestRows(elsewhere)).toHaveCount(0);
     await expect(emptyLine(elsewhere)).toHaveText(/\S/);
     await elsewhere.close();
 
     const refused = refusalAnswering(page, "members.approveRequest");
-    await approving.getByRole("button", { name: "Approve and send the invitation" }).click();
+    await approving.getByRole("button", { name: "Approve", exact: true }).click();
 
     expect(await refused).toMatchObject({ word: "already-decided" });
     await expect(approving).toHaveCount(0);

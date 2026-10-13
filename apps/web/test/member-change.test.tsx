@@ -51,9 +51,7 @@ const demotingHerself = async (api: Api, memberAfter: Parameters<Api["set"]>[1])
   });
   const router = await openAt(MEMBER_PAGE, api);
   fireEvent.click(await screen.findByRole("radio", { name: "Editor" }));
-  fireEvent.click(
-    screen.getByRole("button", { name: MEMBER_PAGE_WORDS.makeRole(ADA.displayName, "Editor") }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
   return router;
 };
 
@@ -77,8 +75,8 @@ describe("a change to the reader's own member", () => {
     });
     const router = await openAt(MEMBER_PAGE, api);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Remove Ada" }));
-    fireEvent.click(screen.getByRole("button", { name: "Remove Ada from this workspace" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Member" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     await waitFor(() => expect(switcherDrawn(), "the band names the workspace left").toBeNull());
     expect(adminsAreaOffered(), "the rail offers the role lost").toBeNull();

@@ -44,12 +44,12 @@ export function CorrectNameDialog(properties: {
       consequence={correctingConsequence(name)}
       commit={
         <Button type="submit" form={ids.form}>
-          Save the name
+          Save Changes
         </Button>
       }
     >
       <form id={ids.form} onSubmit={submit} className="grid gap-2">
-        <Label htmlFor={ids.field}>Display name</Label>
+        <Label htmlFor={ids.field}>Display Name</Label>
         <Input
           id={ids.field}
           name="displayName"
@@ -60,8 +60,7 @@ export function CorrectNameDialog(properties: {
           aria-describedby={byTheRule === undefined ? ids.hint : `${ids.hint} ${ids.refused}`}
         />
         <p id={ids.hint} className="text-sm text-muted-foreground">
-          One line of up to {DISPLAY_NAME_MAX_CHARACTERS} characters, with no &lt; or &gt;: the rule
-          a person’s own name follows.
+          Must be one line of up to {DISPLAY_NAME_MAX_CHARACTERS} characters, with no &lt; or &gt;.
         </p>
         {byTheRule === undefined ? null : (
           <p id={ids.refused} className="text-sm">

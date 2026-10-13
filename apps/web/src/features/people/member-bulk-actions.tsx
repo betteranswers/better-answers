@@ -263,8 +263,8 @@ function ChangeRoleDialog(properties: { readonly actions: Actions }) {
       actions={actions}
       action="role"
       title={BULK_WORDS.changeRole.title(count)}
-      consequence={BULK_WORDS.changeRole.consequence}
-      commit={<Button onClick={commit}>{BULK_WORDS.changeRole.commit(count, role)}</Button>}
+      consequence={BULK_WORDS.changeRole.consequence(role)}
+      commit={<Button onClick={commit}>{BULK_WORDS.changeRole.action}</Button>}
     >
       <RoleChoice role={role} onChoose={actions.setRole} />
     </BulkDialog>
@@ -311,7 +311,7 @@ function GroupChoice(properties: {
           className="gap-1"
           action={
             <Link to={GROUPS_PATH} className="text-brand underline">
-              Create one on the Groups page
+              Go to Groups
             </Link>
           }
         />
@@ -348,12 +348,10 @@ function AddToGroupDialog(properties: { readonly actions: Actions }) {
       actions={actions}
       action="group"
       title={BULK_WORDS.addToGroup.title(count)}
-      consequence={BULK_WORDS.addToGroup.consequence}
+      consequence={BULK_WORDS.addToGroup.consequence(chosen?.name)}
       commit={
         <Button disabled={chosen === undefined} onClick={commit}>
-          {chosen === undefined
-            ? BULK_WORDS.addToGroup.action
-            : BULK_WORDS.addToGroup.commit(count, chosen.name)}
+          {BULK_WORDS.addToGroup.action}
         </Button>
       }
     >
@@ -383,10 +381,10 @@ function RemoveDialog(properties: { readonly actions: Actions }) {
       actions={actions}
       action="remove"
       title={BULK_WORDS.remove.title(count)}
-      consequence={BULK_WORDS.remove.consequence}
+      consequence={BULK_WORDS.remove.consequence(count)}
       commit={
         <Button variant="destructive" onClick={commit}>
-          {BULK_WORDS.remove.commit(count)}
+          {BULK_WORDS.remove.action}
         </Button>
       }
     />

@@ -5,7 +5,6 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Card, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 
-import { INCLUDES_YOU, RECORDED } from "./member-action-words.ts";
 import { useReaderId, useRemovalOf, type ListedMember } from "./people-api.ts";
 import { nameOf } from "./words.tsx";
 
@@ -44,8 +43,8 @@ export function MemberRemoval(properties: {
         <Collapsible open={asking} onOpenChange={setAsking} className="grid gap-3 px-4 py-3">
           <p id={consequenceId} className="text-sm text-muted-foreground">
             {yourself
-              ? "You lose access to this workspace, People included, on every session and assistant you hold. Any other workspace you belong to is untouched, and you stay named on what you checked."
-              : `${name} loses access to this workspace on every session and assistant they hold. Any other workspace they belong to is untouched, and they stay named on what they checked.`}
+              ? "Removing yourself ends your access to this workspace."
+              : `Removing ${name} ends their access to this workspace.`}
           </p>
           <CollapsibleTrigger asChild>
             <Button
@@ -54,18 +53,18 @@ export function MemberRemoval(properties: {
               className="justify-self-start"
               aria-describedby={consequenceId}
             >
-              Remove {name}
+              Remove Member
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <fieldset className="grid gap-2 border border-border bg-muted p-3">
               <legend ref={focusOnArrival} tabIndex={-1} className="float-left font-medium">
-                Confirm the removal of {name}
+                Remove {name}
               </legend>
               <p id={recordId} className="text-sm text-muted-foreground">
                 {yourself
-                  ? `${INCLUDES_YOU} ${RECORDED} You leave your groups here too.`
-                  : `${RECORDED} They leave their groups here too.`}
+                  ? "Are you sure you want to remove yourself from this workspace? You will lose access on every session and assistant you hold."
+                  : "Are you sure you want to remove this member from the workspace? They will lose access on every session and assistant they hold."}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -79,7 +78,7 @@ export function MemberRemoval(properties: {
                     if (offered) onRemove(member);
                   }}
                 >
-                  Remove {name} from this workspace
+                  Remove
                 </Button>
                 <Button
                   variant="ghost"
@@ -88,7 +87,7 @@ export function MemberRemoval(properties: {
                     askRef.current?.focus();
                   }}
                 >
-                  Keep {name}
+                  Keep Member
                 </Button>
               </div>
             </fieldset>

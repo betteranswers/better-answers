@@ -43,8 +43,8 @@ export function GroupChecklist(properties: {
     if (pair === undefined) return;
     setOutcome(undefined);
     const said = ticked
-      ? `${pair.person} is in ${pair.group} now.`
-      : `${pair.person} is out of ${pair.group} now.`;
+      ? `${pair.person} has been added to ${pair.group} successfully.`
+      : `${pair.person} has been removed from ${pair.group} successfully.`;
     void (ticked ? moves.putIn : moves.takeOut)(pair.inGroup).then(
       () => {
         setOutcome({ tone: "said", words: said });

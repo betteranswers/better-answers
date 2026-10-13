@@ -958,7 +958,7 @@ test.describe("the People page's Invitations tab", () => {
               - columnheader "Role"
               - columnheader "Sent"
               - columnheader "Expires"
-              - columnheader "Invited by"
+              - columnheader "Invited By"
               - columnheader "Actions"
           - rowgroup:
             - row /invited-/:

@@ -53,19 +53,19 @@ export function Pages(properties: {
   if (total <= PAGE_SIZE) return null;
   return (
     <nav
-      aria-label="Pages of people"
+      aria-label="Pages of People"
       className="flex flex-wrap items-center gap-3 border-t border-border p-3"
     >
       <p className="tabular-nums">
         Showing {offset + 1}–{offset + shown} of {total}.
       </p>
       <PageTurn
-        label="Previous page"
+        label="Previous Page"
         keystroke={keystrokes.previous}
         offset={turns.previous}
         turnTo={turnTo}
       />
-      <PageTurn label="Next page" keystroke={keystrokes.next} offset={turns.next} turnTo={turnTo} />
+      <PageTurn label="Next Page" keystroke={keystrokes.next} offset={turns.next} turnTo={turnTo} />
     </nav>
   );
 }

@@ -23,6 +23,7 @@ import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx
 import { GroupChecklist } from "./group-checklist.tsx";
 import { consequenceOfDeleting, membersWord } from "./group-words.ts";
 import { useRenameGroup, type ListedGroup } from "./groups-api.ts";
+import { MEMBERS_LOADING } from "./member-action-words.ts";
 import { useMembers } from "./people-api.ts";
 import { outcomeOfFailure, outcomeOfGroupFailure } from "./refusal.tsx";
 import { nameOf } from "./words.tsx";
@@ -50,12 +51,12 @@ function GroupMembers(properties: {
       />
       {/* Not `empty:hidden`: a region out of the accessibility tree is not tracked, so its fill would go unread. */}
       <div aria-live="polite" className="empty:sr-only">
-        {said.isPending ? <p>The members are still loading.</p> : null}
+        {said.isPending ? <p>{MEMBERS_LOADING}</p> : null}
       </div>
       {members.data === undefined ? null : (
         <GroupChecklist
           legend={`Members of ${group.name}`}
-          hint={`Each box puts the member in ${group.name} or takes them out at once.`}
+          hint="Changes are saved immediately."
           listRef={listRef}
           choices={everyone.map((member) => ({
             id: member.personId,
@@ -96,13 +97,13 @@ function RenameGroup(properties: {
     const was = group.name;
     const name = asked.trim();
     if (name === was) {
-      setOutcome({ tone: "said", words: `${was} is its name already.` });
+      setOutcome({ tone: "said", words: `The group is already called ${was}.` });
       return;
     }
     setOutcome(undefined);
     void renameGroup.mutateAsync({ groupId: group.id, name }).then(
       () => {
-        setOutcome({ tone: "said", words: `${was} is ${name} now.` });
+        setOutcome({ tone: "said", words: `${was} has been renamed to ${name} successfully.` });
       },
       (failure: Error) => {
         setOutcome(outcomeOfGroupFailure(failure, "action"));
@@ -126,11 +127,11 @@ function RenameGroup(properties: {
             aria-describedby={ids.hint}
           />
           <p id={ids.hint} className="text-sm text-muted-foreground">
-            Its members stay in it.
+            Members stay in the group.
           </p>
         </div>
         <Button type="submit" className="justify-self-start">
-          Rename {group.name}
+          Rename Group
         </Button>
       </form>
     </SheetPart>
@@ -151,7 +152,7 @@ function DeleteGroup(properties: {
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button ref={buttonRef} variant="outline" className="justify-self-start">
-            Delete {group.name}
+            Delete Group
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>
@@ -160,14 +161,14 @@ function DeleteGroup(properties: {
             <AlertDialogDescription>{consequence}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep {group.name}</AlertDialogCancel>
+            <AlertDialogCancel>Keep Group</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={() => {
                 onDelete(group);
               }}
             >
-              Delete {group.name}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

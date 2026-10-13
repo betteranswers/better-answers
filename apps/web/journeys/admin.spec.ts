@@ -93,7 +93,7 @@ const rolesChanged = async (page: Page, names: readonly string[], role: Role): P
   const { changeRole } = BULK_WORDS;
   const dialog = await opened(page, names, changeRole);
   await chosen(dialog, "Role", role);
-  const commit = dialog.getByRole("button", { name: changeRole.commit(names.length, role) });
+  const commit = dialog.getByRole("button", { name: changeRole.action, exact: true });
   await committed(page, "members.bulkChangeRole", commit, names.length);
   for (const name of names) {
     await expect(rowOf(page, name).getByRole("cell").nth(ROLE_CELL)).toHaveText(role);
@@ -104,7 +104,7 @@ const addedToGroup = async (page: Page, names: readonly string[], group: string)
   const { addToGroup } = BULK_WORDS;
   const dialog = await opened(page, names, addToGroup);
   await chosen(dialog, "Group", group);
-  const commit = dialog.getByRole("button", { name: addToGroup.commit(names.length, group) });
+  const commit = dialog.getByRole("button", { name: addToGroup.action, exact: true });
   await committed(page, "members.bulkAddToGroup", commit, names.length);
   for (const name of names) {
     await expect(rowOf(page, name).getByRole("cell").nth(GROUPS_CELL)).toContainText(group);

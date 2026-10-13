@@ -22,8 +22,6 @@ export type Role = ListedMember["role"];
 
 export type RoleChanged = inferOutput<Api["members"]["changeRole"]>;
 
-export type CredentialsRevokedHere = inferOutput<Api["members"]["endEverySignInAndToken"]>;
-
 export type ActivityEvent = inferOutput<Api["members"]["activity"]>["events"][number];
 
 /** Whether the person took the action, it was done to them, or both, as a self-demotion is. */

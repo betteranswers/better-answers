@@ -25,6 +25,7 @@ import {
   usePendingGroupNames,
   type ListedGroup,
 } from "./groups-api.ts";
+import { GROUPS_LOADING } from "./member-action-words.ts";
 import { inNameOrder, useMembers } from "./people-api.ts";
 import { GROUPS_KEYSTROKES, PEOPLE_SELECT_FIRST } from "./people-state.ts";
 import { outcomeOfGroupFailure } from "./refusal.tsx";
@@ -143,7 +144,7 @@ function CreateGroupForm(properties: {
       className="flex flex-wrap items-end gap-2 border-b border-border p-3"
     >
       <div className="grid gap-1.5">
-        <Label htmlFor={fieldId}>Name of a new group</Label>
+        <Label htmlFor={fieldId}>New Group Name</Label>
         <Input
           ref={fieldRef}
           id={fieldId}
@@ -154,7 +155,7 @@ function CreateGroupForm(properties: {
           className="w-64"
         />
       </div>
-      <Button type="submit">Create the group</Button>
+      <Button type="submit">Create Group</Button>
     </form>
   );
 }
@@ -230,7 +231,7 @@ function GroupList(properties: {
     setOutcome(undefined);
     void deleteGroup.mutateAsync({ groupId: group.id }).then(
       () => {
-        setOutcome({ tone: "said", words: `${group.name} is deleted.` });
+        setOutcome({ tone: "said", words: `${group.name} has been deleted successfully.` });
       },
       (failure: Error) => {
         setOutcome(outcomeOfGroupFailure(failure, "action"));
@@ -251,14 +252,14 @@ function GroupList(properties: {
             setOutcome(undefined);
           }}
           onCreated={(groupId, name) => {
-            setOutcome({ tone: "said", words: `${name} is created.` });
+            setOutcome({ tone: "said", words: `${name} has been created successfully.` });
             setLandOn(groupId);
           }}
           onRefused={setOutcome}
         />
         <GridTable
           table={table}
-          caption="Groups in this workspace, each with how many members it holds. A group’s name opens it."
+          caption="Groups in this workspace."
           empty={<EmptyState line={EMPTY_LINES.groups} className="px-4 py-10" />}
         />
       </Card>
@@ -305,7 +306,7 @@ function GroupsSection() {
         className="mt-2"
       />
       <div aria-live="polite">
-        {said.isPending ? <p className="mt-2">The groups are still loading.</p> : null}
+        {said.isPending ? <p className="mt-2">{GROUPS_LOADING}</p> : null}
       </div>
       {groups.data === undefined ? null : (
         <GroupList groups={groups.data} headingRef={headingRef} />

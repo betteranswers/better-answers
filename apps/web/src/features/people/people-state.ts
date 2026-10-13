@@ -3,41 +3,41 @@ import { INVITE_A_PERSON } from "@/shared/navigation.ts";
 
 /** Said when a row's keystroke is pressed and no row has held focus, naming the row to pick. */
 export const PEOPLE_SELECT_FIRST = {
-  member: "Select a member first.",
-  group: "Select a group first.",
-  invitation: "Select an invitation first.",
-  request: "Select a request first.",
+  member: "Please select a member first.",
+  group: "Please select a group first.",
+  invitation: "Please select an invitation first.",
+  request: "Please select a request first.",
 } as const;
 
 export const PEOPLE_KEYSTROKES = {
-  search: { key: "/", action: "Search the members by name or address" },
-  open: { key: "o", action: "Open the member in focus" },
-  changeRole: { key: "c", action: "Change the role of the member in focus" },
+  search: { key: "/", action: "Search the Members by Name or Address" },
+  open: { key: "o", action: "Open the Member in Focus" },
+  changeRole: { key: "c", action: "Change the Role of the Member in Focus" },
   endEverySignInAndToken: {
     key: "v",
-    action: "End every sign-in and token here of the member in focus",
+    action: "End Every Sign-In and Token Here of the Member in Focus",
   },
-  changeGroups: { key: "g", action: "Change the groups of the member in focus" },
-  remove: { key: "d", action: "Remove the member in focus" },
-  flagName: { key: "f", action: "Flag the display name of the member in focus" },
-  tick: { key: "x", action: "Select or clear the member in focus" },
-  changeSelectedRoles: { key: "C", action: "Change the role of the selected members" },
-  addSelectedToGroup: { key: "G", action: "Add the selected members to a group" },
-  removeSelected: { key: "D", action: "Remove the selected members" },
-  clearSelection: { key: "Escape", action: "Clear the selection" },
-  previousPage: { key: "[", action: "Show the previous page of members" },
-  nextPage: { key: "]", action: "Show the next page of members" },
+  changeGroups: { key: "g", action: "Change the Groups of the Member in Focus" },
+  remove: { key: "d", action: "Remove the Member in Focus" },
+  flagName: { key: "f", action: "Flag the Display Name of the Member in Focus" },
+  tick: { key: "x", action: "Select or Clear the Member in Focus" },
+  changeSelectedRoles: { key: "C", action: "Change the Role of the Selected Members" },
+  addSelectedToGroup: { key: "G", action: "Add the Selected Members to a Group" },
+  removeSelected: { key: "D", action: "Remove the Selected Members" },
+  clearSelection: { key: "Escape", action: "Clear the Selection" },
+  previousPage: { key: "[", action: "Show the Previous Page of Members" },
+  nextPage: { key: "]", action: "Show the Next Page of Members" },
   invite: { key: "i", action: INVITE_A_PERSON.name },
-  searchInvitations: { key: "/", action: "Search the invitations by address" },
-  resend: { key: "r", action: "Resend the invitation in focus" },
-  cancel: { key: "d", action: "Cancel the invitation in focus" },
-  tickInvitation: { key: "x", action: "Select or clear the invitation in focus" },
-  resendSelected: { key: "R", action: "Resend the selected invitations" },
-  cancelSelected: { key: "D", action: "Cancel the selected invitations" },
-  previousInvitations: { key: "[", action: "Show the previous page of invitations" },
-  nextInvitations: { key: "]", action: "Show the next page of invitations" },
-  approve: { key: "a", action: "Approve the request in focus" },
-  decline: { key: "d", action: "Decline the request in focus" },
+  searchInvitations: { key: "/", action: "Search the Invitations by Address" },
+  resend: { key: "r", action: "Resend the Invitation in Focus" },
+  cancel: { key: "d", action: "Cancel the Invitation in Focus" },
+  tickInvitation: { key: "x", action: "Select or Clear the Invitation in Focus" },
+  resendSelected: { key: "R", action: "Resend the Selected Invitations" },
+  cancelSelected: { key: "D", action: "Cancel the Selected Invitations" },
+  previousInvitations: { key: "[", action: "Show the Previous Page of Invitations" },
+  nextInvitations: { key: "]", action: "Show the Next Page of Invitations" },
+  approve: { key: "a", action: "Approve the Request in Focus" },
+  decline: { key: "d", action: "Decline the Request in Focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 /** Shifted, so an action on the selection never shares a key with the action on the row in focus. */
@@ -48,21 +48,21 @@ export const shortcutOf = (keystroke: Keystroke): string => `Shift+${keystroke.k
  * the Audit log's for older events.
  */
 export const MEMBER_PAGE_KEYSTROKES = {
-  changeRole: { key: "c", action: "Change this member’s role" },
-  changeGroups: { key: "g", action: "Change this member’s groups" },
-  flagName: { key: "f", action: "Flag this member’s display name" },
+  changeRole: { key: "c", action: "Change This Member’s Role" },
+  changeGroups: { key: "g", action: "Change This Member’s Groups" },
+  flagName: { key: "f", action: "Flag This Member’s Display Name" },
   endEverySignInAndToken: {
     key: "v",
-    action: "End every sign-in and token this member holds here",
+    action: "End Every Sign-In and Token This Member Holds Here",
   },
-  remove: { key: "d", action: "Remove this member" },
-  olderActivity: { key: "o", action: "Show this member’s older activity" },
+  remove: { key: "d", action: "Remove This Member" },
+  olderActivity: { key: "o", action: "Show This Member’s Older Activity" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 export const GROUPS_KEYSTROKES = {
-  create: { key: "n", action: "Create a group" },
-  open: { key: "o", action: "Open the group in focus" },
-  changeMembers: { key: "m", action: "Change the members of the group in focus" },
-  rename: { key: "r", action: "Rename the group in focus" },
-  delete: { key: "d", action: "Delete the group in focus" },
+  create: { key: "n", action: "Create a Group" },
+  open: { key: "o", action: "Open the Group in Focus" },
+  changeMembers: { key: "m", action: "Change the Members of the Group in Focus" },
+  rename: { key: "r", action: "Rename the Group in Focus" },
+  delete: { key: "d", action: "Delete the Group in Focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;

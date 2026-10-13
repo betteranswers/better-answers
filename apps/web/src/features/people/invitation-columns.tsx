@@ -25,7 +25,7 @@ const SENT = { id: "sent", label: "Sent" } as const;
 
 const EXPIRY = { id: "expires", label: "Expires" } as const;
 
-const INVITED_BY = { id: "invitedBy", label: "Invited by" } as const;
+const INVITED_BY = { id: "invitedBy", label: "Invited By" } as const;
 
 /** Every column but the address can hide, so a row always says whose invitation it is. */
 const HIDEABLE = [ROLE, SENT, EXPIRY, INVITED_BY] as const;

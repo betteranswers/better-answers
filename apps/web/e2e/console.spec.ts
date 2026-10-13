@@ -54,7 +54,7 @@ const WORKSPACES = menuGroupIn(CONSOLE, "workspaces");
 
 const COLUMNS = WORKSPACES_WORDS.columns;
 
-const CLOSED = "The console is better-answers support’s alone";
+const CLOSED = "Access Denied";
 
 const UK_DAY =
   /^\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
@@ -443,7 +443,7 @@ test.describe("the console's Workspaces page", () => {
     await expect(pages).toHaveText(["Everyone", "Names Waiting", "Every Workspace"]);
     await pages.filter({ hasText: "Names Waiting" }).click();
     await expect(page).toHaveURL("/console/people/names-waiting");
-    await expect(page.getByRole("region", { name: "Names waiting" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Names Waiting" })).toBeVisible();
   });
 
   test("keeps the console's regions on an address it lacks", async ({ page, request }) => {

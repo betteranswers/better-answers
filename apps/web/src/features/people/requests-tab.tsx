@@ -85,7 +85,7 @@ function RequestRow(properties: {
             size="sm"
             variant="outline"
             aria-haspopup="dialog"
-            aria-label={`Approve the request from ${name}`}
+            aria-label={`Approve Request from ${name}`}
             aria-describedby={consequenceId}
             aria-keyshortcuts={PEOPLE_KEYSTROKES.approve.key}
             onClick={() => {
@@ -97,7 +97,7 @@ function RequestRow(properties: {
           <Button
             size="sm"
             variant="ghost"
-            aria-label={`Decline the request from ${name}`}
+            aria-label={`Decline Request from ${name}`}
             aria-describedby={consequenceId}
             aria-keyshortcuts={PEOPLE_KEYSTROKES.decline.key}
             onClick={() => {
@@ -128,7 +128,7 @@ function RequestList(properties: {
     properties.onDeclined();
     onOutcome({
       tone: "said",
-      words: `Declined the request from ${requesterName(request)}. They may ask again.`,
+      words: `The request from ${requesterName(request)} has been declined successfully. They can ask again.`,
     });
     decline.mutate(
       { requestId: request.id },
@@ -155,13 +155,9 @@ function RequestList(properties: {
       ) : (
         <>
           <p id={consequenceId} className="mt-1 text-muted-foreground">
-            Approving emails the person an invitation that lasts seven days. Declining sends them
-            nothing, and they may ask again.
+            Approving a request sends the person an invitation.
           </p>
-          <WaitingTable
-            caption="Requests to join this workspace waiting for an Admin, each with who asked, why and when."
-            columns={COLUMNS}
-          >
+          <WaitingTable caption="Requests to join this workspace." columns={COLUMNS}>
             {requests.map((request) => (
               <RequestRow
                 key={request.id}

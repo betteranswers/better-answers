@@ -7,5 +7,5 @@ export const membersWord = (group: Pick<ListedGroup, "memberCount">): string =>
 
 export const consequenceOfDeleting = (group: Pick<ListedGroup, "name" | "memberCount">): string =>
   group.memberCount === 0
-    ? `Deleting ${group.name} cannot be undone.`
-    : `Deleting ${group.name} takes its ${membersWord(group)} out of it, and cannot be undone.`;
+    ? `This will permanently delete ${group.name}. This action cannot be undone.`
+    : `This will permanently delete ${group.name} and remove its ${membersWord(group)} from it. This action cannot be undone.`;
