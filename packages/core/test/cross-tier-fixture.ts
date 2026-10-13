@@ -14,6 +14,12 @@ export const THE_PASSAGE =
   "Overtime is paid at time and a quarter after the fortieth hour.\n\n" +
   "The sort code is [withheld].\n";
 
+/** `THE_PASSAGE` as a rendering quotes it: every line, the empty one its last newline leaves too. */
+export const THE_PASSAGE_QUOTED =
+  "> # The depot handbook\n> \n" +
+  "> Overtime is paid at time and a quarter after the fortieth hour.\n> \n" +
+  "> The sort code is [withheld].\n> ";
+
 export const THE_BANK_DETAILS = "The sort code is 00-00-00 and the account number is 12345678.";
 
 export const THE_SPAN_AS_FOUND = "00-00-00 and the account number is 12345678";

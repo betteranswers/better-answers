@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
-  ANSWER_VERDICTS,
   FEEDBACK_REASONS,
   FEEDBACK_VERDICTS,
   TRUST_RIDERS,
@@ -13,9 +12,11 @@ import {
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
+import { JUDGE_STATES, QUESTION_VERDICTS } from "@better-answers/schema";
 
 import { MCP_TOKEN_RULE, MCP_UNAUTHENTICATED_IP_RULE } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
+import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import type { TestClient } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
@@ -172,6 +173,10 @@ const pastTheCeiling = async (max: number, send: () => Promise<Response>) => {
 
 const ABSENT = "https://better-answers.com/c/01ARZ3NDEKTSV4RRFFQ69G5FAV";
 
+const relatedCollections = z.object({
+  related: z.array(z.object({ collection: z.string().nullable() })),
+});
+
 const loggedEvents = (from: number): readonly unknown[] =>
   app()
     .logs.slice(from)
@@ -241,7 +246,9 @@ describe("era-independent", () => {
     ["find", "trust tier", TRUST_TIERS],
     ["find", "trust status", TRUST_STATUSES],
     ["find", "trust rider", TRUST_RIDERS],
-    ["ask", "verdict", ANSWER_VERDICTS],
+    ["ask", "verdict", QUESTION_VERDICTS],
+    ["ask", "judge state", JUDGE_STATES],
+    ["ask", "trust tier", TRUST_TIERS],
     ["open", "trust tier", TRUST_TIERS],
     ["open", "trust status", TRUST_STATUSES],
     ["open", "trust rider", TRUST_RIDERS],
@@ -326,6 +333,60 @@ describe("era-independent", () => {
     expect(refused.isError).toBe(true);
     expect(firstText(refused)).toContain("a query holds no NUL character");
     expect(loggedEvents(before)).not.toContain("mcp.failed");
+  });
+
+  it("refuses a question holding a NUL, never failing the read", async () => {
+    const { client, token } = await connect();
+    const before = app().logs.length;
+
+    const refused = await result(
+      await callTool(client, token, "ask", { question: "audit\u0000logs" }),
+      toolCalled,
+    );
+
+    expect(refused.isError).toBe(true);
+    expect(refused.structuredContent).toBeUndefined();
+    expect(firstText(refused)).toContain("a question holds no NUL character");
+    expect(loggedEvents(before)).not.toContain("mcp.failed");
+  });
+
+  it("keeps ask to the collections its caller names", async () => {
+    const { workspace, client, token } = await connect();
+    await seedConcepts(
+      app(),
+      conceptsSeeding.parse({
+        workspaceId: workspace.workspaceId,
+        userId: workspace.admin.id,
+        concepts: [
+          {
+            title: "How long are audit logs kept?",
+            collection: "audits",
+            body: "Audit logs are kept for thirteen months.",
+          },
+          {
+            title: "How long are audit logs kept in the LMS?",
+            collection: "lms",
+            body: "The LMS keeps audit logs for a year.",
+          },
+        ],
+      }),
+    );
+    const collectionsAsked = async (collections?: readonly string[]) => {
+      const asked = await result(
+        await callTool(client, token, "ask", {
+          question: "How long are audit logs kept?",
+          ...(collections === undefined ? {} : { collections }),
+        }),
+        toolCalled,
+      );
+      return relatedCollections
+        .parse(asked.structuredContent)
+        .related.map((concept) => concept.collection)
+        .toSorted();
+    };
+
+    expect(await collectionsAsked(["audits"])).toEqual(["audits"]);
+    expect(await collectionsAsked()).toEqual(["audits", "lms"]);
   });
 
   it("refuses a cursor find never handed out", async () => {

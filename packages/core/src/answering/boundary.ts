@@ -1,18 +1,26 @@
 import { z } from "zod";
 
-import { conceptFrontmatter, ids, type ConceptIri } from "@better-answers/schema";
+import {
+  conceptFrontmatter,
+  ids,
+  JUDGE_STATES,
+  QUESTION_VERDICTS,
+  type ConceptIri,
+} from "@better-answers/schema";
 
 import { findCursor } from "./cursor.ts";
 
 const FIND_LIMIT_AT_MOST = 20;
+
+/** Postgres refuses a NUL in text, which would fail the statement rather than refuse the input. */
+const holdsNoNul = (text: string): boolean => !text.includes("\u0000");
 
 export const findInput = z.object({
   query: z
     .string()
     .min(1)
     .max(500)
-    // Postgres refuses a NUL in text, which would fail the read rather than refuse the query.
-    .refine((query) => !query.includes("\u0000"), "a query holds no NUL character")
+    .refine(holdsNoNul, "a query holds no NUL character")
     .describe("What to look for, in the person's own words."),
   limit: z
     .number()
@@ -27,6 +35,36 @@ export const findInput = z.object({
 });
 
 export type FindInput = z.output<typeof findInput>;
+
+const QUESTION_CHARACTERS_AT_MOST = 2_000;
+
+const COLLECTIONS_AT_MOST = 20;
+
+const COLLECTION_CHARACTERS_AT_MOST = 200;
+
+export const askInput = z.object({
+  question: z
+    .string()
+    .min(1)
+    .max(QUESTION_CHARACTERS_AT_MOST)
+    .refine(holdsNoNul, "a question holds no NUL character")
+    .describe("The question, in the person's own words."),
+  collections: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .max(COLLECTION_CHARACTERS_AT_MOST)
+        .refine(holdsNoNul, "a collection's name holds no NUL character"),
+    )
+    .max(COLLECTIONS_AT_MOST)
+    .default([])
+    .describe(
+      "The collections the question concerns, each spelled as an answer's `readableCollections` spells it. Leave it out to consider every collection you can read.",
+    ),
+});
+
+export type AskInput = z.output<typeof askInput>;
 
 export type OpenInput =
   | { readonly iri: ConceptIri; readonly locator?: undefined }
@@ -51,11 +89,26 @@ export const openInput = z
     },
   );
 
-export const passageView = z.object({
+const passageView = z.object({
   locator: z.string(),
   source: z.string(),
   text: z.string(),
   sensitivity: z.string(),
+});
+
+export type PassageView = z.infer<typeof passageView>;
+
+/** A passage as an answer or an open shows it: its document's title is its source. */
+export const passageViewOf = (passage: {
+  readonly locator: string;
+  readonly title: string;
+  readonly text: string;
+  readonly sensitivity: string;
+}): PassageView => ({
+  locator: passage.locator,
+  source: passage.title,
+  text: passage.text,
+  sensitivity: passage.sensitivity,
 });
 
 const documentMatch = z.object({
@@ -106,6 +159,62 @@ const evidenceItem = z.object({
     .exactOptional()
     .describe("The concept this source names; absent where there is none you may read."),
 });
+
+/**
+ * `source` is the file's own label. `locator` or `iri` is what opens it, given only where the reader
+ * may open it; neither is ever `""`.
+ */
+export type Evidence<Iri extends string> = {
+  readonly id?: string;
+  readonly source: string;
+  readonly at?: string;
+  readonly locator?: string;
+  readonly iri?: Iri;
+};
+
+const returnedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
+  z.object({
+    iri: z.string(),
+    url: z.string().describe("The concept's page, for the person to open."),
+    kind: z.string(),
+    title: z.string().describe("For an `Answer`, the question it answered."),
+    collection: z.string().nullable().describe("Null for a concept in no collection."),
+    body: z.string().describe("The concept's own words, to quote unchanged."),
+    trust,
+    trustWords: z.string(),
+    evidence: z.array(evidenceItem),
+  });
+
+export const answerOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
+  z.object({
+    verdict: z.enum(QUESTION_VERDICTS),
+    judgeState: z
+      .enum(JUDGE_STATES)
+      .describe("How the judge stood: an `Answer` it did not judge is never a fit."),
+    answers: z
+      .array(returnedConceptWith(trust))
+      .describe("Every `Answer` a judge found to fit the question, as it stands."),
+    related: z
+      .array(returnedConceptWith(trust))
+      .describe("The concepts that bear on the question, an unjudged `Answer` among them."),
+    conflicts: z.array(
+      z.object({
+        subject: z.string(),
+        values: z.array(z.object({ value: z.string(), evidence: z.string() })),
+      }),
+    ),
+    unmappedPassages: z.array(passageView),
+    map: z.discriminatedUnion("state", [
+      z.object({ state: z.literal("live") }),
+      z.object({ state: z.literal("as_of"), at: z.string() }),
+      z.object({ state: z.literal("unavailable_since"), since: z.string() }),
+    ]),
+    collections: z
+      .array(z.string())
+      .describe("The collections considered: those named, or every one you can read."),
+    readableCollections: z.array(z.string()).describe("The collections you may name."),
+    recordId: z.string().describe("The id of the record kept of this question."),
+  });
 
 export const openOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
   z.discriminatedUnion("found", [

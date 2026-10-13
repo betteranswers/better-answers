@@ -21,6 +21,13 @@ const A_RECORD_WITH_ITS_QUESTION = `WITH record AS (
   INSERT INTO question_content (workspace_id, record_id, asked_at, question)
   SELECT workspace_id, id, asked_at, $9::text FROM record`;
 
+export type RecordOpening = {
+  readonly question: string;
+  readonly collections: readonly string[];
+  readonly transport: QuestionTransport;
+  readonly askedAt: Date;
+};
+
 /**
  * Writes the skeleton and the question in the caller's transaction, which the caller commits
  * before anything that can refuse the question. Answers an error where `askedAt` falls in a month
@@ -29,12 +36,7 @@ const A_RECORD_WITH_ITS_QUESTION = `WITH record AS (
 export const openRecord = async (
   asker: UserPrincipal,
   tx: Tx,
-  input: {
-    readonly question: string;
-    readonly collections: readonly string[];
-    readonly transport: QuestionTransport;
-    readonly askedAt: Date;
-  },
+  input: RecordOpening,
 ): Promise<Result<{ readonly recordId: string }, Error>> =>
   attempt(async () => {
     const recordId = ulid();
@@ -60,7 +62,7 @@ export type RecordedConcept = {
   readonly judged?: CandidateVerdict;
 };
 
-export type DraftedSentence = {
+type DraftedSentence = {
   readonly sentence: string;
   readonly concepts: readonly ConceptIri[];
 };
@@ -87,6 +89,17 @@ const asKept = ({ iri, contentHash, trust, judged }: RecordedConcept) => ({
   judged,
 });
 
+export type RecordCompletion = {
+  readonly recordId: string;
+  readonly completedAt: Date;
+  readonly verdict: QuestionVerdict;
+  readonly judgeState: JudgeState;
+  readonly concepts: readonly RecordedConcept[];
+  readonly unmappedPassages: readonly { readonly locator: string }[];
+  /** Given only when the platform drafted. */
+  readonly drafted?: readonly DraftedSentence[];
+};
+
 /**
  * Completes an open record once: a record already completed, or one that is not there, answers
  * an error and changes nothing. An unmapped passage is kept as its locator alone, and a concept
@@ -95,16 +108,7 @@ const asKept = ({ iri, contentHash, trust, judged }: RecordedConcept) => ({
 export const completeRecord = async (
   asker: UserPrincipal,
   tx: Tx,
-  input: {
-    readonly recordId: string;
-    readonly completedAt: Date;
-    readonly verdict: QuestionVerdict;
-    readonly judgeState: JudgeState;
-    readonly concepts: readonly RecordedConcept[];
-    readonly unmappedPassages: readonly { readonly locator: string }[];
-    /** Given only when the platform drafted. */
-    readonly drafted?: readonly DraftedSentence[];
-  },
+  input: RecordCompletion,
 ): Promise<Result<void, Error>> =>
   attempt(async () => {
     const completed = await tx.query<{ asked_at: string }>(COMPLETED, [

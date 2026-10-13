@@ -21,6 +21,7 @@ const STEPS: Readonly<Record<string, string>> = {
   "audit/record": "writes the audit event of the action that called it, in its transaction",
   "audit/recordEach": "writes the audit events of the action that called it, in its transaction",
   "concepts/cascadingVisibility": "runs its caller's write, and that write's own checks",
+  "concepts/evidenceOf": "ask calls it with the reader it admitted",
   "concepts/findConcepts": "find and ask call it with the reader they admitted",
   "concepts/readConcept": "open calls it with the reader it admitted",
   "guides/recomputeWriteUpsIncluding":
@@ -29,8 +30,8 @@ const STEPS: Readonly<Record<string, string>> = {
   "members/eventsNamed":
     "the audit log's read, its export and a member's activity call it after admitting an Admin",
   "runs/enqueueJob": "opens the transaction enqueueJobIn admits in",
-  "sources/findPassages": "find calls it with the reader it admitted",
-  "sources/passageAt": "open and a concept's read call it for the reader open admitted",
+  "sources/findPassages": "find and ask call it with the reader they admitted",
+  "sources/passageAt": "open, ask and a concept's read call it for the reader each admitted",
 };
 
 const NO_LISTED_STEP = "takes a person, admits nobody and is no listed step";

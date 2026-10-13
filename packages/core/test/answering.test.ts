@@ -1,17 +1,25 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
-import { ids, type ConceptIri } from "@better-answers/schema";
+import {
+  ids,
+  JUDGE_STATES,
+  QUESTION_VERDICTS,
+  ulid,
+  type ConceptIri,
+} from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import {
+  answerOutputWith,
   ask,
+  ASK_CAPS,
+  askInput,
   find,
   findInput,
   findOutputWith,
   giveFeedback,
   mapWords,
-  NOT_ANSWERED,
   NOT_COMPANY_KNOWLEDGE,
   open,
   openInput,
@@ -21,14 +29,34 @@ import {
   renderFind,
   renderOpen,
   type AnswerResult,
+  type AskSteps,
   type FeedbackReason,
   type FeedbackReceipt,
   type FindResult,
   type OpenResult,
+  type PlannedAnswer,
+  type ReturnedConcept,
   type Trust,
 } from "../src/answering/index.ts";
-import { parse, type Result, type Role, type UserPrincipal } from "../src/kernel/index.ts";
+import {
+  actorIdOfPerson,
+  err,
+  parse,
+  type Result,
+  type Role,
+  type UserPrincipal,
+} from "../src/kernel/index.ts";
 import type { Foldable, Folded, Tx } from "../src/store/postgres/index.ts";
+import {
+  asked,
+  askedAsIs,
+  conceptSeeded,
+  plannedOn,
+  REFUSED,
+  stepsFor,
+  withoutRecord,
+  type SeededConcept,
+} from "./asking.ts";
 import {
   codePointsOf,
   documentLanded,
@@ -37,7 +65,13 @@ import {
   type DocumentShape,
   type LandedDocument,
 } from "./suite-documents.ts";
-import { postgresForSuite, readingAs } from "./suite-postgres.ts";
+import {
+  abortTheTransaction,
+  holdingTable,
+  postgresForSuite,
+  readingAs,
+} from "./suite-postgres.ts";
+import { principalFor } from "./workspace-with-bundle.ts";
 
 const db = postgresForSuite();
 
@@ -60,17 +94,6 @@ const acting = <T>(
   work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
 ): Promise<Folded<T>> => readingAs(db().runtimePool, reader, work);
 
-const answer = (overrides: Partial<AnswerResult>): AnswerResult => ({
-  verdict: "ok",
-  text: "The company holds ISO/IEC 27001:2022.",
-  citations: [{ iri: "https://better-answers.com/c/01A", url: "https://app.example/c/01A" }],
-  conflicts: [],
-  coverage: { asked: 1, answered: 1 },
-  unmappedPassages: [],
-  map: { state: "live" },
-  ...overrides,
-});
-
 const unverified: Trust = {
   tier: "unverified",
   status: "current",
@@ -91,12 +114,73 @@ const described = (shape: Readonly<Record<string, z.ZodType>>): Readonly<Record<
     Object.entries(shape).map(([key, field]) => [key, (field.description ?? "").trim() !== ""]),
   );
 
+const RELATED_LINE =
+  "**Related knowledge, not an answer.** Write only what these concepts state, naming each one you use, and quote an `Answer` word for word.";
+
+const returned = (overrides: Partial<ReturnedConcept<string>> = {}): ReturnedConcept<string> => ({
+  iri: "https://better-answers.com/c/01A",
+  url: "https://app.example/knowledge/search/01A",
+  kind: "Answer",
+  title: "How long are audit logs kept?",
+  collection: "audits",
+  body: "Audit logs are kept for thirteen months.\n",
+  trust: unverified,
+  trustWords: "Unverified",
+  evidence: [],
+  ...overrides,
+});
+
+const answer = (overrides: Partial<PlannedAnswer<string>> = {}): PlannedAnswer<string> => ({
+  verdict: "related",
+  judgeState: "not-judged",
+  answers: [],
+  related: [returned()],
+  conflicts: [],
+  unmappedPassages: [],
+  map: { state: "live" },
+  collections: ["audits"],
+  readableCollections: ["audits", "lms"],
+  ...overrides,
+});
+
+const linesOf = (rendered: string): readonly string[] => rendered.split("\n");
+
 describe("the answer's rendering", () => {
-  it("puts the verdict first and the map's line second", () => {
-    expect(renderAnswer(answer({})).split("\n").slice(0, 2)).toEqual([
-      "**Answered from the company's knowledge.**",
-      "_map as of now_",
+  it("heads related knowledge with what to do, never as answered", () => {
+    const [first, ...rest] = linesOf(renderAnswer(answer()));
+
+    expect(first).toBe(RELATED_LINE);
+    expect(first).not.toMatch(/answered/i);
+    expect(rest.slice(0, 3)).toEqual([
+      "_Not judged · map as of now_",
+      "Collections considered: audits",
+      "Collections you may name: audits, lms",
     ]);
+  });
+
+  it.each([
+    ["ok", "**Answered from the company's knowledge.**"],
+    ["warn", "**Answered with a warning for your role.**"],
+    ["refuse", "**Not answered from the company's knowledge.**"],
+    ["related", RELATED_LINE],
+  ] as const)("heads a %s answer with its own line", (verdict, line) => {
+    expect(linesOf(renderAnswer(answer({ verdict })))[0]).toBe(line);
+  });
+
+  it("gives every verdict a record keeps a line", () => {
+    expect([...QUESTION_VERDICTS]).toEqual(["ok", "warn", "refuse", "related"]);
+  });
+
+  it.each([
+    ["not-judged", "_Not judged · map as of now_"],
+    ["judged", "_Judged · map as of now_"],
+    ["judging-failed", "_Judging failed · map as of now_"],
+  ] as const)("says a %s judge in words beside the map", (judgeState, line) => {
+    expect(linesOf(renderAnswer(answer({ judgeState })))[1]).toBe(line);
+    expect(JUDGE_STATES).toContain(judgeState);
+  });
+
+  it("says the map's state in words", () => {
     expect(mapWords({ state: "as_of", at: "2026-09-01T10:00:00Z" })).toBe(
       "map as of 1 September 2026",
     );
@@ -104,42 +188,72 @@ describe("the answer's rendering", () => {
       "map unavailable since 1 September 2026",
     );
     expect(
-      renderAnswer(answer({ map: { state: "unavailable_since", since: "2026-09-01" } })),
-    ).toContain("_map unavailable since 1 September 2026_");
+      linesOf(
+        renderAnswer(answer({ map: { state: "unavailable_since", since: "2026-09-01" } })),
+      )[1],
+    ).toBe("_Not judged · map unavailable since 1 September 2026_");
   });
 
-  it("puts the text after the map line, then numbered citations", () => {
-    expect(
-      renderAnswer(
-        answer({
-          citations: [
-            { iri: "https://better-answers.com/c/01A", url: "https://app.example/c/01A" },
-            { iri: "https://better-answers.com/c/01B", url: "https://app.example/c/01B" },
-          ],
-        }),
-      ),
-    ).toBe(
-      [
-        "**Answered from the company's knowledge.**",
-        "_map as of now_",
-        "",
-        "The company holds ISO/IEC 27001:2022.",
-        "",
-        "[1] https://better-answers.com/c/01A — https://app.example/c/01A",
-        "[2] https://better-answers.com/c/01B — https://app.example/c/01B",
-      ].join("\n"),
-    );
+  it("renders an `Answer` with its collection, question, trust and evidence", () => {
+    const verified = returned({
+      trustWords: "Verified by Priya Anand · 2 May 2026",
+      evidence: [
+        { id: "S-1", source: "SOC 2 report", at: "p.4" },
+        { source: "Hosting contract", locator: "01DOC/chars:0-44" },
+      ],
+    });
+
+    expect(linesOf(renderAnswer(answer({ related: [verified] }))).slice(4)).toEqual([
+      "",
+      "## Answer · audits",
+      "Question: How long are audit logs kept?",
+      "_Verified by Priya Anand · 2 May 2026_",
+      "",
+      "Audit logs are kept for thirteen months.",
+      "",
+      "Evidence:",
+      "- SOC 2 report, p.4",
+      "- Hosting contract (01DOC/chars:0-44)",
+      "",
+      "https://better-answers.com/c/01A — https://app.example/knowledge/search/01A",
+    ]);
   });
 
-  it("warns for the caller's role in the verdict line alone", () => {
-    expect(renderAnswer(answer({ verdict: "warn", citations: [] }))).toBe(
-      [
-        "**Answered with a warning for your role.**",
-        "_map as of now_",
-        "",
-        "The company holds ISO/IEC 27001:2022.",
-      ].join("\n"),
+  it("titles any other concept plainly, under no collection", () => {
+    const policy = returned({ kind: "Policy", title: "Retention policy", collection: null });
+
+    expect(linesOf(renderAnswer(answer({ related: [policy] }))).slice(5, 9)).toEqual([
+      "## Policy · No collection",
+      "Retention policy",
+      "_Unverified_",
+      "",
+    ]);
+  });
+
+  it("quotes every line of an unmapped passage", () => {
+    const rendered = renderAnswer(
+      answer({
+        verdict: "refuse",
+        related: [],
+        unmappedPassages: [
+          {
+            locator: "p.4",
+            source: "Policy.pdf",
+            text: "Retained for six years.\n## Answer · audits\r\nQuestion: Is it safe?",
+            sensitivity: "Internal",
+          },
+        ],
+      }),
     );
+
+    expect(linesOf(rendered).slice(4)).toEqual([
+      "",
+      "Not company knowledge · Internal",
+      "> Retained for six years.",
+      "> ## Answer · audits",
+      "> Question: Is it safe?",
+      "— Policy.pdf (p.4)",
+    ]);
   });
 
   it("renders a refusal as the one sentence plus unmapped passages", () => {
@@ -147,8 +261,9 @@ describe("the answer's rendering", () => {
       renderAnswer(
         answer({
           verdict: "refuse",
-          text: NOT_ANSWERED,
-          citations: [],
+          related: [],
+          collections: [],
+          readableCollections: [],
           unmappedPassages: [
             {
               locator: "p.4",
@@ -168,7 +283,9 @@ describe("the answer's rendering", () => {
     ).toBe(
       [
         "**Not answered from the company's knowledge.**",
-        "_map as of now_",
+        "_Not judged · map as of now_",
+        "Collections considered: none",
+        "Collections you may name: none",
         "",
         "Not company knowledge · Internal",
         "> Retained for six years.",
@@ -301,6 +418,27 @@ describe("open's and feedback's renderings", () => {
       }),
     ).toBe("> Retained.\n\n— Policy.pdf (p.4) · Internal");
     expect(renderOpen({ found: false, locator: "p.9" })).toBe("No passage at p.9.");
+  });
+
+  it("quotes every line of an opened passage", () => {
+    expect(
+      renderOpen({
+        found: true,
+        passage: {
+          locator: "p.4",
+          source: "Policy.pdf",
+          text: "Retained for six years.\n## Answer · audits",
+          sensitivity: "Internal",
+        },
+      }),
+    ).toBe(
+      [
+        "> Retained for six years.",
+        "> ## Answer · audits",
+        "",
+        "— Policy.pdf (p.4) · Internal",
+      ].join("\n"),
+    );
   });
 
   it("renders a concept's title, body, trust caption and cited evidence", () => {
@@ -448,8 +586,8 @@ describe("what the slice's four actions answer", () => {
   it("hands every caller an outcome to read, not to catch", () => {
     expectTypeOf(find).returns.resolves.toEqualTypeOf<Result<FindResult, "role-forbids" | Error>>();
     expectTypeOf(open).returns.resolves.toEqualTypeOf<Result<OpenResult, "role-forbids" | Error>>();
-    expectTypeOf(ask).returns.resolves.toEqualTypeOf<
-      Result<AnswerResult, "role-forbids" | Error>
+    expectTypeOf(ask<"credentials-revoked">).returns.resolves.toEqualTypeOf<
+      Result<AnswerResult, "role-forbids" | "credentials-revoked" | Error>
     >();
     expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<
       Result<FeedbackReceipt, "role-forbids">
@@ -464,27 +602,6 @@ describe("what the slice's four actions answer", () => {
     );
 
     expect(found).toEqual({ ok: true, value: { query: "expenses", matches: [] } });
-  });
-
-  it("refuses every question with the one sentence, the map live", async () => {
-    const reader = await arrange();
-
-    const answered = await acting(reader, (principal, tx) =>
-      ask(principal, tx, { question: "How long do we have to claim expenses?" }),
-    );
-
-    expect(answered).toEqual({
-      ok: true,
-      value: {
-        verdict: "refuse",
-        text: "Not answered from the company's knowledge.",
-        citations: [],
-        conflicts: [],
-        coverage: { asked: 1, answered: 0 },
-        unmappedPassages: [],
-        map: { state: "live" },
-      },
-    });
   });
 
   it("hands a reader a receipt echoing their feedback", async () => {
@@ -505,12 +622,16 @@ describe("what the slice's four actions answer", () => {
     const reader = await arrange();
     // @ts-expect-error — a role no resolver hands out is the value each face must still refuse.
     const stranger = (principal: UserPrincipal): UserPrincipal => ({ ...principal, role: "Owner" });
+    const aStepRan = (): never => {
+      throw new Error("a step ran for a person ask never admitted");
+    };
+    const noStep: AskSteps = { openRecord: aStepRan, read: aStepRan, completeRecord: aStepRan };
 
     const receipt = await acting(reader, (principal, tx) =>
       giveFeedback(stranger(principal), tx, { iri: "urn:x", verdict: "helpful" }),
     );
-    const answered = await acting(reader, (principal, tx) =>
-      ask(stranger(principal), tx, { question: "When is the audit?" }),
+    const answered = await acting(reader, (principal) =>
+      ask(stranger(principal), noStep, { question: "When is the audit?", collections: [] }, now),
     );
 
     expect([receipt, answered]).toEqual([
@@ -631,9 +752,49 @@ describe("the boundary find and open are parsed at", () => {
     ]);
   });
 
-  it("describes every find and open input field", () => {
+  it("describes every find, open and ask input field", () => {
     expect(described(findInput.shape)).toEqual({ query: true, limit: true, cursor: true });
     expect(described(openInput.shape)).toEqual({ iri: true, locator: true });
+    expect(described(askInput.shape)).toEqual({ question: true, collections: true });
+  });
+
+  it("holds a question to 2,000 characters, with no NUL", () => {
+    expect(parse(askInput, { question: "a".repeat(2_000) })).toEqual({
+      ok: true,
+      value: { question: "a".repeat(2_000), collections: [] },
+    });
+    expect([
+      parse(askInput, { question: "a".repeat(2_001) }),
+      parse(askInput, { question: "" }),
+      parse(askInput, { question: "audit\u0000logs" }),
+    ]).toEqual([
+      { ok: false, error: { word: "malformed", fields: { question: "too-big" } } },
+      { ok: false, error: { word: "malformed", fields: { question: "too-small" } } },
+      { ok: false, error: { word: "malformed", fields: { question: "refused" } } },
+    ]);
+  });
+
+  it("holds the collections to twenty names of 200 characters", () => {
+    const twenty = Array.from({ length: 20 }, (_unused, at) => `collection-${at}`);
+    const asking = (collections: readonly string[]) =>
+      parse(askInput, { question: "When is the audit?", collections });
+
+    expect(asking(twenty)).toEqual({
+      ok: true,
+      value: { question: "When is the audit?", collections: twenty },
+    });
+    expect(asking(["a".repeat(200)]).ok).toBe(true);
+    expect([
+      asking([...twenty, "one-more"]),
+      asking(["a".repeat(201)]),
+      asking([""]),
+      asking(["audits\u0000"]),
+    ]).toEqual([
+      { ok: false, error: { word: "malformed", fields: { collections: "too-big" } } },
+      { ok: false, error: { word: "malformed", fields: { "collections.0": "too-big" } } },
+      { ok: false, error: { word: "malformed", fields: { "collections.0": "too-small" } } },
+      { ok: false, error: { word: "malformed", fields: { "collections.0": "refused" } } },
+    ]);
   });
 
   it("describes an evidence item's at, locator and iri", () => {
@@ -675,6 +836,440 @@ describe("the boundary find and open are parsed at", () => {
     expect(messagesOf(refused)).toEqual([
       "a found result carries a concept or a passage, never both or neither",
     ]);
+  });
+});
+
+const RETENTION_QUESTION = "How long are audit logs kept?";
+
+const RETENTION_ANSWER: SeededConcept = {
+  collection: "audits",
+  kind: "Answer",
+  title: "How long are audit logs kept?",
+  body: "Audit logs are kept for thirteen months.\n",
+};
+
+const CONSOLE_EXPORTS: SeededConcept = {
+  collection: "lms",
+  kind: "Note",
+  title: "Console exports",
+  body: "Exports are made in the console.\n",
+};
+
+describe("what ask answers with no model", () => {
+  const anAsker = async (role: Role = "Viewer") => {
+    const reader = await arrange(role);
+    return {
+      workspaceId: reader.workspaceId,
+      asker: await principalFor(db(), reader.workspaceId, reader.userId),
+    };
+  };
+
+  const seededIn = (workspaceId: string, shape: SeededConcept): Promise<ConceptIri> =>
+    conceptSeeded(db(), workspaceId, shape);
+
+  const irisOf = (answer: AnswerResult): readonly ConceptIri[] =>
+    answer.related.map((concept) => concept.iri);
+
+  const pageOf = (iri: ConceptIri): string => `/knowledge/search/${iri.slice(-26)}`;
+
+  const recordOf = async (recordId: string) => {
+    const read = await db().pool.query(
+      `SELECT r.asked_by, r.transport, r.collections, r.verdict, r.judge_state, r.concepts,
+              r.unmapped_passages, r.completed_at IS NOT NULL AS completed, c.question
+         FROM question_asked r
+         JOIN question_content c ON c.record_id = r.id
+        WHERE r.id = $1`,
+      [recordId],
+    );
+    return read.rows;
+  };
+
+  it("refuses a question nothing matches, no judge having run", async () => {
+    const { asker } = await anAsker();
+
+    const answer = await asked(db(), asker, { question: "How long do we have to claim expenses?" });
+
+    expect(withoutRecord(answer)).toEqual(REFUSED);
+    expect(await recordOf(answer.recordId)).toEqual([
+      {
+        asked_by: actorIdOfPerson(asker.userId),
+        transport: "mcp",
+        collections: [],
+        verdict: "refuse",
+        judge_state: "not-judged",
+        concepts: [],
+        unmapped_passages: [],
+        completed: true,
+        question: "How long do we have to claim expenses?",
+      },
+    ]);
+  });
+
+  it("AE10: returns both matching `Answer`s as related, not judged", async () => {
+    const { workspaceId, asker } = await anAsker();
+    const users = {
+      collection: "audits",
+      kind: "Answer",
+      title: "How do buyers access audit information about their users' actions?",
+      body: "Buyers download their users' audit log from the console.\n",
+    };
+    const supplier = {
+      collection: "audits",
+      kind: "Answer",
+      title: "How do buyers access audit information about the supplier's actions?",
+      body: "The supplier sends its own audit report on request.\n",
+    };
+    const iris = [await seededIn(workspaceId, users), await seededIn(workspaceId, supplier)];
+
+    const answer = await asked(db(), asker, {
+      question: "How do buyers access audit information?",
+      collections: ["audits"],
+    });
+
+    expect([answer.verdict, answer.judgeState, answer.answers]).toEqual([
+      "related",
+      "not-judged",
+      [],
+    ]);
+    expect(
+      answer.related.toSorted((one, other) => iris.indexOf(one.iri) - iris.indexOf(other.iri)),
+    ).toEqual(
+      [users, supplier].map(({ collection, kind, title, body }, at) => ({
+        iri: iris[at],
+        url: pageOf(iris[at] ?? ABSENT),
+        kind,
+        title,
+        collection,
+        body,
+        trust: unverified,
+        trustWords: "Unverified",
+        evidence: [],
+      })),
+    );
+  });
+
+  it("AE5: answers related knowledge where no `Answer` matches", async () => {
+    const { workspaceId, asker } = await anAsker();
+    const note = await seededIn(workspaceId, CONSOLE_EXPORTS);
+    const policy = await seededIn(workspaceId, {
+      collection: "audits",
+      title: "Audit log retention",
+      body: "Audit logs are kept for thirteen months.\n",
+      linksTo: [note],
+    });
+
+    const answer = await asked(db(), asker, { question: RETENTION_QUESTION });
+
+    expect([answer.verdict, answer.judgeState, answer.answers, answer.conflicts]).toEqual([
+      "related",
+      "not-judged",
+      [],
+      [],
+    ]);
+    expect(answer.related.map((concept) => [concept.iri, concept.kind])).toEqual([
+      [policy, "Policy"],
+      [note, "Note"],
+    ]);
+    const [first] = linesOf(renderAnswer(answer));
+    expect(first).toBe(RELATED_LINE);
+    expect(first).not.toMatch(/answered/i);
+    expect(Object.keys(answer).toSorted()).toEqual([
+      "answers",
+      "collections",
+      "conflicts",
+      "judgeState",
+      "map",
+      "readableCollections",
+      "recordId",
+      "related",
+      "unmappedPassages",
+      "verdict",
+    ]);
+  });
+
+  it("reaches the concept holding a three-letter acronym", async () => {
+    const { workspaceId, asker } = await anAsker();
+    const signingIn = await seededIn(workspaceId, {
+      collection: null,
+      title: "Signing in",
+      body: "MFA is enforced for every member of staff.\n",
+    });
+
+    const answer = await asked(db(), asker, { question: "Is MFA required?" });
+
+    expect([answer.verdict, irisOf(answer)]).toEqual(["related", [signingIn]]);
+    expect(answer.related.map((concept) => concept.collection)).toEqual([null]);
+  });
+
+  it("ranks a concept sharing three words above one sharing one", async () => {
+    const { workspaceId, asker } = await anAsker();
+    const one = await seededIn(workspaceId, {
+      collection: "audits",
+      title: "Log exports",
+      body: "A log can be exported as a spreadsheet.\n",
+    });
+    const three = await seededIn(workspaceId, {
+      collection: "audits",
+      title: "Storage",
+      body: "Audit logs stay in the console for a long time.\n",
+    });
+
+    const answer = await asked(db(), asker, { question: RETENTION_QUESTION });
+
+    expect(irisOf(answer)).toEqual([three, one]);
+  });
+
+  it("keeps a named collection's concepts and every unmapped passage", async () => {
+    const { workspaceId, asker } = await anAsker();
+    const linked = await seededIn(workspaceId, CONSOLE_EXPORTS);
+    const audits = await seededIn(workspaceId, { ...RETENTION_ANSWER, linksTo: [linked] });
+    const lms = await seededIn(workspaceId, { ...RETENTION_ANSWER, collection: "lms" });
+    const contract = await documentLanded(db().pool, workspaceId, {
+      title: "Hosting contract",
+      text: "Audit logs are kept by the host for ninety days.",
+    });
+
+    const narrowed = await asked(db(), asker, {
+      question: RETENTION_QUESTION,
+      collections: ["audits"],
+    });
+    const whole = await asked(db(), asker, { question: RETENTION_QUESTION });
+
+    expect(irisOf(narrowed)).toEqual([audits]);
+    expect(narrowed.unmappedPassages).toEqual([
+      {
+        locator: contract.locator,
+        source: "Hosting contract",
+        text: "Audit logs are kept by the host for ninety days.",
+        sensitivity: "Internal",
+      },
+    ]);
+    expect(irisOf(whole).toSorted()).toEqual([audits, lms, linked].toSorted());
+    expect(whole.unmappedPassages).toEqual(narrowed.unmappedPassages);
+  });
+
+  it("names the collections it considered, a misspelt one echoed", async () => {
+    const { workspaceId, asker } = await anAsker();
+    await seededIn(workspaceId, RETENTION_ANSWER);
+    await seededIn(workspaceId, CONSOLE_EXPORTS);
+
+    const named = await asked(db(), asker, {
+      question: RETENTION_QUESTION,
+      collections: ["audits", "audts"],
+    });
+    const unnamed = await asked(db(), asker, { question: RETENTION_QUESTION });
+
+    expect([named.collections, named.readableCollections]).toEqual([
+      ["audits", "audts"],
+      ["audits", "lms"],
+    ]);
+    expect([unnamed.collections, unnamed.readableCollections]).toEqual([
+      ["audits", "lms"],
+      ["audits", "lms"],
+    ]);
+  });
+
+  it("reads an empty collections list as every collection", async () => {
+    const { workspaceId, asker } = await anAsker();
+    const audits = await seededIn(workspaceId, RETENTION_ANSWER);
+    const lms = await seededIn(workspaceId, { ...RETENTION_ANSWER, collection: "lms" });
+
+    const emptied = await asked(db(), asker, { question: RETENTION_QUESTION, collections: [] });
+    const unnamed = await asked(db(), asker, { question: RETENTION_QUESTION });
+
+    expect(irisOf(emptied).toSorted()).toEqual([audits, lms].toSorted());
+    expect(withoutRecord(emptied)).toEqual(withoutRecord(unnamed));
+  });
+
+  it("cuts at the related cap, entry points before the walk", async () => {
+    const { workspaceId, asker } = await anAsker();
+    const reached = await seededIn(workspaceId, CONSOLE_EXPORTS);
+    const three = await seededIn(workspaceId, {
+      collection: "audits",
+      title: "Storage",
+      body: "Audit logs stay in the console for a long time.\n",
+      linksTo: [reached],
+    });
+    const one = await seededIn(workspaceId, {
+      collection: "audits",
+      title: "Log exports",
+      body: "A log can be exported as a spreadsheet.\n",
+    });
+    const capped = (related: number) =>
+      asked(db(), asker, { question: RETENTION_QUESTION }, { caps: { ...ASK_CAPS, related } });
+
+    expect(irisOf(await capped(1))).toEqual([three]);
+    expect(irisOf(await capped(2))).toEqual([three, one]);
+    expect(irisOf(await capped(3))).toEqual([three, one, reached]);
+  });
+
+  it("answers from its entry points when the walk times out", async () => {
+    const { workspaceId, asker } = await anAsker();
+    const reached = await seededIn(workspaceId, CONSOLE_EXPORTS);
+    const entry = await seededIn(workspaceId, { ...RETENTION_ANSWER, linksTo: [reached] });
+    const now = new Date();
+
+    const stalled = await holdingTable(db().pool, "map_node", () =>
+      askedAsIs(db(), asker, { question: RETENTION_QUESTION }, { now }),
+    );
+    const after = await asked(db(), asker, { question: RETENTION_QUESTION });
+
+    expect([stalled.verdict, irisOf(stalled), stalled.map]).toEqual([
+      "related",
+      [entry],
+      { state: "unavailable_since", since: now.toISOString() },
+    ]);
+    expect([irisOf(after), after.map]).toEqual([[entry, reached], { state: "live" }]);
+  });
+
+  it("keeps the question and what it returned on its record", async () => {
+    const { workspaceId, asker } = await anAsker();
+    const audits = await seededIn(workspaceId, {
+      ...RETENTION_ANSWER,
+      contentHash: "c".repeat(64),
+    });
+    const contract = await documentLanded(db().pool, workspaceId, {
+      title: "Hosting contract",
+      text: "Audit logs are kept by the host for ninety days.",
+    });
+
+    const answer = await asked(db(), asker, {
+      question: RETENTION_QUESTION,
+      collections: ["audits"],
+    });
+
+    expect(await recordOf(answer.recordId)).toEqual([
+      {
+        asked_by: actorIdOfPerson(asker.userId),
+        transport: "mcp",
+        collections: ["audits"],
+        verdict: "related",
+        judge_state: "not-judged",
+        concepts: [
+          {
+            iri: audits,
+            contentHash: "c".repeat(64),
+            trust: { tier: "unverified", status: "current", verifiedAt: null, rider: null },
+          },
+        ],
+        unmapped_passages: [contract.locator],
+        completed: true,
+        question: RETENTION_QUESTION,
+      },
+    ]);
+  });
+
+  /** The steps a transport hands `ask`, and the id of each record they open. */
+  const stepsKeepingTheirRecords = (asker: UserPrincipal) => {
+    const steps = stepsFor(db().runtimePool, asker);
+    const opened: string[] = [];
+    const keeping: typeof steps = {
+      ...steps,
+      openRecord: async (opening) => {
+        const record = await steps.openRecord(opening);
+        if (record.ok) opened.push(record.value.recordId);
+        return record;
+      },
+    };
+    return { steps: keeping, opened };
+  };
+
+  const AN_OPEN_RECORD = { completed: false, verdict: null, judge_state: null, concepts: [] };
+
+  const RETENTION_ASKED = { question: RETENTION_QUESTION, collections: [] };
+
+  it("answers what a step refuses, its record left open", async () => {
+    const { asker } = await anAsker();
+    const { steps, opened } = stepsKeepingTheirRecords(asker);
+
+    const answered = await ask(
+      asker,
+      { ...steps, read: async () => err("credentials-revoked" as const) },
+      RETENTION_ASKED,
+      new Date(),
+    );
+
+    expect(answered).toEqual({ ok: false, error: "credentials-revoked" });
+    expect(await recordOf(opened[0] ?? "")).toEqual([
+      expect.objectContaining({ ...AN_OPEN_RECORD, question: RETENTION_QUESTION }),
+    ]);
+  });
+
+  it("answers a failed completion, its record left open", async () => {
+    const { workspaceId, asker } = await anAsker();
+    await seededIn(workspaceId, RETENTION_ANSWER);
+    const { steps, opened } = stepsKeepingTheirRecords(asker);
+
+    const answered = await ask(
+      asker,
+      {
+        ...steps,
+        completeRecord: (completion) => steps.completeRecord({ ...completion, recordId: ulid() }),
+      },
+      RETENTION_ASKED,
+      new Date(),
+    );
+
+    expect(answered.ok).toBe(false);
+    expect(String(answered.ok || answered.error)).toMatch(/no open record \w{26} to complete/);
+    expect(await recordOf(opened[0] ?? "")).toEqual([
+      expect.objectContaining({ ...AN_OPEN_RECORD, question: RETENTION_QUESTION }),
+    ]);
+  });
+
+  it("answers a walk's failure other than a timeout", async () => {
+    const { workspaceId, asker } = await anAsker();
+    await seededIn(workspaceId, RETENTION_ANSWER);
+    const steps = stepsFor(db().runtimePool, asker);
+    let reads = 0;
+
+    const answered = await ask(
+      asker,
+      {
+        ...steps,
+        read: (work) => {
+          reads += 1;
+          if (reads !== 2) return steps.read(work);
+          return steps.read(async (tx) => {
+            await abortTheTransaction(tx);
+            return work(tx);
+          });
+        },
+      },
+      RETENTION_ASKED,
+      new Date(),
+    );
+
+    expect(answered).toMatchObject({ ok: false, error: { code: "25P02" } });
+  });
+
+  it("plans the same answer and keeps no record", async () => {
+    const { workspaceId, asker } = await anAsker();
+    await seededIn(workspaceId, RETENTION_ANSWER);
+
+    const planned = await acting(asker, (principal, tx) =>
+      plannedOn(principal, tx, { question: RETENTION_QUESTION }),
+    );
+    const records = await db().pool.query("SELECT 1 FROM question_asked WHERE workspace_id = $1", [
+      workspaceId,
+    ]);
+    const answer = await asked(db(), asker, { question: RETENTION_QUESTION });
+
+    expect(records.rows).toEqual([]);
+    expect(planned).toEqual({ ok: true, value: withoutRecord(answer) });
+  });
+
+  it("keeps an answer whole through ask's output schema", async () => {
+    const { workspaceId, asker } = await anAsker();
+    await seededIn(workspaceId, RETENTION_ANSWER);
+    await documentLanded(db().pool, workspaceId, {
+      title: "Hosting contract",
+      text: "Audit logs are kept by the host for ninety days.",
+    });
+
+    const answer = await asked(db(), asker, { question: RETENTION_QUESTION });
+
+    expect(answerOutputWith(trust).parse(answer)).toEqual(answer);
   });
 });
 

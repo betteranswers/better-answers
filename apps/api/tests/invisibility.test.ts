@@ -115,7 +115,7 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
     expect(rpcListOf(structured(seen)["hits"]).map((match) => match["iri"])).toEqual([iri]);
   });
 
-  it("is absent from ask's answer, though cited in the Admin's", async () => {
+  it("is absent from ask's answer, though related in the Admin's", async () => {
     const { iri, viewer, admin } = await restrictedSourcedConcept();
     const question = { question: "How is the board's remuneration reviewed?" };
 
@@ -125,11 +125,7 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
     });
     const seen = await called(admin.client, admin.token, "ask", question);
 
-    expect(structured(asked)).toMatchObject({
-      verdict: "refuse",
-      citations: [],
-      unmappedPassages: [],
-    });
+    expect(structured(asked)).toMatchObject({ verdict: "refuse", related: [], collections: [] });
     expect(structured(asked)).toEqual(structured(unrelated));
     expect(rendered(asked)).toBe(rendered(unrelated));
     expect(JSON.stringify(asked)).not.toContain("remuneration is reviewed");
@@ -137,8 +133,19 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
 
     const page = `https://app.example.test/knowledge/search/${iri.slice(CONCEPT_PREFIX.length)}`;
     expect(structured(seen)).toMatchObject({
-      verdict: "refuse",
-      citations: [{ iri, url: page }],
+      verdict: "related",
+      judgeState: "not-judged",
+      related: [
+        {
+          iri,
+          url: page,
+          kind: "Note",
+          title: TITLE,
+          collection: null,
+          body: "The board's remuneration is reviewed each March.",
+          trust: { tier: "unverified", status: "current", checkedBy: null, checkedAt: null },
+        },
+      ],
     });
     expect(rendered(seen)).toContain(`${iri} — ${page}`);
   });

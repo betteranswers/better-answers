@@ -4,12 +4,26 @@ import { walkFrom, walkFromEntries, walkTo, walkToEntries } from "@better-answer
 import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
-import { open, renderOpen } from "../src/answering/index.ts";
+import {
+  ASK_CAPS,
+  open,
+  renderAnswer,
+  renderOpen,
+  type AnswerResult,
+} from "../src/answering/index.ts";
 import { conceptByIri, conceptsByIris } from "../src/concepts/index.ts";
 import { footnotesOf } from "../src/guides/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { addToGroup, deleteGroup } from "../src/members/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
+import {
+  answerWritten,
+  asked,
+  conceptSeeded,
+  REFUSED,
+  withoutRecord,
+  type WrittenAnswer,
+} from "./asking.ts";
 import {
   connectedSourceForGroups,
   conceptCiting,
@@ -440,17 +454,234 @@ describe("a document narrowed under a source its siblings stand under", () => {
   });
 });
 
+const irisReadBy = async (
+  person: UserPrincipal,
+  iris: readonly ConceptIri[],
+): Promise<readonly ConceptIri[]> => {
+  const read = await reading(person, (reader, tx) => conceptsByIris(reader, tx, iris));
+  if (!read.ok) throw read.error;
+  return read.value.map((concept) => concept.iri);
+};
+
 describe("concepts read together by iri", () => {
   it("answers the readable ones by iri, withheld ones left out", async () => {
     const { scenario, withheld, visible } = await withheldBesideVisible();
     const iris = [withheld.iri, conceptIriOf(ulid()), visible.iri];
-    const readBy = async (person: UserPrincipal): Promise<readonly ConceptIri[]> => {
-      const read = await reading(person, (reader, tx) => conceptsByIris(reader, tx, iris));
-      if (!read.ok) throw read.error;
-      return read.value.map((concept) => concept.iri);
-    };
 
-    expect(await readBy(scenario.viewer)).toEqual([visible.iri]);
-    expect(await readBy(scenario.admin)).toEqual([visible.iri, withheld.iri].toSorted());
+    expect(await irisReadBy(scenario.viewer, iris)).toEqual([visible.iri]);
+    expect(await irisReadBy(scenario.admin, iris)).toEqual([visible.iri, withheld.iri].toSorted());
+  });
+
+  it("answers none for no iri, and a repeated iri once", async () => {
+    const { scenario, visible } = await withheldBesideVisible();
+
+    expect(await irisReadBy(scenario.viewer, [])).toEqual([]);
+    expect(await irisReadBy(scenario.viewer, [visible.iri, visible.iri])).toEqual([visible.iri]);
+  });
+});
+
+const QUESTION = { question: "How long are audit logs kept?" };
+
+const RETENTION: WrittenAnswer = {
+  collection: "audits",
+  slug: "log-retention",
+  title: "How long are audit logs kept?",
+  body: "Audit logs are kept for thirteen months. The board's period is [separate](/knowledge/audits/board-log-retention.md).",
+};
+
+const BOARD_RETENTION: WrittenAnswer = {
+  collection: "audits",
+  slug: "board-log-retention",
+  title: "How long are audit logs kept for the board?",
+  body: "The board's audit logs are kept for seven years.",
+  sensitivity: "Restricted",
+};
+
+/** The Viewer's answer before and after a withheld `Answer` lands, and the Admin's after. */
+const aroundAWithheldAnswer = async (scenario: Scenario) => {
+  const before = await asked(db(), scenario.viewer, QUESTION);
+  const withheld = await answerWritten(scenario, BOARD_RETENTION);
+  const after = await asked(db(), scenario.viewer, QUESTION);
+  const admins = await asked(db(), scenario.admin, QUESTION);
+  return { before, withheld, after, admins };
+};
+
+const irisOf = (answer: AnswerResult): readonly ConceptIri[] =>
+  answer.related.map((concept) => concept.iri);
+
+describe("an `Answer` withheld from the asker", () => {
+  it("AE7: refuses alike with no match and only withheld matches", async () => {
+    const scenario = await arrange();
+
+    const { before, withheld, after, admins } = await aroundAWithheldAnswer(scenario);
+
+    expect(withoutRecord(before)).toEqual(REFUSED);
+    expect(withoutRecord(after)).toEqual(REFUSED);
+    expect(renderAnswer(after)).toBe(renderAnswer(before));
+    expect(after.recordId).not.toBe(before.recordId);
+    expect(irisOf(admins)).toEqual([withheld.iri]);
+  });
+
+  it("AE4: answers as if a withheld `Answer` were never written", async () => {
+    const scenario = await arrange();
+    const visible = await answerWritten(scenario, RETENTION);
+
+    const { before, withheld, after, admins } = await aroundAWithheldAnswer(scenario);
+
+    expect(irisOf(before)).toEqual([visible.iri]);
+    expect(withoutRecord(after)).toEqual(withoutRecord(before));
+    expect(renderAnswer(after)).toBe(renderAnswer(before));
+    expect(irisOf(admins).toSorted()).toEqual([visible.iri, withheld.iri].toSorted());
+  });
+
+  it("AE4: answers a collection of withheld concepts as one unmade", async () => {
+    const scenario = await arrange();
+    await answerWritten(scenario, RETENTION);
+    const withheld = await answerWritten(scenario, { ...BOARD_RETENTION, collection: "board" });
+    const naming = (asker: UserPrincipal, collection: string) =>
+      asked(db(), asker, { ...QUESTION, collections: [collection] });
+
+    const unreadable = await naming(scenario.viewer, "board");
+    const unmade = await naming(scenario.viewer, "bored");
+    const admins = await naming(scenario.admin, "board");
+
+    expect(withoutRecord(unreadable)).toEqual({
+      ...REFUSED,
+      collections: ["board"],
+      readableCollections: ["audits"],
+    });
+    expect(withoutRecord(unmade)).toEqual({ ...withoutRecord(unreadable), collections: ["bored"] });
+    expect(irisOf(admins)).toEqual([withheld.iri]);
+    expect(admins.readableCollections).toEqual(["audits", "board"]);
+  });
+
+  it("spends no entry slot on a withheld `Answer`", async () => {
+    const scenario = await arrange();
+    const withheld = await answerWritten(scenario, BOARD_RETENTION);
+    const three = await answerWritten(scenario, {
+      collection: "audits",
+      slug: "log-storage",
+      title: "Where do audit logs stay?",
+      body: "Audit logs stay in the console for a long time.",
+    });
+    const two = await answerWritten(scenario, {
+      collection: "audits",
+      slug: "long-audits",
+      title: "Do long audits happen?",
+      body: "A full audit takes a week.",
+    });
+    const one = await answerWritten(scenario, {
+      collection: "audits",
+      slug: "log-exports",
+      title: "Can a log be exported?",
+      body: "A log can be exported as a spreadsheet.",
+    });
+    const entriesFor = async (asker: UserPrincipal, entryPoints: number) =>
+      irisOf(await asked(db(), asker, QUESTION, { caps: { ...ASK_CAPS, entryPoints } }));
+
+    expect(await entriesFor(scenario.viewer, 2)).toEqual([three.iri, two.iri]);
+    expect(await entriesFor(scenario.admin, 2)).toEqual([withheld.iri, three.iri]);
+    expect(await entriesFor(scenario.viewer, 1)).toEqual([three.iri]);
+    expect(await entriesFor(scenario.viewer, 3)).toEqual([three.iri, two.iri, one.iri]);
+  });
+
+  it("spends no walked slot on a withheld concept", async () => {
+    const scenario = await arrange();
+    const minted = [conceptIriOf(ulid()), conceptIriOf(ulid())] as const;
+    const [first, second] = minted[0] < minted[1] ? minted : ([minted[1], minted[0]] as const);
+    const reached = await conceptSeeded(db(), scenario.workspaceId, {
+      collection: "audits",
+      title: "Console exports",
+      body: "Exports are made in the console.",
+      iri: second,
+    });
+    const entry = await conceptSeeded(db(), scenario.workspaceId, {
+      collection: "audits",
+      kind: "Answer",
+      title: QUESTION.question,
+      body: "Audit logs are kept for thirteen months.",
+      linksTo: [first, second],
+    });
+    const ofTwo = { caps: { ...ASK_CAPS, related: 2 } };
+
+    const before = await asked(db(), scenario.viewer, QUESTION, ofTwo);
+    // The lesser IRI: were the withheld concept walked to, it would be the first one reached.
+    const withheld = await conceptSeeded(db(), scenario.workspaceId, {
+      collection: "audits",
+      title: "Board papers",
+      body: "Papers go to the board each quarter.",
+      sensitivity: "Restricted",
+      iri: first,
+    });
+    const after = await asked(db(), scenario.viewer, QUESTION, ofTwo);
+    const admins = await asked(db(), scenario.admin, QUESTION, ofTwo);
+
+    expect(irisOf(before)).toEqual([entry, reached]);
+    expect(withoutRecord(after)).toEqual(withoutRecord(before));
+    expect(irisOf(admins)).toEqual([entry, withheld]);
+  });
+
+  it("keeps a withheld document's passage from the asker", async () => {
+    const scenario = await arrange();
+    const minutes = await documentLanded(db().pool, scenario.workspaceId, {
+      title: "Board minutes 2026",
+      text: "Audit logs are kept for seven years.",
+      sensitivity: "Restricted",
+    });
+
+    const viewers = await asked(db(), scenario.viewer, QUESTION);
+    const admins = await asked(db(), scenario.admin, QUESTION);
+
+    expect(withoutRecord(viewers)).toEqual(REFUSED);
+    expect(renderAnswer(viewers)).not.toContain("seven years");
+    expect(admins.unmappedPassages).toEqual([
+      {
+        locator: minutes.locator,
+        source: "Board minutes 2026",
+        text: "Audit logs are kept for seven years.",
+        sensitivity: "Restricted",
+      },
+    ]);
+    expect(renderAnswer(admins)).toContain("> Audit logs are kept for seven years.");
+  });
+
+  it("names a source the asker cannot open by its label", async () => {
+    const scenario = await arrange();
+    const minutes = await documentLanded(db().pool, scenario.workspaceId, {
+      title: "Board minutes 2026",
+      text: "The board set the retention period in March.",
+      sensitivity: "Restricted",
+    });
+    await conceptCiting(scenario, scenario.editor, [], {
+      title: RETENTION.title,
+      sensitivity: "Internal",
+      body: "Audit logs are kept for thirteen months.[^BM-1]",
+      frontmatter: {
+        title: RETENTION.title,
+        type: "Note",
+        sources: [
+          {
+            id: "BM-1",
+            title: "The board's minutes",
+            resource: "minutes",
+            locator: minutes.locator,
+          },
+        ],
+      },
+    });
+
+    const viewers = await asked(db(), scenario.viewer, QUESTION);
+    const admins = await asked(db(), scenario.admin, QUESTION);
+    const seen = `${JSON.stringify(viewers)}\n${renderAnswer(viewers)}`;
+
+    expect(viewers.related.map((concept) => concept.evidence)).toEqual([
+      [{ id: "BM-1", source: "The board's minutes" }],
+    ]);
+    expect(seen).not.toContain(minutes.locator);
+    expect(seen).not.toContain(minutes.documentId);
+    expect(seen).not.toContain("Board minutes 2026");
+    expect(admins.related.map((concept) => concept.evidence)).toEqual([
+      [{ id: "BM-1", source: "The board's minutes", locator: minutes.locator }],
+    ]);
   });
 });
