@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import type { ConceptIri, MatchStrength } from "@better-answers/schema";
+import type {
+  ConceptIri,
+  FEEDBACK_REASONS,
+  FEEDBACK_VERDICTS,
+  MatchStrength,
+} from "@better-answers/schema";
 
 import type { ConceptRead, Frontmatter } from "../concepts/index.ts";
 import {
@@ -39,6 +44,7 @@ export {
   type OpenInput,
 } from "./boundary.ts";
 export { findCursor, type FindPosition } from "./cursor.ts";
+export { completeRecord, openRecord } from "./record.ts";
 
 export {
   TRUST_RIDERS,
@@ -170,15 +176,9 @@ export type AnswerResult = {
 
 export const NOT_ANSWERED = "Not answered from the company's knowledge.";
 
-export const FEEDBACK_REASONS = [
-  "wrong",
-  "out-of-date",
-  "incomplete",
-  "should-not-have-shown",
-] as const;
+export { FEEDBACK_REASONS, FEEDBACK_VERDICTS } from "@better-answers/schema";
 export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
 
-export const FEEDBACK_VERDICTS = ["helpful", "flag"] as const;
 type FeedbackVerdict = (typeof FEEDBACK_VERDICTS)[number];
 
 export type FeedbackInput =

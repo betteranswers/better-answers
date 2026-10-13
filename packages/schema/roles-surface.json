@@ -185,6 +185,16 @@
     {"role":"app_rt","object":"public.passkey_last_use","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
     {"role":"app_rt","object":"public.passkey_last_use","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"app_rt","object":"public.passkey_last_use","kind":"table","is_partition":false,"privilege":"UPDATE","grantable":false},
+    {"role":"app_rt","object":"public.question_asked","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
+    {"role":"app_rt","object":"public.question_asked","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
+    {"role":"app_rt","object":"public.question_asked","kind":"table","is_partition":false,"privilege":"UPDATE","grantable":false},
+    {"role":"app_rt","object":"public.question_content","kind":"partitioned table","is_partition":false,"privilege":"DELETE","grantable":false},
+    {"role":"app_rt","object":"public.question_content","kind":"partitioned table","is_partition":false,"privilege":"INSERT","grantable":false},
+    {"role":"app_rt","object":"public.question_content","kind":"partitioned table","is_partition":false,"privilege":"SELECT","grantable":false},
+    {"role":"app_rt","object":"public.question_content","kind":"partitioned table","is_partition":false,"privilege":"UPDATE","grantable":false},
+    {"role":"app_rt","object":"public.question_feedback","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
+    {"role":"app_rt","object":"public.question_feedback","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
+    {"role":"app_rt","object":"public.question_feedback","kind":"table","is_partition":false,"privilege":"UPDATE","grantable":false},
     {"role":"app_rt","object":"public.rate_limit","kind":"table","is_partition":false,"privilege":"DELETE","grantable":false},
     {"role":"app_rt","object":"public.rate_limit","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
     {"role":"app_rt","object":"public.rate_limit","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
@@ -314,6 +324,7 @@
   "functions": [
     {"role":"app_rt","object":"public.claim_job","args":"p_worker_id text, p_lease interval, p_kinds text[]","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.concept_write_request_for","args":"p_suggestion_id text","security_definer":true,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
+    {"role":"app_rt","object":"public.create_question_content_partition","args":"p_month date","security_definer":true,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.create_workspace_partition","args":"p_workspace_id text","security_definer":true,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.current_workspace_id","args":"","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.fail_job","args":"p_id text, p_worker_id text, p_outcome jsonb","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
@@ -333,9 +344,10 @@
   ],
   "ownership": [
     {"owner":"<migrator>","kind":"<partition-of index.passage>","relations":1},
-    {"owner":"<migrator>","kind":"partitioned table","relations":1},
+    {"owner":"<migrator>","kind":"<partition-of public.question_content>","relations":1},
+    {"owner":"<migrator>","kind":"partitioned table","relations":2},
     {"owner":"<migrator>","kind":"sequence","relations":1},
-    {"owner":"<migrator>","kind":"table","relations":57},
+    {"owner":"<migrator>","kind":"table","relations":59},
     {"owner":"<migrator>","kind":"view","relations":1}
   ]
 }

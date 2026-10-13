@@ -32,6 +32,7 @@ import {
   verificationCodeFor,
 } from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
+import { recordAskedBy } from "./question-rows.ts";
 import { addressOf, readingAs, seedingWith } from "./suite-postgres.ts";
 import {
   memberOf,
@@ -105,6 +106,16 @@ const SECOND_FACTOR_FAMILIES: ReadonlySet<ErasureFamily> = new Set([
   "identity-last-active",
 ]);
 
+const QUESTIONS: ErasureFamily = "question-asked";
+
+const NO_QUESTION_ASKED = {
+  family: QUESTIONS,
+  categories: ["actor-id", "typed-text"],
+  locations: [],
+};
+
+const questionsNamedIn = (map: ErasureMap) => map.find((entry) => entry.family === QUESTIONS);
+
 const workspaceHoldingAMember = async () => {
   const scenario = await arrange();
   const email = addressOf("priya");
@@ -157,6 +168,7 @@ describe("the erasure map's union", () => {
       "identity-confirm-failures",
       "identity-last-active",
       "source-document",
+      "question-asked",
     ]);
   });
 
@@ -181,10 +193,11 @@ describe("the erasure map's union", () => {
       "identity-recovery-code": findsNothing,
       "identity-confirm-failures": findsNothing,
       "identity-last-active": findsNothing,
+      "question-asked": findsNothing,
     };
 
-    expect(Object.keys(withoutADocumentFinder)).toHaveLength(13);
-    expect(ERASURE_FAMILIES).toHaveLength(14);
+    expect(Object.keys(withoutADocumentFinder)).toHaveLength(14);
+    expect(ERASURE_FAMILIES).toHaveLength(15);
   });
 });
 
@@ -229,7 +242,53 @@ describe("the erasure map for a member", () => {
       { family: "identity-confirm-failures", categories: ["sign-in"], locations: [] },
       { family: "identity-last-active", categories: ["sign-in"], locations: [] },
       { family: "source-document", categories: ["document-text"], locations: [] },
+      NO_QUESTION_ASKED,
     ]);
+  });
+
+  it("names each question they asked here, and no other", async () => {
+    const held = await workspaceHoldingAMember();
+    const { workspaceId, viewer } = held.scenario;
+    const elsewhere = await arrange();
+    const theirs = [
+      await recordAskedBy(db().pool, workspaceId, held.person.id),
+      await recordAskedBy(db().pool, workspaceId, held.person.id),
+    ];
+    await recordAskedBy(db().pool, workspaceId, viewer.userId);
+    await recordAskedBy(db().pool, elsewhere.workspaceId, held.person.id);
+
+    const map = await mapOf(held.scenario, held.request);
+
+    expect(questionsNamedIn(map)).toEqual({
+      ...NO_QUESTION_ASKED,
+      locations: theirs.map((record) => record.recordId).toSorted(byCodeUnit),
+    });
+  });
+
+  it("finds their questions from an address alone", async () => {
+    const held = await workspaceHoldingAMember();
+    const theirs = await recordAskedBy(db().pool, held.scenario.workspaceId, held.person.id);
+    const byAddress = await requestFor(held.scenario, {
+      personId: null,
+      identifiers: identifiersOf(held.email),
+    });
+
+    const map = await mapOf(held.scenario, byAddress);
+
+    expect(questionsNamedIn(map)?.locations).toEqual([theirs.recordId]);
+  });
+
+  it("finds a former member's questions by their person id", async () => {
+    const held = await workspaceHoldingAMember();
+    const theirs = await recordAskedBy(db().pool, held.scenario.workspaceId, held.person.id);
+    await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+      held.scenario.workspaceId,
+      held.person.id,
+    ]);
+
+    const map = await mapOf(held.scenario, held.request);
+
+    expect(questionsNamedIn(map)?.locations).toEqual([theirs.recordId]);
   });
 
   it("names their second factor and their last activity here", async () => {
@@ -303,6 +362,7 @@ describe("the erasure map for a subject with no user row", () => {
       ["identity-confirm-failures", []],
       ["identity-last-active", []],
       ["source-document", []],
+      ["question-asked", []],
     ]);
   });
 });
@@ -365,6 +425,7 @@ describe("the erasure map in one workspace's scope", () => {
       ["identity-confirm-failures", []],
       ["identity-last-active", [here.workspaceId]],
       ["source-document", []],
+      ["question-asked", []],
     ]);
     const named = map.flatMap((entry) => entry.locations);
     for (const theirsOwn of [
@@ -654,7 +715,7 @@ describe("the access answer", () => {
     });
     const map = await mapOf(scenario, request);
 
-    expect(map).toHaveLength(14);
+    expect(map).toHaveLength(15);
     expect(accessAnswerOf(map)).toEqual({ categories: [], locations: [] });
   });
 });

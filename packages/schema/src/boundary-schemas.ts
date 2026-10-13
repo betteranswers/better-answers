@@ -85,6 +85,17 @@ import {
   SOURCE_ENTITY_LABEL_PREFIX,
 } from "./map-tables.ts";
 import { contractStamp, sweepPass, UPLOAD_SWEEP_MODES } from "./platform-tables.ts";
+import {
+  CANDIDATE_VERDICTS,
+  FEEDBACK_REASONS,
+  FEEDBACK_VERDICTS,
+  JUDGE_STATES,
+  QUESTION_TRANSPORTS,
+  QUESTION_VERDICTS,
+  questionAsked,
+  questionContent,
+  questionFeedback,
+} from "./question-tables.ts";
 import { AUDIENCES, SENSITIVITIES } from "./readable-columns.ts";
 import { ROLES } from "./roles.ts";
 import { modelChoice, workspaceConfig } from "./schema.ts";
@@ -696,6 +707,70 @@ const writeUpIncludeSelect = createSelectSchema(writeUpInclude, writeUpIncludeRe
 const writeUpIncludeInsert = createInsertSchema(writeUpInclude, writeUpIncludeRefinements);
 const writeUpIncludeUpdate = createUpdateSchema(writeUpInclude, writeUpIncludeRefinements);
 
+const recordConcept = z.strictObject({
+  iri: z.string().regex(IRI).brand<"ConceptIri">(),
+  contentHash: z.string().regex(CONTENT_HASH),
+  /** Never who verified it: that is a person, and no record holds one. */
+  trust: z.strictObject({
+    tier: z.string().trim().min(1),
+    status: z.string().trim().min(1),
+    verifiedAt: z.union([z.string().trim().min(1), z.null()]),
+    rider: z.union([z.string().trim().min(1), z.null()]),
+  }),
+  judged: z.enum(CANDIDATE_VERDICTS).exactOptional(),
+});
+
+const questionAskedRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  askedBy: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
+  transport: (schema: z.ZodString) => schema.pipe(z.enum(QUESTION_TRANSPORTS)),
+  collections: (schema: z.ZodArray<z.ZodString>) => z.array(schema.element.trim().min(1)),
+  predicateRole: (schema: z.ZodString) => schema.pipe(z.enum(ROLES)),
+  predicateGroups: (schema: z.ZodArray<z.ZodString>) => z.array(groupId(schema.element)),
+  verdict: (schema: z.ZodString) => schema.pipe(z.enum(QUESTION_VERDICTS)),
+  judgeState: (schema: z.ZodString) => schema.pipe(z.enum(JUDGE_STATES)),
+  // Null parses because the column's type takes a JSON null; the table's CHECK refuses one.
+  concepts: (schema: z.ZodType) => schema.pipe(z.union([z.array(recordConcept), z.null()])),
+  unmappedPassages: (schema: z.ZodArray<z.ZodString>) => z.array(schema.element.trim().min(1)),
+};
+
+const questionAskedSelect = createSelectSchema(questionAsked, questionAskedRefinements);
+const questionAskedInsert = createInsertSchema(questionAsked, questionAskedRefinements);
+const questionAskedUpdate = createUpdateSchema(questionAsked, questionAskedRefinements);
+
+const draftedSentence = z.strictObject({
+  sentence: z.string().trim().min(1),
+  concepts: z.array(z.string().regex(IRI).brand<"ConceptIri">()).min(1),
+});
+
+const questionContentRefinements = {
+  workspaceId,
+  recordId: (schema: z.ZodString) => schema.regex(ULID),
+  question: (schema: z.ZodString) => schema.min(1),
+  drafted: (schema: z.ZodType) => schema.pipe(z.union([z.array(draftedSentence), z.null()])),
+};
+
+const questionContentSelect = createSelectSchema(questionContent, questionContentRefinements);
+const questionContentInsert = createInsertSchema(questionContent, questionContentRefinements);
+const questionContentUpdate = createUpdateSchema(questionContent, questionContentRefinements);
+
+const questionFeedbackRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  recordId: (schema: z.ZodString) => schema.regex(ULID),
+  givenBy: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
+  verdict: (schema: z.ZodString) => schema.pipe(z.enum(FEEDBACK_VERDICTS)),
+  reason: (schema: z.ZodString) => schema.pipe(z.enum(FEEDBACK_REASONS)),
+  note: (schema: z.ZodString) => schema.trim().min(1),
+  disputedSentence: (schema: z.ZodString) => schema.trim().min(1),
+  disputedConcept: conceptIri,
+};
+
+const questionFeedbackSelect = createSelectSchema(questionFeedback, questionFeedbackRefinements);
+const questionFeedbackInsert = createInsertSchema(questionFeedback, questionFeedbackRefinements);
+const questionFeedbackUpdate = createUpdateSchema(questionFeedback, questionFeedbackRefinements);
+
 const mapLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
   schema.refine(
     (label) =>
@@ -1064,5 +1139,23 @@ export const boundarySchemas = {
     select: writeUpIncludeSelect,
     insert: writeUpIncludeInsert,
     update: writeUpIncludeUpdate,
+  },
+  questionAsked: {
+    table: questionAsked,
+    select: questionAskedSelect,
+    insert: questionAskedInsert,
+    update: questionAskedUpdate,
+  },
+  questionContent: {
+    table: questionContent,
+    select: questionContentSelect,
+    insert: questionContentInsert,
+    update: questionContentUpdate,
+  },
+  questionFeedback: {
+    table: questionFeedback,
+    select: questionFeedbackSelect,
+    insert: questionFeedbackInsert,
+    update: questionFeedbackUpdate,
   },
 } as const;

@@ -7,6 +7,7 @@ import type { Tx } from "../store/postgres/index.ts";
 import { SESSION_VERIFICATION_PREFIXES, VERIFICATION_PREFIXES } from "../workspaces/index.ts";
 import { documentsNaming } from "./documents.ts";
 import { soughtIdentifiersOf, type SoughtIdentifier } from "./identifiers.ts";
+import { askersOf } from "./questions.ts";
 import type { SubjectIdentifiers, SubjectRequest } from "./requests.ts";
 
 export const ERASURE_FAMILIES = [
@@ -24,6 +25,7 @@ export const ERASURE_FAMILIES = [
   "identity-confirm-failures",
   "identity-last-active",
   "source-document",
+  "question-asked",
 ] as const;
 
 export type ErasureFamily = (typeof ERASURE_FAMILIES)[number];
@@ -37,6 +39,7 @@ export const PERSONAL_DATA_CATEGORIES = [
   "device",
   "linked-account",
   "document-text",
+  "typed-text",
 ] as const;
 
 type PersonalDataCategory = (typeof PERSONAL_DATA_CATEGORIES)[number];
@@ -249,6 +252,24 @@ const ERASURE_FAMILY_DESCRIPTORS = {
   "source-document": {
     categories: ["document-text"],
     find: (platform, subject, tx) => documentsNaming(platform, tx, subject),
+  },
+
+  /**
+   * By the request's person and by the member an address finds, so a former member's records
+   * are named as a present one's are.
+   */
+  "question-asked": {
+    categories: ["actor-id", "typed-text"],
+    find: async (platform, subject, tx) => {
+      const askers = askersOf([subject.actor, subject.memberId]);
+      return askers.length === 0
+        ? []
+        : located(
+            tx,
+            "SELECT id AS location FROM question_asked WHERE workspace_id = $1 AND asked_by = ANY($2)",
+            [subject.workspaceId, askers],
+          );
+    },
   },
 } satisfies Record<ErasureFamily, ErasureFamilyDescriptor>;
 

@@ -55,6 +55,12 @@ const STRANGER_REQUEST_ID = "01J6YYYYYYYYYYYYYYYYYYYYY2";
 
 const MEMBER_ERASURE_ID = "01J6YYYYYYYYYYYYYYYYYYYYY3";
 
+const QUESTION_RECORD_ID = "01J6QQQQQQQQQQQQQQQQQQQQQQ";
+const DRAFTED_RECORD_ID = "01J6QQQQQQQQQQQQQQQQQQQQQ2";
+
+/** Inside the month the migration made a content partition for, which is the month it ran in. */
+const ASKED_THIS_MONTH = new Date();
+
 const DUE = new Date("2026-10-01T00:00:00Z");
 const EXTENDED = new Date("2026-12-01T00:00:00Z");
 
@@ -514,6 +520,80 @@ const acceptedRows = {
   writeUpInclude: [
     { workspaceId: WS_ID, writeUpId: WRITE_UP_ID, id: "i1", ordinal: 0, iri: CONCEPT_IRI },
   ],
+  questionAsked: [
+    {
+      workspaceId: WS_ID,
+      id: QUESTION_RECORD_ID,
+      askedAt: ASKED_THIS_MONTH,
+      askedBy: `human:${USER_ID}`,
+      transport: "mcp",
+      predicateRole: "Viewer",
+    },
+    {
+      workspaceId: WS_ID,
+      id: DRAFTED_RECORD_ID,
+      askedAt: ASKED_THIS_MONTH,
+      askedBy: `human:${USER_ID}`,
+      transport: "trpc",
+      collections: ["audits"],
+      predicateRole: "Editor",
+      predicateGroups: [GROUP_ID],
+      completedAt: ASKED_THIS_MONTH,
+      verdict: "related",
+      judgeState: "judged",
+      concepts: [
+        {
+          iri: CONCEPT_IRI,
+          contentHash: CONTENT_SHA256,
+          trust: {
+            tier: "human-reviewed",
+            status: "current",
+            verifiedAt: "2026-05-02T09:00:00.000Z",
+            rider: null,
+          },
+          judged: "no",
+        },
+      ],
+      unmappedPassages: [`${DOCUMENT_ID}/chars:0-120`],
+    },
+  ],
+  questionContent: [
+    {
+      workspaceId: WS_ID,
+      recordId: QUESTION_RECORD_ID,
+      askedAt: ASKED_THIS_MONTH,
+      question: "How long are audit logs kept?",
+    },
+    {
+      workspaceId: WS_ID,
+      recordId: DRAFTED_RECORD_ID,
+      askedAt: ASKED_THIS_MONTH,
+      question: "How long are audit logs kept?",
+      drafted: [{ sentence: "Audit logs are kept for a year.", concepts: [CONCEPT_IRI] }],
+    },
+  ],
+  questionFeedback: [
+    {
+      workspaceId: WS_ID,
+      id: "01J6QQQQQQQQQQQQQQQQQQQQQ3",
+      recordId: QUESTION_RECORD_ID,
+      givenAt: NOW,
+      givenBy: `human:${USER_ID}`,
+      verdict: "helpful",
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6QQQQQQQQQQQQQQQQQQQQQ4",
+      recordId: DRAFTED_RECORD_ID,
+      givenAt: NOW,
+      givenBy: `human:${USER_ID}`,
+      verdict: "flag",
+      reason: "wrong",
+      note: "The period changed in May.",
+      disputedSentence: "Audit logs are kept for a year.",
+      disputedConcept: CONCEPT_IRI,
+    },
+  ],
   conceptIdentity: [{ workspaceId: WS_ID, iri: CONCEPT_IRI, mergeKey: "policy:expenses" }],
   conceptIndex: [
     {
@@ -858,6 +938,9 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "conceptSensitivityOverride",
         "writeUp",
         "writeUpInclude",
+        "questionAsked",
+        "questionContent",
+        "questionFeedback",
         "passage",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
@@ -1099,6 +1182,47 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
         ...acceptedRows.conceptWriteRequest[0],
         frontmatter: { title: "x".repeat(CONCEPT_FRONTMATTER_MAX) },
       },
+    ],
+    questionAsked: [
+      { ...acceptedRows.questionAsked[0], askedBy: USER_ID },
+      { ...acceptedRows.questionAsked[0], transport: "email" },
+      { ...acceptedRows.questionAsked[0], predicateRole: "Owner" },
+      { ...acceptedRows.questionAsked[1], predicateGroups: ["group-1"] },
+      { ...acceptedRows.questionAsked[0], collections: ["  "] },
+      { ...acceptedRows.questionAsked[1], verdict: "evidence" },
+      { ...acceptedRows.questionAsked[1], judgeState: "failed" },
+      { ...acceptedRows.questionAsked[1], unmappedPassages: [""] },
+      {
+        ...acceptedRows.questionAsked[1],
+        concepts: [{ ...acceptedRows.questionAsked[1].concepts[0], body: "The concept's text." }],
+      },
+      {
+        ...acceptedRows.questionAsked[1],
+        concepts: [
+          {
+            ...acceptedRows.questionAsked[1].concepts[0],
+            trust: {
+              ...acceptedRows.questionAsked[1].concepts[0].trust,
+              verifiedBy: "Priya",
+            },
+          },
+        ],
+      },
+    ],
+    questionContent: [
+      { ...acceptedRows.questionContent[0], question: "" },
+      { ...acceptedRows.questionContent[0], recordId: "record-1" },
+      {
+        ...acceptedRows.questionContent[1],
+        drafted: [{ sentence: "Audit logs are kept for a year.", concepts: [] }],
+      },
+    ],
+    questionFeedback: [
+      { ...acceptedRows.questionFeedback[0], verdict: "unhelpful" },
+      { ...acceptedRows.questionFeedback[0], givenBy: "priya@example.invalid" },
+      { ...acceptedRows.questionFeedback[1], reason: "rude" },
+      { ...acceptedRows.questionFeedback[1], note: "   " },
+      { ...acceptedRows.questionFeedback[1], disputedConcept: "expenses" },
     ],
   } as const;
 
@@ -1926,6 +2050,52 @@ describe("5 — the inferred type is pinned", () => {
       id: string;
       ordinal: number;
       iri: ConceptIri;
+    };
+    questionAsked: {
+      workspaceId: WorkspaceId;
+      id: string;
+      askedAt: Date;
+      askedBy: string;
+      transport: "mcp" | "trpc";
+      collections: string[];
+      predicateRole: "Admin" | "Editor" | "Viewer";
+      predicateGroups: GroupId[];
+      completedAt: Date | null;
+      verdict: "ok" | "warn" | "refuse" | "related" | null;
+      judgeState: "not-judged" | "judged" | "judging-failed" | null;
+      concepts:
+        | {
+            iri: ConceptIri;
+            contentHash: string;
+            trust: {
+              tier: string;
+              status: string;
+              verifiedAt: string | null;
+              rider: string | null;
+            };
+            judged?: "yes" | "no";
+          }[]
+        | null;
+      unmappedPassages: string[];
+    };
+    questionContent: {
+      workspaceId: WorkspaceId;
+      recordId: string;
+      askedAt: Date;
+      question: string;
+      drafted: { sentence: string; concepts: ConceptIri[] }[] | null;
+    };
+    questionFeedback: {
+      workspaceId: WorkspaceId;
+      id: string;
+      recordId: string;
+      givenAt: Date;
+      givenBy: string;
+      verdict: "helpful" | "flag";
+      reason: "wrong" | "out-of-date" | "incomplete" | "should-not-have-shown" | null;
+      note: string | null;
+      disputedSentence: string | null;
+      disputedConcept: ConceptIri | null;
     };
   };
 

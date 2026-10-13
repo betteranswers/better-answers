@@ -88,6 +88,10 @@ export const TABLE_OWNERS = {
 
   "public.write_up": "guides",
   "public.write_up_include": "guides",
+
+  "public.question_asked": "answering",
+  "public.question_content": "answering",
+  "public.question_feedback": "answering",
 } satisfies Record<string, string>;
 
 export type OwnedTable = keyof typeof TABLE_OWNERS;
@@ -284,6 +288,27 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read and write",
     reason:
       "When the person was last active here is this workspace's record of them, so every erasure from it deletes only that row under the workspace's scope. The erasure map reads it first, so an access answer names it.",
+  },
+  {
+    table: "public.question_asked",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "A record names who asked, so every erasure from the workspace rewrites that id to the erasure pseudonym and keeps the row, which is kept for good. The erasure map reads the records first, so an access answer names each one.",
+  },
+  {
+    table: "public.question_content",
+    by: "erasure",
+    access: "write",
+    reason:
+      "The question is the person's own words, so the erasure deletes the content rows of the records it rewrites, ahead of the month's partition being dropped.",
+  },
+  {
+    table: "public.question_feedback",
+    by: "erasure",
+    access: "write",
+    reason:
+      "Feedback names who gave it and may carry their note, so the erasure rewrites the id as it does on the record and clears the note; the reason and the disputed sentence stay.",
   },
   {
     table: "index.passage",

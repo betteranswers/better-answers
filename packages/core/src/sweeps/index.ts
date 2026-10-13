@@ -181,6 +181,31 @@ export const withSweepLock = <T>(
   work: () => Promise<T>,
 ): Promise<T> => withSessionLock(platform, door, SWEEP_LOCK, () => work());
 
+/** The day an ISO instant opens with, which Postgres reads as a date. */
+const ISO_DAY = "yyyy-mm-dd";
+
+const firstOfTheMonth = (now: Date, monthsOn: number): string =>
+  new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthsOn, 1))
+    .toISOString()
+    .slice(0, ISO_DAY.length);
+
+/**
+ * Makes the partitions a question's content is stored in, since a request cannot make its own.
+ * The clock's own month is asked for beside the next, so a database restored from an older dump
+ * has it by the first pass.
+ */
+export const makeQuestionMonths = (
+  door: PostgresDoor,
+  input: { readonly now: Date },
+): Promise<Result<void, Error>> =>
+  attempt(async () => {
+    for (const monthsOn of [0, 1]) {
+      await door.pool.query("SELECT create_question_content_partition($1)", [
+        firstOfTheMonth(input.now, monthsOn),
+      ]);
+    }
+  });
+
 /** Past any wait to type a code from an email, so one that expired just before a pass reads as spent. */
 const VERIFICATION_KEPT_PAST_EXPIRY_MS = 24 * 60 * 60 * 1000;
 

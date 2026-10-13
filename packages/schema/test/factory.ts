@@ -152,6 +152,24 @@ export type TestData = {
   writeUpInclude(
     overrides?: Partial<InsertInput<"writeUpInclude">>,
   ): Promise<Row<"writeUpInclude">>;
+
+  questionAsked(overrides?: Partial<InsertInput<"questionAsked">>): Promise<Row<"questionAsked">>;
+
+  /**
+   * Seeds its record too when given none, asked now. A `recordId` comes with that record's
+   * `askedAt`, so the row lands in its record's month.
+   */
+  questionContent(
+    overrides?: Partial<Omit<InsertInput<"questionContent">, "recordId" | "askedAt">> &
+      (
+        | { readonly recordId: string; readonly askedAt: Date }
+        | { readonly recordId?: undefined; readonly askedAt?: undefined }
+      ),
+  ): Promise<Row<"questionContent">>;
+
+  questionFeedback(
+    overrides?: Partial<InsertInput<"questionFeedback">>,
+  ): Promise<Row<"questionFeedback">>;
 };
 
 const hexOfLength = (length: number): string =>
@@ -177,8 +195,10 @@ const insertRow = async <TName extends keyof Registry>(
     keys.map((key) => {
       const value = parsed[key];
 
-      const isVector = columns[key]?.getSQLType().startsWith("vector") ?? false;
-      return Array.isArray(value) && isVector ? JSON.stringify(value) : value;
+      // The driver writes an array as a Postgres array, which neither a vector nor jsonb reads.
+      const type = columns[key]?.getSQLType() ?? "";
+      const asJson = type.startsWith("vector") || type === "jsonb";
+      return Array.isArray(value) && asJson ? JSON.stringify(value) : value;
     }),
   );
 
@@ -905,6 +925,61 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const questionAsked: TestData["questionAsked"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "questionAsked", {
+      id: ulid(),
+      askedAt: new Date(),
+      askedBy: `human:${ulid()}`,
+      transport: "mcp",
+      collections: [],
+      predicateRole: "Viewer",
+      predicateGroups: [],
+
+      completedAt: null,
+      verdict: null,
+      judgeState: null,
+      concepts: [],
+      unmappedPassages: [],
+      ...overrides,
+      workspaceId,
+    });
+  };
+
+  const questionContent: TestData["questionContent"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const record =
+      overrides.recordId === undefined
+        ? await questionAsked({ workspaceId })
+        : { id: overrides.recordId, askedAt: overrides.askedAt };
+    return insertRow(client, "questionContent", {
+      question: "How long are audit logs kept?",
+      drafted: null,
+      ...overrides,
+      workspaceId,
+      recordId: record.id,
+      askedAt: record.askedAt,
+    });
+  };
+
+  const questionFeedback: TestData["questionFeedback"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const recordId = overrides.recordId ?? (await questionAsked({ workspaceId })).id;
+    return insertRow(client, "questionFeedback", {
+      id: ulid(),
+      givenAt: new Date(),
+      givenBy: `human:${ulid()}`,
+      verdict: "helpful",
+      reason: null,
+      note: null,
+      disputedSentence: null,
+      disputedConcept: null,
+      ...overrides,
+      workspaceId,
+      recordId,
+    });
+  };
+
   return {
     workspace,
     user,
@@ -947,5 +1022,8 @@ export const testData = (client: pg.PoolClient): TestData => {
     conceptSensitivityOverride,
     writeUp,
     writeUpInclude,
+    questionAsked,
+    questionContent,
+    questionFeedback,
   };
 };

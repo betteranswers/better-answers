@@ -173,3 +173,21 @@ export const A_SWEEP_PASS = `INSERT INTO sweep_pass (id, upload_sweep, workspace
 
 export const A_SWEEP_PASS_COUNTING = `INSERT INTO sweep_pass (id, upload_sweep, workspaces, refused, found, removed, generations)
                                       VALUES ($1, $2, $3, $4, $5, $6, 0)`;
+
+export const A_QUESTION_RECORD = `INSERT INTO question_asked (workspace_id, id, asked_at, asked_by, transport, predicate_role)
+       VALUES ($1, $2, $3, $4, 'mcp', 'Viewer')`;
+
+export const A_COMPLETED_QUESTION_RECORD = `INSERT INTO question_asked
+         (workspace_id, id, asked_at, asked_by, transport, predicate_role, completed_at, verdict, judge_state)
+       VALUES ($1, $2, now(), $3, 'mcp', 'Viewer', $4, $5, $6)`;
+
+export const A_QUESTION = `INSERT INTO question_content (workspace_id, record_id, asked_at, question)
+       VALUES ($1, $2, $3, 'How long are audit logs kept?')`;
+
+export const A_QUESTION_WITH_A_DRAFT = `INSERT INTO question_content (workspace_id, record_id, asked_at, question, drafted)
+       VALUES ($1, $2, now(), 'How long are audit logs kept?', $3)`;
+
+export const SOME_QUESTION_FEEDBACK = `INSERT INTO question_feedback
+         (workspace_id, id, record_id, given_at, given_by, verdict, reason, note,
+          disputed_sentence, disputed_concept)
+       VALUES ($1, $2, $3, now(), $4, $5, $6, $7, $8, $9)`;

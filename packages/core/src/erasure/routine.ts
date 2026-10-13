@@ -21,6 +21,7 @@ import type { ObjectDoor } from "../store/objects/index.ts";
 import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { eraseFromTheIdentitySet, type IdentityArm, type IdentitySwept } from "./identity.ts";
 import { erasureMapOf, type ErasureFamily, type ErasureMap } from "./map.ts";
+import { eraseFromTheQuestions, type QuestionsSwept } from "./questions.ts";
 import { rederiveAfterErasure, type Rederived } from "./rederive.ts";
 import { writeReplayCopy } from "./replay.ts";
 import {
@@ -57,13 +58,24 @@ export type ErasureLogLine = {
   readonly last_active_deleted: number;
 };
 
+/** What the questions step did, which a rerun finds already done and counts as nothing. */
+export type QuestionsLogLine = {
+  readonly actor: typeof ERASURE_ACTOR;
+  readonly erasure_request_id: string;
+  readonly records_rewritten: number;
+  readonly questions_removed: number;
+  readonly feedback_rewritten: number;
+};
+
 /**
  * The row and the report are the erasing workspace's to read, so what varies with another
  * workspace's records goes to the tier's log.
  */
 export type ErasureLog = {
-  readonly info: (line: ErasureLogLine, message: string) => void;
+  readonly info: (line: ErasureLogLine | QuestionsLogLine, message: string) => void;
 };
+
+const QUESTIONS_STEP_LOGGED = "erasure: what the questions step rewrote and removed";
 
 const IDENTITY_STEP_LOGGED =
   "erasure: the identity step's arm, and what it pseudonymised and deleted";
@@ -308,6 +320,25 @@ const withTheDocumentsStep = (
   },
 });
 
+const QUESTION_ASKED: ErasureFamily = "question-asked";
+
+const withTheQuestionsStep = (actions: ErasureActions, swept: QuestionsSwept): ErasureActions => ({
+  ...actions,
+  [QUESTION_ASKED]: { ...actions[QUESTION_ASKED], ...swept },
+});
+
+const questionsStepLineOf = (
+  platform: ErasurePrincipal,
+  erasureRequestId: string,
+  swept: QuestionsSwept,
+): QuestionsLogLine => ({
+  actor: platform.actorId,
+  erasure_request_id: erasureRequestId,
+  records_rewritten: swept.rewritten,
+  questions_removed: swept.questionsRemoved,
+  feedback_rewritten: swept.feedbackRewritten,
+});
+
 const IDENTITY_USER: ErasureFamily = "identity-user";
 
 const personTheMapFound = (map: ErasureMap): string | null =>
@@ -543,6 +574,27 @@ export const runErasure = async (
     );
     if (!suppressed.ok) return err(suppressed.error);
 
+    /**
+     * Before the identity step, which ends the member: a rerun after it would find no person
+     * behind an address, and leave their questions.
+     */
+    const questions = await attempt(() =>
+      eraseFromTheQuestions(platform, doors.postgres, {
+        workspaceId,
+        personIds: [personTheMapFound(map), request.personId],
+        pseudonym,
+      }),
+    );
+    if (!questions.ok) return err(questions.error);
+    // Logged as the step commits, for the identity step's reason below; a step that found
+    // nothing has no count to keep.
+    if (questions.value.rewritten + questions.value.feedbackRewritten > 0) {
+      doors.log.info(
+        questionsStepLineOf(platform, erasure.id, questions.value),
+        QUESTIONS_STEP_LOGGED,
+      );
+    }
+
     const identity = await attempt(() =>
       eraseFromTheIdentitySet(platform, doors.postgres, {
         workspaceId,
@@ -565,18 +617,21 @@ export const runErasure = async (
     );
     if (!rederived.ok) return err(rederived.error);
 
-    const actions = withTheDocumentsStep(
-      withTheIdentityStep(
-        withTheVerificationsMoved(
-          withTheGitStep(foundPerFamily(map), rewritten.value),
-          rewritten.value.carried,
+    const actions = withTheQuestionsStep(
+      withTheDocumentsStep(
+        withTheIdentityStep(
+          withTheVerificationsMoved(
+            withTheGitStep(foundPerFamily(map), rewritten.value),
+            rewritten.value.carried,
+          ),
+          identity.value,
         ),
-        identity.value,
+        {
+          ...suppressed.value,
+          connectedSourcesToReprocess: rederived.value.connectedSourcesToReprocess,
+        },
       ),
-      {
-        ...suppressed.value,
-        connectedSourcesToReprocess: rederived.value.connectedSourcesToReprocess,
-      },
+      questions.value,
     );
     return completeTheRequest(platform, doors, workspaceId, opened.value, actions);
   });
