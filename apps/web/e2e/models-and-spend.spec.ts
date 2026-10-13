@@ -2,7 +2,6 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
-import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -19,6 +18,8 @@ import {
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
+
+const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
 
 const modelChoicesCard = (page: Page) => page.getByRole("region", { name: "Model Choices" });
 
@@ -250,7 +251,7 @@ test.describe("the Models and spend page's model choices card", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${aRole(role)} the page as not found`, async ({ page, request }) => {
+    test(`shows ${A_ROLE[role]} the page as not found`, async ({ page, request }) => {
       await aMemberSignedInAt(page, request, role, MODELS_AND_SPEND.path);
 
       await notFoundOfferingHome(page, role);

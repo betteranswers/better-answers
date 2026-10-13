@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { aRole, ROLES } from "@/features/people/role-meanings.ts";
+import { ROLES } from "@/features/people/role-meanings.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -21,6 +21,12 @@ import {
 
 const READ_BUDGET_MS = 1000;
 
+const A_ROLE = {
+  Admin: "an Admin",
+  Editor: "an Editor",
+  Viewer: "a Viewer",
+} as const satisfies Readonly<Record<Role, string>>;
+
 /** Each role's home, as the rail's link and the way home name it. */
 const HOME_NAMED = { Admin: "Members", Editor: "Ask", Viewer: "Ask" } as const satisfies Readonly<
   Record<Role, string>
@@ -30,7 +36,7 @@ const HOME_NAMED = { Admin: "Members", Editor: "Ask", Viewer: "Ask" } as const s
 const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
   const email = anAddress(role.toLowerCase());
   const member = await person(api, email, { displayName: `A ${role}` });
-  const workspace = await provision(api, { name: `A workspace for ${aRole(role)}` });
+  const workspace = await provision(api, { name: `A workspace for ${A_ROLE[role]}` });
   await addMember(api, { role, userId: member.id, workspaceId: workspace.workspaceId });
 
   await page.goto("/sign-in");
@@ -56,13 +62,13 @@ const personMenu = (page: Page, role: Role) =>
   page.getByRole("banner").getByRole("button", { name: `A ${role}`, exact: true });
 
 for (const role of ROLES) {
-  test(`lands ${aRole(role)} on ${HOME_NAMED[role]} after sign-in`, async ({ page, request }) => {
+  test(`lands ${A_ROLE[role]} on ${HOME_NAMED[role]} after sign-in`, async ({ page, request }) => {
     await signedInAs(page, request, role);
 
     await landedAtHome(page, role);
   });
 
-  test(`offers ${aRole(role)} their own home at an unknown address`, async ({
+  test(`offers ${A_ROLE[role]} their own home at an unknown address`, async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -90,7 +96,7 @@ test("offers a Viewer's home from an unknown page, shell kept", async ({
 });
 
 for (const role of ["Editor", "Viewer"] as const) {
-  test(`shows ${aRole(role)} Ask on its way, and Knowledge`, async ({ page, request }) => {
+  test(`shows ${A_ROLE[role]} Ask on its way, and Knowledge`, async ({ page, request }) => {
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
 
@@ -125,7 +131,7 @@ for (const role of ["Editor", "Viewer"] as const) {
     `);
   });
 
-  test(`copies the address on ${aRole(role)} Ask by keyboard`, async ({
+  test(`copies the address on ${A_ROLE[role]} Ask by keyboard`, async ({
     page,
     context,
     request,
@@ -143,7 +149,7 @@ for (const role of ["Editor", "Viewer"] as const) {
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(address);
   });
 
-  test(`shows ${aRole(role)} Members as if it never existed`, async ({ page, request }) => {
+  test(`shows ${A_ROLE[role]} Members as if it never existed`, async ({ page, request }) => {
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
 
