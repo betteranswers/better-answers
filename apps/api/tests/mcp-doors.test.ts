@@ -25,6 +25,9 @@ const app = appForSuite();
 
 type ServedEntry = Entry<z.ZodObject, z.ZodType>;
 
+/** A step refuses as the member's door does, or for groups that moved during the call. */
+type Steps = AskSteps<PrincipalRefusal | "changed-meanwhile">;
+
 /** What a probe keeps of the entry it stands for: its road, its name and what it declares. */
 type Declared = Pick<ServedEntry, "road" | "name" | "scopes" | "annotations">;
 
@@ -177,19 +180,12 @@ describe("every entry the server composes", () => {
       [principal: UserPrincipal, tx: Tx, args: z.infer<z.ZodObject>, now: Date]
     >();
     expectTypeOf<Parameters<StepsEntry<z.ZodObject, z.ZodType>["run"]>>().toEqualTypeOf<
-      [
-        principal: UserPrincipal,
-        steps: AskSteps<PrincipalRefusal>,
-        args: z.infer<z.ZodObject>,
-        now: Date,
-      ]
+      [principal: UserPrincipal, steps: Steps, args: z.infer<z.ZodObject>, now: Date]
     >();
   });
 });
 
 describe("the steps the own-transaction road hands an entry", () => {
-  type Steps = AskSteps<PrincipalRefusal>;
-
   it("are the record's two writes and one read", () => {
     expectTypeOf<keyof Steps>().toEqualTypeOf<"openRecord" | "read" | "completeRecord">();
   });

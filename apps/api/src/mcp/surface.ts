@@ -18,7 +18,6 @@ import {
   err,
   type Claims,
   type Clock,
-  type PrincipalRefusal,
   type Result,
   type UserPrincipal,
 } from "@better-answers/core/kernel";
@@ -31,6 +30,7 @@ import {
   withPrincipal,
   withPrincipalRead,
   type PostgresDoor,
+  type Tx,
 } from "@better-answers/core/store/postgres";
 import {
   TOOLS_LIST_TTL_CONFIG_KEY,
@@ -47,7 +47,7 @@ import { bearerOf } from "../auth/verify.ts";
 import { countByAddress, tooManyRequests } from "../ingress/limits.ts";
 import { refusalLogged, refusalOf, type RefusalAnswer } from "../refusal.ts";
 import { crossing } from "./crossing.ts";
-import type { Entry } from "./entries/define.ts";
+import type { Entry, StepRefusal } from "./entries/define.ts";
 
 export type McpSurfaceDependencies = {
   readonly door: PostgresDoor;
@@ -88,31 +88,40 @@ type ServedEntry = Entry<z.ZodObject, z.ZodType>;
 /** What a road opens its transactions with; an entry is handed neither. */
 type RoadDoors = Pick<McpSurfaceDependencies, "door" | "clock">;
 
-/** A step's own answer, or the refusal of the member its transaction read back. */
-const stepped = <Value, Refused>(
-  opened: Result<Result<Value, Refused>, PrincipalRefusal>,
-): Result<Value, Refused | PrincipalRefusal> => (opened.ok ? opened.value : opened);
+/** Both readings come sorted from the one member query, so they agree place by place or not at all. */
+const inTheSameGroups = (resolved: UserPrincipal, readBack: UserPrincipal): boolean =>
+  resolved.groups.length === readBack.groups.length &&
+  resolved.groups.every((group, place) => group === readBack.groups[place]);
 
 /**
- * Each step is one short transaction that reads the member again. Only the read lends its
- * transaction, and that one opens read-only.
+ * Reads the member again through `open`, which refuses a moved role. Moved groups would read
+ * under another predicate than the record keeps.
  */
-const stepsFor = (
-  { door, clock }: RoadDoors,
+const steppedAs = async <Value, Refused>(
+  open: typeof withMember,
+  door: PostgresDoor,
   asker: UserPrincipal,
-): AskSteps<PrincipalRefusal> => ({
-  openRecord: async (opening) =>
-    stepped(
-      await withMember(asker, door, (member, tx) =>
-        openRecord(member, tx, { ...opening, transport: "mcp" }),
-      ),
+  work: (member: UserPrincipal, tx: Tx) => Promise<Result<Value, Refused>>,
+): Promise<Result<Value, Refused | StepRefusal>> => {
+  const opened = await open(
+    asker,
+    door,
+    async (member, tx): Promise<Result<Value, Refused | StepRefusal>> =>
+      inTheSameGroups(asker, member) ? work(member, tx) : err("changed-meanwhile"),
+  );
+  return opened.ok ? opened.value : opened;
+};
+
+/** Only the read lends its transaction, and that one opens read-only. */
+const stepsFor = ({ door, clock }: RoadDoors, asker: UserPrincipal): AskSteps<StepRefusal> => ({
+  openRecord: (opening) =>
+    steppedAs(withMember, door, asker, (member, tx) =>
+      openRecord(member, tx, { ...opening, transport: "mcp" }),
     ),
-  read: async (work) => stepped(await withMemberUnheld(asker, door, (_member, tx) => work(tx))),
-  completeRecord: async (completion) =>
-    stepped(
-      await withMember(asker, door, (member, tx) =>
-        completeRecord(member, tx, { ...completion, completedAt: clock.now() }),
-      ),
+  read: (work) => steppedAs(withMemberUnheld, door, asker, (_member, tx) => work(tx)),
+  completeRecord: (completion) =>
+    steppedAs(withMember, door, asker, (member, tx) =>
+      completeRecord(member, tx, { ...completion, completedAt: clock.now() }),
     ),
 });
 

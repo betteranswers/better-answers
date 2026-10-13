@@ -2,7 +2,12 @@ import type { ToolAnnotations } from "@modelcontextprotocol/server";
 import type { z } from "zod";
 
 import type { AskSteps } from "@better-answers/core/answering";
-import type { PrincipalRefusal, Result, UserPrincipal } from "@better-answers/core/kernel";
+import type {
+  KernelRefusal,
+  PrincipalRefusal,
+  Result,
+  UserPrincipal,
+} from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
 
 import type { McpScope } from "../../auth/constants.ts";
@@ -43,13 +48,16 @@ export type TransactionEntry<Input extends z.ZodObject, Output extends z.ZodType
   Output
 >;
 
+/** A step refuses a member who is gone, or whose groups moved since the call resolved them. */
+export type StepRefusal = PrincipalRefusal | KernelRefusal<"changed-meanwhile">;
+
 /**
  * Holds no transaction of its own: each step it is handed opens one and settles it, so no
  * connection is held between them.
  */
 export type StepsEntry<Input extends z.ZodObject, Output extends z.ZodType> = EntryOn<
   "own-transaction",
-  AskSteps<PrincipalRefusal>,
+  AskSteps<StepRefusal>,
   Input,
   Output
 >;
