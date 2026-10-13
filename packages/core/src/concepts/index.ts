@@ -1340,6 +1340,20 @@ export const readConcept = async (
   });
 };
 
+/**
+ * A concept's sources as this reader may open them, in the file's order. A source they cannot
+ * open keeps the file's own label and nothing that leads to it.
+ */
+export const evidenceOf = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  frontmatter: Frontmatter,
+  reads: { readonly passageAt: PassageReader; readonly namesPassage: PassageNamer },
+): Promise<Result<EvidencePane["evidence"], Error>> => {
+  const sources = await resolvedSourcesOf({ principal, tx, ...reads }, frontmatter);
+  return sources.ok ? ok(sources.value.map((source) => source.item)) : err(sources.error);
+};
+
 const MATCH = anyWordMatch("c.search", "$4", ["c.iri"]);
 
 /** Collections bind sixth when named; the bound follows them, else binds sixth itself. */

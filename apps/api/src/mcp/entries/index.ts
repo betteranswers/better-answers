@@ -1,8 +1,7 @@
 import { z } from "zod";
 
 import {
-  ANSWER_VERDICTS,
-  ask,
+  answerOutputWith,
   FEEDBACK_REASONS,
   FEEDBACK_VERDICTS,
   find,
@@ -12,7 +11,7 @@ import {
   open,
   openInput,
   openOutputWith,
-  passageView,
+  planAnswer,
   renderAnswer,
   renderFeedback,
   renderFind,
@@ -20,11 +19,12 @@ import {
   TRUST_RIDERS,
   TRUST_STATUSES,
   TRUST_TIERS,
-  type AnswerResult,
   type FindMatch,
   type FindResult,
   type OpenResult,
   type OpenView,
+  type PlannedAnswer,
+  type ReturnedConcept,
   type Trust,
 } from "@better-answers/core/answering";
 import { ok, parse, type Result } from "@better-answers/core/kernel";
@@ -133,11 +133,33 @@ const findEntry = defineEntry({
   render: (found) => renderFind(foundInCore(found)),
 });
 
-/** Core cites a concept by its page's path; an outside client can only open it under our origin. */
-const citedFrom = (origin: string, answer: AnswerResult): AnswerResult => ({
-  ...answer,
-  citations: answer.citations.map((citation) => ({ ...citation, url: `${origin}${citation.url}` })),
-});
+type WireReturned = WireMatch<ReturnedConcept<string>>;
+
+type WireAnswered = Omit<PlannedAnswer<string>, "answers" | "related"> & {
+  readonly answers: readonly WireReturned[];
+  readonly related: readonly WireReturned[];
+};
+
+/** Core names a concept's page by its path; an outside client can only open it under our origin. */
+const answeredOnTheWire = (
+  origin: string,
+  { answers, related, ...answer }: PlannedAnswer,
+): WireAnswered => {
+  const wire = (concept: ReturnedConcept): WireReturned => ({
+    ...concept,
+    url: `${origin}${concept.url}`,
+    trust: wireTrust(concept.trust),
+  });
+  return { ...answer, answers: answers.map(wire), related: related.map(wire) };
+};
+
+const answeredInCore = ({ answers, related, ...answer }: WireAnswered): PlannedAnswer<string> => {
+  const core = (concept: WireReturned): ReturnedConcept<string> => ({
+    ...concept,
+    trust: coreTrust(concept.trust),
+  });
+  return { ...answer, answers: answers.map(core), related: related.map(core) };
+};
 
 const askEntryAt = (origin: string) =>
   defineEntry({
@@ -149,33 +171,25 @@ const askEntryAt = (origin: string) =>
     input: z.object({
       question: z.string().min(1).max(2000).describe("The question, in the person's own words."),
     }),
-    output: z.object({
-      verdict: z.enum(ANSWER_VERDICTS),
-      text: z.string(),
-      citations: z.array(z.object({ iri: z.string(), url: z.string() })),
-      conflicts: z.array(
-        z.object({
-          subject: z.string(),
-          values: z.array(z.object({ value: z.string(), evidence: z.string() })),
-        }),
-      ),
-      coverage: z.object({ asked: z.number().int(), answered: z.number().int() }),
-      unmappedPassages: z.array(passageView),
-      map: z.discriminatedUnion("state", [
-        z.object({ state: z.literal("live") }),
-        z.object({ state: z.literal("as_of"), at: z.string() }),
-        z.object({ state: z.literal("unavailable_since"), since: z.string() }),
-      ]),
-    }),
+    // No record is kept on this entry's one read-only transaction, so the answer names none.
+    output: answerOutputWith(trust).omit({ recordId: true }),
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    run: async (principal, tx, args) =>
-      wired(await ask(principal, tx, args), (answer) => citedFrom(origin, answer)),
-    render: renderAnswer,
+    run: async (principal, tx, args, now) =>
+      wired(
+        await planAnswer(
+          principal,
+          (work) => work(tx),
+          { question: args.question, collections: [] },
+          now,
+        ),
+        (answer) => answeredOnTheWire(origin, answer),
+      ),
+    render: (answer) => renderAnswer(answeredInCore(answer)),
   });
 
 const openEntry = defineEntry({

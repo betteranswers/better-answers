@@ -2,15 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ids, ulid, type ConceptIri } from "@better-answers/schema";
 
-import {
-  ask,
-  find,
-  findCursor,
-  type FindPosition,
-  type FindResult,
-} from "../src/answering/index.ts";
+import { find, findCursor, type FindPosition, type FindResult } from "../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
+import { plannedOn } from "./asking.ts";
 import {
   connectedSourceHolding,
   passageUnder,
@@ -361,19 +356,22 @@ describe("a failed read", () => {
     expect(answered?.ok).toBe(false);
   });
 
-  it("answers ask's lookup as an error", async () => {
+  it("answers ask's first read as an error", async () => {
     const { viewer } = await arrange();
 
     const answered = await afterAFailedStatement(viewer, (reader, tx) =>
-      ask(reader, tx, { question: QUESTION }),
+      plannedOn(reader, tx, { question: QUESTION }),
     );
 
     expect(answered?.ok).toBe(false);
   });
 });
 
-describe("ask's per-word lookup", () => {
-  it("cites a concept whose body alone holds a word", async () => {
+describe("ask's entry step", () => {
+  const relatedTo = async (viewer: UserPrincipal, question: string) =>
+    answered(await reading(viewer, (reader, tx) => plannedOn(reader, tx, { question }))).related;
+
+  it("returns a concept whose body alone holds a word", async () => {
     const { workspaceId, viewer } = await arrange();
     const records = await conceptLanded(workspaceId, {
       title: "Records",
@@ -381,16 +379,14 @@ describe("ask's per-word lookup", () => {
     });
     await conceptLanded(workspaceId, { title: "Holiday policy" });
 
-    const answer = answered(
-      await reading(viewer, (reader, tx) => ask(reader, tx, { question: "When is the audit?" })),
-    );
+    const related = await relatedTo(viewer, "When is the audit?");
 
-    expect(answer.citations).toEqual([
-      { iri: records, url: `/knowledge/search/${records.slice(-26)}` },
+    expect(related.map((concept) => [concept.iri, concept.body])).toEqual([
+      [records, "Our audits run every spring."],
     ]);
   });
 
-  it("links a citation to the concept's page by its ulid", async () => {
+  it("links a concept to its page by its ulid", async () => {
     const { workspaceId, viewer } = await arrange();
     const iri = "https://better-answers.com/c/01J8ZQ4M7V3K9T2R5N6P8W1XYD";
     await seededBy(db(), async (seed) => {
@@ -398,12 +394,10 @@ describe("ask's per-word lookup", () => {
       await seed.conceptIndex({ workspaceId, iri, title: "Audit Logs Retention" });
     });
 
-    const answer = answered(
-      await reading(viewer, (reader, tx) => ask(reader, tx, { question: "audit retention" })),
-    );
+    const related = await relatedTo(viewer, "audit retention");
 
-    expect(answer.citations).toEqual([
-      { iri, url: "/knowledge/search/01J8ZQ4M7V3K9T2R5N6P8W1XYD" },
+    expect(related.map((concept) => [concept.iri, concept.url])).toEqual([
+      [iri, "/knowledge/search/01J8ZQ4M7V3K9T2R5N6P8W1XYD"],
     ]);
   });
 });

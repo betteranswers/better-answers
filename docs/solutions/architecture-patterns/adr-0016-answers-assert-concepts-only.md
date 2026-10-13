@@ -39,11 +39,11 @@ An answer asserts only what a concept states. It is found by traversal before an
 
 An answer is served as one answer contract for the UI, MCP and the response record: an event stream, verdict first, folded by one pure function into one object. The verdict is ok, related, warn or refuse for the caller's role. It is ok when at least one `Answer` is a judged fit, and related when concepts bear on the question and none is. Nothing in v0.1 produces warn. The object says how its judge stood: *not judged*, *judged* or *judging failed*. MCP returns the object alone. On the web the object is the stream's first event and drafted sentences follow it. A refusal ends the stream with no prose.
 
-A concept's collection is in the tree. S2b builds `ask`'s `collections` argument, the narrowing of the walk, the *related knowledge* verdict and the judge, and the tree does not hold them yet.
+A concept's collection, `ask`'s `collections` argument, the narrowing of the walk and the *related knowledge* verdict are in the tree. Until the judge is built, no `Answer` is a judged fit: every answer says *not judged*, and every `Answer` among its concepts is related knowledge. S2b builds the judge, and the tree does not hold it yet.
 
-When the map is unavailable, the answer runs at depth 0. Entry points, the judge and reuse still run, and the context header line says the map is unavailable.
+When the map is unavailable, the answer runs at depth 0. Entry points, the judge and reuse still run, and the context header line says the map is unavailable. A walk that passes its timeout is the map unavailable for that answer.
 
-In v0.1 the entry step is full-text over the concept index alone. The S2a block builds it, and the tree does not hold it yet.
+In v0.1 the entry step is full-text over the concept index alone.
 
 - A stored `tsvector` on the concept index, written in the governed write's transaction, so a concept is searchable at commit.
 - Title weighted first, tags and *Also known as* second, body third.
@@ -81,3 +81,5 @@ The concept unit of the one index, with its vectors and its catch-up run, is the
 The full record, with its amendments (ticket 21, ticket 39, ticket 73, ticket 79 applied by T-001, and the route spec's Q1 spike of 09/09/2026): `docs/archive/adr/0016-answers-assert-concepts-only.md`.
 
 Amended 13/10/2026 on the owner's decisions of 11/10 and 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R28, with R1 to R5 and R8). An answer was one reused `Answer` or prose the platform drafted, on every transport. It is now every `Answer` that fits, returned unchanged, or the concepts that bear on the question under a fourth verdict, and over MCP the assistant writes the prose. The judge answers per candidate, and a caller may name collections. The refusal sentence is kept for a question nothing matches. The *Two contracts, one per transport* entry stands, and it now says what is given up.
+
+Amended 13/10/2026 by the same plan (KTD4). A walk that passed its timeout had no stated outcome. It now counts as the map unavailable: the answer stands on its entry points and says so.

@@ -1,15 +1,16 @@
 import { z } from "zod";
 
-import type {
-  ConceptIri,
-  FEEDBACK_REASONS,
-  FEEDBACK_VERDICTS,
-  MatchStrength,
+import {
+  QUESTION_VERDICTS,
+  type ConceptIri,
+  type FEEDBACK_REASONS,
+  type FEEDBACK_VERDICTS,
+  type JudgeState,
+  type MatchStrength,
 } from "@better-answers/schema";
 
 import type { ConceptRead, Frontmatter } from "../concepts/index.ts";
 import {
-  conceptPageOf,
   findConcepts,
   readConcept,
   trustOf,
@@ -31,19 +32,48 @@ import {
 } from "../kernel/index.ts";
 import { findPassages, parseLocator, passageAt, type PassageMatch } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { findInput, openInput, type FindInput, type OpenInput } from "./boundary.ts";
+import {
+  askInput,
+  findInput,
+  openInput,
+  type AskInput,
+  type Evidence,
+  type FindInput,
+  type OpenInput,
+  type PassageView,
+} from "./boundary.ts";
 import { cursorOf, type FindPosition, type FindRun } from "./cursor.ts";
+import {
+  answerPlanned,
+  ASK_CAPS,
+  type AskCaps,
+  type MapState,
+  type PlannedAnswer,
+  type ReadStep,
+  type ReturnedConcept,
+} from "./plan.ts";
+import type { completeRecord, openRecord } from "./record.ts";
 
 export {
+  answerOutputWith,
+  askInput,
   findInput,
   findOutputWith,
   openInput,
   openOutputWith,
-  passageView,
+  type AskInput,
   type FindInput,
   type OpenInput,
 } from "./boundary.ts";
 export { findCursor, type FindPosition } from "./cursor.ts";
+export {
+  ASK_CAPS,
+  type AskCaps,
+  type MapState,
+  type PlannedAnswer,
+  type ReadStep,
+  type ReturnedConcept,
+} from "./plan.ts";
 export { completeRecord, openRecord } from "./record.ts";
 
 export {
@@ -111,25 +141,6 @@ type ConceptView<Iri extends string> = {
   readonly evidence: readonly Evidence<Iri>[];
 };
 
-/**
- * `source` is the file's own label. `locator` or `iri` is what opens it, given only where the reader
- * may open it; neither is ever `""`.
- */
-type Evidence<Iri extends string> = {
-  readonly id?: string;
-  readonly source: string;
-  readonly at?: string;
-  readonly locator?: string;
-  readonly iri?: Iri;
-};
-
-type PassageView = {
-  readonly locator: string;
-  readonly source: string;
-  readonly text: string;
-  readonly sensitivity: string;
-};
-
 type Opened<Iri extends string, View> =
   | {
       readonly found: true;
@@ -153,30 +164,18 @@ export type OpenResult<Iri extends string = ConceptIri> = Opened<
   ConceptView<Iri> & PaneWords & Required<Pick<ConceptView<Iri>, "bodyLinks">>
 >;
 
-export type MapState =
-  | { readonly state: "live" }
-  | { readonly state: "as_of"; readonly at: string }
-  | { readonly state: "unavailable_since"; readonly since: string };
-
-export const ANSWER_VERDICTS = ["ok", "warn", "refuse"] as const;
+/** The schema's own tuple, so the words a record keeps and the words an answer says cannot drift. */
+export const ANSWER_VERDICTS = QUESTION_VERDICTS;
 type AnswerVerdict = (typeof ANSWER_VERDICTS)[number];
 
-export type AnswerResult = {
-  readonly verdict: AnswerVerdict;
-  readonly text: string;
-  readonly citations: readonly { readonly iri: string; readonly url: string }[];
-  readonly conflicts: readonly {
-    readonly subject: string;
-    readonly values: readonly { readonly value: string; readonly evidence: string }[];
-  }[];
-  readonly coverage: { readonly asked: number; readonly answered: number };
-  readonly unmappedPassages: readonly PassageView[];
-  readonly map: MapState;
+/** What `ask` answers: the answer as planned, and the id of the record kept of the question. */
+export type AnswerResult<Iri extends string = ConceptIri> = PlannedAnswer<Iri> & {
+  readonly recordId: string;
 };
 
-export const NOT_ANSWERED = "Not answered from the company's knowledge.";
+const NOT_ANSWERED = "Not answered from the company's knowledge.";
 
-export { FEEDBACK_REASONS, FEEDBACK_VERDICTS } from "@better-answers/schema";
+export { FEEDBACK_REASONS, FEEDBACK_VERDICTS, JUDGE_STATES } from "@better-answers/schema";
 export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
 
 type FeedbackVerdict = (typeof FEEDBACK_VERDICTS)[number];
@@ -415,63 +414,78 @@ export const open = async (
     : conceptOpened(admitted.value, tx, input.iri, now);
 };
 
-const termsOf = (question: string): readonly string[] =>
-  [...new Set(question.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'-]{3,}/gu) ?? [])].slice(
-    0,
-    ASK_TERMS_AT_MOST,
-  );
-
-const ASK_TERMS_AT_MOST = 8;
-const ASK_MATCHES_PER_TERM = 5;
-
-type AskInput = { readonly question: string };
-
 const askAction = declareAction({
   admits: ANY_ROLE,
-  input: z.custom<AskInput>(),
+  input: askInput,
   refuses: ["role-forbids"],
 });
 
+export type AskRefusal = RefusalOf<typeof askAction> | Error;
+
 /**
- * Answers no question: the verdict is always `refuse`, and the citations are the concepts its
- * words find.
+ * `ask` is handed these in place of a door. Its transport runs each in its own transaction, so
+ * none stays open across a later step.
  */
-export const ask = async (
+export type AskSteps<Refused = never> = {
+  /** Commits before it answers: a question refused later is still on record. */
+  readonly openRecord: (
+    opening: Omit<Parameters<typeof openRecord>[2], "transport">,
+  ) => Promise<Result<{ readonly recordId: string }, Refused | Error>>;
+  readonly read: ReadStep<Refused>;
+  readonly completeRecord: (
+    completion: Omit<Parameters<typeof completeRecord>[2], "completedAt" | "drafted">,
+  ) => Promise<Result<void, Refused | Error>>;
+};
+
+/**
+ * What `ask` would answer, read through `read` alone: no record is opened, so the answer carries
+ * no record's id.
+ */
+export const planAnswer = async <Refused = never>(
   principal: UserPrincipal,
-  tx: Tx,
+  read: ReadStep<Refused>,
   input: AskInput,
-): Promise<Result<AnswerResult, RefusalOf<typeof askAction> | Error>> => {
+  now: Date,
+  caps: AskCaps = ASK_CAPS,
+): Promise<Result<PlannedAnswer, AskRefusal | Refused>> => {
   const admitted = admit(askAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
-  const named = new Map<string, OpenedConcept>();
-  for (const term of termsOf(input.question)) {
-    const search = { principal: admitted.value, tx, query: term };
-    const found = await pageOf(
-      [
-        ["strong", conceptRun(search, "strong")],
-        ["weak", conceptRun(search, "weak")],
-      ],
-      ASK_MATCHES_PER_TERM,
-      undefined,
-    );
-    if (!found.ok) return err(found.error);
-    for (const concept of found.value.matches) named.set(concept.iri, concept);
-  }
-  const citations = [...named.values()]
-    .toSorted(
-      (one, other) => one.title.localeCompare(other.title) || one.iri.localeCompare(other.iri),
-    )
-    .map((concept) => ({ iri: concept.iri, url: conceptPageOf(concept.iri) }));
-  return ok({
-    verdict: "refuse",
-    text: NOT_ANSWERED,
-    citations,
-    conflicts: [],
-    coverage: { asked: 1, answered: 0 },
-    unmappedPassages: [],
-    map: { state: "live" },
+  const plan = await answerPlanned(admitted.value, read, input, now, caps);
+  return plan.ok ? ok(plan.value.answer) : plan;
+};
+
+/**
+ * Opens the question's record, reads what bears on it, and completes the record with what it
+ * returns. No model is called: every `Answer` it finds is related knowledge, and no judge ran.
+ * `now` decides which concepts are past their shelf life.
+ */
+export const ask = async <Refused = never>(
+  principal: UserPrincipal,
+  steps: AskSteps<Refused>,
+  input: AskInput,
+  now: Date,
+  caps: AskCaps = ASK_CAPS,
+): Promise<Result<AnswerResult, AskRefusal | Refused>> => {
+  const admitted = admit(askAction, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+
+  const { question, collections } = input;
+  const opened = await steps.openRecord({ question, collections, askedAt: now });
+  if (!opened.ok) return opened;
+  const { recordId } = opened.value;
+  const plan = await answerPlanned(admitted.value, steps.read, input, now, caps);
+  if (!plan.ok) return plan;
+  const { answer, concepts } = plan.value;
+  const completed = await steps.completeRecord({
+    recordId,
+    verdict: answer.verdict,
+    judgeState: answer.judgeState,
+    concepts,
+    unmappedPassages: answer.unmappedPassages,
   });
+  if (!completed.ok) return completed;
+  return ok({ ...answer, recordId });
 };
 
 const giveFeedbackAction = declareAction({
@@ -526,14 +540,17 @@ export const renderOpen = (result: OpenView<string>): string => {
 const listed = (heading: string, lines: readonly string[]): readonly string[] =>
   lines.length === 0 ? [] : ["", heading, ...lines];
 
-const conceptText = (concept: ConceptView<string>): string => {
-  const title =
-    typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
-  const evidence = concept.evidence.map(({ source, at, locator, iri }) => {
+const evidenceLines = (evidence: readonly Evidence<string>[]): readonly string[] =>
+  evidence.map(({ source, at, locator, iri }) => {
     const named = at === undefined ? source : `${source}, ${at}`;
     const opens = locator ?? iri;
     return opens === undefined ? `- ${named}` : `- ${named} (${opens})`;
   });
+
+const conceptText = (concept: ConceptView<string>): string => {
+  const title =
+    typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
+  const evidence = evidenceLines(concept.evidence);
   const related = concept.relations.map(
     ({ kind, title: named, target }) => `- ${kind} · ${named} · ${target}`,
   );
@@ -564,25 +581,54 @@ export const mapWords = (map: MapState): string => {
   }
 };
 
-export const renderAnswer = (result: AnswerResult): string => {
-  const verdict = {
-    ok: "**Answered from the company's knowledge.**",
-    warn: "**Answered with a warning for your role.**",
-    refuse: `**${NOT_ANSWERED}**`,
-  }[result.verdict];
-  const citations = result.citations.map((c, i) => `[${i + 1}] ${c.iri} — ${c.url}`).join("\n");
-  const unmapped = result.unmappedPassages
-    .map(
-      (p) =>
-        `${NOT_COMPANY_KNOWLEDGE} · ${p.sensitivity}\n> ${p.text}\n— ${p.source} (${p.locator})`,
-    )
-    .join("\n\n");
-  const lines = [verdict, `_${mapWords(result.map)}_`];
-  if (result.verdict !== "refuse") lines.push("", result.text);
-  if (citations !== "") lines.push("", citations);
-  if (unmapped !== "") lines.push("", unmapped);
-  return lines.join("\n");
-};
+const ANSWER_KIND = "Answer";
+
+/** The related line tells an assistant what to do, and never says the question was answered. */
+const VERDICT_LINES = {
+  ok: "**Answered from the company's knowledge.**",
+  warn: "**Answered with a warning for your role.**",
+  refuse: `**${NOT_ANSWERED}**`,
+  related:
+    "**Related knowledge, not an answer.** Write only what these concepts state, naming each one you use, and quote an `Answer` word for word.",
+} satisfies Record<AnswerVerdict, string>;
+
+const JUDGE_WORDS = {
+  "not-judged": "Not judged",
+  judged: "Judged",
+  "judging-failed": "Judging failed",
+} satisfies Record<JudgeState, string>;
+
+const namedOrNone = (collections: readonly string[]): string =>
+  collections.length === 0 ? "none" : collections.join(", ");
+
+const returnedText = (concept: ReturnedConcept<string>): readonly string[] => [
+  "",
+  `## ${concept.kind} · ${concept.collection ?? NO_COLLECTION}`,
+  concept.kind === ANSWER_KIND ? `Question: ${concept.title}` : concept.title,
+  `_${concept.trustWords}_`,
+  "",
+  concept.body.trimEnd(),
+  ...listed("Evidence:", evidenceLines(concept.evidence)),
+  "",
+  `${concept.iri} — ${concept.url}`,
+];
+
+const unmappedText = (passage: PassageView): readonly string[] => [
+  "",
+  `${NOT_COMPANY_KNOWLEDGE} · ${passage.sensitivity}`,
+  `> ${passage.text}`,
+  `— ${passage.source} (${passage.locator})`,
+];
+
+export const renderAnswer = (answer: PlannedAnswer<string>): string =>
+  [
+    VERDICT_LINES[answer.verdict],
+    `_${JUDGE_WORDS[answer.judgeState]} · ${mapWords(answer.map)}_`,
+    `Collections considered: ${namedOrNone(answer.collections)}`,
+    `Collections you may name: ${namedOrNone(answer.readableCollections)}`,
+    ...answer.related.flatMap(returnedText),
+    ...answer.unmappedPassages.flatMap(unmappedText),
+  ].join("\n");
 
 const REASON_WORDS = {
   wrong: "wrong",

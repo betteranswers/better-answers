@@ -9,7 +9,7 @@ import {
   conceptIriTakenAgain,
 } from "@better-answers/schema/testing/probes";
 
-import { ask, find, open } from "../src/answering/index.ts";
+import { find, open } from "../src/answering/index.ts";
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import {
   cascadingVisibility,
@@ -29,6 +29,7 @@ import {
   widenConnectedSourceInput,
 } from "../src/sources/index.ts";
 import { withScope, type Folded, type Tx } from "../src/store/postgres/index.ts";
+import { plannedOn } from "./asking.ts";
 import { bundleHistory } from "./bundle.ts";
 import { bootstrap } from "./platform.ts";
 import {
@@ -1895,33 +1896,19 @@ describe("find", () => {
     ).toEqual([visible.iri, withheld.iri].toSorted());
   });
 
-  it("refuses a question, citing only concepts the reader may see", async () => {
+  it("answers a question with only concepts the reader may see", async () => {
     const scenario = await arrange();
     const { visible, withheld } = await expensesNotes(scenario);
-    const question = { question: "How are expenses claimed?" };
+    const relatedTo = async (person: UserPrincipal, question: string) => {
+      const answer = await reading(person, (reader, tx) => plannedOn(reader, tx, { question }));
+      return answer.ok ? answer.value.related.map((concept) => concept.iri).toSorted() : answer;
+    };
 
-    const [viewer, admin, unrelated] = await Promise.all([
-      reading(scenario.viewer, (reader, tx) => ask(reader, tx, question)),
-      reading(scenario.admin, (reader, tx) => ask(reader, tx, question)),
-      reading(scenario.viewer, (reader, tx) => ask(reader, tx, { question: "Is the sky blue?" })),
-    ]);
-
-    expect(viewer).toEqual({
-      ok: true,
-      value: {
-        verdict: "refuse",
-        text: "Not answered from the company's knowledge.",
-        citations: [{ iri: visible.iri, url: `/knowledge/search/${visible.iri.slice(-26)}` }],
-        conflicts: [],
-        coverage: { asked: 1, answered: 0 },
-        unmappedPassages: [],
-        map: { state: "live" },
-      },
-    });
-    expect(admin.ok && admin.value.citations.map((citation) => citation.iri).toSorted()).toEqual(
+    expect(await relatedTo(scenario.viewer, "How are expenses claimed?")).toEqual([visible.iri]);
+    expect(await relatedTo(scenario.admin, "How are expenses claimed?")).toEqual(
       [visible.iri, withheld.iri].toSorted(),
     );
-    expect(unrelated.ok && unrelated.value.citations).toEqual([]);
+    expect(await relatedTo(scenario.viewer, "Is the sky blue?")).toEqual([]);
   });
 
   it("keeps the limit, reads queries literally, answers nothing to nothing", async () => {
@@ -2007,5 +1994,24 @@ describe("the collections a reader meets", () => {
       { ok: true, value: ["audits"] },
       { ok: true, value: ["audits", "lms"] },
     ]);
+  });
+
+  it("offers no collection whose only concept is unpublished", async () => {
+    const scenario = await arrange();
+    await conceptCiting(scenario, scenario.editor, [], {
+      path: "knowledge/audits/retention.md",
+      title: RETENTION,
+      sensitivity: "Internal",
+    });
+    await conceptCiting(scenario, scenario.editor, [], {
+      path: "knowledge/payroll/retention.md",
+      title: RETENTION,
+      sensitivity: "Internal",
+      status: "draft",
+    });
+
+    const offered = await reading(scenario.admin, (reader, tx) => readableCollections(reader, tx));
+
+    expect(offered).toEqual({ ok: true, value: ["audits"] });
   });
 });
