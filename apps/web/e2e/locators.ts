@@ -230,10 +230,7 @@ export const saysAnotherRefusal = (alert: Locator, earlier: string): Promise<voi
     )
     .toBe(false);
 
-/**
- * Said in whole minutes, rounded up; a single minute is said in words, leaving no number. A wait
- * never named fails.
- */
+/** Said in whole minutes, rounded up, and matched by their number. A wait never named fails. */
 export const saysTheWait = async (
   alert: Locator,
   waitSeconds: number | undefined,
@@ -241,7 +238,7 @@ export const saysTheWait = async (
   const minutes = Math.ceil((waitSeconds ?? 0) / 60);
   expect(minutes, "the ceiling's answer named no wait").toBeGreaterThan(0);
   await expect(alert, `the alert does not say a wait of ${String(minutes)} minutes`).toHaveText(
-    minutes > 1 ? new RegExp(String.raw`\b${String(minutes)}\b`) : /\S/,
+    new RegExp(String.raw`\b${String(minutes)}\b`),
   );
 };
 

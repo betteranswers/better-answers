@@ -187,7 +187,7 @@ More helpers in the same module drive the browser rather than the harness:
 | `saysARefusal` | Asserts an alert holds words. A refusal's region can stand empty from the first draw, so being in the tree shows no refusal |
 | `saysAnotherRefusal` | Asserts an alert says something other than the refusal it said before, which the spec read from it and hands over. Holding words would pass on that earlier refusal |
 | `saysOfItsRead` | Asserts a list's live region holds words, where a list says its read's state in a paragraph and no alert. No role names that region, so it is found by its `aria-live`, apart from the words the list's head always shows |
-| `saysTheWait` | Asserts an alert names a ceiling's wait, given in seconds as the answer named it, as the page counts it: whole minutes, rounded up. A single minute is said in words, so there the alert is checked for holding words. A wait the answer did not name fails |
+| `saysTheWait` | Asserts an alert names a ceiling's wait, given in seconds as the answer named it, as the page counts it: whole minutes, rounded up, matched by their number. A wait the answer did not name fails |
 | `keepsItsWordOffThePage` | Asserts the api's word for a refusal is nowhere on the page: the word is for the logs and the wire |
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
 | `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
