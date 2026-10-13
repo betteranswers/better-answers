@@ -150,24 +150,42 @@ export type Recall = {
   readonly recall: number;
 };
 
+/** A question the measure asks, and the key of each `Answer` it must reach. */
+export type RecallQuestion = {
+  readonly question: string;
+  readonly answers: readonly string[];
+};
+
+/** Each paraphrase as a question that must reach its master `Answer`. */
+export const paraphrasesOf = (set: RecallSet): readonly RecallQuestion[] =>
+  answersOf(set).flatMap(({ key, paraphrases }) =>
+    paraphrases.map((question) => ({ question, answers: [key] })),
+  );
+
+/** Each question once for each `Answer` it names, so recall counts `Answer`s and not questions. */
+export const namedOneByOne = (questions: readonly RecallQuestion[]): readonly RecallQuestion[] =>
+  questions.flatMap(({ question, answers }) =>
+    answers.map((key) => ({ question, answers: [key] })),
+  );
+
 /**
- * Asks every paraphrase through `ranked`, which answers concept IRIs best first, and counts the
- * paraphrases whose master `Answer` is among the first `RECALL_DEPTH`.
+ * Asks every question through `ranked`, which answers concept IRIs best first, and counts the
+ * questions that find every `Answer` they name among the first `depth`.
  */
 export const recallAt = async (
-  set: RecallSet,
-  landed: ReadonlyMap<string, ConceptIri>,
+  questions: readonly RecallQuestion[],
+  landed: ReadonlyMap<string, string>,
   ranked: (question: string) => Promise<readonly string[]>,
+  depth: number,
 ): Promise<Recall> => {
-  let asked = 0;
   let recalled = 0;
-  for (const { key, paraphrases } of answersOf(set)) {
-    const master = landed.get(key);
-    for (const paraphrase of paraphrases) {
-      const top = (await ranked(paraphrase)).slice(0, RECALL_DEPTH);
-      asked += 1;
-      if (master !== undefined && top.includes(master)) recalled += 1;
-    }
+  for (const { question, answers } of questions) {
+    const top = (await ranked(question)).slice(0, depth);
+    const reached = answers.every((key) => {
+      const iri = landed.get(key);
+      return iri !== undefined && top.includes(iri);
+    });
+    if (reached) recalled += 1;
   }
-  return { asked, recalled, recall: recalled / asked };
+  return { asked: questions.length, recalled, recall: recalled / questions.length };
 };
