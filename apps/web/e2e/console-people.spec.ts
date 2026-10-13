@@ -847,9 +847,13 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await again.press("Enter");
     await nameFieldOf(dialogToCorrect(page, "Priya Shah")).fill("Priya Sharma");
     await page.keyboard.press("Enter");
-    await expect(
-      regionOf(sheetOf(page, "Priya Sharma"), "Display Name").getByRole("status"),
-    ).toHaveText(/\S/);
+    const corrected = regionOf(sheetOf(page, "Priya Sharma"), "Display Name");
+    await expect(corrected.getByRole("status")).toHaveText(/\S/);
+    // The action is dimmed while the correction is pending, and the gate audits the page next.
+    await expect(corrected.getByRole("button", { name: "Correct Display Name" })).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
   });
 });
 
