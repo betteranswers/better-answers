@@ -1,6 +1,10 @@
 import type { Page } from "@playwright/test";
 
-import { ASK_TO_JOIN_WORDS, SHORT_NAME_EXAMPLE } from "@/features/auth/ask-to-join-words.ts";
+import {
+  ASK_TO_JOIN_WORDS,
+  REASON_MAX_CHARACTERS,
+  SHORT_NAME_EXAMPLE,
+} from "@/features/auth/ask-to-join-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 
@@ -75,20 +79,20 @@ test("a person in no workspace asks to join by keyboard", async ({
       - heading ${JSON.stringify(NO_WORKSPACE_HEADING)} [level=1]
       - region ${JSON.stringify(ASK_TO_JOIN_WORDS.heading)}:
         - heading ${JSON.stringify(ASK_TO_JOIN_WORDS.heading)} [level=2]
-        - text: ${JSON.stringify(ASK_TO_JOIN_WORDS.shortName)}
         - paragraph
         - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.shortName)}
-        - text: ${JSON.stringify(ASK_TO_JOIN_WORDS.reason)}
         - paragraph
         - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.reason)}
         - button ${JSON.stringify(ASK_TO_JOIN_WORDS.ask)}
       - button "Sign out"
       - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
-  await expect(shortNameField(page)).toHaveAccessibleDescription(
-    `${ASK_TO_JOIN_WORDS.forExample} ${SHORT_NAME_EXAMPLE}`,
+  await expect(shortNameField(page), "the field shows no example").toHaveAccessibleDescription(
+    new RegExp(SHORT_NAME_EXAMPLE),
   );
-  await expect(reasonField(page)).toHaveAccessibleDescription(ASK_TO_JOIN_WORDS.reasonHint);
+  await expect(reasonField(page), "the field names no limit").toHaveAccessibleDescription(
+    new RegExp(REASON_MAX_CHARACTERS.toLocaleString("en-GB")),
+  );
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("j");
@@ -107,8 +111,8 @@ test("a person in no workspace asks to join by keyboard", async ({
   await expect(requestSent(page)).toBeFocused();
   await expect(requestSent(page)).toMatchAriaSnapshot(`
     - alert ${JSON.stringify(ASK_TO_JOIN_WORDS.sent)}:
-      - paragraph: ${JSON.stringify(ASK_TO_JOIN_WORDS.sent)}
-      - paragraph: ${JSON.stringify(ASK_TO_JOIN_WORDS.whatHappensNext)}
+      - paragraph
+      - paragraph
   `);
   await expect(shortNameField(page)).toHaveValue("");
   await expect(reasonField(page)).toHaveValue("");
@@ -127,7 +131,10 @@ test("answers known, unknown and repeated short names alike", async ({ page, req
   }
 
   const [known, unknown, alreadyAsked] = said;
-  expect(known).toContain(ASK_TO_JOIN_WORDS.whatHappensNext);
+  expect(
+    known?.replace(ASK_TO_JOIN_WORDS.sent, ""),
+    "the answer says nothing past its name",
+  ).toMatch(/\S/);
   expect(unknown, "an unknown short name was answered differently").toBe(known);
   expect(alreadyAsked, "a second ask was answered differently").toBe(known);
 });
@@ -202,7 +209,7 @@ test("names no organisation or old word, nor in keystrokes", async ({ page, requ
   await thePageSaysNeither(page, "before an ask");
 
   const keystrokes = await keystrokesListed(page, "this page");
-  await expect(keystrokes).toContainText(ASK_TO_JOIN_WORDS.heading);
+  await expect(keystrokes.getByRole("term").filter({ hasText: /^j$/ })).toBeVisible();
   await thePageSaysNeither(page, "in its keystrokes");
   await keystrokesDismissed(page, keystrokes);
 

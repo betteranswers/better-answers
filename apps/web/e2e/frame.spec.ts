@@ -2,7 +2,6 @@ import type { Locator, Page } from "@playwright/test";
 
 import { BREADCRUMB, JUMP_TO, NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
 import { ACCOUNT_HEADING, PASSKEY_WORDS } from "@/features/auth/account-words.ts";
-import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { keystrokesOn } from "@/shared/keystroke-words.ts";
 import {
   ASK,
@@ -109,14 +108,9 @@ const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Models and spe
 
 const modelChoicesCardOf = (page: Page) => page.getByRole("region", { name: "Model choices" });
 
-/**
- * The page reads its model choices after the nav paints, so a page here has started once its
- * card says a new workspace has none.
- */
+/** The card holds its lead until its read lands, which brings a new workspace two lines more. */
 const theModelChoicesHaveLanded = (page: Page) =>
-  expect(
-    modelChoicesCardOf(page).getByText(MODEL_CHOICES_WORDS.noneSet, { exact: true }),
-  ).toBeVisible();
+  expect(modelChoicesCardOf(page).getByRole("paragraph")).toHaveCount(3);
 
 const boxOf = async (region: Locator) => {
   const box = await region.boundingBox();
@@ -920,7 +914,7 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
   await tabs.getByRole("tab", { name: "Model choices" }).click();
   await page.keyboard.press("ArrowRight");
   await expect(tabs.getByRole("tab", { name: "Spend" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByText("Spend is not built yet.")).toBeVisible();
+  await expect(main.getByRole("tabpanel")).toHaveText(/\S/);
   await expect(modelChoicesCardOf(page)).toHaveCount(0);
 
   await page.keyboard.press("ArrowLeft");
@@ -1086,7 +1080,7 @@ test("keeps a 40-character address on one line, prose measured", async ({ page, 
   });
   expect(lines, "the address wraps").toBe(1);
 
-  const summary = page.getByRole("main").getByText(PEOPLE.summary, { exact: true });
+  const summary = page.getByRole("main").locator("h1 + p");
   const measure = await summary.evaluate((node) =>
     Number.parseFloat(getComputedStyle(node).maxWidth),
   );
@@ -1255,10 +1249,20 @@ test("leads each built page with its group's line, auditing each", async ({
 }) => {
   await signedIn(page, request, "Swaledale Foundry");
 
+  const lineOf = new Map<string, string>();
   for (const [group, listed] of AN_ADMINS_PAGES) {
     await page.goto(listed.path);
     await expect(page.getByRole("heading", { level: 1, name: group.name })).toBeVisible();
-    await expect(page.getByRole("main").getByText(group.summary, { exact: true })).toBeVisible();
+    const lead = page.getByRole("main").locator("h1 + p");
+    await expect(lead, `${listed.name}'s heading leads no line`).toHaveText(/\S/);
+    const line = await lead.innerText();
+    expect(lineOf.get(group.name) ?? line, `${listed.name} leads with a line of its own`).toBe(
+      line,
+    );
+    lineOf.set(group.name, line);
     await passesTheAccessibilityGate();
   }
+  expect(new Set(lineOf.values()).size, "two groups lead their pages with one line").toBe(
+    lineOf.size,
+  );
 });

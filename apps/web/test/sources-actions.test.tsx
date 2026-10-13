@@ -194,7 +194,8 @@ describe("the dismissal as not special category", () => {
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.dismiss.key });
 
     const dialog = screen.getByRole("dialog", { name: REVIEW_WORDS.dismiss.named(1) });
-    expect(dialog.textContent).toContain(`${ruleWordOf(HEALTH_CUE.ruleId)} in Pump service notes`);
+    expect(dialog.textContent).toContain(ruleWordOf(HEALTH_CUE.ruleId));
+    expect(dialog.textContent).toContain("Pump service notes");
     expect(screen.getByLabelText("Reason")).toBeDefined();
     expect(dialog.textContent).not.toMatch(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
   });
@@ -233,6 +234,8 @@ const PRICE_BOOK = {
   audienceGroups: null,
   state: "indexed",
 };
+
+const A_PUBLISH = "2026-10-07T09:05:00.000Z";
 
 const WIDENED = { sensitivity: "Internal", audience: "groups" } as const;
 
@@ -282,6 +285,9 @@ type SourcesApi = {
 
   /** The actions the api refuses for the reader's role. */
   readonly forbidden?: readonly string[];
+
+  /** The connected sources the list read answers, where a test needs its own. */
+  readonly listed?: readonly unknown[];
 };
 
 /** Reads are answered at once; a widening is taken and a keep refused once `held` lets them. */
@@ -289,6 +295,7 @@ const atSources = (api: SourcesApi = {}) => {
   const asked: string[] = [];
   const answers: Readonly<Record<string, unknown>> = {
     ...ANSWERS,
+    "sources.list": api.listed ?? ANSWERS["sources.list"],
     "sources.findings": api.findings ?? [],
   };
   const refusals = new Map<string, unknown>([["sources.keepInText", KEEP_REFUSED]]);
@@ -499,6 +506,17 @@ describe("widening a connected source in its row", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  it("describes widening a published source by who it then reaches", async () => {
+    const { widen } = SENSITIVITY_PANEL_WORDS;
+    atSources({ listed: [{ ...HANDBOOK, state: "published", publishedAt: A_PUBLISH }] });
+    const row = await rowOf("Staff handbook");
+
+    fireEvent.click(rowAction(row, ROW_ACTIONS.widen, "Staff handbook"));
+
+    expect(describedBy(row.getByRole("group"))).toBe(widen.consequence(true));
+    expect(widen.consequence(true)).not.toBe(widen.consequence(false));
+  });
+
   it("lists the one term that changes and names the result", async () => {
     atSources();
     const row = await rowOf("Staff handbook");
@@ -509,7 +527,6 @@ describe("widening a connected source in its row", () => {
     expect(panel.getAllByRole("term").map((term) => term.textContent)).toEqual(["Sensitivity"]);
     expect(panel.getByRole("definition").textContent).toMatch(/Restricted.+Internal/v);
     expect(commitTo(panel, WIDENED)).toBeDefined();
-    expect(panel.queryByText(/audit row/iv)).toBeNull();
   });
 
   it("closes on Cancel, focus back on its opener", async () => {

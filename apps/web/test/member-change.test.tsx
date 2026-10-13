@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { RAIL } from "@/app/words.ts";
-import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
+import { homeNowSaid, MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
 import { ROLE_UNREAD } from "@/features/people/self-action.tsx";
 import { HOMES } from "@/shared/navigation.ts";
@@ -107,11 +107,8 @@ describe("a change to the reader's own member", () => {
   it("lands a self-demoted Admin at an Editor's home, saying why", async () => {
     const router = await demotingHerself(adaAnAdmin(), () => adaAt("Editor"));
 
-    expect(
-      await screen.findByText(
-        "You changed your own role to Editor. People is for Admins, so this is your home now.",
-      ),
-    ).toBeDefined();
+    const said = await screen.findByText(homeNowSaid("Editor"));
+    expect(said.textContent).toContain("Editor");
     expect(router.state.location.pathname).toBe(HOMES.Editor.path);
     expect(adminsAreaOffered(), "the rail offers the role lost").toBeNull();
   });

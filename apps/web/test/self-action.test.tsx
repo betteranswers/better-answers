@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
+import { homeNowSaid, INCLUDES_YOU } from "@/features/people/member-action-words.ts";
 import { useChangeRole, useReaderId } from "@/features/people/people-api.ts";
 import {
   HomeLine,
@@ -147,7 +148,7 @@ describe("an action's confirmation", () => {
       wrapper: wrapperOf(createAppClients()),
     });
 
-    await waitFor(() => expect(result.current[0]).toBe("This includes you."));
+    await waitFor(() => expect(result.current[0]).toBe(INCLUDES_YOU));
     expect(result.current[1]).toBeUndefined();
   });
 });
@@ -156,9 +157,8 @@ describe("going home after an action on yourself", () => {
   it("sends a self-demoted Admin to an Editor's home, saying why", async () => {
     const { history } = await demotedToEditor();
 
-    expect(screen.getByRole("status").textContent).toBe(
-      "You changed your own role to Editor. People is for Admins, so this is your home now.",
-    );
+    expect(screen.getByRole("status").textContent).toBe(homeNowSaid("Editor"));
+    expect(screen.getByRole("status").textContent).toContain("Editor");
     expect(screen.getByText("Held: Editor")).toBeDefined();
     expect(history.length, "the move home pushed an entry of its own").toBe(2);
   });

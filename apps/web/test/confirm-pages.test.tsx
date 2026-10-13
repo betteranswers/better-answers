@@ -6,6 +6,7 @@ import {
   SAID_OF_SECOND_FACTOR,
   tooManyCodesTriedOr,
 } from "@/features/auth/refusal-words.ts";
+import { CODE_AGAIN, RECOVERY_WORDS } from "@/features/auth/second-factor-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 
@@ -124,9 +125,7 @@ describe("the confirm page", () => {
     expect(numbersSaid()).toEqual(["1"]);
     expect(field.hasAttribute("readonly")).toBe(true);
 
-    expect(
-      await screen.findByText("You can enter a code again.", {}, { timeout: 3000 }),
-    ).toBeDefined();
+    expect(await screen.findByText(CODE_AGAIN, {}, { timeout: 3000 })).toBeDefined();
     expect(field.hasAttribute("readonly")).toBe(false);
     expect(alertsSaying()).toEqual([]);
   });
@@ -223,8 +222,6 @@ describe("the recovery page", () => {
     expect(
       within(main()).getByRole("link", { name: "Use your passkey or authenticator instead" }),
     ).toBeDefined();
-    expect(main().textContent).toContain(
-      "No codes left? Ask better-answers support to restore your sign-in. They check who you are another way first.",
-    );
+    expect(main().textContent).toContain(RECOVERY_WORDS.operator);
   });
 });

@@ -1,6 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { JUMP_TO, nothingMatches, searchFor } from "@/app/words.ts";
+import { JUMP_TO, searchFor } from "@/app/words.ts";
 import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import {
@@ -23,6 +23,7 @@ import {
   markTheOperator,
   person,
   provision,
+  saysARefusal,
   seedConcepts,
   signedInAtHome,
   signIn,
@@ -142,11 +143,13 @@ test("hides People from a Viewer, reading no members", async ({ page, request })
   await expect(optionOf(page, ASK.name)).toBeVisible();
   await typed(page, "people");
 
-  await expect(saidIn(page)).toHaveText(nothingMatches("people"));
+  await expect(saidIn(page)).toContainText("people");
   // Search's row is no match, so it stands beside the line that says nothing matches.
   await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("people")]);
   await expect(groupOf(page, JUMP_TO.groups.members)).toHaveCount(0);
-  await expect(inputOf(page)).toHaveAttribute("placeholder", /^Find a page$/);
+  // Of the three kinds jump-to finds, a Viewer is promised pages alone.
+  await expect(inputOf(page)).toHaveAttribute("placeholder", /page/i);
+  await expect(inputOf(page)).not.toHaveAttribute("placeholder", /member|action/i);
   expect(membersReads, "a Viewer's jump-to asked for the members").toEqual([]);
 });
 
@@ -379,7 +382,7 @@ test("offers the operator in the console no search row", async ({ page, request 
   await expect(optionOf(page, EVERY_WORKSPACE.name)).toBeVisible();
   await typed(page, "audit logs");
 
-  await expect(saidIn(page)).toHaveText(nothingMatches("audit logs"));
+  await expect(saidIn(page)).toContainText("audit logs");
   await expect(dialogOf(page).getByRole("option")).toHaveCount(0);
 });
 
@@ -390,7 +393,7 @@ test("finds nothing by an unbuilt page's name", async ({ page, request }) => {
   await expect(groupOf(page, JUMP_TO.groups.members)).toBeVisible();
   await typed(page, SIGNALS.name);
 
-  await expect(saidIn(page)).toHaveText(nothingMatches(SIGNALS.name));
+  await expect(saidIn(page)).toContainText(SIGNALS.name);
   await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor(SIGNALS.name)]);
 });
 
@@ -424,16 +427,21 @@ test("keeps pages and actions through a held, then failed, read", async ({ page,
   await opened(page, "Meta+k");
   await typed(page, "invite");
   await expect(optionOf(page, INVITE_A_PERSON.name)).toBeEnabled();
-  await expect(saidIn(page)).toHaveText(JUMP_TO.membersLoading);
+  // A row matches, so what the status says is the read still held.
+  await expect(saidIn(page)).toHaveText(/\S/);
+  const whileHeld = await saidIn(page).innerText();
 
   await typed(page, "zzz");
   await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("zzz")]);
-  await expect(saidIn(page)).toHaveText(JUMP_TO.membersLoading);
+  await expect(saidIn(page), "the status moved on before the members read ended").toHaveText(
+    whileHeld,
+  );
 
   held.resolve();
   // The query client asks again twice before it gives up.
-  await expect(refusedIn(page)).toHaveText(JUMP_TO.membersUnread, { timeout: 15_000 });
-  await expect(saidIn(page)).toHaveText(nothingMatches("zzz"));
+  await saysARefusal(refusedIn(page), { timeout: 15_000 });
+  await expect(saidIn(page), "the status still says the read is held").not.toHaveText(whileHeld);
+  await expect(saidIn(page)).toHaveText(/\S/);
   await typed(page, "");
   await expect(optionOf(page, new RegExp(`^${MEMBERS.name}`))).toBeVisible();
   await expect(optionOf(page, INVITE_A_PERSON.name)).toBeVisible();

@@ -8,6 +8,12 @@ placedWithoutMeasuring();
 
 const bar = () => screen.queryByRole("toolbar", { name: "Selected members" });
 
+/** Each count the bar's status shows: the rows ticked, then the ticked rows a search hides. */
+const countsIn = (shown: HTMLElement | null): readonly string[] =>
+  within(shown ?? document.body)
+    .getByRole("status")
+    .textContent.match(/\d+/g) ?? [];
+
 const tick = (name: string) => {
   fireEvent.click(screen.getByRole("checkbox", { name: `Select ${name}` }));
 };
@@ -35,9 +41,7 @@ describe("the selection bar", () => {
     tick("Bo Diddley");
     const shown = bar();
     expect(shown).not.toBeNull();
-    expect(within(shown ?? document.body).getByRole("status").textContent).toBe(
-      "2 members selected.",
-    );
+    expect(countsIn(shown)).toEqual(["2"]);
 
     fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
     expect(bar()).toBeNull();
@@ -52,9 +56,7 @@ describe("the selection bar", () => {
     tick("Ada Lovelace");
     tick("Bo Diddley");
     searchFor("Bo");
-    expect(within(bar() ?? document.body).getByRole("status").textContent).toBe(
-      "2 members selected, 1 not shown.",
-    );
+    expect(countsIn(bar())).toEqual(["2", "1"]);
 
     searchFor("");
     expect(

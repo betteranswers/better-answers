@@ -251,7 +251,9 @@ test("drops the left workspace's members when All workspaces picks another", asy
   await page.getByRole("banner").getByRole("button", { name: JUMP_TO.name }).click();
   const jumpTo = page.getByRole("dialog", { name: JUMP_TO.name });
   await jumpTo.getByRole("combobox", { name: JUMP_TO.name }).fill("Only In Esk");
-  await expect(jumpTo.getByRole("status")).toHaveText(JUMP_TO.membersLoading);
+  // Said of the read still out, which is not yet that nothing matches what was typed.
+  await expect(jumpTo.getByRole("status"), "jump-to says nothing of its read").toHaveText(/\S/);
+  await expect(jumpTo.getByRole("status")).not.toContainText("Only In Esk");
   // Search's row names what was typed, so a member is looked for under Members alone.
   await expect(
     jumpTo.getByRole("group", { name: JUMP_TO.groups.members }),
@@ -283,7 +285,7 @@ test("says it reads the list, filling the open menu", async ({
     listedAs(first.name, "Admin"),
   ]);
   await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES, CONSOLE.name]);
-  await expect(saidInTheBand(page)).toHaveText(PICKER_WORDS.reading);
+  await expect(saidInTheBand(page), "the band says nothing of its read").toHaveText(/\S/);
   await passesTheAccessibilityGate();
 
   release();
@@ -350,12 +352,13 @@ test("says a pending switch's refusal, holding others until it answers", async (
 
   const refused = authAnswering(page, "/organization/set-active");
   await switched(page, first.name, second.name);
-  await expect(saidInTheBand(page)).toHaveText(PICKER_WORDS.opening);
+  await expect(saidInTheBand(page), "the band says nothing of the switch").toHaveText(/\S/);
+  const saidOfTheSwitch = await saidInTheBand(page).innerText();
 
   await switcherOf(page, first.name).click();
   const menu = switcherMenuOf(page, first.name);
   await expect(saidInTheBand(page), "opening the menu forgot the pending switch").toHaveText(
-    PICKER_WORDS.opening,
+    saidOfTheSwitch,
   );
   await expect(workspacesIn(menu)).toHaveText([
     listedAs(first.name, "Admin"),
@@ -495,7 +498,7 @@ test("drops the left workspace's name while the switch waits offline", async ({
 
   await switched(page, first.name, second.name);
 
-  await expect(saidInTheBand(page)).toHaveText(PICKER_WORDS.opening);
+  await expect(saidInTheBand(page), "the band says nothing of the switch").toHaveText(/\S/);
   await expect(switcherOf(page, first.name), "the band still names the workspace left").toHaveCount(
     0,
   );

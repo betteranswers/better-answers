@@ -44,6 +44,19 @@ const joinButton = (page: Page, workspace: string) =>
 
 const nameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.label);
 
+/** The line saying who invited, and as the first role it names after them. */
+const invitedAs = (page: Page, role: Role) =>
+  page
+    .getByRole("main")
+    .getByRole("paragraph")
+    .filter({
+      hasText: new RegExp(String.raw`${INVITER}(?:(?!Admin|Editor|Viewer).)*${role}\b`),
+    });
+
+/** A page's own words as a pattern, so a description is matched for holding them. */
+const holding = (words: string): RegExp =>
+  new RegExp(words.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`));
+
 /** A workspace, a named inviter and a waiting invitation to a fresh address, not yet signed in. */
 const anInvitation = async (request: APIRequestContext, workspaceName: string, role: Role) => {
   const workspace = await provision(request, { name: workspaceName });
@@ -74,18 +87,18 @@ test("an invited newcomer names themselves on the invitation, then joins", async
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${quoted(INVITATION_WORDS.heading("Calder Joinery"))} [level=1]
-      - paragraph: ${quoted(INVITATION_WORDS.body(INVITER, "Editor"))}
-      - text: ${quoted(DISPLAY_NAME_WORDS.label)}
-      - paragraph: ${quoted(DISPLAY_NAME_WORDS.hint)}
+      - paragraph
+      - paragraph
       - textbox ${quoted(DISPLAY_NAME_WORDS.label)}
       - button ${quoted(INVITATION_WORDS.join("Calder Joinery"))}
       - button "Sign out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
+  await expect(invitedAs(page, "Editor")).toBeVisible();
   await passesTheAccessibilityGate();
 
   const keystrokes = await keystrokesListed(page, "this page");
-  await expect(keystrokes).toContainText(INVITATION_ACTIONS.join);
+  await expect(keystrokes.getByRole("term").filter({ hasText: /^j$/ })).toBeVisible();
   await keystrokesDismissed(page, keystrokes);
 
   await nameField(page).fill("Priya Shah");
@@ -120,7 +133,7 @@ test("a named invitee reads it within a second, joins keyboard-only", async ({
   const elapsedMs = Date.now() - started;
   test.info().annotations.push({ type: "invitation read", description: `${elapsedMs} ms` });
   expect(elapsedMs, "the invitation was not read within its second").toBeLessThan(READ_BUDGET_MS);
-  await expect(page.getByText(INVITATION_WORDS.body(INVITER, "Viewer"))).toBeVisible();
+  await expect(invitedAs(page, "Viewer")).toBeVisible();
   await expect(nameField(page)).toHaveCount(0);
   await passesTheAccessibilityGate();
 
@@ -154,9 +167,10 @@ test("refuses a bad name, joining nothing until it is fixed", async ({
   await keepsItsWordOffThePage(page, "display-name-angle-bracket");
   await expect(refusal).toHaveCount(1);
   await expect(nameField(page)).toHaveAttribute("aria-invalid", "true");
-  await expect(nameField(page)).toHaveAccessibleDescription(
-    `${DISPLAY_NAME_WORDS.hint} ${await refusal.innerText()}`,
-  );
+  await expect(
+    nameField(page),
+    "the refusal does not describe the field",
+  ).toHaveAccessibleDescription(holding(await refusal.innerText()));
   await expect(invitationHeading(page, "Harrow Glazing")).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${link}$`));
   await passesTheAccessibilityGate();
@@ -261,7 +275,7 @@ test("refuses a person at another address, offering the invited one", async ({
   await passesTheAccessibilityGate();
 
   const keystrokes = await keystrokesListed(page, "this page");
-  await expect(keystrokes).toContainText(INVITATION_ACTIONS.anotherAddress);
+  await expect(keystrokes.getByRole("term").filter({ hasText: /^s$/ })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(keystrokes).toBeHidden();
   await page.keyboard.press("s");

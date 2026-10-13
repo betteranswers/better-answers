@@ -3,18 +3,8 @@ import { z } from "zod";
 
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
-import {
-  codeSent,
-  newCodeSent,
-  sendingANewCode,
-  SIGN_IN_WORDS,
-  type CarriedOn,
-} from "@/features/auth/sign-in-words.ts";
-import {
-  NO_WORKSPACE_HEADING,
-  PICKER_ACTIONS,
-  PICKER_WORDS,
-} from "@/features/auth/workspace-words.ts";
+import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts";
+import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
@@ -83,8 +73,33 @@ const theSendIsRefusedNamingItsWait = async (page: Page, email: string): Promise
 const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
   await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
   await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
-  await expect(page.getByRole("status")).toHaveText(codeSent(email));
+  await expect(codeField(page)).toBeVisible();
+  await expect(page.getByRole("status"), "the page says nothing of the email").toHaveText(/\S/);
 };
+
+/**
+ * A send still out says something new too, so the status is compared only once the button that
+ * sends is free again.
+ */
+const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => {
+  await expect(
+    page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }),
+    "the new email is still sending",
+  ).toHaveAttribute("aria-disabled", "false");
+  await expect
+    .poll(
+      async () => ["", earlier].includes(await page.getByRole("status").innerText()),
+      "the page says nothing new of the email",
+    )
+    .toBe(false);
+};
+
+/** A page's own words as an XPath string, whatever quotes they hold. */
+const asXPath = (words: string): string =>
+  `concat(${words
+    .split('"')
+    .map((part) => `"${part}"`)
+    .join(`, '"', `)}, "")`;
 
 const atTheCodeStep = async (page: Page, email: string): Promise<void> => {
   await page.goto("/sign-in");
@@ -162,8 +177,6 @@ const floodCodesTo = async (request: APIRequestContext, email: string, count: nu
   }
 };
 
-const NO_WE = /\bwe\b/i;
-
 const memberOfTwoWorkspaces = async (
   request: APIRequestContext,
   email: string,
@@ -199,11 +212,13 @@ test("shows a member of two workspaces their role in each", async ({ page, reque
     - list:
       - listitem:
         - button ${quoted(first.name)}
-        - text: Admin
       - listitem:
         - button ${quoted(second.name)}
-        - text: Viewer
   `);
+  await expect(rowsOf(page), "a row does not show the role held there").toContainText([
+    "Admin",
+    "Viewer",
+  ]);
   const acme = page.getByRole("button", { name: first.name, exact: true });
   await expect(acme, "a screen reader hears no role with the button").toHaveAccessibleDescription(
     "Admin",
@@ -266,7 +281,6 @@ test("scopes everything to the workspace a two-workspace member picks", async ({
   await signIn(page, request, email);
 
   await expect(thePicker(page)).toBeVisible();
-  await expect(page.getByText(PICKER_WORDS.lead)).toBeVisible();
   await expect(page.getByRole("button", { name: first.name })).toBeVisible();
 
   await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
@@ -294,7 +308,7 @@ test("ends the chooser with Account, Sign out and Keyboard shortcuts", async ({
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${quoted(PICKER_WORDS.heading)} [level=1]
-      - paragraph: ${quoted(PICKER_WORDS.lead)}
+      - paragraph
       - list
       - link ${quoted(ACCOUNT_HEADING)}
       - button "Sign out"
@@ -311,7 +325,7 @@ test("ends the chooser with Account, Sign out and Keyboard shortcuts", async ({
   await expect(keystrokesButton(page)).toBeFocused();
 
   const listed = await keystrokesListed(page, PICKER_WORDS.heading);
-  await expect(listed).toContainText(PICKER_ACTIONS.toWorkspaces);
+  await expect(listed.getByRole("term").filter({ hasText: /^w$/ })).toBeVisible();
   await keystrokesDismissed(page, listed);
   await page.keyboard.press("w");
   await expect(workspaces.first()).toBeFocused();
@@ -378,11 +392,8 @@ test("says a code is sent, wrong, or asked too often", async ({
 
   await page.goto("/sign-in");
   await expect(signInHeading(page)).toBeVisible();
-  await expect(page.getByText(SIGN_IN_WORDS.emailStep.nothing.hint)).toBeVisible();
-  await expect(page.locator("body"), "the email step says we").not.toContainText(NO_WE);
 
   await sendTheFirstCode(page, email);
-  await expect(page.locator("body"), "the code step says we").not.toContainText(NO_WE);
 
   await aWrongCodeIsRefused(page);
   await passesTheAccessibilityGate();
@@ -455,7 +466,6 @@ const invitedTo = async (request: APIRequestContext, name: string): Promise<stri
 const namesWhereItCarries = async (page: Page, carriedOn: CarriedOn): Promise<void> => {
   await expect(page).toHaveURL(/\/sign-in\?/);
   await expect(signInHeading(page, carriedOn)).toBeVisible();
-  await expect(page.getByText(SIGN_IN_WORDS.emailStep[carriedOn].hint)).toBeVisible();
 };
 
 test("names joining a workspace when sign-in carries an invitation", async ({ page, request }) => {
@@ -465,8 +475,7 @@ test("names joining a workspace when sign-in carries an invitation", async ({ pa
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${quoted(SIGN_IN_WORDS.emailStep.joining.title)} [level=1]
-      - paragraph: ${quoted(SIGN_IN_WORDS.emailStep.joining.hint)}
-      - text: ${quoted(SIGN_IN_WORDS.emailField)}
+      - paragraph
       - textbox ${quoted(SIGN_IN_WORDS.emailField)}
       - button ${quoted(SIGN_IN_WORDS.send)}
   `);
@@ -487,18 +496,20 @@ test("a new code sent from the code step signs in", async ({
   await provision(request, { name: "Again Ltd", adminEmail: email });
   await atTheCodeStep(page, email);
   await aWrongCodeIsRefused(page);
+  const saidOfTheFirst = await page.getByRole("status").innerText();
 
   await page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }).click();
 
-  await expect(page.getByRole("status")).toHaveText(newCodeSent(email));
+  // The press took focus, and the field takes it back only once the new email has gone.
+  await expect(codeField(page), "the new code's field did not take focus").toBeFocused();
+  await expect(codeField(page), "the refused digits outlived the new code").toHaveValue("");
+  await saysANewEmailWent(page, saidOfTheFirst);
   const refused = page.getByRole("alert", { includeHidden: true });
   await expect(refused, "the wrong code's refusal outlived the new code").toBeEmpty();
-  await expect(codeField(page), "the new code's field did not take focus").toBeFocused();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${quoted(SIGN_IN_WORDS.codeTitle)} [level=1]
-      - status: ${quoted(newCodeSent(email))}
-      - text: ${quoted(SIGN_IN_WORDS.codeField)}
+      - status
       - textbox ${quoted(SIGN_IN_WORDS.codeField)}
       - button ${quoted(SIGN_IN_WORDS.signIn)}
       - button ${quoted(SIGN_IN_WORDS.sendAgain)}
@@ -525,11 +536,16 @@ test("names the wait when a new code meets the ceiling", async ({
 
   await page.keyboard.press("Tab");
   const listed = await keystrokesListed(page, KEYSTROKE_WORDS.thisPage);
-  await expect(listed.getByText(SIGN_IN_WORDS.sendAgain)).toBeVisible();
-  await expect(listed.getByText(SIGN_IN_WORDS.otherAddress)).toBeVisible();
+  await expect(listed.getByRole("term").filter({ hasText: /^n$/ })).toBeVisible();
+  await expect(listed.getByRole("term").filter({ hasText: /^e$/ })).toBeVisible();
   await keystrokesDismissed(page, listed);
 
-  await clockTheNextKey(page, { at: "//*[@role='status']", reads: sendingANewCode(email) });
+  // Landed once the status stops saying the first email's line; the page is read by its heading.
+  const saidOfTheFirst = await page.getByRole("status").evaluate((status) => status.textContent);
+  await clockTheNextKey(page, {
+    at: `//main[.//*[@role='status'][string(.)!=${asXPath(saidOfTheFirst)}]]`,
+    reads: SIGN_IN_WORDS.codeTitle,
+  });
   const answered = theSendsAnswer(page);
   await page.keyboard.press("n");
   await theActionLandedWithinItsBudget(page, "send a new code");
@@ -629,10 +645,13 @@ test("sends a wrong code once, selected, naming two tries left", async ({ page, 
 /** A spent code leaves focus on sending another, so Enter alone asks for the code that signs in. */
 const anotherCodeSignsIn = async (page: Page, request: APIRequestContext, email: string) => {
   await expect(page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain })).toBeFocused();
+  const saidOfTheFirst = await page.getByRole("status").innerText();
 
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("status")).toHaveText(newCodeSent(email));
+  // The field takes focus only once the new email has gone, so the code read next is the new one.
   await expect(codeField(page)).toBeFocused();
+  await expect(codeField(page), "the spent digits outlived the new code").toHaveValue("");
+  await saysANewEmailWent(page, saidOfTheFirst);
   await page.keyboard.type(await codeSentTo(request, email));
   await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
 };
@@ -901,11 +920,8 @@ test("separates an unread workspace list from no workspace, offering retry", asy
   await page.unroute(theWorkspacesRead);
   await page.getByRole("button", { name: PICKER_WORDS.tryAgain }).click();
 
-  /* jscpd:ignore-start */
-  await expect(page.getByText(PICKER_WORDS.lead)).toBeVisible();
   await expect(page.getByRole("button", { name: first.name })).toBeVisible();
   await expect(page.getByRole("button", { name: second.name })).toBeVisible();
-  /* jscpd:ignore-end */
 });
 
 test("makes the pages outside the shell keyboard-operable, landmarked and labelled", async ({

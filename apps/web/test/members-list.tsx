@@ -178,22 +178,29 @@ type Narrowed = { readonly search: string; readonly role: string | undefined };
 
 type FocusTarget = RefObject<HTMLElement | null>;
 
+/** The lines this list says of its own state, which a test holds it to by identity. */
+export const LIST_SAYS = {
+  none: "No one belongs to this workspace yet.",
+  noneFiltered: "No one matches these filters.",
+  noneMatching: (search: string): string => `No one matches “${search}”.`,
+  loading: "The members are still loading.",
+  failed: "The members could not be read.",
+} as const;
+
 const emptyOf = (narrowed: Narrowed, clear: () => void, focusAfterClear: FocusTarget) => {
   if (narrowed.search === "" && narrowed.role === undefined) {
     return (
       <ListState
         state={{
           kind: "empty",
-          words: "No one belongs to this workspace yet.",
+          words: LIST_SAYS.none,
           action: <Button>Invite people</Button>,
         }}
       />
     );
   }
   const words =
-    narrowed.search === ""
-      ? "No one matches these filters."
-      : `No one matches “${narrowed.search}”.`;
+    narrowed.search === "" ? LIST_SAYS.noneFiltered : LIST_SAYS.noneMatching(narrowed.search);
   return (
     <ListState
       state={{
@@ -312,14 +319,14 @@ function MembersTable(properties: { readonly held: Held }) {
 function MembersRead(properties: { readonly asked: Asked; readonly held: Held }) {
   const { read = "ready", onRetry = NOTHING } = properties.asked;
   if (read === "loading") {
-    return <ListState state={{ kind: "loading", words: "The members are still loading." }} />;
+    return <ListState state={{ kind: "loading", words: LIST_SAYS.loading }} />;
   }
   if (read === "failed") {
     return (
       <ListState
         state={{
           kind: "failed",
-          words: "The members could not be read.",
+          words: LIST_SAYS.failed,
           onRetry,
           focusAfterRetry: properties.held.searchRef,
         }}

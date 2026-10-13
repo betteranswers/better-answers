@@ -4,14 +4,8 @@ import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { z } from "zod";
 
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
-import {
-  codeShown,
-  codeSpelled,
-  LINK_WORDS,
-  signingInAs,
-  worksUntil,
-} from "@/features/auth/link-words.ts";
-import { newCodeSent, SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
+import { codeShown, codeSpelled, LINK_WORDS } from "@/features/auth/link-words.ts";
+import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 
 import { expect, test as base } from "./browser.ts";
@@ -114,7 +108,7 @@ const refusedOnceAt = (page: Page, path: string, waitSeconds: number) =>
 const DEAD_PAGE = `
   - main:
     - heading ${quoted(LINK_WORDS.deadTitle)} [level=1]
-    - status: ${quoted(LINK_WORDS.dead)}
+    - status
     - link ${quoted(LINK_WORDS.backToSignIn)}:
       - /url: /sign-in
     - button ${quoted(KEYSTROKE_WORDS.button)}
@@ -124,6 +118,7 @@ const DEAD_PAGE = `
 const theDeadPage = async (page: Page): Promise<string> => {
   const main = page.getByRole("main");
   await expect(main).toMatchAriaSnapshot(DEAD_PAGE);
+  await expect(main.getByRole("status"), "the dead page says nothing").toHaveText(/\S/);
   await expect(page, "the fragment lingers in the address").toHaveURL(/\/sign-in\/link$/);
   return main.ariaSnapshot();
 };
@@ -143,7 +138,7 @@ test("a scanner's read spends nothing; the asking browser signs in", async ({
 
   await page.goto(linkTo(token));
   await expect(signInButton(page)).toBeFocused();
-  await expect(page.getByRole("status")).toHaveText(signingInAs(email));
+  await expect(page.getByRole("status"), "the page does not say who signs in").toContainText(email);
   await expect(page, "the fragment lingers in the address").toHaveURL(/\/sign-in\/link$/);
   await passesTheAccessibilityGate();
 
@@ -177,8 +172,11 @@ test("another device shows the code and stays signed out", async ({
   await expect(page.getByText(codeShown(code))).toBeVisible();
   await expect(signInButton(page)).toHaveCount(0);
 
+  // The copy's own status follows the page's, and stands empty until the code is copied.
+  const saidOfTheCopy = page.getByRole("status").last();
+  await expect(saidOfTheCopy, "the copy's status holds words before a copy").toBeEmpty();
   await page.getByRole("button", { name: LINK_WORDS.copy }).click();
-  await expect(page.getByRole("status").filter({ hasText: LINK_WORDS.copied })).toBeVisible();
+  await expect(saidOfTheCopy, "the page says nothing of the copy").toHaveText(/\S/);
   await page.bringToFront();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied, "the copy is not the six digits alone").toBe(code);
@@ -202,8 +200,21 @@ test("unknown, spent and superseded links show one dead page", async ({
 }) => {
   const asked = await aLinkAskedForIn(anotherBrowser, request, "Dunmore");
   const { asking, token: superseded } = asked;
+  const saidOfTheFirst = await asking.getByRole("status").innerText();
   await asking.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }).click();
-  await expect(asking.getByRole("status")).toHaveText(newCodeSent(asked.email));
+  // The press took focus, and the field takes it back only once the new email has gone.
+  await expect(asking.getByLabel(SIGN_IN_WORDS.codeField, { exact: true })).toBeFocused();
+  // A send still out says something new too, so the button is free again before the status is read.
+  await expect(
+    asking.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }),
+    "the second email is still sending",
+  ).toHaveAttribute("aria-disabled", "false");
+  await expect
+    .poll(
+      async () => ["", saidOfTheFirst].includes(await asking.getByRole("status").innerText()),
+      "the page says nothing new of the second email",
+    )
+    .toBe(false);
   const spent = await linkSentTo(request, asked.email);
   expect(spent, "asking again sent the same link").not.toBe(superseded);
 
@@ -259,7 +270,7 @@ test("a refused read offers to check the link again", async ({
   await page.keyboard.press("r");
 
   await expect(signInButton(page)).toBeFocused();
-  await expect(page.getByRole("status")).toHaveText(signingInAs(email));
+  await expect(page.getByRole("status"), "the page does not say who signs in").toContainText(email);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
@@ -298,19 +309,30 @@ test("the code reads as six digits, and c copies it", async ({
   );
   await page.goto(linkTo(token));
   const { until } = elsewhere.parse(await (await described).json());
+  // The time the code stops working, as the reader's own clock shows it.
+  const untilTime = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(
+    new Date(until),
+  );
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${quoted(LINK_WORDS.elsewhereTitle)} [level=1]
-      - status: ${quoted(LINK_WORDS.elsewhere)}
+      - status
       - paragraph: ${quoted(codeSpelled(code))}
-      - paragraph: ${quoted(worksUntil(until))}
+      - paragraph: /${untilTime}/
       - button ${quoted(LINK_WORDS.copy)}
       - paragraph:
-        - strong: ${quoted(`${LINK_WORDS.warning} ${LINK_WORDS.neverShare}`)}
+        - strong
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
+  await expect(page.getByRole("status").first(), "the page says nothing of the code").toHaveText(
+    /\S/,
+  );
 
-  await clockTheNextKey(page, { at: "//main", reads: LINK_WORDS.copied });
+  // Landed once the copy's own status, the page's last, holds words; the page is read by its heading.
+  await clockTheNextKey(page, {
+    at: "//main[(.//*[@role='status'])[last()][normalize-space(.)]]",
+    reads: LINK_WORDS.elsewhereTitle,
+  });
   await page.keyboard.press("c");
   await theActionLandedWithinItsBudget(page, "copy");
 });

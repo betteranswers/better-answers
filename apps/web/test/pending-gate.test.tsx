@@ -5,7 +5,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { detourTo } from "@/features/auth/second-factor-steps.ts";
-import { UNSAVED_AFTER_CONFIRMING } from "@/features/auth/second-factor-words.ts";
+import {
+  CONFIRM_WORDS,
+  PROMOTION_WORDS,
+  SETUP_WORDS,
+  UNSAVED_AFTER_CONFIRMING,
+} from "@/features/auth/second-factor-words.ts";
+import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
 
 import { openApp } from "./open-app.tsx";
@@ -326,15 +332,10 @@ describe("the confirm page for a person just promoted", () => {
     const list = await screen.findByRole("list", {
       name: "You’ve just been made an Admin. These can confirm your sign-in:",
     });
-    expect([...list.querySelectorAll("li")].map((item) => item.textContent)).toEqual([
-      "Passkey · MacBook · added 3 March 2026",
-      "Authenticator",
-    ]);
-    expect(
-      screen.getByText(
-        "If one isn’t yours, confirm with one that is, then remove it on your Account page. If none is, sign out and ask better-answers support to restore your sign-in.",
-      ),
-    ).toBeDefined();
+    const [passkey, ...others] = [...list.querySelectorAll("li")].map((item) => item.textContent);
+    expect(passkey).toMatch(/MacBook.*3 March 2026/v);
+    expect(others).toEqual([PROMOTION_WORDS.authenticator]);
+    expect(screen.getByText(PROMOTION_WORDS.after)).toBeDefined();
     const code = screen.getByRole("textbox", { name: "Authenticator code" });
     expect(list.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -345,7 +346,8 @@ describe("the confirm page for a person just promoted", () => {
     await openAsAda("/confirm");
 
     await screen.findByRole("textbox", { name: "Authenticator code" });
-    expect(screen.queryByText(/You’ve just been made an Admin/)).toBeNull();
+    expect(screen.queryByText(PROMOTION_WORDS.lead)).toBeNull();
+    expect(screen.queryByText(PROMOTION_WORDS.after)).toBeNull();
   });
 
   it("names better-answers support as the operator's reason", async () => {
@@ -353,11 +355,7 @@ describe("the confirm page for a person just promoted", () => {
 
     await openAsAda("/confirm");
 
-    expect(
-      await screen.findByText(
-        "As better-answers support, you confirm a second factor before going on.",
-      ),
-    ).toBeDefined();
+    expect(await screen.findByText(CONFIRM_WORDS.whyTheOperator)).toBeDefined();
   });
 
   it("names the workspace on setup that just made them Admin", async () => {
@@ -369,11 +367,10 @@ describe("the confirm page for a person just promoted", () => {
 
     await openAsAda("/setup");
 
-    expect(
-      await screen.findByText(
-        "You’re now an Admin of Northern Tooling. Admins must hold a passkey or an authenticator, and confirm with it at sign-in.",
-      ),
-    ).toBeDefined();
+    const why = await screen.findByText(SETUP_WORDS.nowAnAdmin("Northern Tooling"), {
+      exact: false,
+    });
+    expect(why.textContent).toContain("Northern Tooling");
   });
 });
 
@@ -411,8 +408,6 @@ describe("a sign-in that ended while waiting on its second factor", () => {
 
     await openApp("/sign-in?redirect=%2Fpeople%2Fmembers");
 
-    expect(
-      await screen.findByText("Your sign-in ended because it wasn’t confirmed within an hour."),
-    ).toBeDefined();
+    expect(await screen.findByText(SIGN_IN_WORDS.arrived["confirm-timed-out"])).toBeDefined();
   });
 });

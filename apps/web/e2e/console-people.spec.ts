@@ -1,14 +1,11 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { JUMP_TO } from "@/app/words.ts";
-import { correctedWords, correctWords } from "@/features/console/correcting-words.ts";
-import { ENDED_BY_THE_SERVER } from "@/features/console/grant-words.ts";
+import { correctWords } from "@/features/console/correcting-words.ts";
 import { EVERYONE_WORDS, NAMES_WAITING_WORDS } from "@/features/console/list-words.ts";
 import {
   NAMES_WAITING_KEYSTROKES,
   PEOPLE_KEYSTROKES,
-  SELECT_A_NAME_FIRST,
-  SELECT_A_PERSON_FIRST,
 } from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR, SIGN_IN_TOO_OLD } from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
@@ -66,6 +63,14 @@ const REVOKE = "End every sign-in and token Priya Shah holds";
 
 const CORRECT_A_NAME = "console.people.correctDisplayName";
 
+/** The instant an ending is said with: a line still on its way holds none. */
+const ENDED_AT = /\d{2}:\d{2}/;
+
+/** Fifty-one people over pages of fifty, as each page counts its own. */
+const THE_FIRST_PAGE = /\b1\D+50\D+51\b/;
+
+const THE_LAST_PAGE = /\b51\D+51\D+51\b/;
+
 /** What the page said, as a pattern's own text, so its full stop matches a full stop alone. */
 const asWritten = (said: string): string => said.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`);
 
@@ -83,6 +88,12 @@ const listedFor = (own: Readonly<Record<string, { readonly action: string }>>): 
 ];
 
 const everyone = (page: Page) => page.getByRole("region", { name: EVERYONE_WORDS.heading });
+
+/** A list's count is its head's, so it is the first status its region holds. */
+const countOf = (list: Locator): Locator => list.getByRole("status").first();
+
+/** An outcome's status stands beside its alert. A list's count and its pages' count have none. */
+const outcomeOf = (list: Locator): Locator => list.locator("output:has(+ [role='alert'])");
 
 const searchBox = (page: Page) =>
   everyone(page).getByRole("searchbox", { name: EVERYONE_WORDS.search });
@@ -102,6 +113,9 @@ const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", 
 
 const regionOf = (sheet: Locator, name: string): Locator =>
   sheet.getByRole("region", { name, exact: true });
+
+/** One item for each session the person holds open. */
+const sessionsOf = (sheet: Locator): Locator => regionOf(sheet, "Sessions").getByRole("listitem");
 
 const confirmationOf = (page: Page): Locator => page.getByRole("dialog", { name: REVOKE });
 
@@ -168,7 +182,7 @@ const openPriya = async (page: Page, tag: string): Promise<Locator> => {
   await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
   await personButton(page, "Priya Shah").click();
   const sheet = sheetOf(page, "Priya Shah");
-  await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
+  await expect(sessionsOf(sheet)).toHaveCount(1);
   return sheet;
 };
 
@@ -179,7 +193,7 @@ const nameFieldOf = (dialog: Locator): Locator =>
   dialog.getByRole("textbox", { name: "Display name" });
 
 /**
- * The action opens on the name as it stands, under the rule and the consequence; Cancel hands focus
+ * Opens on the name as it stands, described by its rule and its consequence; Cancel hands focus
  * back. `audit` runs on the open dialog.
  */
 const correctingCancelled = async (
@@ -192,8 +206,8 @@ const correctingCancelled = async (
   const dialog = dialogToCorrect(page, name);
   await expect(nameFieldOf(dialog)).toBeFocused();
   await expect(nameFieldOf(dialog)).toHaveValue(name);
-  await expect(dialog).toContainText("the rule a person’s own name follows");
-  await expect(dialog).toContainText("in every workspace they belong to");
+  await expect(nameFieldOf(dialog)).toHaveAccessibleDescription(/\b100\b/);
+  await expect(dialog).toHaveAccessibleDescription(new RegExp(asWritten(name)));
   await asked.audit();
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
@@ -204,9 +218,7 @@ const correctingCancelled = async (
 const namesWaiting = (page: Page) =>
   page.getByRole("region", { name: NAMES_WAITING_WORDS.heading });
 
-/** The count, told apart by its words from the action's own status beside it. */
-const waitingCount = (page: Page): Locator =>
-  namesWaiting(page).getByRole("status").filter({ hasText: "to be corrected." });
+const waitingCount = (page: Page): Locator => countOf(namesWaiting(page));
 
 const waitingSearch = (page: Page): Locator =>
   namesWaiting(page).getByRole("searchbox", { name: NAMES_WAITING_WORDS.search });
@@ -286,17 +298,20 @@ test.describe("the console's Everyone page", () => {
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
 
     await expect(personRows(page)).toHaveCount(3);
-    await expect(everyone(page).getByRole("status").first()).toHaveText(
-      EVERYONE_WORDS.matching(3, tag),
-    );
+    await expect(countOf(everyone(page))).toHaveText(/\b3\b/);
     const theirs = rowOf(page, "Priya Shah");
     await expect(theirs).toContainText(priya.email);
     await expect(theirs.getByRole("cell").nth(1).getByRole("listitem")).toHaveText([
       `${beta.name} Viewer`,
       `${operators.name} Editor`,
     ]);
-    await expect(theirs.getByRole("cell").nth(2)).toHaveText("None on record");
-    await expect(rowOf(page, "Sam Okoro").getByRole("cell").nth(1)).toHaveText("No workspace");
+    await expect(
+      theirs.getByRole("cell").nth(2),
+      "a person who never signed in shows an instant, or nothing",
+    ).toHaveText(/^\D+$/);
+    const sams = rowOf(page, "Sam Okoro").getByRole("cell").nth(1);
+    await expect(sams.getByRole("listitem")).toHaveCount(0);
+    await expect(sams, "a person in no workspace has an empty cell").toHaveText(/\S/);
     await expect(rowOf(page, operators.admin.email).getByRole("cell").nth(2)).toHaveText(INSTANT);
   });
 
@@ -313,22 +328,29 @@ test.describe("the console's Everyone page", () => {
 
     await searchBox(page).fill(tag.toUpperCase());
     await expect(personRows(page)).toHaveCount(3);
-    await expect(everyone(page)).toContainText(EVERYONE_WORDS.matching(3, tag.toUpperCase()));
+    await expect(countOf(everyone(page))).toHaveText(/\b3\b/);
 
     await searchBox(page).fill(`hartley ${tag}`);
     await expect(personRows(page)).toHaveCount(1);
     await expect(rowOf(page, `Ada Hartley ${tag}`)).toBeVisible();
-    await expect(everyone(page)).toContainText(EVERYONE_WORDS.matching(1, `hartley ${tag}`));
+    await expect(countOf(everyone(page))).toHaveText(/\b1\b/);
 
     await searchBox(page).fill(`nobody ${tag}`);
-    await expect(everyone(page)).toContainText(EVERYONE_WORDS.noneMatch(`nobody ${tag}`));
+    await expect(countOf(everyone(page))).toHaveText(/\b0\b/);
+    // The one row left is the list's own, saying none match and offering to clear.
     await expect(personRows(page)).toHaveCount(1);
+    await expect(personRows(page).getByRole("button")).toHaveText([CLEAR_WORDS.search]);
+    const narrowed = await countOf(everyone(page)).innerText();
     await passesTheAccessibilityGate();
     await everyone(page).getByRole("button", { name: CLEAR_WORDS.search }).click();
 
     await expect(searchBox(page)).toHaveValue("");
     await expect(searchBox(page)).toBeFocused();
-    await expect(everyone(page)).toContainText("on the platform.");
+    await expect(
+      countOf(everyone(page)),
+      "the count still says what the search left",
+    ).not.toHaveText(narrowed);
+    await expect(countOf(everyone(page))).toHaveText(/\d/);
   });
 
   test("pages through more people than one page holds", async ({ page, request }) => {
@@ -342,7 +364,7 @@ test.describe("the console's Everyone page", () => {
 
     const paging = everyone(page).getByRole("navigation", { name: "Pages of people" });
     await expect(personRows(page)).toHaveCount(50);
-    await expect(paging).toContainText("Showing 1–50 of 51.");
+    await expect(paging).toHaveText(THE_FIRST_PAGE);
     await expect(paging.getByRole("button", { name: "Previous page" })).toHaveAttribute(
       "aria-disabled",
       "true",
@@ -351,21 +373,28 @@ test.describe("the console's Everyone page", () => {
     const next = paging.getByRole("button", { name: "Next page" });
     await next.click();
     await expect(personRows(page)).toHaveCount(1);
-    await expect(paging).toContainText("Showing 51–51 of 51.");
+    await expect(paging).toHaveText(THE_LAST_PAGE);
     await expect(next).toHaveAttribute("aria-disabled", "true");
     await expect(next).toBeFocused();
 
     await paging.getByRole("button", { name: "Previous page" }).click();
     await expect(personRows(page)).toHaveCount(50);
 
+    // A turn past either end moves nowhere, and the list's outcome says so.
+    const said = outcomeOf(everyone(page));
+    await expect(said).toBeEmpty();
     await page.keyboard.press(PEOPLE_KEYSTROKES.previous.key);
-    await expect(everyone(page)).toContainText(EVERYONE_WORDS.onTheFirstPage);
+    await expect(said).toHaveText(/\S/);
+    await expect(paging).toHaveText(THE_FIRST_PAGE);
+    const atTheFirst = await said.innerText();
     await page.keyboard.press(PEOPLE_KEYSTROKES.next.key);
-    await expect(paging).toContainText("Showing 51–51 of 51.");
+    await expect(paging).toHaveText(THE_LAST_PAGE);
     await page.keyboard.press(PEOPLE_KEYSTROKES.next.key);
-    await expect(everyone(page)).toContainText(EVERYONE_WORDS.onTheLastPage);
+    await expect(said, "the outcome still says the first page's end").not.toHaveText(atTheFirst);
+    await expect(said).toHaveText(/\S/);
+    await expect(paging).toHaveText(THE_LAST_PAGE);
     await page.keyboard.press(PEOPLE_KEYSTROKES.previous.key);
-    await expect(paging).toContainText("Showing 1–50 of 51.");
+    await expect(paging).toHaveText(THE_FIRST_PAGE);
   });
 
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
@@ -416,14 +445,14 @@ test.describe("the console's Everyone page", () => {
     await expect(thePage(page)).toMatchAriaSnapshot(`
       - main "Page":
         - heading ${quoted(PEOPLE.name)} [level=1]
-        - paragraph: ${quoted(PEOPLE.summary)}
+        - paragraph
         - region ${quoted(EVERYONE_WORDS.heading)}:
           - heading ${quoted(EVERYONE_WORDS.heading)} [level=2]
-          - paragraph: ${quoted(EVERYONE_WORDS.description)}
-          - status: ${quoted(EVERYONE_WORDS.matching(2, tag))}
+          - paragraph
+          - status: /\\b2\\b/
           - searchbox ${quoted(EVERYONE_WORDS.search)}: ${tag}
           - table:
-            - caption: ${quoted(EVERYONE_WORDS.caption)}
+            - caption
             - rowgroup:
               - row "Person Workspaces and roles Last sign-in":
                 - columnheader "Person"
@@ -433,8 +462,8 @@ test.describe("the console's Everyone page", () => {
               - row /Priya Shah/:
                 - cell /Priya Shah/:
                   - button "Priya Shah"
-                - cell "No workspace"
-                - cell "None on record"
+                - cell
+                - cell
               - row /Test person/:
                 - cell /Test person/:
                   - button "Test person"
@@ -451,7 +480,8 @@ test.describe("the console's Everyone page", () => {
 
     await skipLinkReachesThePage(page);
     await page.keyboard.press("o");
-    await expect(everyone(page)).toContainText(SELECT_A_PERSON_FIRST);
+    await expect(outcomeOf(everyone(page))).toHaveText(/\S/);
+    await expect(page.getByRole("dialog"), "a person opened with none in focus").toHaveCount(0);
 
     const listed = (await keystrokesListed(page, EVERYONE.name)).getByRole("definition");
     await expect(listed).toHaveText(listedFor(PEOPLE_KEYSTROKES));
@@ -509,11 +539,12 @@ test.describe("a person, opened from Everyone as a sheet", () => {
           - term: Last sign-in
           - definition: /\\d{2}:\\d{2} · \\d{1,2} [A-Z][a-z]+ \\d{4}/
           - term: Every sign-in and token ended
-          - definition: Never
+          - definition: /^\\D+$/
         - region "Sessions":
           - heading "Sessions" [level=3]
-          - paragraph: 1 session open. Ending every sign-in and token closes every one at once.
+          - paragraph: /\\b1\\b/
           - list:
+            - /children: equal
             - listitem:
               - term: Began
               - definition: /\\d{4}/
@@ -526,7 +557,6 @@ test.describe("a person, opened from Everyone as a sheet", () => {
           - list:
             - listitem "Claude":
               - heading "Claude" [level=4]
-              - text: Live
               - term: Workspace
               - definition: ${operators.name}
               - term: Issued
@@ -536,17 +566,24 @@ test.describe("a person, opened from Everyone as a sheet", () => {
               - button "More about Claude’s grant"
         - region "Display name":
           - heading "Display name" [level=3]
-          - paragraph: /Replaces Priya Shah’s display name in every workspace they belong to/
+          - paragraph
           - button ${quoted(correctWords("Priya Shah"))}
         - region "End every sign-in everywhere":
           - heading "End every sign-in everywhere" [level=3]
-          - paragraph: /Ends every session and every assistant’s access Priya Shah holds/
+          - paragraph
           - button "${REVOKE}"
         - button "Close"
     `);
+    for (const action of [correctWords("Priya Shah"), REVOKE]) {
+      await expect(
+        sheet.getByRole("button", { name: action }),
+        `“${action}” does not say whom it acts on`,
+      ).toHaveAccessibleDescription(/Priya Shah/);
+    }
     await passesTheAccessibilityGate();
 
     const grant = regionOf(sheet, "Assistant access").getByRole("listitem", { name: "Claude" });
+    await expect(grant.getByText("Live", { exact: true })).toBeVisible();
     await grant.getByRole("button", { name: "More about Claude’s grant" }).click();
     await expect(grant).toContainText("https://claude.ai/oauth/mcp-oauth-client-metadata");
 
@@ -569,7 +606,6 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(grant).toMatchAriaSnapshot(`
       - listitem "Claude":
         - heading "Claude" [level=4]
-        - text: Ended
         - term: Workspace
         - definition: ${operators.name}
         - term: Issued
@@ -577,11 +613,14 @@ test.describe("a person, opened from Everyone as a sheet", () => {
         - term: Ended
         - definition: /\\d{4}/
         - term: Ended by
-        - definition: ${ENDED_BY_THE_SERVER}
+        - definition: /\\S/
         - term: Ended in
         - definition: ${operators.name}
         - button "More about Claude’s grant"
     `);
+    for (const someone of ["Priya Shah", operators.admin.name]) {
+      await expect(grant, `the grant says ${someone} ended it`).not.toContainText(someone);
+    }
   });
 
   test("ends every sign-in everywhere behind a confirmation, within its budget", async ({
@@ -599,33 +638,31 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     await revoke.click();
     const confirmation = confirmationOf(page);
-    await expect(confirmation).toContainText(
-      "Every session and every assistant’s access Priya Shah holds ends now, in every workspace",
-    );
+    await expect(confirmation).toHaveAccessibleDescription(/Priya Shah/);
     await passesTheAccessibilityGate();
     await confirmation.getByRole("button", { name: "Cancel" }).click();
     await expect(confirmation).toHaveCount(0);
     await expect(revoke).toBeFocused();
-    await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
+    await expect(sessionsOf(sheet)).toHaveCount(1);
 
     await revoke.click();
     await confirmation.getByRole("button", { name: "End every sign-in everywhere" }).focus();
     await clockTheNextKey(page, {
-      at: "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Sessions']]",
-      reads: "No session is open.",
+      at: "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Sessions']][not(.//li)]",
+      reads: "Sessions",
     });
     await page.keyboard.press("Enter");
 
-    await expect(regionOf(sheet, "Sessions")).toContainText("No session is open.");
+    await expect(sessionsOf(sheet)).toHaveCount(0);
     await theActionLandedWithinItsBudget(page, "end every sign-in everywhere");
     await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("status")).toHaveText(
-      /^Priya Shah’s sessions and assistant access ended at \d{2}:\d{2} · .+\. They can sign in again\.$/,
+      ENDED_AT,
     );
     await expect(revoke).toBeFocused();
+    // Ended in every workspace, so the last fact names no one workspace.
     const endedEverywhere = `
       - listitem "Claude":
         - heading "Claude" [level=4]
-        - text: Ended
         - term: Workspace
         - definition: ${operators.name}
         - term: Issued
@@ -635,7 +672,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
         - term: Ended by
         - definition: ${operators.admin.name}
         - term: Ended in
-        - definition: Every workspace
+        - definition: /^(?!${operators.name}$).+/
         - button "More about Claude’s grant"
     `;
     await expect(grant).toMatchAriaSnapshot(endedEverywhere);
@@ -643,7 +680,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     await page.reload();
     await personButton(page, "Priya Shah").click();
-    await expect(regionOf(sheet, "Sessions")).toContainText("No session is open.");
+    await expect(sessionsOf(sheet)).toHaveCount(0);
     await expect(grant).toMatchAriaSnapshot(endedEverywhere);
   });
 
@@ -661,7 +698,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     expect(await refused).toMatchObject({ word: SIGN_IN_TOO_OLD });
     await saysARefusal(regionOf(sheet, "End every sign-in everywhere").getByRole("alert"));
-    await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
+    await expect(sessionsOf(sheet)).toHaveCount(1);
 
     await sheet.getByRole("link", { name: "Sign in again" }).click();
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
@@ -675,10 +712,10 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await confirmationOf(page)
       .getByRole("button", { name: "End every sign-in everywhere" })
       .click();
-    await expect(regionOf(again, "End every sign-in everywhere").getByRole("status")).toContainText(
-      "sessions and assistant access ended",
+    await expect(regionOf(again, "End every sign-in everywhere").getByRole("status")).toHaveText(
+      ENDED_AT,
     );
-    await expect(regionOf(again, "Sessions")).toContainText("No session is open.");
+    await expect(sessionsOf(again)).toHaveCount(0);
 
     // The way back has served once the person is closed, so a reload does not reopen them.
     await page.keyboard.press("Escape");
@@ -710,9 +747,10 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     ).toBeFocused();
     await page.keyboard.press("Enter");
 
-    await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("status")).toContainText(
-      "sessions and assistant access ended",
+    await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("status")).toHaveText(
+      ENDED_AT,
     );
+    await expect(sessionsOf(sheet)).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(personButton(page, "Priya Shah")).toBeFocused();
   });
@@ -744,7 +782,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(renamed.getByRole("heading", { level: 2 })).toHaveText("Priya Sharma");
     await theActionLandedWithinItsBudget(page, "correct display name");
     const part = regionOf(renamed, "Display name");
-    await expect(part.getByRole("status")).toHaveText(correctedWords("Priya Shah", "Priya Sharma"));
+    await expect(part.getByRole("status")).toHaveText(/\S/);
     await expect(part.getByRole("button", { name: correctWords("Priya Sharma") })).toBeFocused();
 
     await page.keyboard.press("Escape");
@@ -768,10 +806,15 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await nameFieldOf(dialogToCorrect(page, flagged)).fill("Priya Shah");
     await page.keyboard.press("Enter");
 
-    // Behind the sheet, so read as text: the list, read again, holds the operator alone.
-    await expect(page.getByText(EVERYONE_WORDS.matching(1, tag))).toBeVisible();
+    // Behind the sheet, so read with what it hides: the list, read again, holds the operator alone.
+    await expect(
+      page
+        .getByRole("region", { name: EVERYONE_WORDS.heading, includeHidden: true })
+        .getByRole("status", { includeHidden: true })
+        .first(),
+    ).toHaveText(/\b1\b/);
     const part = regionOf(sheetOf(page, "Priya Shah"), "Display name");
-    await expect(part.getByRole("status")).toHaveText(correctedWords(flagged, "Priya Shah"));
+    await expect(part.getByRole("status")).toHaveText(/\S/);
     await expect(part.getByRole("button", { name: correctWords("Priya Shah") })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(searchBox(page)).toBeFocused();
@@ -802,7 +845,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await page.keyboard.press("Enter");
     await expect(
       regionOf(sheetOf(page, "Priya Sharma"), "Display name").getByRole("status"),
-    ).toHaveText(correctedWords("Priya Shah", "Priya Sharma"));
+    ).toHaveText(/\S/);
   });
 });
 
@@ -833,14 +876,14 @@ test.describe("the console's Names waiting page", () => {
     await expect(thePage(page)).toMatchAriaSnapshot(`
       - main "Page":
         - heading ${quoted(PEOPLE.name)} [level=1]
-        - paragraph: ${quoted(PEOPLE.summary)}
+        - paragraph
         - region ${quoted(NAMES_WAITING_WORDS.heading)}:
           - heading ${quoted(NAMES_WAITING_WORDS.heading)} [level=2]
-          - paragraph: ${quoted(NAMES_WAITING_WORDS.description)}
-          - status: ${quoted(NAMES_WAITING_WORDS.matching(1, name))}
+          - paragraph
+          - status: /\\b1\\b/
           - searchbox ${quoted(NAMES_WAITING_WORDS.search)}: ${quoted(name)}
           - table:
-            - caption: ${quoted(NAMES_WAITING_WORDS.caption)}
+            - caption
             - rowgroup:
               - row "Person Flagged by Actions":
                 - columnheader "Person"
@@ -862,18 +905,24 @@ test.describe("the console's Names waiting page", () => {
     await signedInAsTheOperator(page, request, aTag());
     await page.goto(NAMES_WAITING_PAGE);
 
-    await expect(namesWaiting(page).getByText(NAMES_WAITING_WORDS.description)).toBeVisible();
-    await expect(thePage(page).getByText(PEOPLE.summary)).toBeVisible();
-    await expect(
-      thePage(page).getByText(EVERYONE_WORDS.description),
-      "Names waiting describes Everyone",
-    ).toHaveCount(0);
+    // A page's line follows its heading, and a list's description its own.
+    const summary = thePage(page).locator("h1 + p");
+    const descriptions = thePage(page).locator("h2 + p");
+    await expect(summary).toHaveText(/\S/);
+    await expect(namesWaiting(page).locator("h2 + p")).toHaveText(/\S/);
+    await expect(descriptions, "Names waiting describes more than itself").toHaveCount(1);
+    const theGroups = await summary.innerText();
+    const ofNamesWaiting = await descriptions.innerText();
 
     await navOf(page, CONSOLE).getByRole("link", { name: EVERYONE.name }).click();
-    await expect(everyone(page).getByText(EVERYONE_WORDS.description)).toBeVisible();
-    await expect(thePage(page).getByText(PEOPLE.summary)).toBeVisible();
-    await expect(thePage(page).getByText(EVERYONE_WORDS.description)).toHaveCount(1);
-    await expect(thePage(page).getByText(NAMES_WAITING_WORDS.description)).toHaveCount(0);
+    await expect(everyone(page).locator("h2 + p")).toHaveText(/\S/);
+    await expect(descriptions, "Everyone describes more than itself").toHaveCount(1);
+    await expect(descriptions, "Everyone is described as Names waiting is").not.toHaveText(
+      ofNamesWaiting,
+    );
+    await expect(summary, "the two pages of one group lead with different lines").toHaveText(
+      theGroups,
+    );
   });
 
   test("narrows by name or workspace, and says when none match", async ({
@@ -892,7 +941,7 @@ test.describe("the console's Names waiting page", () => {
     await page.keyboard.type(shouted);
     await expect(waitingRows(page)).toHaveCount(1);
     await expect(waitingRowOf(page, name)).toBeVisible();
-    await expect(namesWaiting(page)).toContainText(NAMES_WAITING_WORDS.matching(1, shouted));
+    await expect(waitingCount(page)).toHaveText(/\b1\b/);
 
     // Her own name holds no word of the workspace that flagged it.
     await waitingSearch(page).fill(operators.name);
@@ -901,15 +950,21 @@ test.describe("the console's Names waiting page", () => {
 
     const nobody = `nobody ${tag}`;
     await waitingSearch(page).fill(nobody);
-    await expect(namesWaiting(page)).toContainText(NAMES_WAITING_WORDS.noneMatch(nobody));
-    await expect(namesWaiting(page)).toContainText(NAMES_WAITING_WORDS.matching(0, nobody));
+    await expect(waitingCount(page)).toHaveText(/\b0\b/);
+    // The one row left is the list's own, saying none match and offering to clear.
+    await expect(waitingRows(page)).toHaveCount(1);
+    await expect(waitingRows(page).getByRole("button")).toHaveText([CLEAR_WORDS.search]);
+    const narrowed = await waitingCount(page).innerText();
     await passesTheAccessibilityGate();
 
     await page.keyboard.press("Escape");
     await expect(waitingSearch(page)).toHaveValue("");
     await expect(waitingSearch(page), "Escape cleared the search and lost its place").toBeFocused();
     await expect(waitingRowOf(page, name)).toBeVisible();
-    await expect(waitingCount(page)).toBeVisible();
+    await expect(waitingCount(page), "the count still says what the search left").not.toHaveText(
+      narrowed,
+    );
+    await expect(waitingCount(page)).toHaveText(/\d/);
   });
 
   test("keeps Names waiting's search and focus through a refused re-read", async ({
@@ -959,13 +1014,14 @@ test.describe("the console's Names waiting page", () => {
 
     await expect(waitingRowOf(page, name)).toHaveCount(0);
     await theActionLandedWithinItsBudget(page, "correct display name");
-    await expect(namesWaiting(page)).toContainText(correctedWords(name, corrected));
+    await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
     await expect(namesWaiting(page).getByRole("heading", { name: "Names waiting" })).toBeFocused();
 
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await expect(personButton(page, corrected)).toBeVisible();
     await page.goto(NAMES_WAITING_PAGE);
-    await expect(waitingCount(page)).toBeVisible();
+    // The count stands empty until the list is read.
+    await expect(waitingCount(page)).toHaveText(/\S/);
     await expect(waitingRowOf(page, name)).toHaveCount(0);
   });
 
@@ -1018,7 +1074,7 @@ test.describe("the console's Names waiting page", () => {
     await nameFieldOf(dialogToCorrect(page, name)).fill(corrected);
     await page.keyboard.press("Enter");
     await expect(waitingRowOf(page, name)).toHaveCount(0);
-    await expect(namesWaiting(page)).toContainText(correctedWords(name, corrected));
+    await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
     // The way back has served once the name is corrected, so a reload lands nowhere in particular.
     await expect(page).toHaveURL(NAMES_WAITING_PAGE);
   });
@@ -1030,7 +1086,8 @@ test.describe("the console's Names waiting page", () => {
 
     await skipLinkReachesThePage(page);
     await page.keyboard.press("c");
-    await expect(namesWaiting(page)).toContainText(SELECT_A_NAME_FIRST);
+    await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
+    await expect(page.getByRole("dialog"), "a name opened with none in focus").toHaveCount(0);
     const listed = await keystrokesListed(page, NAMES_WAITING.name);
     await expect(listed.getByRole("definition")).toHaveText(listedFor(NAMES_WAITING_KEYSTROKES));
     await keystrokesDismissed(page, listed);

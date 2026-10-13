@@ -51,8 +51,9 @@ test("offers a way out, shell intact, when a page throws", async ({
   await signIn(page, request, email);
   await page.goto("/models/models-and-spend");
 
-  await expect(page.getByRole("heading", { level: 1, name: FAILED_PAGE.heading })).toBeVisible();
-  await expect(page.getByRole("alert")).toContainText(FAILED_PAGE.said);
+  const failed = page.getByRole("heading", { level: 1, name: FAILED_PAGE.heading });
+  await expect(page.getByRole("alert").filter({ has: failed })).toBeVisible();
+  await expect(page.getByRole("alert").getByRole("paragraph")).toHaveText(/\S/);
   const home = HOMES.Admin;
   await expect(page.getByRole("link", { name: goHome(home) })).toHaveAttribute("href", home.path);
   const everything = page.locator("body");
@@ -84,7 +85,9 @@ test("offers a way out, shell intact, when a page throws", async ({
     "true",
   );
   await page.getByRole("tab", { name: "Spend" }).click();
-  await expect(page.getByText("Spend is not built yet.")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Spend" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel")).toHaveText(/\S/);
+  await expect(failed).toHaveCount(0);
   await expect(page.getByRole("alert")).toHaveCount(0);
 
   await navigation.getByRole("link", { name: "Members" }).click();

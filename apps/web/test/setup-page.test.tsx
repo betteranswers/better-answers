@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { AUTHENTICATOR_WORDS, RECOVERY_CODE_WORDS } from "@/features/auth/account-words.ts";
+import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 
 import {
@@ -66,7 +68,7 @@ describe("the setup page", () => {
 
     fireEvent.click(disclosure());
 
-    expect(await screen.findByText("Scan this QR code with your authenticator.")).toBeDefined();
+    expect(await screen.findByText(AUTHENTICATOR_WORDS.scan)).toBeDefined();
     expect(asked).toContain("/authenticator/start");
   });
 
@@ -74,7 +76,7 @@ describe("the setup page", () => {
     adasApi(() => NOTHING_HELD, new Map([["/authenticator/start", answering(A_KEY)]]));
     await openAsAda("/setup");
 
-    expect(await screen.findByText("Scan this QR code with your authenticator.")).toBeDefined();
+    expect(await screen.findByText(AUTHENTICATOR_WORDS.scan)).toBeDefined();
     expect(disclosure().getAttribute("aria-expanded")).toBe("true");
     expect(screen.queryByRole("textbox", { name: "Passkey name" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Add a passkey" })).toBeNull();
@@ -139,11 +141,7 @@ describe("the setup page", () => {
     );
     await openAsAda("/setup");
 
-    expect(
-      await screen.findByText(
-        "Your recovery code worked. When you finish, your old passkeys and authenticator stop working and you get new recovery codes.",
-      ),
-    ).toBeDefined();
+    expect(await screen.findByText(SETUP_WORDS.newWhy)).toBeDefined();
     expect(heading().textContent).toBe("Set up a new second factor");
     await finishTheAuthenticator();
 
@@ -296,9 +294,7 @@ describe("the recovery codes detour", () => {
     const list = await screen.findByRole("list", { name: "Recovery codes" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(10);
     expect(heading().textContent).toBe("Save your recovery codes");
-    expect(
-      screen.getByText("These replace the codes shown before, which no longer work."),
-    ).toBeDefined();
+    expect(screen.getByText(RECOVERY_CODE_WORDS.replacedLine)).toBeDefined();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "I have saved these codes" }));
     fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
@@ -336,9 +332,7 @@ describe("the recovery codes detour", () => {
 
     const list = await screen.findByRole("list", { name: "Recovery codes" });
     expect([within(list).getAllByRole("listitem").length, asked]).toEqual([10, ["made"]]);
-    expect(
-      screen.queryByText("These replace the codes shown before, which no longer work."),
-    ).toBeNull();
+    expect(screen.queryByText(RECOVERY_CODE_WORDS.replacedLine)).toBeNull();
   });
 
   it("passes to the display-name step once the set is seen", async () => {

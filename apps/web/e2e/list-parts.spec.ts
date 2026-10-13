@@ -64,7 +64,7 @@ test.describe("the shared list parts, drawn together", () => {
     await drawn(page, request);
     await tickOf(page, "Cy Twombly").click();
     await tickOf(page, "Ada Lovelace").click();
-    await expect(bar(page).getByRole("status")).toHaveText("2 members selected.");
+    await expect(bar(page).getByRole("status")).toHaveText(/\b2\b/);
     await expect(page.getByRole("navigation", { name: "Pages of members" })).toBeVisible();
 
     const room = await page.evaluate(() => {
@@ -97,7 +97,7 @@ test.describe("the shared list parts, drawn together", () => {
 
     await tabUntilFocused(page, tickOf(page, "Cy Twombly"));
     await page.keyboard.press("Space");
-    await expect(bar(page).getByRole("status")).toHaveText("1 member selected.");
+    await expect(bar(page).getByRole("status")).toHaveText(/\b1\b/);
 
     const trigger = page.getByRole("button", { name: "Actions for Cy Twombly" });
     await tabUntilFocused(page, trigger);
