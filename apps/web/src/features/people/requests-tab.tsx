@@ -155,7 +155,7 @@ function RequestList(properties: {
       ) : (
         <>
           <p id={consequenceId} className="mt-1 text-muted-foreground">
-            Approving a request sends the person an invitation.
+            Approving a request sends the person an invitation. Declining sends nothing.
           </p>
           <WaitingTable caption="Requests to join this workspace." columns={COLUMNS}>
             {requests.map((request) => (
