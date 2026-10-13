@@ -7,7 +7,7 @@ import { GridTable, RowLink } from "@/shared/grid-table.tsx";
 import { ListPages } from "@/shared/list-pages.tsx";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
-import { BareList, MEMBERS, MembersList } from "./members-list.tsx";
+import { BareList, LIST_SAYS, MEMBERS, MembersList } from "./members-list.tsx";
 
 placedWithoutMeasuring();
 
@@ -223,7 +223,7 @@ describe("the list's states", () => {
   it("offers the page's primary action when nothing is listed", () => {
     render(<MembersList members={[]} />);
 
-    expect(screen.getByText("No one belongs to this workspace yet.")).toBeTruthy();
+    expect(screen.getByText(LIST_SAYS.none)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Invite people" })).toBeTruthy();
   });
 
@@ -232,7 +232,7 @@ describe("the list's states", () => {
     const search = screen.getByRole("searchbox", { name: "Search by name or address" });
 
     fireEvent.change(search, { target: { value: "Zed" } });
-    expect(screen.getByText("No one matches “Zed”.")).toBeTruthy();
+    expect(screen.getByText(LIST_SAYS.noneMatching("Zed"))).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(people()).toHaveLength(MEMBERS.length);
@@ -242,7 +242,7 @@ describe("the list's states", () => {
     const retry = vi.fn<() => void>();
     render(<MembersList read="failed" onRetry={retry} />);
 
-    expect(screen.getByRole("alert").textContent).toBe("The members could not be read.");
+    expect(screen.getByRole("alert").textContent).toBe(LIST_SAYS.failed);
     pressedWithFocus(screen.getByRole("button", { name: "Retry" }));
     expect(retry).toHaveBeenCalledTimes(1);
     expect(document.activeElement).toBe(searchBox());
@@ -251,7 +251,7 @@ describe("the list's states", () => {
   it("says the list is loading on its first read", () => {
     render(<MembersList read="loading" />);
 
-    expect(screen.getByRole("status").textContent).toBe("The members are still loading.");
+    expect(screen.getByRole("status").textContent).toBe(LIST_SAYS.loading);
     expect(screen.queryByRole("table")).toBeNull();
   });
 
@@ -259,7 +259,7 @@ describe("the list's states", () => {
     render(<MembersList members={MEMBERS.filter((member) => member.role !== "Admin")} />);
 
     pickRole("Admin");
-    expect(screen.getByText("No one matches these filters.")).toBeTruthy();
+    expect(screen.getByText(LIST_SAYS.noneFiltered)).toBeTruthy();
 
     pressedWithFocus(screen.getByRole("button", { name: "Clear filters" }));
     expect(people()).toHaveLength(MEMBERS.length - 1);

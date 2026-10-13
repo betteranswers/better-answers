@@ -11,6 +11,11 @@ const LOADING = "The rows are still loading.";
 
 const REGION = "[aria-live]";
 
+const DOWN = new Error("the network is down");
+
+/** The failure's line as this test's region words it. */
+const failedSaid = (failure: Error): string => `No rows: ${failure.message}`;
+
 type Read = { readonly error: Error | null; readonly isPending: boolean };
 
 function Region(properties: { readonly read: Read }) {
@@ -18,14 +23,14 @@ function Region(properties: { readonly read: Read }) {
   return (
     <div aria-live="polite">
       {said.isPending ? LOADING : null}
-      {said.error === null ? null : `No rows: ${said.error.message}`}
+      {said.error === null ? null : failedSaid(said.error)}
     </div>
   );
 }
 
 const PENDING: Read = { error: null, isPending: true };
 
-const FAILED: Read = { error: new Error("the network is down"), isPending: false };
+const FAILED: Read = { error: DOWN, isPending: false };
 
 const SETTLED: Read = { error: null, isPending: false };
 
@@ -53,7 +58,7 @@ describe("a read's lines, said after their region mounts", () => {
     );
 
     expect(seen[0]).toBe("");
-    expect(seen.at(-1)).toBe("No rows: the network is down");
+    expect(seen.at(-1)).toBe(failedSaid(DOWN));
   });
 
   it.each([

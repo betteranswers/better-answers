@@ -8,11 +8,12 @@ import {
   titleOf,
   verifiedEventsOf,
 } from "@/features/knowledge/concept-frontmatter.ts";
+import { CONCEPT_WORDS } from "@/features/knowledge/knowledge-words.ts";
 
 describe("what a concept page reads from a file's frontmatter", () => {
   it("names a file with no title as untitled", () => {
-    expect(titleOf({ type: "Answer" })).toBe("Untitled concept");
-    expect(titleOf({ type: "Answer", title: "  " })).toBe("Untitled concept");
+    expect(titleOf({ type: "Answer" })).toBe(CONCEPT_WORDS.untitled);
+    expect(titleOf({ type: "Answer", title: "  " })).toBe(CONCEPT_WORDS.untitled);
     expect(titleOf({ type: "Answer", title: "Audit Logs Retention" })).toBe("Audit Logs Retention");
   });
 

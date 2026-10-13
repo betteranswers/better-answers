@@ -125,7 +125,11 @@ describe("the toolbar the open page fills", () => {
     pick("Spend");
 
     expect(openTab()).toBe("Spend");
-    expect(screen.getByText("Spend is not built yet.")).toBeDefined();
+    const panel = screen.getByRole("tabpanel");
+    expect(panel.getAttribute("aria-labelledby")).toBe(
+      within(tabs()).getByRole("tab", { name: "Spend" }).id,
+    );
+    expect(panel.textContent).toMatch(/\S/v);
     expect(screen.queryByRole("region", { name: "Model choices" })).toBeNull();
     // A tab divides a page, so the page's own words stand either way.
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models");

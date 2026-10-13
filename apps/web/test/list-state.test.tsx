@@ -17,6 +17,13 @@ afterEach(() => {
 
 const LOADING = "The invitations are still loading.";
 
+const FAILED = "The members could not be read.";
+
+const DOWN = new Error("the network is down");
+
+/** The failure's line as this test's list words it. */
+const failedSaid = (failure: Error): string => `No list: ${failure.message}`;
+
 const NOTHING = () => undefined;
 
 /** The list's own region, not the count line or the outcome line beside it. */
@@ -26,7 +33,7 @@ const listRead = (read: { readonly error: Error | null; readonly isPending: bool
   <ListRead
     read={{ ...read, refetch: NOTHING }}
     loading={LOADING}
-    failed={(failure) => `No list: ${failure.message}`}
+    failed={failedSaid}
     focusAfterRetry={createRef<HTMLElement>()}
   >
     <p>The rows</p>
@@ -55,7 +62,7 @@ describe("a list's state, said after its region mounts", () => {
         <ListState
           state={{
             kind: "failed",
-            words: "The members could not be read.",
+            words: FAILED,
             onRetry: NOTHING,
             focusAfterRetry: createRef<HTMLElement>(),
           }}
@@ -64,7 +71,7 @@ describe("a list's state, said after its region mounts", () => {
     );
 
     expect(seen[0]).toBe("");
-    expect(screen.getByRole("alert").textContent).toBe("The members could not be read.");
+    expect(screen.getByRole("alert").textContent).toBe(FAILED);
   });
 
   it("draws the loading region while a read is pending", () => {
@@ -74,9 +81,9 @@ describe("a list's state, said after its region mounts", () => {
   });
 
   it("draws a failed read's alert in place of the rows", () => {
-    render(listRead({ error: new Error("the network is down"), isPending: false }));
+    render(listRead({ error: DOWN, isPending: false }));
 
-    expect(screen.getByRole("alert").textContent).toBe("No list: the network is down");
+    expect(screen.getByRole("alert").textContent).toBe(failedSaid(DOWN));
     expect(screen.queryByText("The rows")).toBeNull();
   });
 
@@ -85,12 +92,10 @@ describe("a list's state, said after its region mounts", () => {
     const { rerender } = render(<Seen>{listRead({ error: null, isPending: true })}</Seen>);
     const before = seen.length;
 
-    rerender(
-      <Seen>{listRead({ error: new Error("the network is down"), isPending: false })}</Seen>,
-    );
+    rerender(<Seen>{listRead({ error: DOWN, isPending: false })}</Seen>);
 
     expect(seen.slice(before).find((said) => said !== undefined)).toBe("");
-    expect(screen.getByRole("alert").textContent).toBe("No list: the network is down");
+    expect(screen.getByRole("alert").textContent).toBe(failedSaid(DOWN));
   });
 
   it("draws the rows once the read has them", () => {

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
+import { BULK_WORDS } from "@/features/people/member-action-words.ts";
 import {
   MemberBulkActions,
   MemberBulkDialogs,
@@ -24,7 +25,7 @@ const NOTHING = () => undefined;
 
 const MEMBERS = "/people/members";
 
-const AT_MOST = "Select at most 200 members for one action.";
+const AT_MOST = BULK_WORDS.tooMany(200);
 
 /** Members' bar and dialogs over `count` ticks, standing in for the table that ticked them. */
 const tickedMembers = (count: number, readable: boolean) =>

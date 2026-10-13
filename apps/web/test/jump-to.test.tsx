@@ -318,9 +318,15 @@ describe("what the dialog's outcome line says", () => {
   });
 
   it("promises a Viewer pages, an Admin members and actions too", () => {
-    expect(findWhat([JUMP_TO.kinds.page])).toBe("Find a page");
-    expect(findWhat([JUMP_TO.kinds.page, JUMP_TO.kinds.member, JUMP_TO.kinds.action])).toBe(
-      "Find a page, a member or an action",
-    );
+    const { page, member, action } = JUMP_TO.kinds;
+    const forAViewer = findWhat([page]);
+    const forAnAdmin = findWhat([page, member, action]);
+    const placed = [page, member, action].map((kind) => forAnAdmin.indexOf(kind));
+
+    expect(forAViewer).toContain(page);
+    expect(forAViewer).not.toContain(member);
+    expect(forAViewer).not.toContain(action);
+    expect(placed).not.toContain(-1);
+    expect(placed).toEqual(placed.toSorted((one, next) => one - next));
   });
 });

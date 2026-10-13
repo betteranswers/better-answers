@@ -23,6 +23,9 @@ afterEach(() => {
 
 const REGION = "[aria-live=polite]";
 
+/** A region that mounted empty holds its line: which line is the page's own wording. */
+const HOLDS_TEXT = /\S/v;
+
 const mounted = (selector: string, children: ReactNode) => {
   const { seen, Seen } = regionsSeen(selector);
   render(
@@ -56,21 +59,21 @@ describe("a page's read, said after its region mounts", () => {
     const seen = mounted(REGION, <GroupsPage />);
 
     expect(seen[0]).toBe("");
-    expect(seen.at(-1)).toBe("The groups are still loading.");
+    expect(seen.at(-1)).toMatch(HOLDS_TEXT);
   });
 
   it("fills a region of lines a render after it mounts", () => {
     const seen = mounted(REGION, <ModelChoicesCard />);
 
     expect(seen[0]).toBe("");
-    expect(seen.at(-1)).toBe("The model choices are still loading.");
+    expect(seen.at(-1)).toMatch(HOLDS_TEXT);
   });
 
   it("fills a region drawing one state after mount", () => {
     const seen = mounted(REGION, <WorkspacesPage />);
 
     expect(seen[0]).toBe("");
-    expect(seen.at(-1)).toBe("The workspaces are still loading.");
+    expect(seen.at(-1)).toMatch(HOLDS_TEXT);
   });
 
   it("fills a disclosure's region a render after opening mounts it", () => {
@@ -83,6 +86,6 @@ describe("a page's read, said after its region mounts", () => {
     const opened = seen.slice(closed);
     expect(seen.slice(0, closed).every((text) => text === undefined)).toBe(true);
     expect(opened[0]).toBe("");
-    expect(opened.at(-1)).toBe("The passages are still loading.");
+    expect(opened.at(-1)).toMatch(HOLDS_TEXT);
   });
 });

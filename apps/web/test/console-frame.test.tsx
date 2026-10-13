@@ -196,9 +196,12 @@ describe("the console's shell", () => {
 
     await openApp("/console/workspaces/every-workspace");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      "The console is better-answers support’s alone",
-    );
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "The console is better-answers support’s alone",
+      }),
+    ).toBeDefined();
     const refused = screen.getByRole("alert").textContent;
     expect(refused).toBe(STOCK.permission);
     expect(refused).not.toContain(NOT_THE_OPERATOR);

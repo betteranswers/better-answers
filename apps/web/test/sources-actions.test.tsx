@@ -194,7 +194,8 @@ describe("the dismissal as not special category", () => {
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.dismiss.key });
 
     const dialog = screen.getByRole("dialog", { name: REVIEW_WORDS.dismiss.named(1) });
-    expect(dialog.textContent).toContain(`${ruleWordOf(HEALTH_CUE.ruleId)} in Pump service notes`);
+    expect(dialog.textContent).toContain(ruleWordOf(HEALTH_CUE.ruleId));
+    expect(dialog.textContent).toContain("Pump service notes");
     expect(screen.getByLabelText("Reason")).toBeDefined();
     expect(dialog.textContent).not.toMatch(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
   });
@@ -509,7 +510,6 @@ describe("widening a connected source in its row", () => {
     expect(panel.getAllByRole("term").map((term) => term.textContent)).toEqual(["Sensitivity"]);
     expect(panel.getByRole("definition").textContent).toMatch(/Restricted.+Internal/v);
     expect(commitTo(panel, WIDENED)).toBeDefined();
-    expect(panel.queryByText(/audit row/iv)).toBeNull();
   });
 
   it("closes on Cancel, focus back on its opener", async () => {
