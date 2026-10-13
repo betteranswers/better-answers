@@ -63,6 +63,26 @@ describe("the typed-text check", () => {
   });
 });
 
+describe("the typed-text check on a long text", () => {
+  // The suite's own timeout would let a check that takes half a minute pass.
+  const AT_ONCE = { timeout: 5000 };
+  const A_LONG_RUN = 10_000;
+
+  it("reads pairs after a long unbroken run without stalling", AT_ONCE, () => {
+    const run = "x".repeat(A_LONG_RUN);
+
+    expect(checkTypedText(`${run} ${"sort 20-00-00 12345678 ".repeat(200)}`)).toBe(
+      `${run} ${"sort [withheld] ".repeat(200)}`,
+    );
+  });
+
+  it("reads cues after a long run of spaces without stalling", AT_ONCE, () => {
+    const opened = `Rota\n\n${" ".repeat(A_LONG_RUN)}`;
+
+    expect(checkTypedText(`${opened}${"sickness ".repeat(60_000)}end`)).toBe(`${opened}[withheld]`);
+  });
+});
+
 describe("the redaction agreement's typed-text cases", () => {
   it("reads every case as the worker's detector reads it", () => {
     const read = fixture.typed_text.cases.map(({ name, input }) => ({

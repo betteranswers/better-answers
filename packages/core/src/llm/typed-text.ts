@@ -43,23 +43,17 @@ const A_SORT_CODE_WITH_AN_ACCOUNT = new RegExp(
   "gsu",
 );
 
-const NAMES_AN_ACCOUNT = ["account", "sort", "bank", "payment", "bacs"];
+const A_WORD_THAT_NAMES_A_PAIR = /account|sort|bank|payment|bacs/iu;
 
 /**
- * The worker reads a cue by lemma. These are the forms it folds, bounded by letters alone so
- * that none it reads is missed.
+ * The worker finds a cue by taking an ending off the written word, so any word that opens with
+ * a cue's stem is read.
  */
-const A_CUE = new RegExp(
-  String.raw`(?<!\p{L})(?:diagnos(?:e|es|ed|ing|is)|medications?|sickness(?:es)?)(?!\p{L})`,
-  "giu",
-);
+const A_CUE = new RegExp(String.raw`(?<!\p{L})(?:diagnos[ei]|medication|sickness)`, "giu");
 
 const A_SENTENCE_BREAK = new RegExp(String.raw`(?<=[.!?])[${SPACE}]+|\n[${SPACE}]*\n`, "gu");
 
 const A_SPACE = new RegExp(`[${SPACE}]`, "u");
-const NO_SPACE_TO_THE_END = new RegExp(`[^${SPACE}]*$`, "u");
-const LEADING_SPACE = new RegExp(`^[${SPACE}]+`, "u");
-const TRAILING_SPACE = new RegExp(`[${SPACE}]+$`, "u");
 
 const hitOf = (match: RegExpExecArray): Hit => ({
   start: match.index,
@@ -71,35 +65,64 @@ const passesTheCheckDigit = (written: string): boolean => {
   return digits.reduce((sum, digit, at) => sum + digit * (10 - at), 0) % 11 === 0;
 };
 
+/** One UTF-16 unit at a time: no character of the class is longer. */
+const isSpace = (unit: string | undefined): boolean => unit !== undefined && A_SPACE.test(unit);
+
+/** The run with no space in it that holds `at`, walked by index so a long run is read once. */
+const runAround = (text: string, at: number): Hit => {
+  let start = at;
+  while (start > 0 && !isSpace(text[start - 1])) start -= 1;
+  let end = at;
+  while (end < text.length && !isSpace(text[end])) end += 1;
+  return { start, end };
+};
+
 /**
  * The worker reads five words back, and one word on where a colon joins the sort code to its
  * neighbour. This reads wider than either.
  */
-const named = (text: string, pair: Hit): boolean => {
-  const opens = text.slice(0, pair.start).search(NO_SPACE_TO_THE_END);
-  const toASpace = text.slice(pair.start).search(A_SPACE);
-  const closes = toASpace === -1 ? text.length : pair.start + toASpace;
-  const read = text.slice(opens, closes).includes(":") ? text : text.slice(0, closes);
-  return NAMES_AN_ACCOUNT.some((word) => read.toLowerCase().includes(word));
+const namedPairsIn = (text: string): readonly Hit[] => {
+  const naming = A_WORD_THAT_NAMES_A_PAIR.exec(text);
+  if (naming === null) return [];
+  // No naming word holds another, so the first to open is the first to close.
+  const named = naming.index + naming[0].length;
+  const pairs: Hit[] = [];
+  let run: Hit = { start: 0, end: 0 };
+  let joinedByAColon = false;
+  for (const pair of Array.from(text.matchAll(A_SORT_CODE_WITH_AN_ACCOUNT), hitOf)) {
+    if (pair.start >= run.end) {
+      run = runAround(text, pair.start);
+      joinedByAColon = text.slice(run.start, run.end).includes(":");
+    }
+    if (joinedByAColon || named <= run.end) pairs.push(pair);
+  }
+  return pairs;
 };
 
-/** A blank line ends a sentence as a full stop does, and the space round it is no part of it. */
-const sentenceAround = (text: string, at: number): Hit => {
-  let start = 0;
-  let end = text.length;
-  for (const gap of text.matchAll(A_SENTENCE_BREAK)) {
-    const closes = gap.index + gap[0].length;
-    if (closes <= at) start = closes;
-    else if (gap.index > at) {
-      end = gap.index;
-      break;
-    }
+/** The space round a sentence is no part of it. */
+const trimmed = (text: string, sentence: Hit): Hit => {
+  let { start, end } = sentence;
+  while (start < end && isSpace(text[start])) start += 1;
+  while (end > start && isSpace(text[end - 1])) end -= 1;
+  return { start, end };
+};
+
+/** The sentence that ends at the break numbered `next`, or at the end of the text. */
+const sentenceBefore = (text: string, breaks: readonly Hit[], next: number): Hit =>
+  trimmed(text, { start: breaks[next - 1]?.end ?? 0, end: breaks[next]?.start ?? text.length });
+
+/** One hit a sentence, however many cues it holds. A blank line ends one as a full stop does. */
+const sentencesWithACue = (text: string): readonly Hit[] => {
+  const breaks = Array.from(text.matchAll(A_SENTENCE_BREAK), hitOf);
+  const sentences: Hit[] = [];
+  let next = 0;
+  let read = -1;
+  for (const cue of text.matchAll(A_CUE)) {
+    while ((breaks[next]?.end ?? Infinity) <= cue.index) next += 1;
+    if (next !== read) sentences.push(sentenceBefore(text, breaks, next));
+    read = next;
   }
-  const sentence = text.slice(start, end);
-  return {
-    start: start + sentence.length - sentence.replace(LEADING_SPACE, "").length,
-    end: end - (sentence.length - sentence.replace(TRAILING_SPACE, "").length),
-  };
+  return sentences;
 };
 
 const hitsIn = (text: string): readonly Hit[] => [
@@ -107,10 +130,8 @@ const hitsIn = (text: string): readonly Hit[] => [
   ...Array.from(text.matchAll(AN_NHS_NUMBER))
     .filter((match) => passesTheCheckDigit(match[0]))
     .map(hitOf),
-  ...Array.from(text.matchAll(A_SORT_CODE_WITH_AN_ACCOUNT), hitOf).filter((pair) =>
-    named(text, pair),
-  ),
-  ...Array.from(text.matchAll(A_CUE), (cue) => sentenceAround(text, cue.index)),
+  ...namedPairsIn(text),
+  ...sentencesWithACue(text),
 ];
 
 /** What a hit keeps once each hit ahead of it has taken the characters the two share. */

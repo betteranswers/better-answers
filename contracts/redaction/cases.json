@@ -215,6 +215,13 @@
         "why": "The worker reads Ref:200000 as one word, and then takes the next word after it as one that may name the pair. With a space in place of the colon the same text is left alone."
       },
       {
+        "name": "two pairs, one of them named",
+        "categories": ["bank-details"],
+        "input": "Is 10-20-30 12345678 a ticket, or is sort code 20-00-00 account 87654321 the one we pay?",
+        "expected": "Is 10-20-30 12345678 a ticket, or is sort code [withheld] the one we pay?",
+        "why": "Each pair is read on its own: the word that names the second comes after the first, so the first stays in the text."
+      },
+      {
         "name": "a sort code and account number on two lines",
         "categories": ["bank-details"],
         "input": "Sort code 20-00-00\naccount 12345678\nIs that the account expenses go to?",
@@ -248,6 +255,20 @@
         "input": "Who signs off a return to work? I was diagnosed with asthma last month. What does the handbook say?",
         "expected": "Who signs off a return to work? [withheld] What does the handbook say?",
         "why": "Only the cue's sentence goes, and the cue is read in any of its forms: diagnosed is a form of diagnose."
+      },
+      {
+        "name": "a misspelt cue the worker reads by its ending",
+        "categories": ["special-category"],
+        "input": "My manager keeps diagnoseing me with anxiety, who do I tell?",
+        "expected": "[withheld]",
+        "why": "The worker finds a cue by taking an ending off the written word, so it reads diagnoseing as diagnose. A list of a cue's correct forms does not hold it."
+      },
+      {
+        "name": "a misspelt plural of a cue",
+        "categories": ["special-category"],
+        "input": "How many diagnosises did the clinic record last year?",
+        "expected": "[withheld]",
+        "why": "The same for a noun: the worker reads diagnosises as more than one diagnosis."
       },
       {
         "name": "space round a cue's sentence",
