@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  ASK_CAPS,
   FEEDBACK_REASONS,
   FEEDBACK_VERDICTS,
   TRUST_RIDERS,
   TRUST_STATUSES,
   TRUST_TIERS,
 } from "@better-answers/core/answering";
+import { documentLanded } from "@better-answers/core/testing/documents";
+import { holdingTable } from "@better-answers/core/testing/postgres";
 import {
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
@@ -19,6 +22,7 @@ import { connectAsHost } from "./flow.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import type { TestClient } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
+import { whileReadsAreRefused } from "./provoke.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
 
 const { clock, stopTheClock } = aStoppableClock();
@@ -189,6 +193,53 @@ const REFUSED_AT_THE_CEILING = {
   sentence: expect.stringContaining("an Admin can raise the ceiling in System"),
 };
 
+/** No host's limit on one result is known, so every entry is held to the one figure. */
+const ONE_RESULT_CHARACTERS_AT_MOST = 150_000;
+
+/** About 300 words: a long answer to a procurement question. */
+const A_LONG_BODY_CHARACTERS = 2_000;
+
+const aLongBodyOf = (sentence: string): string =>
+  sentence
+    .repeat(Math.ceil(A_LONG_BODY_CHARACTERS / sentence.length))
+    .slice(0, A_LONG_BODY_CHARACTERS);
+
+const RETENTION_QUESTION = "How long are audit logs kept?";
+
+const A_RECORD_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
+const answered = z.object({
+  verdict: z.string(),
+  related: z.array(z.object({ iri: z.string() })),
+  unmappedPassages: z.array(z.object({ locator: z.string() })),
+  map: z.object({ state: z.string() }),
+  recordId: z.string(),
+});
+
+const askedOf = async (client: TestClient, token: string, args: Params) => {
+  const called = await result(await callTool(client, token, "ask", args), toolCalled);
+  return { called, answer: answered.parse(called.structuredContent) };
+};
+
+/** Uncounted, the planner joins every node to every step, and the walk nears its timeout. */
+const theMapCounted = async (): Promise<void> => {
+  await app().database.superuser.query("ANALYZE map_node, map_edge");
+};
+
+const recordsKeptIn = async (workspaceId: string) => {
+  const kept = await app().database.superuser.query<{
+    id: string;
+    transport: string;
+    verdict: string | null;
+    completed: boolean;
+  }>(
+    `SELECT id, transport, verdict, completed_at IS NOT NULL AS completed
+       FROM question_asked WHERE workspace_id = $1 ORDER BY asked_at, id`,
+    [workspaceId],
+  );
+  return kept.rows;
+};
+
 describe("era-independent", () => {
   it("lists a full token's four entries, in a stable order", async () => {
     const { client, token } = await connect();
@@ -303,7 +354,7 @@ describe("era-independent", () => {
     const text = firstText(absent);
     expect(text).toBe(`No concept at ${ABSENT}.`);
     expect(text).not.toBe(JSON.stringify(absent.structuredContent));
-    expect(text.length).toBeLessThan(150_000);
+    expect(text.length).toBeLessThan(ONE_RESULT_CHARACTERS_AT_MOST);
   });
 
   it("refuses a malformed iri before open runs", async () => {
@@ -511,6 +562,165 @@ describe("era-independent", () => {
     );
 
     expect(refused).toEqual(REFUSED_AT_THE_CEILING);
+  });
+});
+
+describe("ask, on the own-transaction road", () => {
+  it("leaves one record, its id the one it answers", async () => {
+    const { workspace, client, token } = await connect();
+
+    const { called, answer } = await askedOf(client, token, {
+      question: "What accreditations do we hold?",
+    });
+
+    expect(answer.recordId).toMatch(A_RECORD_ID);
+    expect(await recordsKeptIn(workspace.workspaceId)).toEqual([
+      { id: answer.recordId, transport: "mcp", verdict: "refuse", completed: true },
+    ]);
+    expect(firstText(called)).toContain(`Record of this question: ${answer.recordId}`);
+  });
+
+  it("is listed read-only, its description naming the record", async () => {
+    const { client, token } = await connect();
+
+    const ask = (await listTools(client, token)).find((listed) => listed.name === "ask");
+
+    expect(ask?.annotations?.readOnlyHint).toBe(true);
+    expect(ask?.description).toContain(
+      "Each question is kept as a record, and the answer carries its `recordId`.",
+    );
+    expect(ask?.description).toContain(
+      "The person who asked and the workspace's Admins may read it.",
+    );
+    expect(ask?.description).toContain(
+      "The question's words are kept for twelve months; who asked, the verdict and which concepts were returned are kept for good.",
+    );
+  });
+
+  it.each([
+    ["a question holding a NUL", { question: "audit\u0000logs" }],
+    ["a question over 2,000 characters", { question: "a".repeat(2_001) }],
+    [
+      "a question naming 21 collections",
+      {
+        question: RETENTION_QUESTION,
+        collections: Array.from({ length: 21 }, (_, nth) => `collection-${String(nth)}`),
+      },
+    ],
+  ])("keeps no record of %s", async (_case, args) => {
+    const { workspace, client, token } = await connect();
+
+    const refused = await result(await callTool(client, token, "ask", args), toolCalled);
+
+    expect(refused.isError).toBe(true);
+    expect(await recordsKeptIn(workspace.workspaceId)).toEqual([]);
+  });
+
+  it("answers from its entry points when the walk times out", async () => {
+    const { workspace, client, token } = await connect();
+    const { concepts } = await seedConcepts(
+      app(),
+      conceptsSeeding.parse({
+        workspaceId: workspace.workspaceId,
+        userId: workspace.admin.id,
+        concepts: [
+          {
+            title: "Console exports",
+            kind: "Note",
+            body: "A spreadsheet can be exported from the console.",
+          },
+          {
+            title: RETENTION_QUESTION,
+            body: "Audit logs are kept for thirteen months.",
+            linksTo: ["Console exports"],
+          },
+        ],
+      }),
+    );
+    const [reached, entry] = concepts.map((concept) => concept.iri);
+    const before = app().logs.length;
+
+    const stalled = await holdingTable(app().database.superuser, "map_node", () =>
+      askedOf(client, token, { question: RETENTION_QUESTION }),
+    );
+    await theMapCounted();
+    const after = await askedOf(client, token, { question: RETENTION_QUESTION });
+
+    expect(loggedEvents(before)).not.toContain("mcp.failed");
+    expect(await recordsKeptIn(workspace.workspaceId)).toEqual([
+      { id: stalled.answer.recordId, transport: "mcp", verdict: "related", completed: true },
+      { id: after.answer.recordId, transport: "mcp", verdict: "related", completed: true },
+    ]);
+    expect([
+      stalled.answer.verdict,
+      stalled.answer.related.map((concept) => concept.iri),
+      stalled.answer.map.state,
+    ]).toEqual(["related", [entry], "unavailable_since"]);
+    expect(firstText(stalled.called)).toContain("map unavailable since");
+    expect([after.answer.related.map((concept) => concept.iri), after.answer.map.state]).toEqual([
+      [entry, reached],
+      "live",
+    ]);
+  });
+
+  it("leaves its record open when a read fails", async () => {
+    const { workspace, client, token } = await connect();
+    const before = app().logs.length;
+
+    const failed = await whileReadsAreRefused(app(), "concept_index", async () =>
+      result(await callTool(client, token, "ask", { question: RETENTION_QUESTION }), toolCalled),
+    );
+
+    expect(await recordsKeptIn(workspace.workspaceId)).toEqual([
+      { id: expect.stringMatching(A_RECORD_ID), transport: "mcp", verdict: null, completed: false },
+    ]);
+    expect([failed.isError, firstText(failed), failed.structuredContent]).toEqual([
+      true,
+      "ask failed.",
+      undefined,
+    ]);
+    expect(loggedEvents(before)).toContain("mcp.failed");
+  });
+
+  it("keeps its largest result inside one tool result", async () => {
+    const { workspace, client, token } = await connect();
+    const beyondTheEntryPoints = Math.max(0, ASK_CAPS.related - ASK_CAPS.entryPoints);
+    const reached = Array.from({ length: beyondTheEntryPoints }, (_, nth) => ({
+      title: `Console exports ${String(nth)}`,
+      kind: "Note",
+      body: aLongBodyOf("A spreadsheet can be exported from the console. "),
+    }));
+    const entries = Array.from({ length: ASK_CAPS.entryPoints }, (_, nth) => ({
+      title: `Audit log retention ${String(nth)}`,
+      body: aLongBodyOf("Audit logs are kept for thirteen months. "),
+      linksTo: reached
+        .filter((_, place) => place % ASK_CAPS.entryPoints === nth)
+        .map((concept) => concept.title),
+    }));
+    await seedConcepts(
+      app(),
+      conceptsSeeding.parse({
+        workspaceId: workspace.workspaceId,
+        userId: workspace.admin.id,
+        concepts: [...reached, ...entries],
+      }),
+    );
+    for (let nth = 0; nth < ASK_CAPS.unmappedPassages; nth += 1) {
+      await documentLanded(app().database.superuser, workspace.workspaceId, {
+        title: `Hosting contract ${String(nth)}`,
+        text: aLongBodyOf("Audit logs are kept by the host for ninety days. "),
+      });
+    }
+    await theMapCounted();
+
+    const { called, answer } = await askedOf(client, token, { question: RETENTION_QUESTION });
+
+    expect([answer.related.length, answer.unmappedPassages.length, answer.map.state]).toEqual([
+      ASK_CAPS.related,
+      ASK_CAPS.unmappedPassages,
+      "live",
+    ]);
+    expect(JSON.stringify(called).length).toBeLessThan(ONE_RESULT_CHARACTERS_AT_MOST);
   });
 });
 

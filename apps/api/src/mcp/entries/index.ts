@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   answerOutputWith,
+  ask,
   askInput,
   FEEDBACK_REASONS,
   FEEDBACK_VERDICTS,
@@ -12,7 +13,6 @@ import {
   open,
   openInput,
   openOutputWith,
-  planAnswer,
   renderAnswer,
   renderFeedback,
   renderFind,
@@ -20,11 +20,11 @@ import {
   TRUST_RIDERS,
   TRUST_STATUSES,
   TRUST_TIERS,
+  type AnswerResult,
   type FindMatch,
   type FindResult,
   type OpenResult,
   type OpenView,
-  type PlannedAnswer,
   type ReturnedConcept,
   type Trust,
 } from "@better-answers/core/answering";
@@ -111,6 +111,7 @@ const wired = <Value, Wired, Refused>(
 const found = findOutputWith(trust);
 
 const findEntry = defineEntry({
+  road: "resolvers-transaction",
   name: "find",
   title: "Find in the company's knowledge",
   description:
@@ -136,7 +137,7 @@ const findEntry = defineEntry({
 
 type WireReturned = WireMatch<ReturnedConcept<string>>;
 
-type WireAnswered = Omit<PlannedAnswer<string>, "answers" | "related"> & {
+type WireAnswered = Omit<AnswerResult<string>, "answers" | "related"> & {
   readonly answers: readonly WireReturned[];
   readonly related: readonly WireReturned[];
 };
@@ -144,7 +145,7 @@ type WireAnswered = Omit<PlannedAnswer<string>, "answers" | "related"> & {
 /** Core names a concept's page by its path; an outside client can only open it under our origin. */
 const answeredOnTheWire = (
   origin: string,
-  { answers, related, ...answer }: PlannedAnswer,
+  { answers, related, ...answer }: AnswerResult,
 ): WireAnswered => {
   const wire = (concept: ReturnedConcept): WireReturned => ({
     ...concept,
@@ -154,7 +155,7 @@ const answeredOnTheWire = (
   return { ...answer, answers: answers.map(wire), related: related.map(wire) };
 };
 
-const answeredInCore = ({ answers, related, ...answer }: WireAnswered): PlannedAnswer<string> => {
+const answeredInCore = ({ answers, related, ...answer }: WireAnswered): AnswerResult<string> => {
   const core = (concept: WireReturned): ReturnedConcept<string> => ({
     ...concept,
     trust: coreTrust(concept.trust),
@@ -162,33 +163,36 @@ const answeredInCore = ({ answers, related, ...answer }: WireAnswered): PlannedA
   return { ...answer, answers: answers.map(core), related: related.map(core) };
 };
 
+/** A host may hand its assistant the text alone, so the record's id is written there too. */
+const renderAsked = (answer: WireAnswered): string =>
+  `${renderAnswer(answeredInCore(answer))}\n\nRecord of this question: ${answer.recordId}`;
+
 const askEntryAt = (origin: string) =>
   defineEntry({
+    road: "own-transaction",
     name: "ask",
     title: "Ask the company's knowledge a question",
     description:
-      "Ask a question and get the concepts in the company's knowledge that bear on it, verdict first. They are related knowledge, not a judged answer: write only what the returned concepts state, name each one you use, and quote an `Answer` unchanged. A verdict of `refuse` means nothing you can read bears on the question. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised.",
+      "Ask a question and get the concepts in the company's knowledge that bear on it, verdict first. They are related knowledge, not a judged answer: write only what the returned concepts state, name each one you use, and quote an `Answer` unchanged. Each concept is labelled with its collection, and `Answer`s under different collections are never merged: give each under its own. An empty `conflicts` list means no conflict was looked for, not that none exists. A verdict of `refuse` means nothing you can read bears on the question. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised. Each question is kept as a record, and the answer carries its `recordId`. The person who asked and the workspace's Admins may read it. The question's words are kept for twelve months; who asked, the verdict and which concepts were returned are kept for good.",
     scopes: ["knowledge:read"],
     input: z.object({
       question: askInput.shape.question,
       collections: askInput.shape.collections,
     }),
-    // No record is kept on this entry's one read-only transaction, so the answer names none.
-    output: answerOutputWith(trust).omit({ recordId: true }),
+    output: answerOutputWith(trust),
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: false,
       openWorldHint: false,
     },
-    run: async (principal, tx, args, now) =>
-      wired(await planAnswer(principal, (work) => work(tx), args, now), (answer) =>
-        answeredOnTheWire(origin, answer),
-      ),
-    render: (answer) => renderAnswer(answeredInCore(answer)),
+    run: async (principal, steps, args, now) =>
+      wired(await ask(principal, steps, args, now), (answer) => answeredOnTheWire(origin, answer)),
+    render: renderAsked,
   });
 
 const openEntry = defineEntry({
+  road: "resolvers-transaction",
   name: "open",
   title: "Open a concept, or the passage a citation rests on",
   description:
@@ -227,6 +231,7 @@ const feedbackInput = z.discriminatedUnion("verdict", [
 ]);
 
 const giveFeedbackEntry = defineEntry({
+  road: "resolvers-transaction",
   name: "give_feedback",
   title: "Give feedback on an answer",
   description:

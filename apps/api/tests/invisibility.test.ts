@@ -103,6 +103,10 @@ const restrictedSourcedConcept = async () => {
   };
 };
 
+const REMUNERATION_QUESTION = { question: "How is the board's remuneration reviewed?" };
+
+const A_RECORD_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
 describe("a Restricted-sourced concept, to a Viewer's token", () => {
   it("is no match through find, though the Admin finds it", async () => {
     const { iri, viewer, admin } = await restrictedSourcedConcept();
@@ -115,21 +119,34 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
     expect(rpcListOf(structured(seen)["hits"]).map((match) => match["iri"])).toEqual([iri]);
   });
 
-  it("is absent from ask's answer, though related in the Admin's", async () => {
-    const { iri, viewer, admin } = await restrictedSourcedConcept();
-    const question = { question: "How is the board's remuneration reviewed?" };
+  it("answers ask as an unrelated question, the record's id apart", async () => {
+    const { viewer } = await restrictedSourcedConcept();
 
-    const asked = await called(viewer.client, viewer.token, "ask", question);
+    const asked = await called(viewer.client, viewer.token, "ask", REMUNERATION_QUESTION);
     const unrelated = await called(viewer.client, viewer.token, "ask", {
       question: "Is the sky blue?",
     });
-    const seen = await called(admin.client, admin.token, "ask", question);
+    const { recordId, ...answer } = structured(asked);
+    const { recordId: unrelatedRecordId, ...unrelatedAnswer } = structured(unrelated);
 
-    expect(structured(asked)).toMatchObject({ verdict: "refuse", related: [], collections: [] });
-    expect(structured(asked)).toEqual(structured(unrelated));
-    expect(rendered(asked)).toBe(rendered(unrelated));
+    expect(answer).toMatchObject({ verdict: "refuse", related: [], collections: [] });
+    expect(answer).toEqual(unrelatedAnswer);
+    expect([recordId, unrelatedRecordId]).toEqual([
+      expect.stringMatching(A_RECORD_ID),
+      expect.stringMatching(A_RECORD_ID),
+    ]);
+    expect(recordId).not.toBe(unrelatedRecordId);
+    expect(rendered(asked).replace(String(recordId), String(unrelatedRecordId))).toBe(
+      rendered(unrelated),
+    );
     expect(JSON.stringify(asked)).not.toContain("remuneration is reviewed");
     expect(JSON.stringify(asked)).not.toContain("better-answers.com/c/");
+  });
+
+  it("is cited to its Admin under the product's origin", async () => {
+    const { iri, admin } = await restrictedSourcedConcept();
+
+    const seen = await called(admin.client, admin.token, "ask", REMUNERATION_QUESTION);
 
     const page = `https://app.example.test/knowledge/search/${iri.slice(CONCEPT_PREFIX.length)}`;
     expect(structured(seen)).toMatchObject({

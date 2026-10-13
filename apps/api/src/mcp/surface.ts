@@ -13,11 +13,21 @@ import {
 import type { Logger } from "pino";
 import type { z } from "zod";
 
-import { err, type Clock } from "@better-answers/core/kernel";
+import { completeRecord, openRecord, type AskSteps } from "@better-answers/core/answering";
+import {
+  err,
+  type Claims,
+  type Clock,
+  type PrincipalRefusal,
+  type Result,
+  type UserPrincipal,
+} from "@better-answers/core/kernel";
 import {
   consumeCall,
   folded,
   readWorkspaceConfig,
+  withMember,
+  withMemberUnheld,
   withPrincipal,
   withPrincipalRead,
   type PostgresDoor,
@@ -73,6 +83,62 @@ const toolsListTtlOf = (authInfo: AuthInfo | undefined): number =>
 export const doorOf = ({ readOnlyHint }: ToolAnnotations): typeof withPrincipal =>
   readOnlyHint === true ? withPrincipalRead : withPrincipal;
 
+type ServedEntry = Entry<z.ZodObject, z.ZodType>;
+
+/** What a road opens its transactions with; an entry is handed neither. */
+type RoadDoors = Pick<McpSurfaceDependencies, "door" | "clock">;
+
+/** A step's own answer, or the refusal of the member its transaction read back. */
+const stepped = <Value, Refused>(
+  opened: Result<Result<Value, Refused>, PrincipalRefusal>,
+): Result<Value, Refused | PrincipalRefusal> => (opened.ok ? opened.value : opened);
+
+/**
+ * Each step is one short transaction that reads the member again. Only the read lends its
+ * transaction, and that one opens read-only.
+ */
+const stepsFor = (
+  { door, clock }: RoadDoors,
+  asker: UserPrincipal,
+): AskSteps<PrincipalRefusal> => ({
+  openRecord: async (opening) =>
+    stepped(
+      await withMember(asker, door, (member, tx) =>
+        openRecord(member, tx, { ...opening, transport: "mcp" }),
+      ),
+    ),
+  read: async (work) => stepped(await withMemberUnheld(asker, door, (_member, tx) => work(tx))),
+  completeRecord: async (completion) =>
+    stepped(
+      await withMember(asker, door, (member, tx) =>
+        completeRecord(member, tx, { ...completion, completedAt: clock.now() }),
+      ),
+    ),
+});
+
+/**
+ * On the own-transaction road the member is resolved and the connection released before the
+ * entry runs.
+ */
+const answeredOnItsRoad = async (
+  doors: RoadDoors,
+  entry: ServedEntry,
+  claims: Claims,
+  args: z.infer<z.ZodObject>,
+): ReturnType<ServedEntry["run"]> => {
+  if (entry.road === "resolvers-transaction") {
+    return folded(
+      await doorOf(entry.annotations)(doors.door, claims, (principal, tx) =>
+        entry.run(principal, tx, args, doors.clock.now()),
+      ),
+    );
+  }
+  const resolved = await withPrincipalRead(doors.door, claims, async (principal) => principal);
+  if (!resolved.ok) return resolved;
+  const asker = resolved.value;
+  return entry.run(asker, stepsFor(doors, asker), args, doors.clock.now());
+};
+
 export const createMcpSurface = (
   deps: McpSurfaceDependencies,
 ): ((request: Request) => Promise<Response>) => {
@@ -116,11 +182,7 @@ export const createMcpSurface = (
             async () =>
               bearer === undefined
                 ? err<RefusalAnswer>("no-session")
-                : folded(
-                    await doorOf(entry.annotations)(deps.door, bearer.claims, (principal, tx) =>
-                      entry.run(principal, tx, args, deps.clock.now()),
-                    ),
-                  ),
+                : answeredOnItsRoad(deps, entry, bearer.claims, args),
             entry.render,
           ),
       );

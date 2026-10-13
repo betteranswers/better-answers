@@ -293,6 +293,21 @@ export const whileCommitsAreRefused = async <T>(
   }
 };
 
+/** The api's own role may not read `table`, so a statement that reads it fails where it runs. */
+export const whileReadsAreRefused = async <T>(
+  app: TestApp,
+  table: string,
+  work: () => Promise<T>,
+): Promise<T> => {
+  const store = app.database.superuser;
+  await store.query(`REVOKE SELECT ON "${table}" FROM app_rt`);
+  try {
+    return await work();
+  } finally {
+    await store.query(`GRANT SELECT ON "${table}" TO app_rt`);
+  }
+};
+
 /**
  * The insert lands no row and raises nothing, so Postgres leaves the transaction open: only the
  * transport's rollback can undo the write before it.
