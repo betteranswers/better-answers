@@ -52,7 +52,7 @@ const picked = (filter: string, choice: string) => {
 };
 
 const pickRole = (role: string) => {
-  picked("Filter by role", role);
+  picked("Filter by Role", role);
 };
 
 const searchBox = () => screen.getByRole("searchbox", { name: "Search by name or address" });
@@ -93,7 +93,7 @@ describe("the shared table", () => {
     expect(tickOf("Cy Twombly").getAttribute("aria-checked")).toBe("true");
     expect(tickOf("Ada Lovelace").getAttribute("aria-checked")).toBe("true");
 
-    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
     expect(tickOf("Ed Ruscha").getAttribute("aria-checked")).toBe("false");
     expect(tickOf("Bo Diddley").getAttribute("aria-checked")).toBe("false");
     expect(pageTick().getAttribute("aria-checked")).toBe("false");
@@ -234,7 +234,7 @@ describe("the list's states", () => {
     fireEvent.change(search, { target: { value: "Zed" } });
     expect(screen.getByText(LIST_SAYS.noneMatching("Zed"))).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear Filters" }));
     expect(people()).toHaveLength(MEMBERS.length);
   });
 
@@ -261,18 +261,18 @@ describe("the list's states", () => {
     pickRole("Admin");
     expect(screen.getByText(LIST_SAYS.noneFiltered)).toBeTruthy();
 
-    pressedWithFocus(screen.getByRole("button", { name: "Clear filters" }));
+    pressedWithFocus(screen.getByRole("button", { name: "Clear Filters" }));
     expect(people()).toHaveLength(MEMBERS.length - 1);
     expect(document.activeElement).toBe(searchBox());
   });
 
   it("leaves focus alone when Clear filters is pressed without it", () => {
     render(<MembersList />);
-    const role = screen.getByRole("combobox", { name: "Filter by role" });
+    const role = screen.getByRole("combobox", { name: "Filter by Role" });
     fireEvent.change(searchBox(), { target: { value: "Zed" } });
     role.focus();
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear Filters" }));
     expect(people()).toHaveLength(MEMBERS.length);
     expect(document.activeElement).toBe(role);
   });
@@ -285,14 +285,14 @@ describe("the list's pages", () => {
 
     expect(within(pages).getByText("Showing 1–2 of 5.")).toBeTruthy();
     expect(within(pages).getByText("Page 1 of 3")).toBeTruthy();
-    const previous = within(pages).getByRole("button", { name: "Previous page" });
+    const previous = within(pages).getByRole("button", { name: "Previous Page" });
     expect(previous.getAttribute("aria-disabled")).toBe("true");
 
-    fireEvent.click(within(pages).getByRole("button", { name: "Next page" }));
-    fireEvent.click(within(pages).getByRole("button", { name: "Next page" }));
+    fireEvent.click(within(pages).getByRole("button", { name: "Next Page" }));
+    fireEvent.click(within(pages).getByRole("button", { name: "Next Page" }));
     expect(within(pages).getByText("Showing 5–5 of 5.")).toBeTruthy();
     expect(people()).toEqual(["Diana Featherstonehaugh-Whittingham"]);
-    const next = within(pages).getByRole("button", { name: "Next page" });
+    const next = within(pages).getByRole("button", { name: "Next Page" });
     expect(next.getAttribute("aria-disabled")).toBe("true");
   });
 
@@ -300,7 +300,7 @@ describe("the list's pages", () => {
     render(<MembersList pageSize={2} />);
     const pages = screen.getByRole("navigation", { name: "Pages of members" });
 
-    fireEvent.click(within(pages).getByRole("button", { name: "Next page" }));
+    fireEvent.click(within(pages).getByRole("button", { name: "Next Page" }));
     expect(
       within(pages)
         .getAllByRole("status")
@@ -316,7 +316,7 @@ describe("the list's pages", () => {
 
   it("shows the last page when rows leave a later one", () => {
     const { rerender } = render(<MembersList pageSize={2} />);
-    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
     expect(people()).toEqual(["Ed Ruscha", "Bo Diddley"]);
 
     rerender(<MembersList pageSize={2} members={MEMBERS.slice(0, 2)} />);
@@ -326,7 +326,7 @@ describe("the list's pages", () => {
 
   it("starts again from the first page when a filter narrows", () => {
     render(<MembersList pageSize={1} />);
-    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
     expect(people()).toEqual(["Ada Lovelace"]);
 
     pickRole("Editor");
@@ -350,7 +350,7 @@ describe("the list's pages", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: "Load more" }).getAttribute("aria-keyshortcuts"),
+      screen.getByRole("button", { name: "Load More" }).getAttribute("aria-keyshortcuts"),
     ).toBe("m");
 
     fireEvent.keyDown(document.body, { key: "m" });
@@ -380,7 +380,7 @@ describe("the list's pages", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: "Next page" }).getAttribute("aria-keyshortcuts"),
+      screen.getByRole("button", { name: "Next Page" }).getAttribute("aria-keyshortcuts"),
     ).toBe("]");
 
     fireEvent.keyDown(document.body, { key: "]" });
@@ -414,7 +414,7 @@ describe("the list's pages", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    fireEvent.click(screen.getByRole("button", { name: "Load More" }));
     expect(more).toHaveBeenCalledTimes(1);
 
     rerender(
@@ -422,7 +422,7 @@ describe("the list's pages", () => {
         pages={{ kind: "more", label: "Older events", more: false, loading: false, onMore: more }}
       />,
     );
-    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Load More" })).toBeNull();
   });
 });
 
@@ -461,7 +461,7 @@ describe("the filter row", () => {
       />,
     );
 
-    expect(screen.getByRole("combobox", { name: "Filter by role" }).textContent).toBe("Any role");
+    expect(screen.getByRole("combobox", { name: "Filter by Role" }).textContent).toBe("Any role");
   });
 
   it("tells a choice valued “any” from no narrowing at all", () => {
@@ -484,15 +484,15 @@ describe("the filter row", () => {
       />
     );
     const { rerender } = render(colourOf("any"));
-    const trigger = () => screen.getByRole("combobox", { name: "Filter by colour" });
+    const trigger = () => screen.getByRole("combobox", { name: "Filter by Colour" });
     expect(trigger().textContent).toBe("Any colour at all");
 
     rerender(colourOf(undefined));
     expect(trigger().textContent).toBe("Every colour");
 
-    picked("Filter by colour", "Any colour at all");
+    picked("Filter by Colour", "Any colour at all");
     rerender(colourOf("any"));
-    picked("Filter by colour", "Every colour");
+    picked("Filter by Colour", "Every colour");
     expect(chose).toEqual(["any", undefined]);
   });
 

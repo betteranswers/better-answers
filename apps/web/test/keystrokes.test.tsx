@@ -71,7 +71,7 @@ describe("the keystrokes list", () => {
   });
 });
 
-const JUMP_TO: Keystroke = { key: "Ctrl K", action: "Jump to" };
+const JUMP_TO: Keystroke = { key: "Ctrl K", action: "Jump To" };
 
 const MEMBERS_KEYSTROKES: readonly Keystroke[] = [
   { key: "/", action: "Search the members" },
@@ -117,7 +117,7 @@ describe("the shell's keystrokes list", () => {
       "Search the members",
       "Open the member in focus",
       KEYSTROKE_WORDS.showTheList,
-      "Jump to",
+      "Jump To",
     ]);
     expect(listed.textContent).not.toContain(KEYSTROKE_WORDS.noneOfItsOwn);
   });
@@ -139,7 +139,7 @@ describe("the shell's keystrokes list", () => {
     expect(actionsIn(listed)).toStrictEqual([
       "Create a group",
       KEYSTROKE_WORDS.showTheList,
-      "Jump to",
+      "Jump To",
     ]);
   });
 
@@ -149,7 +149,7 @@ describe("the shell's keystrokes list", () => {
     const listed = listedOnQuestionMark(keystrokesOn(KEYSTROKE_WORDS.thisPage));
 
     expect(listed.textContent).toContain(KEYSTROKE_WORDS.noneOfItsOwn);
-    expect(actionsIn(listed)).toStrictEqual([KEYSTROKE_WORDS.showTheList, "Jump to"]);
+    expect(actionsIn(listed)).toStrictEqual([KEYSTROKE_WORDS.showTheList, "Jump To"]);
   });
 
   it("opens from its trigger, which names `?` as its keystroke", () => {

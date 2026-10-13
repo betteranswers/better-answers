@@ -45,7 +45,7 @@ function List(properties: { readonly prefix: string }) {
           write({ page: state.page + 1 });
         }}
       >
-        Next page
+        Next Page
       </button>
       <button
         type="button"
@@ -147,7 +147,7 @@ describe("a list's state in the address", () => {
   it("drops a value back at its default from the address", async () => {
     const { at } = await openMembers("/members?members.search=priya&members.page=2");
 
-    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
     await at("/members?members.search=priya&members.page=3");
     typeIn(searchBox(), "");
 

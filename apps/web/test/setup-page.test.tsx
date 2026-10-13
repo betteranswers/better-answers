@@ -110,7 +110,7 @@ describe("the setup page", () => {
     expect(disclosure().getAttribute("aria-expanded")).toBe("true");
     fireEvent.keyDown(document.body, { key: "?" });
     const listed = await screen.findByRole("dialog", {
-      name: "Keyboard shortcuts on Set up a second factor",
+      name: "Keyboard Shortcuts on Set up a second factor",
     });
     expect(within(listed).getByText("Set up an authenticator instead")).toBeDefined();
 

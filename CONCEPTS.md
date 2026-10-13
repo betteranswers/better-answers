@@ -1839,7 +1839,7 @@ its menu group where its area has them: Members, Connected sources, Audit log.
 Control Centre's are listed in its entry above, in the order the menu shows them. A person sees a
 page by their *role* or by owning a *collection* it serves. A page not built, or not theirs to see,
 appears nowhere, and its address shows the same **not-found page** as one that never existed,
-offering their *home*. A page that fails says "This page didn’t load". A page may carry *tabs*. Not
+offering their *home*. A page that fails says "This Page Didn’t Load". A page may carry *tabs*. Not
 a *view (of an MCP App)*.
 
 ### tab
@@ -1892,7 +1892,7 @@ Keyboard shortcuts instead.
 The region beside the icon rail, below the *top band*, listing the open *area*'s groups, each a
 heading over its *pages*, marking the page being read, and swapping when the area changes.
 
-No heading in it repeats the area's name. The *navigation control* hides it (*Hide the menu*) and
+No heading in it repeats the area's name. The *navigation control* hides it (*Hide Menu*) and
 shows it again, moving nothing in the top band, and that choice is remembered on the browser it was
 made on.
 

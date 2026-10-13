@@ -64,12 +64,12 @@ describe("a page that throws", () => {
     const band = screen.getByRole("banner");
     expect(within(band).getByRole("link", { name: PRODUCT_NAME })).toBeDefined();
     expect(within(band).getByText(A_MEMBER.workspace.name)).toBeDefined();
-    expect(within(band).getByRole("button", { name: "Hide the menu" })).toBeDefined();
+    expect(within(band).getByRole("button", { name: "Hide Menu" })).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
     const rail = screen.getByRole("navigation", { name: "Areas" });
     expect(within(rail).getByRole("link", { name: "Control Centre" })).toBeDefined();
     const nav = screen.getByRole("navigation", { name: "Control Centre" });
-    expect(within(nav).getByRole("link", { name: "Models and spend" })).toBeDefined();
+    expect(within(nav).getByRole("link", { name: "Models and Spend" })).toBeDefined();
 
     expect(saying().map((alert) => screen.getByRole("main").contains(alert))).toEqual([true]);
   });

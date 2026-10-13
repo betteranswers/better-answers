@@ -78,7 +78,7 @@ describe("the shell's regions", () => {
     expect(screen.getByRole("main")).toBeDefined();
 
     const first = container.querySelector("a");
-    expect(first?.textContent).toBe("Skip to the page");
+    expect(first?.textContent).toBe("Skip to the Page");
     expect(first?.getAttribute("href")).toBe(`#${screen.getByRole("main").id}`);
   });
 
@@ -87,11 +87,11 @@ describe("the shell's regions", () => {
 
     expect(namesIn(menu(), "heading")).toEqual(["Sources", "Models", "People", "System"]);
     expect(namesIn(menu())).toEqual([
-      "Connected sources",
-      "Models and spend",
+      "Connected Sources",
+      "Models and Spend",
       "Members",
       "Groups",
-      "Audit log",
+      "Audit Log",
     ]);
   });
 
@@ -112,7 +112,7 @@ describe("the shell's regions", () => {
     await openAs("Admin", "/models/models-and-spend");
 
     const bar = screen.getByRole("banner");
-    for (const name of ["Control Centre", "Models", "Models and spend"]) {
+    for (const name of ["Control Centre", "Models", "Models and Spend"]) {
       expect(within(bar).getByText(name, { exact: true })).toBeDefined();
     }
   });

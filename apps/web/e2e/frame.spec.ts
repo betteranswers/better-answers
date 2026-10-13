@@ -40,7 +40,7 @@ const SOURCES = menuGroupIn(CONTROL_CENTRE, "sources");
 
 const MODELS = menuGroupIn(CONTROL_CENTRE, "models");
 
-const MODELS_AND_SPEND = pageNamed(MODELS, "Models and spend");
+const MODELS_AND_SPEND = pageNamed(MODELS, "Models and Spend");
 
 const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
 
@@ -50,11 +50,11 @@ const SYSTEM = menuGroupIn(CONTROL_CENTRE, "system");
 
 /** What an Admin is shown today, spelled out rather than read through the filter that draws it. */
 const AN_ADMINS_PAGES = [
-  [SOURCES, pageNamed(SOURCES, "Connected sources")],
+  [SOURCES, pageNamed(SOURCES, "Connected Sources")],
   [MODELS, MODELS_AND_SPEND],
   [PEOPLE, MEMBERS],
   [PEOPLE, pageNamed(PEOPLE, "Groups")],
-  [SYSTEM, pageNamed(SYSTEM, "Audit log")],
+  [SYSTEM, pageNamed(SYSTEM, "Audit Log")],
 ] as const;
 
 const AREA_NAMES = ["Knowledge", "Control Centre"];
@@ -102,9 +102,9 @@ const partOf = (page: Page, name: string) => bandOf(page).getByText(name, { exac
 
 const crumbsOf = (page: Page) => bandOf(page).getByRole("navigation", { name: BREADCRUMB });
 
-const TOOLBAR_TABS = ["Model choices", "Spend"];
+const TOOLBAR_TABS = ["Model Choices", "Spend"];
 
-const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Models and spend" });
+const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Models and Spend" });
 
 const modelChoicesCardOf = (page: Page) => page.getByRole("region", { name: "Model choices" });
 
@@ -368,11 +368,11 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
 
   const nav = navOf(page, CONTROL_CENTRE);
   await expect(nav.getByRole("link")).toHaveText(PAGE_NAMES);
-  const open = nav.getByRole("link", { name: "Audit log" });
+  const open = nav.getByRole("link", { name: "Audit Log" });
   await expect(open).toHaveAttribute("aria-current", "page");
 
   // Heavier and filled where its neighbours are neither, so it survives a greyscale page.
-  expect(await weightOf(page, "Audit log")).toBeGreaterThan(await weightOf(page, "Members"));
+  expect(await weightOf(page, "Audit Log")).toBeGreaterThan(await weightOf(page, "Members"));
   expect(await greyOf(open, "own"), "the open page's fill is the nav's own").not.toBe(
     await greyOf(open, "behind"),
   );
@@ -390,11 +390,11 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
       - heading "Sources" [level=3]
       - list:
         - listitem:
-          - link "Connected sources"
+          - link "Connected Sources"
       - heading "Models" [level=3]
       - list:
         - listitem:
-          - link "Models and spend"
+          - link "Models and Spend"
       - heading "People" [level=3]
       - list:
         - listitem:
@@ -404,7 +404,7 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
       - heading "System" [level=3]
       - list:
         - listitem:
-          - link "Audit log"
+          - link "Audit Log"
   `);
 
   const started = Date.now();
@@ -476,7 +476,7 @@ test("names workspace and place, the logo leading home", async ({ page, request 
   for (const name of [CONTROL_CENTRE.name, MODELS.name, MODELS_AND_SPEND.name]) {
     await expect(partOf(page, name)).toBeVisible();
   }
-  await expect(bandOf(page).getByRole("button", { name: "Sign out" })).toHaveCount(0);
+  await expect(bandOf(page).getByRole("button", { name: "Sign Out" })).toHaveCount(0);
 
   // The logo is the way home from anywhere, named for the product rather than drawn alone.
   await expect(logoOf(page)).toHaveAttribute("href", HOMES.Admin.path);
@@ -500,7 +500,7 @@ test("shows initials, with name and role one menu in", async ({ page, request })
   const menu = await personMenuOpened(page, LONG_PERSON);
   await expect(menu.getByText(LONG_PERSON, { exact: true })).toBeVisible();
   await expect(menu.getByText("Admin", { exact: true })).toBeVisible();
-  await expect(menu.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign out"]);
+  await expect(menu.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign Out"]);
 });
 
 test("names area, group, page and open tab, following the tab", async ({ page, request }) => {
@@ -625,7 +625,7 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
   expect(await inDocumentOrder(page, band), "the band reads out of order").toBe(true);
 
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to the page" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
 
   for (const stop of band) {
     await page.keyboard.press("Tab");
@@ -654,7 +654,7 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
   await expect(offer.getByRole("button", { name: PASSKEY_WORDS.dismissOffer })).toBeFocused();
 
   await page.keyboard.press("Tab");
-  await expect(tabsOf(page).getByRole("tab", { name: "Model choices" })).toBeFocused();
+  await expect(tabsOf(page).getByRole("tab", { name: "Model Choices" })).toBeFocused();
 
   // The open tab's panel holds the page, so the content is reached through the toolbar.
   const panel = page.getByRole("tabpanel");
@@ -703,7 +703,7 @@ test("leaves no target half under the band after skipping", async ({ page, reque
     const overflow = await pageGrownBy(page, grown);
     // Scrolling from the first step on, the sweep would skip the shallow jumps that cut the head.
     if (grown === 0) expect(overflow, "the page scrolls before it is grown").toBe(0);
-    await page.getByRole("link", { name: "Skip to the page" }).focus();
+    await page.getByRole("link", { name: "Skip to the Page" }).focus();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("main")).toBeFocused();
     expect(await halfUnderTheBand(page), `the page grown by ${String(grown)}px`).toEqual([]);
@@ -790,7 +790,7 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
 
   // From the top to the last member row: first row, the parts that lead somewhere, toolbar, page.
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to the page" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
   for (const stop of [
     ...firstRow,
     crumbOf(page, CONTROL_CENTRE.name),
@@ -898,8 +898,8 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
   const tabs = tabsOf(page);
   await expect(tabs.getByRole("tab")).toHaveText(TOOLBAR_TABS);
   await expect(tabs).toMatchAriaSnapshot(`
-    - tablist "Models and spend":
-      - tab "Model choices" [selected]
+    - tablist "Models and Spend":
+      - tab "Model Choices" [selected]
       - tab "Spend"
   `);
 
@@ -911,7 +911,7 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
   expect(await topOf(heading)).toBeLessThan(await topOf(tabs));
 
   // The arrows and the selection are the registry's, so the shell rolls no keyboard of its own.
-  await tabs.getByRole("tab", { name: "Model choices" }).click();
+  await tabs.getByRole("tab", { name: "Model Choices" }).click();
   await page.keyboard.press("ArrowRight");
   await expect(tabs.getByRole("tab", { name: "Spend" })).toHaveAttribute("aria-selected", "true");
   await expect(main.getByRole("tabpanel")).toHaveText(/\S/);
@@ -1211,7 +1211,7 @@ test("closes the sheet on a chosen page, focus returned", async ({ page, request
   await menu.click();
   await expect(sheetOf(page)).toBeVisible();
   await scrollsNothingSideways(page, "with the sheet open");
-  await sheetOf(page).getByRole("link", { name: "Audit log" }).click();
+  await sheetOf(page).getByRole("link", { name: "Audit Log" }).click();
 
   await expect(sheetOf(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();

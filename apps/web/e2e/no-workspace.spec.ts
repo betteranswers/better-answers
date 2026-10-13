@@ -204,7 +204,7 @@ test("lists a waiting invitation within a second, then joins it", async ({
   await expect(claudeLine(page)).toHaveCount(0);
   await passesTheAccessibilityGate();
 
-  const keystrokes = await keystrokesListed(page, "this page");
+  const keystrokes = await keystrokesListed(page, "This Page");
   await expect(keystrokes.getByRole("term").filter({ hasText: /^i$/ })).toBeVisible();
   await keystrokesDismissed(page, keystrokes);
   await page.keyboard.press("i");
@@ -238,7 +238,7 @@ test("offers to read the invitations again when no answer came", async ({
   await passesTheAccessibilityGate();
 
   await page.unroute(INVITATIONS_READ_ROUTE);
-  const keystrokes = await keystrokesListed(page, "this page");
+  const keystrokes = await keystrokesListed(page, "This Page");
   await expect(keystrokes.getByRole("term").filter({ hasText: /^r$/ })).toBeVisible();
   await keystrokesDismissed(page, keystrokes);
   await page.keyboard.press("r");

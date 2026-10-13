@@ -60,7 +60,7 @@ function Searched() {
         Open a row
       </button>
       <button type="button" onClick={list.clear}>
-        Clear filters
+        Clear Filters
       </button>
     </>
   );
@@ -78,7 +78,7 @@ function SearchedWithoutPages() {
         }}
       />
       <button type="button" onClick={list.clear}>
-        Clear filters
+        Clear Filters
       </button>
     </>
   );
@@ -190,7 +190,7 @@ describe("a searched list, its search settled into the address", () => {
       "/list?list.search=ada&list.role=Admin&list.sort=-name&list.page=2",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear Filters" }));
 
     await at("/list?list.sort=-name");
     expect(box().value).toBe("");
@@ -210,7 +210,7 @@ describe("a searched list, its search settled into the address", () => {
       "/older?older.search=export&older.family=people",
     ]);
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear Filters" }));
 
     await at("/older");
     expect(box().value).toBe("");

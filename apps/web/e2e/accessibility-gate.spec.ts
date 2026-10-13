@@ -153,7 +153,7 @@ const scrollAControlHalfUnderABand = (): boolean => {
   band.style.cssText =
     "position: sticky; top: 0; z-index: 30; box-sizing: border-box; height: 48px; padding: 8px 0;";
   const inTheBand = document.createElement("button");
-  inTheBand.textContent = "Jump to";
+  inTheBand.textContent = "Jump To";
   inTheBand.style.cssText = "display: block; width: 176px; height: 32px;";
   band.append(inTheBand);
   document.body.prepend(band);

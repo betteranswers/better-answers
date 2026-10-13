@@ -26,7 +26,7 @@ describe("a list's head", () => {
       heading="Members"
       headingId="members"
       count="8 members"
-      action={<button type="button">Invite a person</button>}
+      action={<button type="button">Invite a Person</button>}
     />
   );
 
@@ -36,7 +36,7 @@ describe("a list's head", () => {
     const read = [
       screen.getByRole("heading", { level: 2, name: "Members" }),
       screen.getByRole("status"),
-      screen.getByRole("button", { name: "Invite a person" }),
+      screen.getByRole("button", { name: "Invite a Person" }),
     ];
     expect(screen.getByRole("status").textContent).toBe("8 members");
     for (const [index, part] of read.slice(1).entries()) {

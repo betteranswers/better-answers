@@ -22,7 +22,7 @@ export const personMenuOpened = async (page: Page, who: string): Promise<Locator
 /** Sign-out is one disclosure in from the band, so a spec that leaves opens the menu first. */
 export const signOutFromTheShell = async (page: Page, who: string): Promise<void> => {
   const menu = await personMenuOpened(page, who);
-  await menu.getByRole("menuitem", { name: "Sign out" }).click();
+  await menu.getByRole("menuitem", { name: "Sign Out" }).click();
 };
 
 /** Named for where the person is: the workspace they are reading, or the console. */
@@ -54,7 +54,7 @@ export const crumbOf = (page: Page, name: string): Locator =>
 /** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
 export const skipLinkReachesThePage = async (page: Page): Promise<void> => {
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to the page" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("main")).toBeFocused();
 };

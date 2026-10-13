@@ -33,7 +33,7 @@ describe("the band's breadcrumb", () => {
     expect(partsAt("Admin", "/system/audit-log")).toEqual([
       { name: "Control Centre", to: "/people/members" },
       { name: "System", to: "/system/audit-log" },
-      { name: "Audit log", to: undefined },
+      { name: "Audit Log", to: undefined },
     ]);
   });
 
@@ -61,7 +61,7 @@ describe("the band's breadcrumb", () => {
     expect(partsAt("operator", "/console/people/names-waiting")).toEqual([
       { name: "Console", to: "/console/workspaces/every-workspace" },
       { name: "People", to: "/console/people/everyone" },
-      { name: "Names waiting", to: undefined },
+      { name: "Names Waiting", to: undefined },
     ]);
   });
 
@@ -70,8 +70,8 @@ describe("the band's breadcrumb", () => {
   });
 
   it("names the page's own part where no place is open", () => {
-    expect(partsAt("Admin", "/system/not-a-page", "No page at this address")).toEqual([
-      { name: "No page at this address", to: undefined },
+    expect(partsAt("Admin", "/system/not-a-page", "Page Not Found")).toEqual([
+      { name: "Page Not Found", to: undefined },
     ]);
   });
 

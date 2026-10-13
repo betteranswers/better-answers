@@ -23,7 +23,7 @@ const aPage = (name: string, path: string, icon: IconName): Page => ({
   seenBy: ["Admin"],
 });
 
-const QUESTIONS = aPage("Your questions", "/first/your-questions", "question");
+const QUESTIONS = aPage("Your Questions", "/first/your-questions", "question");
 
 const GUIDES = aPage("Guides", "/second/guides", "guides");
 

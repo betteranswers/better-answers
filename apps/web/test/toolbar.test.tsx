@@ -13,7 +13,7 @@ const MODELS_AND_SPEND = "/models/models-and-spend";
 
 const shellAt = async (path: string) => (await openApp(path)).router;
 
-const tabs = () => screen.getByRole("tablist", { name: "Models and spend" });
+const tabs = () => screen.getByRole("tablist", { name: "Models and Spend" });
 
 const openTab = () => within(tabs()).getByRole("tab", { selected: true }).textContent;
 
@@ -115,8 +115,8 @@ describe("the toolbar the open page fills", () => {
       within(tabs())
         .getAllByRole("tab")
         .map((tab) => tab.textContent),
-    ).toEqual(["Model choices", "Spend"]);
-    expect(openTab()).toBe("Model choices");
+    ).toEqual(["Model Choices", "Spend"]);
+    expect(openTab()).toBe("Model Choices");
   });
 
   it("opens the picked tab, and says when it is unbuilt", async () => {
@@ -141,7 +141,7 @@ describe("the toolbar the open page fills", () => {
         <Toolbar name={name} toolbar={toolbar} />
       </PageTabsRoot>
     );
-    const { rerender } = render(shell(A_TABBED_PAGE, "Connected sources"));
+    const { rerender } = render(shell(A_TABBED_PAGE, "Connected Sources"));
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Gone at source" }));
     expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Gone at source");
 
@@ -155,7 +155,7 @@ describe("the toolbar the open page fills", () => {
 
     const panel = screen.getByRole("tabpanel");
     expect(panel.getAttribute("aria-labelledby")).toBe(
-      within(tabs()).getByRole("tab", { name: "Model choices" }).id,
+      within(tabs()).getByRole("tab", { name: "Model Choices" }).id,
     );
     expect(within(panel).getByRole("region", { name: "Model choices" })).toBeDefined();
   });

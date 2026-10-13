@@ -88,7 +88,7 @@ function PersonMenu(properties: Pick<BandProperties, "person" | "signingOut" | "
           <Link to="/account">{ACCOUNT_HEADING}</Link>
         </DropdownMenuItem>
         <DropdownMenuItem disabled={properties.signingOut} onSelect={() => properties.onSignOut()}>
-          Sign out
+          Sign Out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

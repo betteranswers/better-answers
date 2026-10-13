@@ -51,7 +51,7 @@ const searchBox = (page: Page) => searchRegion(page).getByRole("searchbox", { na
 const matchesOf = (page: Page): Locator =>
   searchRegion(page).getByRole("list", { name: WORDS.matches }).getByRole("listitem");
 
-const loadMore = (page: Page) => searchRegion(page).getByRole("button", { name: "Load more" });
+const loadMore = (page: Page) => searchRegion(page).getByRole("button", { name: "Load More" });
 
 /** The search's own status: a passage opened beneath its match says its read in another. */
 const said = (page: Page) => searchRegion(page).getByRole("status").first();

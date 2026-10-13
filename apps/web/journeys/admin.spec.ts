@@ -19,12 +19,12 @@ import { theFixtureHolds, type RepairMembers } from "./test-workspace.ts";
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 const MEMBERS = pageNamed(people, "Members").path;
 const GROUPS = pageNamed(people, "Groups").path;
-const AUDIT_LOG = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit log").path;
+const AUDIT_LOG = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log").path;
 const CONNECTED_SOURCES = pageNamed(
   menuGroupIn(CONTROL_CENTRE, "sources"),
-  "Connected sources",
+  "Connected Sources",
 ).path;
-const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Models and spend").path;
+const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Models and Spend").path;
 
 /** Every group the journeys make starts so, and the opening repair deletes any left behind. */
 const JOURNEYS_GROUPS = "Journeys run";
@@ -152,7 +152,7 @@ const pagesOfMembers = (page: Page): Locator =>
 
 /** Each turn waits for the count it says, so the next turn starts from the page it drew. */
 const lastPageReached = async (page: Page): Promise<number> => {
-  const next = pagesOfMembers(page).getByRole("button", { name: "Next page" });
+  const next = pagesOfMembers(page).getByRole("button", { name: "Next Page" });
   const said = pagesOfMembers(page).getByRole("status");
   await expect(said).toBeVisible();
   let turned = 0;
@@ -187,7 +187,7 @@ const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
   await page.goto(AUDIT_LOG);
   const auditLog = page.getByRole("region", { name: AUDIT_LOG_WORDS.heading });
   const events = auditLog.getByRole("listitem");
-  const loadMore = auditLog.getByRole("button", { name: "Load more" });
+  const loadMore = auditLog.getByRole("button", { name: "Load More" });
   await expect(loadMore, "the Audit log offered no Load more").toBeVisible();
   const shown = await events.count();
   await loadMore.click();
