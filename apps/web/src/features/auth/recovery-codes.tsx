@@ -79,10 +79,10 @@ function CodesActions(properties: {
   );
 }
 
-/** A ceiling carries no word, only its wait. With no response a set may have been made. */
-export const codesUnanswered = (failure: Error | ApiError): string => {
+/** A ceiling carries no word, only its wait. What no response means is the page's to say. */
+export const codesUnanswered = (failure: Error | ApiError, unanswered: string): string => {
   const liftsIn = ceilingLiftsIn(failure);
-  return liftsIn === undefined ? STOCK.unconfirmed : stockWait(liftsIn);
+  return liftsIn === undefined ? unanswered : stockWait(liftsIn);
 };
 
 export const saidOfAcknowledging = (failure: Error | ApiError | null): string | undefined => {

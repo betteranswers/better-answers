@@ -18,6 +18,7 @@ import {
   withPasskeysHere,
   type Route,
 } from "./second-factor-api.ts";
+import { addressOf } from "./stubbed-api.ts";
 
 afterEach(() => {
   cleanup();
@@ -266,13 +267,14 @@ describe("what the setup page says of a failed setup", () => {
   });
 });
 
-describe("the recovery codes detour", () => {
-  const CONFIRMED = {
-    ...BOTH_HELD,
-    thisSession: sessionStanding("confirmed", { confirmed: true }),
-  };
-  const UNSEEN = { ...CONFIRMED, codesAcknowledged: false };
+const CONFIRMED = {
+  ...BOTH_HELD,
+  thisSession: sessionStanding("confirmed", { confirmed: true }),
+};
 
+const UNSEEN = { ...CONFIRMED, codesAcknowledged: false };
+
+describe("the recovery codes detour", () => {
   it("shows a new set that replaces the one shown before", async () => {
     const acknowledged: unknown[] = [];
     adasApi(
@@ -364,6 +366,44 @@ describe("the recovery codes detour", () => {
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/recovery-codes");
+    });
+  });
+});
+
+/** Ada's api as `held` says, where the call that makes a set of codes gets no response. */
+const withTheMakeDropped = (held: () => unknown): void => {
+  adasApi(held);
+  const answer = globalThis.fetch;
+  vi.stubGlobal("fetch", (input: string | URL | Request) =>
+    addressOf(input).pathname.includes("person.replaceRecoveryCodes")
+      ? Promise.reject(new TypeError("the network is down"))
+      : answer(input),
+  );
+};
+
+/** Free to hold no codes, so the Account page offers a first set and no detour makes one. */
+const NO_CODES_YET = { ...CONFIRMED, mustHoldOne: false, recoveryCodes: undefined };
+
+describe("a set of recovery codes whose making got no response", () => {
+  it("says to try again on the setup's own step", async () => {
+    withTheMakeDropped(() => UNSEEN);
+
+    await openAsAda("/recovery-codes");
+
+    await waitFor(() => {
+      expect(alertsSaying()).toEqual([STOCK.tryAgain]);
+    });
+    expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
+  });
+
+  it("cannot be confirmed on the Account page", async () => {
+    withTheMakeDropped(() => NO_CODES_YET);
+    await openAsAda("/account");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Make recovery codes" }));
+
+    await waitFor(() => {
+      expect(alertsSaying()).toEqual([STOCK.unconfirmed]);
     });
   });
 });

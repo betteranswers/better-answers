@@ -36,3 +36,6 @@ export const codeShown = (code: string): string => `${code.slice(0, 3)} ${code.s
 export const codeSpelled = (code: string): string => code.split("").join(" ");
 
 export const CODE_NOT_COPIED = "Couldn't copy. Please type the code on the page where you started.";
+
+/** Sign in is the one control here, and a second press of a spent link shows the dead page. */
+export const SIGN_IN_UNCONFIRMED = "We couldn't confirm that. Please try again.";

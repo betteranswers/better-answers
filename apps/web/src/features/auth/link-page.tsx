@@ -26,6 +26,7 @@ import {
   codeSpelled,
   LINK_ACTIONS,
   LINK_WORDS,
+  SIGN_IN_UNCONFIRMED,
   signingInAs,
   worksUntil,
 } from "./link-words.ts";
@@ -218,7 +219,7 @@ const boundSlots = (bound: Bound, acting: Acting): Slots => ({
   refused:
     acting.signInFailure === null
       ? undefined
-      : saidOfFailure(acting.signInFailure, STOCK.unconfirmed),
+      : saidOfFailure(acting.signInFailure, SIGN_IN_UNCONFIRMED),
   actions: null,
 });
 

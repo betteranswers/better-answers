@@ -230,7 +230,9 @@ const failureOnThePage = (read: SecondFactorRead, actions: AccountActions) => {
   const removal = actions.remove.error ?? actions.removePasskey.error;
   if (removal !== null) return { failure: removal, unanswered: STOCK.tryAgain };
   const made = actions.make.error;
-  return { failure: made, unanswered: made === null ? STOCK.tryAgain : codesUnanswered(made) };
+  if (made === null) return { failure: made, unanswered: STOCK.tryAgain };
+  // With no response a set may have been made, so no one is told to make another.
+  return { failure: made, unanswered: codesUnanswered(made, STOCK.unconfirmed) };
 };
 
 /** The opening actions of the passkeys and the authenticator, each offered while it is closed. */
