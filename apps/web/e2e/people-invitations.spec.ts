@@ -7,11 +7,14 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  A_ROLE,
   addMember,
   anAddress,
   clockTheNextKey,
+  countOf,
   emailsSentTo,
   invite,
+  keyListed,
   keystrokesDismissed,
   keystrokesListed,
   notFoundOfferingHome,
@@ -36,8 +39,6 @@ const MEMBERS_PAGE = pageNamed(people, "Members").path;
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
 
 type Status = "Waiting" | "Accepted" | "Expired" | "Cancelled";
 
@@ -82,9 +83,7 @@ const saidInTheTab = (page: Page, address: string | RegExp): Locator =>
 /** An empty list draws one cell, which says so; a row of an invitation draws several. */
 const theOneCell = (page: Page): Locator => invitationsRegion(page).getByRole("cell");
 
-/** The tab's statuses in order: its count, then its outcome line. */
-const countIn = (page: Page): Locator => invitationsRegion(page).getByRole("status").nth(0);
-
+/** The tab's second status, after its count, is its outcome line. */
 const outcomeIn = (page: Page): Locator => invitationsRegion(page).getByRole("status").nth(1);
 
 const selectionSaid = (page: Page): Locator =>
@@ -266,7 +265,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(cells.nth(3)).toHaveText(LONG_UK_DATE);
     await expect(cells.nth(4)).toHaveText(LONG_UK_DATE);
     await expect(cells.nth(5)).toHaveText("Test person");
-    await expect(countIn(page)).toHaveText(/\b1\b/);
+    await expect(countOf(invitationsRegion(page))).toHaveText(/\b1\b/);
     await expect(
       page.getByRole("main").getByRole("status").filter({ hasText: /\d/ }),
       "a second count, the members', shows on Invitations",
@@ -870,7 +869,7 @@ test.describe("the People page's Invitations tab", () => {
     await page.keyboard.press(PEOPLE_KEYSTROKES.tickInvitation.key);
     await expect(tickOf(page, dropped)).not.toBeChecked();
 
-    await expect(countIn(page)).toHaveText(/\b2\b/);
+    await expect(countOf(invitationsRegion(page))).toHaveText(/\b2\b/);
     await clockTheNextKey(page, { at: THE_COUNT, reads: "1" });
     await page.keyboard.press(PEOPLE_KEYSTROKES.cancel.key);
     await expect(rowOf(page, dropped)).toHaveCount(0);
@@ -896,12 +895,12 @@ test.describe("the People page's Invitations tab", () => {
       PEOPLE_KEYSTROKES.nextInvitations,
     ]) {
       await expect(
-        keystrokes.getByRole("term").getByText(listed.key, { exact: true }),
+        keyListed(keystrokes, listed.key),
         `the list holds no ${listed.key}`,
       ).toBeVisible();
     }
     await expect(
-      keystrokes.getByRole("term").getByText(PEOPLE_KEYSTROKES.open.key, { exact: true }),
+      keyListed(keystrokes, PEOPLE_KEYSTROKES.open.key),
       "the Members tab's keystrokes on Invitations",
     ).toHaveCount(0);
     await keystrokesDismissed(page, keystrokes);

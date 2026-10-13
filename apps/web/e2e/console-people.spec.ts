@@ -19,6 +19,7 @@ import {
   claudeExchanges,
   claudesAuthorizeUrl,
   clockTheNextKey,
+  countOf,
   flagTheName,
   keystrokesDismissed,
   keystrokesListed,
@@ -71,9 +72,6 @@ const aTag = (): string => `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 
 const everyone = (page: Page) => page.getByRole("region", { name: "Everyone" });
-
-/** A list's count is its head's, so it is the first status its region holds. */
-const countOf = (list: Locator): Locator => list.getByRole("status").first();
 
 /** An outcome's status stands beside its alert. A list's count and its pages' count have none. */
 const outcomeOf = (list: Locator): Locator => list.locator("output:has(+ [role='alert'])");

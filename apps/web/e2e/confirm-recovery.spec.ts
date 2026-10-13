@@ -15,7 +15,7 @@ import {
   provision,
   refusedDigitsSelected,
   restored,
-  saysAnotherRefusal,
+  saysSomethingNew,
   saysTheWait,
   signIn,
   signInByEmail,
@@ -213,7 +213,7 @@ test("repeated wrong codes make the field wait; passkeys still confirm", async (
   const { waitSeconds, saidOfAWrongCode } = await wrongCodesUntilTheWait(page, key);
 
   await saysTheWait(theRefusal(page), waitSeconds);
-  await saysAnotherRefusal(theRefusal(page), saidOfAWrongCode);
+  await saysSomethingNew(theRefusal(page), saidOfAWrongCode);
   await expect(codeField(page)).not.toBeEditable();
   await passesTheAccessibilityGate();
   await passkeyButton(page).click();

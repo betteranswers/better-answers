@@ -5,11 +5,14 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  A_ROLE,
   addMember,
   anAddress,
   askToJoin,
   clockTheNextKey,
+  countOf,
   editorPickedByKeyboard,
+  keyListed,
   keystrokesListed,
   notFoundOfferingHome,
   person,
@@ -26,8 +29,6 @@ const LIST_BUDGET_MS = 1000;
 
 const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
 
-const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
-
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
 const REASON = "I have joined the bids team and need the answer library.";
@@ -38,8 +39,6 @@ const requestsRegion = (page: Page) => page.getByRole("region", { name: "Request
 
 /** The region's outcome line: its count is a status too, and stands before it. */
 const saidIn = (page: Page): Locator => requestsRegion(page).getByRole("status").last();
-
-const countIn = (page: Page): Locator => requestsRegion(page).getByRole("status").first();
 
 /** An empty list is one paragraph, which says so, where a list of requests draws a table. */
 const emptyLine = (page: Page): Locator => requestsRegion(page).getByRole("paragraph");
@@ -135,7 +134,7 @@ test.describe("the People page's Requests tab", () => {
     await expect(cells.nth(1)).toHaveText(REASON);
     await expect(cells.nth(2)).toHaveText("Waiting");
     await expect(cells.nth(3)).toHaveText(LONG_UK_DATE);
-    await expect(countIn(page)).toHaveText(/\b1\b/);
+    await expect(countOf(requestsRegion(page))).toHaveText(/\b1\b/);
 
     await rowOf(page, "Priya Shah")
       .getByRole("button", { name: "Approve Request from Priya Shah" })
@@ -237,11 +236,10 @@ test.describe("the People page's Requests tab", () => {
     await expect(saidIn(page)).toContainText("Dropped Ray");
 
     const keystrokes = await keystrokesListed(page, "Members");
-    const listed = (key: string) => keystrokes.getByRole("term").getByText(key, { exact: true });
-    await expect(listed(PEOPLE_KEYSTROKES.approve.key)).toBeVisible();
-    await expect(listed(PEOPLE_KEYSTROKES.decline.key)).toBeVisible();
+    await expect(keyListed(keystrokes, PEOPLE_KEYSTROKES.approve.key)).toBeVisible();
+    await expect(keyListed(keystrokes, PEOPLE_KEYSTROKES.decline.key)).toBeVisible();
     await expect(
-      listed(PEOPLE_KEYSTROKES.changeRole.key),
+      keyListed(keystrokes, PEOPLE_KEYSTROKES.changeRole.key),
       "the Members tab's keystrokes on Requests",
     ).toHaveCount(0);
     await page.keyboard.press("Escape");

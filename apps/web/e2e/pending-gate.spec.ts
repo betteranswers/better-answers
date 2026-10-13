@@ -15,6 +15,7 @@ import {
   landedAtHome,
   person,
   provision,
+  saysSomethingNew,
   signIn,
   signInByEmail,
   signInHeading,
@@ -131,12 +132,7 @@ test("an hour unconfirmed ends the sign-in; signing in returns there", async ({
   await page.context().clearCookies();
   await page.reload();
   await expect(signInHeading(page)).toBeVisible();
-  await expect
-    .poll(
-      async () => ["", timedOut].includes(await page.getByRole("status").innerText()),
-      "an ended session read as one never confirmed",
-    )
-    .toBe(false);
+  await saysSomethingNew(page.getByRole("status"), timedOut);
 });
 
 test("a confirmed session opening confirm goes straight to its return", async ({

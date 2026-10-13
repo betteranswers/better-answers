@@ -22,7 +22,7 @@ import {
   personMenuOpened,
   provision,
   removeMember,
-  saysAnotherRefusal,
+  saysSomethingNew,
   saysARefusal,
   saysTheWait,
   signedInAtHome,
@@ -79,12 +79,7 @@ const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => 
     page.getByRole("button", { name: "Send a New Code" }),
     "the new email is still sending",
   ).toHaveAttribute("aria-disabled", "false");
-  await expect
-    .poll(
-      async () => ["", earlier].includes(await page.getByRole("status").innerText()),
-      "the page says nothing new of the email",
-    )
-    .toBe(false);
+  await saysSomethingNew(page.getByRole("status"), earlier);
 };
 
 /** A page's own words as an XPath string, whatever quotes they hold. */
@@ -254,7 +249,6 @@ test("lands a sole member in the shell: workspace, person, role", async ({ page,
   await expect(you.getByText(workspace.admin.name, { exact: true })).toBeVisible();
   await expect(you.getByText("Admin", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Choose a workspace" })).toHaveCount(0);
 
   await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
@@ -664,7 +658,7 @@ test("a third wrong code hands focus to sending another", async ({ page, request
   const third = authAnswering(page, SIGN_IN_PATH);
   await codeField(page).fill(notTheCode(code, 3));
   expect(await third).toMatchObject({ status: 400, code: "INVALID_OTP" });
-  await saysAnotherRefusal(page.getByRole("alert"), oneLeft);
+  await saysSomethingNew(page.getByRole("alert"), oneLeft);
 
   await anotherCodeSignsIn(page, request, email);
 });

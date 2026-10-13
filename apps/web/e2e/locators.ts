@@ -49,6 +49,9 @@ export const crumbOf = (page: Page, name: string): Locator =>
     .getByRole("navigation", { name: "Breadcrumb" })
     .getByRole("link", { name, exact: true });
 
+/** A list's count is its head's, so it is the first status its region holds. */
+export const countOf = (list: Locator): Locator => list.getByRole("status").first();
+
 /** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
 export const skipLinkReachesThePage = async (page: Page): Promise<void> => {
   await page.keyboard.press("Tab");
@@ -131,6 +134,10 @@ export const keystrokesListed = async (page: Page, named: string): Promise<Locat
   return listed;
 };
 
+/** A keystroke's key in the open list, which sets each action beside its key. */
+export const keyListed = (keystrokes: Locator, key: string): Locator =>
+  keystrokes.getByRole("term").getByText(key, { exact: true });
+
 /** The one button opening the list: the rail's or the band's, or a page's outside the shell. */
 export const keystrokesButton = (within: Page | Locator): Locator =>
   within.getByRole("button", { name: "Keyboard Shortcuts", exact: true });
@@ -141,6 +148,13 @@ export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<
   await expect(listed).toHaveCount(0);
   await expect(keystrokesButton(page)).toBeFocused();
 };
+
+/** The article a role takes in a test's title. */
+export const A_ROLE = {
+  Admin: "an Admin",
+  Editor: "an Editor",
+  Viewer: "a Viewer",
+} as const satisfies Readonly<Record<Role, string>>;
 
 /** A role's home: its page's first heading, and the link the not-found page offers back to it. */
 const HOME_NAMES = {
@@ -226,12 +240,12 @@ export const saysOfItsRead = (list: Locator): Promise<void> =>
     /\S/,
   );
 
-/** A region already saying a refusal shows the next only by saying something else. */
-export const saysAnotherRefusal = (alert: Locator, earlier: string): Promise<void> =>
+/** A status or an alert already saying something shows the next only by saying something else. */
+export const saysSomethingNew = (region: Locator, earlier: string): Promise<void> =>
   expect
     .poll(
-      async () => ["", earlier.trim()].includes((await alert.innerText()).trim()),
-      "the alert says nothing, or only the earlier refusal",
+      async () => ["", earlier.trim()].includes((await region.innerText()).trim()),
+      "the region says nothing, or only what it said before",
     )
     .toBe(false);
 

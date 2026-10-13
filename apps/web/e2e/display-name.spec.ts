@@ -11,7 +11,7 @@ import {
   landedAtHome,
   person,
   provision,
-  saysAnotherRefusal,
+  saysSomethingNew,
   saysARefusal,
   signIn,
   theActionLandedWithinItsBudget,
@@ -140,7 +140,7 @@ test("says what to change in a bad name, then saves", async ({
   const tooLong = refusalAnswering(page, SET_DISPLAY_NAME);
   await saveButton(page).click();
   expect(await tooLong).toMatchObject({ word: "display-name-too-long" });
-  await saysAnotherRefusal(refusal, said);
+  await saysSomethingNew(refusal, said);
 
   await displayNameField(page).fill("Priya Shah");
   await saveButton(page).click();

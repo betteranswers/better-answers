@@ -5,6 +5,7 @@ import { HOMES, type Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  A_ROLE,
   addMember,
   anAddress,
   askShowsTheServedAddress,
@@ -20,12 +21,6 @@ import {
 } from "./harness.ts";
 
 const READ_BUDGET_MS = 1000;
-
-const A_ROLE = {
-  Admin: "an Admin",
-  Editor: "an Editor",
-  Viewer: "a Viewer",
-} as const satisfies Readonly<Record<Role, string>>;
 
 /** Each role's home, as the rail's link and the way home name it. */
 const HOME_NAMED = { Admin: "Members", Editor: "Ask", Viewer: "Ask" } as const satisfies Readonly<

@@ -6,6 +6,7 @@ import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigati
 
 import { expect, test } from "./browser.ts";
 import {
+  A_ROLE,
   aMemberSignedInAt,
   notFoundOfferingHome,
   anAddress,
@@ -18,8 +19,6 @@ import {
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
-
-const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
 
 const modelChoicesCard = (page: Page) => page.getByRole("region", { name: "Model Choices" });
 

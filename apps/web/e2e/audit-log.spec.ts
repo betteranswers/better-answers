@@ -7,9 +7,11 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  A_ROLE,
   addMember,
   aMemberSignedInAt,
   anAddress,
+  keyListed,
   keystrokesListed,
   makeGroups,
   notFoundOfferingHome,
@@ -26,8 +28,6 @@ const LIST_BUDGET_MS = 1000;
 const ONE_LINE_PX = 48;
 
 const AUDIT_LOG_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log").path;
-
-const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
 
 const SAID_DAY = /^[A-Z][a-z]+day \d{1,2} [A-Z][a-z]+ \d{4}$/;
 
@@ -384,7 +384,7 @@ test.describe("the System group's Audit log page", () => {
 
     const keystrokes = await keystrokesListed(page, "Audit Log");
     for (const { key } of Object.values(KEY))
-      await expect(keystrokes.getByRole("term").getByText(key, { exact: true })).toBeVisible();
+      await expect(keyListed(keystrokes, key)).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(keystrokes).toHaveCount(0);
 

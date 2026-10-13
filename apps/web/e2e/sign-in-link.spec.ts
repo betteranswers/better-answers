@@ -16,6 +16,7 @@ import {
   linkSentTo,
   person,
   provision,
+  saysSomethingNew,
   saysTheWait,
   signInHeading,
   theActionLandedWithinItsBudget,
@@ -204,12 +205,7 @@ test("unknown, spent and superseded links show one dead page", async ({
     asking.getByRole("button", { name: "Send a New Code" }),
     "the second email is still sending",
   ).toHaveAttribute("aria-disabled", "false");
-  await expect
-    .poll(
-      async () => ["", saidOfTheFirst].includes(await asking.getByRole("status").innerText()),
-      "the page says nothing new of the second email",
-    )
-    .toBe(false);
+  await saysSomethingNew(asking.getByRole("status"), saidOfTheFirst);
   const spent = await linkSentTo(request, asked.email);
   expect(spent, "asking again sent the same link").not.toBe(superseded);
 

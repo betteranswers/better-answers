@@ -5,11 +5,13 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  A_ROLE,
   addMember,
   aMemberSignedInAt,
   anAddress,
   clockTheNextKey,
   keepsItsWordOffThePage,
+  keyListed,
   keystrokesDismissed,
   keystrokesListed,
   makeGroups,
@@ -30,8 +32,6 @@ const people = menuGroupIn(CONTROL_CENTRE, "people");
 const GROUPS_PAGE = pageNamed(people, "Groups").path;
 
 const MEMBERS_PAGE = pageNamed(people, "Members").path;
-
-const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
 
 /** A member's row leads with its tick, then the person and their role. */
 const GROUPS_CELL = 3;
@@ -389,10 +389,10 @@ test.describe("a group's actions", () => {
 
     const keystrokes = await keystrokesListed(page, "Groups");
     for (const { key } of Object.values(GROUPS_KEYSTROKES)) {
-      await expect(keystrokes.getByRole("term").getByText(key, { exact: true })).toBeVisible();
+      await expect(keyListed(keystrokes, key)).toBeVisible();
     }
     await expect(
-      keystrokes.getByRole("term").getByText(PEOPLE_KEYSTROKES.changeRole.key, { exact: true }),
+      keyListed(keystrokes, PEOPLE_KEYSTROKES.changeRole.key),
       "the Members page's keystrokes on Groups",
     ).toHaveCount(0);
     await keystrokesDismissed(page, keystrokes);
@@ -454,20 +454,16 @@ test.describe("the keystrokes listed across the People group", () => {
     await expect(page).toHaveURL(new RegExp(`${MEMBERS_PAGE}$`));
 
     const onMembers = await keystrokesListed(page, "Members");
-    await expect(
-      onMembers.getByRole("term").getByText(PEOPLE_KEYSTROKES.changeRole.key, { exact: true }),
-    ).toBeVisible();
+    await expect(keyListed(onMembers, PEOPLE_KEYSTROKES.changeRole.key)).toBeVisible();
     const doneOnMembers = await actionBeside(onMembers, PEOPLE_KEYSTROKES.remove.key).innerText();
     await keystrokesDismissed(page, onMembers);
 
     await nav(page).getByRole("link", { name: "Groups" }).click();
     await expect(groupRows(page)).toHaveCount(2);
     const onGroups = await keystrokesListed(page, "Groups");
+    await expect(keyListed(onGroups, GROUPS_KEYSTROKES.changeMembers.key)).toBeVisible();
     await expect(
-      onGroups.getByRole("term").getByText(GROUPS_KEYSTROKES.changeMembers.key, { exact: true }),
-    ).toBeVisible();
-    await expect(
-      onGroups.getByRole("term").getByText(PEOPLE_KEYSTROKES.changeRole.key, { exact: true }),
+      keyListed(onGroups, PEOPLE_KEYSTROKES.changeRole.key),
       "Members' keystrokes outlived the page",
     ).toHaveCount(0);
     const doneOnGroups = actionBeside(onGroups, GROUPS_KEYSTROKES.delete.key);
@@ -493,10 +489,10 @@ test.describe("a member's groups, on their row and their page", () => {
 
     const keystrokes = await keystrokesListed(page, "Members");
     for (const { key } of [PEOPLE_KEYSTROKES.changeGroups, PEOPLE_KEYSTROKES.remove]) {
-      await expect(keystrokes.getByRole("term").getByText(key, { exact: true })).toBeVisible();
+      await expect(keyListed(keystrokes, key)).toBeVisible();
     }
     await expect(
-      keystrokes.getByRole("term").getByText(GROUPS_KEYSTROKES.changeMembers.key, { exact: true }),
+      keyListed(keystrokes, GROUPS_KEYSTROKES.changeMembers.key),
       "the Groups page's keystrokes on Members",
     ).toHaveCount(0);
     await keystrokesDismissed(page, keystrokes);

@@ -13,6 +13,7 @@ import {
   provision,
   railOf,
   saysARefusal,
+  saysSomethingNew,
   signedInAtHome,
   signedInWithNoWorkspace,
   signIn,
@@ -205,19 +206,12 @@ test("an Admin keeps their only passkey, told why beside Remove", async ({ page,
  * again once the button is free.
  */
 const saysNoPasskeyWasUsed = async (page: Page, saidBefore: string): Promise<void> => {
-  const saysSomethingNew = () =>
-    expect
-      .poll(
-        async () => ["", saidBefore].includes(await page.getByRole("status").innerText()),
-        "the page says nothing of the unused passkey",
-      )
-      .toBe(false);
-  await saysSomethingNew();
+  await saysSomethingNew(page.getByRole("status"), saidBefore);
   await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toHaveAttribute(
     "aria-disabled",
     "false",
   );
-  await saysSomethingNew();
+  await saysSomethingNew(page.getByRole("status"), saidBefore);
   await expect(
     page.getByRole("alert", { includeHidden: true }),
     "an unused passkey read as a refusal",

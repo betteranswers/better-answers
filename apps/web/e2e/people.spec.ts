@@ -5,16 +5,19 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  A_ROLE,
   addMember,
   aMemberSignedInAt,
   anAddress,
   askToJoin,
   clockTheNextKey,
   confirmedWhenAsked,
+  countOf,
   crumbOf,
   editorPickedByKeyboard,
   invite,
   keepsItsWordOffThePage,
+  keyListed,
   keystrokesButton,
   keystrokesDismissed,
   keystrokesListed,
@@ -44,8 +47,6 @@ const MEMBERS_PAGE = pageNamed(people, "Members").path;
 const AUDIT_LOG_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log").path;
 
 const GROUPS_PAGE = pageNamed(people, "Groups").path;
-
-const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
 
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 const MEMBER_READ = (url: URL): boolean => url.pathname.includes("session.member");
@@ -87,14 +88,8 @@ const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre
 
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
 
-/** The list's statuses in order: its count, then its outcome line. */
-const countOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(0);
-
+/** The list's second status, after its count, is its outcome line. */
 const outcomeOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(1);
-
-/** A keystroke's key in the open list, which sets each action beside its key. */
-const keyListed = (keystrokes: Locator, key: string): Locator =>
-  keystrokes.getByRole("term").getByText(key, { exact: true });
 
 /** What describes a control, read as the page says it, so a later description is told from it. */
 const describing = async (control: Locator): Promise<string> =>
@@ -423,7 +418,7 @@ test.describe("the People group's Members page", () => {
     const { admin, joined, stranger } = await anAdminAtPeople(page, request, "Aire Valley Tooling");
 
     await expect(memberRows(page)).toHaveCount(3);
-    await expect(countOf(page)).toHaveText(/\b3\b/);
+    await expect(countOf(membersRegion(page))).toHaveText(/\b3\b/);
     for (const member of joined) {
       await expect(rowOf(page, member.displayName)).toContainText(member.email);
       await expect(cellOf(page, member.displayName, "Role")).toHaveText(member.role);
@@ -452,7 +447,9 @@ test.describe("the People group's Members page", () => {
     await searchBox(page).press("A");
     await expect(memberRows(page)).toHaveCount(1);
     await expect(rowOf(page, "Priya Shah")).toBeVisible();
-    await expect(countOf(page), "the count says one of three match").toHaveText(/\b1\b\D+\b3\b/);
+    await expect(countOf(membersRegion(page)), "the count says one of three match").toHaveText(
+      /\b1\b\D+\b3\b/,
+    );
     await theActionLandedWithinItsBudget(page, "search");
 
     await searchBox(page).fill(sam.email.slice(0, 12));
@@ -1836,7 +1833,9 @@ test.describe("bulk actions on the members ticked", () => {
     await membersRegion(page).getByRole("combobox", { name: "Filter by Group" }).click();
     await page.getByRole("option", { name: "Site leads", exact: true }).click();
     await expect(names).toHaveText(["Sam Okoro"]);
-    await expect(countOf(page), "the count says one of three match").toHaveText(/\b1\b\D+\b3\b/);
+    await expect(countOf(membersRegion(page)), "the count says one of three match").toHaveText(
+      /\b1\b\D+\b3\b/,
+    );
     await membersRegion(page).getByRole("combobox", { name: "Filter by Group" }).click();
     await page.getByRole("option", { name: "Any Group", exact: true }).click();
     await expect(names).toHaveCount(3);
