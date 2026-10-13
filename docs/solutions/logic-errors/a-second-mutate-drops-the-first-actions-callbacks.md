@@ -61,7 +61,7 @@ The earlier request still runs to completion, and options given to `useMutation`
 So an action whose per-call callbacks carry its answer must not let a second call reach the same observer while the first is pending. Both fixes refuse the second press:
 
 - `apps/web/src/features/people/member-page.tsx`, `useRemoval`'s `remove()`: `if (removeMember.isPending) return;`, the same guard `CredentialsRevoker` already used in `member-sections.tsx`, with the confirm button marked `aria-disabled` while pending so focus stays on it.
-- `apps/web/src/features/people/member-bulk-actions.tsx`, `useMemberBulkActions`: an `acting` flag set when an action is sent and cleared first thing when it succeeds or fails. While it is set, the bar's actions and their keystrokes refuse to open another action and say "The action before this one is still going. Try again once it answers.", and `command()` sends nothing. It blocks every kind of action, not only the same kind, so two actions' outcome lines cannot overwrite each other.
+- `apps/web/src/features/people/member-bulk-actions.tsx`, `useMemberBulkActions`: an `acting` flag set when an action is sent and cleared first thing when it succeeds or fails. While it is set, the bar's actions and their keystrokes refuse to open another action and say "The previous action is still in progress. Please try again when it has finished.", and `command()` sends nothing. It blocks every kind of action, not only the same kind, so two actions' outcome lines cannot overwrite each other.
 
 The browser specs in `apps/web/e2e/people.spec.ts` hold the first request's answer back and press again; both failed on the unguarded code.
 
