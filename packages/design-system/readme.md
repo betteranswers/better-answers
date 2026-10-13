@@ -126,7 +126,7 @@ verb keeps its capital, as in "Sign In Again".
 | Form field label and legend | Title Case | "Display Name", "Email Address", "Personal Information" |
 | Tick box and switch label | Sentence case | "Remember me", "Email notifications" |
 | Radio option label | Sentence case, as a tick box label | "All new messages" |
-| Link text | Title Case where it is the name of a page or a control it leads to, sentence case where it is part of a sentence | "Terms of Service"; in a sentence, "account page" in "You can change this later from your account page." |
+| Link text | Title Case where it stands alone, whether it names where it leads or says the action as a button would; sentence case where it is part of a sentence | "Terms of Service", "Back to Sign In"; in a sentence, "account page" in "You can change this later from your account page." |
 | Empty state title | Sentence case, no full stop | "No results found", "No groups yet" |
 | Description, help text, tooltip | Sentence case, with a full stop | "This will be displayed publicly.", "Must be at least 8 characters long." |
 | Alert, done message, field message | Sentence case | "Your changes have been saved successfully.", "Please enter a valid email address." |
