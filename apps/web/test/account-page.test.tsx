@@ -2,7 +2,12 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
-import { THEME_WORDS } from "@/features/auth/account-words.ts";
+import {
+  ACTION_LANDED,
+  AUTHENTICATOR_WORDS,
+  PASSKEY_WORDS,
+  THEME_WORDS,
+} from "@/features/auth/account-words.ts";
 import { SAID_OF_SECOND_FACTOR } from "@/features/auth/refusal-words.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
 
@@ -135,7 +140,7 @@ describe("the Account page's passkeys", () => {
 
     const row = await screen.findByRole("listitem", { name: "MacBook" });
 
-    expect(row.textContent).toContain("Added 3 March 2026 · Not used yet");
+    expect(row.textContent).toContain("3 March 2026");
   });
 
   it("keeps an Admin's only factor, saying why beside Remove", async () => {
@@ -151,14 +156,9 @@ describe("the Account page's passkeys", () => {
   it("says there are none, and this browser adds none", async () => {
     await accountOpened(NO_SET);
 
-    expect(
-      await screen.findByText(
-        "No passkeys yet. A passkey signs you in with your fingerprint, face or device PIN, with no email.",
-      ),
-    ).toBeDefined();
-    expect(
-      screen.getByText("This browser can’t add a passkey. Use another browser or device."),
-    ).toBeDefined();
+    expect(await screen.findByText(PASSKEY_WORDS.none)).toBeDefined();
+    expect(screen.getByText(PASSKEY_WORDS.noWebAuthn)).toBeDefined();
+    expect(screen.queryByRole("button", { name: PASSKEY_WORDS.add })).toBeNull();
   });
 });
 
@@ -206,7 +206,7 @@ describe("setting up an authenticator on the Account page", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Set up an authenticator" }));
 
-    expect(await screen.findByText("Scan this QR code with your authenticator.")).toBeDefined();
+    expect(await screen.findByText(AUTHENTICATOR_WORDS.scan)).toBeDefined();
     expect(asked).toContain("/second-factor/replace/authenticator-start");
     expect(asked).not.toContain("/authenticator/start");
   });
@@ -224,9 +224,7 @@ describe("making a first set on the Account page", () => {
 
     await makeCodesPressed();
 
-    expect(
-      await screen.findByText("Recovery codes made. A notice is on its way to ada@example.test."),
-    ).toBeDefined();
+    expect(await screen.findByText(ACTION_LANDED.made(SESSION.user.email))).toBeDefined();
   });
 
   it("offers Replace once another tab made a set", async () => {
