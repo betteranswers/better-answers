@@ -9,6 +9,7 @@ import {
   groupSeeded,
   type DocumentShape,
 } from "@better-answers/core/testing/documents";
+import { ULID } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { connectAsHost } from "./flow.ts";
@@ -103,6 +104,8 @@ const restrictedSourcedConcept = async () => {
   };
 };
 
+const REMUNERATION_QUESTION = { question: "How is the board's remuneration reviewed?" };
+
 describe("a Restricted-sourced concept, to a Viewer's token", () => {
   it("is no match through find, though the Admin finds it", async () => {
     const { iri, viewer, admin } = await restrictedSourcedConcept();
@@ -115,39 +118,60 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
     expect(rpcListOf(structured(seen)["hits"]).map((match) => match["iri"])).toEqual([iri]);
   });
 
-  it("is absent from ask's answer, though related in the Admin's", async () => {
-    const { iri, viewer, admin } = await restrictedSourcedConcept();
-    const question = { question: "How is the board's remuneration reviewed?" };
+  describe("through ask", () => {
+    let seeded: Awaited<ReturnType<typeof restrictedSourcedConcept>>;
 
-    const asked = await called(viewer.client, viewer.token, "ask", question);
-    const unrelated = await called(viewer.client, viewer.token, "ask", {
-      question: "Is the sky blue?",
+    beforeAll(async () => {
+      seeded = await restrictedSourcedConcept();
     });
-    const seen = await called(admin.client, admin.token, "ask", question);
 
-    expect(structured(asked)).toMatchObject({ verdict: "refuse", related: [], collections: [] });
-    expect(structured(asked)).toEqual(structured(unrelated));
-    expect(rendered(asked)).toBe(rendered(unrelated));
-    expect(JSON.stringify(asked)).not.toContain("remuneration is reviewed");
-    expect(JSON.stringify(asked)).not.toContain("better-answers.com/c/");
+    it("answers ask as an unrelated question, the record's id apart", async () => {
+      const { viewer } = seeded;
 
-    const page = `https://app.example.test/knowledge/search/${iri.slice(CONCEPT_PREFIX.length)}`;
-    expect(structured(seen)).toMatchObject({
-      verdict: "related",
-      judgeState: "not-judged",
-      related: [
-        {
-          iri,
-          url: page,
-          kind: "Note",
-          title: TITLE,
-          collection: null,
-          body: "The board's remuneration is reviewed each March.",
-          trust: { tier: "unverified", status: "current", checkedBy: null, checkedAt: null },
-        },
-      ],
+      const asked = await called(viewer.client, viewer.token, "ask", REMUNERATION_QUESTION);
+      const unrelated = await called(viewer.client, viewer.token, "ask", {
+        question: "Is the sky blue?",
+      });
+      const { recordId, ...answer } = structured(asked);
+      const { recordId: unrelatedRecordId, ...unrelatedAnswer } = structured(unrelated);
+
+      expect(answer).toMatchObject({ verdict: "refuse", related: [], collections: [] });
+      expect(answer).toEqual(unrelatedAnswer);
+      expect([recordId, unrelatedRecordId]).toEqual([
+        expect.stringMatching(ULID),
+        expect.stringMatching(ULID),
+      ]);
+      expect(recordId).not.toBe(unrelatedRecordId);
+      expect(rendered(asked).replace(String(recordId), String(unrelatedRecordId))).toBe(
+        rendered(unrelated),
+      );
+      expect(JSON.stringify(asked)).not.toContain("remuneration is reviewed");
+      expect(JSON.stringify(asked)).not.toContain("better-answers.com/c/");
     });
-    expect(rendered(seen)).toContain(`${iri} — ${page}`);
+
+    it("is cited to its Admin under the product's origin", async () => {
+      const { iri, admin } = seeded;
+
+      const seen = await called(admin.client, admin.token, "ask", REMUNERATION_QUESTION);
+
+      const page = `https://app.example.test/knowledge/search/${iri.slice(CONCEPT_PREFIX.length)}`;
+      expect(structured(seen)).toMatchObject({
+        verdict: "related",
+        judgeState: "not-judged",
+        related: [
+          {
+            iri,
+            url: page,
+            kind: "Note",
+            title: TITLE,
+            collection: null,
+            body: "The board's remuneration is reviewed each March.",
+            trust: { tier: "unverified", status: "current", checkedBy: null, checkedAt: null },
+          },
+        ],
+      });
+      expect(rendered(seen)).toContain(`${iri} — ${page}`);
+    });
   });
 
   it("opens as an unminted IRI, though the Admin opens it", async () => {

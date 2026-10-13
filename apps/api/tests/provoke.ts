@@ -1,6 +1,7 @@
 import { expect } from "vitest";
 import { z } from "zod";
 
+import { holdingTable, isBlockedOnTable, until } from "@better-answers/core/testing/postgres";
 import { restoreSignIn, SIGN_IN_CODE_PREFIX } from "@better-answers/core/workspaces";
 import { testData } from "@better-answers/schema/testing";
 import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authenticator-code";
@@ -291,6 +292,46 @@ export const whileCommitsAreRefused = async <T>(
     await store.query(`DROP TRIGGER test_refuse_commit ON "${table}"`);
     await store.query("DROP FUNCTION test_refuse_commit()");
   }
+};
+
+/**
+ * The api's role lacks `privilege` on `table` in the whole database, so no suite whose tests run
+ * together may use it.
+ */
+export const whileTheApiLacks = async <T>(
+  app: TestApp,
+  privilege: "SELECT" | "UPDATE",
+  table: string,
+  work: () => Promise<T>,
+): Promise<T> => {
+  const store = app.database.superuser;
+  await store.query(`REVOKE ${privilege} ON "${table}" FROM app_rt`);
+  try {
+    return await work();
+  } finally {
+    await store.query(`GRANT ${privilege} ON "${table}" TO app_rt`);
+  }
+};
+
+/**
+ * `change` lands while `work` waits on `table`, so between two of its statements, and `work`
+ * then goes on.
+ */
+export const changedWhileItWaitsOn = async <T>(
+  app: TestApp,
+  table: string,
+  work: () => Promise<T>,
+  change: () => Promise<unknown>,
+): Promise<T> => {
+  const store = app.database.superuser;
+  // Wrapped, or the lock would be held until the work it blocks had ended.
+  const held = await holdingTable(store, table, async () => {
+    const working = work();
+    await until(() => isBlockedOnTable(store, table));
+    await change();
+    return { working };
+  });
+  return held.working;
 };
 
 /**
