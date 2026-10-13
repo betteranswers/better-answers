@@ -1,0 +1,618 @@
+{
+  "note": "Rows of public procurement forms, word for word, each naming the synthetic Answers of recall-set.json it must reach. Each form was walked in its own order. A row is here when a person filling in the form would answer it from an Answer, and it names every Answer they would answer it from: a row about the product names the account-wide Answer and each module's. A row no Answer answers is left out, and so is a row that asks only for what the row before it left out. A cloud security principle names the Answers of the G-Cloud rows in the section G-Cloud gives that principle. No row was taken or left for the words it shares with an Answer, and none names a collection. Only white space, markup and footnote marks differ from the form: a row of the Selection Questionnaire is its question cell, cut after the last whole line that keeps it within find's 500 characters, and a principle is its heading without its number.",
+  "sources": [
+    {
+      "id": "g-cloud-13",
+      "form": "G-Cloud 13, the service questions of the cloud software lot and the supplier declaration",
+      "publisher": "Crown Commercial Service",
+      "url": "https://github.com/Crown-Commercial-Service/digitalmarketplace-frameworks/tree/11e5de7d2b7849ed485f68e1bad51894cf55c1cb/frameworks/g-cloud-13",
+      "licence": "MIT",
+      "notice": "The MIT License (MIT). Copyright (C) 2015 Crown Copyright (Government Digital Service). Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.",
+      "retrieved": "2026-10-13"
+    },
+    {
+      "id": "selection-questionnaire",
+      "form": "PPN 03/24, Annex C: Selection Questionnaire Template",
+      "publisher": "Cabinet Office",
+      "url": "https://www.gov.uk/government/publications/ppn-0324-standard-selection-questionnaire-sq/annex-c-selection-questionnaire-template-single-procurement-document-spdhtml",
+      "licence": "Open Government Licence v3.0",
+      "notice": "Contains public sector information licensed under the Open Government Licence v3.0.",
+      "retrieved": "2026-10-13"
+    },
+    {
+      "id": "cloud-security-principles",
+      "form": "Summary of Cloud Security Principles",
+      "publisher": "CESG",
+      "url": "https://www.gov.uk/government/publications/cloud-service-security-principles/cloud-service-security-principles",
+      "licence": "Open Government Licence v3.0",
+      "notice": "Contains public sector information licensed under the Open Government Licence v3.0.",
+      "retrieved": "2026-10-13"
+    }
+  ],
+  "questions": [
+    {
+      "question": "Provide a summary describing what your service is for.",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/serviceDescription.yml",
+      "answers": ["what-tallyloom-is"]
+    },
+    {
+      "question": "Does your service have any constraints that buyers should know about?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/serviceConstraintsHostingAndSoftware.yml",
+      "answers": ["maintenance-windows"]
+    },
+    {
+      "question": "What system requirements does your service have?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/systemRequirements.yml",
+      "answers": ["tallyloom-browsers"]
+    },
+    {
+      "question": "Do you provide email or online ticketing support?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/emailOrTicketingSupport.yml",
+      "answers": ["bug-reports"]
+    },
+    {
+      "question": "How quickly do you respond to questions?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/emailOrTicketingSupportResponseTimes.yml",
+      "answers": ["urgent-response-time"]
+    },
+    {
+      "question": "Describe your support levels",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/supportLevels.yml",
+      "answers": ["support-hours", "urgent-response-time", "account-manager"]
+    },
+    {
+      "question": "Is your service accessed through a browser?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/browsersAccess.yml",
+      "answers": ["tallyloom-browsers"]
+    },
+    {
+      "question": "What browsers does your service work with?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/browsersSupported.yml",
+      "answers": ["tallyloom-browsers"]
+    },
+    {
+      "question": "Is there an application that users install to use your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/installation.yml",
+      "answers": ["tallyloom-mobile-application"]
+    },
+    {
+      "question": "Which operating systems does your service work with?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/installationCompatibleOperatingSystems.yml",
+      "answers": ["tallyloom-mobile-application"]
+    },
+    {
+      "question": "Has your service been designed to work on mobile devices?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/mobile.yml",
+      "answers": [
+        "tallyloom-mobile-application",
+        "invoicing-mobile-access",
+        "payroll-mobile-access",
+        "rota-mobile-access",
+        "stockroom-mobile-access",
+        "fleet-mobile-access",
+        "helpdesk-mobile-access"
+      ]
+    },
+    {
+      "question": "Describe any differences between the mobile and desktop service.",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/mobileDifferences.yml",
+      "answers": ["tallyloom-mobile-application"]
+    },
+    {
+      "question": "What accessibility standards does your service meet?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/serviceInterfaceAccessibility.yml",
+      "answers": ["web-accessibility", "tallyloom-accessibility"]
+    },
+    {
+      "question": "Describe how your service is accessible.",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/serviceInterfaceAccessibilityDescription.yml",
+      "answers": ["web-accessibility", "tallyloom-accessibility"]
+    },
+    {
+      "question": "Describe any interface testing you’ve done with users of assistive technology.",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/serviceInterfaceTesting.yml",
+      "answers": ["web-accessibility"]
+    },
+    {
+      "question": "Is there an API for your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/APISoftware.yml",
+      "answers": ["tallyloom-api"]
+    },
+    {
+      "question": "Do you provide API documentation for your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/APIDocumentation.yml",
+      "answers": ["tallyloom-api"]
+    },
+    {
+      "question": "Is there a sandbox or test environment for your API?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/APISandbox.yml",
+      "answers": ["tallyloom-sandbox"]
+    },
+    {
+      "question": "Can buyers customise your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/customisationAvailable.yml",
+      "answers": ["tallyloom-custom-fields"]
+    },
+    {
+      "question": "How can users customise your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/customisationDescription.yml",
+      "answers": ["tallyloom-custom-fields"]
+    },
+    {
+      "question": "How do you help users start using your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/gettingStarted.yml",
+      "answers": ["onboarding-timeline", "customer-training", "user-guides"]
+    },
+    {
+      "question": "Do you provide documentation for your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/documentation.yml",
+      "answers": ["user-guides"]
+    },
+    {
+      "question": "What formats do you provide documentation in?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/documentationFormats.yml",
+      "answers": ["user-guides"]
+    },
+    {
+      "question": "How do users extract their data when the contract ends?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/endOfContractDataExtraction.yml",
+      "answers": ["tallyloom-full-export", "deletion-at-contract-end"]
+    },
+    {
+      "question": "Describe what happens at the end of the contract.",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/endOfContractProcess.yml",
+      "answers": ["deletion-at-contract-end"]
+    },
+    {
+      "question": "How do users export their data?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/dataExportHow.yml",
+      "answers": [
+        "tallyloom-full-export",
+        "invoicing-data-export",
+        "payroll-data-export",
+        "rota-data-export",
+        "stockroom-data-export",
+        "fleet-data-export",
+        "helpdesk-data-export"
+      ]
+    },
+    {
+      "question": "What open formats can users export their data in?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/dataExportFormats.yml",
+      "answers": [
+        "tallyloom-full-export",
+        "invoicing-data-export",
+        "payroll-data-export",
+        "rota-data-export",
+        "stockroom-data-export",
+        "fleet-data-export",
+        "helpdesk-data-export"
+      ]
+    },
+    {
+      "question": "What open data formats can users upload their data in?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/dataImportFormats.yml",
+      "answers": [
+        "tallyloom-data-import",
+        "invoicing-csv-import",
+        "payroll-csv-import",
+        "rota-csv-import",
+        "stockroom-csv-import",
+        "fleet-csv-import",
+        "helpdesk-csv-import"
+      ]
+    },
+    {
+      "question": "How do you protect data between the buyer’s network and your network?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/dataProtectionBetweenNetworks.yml",
+      "answers": ["encryption-in-transit"]
+    },
+    {
+      "question": "Do you know where your data is stored and processed?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/dataStorageAndProcessing.yml",
+      "answers": ["hosting-location", "tallyloom-hosting"]
+    },
+    {
+      "question": "Where is data stored and processed?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/dataStorageAndProcessingLocations.yml",
+      "answers": ["hosting-location", "tallyloom-hosting"]
+    },
+    {
+      "question": "How often do you do penetration testing?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/penetrationTesting.yml",
+      "answers": ["penetration-testing"]
+    },
+    {
+      "question": "What is your approach to penetration testing?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/penetrationTestingApproach.yml",
+      "answers": ["penetration-testing"]
+    },
+    {
+      "question": "How do you dispose of equipment?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/equipmentDisposalApproach.yml",
+      "answers": ["ethical-sourcing"]
+    },
+    {
+      "question": "Describe the level of availability you guarantee.",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/guaranteedAvailability.yml",
+      "answers": ["availability-target", "service-credits"]
+    },
+    {
+      "question": "Describe how your service is designed to be resilient.",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/approachToResilience.yml",
+      "answers": ["tallyloom-hosting"]
+    },
+    {
+      "question": "How does your service report any outages?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/outageReporting.yml",
+      "answers": ["status-page"]
+    },
+    {
+      "question": "Is your security governance certified to a standard?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/securityGovernanceAccreditation.yml",
+      "answers": ["information-security-certification"]
+    },
+    {
+      "question": "What security governance standards do you comply with?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/securityGovernanceStandards.yml",
+      "answers": ["information-security-certification"]
+    },
+    {
+      "question": "Describe your vulnerability management process?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/vulnerabilityManagementApproach.yml",
+      "answers": ["vulnerability-scanning", "patching-cadence"]
+    },
+    {
+      "question": "Describe your incident management processes.",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/incidentManagementApproach.yml",
+      "answers": ["incident-response-plan", "breach-notification"]
+    },
+    {
+      "question": "How do you manage staff security clearance checks?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/staffSecurityClearanceChecks.yml",
+      "answers": ["background-checks"]
+    },
+    {
+      "question": "Do users need to be authenticated when using your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/userAuthenticationNeeded.yml",
+      "answers": ["tallyloom-single-sign-on", "tallyloom-two-factor"]
+    },
+    {
+      "question": "How do you authenticate users when they access the service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/userAuthenticationSoftware.yml",
+      "answers": ["tallyloom-single-sign-on", "tallyloom-two-factor"]
+    },
+    {
+      "question": "How do you authenticate management access to your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/managementAccessAuthentication.yml",
+      "answers": ["multi-factor-sign-in", "privileged-accounts"]
+    },
+    {
+      "question": "How do buyers access audit information about the actions their users have taken?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/auditBuyersActions.yml",
+      "answers": [
+        "tallyloom-audit-trail",
+        "invoicing-change-history",
+        "payroll-change-history",
+        "rota-change-history",
+        "stockroom-change-history",
+        "fleet-change-history",
+        "helpdesk-change-history"
+      ]
+    },
+    {
+      "question": "How do buyers access audit information about the actions your organisation has taken?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/auditSuppliersActions.yml",
+      "answers": ["administrator-activity-logging"]
+    },
+    {
+      "question": "How long do you store your organisation’s audit data for?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/auditSuppliersActionsStorage.yml",
+      "answers": ["security-log-retention"]
+    },
+    {
+      "question": "How long are system logs stored for?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/howLongSystemLogsStored.yml",
+      "answers": ["security-log-retention"]
+    },
+    {
+      "question": "Do you have a current ISO/IEC 27001 certification (2005 or 2013) that covers the security of your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/standardsISOIEC27001.yml",
+      "answers": ["information-security-certification"]
+    },
+    {
+      "question": "What is not covered by your ISO/IEC 27001 certification?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/standardsISOIEC27001Exclusions.yml",
+      "answers": ["information-security-certification"]
+    },
+    {
+      "question": "Do you have any other security certifications that cover this service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/accreditationsOther.yml",
+      "answers": ["cyber-essentials"]
+    },
+    {
+      "question": "What other security certifications do you have?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/accreditationsOtherList.yml",
+      "answers": ["cyber-essentials"]
+    },
+    {
+      "question": "How much does the service cost (excluding VAT)?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/price.yml",
+      "answers": ["tallyloom-pricing-tiers"]
+    },
+    {
+      "question": "Do you provide a free trial option for your service?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/freeVersionTrialOption.yml",
+      "answers": ["tallyloom-free-trial"]
+    },
+    {
+      "question": "Describe the free version of your service.",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/services/freeVersionDescription.yml",
+      "answers": ["tallyloom-free-trial"]
+    },
+    {
+      "question": "Do you work in an environmentally-friendly way?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/declaration/environmentallyFriendly.yml",
+      "answers": ["environmental-policy"]
+    },
+    {
+      "question": "Please confirm that your organisation complies with legal equality and diversity obligations relating to: - age - disability - gender reassignment - marriage and civil partnership - pregnancy and maternity - race - religion or belief - sex - sexual orientation",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/declaration/equalityAndDiversity.yml",
+      "answers": ["equal-opportunities"]
+    },
+    {
+      "question": "Does your organisation have, or will it have before the framework is awarded, employer’s liability insurance of at least £5 million?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/declaration/employersInsurance.yml",
+      "answers": ["public-liability"]
+    },
+    {
+      "question": "Does your organisation comply with the annual reporting requirements of section 54 of The Modern Slavery Act (2015)?",
+      "source": "g-cloud-13",
+      "at": "frameworks/g-cloud-13/questions/declaration/modernSlaveryReportingRequirements.yml",
+      "answers": ["modern-slavery"]
+    },
+    {
+      "question": "Trading status a) - public limited company b) - private limited company c) - limited liability partnership d) - other partnership e) - sole trader f) - third sector g) - other (please specify your trading status)",
+      "source": "selection-questionnaire",
+      "at": "question 1.1(c)",
+      "answers": ["company-registration"]
+    },
+    {
+      "question": "Date of registration (if applicable) or date of formation.",
+      "source": "selection-questionnaire",
+      "at": "question 1.1(d)",
+      "answers": ["years-trading"]
+    },
+    {
+      "question": "Registration number (company, partnership, charity, etc if applicable).",
+      "source": "selection-questionnaire",
+      "at": "question 1.1(e)",
+      "answers": ["company-registration"]
+    },
+    {
+      "question": "Registered VAT number.",
+      "source": "selection-questionnaire",
+      "at": "question 1.1(f)",
+      "answers": ["vat-registration"]
+    },
+    {
+      "question": "Are you a Small, Medium or Micro Enterprise (SME)?",
+      "source": "selection-questionnaire",
+      "at": "question 1.1(j)",
+      "answers": ["sme-status"]
+    },
+    {
+      "question": "Details of Persons with Significant Control (PSC), where appropriate: - Name - Date of birth - Nationality - Country, state or part of the UK where the PSC usually lives - Service address - The date he or she became a PSC in relation to the company - Which conditions for being a PSC are met: - Over 25% up to (and including) 50% - More than 50% and less than 75% - 75% or more (Please enter N/A if not applicable)",
+      "source": "selection-questionnaire",
+      "at": "question 1.1(k)",
+      "answers": ["ownership"]
+    },
+    {
+      "question": "If you are proposing to use subcontractors/a supply chain, please provide the details for each one. - Name - Registration number - Registered or head office address, - Trading status a. Public limited company b. Private limited company c. Limited liability partnership d. Other partnership e. Sole trader f. Third sector g. Other (please specify your trading status) - Registered VAT number - SME (Yes/No)",
+      "source": "selection-questionnaire",
+      "at": "question 1.3, the first 14 of its 17 lines",
+      "answers": ["subcontracting"]
+    },
+    {
+      "question": "You are a relevant commercial organisation subject to Section 54 of the Modern Slavery Act 2015 if you carry on your business, or part of your business in the UK, supplying goods or services and you have an annual turnover of at least £36 million. If you are a relevant commercial organisation, please - - confirm that you have published a statement as required by Section 54 of the Modern Slavery Act. - confirm that the statement complies with the requirements of Section 54.",
+      "source": "selection-questionnaire",
+      "at": "question 4.2",
+      "answers": ["modern-slavery"]
+    },
+    {
+      "question": "If documentary evidence of economic and financial standing is available electronically (e.g. financial statements filed with Companies House), please provide: - the web address - issuing authority - precise reference of the documents",
+      "source": "selection-questionnaire",
+      "at": "question 5.1",
+      "answers": ["financial-accounts"]
+    },
+    {
+      "question": "If documentary evidence of economic and financial standing is not available electronically, please provide a copy of your detailed accounts for the last two years (audited if required by law). Also, for any other person or entity on whom you are relying to meet the selection criteria relating to economic and financial standing, please provide a copy of their detailed accounts for the last two years (audited if required by law).",
+      "source": "selection-questionnaire",
+      "at": "question 5.2",
+      "answers": ["financial-accounts"]
+    },
+    {
+      "question": "Relevant experience and contract examples",
+      "source": "selection-questionnaire",
+      "at": "question 6.1, the first 1 of its 7 lines",
+      "answers": ["customer-references", "case-studies"]
+    },
+    {
+      "question": "Where you intend to subcontract a proportion of the contract, please demonstrate how you have previously maintained healthy supply chains with your subcontractor(s). The description should include, but is not limited to, details of your supply chain management tracking systems to ensure performance of the contract and including prompt payment and whether you are a signatory of the UK Prompt Payment Code (or have given commitments under other equivalent schemes).",
+      "source": "selection-questionnaire",
+      "at": "question 6.3",
+      "answers": ["subcontracting", "supplier-reviews"]
+    },
+    {
+      "question": "Insurance Please confirm whether you already have, or can commit to obtain, prior to the commencement of the contract, the levels of insurance cover indicated below: Employer’s (Compulsory) Liability Insurance = £x Public Liability Insurance = £x Professional Indemnity Insurance = £x Product Liability Insurance = £x",
+      "source": "selection-questionnaire",
+      "at": "question 7.1, the first 6 of its 7 lines",
+      "answers": ["professional-indemnity", "public-liability"]
+    },
+    {
+      "question": "Please confirm that you have in place, or that you will have in place by contract award, the human and technical resources to perform the contract to ensure compliance with the UK General Data Protection Regulations and to ensure the protection of the rights of data subjects.",
+      "source": "selection-questionnaire",
+      "at": "question 7.2(a)",
+      "answers": ["data-protection-officer"]
+    },
+    {
+      "question": "Please describe the arrangements you have in place to manage health and safety effectively and control significant risks relevant to the requirement (including risks from the use of contractors, where relevant). Please use no more than [500] words.",
+      "source": "selection-questionnaire",
+      "at": "question 7.3(a)",
+      "answers": ["health-and-safety"]
+    },
+    {
+      "question": "Please confirm that you have detailed your environmental management measures by completing and publishing a Carbon Reduction Plan which meets the required reporting standard",
+      "source": "selection-questionnaire",
+      "at": "question 7.7(a)",
+      "answers": ["carbon-reduction-plan"]
+    },
+    {
+      "question": "Please confirm that your organisation is taking steps to reduce your GHG Emissions over time and is publicly committed to achieving Net Zero by 2050",
+      "source": "selection-questionnaire",
+      "at": "question 7.7(c)",
+      "answers": ["carbon-reduction-plan"]
+    },
+    {
+      "question": "Please provide your current Net Zero Target Date",
+      "source": "selection-questionnaire",
+      "at": "question 7.7(d)",
+      "answers": ["carbon-reduction-plan"]
+    },
+    {
+      "question": "If you are a relevant commercial organisation subject to Section 54 of the Modern Slavery Act 2015, and if your latest statement is available electronically, please provide: - the web address, - precise reference of the documents.",
+      "source": "selection-questionnaire",
+      "at": "question 7.11(a)",
+      "answers": ["modern-slavery"]
+    },
+    {
+      "question": "Data in transit protection",
+      "source": "cloud-security-principles",
+      "at": "principle 1",
+      "answers": ["encryption-in-transit"]
+    },
+    {
+      "question": "Asset protection and resilience",
+      "source": "cloud-security-principles",
+      "at": "principle 2",
+      "answers": [
+        "hosting-location",
+        "tallyloom-hosting",
+        "penetration-testing",
+        "ethical-sourcing",
+        "availability-target",
+        "service-credits",
+        "status-page"
+      ]
+    },
+    {
+      "question": "Governance framework",
+      "source": "cloud-security-principles",
+      "at": "principle 4",
+      "answers": ["information-security-certification"]
+    },
+    {
+      "question": "Operational security",
+      "source": "cloud-security-principles",
+      "at": "principle 5",
+      "answers": [
+        "vulnerability-scanning",
+        "patching-cadence",
+        "incident-response-plan",
+        "breach-notification"
+      ]
+    },
+    {
+      "question": "Personnel security",
+      "source": "cloud-security-principles",
+      "at": "principle 6",
+      "answers": ["background-checks"]
+    },
+    {
+      "question": "Identity and authentication",
+      "source": "cloud-security-principles",
+      "at": "principle 10",
+      "answers": [
+        "tallyloom-single-sign-on",
+        "tallyloom-two-factor",
+        "multi-factor-sign-in",
+        "privileged-accounts"
+      ]
+    },
+    {
+      "question": "Audit information provision to consumers",
+      "source": "cloud-security-principles",
+      "at": "principle 13",
+      "answers": [
+        "tallyloom-audit-trail",
+        "invoicing-change-history",
+        "payroll-change-history",
+        "rota-change-history",
+        "stockroom-change-history",
+        "fleet-change-history",
+        "helpdesk-change-history",
+        "administrator-activity-logging",
+        "security-log-retention"
+      ]
+    }
+  ]
+}

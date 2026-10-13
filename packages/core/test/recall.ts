@@ -11,11 +11,15 @@ import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 
 const RECALL_SET = fileURLToPath(new URL("./fixtures/recall-set.json", import.meta.url));
 
+const BUYER_QUESTIONS = fileURLToPath(new URL("./fixtures/buyer-questions.json", import.meta.url));
+
 /** How far down a ranking the master `Answer` may sit and still count as recalled. */
 export const RECALL_DEPTH = 10;
 
+const answerKey = z.string().regex(/^[a-z0-9-]+$/);
+
 const recallAnswer = z.strictObject({
-  key: z.string().regex(/^[a-z0-9-]+$/),
+  key: answerKey,
   title: z.string().min(1),
   body: z.string().min(1),
   paraphrases: z.array(z.string().min(1)).min(1).max(2),
@@ -39,20 +43,76 @@ export type RecallSet = z.infer<typeof recallSet>;
 export const answersOf = (set: RecallSet): readonly (RecallAnswer & { group: string })[] =>
   set.groups.flatMap(({ group, answers }) => answers.map((answer) => ({ ...answer, group })));
 
-/** The set at `path`, refused when it cannot be read, is not JSON, or holds no answer. */
-export const readRecallSet = async (path: string): Promise<Result<RecallSet, Error>> => {
+const readAs = async <Held>(path: string, shape: z.ZodType<Held>): Promise<Result<Held, Error>> => {
   const text = await attempt(() => readFile(path, "utf8"));
   if (!text.ok) return text;
   const json = await attempt(async (): Promise<unknown> => JSON.parse(text.value));
   if (!json.ok) return json;
-  const parsed = recallSet.safeParse(json.value);
+  const parsed = shape.safeParse(json.value);
   return parsed.success ? ok(parsed.data) : err(new Error(z.prettifyError(parsed.error)));
 };
+
+/** The set at `path`, refused when it cannot be read, is not JSON, or holds no answer. */
+export const readRecallSet = (path: string): Promise<Result<RecallSet, Error>> =>
+  readAs(path, recallSet);
 
 /** The repository's set; throws when it does not read, as a suite's setup should. */
 export const theRecallSet = async (): Promise<RecallSet> => {
   const read = await readRecallSet(RECALL_SET);
   if (!read.ok) throw new Error(`the recall set did not read: ${read.error.message}`);
+  return read.value;
+};
+
+/** `find` takes no longer a query, and the measure asks every question of both entries. */
+const QUESTION_CHARACTERS_AT_MOST = 500;
+
+const buyerQuestions = z.strictObject({
+  note: z.string(),
+  sources: z
+    .array(
+      z.strictObject({
+        id: answerKey,
+        form: z.string().min(1),
+        publisher: z.string().min(1),
+        url: z.url(),
+        licence: z.string().min(1),
+        notice: z.string().min(1),
+        retrieved: z.iso.date(),
+      }),
+    )
+    .min(1),
+  questions: z
+    .array(
+      z.strictObject({
+        question: z.string().min(1).max(QUESTION_CHARACTERS_AT_MOST),
+        /** The `id` of the form it was taken from. */
+        source: answerKey,
+        /** Where in the form it stands. */
+        at: z.string().min(1),
+        /** The key of each `Answer` of the recall set it must reach. */
+        answers: z.array(answerKey).min(1),
+      }),
+    )
+    .min(1),
+});
+
+export type BuyerQuestions = z.infer<typeof buyerQuestions>;
+
+/** The buyer-worded set at `path`, refused as the recall set is, or for a question naming no `Answer`. */
+export const readBuyerQuestions = (path: string): Promise<Result<BuyerQuestions, Error>> =>
+  readAs(path, buyerQuestions);
+
+/** Throws on a key `set` does not hold, which the measure would count as a miss. */
+export const theBuyerQuestions = async (set: RecallSet): Promise<BuyerQuestions> => {
+  const read = await readBuyerQuestions(BUYER_QUESTIONS);
+  if (!read.ok) throw new Error(`the buyer-worded set did not read: ${read.error.message}`);
+  const held = new Set(answersOf(set).map(({ key }) => key));
+  const unheld = read.value.questions.flatMap(({ answers }) =>
+    answers.filter((key) => !held.has(key)),
+  );
+  if (unheld.length > 0) {
+    throw new Error(`the buyer-worded set names no Answer of the recall set: ${unheld.join(", ")}`);
+  }
   return read.value;
 };
 

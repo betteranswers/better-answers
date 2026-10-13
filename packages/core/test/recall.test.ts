@@ -12,10 +12,13 @@ import { recordFigures } from "./figures.ts";
 import {
   answersOf,
   landRecallSet,
+  readBuyerQuestions,
   readRecallSet,
   recallAt,
   RECALL_DEPTH,
+  theBuyerQuestions,
   theRecallSet,
+  type RecallAnswer,
 } from "./recall.ts";
 import { visibilitySuite } from "./sourced-concept.ts";
 import { answered } from "./suite-postgres.ts";
@@ -60,15 +63,15 @@ describe("recall at ten over the synthetic set", () => {
   }, 300_000);
 });
 
+let scratch: string;
+
+beforeAll(async () => {
+  scratch = await mkdtemp(join(tmpdir(), "recall-set-"));
+});
+
+afterAll(() => rm(scratch, { recursive: true }));
+
 describe("the recall set's reader", () => {
-  let scratch: string;
-
-  beforeAll(async () => {
-    scratch = await mkdtemp(join(tmpdir(), "recall-set-"));
-  });
-
-  afterAll(() => rm(scratch, { recursive: true }));
-
   it.each([
     ["a file that is not there", undefined],
     ["text that is not JSON", "{ groups: "],
@@ -82,6 +85,20 @@ describe("the recall set's reader", () => {
     if (text !== undefined) await writeFile(path, text);
 
     expect((await readRecallSet(path)).ok).toBe(false);
+  });
+});
+
+describe("the buyer-worded set's reader", () => {
+  it("refuses a question that names no Answer", async () => {
+    const held = await theBuyerQuestions(await theRecallSet());
+    const [first, ...rest] = held.questions;
+    const path = join(scratch, "a-question-naming-no-answer.json");
+    await writeFile(
+      path,
+      JSON.stringify({ ...held, questions: [{ ...first, answers: [] }, ...rest] }),
+    );
+
+    expect((await readBuyerQuestions(path)).ok).toBe(false);
   });
 });
 
@@ -159,5 +176,28 @@ describe("the recall set's provenance", () => {
 
     expect(bundle.runs.size).toBeGreaterThan(0);
     expect(borrowed).toEqual([]);
+  });
+});
+
+/** Every wording the set holds an `Answer` under: its title, each line of its body, each paraphrase. */
+const wordingsOf = ({ title, body, paraphrases }: RecallAnswer): readonly string[] =>
+  [title, ...body.split("\n"), ...paraphrases].map(phraseOf);
+
+describe("the buyer-worded set", () => {
+  it("words no question as its Answer's title or line", async () => {
+    const set = await theRecallSet();
+    const byKey = new Map(answersOf(set).map((answer) => [answer.key, answer]));
+    const { questions } = await theBuyerQuestions(set);
+
+    const worded = questions.flatMap(({ question, answers }) =>
+      answers.flatMap((key) => {
+        const answer = byKey.get(key);
+        return answer !== undefined && wordingsOf(answer).includes(phraseOf(question))
+          ? [`${question} (${key})`]
+          : [];
+      }),
+    );
+
+    expect(worded).toEqual([]);
   });
 });
