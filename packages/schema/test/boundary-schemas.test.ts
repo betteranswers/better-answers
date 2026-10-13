@@ -545,7 +545,12 @@ const acceptedRows = {
         {
           iri: CONCEPT_IRI,
           contentHash: CONTENT_SHA256,
-          trust: { tier: "human-reviewed", status: "current", rider: null },
+          trust: {
+            tier: "human-reviewed",
+            status: "current",
+            verifiedAt: "2026-05-02T09:00:00.000Z",
+            rider: null,
+          },
           judged: "no",
         },
       ],
@@ -1196,7 +1201,10 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
         concepts: [
           {
             ...acceptedRows.questionAsked[1].concepts[0],
-            trust: { tier: "human-reviewed", status: "current", rider: null, verifiedBy: "Priya" },
+            trust: {
+              ...acceptedRows.questionAsked[1].concepts[0].trust,
+              verifiedBy: "Priya",
+            },
           },
         ],
       },
@@ -2059,7 +2067,12 @@ describe("5 — the inferred type is pinned", () => {
         | {
             iri: ConceptIri;
             contentHash: string;
-            trust: { tier: string; status: string; rider: string | null };
+            trust: {
+              tier: string;
+              status: string;
+              verifiedAt: string | null;
+              rider: string | null;
+            };
             judged?: "yes" | "no";
           }[]
         | null;

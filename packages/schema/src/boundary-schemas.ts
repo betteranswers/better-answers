@@ -710,10 +710,11 @@ const writeUpIncludeUpdate = createUpdateSchema(writeUpInclude, writeUpIncludeRe
 const recordConcept = z.strictObject({
   iri: z.string().regex(IRI).brand<"ConceptIri">(),
   contentHash: z.string().regex(CONTENT_HASH),
-  /** The tier, status and rider alone: who verified a concept is a person, and no record holds one. */
+  /** Never who verified it: that is a person, and no record holds one. */
   trust: z.strictObject({
     tier: z.string().trim().min(1),
     status: z.string().trim().min(1),
+    verifiedAt: z.union([z.string().trim().min(1), z.null()]),
     rider: z.union([z.string().trim().min(1), z.null()]),
   }),
   judged: z.enum(CANDIDATE_VERDICTS).exactOptional(),

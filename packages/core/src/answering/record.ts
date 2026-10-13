@@ -75,11 +75,16 @@ const COMPLETED = `UPDATE question_asked
 const ITS_DRAFT = `UPDATE question_content SET drafted = $4
    WHERE workspace_id = $1 AND record_id = $2 AND asked_at = $3`;
 
-/** Who verified a concept is a person and a record is kept for good, so that is left out. */
+/** Who verified a concept is a person and a record is kept for good, so the name is left out. */
 const asKept = ({ iri, contentHash, trust, judged }: RecordedConcept) => ({
   iri,
   contentHash,
-  trust: { tier: trust.tier, status: trust.status, rider: trust.rider },
+  trust: {
+    tier: trust.tier,
+    status: trust.status,
+    verifiedAt: trust.verifiedAt,
+    rider: trust.rider,
+  },
   judged,
 });
 

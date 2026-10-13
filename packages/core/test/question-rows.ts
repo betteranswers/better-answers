@@ -25,7 +25,7 @@ export const recordAskedBy = (pool: pg.Pool, workspaceId: string, personId: stri
         {
           iri: concept,
           contentHash: "a".repeat(64),
-          trust: { tier: "unverified", status: "current", rider: null },
+          trust: { tier: "unverified", status: "current", verifiedAt: null, rider: null },
         },
       ],
     });

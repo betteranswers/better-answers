@@ -230,13 +230,18 @@ describe("completing a record", () => {
           {
             iri: retention,
             contentHash: HASH_OF.retention,
-            trust: { tier: "human-reviewed", status: "current", rider: null },
+            trust: {
+              tier: "human-reviewed",
+              status: "current",
+              verifiedAt: VERIFIED_BY_PRIYA.verifiedAt,
+              rider: null,
+            },
             judged: "no",
           },
           {
             iri: backups,
             contentHash: HASH_OF.backups,
-            trust: { tier: "unverified", status: "draft", rider: "imported" },
+            trust: { tier: "unverified", status: "draft", verifiedAt: null, rider: "imported" },
           },
         ],
       }),
