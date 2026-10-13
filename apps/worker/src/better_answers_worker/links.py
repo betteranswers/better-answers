@@ -1,5 +1,6 @@
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from typing import NamedTuple
 
 from .concept_file import (
     Frontmatter,
@@ -22,27 +23,218 @@ CONCEPT_DEPRECATED_STATUS = "deprecated"
 _IRI = re.compile(r"^https://better-answers\.com/c/[0-9A-HJKMNP-TV-Z]{26}$")
 
 
-# Lines break at `\n` alone and whitespace is these six, so both tiers'
-# regex engines read alike.
-_LINK_DEFINITION = re.compile(
-    r"(?:^|(?<=\n)) {0,3}\[([^\]]+)\]:[ \t\n\r\f\v]*([^ \t\n\r\f\v]+)"
-)
+# Lines break at `\n` alone and whitespace is these six, so both tiers read alike.
+_SIX = " \t\n\r\f\v"
 
+_WS = re.compile(r"\s")
 
 _FOOTNOTE = re.compile(r"^\[\^([^\]]*)\]$")
 
 
-_LINK = re.compile(
-    r"\[[^\]]*\]\([^)]*\)|\[(?!\^)[^\]]*\]\[[^\]]*\]|\[[^\]]*\]"
-    r"|<[a-z][a-z0-9+.-]*:[^> \t\n\r\f\v]*>",
-    re.I,
-)
+class _Found(NamedTuple):
+    """A scanner's find: where it starts, and what it holds."""
+
+    at: int
+    text: str
 
 
-_FENCED_BLOCK = re.compile(
-    r"(?:^|(?<=\n)) {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?"
-    r"(?:(?<=\n) {0,3}\1\2*[ \t]*(?=\n|(?![\s\S]))|(?![\s\S]))"
-)
+def _is_six(char: str) -> bool:
+    return char in _SIX
+
+
+def _line_start_from(text: str, from_: int) -> int:
+    """The first line start at or after `from_`: the start, or after a `\n`."""
+    if from_ <= 0:
+        return 0
+    if from_ > len(text):
+        return len(text)
+    if text[from_ - 1] == "\n":
+        return from_
+    found = text.find("\n", from_)
+    return len(text) if found == -1 else found + 1
+
+
+def _next_of(text: str, close: str) -> list[int]:
+    """The next `close` at or after each position, -1 where there is none."""
+    next_: list[int] = [-1] * (len(text) + 1)
+    for at in range(len(text) - 1, -1, -1):
+        next_[at] = at if text[at] == close else next_[at + 1]
+    return next_
+
+
+def _next_stops(text: str, stops: Callable[[str], bool]) -> list[int]:
+    """The next position at or after each index whose character `stops` holds."""
+    next_: list[int] = [-1] * (len(text) + 1)
+    for at in range(len(text) - 1, -1, -1):
+        next_[at] = at if stops(text[at]) else next_[at + 1]
+    return next_
+
+
+def _autolink_ends_of(text: str) -> list[int]:
+    """The next `>` or one of the six at or after each position, -1 if none."""
+
+    def stops(char: str) -> bool:
+        return char == ">" or char in _SIX
+
+    return _next_stops(text, stops)
+
+
+_SCHEME = re.compile(r"[a-z0-9+.-]", re.I)
+
+
+def _colon_after(text: str, at: int) -> int | None:
+    """Where the autolink's scheme and colon end, or `None` when `at` opens none."""
+    if at + 1 >= len(text) or not re.match(r"[a-z]", text[at + 1], re.I):
+        return None
+    scheme = at + 2
+    while scheme < len(text) and _SCHEME.match(text[scheme]):
+        scheme += 1
+    return scheme if scheme < len(text) and text[scheme] == ":" else None
+
+
+def _autolink_closes_at(text: str, at: int, ends: list[int]) -> int | None:
+    """Where the autolink starting at `at` closes, or `None` when it is none."""
+    colon = _colon_after(text, at)
+    if colon is None:
+        return None
+    end = ends[colon + 1]
+    return end if end != -1 and text[end] == ">" else None
+
+
+def _inline_form_at(prose: str, bracket: int, ending: list[int]) -> int | None:
+    """Where the inline form after `bracket` ends, or `None` when it is none."""
+    if prose[bracket + 1 : bracket + 2] != "(":
+        return None
+    closed = ending[bracket + 2]
+    return None if closed == -1 else closed + 1
+
+
+def _reference_form_at(
+    prose: str, at: int, bracket: int, close: list[int]
+) -> int | None:
+    """Where the reference form after `bracket` ends, or `None` when it is none."""
+    if prose[bracket + 1 : bracket + 2] != "[" or prose[at + 1 : at + 2] == "^":
+        return None
+    reference = close[bracket + 2]
+    return None if reference == -1 else reference + 1
+
+
+def _bracket_form_at(
+    prose: str, at: int, close: list[int], ending: list[int]
+) -> int | None:
+    """Where the `[`-form at `at` ends: inline first, then reference, then bare."""
+    bracket = close[at + 1]
+    if bracket == -1:
+        return None
+    found = _inline_form_at(prose, bracket, ending)
+    if found is None:
+        found = _reference_form_at(prose, at, bracket, close)
+    return bracket + 1 if found is None else found
+
+
+def _link_matches(prose: str) -> list[_Found]:
+    """Every `[`-form and autolink in order and extent, as the old `LINK` held them."""
+    close = _next_of(prose, "]")
+    ending = _next_of(prose, ")")
+    ends = _autolink_ends_of(prose)
+    found: list[_Found] = []
+    at = 0
+    while at < len(prose):
+        if prose[at] == "[":
+            end = _bracket_form_at(prose, at, close, ending)
+            if end is not None:
+                found.append(_Found(at, prose[at:end]))
+                at = end
+                continue
+        elif prose[at] == "<":
+            end = _autolink_closes_at(prose, at, ends)
+            if end is not None:
+                found.append(_Found(at, prose[at : end + 1]))
+                at = end + 1
+                continue
+        at += 1
+    return found
+
+
+def _leading_spaces(text: str, at: int) -> int:
+    """The spaces before a fence or a definition, at most three of them, or four."""
+    spaces = 0
+    while spaces < 4 and text[at + spaces : at + spaces + 1] == " ":
+        spaces += 1
+    return spaces
+
+
+def _mark_run(text: str, at: int, mark: str) -> int:
+    """Where the run of `mark` starting at `at` ends."""
+    marker = at
+    while text[marker : marker + 1] == mark:
+        marker += 1
+    return marker
+
+
+class _OpenedFence(NamedTuple):
+    mark: str
+    marks: int
+    line_end: int
+
+
+def _opened_fence_at(body: str, at: int) -> _OpenedFence | None:
+    """The fence opening at the line start `at`, or `None` when the line opens none."""
+    spaces = _leading_spaces(body, at)
+    opened = at + spaces
+    mark = body[opened : opened + 1]
+    if spaces > 3 or mark not in ("`", "~"):
+        return None
+    run = _mark_run(body, opened, mark)
+    if run - opened < 3:
+        return None
+    line_end = body.find("\n", run)
+    return None if line_end == -1 else _OpenedFence(mark, run - opened, line_end)
+
+
+def _closing_at(body: str, at: int, mark: str, marks: int) -> int:
+    """Where the line at `at` ends, when only spaces or tabs follow its marks."""
+    spaces = _leading_spaces(body, at)
+    if spaces > 3:
+        return -1
+    run = _mark_run(body, at + spaces, mark)
+    if run - (at + spaces) < marks:
+        return -1
+    tail = run
+    while body[tail : tail + 1] in (" ", "\t"):
+        tail += 1
+    if tail == len(body) or body[tail] == "\n":
+        return tail
+    return -1
+
+
+def _closing_line_end(body: str, from_: int, mark: str, marks: int) -> int:
+    """Where the fence opened before `from_` closes, or -1 when no line closes it."""
+    at = from_
+    while at < len(body):
+        end = _closing_at(body, at, mark, marks)
+        if end != -1:
+            return end
+        at = _line_start_from(body, at + 1)
+    return -1
+
+
+def _fenced_blocks(body: str) -> list[tuple[int, int]]:
+    """Each fenced block's extent: a line of three or more marks, closed by as long a
+    line or the body's end."""
+    blocks: list[tuple[int, int]] = []
+    at = 0
+    while at < len(body):
+        opened = _opened_fence_at(body, at)
+        if opened is None:
+            at = _line_start_from(body, at + 1)
+            continue
+        end = _closing_line_end(body, opened.line_end + 1, opened.mark, opened.marks)
+        close = len(body) if end == -1 else end
+        blocks.append((at, close))
+        at = _line_start_from(body, close + 1)
+    return blocks
+
 
 _BACKTICK_RUN = re.compile(r"`+")
 _HEADING = re.compile(r"^\#{1,6}\s+(.*)$")
@@ -93,7 +285,14 @@ def _blanked_spans(body: str) -> str:
 def prose_of(body: str) -> str:
     """The body with fenced blocks and code spans blanked to spaces,
     newlines kept, so an offset into it is an offset into the body."""
-    return _blanked_spans(_FENCED_BLOCK.sub(lambda found: _blank(found.group(0)), body))
+    pieces: list[str] = []
+    cursor = 0
+    for start, end in _fenced_blocks(body):
+        pieces.append(body[cursor:start])
+        pieces.append(_blank(body[start:end]))
+        cursor = end
+    pieces.append(body[cursor:])
+    return _blanked_spans("".join(pieces))
 
 
 def _normalised_label(label: str) -> str:
@@ -106,12 +305,57 @@ def _label_key(label: str) -> str:
     return _normalised_label(label)
 
 
-def _definitions_of(body: str) -> dict[str, str]:
+def _target_after(prose: str, from_: int) -> tuple[int, int] | None:
+    """The first run of more than the six after the six that follow `from_`, and where
+    it ends."""
+    start = from_
+    while start < len(prose) and prose[start] in _SIX:
+        start += 1
+    if start == len(prose):
+        return None
+    end = start
+    while end < len(prose) and prose[end] not in _SIX:
+        end += 1
+    return start, end
+
+
+def _definition_at(
+    prose: str, at: int, close: list[int]
+) -> tuple[str, str, int] | None:
+    """The definition at the line start `at`: a label without `]`, a colon at once, a
+    target after the six."""
+    spaces = _leading_spaces(prose, at)
+    opened = at + spaces
+    if spaces > 3 or prose[opened : opened + 1] != "[":
+        return None
+    bracket = close[opened + 1]
+    if (
+        bracket == -1
+        or bracket == opened + 1
+        or prose[bracket + 1 : bracket + 2] != ":"
+    ):
+        return None
+    target = _target_after(prose, bracket + 2)
+    if target is None:
+        return None
+    start, end = target
+    return _label_key(prose[opened + 1 : bracket]), prose[start:end], end
+
+
+def _definitions_of(prose: str) -> dict[str, str]:
+    """Every definition at a line start, keyed as a label is keyed."""
     definitions: dict[str, str] = {}
-    for found in _LINK_DEFINITION.finditer(body):
-        label = _label_key(found.group(1) or "")
-        if label not in definitions:
-            definitions[label] = (found.group(2) or "").lstrip("<").rstrip(">")
+    close = _next_of(prose, "]")
+    at = 0
+    while at < len(prose):
+        found = _definition_at(prose, at, close)
+        if found is None:
+            at = _line_start_from(prose, at + 1)
+            continue
+        key, target, end = found
+        if key not in definitions:
+            definitions[key] = target.lstrip("<").rstrip(">")
+        at = _line_start_from(prose, end)
     return definitions
 
 
@@ -141,14 +385,15 @@ _INLINE_TARGET = re.compile(r"\]\([ \t\n\r\f\v]*<?([^) \t\n\r\f\v>]+)")
 _REFERENCE = re.compile(r"^\[([^\]]*)\]\[([^\]]*)\]$")
 
 
-def _defines(found: re.Match[str], body: str) -> bool:
-    return found.end() < len(body) and body[found.end()] == ":"
+def _defines(found: _Found, body: str) -> bool:
+    end = found.at + len(found.text)
+    return end < len(body) and body[end] == ":"
 
 
 def _link_target_of(
-    found: re.Match[str], body: str, definitions: dict[str, str]
+    found: _Found, body: str, definitions: dict[str, str]
 ) -> str | None:
-    text = found.group(0)
+    text = found.text
     if text.startswith("<"):
         return text[1:-1]
     if "](" in text:
@@ -184,11 +429,95 @@ def _section_at(body: str, index: int) -> str | None:
     return None
 
 
+type _SpanOf = Callable[[str, int, list[int], list[int]], int | None]
+
+
+def _labels_of(text: str, span_of: _SpanOf) -> str:
+    """One bracket pass: the label replaces the match, leftmost and non-overlapping,
+    as the pass's `re.sub` held it."""
+    close = _next_of(text, "]")
+    ending = _next_of(text, ")")
+    pieces: list[str] = []
+    cursor = 0
+    at = 0
+    while at < len(text):
+        if text[at] != "[":
+            at += 1
+            continue
+        bracket = close[at + 1]
+        if bracket == -1:
+            at += 1
+            continue
+        end = span_of(text, bracket, ending, close)
+        if end is None:
+            at += 1
+            continue
+        pieces.append(text[cursor:at])
+        pieces.append(text[at + 1 : bracket])
+        cursor = end
+        at = end
+    pieces.append(text[cursor:])
+    return "".join(pieces)
+
+
+def _inline_span(
+    text: str, bracket: int, ending: list[int], _close: list[int]
+) -> int | None:
+    if text[bracket + 1 : bracket + 2] != "(":
+        return None
+    closed = ending[bracket + 2]
+    return None if closed == -1 else closed + 1
+
+
+def _reference_span(
+    text: str, bracket: int, _ending: list[int], close: list[int]
+) -> int | None:
+    if text[bracket + 1 : bracket + 2] != "[":
+        return None
+    reference = close[bracket + 2]
+    return None if reference == -1 else reference + 1
+
+
+def _bare_span(
+    _text: str, bracket: int, _ending: list[int], _close: list[int]
+) -> int | None:
+    return bracket + 1
+
+
+def _angle_bracketed(text: str) -> str:
+    """The autolink pass: what each link holds replaces it, leftmost and
+    non-overlapping."""
+    ends = _next_stops(text, _pass_four_stops)
+    pieces: list[str] = []
+    cursor = 0
+    at = 0
+    while at < len(text):
+        if text[at] != "<":
+            at += 1
+            continue
+        end = _autolink_closes_at(text, at, ends)
+        if end is None:
+            at += 1
+            continue
+        pieces.append(text[cursor:at])
+        pieces.append(text[at + 1 : end])
+        cursor = end + 1
+        at = end + 1
+    pieces.append(text[cursor:])
+    return "".join(pieces)
+
+
+def _pass_four_stops(char: str) -> bool:
+    return char == ">" or _WS.fullmatch(char) is not None
+
+
 def _flattened_links(text: str) -> str:
-    flattened = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
-    flattened = re.sub(r"\[([^\]]*)\]\[[^\]]*\]", r"\1", flattened)
-    flattened = re.sub(r"\[([^\]]*)\]", r"\1", flattened)
-    return re.sub(r"<([a-z][a-z0-9+.-]*:[^>\s]*)>", r"\1", flattened, flags=re.I)
+    """Every link form collapsed to what it held, in the four passes' order: inline,
+    reference, bare, autolink."""
+    flattened = _labels_of(text, _inline_span)
+    flattened = _labels_of(flattened, _reference_span)
+    flattened = _labels_of(flattened, _bare_span)
+    return _angle_bracketed(flattened)
 
 
 def _sentence_at(body: str, index: int) -> str:
@@ -231,12 +560,12 @@ _TEXT = ("text", None)
 
 
 def _footnote_reading(
-    found: re.Match[str],
+    found: _Found,
     prose: str,
     definitions: dict[str, str],
     sources_by_id: dict[str, int],
 ) -> tuple[str, str | int | None] | None:
-    footnote = _FOOTNOTE.match(found.group(0))
+    footnote = _FOOTNOTE.match(found.text)
     if footnote is None:
         return None
     if _defines(found, prose):
@@ -249,12 +578,12 @@ def _footnote_reading(
 
 
 def _reading_of(
-    found: re.Match[str],
+    found: _Found,
     prose: str,
     definitions: dict[str, str],
     sources_by_id: dict[str, int],
 ) -> tuple[str, str | int | None]:
-    if found.start() > 0 and prose[found.start() - 1] == "!":
+    if found.at > 0 and prose[found.at - 1] == "!":
         return "link", None
     footnote = _footnote_reading(found, prose, definitions, sources_by_id)
     if footnote is not None:
@@ -275,14 +604,14 @@ def links_and_marks_of(
     links: list[BodyLink] = []
     marks: list[CitationMark] = []
     ordinal = 0
-    for found in _LINK.finditer(prose):
+    for found in _link_matches(prose):
         reading, value = _reading_of(found, prose, definitions, sources_by_id)
         if reading == "mark" and isinstance(value, int):
-            marks.append(CitationMark(found.start(), found.group(0), value))
+            marks.append(CitationMark(found.at, found.text, value))
         if reading != "link":
             continue
         if isinstance(value, str):
-            links.append(BodyLink(ordinal, found.start(), value))
+            links.append(BodyLink(ordinal, found.at, value))
         ordinal += 1
     return links, marks
 
