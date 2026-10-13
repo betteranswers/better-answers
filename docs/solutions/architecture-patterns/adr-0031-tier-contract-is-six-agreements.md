@@ -39,7 +39,7 @@ The agreements live in top-level `contracts/`, listed in `contracts/manifest.jso
 - `credential-envelope`: the envelope's sealed vectors and the words an opener refuses with.
 - `id-shape`: the one shape every minted id has.
 - `concept-file`: the canonical text and content hash of a concept file.
-- `redaction`: what the redaction seam withholds, under which word, and the version string's shape.
+- `redaction`: what the redaction seam withholds, under which word, the version string's shape, and what the always tier makes of a text a person types.
 - `document-passage`: the derived passage id, the locator's span in code points, and how passage rows partition a text.
 - `upload-media-types`: the media types an upload is admitted under.
 - `citation`: the patterns each tier's comment gate refuses.

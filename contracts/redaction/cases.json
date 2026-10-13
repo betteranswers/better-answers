@@ -1,5 +1,5 @@
 {
-  "description": "redaction (ADR 0031, ADR 0020): what the seam withholds, said once for both tiers. The detector runs in the worker and the review of a finding is an Admin's action, so the two tiers have to agree about four things and only these four — which categories exist, what word stands in place of each, when a finding narrows the document, and how the version string that rides on every finding is written. This file is the contract and T-121's category descriptors derive it: name, tier, recogniser, threshold, context words, cues, placeholder and narrowing are one declaration per category in the worker, from which the analyzer registry and `rule_version` are built, and that table is held to this file. Nothing here is derived from a detector — no recogniser, no threshold, no model id — because the detector is T-121's and a fixture that named one would be the seam describing itself. A category's `tier` is the tier it is ordinarily raised at, and one rule outranks it: the officer-block post-pass always wins, so a name inside an officers block is a `person-name` finding raised at the always tier and written into the row that way. **The placeholder follows the tier the finding was raised at, not the category**, which is why such a name is `[withheld]` with its block and not `[person A]`: the always set has one word for everything in it. The TypeScript half asserts against this tier's own boundary schemas (packages/core/test/redaction.contract.test.ts); the Python half asserts against the columns the worker writes findings into (apps/worker/tests/test_redaction_contract.py). Neither holds the other's literals.",
+  "description": "redaction (ADR 0031, ADR 0020): what the seam withholds, said once for both tiers. The detector runs in the worker and the review of a finding is an Admin's action, so the two tiers have to agree about five things and only these five — which categories exist, what word stands in place of each, when a finding narrows the document, how the version string that rides on every finding is written, and what the always tier makes of a text a person types. This file is the contract and T-121's category descriptors derive it: name, tier, recogniser, threshold, context words, cues, placeholder and narrowing are one declaration per category in the worker, from which the analyzer registry and `rule_version` are built, and that table is held to this file. Nothing here names a part of a detector — no recogniser, no threshold, no model id — because the detector is T-121's and a fixture that named one would be the seam describing itself. The cases under `typed_text` keep to that: each is a text and the text it becomes, and says nothing of how. A category's `tier` is the tier it is ordinarily raised at, and one rule outranks it: the officer-block post-pass always wins, so a name inside an officers block is a `person-name` finding raised at the always tier and written into the row that way. **The placeholder follows the tier the finding was raised at, not the category**, which is why such a name is `[withheld]` with its block and not `[person A]`: the always set has one word for everything in it. The TypeScript half asserts against this tier's own boundary schemas (packages/core/test/redaction.contract.test.ts); the Python half asserts against the columns the worker writes findings into (apps/worker/tests/test_redaction_contract.py). Neither holds the other's literals. The cases under `typed_text` are the one part both halves run alike: packages/core/test/typed-text.test.ts through the api's own readers, and the Python half through the detector.",
   "placeholder_shape": "^\\[[a-z]+(?: [a-zA-Z]+)*\\]$",
   "always_placeholder": "[withheld]",
   "narrows_to": "Restricted",
@@ -131,6 +131,221 @@
       {
         "value": "",
         "why": "empty"
+      }
+    ]
+  },
+  "typed_text": {
+    "why": "Text a person types never passes the worker's seam, so the api reads it against the always tier with readers of its own. Each case is a text and what it becomes with the always tier alone in force. Both tiers run every case: the worker through its detector with both switchable tiers off, the api through its own readers. `expected` is what the worker's detector returned, so a case that surprises is the seam's own behaviour written down, and a change to it is a change both tiers make together. `categories` names the always-tier categories a case is about, whether or not it ends in a hit.",
+    "cases": [
+      {
+        "name": "a National Insurance number in a question",
+        "categories": ["government-identifier"],
+        "input": "Does the pension scheme need my National Insurance number AB 12 34 56 C before I join?",
+        "expected": "Does the pension scheme need my National Insurance number[withheld] before I join?",
+        "why": "The number goes and the question stays. The space before the number goes with it, because the worker's pattern reads that space as the number's first character."
+      },
+      {
+        "name": "a National Insurance number that opens the text",
+        "categories": ["government-identifier"],
+        "input": "AB123456C is on the starter form, is that enough for payroll?",
+        "expected": "[withheld] is on the starter form, is that enough for payroll?",
+        "why": "With no space before it, the number alone is taken."
+      },
+      {
+        "name": "a National Insurance number in lower case",
+        "categories": ["government-identifier"],
+        "input": "Is ab123456c the number payroll holds for me?",
+        "expected": "Is[withheld] the number payroll holds for me?",
+        "why": "The pattern reads its letters in either case."
+      },
+      {
+        "name": "a refused prefix is taken after a space",
+        "categories": ["government-identifier"],
+        "input": "Is GB123456A a National Insurance number?",
+        "expected": "Is[withheld] a National Insurance number?",
+        "why": "GB is a prefix the pattern refuses, but it reads the refusal before the space, so a number that follows a space is taken whatever its prefix. The seam does this today, and so both tiers do."
+      },
+      {
+        "name": "a refused prefix that opens the text",
+        "categories": ["government-identifier"],
+        "input": "Gb123456A is the reference on the form, is that right?",
+        "expected": "Gb123456A is the reference on the form, is that right?",
+        "why": "With no space before it the refusal holds, in either case of its letters."
+      },
+      {
+        "name": "an NHS number",
+        "categories": ["government-identifier"],
+        "input": "Which form asks for an NHS number such as 999 000 0018?",
+        "expected": "Which form asks for an NHS number such as [withheld]?",
+        "why": "Ten digits that pass the NHS check digit, with or without their spaces."
+      },
+      {
+        "name": "ten digits that fail the NHS check digit",
+        "categories": ["government-identifier"],
+        "input": "Is purchase order 4500012345 still open?",
+        "expected": "Is purchase order 4500012345 still open?",
+        "why": "An NHS number carries a check digit, and ten digits that fail it are left in the text."
+      },
+      {
+        "name": "a sort code with its account number",
+        "categories": ["bank-details"],
+        "input": "Can payroll pay expenses into sort code 20-00-00, account number 12345678?",
+        "expected": "Can payroll pay expenses into sort code [withheld]?",
+        "why": "One placeholder covers the sort code, the account number and what lies between them."
+      },
+      {
+        "name": "two numbers nothing calls an account",
+        "categories": ["bank-details"],
+        "input": "Is ticket 10-20-30 the same fault as ticket 12345678?",
+        "expected": "Is ticket 10-20-30 the same fault as ticket 12345678?",
+        "why": "Six digits and eight are a sort code and an account number only when a word before them says so: account, sort, bank, payment or BACS."
+      },
+      {
+        "name": "the word that names the pair sits between its numbers",
+        "categories": ["bank-details"],
+        "input": "Can payroll pay expenses into 20-00-00, account number 12345678?",
+        "expected": "Can payroll pay expenses into 20-00-00, account number 12345678?",
+        "why": "The worker reads only the words before the pair. Here the one word that names it follows the sort code, so the pair stays in the text. The seam does this today, and so both tiers do."
+      },
+      {
+        "name": "a sort code and account number on two lines",
+        "categories": ["bank-details"],
+        "input": "Sort code 20-00-00\naccount 12345678\nIs that the account expenses go to?",
+        "expected": "Sort code [withheld]\nIs that the account expenses go to?",
+        "why": "What lies between the two numbers may hold a line break."
+      },
+      {
+        "name": "two numbers too far apart to be a pair",
+        "categories": ["bank-details"],
+        "input": "Is sort code 20-00-00 the one we gave the auditors last year, and is 12345678 the old account?",
+        "expected": "Is sort code 20-00-00 the one we gave the auditors last year, and is 12345678 the old account?",
+        "why": "An account number more than forty characters after the sort code is not read with it."
+      },
+      {
+        "name": "the word that names the pair is joined to its sort code",
+        "categories": ["bank-details"],
+        "input": "Do expenses go to 200000.account 12345678?",
+        "expected": "Do expenses go to [withheld]?",
+        "why": "With no space after the sort code, the worker reads it and the word as one, and a word read with the pair names it."
+      },
+      {
+        "name": "a one-sentence question that holds a cue",
+        "categories": ["special-category"],
+        "input": "Do you have a sickness absence policy?",
+        "expected": "[withheld]",
+        "why": "A special-category cue withholds its whole sentence, so a one-sentence question reaches the model as the placeholder alone."
+      },
+      {
+        "name": "a cue in one sentence of three",
+        "categories": ["special-category"],
+        "input": "Who signs off a return to work? I was diagnosed with asthma last month. What does the handbook say?",
+        "expected": "Who signs off a return to work? [withheld] What does the handbook say?",
+        "why": "Only the cue's sentence goes, and the cue is read in any of its forms: diagnosed is a form of diagnose."
+      },
+      {
+        "name": "space round a cue's sentence",
+        "categories": ["special-category"],
+        "input": "  Which staff are on medication this week\n",
+        "expected": "  [withheld]\n",
+        "why": "The space before a sentence and after it is no part of it, so it stays."
+      },
+      {
+        "name": "a blank line ends a sentence",
+        "categories": ["special-category"],
+        "input": "Who is on medication this week\n\nWhere is the rota kept",
+        "expected": "[withheld]\n\nWhere is the rota kept",
+        "why": "Lines typed with no full stop are still two sentences when a blank line parts them."
+      },
+      {
+        "name": "words near a cue that are not one",
+        "categories": ["special-category"],
+        "input": "Who approves sick leave, and where is the diagnostic report for the boiler?",
+        "expected": "Who approves sick leave, and where is the diagnostic report for the boiler?",
+        "why": "Sick and diagnostic are not forms of sickness, diagnose or diagnosis."
+      },
+      {
+        "name": "a cue set off by underscores",
+        "categories": ["special-category"],
+        "input": "Was she _diagnosed_ before her start date?",
+        "expected": "[withheld]",
+        "why": "The worker's tokenizer takes an underscore off either end of a word, so the cue is read. To a pattern's \\b an underscore is one more letter of the word."
+      },
+      {
+        "name": "a question with nothing to withhold",
+        "categories": [],
+        "input": "How long is the notice period for a framework contract?",
+        "expected": "How long is the notice period for a framework contract?",
+        "why": "It comes back byte for byte."
+      },
+      {
+        "name": "a person's name",
+        "categories": [],
+        "input": "Does Rosalind Petheridge still lead the audit team?",
+        "expected": "Does Rosalind Petheridge still lead the audit team?",
+        "why": "The stated limit. The always tier holds no names outside an officers block, and a name needs the detector's model, which the api tier cannot run."
+      },
+      {
+        "name": "two hits in one question",
+        "categories": ["government-identifier", "bank-details"],
+        "input": "Is NHS number 999 000 0018 hers, and is sort code 20-00-00 account 12345678 the one on file?",
+        "expected": "Is NHS number [withheld] hers, and is sort code [withheld] the one on file?",
+        "why": "Each hit takes its own placeholder, and the text between them stays as typed."
+      },
+      {
+        "name": "an identifier inside a cue's sentence",
+        "categories": ["special-category", "government-identifier"],
+        "input": "She was diagnosed last year, and her NHS number is 999 000 0018. Who holds the record?",
+        "expected": "[withheld] Who holds the record?",
+        "why": "A hit inside a longer one is written under the longer one's placeholder, so the sentence takes one placeholder and not two."
+      },
+      {
+        "name": "a pair that runs into a cue's sentence",
+        "categories": ["special-category", "bank-details"],
+        "input": "Sort code 20-00-00. Was account 12345678 opened after her diagnosis?",
+        "expected": "Sort code [withheld][withheld]",
+        "why": "The pair crosses the full stop into the cue's sentence. The longer hit keeps its span and the other keeps the characters left over, under a placeholder of its own."
+      },
+      {
+        "name": "a pair that runs out of a cue's sentence",
+        "categories": ["special-category", "bank-details"],
+        "input": "Is her diagnosis why sort code 20-00-00 changed? The account is 12345678.",
+        "expected": "[withheld][withheld].",
+        "why": "The same the other way round: the pair starts in the cue's sentence and keeps what follows it, the space after the question mark included."
+      },
+      {
+        "name": "a next-line character ends a sentence",
+        "categories": ["special-category"],
+        "input": "Sickness absence rose.\u0085Who reports it?",
+        "expected": "[withheld]\u0085Who reports it?",
+        "why": "Python's whitespace holds U+0085 and JavaScript's \\s does not."
+      },
+      {
+        "name": "a byte-order mark does not end a sentence",
+        "categories": ["special-category"],
+        "input": "Sickness absence rose.\ufeff Who reports it?",
+        "expected": "[withheld]",
+        "why": "JavaScript's \\s holds U+FEFF and Python's whitespace does not, so the worker reads one sentence here."
+      },
+      {
+        "name": "a letter outside ASCII joins a National Insurance number",
+        "categories": ["government-identifier"],
+        "input": "Is caf\u00e9AB123456C a National Insurance number?",
+        "expected": "Is caf\u00e9AB123456C a National Insurance number?",
+        "why": "The number must stand apart from the letters round it, and the worker counts \u00e9 as a letter. JavaScript's \\b does not."
+      },
+      {
+        "name": "a letter outside ASCII joins an account number",
+        "categories": ["bank-details"],
+        "input": "Is sort code 20-00-00 account 12345678\u00e9 ours?",
+        "expected": "Is sort code 20-00-00 account 12345678\u00e9 ours?",
+        "why": "The same boundary, read by the worker's other regex engine."
+      },
+      {
+        "name": "digits outside ASCII in a sort code and account number",
+        "categories": ["bank-details"],
+        "input": "Is sort code \u0662\u0660-\u0660\u0660-\u0660\u0660 account \u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668 ours?",
+        "expected": "Is sort code [withheld] ours?",
+        "why": "Python's \\d reads any decimal digit and JavaScript's reads 0 to 9."
       }
     ]
   }

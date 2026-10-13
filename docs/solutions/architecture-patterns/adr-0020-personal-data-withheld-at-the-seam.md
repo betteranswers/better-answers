@@ -38,9 +38,10 @@ Text a person types, such as a question or a note on a flag, never passes the wo
 
 - Before any model call, typed text is read against the always tier, and each hit is replaced by a placeholder in what the model is sent. The record keeps the text as typed.
 - Core reads the three always-tier categories with detectors of its own. Cases in `contracts/redaction` hold them to the worker's, and both tiers run every case. The worker's patterns and its detector version do not change.
+- The worker reads a cue, and the word that names a sort code and account number, through its tokenizer. Core has none: it reads a cue by its written forms, and reads all the text before the pair where the worker reads five words. Core's reading is made the wider of the two, so that a difference between them withholds more and not less.
 - The limit is stated: a name in typed text is not withheld. The always tier is patterns, which the api tier can read, and a name needs the detector's model, which it cannot.
 - A special-category cue withholds its whole sentence, so a one-sentence question that holds one reaches the model as a placeholder alone.
-- S2b builds the check, and the tree does not hold it yet.
+- The check is `checkTypedText` in core's `llm` layer. S2b builds its callers with the model client, and the tree does not hold them yet.
 
 The erasure routine rewrites what the platform wrote; a person edits what the company wrote.
 
