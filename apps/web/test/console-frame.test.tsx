@@ -1,8 +1,6 @@
 import { act, cleanup, fireEvent, renderHook, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { RAIL } from "@/app/words.ts";
-import { correctWords } from "@/features/console/correcting-words.ts";
 import { useAsking } from "@/features/console/everyone-search.tsx";
 import {
   EVERYONE_WORDS,
@@ -16,7 +14,6 @@ import {
 import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
-import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
 import { addressOf, answered } from "./stubbed-api.ts";
@@ -171,7 +168,7 @@ describe("the console's shell", () => {
         .map((each) => each.textContent);
 
     expect(router.state.location.pathname).toBe("/console/workspaces/every-workspace");
-    expect(namesIn(screen.getByRole("navigation", { name: RAIL }), "link")).toEqual(["Console"]);
+    expect(namesIn(screen.getByRole("navigation", { name: "Areas" }), "link")).toEqual(["Console"]);
     expect(namesIn(nav, "heading")).toEqual(["People", "Workspaces"]);
     expect(namesIn(nav, "link")).toEqual(["Everyone", "Names Waiting", "Every Workspace"]);
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
@@ -187,7 +184,7 @@ describe("the console's shell", () => {
     const you = within(bar).getByRole("button", { name: "Ada" });
     expect(within(you).getByText("A", { exact: true })).toBeDefined();
     expect(you.textContent).not.toMatch(/Admin|Editor|Viewer/);
-    const logo = within(bar).getByRole("link", { name: PRODUCT_NAME });
+    const logo = within(bar).getByRole("link", { name: "better-answers" });
     expect(logo.getAttribute("href")).toBe(HOMES.operator.path);
   });
 
@@ -221,16 +218,24 @@ const EVERY_WORKSPACE = "/console/workspaces/every-workspace";
 
 const NAMES_WAITING_PAGE = "/console/people/names-waiting";
 
+/** The names the page gives each list's region and its search box. */
+const WORKSPACES_LIST = { heading: "Every Workspace", search: "Search by name or short name" };
+
+const NAMES_WAITING_LIST = { heading: "Names Waiting", search: "Search by name or workspace" };
+
 describe("the console's lists", () => {
   it("opens Every workspace as a table under its head", async () => {
     const workspaces = menuGroupIn(CONSOLE, "workspaces");
-    const list = await listAt(EVERY_WORKSPACE, WORKSPACES_WORDS.heading, {
+    const list = await listAt(EVERY_WORKSPACE, WORKSPACES_LIST.heading, {
       "console.workspaces.list": [ACME, DALES],
     });
 
-    expect(within(list).getAllByRole("columnheader").map(textOf)).toEqual(
-      Object.values(WORKSPACES_WORDS.columns),
-    );
+    expect(within(list).getAllByRole("columnheader").map(textOf)).toEqual([
+      "Workspace",
+      "Short Name",
+      "Members",
+      "Provisioned",
+    ]);
     const [acme] = rowsOf(list);
     if (acme === undefined) throw new Error("no workspace is listed");
     expect(within(acme).getAllByRole("cell").slice(1).map(textOf)).toEqual([
@@ -240,9 +245,9 @@ describe("the console's lists", () => {
     ]);
     expect(
       readsInOrder(screen.getByRole("main"), [
-        workspaces.name,
+        "Workspaces",
         workspaces.summary,
-        WORKSPACES_WORDS.heading,
+        WORKSPACES_LIST.heading,
         WORKSPACES_WORDS.description,
         WORKSPACES_WORDS.counted(2),
         ACME.name,
@@ -250,22 +255,20 @@ describe("the console's lists", () => {
     ).toBe(true);
 
     expect(within(list).queryByText(ACME.id)).toBeNull();
-    fireEvent.click(
-      within(acme).getByRole("button", { name: WORKSPACES_WORDS.moreAbout(ACME.name) }),
-    );
+    fireEvent.click(within(acme).getByRole("button", { name: `More About ${ACME.name}` }));
     expect(within(acme).getByText(ACME.id)).toBeDefined();
   });
 
   it("narrows Every workspace by name or short name", async () => {
-    const list = await listAt(EVERY_WORKSPACE, WORKSPACES_WORDS.heading, {
+    const list = await listAt(EVERY_WORKSPACE, WORKSPACES_LIST.heading, {
       "console.workspaces.list": [ACME, DALES],
     });
 
-    searchFor(list, WORKSPACES_WORDS.search, "NORTH");
+    searchFor(list, WORKSPACES_LIST.search, "NORTH");
     expect(rowsOf(list).map(textOf)).toEqual([expect.stringContaining(ACME.name)]);
     expect(within(list).getByText(WORKSPACES_WORDS.matching(1, "NORTH"))).toBeDefined();
 
-    searchFor(list, WORKSPACES_WORDS.search, "nowhere");
+    searchFor(list, WORKSPACES_LIST.search, "nowhere");
     expect(within(list).getByText(WORKSPACES_WORDS.noneMatch("nowhere"))).toBeDefined();
     fireEvent.click(within(list).getByRole("button", { name: "Clear Search" }));
     expect(rowsOf(list)).toHaveLength(2);
@@ -274,16 +277,16 @@ describe("the console's lists", () => {
 
   it.each([
     {
-      page: WORKSPACES_WORDS.heading,
+      page: WORKSPACES_LIST.heading,
       path: EVERY_WORKSPACE,
-      words: WORKSPACES_WORDS,
+      words: WORKSPACES_LIST,
       read: "console.workspaces.list",
       rows: [ACME, DALES],
     },
     {
-      page: NAMES_WAITING_WORDS.heading,
+      page: NAMES_WAITING_LIST.heading,
       path: NAMES_WAITING_PAGE,
-      words: NAMES_WAITING_WORDS,
+      words: NAMES_WAITING_LIST,
       read: "console.people.namesWaiting",
       rows: NAMES_WAITING,
     },
@@ -305,53 +308,53 @@ describe("the console's lists", () => {
   });
 
   it("narrows Names waiting by name or flagging workspace", async () => {
-    const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_WORDS.heading, {
+    const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
       "console.people.namesWaiting": NAMES_WAITING,
     });
 
-    searchFor(list, NAMES_WAITING_WORDS.search, "priya");
+    searchFor(list, NAMES_WAITING_LIST.search, "priya");
     expect(rowsOf(list).map(textOf)).toEqual([expect.stringContaining("Priya Shah")]);
 
-    searchFor(list, NAMES_WAITING_WORDS.search, "dales");
+    searchFor(list, NAMES_WAITING_LIST.search, "dales");
     expect(rowsOf(list).map(textOf)).toEqual([expect.stringContaining("Sam Okoro")]);
     expect(within(list).getByText(NAMES_WAITING_WORDS.matching(1, "dales"))).toBeDefined();
 
-    searchFor(list, NAMES_WAITING_WORDS.search, "nobody");
+    searchFor(list, NAMES_WAITING_LIST.search, "nobody");
     expect(within(list).getByText(NAMES_WAITING_WORDS.noneMatch("nobody"))).toBeDefined();
   });
 
   it("keeps the correct keystroke off a name the search hid", async () => {
-    const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_WORDS.heading, {
+    const list = await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
       "console.people.namesWaiting": NAMES_WAITING,
     });
-    const toCorrectPriya = correctWords("Priya Shah");
+    const toCorrectPriya = "Correct Priya Shah’s Display Name";
     const pressCorrect = () => {
       fireEvent.keyDown(document.body, { key: NAMES_WAITING_KEYSTROKES.correct.key });
     };
     fireEvent.focus(within(list).getByRole("button", { name: toCorrectPriya }));
 
-    searchFor(list, NAMES_WAITING_WORDS.search, "sam");
+    searchFor(list, NAMES_WAITING_LIST.search, "sam");
     pressCorrect();
     expect(within(list).getByText(SELECT_A_NAME_FIRST)).toBeDefined();
     expect(screen.queryByRole("dialog")).toBeNull();
 
-    searchFor(list, NAMES_WAITING_WORDS.search, "");
+    searchFor(list, NAMES_WAITING_LIST.search, "");
     pressCorrect();
     expect(await screen.findByRole("dialog", { name: toCorrectPriya })).toBeDefined();
   });
 
   it("keeps the description of Everyone off Names waiting", async () => {
     const people = menuGroupIn(CONSOLE, "people");
-    await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_WORDS.heading, {
+    await listAt(NAMES_WAITING_PAGE, NAMES_WAITING_LIST.heading, {
       "console.people.namesWaiting": NAMES_WAITING,
     });
     const page = screen.getByRole("main");
 
     expect(
       readsInOrder(page, [
-        people.name,
+        "People",
         people.summary,
-        NAMES_WAITING_WORDS.heading,
+        NAMES_WAITING_LIST.heading,
         NAMES_WAITING_WORDS.description,
         NAMES_WAITING_WORDS.counted(2),
         "Priya Shah",
@@ -366,12 +369,13 @@ describe("the console's lists", () => {
       answering(THE_OPERATOR, { "console.people.list": { people: [], total: 0 } }),
     );
     await openApp("/console/people/everyone");
-    const list = await screen.findByRole("region", { name: EVERYONE_WORDS.heading });
-    const search = await within(list).findByRole("searchbox", { name: EVERYONE_WORDS.search });
+    const label = "Search by name or address";
+    const list = await screen.findByRole("region", { name: "Everyone" });
+    const search = await within(list).findByRole("searchbox", { name: label });
 
     expect(screen.getByRole("main").textContent.split(EVERYONE_WORDS.description)).toHaveLength(2);
-    expect(search.getAttribute("placeholder")).toBe(EVERYONE_WORDS.search);
-    expect(within(list).queryByText(EVERYONE_WORDS.search)).toBeNull();
+    expect(search.getAttribute("placeholder")).toBe(label);
+    expect(within(list).queryByText(label)).toBeNull();
   });
 });
 

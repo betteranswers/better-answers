@@ -28,7 +28,9 @@ describe("Ask while it is unbuilt", () => {
     const main = await askOpened();
 
     expect(main.getByText(unbuiltLineOf(HOMES.Viewer))).toBeDefined();
-    expect(main.getByRole("heading", { level: 2, name: CONNECT_ASSISTANT.heading })).toBeDefined();
+    expect(
+      main.getByRole("heading", { level: 2, name: "Connect Claude as Your Assistant" }),
+    ).toBeDefined();
     expect(
       steps(main)
         .getAllByRole("listitem")
@@ -42,7 +44,7 @@ describe("Ask while it is unbuilt", () => {
     const written = clipboardAnswering(() => Promise.resolve());
     const main = await askOpened();
 
-    fireEvent.click(main.getByRole("button", { name: CONNECT_ASSISTANT.copy }));
+    fireEvent.click(main.getByRole("button", { name: "Copy Address" }));
 
     await vi.waitFor(() => {
       expect(steps(main).getByRole("status").textContent).toBe(CONNECT_ASSISTANT.copied);
@@ -55,7 +57,7 @@ describe("Ask while it is unbuilt", () => {
     clipboardAnswering(() => Promise.reject(new Error("refused")));
     const main = await askOpened();
 
-    fireEvent.click(main.getByRole("button", { name: CONNECT_ASSISTANT.copy }));
+    fireEvent.click(main.getByRole("button", { name: "Copy Address" }));
 
     await vi.waitFor(() => {
       expect(steps(main).getByRole("alert").textContent).toBe(STOCK.copy);

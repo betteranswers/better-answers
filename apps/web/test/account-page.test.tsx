@@ -6,7 +6,6 @@ import {
   ACTION_LANDED,
   AUTHENTICATOR_WORDS,
   PASSKEY_WORDS,
-  THEME_WORDS,
 } from "@/features/auth/account-words.ts";
 import { SAID_OF_SECOND_FACTOR } from "@/features/auth/refusal-words.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
@@ -159,7 +158,7 @@ describe("the Account page's passkeys", () => {
 
     expect(await screen.findByText(PASSKEY_WORDS.none)).toBeDefined();
     expect(screen.getByText(PASSKEY_WORDS.noWebAuthn)).toBeDefined();
-    expect(screen.queryByRole("button", { name: PASSKEY_WORDS.add })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add a Passkey" })).toBeNull();
   });
 });
 
@@ -167,8 +166,8 @@ describe("the Account page's theme", () => {
   it("matches this device until a theme is picked", async () => {
     await accountOpened(NO_SET);
 
-    const theme = await screen.findByRole("radiogroup", { name: THEME_WORDS.heading });
-    const device = screen.getByRole("radio", { name: THEME_WORDS.device });
+    const theme = await screen.findByRole("radiogroup", { name: "Theme" });
+    const device = screen.getByRole("radio", { name: "Match this device" });
 
     expect(theme.getAttribute("aria-describedby")).not.toBeNull();
     expect(device.getAttribute("aria-checked")).toBe("true");
@@ -177,11 +176,9 @@ describe("the Account page's theme", () => {
   it("paints and keeps the theme picked", async () => {
     await accountOpened(NO_SET);
 
-    fireEvent.click(await screen.findByRole("radio", { name: THEME_WORDS.dark }));
+    fireEvent.click(await screen.findByRole("radio", { name: "Dark" }));
 
-    expect(screen.getByRole("radio", { name: THEME_WORDS.dark }).getAttribute("aria-checked")).toBe(
-      "true",
-    );
+    expect(screen.getByRole("radio", { name: "Dark" }).getAttribute("aria-checked")).toBe("true");
     expect(document.documentElement.dataset["theme"]).toBe("dark");
     expect(localStorage.getItem(THEME_KEPT_UNDER)).toBe("dark");
   });

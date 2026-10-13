@@ -9,9 +9,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/test-workspace";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
-import { CONFIRM_WORDS } from "@/features/auth/second-factor-words.ts";
-import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
-
 // oxlint-disable-next-line no-restricted-imports -- the journeys sit outside `src`, where no alias reaches
 import { authenticatorKeyOf } from "../journeys/second-factor.ts";
 import {
@@ -34,10 +31,10 @@ const KEY = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
 /** Six digits submit on their own, as the product's page does, and then six more confirm. */
 const PAGE = [
   '<!doctype html><html lang="en"><title>Sign in</title><main>',
-  `<label>${SIGN_IN_WORDS.emailField} <input type="email"></label>`,
-  `<button id="send">${SIGN_IN_WORDS.send}</button>`,
-  `<label id="step" hidden>${SIGN_IN_WORDS.codeField} <input id="code"></label>`,
-  `<label id="confirm" hidden>${CONFIRM_WORDS.codeField} <input id="factor"></label>`,
+  '<label>Email Address <input type="email"></label>',
+  '<button id="send">Send Code</button>',
+  '<label id="step" hidden>Verification Code <input id="code"></label>',
+  '<label id="confirm" hidden>Authenticator Code <input id="factor"></label>',
   "<script>",
   'document.getElementById("send").onclick = async () => {',
   '  const sent = await fetch("/email-otp/send-verification-otp", { method: "POST" });',

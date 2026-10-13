@@ -1,8 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { RAIL } from "@/app/words.ts";
-import { homeNowSaid, MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
+import { homeNowSaid } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
 import { ROLE_UNREAD } from "@/features/people/self-action.tsx";
 import { HOMES } from "@/shared/navigation.ts";
@@ -51,7 +50,7 @@ const demotingHerself = async (api: Api, memberAfter: Parameters<Api["set"]>[1])
   });
   const router = await openAt(MEMBER_PAGE, api);
   fireEvent.click(await screen.findByRole("radio", { name: "Editor" }));
-  fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
+  fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
   return router;
 };
 
@@ -84,7 +83,7 @@ describe("a change to the reader's own member", () => {
     landing.resolve();
     expect(await screen.findByRole("button", { name: HOLME.name })).toBeDefined();
     expect(router.state.location.pathname).toBe("/choose-workspace");
-    expect(screen.queryByRole("navigation", { name: RAIL })).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Areas" })).toBeNull();
   });
 
   it("drops the left workspace's name when a switch's re-read fails", async () => {

@@ -2,9 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
-import { FAILED_PAGE, RAIL } from "@/app/words.ts";
-import { BULK_WORDS } from "@/features/people/member-action-words.ts";
-import { CONTROL_CENTRE, type Role } from "@/shared/navigation.ts";
+import type { Role } from "@/shared/navigation.ts";
 
 import { openApp } from "./open-app.tsx";
 import { server, type Asked } from "./stub-server.ts";
@@ -134,9 +132,9 @@ export const tickOf = (name: string) => screen.queryByRole("checkbox", { name: `
 
 /** The one ticked member's role, sent to change to Viewer through the bar's dialog. */
 export const changeTheTickedToViewer = async () => {
-  fireEvent.click(screen.getByRole("button", { name: BULK_WORDS.changeRole.action }));
-  const dialog = await screen.findByRole("dialog", { name: BULK_WORDS.changeRole.title(1) });
-  fireEvent.click(within(dialog).getByRole("button", { name: BULK_WORDS.changeRole.action }));
+  fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
+  const dialog = await screen.findByRole("dialog", { name: "Change Role for 1 Member" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Change Role" }));
 };
 
 export const openTab = (name: string) => {
@@ -147,14 +145,16 @@ export const openTab = (name: string) => {
 
 /** An Admin's own area, which the rail offers no other role. */
 export const adminsAreaOffered = () =>
-  within(screen.getByRole("navigation", { name: RAIL })).queryByRole("link", {
-    name: CONTROL_CENTRE.name,
+  within(screen.getByRole("navigation", { name: "Areas" })).queryByRole("link", {
+    name: "Control Centre",
   });
 
 /** The frame after a member read that failed: no name of the workspace left, and a way to retry. */
 export const drawnWithNoWorkspace = async () => {
   await waitFor(() => expect(screen.queryByText(NORTHERN.name, { exact: false })).toBeNull());
-  expect(await screen.findByRole("heading", { level: 1, name: FAILED_PAGE.heading })).toBeDefined();
+  expect(
+    await screen.findByRole("heading", { level: 1, name: "This Page Didn’t Load" }),
+  ).toBeDefined();
 };
 
 /** The whole web at `path`, drawn as far as the band's workspace; no failed read is asked again. */

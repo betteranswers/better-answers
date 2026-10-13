@@ -1,7 +1,7 @@
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FAILED_PAGE, goHome, RAIL, unbuiltLineOf, UNKNOWN_PAGE } from "@/app/words.ts";
+import { unbuiltLineOf } from "@/app/words.ts";
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
 import {
@@ -9,7 +9,6 @@ import {
   CONTROL_CENTRE,
   detailAt,
   menuGroupIn,
-  headingOf,
   hides,
   HOMES,
   movedWithin,
@@ -341,6 +340,8 @@ describe("a member page, declared beneath Members", () => {
 
 const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
 
+const NOT_FOUND = "Page Not Found";
+
 const MOVED = [
   ["/people/audit-log", "/system/audit-log"],
   ["/system/routes-and-spend", "/models/models-and-spend"],
@@ -367,7 +368,7 @@ describe("an address that moved", () => {
 
         const { router } = await openApp(from);
 
-        expect(heading()).toBe(UNKNOWN_PAGE.heading);
+        expect(heading()).toBe(NOT_FOUND);
         expect(router.state.location.pathname).toBe(from);
       });
     }
@@ -378,7 +379,7 @@ describe("an address that moved", () => {
       const { router } = await openApp(from, clients);
       await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
-      expect(heading()).toBe(FAILED_PAGE.heading);
+      expect(heading()).toBe("This Page Didn’t Load");
       expect(router.state.location.pathname).toBe(from);
     });
   }
@@ -420,14 +421,14 @@ describe("an address the person may not see", () => {
 
     const hidden = await openApp("/people/members");
     const main = screen.getByRole("main");
-    await within(main).findByRole("link", { name: goHome(HOMES.Viewer) });
+    await within(main).findByRole("link", { name: "Go to Ask" });
     const drawn = { main: main.innerHTML, banner: screen.getByRole("banner").textContent };
     hidden.rendered.unmount();
 
     await openApp("/people/not-a-page");
-    await within(screen.getByRole("main")).findByRole("link", { name: goHome(HOMES.Viewer) });
+    await within(screen.getByRole("main")).findByRole("link", { name: "Go to Ask" });
 
-    expect(heading()).toBe(UNKNOWN_PAGE.heading);
+    expect(heading()).toBe(NOT_FOUND);
     expect(screen.getByRole("main").innerHTML).toBe(drawn.main);
     expect(screen.getByRole("banner").textContent).toBe(drawn.banner);
     expect(screen.queryByRole("tablist")).toBeNull();
@@ -438,7 +439,7 @@ describe("an address the person may not see", () => {
 
     await openApp("/ask");
 
-    expect(heading()).toBe(UNKNOWN_PAGE.heading);
+    expect(heading()).toBe(NOT_FOUND);
   });
 
   it("tells a Viewer at Ask it is on its way", async () => {
@@ -446,7 +447,7 @@ describe("an address the person may not see", () => {
 
     await openApp("/ask");
 
-    expect(heading()).toBe(HOMES.Viewer.name);
+    expect(heading()).toBe("Ask");
     expect(screen.getByText(unbuiltLineOf(HOMES.Viewer))).toBeDefined();
   });
 
@@ -455,9 +456,9 @@ describe("an address the person may not see", () => {
       vi.stubGlobal("fetch", answeringAs(role));
 
       await openApp(`${MEMBERS.path}/${A_PERSON}`);
-      await within(screen.getByRole("main")).findByRole("link", { name: goHome(HOMES[role]) });
+      await within(screen.getByRole("main")).findByRole("link", { name: "Go to Ask" });
 
-      expect(heading()).toBe(UNKNOWN_PAGE.heading);
+      expect(heading()).toBe(NOT_FOUND);
     });
   }
 
@@ -466,7 +467,7 @@ describe("an address the person may not see", () => {
 
     await openApp(`${MEMBERS.path}/${A_PERSON}/x`);
 
-    expect(heading()).toBe(UNKNOWN_PAGE.heading);
+    expect(heading()).toBe(NOT_FOUND);
   });
 
   it("names no one at a malformed member address, asking nothing", async () => {
@@ -480,8 +481,8 @@ describe("an address the person may not see", () => {
     await openApp(`${MEMBERS.path}/not-a-person`);
     await screen.findByText(MEMBER_PAGE_WORDS.noSuchMember);
 
-    expect(heading()).toBe(headingOf(MEMBERS));
-    expect(screen.getByRole("link", { name: MEMBER_PAGE_WORDS.toMembers })).toBeDefined();
+    expect(heading()).toBe("People");
+    expect(screen.getByRole("link", { name: "Go to Members" })).toBeDefined();
     expect(asked.filter((path) => path.includes("members."))).toEqual([]);
   });
 
@@ -491,7 +492,7 @@ describe("an address the person may not see", () => {
 
       const { router } = await openApp(path);
 
-      await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading });
+      await screen.findByRole("heading", { level: 1, name: NOT_FOUND });
       expect(router.state.location.pathname).toBe(path);
     });
   }
@@ -505,17 +506,15 @@ describe("a role changed while the person is on a page", () => {
 
     vi.stubGlobal("fetch", answeringAs("Editor"));
     await clients.queryClient.invalidateQueries();
-    const rail = screen.getByRole("navigation", { name: RAIL });
+    const rail = screen.getByRole("navigation", { name: "Areas" });
     await within(rail).findByRole("link", { name: "Ask" });
 
     expect(heading()).toBe("People");
-    expect(screen.getByRole("main").textContent).not.toContain(UNKNOWN_PAGE.heading);
+    expect(screen.getByRole("main").textContent).not.toContain(NOT_FOUND);
 
     await router.navigate({ href: HOMES.Editor.path });
     await router.navigate({ href: "/people/groups" });
 
-    expect(
-      await screen.findByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading }),
-    ).toBeDefined();
+    expect(await screen.findByRole("heading", { level: 1, name: NOT_FOUND })).toBeDefined();
   });
 });

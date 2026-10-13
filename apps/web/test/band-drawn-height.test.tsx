@@ -8,7 +8,6 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Band } from "@/app/band.tsx";
-import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 
 const MEASURED = 84;
 
@@ -44,7 +43,7 @@ const openTheWideBand = async () => {
         person={undefined}
         signingOut={false}
         onSignOut={() => undefined}
-        outcome={{ tone: "said", words: PICKER_WORDS.opening }}
+        outcome={{ tone: "said", words: "A line the band says." }}
       />
     ),
   });

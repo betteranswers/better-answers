@@ -3,15 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { jumpsIn, linesOf, matching, searchGroup, type JumpGroup } from "@/app/jump-to.tsx";
 import { findWhat, JUMP_TO, nothingMatches } from "@/app/words.ts";
-import {
-  CONSOLE,
-  INVITE_A_PERSON,
-  readerOf,
-  AREAS,
-  visibleTo,
-  type Role,
-  type Area,
-} from "@/shared/navigation.ts";
+import { CONSOLE, readerOf, AREAS, visibleTo, type Role, type Area } from "@/shared/navigation.ts";
 
 import { openApp } from "./open-app.tsx";
 import { answeringAs } from "./stubbed-api.ts";
@@ -79,12 +71,14 @@ const STUB: readonly Area[] = [
   },
 ];
 
+const INVITE = "Invite a Person";
+
 describe("what jump-to lists", () => {
   it("lists a stub tree's built pages and their actions alone", () => {
     expect(outline(jumpsIn(treeOf("Admin", STUB), undefined, AT_ROOT))).toEqual([
       ["Areas", ["Yard"]],
       ["Pages", ["Timber", "Deliveries"]],
-      [JUMP_TO.groups.actions, ["Order timber"]],
+      ["Actions", ["Order timber"]],
     ]);
   });
 
@@ -92,29 +86,29 @@ describe("what jump-to lists", () => {
     const editors = jumpsIn(treeOf("Editor", STUB), undefined, AT_ROOT);
 
     expect(outline(editors)).toEqual([
-      [JUMP_TO.groups.areas, ["Yard"]],
-      [JUMP_TO.groups.pages, ["Timber"]],
-      [JUMP_TO.groups.actions, ["Order timber"]],
+      ["Areas", ["Yard"]],
+      ["Pages", ["Timber"]],
+      ["Actions", ["Order timber"]],
     ]);
     expect(jumpsIn(treeOf("Viewer", STUB), undefined, AT_ROOT)).toEqual([]);
   });
 
   it("lists a Viewer's Ask once, with no members or actions", () => {
     expect(outline(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT))).toEqual([
-      [JUMP_TO.groups.areas, ["Ask", "Knowledge"]],
-      [JUMP_TO.groups.pages, ["Search"]],
+      ["Areas", ["Ask", "Knowledge"]],
+      ["Pages", ["Search"]],
     ]);
   });
 
   it("lists an Admin's built pages, the invite action and members", () => {
     expect(outline(jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT))).toEqual([
-      [JUMP_TO.groups.areas, ["Knowledge", "Control Centre"]],
+      ["Areas", ["Knowledge", "Control Centre"]],
       [
-        JUMP_TO.groups.pages,
+        "Pages",
         ["Search", "Connected Sources", "Models and Spend", "Members", "Groups", "Audit Log"],
       ],
-      [JUMP_TO.groups.actions, [INVITE_A_PERSON.name]],
-      [JUMP_TO.groups.members, ["Priya Shah", "new@example.test"]],
+      ["Actions", [INVITE]],
+      ["Members", ["Priya Shah", "new@example.test"]],
     ]);
   });
 
@@ -132,7 +126,7 @@ describe("what jump-to lists", () => {
 
     expect(to["Control Centre"]).toBe("/people/members");
     expect(to["Audit Log"]).toBe("/system/audit-log");
-    expect(to[INVITE_A_PERSON.name]).toBe("/people/members?action=invite");
+    expect(to[INVITE]).toBe("/people/members?action=invite");
   });
 
   it("leads a member to their page from anywhere", () => {
@@ -155,7 +149,7 @@ describe("what jump-to lists", () => {
     const toOf = (here: typeof filtered) =>
       jumpsIn(treeOf("Admin"), [PRIYA], here)
         .flatMap((group) => group.jumps)
-        .find((jump) => jump.name === INVITE_A_PERSON.name)?.to;
+        .find((jump) => jump.name === INVITE)?.to;
 
     expect(toOf(filtered)).toBe("/people/members?members.role=Editor&action=invite");
     expect(toOf(elsewhere)).toBe("/people/members?action=invite");
@@ -186,12 +180,12 @@ describe("choosing Invite a person in the app", () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
     vi.stubGlobal("ResizeObserver", Unmeasured);
     const { router } = await openApp("/people/members?members.role=Editor");
-    await screen.findByRole("button", { name: JUMP_TO.name });
+    await screen.findByRole("button", { name: "Jump To" });
 
     fireEvent.keyDown(document, { key: "k", metaKey: true });
-    fireEvent.click(await screen.findByRole("option", { name: new RegExp(INVITE_A_PERSON.name) }));
+    fireEvent.click(await screen.findByRole("option", { name: new RegExp(INVITE) }));
 
-    expect(await screen.findByRole("dialog", { name: INVITE_A_PERSON.name })).toBeDefined();
+    expect(await screen.findByRole("dialog", { name: INVITE })).toBeDefined();
     await vi.waitFor(() =>
       expect(router.state.location.href).toBe("/people/members?members.role=Editor"),
     );
@@ -205,25 +199,21 @@ describe("what typing leaves", () => {
 
   it("finds an Admin's People pages by their group's name", () => {
     expect(outline(matching(jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT), "People"))).toEqual([
-      [JUMP_TO.groups.pages, ["Members", "Groups"]],
+      ["Pages", ["Members", "Groups"]],
     ]);
   });
 
   it("finds Invite a person by its first word", () => {
     expect(outline(matching(jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT), "invite"))).toEqual([
-      [JUMP_TO.groups.actions, [INVITE_A_PERSON.name]],
+      ["Actions", [INVITE]],
     ]);
   });
 
   it("finds a member by name or address, every word counting", () => {
     const groups = jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT);
 
-    expect(outline(matching(groups, "shah priya"))).toEqual([
-      [JUMP_TO.groups.members, ["Priya Shah"]],
-    ]);
-    expect(outline(matching(groups, "NEW@"))).toEqual([
-      [JUMP_TO.groups.members, ["new@example.test"]],
-    ]);
+    expect(outline(matching(groups, "shah priya"))).toEqual([["Members", ["Priya Shah"]]]);
+    expect(outline(matching(groups, "NEW@"))).toEqual([["Members", ["new@example.test"]]]);
   });
 
   it("finds nothing by an unbuilt page's name", () => {

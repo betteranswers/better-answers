@@ -6,7 +6,6 @@ import {
   NavigationSheet,
   useNavigationSheet,
 } from "@/app/navigation-control.tsx";
-import { NAVIGATION_SHEET } from "@/app/words.ts";
 
 afterEach(cleanup);
 
@@ -39,7 +38,7 @@ function AtNoPage(properties: { readonly wide: boolean }) {
 describe("the navigation sheet", () => {
   it("hands focus to the page when widening leaves no control", async () => {
     const { rerender } = render(<AtNoPage wide={false} />);
-    fireEvent.click(screen.getByRole("button", { name: NAVIGATION_SHEET }));
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
     expect(screen.getByRole("dialog", { name: "Menu" })).toBeDefined();
 
     rerender(<AtNoPage wide />);

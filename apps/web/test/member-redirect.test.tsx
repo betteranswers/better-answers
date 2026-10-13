@@ -2,10 +2,9 @@ import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppClients } from "@/app/providers.tsx";
-import { FAILED_PAGE, goHome, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { ROLES } from "@/features/people/role-meanings.ts";
-import { CONTROL_CENTRE, HOMES, INVITE_A_PERSON, type Role } from "@/shared/navigation.ts";
+import { HOMES, type Role } from "@/shared/navigation.ts";
 
 import { appAt, openApp } from "./open-app.tsx";
 import { addressOf, answered, answeringAs, withTheApiDown } from "./stubbed-api.ts";
@@ -141,8 +140,8 @@ describe("a person the api will not answer about", () => {
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
     expect(heading()).toBe("People");
-    expect(heading()).not.toBe(UNKNOWN_PAGE.heading);
-    expect(screen.getByRole("navigation", { name: RAIL })).toBeDefined();
+    expect(heading()).not.toBe("Page Not Found");
+    expect(screen.getByRole("navigation", { name: "Areas" })).toBeDefined();
     expect(router.state.location.pathname).toBe("/people/members");
   });
 
@@ -150,27 +149,27 @@ describe("a person the api will not answer about", () => {
     vi.stubGlobal("fetch", losingTheShellsRead("Viewer"));
 
     await openAt("/people/members");
-    await within(screen.getByRole("navigation", { name: RAIL })).findByRole("link", {
-      name: HOMES.Viewer.name,
+    await within(screen.getByRole("navigation", { name: "Areas" })).findByRole("link", {
+      name: "Ask",
     });
 
-    expect(heading()).toBe(UNKNOWN_PAGE.heading);
-    expect(screen.getByRole("link", { name: goHome(HOMES.Viewer) })).toBeDefined();
+    expect(heading()).toBe("Page Not Found");
+    expect(screen.getByRole("link", { name: "Go to Ask" })).toBeDefined();
     expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.queryByRole("button", { name: INVITE_A_PERSON.name })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Invite a Person" })).toBeNull();
   });
 
   it("holds the verdict taken when the role arrives", async () => {
     vi.stubGlobal("fetch", losingTheShellsRead("Admin"));
     const { router, clients } = await openApp("/people/members");
-    const rail = () => within(screen.getByRole("navigation", { name: RAIL }));
-    await rail().findByRole("link", { name: CONTROL_CENTRE.name });
+    const rail = () => within(screen.getByRole("navigation", { name: "Areas" }));
+    await rail().findByRole("link", { name: "Control Centre" });
     await vi.waitFor(() => expect(router.state.matches.at(-1)?.context).toMatchObject(TAKEN));
 
     // An Admin who demotes themself reads their role again, as a Viewer.
     vi.stubGlobal("fetch", answeringAs("Viewer"));
     await clients.queryClient.refetchQueries({ queryKey: [["session", "member"]] });
-    await rail().findByRole("link", { name: HOMES.Viewer.name });
+    await rail().findByRole("link", { name: "Ask" });
 
     expect(heading()).toBe("People");
     expect(screen.getByRole("tablist")).toBeDefined();
@@ -210,7 +209,7 @@ describe("the index route", () => {
     const router = await openAt("/", clients);
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
-    expect(heading()).toBe(FAILED_PAGE.heading);
+    expect(heading()).toBe("This Page Didn’t Load");
     expect(router.state.location.pathname).toBe("/");
   });
 
@@ -220,7 +219,7 @@ describe("the index route", () => {
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
     vi.stubGlobal("fetch", answering(undefined, "Viewer"));
-    fireEvent.click(screen.getByRole("button", { name: FAILED_PAGE.retry }));
+    fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
 
     await vi.waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Viewer.path));
   });

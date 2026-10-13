@@ -17,7 +17,6 @@ import { RowMenu } from "@/shared/row-menu.tsx";
 import { SelectionAction, SelectionBar } from "@/shared/selection-bar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { CLEAR_WORDS } from "@/shared/words.ts";
 
 type Member = {
   readonly id: string;
@@ -206,7 +205,7 @@ const emptyOf = (narrowed: Narrowed, clear: () => void, focusAfterClear: FocusTa
       state={{
         kind: "emptied",
         words,
-        clearWords: CLEAR_WORDS.filters,
+        clearWords: "Clear Filters",
         onClear: clear,
         focusAfterClear,
       }}

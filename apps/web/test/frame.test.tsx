@@ -4,9 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
-import { goHome, JUMP_TO, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import {
   EVERY_AREA,
   headingOf,
@@ -19,7 +17,6 @@ import {
   type Role,
   type Page,
 } from "@/shared/navigation.ts";
-import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
 import { answeringAs, withTheApiDown } from "./stubbed-api.ts";
@@ -41,7 +38,7 @@ const openWithNoRoleAt = async (path: string) => {
   return opened.rendered;
 };
 
-const rail = () => screen.getByRole("navigation", { name: RAIL });
+const rail = () => screen.getByRole("navigation", { name: "Areas" });
 
 const menu = () => screen.getByRole("navigation", { name: "Control Centre" });
 
@@ -120,20 +117,20 @@ describe("the shell's regions", () => {
   it("names an area's home once in the band", async () => {
     await openAs("Viewer", HOMES.Viewer.path);
 
-    expect(within(screen.getByRole("banner")).getAllByText(HOMES.Viewer.name)).toHaveLength(1);
+    expect(within(screen.getByRole("banner")).getAllByText("Ask")).toHaveLength(1);
   });
 
   it("links the band's logo to the reader's home", async () => {
     await openAs("Admin", "/system/audit-log");
 
-    const logo = within(screen.getByRole("banner")).getByRole("link", { name: PRODUCT_NAME });
+    const logo = within(screen.getByRole("banner")).getByRole("link", { name: "better-answers" });
     expect(logo.getAttribute("href")).toBe(HOMES.Admin.path);
   });
 
   it("links the logo to the index with no role held", async () => {
     await openWithNoRoleAt("/people/members");
 
-    const logo = within(screen.getByRole("banner")).getByRole("link", { name: PRODUCT_NAME });
+    const logo = within(screen.getByRole("banner")).getByRole("link", { name: "better-answers" });
     expect(logo.getAttribute("href")).toBe("/");
   });
 
@@ -172,22 +169,20 @@ describe("the shell's regions", () => {
   it("says an unknown address names no page", async () => {
     await openApp("/not-a-page");
 
-    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe(
-      UNKNOWN_PAGE.heading,
-    );
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("Page Not Found");
   });
 
   it("sends a reader of unknown role home by the index", async () => {
     await openApp("/not-a-page");
 
-    const home = await screen.findByRole("link", { name: goHome(undefined) });
+    const home = await screen.findByRole("link", { name: "Go to Your Home Page" });
     expect(home.getAttribute("href")).toBe("/");
   });
 
   it("says an unknown page names no place, rail kept", async () => {
     await openAs("Admin", "/system/not-a-page");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_PAGE.heading);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Page Not Found");
     expect(namesIn(rail())).toEqual(["Knowledge", "Control Centre"]);
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
@@ -199,7 +194,7 @@ describe("jump to, while no role is held", () => {
     await openWithNoRoleAt("/people/members");
 
     const band = within(screen.getByRole("banner"));
-    expect(band.queryByRole("button", { name: JUMP_TO.name })).toBeNull();
+    expect(band.queryByRole("button", { name: "Jump To" })).toBeNull();
   });
 
   it("leaves its chord to the browser", async () => {
@@ -219,8 +214,8 @@ describe("jump to, while no role is held", () => {
       (each) => each.textContent,
     );
 
-    expect(actions).toContain(KEYSTROKE_WORDS.showTheList);
-    expect(actions).not.toContain(JUMP_TO.name);
+    expect(actions).toContain("Show This List");
+    expect(actions).not.toContain("Jump To");
   });
 });
 

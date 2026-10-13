@@ -1,11 +1,10 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { FAILED_PAGE, RAIL } from "@/app/words.ts";
 import { INVITATIONS_WORDS } from "@/features/people/invitation-words.ts";
-import { MEMBER_PAGE_WORDS, MEMBERS_LOADING } from "@/features/people/member-action-words.ts";
+import { MEMBERS_LOADING } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
-import { HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
+import { HOMES } from "@/shared/navigation.ts";
 import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
@@ -64,7 +63,7 @@ const openGracesPage = async (api: Api) => {
 
 const changeGracesRole = () => {
   fireEvent.click(screen.getByRole("radio", { name: "Editor" }));
-  fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
+  fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
 };
 
 /** The band names the session's workspace and says why the tab moved. */
@@ -129,7 +128,7 @@ describe("a tab whose workspace the session has left", () => {
     expect(router.state.location.pathname).toBe("/");
 
     aSwitchInAnotherTab(api, "Viewer");
-    fireEvent.click(screen.getByRole("button", { name: FAILED_PAGE.retry }));
+    fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
 
     await landedInHolme();
     expect(router.state.location.pathname).toBe(HOMES.Viewer.path);
@@ -140,8 +139,8 @@ describe("a tab whose workspace the session has left", () => {
     await landedInHolme();
 
     fireEvent.click(
-      within(screen.getByRole("navigation", { name: RAIL })).getByRole("link", {
-        name: KNOWLEDGE.name,
+      within(screen.getByRole("navigation", { name: "Areas" })).getByRole("link", {
+        name: "Knowledge",
       }),
     );
 
@@ -156,7 +155,7 @@ describe("a tab whose workspace the session has left", () => {
     const router = await openGracesPage(api);
     aSwitchInAnotherTab(api, "Admin");
 
-    fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.endEverySignInAndToken }));
+    fireEvent.click(screen.getByRole("button", { name: "End Every Sign-In and Token Here" }));
     // Sent apart: two actions in one request are answered together, so both would be held back.
     await second.asked;
     changeGracesRole();
@@ -186,7 +185,7 @@ describe("a tab whose workspace the session has left", () => {
     fireEvent.keyDown(await screen.findByRole("button", { name: `Actions for ${KAYS.address}` }), {
       key: "Enter",
     });
-    fireEvent.click(screen.getByRole("menuitem", { name: INVITATIONS_WORDS.cancel }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Cancel" }));
     openTab("Members");
     aSwitchInAnotherTab(api, "Admin");
     refusal.resolve();
