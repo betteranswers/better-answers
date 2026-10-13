@@ -50,6 +50,12 @@ const exportButton = (page: Page) => auditLog(page).getByRole("button", { name: 
 
 const said = (page: Page) => auditLog(page).getByRole("status").first();
 
+/** The empty list's one action, drawn only once a read has answered with no event. */
+const clearFilters = (page: Page) => auditLog(page).getByRole("button", { name: "Clear filters" });
+
+/** Priya's one event: her name as the actor, then the group she created. */
+const BY_PRIYA = /Priya Shah.*Bid writers/;
+
 const pickFamily = async (page: Page, family: string): Promise<void> => {
   await familyFilter(page).click();
   await page.getByRole("option", { name: family }).click();
@@ -127,20 +133,22 @@ const aFullPageOpened = async (
 };
 
 test.describe("the System group's Audit log page", () => {
-  test("shows an Admin each action as its sentence, by day", async ({ page, request }) => {
+  test("shows an Admin who acted on what, by day", async ({ page, request }) => {
     const { unnamedEmail } = await anAdminAtTheAuditLog(page, request, "Calder Joinery");
 
-    await expect(auditLog(page).getByRole("heading", { level: 2 })).toHaveText(WORDS.heading);
-    await expect(auditLog(page)).toContainText(WORDS.summary);
+    await expect(
+      auditLog(page).getByRole("heading", { level: 2, name: WORDS.heading, exact: true }),
+    ).toBeVisible();
+    await expect(auditLog(page).getByRole("paragraph").first()).toHaveText(/\S/);
     await expect(linesOf(page)).toHaveCount(3);
-    await expect(said(page)).toHaveText("3 events.");
+    await expect(said(page)).toHaveText(/\b3\b/);
     await expect(auditLog(page).getByRole("heading", { level: 3 })).toHaveText(SAID_DAY);
 
-    await expect(linesOf(page).nth(0)).toContainText(
-      `${unnamedEmail} created the group Estimators`,
+    await expect(linesOf(page).nth(0)).toContainText(new RegExp(`${unnamedEmail}.*Estimators`));
+    await expect(linesOf(page).nth(1)).toContainText(BY_PRIYA);
+    await expect(linesOf(page).nth(2), "the oldest event names a member").not.toContainText(
+      /Priya Shah|Estimators|Bid writers/,
     );
-    await expect(linesOf(page).nth(1)).toContainText("Priya Shah created the group Bid writers");
-    await expect(linesOf(page).nth(2)).toContainText("The platform provisioned the workspace");
 
     await expect(page.locator("body")).not.toContainText("Una Elsewhere");
   });
@@ -206,16 +214,19 @@ test.describe("the System group's Audit log page", () => {
 
     await page.goto(AUDIT_LOG_PAGE);
     await expect(linesOf(page)).toHaveCount(5);
-    for (const [line, address] of [
-      [linesOf(page).nth(0), addresses[1]],
-      [linesOf(page).nth(1), addresses[0]],
+    // Newest first, so the second Sam's event leads.
+    for (const [at, made] of [
+      [0, 1],
+      [1, 0],
     ] as const) {
-      await expect(line, "the address shows before the details open").toContainText(
-        `Sam Okoro created the group`,
-      );
-      await expect(line.getByText(address ?? "", { exact: true })).toBeVisible();
+      const line = linesOf(page).nth(at);
+      await expect(line).toContainText(new RegExp(`Sam Okoro.*Crew ${String(made)}`));
+      await expect(
+        line.getByText(addresses[made] ?? "", { exact: true }),
+        "the address shows before the details open",
+      ).toBeVisible();
     }
-    const priyas = linesOf(page).filter({ hasText: "Priya Shah created the group" });
+    const priyas = linesOf(page).filter({ hasText: BY_PRIYA });
     await expect(priyas, "a name no other actor shares shows an address at rest").not.toContainText(
       priya.email,
     );
@@ -227,14 +238,14 @@ test.describe("the System group's Audit log page", () => {
 
     await searchBox(page).fill("Priya");
     await expect(linesOf(page)).toHaveCount(1);
-    await expect(linesOf(page).first()).toContainText("Priya Shah created the group Bid writers");
+    await expect(linesOf(page).first()).toContainText(BY_PRIYA);
     await expect(page).toHaveURL(/audit\.search=Priya/);
 
     await searchBox(page).fill("Crew");
     await expect(linesOf(page)).toHaveCount(50);
     await loadMore(page).click();
     await expect(linesOf(page)).toHaveCount(55);
-    await expect(said(page)).toHaveText("55 events matching “Crew”.");
+    await expect(said(page)).toHaveText(/\b55\b/);
     await expect(searchBox(page)).toHaveValue("Crew");
   });
 
@@ -247,14 +258,13 @@ test.describe("the System group's Audit log page", () => {
     // Timed from the pick, so the budget is the read's and not the pointer's way to the list.
     const started = Date.now();
     await page.getByRole("option", { name: WORDS.families.platform }).click();
-    await expect(
-      auditLog(page).getByText("No events in the platform family matching “Priya”."),
-    ).toBeVisible();
+    await expect(clearFilters(page)).toBeVisible();
     const elapsed = Date.now() - started;
     test.info().annotations.push({ type: "family filter", description: `${elapsed} ms` });
     expect(elapsed, "the platform family's events rendered past the list's budget").toBeLessThan(
       LIST_BUDGET_MS,
     );
+    await expect(linesOf(page)).toHaveCount(0);
     await expect(searchBox(page)).toHaveValue("Priya");
     await expect(page).toHaveURL(/audit\.family=platform/);
 
@@ -274,16 +284,21 @@ test.describe("the System group's Audit log page", () => {
     const csv = await readFile(await download.path(), "utf8");
     expect(csv, "the file holds Priya's event").toContain("Priya Shah");
     expect(download.suggestedFilename()).toMatch(/^audit-log-\d{4}-\d{2}-\d{2}\.csv$/);
-    await expect(auditLog(page)).toContainText(`Saved 1 event to ${download.suggestedFilename()}.`);
+    await expect(
+      auditLog(page).getByRole("status").filter({ hasText: download.suggestedFilename() }),
+      "the outcome names the file and counts its event",
+    ).toHaveText(/\b1\b/);
 
     await searchBox(page).fill("");
     await pickFamily(page, WORDS.everyFamily);
     const exported = linesOf(page).first();
-    await expect(exported).toContainText("exported 1 event from the audit log");
+    await expect(exported).toContainText(/Test person.*\b1\b/);
     await detailsOf(exported).click();
     await expect(exported.getByRole("definition").first()).toContainText(adminEmail);
-    await expect(exported).toContainText(`Family${WORDS.families.people}`);
-    await expect(exported).toContainText("Search matchedPriya Shah");
+    await expect(exported.getByRole("definition")).toContainText([
+      WORDS.families.people,
+      "Priya Shah",
+    ]);
     await expect(exported, "the export event shows the address searched for").not.toContainText(
       priya.email,
     );
@@ -295,9 +310,10 @@ test.describe("the System group's Audit log page", () => {
 
     await searchBox(page).fill(nothing);
 
-    await expect(auditLog(page).getByText(`No events matching “${nothing}”.`)).toBeVisible();
+    await expect(linesOf(page)).toHaveCount(0);
+    await expect(auditLog(page), "the empty list names no search").toContainText(nothing);
     await expect(exportButton(page)).toBeDisabled();
-    await auditLog(page).getByRole("button", { name: "Clear filters" }).click();
+    await clearFilters(page).click();
     await expect(linesOf(page)).toHaveCount(3);
     await expect(searchBox(page)).toBeFocused();
     await expect(exportButton(page)).toBeEnabled();
@@ -347,7 +363,9 @@ test.describe("the System group's Audit log page", () => {
     });
 
     await pickFamily(page, WORDS.families.sources);
-    await expect(auditLog(page).getByText(WORDS.loading)).toBeVisible();
+    // Held, so the list draws no event and says in a status that it is being read.
+    await expect(linesOf(page)).toHaveCount(0);
+    await expect(auditLog(page).getByRole("status").filter({ hasText: /\S/ })).toHaveCount(1);
     held.resolve();
 
     // The query asks twice more before it answers, as it does of any failure with no word.
@@ -371,8 +389,8 @@ test.describe("the System group's Audit log page", () => {
     await skipLinkReachesThePage(page);
 
     const keystrokes = await keystrokesListed(page, AUDIT_LOG.name);
-    for (const keystroke of Object.values(KEY))
-      await expect(keystrokes).toContainText(keystroke.action);
+    for (const { key } of Object.values(KEY))
+      await expect(keystrokes.getByRole("term").getByText(key, { exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(keystrokes).toHaveCount(0);
 

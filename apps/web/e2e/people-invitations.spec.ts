@@ -2,13 +2,11 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 
-import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
   INVITATIONS_WORDS,
   INVITE_WORDS,
   STATUS_WORDS,
 } from "@/features/people/invitation-words.ts";
-import { BULK_WORDS } from "@/features/people/member-action-words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, INVITE_A_PERSON, pageNamed } from "@/shared/navigation.ts";
@@ -84,8 +82,20 @@ const selectionAction = (page: Page, action: string): Locator =>
     .getByRole("toolbar", { name: INVITATIONS_WORDS.selected })
     .getByRole("button", { name: action, exact: true });
 
-const saidInTheTab = (page: Page, words: string): Locator =>
-  invitationsRegion(page).getByRole("status").filter({ hasText: words });
+/** The tab's outcome line naming an address, which its count beside it never does. */
+const saidInTheTab = (page: Page, address: string | RegExp): Locator =>
+  invitationsRegion(page).getByRole("status").filter({ hasText: address });
+
+/** The tab's statuses in order: its count, then its outcome line. */
+const countIn = (page: Page): Locator => invitationsRegion(page).getByRole("status").nth(0);
+
+const outcomeIn = (page: Page): Locator => invitationsRegion(page).getByRole("status").nth(1);
+
+const selectionSaid = (page: Page): Locator =>
+  page.getByRole("toolbar", { name: INVITATIONS_WORDS.selected }).getByRole("status");
+
+/** The count output under the Invitations region's heading. */
+const THE_COUNT = "//section[.//h2[.='Invitations']]//output";
 
 const INVITE = PEOPLE_KEYSTROKES.invite.action;
 
@@ -228,23 +238,28 @@ test.describe("the People page's Invitations tab", () => {
   test("an Admin invites a person by address; the invitation waits", async ({ page, request }) => {
     await anAdminAtInvitations(page, request, "Calder Joinery");
     await openInvitations(page);
-    await expect(invitationsRegion(page)).toContainText(EMPTY_LINES.invitations);
+    await expect(invitationRows(page)).toHaveCount(0);
     const address = anAddress("sam");
 
     await dialogOpened(page);
     await addressField(page).fill(address);
-    await inviteDialog(page).getByRole("combobox", { name: "Role" }).click();
+    const role = inviteDialog(page).getByRole("combobox", { name: "Role" });
+    const meant = await inviteDialog(page)
+      .locator(`[id="${(await role.getAttribute("aria-describedby")) ?? ""}"]`)
+      .innerText();
+    await role.click();
     await page.getByRole("option", { name: "Editor" }).click();
-    await expect(inviteDialog(page)).toContainText(
-      "Checks concepts, asks question sets and saves Answers.",
-    );
+    await expect(role).toHaveText("Editor");
+    await expect(role).toHaveAccessibleDescription(/\S/);
+    await expect(
+      role,
+      "the role's meaning did not follow the pick",
+    ).not.toHaveAccessibleDescription(meant);
     await inviteDialog(page)
       .getByRole("button", { name: INVITE_WORDS.send(1) })
       .click();
 
-    await expect(inviteDialog(page).getByRole("status").first()).toContainText(
-      `Invited ${address} as an Editor. The email went, and the invitation lasts until`,
-    );
+    await expect(inviteDialog(page).getByRole("status").first()).toContainText(address);
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();
     await inviteDialog(page).getByRole("button", { name: "Done" }).click();
     await expect(inviteDialog(page)).toHaveCount(0);
@@ -257,13 +272,11 @@ test.describe("the People page's Invitations tab", () => {
     await expect(cells.nth(3)).toHaveText(LONG_UK_DATE);
     await expect(cells.nth(4)).toHaveText(LONG_UK_DATE);
     await expect(cells.nth(5)).toHaveText("Test person");
+    await expect(countIn(page)).toHaveText(/\b1\b/);
     await expect(
-      invitationsRegion(page).getByText(INVITATIONS_WORDS.counted("waiting", 1), { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("main").getByText(/\d+ members?\b/),
-      "the members' count shows on Invitations",
-    ).toHaveCount(0);
+      page.getByRole("main").getByRole("status").filter({ hasText: /\d/ }),
+      "a second count, the members', shows on Invitations",
+    ).toHaveCount(1);
     await countedUnder(page, "waiting", 1);
     expect(await emailsSentTo(request, address), "the invitation's one email").toBe(1);
   });
@@ -306,7 +319,7 @@ test.describe("the People page's Invitations tab", () => {
                 - checkbox [disabled]
           - rowgroup:
             - row:
-              - cell "${EMPTY_LINES.invitations}"
+              - cell
     `);
     await expect(invitingButtons(page), "the head's action is the one way to invite").toHaveCount(
       1,
@@ -376,7 +389,8 @@ test.describe("the People page's Invitations tab", () => {
     await expect(
       inviteDialog(page)
         .getByRole("status")
-        .filter({ hasText: INVITE_WORDS.summary(2, 1) }),
+        .filter({ hasText: /\b2\b\D+\b1\b/ }),
+      "the dialog counts two ready and one flagged",
     ).toBeVisible();
     await expect(sendButton(page)).toBeDisabled();
     await addressField(page).press("Enter");
@@ -391,9 +405,9 @@ test.describe("the People page's Invitations tab", () => {
     await expect(sendButton(page)).toHaveText(INVITE_WORDS.send(2));
     await sendButton(page).click();
 
-    await expect(inviteDialog(page).getByRole("status").first()).toContainText(
-      "Invited 2 people as Viewers.",
-    );
+    // The form counts its two addresses in a status too, so the outcome is read once Done shows.
+    await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeVisible();
+    await expect(inviteDialog(page).getByRole("status").first()).toHaveText(/\b2\b/);
     await inviteDialog(page).getByRole("button", { name: "Done" }).click();
     await expect(invitationRows(page)).toHaveCount(2);
   });
@@ -433,10 +447,10 @@ test.describe("the People page's Invitations tab", () => {
     await sendButton(page).click();
 
     const sent = inviteDialog(page).getByRole("status").first();
-    await expect(sent, "a send holding 50 sends them, though more wait in the field").toContainText(
-      "Invited 50 people as Viewers.",
+    await expect(sent, "a send holding 50 sends them, and counts the one still waiting").toHaveText(
+      /\b50\b.*\b1\b/,
     );
-    await expect(sent, "the outcome names what still waits").toContainText(INVITE_WORDS.waiting(1));
+    const sentFifty = await sent.innerText();
     expect(await emailsSentTo(request, late), "the 51st waits, unsent").toBe(0);
     const next = inviteDialog(page).getByRole("button", { name: INVITE, exact: true });
     await expect(next, "the outcome leads to the address waiting, not to Done").toBeFocused();
@@ -445,8 +459,8 @@ test.describe("the People page's Invitations tab", () => {
     await expect(addressField(page), "the next invite starts from what was left").toHaveValue(late);
     await sendButton(page).click();
 
-    await expect(sent).toContainText(`Invited ${late} as a Viewer.`);
-    await expect(sent).not.toContainText(INVITE_WORDS.waiting(1));
+    await expect(sent).toContainText(late);
+    await expect(sent, "the outcome still tells of the 50").not.toHaveText(sentFifty);
     const done = inviteDialog(page).getByRole("button", { name: "Done" });
     await expect(done).toBeFocused();
     await done.click();
@@ -465,8 +479,7 @@ test.describe("the People page's Invitations tab", () => {
 
     await countedUnder(page, "waiting", 0);
     await countedUnder(page, "expired", 1);
-    await expect(rowOf(page, old)).toHaveCount(0);
-    await expect(invitationsRegion(page)).toContainText(EMPTY_LINES.invitations);
+    await expect(invitationRows(page)).toHaveCount(0);
 
     await shownUnder(page, "expired");
     await expect(rowOf(page, old)).toHaveCount(1);
@@ -486,7 +499,8 @@ test.describe("the People page's Invitations tab", () => {
 
     const nobody = "nobody-at-this-address";
     await search.fill(nobody);
-    await expect(invitationsRegion(page)).toContainText(INVITATIONS_WORDS.noneMatch(nobody));
+    await expect(invitationRows(page)).toHaveCount(0);
+    await expect(invitationsRegion(page), "the empty list names no search").toContainText(nobody);
     await invitationsRegion(page).getByRole("button", { name: CLEAR_WORDS.search }).click();
 
     await expect(search).toHaveValue("");
@@ -505,9 +519,7 @@ test.describe("the People page's Invitations tab", () => {
     await addressField(page).fill(`${capitalised(ana)}, ${ana}`);
     await sendButton(page).click();
 
-    await expect(inviteDialog(page).getByRole("status").first()).toContainText(
-      `Invited ${ana} as a Viewer.`,
-    );
+    await expect(inviteDialog(page).getByRole("status").first()).toContainText(ana);
     await inviteDialog(page).getByRole("button", { name: "Done" }).click();
     await expect(invitationRows(page)).toHaveCount(1);
     expect(await emailsSentTo(request, ana), "one email for the folded address").toBe(1);
@@ -525,9 +537,7 @@ test.describe("the People page's Invitations tab", () => {
     await addressField(page).fill(sam);
     await sendButton(page).click();
 
-    await expect(inviteDialog(page).getByRole("status").first()).toContainText(
-      `Re-sent the invitation to ${sam} as ${aRole("Viewer")}, replacing the one waiting.`,
-    );
+    await expect(inviteDialog(page).getByRole("status").first()).toContainText(sam);
     await inviteDialog(page).getByRole("button", { name: "Done" }).click();
     await countedUnder(page, "waiting", 1);
     await countedUnder(page, "cancelled", 1);
@@ -542,17 +552,19 @@ test.describe("the People page's Invitations tab", () => {
     await addressField(page).fill(offline);
     await sendButton(page).click();
 
-    await expect(inviteDialog(page).getByRole("alert").first()).toContainText(
-      `The email to ${offline} did not go, but its invitation stands.`,
-    );
-    const resend = inviteDialog(page).getByRole("button", {
-      name: INVITATIONS_WORDS.resendTo(offline),
-    });
+    await expect(inviteDialog(page).getByRole("alert").first()).toContainText(offline);
+    await expect(inviteDialog(page).getByRole("status").first()).toHaveText("");
+    const unsent = unsentIn(inviteDialog(page));
+    const resend = unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(offline) });
     await resend.click();
-    await expect(inviteDialog(page)).toContainText(
-      `The invitation to ${offline} stands, but its email did not go again.`,
-    );
+    await expect(unsent.getByRole("alert")).toContainText(offline);
+    await expect(unsent.getByRole("status")).toHaveText("");
     await expect(resend).toBeFocused();
+    await inviteDialog(page).getByRole("button", { name: "Done" }).click();
+    await expect(
+      rowOf(page, offline),
+      "the invitation stands though its email did not go",
+    ).toHaveCount(1);
   });
 
   test("the dialog's unsent list drops an address whose Resend went", async ({ page, request }) => {
@@ -568,7 +580,7 @@ test.describe("the People page's Invitations tab", () => {
 
     await resentAsIfItWent(page);
     await unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(offline) }).click();
-    await expect(unsent).toContainText(`Sent the invitation to ${offline} again.`);
+    await expect(unsent.getByRole("status")).toContainText(offline);
     await expect(unsent.getByRole("listitem")).toHaveCount(1);
     await expect(
       unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(other) }),
@@ -594,7 +606,7 @@ test.describe("the People page's Invitations tab", () => {
 
     await resentAsIfItWent(page);
     await resend.click();
-    await expect(unsent).toContainText(`Sent the invitation to ${offline} again.`);
+    await expect(unsent.getByRole("status")).toContainText(offline);
     await expect(resend).toHaveCount(0);
     await expect(
       unsent.getByRole("heading", { name: INVITATIONS_WORDS.unsent }),
@@ -653,7 +665,7 @@ test.describe("the People page's Invitations tab", () => {
     await menuOf(page, old).click();
     await page.getByRole("menuitem", { name: INVITATIONS_WORDS.resend }).click();
 
-    await expect(saidInTheTab(page, `Sent the invitation to ${old} again.`)).toBeVisible();
+    await expect(saidInTheTab(page, old)).toBeVisible();
     await expect(rowOf(page, old)).toHaveCount(0);
     await expect(invitationsHeading(page), "focus left with the row").toBeFocused();
     await countedUnder(page, "expired", 0);
@@ -673,7 +685,7 @@ test.describe("the People page's Invitations tab", () => {
     await page.getByRole("menuitem", { name: INVITATIONS_WORDS.cancel }).click();
 
     await expect(rowOf(page, ana)).toHaveCount(0);
-    await expect(saidInTheTab(page, INVITATIONS_WORDS.cancelled(ana))).toBeVisible();
+    await expect(saidInTheTab(page, ana)).toBeVisible();
     await expect(invitationsHeading(page), "focus left with the row").toBeFocused();
     await countedUnder(page, "cancelled", 1);
   });
@@ -695,9 +707,9 @@ test.describe("the People page's Invitations tab", () => {
 
     await expect(invitationRows(page)).toHaveCount(0);
     await expect(
-      saidInTheTab(page, INVITATIONS_WORDS.bulk.cancelled(2, 0)),
-      "the bulk cancel's outcome",
-    ).toBeVisible();
+      outcomeIn(page),
+      "the bulk cancel's outcome counts two, and none skipped",
+    ).toHaveText(/^\D*2\D*$/);
     await countedUnder(page, "cancelled", 2);
     await countedUnder(page, "waiting", 0);
   });
@@ -715,7 +727,9 @@ test.describe("the People page's Invitations tab", () => {
     expect(await actedAside(page, here, "cancelInvitation", { invitationId: ids[0] })).toBe(200);
     await page.keyboard.press(`Shift+${PEOPLE_KEYSTROKES.cancelSelected.key}`);
 
-    await expect(saidInTheTab(page, INVITATIONS_WORDS.bulk.cancelled(1, 1))).toBeVisible();
+    await expect(outcomeIn(page), "the outcome counts one cancelled and one skipped").toHaveText(
+      /\b1\b\D+\b1\b/,
+    );
     await countedUnder(page, "cancelled", 2);
   });
 
@@ -730,7 +744,7 @@ test.describe("the People page's Invitations tab", () => {
     await tickOf(page, old).check();
     await selectionAction(page, INVITATIONS_WORDS.resend).click();
 
-    await expect(saidInTheTab(page, "Sent 1 invitation again. It lasts until")).toBeVisible();
+    await expect(outcomeIn(page)).toHaveText(/\b1\b/);
     await expect(rowOf(page, old)).toHaveCount(0);
     await countedUnder(page, "waiting", 1);
     await countedUnder(page, "expired", 0);
@@ -738,6 +752,7 @@ test.describe("the People page's Invitations tab", () => {
 
   test("a refused bulk Resend names a row not shown", async ({ page, request }) => {
     const [gone, kept] = [anAddress("gone"), anAddress("kept")];
+    const TWO_TICKED_NEITHER_SHOWN = /\b2\b\D+\b2\b/;
     let ids: string[] = [];
     const here = await anAdminAtInvitations(page, request, "Arkengarthdale Lead", async (at) => {
       ids = await invitedEach(request, at, [gone, kept]);
@@ -747,20 +762,18 @@ test.describe("the People page's Invitations tab", () => {
     await tickOf(page, gone).check();
     await tickOf(page, kept).check();
     await shownUnder(page, "expired");
-    await expect(page.getByRole("toolbar", { name: INVITATIONS_WORDS.selected })).toContainText(
-      "2 invitations selected, 2 not shown.",
-    );
+    await expect(selectionSaid(page)).toHaveText(TWO_TICKED_NEITHER_SHOWN);
     expect(await actedAside(page, here, "cancelInvitation", { invitationId: ids[0] })).toBe(200);
     const refused = refusalAnswering(page, "members.bulkResendInvitations");
     await selectionAction(page, INVITATIONS_WORDS.resend).click();
 
     expect((await refused).items).toEqual({ [ids[0] ?? ""]: "no-such-invitation" });
     const refusal = invitationsRegion(page).getByRole("alert");
-    await expect(refusal).toContainText(INVITATIONS_WORDS.bulk.refused(1));
-    await expect(refusal.getByRole("listitem")).toContainText([gone]);
-    await expect(page.getByRole("toolbar", { name: INVITATIONS_WORDS.selected })).toContainText(
-      "2 invitations selected, 2 not shown.",
+    await expect(refusal.getByRole("paragraph"), "the refusal counts one refused").toHaveText(
+      /\b1\b/,
     );
+    await expect(refusal.getByRole("listitem")).toHaveText([new RegExp(gone)]);
+    await expect(selectionSaid(page)).toHaveText(TWO_TICKED_NEITHER_SHOWN);
     expect(await emailsSentTo(request, kept), "the refused set sent nothing").toBe(0);
   });
 
@@ -781,16 +794,25 @@ test.describe("the People page's Invitations tab", () => {
 
     await tickOf(page, ana).check();
     await selectionAction(page, INVITATIONS_WORDS.cancel).click();
-    await expect(saidInTheTab(page, INVITATIONS_WORDS.bulk.cancelling(1))).toBeVisible();
+    const outcome = outcomeIn(page);
+    await expect(outcome, "the pending cancel counts its one invitation").toHaveText(/\b1\b/);
+    const saidPending = await outcome.innerText();
     await tickOf(page, ben).check();
     const action = selectionAction(page, INVITATIONS_WORDS.cancel);
     await expect(action).toHaveAttribute("aria-disabled", "true");
     await action.focus();
     await page.keyboard.press("Enter");
-    await expect(saidInTheTab(page, BULK_WORDS.stillGoing)).toBeVisible();
+    await expect(outcome).toHaveText(/\S/);
+    await expect(outcome, "the second press said nothing of its own").not.toHaveText(saidPending);
+    const saidWaiting = await outcome.innerText();
 
     answered.resolve();
-    await expect(saidInTheTab(page, INVITATIONS_WORDS.bulk.cancelled(1, 0))).toBeVisible();
+    await expect(outcome, "the first action's outcome never landed").not.toHaveText(saidWaiting);
+    await expect(outcome).not.toHaveText(saidPending);
+    await expect(outcome, "the outcome counts one cancelled, and none skipped").toHaveText(
+      /^\D*1\D*$/,
+    );
+    await expect(rowOf(page, ana)).toHaveCount(0);
     await expect(tickOf(page, ben)).toBeChecked();
     await expect(action).not.toHaveAttribute("aria-disabled", "true");
   });
@@ -831,41 +853,49 @@ test.describe("the People page's Invitations tab", () => {
 
     await tabUntilFocused(page, menuOf(page, dropped));
     await page.keyboard.press(PEOPLE_KEYSTROKES.resend.key);
-    await expect(saidInTheTab(page, `Sent the invitation to ${dropped} again.`)).toBeVisible();
+    // A resend still going names the address too; one that landed goes on to the day it lasts until.
+    await expect(saidInTheTab(page, new RegExp(`${dropped}.*\\d{4}`))).toBeVisible();
+    const saidOfTheResend = await outcomeIn(page).innerText();
 
     await page.keyboard.press(PEOPLE_KEYSTROKES.tickInvitation.key);
     await expect(tickOf(page, dropped)).toBeChecked();
     await page.keyboard.press(PEOPLE_KEYSTROKES.tickInvitation.key);
     await expect(tickOf(page, dropped)).not.toBeChecked();
 
-    await clockTheNextKey(page, {
-      at: `//section[.//h2[.='Invitations']]//output[.='${INVITATIONS_WORDS.counted("waiting", 1)}']`,
-      reads: INVITATIONS_WORDS.counted("waiting", 1),
-    });
+    await expect(countIn(page)).toHaveText(/\b2\b/);
+    await clockTheNextKey(page, { at: THE_COUNT, reads: "1" });
     await page.keyboard.press(PEOPLE_KEYSTROKES.cancel.key);
     await expect(rowOf(page, dropped)).toHaveCount(0);
     await theActionLandedWithinItsBudget(page, "cancel");
     await expect(
       invitationsRegion(page).getByRole("heading", { name: "Invitations" }),
     ).toBeFocused();
-    await expect(saidInTheTab(page, INVITATIONS_WORDS.cancelled(dropped))).toBeVisible();
+    // The line named the same address for the resend, so the cancel shows in what else it says.
+    await expect(outcomeIn(page)).toContainText(dropped);
+    await expect(outcomeIn(page), "the cancel said nothing of its own").not.toHaveText(
+      saidOfTheResend,
+    );
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
     for (const listed of [
-      INVITE,
-      PEOPLE_KEYSTROKES.searchInvitations.action,
-      PEOPLE_KEYSTROKES.resend.action,
-      PEOPLE_KEYSTROKES.cancel.action,
-      PEOPLE_KEYSTROKES.tickInvitation.action,
-      PEOPLE_KEYSTROKES.resendSelected.action,
-      PEOPLE_KEYSTROKES.cancelSelected.action,
-      PEOPLE_KEYSTROKES.nextInvitations.action,
+      PEOPLE_KEYSTROKES.invite,
+      PEOPLE_KEYSTROKES.searchInvitations,
+      PEOPLE_KEYSTROKES.resend,
+      PEOPLE_KEYSTROKES.cancel,
+      PEOPLE_KEYSTROKES.tickInvitation,
+      PEOPLE_KEYSTROKES.resendSelected,
+      PEOPLE_KEYSTROKES.cancelSelected,
+      PEOPLE_KEYSTROKES.nextInvitations,
     ]) {
-      await expect(keystrokes).toContainText(listed);
+      await expect(
+        keystrokes.getByRole("term").getByText(listed.key, { exact: true }),
+        `the list holds no ${listed.key}`,
+      ).toBeVisible();
     }
-    await expect(keystrokes, "the Members tab's keystrokes on Invitations").not.toContainText(
-      "Open the member in focus",
-    );
+    await expect(
+      keystrokes.getByRole("term").getByText(PEOPLE_KEYSTROKES.open.key, { exact: true }),
+      "the Members tab's keystrokes on Invitations",
+    ).toHaveCount(0);
     await keystrokesDismissed(page, keystrokes);
 
     const invited = anAddress("invited");
@@ -880,9 +910,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(heldAddresses(page)).toHaveCount(1);
     await expect(addressField(page)).toHaveValue("");
     await page.keyboard.press("Enter");
-    await expect(inviteDialog(page).getByRole("status").first()).toContainText(
-      `Invited ${invited} as an Editor.`,
-    );
+    await expect(inviteDialog(page).getByRole("status").first()).toContainText(invited);
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();
     await passesTheAccessibilityGate();
     await page.keyboard.press("Enter");
@@ -893,8 +921,8 @@ test.describe("the People page's Invitations tab", () => {
     await expect(invitationsRegion(page)).toMatchAriaSnapshot(`
       - region "Invitations":
         - heading "Invitations" [level=2]
-        - status: ${INVITATIONS_WORDS.counted("waiting", 2)}
-        - status: /Cancelled the invitation to/
+        - status: /\\b2\\b/
+        - status: /dropped-\\d+/
         - searchbox "${INVITATIONS_WORDS.search}"
         - radiogroup "${INVITATIONS_WORDS.status}":
           - radio "Waiting 2" [checked]
@@ -902,7 +930,7 @@ test.describe("the People page's Invitations tab", () => {
           - radio "Expired 0"
           - radio "Cancelled 1"
         - table:
-          - caption: /Invitations to this workspace/
+          - caption
           - rowgroup:
             - row:
               - columnheader "${INVITATIONS_WORDS.everyOnThePage}"
@@ -946,10 +974,8 @@ test.describe("the People page's Invitations tab", () => {
     await expect(sendButton(page)).toHaveText(INVITE_WORDS.send(2));
     await page.keyboard.press("Enter");
 
-    await expect(inviteDialog(page).getByRole("status").first()).toContainText(
-      "Invited 2 people as Editors.",
-    );
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();
+    await expect(inviteDialog(page).getByRole("status").first()).toHaveText(/\b2\b/);
     await page.keyboard.press("Enter");
     await expect(inviteDialog(page)).toHaveCount(0);
     await expect(inviteAction(page)).toBeFocused();

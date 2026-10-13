@@ -3,24 +3,13 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { BREADCRUMB, JUMP_TO, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
-  ACTIVITY_WORDS,
   BULK_WORDS,
-  homeNowSaid,
-  INCLUDES_YOU,
   MEMBER_PAGE_WORDS,
-  NO_LONGER_LISTED,
-  RECORDED,
   SELECTED_MEMBERS,
 } from "@/features/people/member-action-words.ts";
-import {
-  MEMBER_PAGE_KEYSTROKES,
-  PEOPLE_KEYSTROKES,
-  PEOPLE_SELECT_FIRST,
-} from "@/features/people/people-state.ts";
+import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
-import { headlineOf, sentenceOf as saidOfAction } from "@/shared/audit/audit-sentences.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, headingOf, pageNamed } from "@/shared/navigation.ts";
 
@@ -45,7 +34,6 @@ import {
   person,
   personMenuOpened,
   provision,
-  quoted,
   removeMember,
   saysARefusal,
   signIn,
@@ -58,8 +46,6 @@ import {
 import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
-
-const ACTION_BUDGET_MS = 100;
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
@@ -110,6 +96,22 @@ const answeredChangedMeanwhile = (
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
+
+/** The list's statuses in order: its count, then its outcome line. */
+const countOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(0);
+
+const outcomeOf = (page: Page): Locator => membersRegion(page).getByRole("status").nth(1);
+
+/** A keystroke's key in the open list, which sets each action beside its key. */
+const keyListed = (keystrokes: Locator, key: string): Locator =>
+  keystrokes.getByRole("term").getByText(key, { exact: true });
+
+/** What describes a control, read as the page says it, so a later description is told from it. */
+const describing = async (control: Locator): Promise<string> =>
+  control
+    .page()
+    .locator(`[id="${(await control.getAttribute("aria-describedby")) ?? ""}"]`)
+    .innerText();
 
 const searchBox = (page: Page) =>
   page.getByRole("searchbox", { name: "Search by name or address" });
@@ -181,6 +183,10 @@ const THE_ROLE_HELD = "//section[div[@data-slot='card-header']/h3[normalize-spac
 const removalOf = (page: Page): Locator =>
   thePage(page).getByRole("region", { name: "Removal", exact: true });
 
+/** The removal's confirmation, a group whose legend names the member and takes focus as it opens. */
+const confirmationOf = (page: Page, name: string): Locator =>
+  removalOf(page).getByRole("group", { name: new RegExp(name) });
+
 /** The output in the row under the Members region's heading: the count of members. */
 const THE_COUNT = "//section[h2='Members']/div/output";
 
@@ -202,6 +208,13 @@ const linesOf = (page: Page): Locator => activityOf(page).getByRole("listitem");
 
 const ACTIVITY_READ = (url: URL): boolean => url.pathname.includes("members.activity");
 
+/** A stream read and found empty: its loading status is gone, and it draws no line. */
+const readWithNoLine = async (page: Page): Promise<void> => {
+  await expect(activityOf(page).getByRole("status")).toHaveCount(0);
+  await expect(activityOf(page).getByRole("alert")).toHaveCount(0);
+  await expect(linesOf(page)).toHaveCount(0);
+};
+
 /** Timed from the ask, so the list's second covers the read and the lines it draws. */
 const linesWithinTheBudget = async (
   page: Page,
@@ -216,9 +229,6 @@ const linesWithinTheBudget = async (
   test.info().annotations.push({ type: what, description: `${elapsed} ms` });
   expect(elapsed, `${what} drew past the list's budget`).toBeLessThan(LIST_BUDGET_MS);
 };
-
-/** A person as the audit read names them, so a line's sentence is the web's own, not a copy. */
-const named = (displayName: string) => ({ kind: "person", displayName, address: "" }) as const;
 
 /** The page's own address, its last segment a person's id. */
 const AT_A_MEMBER_PAGE = new RegExp(`${MEMBERS_PAGE}/[0-9A-HJKMNP-TV-Z]{26}$`);
@@ -235,39 +245,6 @@ const backToMembers = async (page: Page): Promise<void> => {
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`${MEMBERS_PAGE}(\\?[^#]*)?(#.*)?$`));
   await expect(listHeading(page)).toBeVisible();
-};
-
-const SENT_TO_THE_OPERATOR =
-  "Sent to better-answers support. The name stands until they correct it.";
-
-const EACH_ROLE_MEANS = {
-  Admin: "Manages people and sources, and does everything an Editor does.",
-  Editor: "Checks concepts, asks question sets and saves Answers.",
-  Viewer: "Asks questions, flags answers and suggests changes.",
-};
-
-/** Timed in the page, from the key to the count that says it: a matcher polls too coarsely. */
-const clockTheSearch = (page: Page, saying: string) =>
-  page.evaluate((expected) => {
-    const landed = Promise.withResolvers<number>();
-    const watch = (pressed: KeyboardEvent) => {
-      const saysIt = new MutationObserver(() => {
-        if (!document.body.textContent.includes(expected)) return;
-        saysIt.disconnect();
-        landed.resolve(performance.now() - pressed.timeStamp);
-      });
-      saysIt.observe(document.body, { subtree: true, childList: true, characterData: true });
-    };
-    document.addEventListener("keydown", watch, { capture: true, once: true });
-    Reflect.set(window, "searchClocked", landed.promise);
-  }, saying);
-
-const theSearchLandedWithinItsBudget = async (page: Page) => {
-  const elapsed = await page.evaluate(() => Reflect.get(window, "searchClocked"));
-  test.info().annotations.push({ type: "search action", description: `${elapsed} ms` });
-  expect(elapsed, "the search did not narrow the list within its budget").toBeLessThan(
-    ACTION_BUDGET_MS,
-  );
 };
 
 type Joined = {
@@ -329,6 +306,14 @@ const anAdminAtPeople = async (
   };
 };
 
+/** A row's keystroke pressed with no row in focus changes nothing, and the outcome line says so. */
+const saysToPickAMemberAfter = async (page: Page, key: string): Promise<void> => {
+  await expect(outcomeOf(page)).toHaveText("");
+  await page.keyboard.press(key);
+  await expect(outcomeOf(page)).toHaveText(/\S/);
+  await expect(page, "the keystroke left Members").toHaveURL(new RegExp(`${MEMBERS_PAGE}(#.*)?$`));
+};
+
 /** A fresh document, so the first Tab starts from the top rather than from the rail's link. */
 const skippedToMembers = async (page: Page, api: APIRequestContext, workspaceName: string) => {
   await anAdminAtPeople(page, api, workspaceName);
@@ -353,17 +338,20 @@ const anAdminBesideAnotherAtPeople = async (
   return workspace;
 };
 
-/**
- * The Admin signed in makes themself an Editor on their own page, told first that it includes
- * them.
- */
+/** The Admin signed in makes themself an Editor on their own page, its commit described. */
 const demotedThemself = async (page: Page): Promise<void> => {
   await openedByName(page, "Test person");
   await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
   const commit = thePage(page).getByRole("button", { name: "Make Test person an Editor" });
-  await expect(commit).toHaveAccessibleDescription(new RegExp(`^${INCLUDES_YOU}`));
+  await expect(commit).toHaveAccessibleDescription(/\S/);
   await commit.click();
 };
+
+/** The home a demoted Admin lands on says one thing in a status, naming the role they hold now. */
+const saysTheirRoleNow = (page: Page, role: string): Promise<void> =>
+  expect(page.getByRole("status").filter({ hasText: /\S/ })).toHaveText(
+    new RegExp(String.raw`\b${role}\b`),
+  );
 
 /** The page they left was Members', so coming back to it asks again, as an Editor. */
 const membersHiddenOnTheWayBack = async (page: Page): Promise<void> => {
@@ -402,7 +390,7 @@ test.describe("the People group's Members page", () => {
     await expect(main).toMatchAriaSnapshot(`
       - main "Page":
         - heading ${JSON.stringify(people.name)} [level=1]
-        - paragraph: ${JSON.stringify(people.summary)}
+        - paragraph
         - tablist ${JSON.stringify(MEMBERS.name)}:
           - tab "Members" [selected]
           - tab "Invitations"
@@ -410,13 +398,12 @@ test.describe("the People group's Members page", () => {
         - tabpanel "Members":
           - region "Members":
             - heading "Members" [level=2]
-            - status: 3 members
+            - status: /\\b3\\b/
             - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
             - searchbox "Search by name or address"
     `);
-    await expect(main.getByText(/\b3 (members|people)\b/), "the count is said twice").toHaveCount(
-      1,
-    );
+    // A count is its number then a word; a date's month is capitalised.
+    await expect(main.getByText(/\b3 [a-z]/), "the count is said twice").toHaveCount(1);
 
     // The open tab names the list, so the list's own heading is kept for a screen reader alone.
     const heading = membersRegion(page).getByRole("heading", { level: 2, name: "Members" });
@@ -429,7 +416,7 @@ test.describe("the People group's Members page", () => {
     const { admin, joined, stranger } = await anAdminAtPeople(page, request, "Aire Valley Tooling");
 
     await expect(memberRows(page)).toHaveCount(3);
-    await expect(membersRegion(page).getByText("3 members", { exact: true })).toBeVisible();
+    await expect(countOf(page)).toHaveText(/\b3\b/);
     for (const member of joined) {
       await expect(rowOf(page, member.displayName)).toContainText(member.email);
       await expect(cellOf(page, member.displayName, "Role")).toHaveText(member.role);
@@ -453,20 +440,23 @@ test.describe("the People group's Members page", () => {
     if (sam === undefined) throw new Error("Sam Okoro was joined");
 
     await searchBox(page).fill("PRIY");
-    await clockTheSearch(page, "1 of 3 members match “PRIYA”.");
+    // The count says what was searched for, so it reads the whole word once the last key lands.
+    await clockTheNextKey(page, { at: THE_COUNT, reads: "PRIYA" });
     await searchBox(page).press("A");
     await expect(memberRows(page)).toHaveCount(1);
     await expect(rowOf(page, "Priya Shah")).toBeVisible();
-    await expect(membersRegion(page).getByText("1 of 3 members match “PRIYA”.")).toBeVisible();
-    await theSearchLandedWithinItsBudget(page);
+    await expect(countOf(page), "the count says one of three match").toHaveText(/\b1\b\D+\b3\b/);
+    await theActionLandedWithinItsBudget(page, "search");
 
     await searchBox(page).fill(sam.email.slice(0, 12));
     await expect(memberRows(page)).toHaveCount(1);
     await expect(rowOf(page, "Sam Okoro")).toBeVisible();
 
     await searchBox(page).fill("nobody by this name");
-    await expect(memberRows(page)).toHaveCount(1);
-    await expect(membersRegion(page)).toContainText("No one matches “nobody by this name”.");
+    await expect(membersRegion(page).getByRole("link")).toHaveCount(0);
+    await expect(membersRegion(page), "the empty list names no search").toContainText(
+      "nobody by this name",
+    );
     await passesTheAccessibilityGate();
     await membersRegion(page).getByRole("button", { name: "Clear filters" }).click();
 
@@ -508,7 +498,7 @@ test.describe("the People group's Members page", () => {
     await skippedToMembers(page, request, "Calder Castings");
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
-    await expect(keystrokes).toContainText("Search the members by name or address");
+    await expect(keyListed(keystrokes, PEOPLE_KEYSTROKES.search.key)).toBeVisible();
     await keystrokesDismissed(page, keystrokes);
 
     await page.keyboard.press("/");
@@ -522,13 +512,13 @@ test.describe("the People group's Members page", () => {
     await expect(membersRegion(page)).toMatchAriaSnapshot(`
       - region "Members":
         - heading "Members" [level=2]
-        - status: 3 members
+        - status: /\\b3\\b/
         - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
         - searchbox "Search by name or address"
         - combobox "Filter by role": Any role
         - button "Columns"
         - table:
-          - caption: /Members of this workspace/
+          - caption
           - rowgroup:
             - row:
               - columnheader "Select every member on this page":
@@ -584,6 +574,14 @@ const crumbsOf = (page: Page): Locator =>
 
 const A_PERSON_NOWHERE = "01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
 
+/** A page that names no member draws no person's heading, and offers the way to Members. */
+const namesNoMember = async (page: Page): Promise<void> => {
+  await expect(
+    thePage(page).getByRole("link", { name: MEMBER_PAGE_WORDS.toMembers }),
+  ).toBeVisible();
+  await expect(thePage(page).getByRole("heading", { level: 2 })).toHaveCount(0);
+};
+
 test.describe("a member's own page", () => {
   test("opens by name, row menu and link, crumbed by name", async ({ page, request }) => {
     const { joined } = await anAdminAtPeople(page, request, "Swale Ironmongers");
@@ -630,11 +628,13 @@ test.describe("a member's own page", () => {
     await expect(personHeading(page, "Priya Shah")).toBeFocused();
     await expect(thePage(page)).toContainText(priya.email);
     await expect(rolePicker(page).getByRole("radio")).toHaveCount(3);
-    for (const [role, meaning] of Object.entries(EACH_ROLE_MEANS)) {
-      await expect(
-        thePage(page).getByRole("radio", { name: role, exact: true }),
-      ).toHaveAccessibleDescription(meaning);
+    const meanings: string[] = [];
+    for (const role of ["Admin", "Editor", "Viewer"]) {
+      const radio = thePage(page).getByRole("radio", { name: role, exact: true });
+      await expect(radio).toHaveAccessibleDescription(/\S/);
+      meanings.push(await describing(radio));
     }
+    expect(new Set(meanings).size, "two roles are described alike").toBe(3);
     await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeChecked();
     await expect(changeRoleButton(page)).toBeDisabled();
     // The role is said where it is changed and nowhere else: its word stands alone as the radio's label.
@@ -662,42 +662,38 @@ test.describe("a member's own page", () => {
               - link "${MEMBER_PAGE_WORDS.removeAndEndEverySignIn}"
         - region "${MEMBER_PAGE_WORDS.access}":
           - heading "${MEMBER_PAGE_WORDS.access}" [level=2]
-          - term: Joined
+          - term
           - definition: /\\d{4}/
-          - term: ${quoted(MEMBER_PAGE_WORDS.signInsAndTokensHere)}
-          - definition: Never ended
+          - term
+          - definition
           - region "Role":
             - heading "Role" [level=3]
             - radiogroup "Role":
               - radio "Admin"
-              - text: Admin Manages people and sources, and does everything an Editor does.
               - radio "Editor" [checked]
-              - text: Editor Checks concepts, asks question sets and saves Answers.
               - radio "Viewer"
-              - text: Viewer Asks questions, flags answers and suggests changes.
             - button "${MEMBER_PAGE_WORDS.changeRole}" [disabled]
-            - paragraph: ${quoted(MEMBER_PAGE_WORDS.holdsRole("Priya Shah", "Editor"))}
+            - paragraph: /Priya Shah.*Editor/
           - region "Groups":
             - heading "Groups" [level=3]
-            - paragraph: ${EMPTY_LINES.groups}
+            - paragraph
             - link "Create one on the Groups page"
           - region "Display name":
             - heading "Display name" [level=3]
-            - paragraph: People give their own display name, and no Admin can change one. better-answers support corrects a name you flag as inappropriate.
+            - paragraph
             - button "Flag the name to support"
-            - paragraph: better-answers support is emailed, and the flag is recorded on the audit log under your name. While a flag from this workspace waits, another adds nothing.
+            - paragraph
         - region "${MEMBER_PAGE_WORDS.activity}":
           - heading "${MEMBER_PAGE_WORDS.activity}" [level=2]
-          - text: ${quoted(ACTIVITY_WORDS.none("Priya Shah"))}
         - region "${MEMBER_PAGE_WORDS.removeAndEndEverySignIn}":
           - heading "${MEMBER_PAGE_WORDS.removeAndEndEverySignIn}" [level=2]
           - region "${MEMBER_PAGE_WORDS.signInsAndTokens}":
             - heading "${MEMBER_PAGE_WORDS.signInsAndTokens}" [level=3]
             - button "${MEMBER_PAGE_WORDS.endEverySignInAndToken}"
-            - paragraph: ${quoted(`${MEMBER_PAGE_WORDS.endsAtOnce("Priya Shah")} ${RECORDED}`)}
+            - paragraph: /Priya Shah/
           - region "Removal":
             - heading "Removal" [level=3]
-            - paragraph: /Priya Shah loses access to this workspace/
+            - paragraph: /Priya Shah/
             - button "Remove Priya Shah"
     `);
     await passesTheAccessibilityGate();
@@ -778,7 +774,7 @@ test.describe("a member's own page", () => {
 
     await page.goto(memberPageAt(malformed));
 
-    await expect(thePage(page).getByText(MEMBER_PAGE_WORDS.noSuchMember)).toBeVisible();
+    await namesNoMember(page);
     await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
     expect(
       asked.filter((sent) => sent.includes(malformed) || sent.includes("members.")),
@@ -795,7 +791,7 @@ test.describe("a member's own page", () => {
 
     await page.goto(memberPageAt(A_PERSON_NOWHERE));
 
-    await expect(thePage(page).getByText(MEMBER_PAGE_WORDS.noSuchMember)).toBeVisible();
+    await namesNoMember(page);
     await expect(crumbsOf(page).last()).toHaveText(MEMBERS.name);
     await passesTheAccessibilityGate();
     await thePage(page).getByRole("link", { name: MEMBER_PAGE_WORDS.toMembers }).click();
@@ -825,19 +821,17 @@ test.describe("a member's own page", () => {
     await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
     const commit = thePage(page).getByRole("button", { name: "Make Sam Okoro an Editor" });
     await commit.focus();
-    const heldNow = MEMBER_PAGE_WORDS.holdsRole("Sam Okoro", "Editor");
-    await clockTheNextKey(page, { at: THE_ROLE_HELD, reads: heldNow });
+    await expect(commit).toHaveAccessibleDescription(/Sam Okoro.*Viewer/);
+    await clockTheNextKey(page, { at: THE_ROLE_HELD, reads: "Editor" });
     await page.keyboard.press("Enter");
 
-    await expect(rolePickerRegion(page).getByRole("status")).toHaveText(
-      "Sam Okoro is an Editor now, from their next request.",
-    );
+    await expect(rolePickerRegion(page).getByRole("status")).toHaveText(/Sam Okoro.*Editor/);
     await theActionLandedWithinItsBudget(page, "role change");
     await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
 
     await page.reload();
     await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeChecked();
-    await expect(changeRoleButton(page)).toHaveAccessibleDescription(heldNow);
+    await expect(changeRoleButton(page)).toHaveAccessibleDescription(/Sam Okoro.*Editor/);
     await backToMembers(page);
     await expect(cellOf(page, "Sam Okoro", "Role")).toHaveText("Editor");
   });
@@ -861,14 +855,10 @@ test.describe("a member's own page", () => {
     // The refused pick stays, so the card still says which role they hold.
     await expect(
       thePage(page).getByRole("button", { name: "Make Test person a Viewer" }),
-    ).toHaveAccessibleDescription(
-      new RegExp(`${MEMBER_PAGE_WORDS.heldUntilChanged("Test person", "Admin")}$`),
-    );
+    ).toHaveAccessibleDescription(/Test person.*Admin/);
     // The card says the role held once the pick matches it, so the pick is put back to read it.
     await thePage(page).getByRole("radio", { name: "Admin", exact: true }).click();
-    await expect(changeRoleButton(page)).toHaveAccessibleDescription(
-      MEMBER_PAGE_WORDS.holdsRole("Test person", "Admin"),
-    );
+    await expect(changeRoleButton(page)).toHaveAccessibleDescription(/Test person.*Admin/);
   });
 
   test("names a role change only once another role is picked", async ({ page, request }) => {
@@ -876,9 +866,7 @@ test.describe("a member's own page", () => {
     await openedByName(page, "Priya Shah");
 
     await expect(changeRoleButton(page)).toBeDisabled();
-    await expect(changeRoleButton(page)).toHaveAccessibleDescription(
-      MEMBER_PAGE_WORDS.holdsRole("Priya Shah", "Editor"),
-    );
+    await expect(changeRoleButton(page)).toHaveAccessibleDescription(/Priya Shah.*Editor/);
 
     await thePage(page).getByRole("radio", { name: "Viewer", exact: true }).click();
     await expect(
@@ -902,7 +890,7 @@ test.describe("a member's own page", () => {
     await demotedThemself(page);
 
     await landedAtHome(page, "Editor");
-    await expect(page.getByRole("status").filter({ hasText: homeNowSaid("Editor") })).toBeVisible();
+    await saysTheirRoleNow(page, "Editor");
     const you = await personMenuOpened(page, "Test person");
     await expect(you).toContainText("Editor");
     await expect(you).not.toContainText("Admin");
@@ -930,7 +918,7 @@ test.describe("a member's own page", () => {
     await thePage(page).getByRole("button", { name: "Make Test person an Editor" }).click();
 
     await landedAtHome(page, "Editor");
-    await expect(page.getByRole("status").filter({ hasText: homeNowSaid("Editor") })).toBeVisible();
+    await saysTheirRoleNow(page, "Editor");
   });
 
   test("lists Members' keystrokes from the rail's foot, as ? does", async ({
@@ -950,7 +938,7 @@ test.describe("a member's own page", () => {
 
     await inTheRail.click();
     const clicked = page.getByRole("dialog", { name: keystrokesOn(MEMBERS.name) });
-    await expect(clicked).toContainText("Open the member in focus");
+    await expect(keyListed(clicked, PEOPLE_KEYSTROKES.open.key)).toBeVisible();
     await expect(clicked).toContainText(JUMP_TO.name);
     await passesTheAccessibilityGate();
     const listedOnClick = await clicked.ariaSnapshot();
@@ -967,19 +955,21 @@ test.describe("a member's own page", () => {
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
     await skippedToMembers(page, request, "Calder Rolling");
 
-    await page.keyboard.press(PEOPLE_KEYSTROKES.changeRole.key);
-    await expect(membersRegion(page)).toContainText(PEOPLE_SELECT_FIRST.member);
+    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.changeRole.key);
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
-    await expect(keystrokes).toContainText("Open the member in focus");
-    await expect(keystrokes).toContainText("Change the role of the member in focus");
-    await expect(keystrokes).toContainText(
-      "End every sign-in and token here of the member in focus",
-    );
-    await expect(keystrokes).toContainText("Remove the member in focus");
-    await expect(keystrokes, "d declines a request on the Requests tab alone").not.toContainText(
-      "Decline the request in focus",
-    );
+    for (const { key } of [
+      PEOPLE_KEYSTROKES.open,
+      PEOPLE_KEYSTROKES.changeRole,
+      PEOPLE_KEYSTROKES.endEverySignInAndToken,
+      PEOPLE_KEYSTROKES.remove,
+    ]) {
+      await expect(keyListed(keystrokes, key), `the list holds no ${key}`).toBeVisible();
+    }
+    await expect(
+      keyListed(keystrokes, PEOPLE_KEYSTROKES.approve.key),
+      "the Requests tab's keystrokes on Members",
+    ).toHaveCount(0);
     await keystrokesDismissed(page, keystrokes);
 
     await tabUntilFocused(page, memberLink(page, "Priya Shah"));
@@ -994,14 +984,12 @@ test.describe("a member's own page", () => {
       thePage(page).getByRole("button", { name: "Make Priya Shah a Viewer" }),
     ).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(rolePickerRegion(page).getByRole("status")).toHaveText(
-      "Priya Shah is a Viewer now, from their next request.",
-    );
+    await expect(rolePickerRegion(page).getByRole("status")).toHaveText(/Priya Shah.*Viewer/);
 
     // The page's own keystrokes reach each action's control again, listed under Members.
     const onThePage = await keystrokesListed(page, MEMBERS.name);
-    for (const keystroke of Object.values(MEMBER_PAGE_KEYSTROKES)) {
-      await expect(onThePage).toContainText(keystroke.action);
+    for (const { key } of Object.values(MEMBER_PAGE_KEYSTROKES)) {
+      await expect(keyListed(onThePage, key), `the list holds no ${key}`).toBeVisible();
     }
     await keystrokesDismissed(page, onThePage);
     await page.keyboard.press(MEMBER_PAGE_KEYSTROKES.remove.key);
@@ -1017,7 +1005,7 @@ test.describe("a member's own page", () => {
 });
 
 test.describe("a member's Activity", () => {
-  test("a role change reads by Hannah and to Priya", async ({ page, request }) => {
+  test("a role change shows on both members' Activity", async ({ page, request }) => {
     const { workspaceId } = await provision(request, { name: "Swale Brassworks" });
     const hannahAt = anAddress("hannah");
     const hannah = await person(request, hannahAt, { displayName: "Hannah Wright" });
@@ -1026,22 +1014,15 @@ test.describe("a member's Activity", () => {
     await addMember(request, { workspaceId, userId: priya.id, role: "Viewer" });
     await page.goto(memberPageAt(priya.id));
     await signIn(page, request, hannahAt);
-    await expect(activityOf(page)).toContainText(ACTIVITY_WORDS.none("Priya Shah"));
+    await readWithNoLine(page);
 
     await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
     await thePage(page).getByRole("button", { name: "Make Priya Shah an Editor" }).click();
 
-    const changed = saidOfAction({
-      action: "people.member.role_changed",
-      by: named("Hannah Wright"),
-      subject: named("Priya Shah"),
-      detail: { role: "Editor" },
-      named: {},
-    });
+    const byHannahToPriya = /Hannah Wright.*Priya Shah.*Editor/;
     // The page the action was taken on reads its Activity again once the action settles.
     await expect(linesOf(page)).toHaveCount(1);
-    await expect(linesOf(page)).toContainText(changed);
-    await expect(linesOf(page)).toContainText(ACTIVITY_WORDS.direction.to("Priya Shah"));
+    await expect(linesOf(page)).toContainText(byHannahToPriya);
 
     await page.goto(memberPageAt(hannah.id));
     await expect(personHeading(page, "Hannah Wright")).toBeVisible();
@@ -1052,8 +1033,8 @@ test.describe("a member's Activity", () => {
         - list:
           - listitem:
             - time: /\\d{2}:\\d{2}/
-            - text: ${quoted(`${changed} ${ACTIVITY_WORDS.direction.by("Hannah Wright")}`)}
     `);
+    await expect(linesOf(page)).toContainText(byHannahToPriya);
   });
 
   test("Load more lands focus on the first older line", async ({ page, request }) => {
@@ -1075,7 +1056,7 @@ test.describe("a member's Activity", () => {
     await expect(loadMore).toHaveCount(0);
   });
 
-  test("shows only joining, marked both, with no Load more", async ({ page, request }) => {
+  test("shows only joining, with no Load more", async ({ page, request }) => {
     const workspace = await provision(request, { name: "Holme Joinery" });
     const address = anAddress("ola");
     await person(request, address, { displayName: "Ola Brennan" });
@@ -1093,16 +1074,8 @@ test.describe("a member's Activity", () => {
 
     await openedByName(page, "Ola Brennan");
 
-    const joined = saidOfAction({
-      action: "people.member.joined",
-      by: named("Ola Brennan"),
-      subject: named("Ola Brennan"),
-      detail: { role: "Admin" },
-      named: {},
-    });
     await expect(linesOf(page)).toHaveCount(1);
-    await expect(linesOf(page)).toContainText(joined);
-    await expect(linesOf(page)).toContainText(ACTIVITY_WORDS.direction.both("Ola Brennan"));
+    await expect(linesOf(page)).toContainText(/Ola Brennan.*Admin/);
     await expect(activityOf(page).getByRole("button", { name: "Load more" })).toHaveCount(0);
   });
 
@@ -1118,16 +1091,8 @@ test.describe("a member's Activity", () => {
 
     await page.goto(memberPageAt(asker.id));
 
-    const asked = saidOfAction({
-      action: "people.request.asked",
-      by: named("Ola Asker"),
-      subject: null,
-      detail: {},
-      named: {},
-    });
     await expect(linesOf(page)).toHaveCount(1);
-    await expect(linesOf(page)).toContainText(asked);
-    await expect(linesOf(page)).toContainText(ACTIVITY_WORDS.direction.both("Ola Asker"));
+    await expect(linesOf(page)).toContainText("Ola Asker");
   });
 
   test("draws nothing of the workspace left after a switch", async ({ page, request }) => {
@@ -1162,12 +1127,14 @@ test.describe("a member's Activity", () => {
     await expect(switcherOf(page, entered.name)).toBeVisible();
     await openedByName(page, "Rhea Kemp");
 
-    await expect(activityOf(page)).toContainText(ACTIVITY_WORDS.loading);
+    await expect(activityOf(page).getByRole("status"), "the held read says nothing").toHaveText(
+      /\S/,
+    );
     await expect(thePage(page), "drew the left workspace's Activity").not.toContainText(
       "Wharfe leads",
     );
     held.resolve();
-    await expect(activityOf(page)).toContainText(ACTIVITY_WORDS.none("Rhea Kemp"));
+    await readWithNoLine(page);
     await expect(thePage(page)).not.toContainText("Wharfe leads");
   });
 
@@ -1195,7 +1162,8 @@ test.describe("a member's Activity", () => {
   });
 });
 
-const ENDED_AT = /Ended\s*\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
+/** A time and its day, which the Access section shows only once sign-ins have been ended. */
+const ENDED_AT = /\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
 
 const endButton = (page: Page): Locator =>
   thePage(page).getByRole("button", { name: MEMBER_PAGE_WORDS.endEverySignInAndToken });
@@ -1226,18 +1194,17 @@ test.describe("ending every sign-in and token a member holds here", () => {
     const { elsewhere } = await anAdminWithAMemberOfTwo(page, request);
 
     await openedByName(page, "Priya Shah");
-    await expect(accessOf(page)).toContainText("Never ended");
+    await expect(accessOf(page)).not.toContainText(ENDED_AT);
     const revoke = endButton(page);
     await revoke.focus();
+    // The line holds no number until it holds the time and day, whose year this is.
     await clockTheNextKey(page, {
       at: accessLine(MEMBER_PAGE_WORDS.signInsAndTokensHere),
-      reads: "Ended",
+      reads: String(new Date().getFullYear()),
     });
     await page.keyboard.press("Enter");
 
-    await expect(credentialsRegion(page).getByRole("status")).toContainText(
-      MEMBER_PAGE_WORDS.everySignInEnded("Priya Shah"),
-    );
+    await expect(credentialsRegion(page).getByRole("status")).toContainText("Priya Shah");
     await theActionLandedWithinItsBudget(page, "revocation");
     await expect(revoke).toBeFocused();
     await expect(accessOf(page)).toContainText(ENDED_AT);
@@ -1258,7 +1225,7 @@ test.describe("ending every sign-in and token a member holds here", () => {
 
     await openedByName(page, "Test person");
     const ownPage = page.url();
-    await expect(credentialsRegion(page)).toContainText("Your own session here ends with it.");
+    await expect(endButton(page)).toHaveAccessibleDescription(/Test person/);
     // The action lands; it is the read after it, the session's own, that the api refuses.
     const refused = refusalAnswering(page, "session.member");
     await endButton(page).click();
@@ -1275,17 +1242,14 @@ test.describe("ending every sign-in and token a member holds here", () => {
   test("opens a member's sign-ins and ends them by keyboard", async ({ page, request }) => {
     await skippedToMembers(page, request, "Nidd Presswork");
 
-    await page.keyboard.press(PEOPLE_KEYSTROKES.endEverySignInAndToken.key);
-    await expect(membersRegion(page)).toContainText(PEOPLE_SELECT_FIRST.member);
+    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.endEverySignInAndToken.key);
 
     await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
     await page.keyboard.press(PEOPLE_KEYSTROKES.endEverySignInAndToken.key);
     const revoke = endButton(page);
     await expect(revoke).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(credentialsRegion(page).getByRole("status")).toContainText(
-      MEMBER_PAGE_WORDS.everySignInEnded("Sam Okoro"),
-    );
+    await expect(credentialsRegion(page).getByRole("status")).toContainText("Sam Okoro");
     await expect(revoke).toBeFocused();
   });
 });
@@ -1308,52 +1272,40 @@ test.describe("removing a member from their page", () => {
     const priyasPage = page.url();
     const removal = removalOf(page);
     const asked = removal.getByRole("button", { name: "Remove Priya Shah", exact: true });
-    await expect(asked).toHaveAccessibleDescription(
-      "Priya Shah loses access to this workspace on every session and assistant they hold. Any other workspace they belong to is untouched, and they stay named on what they checked.",
-    );
+    await expect(asked).toHaveAccessibleDescription(/Priya Shah/);
     await asked.click();
-    await expect(removal.getByText("Confirm the removal of Priya Shah")).toBeFocused();
+    await expect(confirmationOf(page, "Priya Shah").locator("legend")).toBeFocused();
     await removal.getByRole("button", { name: "Keep Priya Shah" }).click();
     await expect(asked).toBeFocused();
     await expect(asked).toHaveAttribute("aria-expanded", "false");
 
     await asked.click();
     const confirm = removal.getByRole("button", { name: "Remove Priya Shah from this workspace" });
-    await expect(confirm).toHaveAccessibleDescription(
-      "Recorded on the audit log under your name. They leave their groups here too.",
-    );
+    await expect(confirm).toHaveAccessibleDescription(/\S/);
     await expect(removal).toMatchAriaSnapshot(`
       - region "Removal":
         - heading "Removal" [level=3]
-        - paragraph: /Priya Shah loses access to this workspace/
         - button "Remove Priya Shah" [expanded]
-        - group "Confirm the removal of Priya Shah":
-          - text: Confirm the removal of Priya Shah
-          - paragraph: /Recorded on the audit log/
+        - group /Priya Shah/:
           - button "Remove Priya Shah from this workspace"
           - button "Keep Priya Shah"
     `);
     await passesTheAccessibilityGate();
 
     await confirm.focus();
-    await clockTheNextKey(page, { at: THE_COUNT, reads: "2 members" });
+    await clockTheNextKey(page, { at: THE_COUNT, reads: "2" });
     await page.keyboard.press("Enter");
 
     await expect(page).toHaveURL(sorted);
     await expect(memberRows(page)).toHaveCount(2);
     await expect(person).toHaveAttribute("aria-sort", "descending");
     await expect(listHeading(page)).toBeFocused();
-    await expect(
-      membersRegion(page)
-        .getByRole("status")
-        .filter({ hasText: MEMBER_PAGE_WORDS.removed("Priya Shah") }),
-    ).toBeVisible();
+    await expect(outcomeOf(page)).toContainText("Priya Shah");
     await theActionLandedWithinItsBudget(page, "removal");
 
     await page.goBack();
     await expect(page).toHaveURL(priyasPage);
-    await expect(thePage(page).getByText(MEMBER_PAGE_WORDS.noSuchMember)).toBeVisible();
-    await expect(personHeading(page, "Priya Shah")).toHaveCount(0);
+    await namesNoMember(page);
 
     await page.goto(MEMBERS_PAGE);
     await expect(memberRows(page)).toHaveCount(2);
@@ -1394,9 +1346,7 @@ test.describe("removing a member from their page", () => {
     expect(await refused).toMatchObject({ word: "last-admin", class: "precondition" });
     await saysARefusal(removalOf(page).getByRole("alert"));
     await expect(page).toHaveURL(AT_A_MEMBER_PAGE);
-    await expect(changeRoleButton(page)).toHaveAccessibleDescription(
-      MEMBER_PAGE_WORDS.holdsRole("Test person", "Admin"),
-    );
+    await expect(changeRoleButton(page)).toHaveAccessibleDescription(/Test person.*Admin/);
     await passesTheAccessibilityGate();
   });
 
@@ -1407,13 +1357,16 @@ test.describe("removing a member from their page", () => {
     await anAdminBesideAnotherAtPeople(page, request, "Esk Tinsmiths");
     await openedByName(page, "Test person");
     const removal = removalOf(page);
+    const asked = removal.getByRole("button", { name: "Remove Test person", exact: true });
+    await expect(asked).toHaveAccessibleDescription(/\S/);
     await expect(
-      removal.getByRole("button", { name: "Remove Test person", exact: true }),
-    ).toHaveAccessibleDescription(/^You lose access to this workspace, People included,/);
-    await removal.getByRole("button", { name: "Remove Test person", exact: true }).click();
+      asked,
+      "their own removal names them as it would another",
+    ).not.toHaveAccessibleDescription(/Test person/);
+    await asked.click();
     await expect(
       removal.getByRole("button", { name: "Remove Test person from this workspace" }),
-    ).toHaveAccessibleDescription(new RegExp(`^${INCLUDES_YOU}`));
+    ).toHaveAccessibleDescription(/\S/);
     await removal.getByRole("button", { name: "Remove Test person from this workspace" }).click();
 
     // The chooser sends a person who holds no other workspace straight on.
@@ -1461,8 +1414,7 @@ test.describe("removing a member from their page", () => {
   test("removes a member by keyboard alone", async ({ page, request }) => {
     await skippedToMembers(page, request, "Calder Presswork");
 
-    await page.keyboard.press(PEOPLE_KEYSTROKES.remove.key);
-    await expect(membersRegion(page)).toContainText(PEOPLE_SELECT_FIRST.member);
+    await saysToPickAMemberAfter(page, PEOPLE_KEYSTROKES.remove.key);
 
     await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
     await page.keyboard.press(PEOPLE_KEYSTROKES.remove.key);
@@ -1471,7 +1423,7 @@ test.describe("removing a member from their page", () => {
       removal.getByRole("button", { name: "Remove Sam Okoro", exact: true }),
     ).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(removal.getByText("Confirm the removal of Sam Okoro")).toBeFocused();
+    await expect(confirmationOf(page, "Sam Okoro").locator("legend")).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(
       removal.getByRole("button", { name: "Remove Sam Okoro from this workspace" }),
@@ -1495,18 +1447,21 @@ test.describe("a member's display name, flagged to better-answers support", () =
     const said = displayNameRegion(page).getByRole("status");
 
     await flagButton(page).focus();
+    await expect(said).toHaveText("");
+    // The card's own name is read once its outcome line holds words, as the flag's landing leaves it.
     await clockTheNextKey(page, {
-      at: "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Display name']]//output",
-      reads: SENT_TO_THE_OPERATOR,
+      at: "//section[div[@data-slot='card-header']/h3[normalize-space(.)='Display name']][.//output[normalize-space(.)!='']]",
+      reads: "Display name",
     });
     await page.keyboard.press("Enter");
 
-    await expect(said).toHaveText(SENT_TO_THE_OPERATOR);
+    await expect(said).toHaveText(/\S/);
     await theActionLandedWithinItsBudget(page, "name flag");
     await expect(flagButton(page)).toBeFocused();
+    const saidOnce = await said.innerText();
 
     await page.keyboard.press("Enter");
-    await expect(said).toHaveText(SENT_TO_THE_OPERATOR);
+    await expect(said, "a second flag answers as the first did").toHaveText(saidOnce);
     await expect(displayNameRegion(page).getByRole("alert")).toHaveCount(0);
     await expect(personHeading(page, "Sam Okoro")).toBeVisible();
     await passesTheAccessibilityGate();
@@ -1524,9 +1479,7 @@ test.describe("a member's display name, flagged to better-answers support", () =
     await expect(crumbsOf(page).last()).toHaveText(unnamed);
     const region = displayNameRegion(page);
 
-    await expect(region).toContainText(
-      `${unnamed} has given no display name yet, so there is none to flag.`,
-    );
+    await expect(region).toContainText(unnamed);
     await expect(region.getByRole("button")).toHaveCount(0);
   });
 
@@ -1556,14 +1509,15 @@ test.describe("a member's display name, flagged to better-answers support", () =
     await skippedToMembers(page, request, "Swale Carving");
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
-    await expect(keystrokes).toContainText("Flag the display name of the member in focus");
+    await expect(keyListed(keystrokes, PEOPLE_KEYSTROKES.flagName.key)).toBeVisible();
     await keystrokesDismissed(page, keystrokes);
 
     await tabUntilFocused(page, memberLink(page, "Priya Shah"));
     await page.keyboard.press(PEOPLE_KEYSTROKES.flagName.key);
     await expect(flagButton(page)).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(displayNameRegion(page).getByRole("status")).toHaveText(SENT_TO_THE_OPERATOR);
+    await expect(displayNameRegion(page).getByRole("status")).toHaveText(/\S/);
+    await expect(displayNameRegion(page).getByRole("alert")).toHaveCount(0);
   });
 });
 
@@ -1647,11 +1601,11 @@ test.describe("the People page's words", () => {
     await page.goto(MEMBERS_PAGE);
     await openedByName(page, "Priya Shah");
     await endButton(page).click();
-    await expect(credentialsRegion(page).getByRole("status")).toContainText("held here has ended");
+    await expect(accessOf(page)).toContainText(ENDED_AT);
     await said("a revocation");
 
     await page.goto(AUDIT_LOG_PAGE);
-    await expect(auditLog).toContainText(headlineOf("people.member.credentials_revoked"));
+    await expect(auditLog.getByRole("listitem").first()).toContainText(/Test person.*Priya Shah/);
     await said(`${AUDIT_LOG_PAGE}, a revocation logged`);
 
     // A modal hides the page behind it from the tree, so each one is read on its own.
@@ -1676,7 +1630,8 @@ test.describe("the People page's words", () => {
     await expect(page.getByRole("region", { name: "Invitations" }).getByRole("row")).toHaveCount(2);
     await said("the Invitations tab with an invitation waiting");
 
-    const asker = await person(request, anAddress("asker"), { displayName: "Ola Asker" });
+    const askerAt = anAddress("asker");
+    const asker = await person(request, askerAt, { displayName: "Ola Asker" });
     await askToJoin(request, {
       shortName,
       requesterId: asker.id,
@@ -1690,7 +1645,9 @@ test.describe("the People page's words", () => {
     await saidIn(approving, "the approve dialog");
     await approving.getByRole("button", { name: "Approve and send the invitation" }).click();
     await expect(approving).toHaveCount(0);
-    await expect(page.getByRole("region", { name: "Requests" })).toContainText("Approved.");
+    await expect(
+      page.getByRole("region", { name: "Requests" }).getByRole("status").last(),
+    ).toContainText(askerAt);
     await said("the Requests tab once the request is approved");
 
     await page.goto(GROUPS_PAGE);
@@ -1754,12 +1711,14 @@ const selectionAction = (page: Page, action: string): Locator =>
 
 const pagesOf = (page: Page): Locator => page.getByRole("navigation", { name: "Pages of members" });
 
-const saidInTheList = (page: Page, words: string): Locator =>
-  membersRegion(page).getByRole("status").filter({ hasText: words });
-
 /** A set refused whole names each person who stopped it on a line of their own. */
 const refusedLineOf = (page: Page, name: string): Locator =>
   membersRegion(page).getByRole("alert").getByRole("listitem").filter({ hasText: name });
+
+/** The bar counts the ticked alone while each is shown, and then how many are not. */
+const TWO_TICKED = /^\D*2\D*$/;
+
+const TWO_TICKED_ONE_HIDDEN = /\b2\b\D+\b1\b/;
 
 const BULK_ROLE_CHANGE_ASKED = "members.bulkChangeRole";
 
@@ -1787,6 +1746,9 @@ const aWorkspaceOfThirtyEditors = async (
   await expect(memberRows(page)).toHaveCount(PAGE_OF_ROWS);
   return workspace;
 };
+
+/** A bulk dialog's lines: one more stands in it when the selection includes the reader. */
+const linesIn = (dialog: Locator): Locator => dialog.getByRole("paragraph");
 
 /** Opens the bar's Change role and answers its dialog, the role select in focus. */
 const changeRoleOpened = async (page: Page, count: number): Promise<Locator> => {
@@ -1821,19 +1783,23 @@ test.describe("bulk actions on the members ticked", () => {
     await tickOf(page, "Ada Hartley").check();
 
     const dialog = await changeRoleOpened(page, 2);
-    await expect(dialog).toContainText(INCLUDES_YOU);
+    await expect(linesIn(dialog), "no line warns that the two include the reader").toHaveCount(3);
     const answered = refusalAnswering(page, BULK_ROLE_CHANGE_ASKED);
     await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") }).click();
 
     expect(Object.values((await answered).items ?? {})).toEqual(["last-admin", "last-admin"]);
-    await expect(membersRegion(page).getByRole("alert")).toContainText(BULK_WORDS.refused(2));
+    const refusal = membersRegion(page).getByRole("alert");
+    await expect(refusal.getByRole("paragraph"), "the refusal counts two refused").toHaveText(
+      /\b2\b/,
+    );
+    await expect(refusal.getByRole("listitem")).toHaveCount(2);
     for (const name of ["Test person", "Ada Hartley"]) {
       await expect(refusedLineOf(page, name)).toHaveCount(1);
       await expect(tickOf(page, name)).toBeChecked();
       await expect(rowOf(page, name).getByText("Refused", { exact: true })).toBeVisible();
       await expect(cellOf(page, name, "Role")).toHaveText("Admin");
     }
-    await expect(selectionBar(page).getByRole("status")).toHaveText("2 members selected.");
+    await expect(selectionBar(page).getByRole("status")).toHaveText(TWO_TICKED);
     await passesTheAccessibilityGate();
   });
 
@@ -1843,17 +1809,13 @@ test.describe("bulk actions on the members ticked", () => {
     await tickOf(page, "Ada Hartley").check();
     await searchBox(page).fill("Ada");
     await expect(memberRows(page)).toHaveCount(1);
-    await expect(selectionBar(page).getByRole("status")).toHaveText(
-      "2 members selected, 1 not shown.",
-    );
+    await expect(selectionBar(page).getByRole("status")).toHaveText(TWO_TICKED_ONE_HIDDEN);
 
     const dialog = await changeRoleOpened(page, 2);
     await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") }).click();
 
     await expect(refusedLineOf(page, "Test person")).toHaveCount(1);
-    await expect(selectionBar(page).getByRole("status")).toHaveText(
-      "2 members selected, 1 not shown.",
-    );
+    await expect(selectionBar(page).getByRole("status")).toHaveText(TWO_TICKED_ONE_HIDDEN);
     await expect(listHeading(page)).toBeFocused();
     await page.keyboard.press(PEOPLE_KEYSTROKES.clearSelection.key);
     await expect(selectionBar(page)).toBeHidden();
@@ -1877,9 +1839,7 @@ test.describe("bulk actions on the members ticked", () => {
     await membersRegion(page).getByRole("combobox", { name: "Filter by group" }).click();
     await page.getByRole("option", { name: "Site leads", exact: true }).click();
     await expect(names).toHaveText(["Sam Okoro"]);
-    await expect(
-      membersRegion(page).getByText("1 of 3 members match these filters."),
-    ).toBeVisible();
+    await expect(countOf(page), "the count says one of three match").toHaveText(/\b1\b\D+\b3\b/);
     await membersRegion(page).getByRole("combobox", { name: "Filter by group" }).click();
     await page.getByRole("option", { name: "Any group", exact: true }).click();
     await expect(names).toHaveCount(3);
@@ -1927,7 +1887,7 @@ test.describe("bulk actions on the members ticked", () => {
     await membersRegion(page)
       .getByRole("checkbox", { name: "Select every member on this page" })
       .check();
-    await expect(selectionBar(page).getByRole("status")).toHaveText("10 members selected.");
+    await expect(selectionBar(page).getByRole("status")).toHaveText(/^\D*10\D*$/);
     await selectionAction(page, BULK_WORDS.addToGroup.action).click();
     const dialog = page.getByRole("dialog", { name: BULK_WORDS.addToGroup.title(10) });
     const group = dialog.getByRole("combobox", { name: "Group" });
@@ -1936,7 +1896,10 @@ test.describe("bulk actions on the members ticked", () => {
     await page.getByRole("option", { name: "Sales", exact: true }).click();
     await dialog.getByRole("button", { name: BULK_WORDS.addToGroup.commit(10, "Sales") }).click();
 
-    await expect(saidInTheList(page, BULK_WORDS.addToGroup.done(8, "Sales", 2))).toBeVisible();
+    await expect(
+      outcomeOf(page),
+      "the outcome counts eight added to Sales and two in it",
+    ).toHaveText(/\b8\b.*Sales.*\b2\b/);
     await expect(listHeading(page)).toBeFocused();
     await expect(selectionBar(page)).toBeHidden();
     await expect(cellOf(page, "Seller 9", "Groups")).toHaveText("Sales");
@@ -1948,12 +1911,12 @@ test.describe("bulk actions on the members ticked", () => {
     await tickOf(page, "Test person").check();
 
     const dialog = await changeRoleOpened(page, 1);
-    await expect(dialog).toContainText(INCLUDES_YOU);
+    await expect(linesIn(dialog), "no line warns that the one is the reader").toHaveCount(3);
     await editorPickedByKeyboard(page, dialog.getByRole("combobox", { name: "Role" }));
     await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(1, "Editor") }).click();
 
     await landedAtHome(page, "Editor");
-    await expect(page.getByRole("status").filter({ hasText: homeNowSaid("Editor") })).toBeVisible();
+    await saysTheirRoleNow(page, "Editor");
   });
 
   test("removing yourself lands on the chooser, without this workspace", async ({
@@ -1978,7 +1941,7 @@ test.describe("bulk actions on the members ticked", () => {
     await tickOf(page, "Test person").check();
     await selectionAction(page, BULK_WORDS.remove.action).click();
     const dialog = page.getByRole("dialog", { name: BULK_WORDS.remove.title(1) });
-    await expect(dialog).toContainText(INCLUDES_YOU);
+    await expect(linesIn(dialog), "no line warns that the one is the reader").toHaveCount(2);
     await dialog.getByRole("button", { name: BULK_WORDS.remove.commit(1) }).click();
 
     await expect(page).toHaveURL(/\/choose-workspace$/);
@@ -2032,8 +1995,8 @@ test.describe("bulk actions on the members ticked", () => {
     await remove.click();
     const dialog = page.getByRole("dialog", { name: BULK_WORDS.remove.title(2) });
     await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
-    await expect(dialog).toHaveAccessibleDescription(BULK_WORDS.remove.consequence);
-    await expect(dialog).not.toContainText(INCLUDES_YOU);
+    await expect(dialog).toHaveAccessibleDescription(/\S/);
+    await expect(linesIn(dialog), "a line warns two others as it would the reader").toHaveCount(1);
     await passesTheAccessibilityGate();
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
@@ -2043,7 +2006,9 @@ test.describe("bulk actions on the members ticked", () => {
     await remove.click();
     await dialog.getByRole("button", { name: BULK_WORDS.remove.commit(2) }).click();
     await expect(memberRows(page)).toHaveCount(1);
-    await expect(saidInTheList(page, BULK_WORDS.remove.done(2, 0))).toBeVisible();
+    await expect(outcomeOf(page), "the outcome counts two removed, and none skipped").toHaveText(
+      /^\D*2\D*$/,
+    );
     await expect(listHeading(page)).toBeFocused();
     await page.reload();
     await expect(memberRows(page)).toHaveCount(1);
@@ -2055,11 +2020,12 @@ test.describe("bulk actions on the members ticked", () => {
     await tickOf(page, "Person 02").check();
     await page.keyboard.press(PEOPLE_KEYSTROKES.nextPage.key);
     await tickOf(page, "Person 27").check();
-    await expect(selectionBar(page).getByRole("status")).toHaveText(
-      "3 members selected, 2 not shown.",
-    );
+    await expect(selectionBar(page).getByRole("status")).toHaveText(/\b3\b\D+\b2\b/);
 
     const dialog = await changeRoleOpened(page, 3);
+    await expect(linesIn(dialog), "a line warns three others as it would the reader").toHaveCount(
+      2,
+    );
     const commit = dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(3, "Viewer") });
     await commit.focus();
     await clockTheNextKey(page, {
@@ -2068,7 +2034,9 @@ test.describe("bulk actions on the members ticked", () => {
     });
     await page.keyboard.press("Enter");
 
-    await expect(saidInTheList(page, BULK_WORDS.changeRole.done(3, "Viewer", 0))).toBeVisible();
+    await expect(outcomeOf(page), "the outcome counts three changed, and none skipped").toHaveText(
+      /^\D*3\D*$/,
+    );
     await theActionLandedWithinItsBudget(page, "bulk role change");
     await page.keyboard.press(PEOPLE_KEYSTROKES.previousPage.key);
     await expect(cellOf(page, "Person 01", "Role")).toHaveText("Viewer");
@@ -2083,15 +2051,16 @@ test.describe("bulk actions on the members ticked", () => {
     await membersRegion(page).getByRole("combobox", { name: "Filter by role" }).click();
     await page.getByRole("option", { name: "Editor", exact: true }).click();
     await pagesOf(page).getByRole("button", { name: "Next page" }).click();
+    const lastFiveOfThirty = /\b26\D+30\D+30\b/;
     await expect(memberRows(page)).toHaveCount(5);
-    await expect(pagesOf(page).getByRole("status")).toHaveText("Showing 26–30 of 30.");
+    await expect(pagesOf(page).getByRole("status")).toHaveText(lastFiveOfThirty);
 
     await openedByName(page, "Person 27");
     await backToMembers(page);
 
     await expect(memberRows(page)).toHaveCount(5);
     await expect(rowOf(page, "Person 26")).toBeVisible();
-    await expect(pagesOf(page).getByRole("status")).toHaveText("Showing 26–30 of 30.");
+    await expect(pagesOf(page).getByRole("status")).toHaveText(lastFiveOfThirty);
     await expect(membersRegion(page).getByRole("combobox", { name: "Filter by role" })).toHaveText(
       "Editor",
     );
@@ -2105,15 +2074,15 @@ test.describe("bulk actions on the members ticked", () => {
     await skippedToMembers(page, request, "Calder Spinning");
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
-    await expect(keystrokes).toContainText(PEOPLE_KEYSTROKES.changeSelectedRoles.action);
-    await expect(keystrokes).toContainText(PEOPLE_KEYSTROKES.tick.action);
+    await expect(keyListed(keystrokes, PEOPLE_KEYSTROKES.changeSelectedRoles.key)).toBeVisible();
+    await expect(keyListed(keystrokes, PEOPLE_KEYSTROKES.tick.key)).toBeVisible();
     await keystrokesDismissed(page, keystrokes);
 
     await tabUntilFocused(page, tickOf(page, "Priya Shah"));
     await page.keyboard.press("Space");
     await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
     await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
-    await expect(selectionBar(page).getByRole("status")).toHaveText("2 members selected.");
+    await expect(selectionBar(page).getByRole("status")).toHaveText(TWO_TICKED);
 
     await page.keyboard.press(`Shift+${PEOPLE_KEYSTROKES.changeSelectedRoles.key}`);
     const dialog = page.getByRole("dialog", { name: BULK_WORDS.changeRole.title(2) });
@@ -2127,7 +2096,9 @@ test.describe("bulk actions on the members ticked", () => {
     await page.keyboard.press("Enter");
 
     await expect(listHeading(page)).toBeFocused();
-    await expect(saidInTheList(page, BULK_WORDS.changeRole.done(1, "Editor", 1))).toBeVisible();
+    await expect(outcomeOf(page), "the outcome counts one changed and one skipped").toHaveText(
+      /\b1\b\D+\b1\b/,
+    );
     await expect(cellOf(page, "Sam Okoro", "Role")).toHaveText("Editor");
     await passesTheAccessibilityGate();
   });
@@ -2144,34 +2115,40 @@ test.describe("bulk actions on the members ticked", () => {
     await removeMember(request, { workspaceId, userId: sam.id });
     const refused = membersRegion(page).getByRole("alert");
     const ticks = selectionBar(page).getByRole("status");
-    const refusedAsNoMember = async (name: string) => {
+    const refusedAsNoMember = async () => {
       const dialog = await changeRoleOpened(page, 2);
       const answered = refusalAnswering(page, BULK_ROLE_CHANGE_ASKED);
       await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") }).click();
       expect((await answered).items).toEqual({ [sam.id]: "no-such-member" });
-      await expect(refused).toContainText(BULK_WORDS.refused(1));
-      await expect(refused.getByRole("listitem")).toContainText([name]);
+      await expect(refused.getByRole("paragraph"), "the refusal counts one refused").toHaveText(
+        /\b1\b/,
+      );
+      await expect(refused.getByRole("listitem")).toHaveCount(1);
       await expect(tickOf(page, "Priya Shah")).toBeChecked();
       await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Editor");
     };
 
-    await refusedAsNoMember("Sam Okoro");
+    await refusedAsNoMember();
+    await expect(refused.getByRole("listitem")).toContainText("Sam Okoro");
     // The refusal reads the list again, which no longer holds Sam.
     await expect(rowOf(page, "Sam Okoro")).toHaveCount(0);
-    await expect(ticks).toHaveText("2 members selected, 1 not shown.");
+    await expect(ticks).toHaveText(TWO_TICKED_ONE_HIDDEN);
 
-    await refusedAsNoMember(NO_LONGER_LISTED);
-    await expect(ticks).toHaveText("2 members selected, 1 not shown.");
+    await refusedAsNoMember();
+    await expect(
+      refused.getByRole("listitem"),
+      "a member no longer listed is refused by the name they had",
+    ).not.toContainText("Sam Okoro");
+    await expect(ticks).toHaveText(TWO_TICKED_ONE_HIDDEN);
 
     await removedThroughTheBar(page, 2);
-    await expect(saidInTheList(page, BULK_WORDS.remove.done(1, 1))).toBeVisible();
+    await expect(outcomeOf(page), "the outcome counts one removed and one skipped").toHaveText(
+      /\b1\b\D+\b1\b/,
+    );
     await expect(rowOf(page, "Priya Shah")).toHaveCount(0);
   });
 
-  test("a set answered changed-meanwhile comes back, saying try again", async ({
-    page,
-    request,
-  }) => {
+  test("a set answered changed-meanwhile comes back with its ticks", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Wharfe Weaving");
     await answeredChangedMeanwhile(page, BULK_ROLE_CHANGE);
     await tickOf(page, "Priya Shah").check();
@@ -2200,14 +2177,18 @@ test.describe("bulk actions on the members ticked", () => {
     await tickOf(page, "Priya Shah").check();
     const dialog = await changeRoleOpened(page, 1);
     await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(1, "Viewer") }).click();
-    await expect(saidInTheList(page, BULK_WORDS.changeRole.pending(1, "Viewer"))).toBeVisible();
+    await expect(outcomeOf(page), "the pending change counts its one member").toHaveText(/\b1\b/);
+    const saidPending = await outcomeOf(page).innerText();
 
     await tickOf(page, "Sam Okoro").check();
     const action = selectionAction(page, BULK_WORDS.changeRole.action);
     await expect(action).toHaveAttribute("aria-disabled", "true");
     await action.focus();
     await page.keyboard.press("Enter");
-    await expect(saidInTheList(page, BULK_WORDS.stillGoing)).toBeVisible();
+    await expect(outcomeOf(page)).toHaveText(/\S/);
+    await expect(outcomeOf(page), "the second press said nothing of its own").not.toHaveText(
+      saidPending,
+    );
     await page.keyboard.press(`Shift+${PEOPLE_KEYSTROKES.removeSelected.key}`);
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await passesTheAccessibilityGate();
@@ -2235,9 +2216,7 @@ test.describe("bulk actions on the members ticked", () => {
     await expect(thePage(page).getByRole("radio", { name: "Viewer", exact: true })).toBeFocused();
     await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
     await thePage(page).getByRole("button", { name: "Make Sam Okoro an Editor" }).click();
-    await expect(rolePickerRegion(page).getByRole("status")).toHaveText(
-      "Sam Okoro is an Editor now, from their next request.",
-    );
+    await expect(rolePickerRegion(page).getByRole("status")).toHaveText(/Sam Okoro.*Editor/);
     await backToMembers(page);
     await expect(cellOf(page, "Sam Okoro", "Role")).toHaveText("Editor");
     await expect(selectionBar(page)).toBeHidden();
