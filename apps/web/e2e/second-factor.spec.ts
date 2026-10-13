@@ -381,7 +381,7 @@ test("a signed-out visitor signs in and lands back on Account", async ({ page, r
           - paragraph
           - button ${quoted(AUTHENTICATOR_WORDS.setUp)} [expanded=false]
       - link ${quoted(ACCOUNT_WORDS.goOn)}
-      - button "Sign out"
+      - button "Sign Out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
 

@@ -34,12 +34,12 @@ const ISSUED = { recoveryCodes: CODES, madeAt: MADE_AT };
 
 const heading = () => screen.getByRole("heading", { level: 1 });
 
-const disclosure = () => screen.getByRole("button", { name: "Set up an authenticator instead" });
+const disclosure = () => screen.getByRole("button", { name: "Set Up an Authenticator Instead" });
 
 /** The authenticator's setup, opened if it is not yet, then finished with a working code. */
 const finishTheAuthenticator = async () => {
   if (disclosure().getAttribute("aria-expanded") === "false") fireEvent.click(disclosure());
-  const field = await screen.findByRole("textbox", { name: "Code from your authenticator" });
+  const field = await screen.findByRole("textbox", { name: "Authenticator Code" });
   fireEvent.change(field, { target: { value: "123456" } });
 };
 
@@ -48,7 +48,7 @@ const openedWithBothWays = async () => {
   withPasskeysHere();
   adasApi(() => NOTHING_HELD, new Map([["/authenticator/start", answering(A_KEY)]]));
   await openAsAda("/setup");
-  return screen.findByRole("textbox", { name: "Passkey name" });
+  return screen.findByRole("textbox", { name: "Passkey Name" });
 };
 
 describe("the setup page", () => {
@@ -60,10 +60,10 @@ describe("the setup page", () => {
     );
     await openAsAda("/setup");
 
-    const name = await screen.findByRole("textbox", { name: "Passkey name" });
-    expect(heading().textContent).toBe("Set up a second factor");
+    const name = await screen.findByRole("textbox", { name: "Passkey Name" });
+    expect(heading().textContent).toBe("Set Up a Second Factor");
     expect(document.activeElement).toBe(name);
-    expect(screen.getByRole("button", { name: "Add a passkey" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Add a Passkey" })).toBeDefined();
     expect(disclosure().getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.click(disclosure());
@@ -78,8 +78,8 @@ describe("the setup page", () => {
 
     expect(await screen.findByText(AUTHENTICATOR_WORDS.scan)).toBeDefined();
     expect(disclosure().getAttribute("aria-expanded")).toBe("true");
-    expect(screen.queryByRole("textbox", { name: "Passkey name" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Add a passkey" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Passkey Name" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add a Passkey" })).toBeNull();
   });
 
   it("collapses the passkey form while the authenticator is open", async () => {
@@ -88,15 +88,15 @@ describe("the setup page", () => {
 
     fireEvent.click(disclosure());
 
-    expect(await screen.findByRole("button", { name: "Finish setup" })).toBeDefined();
-    expect(screen.queryByRole("button", { name: "Add a passkey" })).toBeNull();
-    expect(screen.queryByRole("textbox", { name: "Passkey name" })).toBeNull();
+    expect(await screen.findByRole("button", { name: "Finish Setup" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Add a Passkey" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Passkey Name" })).toBeNull();
 
     fireEvent.click(disclosure());
 
-    expect(screen.queryByRole("button", { name: "Finish setup" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Add a passkey" })).toBeDefined();
-    expect(screen.getByRole("textbox", { name: "Passkey name" })).toHaveProperty(
+    expect(screen.queryByRole("button", { name: "Finish Setup" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Add a Passkey" })).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "Passkey Name" })).toHaveProperty(
       "value",
       "Work laptop",
     );
@@ -110,19 +110,19 @@ describe("the setup page", () => {
     expect(disclosure().getAttribute("aria-expanded")).toBe("true");
     fireEvent.keyDown(document.body, { key: "?" });
     const listed = await screen.findByRole("dialog", {
-      name: "Keyboard Shortcuts on Set up a second factor",
+      name: "Keyboard Shortcuts on Set Up a Second Factor",
     });
-    expect(within(listed).getByText("Set up an authenticator instead")).toBeDefined();
+    expect(within(listed).getByText("Set Up an Authenticator Instead")).toBeDefined();
 
     fireEvent.keyDown(document.body, { key: "s" });
 
     expect(disclosure().getAttribute("aria-expanded")).toBe("false");
-    expect(screen.getByRole("button", { name: "Add a passkey" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Add a Passkey" })).toBeDefined();
   });
 
   it("keeps focus when its keystroke hides the focused part", async () => {
     await openedWithBothWays();
-    const add = screen.getByRole("button", { name: "Add a passkey" });
+    const add = screen.getByRole("button", { name: "Add a Passkey" });
     add.focus();
 
     fireEvent.keyDown(add, { key: "s" });
@@ -142,13 +142,13 @@ describe("the setup page", () => {
     await openAsAda("/setup");
 
     expect(await screen.findByText(SETUP_WORDS.newWhy)).toBeDefined();
-    expect(heading().textContent).toBe("Set up a new second factor");
+    expect(heading().textContent).toBe("Set Up a New Second Factor");
     await finishTheAuthenticator();
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Save your recovery codes" }),
+      await screen.findByRole("heading", { level: 1, name: "Save Your Recovery Codes" }),
     ).toBeDefined();
-    expect(screen.getByRole("button", { name: "Finish setup" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Finish Setup" })).toBeDefined();
     expect(asked).not.toContain("/authenticator/start");
     expect(asked).not.toContain("/authenticator/finish");
   });
@@ -171,18 +171,18 @@ describe("the setup page", () => {
     );
     await openAsAda("/setup");
 
-    const field = await screen.findByRole("textbox", { name: "Restore code" });
+    const field = await screen.findByRole("textbox", { name: "Restore Code" });
     expect(document.activeElement).toBe(field);
-    expect(screen.queryByRole("textbox", { name: "Passkey name" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Set up an authenticator instead" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Passkey Name" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Set Up an Authenticator Instead" })).toBeNull();
 
     fireEvent.change(field, { target: { value: "rstr-code-0000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Use code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use Code" }));
 
-    const name = await screen.findByRole("textbox", { name: "Passkey name" });
+    const name = await screen.findByRole("textbox", { name: "Passkey Name" });
     expect(document.activeElement).toBe(name);
     expect(disclosure()).toBeDefined();
-    expect(screen.queryByRole("textbox", { name: "Restore code" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Restore Code" })).toBeNull();
   });
 
   it("sends a session holding factors, but no grant, to confirm", async () => {
@@ -194,7 +194,7 @@ describe("the setup page", () => {
       expect(router.state.location.pathname).toBe("/confirm");
     });
     expect(router.state.location.search).toEqual({ redirect: "/people/members" });
-    expect(screen.queryByRole("button", { name: "Add a passkey" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add a Passkey" })).toBeNull();
   });
 });
 
@@ -228,7 +228,7 @@ const finishedWith = async (finish: Route) => {
     ]),
   );
   await openAsAda("/setup");
-  await screen.findByRole("button", { name: "Finish setup" });
+  await screen.findByRole("button", { name: "Finish Setup" });
   await finishTheAuthenticator();
 };
 
@@ -254,7 +254,7 @@ describe("what the setup page says of a failed setup", () => {
     adasApi(() => NOTHING_HELD, new Map([["/passkeys/add-options", answering(ASKED_TO_ADD)]]));
     await openAsAda("/setup");
 
-    const add = await screen.findByRole("button", { name: "Add a passkey" });
+    const add = await screen.findByRole("button", { name: "Add a Passkey" });
     fireEvent.click(add);
 
     await waitFor(() => {
@@ -291,13 +291,13 @@ describe("the recovery codes detour", () => {
     );
     await openAsAda("/recovery-codes");
 
-    const list = await screen.findByRole("list", { name: "Recovery codes" });
+    const list = await screen.findByRole("list", { name: "Recovery Codes" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(10);
-    expect(heading().textContent).toBe("Save your recovery codes");
+    expect(heading().textContent).toBe("Save Your Recovery Codes");
     expect(screen.getByText(RECOVERY_CODE_WORDS.replacedLine)).toBeDefined();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "I have saved these codes" }));
-    fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
+    fireEvent.click(screen.getByRole("button", { name: "Finish Setup" }));
 
     await waitFor(() => {
       expect(acknowledged).toEqual([MADE_AT]);
@@ -330,7 +330,7 @@ describe("the recovery codes detour", () => {
     );
     await openAsAda("/display-name");
 
-    const list = await screen.findByRole("list", { name: "Recovery codes" });
+    const list = await screen.findByRole("list", { name: "Recovery Codes" });
     expect([within(list).getAllByRole("listitem").length, asked]).toEqual([10, ["made"]]);
     expect(screen.queryByText(RECOVERY_CODE_WORDS.replacedLine)).toBeNull();
   });
@@ -356,7 +356,7 @@ describe("the recovery codes detour", () => {
     );
     const { router } = await openAsAda("/sign-in/link#abc123");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign In" }));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/recovery-codes");
@@ -387,14 +387,14 @@ describe("a set of recovery codes whose making got no response", () => {
     await waitFor(() => {
       expect(alertsSaying()).toEqual([STOCK.tryAgain]);
     });
-    expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Try Again" })).toBeDefined();
   });
 
   it("cannot be confirmed on the Account page", async () => {
     withTheMakeDropped(() => NO_CODES_YET);
     await openAsAda("/account");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Make recovery codes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Make Recovery Codes" }));
 
     await waitFor(() => {
       expect(alertsSaying()).toEqual([STOCK.unconfirmed]);

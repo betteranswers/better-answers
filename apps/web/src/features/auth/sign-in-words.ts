@@ -1,3 +1,5 @@
+import { STOCK } from "@/shared/refusal-words.ts";
+
 /** What a sign-in carries the person on to once it is done, when it carries anything. */
 export type CarriedOn = "joining" | "connecting";
 
@@ -6,48 +8,44 @@ export type Arrival = "signed-out" | "session-ended" | "confirm-timed-out";
 
 type EmailStep = { readonly title: string; readonly hint: string };
 
-const CODE_LIFETIME = "five minutes";
-
-const WHAT_COMES = "You’ll get an email with a sign-in link and a six-digit code.";
-
-const HINT = `Enter your work email address. ${WHAT_COMES}`;
+const HINT = "Enter your work email address to sign in.";
 
 export const SIGN_IN_WORDS = {
   emailStep: {
-    nothing: { title: "Sign in", hint: HINT },
+    nothing: { title: "Sign In", hint: HINT },
     joining: {
-      title: "Sign in to join a workspace",
-      hint: `Enter the email address your invitation was sent to. ${WHAT_COMES}`,
+      title: "Sign In to Join a Workspace",
+      hint: "Enter the email address your invitation was sent to.",
     },
-    connecting: { title: "Sign in to connect Claude", hint: HINT },
+    connecting: { title: "Sign In to Connect Claude", hint: HINT },
   } satisfies Record<CarriedOn | "nothing", EmailStep>,
   arrived: {
-    "signed-out": "You have signed out.",
-    "session-ended": "Your session has ended.",
-    "confirm-timed-out": "Your sign-in ended because it wasn’t confirmed within an hour.",
+    "signed-out": "You have signed out successfully.",
+    "session-ended": STOCK.session,
+    "confirm-timed-out": "Your sign-in wasn’t confirmed within an hour. Please sign in again.",
   } satisfies Record<Arrival, string>,
-  emailField: "Email address",
-  send: "Send sign-in email",
+  emailField: "Email Address",
+  send: "Send Code",
   sending: "Sending",
-  codeTitle: "Enter your code",
-  codeField: "Code",
-  signIn: "Sign in",
-  signingIn: "Signing in",
-  sendAgain: "Send a new code",
-  otherAddress: "Use a different email address",
+  codeTitle: "Enter Your Code",
+  codeField: "Verification Code",
+  signIn: "Sign In",
+  signingIn: "Signing In",
+  sendAgain: "Send a New Code",
+  otherAddress: "Use a Different Email Address",
   or: "Or",
-  passkey: "Sign in with a passkey",
-  passkeyWaiting: "Waiting for your passkey",
-  passkeyNotUsed: "No passkey was used. Try again, or send a sign-in email.",
+  passkey: "Sign In with a Passkey",
+  passkeyWaiting: "Waiting for your passkey.",
+  passkeyNotUsed: "No passkey was used. Please try again, or sign in by email.",
 } as const;
 
-const EITHER_WORKS = `Open its link, or enter its code here. Both work for ${CODE_LIFETIME}.`;
+const ENTER_IT = "Please enter it below.";
 
 export const codeSent = (address: string): string =>
-  `Sign-in email sent to ${address}. ${EITHER_WORKS}`;
+  `We’ve sent a 6-digit code to ${address}. ${ENTER_IT}`;
 
 export const sendingANewCode = (address: string): string =>
   `Sending a new sign-in email to ${address}.`;
 
 export const newCodeSent = (address: string): string =>
-  `New sign-in email sent to ${address}. ${EITHER_WORKS}`;
+  `We’ve sent a new 6-digit code to ${address}. ${ENTER_IT}`;

@@ -46,7 +46,7 @@ describe("the recovery codes block", () => {
   it("reads as a list of the ten codes", () => {
     drawn();
 
-    const list = screen.getByRole("list", { name: "Recovery codes" });
+    const list = screen.getByRole("list", { name: "Recovery Codes" });
     expect(
       within(list)
         .getAllByRole("listitem")
@@ -86,7 +86,7 @@ describe("the recovery codes block", () => {
     const written = clipboardAnswering(() => Promise.resolve());
     drawn();
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy codes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy Codes" }));
 
     expect(await screen.findByText(RECOVERY_CODE_WORDS.copied)).toBeDefined();
     expect(written).toEqual([CODES.join("\n")]);

@@ -418,7 +418,7 @@ export function CodesPage() {
 
   return (
     <AuthPage title={RECOVERY_CODE_WORDS.saveHeading}>
-      <Outcome tone="said">{make.isPending ? RECOVERY_CODE_WORDS.making : null}</Outcome>
+      <Outcome tone="said">{make.isPending ? RECOVERY_CODE_WORDS.makingLine : null}</Outcome>
       {/* A repeat voids only a set never shown, as a reload would, so it is safe to ask for. */}
       <Refused
         id={refusedId}

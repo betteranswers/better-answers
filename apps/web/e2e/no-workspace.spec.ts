@@ -114,7 +114,7 @@ test("tells a person from Claude it connects once they join", async ({
       - heading ${quoted(NO_WORKSPACE_HEADING)} [level=1]
       - paragraph
       - region ${quoted(ASK_TO_JOIN_WORDS.heading)}
-      - button "Sign out"
+      - button "Sign Out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
   await expect(claudeLine(page)).toBeVisible();
@@ -187,7 +187,7 @@ test("lists a waiting invitation within a second, then joins it", async ({
             - link ${quoted(workspace.name)}
             - paragraph
       - region ${quoted(ASK_TO_JOIN_WORDS.heading)}
-      - button "Sign out"
+      - button "Sign Out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
   await expect(
@@ -271,7 +271,7 @@ test("carries Claude's request through a join to consent", async ({
             - link ${quoted(workspace.name)}
             - paragraph
       - region ${quoted(ASK_TO_JOIN_WORDS.heading)}
-      - button "Sign out"
+      - button "Sign Out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
   await passesTheAccessibilityGate();
@@ -281,7 +281,7 @@ test("carries Claude's request through a join to consent", async ({
     page.getByRole("heading", { level: 1, name: INVITATION_WORDS.heading(workspace.name) }),
   ).toBeVisible();
   expect(landedAt(page).searchParams.get("sig"), "the link dropped Claude's query").not.toBeNull();
-  await page.getByRole("button", { name: INVITATION_WORDS.join(workspace.name) }).click();
+  await page.getByRole("button", { name: INVITATION_WORDS.join }).click();
 
   await expect(consentHeading(page)).toBeVisible();
   // The consent's own line names the workspace, apart from any heading or band that might.
@@ -313,7 +313,7 @@ test("lands a join at home once Claude's request has lapsed", async ({
   await page.goto(`/no-workspace${lapsed(landedAt(page).search)}`);
   await expect(claudeLine(page)).toBeVisible();
   await invitationTo(page, workspace.name).click();
-  await page.getByRole("button", { name: INVITATION_WORDS.join(workspace.name) }).click();
+  await page.getByRole("button", { name: INVITATION_WORDS.join }).click();
 
   await landedAtHome(page, "Viewer");
   await expect(consentHeading(page)).toHaveCount(0);
@@ -327,7 +327,7 @@ test("signs out for good once Claude's request has lapsed", async ({ page, reque
   await expect(noWorkspaceHeading(page)).toBeVisible();
 
   await page.goto(`/no-workspace${lapsed(landedAt(page).search)}`);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Sign Out" }).click();
   await expect(signInHeading(page)).toBeVisible();
 
   await page.goto("/choose-workspace");

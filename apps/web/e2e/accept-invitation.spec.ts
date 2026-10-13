@@ -39,8 +39,7 @@ const THE_JOIN = "person.acceptInvitation";
 const invitationHeading = (page: Page, workspace: string) =>
   page.getByRole("heading", { level: 1, name: INVITATION_WORDS.heading(workspace) });
 
-const joinButton = (page: Page, workspace: string) =>
-  page.getByRole("button", { name: INVITATION_WORDS.join(workspace) });
+const joinButton = (page: Page) => page.getByRole("button", { name: INVITATION_WORDS.join });
 
 const nameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.label);
 
@@ -90,8 +89,8 @@ test("an invited newcomer names themselves on the invitation, then joins", async
       - paragraph
       - paragraph
       - textbox ${quoted(DISPLAY_NAME_WORDS.label)}
-      - button ${quoted(INVITATION_WORDS.join("Calder Joinery"))}
-      - button "Sign out"
+      - button ${quoted(INVITATION_WORDS.join)}
+      - button "Sign Out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
   await expect(invitedAs(page, "Editor")).toBeVisible();
@@ -103,7 +102,7 @@ test("an invited newcomer names themselves on the invitation, then joins", async
 
   await nameField(page).fill("Priya Shah");
   await page.keyboard.press("Tab");
-  await expect(joinButton(page, "Calder Joinery")).toBeFocused();
+  await expect(joinButton(page)).toBeFocused();
   await clockTheNextKey(page, {
     at: "//main//button[@type='submit']",
     reads: INVITATION_WORDS.joining,
@@ -129,7 +128,7 @@ test("a named invitee reads it within a second, joins keyboard-only", async ({
 
   const started = Date.now();
   await page.goto(link);
-  await expect(joinButton(page, "Ryedale Metalwork")).toBeVisible();
+  await expect(joinButton(page)).toBeVisible();
   const elapsedMs = Date.now() - started;
   test.info().annotations.push({ type: "invitation read", description: `${elapsedMs} ms` });
   expect(elapsedMs, "the invitation was not read within its second").toBeLessThan(READ_BUDGET_MS);
@@ -138,10 +137,8 @@ test("a named invitee reads it within a second, joins keyboard-only", async ({
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("Tab");
-  await expect(joinButton(page, "Ryedale Metalwork")).toBeFocused();
-  const ring = await joinButton(page, "Ryedale Metalwork").evaluate(
-    (element) => getComputedStyle(element).boxShadow,
-  );
+  await expect(joinButton(page)).toBeFocused();
+  const ring = await joinButton(page).evaluate((element) => getComputedStyle(element).boxShadow);
   expect(ring, "the focused action shows no focus ring").not.toBe("none");
   await page.keyboard.press("Enter");
 
@@ -159,7 +156,7 @@ test("refuses a bad name, joining nothing until it is fixed", async ({
 
   await nameField(page).fill("Priya <priya@acme.invalid>");
   const refused = refusalAnswering(page, "person.setDisplayName");
-  await joinButton(page, "Harrow Glazing").click();
+  await joinButton(page).click();
 
   expect(await refused).toMatchObject({ word: "display-name-angle-bracket" });
   const refusal = page.getByRole("alert");
@@ -198,7 +195,7 @@ test("keeps a given name when the join is then refused", async ({
 
   await nameField(page).fill("Ines Moreau");
   const refused = refusalAnswering(page, THE_JOIN);
-  await joinButton(page, "Ashby Survey").click();
+  await joinButton(page).click();
 
   expect(await refused).toMatchObject({ word: "already-a-member" });
   await saysARefusal(page.getByRole("alert"));
@@ -230,11 +227,11 @@ test("asks for a name when the join finds none given", async ({
     });
   });
   await page.goto(link);
-  await expect(joinButton(page, "Selby Roofing")).toBeVisible();
+  await expect(joinButton(page)).toBeVisible();
   await expect(nameField(page)).toHaveCount(0);
 
   const refused = refusalAnswering(page, THE_JOIN);
-  await joinButton(page, "Selby Roofing").click();
+  await joinButton(page).click();
   expect(await refused).toMatchObject({ word: "no-display-name" });
   await saysARefusal(page.getByRole("alert"));
   await keepsItsWordOffThePage(page, "no-display-name");
@@ -268,7 +265,7 @@ test("refuses a person at another address, offering the invited one", async ({
       - heading ${quoted(INVITATION_WORDS.untitled)} [level=1]
       - alert
       - button ${quoted(INVITATION_ACTIONS.anotherAddress)}
-      - button "Sign out"
+      - button "Sign Out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
   await expect(page.getByRole("main")).not.toContainText("Brightwater Estimating");

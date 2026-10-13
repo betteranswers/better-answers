@@ -33,10 +33,7 @@ export const codeWrong = (triesLeft: number): string =>
 
 /** The list of what is left stands beside it, so the list is what to do next. */
 export const noLongerAMember = (workspace: string): string =>
-  `You are no longer a member of ${workspace}.`;
-
-/** A Try again button stands beside it. */
-export const WORKSPACES_UNREAD = "Your workspaces couldn’t be read.";
+  `You're no longer a member of ${workspace}.`;
 
 /** Said in the band, where the switcher lists the workspaces left. */
 export const noLongerAMemberOf = (workspace: string): string =>

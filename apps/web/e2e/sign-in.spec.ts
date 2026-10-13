@@ -311,7 +311,7 @@ test("ends the chooser with Account, Sign out and Keyboard shortcuts", async ({
       - paragraph
       - list
       - link ${quoted(ACCOUNT_HEADING)}
-      - button "Sign out"
+      - button "Sign Out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
   await workspaces.first().focus();
@@ -320,7 +320,7 @@ test("ends the chooser with Account, Sign out and Keyboard shortcuts", async ({
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: ACCOUNT_HEADING })).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Sign Out" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(keystrokesButton(page)).toBeFocused();
 
@@ -339,7 +339,7 @@ test("offers one way on to a person in no workspace", async ({ page, request }) 
   await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Sign Out" }).click();
   await expect(signInHeading(page)).toBeVisible();
 });
 
@@ -894,7 +894,7 @@ test("sends a non-member from the picker to the refused page", async ({ page, re
   await page.goto("/choose-workspace");
 
   await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign Out" })).toBeVisible();
 });
 
 test("separates an unread workspace list from no workspace, offering retry", async ({
@@ -949,7 +949,7 @@ test("makes the pages outside the shell keyboard-operable, landmarked and labell
 
   await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
   await expect(page.getByRole("main")).toHaveCount(1);
-  const signOut = page.getByRole("button", { name: "Sign out" });
+  const signOut = page.getByRole("button", { name: "Sign Out" });
   await signOut.focus();
   await expect(signOut).toBeFocused();
 

@@ -3,37 +3,36 @@ import { PRODUCT_NAME } from "@/shared/words.ts";
 import { invitedAs } from "./invitation-words.ts";
 
 export const PICKER_WORDS = {
-  heading: "Your workspaces",
-  lead: "Choose the workspace to open.",
+  heading: "Your Workspaces",
+  lead: "Choose a workspace to open.",
   reading: "Reading your workspaces.",
   opening: "Taking you to your workspace.",
-  tryAgain: "Try again",
+  tryAgain: "Try Again",
 } as const;
 
 export const PICKER_ACTIONS = {
-  toWorkspaces: "Go to your workspaces",
+  toWorkspaces: "Go to Your Workspaces",
 } as const;
 
-export const NO_WORKSPACE_HEADING = "No workspace yet";
+export const NO_WORKSPACE_HEADING = "No Workspace Yet";
 
 /** Apart from the page's JSX, so the browser suite reads the words the no-workspace page shows. */
 export const NO_WORKSPACE_WORDS = {
   /** Claude's request lapses within minutes, and joining can take an Admin's day. */
-  claudeAfterJoining:
-    "Claude can connect once you’ve joined a workspace. When you’re in, connect again from Claude.",
-  invitations: "Your invitations",
+  claudeAfterJoining: "Join a workspace, then connect again from Claude.",
+  invitations: "Your Invitations",
   invitedAs,
-  tryAgain: "Try again",
+  tryAgain: "Try Again",
   readingAgain: "Reading",
 } as const;
 
 export const NO_WORKSPACE_ACTIONS = {
-  toInvitations: "Go to your invitations",
-  readAgain: "Read your invitations again",
+  toInvitations: "Go to Your Invitations",
+  readAgain: "Read Your Invitations Again",
 } as const;
 
 /** A connection carried through sign-in that the picker could not hand back. */
 export const NOT_CONNECTED = {
-  heading: "You’re signed in",
+  heading: "You’re Signed In",
   carryOn: `Go to ${PRODUCT_NAME}`,
 } as const;

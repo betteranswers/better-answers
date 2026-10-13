@@ -102,7 +102,7 @@ const makeCodesPressed = async () => {
   const clients = createAppClients();
   clients.queryClient.setQueryData(["auth", "session"], SESSION);
   await openApp("/account", clients);
-  fireEvent.click(await screen.findByRole("button", { name: "Make recovery codes" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Make Recovery Codes" }));
 };
 
 const A_PASSKEY = {
@@ -205,7 +205,7 @@ describe("setting up an authenticator on the Account page", () => {
     );
     await openAsAda("/account");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Set up an authenticator" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Set Up an Authenticator" }));
 
     expect(await screen.findByText(AUTHENTICATOR_WORDS.scan)).toBeDefined();
     expect(asked).toContain("/second-factor/replace/authenticator-start");
@@ -244,7 +244,7 @@ describe("making a first set on the Account page", () => {
 
     await makeCodesPressed();
 
-    expect(await screen.findByRole("button", { name: "Replace recovery codes" })).toBeDefined();
+    expect(await screen.findByRole("button", { name: "Replace Recovery Codes" })).toBeDefined();
     expect(screen.getByText(SAID_OF_SECOND_FACTOR["recovery-codes-held"])).toBeDefined();
   });
 

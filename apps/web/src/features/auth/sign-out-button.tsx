@@ -12,7 +12,7 @@ export function SignOutButton(properties: { readonly variant?: "default" | "outl
       disabled={signingOut}
       onClick={signOut}
     >
-      Sign out
+      Sign Out
     </Button>
   );
 }

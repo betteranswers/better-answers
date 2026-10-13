@@ -174,7 +174,7 @@ const scrollAControlHalfUnderABand = (): boolean => {
 
 const theSignInPage = async (page: Page): Promise<void> => {
   await page.goto("/sign-in");
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
 };
 
 test("audits the page a spec leaves, though it never asked", async ({ page }) => {

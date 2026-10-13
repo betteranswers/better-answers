@@ -67,8 +67,8 @@ describe("the confirm page", () => {
 
     await openAsAda("/confirm");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Confirm it’s you");
-    expect(controls().map((control) => control.textContent)).toEqual(["Sign out"]);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Confirm It’s You");
+    expect(controls().map((control) => control.textContent)).toEqual(["Sign Out"]);
   });
 
   it("orders passkey (focused), code, recovery code, then Sign out", async () => {
@@ -77,12 +77,12 @@ describe("the confirm page", () => {
 
     await openAsAda("/confirm");
 
-    const passkey = await screen.findByRole("button", { name: "Use your passkey" });
+    const passkey = await screen.findByRole("button", { name: "Use Your Passkey" });
     const ways: readonly Element[] = [
       passkey,
-      screen.getByRole("textbox", { name: "Authenticator code" }),
-      screen.getByRole("link", { name: "Use a recovery code" }),
-      screen.getByRole("button", { name: "Sign out" }),
+      screen.getByRole("textbox", { name: "Authenticator Code" }),
+      screen.getByRole("link", { name: "Use a Recovery Code" }),
+      screen.getByRole("button", { name: "Sign Out" }),
     ];
     expect(document.activeElement).toBe(passkey);
     expect(controls().filter((control) => ways.includes(control))).toEqual(ways);
@@ -94,7 +94,7 @@ describe("the confirm page", () => {
     const asked = confirmingByPasskey(refusing(429, "too_many_requests", 240));
     const { router } = await openAsAda("/confirm");
 
-    const field = await screen.findByRole("textbox", { name: "Authenticator code" });
+    const field = await screen.findByRole("textbox", { name: "Authenticator Code" });
     fireEvent.change(field, { target: { value: "123 456" } });
 
     await waitFor(() => {
@@ -103,7 +103,7 @@ describe("the confirm page", () => {
     expect(numbersSaid()).toEqual(["4"]);
     expect(field.hasAttribute("readonly")).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Use your passkey" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use Your Passkey" }));
 
     await waitFor(() => {
       expect(router.state.location.pathname).not.toBe("/confirm");
@@ -120,7 +120,7 @@ describe("the confirm page", () => {
     }));
     await openAsAda("/confirm");
 
-    const field = await screen.findByRole("textbox", { name: "Authenticator code" });
+    const field = await screen.findByRole("textbox", { name: "Authenticator Code" });
     expect(alertsSaying()).toEqual([tooManyCodesTriedOr(1, ["recovery-code"])]);
     expect(numbersSaid()).toEqual(["1"]);
     expect(field.hasAttribute("readonly")).toBe(true);
@@ -138,7 +138,7 @@ describe("the confirm page", () => {
     await waitFor(() => {
       expect(alertsSaying()).toEqual([STOCK.notLoaded]);
     });
-    expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Try Again" })).toBeDefined();
     expect(screen.getByRole("button", { name: KEYSTROKE_WORDS.button })).toBeDefined();
   });
 
@@ -150,7 +150,7 @@ describe("the confirm page", () => {
     await openAsAda("/confirm");
 
     const field = await screen.findByRole<HTMLInputElement>("textbox", {
-      name: "Authenticator code",
+      name: "Authenticator Code",
     });
     fireEvent.change(field, { target: { value: "123456" } });
 
@@ -190,17 +190,17 @@ describe("the recovery page", () => {
     );
     const { router } = await openAsAda("/recovery?redirect=%2Fpeople%2Fmembers");
 
-    const field = await screen.findByRole("textbox", { name: "Recovery code" });
+    const field = await screen.findByRole("textbox", { name: "Recovery Code" });
     expect(document.activeElement).toBe(field);
     fireEvent.change(field, { target: { value: "ABCD efgh-jkmn-pqrs" } });
-    fireEvent.click(screen.getByRole("button", { name: "Use code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use Code" }));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/setup");
     });
     expect(router.state.location.search).toEqual({ redirect: "/people/members" });
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Set up a new second factor" }),
+      await screen.findByRole("heading", { level: 1, name: "Set Up a New Second Factor" }),
     ).toBeDefined();
   });
 
@@ -211,16 +211,16 @@ describe("the recovery page", () => {
     );
     await openAsAda("/recovery");
 
-    const field = await screen.findByRole("textbox", { name: "Recovery code" });
+    const field = await screen.findByRole("textbox", { name: "Recovery Code" });
     fireEvent.change(field, { target: { value: "abcd-efgh-jkmn-pqrs" } });
-    fireEvent.click(screen.getByRole("button", { name: "Use code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use Code" }));
 
     await waitFor(() => {
       expect(alertsSaying()).toEqual([SAID_OF_SECOND_FACTOR["recovery-code-wrong"]]);
     });
     expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(
-      within(main()).getByRole("link", { name: "Use your passkey or authenticator instead" }),
+      within(main()).getByRole("link", { name: "Use Your Passkey or Authenticator Instead" }),
     ).toBeDefined();
     expect(main().textContent).toContain(RECOVERY_WORDS.operator);
   });

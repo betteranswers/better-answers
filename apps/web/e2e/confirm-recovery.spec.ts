@@ -188,7 +188,7 @@ test("an email-signed-in Admin confirms with the passkey offered first", async (
       - button ${quoted(CONFIRM_WORDS.passkey)}
       - textbox ${quoted(CONFIRM_WORDS.codeField)}
       - link ${quoted(CONFIRM_WORDS.recoveryCode)}
-      - button "Sign out"
+      - button "Sign Out"
   `);
   await passkeyButton(page).click();
   await landedAtHome(page, "Admin");

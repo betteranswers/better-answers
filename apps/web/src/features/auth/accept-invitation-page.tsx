@@ -11,6 +11,7 @@ import {
   type RefusalWord,
 } from "@/shared/api/trpc.ts";
 import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -35,8 +36,6 @@ type Invitation = inferOutput<ReturnType<typeof useTRPC>["person"]["invitation"]
 const JOIN: Keystroke = { key: "j", action: INVITATION_ACTIONS.join };
 
 const READ_AGAIN: Keystroke = { key: "r", action: INVITATION_ACTIONS.readAgain };
-
-const PAGE = "this page";
 
 const READ_REFUSED = "invitation-refused";
 
@@ -113,7 +112,7 @@ function Leaving(properties: { readonly keystrokes: readonly Keystroke[] }) {
   return (
     <div className="mt-8 flex flex-wrap items-center gap-2">
       <SignOutButton />
-      <KeystrokesAction page={PAGE} keystrokes={properties.keystrokes} />
+      <KeystrokesAction page={KEYSTROKE_WORDS.thisPage} keystrokes={properties.keystrokes} />
     </div>
   );
 }
@@ -271,7 +270,7 @@ function InvitationToJoin(properties: {
           aria-describedby={accept.error === null ? undefined : JOIN_REFUSED}
           aria-keyshortcuts={JOIN.key}
         >
-          {joining ? INVITATION_WORDS.joining : INVITATION_WORDS.join(invitation.workspaceName)}
+          {joining ? INVITATION_WORDS.joining : INVITATION_WORDS.join}
         </Button>
       </form>
 

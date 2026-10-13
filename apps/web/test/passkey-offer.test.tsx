@@ -69,7 +69,7 @@ afterEach(() => {
 });
 
 /** By its dismissal, which the Account page's own passkeys region does not hold. */
-const DISMISSAL = { name: "Dismiss the passkey offer" };
+const DISMISSAL = { name: "Dismiss Passkey Offer" };
 
 const offer = () => screen.queryByRole("button", DISMISSAL);
 
@@ -156,7 +156,7 @@ describe("the passkey offer", () => {
     adaHoldingNoPasskey();
     // Account reads the second factor and draws no offer, so the next load finds the read held.
     const { clients, rendered } = await openAsAda("/account");
-    await screen.findByRole("button", { name: "Add a passkey" });
+    await screen.findByRole("button", { name: "Add a Passkey" });
     rendered.unmount();
     globalThis.localStorage.setItem(SHOWN_UNDER, "shown");
 

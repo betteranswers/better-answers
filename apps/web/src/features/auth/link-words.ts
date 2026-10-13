@@ -3,31 +3,31 @@ import { instantWords } from "@/shared/words.ts";
 /** Apart from the page's JSX, so the browser suite reads the words the link's page shows. */
 export const LINK_WORDS = {
   checking: "Checking the link.",
-  elsewhereTitle: "Enter this code where you started",
-  elsewhere:
-    "This browser didn’t ask to sign in, so it stays signed out. Type this code on the page that asked:",
-  copy: "Copy code",
-  copied: "Code copied.",
+  elsewhereTitle: "Enter This Code Where You Started",
+  elsewhere: "You opened this link in a different browser.",
+  copy: "Copy Code",
+  copied: "Code copied successfully.",
   warning: "Warning",
-  neverShare: "Never read this code to anyone, or type it into a page you didn’t open yourself.",
-  deadTitle: "This sign-in link no longer works",
-  dead: "Each link works once, for five minutes.",
-  backToSignIn: "Back to sign-in",
-  tryAgain: "Try again",
+  neverShare: "Never share this code with anyone.",
+  deadTitle: "This Sign-In Link No Longer Works",
+  dead: "Each link works once, for 5 minutes.",
+  backToSignIn: "Back to Sign-In",
+  tryAgain: "Try Again",
   readingAgain: "Checking",
 } as const;
 
 /** Each keystroke's action, as the list of keystrokes names it. */
 export const LINK_ACTIONS = {
-  copy: "Copy the code",
-  readAgain: "Check the link again",
-  backToSignIn: "Go back to sign-in",
+  copy: "Copy the Code",
+  readAgain: "Check the Link Again",
+  backToSignIn: "Go Back to Sign-In",
 } as const;
 
 /** Safe to say only because the link is bound to this browser. */
 export const signingInAs = (address: string): string => `Signing in as ${address}.`;
 
-export const worksUntil = (until: string): string => `It works until ${instantWords(until)}.`;
+export const worksUntil = (until: string): string =>
+  `This code works until ${instantWords(until)}.`;
 
 /** Grouped in threes, so the eye holds it while typing it elsewhere. */
 export const codeShown = (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`;
