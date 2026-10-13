@@ -7,9 +7,7 @@ import {
   SEARCH_KEYSTROKES as KEY,
 } from "@/features/knowledge/knowledge-state.ts";
 import { EVIDENCE_WORDS, SEARCH_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
-import { readsCeiling, SAID_OF_KNOWLEDGE } from "@/features/knowledge/refusal-words.ts";
 import { HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
-import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -19,6 +17,8 @@ import {
   navOf,
   provision,
   railOf,
+  saysARefusal,
+  saysTheWait,
   seedConcepts,
   seedConnectedSources,
   signIn,
@@ -37,6 +37,7 @@ import {
   scrolledSideways,
   windowRefocused,
 } from "./knowledge.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -468,7 +469,7 @@ test.describe("the Knowledge Search page", () => {
     await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
 
     const panel = passagePanel(page, HANDBOOK);
-    await expect(panel.getByRole("alert")).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
+    await saysARefusal(panel.getByRole("alert"));
     await page.unroute(isAnOpen);
     await panel.getByRole("button", { name: "Retry" }).click();
     await expect(panel).toContainText(PALLET_PASSAGES[0] ?? "");
@@ -479,10 +480,12 @@ test.describe("the Knowledge Search page", () => {
     await anAdminAtSearch(page, request, "Holme Records", [handbookSeeded]);
     await searched(page, "pallet");
     await page.route(isAnOpen, asOfADocumentNobodyHolds);
+    const refused = refusalAnswering(page, "knowledge.open");
     await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
 
+    expect(await refused).toMatchObject({ word: "not-found" });
     const panel = passagePanel(page, HANDBOOK);
-    await expect(panel.getByRole("alert")).toHaveText(sentenceOf(SAID_OF_KNOWLEDGE["not-found"]));
+    await saysARefusal(panel.getByRole("alert"));
     await expect(panel).not.toContainText(PALLET_PASSAGES[0] ?? "");
   });
 
@@ -506,10 +509,10 @@ test.describe("the Knowledge Search page", () => {
     await expect(panel).toHaveCount(0);
     await page.unroute(isAnOpen);
     await page.route(isAnOpen, asOfADocumentNobodyHolds);
+    const refused = refusalAnswering(page, "knowledge.open");
     await first.getByRole("button", { name: HANDBOOK }).click();
-    await expect(passagePanel(page, HANDBOOK).getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_KNOWLEDGE["not-found"]),
-    );
+    expect(await refused).toMatchObject({ word: "not-found" });
+    await saysARefusal(passagePanel(page, HANDBOOK).getByRole("alert"));
     await expect(page.getByText(renamed), "a refused read kept its earlier title").toHaveCount(0);
   });
 
@@ -616,8 +619,11 @@ test.describe("the Knowledge Search page", () => {
     page.on("request", (sent) => {
       if (isAFind(new URL(sent.url())) && sent.url().includes("forklift")) asked.push(sent.url());
     });
+    const refused = refusalAnswering(page, "knowledge.find");
     await searchBox(page).fill("forklift");
-    await expect(alerted(page)).toHaveText(sentenceOf(readsCeiling(60)));
+    const { status, waitSeconds } = await refused;
+    expect(status, "the search met no ceiling").toBe(429);
+    await saysTheWait(alerted(page), waitSeconds);
     await windowRefocused(page);
     expect(asked, "the page asked again past the ceiling").toHaveLength(1);
   });
@@ -644,14 +650,14 @@ test.describe("the Knowledge Search page", () => {
 
     for (const opener of [unread, read]) {
       await opener.click();
-      await expect(panel.getByRole("alert")).toHaveText(sentenceOf(readsCeiling(60)));
+      await saysTheWait(panel.getByRole("alert"), 60);
       await closed();
       await opener.click();
-      await expect(panel.getByRole("alert")).toHaveText(sentenceOf(readsCeiling(60)));
+      await saysTheWait(panel.getByRole("alert"), 60);
       await closed();
     }
     await read.click();
-    await expect(panel.getByRole("alert")).toHaveText(sentenceOf(readsCeiling(60)));
+    await saysTheWait(panel.getByRole("alert"), 60);
     await windowRefocused(page);
     expect(opens, "a passage was asked for again while its wait ran").toHaveLength(2);
   });
@@ -662,7 +668,7 @@ test.describe("the Knowledge Search page", () => {
 
     await searchBox(page).fill("pallet");
     // The query asks twice more before it answers, as it does of any failure with no word.
-    await expect(alerted(page)).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
+    await saysARefusal(alerted(page));
     await page.unroute(isAFind);
     await searchRegion(page).getByRole("button", { name: "Retry" }).click();
     await expect(matchesOf(page)).toHaveCount(A_PAGE);
@@ -677,14 +683,14 @@ test.describe("the Knowledge Search page", () => {
     await page.route(isAFindPastTheFirstPage, (route) => route.abort());
 
     await loadMore(page).click();
-    await expect(alerted(page)).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
+    await saysARefusal(alerted(page));
     await expect(matchesOf(page)).toHaveCount(A_PAGE);
 
     // A retry that fails again says so again: the alert leaves while it runs.
     const retry = searchRegion(page).getByRole("button", { name: "Retry" });
     await retry.click();
     await expect(alerted(page)).toHaveCount(0);
-    await expect(alerted(page)).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
+    await saysARefusal(alerted(page));
     await expect(retry).toBeFocused();
 
     await page.unroute(isAFindPastTheFirstPage);

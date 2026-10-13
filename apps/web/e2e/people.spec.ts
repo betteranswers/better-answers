@@ -2,7 +2,6 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { BREADCRUMB, JUMP_TO, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
-import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
@@ -20,18 +19,15 @@ import {
   PEOPLE_KEYSTROKES,
   PEOPLE_SELECT_FIRST,
 } from "@/features/people/people-state.ts";
-import { SAID_OF_A_MEMBER, SAID_OF_TICKED_MEMBERS } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { headlineOf, sentenceOf as saidOfAction } from "@/shared/audit/audit-sentences.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, headingOf, pageNamed } from "@/shared/navigation.ts";
-import { NO_RESPONSE_TO_A_READ, SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   aMemberSignedInAt,
-  notFoundOfferingHome,
   anAddress,
   askToJoin,
   clockTheNextKey,
@@ -39,17 +35,19 @@ import {
   crumbOf,
   editorPickedByKeyboard,
   invite,
+  keepsItsWordOffThePage,
   keystrokesButton,
   keystrokesDismissed,
   keystrokesListed,
   landedAtHome,
   makeGroups,
+  notFoundOfferingHome,
   person,
   personMenuOpened,
   provision,
   quoted,
   removeMember,
-  saysItsSentenceNotItsWord,
+  saysARefusal,
   signIn,
   skipLinkReachesThePage,
   switcherMenuOf,
@@ -57,6 +55,7 @@ import {
   tabUntilFocused,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -852,12 +851,12 @@ test.describe("a member's own page", () => {
 
     await openedByName(page, "Test person");
     await thePage(page).getByRole("radio", { name: "Viewer", exact: true }).click();
+    const refused = refusalAnswering(page, "members.changeRole");
     await thePage(page).getByRole("button", { name: "Make Test person a Viewer" }).click();
 
-    await saysItsSentenceNotItsWord(rolePickerRegion(page).getByRole("alert"), {
-      table: SAID_OF_A_MEMBER,
-      word: "last-admin",
-    });
+    expect(await refused).toMatchObject({ word: "last-admin" });
+    await saysARefusal(rolePickerRegion(page).getByRole("alert"));
+    await keepsItsWordOffThePage(page, "last-admin");
     await passesTheAccessibilityGate();
     // The refused pick stays, so the card still says which role they hold.
     await expect(
@@ -1179,10 +1178,7 @@ test.describe("a member's Activity", () => {
     await page.goto(memberPageAt(adminId));
 
     // The query client asks twice more before it gives up, a second apart and then two.
-    await expect(activityOf(page).getByRole("alert")).toHaveText(
-      sentenceOf(NO_RESPONSE_TO_A_READ),
-      { timeout: 10_000 },
-    );
+    await saysARefusal(activityOf(page).getByRole("alert"), { timeout: 10_000 });
     await expect(accessOf(page), "a failed Activity took Access with it").toBeVisible();
     await expect(
       thePage(page).getByRole("region", { name: MEMBER_PAGE_WORDS.removeAndEndEverySignIn }),
@@ -1263,11 +1259,12 @@ test.describe("ending every sign-in and token a member holds here", () => {
     await openedByName(page, "Test person");
     const ownPage = page.url();
     await expect(credentialsRegion(page)).toContainText("Your own session here ends with it.");
+    // The action lands; it is the read after it, the session's own, that the api refuses.
+    const refused = refusalAnswering(page, "session.member");
     await endButton(page).click();
 
-    await expect(thePage(page).getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_CLASS.unauthenticated),
-    );
+    expect(await refused).toMatchObject({ word: "credentials-revoked", class: "unauthenticated" });
+    await saysARefusal(thePage(page).getByRole("alert"));
     await page.reload();
     await signIn(page, request, admin);
     await expect(page).toHaveURL(ownPage);
@@ -1372,13 +1369,13 @@ test.describe("removing a member from their page", () => {
     // Refused only once the page has left for Members, as a change landing meanwhile is.
     await answeredChangedMeanwhile(page, REMOVAL);
 
+    const refused = refusalAnswering(page, "members.remove");
     await removedThroughTheirPage(page, "Priya Shah");
 
+    expect(await refused).toMatchObject({ word: "changed-meanwhile" });
     await expect(page).toHaveURL(new RegExp(`${MEMBERS_PAGE}$`));
-    await saysItsSentenceNotItsWord(membersRegion(page).getByRole("alert"), {
-      table: SAID_OF_A_MEMBER,
-      word: "changed-meanwhile",
-    });
+    await saysARefusal(membersRegion(page).getByRole("alert"));
+    await keepsItsWordOffThePage(page, "changed-meanwhile");
     await expect(rowOf(page, "Priya Shah")).toBeVisible();
     await expect(memberRows(page)).toHaveCount(3);
     await passesTheAccessibilityGate();
@@ -1391,11 +1388,11 @@ test.describe("removing a member from their page", () => {
   }) => {
     await anAdminAtPeople(page, request, "Hodder Tools");
 
+    const refused = refusalAnswering(page, "members.remove");
     await removedThroughTheirPage(page, "Test person");
 
-    await expect(removalOf(page).getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_A_MEMBER["last-admin"]),
-    );
+    expect(await refused).toMatchObject({ word: "last-admin", class: "precondition" });
+    await saysARefusal(removalOf(page).getByRole("alert"));
     await expect(page).toHaveURL(AT_A_MEMBER_PAGE);
     await expect(changeRoleButton(page)).toHaveAccessibleDescription(
       MEMBER_PAGE_WORDS.holdsRole("Test person", "Admin"),
@@ -1546,11 +1543,11 @@ test.describe("a member's display name, flagged to better-answers support", () =
     await openedByName(page, "Sam Okoro");
     await removeMember(request, { workspaceId, userId: sam.id });
 
+    const refused = refusalAnswering(page, "members.flagDisplayName");
     await flagButton(page).click();
 
-    await expect(displayNameRegion(page).getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_A_MEMBER["no-such-member"]),
-    );
+    expect(await refused).toMatchObject({ word: "no-such-member" });
+    await saysARefusal(displayNameRegion(page).getByRole("alert"));
     await expect(displayNameRegion(page).getByRole("status")).toHaveText("");
     await passesTheAccessibilityGate();
   });
@@ -1737,10 +1734,10 @@ test.describe("the People page's words", () => {
       }),
     ).toBeVisible();
     await saidOnTheAcceptPage("the accept page");
+    const refused = refusalAnswering(page, "person.invitation");
     await page.goto(`/invitations/${forSomeoneElse.id}`);
-    await expect(page.getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_ACCEPTING["invitation-for-another-address"]),
-    );
+    expect(await refused).toMatchObject({ word: "invitation-for-another-address" });
+    await saysARefusal(page.getByRole("alert"));
     await saidOnTheAcceptPage("the accept page refusing another address");
   });
 });
@@ -1760,11 +1757,14 @@ const pagesOf = (page: Page): Locator => page.getByRole("navigation", { name: "P
 const saidInTheList = (page: Page, words: string): Locator =>
   membersRegion(page).getByRole("status").filter({ hasText: words });
 
-const refusedLine = (name: string, said: { readonly why: string; readonly next: string }) =>
-  `${name}: ${sentenceOf(said)}`;
+/** A set refused whole names each person who stopped it on a line of their own. */
+const refusedLineOf = (page: Page, name: string): Locator =>
+  membersRegion(page).getByRole("alert").getByRole("listitem").filter({ hasText: name });
+
+const BULK_ROLE_CHANGE_ASKED = "members.bulkChangeRole";
 
 /** Matched by name anywhere in the path, because the tRPC client batches its calls. */
-const BULK_ROLE_CHANGE = (url: URL): boolean => url.pathname.includes("members.bulkChangeRole");
+const BULK_ROLE_CHANGE = (url: URL): boolean => url.pathname.includes(BULK_ROLE_CHANGE_ASKED);
 
 /** More members than one page holds, named so the list's own order is their number's. */
 const aWorkspaceOfThirtyEditors = async (
@@ -1822,15 +1822,15 @@ test.describe("bulk actions on the members ticked", () => {
 
     const dialog = await changeRoleOpened(page, 2);
     await expect(dialog).toContainText(INCLUDES_YOU);
+    const answered = refusalAnswering(page, BULK_ROLE_CHANGE_ASKED);
     await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") }).click();
 
-    const refused = membersRegion(page).getByRole("alert");
-    await expect(refused).toContainText(BULK_WORDS.refused(2));
-    const lastAdmin = SAID_OF_TICKED_MEMBERS["last-admin"];
+    expect(Object.values((await answered).items ?? {})).toEqual(["last-admin", "last-admin"]);
+    await expect(membersRegion(page).getByRole("alert")).toContainText(BULK_WORDS.refused(2));
     for (const name of ["Test person", "Ada Hartley"]) {
-      await expect(refused).toContainText(refusedLine(name, lastAdmin));
+      await expect(refusedLineOf(page, name)).toHaveCount(1);
       await expect(tickOf(page, name)).toBeChecked();
-      await expect(rowOf(page, name)).toContainText(lastAdmin.why);
+      await expect(rowOf(page, name).getByText("Refused", { exact: true })).toBeVisible();
       await expect(cellOf(page, name, "Role")).toHaveText("Admin");
     }
     await expect(selectionBar(page).getByRole("status")).toHaveText("2 members selected.");
@@ -1850,9 +1850,7 @@ test.describe("bulk actions on the members ticked", () => {
     const dialog = await changeRoleOpened(page, 2);
     await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") }).click();
 
-    await expect(membersRegion(page).getByRole("alert")).toContainText(
-      refusedLine("Test person", SAID_OF_TICKED_MEMBERS["last-admin"]),
-    );
+    await expect(refusedLineOf(page, "Test person")).toHaveCount(1);
     await expect(selectionBar(page).getByRole("status")).toHaveText(
       "2 members selected, 1 not shown.",
     );
@@ -2148,11 +2146,11 @@ test.describe("bulk actions on the members ticked", () => {
     const ticks = selectionBar(page).getByRole("status");
     const refusedAsNoMember = async (name: string) => {
       const dialog = await changeRoleOpened(page, 2);
+      const answered = refusalAnswering(page, BULK_ROLE_CHANGE_ASKED);
       await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") }).click();
+      expect((await answered).items).toEqual({ [sam.id]: "no-such-member" });
       await expect(refused).toContainText(BULK_WORDS.refused(1));
-      await expect(refused.getByRole("listitem")).toHaveText([
-        refusedLine(name, SAID_OF_TICKED_MEMBERS["no-such-member"]),
-      ]);
+      await expect(refused.getByRole("listitem")).toContainText([name]);
       await expect(tickOf(page, "Priya Shah")).toBeChecked();
       await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Editor");
     };
@@ -2180,12 +2178,12 @@ test.describe("bulk actions on the members ticked", () => {
     await tickOf(page, "Sam Okoro").check();
 
     const dialog = await changeRoleOpened(page, 2);
+    const refused = refusalAnswering(page, BULK_ROLE_CHANGE_ASKED);
     await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") }).click();
 
-    await saysItsSentenceNotItsWord(membersRegion(page).getByRole("alert"), {
-      table: SAID_OF_TICKED_MEMBERS,
-      word: "changed-meanwhile",
-    });
+    expect(await refused).toMatchObject({ word: "changed-meanwhile" });
+    await saysARefusal(membersRegion(page).getByRole("alert"));
+    await keepsItsWordOffThePage(page, "changed-meanwhile");
     await expect(tickOf(page, "Priya Shah")).toBeChecked();
     await expect(tickOf(page, "Sam Okoro")).toBeChecked();
     await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Editor");
@@ -2215,10 +2213,8 @@ test.describe("bulk actions on the members ticked", () => {
     await passesTheAccessibilityGate();
 
     answered.resolve();
-    await saysItsSentenceNotItsWord(membersRegion(page).getByRole("alert"), {
-      table: SAID_OF_TICKED_MEMBERS,
-      word: "changed-meanwhile",
-    });
+    await saysARefusal(membersRegion(page).getByRole("alert"));
+    await keepsItsWordOffThePage(page, "changed-meanwhile");
     await expect(tickOf(page, "Priya Shah")).toBeChecked();
     await expect(action).not.toHaveAttribute("aria-disabled", "true");
   });

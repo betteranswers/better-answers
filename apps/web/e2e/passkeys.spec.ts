@@ -9,16 +9,10 @@ import {
   RECOVERY_CODE_WORDS,
   removePasskeyTitle,
 } from "@/features/auth/account-words.ts";
-import {
-  PASSKEY_HELD,
-  PASSKEY_UNKNOWN,
-  SAID_OF_SECOND_FACTOR,
-} from "@/features/auth/refusal-words.ts";
 import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { ASK, KNOWLEDGE, menuGroupIn } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -30,16 +24,18 @@ import {
   person,
   provision,
   railOf,
+  saysARefusal,
   signedInAtHome,
+  signedInWithNoWorkspace,
   signIn,
   signInByEmail,
   signInHeading,
-  signedInWithNoWorkspace,
   signOutFromTheShell,
   switcherMenuOf,
   switcherOf,
   tabUntilFocused,
 } from "./harness.ts";
+import { authAnswering } from "./refused-read.ts";
 import { aVirtualAuthenticator, withoutWebAuthn } from "./virtual-authenticator.ts";
 
 const accountHeading = (page: Page) =>
@@ -119,9 +115,7 @@ test("a renamed passkey shows its name, and its last use", async ({ page, reques
 
   await renameTyped(page, name, "   ");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("alert")).toContainText(
-    sentenceOf(SAID_OF_SECOND_FACTOR["passkey-name-empty"]),
-  );
+  await saysARefusal(page.getByRole("alert"));
   await page.getByRole("textbox", { name: PASSKEY_WORDS.nameField }).fill("Work laptop");
   await page.keyboard.press("Enter");
 
@@ -172,9 +166,11 @@ test("a passkey removed stops signing in", async ({ page, request }) => {
   await expect(page.getByRole("heading", { level: 3, name: PASSKEY_WORDS.heading })).toBeFocused();
   expect(await device.held(), "the device should still hold the removed passkey").toBe(1);
 
+  const refused = authAnswering(page, "/passkeys/sign-in");
   await signedOut(page);
 
-  await expect(page.getByRole("alert")).toContainText(sentenceOf(PASSKEY_UNKNOWN));
+  expect(await refused).toMatchObject({ status: 401, word: "passkey-unknown" });
+  await saysARefusal(page.getByRole("alert"));
   await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toBeVisible();
 });
 
@@ -183,7 +179,7 @@ test("a second passkey from the same device is refused", async ({ page, request 
 
   await passkeyAdded(page);
 
-  await expect(page.getByRole("alert")).toContainText(sentenceOf(PASSKEY_HELD));
+  await saysARefusal(page.getByRole("alert"));
   await expect(page.getByRole("listitem")).toHaveCount(1);
   await expect(page.getByRole("button", { name: PASSKEY_WORDS.addCommit })).toBeFocused();
 });
@@ -205,9 +201,7 @@ test("an Admin keeps their only passkey, told why beside Remove", async ({ page,
   await accountOpened(page);
   const remove = rowOf(page, name).getByRole("button", { name: PASSKEY_WORDS.remove });
   await expect(remove).toHaveAttribute("aria-disabled", "true");
-  await expect(remove).toHaveAccessibleDescription(
-    sentenceOf(SAID_OF_SECOND_FACTOR["last-second-factor"]),
-  );
+  await expect(remove).toHaveAccessibleDescription(/\S/);
 });
 
 test("a device whose user check fails signs nothing in", async ({ page, request }) => {

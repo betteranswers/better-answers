@@ -6,7 +6,6 @@ import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts"
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { headingOf, HOMES, type Role, type Area } from "@/shared/navigation.ts";
-import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
 
 /** Named for the person, though it shows their initials alone. */
 export const avatarOf = (page: Page, who: string): Locator =>
@@ -210,17 +209,45 @@ export const theActionLandedWithinItsBudget = async (page: Page, action: string)
   );
 };
 
-/** The word stays off the page: it is for the logs and the wire. */
-export const saysItsSentenceNotItsWord = async <Word extends RefusalWord>(
+/** A refusal's region can stand empty from the first draw, so it shows one only once it holds words. */
+export const saysARefusal = (
   alert: Locator,
-  refused: { readonly table: Readonly<Record<Word, Said>>; readonly word: Word },
+  within?: { readonly timeout: number },
+): Promise<void> => expect(alert, "the alert says nothing").toHaveText(/\S/, within);
+
+/** A list says its read in a live region no role names, apart from its head's standing words. */
+export const saysOfItsRead = (list: Locator): Promise<void> =>
+  expect(list.locator('[aria-live="polite"]'), "the list says nothing of its read").toHaveText(
+    /\S/,
+  );
+
+/** A region already saying a refusal shows the next only by saying something else. */
+export const saysAnotherRefusal = (alert: Locator, earlier: string): Promise<void> =>
+  expect
+    .poll(
+      async () => ["", earlier.trim()].includes((await alert.innerText()).trim()),
+      "the alert says nothing, or only the earlier refusal",
+    )
+    .toBe(false);
+
+/**
+ * Said in whole minutes, rounded up; a single minute is said in words, leaving no number. A wait
+ * never named fails.
+ */
+export const saysTheWait = async (
+  alert: Locator,
+  waitSeconds: number | undefined,
 ): Promise<void> => {
-  const { word } = refused;
-  await expect(alert).toHaveText(sentenceOf(refused.table[word]));
-  await expect(alert.page().locator("body"), `the page shows the word ${word}`).not.toContainText(
-    word,
+  const minutes = Math.ceil((waitSeconds ?? 0) / 60);
+  expect(minutes, "the ceiling's answer named no wait").toBeGreaterThan(0);
+  await expect(alert, `the alert does not say a wait of ${String(minutes)} minutes`).toHaveText(
+    minutes > 1 ? new RegExp(String.raw`\b${String(minutes)}\b`) : /\S/,
   );
 };
+
+/** The word stays off the page: it is for the logs and the wire. */
+export const keepsItsWordOffThePage = (page: Page, word: RefusalWord): Promise<void> =>
+  expect(page.locator("body"), `the page shows the word ${word}`).not.toContainText(word);
 
 /** The key in fours, as the page writes it out for typing into a phone. */
 const KEY_IN_FOURS = /^[A-Z2-7]{4}(?: [A-Z2-7]{1,4})+$/;

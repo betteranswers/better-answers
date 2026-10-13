@@ -4,14 +4,6 @@ import { z } from "zod";
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
 import {
-  codeWrong,
-  noLongerAMember,
-  PICK_REFUSED,
-  SOLE_PICK_REFUSED,
-  tooManyCodesAskedFor,
-  WORKSPACES_UNREAD,
-} from "@/features/auth/refusal-words.ts";
-import {
   codeSent,
   newCodeSent,
   sendingANewCode,
@@ -24,7 +16,6 @@ import {
   PICKER_WORDS,
 } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -36,6 +27,7 @@ import {
   clockTheNextKey,
   codeSentTo,
   confirmedWhenAsked,
+  drawnMarks,
   invite,
   keystrokesButton,
   keystrokesDismissed,
@@ -46,14 +38,17 @@ import {
   provision,
   quoted,
   removeMember,
+  saysAnotherRefusal,
+  saysARefusal,
+  saysTheWait,
   signedInAtHome,
   signedInWithNoWorkspace,
   signIn,
   signInHeading,
   theActionLandedWithinItsBudget,
   tokenColour,
-  drawnMarks,
 } from "./harness.ts";
+import { authAnswering } from "./refused-read.ts";
 
 const thePicker = (page: Page) =>
   page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading });
@@ -81,8 +76,7 @@ const theSendIsRefusedNamingItsWait = async (page: Page, email: string): Promise
   const answered = theSendsAnswer(page);
   await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
 
-  const said = sentenceOf(tooManyCodesAskedFor(await waitNamedBy(answered)));
-  await expect(page.getByRole("alert")).toHaveText(said);
+  await saysTheWait(page.getByRole("alert"), await waitNamedBy(answered));
 };
 
 /** From the email step the page shows to the code step, through the product's own page. */
@@ -97,10 +91,13 @@ const atTheCodeStep = async (page: Page, email: string): Promise<void> => {
   await sendTheFirstCode(page, email);
 };
 
+/** The page counts the tries left itself, so the alert's number is all that says them. */
+const triesLeft = (left: number): RegExp => new RegExp(String.raw`\b${String(left)}\b`);
+
 /** Wrong unless the code sent was six zeros, one chance in a million. */
 const aWrongCodeIsRefused = async (page: Page): Promise<void> => {
   await codeField(page).fill("000000");
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(codeWrong(2)));
+  await expect(page.getByRole("alert")).toHaveText(triesLeft(2));
 };
 
 /** Never the code sent: six digits `step` past it, wrapping at a million. */
@@ -537,8 +534,7 @@ test("names the wait when a new code meets the ceiling", async ({
   await page.keyboard.press("n");
   await theActionLandedWithinItsBudget(page, "send a new code");
 
-  const said = sentenceOf(tooManyCodesAskedFor(await waitNamedBy(answered)));
-  await expect(page.getByRole("alert")).toHaveText(said);
+  await saysTheWait(page.getByRole("alert"), await waitNamedBy(answered));
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("e");
@@ -612,8 +608,10 @@ test("sends a wrong code once, selected, naming two tries left", async ({ page, 
   const code = await codeSentTo(request, email);
   const sent = codesSentFrom(page);
 
+  const refused = authAnswering(page, SIGN_IN_PATH);
   await codeField(page).fill(notTheCode(code, 1));
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(codeWrong(2)));
+  expect(await refused).toMatchObject({ status: 400, code: "INVALID_OTP" });
+  await expect(page.getByRole("alert")).toHaveText(triesLeft(2));
   await expect(codeField(page)).toBeFocused();
   await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
   const selected = await codeField(page).evaluate((field: HTMLInputElement) => [
@@ -624,7 +622,7 @@ test("sends a wrong code once, selected, naming two tries left", async ({ page, 
 
   await page.keyboard.press("Enter");
   await page.keyboard.type(notTheCode(code, 2));
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(codeWrong(1)));
+  await expect(page.getByRole("alert")).toHaveText(triesLeft(1));
   expect(sent, "the refused code was sent again").toHaveLength(2);
 });
 
@@ -645,10 +643,16 @@ test("a third wrong code hands focus to sending another", async ({ page, request
   await atTheCodeStep(page, email);
   const code = await codeSentTo(request, email);
 
-  for (const left of [2, 1, 0]) {
+  for (const left of [2, 1]) {
     await codeField(page).fill(notTheCode(code, 3 - left));
-    await expect(page.getByRole("alert")).toHaveText(sentenceOf(codeWrong(left)));
+    await expect(page.getByRole("alert")).toHaveText(triesLeft(left));
   }
+  const oneLeft = await page.getByRole("alert").innerText();
+  // The api refuses the third as it did the first; the page's own count makes it the last.
+  const third = authAnswering(page, SIGN_IN_PATH);
+  await codeField(page).fill(notTheCode(code, 3));
+  expect(await third).toMatchObject({ status: 400, code: "INVALID_OTP" });
+  await saysAnotherRefusal(page.getByRole("alert"), oneLeft);
 
   await anotherCodeSignsIn(page, request, email);
 });
@@ -660,10 +664,12 @@ test("an expired code reads as spent, handing focus to another", async ({ page, 
   const code = await codeSentTo(request, email);
   await ageTheCode(request, email);
 
+  const refused = authAnswering(page, SIGN_IN_PATH);
   await codeField(page).fill(code);
-  await expect(page.getByRole("alert"), "the expired code was not refused as spent").toHaveText(
-    sentenceOf(codeWrong(0)),
-  );
+  expect(await refused, "the expired code was not refused as spent").toMatchObject({
+    code: "OTP_EXPIRED",
+  });
+  await saysARefusal(page.getByRole("alert"));
 
   await anotherCodeSignsIn(page, request, email);
 });
@@ -813,9 +819,14 @@ test("drops and names a workspace the person was removed from", async ({
   await expect(page.getByRole("button", { name: second.name })).toBeVisible();
 
   await removeMember(request, { workspaceId: second.workspaceId, userId: first.admin.id });
+  const refused = authAnswering(page, "/organization/set-active");
   await page.getByRole("button", { name: second.name }).click();
 
-  await expect(page.getByRole("alert")).toHaveText(noLongerAMember(second.name));
+  expect(await refused).toMatchObject({
+    status: 403,
+    code: "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION",
+  });
+  await expect(page.getByRole("alert")).toContainText(second.name);
   await expect(thePicker(page)).toBeVisible();
   await expect(page.getByRole("button", { name: second.name })).toHaveCount(0);
   const stillMine = page.getByRole("button", { name: first.name });
@@ -835,7 +846,7 @@ test("stops at one refused pick of a sole workspace", async ({ page, request }) 
   });
   await page.goto("/choose-workspace");
 
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(SOLE_PICK_REFUSED));
+  await saysARefusal(page.getByRole("alert"));
   await expect(thePicker(page)).toBeVisible();
   expect(picks, "a refused pick was asked again").toBe(1);
 });
@@ -853,7 +864,7 @@ test("keeps the list, saying so, when a pick is refused", async ({ page, request
   const picked = page.getByRole("button", { name: second.name });
   await picked.click();
 
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(PICK_REFUSED));
+  await saysARefusal(page.getByRole("alert"));
   await expect(picked).toBeFocused();
   await expect(page.getByRole("button", { name: first.name })).toBeVisible();
 });
@@ -882,7 +893,7 @@ test("separates an unread workspace list from no workspace, offering retry", asy
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  await expect(page.getByRole("alert")).toHaveText(WORKSPACES_UNREAD, { timeout: 15_000 });
+  await saysARefusal(page.getByRole("alert"), { timeout: 15_000 });
   await expect(thePicker(page)).toBeVisible();
 
   await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toHaveCount(0);

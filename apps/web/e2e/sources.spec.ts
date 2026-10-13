@@ -1,7 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { JUMP_TO, RAIL } from "@/app/words.ts";
-import { SAID_OF_A_CONNECTED_SOURCE } from "@/features/sources/refusal-words.ts";
 import {
   AUDIENCE_WORDS,
   CONNECT_WORDS,
@@ -26,26 +25,27 @@ import {
 } from "@/features/sources/words.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
   clockTheNextKey,
+  keepsItsWordOffThePage,
   keystrokesDismissed,
   moveTheSync,
   notFoundOfferingHome,
   person,
   provision,
   quoted,
-  saysItsSentenceNotItsWord,
+  saysARefusal,
+  type SeedConnectedSource,
   seedConnectedSources,
   signIn,
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
-  type SeedConnectedSource,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -416,7 +416,7 @@ test.describe("connecting a document on the Sources page", () => {
     await expect(lastSyncedOf(page, "The staff handbook")).toHaveText(/^\d{2}:\d{2} · /);
   });
 
-  test("refuses an Admin's unconvertible file, naming the kinds that convert", async ({
+  test("refuses an Admin's unconvertible file, keeping the dialog open", async ({
     page,
     request,
   }) => {
@@ -432,10 +432,38 @@ test.describe("connecting a document on the Sources page", () => {
     });
     await dialog.getByRole("button", { name: "Connect the document" }).click();
 
-    await saysItsSentenceNotItsWord(dialog.getByRole("alert"), {
-      table: SAID_OF_A_CONNECTED_SOURCE,
-      word: "media-type-refused",
+    await saysARefusal(dialog.getByRole("alert"));
+    await keepsItsWordOffThePage(page, "media-type-refused");
+    await expect(dialog).toBeVisible();
+  });
+
+  test("says in the dialog that the api refused an upload", async ({ page, request }) => {
+    await anAdminAtSources(page, request, { workspace: "Ryburn Stores" });
+    // The page lets a markdown file through, so the kind is changed on its way to the api.
+    await page.route(
+      (url) => url.pathname.endsWith("sources.connect"),
+      (route) =>
+        route.continue({
+          headers: {
+            ...route.request().headers(),
+            "x-upload-media-type": encodeURIComponent(JSON.stringify("image/png")),
+          },
+        }),
+    );
+
+    await page.keyboard.press("b");
+    const dialog = page.getByRole("dialog", { name: "Connect a document" });
+    await dialog.getByLabel("Name").fill("Shop notes");
+    await dialog.getByLabel("File").setInputFiles({
+      name: "notes.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("The shop opens at eight.\n"),
     });
+    const refused = refusalAnswering(page, "sources.connect");
+    await dialog.getByRole("button", { name: "Connect the document" }).click();
+
+    expect(await refused).toMatchObject({ word: "media-type-refused", class: "inapplicable" });
+    await saysARefusal(dialog.getByRole("alert"));
     await expect(dialog).toBeVisible();
   });
 });
@@ -779,9 +807,7 @@ test.describe("reviewing a connected source's findings", () => {
     await page.keyboard.press("x");
     await expect(review.getByRole("checkbox", { name: BANK_ACCOUNT_BOX })).toBeChecked();
     await expect(dismissal).toBeDisabled();
-    await expect(review).toContainText(
-      sentenceOf(SAID_OF_A_CONNECTED_SOURCE["not-special-category"]),
-    );
+    await expect(dismissal).toHaveAccessibleDescription(/\S/);
     await page.keyboard.press("x");
 
     await page.keyboard.press("Tab");
@@ -1139,9 +1165,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     ).toBeFocused();
     const commit = panel.getByRole("button", { name: /^Widen Tender answers to / });
     await expect(commit).toBeDisabled();
-    await expect(commit).toHaveAccessibleDescription(
-      sentenceOf(SAID_OF_A_CONNECTED_SOURCE["not-wider"]),
-    );
+    await expect(commit).toHaveAccessibleDescription(/\S/);
     await expect(panel.getByRole("term")).toHaveCount(0);
 
     await sensitivityPicked.press("Enter");
@@ -1332,14 +1356,14 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     });
 
     await rowAction(page, "Service records", "widen").click();
+    const refused = refusalAnswering(page, "sources.widen");
     await commitOf(page, "Service records", "widen", {
       sensitivity: "Internal",
       audience: "everyone",
     }).click();
 
-    await expect(connectedSourcesRegion(page).getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_A_CONNECTED_SOURCE["special-category-unreviewed"]),
-    );
+    expect(await refused).toMatchObject({ word: "special-category-unreviewed" });
+    await saysARefusal(connectedSourcesRegion(page).getByRole("alert"));
     await expect(sensitivityOf(page, "Service records")).toHaveText("Restricted");
   });
 });

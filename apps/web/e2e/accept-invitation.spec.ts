@@ -1,11 +1,9 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { INVITATION_ACTIONS, INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
-import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
-import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
+import { DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import type { Role } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -13,6 +11,7 @@ import {
   anAddress,
   clockTheNextKey,
   invite,
+  keepsItsWordOffThePage,
   keystrokesDismissed,
   keystrokesListed,
   landedAtHome,
@@ -20,17 +19,22 @@ import {
   personMenuOpened,
   provision,
   quoted,
-  saysItsSentenceNotItsWord,
+  saysARefusal,
   signIn,
   signInHeading,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const READ_BUDGET_MS = 1000;
 
 const INVITER = "Morgan Reid";
 
 const SESSION_READ = "**/get-session*";
+
+const THE_INVITATION = "person.invitation";
+
+const THE_JOIN = "person.acceptInvitation";
 
 const invitationHeading = (page: Page, workspace: string) =>
   page.getByRole("heading", { level: 1, name: INVITATION_WORDS.heading(workspace) });
@@ -141,17 +145,17 @@ test("refuses a bad name, joining nothing until it is fixed", async ({
   await signIn(page, request, address);
 
   await nameField(page).fill("Priya <priya@acme.invalid>");
+  const refused = refusalAnswering(page, "person.setDisplayName");
   await joinButton(page, "Harrow Glazing").click();
 
+  expect(await refused).toMatchObject({ word: "display-name-angle-bracket" });
   const refusal = page.getByRole("alert");
-  await saysItsSentenceNotItsWord(refusal, {
-    table: DISPLAY_NAME_REFUSED,
-    word: "display-name-angle-bracket",
-  });
+  await saysARefusal(refusal);
+  await keepsItsWordOffThePage(page, "display-name-angle-bracket");
   await expect(refusal).toHaveCount(1);
   await expect(nameField(page)).toHaveAttribute("aria-invalid", "true");
   await expect(nameField(page)).toHaveAccessibleDescription(
-    `${DISPLAY_NAME_WORDS.hint} ${sentenceOf(DISPLAY_NAME_REFUSED["display-name-angle-bracket"])}`,
+    `${DISPLAY_NAME_WORDS.hint} ${await refusal.innerText()}`,
   );
   await expect(invitationHeading(page, "Harrow Glazing")).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${link}$`));
@@ -179,12 +183,12 @@ test("keeps a given name when the join is then refused", async ({
   });
 
   await nameField(page).fill("Ines Moreau");
+  const refused = refusalAnswering(page, THE_JOIN);
   await joinButton(page, "Ashby Survey").click();
 
-  await saysItsSentenceNotItsWord(page.getByRole("alert"), {
-    table: SAID_OF_ACCEPTING,
-    word: "already-a-member",
-  });
+  expect(await refused).toMatchObject({ word: "already-a-member" });
+  await saysARefusal(page.getByRole("alert"));
+  await keepsItsWordOffThePage(page, "already-a-member");
   await passesTheAccessibilityGate();
 
   await page.getByRole("button", { name: INVITATION_ACTIONS.yourWorkspaces }).click();
@@ -215,11 +219,11 @@ test("asks for a name when the join finds none given", async ({
   await expect(joinButton(page, "Selby Roofing")).toBeVisible();
   await expect(nameField(page)).toHaveCount(0);
 
+  const refused = refusalAnswering(page, THE_JOIN);
   await joinButton(page, "Selby Roofing").click();
-  await saysItsSentenceNotItsWord(page.getByRole("alert"), {
-    table: SAID_OF_ACCEPTING,
-    word: "no-display-name",
-  });
+  expect(await refused).toMatchObject({ word: "no-display-name" });
+  await saysARefusal(page.getByRole("alert"));
+  await keepsItsWordOffThePage(page, "no-display-name");
   await expect(nameField(page)).toBeVisible();
   await passesTheAccessibilityGate();
 
@@ -240,14 +244,15 @@ test("refuses a person at another address, offering the invited one", async ({
   await person(request, other, { displayName: "Theo Other" });
 
   await page.goto(link);
+  const refused = refusalAnswering(page, THE_INVITATION);
   await signIn(page, request, other);
 
-  const refused = sentenceOf(SAID_OF_ACCEPTING["invitation-for-another-address"]);
-  await expect(page.getByRole("alert")).toHaveText(refused);
+  expect(await refused).toMatchObject({ word: "invitation-for-another-address" });
+  await saysARefusal(page.getByRole("alert"));
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${quoted(INVITATION_WORDS.untitled)} [level=1]
-      - alert: ${quoted(refused)}
+      - alert
       - button ${quoted(INVITATION_ACTIONS.anotherAddress)}
       - button "Sign out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
@@ -271,11 +276,11 @@ test("tells a named person a stray link names no invitation", async ({ page, req
   await person(request, address, { displayName: "Una Price" });
 
   await page.goto("/invitations/01J0000000000000000000000Z");
+  const refused = refusalAnswering(page, THE_INVITATION);
   await signIn(page, request, address);
 
-  await saysItsSentenceNotItsWord(page.getByRole("alert"), {
-    table: SAID_OF_ACCEPTING,
-    word: "no-such-invitation",
-  });
+  expect(await refused).toMatchObject({ word: "no-such-invitation" });
+  await saysARefusal(page.getByRole("alert"));
+  await keepsItsWordOffThePage(page, "no-such-invitation");
   await expect(page.getByRole("button", { name: /^Join/ })).toHaveCount(0);
 });

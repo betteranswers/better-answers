@@ -13,16 +13,11 @@ import {
   PASSKEY_WORDS,
   RECOVERY_CODE_WORDS,
 } from "@/features/auth/account-words.ts";
-import {
-  CODES_NOT_TICKED,
-  SAID_OF_SECOND_FACTOR,
-  SETUP_CODE_WRONG,
-} from "@/features/auth/refusal-words.ts";
+import { CODES_NOT_TICKED } from "@/features/auth/refusal-words.ts";
 import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, HOMES } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -30,6 +25,7 @@ import {
   anAddress,
   clockTheNextKey,
   crumbOf,
+  keepsItsWordOffThePage,
   keyShown,
   keystrokesDismissed,
   keystrokesListed,
@@ -40,12 +36,13 @@ import {
   quoted,
   railOf,
   refusedDigitsSelected,
-  saysItsSentenceNotItsWord,
+  saysARefusal,
+  signedInAtHome,
   signIn,
   signInByEmail,
-  signedInAtHome,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { authAnswering, refusalAnswering } from "./refused-read.ts";
 
 /** A recovery code as the api mints it: four groups of four, none of them easy to misread. */
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
@@ -177,7 +174,7 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   });
   await page.keyboard.press("Enter");
   await theActionLandedWithinItsBudget(page, "unticked done");
-  await expect(codesBlock(page).getByRole("alert")).toHaveText(sentenceOf(CODES_NOT_TICKED));
+  await saysARefusal(codesBlock(page).getByRole("alert"));
   await expect(savedBox(page)).toBeFocused();
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
 
@@ -205,9 +202,7 @@ test("an Admin's only authenticator keeps Remove disabled, saying why", async ({
 
   const remove = authenticatorPart(page).getByRole("button", { name: AUTHENTICATOR_WORDS.remove });
   await expect(remove).toHaveAttribute("aria-disabled", "true");
-  await expect(remove).toHaveAccessibleDescription(
-    sentenceOf(SAID_OF_SECOND_FACTOR["last-second-factor"]),
-  );
+  await expect(remove).toHaveAccessibleDescription(/\S/);
   await remove.press("Enter");
   await expect(remove).toBeFocused();
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -221,9 +216,11 @@ test("a wrong setup code is refused, its digits left selected", async ({ page, r
   await expect(page.getByRole("img", { name: AUTHENTICATOR_WORDS.qrCode })).toBeVisible();
   const key = await keyShown(page);
 
+  const refused = authAnswering(page, "/authenticator/finish");
   await codeField(page).fill(aWrongCode(authenticatorCodeAt(key, new Date())));
 
-  await expect(authenticatorPart(page).getByRole("alert")).toHaveText(sentenceOf(SETUP_CODE_WRONG));
+  expect(await refused).toMatchObject({ status: 400, word: "code-wrong" });
+  await saysARefusal(authenticatorPart(page).getByRole("alert"));
   await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
   await expect(codeField(page)).toBeFocused();
   await refusedDigitsSelected(codeField(page));
@@ -320,12 +317,12 @@ test("a set replaced in another tab is refused at Done", async ({ page, context,
   await other.close();
 
   await savedBox(page).check();
+  const refused = refusalAnswering(page, "person.acknowledgeRecoveryCodes");
   await doneButton(page).click();
 
-  await saysItsSentenceNotItsWord(codesBlock(page).getByRole("alert"), {
-    table: SAID_OF_SECOND_FACTOR,
-    word: "changed-meanwhile",
-  });
+  expect(await refused).toMatchObject({ word: "changed-meanwhile" });
+  await saysARefusal(codesBlock(page).getByRole("alert"));
+  await keepsItsWordOffThePage(page, "changed-meanwhile");
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
 });
 

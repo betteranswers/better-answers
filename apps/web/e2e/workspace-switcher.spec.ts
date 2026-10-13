@@ -1,10 +1,8 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { ALL_WORKSPACES, FAILED_PAGE, JUMP_TO, ROLE_UNREAD } from "@/app/words.ts";
-import { noLongerAMemberOf, PICK_REFUSED, SWITCHER_UNREAD } from "@/features/auth/refusal-words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { CONSOLE, CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -17,11 +15,13 @@ import {
   person,
   railOf,
   removeMember,
+  saysARefusal,
   signOutFromTheShell,
   switched,
   switcherMenuOf,
   switcherOf,
 } from "./harness.ts";
+import { authAnswering } from "./refused-read.ts";
 
 const SWITCH_BUDGET_MS = 1000;
 
@@ -50,6 +50,9 @@ const saidInTheBand = (page: Page): Locator =>
 
 const refusedInTheBand = (page: Page): Locator =>
   page.getByRole("banner").getByRole("alert", { includeHidden: true });
+
+/** Better Auth's code for a switch to a workspace the person has left. */
+const NOT_A_MEMBER = "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION";
 
 const memberLink = (page: Page, name: string): Locator =>
   page.getByRole("main").getByRole("link", { name, exact: true });
@@ -310,9 +313,11 @@ test("says a refused switch in the band, keeping the page", async ({
   const leaving = workspacesIn(switcherMenuOf(page, first.name)).filter({ hasText: second.name });
   await expect(leaving).toBeVisible();
   await removeMember(request, { workspaceId: second.workspaceId, userId: first.admin.id });
+  const refused = authAnswering(page, "/organization/set-active");
   await leaving.click();
 
-  await expect(refusedInTheBand(page)).toHaveText(sentenceOf(noLongerAMemberOf(second.name)));
+  expect(await refused).toMatchObject({ status: 403, code: NOT_A_MEMBER });
+  await expect(refusedInTheBand(page)).toContainText(second.name);
   await expect(switcherOf(page, first.name), "focus left the switcher").toBeFocused();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
   await expect(memberLink(page, "Only In Kept")).toBeVisible();
@@ -343,6 +348,7 @@ test("says a pending switch's refusal, holding others until it answers", async (
   });
   const release = await heldBack(page, "**/organization/set-active");
 
+  const refused = authAnswering(page, "/organization/set-active");
   await switched(page, first.name, second.name);
   await expect(saidInTheBand(page)).toHaveText(PICKER_WORDS.opening);
 
@@ -371,8 +377,9 @@ test("says a pending switch's refusal, holding others until it answers", async (
   await removeMember(request, { workspaceId: second.workspaceId, userId: first.admin.id });
   release();
 
-  await expect(refusedInTheBand(page), "the first switch's refusal was lost").toHaveText(
-    sentenceOf(noLongerAMemberOf(second.name)),
+  expect(await refused).toMatchObject({ status: 403, code: NOT_A_MEMBER });
+  await expect(refusedInTheBand(page), "the first switch's refusal was lost").toContainText(
+    second.name,
   );
   await expect(switcherOf(page, first.name)).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
@@ -383,7 +390,7 @@ test("says a pending switch's refusal, holding others until it answers", async (
 const unansweredSwitch = async (page: Page, from: string, to: string): Promise<void> => {
   await page.route("**/organization/set-active", (route) => route.abort());
   await switched(page, from, to);
-  await expect(refusedInTheBand(page)).toHaveText(sentenceOf(PICK_REFUSED));
+  await saysARefusal(refusedInTheBand(page));
 };
 
 test("says an unanswered switch in the band, keeping the page", async ({ page, request }) => {
@@ -510,9 +517,7 @@ test("says an unread list, and how to read it again", async ({ page, request }) 
 
   await switcherOf(page, first.name).click();
 
-  await expect(refusedInTheBand(page)).toHaveText(sentenceOf(SWITCHER_UNREAD), {
-    timeout: 15_000,
-  });
+  await saysARefusal(refusedInTheBand(page), { timeout: 15_000 });
   await expect(workspacesIn(switcherMenuOf(page, first.name))).toHaveText([
     listedAs(first.name, "Admin"),
   ]);

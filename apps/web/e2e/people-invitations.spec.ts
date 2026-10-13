@@ -5,16 +5,13 @@ import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
   INVITATIONS_WORDS,
-  INVITE_REFUSED,
   INVITE_WORDS,
   STATUS_WORDS,
 } from "@/features/people/invitation-words.ts";
 import { BULK_WORDS } from "@/features/people/member-action-words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
-import { invitationsCeiling, SAID_OF_TICKED_INVITATIONS } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, INVITE_A_PERSON, pageNamed } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -30,11 +27,14 @@ import {
   person,
   provision,
   editorPickedByKeyboard,
+  saysARefusal,
+  saysTheWait,
   signIn,
   tabOpenedByKeyboard,
   tabUntilFocused,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
@@ -329,9 +329,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(sendButton(page)).toBeDisabled();
     await addressField(page).press("Enter");
     await expect(removeOf(page, editor.toUpperCase())).toBeFocused();
-    await expect(inviteDialog(page).getByRole("alert")).toHaveText(
-      sentenceOf(INVITE_REFUSED.flagged),
-    );
+    await saysARefusal(inviteDialog(page).getByRole("alert"));
     await page.keyboard.press("Escape");
     await expect(inviteAction(page)).toBeFocused();
     await expect(invitationRows(page)).toHaveCount(0);
@@ -347,11 +345,12 @@ test.describe("the People page's Invitations tab", () => {
     const made = await person(request, joined, { displayName: "Ola Joined" });
     await addMember(request, { workspaceId: at.workspaceId, userId: made.id, role: "Viewer" });
     await addressField(page).fill(`${other}, ${joined}`);
+    const refused = refusalAnswering(page, "members.invite");
     await sendButton(page).click();
 
-    await expect(inviteDialog(page).getByRole("alert")).toHaveText(
-      sentenceOf(INVITE_REFUSED.flagged),
-    );
+    // An item is named by its address's place in the send.
+    expect((await refused).items).toEqual({ 1: "already-a-member" });
+    await saysARefusal(inviteDialog(page).getByRole("alert"));
     await expect(removeOf(page, joined)).toBeFocused();
     await expect(removeOf(page, joined)).toHaveAccessibleDescription(
       INVITE_WORDS.flag["already-a-member"],
@@ -382,9 +381,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(sendButton(page)).toBeDisabled();
     await addressField(page).press("Enter");
     await expect(removeOf(page, "not-an-address")).toBeFocused();
-    await expect(inviteDialog(page).getByRole("alert")).toHaveText(
-      sentenceOf(INVITE_REFUSED.flagged),
-    );
+    await saysARefusal(inviteDialog(page).getByRole("alert"));
     expect(await emailsSentTo(request, ana), "the flagged send sent nothing").toBe(0);
 
     await page.keyboard.press("Enter");
@@ -431,9 +428,7 @@ test.describe("the People page's Invitations tab", () => {
 
     await expect(heldAddresses(page)).toHaveCount(50);
     await expect(addressField(page)).toHaveValue(late);
-    await expect(inviteDialog(page).getByRole("alert")).toHaveText(
-      sentenceOf(INVITE_REFUSED.capped(50)),
-    );
+    await saysARefusal(inviteDialog(page).getByRole("alert"));
     await expect(sendButton(page)).toHaveText(INVITE_WORDS.send(50));
     await sendButton(page).click();
 
@@ -620,14 +615,12 @@ test.describe("the People page's Invitations tab", () => {
 
     await dialogOpened(page);
     await addressField(page).fill(capped);
-    const refused = page.waitForResponse((answer) => answer.url().includes("members.invite"));
+    const refused = refusalAnswering(page, "members.invite");
     await sendButton(page).click();
-    const liftsInSeconds = Number((await refused).headers()["retry-after"]);
+    const { status, waitSeconds } = await refused;
 
-    expect(liftsInSeconds, "the ceiling's answer named no wait").toBeGreaterThan(0);
-    await expect(inviteDialog(page).getByRole("alert")).toHaveText(
-      sentenceOf(invitationsCeiling(liftsInSeconds)),
-    );
+    expect(status, "the send met no ceiling").toBe(429);
+    await saysTheWait(inviteDialog(page).getByRole("alert"), waitSeconds);
     await expect(sendButton(page)).toBeFocused();
   });
 
@@ -758,13 +751,13 @@ test.describe("the People page's Invitations tab", () => {
       "2 invitations selected, 2 not shown.",
     );
     expect(await actedAside(page, here, "cancelInvitation", { invitationId: ids[0] })).toBe(200);
+    const refused = refusalAnswering(page, "members.bulkResendInvitations");
     await selectionAction(page, INVITATIONS_WORDS.resend).click();
 
+    expect((await refused).items).toEqual({ [ids[0] ?? ""]: "no-such-invitation" });
     const refusal = invitationsRegion(page).getByRole("alert");
     await expect(refusal).toContainText(INVITATIONS_WORDS.bulk.refused(1));
-    await expect(refusal).toContainText(
-      `${gone}: ${sentenceOf(SAID_OF_TICKED_INVITATIONS["no-such-invitation"])}`,
-    );
+    await expect(refusal.getByRole("listitem")).toContainText([gone]);
     await expect(page.getByRole("toolbar", { name: INVITATIONS_WORDS.selected })).toContainText(
       "2 invitations selected, 2 not shown.",
     );

@@ -11,10 +11,8 @@ import {
   signingInAs,
   worksUntil,
 } from "@/features/auth/link-words.ts";
-import { tooManyCodesTried } from "@/features/auth/refusal-words.ts";
 import { newCodeSent, SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test as base } from "./browser.ts";
 import {
@@ -28,6 +26,7 @@ import {
   person,
   provision,
   quoted,
+  saysTheWait,
   signInHeading,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
@@ -255,7 +254,7 @@ test("a refused read offers to check the link again", async ({
   await refusedOnceAt(page, DESCRIBE_PATH, 60);
 
   await page.goto(linkTo(token));
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(tooManyCodesTried(60)));
+  await saysTheWait(page.getByRole("alert"), 60);
   await passesTheAccessibilityGate();
   await page.keyboard.press("r");
 
@@ -276,7 +275,7 @@ test("a ceiling's refusal names its wait, keeping Sign in focused", async ({
   await expect(signInButton(page)).toBeFocused();
 
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(tooManyCodesTried(120)));
+  await saysTheWait(page.getByRole("alert"), 120);
   await expect(signInButton(page)).toBeFocused();
   await passesTheAccessibilityGate();
 
