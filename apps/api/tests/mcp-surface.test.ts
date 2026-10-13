@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -15,7 +15,7 @@ import {
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
-import { JUDGE_STATES, QUESTION_VERDICTS } from "@better-answers/schema";
+import { JUDGE_STATES, QUESTION_VERDICTS, ULID } from "@better-answers/schema";
 
 import { MCP_TOKEN_RULE, MCP_UNAUTHENTICATED_IP_RULE } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
@@ -205,8 +205,6 @@ const aLongBodyOf = (sentence: string): string =>
     .slice(0, A_LONG_BODY_CHARACTERS);
 
 const RETENTION_QUESTION = "How long are audit logs kept?";
-
-const A_RECORD_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const answered = z.object({
   verdict: z.string(),
@@ -573,7 +571,7 @@ describe("ask, on the own-transaction road", () => {
       question: "What accreditations do we hold?",
     });
 
-    expect(answer.recordId).toMatch(A_RECORD_ID);
+    expect(answer.recordId).toMatch(ULID);
     expect(await recordsKeptIn(workspace.workspaceId)).toEqual([
       { id: answer.recordId, transport: "mcp", verdict: "refuse", completed: true },
     ]);
@@ -597,23 +595,31 @@ describe("ask, on the own-transaction road", () => {
     );
   });
 
-  it.each([
-    ["a question holding a NUL", { question: "audit\u0000logs" }],
-    ["a question over 2,000 characters", { question: "a".repeat(2_001) }],
-    [
-      "a question naming 21 collections",
-      {
-        question: RETENTION_QUESTION,
-        collections: Array.from({ length: 21 }, (_, nth) => `collection-${String(nth)}`),
-      },
-    ],
-  ])("keeps no record of %s", async (_case, args) => {
-    const { workspace, client, token } = await connect();
+  describe("refused where the call enters", () => {
+    let connected: Awaited<ReturnType<typeof connect>>;
 
-    const refused = await result(await callTool(client, token, "ask", args), toolCalled);
+    beforeAll(async () => {
+      connected = await connect();
+    });
 
-    expect(refused.isError).toBe(true);
-    expect(await recordsKeptIn(workspace.workspaceId)).toEqual([]);
+    it.each([
+      ["a question holding a NUL", { question: "audit\u0000logs" }],
+      ["a question over 2,000 characters", { question: "a".repeat(2_001) }],
+      [
+        "a question naming 21 collections",
+        {
+          question: RETENTION_QUESTION,
+          collections: Array.from({ length: 21 }, (_, nth) => `collection-${String(nth)}`),
+        },
+      ],
+    ])("keeps no record of %s", async (_case, args) => {
+      const { workspace, client, token } = connected;
+
+      const refused = await result(await callTool(client, token, "ask", args), toolCalled);
+
+      expect(refused.isError).toBe(true);
+      expect(await recordsKeptIn(workspace.workspaceId)).toEqual([]);
+    });
   });
 
   it("answers from its entry points when the walk times out", async () => {
@@ -672,7 +678,7 @@ describe("ask, on the own-transaction road", () => {
     );
 
     expect(await recordsKeptIn(workspace.workspaceId)).toEqual([
-      { id: expect.stringMatching(A_RECORD_ID), transport: "mcp", verdict: null, completed: false },
+      { id: expect.stringMatching(ULID), transport: "mcp", verdict: null, completed: false },
     ]);
     expect([failed.isError, firstText(failed), failed.structuredContent]).toEqual([
       true,

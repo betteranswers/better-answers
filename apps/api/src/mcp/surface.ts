@@ -117,8 +117,8 @@ const stepsFor = (
 });
 
 /**
- * On the own-transaction road the member is resolved and the connection released before the
- * entry runs.
+ * One transaction holds the first road's entry. The own-transaction road's member outlives the
+ * transaction that resolved it, and each step re-judges it.
  */
 const answeredOnItsRoad = async (
   doors: RoadDoors,

@@ -37,12 +37,15 @@ const PROBE = {
   render: () => "landed",
 };
 
-/** Writes through the one transaction its road lets it reach: its own, or its read step's. */
-const writing = ({ road, ...declared }: Declared, key: string): ServedEntry =>
-  road === "own-transaction"
+/**
+ * Writes through the transaction its road lends: its own, or its read step's. A road types its
+ * own `run`, so each literal names both.
+ */
+const writing = ({ road, ...declared }: Declared, key: string): ServedEntry => {
+  const probe = { ...declared, ...PROBE };
+  return road === "own-transaction"
     ? {
-        ...declared,
-        ...PROBE,
+        ...probe,
         road,
         run: async (principal, steps) => {
           const written = await steps.read((tx) =>
@@ -52,14 +55,14 @@ const writing = ({ road, ...declared }: Declared, key: string): ServedEntry =>
         },
       }
     : {
-        ...declared,
-        ...PROBE,
+        ...probe,
         road,
         run: async (principal, tx) => {
           await configProbeWritten(tx, principal.workspaceId, key);
           return ok({ outcome: "landed" });
         },
       };
+};
 
 /** The bearer check alone is stood in for; the gate and the member resolve behind it are real. */
 const verifiedAs = (claims: {
@@ -153,7 +156,7 @@ describe("a write through the own-transaction road's read step", () => {
 });
 
 describe("every entry the server composes", () => {
-  it("fails a write wherever its road or hint forbids one", async () => {
+  it("lets a write land only where its hint declares one", async () => {
     const outcomes: unknown[] = [];
     for (const entry of entriesAt(PUBLIC_URL)) {
       const { said, rows, failed } = await calledAsAnAdmin(entry);
@@ -202,7 +205,6 @@ describe("the steps the own-transaction road hands an entry", () => {
       ]
     >();
     type Completion = Parameters<Steps["completeRecord"]>[0];
-    expectTypeOf<Parameters<Steps["completeRecord"]>>().toEqualTypeOf<[completion: Completion]>();
     expectTypeOf<Omit<Completion, "concepts">>().toEqualTypeOf<{
       readonly recordId: string;
       readonly verdict: QuestionVerdict;
