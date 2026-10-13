@@ -68,7 +68,7 @@ const nothingWider = (connectedSource: ListedConnectedSource): Outcome => ({
   words: `“${connectedSource.name}” is ${sensitivityAndAudienceWords(connectedSource)}, and no sensitivity or audience is wider.`,
 });
 
-type Tell = (outcome: Outcome) => void;
+type Tell = (outcome: Outcome | undefined) => void;
 
 const settledSaying = <Answer,>(tell: Tell, said: (answer: Answer) => ReactNode) => ({
   onSuccess: (answer: Answer) => {
@@ -128,6 +128,8 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
   const commit = (asked: SensitivityAndAudience) => {
     focusOn(connectedSourceHeadingId(connectedSourceId));
     setChanging(undefined);
+    // Cleared as the change is sent, so a second refusal in the same sentence is announced again.
+    tell(undefined);
     if (changing.change === "narrow") {
       narrowAction.mutate(
         {
@@ -317,6 +319,7 @@ export function ConnectedSourcesPage() {
           }}
           onConfirm={(confirmations) => {
             setPublishing(undefined);
+            setOutcome(undefined);
             publishAction.mutate(
               { connectedSourceId: toPublish.connectedSourceId, confirmations },
               settledSaying(

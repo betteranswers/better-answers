@@ -20,6 +20,7 @@ import {
   THE_CHANGE_BEFORE_IS_STILL_GOING,
 } from "@/features/sources/words.ts";
 import { ViewStateSlot } from "@/shared/page-toolbar.tsx";
+import { STOCK } from "@/shared/refusal-words.ts";
 
 import { addressOf, answered } from "./stubbed-api.ts";
 
@@ -255,28 +256,44 @@ const KEEP_REFUSED = {
   },
 };
 
+/** The api's refusal of a widening, in a word this feature lists no sentence for. */
+const WIDEN_REFUSED = {
+  error: {
+    message: "refused",
+    code: -32_003,
+    data: {
+      code: "FORBIDDEN",
+      httpStatus: 403,
+      refusal: { word: "role-forbids", class: "forbidden" },
+    },
+  },
+};
+
 const HELD: ReadonlySet<string> = new Set(["sources.widen", "sources.keepInText"]);
 
+type SourcesApi = {
+  /** Read as each held call arrives, so a test may hold a later call and not an earlier one. */
+  held?: Promise<void>;
+  readonly findings?: readonly GroupOfFindings[];
+  readonly widenRefused?: true;
+};
+
 /** Reads are answered at once; a widening is taken and a keep refused once `held` lets them. */
-const atSources = (
-  api: { readonly held?: Promise<void>; readonly findings?: readonly GroupOfFindings[] } = {},
-) => {
+const atSources = (api: SourcesApi = {}) => {
   const asked: string[] = [];
   const answers: Readonly<Record<string, unknown>> = {
     ...ANSWERS,
     "sources.findings": api.findings ?? [],
   };
+  const refusals = new Map<string, unknown>([["sources.keepInText", KEEP_REFUSED]]);
+  if (api.widenRefused) refusals.set("sources.widen", WIDEN_REFUSED);
   vi.stubGlobal("fetch", async (input: string | URL | Request) => {
     const { pathname } = addressOf(input);
     if (!pathname.startsWith("/trpc/")) return answered({});
     const names = pathname.replace("/trpc/", "").split(",");
     asked.push(...names);
     if (names.some((name) => HELD.has(name))) await api.held;
-    return answered(
-      names.map((name) =>
-        name === "sources.keepInText" ? KEEP_REFUSED : { result: { data: answers[name] } },
-      ),
-    );
+    return answered(names.map((name) => refusals.get(name) ?? { result: { data: answers[name] } }));
   });
   render(
     <Providers clients={createAppClients()}>
@@ -567,6 +584,27 @@ describe("widening a connected source in its row", () => {
     expect(
       await screen.findByText(new RegExp(sensitivityAndAudienceWords(WIDENED), "v")),
     ).toBeDefined();
+  });
+
+  it("empties the alert when a refused widening is sent again", async () => {
+    const api: SourcesApi = { widenRefused: true };
+    atSources(api);
+    const row = await rowOf("Staff handbook");
+    widenOpened(row);
+    fireEvent.click(commitTo(row, WIDENED));
+    const alert = await screen.findByText(STOCK.permission);
+    expect(alert.getAttribute("role")).toBe("alert");
+
+    const second = Promise.withResolvers<void>();
+    api.held = second.promise;
+    widenOpened(row);
+    fireEvent.click(commitTo(row, WIDENED));
+
+    expect(alert.textContent).toBe("");
+    second.resolve();
+    await waitFor(() => {
+      expect(alert.textContent).toBe(STOCK.permission);
+    });
   });
 });
 
