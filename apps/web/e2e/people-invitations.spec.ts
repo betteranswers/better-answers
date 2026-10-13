@@ -2,15 +2,8 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { TAB_WORKSPACE_HEADER } from "@better-answers/schema/tab-workspace";
 
-import {
-  INVITATIONS_WORDS,
-  INVITE_WORDS,
-  STATUS_WORDS,
-} from "@/features/people/invitation-words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
-import { aRole } from "@/features/people/role-meanings.ts";
-import { CONTROL_CENTRE, menuGroupIn, INVITE_A_PERSON, pageNamed } from "@/shared/navigation.ts";
-import { CLEAR_WORDS } from "@/shared/words.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -38,15 +31,15 @@ const people = menuGroupIn(CONTROL_CENTRE, "people");
 
 const LIST_BUDGET_MS = 1000;
 
-const MEMBERS = pageNamed(people, "Members");
-
-const MEMBERS_PAGE = MEMBERS.path;
+const MEMBERS_PAGE = pageNamed(people, "Members").path;
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type Status = keyof typeof STATUS_WORDS;
+const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
+
+type Status = "Waiting" | "Accepted" | "Expired" | "Cancelled";
 
 const invitationsRegion = (page: Page) => page.getByRole("region", { name: "Invitations" });
 
@@ -61,7 +54,7 @@ const rowOf = (page: Page, address: string): Locator =>
   invitationRows(page).filter({ hasText: address });
 
 const statusChoice = (page: Page, status: Status): Locator =>
-  invitationsRegion(page).getByRole("radio", { name: new RegExp(`^${STATUS_WORDS[status]}\\b`) });
+  invitationsRegion(page).getByRole("radio", { name: new RegExp(`^${status}\\b`) });
 
 const shownUnder = async (page: Page, status: Status): Promise<void> => {
   await statusChoice(page, status).click();
@@ -69,7 +62,7 @@ const shownUnder = async (page: Page, status: Status): Promise<void> => {
 };
 
 const countedUnder = (page: Page, status: Status, count: number) =>
-  expect(statusChoice(page, status)).toHaveAccessibleName(`${STATUS_WORDS[status]} ${count}`);
+  expect(statusChoice(page, status)).toHaveAccessibleName(`${status} ${count}`);
 
 const tickOf = (page: Page, address: string): Locator =>
   invitationsRegion(page).getByRole("checkbox", { name: `Select ${address}`, exact: true });
@@ -79,7 +72,7 @@ const menuOf = (page: Page, address: string): Locator =>
 
 const selectionAction = (page: Page, action: string): Locator =>
   page
-    .getByRole("toolbar", { name: INVITATIONS_WORDS.selected })
+    .getByRole("toolbar", { name: "Selected Invitations" })
     .getByRole("button", { name: action, exact: true });
 
 /** The tab's outcome line naming an address, which its count beside it never does. */
@@ -95,26 +88,26 @@ const countIn = (page: Page): Locator => invitationsRegion(page).getByRole("stat
 const outcomeIn = (page: Page): Locator => invitationsRegion(page).getByRole("status").nth(1);
 
 const selectionSaid = (page: Page): Locator =>
-  page.getByRole("toolbar", { name: INVITATIONS_WORDS.selected }).getByRole("status");
+  page.getByRole("toolbar", { name: "Selected Invitations" }).getByRole("status");
 
 /** The count output under the Invitations region's heading. */
 const THE_COUNT = "//section[.//h2[.='Invitations']]//output";
 
-const INVITE = PEOPLE_KEYSTROKES.invite.action;
+const INVITE = "Invite a Person";
 
 const inviteDialog = (page: Page) => page.getByRole("dialog", { name: INVITE });
 
 const inviteAction = (page: Page) => page.getByRole("button", { name: INVITE, exact: true });
 
-const addressField = (page: Page) => inviteDialog(page).getByLabel(INVITE_WORDS.field);
+const addressField = (page: Page) => inviteDialog(page).getByLabel("Email Addresses");
 
 const sendButton = (page: Page) => inviteDialog(page).getByRole("button", { name: /^Send/ });
 
 const heldAddresses = (page: Page) =>
-  inviteDialog(page).getByRole("list", { name: INVITE_WORDS.list }).getByRole("listitem");
+  inviteDialog(page).getByRole("list", { name: "Addresses to Invite" }).getByRole("listitem");
 
 const removeOf = (page: Page, address: string) =>
-  inviteDialog(page).getByRole("button", { name: INVITE_WORDS.remove(address), exact: true });
+  inviteDialog(page).getByRole("button", { name: `Remove ${address}`, exact: true });
 
 /** Every button whose name starts by inviting, so a second one under another name is counted. */
 const invitingButtons = (page: Page) => page.getByRole("button", { name: /^invite/i });
@@ -144,8 +137,7 @@ const resentAsIfItWent = (page: Page) =>
     },
   );
 
-const unsentIn = (where: Locator): Locator =>
-  where.getByRole("region", { name: INVITATIONS_WORDS.unsent });
+const unsentIn = (where: Locator): Locator => where.getByRole("region", { name: "Unsent Emails" });
 
 /** The action as the page's own tRPC client would send it, under the Admin's session. */
 const actedAside = async (
@@ -259,9 +251,7 @@ test.describe("the People page's Invitations tab", () => {
       role,
       "the role's meaning did not follow the pick",
     ).not.toHaveAccessibleDescription(meant);
-    await inviteDialog(page)
-      .getByRole("button", { name: INVITE_WORDS.send(1) })
-      .click();
+    await inviteDialog(page).getByRole("button", { name: "Send Invitation" }).click();
 
     await expect(inviteDialog(page).getByRole("status").first()).toContainText(address);
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();
@@ -281,7 +271,7 @@ test.describe("the People page's Invitations tab", () => {
       page.getByRole("main").getByRole("status").filter({ hasText: /\d/ }),
       "a second count, the members', shows on Invitations",
     ).toHaveCount(1);
-    await countedUnder(page, "waiting", 1);
+    await countedUnder(page, "Waiting", 1);
     expect(await emailsSentTo(request, address), "the invitation's one email").toBe(1);
   });
 
@@ -303,7 +293,7 @@ test.describe("the People page's Invitations tab", () => {
       await expect(inviteAction(page), `focus left the action on ${name}`).toBeFocused();
 
       // Each tab's list sets its own action beside d: the definition after the key's term.
-      const keystrokes = await keystrokesListed(page, MEMBERS.name);
+      const keystrokes = await keystrokesListed(page, "Members");
       const action = keystrokes
         .getByRole("term")
         .filter({ hasText: new RegExp(`^${PEOPLE_KEYSTROKES.remove.key}$`) })
@@ -325,8 +315,8 @@ test.describe("the People page's Invitations tab", () => {
     await expect(invitationsRegion(page)).toMatchAriaSnapshot(`
       - region "Invitations":
         - heading "Invitations" [level=2]
-        - searchbox "${INVITATIONS_WORDS.search}"
-        - radiogroup "${INVITATIONS_WORDS.status}":
+        - searchbox "Search by address"
+        - radiogroup "Status":
           - radio "Waiting 0" [checked]
           - radio "Accepted 0"
           - radio "Expired 0"
@@ -334,7 +324,7 @@ test.describe("the People page's Invitations tab", () => {
         - table:
           - rowgroup:
             - row:
-              - columnheader "${INVITATIONS_WORDS.everyOnThePage}":
+              - columnheader "Select every invitation on this page":
                 - checkbox [disabled]
           - rowgroup:
             - row:
@@ -356,7 +346,7 @@ test.describe("the People page's Invitations tab", () => {
 
     await expect(heldAddresses(page)).toHaveCount(1);
     await expect(removeOf(page, editor.toUpperCase())).toHaveAccessibleDescription(
-      INVITE_WORDS.flag["already-a-member"],
+      "Already a member",
     );
     await expect(sendButton(page)).toBeDisabled();
     await addressField(page).press("Enter");
@@ -384,10 +374,8 @@ test.describe("the People page's Invitations tab", () => {
     expect((await refused).items).toEqual({ 1: "already-a-member" });
     await saysARefusal(inviteDialog(page).getByRole("alert"));
     await expect(removeOf(page, joined)).toBeFocused();
-    await expect(removeOf(page, joined)).toHaveAccessibleDescription(
-      INVITE_WORDS.flag["already-a-member"],
-    );
-    await expect(removeOf(page, other)).toHaveAccessibleDescription(INVITE_WORDS.flag.ready);
+    await expect(removeOf(page, joined)).toHaveAccessibleDescription("Already a member");
+    await expect(removeOf(page, other)).toHaveAccessibleDescription("Ready");
     expect(await emailsSentTo(request, other), "a refused send sent nothing").toBe(0);
   });
 
@@ -403,7 +391,7 @@ test.describe("the People page's Invitations tab", () => {
 
     await expect(heldAddresses(page)).toHaveCount(3);
     await expect(removeOf(page, "not-an-address")).toHaveAccessibleDescription(
-      INVITE_WORDS.flag.malformed,
+      "Invalid email address",
     );
     await expect(
       inviteDialog(page)
@@ -421,7 +409,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(heldAddresses(page)).toHaveCount(2);
     await expect(removeOf(page, ben), "focus goes to the row that took its place").toBeFocused();
     await expect(sendButton(page)).toBeEnabled();
-    await expect(sendButton(page)).toHaveText(INVITE_WORDS.send(2));
+    await expect(sendButton(page)).toHaveText("Send 2 Invitations");
     await sendButton(page).click();
 
     // The form counts its two addresses in a status too, so the outcome is read once Done shows.
@@ -462,7 +450,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(heldAddresses(page)).toHaveCount(50);
     await expect(addressField(page)).toHaveValue(late);
     await saysARefusal(inviteDialog(page).getByRole("alert"));
-    await expect(sendButton(page)).toHaveText(INVITE_WORDS.send(50));
+    await expect(sendButton(page)).toHaveText("Send 50 Invitations");
     await sendButton(page).click();
 
     const sent = inviteDialog(page).getByRole("status").first();
@@ -483,7 +471,7 @@ test.describe("the People page's Invitations tab", () => {
     const done = inviteDialog(page).getByRole("button", { name: "Done" });
     await expect(done).toBeFocused();
     await done.click();
-    await countedUnder(page, "waiting", 51);
+    await countedUnder(page, "Waiting", 51);
   });
 
   test("shows an eight-day-old invitation under Expired, not Waiting", async ({
@@ -496,12 +484,12 @@ test.describe("the People page's Invitations tab", () => {
     );
     await openInvitations(page);
 
-    await countedUnder(page, "waiting", 0);
-    await countedUnder(page, "expired", 1);
+    await countedUnder(page, "Waiting", 0);
+    await countedUnder(page, "Expired", 1);
     await expect(invitationRows(page)).toHaveCount(0);
     await expect(theOneCell(page)).toHaveText(/\S/);
 
-    await shownUnder(page, "expired");
+    await shownUnder(page, "Expired");
     await expect(rowOf(page, old)).toHaveCount(1);
     await expect(page).toHaveURL(/invitations\.status=expired/);
   });
@@ -512,20 +500,20 @@ test.describe("the People page's Invitations tab", () => {
       invitedEach(request, at, [lapsed], anEightDayOldInvitation).then(() => undefined),
     );
     await openInvitations(page);
-    await shownUnder(page, "expired");
+    await shownUnder(page, "Expired");
     const search = invitationsRegion(page).getByRole("searchbox", {
-      name: INVITATIONS_WORDS.search,
+      name: "Search by address",
     });
 
     const nobody = "nobody-at-this-address";
     await search.fill(nobody);
     await expect(invitationRows(page)).toHaveCount(0);
     await expect(invitationsRegion(page), "the empty list names no search").toContainText(nobody);
-    await invitationsRegion(page).getByRole("button", { name: CLEAR_WORDS.search }).click();
+    await invitationsRegion(page).getByRole("button", { name: "Clear Search" }).click();
 
     await expect(search).toHaveValue("");
     await expect(search).toBeFocused();
-    await expect(statusChoice(page, "expired")).toBeChecked();
+    await expect(statusChoice(page, "Expired")).toBeChecked();
     await expect(page).toHaveURL(/invitations\.status=expired/);
     await expect(rowOf(page, lapsed)).toHaveCount(1);
   });
@@ -551,7 +539,7 @@ test.describe("the People page's Invitations tab", () => {
       invitedEach(request, at, [sam]).then(() => undefined),
     );
     await openInvitations(page);
-    await countedUnder(page, "waiting", 1);
+    await countedUnder(page, "Waiting", 1);
 
     await dialogOpened(page);
     await addressField(page).fill(sam);
@@ -559,8 +547,8 @@ test.describe("the People page's Invitations tab", () => {
 
     await expect(inviteDialog(page).getByRole("status").first()).toContainText(sam);
     await inviteDialog(page).getByRole("button", { name: "Done" }).click();
-    await countedUnder(page, "waiting", 1);
-    await countedUnder(page, "cancelled", 1);
+    await countedUnder(page, "Waiting", 1);
+    await countedUnder(page, "Cancelled", 1);
   });
 
   test("names an email that did not go, offering a Resend", async ({ page, request }) => {
@@ -575,7 +563,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(inviteDialog(page).getByRole("alert").first()).toContainText(offline);
     await expect(inviteDialog(page).getByRole("status").first()).toHaveText("");
     const unsent = unsentIn(inviteDialog(page));
-    const resend = unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(offline) });
+    const resend = unsent.getByRole("button", { name: `Resend Invitation to ${offline}` });
     await resend.click();
     await expect(unsent.getByRole("alert")).toContainText(offline);
     await expect(unsent.getByRole("status")).toHaveText("");
@@ -599,14 +587,14 @@ test.describe("the People page's Invitations tab", () => {
     await expect(unsent.getByRole("listitem")).toHaveCount(2);
 
     await resentAsIfItWent(page);
-    await unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(offline) }).click();
+    await unsent.getByRole("button", { name: `Resend Invitation to ${offline}` }).click();
     await expect(unsent.getByRole("status")).toContainText(offline);
     await expect(unsent.getByRole("listitem")).toHaveCount(1);
     await expect(
-      unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(other) }),
+      unsent.getByRole("button", { name: `Resend Invitation to ${other}` }),
     ).toBeVisible();
     await expect(
-      unsent.getByRole("heading", { name: INVITATIONS_WORDS.unsent }),
+      unsent.getByRole("heading", { name: "Unsent Emails" }),
       "focus left with the row",
     ).toBeFocused();
   });
@@ -619,9 +607,9 @@ test.describe("the People page's Invitations tab", () => {
     await openInvitations(page);
 
     await tickOf(page, offline).check();
-    await selectionAction(page, INVITATIONS_WORDS.resend).click();
+    await selectionAction(page, "Resend").click();
     const unsent = unsentIn(invitationsRegion(page));
-    const resend = unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(offline) });
+    const resend = unsent.getByRole("button", { name: `Resend Invitation to ${offline}` });
     await expect(resend).toBeVisible();
 
     await resentAsIfItWent(page);
@@ -629,7 +617,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(unsent.getByRole("status")).toContainText(offline);
     await expect(resend).toHaveCount(0);
     await expect(
-      unsent.getByRole("heading", { name: INVITATIONS_WORDS.unsent }),
+      unsent.getByRole("heading", { name: "Unsent Emails" }),
       "focus left with the row",
     ).toBeFocused();
   });
@@ -680,17 +668,17 @@ test.describe("the People page's Invitations tab", () => {
       invitedEach(request, at, [old], anEightDayOldInvitation).then(() => undefined),
     );
     await openInvitations(page);
-    await shownUnder(page, "expired");
+    await shownUnder(page, "Expired");
 
     await menuOf(page, old).click();
-    await page.getByRole("menuitem", { name: INVITATIONS_WORDS.resend }).click();
+    await page.getByRole("menuitem", { name: "Resend" }).click();
 
     await expect(saidInTheTab(page, new RegExp(`${old}.*\\d{4}`))).toBeVisible();
     await expect(rowOf(page, old)).toHaveCount(0);
     await expect(invitationsHeading(page), "focus left with the row").toBeFocused();
-    await countedUnder(page, "expired", 0);
-    await countedUnder(page, "waiting", 1);
-    await shownUnder(page, "waiting");
+    await countedUnder(page, "Expired", 0);
+    await countedUnder(page, "Waiting", 1);
+    await shownUnder(page, "Waiting");
     await expect(rowOf(page, old)).toHaveCount(1);
   });
 
@@ -702,12 +690,12 @@ test.describe("the People page's Invitations tab", () => {
     await openInvitations(page);
 
     await menuOf(page, ana).click();
-    await page.getByRole("menuitem", { name: INVITATIONS_WORDS.cancel }).click();
+    await page.getByRole("menuitem", { name: "Cancel" }).click();
 
     await expect(rowOf(page, ana)).toHaveCount(0);
     await expect(saidInTheTab(page, ana)).toBeVisible();
     await expect(invitationsHeading(page), "focus left with the row").toBeFocused();
-    await countedUnder(page, "cancelled", 1);
+    await countedUnder(page, "Cancelled", 1);
   });
 
   test("bulk Cancel over two waiting invitations moves both to Cancelled", async ({
@@ -719,19 +707,19 @@ test.describe("the People page's Invitations tab", () => {
       invitedEach(request, at, [ana, ben]).then(() => undefined),
     );
     await openInvitations(page);
-    await countedUnder(page, "cancelled", 0);
+    await countedUnder(page, "Cancelled", 0);
 
     await tickOf(page, ana).check();
     await tickOf(page, ben).check();
-    await selectionAction(page, INVITATIONS_WORDS.cancel).click();
+    await selectionAction(page, "Cancel").click();
 
     await expect(invitationRows(page)).toHaveCount(0);
     await expect(
       outcomeIn(page),
       "the bulk cancel's outcome counts two, and none skipped",
     ).toHaveText(/^\D*2\D*$/);
-    await countedUnder(page, "cancelled", 2);
-    await countedUnder(page, "waiting", 0);
+    await countedUnder(page, "Cancelled", 2);
+    await countedUnder(page, "Waiting", 0);
   });
 
   test("bulk Cancel counts a row cancelled meanwhile as skipped", async ({ page, request }) => {
@@ -750,7 +738,7 @@ test.describe("the People page's Invitations tab", () => {
     await expect(outcomeIn(page), "the outcome counts one cancelled and one skipped").toHaveText(
       /\b1\b\D+\b1\b/,
     );
-    await countedUnder(page, "cancelled", 2);
+    await countedUnder(page, "Cancelled", 2);
   });
 
   test("an expired invitation resent from the bar waits again", async ({ page, request }) => {
@@ -759,15 +747,15 @@ test.describe("the People page's Invitations tab", () => {
       invitedEach(request, at, [old], anEightDayOldInvitation).then(() => undefined),
     );
     await openInvitations(page);
-    await shownUnder(page, "expired");
+    await shownUnder(page, "Expired");
 
     await tickOf(page, old).check();
-    await selectionAction(page, INVITATIONS_WORDS.resend).click();
+    await selectionAction(page, "Resend").click();
 
     await expect(outcomeIn(page)).toHaveText(/\b1\b.*\d{4}/);
     await expect(rowOf(page, old)).toHaveCount(0);
-    await countedUnder(page, "waiting", 1);
-    await countedUnder(page, "expired", 0);
+    await countedUnder(page, "Waiting", 1);
+    await countedUnder(page, "Expired", 0);
   });
 
   test("a refused bulk Resend names a row not shown", async ({ page, request }) => {
@@ -781,11 +769,11 @@ test.describe("the People page's Invitations tab", () => {
 
     await tickOf(page, gone).check();
     await tickOf(page, kept).check();
-    await shownUnder(page, "expired");
+    await shownUnder(page, "Expired");
     await expect(selectionSaid(page)).toHaveText(TWO_TICKED_NEITHER_SHOWN);
     expect(await actedAside(page, here, "cancelInvitation", { invitationId: ids[0] })).toBe(200);
     const refused = refusalAnswering(page, "members.bulkResendInvitations");
-    await selectionAction(page, INVITATIONS_WORDS.resend).click();
+    await selectionAction(page, "Resend").click();
 
     expect((await refused).items).toEqual({ [ids[0] ?? ""]: "no-such-invitation" });
     const refusal = invitationsRegion(page).getByRole("alert");
@@ -813,12 +801,12 @@ test.describe("the People page's Invitations tab", () => {
     );
 
     await tickOf(page, ana).check();
-    await selectionAction(page, INVITATIONS_WORDS.cancel).click();
+    await selectionAction(page, "Cancel").click();
     const outcome = outcomeIn(page);
     await expect(outcome, "the pending cancel counts its one invitation").toHaveText(/\b1\b/);
     const saidPending = await outcome.innerText();
     await tickOf(page, ben).check();
-    const action = selectionAction(page, INVITATIONS_WORDS.cancel);
+    const action = selectionAction(page, "Cancel");
     await expect(action).toHaveAttribute("aria-disabled", "true");
     await action.focus();
     await page.keyboard.press("Enter");
@@ -848,11 +836,11 @@ test.describe("the People page's Invitations tab", () => {
     });
     await openInvitations(page);
 
-    await shownUnder(page, "accepted");
+    await shownUnder(page, "Accepted");
     await expect(rowOf(page, joined)).toHaveCount(1);
     await expect(tickOf(page, joined)).toHaveCount(0);
     await expect(menuOf(page, joined)).toHaveCount(0);
-    await shownUnder(page, "cancelled");
+    await shownUnder(page, "Cancelled");
     await expect(rowOf(page, dropped)).toHaveCount(1);
     await expect(tickOf(page, dropped)).toHaveCount(0);
     await expect(menuOf(page, dropped)).toHaveCount(0);
@@ -896,7 +884,7 @@ test.describe("the People page's Invitations tab", () => {
       saidOfTheResend,
     );
 
-    const keystrokes = await keystrokesListed(page, MEMBERS.name);
+    const keystrokes = await keystrokesListed(page, "Members");
     for (const listed of [
       PEOPLE_KEYSTROKES.invite,
       PEOPLE_KEYSTROKES.searchInvitations,
@@ -943,8 +931,8 @@ test.describe("the People page's Invitations tab", () => {
         - heading "Invitations" [level=2]
         - status: /\\b2\\b/
         - status: /dropped-\\d+/
-        - searchbox "${INVITATIONS_WORDS.search}"
-        - radiogroup "${INVITATIONS_WORDS.status}":
+        - searchbox "Search by address"
+        - radiogroup "Status":
           - radio "Waiting 2" [checked]
           - radio "Accepted 0"
           - radio "Expired 0"
@@ -953,7 +941,7 @@ test.describe("the People page's Invitations tab", () => {
           - caption
           - rowgroup:
             - row:
-              - columnheader "${INVITATIONS_WORDS.everyOnThePage}"
+              - columnheader "Select every invitation on this page"
               - columnheader "Address"
               - columnheader "Role"
               - columnheader "Sent"
@@ -981,7 +969,7 @@ test.describe("the People page's Invitations tab", () => {
 
     await page.keyboard.press("Meta+k");
     await page.keyboard.type("invite");
-    await expect(page.getByRole("option", { name: INVITE_A_PERSON.name })).toBeVisible();
+    await expect(page.getByRole("option", { name: INVITE })).toBeVisible();
     await page.keyboard.press("Enter");
     await expect(addressField(page)).toBeFocused();
 
@@ -991,7 +979,7 @@ test.describe("the People page's Invitations tab", () => {
     await tabUntilFocused(page, role);
     await editorPickedByKeyboard(page, role);
     await tabUntilFocused(page, sendButton(page));
-    await expect(sendButton(page)).toHaveText(INVITE_WORDS.send(2));
+    await expect(sendButton(page)).toHaveText("Send 2 Invitations");
     await page.keyboard.press("Enter");
 
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();
@@ -1022,7 +1010,10 @@ test.describe("the People page's Invitations tab", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${aRole(role)} no invitations, Members being hidden`, async ({ page, request }) => {
+    test(`shows ${A_ROLE[role]} no invitations, Members being hidden`, async ({
+      page,
+      request,
+    }) => {
       await aMemberBelowAdminAtPeople(page, request, role);
 
       await notFoundOfferingHome(page, role);

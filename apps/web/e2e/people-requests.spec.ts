@@ -1,7 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
-import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -25,9 +24,9 @@ import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
+const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
 
-const MEMBERS_PAGE = MEMBERS.path;
+const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
@@ -196,16 +195,14 @@ test.describe("the People page's Requests tab", () => {
         - /children: equal
         - heading "Requests" [level=2]
         - status
-        - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
+        - button "Invite a Person"
         - status
         - paragraph: /\\S/
     `);
     await expect(invitingButtons(page), "the head's action is the one way to invite").toHaveCount(
       1,
     );
-    await expect(
-      page.getByRole("button", { name: PEOPLE_KEYSTROKES.invite.action, exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Invite a Person", exact: true })).toBeVisible();
   });
 
   test("an Admin decides requests by keyboard alone", async ({
@@ -239,7 +236,7 @@ test.describe("the People page's Requests tab", () => {
     expect((await landed.boundingBox())?.width, "focus landed out of sight").toBeGreaterThan(1);
     await expect(saidIn(page)).toContainText("Dropped Ray");
 
-    const keystrokes = await keystrokesListed(page, MEMBERS.name);
+    const keystrokes = await keystrokesListed(page, "Members");
     const listed = (key: string) => keystrokes.getByRole("term").getByText(key, { exact: true });
     await expect(listed(PEOPLE_KEYSTROKES.approve.key)).toBeVisible();
     await expect(listed(PEOPLE_KEYSTROKES.decline.key)).toBeVisible();
@@ -281,7 +278,7 @@ test.describe("the People page's Requests tab", () => {
       - region "Requests":
         - heading "Requests" [level=2]
         - status: /\\b1\\b/
-        - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
+        - button "Invite a Person"
         - status: /approved-\\d+/
         - paragraph
         - table:
@@ -352,7 +349,7 @@ test.describe("the People page's Requests tab", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${aRole(role)} no requests, Members being hidden`, async ({ page, request }) => {
+    test(`shows ${A_ROLE[role]} no requests, Members being hidden`, async ({ page, request }) => {
       const email = anAddress(role.toLowerCase());
       const [member, workspace] = await Promise.all([
         person(request, email, { displayName: `A ${role}` }),

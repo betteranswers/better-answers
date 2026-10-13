@@ -1,7 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { GROUPS_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
-import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -28,18 +27,16 @@ const LIST_BUDGET_MS = 1000;
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
 
-const GROUPS = pageNamed(people, "Groups");
+const GROUPS_PAGE = pageNamed(people, "Groups").path;
 
-const GROUPS_PAGE = GROUPS.path;
+const MEMBERS_PAGE = pageNamed(people, "Members").path;
 
-const MEMBERS = pageNamed(people, "Members");
-
-const MEMBERS_PAGE = MEMBERS.path;
+const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
 
 /** A member's row leads with its tick, then the person and their role. */
 const GROUPS_CELL = 3;
 
-const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
+const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
 const groupsRegion = (page: Page) => page.getByRole("region", { name: "Groups" });
 
@@ -137,7 +134,7 @@ test.describe("the People group's Groups page", () => {
     // With no tabs to name the list, its own heading shows, under the page's.
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
-        - heading ${JSON.stringify(people.name)} [level=1]
+        - heading "People" [level=1]
         - paragraph
         - region "Groups":
           - heading "Groups" [level=2]
@@ -191,7 +188,7 @@ test.describe("the People group's Groups page", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${aRole(role)} Groups as not found, listing none`, async ({ page, request }) => {
+    test(`shows ${A_ROLE[role]} Groups as not found, listing none`, async ({ page, request }) => {
       const workspace = await aMemberSignedInAt(page, request, role, GROUPS_PAGE);
       await makeGroups(request, {
         workspaceId: workspace.workspaceId,
@@ -390,7 +387,7 @@ test.describe("a group's actions", () => {
     await expect(groupRows(page)).toHaveCount(2);
     await skipLinkReachesThePage(page);
 
-    const keystrokes = await keystrokesListed(page, GROUPS.name);
+    const keystrokes = await keystrokesListed(page, "Groups");
     for (const { key } of Object.values(GROUPS_KEYSTROKES)) {
       await expect(keystrokes.getByRole("term").getByText(key, { exact: true })).toBeVisible();
     }
@@ -453,19 +450,19 @@ test.describe("the keystrokes listed across the People group", () => {
     request,
   }) => {
     await anAdminAtGroups(page, request, "Calder Mills");
-    await nav(page).getByRole("link", { name: MEMBERS.name }).click();
+    await nav(page).getByRole("link", { name: "Members" }).click();
     await expect(page).toHaveURL(new RegExp(`${MEMBERS_PAGE}$`));
 
-    const onMembers = await keystrokesListed(page, MEMBERS.name);
+    const onMembers = await keystrokesListed(page, "Members");
     await expect(
       onMembers.getByRole("term").getByText(PEOPLE_KEYSTROKES.changeRole.key, { exact: true }),
     ).toBeVisible();
     const doneOnMembers = await actionBeside(onMembers, PEOPLE_KEYSTROKES.remove.key).innerText();
     await keystrokesDismissed(page, onMembers);
 
-    await nav(page).getByRole("link", { name: GROUPS.name }).click();
+    await nav(page).getByRole("link", { name: "Groups" }).click();
     await expect(groupRows(page)).toHaveCount(2);
-    const onGroups = await keystrokesListed(page, GROUPS.name);
+    const onGroups = await keystrokesListed(page, "Groups");
     await expect(
       onGroups.getByRole("term").getByText(GROUPS_KEYSTROKES.changeMembers.key, { exact: true }),
     ).toBeVisible();
@@ -494,7 +491,7 @@ test.describe("a member's groups, on their row and their page", () => {
     await expect(members.getByRole("columnheader", { name: "Groups" })).toBeVisible();
     await expect(priyaRow.getByRole("cell").nth(GROUPS_CELL)).toHaveText("HR team");
 
-    const keystrokes = await keystrokesListed(page, MEMBERS.name);
+    const keystrokes = await keystrokesListed(page, "Members");
     for (const { key } of [PEOPLE_KEYSTROKES.changeGroups, PEOPLE_KEYSTROKES.remove]) {
       await expect(keystrokes.getByRole("term").getByText(key, { exact: true })).toBeVisible();
     }
@@ -570,7 +567,7 @@ test.describe("a member's groups, on their row and their page", () => {
       - region "Groups":
         - heading "Groups" [level=2]
         - status: /\\b0\\b/
-        - form "${GROUPS_KEYSTROKES.create.action}":
+        - form "Create a Group":
           - textbox "New Group Name"
           - button "Create Group"
         - table:

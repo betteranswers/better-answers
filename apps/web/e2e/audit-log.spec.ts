@@ -3,8 +3,6 @@ import { readFile } from "node:fs/promises";
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { AUDIT_LOG_KEYSTROKES as KEY } from "@/features/people/audit-log-state.ts";
-import { AUDIT_LOG_WORDS as WORDS } from "@/features/people/audit-log-words.ts";
-import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -27,26 +25,25 @@ const LIST_BUDGET_MS = 1000;
 /** Under two lines of text with a row's padding, so only an event on one line passes. */
 const ONE_LINE_PX = 48;
 
-const system = menuGroupIn(CONTROL_CENTRE, "system");
+const AUDIT_LOG_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log").path;
 
-const AUDIT_LOG = pageNamed(system, "Audit Log");
-
-const AUDIT_LOG_PAGE = AUDIT_LOG.path;
+const A_ROLE = { Editor: "an Editor", Viewer: "a Viewer" } as const;
 
 const SAID_DAY = /^[A-Z][a-z]+day \d{1,2} [A-Z][a-z]+ \d{4}$/;
 
-const auditLog = (page: Page) => page.getByRole("region", { name: WORDS.heading });
+const auditLog = (page: Page) => page.getByRole("region", { name: "Audit Log" });
 
 const linesOf = (page: Page): Locator => auditLog(page).getByRole("listitem");
 
-const searchBox = (page: Page) => auditLog(page).getByRole("searchbox", { name: WORDS.search });
+const searchBox = (page: Page) =>
+  auditLog(page).getByRole("searchbox", { name: "Search by person, group or action" });
 
 const familyFilter = (page: Page) =>
-  auditLog(page).getByRole("combobox", { name: `Filter by ${WORDS.family}` });
+  auditLog(page).getByRole("combobox", { name: "Filter by Family" });
 
 const loadMore = (page: Page) => auditLog(page).getByRole("button", { name: "Load More" });
 
-const exportButton = (page: Page) => auditLog(page).getByRole("button", { name: WORDS.export });
+const exportButton = (page: Page) => auditLog(page).getByRole("button", { name: "Export Events" });
 
 const said = (page: Page) => auditLog(page).getByRole("status").first();
 
@@ -106,7 +103,7 @@ const anAdminAtTheAuditLog = async (
   await page.goto("/sign-in");
   await signIn(page, api, adminEmail);
   await page
-    .getByRole("navigation", { name: CONTROL_CENTRE.name })
+    .getByRole("navigation", { name: "Control Centre" })
     .getByRole("link", { name: "Audit Log" })
     .click();
   await expect(page).toHaveURL(new RegExp(`${AUDIT_LOG_PAGE}$`));
@@ -137,7 +134,7 @@ test.describe("the System group's Audit log page", () => {
     const { unnamedEmail } = await anAdminAtTheAuditLog(page, request, "Calder Joinery");
 
     await expect(
-      auditLog(page).getByRole("heading", { level: 2, name: WORDS.heading, exact: true }),
+      auditLog(page).getByRole("heading", { level: 2, name: "Audit Log", exact: true }),
     ).toBeVisible();
     await expect(auditLog(page).getByRole("paragraph").first()).toHaveText(/\S/);
     await expect(linesOf(page)).toHaveCount(3);
@@ -161,7 +158,7 @@ test.describe("the System group's Audit log page", () => {
       const box = await line.boundingBox();
       expect(box?.height, "an event at rest is taller than one line").toBeLessThan(ONE_LINE_PX);
     }
-    for (const family of Object.values(WORDS.families)) {
+    for (const family of ["People", "Knowledge", "Sources", "Platform"]) {
       await expect(
         linesOf(page).filter({ hasText: new RegExp(family) }),
         `a line says ${family} at rest`,
@@ -169,10 +166,10 @@ test.describe("the System group's Audit log page", () => {
     }
 
     // The filter says the family in the lines' place, and still narrows them by it.
-    await expect(familyFilter(page)).toHaveText(WORDS.everyFamily);
-    await pickFamily(page, WORDS.families.platform);
+    await expect(familyFilter(page)).toHaveText("All Families");
+    await pickFamily(page, "Platform");
     await expect(linesOf(page)).toHaveCount(1);
-    await expect(familyFilter(page)).toHaveText(WORDS.families.platform);
+    await expect(familyFilter(page)).toHaveText("Platform");
   });
 
   test("opens an event's detail, a sign-in address beneath each name", async ({
@@ -197,7 +194,7 @@ test.describe("the System group's Audit log page", () => {
 
     const provisioned = linesOf(page).nth(2);
     await detailsOf(provisioned).click();
-    await expect(provisioned.getByRole("term").first()).toHaveText(WORDS.by);
+    await expect(provisioned.getByRole("term").first()).toHaveText("By");
     for (const raw of ["platform.workspace.provisioned", "process:", "human:", "Actor id"]) {
       await expect(auditLog(page), `the audit log shows ${raw}`).not.toContainText(raw);
     }
@@ -257,7 +254,7 @@ test.describe("the System group's Audit log page", () => {
     await familyFilter(page).click();
     // Timed from the pick, so the budget is the read's and not the pointer's way to the list.
     const started = Date.now();
-    await page.getByRole("option", { name: WORDS.families.platform }).click();
+    await page.getByRole("option", { name: "Platform" }).click();
     await expect(clearFilters(page)).toBeVisible();
     const elapsed = Date.now() - started;
     test.info().annotations.push({ type: "family filter", description: `${elapsed} ms` });
@@ -268,13 +265,13 @@ test.describe("the System group's Audit log page", () => {
     await expect(searchBox(page)).toHaveValue("Priya");
     await expect(page).toHaveURL(/audit\.family=platform/);
 
-    await pickFamily(page, WORDS.families.people);
+    await pickFamily(page, "People");
     await expect(linesOf(page)).toHaveCount(1);
   });
 
   test("exports what matches, and the log shows the export first", async ({ page, request }) => {
     const { adminEmail, priya } = await anAdminAtTheAuditLog(page, request, "Ryedale Exports");
-    await pickFamily(page, WORDS.families.people);
+    await pickFamily(page, "People");
     await searchBox(page).fill(priya.email);
     await expect(linesOf(page)).toHaveCount(1);
 
@@ -290,15 +287,12 @@ test.describe("the System group's Audit log page", () => {
     ).toHaveText(/\b1\b/);
 
     await searchBox(page).fill("");
-    await pickFamily(page, WORDS.everyFamily);
+    await pickFamily(page, "All Families");
     const exported = linesOf(page).first();
     await expect(exported).toContainText(/Test person.*\b1\b/);
     await detailsOf(exported).click();
     await expect(exported.getByRole("definition").first()).toContainText(adminEmail);
-    await expect(exported.getByRole("definition")).toContainText([
-      WORDS.families.people,
-      "Priya Shah",
-    ]);
+    await expect(exported.getByRole("definition")).toContainText(["People", "Priya Shah"]);
     await expect(exported, "the export event shows the address searched for").not.toContainText(
       priya.email,
     );
@@ -344,7 +338,7 @@ test.describe("the System group's Audit log page", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${aRole(role)} the audit log as not found`, async ({ page, request }) => {
+    test(`shows ${A_ROLE[role]} the audit log as not found`, async ({ page, request }) => {
       await aMemberSignedInAt(page, request, role, AUDIT_LOG_PAGE);
 
       await notFoundOfferingHome(page, role);
@@ -362,7 +356,7 @@ test.describe("the System group's Audit log page", () => {
       await route.abort();
     });
 
-    await pickFamily(page, WORDS.families.sources);
+    await pickFamily(page, "Sources");
     // Held, so the list draws no event and says in a status that it is being read.
     await expect(linesOf(page)).toHaveCount(0);
     await expect(auditLog(page).getByRole("status").filter({ hasText: /\S/ })).toHaveCount(1);
@@ -370,9 +364,9 @@ test.describe("the System group's Audit log page", () => {
 
     // The query asks twice more before it answers, as it does of any failure with no word.
     await saysARefusal(auditLog(page).getByRole("alert"));
-    await expect(familyFilter(page)).toHaveText(WORDS.families.sources);
+    await expect(familyFilter(page)).toHaveText("Sources");
     await page.unroute(read);
-    await pickFamily(page, WORDS.everyFamily);
+    await pickFamily(page, "All Families");
     await expect(linesOf(page)).toHaveCount(3);
     await expect(auditLog(page).getByRole("alert")).toHaveCount(0);
   });
@@ -388,7 +382,7 @@ test.describe("the System group's Audit log page", () => {
 
     await skipLinkReachesThePage(page);
 
-    const keystrokes = await keystrokesListed(page, AUDIT_LOG.name);
+    const keystrokes = await keystrokesListed(page, "Audit Log");
     for (const { key } of Object.values(KEY))
       await expect(keystrokes.getByRole("term").getByText(key, { exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
