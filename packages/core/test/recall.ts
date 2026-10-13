@@ -89,6 +89,8 @@ const buyerQuestions = z.strictObject({
         source: answerKey,
         /** Where in the form it stands. */
         at: z.string().min(1),
+        /** The one group every `Answer` it names sits in, where there is one. */
+        collection: answerKey.optional(),
         /** The key of each `Answer` of the recall set it must reach. */
         answers: z.array(answerKey).min(1),
       }),
@@ -102,16 +104,35 @@ export type BuyerQuestions = z.infer<typeof buyerQuestions>;
 export const readBuyerQuestions = (path: string): Promise<Result<BuyerQuestions, Error>> =>
   readAs(path, buyerQuestions);
 
-/** Throws on a key `set` does not hold, which the measure would count as a miss. */
+/** The group every key sits in, where they share one. A key `set` does not hold has none. */
+const oneGroupOf = (
+  groups: ReadonlyMap<string, string>,
+  keys: readonly string[],
+): string | undefined => {
+  const [group, ...others] = new Set(keys.map((key) => groups.get(key)));
+  return others.length === 0 ? group : undefined;
+};
+
+/**
+ * Throws on a key `set` does not hold, counted otherwise as a miss, and on a collection that is
+ * not its row's one group.
+ */
 export const theBuyerQuestions = async (set: RecallSet): Promise<BuyerQuestions> => {
   const read = await readBuyerQuestions(BUYER_QUESTIONS);
   if (!read.ok) throw new Error(`the buyer-worded set did not read: ${read.error.message}`);
-  const held = new Set(answersOf(set).map(({ key }) => key));
-  const unheld = read.value.questions.flatMap(({ answers }) =>
-    answers.filter((key) => !held.has(key)),
-  );
+  const groups = new Map(answersOf(set).map(({ key, group }) => [key, group]));
+  const { questions } = read.value;
+  const unheld = questions.flatMap(({ answers }) => answers.filter((key) => !groups.has(key)));
   if (unheld.length > 0) {
     throw new Error(`the buyer-worded set names no Answer of the recall set: ${unheld.join(", ")}`);
+  }
+  const misplaced = questions.filter(
+    ({ collection, answers }) => collection !== oneGroupOf(groups, answers),
+  );
+  if (misplaced.length > 0) {
+    throw new Error(
+      `the buyer-worded set's collection is not its Answers' one group: ${misplaced.map(({ at }) => at).join(", ")}`,
+    );
   }
   return read.value;
 };
@@ -153,39 +174,55 @@ export type Recall = {
 /** A question the measure asks, and the key of each `Answer` it must reach. */
 export type RecallQuestion = {
   readonly question: string;
+  /** The collection every `Answer` it names sits in, where there is one. */
+  readonly collection?: string | undefined;
   readonly answers: readonly string[];
 };
 
-/** Each paraphrase as a question that must reach its master `Answer`. */
+/** Each paraphrase as a question that must reach its master `Answer`, in that `Answer`'s group. */
 export const paraphrasesOf = (set: RecallSet): readonly RecallQuestion[] =>
-  answersOf(set).flatMap(({ key, paraphrases }) =>
-    paraphrases.map((question) => ({ question, answers: [key] })),
+  answersOf(set).flatMap(({ key, group, paraphrases }) =>
+    paraphrases.map((question) => ({ question, collection: group, answers: [key] })),
   );
 
-/** Each question once for each `Answer` it names, so recall counts `Answer`s and not questions. */
-export const namedOneByOne = (questions: readonly RecallQuestion[]): readonly RecallQuestion[] =>
-  questions.flatMap(({ question, answers }) =>
-    answers.map((key) => ({ question, answers: [key] })),
-  );
+/** One reading counted three ways. A cap is sized from `byAnswer`. */
+export type Recalls = {
+  /** The questions that reach every `Answer` they name. */
+  readonly everyAnswer: Recall;
+  /** The questions that reach at least one. */
+  readonly anyAnswer: Recall;
+  /** The `Answer`s named, each counted once for each question that names it. */
+  readonly byAnswer: Recall;
+};
+
+const recallOf = (recalled: number, asked: number): Recall => ({
+  asked,
+  recalled,
+  recall: recalled / asked,
+});
 
 /**
- * Asks every question through `ranked`, which answers concept IRIs best first, and counts the
- * questions that find every `Answer` they name among the first `depth`.
+ * Asks every question through `ranked`, which answers concept IRIs best first, and counts what
+ * each finds of the `Answer`s it names among the first `depth`.
  */
 export const recallAt = async (
   questions: readonly RecallQuestion[],
   landed: ReadonlyMap<string, string>,
-  ranked: (question: string) => Promise<readonly string[]>,
+  ranked: (question: RecallQuestion) => Promise<readonly string[]>,
   depth: number,
-): Promise<Recall> => {
-  let recalled = 0;
-  for (const { question, answers } of questions) {
-    const top = (await ranked(question)).slice(0, depth);
-    const reached = answers.every((key) => {
-      const iri = landed.get(key);
-      return iri !== undefined && top.includes(iri);
-    });
-    if (reached) recalled += 1;
+): Promise<Recalls> => {
+  const counted = { every: 0, any: 0, reached: 0, named: 0 };
+  for (const question of questions) {
+    const top = new Set((await ranked(question)).slice(0, depth));
+    const reached = question.answers.filter((key) => top.has(landed.get(key) ?? "")).length;
+    counted.named += question.answers.length;
+    counted.reached += reached;
+    if (reached === question.answers.length) counted.every += 1;
+    if (reached > 0) counted.any += 1;
   }
-  return { asked: questions.length, recalled, recall: recalled / questions.length };
+  return {
+    everyAnswer: recallOf(counted.every, questions.length),
+    anyAnswer: recallOf(counted.any, questions.length),
+    byAnswer: recallOf(counted.reached, counted.named),
+  };
 };

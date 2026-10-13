@@ -8,11 +8,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ASK_CAPS, askInput, find, planAnswer } from "../src/answering/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
-import { recordFigures } from "./figures.ts";
+import { recordFigures, type Figure } from "./figures.ts";
 import {
   answersOf,
   landRecallSet,
-  namedOneByOne,
   paraphrasesOf,
   readBuyerQuestions,
   readRecallSet,
@@ -22,6 +21,8 @@ import {
   theRecallSet,
   type Recall,
   type RecallAnswer,
+  type RecallQuestion,
+  type Recalls,
 } from "./recall.ts";
 import { visibilitySuite } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
@@ -31,10 +32,10 @@ const { arrange, reading } = visibilitySuite();
 
 const NOW = new Date("2026-10-09T12:00:00.000Z");
 
-/** `find`'s concept matches for `question`, best first, as `person` reads them. */
+/** `find`'s concept matches for a question, best first, as `person` reads them. */
 const conceptsFound =
   (person: UserPrincipal) =>
-  async (question: string): Promise<readonly string[]> => {
+  async ({ question }: RecallQuestion): Promise<readonly string[]> => {
     const found = answered(
       await reading(person, (reader, tx) =>
         find(reader, tx, { query: question, limit: RECALL_DEPTH }, NOW),
@@ -43,13 +44,17 @@ const conceptsFound =
     return found.matches.flatMap((match) => (match.layer === "bundles" ? [match.iri] : []));
   };
 
+type Narrowing = "no collection named" | "its collection named";
+
 /** Entry points alone: no `Answer` of the set links to another, so the walk adds no concept. */
 const conceptsPlanned =
-  (person: UserPrincipal) =>
-  async (question: string): Promise<readonly string[]> => {
+  (person: UserPrincipal, narrowing: Narrowing) =>
+  async ({ question, collection }: RecallQuestion): Promise<readonly string[]> => {
+    const named = narrowing === "its collection named" && collection !== undefined;
+    const asking = { question, collections: named ? [collection] : [] };
     const planned = answered(
       await reading(person, (reader, tx) =>
-        planAnswer(reader, (work) => work(tx), inputOf(askInput, { question }), NOW, ASK_CAPS),
+        planAnswer(reader, (work) => work(tx), inputOf(askInput, asking), NOW, ASK_CAPS),
       ),
     );
     return planned.related.map(({ iri }) => iri);
@@ -58,65 +63,70 @@ const conceptsPlanned =
 const worded = ({ recall, recalled, asked }: Recall, counted: string): string =>
   `${(recall * 100).toFixed(1)} %, for ${recalled} of ${asked} ${counted}`;
 
+/** By `Answer` named leads: it is the figure a cap is sized from. */
+const figuresOf = (
+  read: string,
+  { byAnswer, everyAnswer, anyAnswer }: Recalls,
+): readonly Figure[] => [
+  [`${read}, by Answer named`, worded(byAnswer, "Answers named")],
+  [`${read}, questions reaching every Answer named`, worded(everyAnswer, "questions")],
+  [`${read}, questions reaching at least one`, worded(anyAnswer, "questions")],
+];
+
 describe("recall over the synthetic set", () => {
   it("reports each set's recall and fails no build", async () => {
     const set = await theRecallSet();
-    const buyers = (await theBuyerQuestions(set)).questions;
-    const paraphrases = paraphrasesOf(set);
     const scenario = await arrange();
     const landed = await landRecallSet(scenario, set);
-    const found = conceptsFound(scenario.viewer);
-    const planned = conceptsPlanned(scenario.viewer);
     const entryCap = ASK_CAPS.entryPoints;
+    const reads = [
+      ["find's first ten concepts", conceptsFound(scenario.viewer), RECALL_DEPTH],
+      [
+        `ask's first ${entryCap} entry points`,
+        conceptsPlanned(scenario.viewer, "no collection named"),
+        entryCap,
+      ],
+      [
+        `ask's first ${entryCap} entry points with its collection named`,
+        conceptsPlanned(scenario.viewer, "its collection named"),
+        entryCap,
+      ],
+    ] as const;
+    const sets = [
+      ["paraphrases", paraphrasesOf(set)],
+      ["buyer-worded questions", (await theBuyerQuestions(set)).questions],
+    ] as const;
 
-    const ofParaphrases = {
-      find: await recallAt(paraphrases, landed, found, RECALL_DEPTH),
-      ask: await recallAt(paraphrases, landed, planned, entryCap),
-    };
-    const ofBuyers = {
-      find: await recallAt(buyers, landed, found, RECALL_DEPTH),
-      ask: await recallAt(buyers, landed, planned, entryCap),
-      askByAnswer: await recallAt(namedOneByOne(buyers), landed, planned, entryCap),
-    };
+    const figures: Figure[] = [];
+    for (const [name, questions] of sets) {
+      const named = questions.flatMap(({ answers }) => answers).length;
+      for (const [read, ranked, depth] of reads) {
+        const recalls = await recallAt(questions, landed, ranked, depth);
+        figures.push(...figuresOf(`${name} in ${read}`, recalls));
+
+        const { byAnswer, everyAnswer, anyAnswer } = recalls;
+        expect([byAnswer.asked, everyAnswer.asked, anyAnswer.asked]).toEqual([
+          named,
+          questions.length,
+          questions.length,
+        ]);
+        expect(everyAnswer.recalled).toBeLessThanOrEqual(anyAnswer.recalled);
+        expect(anyAnswer.recalled).toBeLessThanOrEqual(byAnswer.recalled);
+        expect(byAnswer.recalled).toBeLessThanOrEqual(named);
+      }
+    }
 
     await recordFigures("Recall over the synthetic set", [
-      [
-        "paraphrases, the master Answer in find's first ten concepts",
-        worded(ofParaphrases.find, "paraphrases"),
-      ],
-      [
-        `paraphrases, the master Answer in ask's first ${entryCap} entry points`,
-        worded(ofParaphrases.ask, "paraphrases"),
-      ],
-      [
-        "buyer-worded questions, every Answer named in find's first ten concepts",
-        worded(ofBuyers.find, "questions"),
-      ],
-      [
-        `buyer-worded questions, every Answer named in ask's first ${entryCap} entry points`,
-        worded(ofBuyers.ask, "questions"),
-      ],
-      [
-        `buyer-worded questions, each Answer named in ask's first ${entryCap} entry points`,
-        worded(ofBuyers.askByAnswer, "Answers named"),
-      ],
+      ...figures,
       ["the corpus", `${landed.size} synthetic Answers`],
       ["the route's threshold, reported and never enforced", "90 %"],
     ]);
-    const answers = answersOf(set);
-    const written = answers.flatMap((answer) => answer.paraphrases).length;
-    expect(landed.size).toBe(answers.length);
-    expect([ofParaphrases.find.asked, ofParaphrases.ask.asked]).toEqual([written, written]);
-    expect([ofBuyers.find.asked, ofBuyers.ask.asked]).toEqual([buyers.length, buyers.length]);
-    for (const { recall } of [...Object.values(ofParaphrases), ...Object.values(ofBuyers)]) {
-      expect(recall).toBeGreaterThanOrEqual(0);
-      expect(recall).toBeLessThanOrEqual(1);
-    }
+    expect(landed.size).toBe(answersOf(set).length);
   }, 300_000);
 });
 
 describe("recall", () => {
-  it("counts a question when every Answer it names is reached", async () => {
+  it("counts every Answer, any Answer and each Answer named", async () => {
     const landed = new Map([
       ["first", "iri:first"],
       ["second", "iri:second"],
@@ -124,17 +134,23 @@ describe("recall", () => {
     ]);
     const ranked = () => Promise.resolve(["iri:first", "iri:second", "iri:third"]);
 
-    const recall = await recallAt(
+    const recalls = await recallAt(
       [
         { question: "both inside the depth", answers: ["first", "second"] },
         { question: "one beyond the depth", answers: ["first", "third"] },
+        { question: "its one beyond the depth", answers: ["third"] },
+        { question: "its one inside the depth", answers: ["second"] },
       ],
       landed,
       ranked,
       2,
     );
 
-    expect(recall).toEqual({ asked: 2, recalled: 1, recall: 0.5 });
+    expect(recalls).toEqual({
+      everyAnswer: { asked: 4, recalled: 2, recall: 0.5 },
+      anyAnswer: { asked: 4, recalled: 3, recall: 0.75 },
+      byAnswer: { asked: 6, recalled: 4, recall: 4 / 6 },
+    });
   });
 });
 
