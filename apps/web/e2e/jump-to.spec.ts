@@ -1,18 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { JUMP_TO, searchFor } from "@/app/words.ts";
 import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
-import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
-import {
-  ASK,
-  CONSOLE,
-  CONTROL_CENTRE,
-  KNOWLEDGE,
-  menuGroupIn,
-  headingOf,
-  INVITE_A_PERSON,
-  pageNamed,
-} from "@/shared/navigation.ts";
+import { ASK, CONSOLE, CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -40,22 +29,23 @@ const MODELS = menuGroupIn(CONTROL_CENTRE, "models");
 const MODELS_AND_SPEND = pageNamed(MODELS, "Models and Spend");
 
 /** Declared and never built, so no reader may find it. */
-const SIGNALS = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Signals");
+const SIGNALS = "Signals";
 
 const EVERY_WORKSPACE = pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every Workspace");
 
 const NARROW = { width: 320, height: 720 };
 
+const INVITE_A_PERSON = "Invite a Person";
+
 const PRIYA = "Priya Shah";
 
 const TOM = "Tom Okafor";
 
-const triggerOf = (page: Page) =>
-  page.getByRole("banner").getByRole("button", { name: JUMP_TO.name });
+const triggerOf = (page: Page) => page.getByRole("banner").getByRole("button", { name: "Jump To" });
 
-const dialogOf = (page: Page) => page.getByRole("dialog", { name: JUMP_TO.name });
+const dialogOf = (page: Page) => page.getByRole("dialog", { name: "Jump To" });
 
-const inputOf = (page: Page) => dialogOf(page).getByRole("combobox", { name: JUMP_TO.name });
+const inputOf = (page: Page) => dialogOf(page).getByRole("combobox", { name: "Jump To" });
 
 const optionOf = (page: Page, name: string | RegExp) =>
   dialogOf(page).getByRole("option", { name });
@@ -63,12 +53,12 @@ const optionOf = (page: Page, name: string | RegExp) =>
 const groupOf = (page: Page, name: string) => dialogOf(page).getByRole("group", { name });
 
 /** The row that takes what is typed to Search, listed under its area's name. */
-const searchRowOf = (page: Page) => groupOf(page, KNOWLEDGE.name).getByRole("option");
+const searchRowOf = (page: Page) => groupOf(page, "Knowledge").getByRole("option");
 
 const searchBoxOf = (page: Page) =>
   page
-    .getByRole("region", { name: SEARCH.name })
-    .getByRole("searchbox", { name: SEARCH_WORDS.search });
+    .getByRole("region", { name: "Search" })
+    .getByRole("searchbox", { name: "Search by a word or a question" });
 
 const saidIn = (page: Page) => dialogOf(page).getByRole("status");
 
@@ -93,9 +83,7 @@ const signedInOffMembers = async (page: Page, api: APIRequestContext, email: str
   await page.goto("/sign-in");
   await signIn(page, api, email);
   await page.goto(MODELS_AND_SPEND.path);
-  await expect(
-    page.getByRole("heading", { level: 1, name: headingOf(MODELS_AND_SPEND) }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Models" })).toBeVisible();
 };
 
 type Teammate = { readonly address: string; readonly id: string };
@@ -140,13 +128,13 @@ test("hides People from a Viewer, reading no members", async ({ page, request })
   });
 
   await opened(page, "Control+k");
-  await expect(optionOf(page, ASK.name)).toBeVisible();
+  await expect(optionOf(page, "Ask")).toBeVisible();
   await typed(page, "people");
 
   await expect(saidIn(page)).toContainText("people");
   // Search's row is no match, so it stands beside the line that says nothing matches.
-  await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("people")]);
-  await expect(groupOf(page, JUMP_TO.groups.members)).toHaveCount(0);
+  await expect(dialogOf(page).getByRole("option")).toHaveText(["Search for “people”"]);
+  await expect(groupOf(page, "Members")).toHaveCount(0);
   // Of the three kinds jump-to finds, a Viewer is promised pages alone.
   await expect(inputOf(page)).toHaveAttribute("placeholder", /page/i);
   await expect(inputOf(page)).not.toHaveAttribute("placeholder", /member|action/i);
@@ -158,10 +146,10 @@ test("opens the invite action on Members for an Admin", async ({ page, request }
 
   await opened(page, "Meta+k");
   await typed(page, "invite");
-  await expect(optionOf(page, INVITE_A_PERSON.name)).toBeVisible();
+  await expect(optionOf(page, INVITE_A_PERSON)).toBeVisible();
   await page.keyboard.press("Enter");
 
-  const invite = page.getByRole("dialog", { name: INVITE_A_PERSON.name });
+  const invite = page.getByRole("dialog", { name: INVITE_A_PERSON });
   await expect(invite).toBeVisible();
   await expect(invite.getByLabel("Email Addresses")).toBeFocused();
   await expect(dialogOf(page)).toHaveCount(0);
@@ -170,7 +158,7 @@ test("opens the invite action on Members for an Admin", async ({ page, request }
 
   await page.keyboard.press("Escape");
   await expect(invite).toHaveCount(0);
-  await expect(page.getByRole("button", { name: INVITE_A_PERSON.name })).toBeFocused();
+  await expect(page.getByRole("button", { name: INVITE_A_PERSON })).toBeFocused();
 });
 
 test("opens on either chord anywhere, Escape handing focus back", async ({ page, request }) => {
@@ -212,7 +200,7 @@ test("lands an Admin on the member they chose", async ({ page, request }) => {
 
   await opened(page, "Meta+k");
   await typed(page, "priya");
-  await expect(groupOf(page, JUMP_TO.groups.members)).toBeVisible();
+  await expect(groupOf(page, "Members")).toBeVisible();
   await optionOf(page, new RegExp(PRIYA)).click();
 
   // The person's own page, not a list narrowed to them.
@@ -258,14 +246,14 @@ test("lands on Search with the typed query and its matches", async ({ page, requ
 
   await opened(page, "Meta+k");
   await typed(page, "audit logs");
-  await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("audit logs")]);
+  await expect(dialogOf(page).getByRole("option")).toHaveText(["Search for “audit logs”"]);
   await page.keyboard.press("Enter");
 
   await expect(searchBoxOf(page)).toHaveValue("audit logs");
   await expect(
     page
-      .getByRole("region", { name: SEARCH.name })
-      .getByRole("list", { name: SEARCH_WORDS.matches })
+      .getByRole("region", { name: "Search" })
+      .getByRole("list", { name: "Matches" })
       .getByRole("listitem")
       .first(),
   ).toContainText("Audit Logs Retention");
@@ -311,10 +299,7 @@ test("reaches the search row by the arrow keys", async ({ page, request }) => {
 
   await opened(page, "Control+k");
   await typed(page, "search");
-  await expect(optionOf(page, new RegExp(`^${SEARCH.name}`)).first()).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  await expect(optionOf(page, /^Search/).first()).toHaveAttribute("aria-selected", "true");
   // The list loops, so one step up from the first match is the last row.
   await page.keyboard.press("ArrowUp");
   await expect(searchRowOf(page)).toHaveAttribute("aria-selected", "true");
@@ -345,13 +330,13 @@ test("offers no search row with nothing typed", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
 
   await opened(page, "Control+k");
-  await expect(optionOf(page, ASK.name)).toBeVisible();
+  await expect(optionOf(page, "Ask")).toBeVisible();
   await expect(searchRowOf(page)).toHaveCount(0);
 
   await typed(page, "audit");
-  await expect(searchRowOf(page)).toHaveText([searchFor("audit")]);
+  await expect(searchRowOf(page)).toHaveText(["Search for “audit”"]);
   await typed(page, "");
-  await expect(optionOf(page, ASK.name)).toBeVisible();
+  await expect(optionOf(page, "Ask")).toBeVisible();
   await expect(searchRowOf(page)).toHaveCount(0);
 });
 
@@ -363,7 +348,7 @@ test("offers no search row for spaces alone", async ({ page, request }) => {
   await expect(searchRowOf(page)).toHaveCount(1);
   await typed(page, "   ");
 
-  await expect(optionOf(page, ASK.name)).toBeVisible();
+  await expect(optionOf(page, "Ask")).toBeVisible();
   await expect(searchRowOf(page)).toHaveCount(0);
   await expect(saidIn(page)).toBeEmpty();
 });
@@ -374,12 +359,10 @@ test("offers the operator in the console no search row", async ({ page, request 
   await markTheOperator(request, email);
   await signedInAtHome(page, request, email);
   await page.goto(EVERY_WORKSPACE.path);
-  await expect(
-    page.getByRole("heading", { level: 1, name: headingOf(EVERY_WORKSPACE) }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
 
   await opened(page, "Meta+k");
-  await expect(optionOf(page, EVERY_WORKSPACE.name)).toBeVisible();
+  await expect(optionOf(page, "Every Workspace")).toBeVisible();
   await typed(page, "audit logs");
 
   await expect(saidIn(page)).toContainText("audit logs");
@@ -390,20 +373,18 @@ test("finds nothing by an unbuilt page's name", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Nidderdale Forge");
 
   await opened(page, "Meta+k");
-  await expect(groupOf(page, JUMP_TO.groups.members)).toBeVisible();
-  await typed(page, SIGNALS.name);
+  await expect(groupOf(page, "Members")).toBeVisible();
+  await typed(page, SIGNALS);
 
-  await expect(saidIn(page)).toContainText(SIGNALS.name);
-  await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor(SIGNALS.name)]);
+  await expect(saidIn(page)).toContainText(SIGNALS);
+  await expect(dialogOf(page).getByRole("option")).toHaveText([`Search for “${SIGNALS}”`]);
 });
 
 test("draws the list within its second, timed in the page", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Ryedale Metalwork");
   // A fresh document, so no members read is cached to answer it.
   await page.reload();
-  await expect(
-    page.getByRole("heading", { level: 1, name: headingOf(MODELS_AND_SPEND) }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Models" })).toBeVisible();
 
   await clockTheNextKey(page, { at: "//*[@role='dialog']", reads: TOM });
   await page.keyboard.press("Meta+k");
@@ -411,9 +392,9 @@ test("draws the list within its second, timed in the page", async ({ page, reque
   test.info().annotations.push({ type: "jump-to list", description: `${elapsed} ms` });
   expect(elapsed, "the jump-to list did not draw within its second").toBeLessThan(LIST_BUDGET_MS);
 
-  await expect(groupOf(page, JUMP_TO.groups.pages)).toBeVisible();
+  await expect(groupOf(page, "Pages")).toBeVisible();
   await expect(optionOf(page, new RegExp(PRIYA))).toBeVisible();
-  await expect(optionOf(page, INVITE_A_PERSON.name)).toBeVisible();
+  await expect(optionOf(page, INVITE_A_PERSON)).toBeVisible();
 });
 
 test("keeps pages and actions through a held, then failed, read", async ({ page, request }) => {
@@ -426,13 +407,13 @@ test("keeps pages and actions through a held, then failed, read", async ({ page,
 
   await opened(page, "Meta+k");
   await typed(page, "invite");
-  await expect(optionOf(page, INVITE_A_PERSON.name)).toBeEnabled();
+  await expect(optionOf(page, INVITE_A_PERSON)).toBeEnabled();
   // A row matches, so what the status says is the read still held.
   await expect(saidIn(page)).toHaveText(/\S/);
   const whileHeld = await saidIn(page).innerText();
 
   await typed(page, "zzz");
-  await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("zzz")]);
+  await expect(dialogOf(page).getByRole("option")).toHaveText(["Search for “zzz”"]);
   await expect(saidIn(page), "the status moved on before the members read ended").toHaveText(
     whileHeld,
   );
@@ -443,9 +424,9 @@ test("keeps pages and actions through a held, then failed, read", async ({ page,
   await expect(saidIn(page), "the status still says the read is held").not.toHaveText(whileHeld);
   await expect(saidIn(page)).toHaveText(/\S/);
   await typed(page, "");
-  await expect(optionOf(page, new RegExp(`^${MEMBERS.name}`))).toBeVisible();
-  await expect(optionOf(page, INVITE_A_PERSON.name)).toBeVisible();
-  await expect(groupOf(page, JUMP_TO.groups.members)).toHaveCount(0);
+  await expect(optionOf(page, /^Members/)).toBeVisible();
+  await expect(optionOf(page, INVITE_A_PERSON)).toBeVisible();
+  await expect(groupOf(page, "Members")).toHaveCount(0);
 });
 
 test("opens from the narrow band, scrolling nothing sideways", async ({ page, request }) => {
@@ -455,7 +436,7 @@ test("opens from the narrow band, scrolling nothing sideways", async ({ page, re
   await triggerOf(page).click();
   await expect(inputOf(page)).toBeFocused();
   await typed(page, "invite");
-  await expect(optionOf(page, INVITE_A_PERSON.name)).toBeVisible();
+  await expect(optionOf(page, INVITE_A_PERSON)).toBeVisible();
 
   const room = await page.evaluate(() => ({
     scrolls: document.documentElement.scrollWidth,

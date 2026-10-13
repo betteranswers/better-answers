@@ -2,8 +2,6 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
-import { goHome } from "@/app/words.ts";
-import { providerWordOf } from "@/features/model-choices/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
 
@@ -117,15 +115,15 @@ test.describe("the Models and spend page's model choices card", () => {
 
     const card = modelChoicesCard(page);
     await expect(card.getByRole("heading", { level: 3 })).toHaveText(PURPOSES);
-    await expect(card).toContainText(providerWordOf(ANSWERING.provider));
+    await expect(card).toContainText("Anthropic");
     await expect(card).toContainText(ANSWERING.model);
 
     const everything = page.locator("body");
     await expect(everything).not.toContainText("openai");
-    await expect(everything).not.toContainText(providerWordOf("openai"));
+    await expect(everything).not.toContainText("OpenAI");
     await expect(everything).not.toContainText("gpt-5-not-mine");
     await expect(everything).not.toContainText("google");
-    await expect(everything).not.toContainText(providerWordOf("google"));
+    await expect(everything).not.toContainText("Google");
     await expect(everything).not.toContainText("gemini-not-mine");
     await expect(everything).not.toContainText(theirs.name);
   });
@@ -136,12 +134,8 @@ test.describe("the Models and spend page's model choices card", () => {
       modelChoices: ANSWERING_AND_EMBEDDING,
     });
 
-    await expect(
-      rowOf(page, "Answering").getByText(providerWordOf(ANSWERING.provider), { exact: true }),
-    ).toBeVisible();
-    await expect(
-      embeddingRow(page).getByText(providerWordOf(EMBEDDING.provider), { exact: true }),
-    ).toBeVisible();
+    await expect(rowOf(page, "Answering").getByText("Anthropic", { exact: true })).toBeVisible();
+    await expect(embeddingRow(page).getByText("Mistral AI", { exact: true })).toBeVisible();
 
     // Exact, because a model's id can hold its provider's: mistral-embed.
     await expect(page.getByText(ANSWERING.provider, { exact: true })).toHaveCount(0);
@@ -207,7 +201,7 @@ test.describe("the Models and spend page's model choices card", () => {
     await signedInWith(page, request, { name: "Halifax Fabrication", modelChoices: [EMBEDDING] });
 
     const embedding = embeddingRow(page);
-    await expect(embedding).toContainText(providerWordOf(EMBEDDING.provider));
+    await expect(embedding).toContainText("Mistral AI");
     await expect(embedding).toContainText(EMBEDDING.model);
 
     // Its note with the dimensions, then why.
@@ -242,12 +236,12 @@ test.describe("the Models and spend page's model choices card", () => {
       modelChoices: ANSWERING_AND_EMBEDDING,
     });
 
-    const nav = page.getByRole("navigation", { name: CONTROL_CENTRE.name });
+    const nav = page.getByRole("navigation", { name: "Control Centre" });
     await nav.getByRole("link", { name: "Members" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 
     const started = Date.now();
-    await nav.getByRole("link", { name: MODELS_AND_SPEND.name }).click();
+    await nav.getByRole("link", { name: "Models and Spend" }).click();
     await expect(modelChoicesCard(page).getByRole("listitem")).toHaveCount(5);
     const elapsed = Date.now() - started;
 
@@ -292,7 +286,7 @@ test.describe("the Models and spend page's model choices card", () => {
           - listitem:
             - heading "Answering" [level=3]
             - term: Provider
-            - definition: ${JSON.stringify(providerWordOf(ANSWERING.provider))}
+            - definition: "Anthropic"
             - term: Model
             - definition: ${ANSWERING.model}
           - listitem:
@@ -301,7 +295,7 @@ test.describe("the Models and spend page's model choices card", () => {
           - listitem:
             - heading "Embedding" [level=3]
             - term: Provider
-            - definition: ${JSON.stringify(providerWordOf(EMBEDDING.provider))}
+            - definition: "Mistral AI"
             - term: Model
             - definition: ${EMBEDDING.model}
             - paragraph: /\\b${String(EMBEDDING_DIMENSIONS)}\\b/
@@ -310,9 +304,9 @@ test.describe("the Models and spend page's model choices card", () => {
     // The heading and its lead line, then the tabs. Equal children: the panel holds the card alone.
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
-        - heading ${JSON.stringify(models.name)} [level=1]
+        - heading "Models" [level=1]
         - paragraph
-        - tablist ${JSON.stringify(MODELS_AND_SPEND.name)}:
+        - tablist "Models and Spend":
           - tab "Model Choices" [selected]
           - tab "Spend"
         - tabpanel "Model Choices":
@@ -335,7 +329,7 @@ test.describe("a page's older address", () => {
     test(`leads an Admin from ${from} to ${to}, Back returning`, async ({ page, request }) => {
       await signedInWith(page, request, { name: "Nidderdale Forge", modelChoices: [] });
       await page
-        .getByRole("navigation", { name: CONTROL_CENTRE.name })
+        .getByRole("navigation", { name: "Control Centre" })
         .getByRole("link", { name: "Members" })
         .click();
       await expect(page).toHaveURL(/\/people\/members$/);
@@ -355,14 +349,14 @@ test.describe("a page's older address", () => {
   }) => {
     await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
     await page.goto("/people/not-a-page");
-    await expect(page.getByRole("link", { name: goHome(HOMES.Viewer) })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to Ask" })).toBeVisible();
     const neverExisted = await page.getByRole("main").ariaSnapshot();
 
     const visited: string[] = [];
     page.on("framenavigated", (frame) => visited.push(frame.url()));
     await page.goto("/people/audit-log");
 
-    await expect(page.getByRole("link", { name: goHome(HOMES.Viewer) })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to Ask" })).toBeVisible();
     await expect(page).toHaveURL(/\/people\/audit-log$/);
     expect(await page.getByRole("main").ariaSnapshot(), "a hidden page gives itself away").toBe(
       neverExisted,

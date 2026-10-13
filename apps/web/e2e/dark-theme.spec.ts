@@ -1,12 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
 
-import {
-  ACCOUNT_ACTIONS,
-  ACCOUNT_HEADING,
-  AUTHENTICATOR_WORDS,
-  THEME_WORDS,
-} from "@/features/auth/account-words.ts";
-import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
 
 import { expect, test } from "./browser.ts";
@@ -38,9 +31,9 @@ const keptOnThisBrowser = (page: Page, theme: string) =>
 const emailStepPaint = (page: Page) =>
   Promise.all(
     [
-      page.getByLabel(SIGN_IN_WORDS.emailField),
-      page.getByRole("button", { name: SIGN_IN_WORDS.passkey }),
-      page.getByRole("button", { name: SIGN_IN_WORDS.send }),
+      page.getByLabel("Email Address"),
+      page.getByRole("button", { name: "Sign In with a Passkey" }),
+      page.getByRole("button", { name: "Send Code" }),
     ].map((part) =>
       part.evaluate((node) => {
         const style = getComputedStyle(node);
@@ -69,13 +62,13 @@ test("picks dark on the Account page and keeps it", async ({ page, request }) =>
   await provision(request, { name: "Calder Lighting", adminEmail: email });
   await signedInAtHome(page, request, email);
   await page.goto("/account");
-  await expect(page.getByRole("heading", { level: 1, name: ACCOUNT_HEADING })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Account" })).toBeVisible();
 
-  const theme = page.getByRole("radiogroup", { name: THEME_WORDS.heading });
-  await expect(theme.getByRole("radio", { name: THEME_WORDS.device })).toBeChecked();
-  await theme.getByRole("radio", { name: THEME_WORDS.device }).focus();
+  const theme = page.getByRole("radiogroup", { name: "Theme" });
+  await expect(theme.getByRole("radio", { name: "Match this device" })).toBeChecked();
+  await theme.getByRole("radio", { name: "Match this device" }).focus();
   // The group checks the radio it moves to, a task later, only while the arrow is still held.
-  for (const next of [THEME_WORDS.light, THEME_WORDS.dark]) {
+  for (const next of ["Light", "Dark"]) {
     await page.keyboard.down("ArrowDown");
     await expect(theme.getByRole("radio", { name: next })).toBeChecked();
     await page.keyboard.up("ArrowDown");
@@ -84,9 +77,7 @@ test("picks dark on the Account page and keeps it", async ({ page, request }) =>
 
   await page.reload();
   await expect(
-    page
-      .getByRole("radiogroup", { name: THEME_WORDS.heading })
-      .getByRole("radio", { name: THEME_WORDS.dark }),
+    page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: "Dark" }),
   ).toBeChecked();
   expect(await themeOf(page), "a reload lost the theme picked").toBe("dark");
 });
@@ -144,8 +135,8 @@ test("draws the authenticator's code dark on light in dark", async ({ page, requ
   await keptOnThisBrowser(page, "dark");
   await signedInWithNoWorkspace(page, request, "theme-code");
   await page.goto("/account");
-  await page.getByRole("button", { name: ACCOUNT_ACTIONS.setUp }).click();
-  const code = page.getByRole("img", { name: AUTHENTICATOR_WORDS.qrCode });
+  await page.getByRole("button", { name: "Set Up an Authenticator" }).click();
+  const code = page.getByRole("img", { name: "QR code for your authenticator" });
   await expect(code).toBeVisible();
 
   const [modules = "", field = ""] = await Promise.all([
@@ -180,7 +171,7 @@ const wordsAndFill = (control: Locator) =>
 test("keeps the hovered primary's words at 4.5:1 in dark", async ({ page }) => {
   await keptOnThisBrowser(page, "dark");
   await page.goto("/sign-in");
-  const send = page.getByRole("button", { name: SIGN_IN_WORDS.send });
+  const send = page.getByRole("button", { name: "Send Code" });
   await expect(send).toBeVisible();
 
   await send.hover();

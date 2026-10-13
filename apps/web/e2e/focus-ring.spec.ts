@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 
-import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
 
@@ -138,7 +137,7 @@ for (const [theme, kept] of [
   test(`shows${theme} focus at 3:1 on every sign-in page control`, async ({ page }) => {
     if (kept) await inTheDark(page);
     await page.goto("/sign-in");
-    await expect(page.getByRole("button", { name: SIGN_IN_WORDS.send })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send Code" })).toBeVisible();
 
     await holdsTheRing(page, await walked(page));
   });
@@ -146,7 +145,7 @@ for (const [theme, kept] of [
   test(`the primary button's${theme} ring holds 3:1 on its fill`, async ({ page }) => {
     if (kept) await inTheDark(page);
     await page.goto("/sign-in");
-    const send = page.getByRole("button", { name: SIGN_IN_WORDS.send });
+    const send = page.getByRole("button", { name: "Send Code" });
     await send.focus();
     await page.keyboard.press("Shift+Tab");
     await page.keyboard.press("Tab");

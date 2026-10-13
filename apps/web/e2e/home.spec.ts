@@ -1,10 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { CONNECT_ASSISTANT, goHome, JUMP_TO, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
-import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
-import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
-import { CONTROL_CENTRE, headingOf, HOMES, KNOWLEDGE, type Role } from "@/shared/navigation.ts";
+import { HOMES, type Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -17,13 +14,17 @@ import {
   notFoundOfferingHome,
   person,
   provision,
-  quoted,
   signIn,
   skipLinkReachesThePage,
   tabUntilFocused,
 } from "./harness.ts";
 
 const READ_BUDGET_MS = 1000;
+
+/** Each role's home, as the rail's link and the way home name it. */
+const HOME_NAMED = { Admin: "Members", Editor: "Ask", Viewer: "Ask" } as const satisfies Readonly<
+  Record<Role, string>
+>;
 
 /** Every role joins the same way, so the Admin here differs from the others by role alone. */
 const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
@@ -36,14 +37,13 @@ const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
   await signIn(page, api, email);
 };
 
-const unknownPage = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading });
+const unknownPage = (page: Page) => page.getByRole("heading", { level: 1, name: "Page Not Found" });
 
 /** In the shell, past the skip link, the not-found's one link is the way home. */
 const homeOfferedInTheShell = async (page: Page, role: Role, audited: () => Promise<void>) => {
-  const home = goHome(HOMES[role]);
+  const home = `Go to ${HOME_NAMED[role]}`;
   await notFoundOfferingHome(page, role);
-  await expect(page.getByRole("navigation", { name: RAIL })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Areas" })).toBeVisible();
   await audited();
   await skipLinkReachesThePage(page);
   await page.keyboard.press("Tab");
@@ -56,9 +56,7 @@ const personMenu = (page: Page, role: Role) =>
   page.getByRole("banner").getByRole("button", { name: `A ${role}`, exact: true });
 
 for (const role of ROLES) {
-  const home = HOMES[role];
-
-  test(`lands ${aRole(role)} on ${home.name} after sign-in`, async ({ page, request }) => {
+  test(`lands ${aRole(role)} on ${HOME_NAMED[role]} after sign-in`, async ({ page, request }) => {
     await signedInAs(page, request, role);
 
     await landedAtHome(page, role);
@@ -93,34 +91,33 @@ test("offers a Viewer's home from an unknown page, shell kept", async ({
 
 for (const role of ["Editor", "Viewer"] as const) {
   test(`shows ${aRole(role)} Ask on its way, and Knowledge`, async ({ page, request }) => {
-    const home = HOMES[role];
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
 
-    await expect(page.getByRole("navigation", { name: RAIL })).toMatchAriaSnapshot(`
-      - navigation ${quoted(RAIL)}:
+    await expect(page.getByRole("navigation", { name: "Areas" })).toMatchAriaSnapshot(`
+      - navigation "Areas":
         - list:
           - /children: equal
           - listitem:
-            - link ${quoted(home.name)}
+            - link "Ask"
           - listitem:
-            - link ${quoted(KNOWLEDGE.name)}
+            - link "Knowledge"
     `);
-    await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
     const address = await askShowsTheServedAddress(page);
     await expect(page.getByRole("main")).toMatchAriaSnapshot(`
       - main "Page":
-        - heading ${quoted(headingOf(home))} [level=1]
+        - heading "Ask" [level=1]
         - paragraph
-        - heading ${quoted(CONNECT_ASSISTANT.heading)} [level=2]
+        - heading "Connect Claude as Your Assistant" [level=2]
         - list:
           - /children: equal
           - listitem:
             - paragraph
           - listitem:
             - paragraph
-            - code: ${quoted(address)}
-            - button ${quoted(CONNECT_ASSISTANT.copy)}
+            - code: ${JSON.stringify(address)}
+            - button "Copy Address"
             - status
           - listitem:
             - paragraph
@@ -138,7 +135,7 @@ for (const role of ["Editor", "Viewer"] as const) {
     await landedAtHome(page, role);
     const address = await askShowsTheServedAddress(page);
 
-    const copy = page.getByRole("button", { name: CONNECT_ASSISTANT.copy });
+    const copy = page.getByRole("button", { name: "Copy Address" });
     await tabUntilFocused(page, copy);
     await page.keyboard.press("Enter");
 
@@ -151,21 +148,21 @@ for (const role of ["Editor", "Viewer"] as const) {
     await landedAtHome(page, role);
 
     await page.goto("/people/not-a-page");
-    await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to Ask" })).toBeVisible();
     const neverExisted = await page.getByRole("main").ariaSnapshot();
 
     await page.goto(HOMES.Admin.path);
 
-    await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to Ask" })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
     expect(await page.getByRole("main").ariaSnapshot(), "a hidden page gives itself away").toBe(
       neverExisted,
     );
     await expect(page.getByRole("tablist")).toHaveCount(0);
-    await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
 
     await personMenu(page, role).click();
-    await expect(page.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign Out"]);
+    await expect(page.getByRole("menuitem")).toHaveText(["Account", "Sign Out"]);
   });
 }
 
@@ -177,7 +174,7 @@ test("draws a Viewer's Ask within a second of arriving", async ({ page, request 
   const started = Date.now();
   await page.goto(home.path);
   await expect(
-    page.getByRole("heading", { level: 2, name: CONNECT_ASSISTANT.heading }),
+    page.getByRole("heading", { level: 2, name: "Connect Claude as Your Assistant" }),
   ).toBeVisible();
   const elapsedMs = Date.now() - started;
 
@@ -190,18 +187,17 @@ test("lists the shell's keystrokes alone on Ask and unknown pages", async ({
   request,
   passesTheAccessibilityGate,
 }) => {
-  const home = HOMES.Viewer;
   await signedInAs(page, request, "Viewer");
   await landedAtHome(page, "Viewer");
-  const theShells = [KEYSTROKE_WORDS.showTheList, JUMP_TO.name];
+  const theShells = ["Show This List", "Jump To"];
   // The list always says where single keys work; a page with none of its own adds a line.
   const addsNoLine = "the list adds no line for a page with no keystrokes of its own";
 
   await page
-    .getByRole("navigation", { name: RAIL })
-    .getByRole("button", { name: KEYSTROKE_WORDS.button })
+    .getByRole("navigation", { name: "Areas" })
+    .getByRole("button", { name: "Keyboard Shortcuts" })
     .click();
-  const onAsk = page.getByRole("dialog", { name: keystrokesOn(home.name) });
+  const onAsk = page.getByRole("dialog", { name: "Keyboard Shortcuts on Ask" });
   await expect(onAsk.getByRole("paragraph"), addsNoLine).toHaveCount(2);
   await expect(onAsk.getByRole("definition")).toHaveText(theShells);
   await passesTheAccessibilityGate();
@@ -210,7 +206,7 @@ test("lists the shell's keystrokes alone on Ask and unknown pages", async ({
   // Hidden from a Viewer, so it is the page that never existed.
   await page.goto(HOMES.Admin.path);
   await expect(unknownPage(page)).toBeVisible();
-  const onUnknown = await keystrokesListed(page, KEYSTROKE_WORDS.thisPage);
+  const onUnknown = await keystrokesListed(page, "This Page");
   await expect(onUnknown.getByRole("paragraph"), addsNoLine).toHaveCount(2);
   await expect(onUnknown.getByRole("definition")).toHaveText(theShells);
   await keystrokesDismissed(page, onUnknown);
