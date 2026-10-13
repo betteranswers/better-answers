@@ -6,18 +6,6 @@ import {
 } from "@better-answers/schema/second-factor";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
-import {
-  AUTHENTICATOR_WORDS,
-  PASSKEY_WORDS,
-  RECOVERY_CODE_WORDS,
-} from "@/features/auth/account-words.ts";
-import {
-  CONFIRM_WORDS,
-  RECOVERY_WORDS,
-  SETUP_WORDS,
-  USE_CODE,
-} from "@/features/auth/second-factor-words.ts";
-
 import { expect, test } from "./browser.ts";
 import {
   enrolledWith,
@@ -25,7 +13,6 @@ import {
   keyShown,
   landedAtHome,
   provision,
-  quoted,
   refusedDigitsSelected,
   restored,
   saysAnotherRefusal,
@@ -45,25 +32,28 @@ const MOST_TRIES = 10;
 
 const heading = (page: Page, name: string) => page.getByRole("heading", { level: 1, name });
 
-const passkeyButton = (page: Page) => page.getByRole("button", { name: CONFIRM_WORDS.passkey });
+const CONFIRM_HEADING = "Confirm It’s You";
 
-const codeField = (page: Page) => page.getByRole("textbox", { name: CONFIRM_WORDS.codeField });
+const passkeyButton = (page: Page) =>
+  page.getByRole("button", { name: "Use Your Passkey", exact: true });
 
-const recoveryField = (page: Page) => page.getByRole("textbox", { name: RECOVERY_WORDS.field });
+const codeField = (page: Page) => page.getByRole("textbox", { name: "Authenticator Code" });
 
-const restoreField = (page: Page) => page.getByRole("textbox", { name: SETUP_WORDS.restoreField });
+const recoveryField = (page: Page) => page.getByRole("textbox", { name: "Recovery Code" });
 
-const addAPasskey = (page: Page) => page.getByRole("button", { name: SETUP_WORDS.addPasskey });
+const restoreField = (page: Page) => page.getByRole("textbox", { name: "Restore Code" });
+
+const addAPasskey = (page: Page) => page.getByRole("button", { name: "Add a Passkey" });
 
 const authenticatorInstead = (page: Page) =>
-  page.getByRole("button", { name: SETUP_WORDS.authenticatorInstead });
+  page.getByRole("button", { name: "Set Up an Authenticator Instead" });
 
 const codesListed = (page: Page) =>
-  page.getByRole("list", { name: RECOVERY_CODE_WORDS.list }).getByRole("listitem");
+  page.getByRole("list", { name: "Recovery Codes" }).getByRole("listitem");
 
 /** What the codes' block says of its set: one line for a first set, and one more for a set that replaces one. */
 const saidOfTheSet = (page: Page) =>
-  page.getByRole("region", { name: RECOVERY_CODE_WORDS.saveHeading }).getByRole("paragraph");
+  page.getByRole("region", { name: "Save Your Recovery Codes" }).getByRole("paragraph");
 
 /** Every refusal region stands from the first draw, so the one saying something is the refusal. */
 const theRefusal = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
@@ -87,7 +77,7 @@ const signedInWaiting = async (page: Page, api: APIRequestContext, email: string
 /** Drops the cookie alone, so the session it named stays open on the server. */
 const signedInAgain = async (page: Page, api: APIRequestContext, email: string) => {
   await page.context().clearCookies();
-  await signedInWaiting(page, api, email, CONFIRM_WORDS.heading);
+  await signedInWaiting(page, api, email, CONFIRM_HEADING);
 };
 
 /** Left on the confirm page, not yet confirmed, holding ten saved codes unless told none. */
@@ -98,7 +88,7 @@ const anAdminWithAnAuthenticator = async (
 ) => {
   const { admin } = await provision(api, { name: "Calder Confirmations" });
   const { key, recoveryCodes } = await enrolledWith(api, admin.email, codes);
-  await signedInWaiting(page, api, admin.email, CONFIRM_WORDS.heading);
+  await signedInWaiting(page, api, admin.email, CONFIRM_HEADING);
   return { email: admin.email, key, codes: recoveryCodes };
 };
 
@@ -110,7 +100,7 @@ const confirmedByCode = async (page: Page, key: string): Promise<void> => {
 
 /** Ticked on the page showing them, so no later sign-in shows them again. */
 const codesTicked = async (page: Page, finish: string): Promise<void> => {
-  await page.getByRole("checkbox", { name: RECOVERY_CODE_WORDS.saved }).check();
+  await page.getByRole("checkbox", { name: "I have saved these codes" }).check();
   await page.getByRole("button", { name: finish }).click();
   await expect(codesListed(page)).toHaveCount(0);
 };
@@ -124,9 +114,9 @@ const anAdminWithBothFactors = async (page: Page, api: APIRequestContext) => {
   const admin = await anAdminWithAnAuthenticator(page, api);
   await confirmedByCode(page, admin.key);
   await page.goto("/account");
-  await page.getByRole("button", { name: PASSKEY_WORDS.add }).click();
-  await page.getByLabel(PASSKEY_WORDS.nameField).fill("Work laptop");
-  await page.getByRole("button", { name: PASSKEY_WORDS.addCommit }).click();
+  await addAPasskey(page).click();
+  await page.getByLabel("Passkey Name").fill("Work laptop");
+  await page.getByRole("button", { name: "Add Passkey" }).click();
   await expect(page.getByRole("listitem", { name: "Work laptop", exact: true })).toBeFocused();
   await expect(page.getByRole("status").filter({ hasText: /\S/ })).toBeVisible();
 
@@ -139,14 +129,14 @@ const anAdminWithBothFactors = async (page: Page, api: APIRequestContext) => {
 /** A recovery or restore code, sent with the button beside its field. */
 const codeUsed = async (field: Locator, code: string): Promise<void> => {
   await field.fill(code);
-  await field.page().getByRole("button", { name: USE_CODE }).click();
+  await field.page().getByRole("button", { name: "Use Code" }).click();
 };
 
 const recoveryCodeSpent = async (page: Page, code: string): Promise<void> => {
   await page.goto("/recovery");
   await expect(recoveryField(page)).toBeFocused();
   await codeUsed(recoveryField(page), code);
-  await expect(heading(page, SETUP_WORDS.newHeading)).toBeVisible();
+  await expect(heading(page, "Set Up a New Second Factor")).toBeVisible();
   await expect(page).toHaveURL(/\/setup$/);
 };
 
@@ -154,8 +144,8 @@ const recoveryCodeSpent = async (page: Page, code: string): Promise<void> => {
 const authenticatorSetUpThere = async (page: Page): Promise<string> => {
   await authenticatorInstead(page).click();
   const key = await keyShown(page);
-  await page.getByLabel(AUTHENTICATOR_WORDS.codeField).fill(codeOf(key));
-  await expect(heading(page, RECOVERY_CODE_WORDS.saveHeading)).toBeVisible();
+  await page.getByLabel("Authenticator Code").fill(codeOf(key));
+  await expect(heading(page, "Save Your Recovery Codes")).toBeVisible();
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
   return key;
 };
@@ -184,10 +174,10 @@ test("an email-signed-in Admin confirms with the passkey offered first", async (
   await expect(passkeyButton(page)).toBeFocused();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(CONFIRM_WORDS.heading)} [level=1]
-      - button ${quoted(CONFIRM_WORDS.passkey)}
-      - textbox ${quoted(CONFIRM_WORDS.codeField)}
-      - link ${quoted(CONFIRM_WORDS.recoveryCode)}
+      - heading "Confirm It’s You" [level=1]
+      - button "Use Your Passkey"
+      - textbox "Authenticator Code"
+      - link "Use a Recovery Code"
       - button "Sign Out"
   `);
   await passkeyButton(page).click();
@@ -242,7 +232,7 @@ test("a recovery code's setup swaps in a new authenticator", async ({
   const newKey = await authenticatorSetUpThere(page);
 
   await expect(saidOfTheSet(page), "the set does not say it replaces one").toHaveCount(2);
-  await codesTicked(page, RECOVERY_CODE_WORDS.finish);
+  await codesTicked(page, "Finish Setup");
   await landedAtHome(page, "Admin");
   await signedInAgain(page, request, email);
   await page.goto("/confirm");
@@ -261,7 +251,7 @@ test("after a recovery code, another email sign-in must confirm", async ({ page,
   await signedInAgain(page, request, email);
   await page.goto("/setup");
 
-  await expect(heading(page, CONFIRM_WORDS.heading)).toBeVisible();
+  await expect(heading(page, CONFIRM_HEADING)).toBeVisible();
   await expect(page).toHaveURL(/\/confirm$/);
   await codeField(page).fill(codeOf(key));
   await landedAtHome(page, "Admin");
@@ -274,7 +264,7 @@ test("a restored Admin gives the restore code before any setup", async ({
 }) => {
   const { admin } = await provision(request, { name: "Restored Glazing" });
   const code = await restored(request, admin.email);
-  await signedInWaiting(page, request, admin.email, SETUP_WORDS.heading);
+  await signedInWaiting(page, request, admin.email, "Set Up a Second Factor");
   await expect(restoreField(page)).toBeFocused();
   await expect(addAPasskey(page)).toHaveCount(0);
   await expect(authenticatorInstead(page)).toHaveCount(0);
@@ -301,13 +291,13 @@ test("without WebAuthn, setup opens on the authenticator's steps", async ({ page
   await withoutWebAuthn(page);
   const { admin } = await provision(request, { name: "Keyless Roofing" });
 
-  await signedInWaiting(page, request, admin.email, SETUP_WORDS.heading);
+  await signedInWaiting(page, request, admin.email, "Set Up a Second Factor");
 
   await expect(authenticatorInstead(page)).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("img", { name: AUTHENTICATOR_WORDS.qrCode })).toBeVisible();
-  await expect(page.getByLabel(AUTHENTICATOR_WORDS.codeField)).toBeVisible();
+  await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();
+  await expect(page.getByLabel("Authenticator Code")).toBeVisible();
   await expect(addAPasskey(page)).toHaveCount(0);
-  await expect(page.getByLabel(PASSKEY_WORDS.nameField)).toHaveCount(0);
+  await expect(page.getByLabel("Passkey Name")).toHaveCount(0);
 });
 
 test("unticked codes come back as a new set at sign-in", async ({
@@ -317,7 +307,7 @@ test("unticked codes come back as a new set at sign-in", async ({
 }) => {
   const { email, key } = await anAdminWithAnAuthenticator(page, request, "none");
   await codeField(page).fill(codeOf(key));
-  await expect(heading(page, RECOVERY_CODE_WORDS.saveHeading)).toBeVisible();
+  await expect(heading(page, "Save Your Recovery Codes")).toBeVisible();
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
   await expect(saidOfTheSet(page), "a first set says it replaces one").toHaveCount(1);
   const first = await codesListed(page).allInnerTexts();
@@ -326,7 +316,7 @@ test("unticked codes come back as a new set at sign-in", async ({
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  await expect(heading(page, RECOVERY_CODE_WORDS.saveHeading)).toBeVisible();
+  await expect(heading(page, "Save Your Recovery Codes")).toBeVisible();
   await expect(page).toHaveURL(/\/recovery-codes$/);
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
   const second = await codesListed(page).allInnerTexts();
@@ -336,7 +326,7 @@ test("unticked codes come back as a new set at sign-in", async ({
   ).toEqual([]);
   await expect(saidOfTheSet(page), "the set does not say it replaces one").toHaveCount(2);
   await passesTheAccessibilityGate();
-  await codesTicked(page, RECOVERY_CODE_WORDS.finish);
+  await codesTicked(page, "Finish Setup");
   await landedAtHome(page, "Admin");
 
   await signedInAgain(page, request, email);
@@ -348,5 +338,5 @@ test("unticked codes come back as a new set at sign-in", async ({
   await keepsItsWordOffThePage(page, "recovery-code-wrong");
   await passesTheAccessibilityGate();
   await codeUsed(recoveryField(page), second[0] ?? "");
-  await expect(heading(page, SETUP_WORDS.newHeading)).toBeVisible();
+  await expect(heading(page, "Set Up a New Second Factor")).toBeVisible();
 });

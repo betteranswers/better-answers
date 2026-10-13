@@ -2,10 +2,6 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
-import { ACCOUNT_HEADING, PASSKEY_WORDS } from "@/features/auth/account-words.ts";
-import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
-import { CONFIRM_WORDS } from "@/features/auth/second-factor-words.ts";
-import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -19,7 +15,6 @@ import {
   landedAtHome,
   person,
   provision,
-  quoted,
   signIn,
   signInByEmail,
   signInHeading,
@@ -33,9 +28,9 @@ const MEMBERS = HOMES.Admin.path;
 const GROUPS = "/people/groups";
 
 const confirmHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: CONFIRM_WORDS.heading });
+  page.getByRole("heading", { level: 1, name: "Confirm It’s You" });
 
-const codeField = (page: Page) => page.getByRole("textbox", { name: CONFIRM_WORDS.codeField });
+const codeField = (page: Page) => page.getByRole("textbox", { name: "Authenticator Code" });
 
 const landedAt = (page: Page): URL => new URL(page.url());
 
@@ -93,7 +88,7 @@ test("a pending connection to Claude resumes at the workspace picker", async ({
   ).not.toBeNull();
   expect(landedAt(page).searchParams.get("code")).toBeNull();
   await confirmedWith(page, key);
-  await expect(page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your Workspaces" })).toBeVisible();
   expect(landedAt(page).pathname).toBe("/choose-workspace");
   expect(landedAt(page).searchParams.get("sig")).not.toBeNull();
   await page.getByRole("button", { name: second.name }).click();
@@ -165,12 +160,12 @@ const someoneHoldingBoth = async (page: Page, api: APIRequestContext) => {
   const key = await withAnAuthenticator(api, email);
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   await page.goto("/account");
-  await expect(page.getByRole("heading", { level: 1, name: ACCOUNT_HEADING })).toBeVisible();
-  await page.getByRole("button", { name: PASSKEY_WORDS.add }).click();
-  const passkey = await page.getByLabel(PASSKEY_WORDS.nameField).inputValue();
-  await page.getByRole("button", { name: PASSKEY_WORDS.addCommit }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Account" })).toBeVisible();
+  await page.getByRole("button", { name: "Add a Passkey" }).click();
+  const passkey = await page.getByLabel("Passkey Name").inputValue();
+  await page.getByRole("button", { name: "Add Passkey" }).click();
   // Codes come only with a first factor, and the harness's authenticator came first.
   await expect(page.getByRole("listitem", { name: passkey, exact: true })).toBeFocused();
   return { device, who, key, passkey };
@@ -191,7 +186,7 @@ test("a just-promoted Admin sees what can confirm, gone once confirmed", async (
   });
 
   await page.goto(`/invitations/${invited.id}`);
-  await page.getByRole("button", { name: INVITATION_WORDS.join }).click();
+  await page.getByRole("button", { name: "Join Workspace" }).click();
 
   await expect(confirmHeading(page)).toBeVisible();
   const whatConfirms = page.getByRole("main").getByRole("list");
@@ -199,15 +194,15 @@ test("a just-promoted Admin sees what can confirm, gone once confirmed", async (
   await expect(whatConfirms.getByRole("listitem")).toContainText([passkey, "Authenticator"]);
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(CONFIRM_WORDS.heading)} [level=1]
+      - heading "Confirm It’s You" [level=1]
       - paragraph
       - paragraph
       - list:
         - listitem
         - listitem
       - paragraph
-      - button ${quoted(CONFIRM_WORDS.passkey)}
-      - textbox ${quoted(CONFIRM_WORDS.codeField)}
+      - button "Use Your Passkey"
+      - textbox "Authenticator Code"
   `);
   await passesTheAccessibilityGate();
   await confirmedWith(page, key);

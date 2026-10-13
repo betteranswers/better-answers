@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { CONTROL_CENTRE, menuGroupIn, headingOf, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -50,7 +50,7 @@ test("brings an ended session through sign-in back to its page", async ({
   await signIn(page, request, email);
   // Not the Admin's home, which sign-in would reach without carrying the page back.
   const elsewhere = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log");
-  await page.getByRole("link", { name: elsewhere.name }).click();
+  await page.getByRole("link", { name: "Audit Log" }).click();
   await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));
 
   await context.clearCookies();
@@ -61,7 +61,7 @@ test("brings an ended session through sign-in back to its page", async ({
   await signIn(page, request, email);
 
   await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));
-  await expect(page.getByRole("heading", { level: 1, name: headingOf(elsewhere) })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
 
   await signOutFromTheShell(page, workspace.admin.name);
   expect(await signInSaysWhy(page), "a sign-out read as an ended session").not.toBe(ended);

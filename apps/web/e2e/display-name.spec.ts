@@ -1,7 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
-import { DISPLAY_NAME_MAX_CHARACTERS, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
+import { DISPLAY_NAME_MAX_CHARACTERS } from "@/shared/display-name-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -20,10 +19,10 @@ import {
 import { refusalAnswering } from "./refused-read.ts";
 
 const displayNameHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: DISPLAY_NAME_WORDS.heading });
+  page.getByRole("heading", { level: 1, name: "Your Name" });
 
 const noWorkspaceHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
+  page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
 
 const displayNameField = (page: Page) => page.getByLabel("Display Name");
 
@@ -53,7 +52,7 @@ test("asks a first-time person for a display name before anything", async ({
   await expect(displayNameField(page)).toBeFocused();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${JSON.stringify(DISPLAY_NAME_WORDS.heading)} [level=1]
+      - heading "Your Name" [level=1]
       - paragraph
       - textbox "Display Name"
       - button "Save and Continue"

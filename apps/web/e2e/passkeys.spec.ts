@@ -1,17 +1,6 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { ALL_WORKSPACES } from "@/app/words.ts";
-import {
-  ACCOUNT_HEADING,
-  PASSKEY_WORDS,
-  passkeyNameFor,
-  RECOVERY_CODE_WORDS,
-  removePasskeyTitle,
-} from "@/features/auth/account-words.ts";
-import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
-import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
-import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
-import { ASK, KNOWLEDGE, menuGroupIn } from "@/shared/navigation.ts";
+import { passkeyNameFor } from "@/features/auth/account-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -37,13 +26,12 @@ import {
 import { authAnswering } from "./refused-read.ts";
 import { aVirtualAuthenticator, withoutWebAuthn } from "./virtual-authenticator.ts";
 
-const accountHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: ACCOUNT_HEADING });
+const accountHeading = (page: Page) => page.getByRole("heading", { level: 1, name: "Account" });
 
 const rowOf = (page: Page, name: string) => page.getByRole("listitem", { name, exact: true });
 
 const theNoWorkspacePage = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
+  page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
 
 /** The status an action's outcome is said in: the one holding words. */
 const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
@@ -58,9 +46,9 @@ const suggestedName = (page: Page): Promise<string> =>
 /** From the Account page: open the add, keep the suggested name, and add it. */
 const passkeyAdded = async (page: Page): Promise<string> => {
   const name = await suggestedName(page);
-  await page.getByRole("button", { name: PASSKEY_WORDS.add }).click();
-  await expect(page.getByLabel(PASSKEY_WORDS.nameField)).toHaveValue(name);
-  await page.getByRole("button", { name: PASSKEY_WORDS.addCommit }).click();
+  await page.getByRole("button", { name: "Add a Passkey" }).click();
+  await expect(page.getByLabel("Passkey Name")).toHaveValue(name);
+  await page.getByRole("button", { name: "Add Passkey" }).click();
   return name;
 };
 
@@ -91,8 +79,8 @@ const withAPasskey = async (
 
 /** Rename opened on the passkey's row, its field holding `typed`. */
 const renameTyped = async (page: Page, name: string, typed: string): Promise<void> => {
-  await rowOf(page, name).getByRole("button", { name: PASSKEY_WORDS.rename }).click();
-  await page.getByRole("textbox", { name: PASSKEY_WORDS.nameField }).fill(typed);
+  await rowOf(page, name).getByRole("button", { name: "Rename" }).click();
+  await page.getByRole("textbox", { name: "Passkey Name" }).fill(typed);
 };
 
 test("a person adds a passkey, then signs in without email", async ({ page, request }) => {
@@ -123,13 +111,11 @@ test("a renamed passkey shows its name, and its last use", async ({ page, reques
   await renameTyped(page, name, "   ");
   await page.keyboard.press("Enter");
   await saysARefusal(page.getByRole("alert"));
-  await page.getByRole("textbox", { name: PASSKEY_WORDS.nameField }).fill("Work laptop");
+  await page.getByRole("textbox", { name: "Passkey Name" }).fill("Work laptop");
   await page.keyboard.press("Enter");
 
   await expect(rowOf(page, "Work laptop")).toBeVisible();
-  await expect(
-    rowOf(page, "Work laptop").getByRole("button", { name: PASSKEY_WORDS.rename }),
-  ).toBeFocused();
+  await expect(rowOf(page, "Work laptop").getByRole("button", { name: "Rename" })).toBeFocused();
   await signedOut(page);
   await expect(theNoWorkspacePage(page)).toBeVisible();
   await accountOpened(page);
@@ -142,19 +128,19 @@ test("Escape puts a passkey's name back", async ({ page, request }) => {
   await renameTyped(page, name, "Not this");
   await page.keyboard.press("Escape");
 
-  await expect(rowOf(page, name).getByRole("button", { name: PASSKEY_WORDS.rename })).toBeFocused();
+  await expect(rowOf(page, name).getByRole("button", { name: "Rename" })).toBeFocused();
 });
 
 test("a passkey's rename field and Save share one height", async ({ page, request }) => {
   const { name } = await withAPasskey(page, request, "height");
   const row = rowOf(page, name);
-  const renameField = row.getByRole("textbox", { name: PASSKEY_WORDS.nameField });
-  await row.getByRole("button", { name: PASSKEY_WORDS.rename }).click();
+  const renameField = row.getByRole("textbox", { name: "Passkey Name" });
+  await row.getByRole("button", { name: "Rename" }).click();
   await expect(renameField).toBeVisible();
 
   const [field, button] = await Promise.all([
     renameField.boundingBox(),
-    row.getByRole("button", { name: PASSKEY_WORDS.save, exact: true }).boundingBox(),
+    row.getByRole("button", { name: "Save", exact: true }).boundingBox(),
   ]);
 
   expect(field, "the rename field has no box to measure").not.toBeNull();
@@ -165,15 +151,15 @@ test("a passkey removed stops signing in", async ({ page, request }) => {
   const { device, name } = await withAPasskey(page, request, "removed");
   const saidOfTheAdd = await outcomeOf(page).innerText();
 
-  await rowOf(page, name).getByRole("button", { name: PASSKEY_WORDS.remove }).click();
-  const dialog = page.getByRole("dialog", { name: removePasskeyTitle(name) });
-  await dialog.getByRole("button", { name: PASSKEY_WORDS.removeCommit }).click();
+  await rowOf(page, name).getByRole("button", { name: "Remove", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: `Remove Passkey “${name}”` });
+  await dialog.getByRole("button", { name: "Remove", exact: true }).click();
 
   await expect
     .poll(() => outcomeOf(page).innerText(), "the page says nothing new of the removal")
     .not.toBe(saidOfTheAdd);
   await expect(rowOf(page, name)).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 3, name: PASSKEY_WORDS.heading })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 3, name: "Passkeys" })).toBeFocused();
   expect(await device.held(), "the device should still hold the removed passkey").toBe(1);
 
   const refused = authAnswering(page, "/passkeys/sign-in");
@@ -181,7 +167,7 @@ test("a passkey removed stops signing in", async ({ page, request }) => {
 
   expect(await refused).toMatchObject({ status: 401, word: "passkey-unknown" });
   await saysARefusal(page.getByRole("alert"));
-  await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toBeVisible();
+  await expect(page.getByLabel("Email Address")).toBeVisible();
 });
 
 test("a second passkey from the same device is refused", async ({ page, request }) => {
@@ -191,7 +177,7 @@ test("a second passkey from the same device is refused", async ({ page, request 
 
   await saysARefusal(page.getByRole("alert"));
   await expect(page.getByRole("listitem")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: PASSKEY_WORDS.addCommit })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Add Passkey" })).toBeFocused();
 });
 
 test("an Admin keeps their only passkey, told why beside Remove", async ({ page, request }) => {
@@ -201,15 +187,15 @@ test("an Admin keeps their only passkey, told why beside Remove", async ({ page,
   await page.goto("/sign-in");
   await signInByEmail(page, request, admin.email);
   const name = await suggestedName(page);
-  await expect(page.getByLabel(PASSKEY_WORDS.nameField)).toHaveValue(name);
-  await page.getByRole("button", { name: SETUP_WORDS.addPasskey }).click();
+  await expect(page.getByLabel("Passkey Name")).toHaveValue(name);
+  await page.getByRole("button", { name: "Add a Passkey" }).click();
 
-  await expect(page.getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading })).toBeFocused();
-  await page.getByRole("checkbox", { name: RECOVERY_CODE_WORDS.saved }).check();
-  await page.getByRole("button", { name: RECOVERY_CODE_WORDS.finish }).click();
+  await expect(page.getByRole("heading", { name: "Save Your Recovery Codes" })).toBeFocused();
+  await page.getByRole("checkbox", { name: "I have saved these codes" }).check();
+  await page.getByRole("button", { name: "Finish Setup" }).click();
   await landedAtHome(page, "Admin");
   await accountOpened(page);
-  const remove = rowOf(page, name).getByRole("button", { name: PASSKEY_WORDS.remove });
+  const remove = rowOf(page, name).getByRole("button", { name: "Remove", exact: true });
   await expect(remove).toHaveAttribute("aria-disabled", "true");
   await expect(remove).toHaveAccessibleDescription(/\S/);
 });
@@ -227,7 +213,7 @@ const saysNoPasskeyWasUsed = async (page: Page, saidBefore: string): Promise<voi
       )
       .toBe(false);
   await saysSomethingNew();
-  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.passkey })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toHaveAttribute(
     "aria-disabled",
     "false",
   );
@@ -246,44 +232,41 @@ test("a device whose user check fails signs nothing in", async ({ page, request 
   // The page already says the session ended, so an unused passkey shows by what is said next.
   await expect(page.getByRole("status")).toHaveText(/\S/);
   const saidOnArriving = await page.getByRole("status").innerText();
-  await page.getByRole("button", { name: SIGN_IN_WORDS.passkey }).click();
+  await page.getByRole("button", { name: "Sign In with a Passkey" }).click();
 
   await saysNoPasskeyWasUsed(page, saidOnArriving);
-  await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toBeVisible();
+  await expect(page.getByLabel("Email Address")).toBeVisible();
 });
 
 test("a cancelled passkey prompt leaves the email step unchanged", async ({ page }) => {
   await aVirtualAuthenticator(page);
   await page.goto("/sign-in");
   const address = anAddress("cancelled");
-  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(address);
+  await page.getByLabel("Email Address").fill(address);
 
-  await page.getByRole("button", { name: SIGN_IN_WORDS.passkey }).click();
+  await page.getByRole("button", { name: "Sign In with a Passkey" }).click();
 
   await saysNoPasskeyWasUsed(page, "");
-  await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toHaveValue(address);
-  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.passkey })).toBeFocused();
+  await expect(page.getByLabel("Email Address")).toHaveValue(address);
+  await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toBeFocused();
 });
 
 test("the email step reads email, send, then the passkey", async ({ page }) => {
   await aVirtualAuthenticator(page);
   await page.goto("/sign-in");
-  const email = page.getByLabel(SIGN_IN_WORDS.emailField);
+  const email = page.getByLabel("Email Address");
   await expect(email).toHaveAttribute("autocomplete", "username webauthn");
 
   await tabUntilFocused(page, email);
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.send })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Send Code" })).toBeFocused();
   await page.keyboard.press("Tab");
 
-  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.passkey })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toBeFocused();
 });
 
-/** Knowledge's first group, whose name heads the page its rail link opens. */
-const BROWSE = menuGroupIn(KNOWLEDGE, "browse");
-
 /** The offer, found by the one control it alone draws. */
-const offerOf = (page: Page) => page.getByRole("button", { name: PASSKEY_WORDS.dismissOffer });
+const offerOf = (page: Page) => page.getByRole("button", { name: "Dismiss Passkey Offer" });
 
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 
@@ -319,8 +302,9 @@ const signedInAgain = async (
 
 /** On to another page, where the offer must not follow. */
 const movedOnWithoutTheOffer = async (page: Page): Promise<void> => {
-  await railOf(page).getByRole("link", { name: KNOWLEDGE.name }).click();
-  await expect(page.getByRole("heading", { level: 1, name: BROWSE.name })).toBeVisible();
+  await railOf(page).getByRole("link", { name: "Knowledge" }).click();
+  // Knowledge's first group heads the page its rail link opens.
+  await expect(page.getByRole("heading", { level: 1, name: "Browse" })).toBeVisible();
   await expect(offerOf(page), "the offer followed the Viewer to the next page").toHaveCount(0);
 };
 
@@ -383,7 +367,7 @@ test("a Viewer's offer survives a switch to the same address", async ({ page, re
 
   await movedOnWithoutTheOffer(page);
 
-  await railOf(page).getByRole("link", { name: ASK.name, exact: true }).click();
+  await railOf(page).getByRole("link", { name: "Ask", exact: true }).click();
   await landedAtHome(page, "Viewer");
   await expect(offerOf(page), "the offer came back with the Viewer").toHaveCount(0);
 });
@@ -392,7 +376,7 @@ test("a Viewer's offer ends on a trip through All workspaces", async ({ page, re
   const { first, second } = await aViewerOfTwoOffered(page, request);
 
   await switcherOf(page, first.name).click();
-  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: ALL_WORKSPACES }).click();
+  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: "All Workspaces" }).click();
   // A pick drops the second factor's read, so the home it opens reads it again.
   const read = secondFactorRead(page);
   await page.getByRole("button", { name: second.name }).click();
@@ -407,10 +391,10 @@ test("the offer's link lands on the Account page's add", async ({ page, request 
   await aVirtualAuthenticator(page);
   await aMemberSignedInAt(page, request, "Editor", "/ask");
 
-  await page.getByRole("link", { name: PASSKEY_WORDS.add }).click();
+  await page.getByRole("link", { name: "Add a Passkey" }).click();
 
   await expect(accountHeading(page)).toBeVisible();
-  await expect(page.getByRole("button", { name: PASSKEY_WORDS.add })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Add a Passkey" })).toBeFocused();
   await expect(offerOf(page)).toHaveCount(0);
 });
 
@@ -420,13 +404,13 @@ test("a browser without WebAuthn keeps the email path alone", async ({ page, req
   await expect(offerOf(page)).toHaveCount(0);
 
   await signedOut(page);
-  await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toBeVisible();
-  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.passkey })).toHaveCount(0);
+  await expect(page.getByLabel("Email Address")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toHaveCount(0);
   await signedInWithNoWorkspace(page, request, "no-webauthn");
   await accountOpened(page);
 
   // The add's place holds a line more than a list with no passkey shows, and no button.
-  const passkeys = page.getByRole("region", { name: PASSKEY_WORDS.heading });
+  const passkeys = page.getByRole("region", { name: "Passkeys" });
   await expect(passkeys.getByRole("paragraph"), "nothing stands in the add's place").toHaveCount(2);
-  await expect(passkeys.getByRole("button", { name: PASSKEY_WORDS.add })).toHaveCount(0);
+  await expect(passkeys.getByRole("button", { name: "Add a Passkey" })).toHaveCount(0);
 });

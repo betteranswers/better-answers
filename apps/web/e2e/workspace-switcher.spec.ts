@@ -1,8 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { ALL_WORKSPACES, FAILED_PAGE, JUMP_TO } from "@/app/words.ts";
-import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { CONSOLE, CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -92,7 +90,7 @@ test("lists the operator's workspaces and Console, others none", async ({ page, 
     listedAs(operator.second.name, "Admin"),
   ]);
   await expect(workspacesIn(menu).first()).toHaveAttribute("aria-checked", "true");
-  await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES, CONSOLE.name]);
+  await expect(menu.getByRole("menuitem")).toHaveText(["All Workspaces", "Console"]);
   await page.keyboard.press("Escape");
   await expect(switcherOf(page, operator.first.name)).toBeFocused();
   await signOutFromTheShell(page, operator.first.admin.name);
@@ -107,7 +105,7 @@ test("lists the operator's workspaces and Console, others none", async ({ page, 
     listedAs(other.first.name, "Admin"),
     listedAs(other.second.name, "Admin"),
   ]);
-  await expect(theirs.getByRole("menuitem")).toHaveText([ALL_WORKSPACES]);
+  await expect(theirs.getByRole("menuitem")).toHaveText(["All Workspaces"]);
 });
 
 test("lists each workspace with the person's role, the open first", async ({ page, request }) => {
@@ -220,10 +218,10 @@ test("takes All workspaces to the picker", async ({ page, request }) => {
   });
 
   await switcherOf(page, first.name).click();
-  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: ALL_WORKSPACES }).click();
+  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: "All Workspaces" }).click();
 
   await expect(page).toHaveURL("/choose-workspace");
-  await expect(page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your Workspaces" })).toBeVisible();
 });
 
 test("drops the left workspace's members when All workspaces picks another", async ({
@@ -242,21 +240,21 @@ test("drops the left workspace's members when All workspaces picks another", asy
   const release = await heldBack(page, MEMBERS_READ);
 
   await switcherOf(page, first.name).click();
-  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: ALL_WORKSPACES }).click();
+  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: "All Workspaces" }).click();
   await page.getByRole("button", { name: second.name, exact: true }).click();
 
   await expect(switcherOf(page, second.name)).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
   await expect(memberLink(page, "Only In Esk"), "drew the left workspace's members").toHaveCount(0);
-  await page.getByRole("banner").getByRole("button", { name: JUMP_TO.name }).click();
-  const jumpTo = page.getByRole("dialog", { name: JUMP_TO.name });
-  await jumpTo.getByRole("combobox", { name: JUMP_TO.name }).fill("Only In Esk");
+  await page.getByRole("banner").getByRole("button", { name: "Jump To" }).click();
+  const jumpTo = page.getByRole("dialog", { name: "Jump To" });
+  await jumpTo.getByRole("combobox", { name: "Jump To" }).fill("Only In Esk");
   // Said of the read still out, which is not yet that nothing matches what was typed.
   await expect(jumpTo.getByRole("status"), "jump-to says nothing of its read").toHaveText(/\S/);
   await expect(jumpTo.getByRole("status")).not.toContainText("Only In Esk");
   // Search's row names what was typed, so a member is looked for under Members alone.
   await expect(
-    jumpTo.getByRole("group", { name: JUMP_TO.groups.members }),
+    jumpTo.getByRole("group", { name: "Members" }),
     "jump-to offered the left workspace's members",
   ).toHaveCount(0);
 
@@ -284,7 +282,7 @@ test("says it reads the list, filling the open menu", async ({
   await expect(workspacesIn(menu), "the open workspace waits on the list for its role").toHaveText([
     listedAs(first.name, "Admin"),
   ]);
-  await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES, CONSOLE.name]);
+  await expect(menu.getByRole("menuitem")).toHaveText(["All Workspaces", "Console"]);
   await expect(saidInTheBand(page), "the band says nothing of its read").toHaveText(/\S/);
   await passesTheAccessibilityGate();
 
@@ -367,7 +365,7 @@ test("says a pending switch's refusal, holding others until it answers", async (
   for (const workspace of await workspacesIn(menu).all()) {
     await expect(workspace).toHaveAttribute("aria-disabled", "true");
   }
-  await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES, CONSOLE.name]);
+  await expect(menu.getByRole("menuitem")).toHaveText(["All Workspaces", "Console"]);
   for (const wayOut of await menu.getByRole("menuitem").all()) {
     await expect(wayOut, "a way out of the shell is open mid-switch").toHaveAttribute(
       "aria-disabled",
@@ -469,13 +467,13 @@ test("drops the left workspace's name when the member read fails", async ({ page
     0,
     { timeout: 15_000 },
   );
-  await expect(page.getByRole("heading", { level: 1, name: FAILED_PAGE.heading })).toBeVisible({
+  await expect(page.getByRole("heading", { level: 1, name: "This Page Didn’t Load" })).toBeVisible({
     timeout: 15_000,
   });
   await saysARefusal(page.getByRole("main").getByRole("alert"));
 
   await page.unroute(MEMBER_READ);
-  await page.getByRole("button", { name: FAILED_PAGE.retry }).click();
+  await page.getByRole("button", { name: "Try Again" }).click();
   await landedAtHome(page, "Admin");
   await expect(switcherOf(page, second.name)).toBeVisible();
 });
