@@ -3,7 +3,12 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import type { Refusal, RefusalClass, RefusalWord } from "@/shared/api/trpc.ts";
-import { RefusedItemLines, refusalsOf, saidOfItems } from "@/shared/refusal-outcome.tsx";
+import {
+  RefusedItemLines,
+  refusalsOf,
+  saidOfItems,
+  setRefusalOutcome,
+} from "@/shared/refusal-outcome.tsx";
 import { STOCK, stockWait, type OwnSentences } from "@/shared/refusal-words.ts";
 
 import { carrying } from "./stubbed-api.ts";
@@ -171,5 +176,21 @@ describe("the reasons a refusal naming items gives", () => {
     ["a wordless failure", NETWORK_FAILURE],
   ])("gives no reason for %s", (_, failure) => {
     expect(saidOfItems(THE_PEOPLES_OWN, failure)).toEqual([]);
+  });
+});
+
+const lead = (count: number): string => `${String(count)} refused:`;
+
+describe("a set refused whole", () => {
+  it("shows the refusal's own sentence when it names no item", () => {
+    const outcome = setRefusalOutcome({
+      featureWords: A_FEATURES_OWN,
+      failure: refusedWith("last-admin", "precondition"),
+      nameOf,
+      lead,
+    });
+
+    expect(outcome.tone).toBe("refused");
+    expect(shown(outcome.words).textContent).toBe(A_FEATURES_OWN["last-admin"]);
   });
 });
