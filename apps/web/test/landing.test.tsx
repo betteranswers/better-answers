@@ -42,7 +42,7 @@ function Lines() {
           landing.landOn(lines.length);
         }}
       >
-        Load more
+        Load More
       </button>
       <button
         type="button"
@@ -63,7 +63,7 @@ function Lines() {
 const searchBox = (): HTMLElement => screen.getByRole("searchbox", { name: "Search" });
 
 const askedForMore = (): void => {
-  const more = screen.getByRole("button", { name: "Load more" });
+  const more = screen.getByRole("button", { name: "Load More" });
   more.focus();
   fireEvent.click(more);
 };
@@ -73,7 +73,7 @@ const thePageLands = (): void => {
   fireEvent.click(screen.getByRole("button", { name: "The page lands" }));
 };
 
-describe("where focus goes when Load more's page lands", () => {
+describe("where focus goes when Load More's page lands", () => {
   it("lands on the first new line", () => {
     render(<Lines />);
 
@@ -87,7 +87,7 @@ describe("where focus goes when Load more's page lands", () => {
     render(<Lines />);
 
     askedForMore();
-    screen.getByRole("button", { name: "Load more" }).blur();
+    screen.getByRole("button", { name: "Load More" }).blur();
     thePageLands();
 
     expect(document.activeElement?.textContent).toBe("line 3");
@@ -108,7 +108,7 @@ describe("where focus goes when Load more's page lands", () => {
 
     askedForMore();
     // As a browser does for the control that held focus when its window is brought to the front again.
-    fireEvent.focusIn(screen.getByRole("button", { name: "Load more" }));
+    fireEvent.focusIn(screen.getByRole("button", { name: "Load More" }));
     thePageLands();
 
     expect(document.activeElement?.textContent).toBe("line 3");

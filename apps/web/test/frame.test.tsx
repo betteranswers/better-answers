@@ -78,7 +78,7 @@ describe("the shell's regions", () => {
     expect(screen.getByRole("main")).toBeDefined();
 
     const first = container.querySelector("a");
-    expect(first?.textContent).toBe("Skip to Main Content");
+    expect(first?.textContent).toBe("Skip to the Page");
     expect(first?.getAttribute("href")).toBe(`#${screen.getByRole("main").id}`);
   });
 

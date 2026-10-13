@@ -54,7 +54,7 @@ export const crumbOf = (page: Page, name: string): Locator =>
 /** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
 export const skipLinkReachesThePage = async (page: Page): Promise<void> => {
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to Main Content" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("main")).toBeFocused();
 };

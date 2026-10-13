@@ -625,7 +625,7 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
   expect(await inDocumentOrder(page, band), "the band reads out of order").toBe(true);
 
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to Main Content" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
 
   for (const stop of band) {
     await page.keyboard.press("Tab");
@@ -703,7 +703,7 @@ test("leaves no target half under the band after skipping", async ({ page, reque
     const overflow = await pageGrownBy(page, grown);
     // Scrolling from the first step on, the sweep would skip the shallow jumps that cut the head.
     if (grown === 0) expect(overflow, "the page scrolls before it is grown").toBe(0);
-    await page.getByRole("link", { name: "Skip to Main Content" }).focus();
+    await page.getByRole("link", { name: "Skip to the Page" }).focus();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("main")).toBeFocused();
     expect(await halfUnderTheBand(page), `the page grown by ${String(grown)}px`).toEqual([]);
@@ -790,7 +790,7 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
 
   // From the top to the last member row: first row, the parts that lead somewhere, toolbar, page.
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to Main Content" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
   for (const stop of [
     ...firstRow,
     crumbOf(page, CONTROL_CENTRE.name),

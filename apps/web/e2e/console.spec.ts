@@ -499,7 +499,7 @@ test.describe("the console's Workspaces page", () => {
     await skipLinkReachesThePage(page);
 
     // Back to the first stop, to walk the regions in the order the document gives them.
-    await page.getByRole("link", { name: "Skip to Main Content" }).focus();
+    await page.getByRole("link", { name: "Skip to the Page" }).focus();
     for (const stop of [
       page.getByRole("banner").getByRole("link", { name: PRODUCT_NAME }),
       switcherOf(page, CONSOLE.name),
