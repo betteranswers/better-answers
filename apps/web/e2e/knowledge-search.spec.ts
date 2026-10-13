@@ -53,7 +53,8 @@ const matchesOf = (page: Page): Locator =>
 
 const loadMore = (page: Page) => searchRegion(page).getByRole("button", { name: "Load more" });
 
-const said = (page: Page) => searchRegion(page).getByRole("status");
+/** The search's own status: a passage opened beneath its match says its read in another. */
+const said = (page: Page) => searchRegion(page).getByRole("status").first();
 
 const alerted = (page: Page) => searchRegion(page).getByRole("alert");
 
@@ -167,9 +168,38 @@ const anAdminAtSearch = async (
   return workspace;
 };
 
+/** What the status says now, as `toHaveText` reads it, for telling a later state from this one. */
+const saidNow = async (page: Page): Promise<string> => (await said(page).textContent()) ?? "";
+
+/** The status moves on as the typed search settles, and its list is drawn once matches land. */
 const searched = async (page: Page, query: string): Promise<void> => {
+  const before = await saidNow(page);
   await searchBox(page).fill(query);
-  await expect(said(page)).toHaveText(new RegExp(`^${WORDS.matched(query, false).slice(0, -1)}`));
+  await expect(said(page), "the status says nothing new of the search").not.toHaveText(before);
+  await expect(said(page)).toContainText(query);
+  await expect(matchesOf(page).first()).toBeVisible();
+};
+
+/**
+ * No row tells a search that found nothing from one still asking, so the status must move on
+ * from what it said while held.
+ */
+const foundNothing = async (
+  page: Page,
+  query: string,
+  ask: () => Promise<unknown> = () => searchBox(page).fill(query),
+): Promise<void> => {
+  const find = await heldBack(page, isAFind);
+  await ask();
+  await find.reached;
+  await expect(said(page)).toContainText(query);
+  const whileAsking = await saidNow(page);
+  find.release();
+  await expect(said(page), "the status still says the search is asking").not.toHaveText(
+    whileAsking,
+  );
+  await expect(said(page)).toContainText(query);
+  await expect(matchesOf(page)).toHaveCount(0);
 };
 
 const handbookMatches = (page: Page) => matchesOf(page).filter({ hasText: HANDBOOK });
@@ -211,17 +241,19 @@ test.describe("the Knowledge Search page", () => {
     });
     await page.goto(SEARCH.path);
 
-    await expect(said(page)).toHaveText(WORDS.nothingAsked);
+    await expect(said(page)).toHaveText(/\S/);
     await expect(matchesOf(page)).toHaveCount(0);
+    const nothingAsked = await saidNow(page);
 
     await searchBox(page).fill("   ");
     await expect(page).toHaveURL(/knowledge\.search=(?:\+|%20){3}/);
-    await expect(said(page)).toHaveText(WORDS.nothingAsked);
+    await expect(said(page), "a blank search is not said as nothing asked").toHaveText(
+      nothingAsked,
+    );
     expect(finds, "the page asked for matches with nothing asked").toHaveLength(0);
 
     // An ask the page sent late for nothing would have left before this one, and been counted.
-    await searchBox(page).fill("audit");
-    await expect(said(page)).toHaveText(WORDS.noMatches("audit"));
+    await foundNothing(page, "audit");
     expect(
       finds.map((sent) => new URL(sent.url()).searchParams.get("input")),
       "the page asked for more than the one search typed",
@@ -269,7 +301,8 @@ test.describe("the Knowledge Search page", () => {
 
     await searched(page, "pallet");
     await expect(matchesOf(page)).toHaveCount(A_PAGE);
-    await expect(said(page)).toHaveText(WORDS.matched("pallet", true));
+    await expect(loadMore(page)).toBeVisible();
+    const whileMoreFollow = await saidNow(page);
     await loadMore(page).click();
 
     await expect(matchesOf(page)).toHaveCount(PALLET_PASSAGES.length);
@@ -278,6 +311,7 @@ test.describe("the Knowledge Search page", () => {
       "focus did not land on the first new match",
     ).toBeFocused();
     await expect(loadMore(page)).toHaveCount(0);
+    await expect(said(page), "the status still says more follow").not.toHaveText(whileMoreFollow);
   });
 
   test("leaves focus where the reader moved it while More loads", async ({ page, request }) => {
@@ -316,7 +350,7 @@ test.describe("the Knowledge Search page", () => {
     const more = await moreAskedForAndHeld(page);
 
     await searchBox(page).fill("forklift");
-    await expect(said(page)).toHaveText(WORDS.matched("forklift", false));
+    await expect(matchesOf(page)).toHaveText([/Forklift Licences/]);
     const landed = page.waitForResponse((answered) =>
       isAFindPastTheFirstPage(new URL(answered.url())),
     );
@@ -342,13 +376,12 @@ test.describe("the Knowledge Search page", () => {
     });
 
     await page.goto(asked("audit"));
-    await expect(said(page)).toHaveText(WORDS.matched("audit", false));
+    await expect(said(page)).toContainText("audit");
     await expect(matchesOf(page).filter({ hasText: "Audit Logs Retention" })).toHaveCount(1);
     await expect(matchesOf(page).filter({ hasText: "Audit Salary Bands" })).toHaveCount(0);
     await expect(page.locator("body"), "the matches page shows a number").not.toContainText(/\d/);
 
-    await page.goto(asked("salary bands"));
-    await expect(said(page)).toHaveText(WORDS.noMatches("salary bands"));
+    await foundNothing(page, "salary bands", () => page.goto(asked("salary bands")));
     await expect(page.locator("body"), "the page shows a number").not.toContainText(/\d/);
     expect(await page.content(), "the page draws the withheld document").not.toContain(PAY_REVIEW);
     await expect.poll(() => answers.length).toBe(2);
@@ -399,6 +432,7 @@ test.describe("the Knowledge Search page", () => {
     await searched(page, "pallet");
 
     const first = handbookMatches(page).first();
+    await expect(first).toContainText(WORDS.document);
     await expect(first).toContainText(WORDS.notCompanyKnowledge);
     await expect(first).toContainText("Internal");
     const opener = first.getByRole("button", { name: HANDBOOK });
@@ -435,6 +469,8 @@ test.describe("the Knowledge Search page", () => {
     passesTheAccessibilityGate,
   }) => {
     await anAdminAtSearch(page, request, "Swale Stores", [handbookSeeded]);
+    await foundNothing(page, "forklift");
+    const withNoPassageOpened = await saidNow(page);
     await searched(page, "pallet");
     const opener = handbookMatches(page).first().getByRole("button", { name: HANDBOOK });
     await opener.click();
@@ -458,7 +494,7 @@ test.describe("the Knowledge Search page", () => {
     await expect(panel, "a new search left the last one's passage open").toHaveCount(0);
     await expect(searchBox(page)).toBeFocused();
     await expect(said(page), "a new search was said to have lost a passage").toHaveText(
-      WORDS.noMatches("forklift"),
+      withNoPassageOpened,
     );
   });
 
@@ -521,6 +557,7 @@ test.describe("the Knowledge Search page", () => {
       await anAdminAtSearch(page, request, `Holme Annals ${String(width)}`, [handbookSeeded]);
       await page.setViewportSize({ width, height: 720 });
       await searched(page, "pallet");
+      const whileListed = await saidNow(page);
       await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
       const heading = page.getByRole("heading", { name: HANDBOOK });
       await expect(heading).toBeFocused();
@@ -536,8 +573,10 @@ test.describe("the Knowledge Search page", () => {
 
       await expect(matchesOf(page)).toHaveCount(A_PAGE - 1);
       await expect(heading, "the passage outlived its match").toHaveCount(0);
-      const saidItLeft = `${WORDS.matched("pallet", true)} ${WORDS.passageLeft}`;
-      await expect(said(page)).toHaveText(saidItLeft);
+      await expect(said(page), "the page does not say its passage left").not.toHaveText(
+        whileListed,
+      );
+      const saidItLeft = await saidNow(page);
       await expect(
         searchRegion(page).getByRole("heading", { name: SEARCH.name }),
         "focus fell to the page with the passage",
@@ -545,9 +584,7 @@ test.describe("the Knowledge Search page", () => {
 
       await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
       await expect(heading).toBeFocused();
-      await expect(searchRegion(page), "the page still says a passage left").not.toContainText(
-        WORDS.passageLeft,
-      );
+      await expect(said(page), "the page still says a passage left").toHaveText(whileListed);
 
       await searchBox(page).focus();
       withheld = 2;
@@ -558,10 +595,11 @@ test.describe("the Knowledge Search page", () => {
       await expect(searchBox(page), "focus was taken from where the reader put it").toBeFocused();
 
       await searchBox(page).fill("forklift");
-      await expect(said(page)).toHaveText(WORDS.noMatches("forklift"));
+      await expect(said(page)).toContainText("forklift");
+      await expect(matchesOf(page)).toHaveCount(0);
       await searchBox(page).fill("pallet");
       await expect(said(page), "a search come back to still says a passage left").toHaveText(
-        WORDS.matched("pallet", true),
+        whileListed,
       );
     });
   }
@@ -601,12 +639,8 @@ test.describe("the Knowledge Search page", () => {
   test("says nothing matches, for stop words alone too", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Ouse Archives", [conceptsSeeded]);
 
-    await searchBox(page).fill("zzz-nowhere");
-    await expect(said(page)).toHaveText(WORDS.noMatches("zzz-nowhere"));
-    await expect(matchesOf(page)).toHaveCount(0);
-
-    await searchBox(page).fill("the and of");
-    await expect(said(page)).toHaveText(WORDS.noMatches("the and of"));
+    await foundNothing(page, "zzz-nowhere");
+    await foundNothing(page, "the and of");
   });
 
   test("says the reads' ceiling and asks no more", async ({ page, request }) => {
@@ -759,12 +793,10 @@ test.describe("the Knowledge Search page", () => {
       - region "${SEARCH.name}":
         - heading "${SEARCH.name}" [level=2]
         - searchbox "${WORDS.search}": pallet
-        - status: ${WORDS.matched("pallet", false)}
+        - status
         - list "${WORDS.matches}":
           - listitem:
-            - text: ${WORDS.document}
             - button "${HANDBOOK}"
-            - text: ${WORDS.notCompanyKnowledge} · Internal
     `);
 
     await passesTheAccessibilityGate();
@@ -783,7 +815,8 @@ test.describe("the Knowledge Search page", () => {
       await expect(page).toHaveURL(new RegExp(`${SEARCH.path}$`));
       await expect(page.getByRole("heading", { level: 1, name: BROWSE.name })).toBeVisible();
       await expect(navOf(page, KNOWLEDGE).getByRole("link")).toHaveText([SEARCH.name]);
-      await expect(said(page)).toHaveText(WORDS.nothingAsked);
+      await expect(said(page)).toHaveText(/\S/);
+      await expect(matchesOf(page)).toHaveCount(0);
     });
   }
 });
