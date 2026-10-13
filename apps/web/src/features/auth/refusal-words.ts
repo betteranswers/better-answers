@@ -42,6 +42,9 @@ export const WORKSPACES_UNREAD = "Your workspaces couldn’t be read.";
 export const noLongerAMemberOf = (workspace: string): string =>
   `You're no longer a member of ${workspace}.`;
 
+/** The page picked the one workspace itself, so it shows nothing to press again. */
+export const SOLE_PICK_REFUSED = "Something went wrong. Please reload the page.";
+
 export const CONNECTION_UNFINISHED =
   "The connection couldn't be completed. Please start it again from the app you were connecting.";
 

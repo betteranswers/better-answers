@@ -21,7 +21,12 @@ import {
 } from "./auth-hooks.ts";
 import { AuthPage } from "./auth-page.tsx";
 import { carriedFlow, leavingFor, pageQuery } from "./carried-flow.ts";
-import { CONNECTION_UNFINISHED, noLongerAMember, WORKSPACES_UNREAD } from "./refusal-words.ts";
+import {
+  CONNECTION_UNFINISHED,
+  noLongerAMember,
+  SOLE_PICK_REFUSED,
+  WORKSPACES_UNREAD,
+} from "./refusal-words.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
 import { NOT_CONNECTED, PICKER_ACTIONS, PICKER_WORDS } from "./workspace-words.ts";
 
@@ -232,7 +237,7 @@ const pickOutcome = (standing: Standing): Outcome | undefined => {
   if (standing.removedFrom !== undefined) {
     return { tone: "refused", words: noLongerAMember(standing.removedFrom.name) };
   }
-  if (standing.refused) return refusedWith(STOCK.general);
+  if (standing.refused) return refusedWith(standing.listed ? STOCK.general : SOLE_PICK_REFUSED);
   return standing.listed ? undefined : { tone: "said", words: PICKER_WORDS.opening };
 };
 
