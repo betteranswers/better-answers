@@ -10,6 +10,7 @@ from .contract_stamp import CONTRACT_DIGEST
 from .ids import ulid
 from .kinds import KINDS
 from .log import logger
+from .pipeline import DocumentFailedError
 from .schema_view import MIGRATION_ID, MIGRATION_WHEN
 
 IDLE_SLEEP_SECONDS = 5
@@ -112,12 +113,20 @@ def _serve_workspace(
     try:
         outcome = _run_claimed(bootstrap, claimed, heartbeat_every_seconds)
     except Exception as failure:
+        document_id = (
+            failure.source_document_id
+            if isinstance(failure, DocumentFailedError)
+            else None
+        )
         with queue.scoped(connection, claimed.workspace_id) as cursor:
             queue.fail(
                 cursor,
                 claimed.id,
                 bootstrap.worker_id,
-                {"error": type(failure).__name__},
+                {
+                    "error": type(failure).__name__,
+                    **({"source_document_id": document_id} if document_id else {}),
+                },
             )
         logger.error(
             "job failed",
@@ -125,6 +134,7 @@ def _serve_workspace(
             job_id=claimed.id,
             kind=claimed.kind,
             error=type(failure).__name__,
+            **({"source_document_id": document_id} if document_id else {}),
             worker_id=bootstrap.worker_id,
         )
         return True

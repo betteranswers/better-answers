@@ -305,14 +305,19 @@ def test_a_failed_audit_counts_so_idle_ticks_queue_no_other(
     assert loop.tick(database, bootstrap) is False
     assert loop.tick(database, bootstrap) is True
 
+    # A failure no longer ends the job: the audit runs to its bound, then idles.
+    assert loop.tick(database, bootstrap) is True
+    assert loop.tick(database, bootstrap) is True
+
     assert loop.tick(database, bootstrap) is False
 
     with database.cursor() as cursor:
         cursor.execute(
-            "SELECT status FROM job WHERE workspace_id = %s ORDER BY enqueued_at",
+            "SELECT status, attempts FROM job"
+            " WHERE workspace_id = %s ORDER BY enqueued_at",
             (workspace,),
         )
-        assert cursor.fetchall() == [("failed",)]
+        assert cursor.fetchall() == [("failed", 3)]
 
 
 def test_refuses_a_malformed_workspace_id_before_touching_the_store(

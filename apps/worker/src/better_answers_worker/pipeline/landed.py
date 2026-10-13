@@ -233,10 +233,34 @@ async def _one_document(
     )
 
 
-def _fail_the_sync(error: BaseException, _: coco.ExceptionContext) -> None:
+class DocumentFailedError(RuntimeError):
+    """An unexpected failure inside one document's component, naming the document.
+
+    `error` is what raised; `source_document_id` is `None` when the failure
+    names no document."""
+
+    def __init__(self, stable_path: str, error: BaseException) -> None:
+        super().__init__(error)
+        self.error = error
+        self.source_document_id = _document_of(stable_path)
+
+
+def _document_of(stable_path: str) -> str | None:
+    """The document id a stable path names, or `None` when it names no document.
+
+    A stable path is quoted segments joined by slashes."""
+
+    parts = stable_path.split("/")
+    for at, part in enumerate(parts):
+        if part == f'"{A_DOCUMENTS_COMPONENT}"' and at + 1 < len(parts):
+            return parts[at + 1].strip('"')
+    return None
+
+
+def _fail_the_sync(error: BaseException, ctx: coco.ExceptionContext) -> None:
     # The engine's default logs and carries on, so the sync would finish with the
     # document neither read nor unreadable and land_rows would delete its passages.
-    raise error
+    raise DocumentFailedError(ctx.stable_path, error) from error
 
 
 @coco.fn

@@ -547,6 +547,13 @@
       "when": 1791926233302,
       "tag": "0077_the-concept-body-cap",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1791930411781,
+      "tag": "0078_the-retried-job-failure",
+      "breakpoints": true
     }
   ]
 }

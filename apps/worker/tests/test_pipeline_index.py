@@ -4,7 +4,7 @@ import re
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 import anydoc
 import asyncpg
@@ -20,12 +20,14 @@ from better_answers_worker.pipeline import (
     FINDINGS_STORE,
     SEAM_MS_PER_PAGE,
     TIMEOUT_MARGIN_MS,
+    DocumentFailedError,
     IndexOutcome,
     LandedCopies,
     ReadDocument,
     RedactedDocument,
     Sync,
     index_connected_source,
+    object_key_of,
 )
 from better_answers_worker.pipeline.catalogue import (
     reconcile_catalogue,
@@ -419,6 +421,117 @@ def test_the_loop_claims_runs_and_finishes_an_index_job(
 
     assert row[4]["restores_overridden_by_erasure"] == []
     assert row[4]["sensitivity_moved"] == []
+
+
+def a_workspace_with_an_invoice_and_a_sick_note(
+    connection: psycopg.Connection,
+) -> str:
+    """The two-document connected source a failing sync reads."""
+    return seed_the_connected_source(
+        connection,
+        documents=(AN_INVOICE_ID, A_SICK_NOTE_ID),
+        media_types={A_SICK_NOTE_ID: DOCX_MEDIA_TYPE},
+    )
+
+
+class AnInMemoryObjectStore:
+    """The S3 service in memory, behind the adapter that always speaks to it."""
+
+    def __init__(self) -> None:
+        self.objects: dict[str, bytes] = {}
+
+    def client(self, *_args: object, **_kwargs: object) -> "AnInMemoryObjectStore":
+        return self
+
+    def get_object(self, **fields: object) -> dict[str, "AnInMemoryObjectStore.Body"]:
+        key = str(fields["Key"])
+        return {"Body": AnInMemoryObjectStore.Body(self.objects[key])}
+
+    def put_object(self, **fields: object) -> None:
+        body = cast(bytes, fields["Body"])
+        self.objects[str(fields["Key"])] = body
+
+    class Body:
+        def __init__(self, body: bytes) -> None:
+            self._body = body
+
+        def read(self) -> bytes:
+            return self._body
+
+
+def test_runs_a_failed_index_job_again_and_names_it(
+    database: tuple[psycopg.Connection, str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection, dsn = database
+    workspace_id = a_workspace_with_an_invoice_and_a_sick_note(connection)
+
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    store = AnInMemoryObjectStore()
+    monkeypatch.setattr("boto3.client", store.client)
+    for key, body in a_bucket_holding_the_three().objects.items():
+        store.objects[object_key_of(workspace_id, key)] = body
+    store.objects[object_key_of(workspace_id, original_key_of(A_SICK_NOTE_ID))] = (
+        AN_EXPENSES_POLICY_DOCX
+    )
+
+    def the_job_row(job_id: str) -> tuple[Any, ...]:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT status, attempts, outcome FROM job"
+                " WHERE workspace_id = %s AND id = %s",
+                (workspace_id, job_id),
+            )
+            answered = cursor.fetchone()
+        assert answered is not None
+        return answered
+
+    # A good run first, so the binding holds passages the retries must not lose.
+    with connection.cursor() as cursor:
+        good = seed_job(
+            cursor,
+            workspace_id=workspace_id,
+            kind="index",
+            reason="connected",
+            subject_id=CONNECTED_SOURCE,
+        )
+    connection.commit()
+    with queue.connected(bootstrap.database_url) as worker:
+        assert loop.tick(worker, bootstrap) is True
+    status, attempts, _ = the_job_row(good["id"])
+    assert (status, attempts) == ("done", 1)
+    passages = passage_rows_of(connection, workspace_id)
+
+    def out_of_memory(*_: object, **__: object) -> str:
+        raise ConverterOutOfMemoryError
+
+    monkeypatch.setattr(anydoc, "to_markdown_bytes", out_of_memory)
+    with connection.cursor() as cursor:
+        job = seed_job(
+            cursor,
+            workspace_id=workspace_id,
+            kind="index",
+            reason="connected",
+            subject_id=CONNECTED_SOURCE,
+        )
+    connection.commit()
+
+    # Each failing run goes back to the queue until the bound ends the job.
+    for attempt in (1, 2):
+        with queue.connected(bootstrap.database_url) as worker:
+            assert loop.tick(worker, bootstrap) is True
+        assert the_job_row(job["id"]) == ("queued", attempt, None)
+
+    with queue.connected(bootstrap.database_url) as worker:
+        assert loop.tick(worker, bootstrap) is True
+    status, attempts, outcome = the_job_row(job["id"])
+    assert (status, attempts) == ("failed", 3)
+    assert outcome["error"] == "DocumentFailedError"
+    assert outcome["source_document_id"] in {AN_INVOICE_ID, A_SICK_NOTE_ID}
+
+    # The binding keeps its last good chunks: nothing was re-uploaded or re-bound.
+    assert passage_rows_of(connection, workspace_id) == passages
 
 
 def test_lands_every_passage_column_under_a_source_with_a_visibility(
@@ -832,8 +945,10 @@ def test_an_unexpected_document_failure_fails_the_sync_and_keeps_passages(
 
     monkeypatch.setattr(anydoc, "to_markdown_bytes", out_of_memory)
 
-    with pytest.raises(ConverterOutOfMemoryError):
+    with pytest.raises(DocumentFailedError) as failed:
         indexed(bootstrap, sync_for(workspace_id), copies=bucket)
+    assert isinstance(failed.value.error, ConverterOutOfMemoryError)
+    assert failed.value.source_document_id in {AN_INVOICE_ID, A_SICK_NOTE_ID}
     assert {row["source_document_id"] for row in passages} == {
         AN_INVOICE_ID,
         A_SICK_NOTE_ID,
