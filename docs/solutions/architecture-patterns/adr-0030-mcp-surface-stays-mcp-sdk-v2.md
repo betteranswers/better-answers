@@ -27,7 +27,11 @@ tags:
 The MCP surface is built on MCP SDK v2, `@modelcontextprotocol/server`, in `apps/api`. It stays in the TypeScript tier.
 
 - It is reached through one fetch-shaped seam. `createMcpSurface` in `apps/api/src/mcp/surface.ts` returns a `(Request) => Response` function that Hono mounts. It verifies the bearer before the SDK's handler sees the request, hands the handler `{ authInfo }`, and runs each entry under the Principal built from the bearer.
-- Each entry runs in a transaction of its own, opened as the entry's `readOnlyHint` declares. An entry that tells the host it only reads opens read-only, so a write on that transaction fails at its statement. Any other entry opens read-write. The server, `createServer` in `apps/api/src/server.ts`, hands the surface its entries, and an entry is handed no door. The gate counts the call in a read-write transaction of its own before any entry runs.
+- An entry runs on one of two roads, and on neither is it handed a door. The server, `createServer` in `apps/api/src/server.ts`, hands the surface its entries. The gate counts the call in a read-write transaction of its own before any entry runs.
+- On the first road an entry runs in a transaction of its own, opened as the entry's `readOnlyHint` declares. An entry that tells the host it only reads opens read-only, so a write on that transaction fails at its statement. Any other entry opens read-write, and its transaction holds the member's rows to its commit, as a tRPC mutation's does. `give_feedback` is the first entry to store on a member's behalf.
+- On the second, the own-transaction road, the surface resolves the member in a short transaction and releases the connection. It then hands the entry fixed steps. `ask` takes this road: its reads run in short read-only transactions, and its steps open the *Questions asked* record, reserve spend, settle it and complete the record. The record is opened and committed before anything that can refuse or call a model. No connection is held while a model is called.
+- `readOnlyHint` promises that an entry changes nothing the person asked about. It excludes the platform's own account of the call: the gate's count, the *Questions asked* record and the spend rows. So `ask` declares the hint and keeps a record. Postgres holds the read half of that promise, and the step types and a probe test hold the write half.
+- S2b builds the second road and the held member, and the tree does not hold them yet.
 - No MCP library type crosses into `packages/core`. The import-direction lint refuses `@modelcontextprotocol` there.
 - The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`.
 - `open` returns structured content: frontmatter, body, relations, the concept each link in the body leads to, trust state and evidence as fields. The human rendering is derived from it.
@@ -45,6 +49,9 @@ The platform builds no outbound connectors to third-party SaaS, no outbound OAut
 - FastMCP's real advantage is authentication, and it is Python-only. Its identity assertion (SEP-990) hangs off an OAuth proxy, where someone else owns the accounts. ADR 0009 makes the platform its own authorization server.
 - SEP-990 is about a week's work when a customer asks for it: the RFC 7523 `jwt-bearer` grant on Better Auth's token endpoint, behind ADR 0009's identity seam. Moving the transport into the worker would add a permanent second identity boundary instead.
 - A host splits read tools from write tools on `readOnlyHint`, and may run a read tool without asking the person. So the hint is a promise, and Postgres holds it as it holds a tRPC query's (ADR 0043). Held by review alone, three entries declared it while running read-write.
+- A person filling a form asks once per row, and a host that asked their permission for each call would stop the work. A host runs a tool that declares itself read-only with no prompt, so `ask` keeps the declaration.
+- A model call inside an entry's transaction would hold one of the pool's ten connections for as long as the model takes.
+- A revocation that does not wait on a writing entry lets a removed member's flag land after they are gone.
 - An MCP App turns `open` into the thing a person looks at. Without structured content, the views would be a rewrite of `open` rather than an addition beside it.
 - The Claude platform is the integrator, reaching a customer's other systems with credentials we never hold.
 
@@ -56,6 +63,8 @@ The platform builds no outbound connectors to third-party SaaS, no outbound OAut
 - Vercel's `mcp-handler`: a thinner version of what the SDK already gives, with no MCP App support.
 - `mcp-use` as the MCP App framework: the named runner-up, if hand-rolling the bridge over `ext-apps` proves fiddly.
 - Deciding later: an implementation was already named, so later means unpicking it.
+- Handing `ask` a door, or dropping its read-only declaration: a door lets it write anything, and without the declaration a host asks the person before every question. What is given up is Postgres holding all of `ask`'s promise. A step added to the fixed list can write, and review and the probe test are what refuse it.
+- A writing entry that leaves the member's rows unheld: a tRPC mutation already holds them.
 
 ## History
 
@@ -64,3 +73,5 @@ The full record, with its two amendments (the same-day correction to four entrie
 Amended 10/10/2026 on the owner's ruling, by the MCP entry door plan (`docs/plans/2026-10-10-1334-feat-mcp-entry-read-only-door-plan.md`, R1 and R5). An entry's transaction opens as its `readOnlyHint` declares. The read-only query road's plan left this surface unchanged and named the change as a follow-up (`docs/plans/2026-10-10-0123-feat-read-only-query-road-plan.md`). The follow-up waited for a decision of its own under the architecture review's decision 14 (`docs/plans/2026-10-08-2311-docs-architecture-review-before-s2-plan.md`), and the ruling is that decision.
 
 Amended 10/10/2026 by the body link plan (`docs/plans/2026-10-10-1629-feat-body-link-targets-plan.md`, R1 and R6). `open` also answers, for each link in a concept's body, the concept it leads to, where the reader may read it. A relative path in a body opens nothing for an outside client, and the answered IRI does.
+
+Amended 13/10/2026 on the owner's rulings of 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, KTD6 and KTD7). An entry gains a second road, the own-transaction road, which `ask` takes so that no connection is held while a model is called. Read-only now excludes the platform's own account of the call. An entry that does not declare read-only holds the member's rows to its commit, which settles BA-135.

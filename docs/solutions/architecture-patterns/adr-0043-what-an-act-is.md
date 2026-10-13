@@ -67,7 +67,9 @@ Each transport:
 - A mutation reads the member `FOR SHARE`.
 - An own-transaction procedure resolves the Principal in a short transaction, releases the connection, and hands the action the Principal and its doors.
 
-An MCP entry's transaction opens as the entry's `readOnlyHint` declares: read-only where the entry tells the host it only reads, read-write otherwise (ADR 0030).
+An MCP entry's transaction opens as the entry's `readOnlyHint` declares: read-only where the entry tells the host it only reads, read-write otherwise (ADR 0030). A read-write entry reads the member `FOR SHARE`, as a mutation does, so a revocation waits on its commit.
+
+An MCP entry may take the own-transaction road instead. The surface resolves the member in a short transaction, releases the connection, and hands the entry fixed steps, never a door. Read-only, for such an entry, excludes the platform's own account of the call: the record of the question and the spend rows (ADR 0030). `ask` is the first. S2b builds the held member and this road, and the tree does not hold them yet.
 
 Every Postgres door rolls back when its work answers a refusal or throws. A principal-scoped door answers its own refusal apart from its work's, and an action that wants one union calls `folded` on it. One composition root, `openDoors` in `apps/api/src/doors.ts`, opens the four doors and the Clock (ADR 0040) and states the pool's size.
 
@@ -114,3 +116,5 @@ Amended 10/10/2026 by the one admission declaration plan (`docs/plans/2026-10-10
 Amended 10/10/2026 by the admission types plan (`docs/plans/2026-10-10-1702-fix-admission-types-and-face-admission-plan.md`, R1, R4, R6 and R11). A face that every role may ask for was typed by its parameter alone, and nothing held a new face to admit. Each of the eight now declares that level and admits, and a test over every face names a function that takes a person and admits nobody. A person of the three roles is answered as before. The kernel types an admitted person by the lowest role a declaration can name, where it read a union of roles as an Admin.
 
 Amended 11/10/2026 by the workspace-bound actions plan (`docs/plans/2026-10-11-2213-fix-workspace-bound-actions-and-shared-member-plan.md`, R7 to R9). The api's transport adds a third word, `workspace-switched`, of class *conflict*. A tab names the workspace it holds in a request header, and the two workspace roads refuse a mutation that names another workspace, or none. They judge it straight after the session's own words, before any ceiling, the principal and the parse. A query is never refused this way, and the person's and the operator's roads are not checked. Core gains no word and no input field.
+
+Amended 13/10/2026 on the owner's rulings of 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, KTD6 and KTD7). An MCP entry may take the own-transaction road and is then handed fixed steps. An entry that declares the hint false holds the member's rows, where the amendment of 10/10/2026 left its resolve read-write and unheld. What is given up is in ADR 0030.
