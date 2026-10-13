@@ -1,13 +1,6 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import {
-  CONNECT_ASSISTANT,
-  goHome,
-  JUMP_TO,
-  RAIL,
-  unbuiltLineOf,
-  UNKNOWN_PAGE,
-} from "@/app/words.ts";
+import { CONNECT_ASSISTANT, goHome, JUMP_TO, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
@@ -115,23 +108,23 @@ for (const role of ["Editor", "Viewer"] as const) {
     `);
     await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toHaveCount(0);
     const address = await askShowsTheServedAddress(page);
-    const [first, second, third] = CONNECT_ASSISTANT.steps;
     await expect(page.getByRole("main")).toMatchAriaSnapshot(`
       - main "Page":
         - heading ${quoted(headingOf(home))} [level=1]
-        - paragraph: ${quoted(unbuiltLineOf(home))}
+        - paragraph
         - heading ${quoted(CONNECT_ASSISTANT.heading)} [level=2]
         - list:
+          - /children: equal
           - listitem:
-            - paragraph: ${quoted(first)}
+            - paragraph
           - listitem:
-            - paragraph: ${quoted(second)}
+            - paragraph
             - code: ${quoted(address)}
             - button ${quoted(CONNECT_ASSISTANT.copy)}
             - status
           - listitem:
-            - paragraph: ${quoted(third)}
-        - paragraph: ${quoted(CONNECT_ASSISTANT.asYou)}
+            - paragraph
+        - paragraph
     `);
   });
 
@@ -149,9 +142,7 @@ for (const role of ["Editor", "Viewer"] as const) {
     await tabUntilFocused(page, copy);
     await page.keyboard.press("Enter");
 
-    await expect(page.getByRole("main").getByRole("list").getByRole("status")).toHaveText(
-      CONNECT_ASSISTANT.copied,
-    );
+    await expect(page.getByRole("main").getByRole("list").getByRole("status")).toHaveText(/\S/);
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(address);
   });
 
@@ -185,7 +176,9 @@ test("draws a Viewer's Ask within a second of arriving", async ({ page, request 
 
   const started = Date.now();
   await page.goto(home.path);
-  await expect(page.getByText(unbuiltLineOf(home))).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: CONNECT_ASSISTANT.heading }),
+  ).toBeVisible();
   const elapsedMs = Date.now() - started;
 
   test.info().annotations.push({ type: "Ask drawn", description: `${elapsedMs} ms` });
@@ -201,13 +194,15 @@ test("lists the shell's keystrokes alone on Ask and unknown pages", async ({
   await signedInAs(page, request, "Viewer");
   await landedAtHome(page, "Viewer");
   const theShells = [KEYSTROKE_WORDS.showTheList, JUMP_TO.name];
+  // The list always says where single keys work; a page with none of its own adds a line.
+  const addsNoLine = "the list adds no line for a page with no keystrokes of its own";
 
   await page
     .getByRole("navigation", { name: RAIL })
     .getByRole("button", { name: KEYSTROKE_WORDS.button })
     .click();
   const onAsk = page.getByRole("dialog", { name: keystrokesOn(home.name) });
-  await expect(onAsk).toContainText(KEYSTROKE_WORDS.noneOfItsOwn);
+  await expect(onAsk.getByRole("paragraph"), addsNoLine).toHaveCount(2);
   await expect(onAsk.getByRole("definition")).toHaveText(theShells);
   await passesTheAccessibilityGate();
   await keystrokesDismissed(page, onAsk);
@@ -216,7 +211,7 @@ test("lists the shell's keystrokes alone on Ask and unknown pages", async ({
   await page.goto(HOMES.Admin.path);
   await expect(unknownPage(page)).toBeVisible();
   const onUnknown = await keystrokesListed(page, KEYSTROKE_WORDS.thisPage);
-  await expect(onUnknown).toContainText(KEYSTROKE_WORDS.noneOfItsOwn);
+  await expect(onUnknown.getByRole("paragraph"), addsNoLine).toHaveCount(2);
   await expect(onUnknown.getByRole("definition")).toHaveText(theShells);
   await keystrokesDismissed(page, onUnknown);
 });

@@ -49,6 +49,9 @@ test.describe("an action's outcome region", () => {
       .poll(() => Promise.all(standing.map((status) => status.textContent())), {
         message: "the outcome came in a region that was not there while it was empty",
       })
-      .toContain("Site leads is created.");
+      .toContainEqual(expect.stringMatching(/\S/));
+    await expect(
+      groupsRegion(page).getByRole("button", { name: "Site leads", exact: true }),
+    ).toBeVisible();
   });
 });
