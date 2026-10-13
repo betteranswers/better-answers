@@ -367,6 +367,30 @@
       "links": [],
       "marks": [],
       "why": "A carriage return alone or a line separator does not start a line, so neither definition here defines anything, and both footnotes are plain text."
+    },
+    {
+      "case": "a bracket run is one link naming nothing",
+      "body": "[[[[[[]] Claims close [the product](https://better-answers.com/c/01J6RRRRRRRRRRRRRRRRRRRRRR).",
+      "sources": [{ "resource": "https://example.test/handbook", "id": "a" }],
+      "links": [{ "ordinal": 1, "to": "https://better-answers.com/c/01J6RRRRRRRRRRRRRRRRRRRRRR" }],
+      "marks": [],
+      "why": "A run of brackets before the first `]` is one bare link of the whole span: it names nothing and takes the first ordinal, and the readable link after it takes the next. However many brackets a body holds, the reader walks it once."
+    },
+    {
+      "case": "an unclosed fence blanks the rest of the body",
+      "body": "```\n[a](https://better-answers.com/c/01J6SSSSSSSSSSSSSSSSSSSSSS)\nSee [the handbook](https://better-answers.com/c/01J6SSSSSSSSSSSSSSSSSSSSSS).",
+      "sources": [],
+      "links": [],
+      "marks": [],
+      "why": "A fence that no line closes runs to the body's end, and every link inside it is blanked with it, so nothing inside maps. The reader costs one walk, wherever the fence ends."
+    },
+    {
+      "case": "a definition's target may sit on a later line",
+      "body": "[the handbook]:\n\nhttps://better-answers.com/c/01J6TTTTTTTTTTTTTTTTTTTTTT\n\nRead [the handbook].[^a]",
+      "sources": [{ "resource": "https://example.test/handbook", "id": "a" }],
+      "links": [{ "ordinal": 1, "to": "https://better-answers.com/c/01J6TTTTTTTTTTTTTTTTTTTTTT" }],
+      "marks": [{ "mark": "[^a]", "source": 0 }],
+      "why": "The definition's target is the first run after the colon that is more than the six, and the six include line feeds, so the target may sit on a later line. The definition line itself is a link naming nothing and takes the first ordinal; the reference resolves to the target and takes the next."
     }
   ]
 }

@@ -1040,6 +1040,19 @@ describe("the concept write path under app_rt", () => {
         ],
 
         [
+          A_CONCEPT_INDEX_ROW_WITH_A_BODY,
+          [
+            WS_A,
+            identity.iri,
+            "knowledge/too-long.md",
+            "x".repeat(CONCEPT_BODY_MAX + 1),
+            A_CONTENT_HASH,
+            commit.sha,
+          ],
+          "concept_index_body_length_check",
+        ],
+
+        [
           A_CONCEPT_VERIFICATION_OF_ORIGIN,
           [ulid(), WS_A, identity.iri, "imported", A_CONTENT_HASH],
           "concept_verification_imported_check",
@@ -1068,25 +1081,6 @@ describe("the concept write path under app_rt", () => {
         );
         await client.query("ROLLBACK TO SAVEPOINT concept_row");
       }
-    });
-  });
-
-  it("refuses a concept row whose body is over the cap", async () => {
-    await withRollback(db.pool, async (client) => {
-      const seed = await seedTwoWorkspaces(client);
-      const identity = await seed.conceptIdentity({ workspaceId: WS_A });
-      const commit = await seed.bundleCommit({ workspaceId: WS_A });
-
-      await expect(
-        client.query(A_CONCEPT_INDEX_ROW_WITH_A_BODY, [
-          WS_A,
-          identity.iri,
-          "knowledge/too-long.md",
-          "x".repeat(CONCEPT_BODY_MAX + 1),
-          A_CONTENT_HASH,
-          commit.sha,
-        ]),
-      ).rejects.toThrow(/concept_index_body_length_check/);
     });
   });
 

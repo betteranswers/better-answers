@@ -18,6 +18,9 @@ import { linksAndMarksOf, proseOf } from "@better-answers/schema/concept-file";
 
 import { readableClause, readableParameters } from "../../access/index.ts";
 import type { PlatformPrincipal, Principal, UserPrincipal } from "../../kernel/index.ts";
+import { sentenceAt } from "./sentence.ts";
+
+export { sentenceAt };
 
 type Tx = Pick<pg.PoolClient, "query">;
 
@@ -92,32 +95,6 @@ const sectionAt = (body: string, index: number): string | null => {
     if (heading !== null) return (heading[1] ?? "").trim();
   }
   return null;
-};
-
-const flattenedLinks = (text: string): string =>
-  text
-    .replaceAll(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replaceAll(/\[([^\]]*)\]\[[^\]]*\]/g, "$1")
-    .replaceAll(/\[([^\]]*)\]/g, "$1")
-    .replaceAll(/<([a-z][a-z0-9+.-]*:[^>\s]*)>/gi, "$1");
-
-const sentenceAt = (body: string, index: number): string => {
-  const before = body.lastIndexOf("\n\n", index);
-  const paragraphStart = before === -1 ? 0 : before + 2;
-  const after = body.indexOf("\n\n", index);
-  const paragraph = body.slice(paragraphStart, after === -1 ? body.length : after);
-  const at = index - paragraphStart;
-
-  let start = 0;
-  let end = paragraph.length;
-  for (const boundary of paragraph.matchAll(/[.!?](?=\s|$)/g)) {
-    if (boundary.index < at) start = boundary.index + 1;
-    else {
-      end = boundary.index + 1;
-      break;
-    }
-  }
-  return flattenedLinks(paragraph.slice(start, end)).replaceAll(/\s+/g, " ").trim();
 };
 
 const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
