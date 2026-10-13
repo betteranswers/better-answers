@@ -36,7 +36,7 @@ function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOpe
   if (standing.isPending) {
     return (
       <AuthPage title={CONSOLE.name}>
-        <Outcome tone="said">Checking whether the console is open to you.</Outcome>
+        <Outcome tone="said">Checking your access.</Outcome>
       </AuthPage>
     );
   }

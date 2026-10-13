@@ -102,7 +102,7 @@ export const KNOWLEDGE = {
     {
       id: "browse",
       name: "Browse",
-      summary: "Search and read what this workspace knows.",
+      summary: "Search this workspace.",
       pages: [
         {
           name: "Search",
@@ -124,8 +124,7 @@ export const KNOWLEDGE = {
     {
       id: "curation",
       name: "Curation",
-      summary:
-        "Review everything this workspace knows, what needs verifying and who owns each collection.",
+      summary: "Manage knowledge.",
       pages: [
         {
           name: "All Knowledge",
@@ -209,7 +208,7 @@ export const CONTROL_CENTRE = {
     {
       id: "overview",
       name: "Overview",
-      summary: "See where this workspace needs your attention.",
+      summary: "See what needs attention.",
       pages: [
         { name: "Overview", path: "/overview", icon: "overview", built: false, seenBy: ADMINS },
       ],
@@ -217,7 +216,7 @@ export const CONTROL_CENTRE = {
     {
       id: "suggestions",
       name: "Suggestions",
-      summary: "Review suggested changes waiting for a decision.",
+      summary: "Review suggested changes.",
       pages: [
         {
           name: "To Decide",
@@ -231,7 +230,7 @@ export const CONTROL_CENTRE = {
     {
       id: "sources",
       name: "Sources",
-      summary: "Manage the documents this workspace learns from.",
+      summary: "Manage documents.",
       movedFrom: ["/sources"],
       pages: [
         {
@@ -282,7 +281,7 @@ export const CONTROL_CENTRE = {
     {
       id: "models",
       name: "Models",
-      summary: "Choose the model each purpose uses and see what it spends.",
+      summary: "Manage models and spend.",
       pages: [
         {
           name: "Models and Spend",
@@ -304,7 +303,7 @@ export const CONTROL_CENTRE = {
     {
       id: "questions",
       name: "Questions",
-      summary: "See the questions asked in this workspace and the answers they got.",
+      summary: "Review questions and answers.",
       pages: [
         {
           name: "Questions Asked",
@@ -325,7 +324,7 @@ export const CONTROL_CENTRE = {
     {
       id: "people",
       name: "People",
-      summary: "Manage who can use this workspace and what each person can do.",
+      summary: "Manage workspace.",
       movedFrom: ["/people"],
       pages: [
         {
@@ -350,8 +349,7 @@ export const CONTROL_CENTRE = {
     {
       id: "personal-data",
       name: "Personal Data",
-      summary:
-        "See the personal data this workspace holds and manage requests to erase or suppress it.",
+      summary: "Manage personal data.",
       pages: [
         {
           name: "Erasure and Suppression",
@@ -365,7 +363,7 @@ export const CONTROL_CENTRE = {
     {
       id: "system",
       name: "System",
-      summary: "See how this workspace is running and a record of what was done in it.",
+      summary: "View status and activity.",
       movedFrom: ["/system"],
       pages: [
         {
@@ -405,8 +403,7 @@ export const CONSOLE = {
     {
       id: "people",
       name: "People",
-      summary:
-        "See the people on the platform and the display names waiting on better-answers support.",
+      summary: "Manage people.",
       movedFrom: ["/console/people"],
       pages: [
         {
@@ -428,8 +425,7 @@ export const CONSOLE = {
     {
       id: "workspaces",
       name: "Workspaces",
-      summary:
-        "See every workspace on the platform, with its short name, its member count and the day it was provisioned. Provisioning and renaming are ops commands, so this list is read-only.",
+      summary: "View all workspaces.",
       movedFrom: ["/console/workspaces"],
       pages: [
         {

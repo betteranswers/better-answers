@@ -4,7 +4,7 @@ import { PRODUCT_NAME } from "@/shared/words.ts";
 
 export const FAILED_PAGE = {
   heading: "This Page Didn’t Load",
-  said: "Other pages still work. Please try again.",
+  said: STOCK.general,
   retry: "Try Again",
 } as const;
 
@@ -35,15 +35,15 @@ export const TOGGLE = {
   show: "Show Menu",
 } as const;
 
-/** The band's finder. Never called a search: that is Knowledge's page, and this goes places. */
+/** The band's finder. Never named Search: that is Knowledge's page, and this goes places. */
 export const JUMP_TO = {
   name: "Jump To",
-  said: "Type to filter the list, then choose an item.",
+  said: "Type to search.",
   list: "Matches",
   groups: { areas: "Areas", pages: "Pages", actions: "Actions", members: "Members" },
   kinds: { page: "a page", member: "a member", action: "an action" },
   membersLoading: "The members are still loading.",
-  membersUnread: "The members didn’t load. Please close this and open it again.",
+  membersUnread: "The members didn’t load. Please close this and try again.",
 } as const;
 
 export const nothingMatches = (typed: string): string => `No results found for “${typed}”.`;
