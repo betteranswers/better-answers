@@ -1971,7 +1971,7 @@ rail and the menu, in three cells.
 
 Its three cells are the *logo* over the rail; the *workspace switcher* and the *navigation control*
 over the menu; then the *breadcrumb*, *Jump to* and the **avatar menu**, which shows the person's
-initials and opens to their name, their role and *Sign out*. It holds no page's actions: those are
+initials and opens to their name, their role and *Sign Out*. It holds no page's actions: those are
 in the page's own *page head*. Hiding the menu moves nothing in it. Where the window is not wide it
 takes two rows, the breadcrumb alone on the second, and scrolls with the page.
 
