@@ -42,6 +42,9 @@ const saidIn = (page: Page): Locator => requestsRegion(page).getByRole("status")
 
 const countIn = (page: Page): Locator => requestsRegion(page).getByRole("status").first();
 
+/** An empty list is one paragraph, which says so, where a list of requests draws a table. */
+const emptyLine = (page: Page): Locator => requestsRegion(page).getByRole("paragraph");
+
 /** The output in the row under the Requests region's heading: the count of requests. */
 const THE_COUNT = "//section[h2='Requests']/div/output";
 
@@ -152,6 +155,7 @@ test.describe("the People page's Requests tab", () => {
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
     await expect(saidIn(page)).toContainText(priya);
     await expect(requestRows(page)).toHaveCount(0);
+    await expect(emptyLine(page)).toHaveText(/\S/);
 
     await page.getByRole("tab", { name: "Invitations" }).click();
     const invited = page
@@ -194,7 +198,7 @@ test.describe("the People page's Requests tab", () => {
         - status
         - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
         - status
-        - paragraph
+        - paragraph: /\\S/
     `);
     await expect(invitingButtons(page), "the head's action is the one way to invite").toHaveCount(
       1,
@@ -324,6 +328,7 @@ test.describe("the People page's Requests tab", () => {
       .getByRole("button", { name: "Decline the request from Priya Shah" })
       .click();
     await expect(requestRows(elsewhere)).toHaveCount(0);
+    await expect(emptyLine(elsewhere)).toHaveText(/\S/);
     await elsewhere.close();
 
     const refused = refusalAnswering(page, "members.approveRequest");

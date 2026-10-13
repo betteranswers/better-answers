@@ -60,6 +60,13 @@ const nameField = (page: Page): Locator =>
 
 const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
 
+/** The action a keystroke list sets beside a key: the definition after the key's term. */
+const actionBeside = (keystrokes: Locator, key: string): Locator =>
+  keystrokes
+    .getByRole("term")
+    .filter({ hasText: new RegExp(`^${key}$`) })
+    .locator("xpath=following-sibling::*[1]");
+
 /** A group being created is a name before it is a button, so its row is found by its text. */
 const countCellOf = (name: string): string => `//tr[td[1][normalize-space(.)='${name}']]/td[2]`;
 
@@ -331,6 +338,7 @@ test.describe("a group's actions", () => {
     await page.keyboard.press("Space");
 
     await expect(said).toHaveText(/Sam Okoro.*Bid writers/);
+    const saidOfTheAdd = await said.innerText();
     await theActionLandedWithinItsBudget(page, "put a member in a group");
     await expect(sam).toBeChecked();
     await expect(sam).toBeFocused();
@@ -366,6 +374,9 @@ test.describe("a group's actions", () => {
     await clockTheNextKey(page, { at: SHEET_COUNT, reads: "0" });
     await page.keyboard.press("Space");
     await expect(said).toHaveText(/Sam Okoro.*Bid writers/);
+    await expect(said, "the status says of taking him out what it said of the add").not.toHaveText(
+      saidOfTheAdd,
+    );
     await expect(sam).not.toBeChecked();
     await theActionLandedWithinItsBudget(page, "take a member out of a group");
     await page.keyboard.press("Escape");
@@ -449,6 +460,7 @@ test.describe("the keystrokes listed across the People group", () => {
     await expect(
       onMembers.getByRole("term").getByText(PEOPLE_KEYSTROKES.changeRole.key, { exact: true }),
     ).toBeVisible();
+    const doneOnMembers = await actionBeside(onMembers, PEOPLE_KEYSTROKES.remove.key).innerText();
     await keystrokesDismissed(page, onMembers);
 
     await nav(page).getByRole("link", { name: GROUPS.name }).click();
@@ -461,6 +473,11 @@ test.describe("the keystrokes listed across the People group", () => {
       onGroups.getByRole("term").getByText(PEOPLE_KEYSTROKES.changeRole.key, { exact: true }),
       "Members' keystrokes outlived the page",
     ).toHaveCount(0);
+    const doneOnGroups = actionBeside(onGroups, GROUPS_KEYSTROKES.delete.key);
+    await expect(doneOnGroups).toHaveText(/\S/);
+    await expect(doneOnGroups, "the shared key is listed with Members' action").not.toHaveText(
+      doneOnMembers,
+    );
   });
 });
 
@@ -561,7 +578,7 @@ test.describe("a member's groups, on their row and their page", () => {
             - row "Group Members"
           - rowgroup:
             - row:
-              - cell
+              - cell /\\S/
     `);
     await expect(
       groupsRegion(page).getByRole("button"),

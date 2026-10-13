@@ -86,6 +86,9 @@ const selectionAction = (page: Page, action: string): Locator =>
 const saidInTheTab = (page: Page, address: string | RegExp): Locator =>
   invitationsRegion(page).getByRole("status").filter({ hasText: address });
 
+/** An empty list draws one cell, which says so; a row of an invitation draws several. */
+const theOneCell = (page: Page): Locator => invitationsRegion(page).getByRole("cell");
+
 /** The tab's statuses in order: its count, then its outcome line. */
 const countIn = (page: Page): Locator => invitationsRegion(page).getByRole("status").nth(0);
 
@@ -239,6 +242,7 @@ test.describe("the People page's Invitations tab", () => {
     await anAdminAtInvitations(page, request, "Calder Joinery");
     await openInvitations(page);
     await expect(invitationRows(page)).toHaveCount(0);
+    await expect(theOneCell(page)).toHaveText(/\S/);
     const address = anAddress("sam");
 
     await dialogOpened(page);
@@ -281,8 +285,9 @@ test.describe("the People page's Invitations tab", () => {
     expect(await emailsSentTo(request, address), "the invitation's one email").toBe(1);
   });
 
-  test("opens the invite dialog by keystroke from each tab", async ({ page, request }) => {
+  test("each tab invites by keystroke, giving d its own action", async ({ page, request }) => {
     await anAdminAtInvitations(page, request, "Nidd Presswork");
+    const besideTheSharedKey: string[] = [];
 
     for (const name of ["Members", "Invitations", "Requests"]) {
       const tab = page.getByRole("tab", { name });
@@ -296,7 +301,21 @@ test.describe("the People page's Invitations tab", () => {
       await page.keyboard.press("Escape");
       await expect(inviteDialog(page)).toHaveCount(0);
       await expect(inviteAction(page), `focus left the action on ${name}`).toBeFocused();
+
+      // Each tab's list sets its own action beside d: the definition after the key's term.
+      const keystrokes = await keystrokesListed(page, MEMBERS.name);
+      const action = keystrokes
+        .getByRole("term")
+        .filter({ hasText: new RegExp(`^${PEOPLE_KEYSTROKES.remove.key}$`) })
+        .locator("xpath=following-sibling::*[1]");
+      await expect(action, `${name} lists no action beside the key`).toHaveText(/\S/);
+      besideTheSharedKey.push(await action.innerText());
+      await keystrokesDismissed(page, keystrokes);
     }
+
+    expect(new Set(besideTheSharedKey).size, "two tabs list one action beside the shared key").toBe(
+      3,
+    );
   });
 
   test("an empty tab says so in one line, inviting once", async ({ page, request }) => {
@@ -319,7 +338,7 @@ test.describe("the People page's Invitations tab", () => {
                 - checkbox [disabled]
           - rowgroup:
             - row:
-              - cell
+              - cell /\\S/
     `);
     await expect(invitingButtons(page), "the head's action is the one way to invite").toHaveCount(
       1,
@@ -480,6 +499,7 @@ test.describe("the People page's Invitations tab", () => {
     await countedUnder(page, "waiting", 0);
     await countedUnder(page, "expired", 1);
     await expect(invitationRows(page)).toHaveCount(0);
+    await expect(theOneCell(page)).toHaveText(/\S/);
 
     await shownUnder(page, "expired");
     await expect(rowOf(page, old)).toHaveCount(1);
@@ -665,7 +685,7 @@ test.describe("the People page's Invitations tab", () => {
     await menuOf(page, old).click();
     await page.getByRole("menuitem", { name: INVITATIONS_WORDS.resend }).click();
 
-    await expect(saidInTheTab(page, old)).toBeVisible();
+    await expect(saidInTheTab(page, new RegExp(`${old}.*\\d{4}`))).toBeVisible();
     await expect(rowOf(page, old)).toHaveCount(0);
     await expect(invitationsHeading(page), "focus left with the row").toBeFocused();
     await countedUnder(page, "expired", 0);
@@ -744,7 +764,7 @@ test.describe("the People page's Invitations tab", () => {
     await tickOf(page, old).check();
     await selectionAction(page, INVITATIONS_WORDS.resend).click();
 
-    await expect(outcomeIn(page)).toHaveText(/\b1\b/);
+    await expect(outcomeIn(page)).toHaveText(/\b1\b.*\d{4}/);
     await expect(rowOf(page, old)).toHaveCount(0);
     await countedUnder(page, "waiting", 1);
     await countedUnder(page, "expired", 0);

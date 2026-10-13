@@ -113,6 +113,10 @@ const describing = async (control: Locator): Promise<string> =>
     .locator(`[id="${(await control.getAttribute("aria-describedby")) ?? ""}"]`)
     .innerText();
 
+/** A control's description with the member's name taken out, so one member's is set against another's. */
+const describingWhoever = async (control: Locator, name: string): Promise<string> =>
+  (await describing(control)).replaceAll(name, "…");
+
 const searchBox = (page: Page) =>
   page.getByRole("searchbox", { name: "Search by name or address" });
 
@@ -208,8 +212,11 @@ const linesOf = (page: Page): Locator => activityOf(page).getByRole("listitem");
 
 const ACTIVITY_READ = (url: URL): boolean => url.pathname.includes("members.activity");
 
-/** A stream read and found empty: its loading status is gone, and it draws no line. */
-const readWithNoLine = async (page: Page): Promise<void> => {
+/** A stream read and found empty: it names the member in a line of words, and draws no event. */
+const readWithNoLine = async (page: Page, name: string): Promise<void> => {
+  await expect(activityOf(page), "the empty Activity says nothing of the member").toContainText(
+    name,
+  );
   await expect(activityOf(page).getByRole("status")).toHaveCount(0);
   await expect(activityOf(page).getByRole("alert")).toHaveCount(0);
   await expect(linesOf(page)).toHaveCount(0);
@@ -338,12 +345,24 @@ const anAdminBesideAnotherAtPeople = async (
   return workspace;
 };
 
-/** The Admin signed in makes themself an Editor on their own page, its commit described. */
+/**
+ * The Admin signed in makes themself an Editor on their own page, its commit described as the
+ * other Admin's is not.
+ */
 const demotedThemself = async (page: Page): Promise<void> => {
-  await openedByName(page, "Test person");
-  await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
-  const commit = thePage(page).getByRole("button", { name: "Make Test person an Editor" });
+  const commitFor = async (name: string): Promise<Locator> => {
+    await openedByName(page, name);
+    await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
+    return thePage(page).getByRole("button", { name: `Make ${name} an Editor` });
+  };
+  const ofAnother = await describingWhoever(await commitFor("Ada Hartley"), "Ada Hartley");
+  await backToMembers(page);
+  const commit = await commitFor("Test person");
   await expect(commit).toHaveAccessibleDescription(/\S/);
+  expect(
+    await describingWhoever(commit, "Test person"),
+    "their own demotion is described as another member's is",
+  ).not.toBe(ofAnother);
   await commit.click();
 };
 
@@ -1014,7 +1033,7 @@ test.describe("a member's Activity", () => {
     await addMember(request, { workspaceId, userId: priya.id, role: "Viewer" });
     await page.goto(memberPageAt(priya.id));
     await signIn(page, request, hannahAt);
-    await readWithNoLine(page);
+    await readWithNoLine(page, "Priya Shah");
 
     await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
     await thePage(page).getByRole("button", { name: "Make Priya Shah an Editor" }).click();
@@ -1023,6 +1042,7 @@ test.describe("a member's Activity", () => {
     // The page the action was taken on reads its Activity again once the action settles.
     await expect(linesOf(page)).toHaveCount(1);
     await expect(linesOf(page)).toContainText(byHannahToPriya);
+    const saidOnPriyas = ((await linesOf(page).textContent()) ?? "").replace(/^\d{2}:\d{2}/, "");
 
     await page.goto(memberPageAt(hannah.id));
     await expect(personHeading(page, "Hannah Wright")).toBeVisible();
@@ -1035,6 +1055,10 @@ test.describe("a member's Activity", () => {
             - time: /\\d{2}:\\d{2}/
     `);
     await expect(linesOf(page)).toContainText(byHannahToPriya);
+    // One event, said by on the actor's page and to on the subject's, so the two lines differ.
+    await expect(linesOf(page), "Hannah's page says the line as Priya's does").not.toContainText(
+      saidOnPriyas,
+    );
   });
 
   test("Load more lands focus on the first older line", async ({ page, request }) => {
@@ -1134,7 +1158,7 @@ test.describe("a member's Activity", () => {
       "Wharfe leads",
     );
     held.resolve();
-    await readWithNoLine(page);
+    await readWithNoLine(page, "Rhea Kemp");
     await expect(thePage(page)).not.toContainText("Wharfe leads");
   });
 
@@ -1355,6 +1379,13 @@ test.describe("removing a member from their page", () => {
     request,
   }) => {
     await anAdminBesideAnotherAtPeople(page, request, "Esk Tinsmiths");
+    await openedByName(page, "Ada Hartley");
+    await removalOf(page).getByRole("button", { name: "Remove Ada Hartley", exact: true }).click();
+    const ofAnother = await describingWhoever(
+      removalOf(page).getByRole("button", { name: "Remove Ada Hartley from this workspace" }),
+      "Ada Hartley",
+    );
+    await backToMembers(page);
     await openedByName(page, "Test person");
     const removal = removalOf(page);
     const asked = removal.getByRole("button", { name: "Remove Test person", exact: true });
@@ -1364,10 +1395,13 @@ test.describe("removing a member from their page", () => {
       "their own removal names them as it would another",
     ).not.toHaveAccessibleDescription(/Test person/);
     await asked.click();
-    await expect(
-      removal.getByRole("button", { name: "Remove Test person from this workspace" }),
-    ).toHaveAccessibleDescription(/\S/);
-    await removal.getByRole("button", { name: "Remove Test person from this workspace" }).click();
+    const confirm = removal.getByRole("button", { name: "Remove Test person from this workspace" });
+    await expect(confirm).toHaveAccessibleDescription(/\S/);
+    expect(
+      await describingWhoever(confirm, "Test person"),
+      "their own removal is confirmed as another member's is",
+    ).not.toBe(ofAnother);
+    await confirm.click();
 
     // The chooser sends a person who holds no other workspace straight on.
     await expect(page).toHaveURL(/\/no-workspace$/);
