@@ -227,7 +227,7 @@ function CredentialsRevoker(properties: {
 /** Shown at the press, since the answer is this for every member; a refusal replaces it. */
 const SENT_TO_THE_OPERATOR: Outcome = {
   tone: "said",
-  words: "The name has been flagged to better-answers support successfully.",
+  words: "The name has been flagged to better-answers support.",
 };
 
 function DisplayNameFlag(properties: {
@@ -268,7 +268,8 @@ function DisplayNameFlag(properties: {
               Flag Name
             </Button>
             <p id={hintId} className="text-sm text-muted-foreground">
-              This will email better-answers support to correct it.
+              This will email better-answers support to correct it. A name already flagged is not
+              flagged again.
             </p>
           </div>
           <OutcomeLine outcome={outcome} className="contents" />

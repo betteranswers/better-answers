@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { ACTIVITY_WORDS, MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
+import {
+  ACTIVITY_WORDS,
+  BULK_WORDS,
+  MEMBER_PAGE_WORDS,
+} from "@/features/people/member-action-words.ts";
 
 const AMARA = "Amara Okafor";
 
@@ -42,5 +46,27 @@ describe("an activity line's marker", () => {
 
     for (const marker of markers) expect(marker).toContain(AMARA);
     expect(new Set(markers).size).toBe(3);
+  });
+});
+
+describe("a bulk action's done line", () => {
+  const doneWith = (changed: number): readonly string[] => [
+    BULK_WORDS.changeRole.done(changed, "Viewer", 3),
+    BULK_WORDS.addToGroup.done(changed, "Site leads", 3),
+    BULK_WORDS.remove.done(changed, 3),
+  ];
+
+  it("counts no success where nobody changed, only the skipped", () => {
+    for (const said of doneWith(0)) {
+      expect(said).not.toMatch(/\b0\b/);
+      expect(said).toMatch(/\b3\b/);
+    }
+  });
+
+  it("counts the changed beside the skipped", () => {
+    for (const said of doneWith(2)) {
+      expect(said).toMatch(/\b2\b/);
+      expect(said).toMatch(/\b3\b/);
+    }
   });
 });

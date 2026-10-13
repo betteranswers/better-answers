@@ -61,6 +61,10 @@ const membersTitled = (count: number): string => counted(count, "Member", "Membe
 
 const membersHave = (count: number): string => counted(count, "member has", "members have");
 
+/** A bulk action that changed nobody says so, and counts no success. */
+const changedSaid = (changed: number, none: string, done: string): string =>
+  changed === 0 ? none : `${membersHave(changed)} been ${done} successfully.`;
+
 /** A row whose change was already true is counted, never refused. */
 const andAlready = (skipped: number, already: string): string =>
   skipped === 0 ? "" : ` ${String(skipped)} ${skipped === 1 ? "was" : "were"} ${already}.`;
@@ -72,7 +76,7 @@ export const BULK_WORDS = {
     consequence: (role: Role) => `This will change each member’s role to ${role}.`,
     pending: (count: number, role: Role) => `Changing ${members(count)} to ${role}.`,
     done: (changed: number, role: Role, skipped: number) =>
-      `${membersHave(changed)} been changed to ${role} successfully.${andAlready(skipped, `already in the ${role} role`)}`,
+      `${changedSaid(changed, "No members were changed.", `changed to ${role}`)}${andAlready(skipped, `already in the ${role} role`)}`,
   },
   addToGroup: {
     action: "Add to Group",
@@ -84,7 +88,7 @@ export const BULK_WORDS = {
     choose: "Select a group",
     pending: (count: number, group: string) => `Adding ${members(count)} to ${group}.`,
     done: (changed: number, group: string, skipped: number) =>
-      `${membersHave(changed)} been added to ${group} successfully.${andAlready(skipped, "already in it")}`,
+      `${changedSaid(changed, "No members were added.", `added to ${group}`)}${andAlready(skipped, "already in it")}`,
   },
   remove: {
     action: "Remove",
@@ -93,7 +97,7 @@ export const BULK_WORDS = {
       `Are you sure you want to remove ${count === 1 ? "this member" : "these members"} from the workspace? They will lose access on every session and assistant they hold.`,
     pending: (count: number) => `Removing ${members(count)} from this workspace.`,
     done: (changed: number, skipped: number) =>
-      `${membersHave(changed)} been removed from this workspace successfully.${andAlready(skipped, "no longer a member")}`,
+      `${changedSaid(changed, "No members were removed.", "removed from this workspace")}${andAlready(skipped, "no longer a member")}`,
   },
   refused: (count: number) => `No changes were made. There was a problem with ${members(count)}:`,
   stillGoing: "The previous action is still in progress. Please try again when it has finished.",

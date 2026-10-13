@@ -129,7 +129,7 @@ export const INVITATIONS_WORDS = {
   noLongerListed: "An invitation no longer listed",
   resending: (address: string) => `Resending the invitation to ${address}.`,
   cancelled: (address: string) =>
-    `The invitation to ${address} has been cancelled successfully. Its link no longer works.`,
+    `The invitation to ${address} has been cancelled. Its link no longer works.`,
   bulk: {
     resending: (count: number) => `Resending ${invitations(count)}.`,
     cancelling: (count: number) => `Cancelling ${invitations(count)}.`,

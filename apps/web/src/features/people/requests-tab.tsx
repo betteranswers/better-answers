@@ -128,7 +128,7 @@ function RequestList(properties: {
     properties.onDeclined();
     onOutcome({
       tone: "said",
-      words: `The request from ${requesterName(request)} has been declined successfully. They can ask again.`,
+      words: `The request from ${requesterName(request)} has been declined. They can ask again.`,
     });
     decline.mutate(
       { requestId: request.id },
