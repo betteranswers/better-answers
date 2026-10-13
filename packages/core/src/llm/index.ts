@@ -15,6 +15,8 @@ import {
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
+export { checkTypedText } from "./typed-text.ts";
+
 export const LLM_PURPOSES = llmPurpose.enumValues;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];
 

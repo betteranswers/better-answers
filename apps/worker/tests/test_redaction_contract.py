@@ -1,8 +1,13 @@
 import json
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
+
+from better_answers_worker.redaction import redact
+from better_answers_worker.redaction.engine import spans_detected
 from better_answers_worker.schema_view import TABLES
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "contracts"
@@ -12,9 +17,15 @@ SPOKEN_TIERS = ["always", "default-on", "default-off"]
 SPOKEN_ALWAYS_TIER = "always"
 
 
+THE_ALWAYS_TIER_ALONE: Mapping[str, bool] = {"default_on": False, "default_off": False}
+
+
 def read_redaction() -> dict[str, Any]:
     raw = (CONTRACTS_DIR / "redaction" / "cases.json").read_text(encoding="utf-8")
     return cast("dict[str, Any]", json.loads(raw))
+
+
+TYPED_TEXT_CASES: list[dict[str, Any]] = read_redaction()["typed_text"]["cases"]
 
 
 def test_writes_the_three_agreed_tiers_on_a_finding() -> None:
@@ -110,3 +121,14 @@ def test_the_version_string_joins_a_findings_two_columns() -> None:
     assert (
         re.compile(fixture["version_string"]["pattern"]).fullmatch(written) is not None
     )
+
+
+@pytest.mark.parametrize(
+    "case", TYPED_TEXT_CASES, ids=[case["name"] for case in TYPED_TEXT_CASES]
+)
+def test_reads_typed_text_as_the_agreement_says(case: dict[str, Any]) -> None:
+    typed = case["input"]
+
+    read = redact(typed, spans_detected(typed), THE_ALWAYS_TIER_ALONE, (), "a-seed")
+
+    assert read.text == case["expected"], case["why"]
