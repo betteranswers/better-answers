@@ -181,10 +181,13 @@ export const withSweepLock = <T>(
   work: () => Promise<T>,
 ): Promise<T> => withSessionLock(platform, door, SWEEP_LOCK, () => work());
 
+/** The day an ISO instant opens with, which Postgres reads as a date. */
+const ISO_DAY = "yyyy-mm-dd";
+
 const firstOfTheMonth = (now: Date, monthsOn: number): string =>
   new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthsOn, 1))
     .toISOString()
-    .slice(0, "yyyy-mm-dd".length);
+    .slice(0, ISO_DAY.length);
 
 /**
  * Makes the partitions a question's content is stored in, since a request cannot make its own.

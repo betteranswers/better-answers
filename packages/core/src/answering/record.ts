@@ -1,27 +1,25 @@
 import type {
-  CANDIDATE_VERDICTS,
+  CandidateVerdict,
   ConceptIri,
-  JUDGE_STATES,
-  QUESTION_TRANSPORTS,
-  QUESTION_VERDICTS,
+  JudgeState,
+  QuestionTransport,
+  QuestionVerdict,
 } from "@better-answers/schema";
 
 import type { Trust } from "../concepts/index.ts";
 import { actorIdOf, attempt, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
-export type QuestionTransport = (typeof QUESTION_TRANSPORTS)[number];
-
-export type RecordVerdict = (typeof QUESTION_VERDICTS)[number];
-
-export type JudgeState = (typeof JUDGE_STATES)[number];
-
-const A_RECORD = `INSERT INTO question_asked
-    (workspace_id, id, asked_at, asked_by, transport, collections, predicate_role, predicate_groups)
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`;
-
-const ITS_QUESTION = `INSERT INTO question_content (workspace_id, record_id, asked_at, question)
-  VALUES ($1, $2, $3, $4)`;
+/** One statement, so the content's month is its record's own `asked_at`. */
+const A_RECORD_WITH_ITS_QUESTION = `WITH record AS (
+    INSERT INTO question_asked
+      (workspace_id, id, asked_at, asked_by, transport, collections, predicate_role,
+       predicate_groups)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING workspace_id, id, asked_at
+  )
+  INSERT INTO question_content (workspace_id, record_id, asked_at, question)
+  SELECT workspace_id, id, asked_at, $9::text FROM record`;
 
 /**
  * Writes the skeleton and the question in the caller's transaction, which the caller commits
@@ -40,7 +38,7 @@ export const openRecord = async (
 ): Promise<Result<{ readonly recordId: string }, Error>> =>
   attempt(async () => {
     const recordId = ulid();
-    await tx.query(A_RECORD, [
+    await tx.query(A_RECORD_WITH_ITS_QUESTION, [
       asker.workspaceId,
       recordId,
       input.askedAt,
@@ -49,8 +47,8 @@ export const openRecord = async (
       [...input.collections],
       asker.role,
       [...asker.groups],
+      input.question,
     ]);
-    await tx.query(ITS_QUESTION, [asker.workspaceId, recordId, input.askedAt, input.question]);
     return { recordId };
   });
 
@@ -59,7 +57,7 @@ export type RecordedConcept = {
   readonly contentHash: string;
   readonly trust: Trust;
   /** The judge's word on a candidate; absent for a concept no judge was asked about. */
-  readonly judged?: (typeof CANDIDATE_VERDICTS)[number];
+  readonly judged?: CandidateVerdict;
 };
 
 export type DraftedSentence = {
@@ -99,7 +97,7 @@ export const completeRecord = async (
   input: {
     readonly recordId: string;
     readonly completedAt: Date;
-    readonly verdict: RecordVerdict;
+    readonly verdict: QuestionVerdict;
     readonly judgeState: JudgeState;
     readonly concepts: readonly RecordedConcept[];
     readonly unmappedPassages: readonly { readonly locator: string }[];

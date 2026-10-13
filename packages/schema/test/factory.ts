@@ -155,9 +155,16 @@ export type TestData = {
 
   questionAsked(overrides?: Partial<InsertInput<"questionAsked">>): Promise<Row<"questionAsked">>;
 
-  /** Seeds its record too when given none, asked now, so the month's partition is there. */
+  /**
+   * Seeds its record too when given none, asked now. A `recordId` comes with that record's
+   * `askedAt`, so the row lands in its record's month.
+   */
   questionContent(
-    overrides?: Partial<InsertInput<"questionContent">>,
+    overrides?: Partial<Omit<InsertInput<"questionContent">, "recordId" | "askedAt">> &
+      (
+        | { readonly recordId: string; readonly askedAt: Date }
+        | { readonly recordId?: undefined; readonly askedAt?: undefined }
+      ),
   ): Promise<Row<"questionContent">>;
 
   questionFeedback(
@@ -944,14 +951,14 @@ export const testData = (client: pg.PoolClient): TestData => {
     const record =
       overrides.recordId === undefined
         ? await questionAsked({ workspaceId })
-        : { id: overrides.recordId, askedAt: new Date() };
+        : { id: overrides.recordId, askedAt: overrides.askedAt };
     return insertRow(client, "questionContent", {
-      askedAt: record.askedAt,
       question: "How long are audit logs kept?",
       drafted: null,
       ...overrides,
       workspaceId,
       recordId: record.id,
+      askedAt: record.askedAt,
     });
   };
 

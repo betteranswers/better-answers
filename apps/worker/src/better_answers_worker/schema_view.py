@@ -2,7 +2,7 @@
 
 MIGRATION_ID = "0076_the-questions-asked"
 
-MIGRATION_WHEN = 1791888930088
+MIGRATION_WHEN = 1791891720494
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {

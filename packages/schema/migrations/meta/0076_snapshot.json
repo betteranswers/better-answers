@@ -1,5 +1,5 @@
 {
-  "id": "8e95ec70-7254-471c-8aea-429802d67794",
+  "id": "b5bc997b-1023-4ab3-98b2-06b987e6a439",
   "prevId": "0705154d-9fbe-46e9-a023-bc4b40a0a7db",
   "version": "7",
   "dialect": "postgresql",
@@ -6263,6 +6263,27 @@
             },
             {
               "expression": "record_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "question_feedback_workspace_id_given_by_idx": {
+          "name": "question_feedback_workspace_id_given_by_idx",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "given_by",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

@@ -1,17 +1,13 @@
 import { boundarySchemas } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-import {
-  actorIdOfPerson,
-  PERSON_PREFIX,
-  type ActorId,
-  type PlatformPrincipal,
-} from "../kernel/index.ts";
+import { actorIdOfPerson, type ActorId, type PlatformPrincipal } from "../kernel/index.ts";
 import { historyNaming, type GitDoor } from "../store/git/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { SESSION_VERIFICATION_PREFIXES, VERIFICATION_PREFIXES } from "../workspaces/index.ts";
 import { documentsNaming } from "./documents.ts";
 import { soughtIdentifiersOf, type SoughtIdentifier } from "./identifiers.ts";
+import { askersOf } from "./questions.ts";
 import type { SubjectIdentifiers, SubjectRequest } from "./requests.ts";
 
 export const ERASURE_FAMILIES = [
@@ -110,15 +106,6 @@ const rowsOfThePersonIn =
   (table: "account" | "authenticator" | "recovery_code"): ErasureFinder =>
   (platform, subject, tx) =>
     aboutTheMember(tx, subject, `SELECT id AS location FROM ${table} WHERE user_id = $1`);
-
-/** The actor ids a record may name the person by, given each as an actor id or a person id. */
-export const askersOf = (people: readonly (string | null)[]): readonly string[] => [
-  ...new Set(
-    people
-      .filter((person) => person !== null)
-      .map((person) => (person.startsWith(PERSON_PREFIX) ? person : `${PERSON_PREFIX}${person}`)),
-  ),
-];
 
 const MEMBER_HERE = `SELECT u.id AS location
      FROM "user" u

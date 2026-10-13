@@ -2140,6 +2140,24 @@ describe("the questions a person asked", () => {
     expect(await rowsOf(theirs.recordId)).toEqual(asErased(pseudonym));
   });
 
+  it("removes a question asked at a microsecond's precision", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const theirs = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+    for (const [table, key] of [
+      ["question_content", "record_id"],
+      ["question_asked", "id"],
+    ]) {
+      await db().pool.query(
+        `UPDATE ${table} SET asked_at = asked_at + interval '123 microseconds' WHERE ${key} = $1`,
+        [theirs.recordId],
+      );
+    }
+
+    await completing(scenario, subjectRequestId);
+
+    expect((await rowsOf(theirs.recordId)).content).toEqual([]);
+  });
+
   it("leaves another member's question and note as they were", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     await recordAskedBy(db().pool, scenario.workspaceId, person.id);

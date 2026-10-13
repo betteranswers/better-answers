@@ -7,14 +7,18 @@ import { ROLES } from "./roles.ts";
 import { withRLS } from "./with-rls.ts";
 
 export const QUESTION_VERDICTS = ["ok", "warn", "refuse", "related"] as const;
+export type QuestionVerdict = (typeof QUESTION_VERDICTS)[number];
 
 export const JUDGE_STATES = ["not-judged", "judged", "judging-failed"] as const;
+export type JudgeState = (typeof JUDGE_STATES)[number];
 
 /** The judge's word on one candidate. */
 export const CANDIDATE_VERDICTS = ["yes", "no"] as const;
+export type CandidateVerdict = (typeof CANDIDATE_VERDICTS)[number];
 
 /** Where a question was asked: through an assistant, or on the Ask page. */
 export const QUESTION_TRANSPORTS = ["mcp", "trpc"] as const;
+export type QuestionTransport = (typeof QUESTION_TRANSPORTS)[number];
 
 export const FEEDBACK_VERDICTS = ["helpful", "flag"] as const;
 
@@ -143,6 +147,7 @@ export const questionFeedback = withRLS(
       name: "question_feedback_record_fk",
     }),
     index("question_feedback_workspace_id_record_id_idx").on(table.workspaceId, table.recordId),
+    index("question_feedback_workspace_id_given_by_idx").on(table.workspaceId, table.givenBy),
 
     check("question_feedback_given_by_check", sql.raw(`given_by ~ '^${ACTOR_ID_PATTERN}$'`)),
     check("question_feedback_verdict_check", sql.raw(`verdict IN (${listed(FEEDBACK_VERDICTS)})`)),

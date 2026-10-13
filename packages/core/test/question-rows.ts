@@ -2,6 +2,8 @@ import type pg from "pg";
 
 import { conceptIriOf, ulid } from "@better-answers/schema";
 
+import { actorIdOfPerson } from "../src/kernel/index.ts";
+import { personIdOf } from "./platform.ts";
 import { seedingWith } from "./suite-postgres.ts";
 
 const A_QUESTION_ASKED = "How long are audit logs kept?";
@@ -13,7 +15,7 @@ const A_DISPUTED_SENTENCE = "Audit logs are kept for a year.";
 /** One completed record `personId` asked, with its question and a flag of theirs carrying a note. */
 export const recordAskedBy = (pool: pg.Pool, workspaceId: string, personId: string) =>
   seedingWith(pool, async (seed) => {
-    const asker = `human:${personId}`;
+    const asker = actorIdOfPerson(personIdOf(personId));
     const concept = conceptIriOf(ulid());
     const record = await seed.questionAsked({
       workspaceId,
