@@ -147,7 +147,9 @@ test("hides People from a Viewer, reading no members", async ({ page, request })
   // Search's row is no match, so it stands beside the line that says nothing matches.
   await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("people")]);
   await expect(groupOf(page, JUMP_TO.groups.members)).toHaveCount(0);
-  await expect(inputOf(page)).not.toHaveAttribute("placeholder", /member/i);
+  // Of the three kinds jump-to finds, a Viewer is promised pages alone.
+  await expect(inputOf(page)).toHaveAttribute("placeholder", /page/i);
+  await expect(inputOf(page)).not.toHaveAttribute("placeholder", /member|action/i);
   expect(membersReads, "a Viewer's jump-to asked for the members").toEqual([]);
 });
 
