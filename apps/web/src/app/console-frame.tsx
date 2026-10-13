@@ -3,10 +3,9 @@ import { Link } from "@tanstack/react-router";
 import { AuthPage, Outcome, Refused } from "@/features/auth/auth-page.tsx";
 import { SignOutButton } from "@/features/auth/sign-out-button.tsx";
 import { useOperatorStanding } from "@/features/console/operator.ts";
-import { ONLY_THE_OPERATOR, STANDING_UNANSWERED } from "@/features/console/refusal-words.ts";
 import { CONSOLE_CLOSED, saidOf } from "@/features/console/words.ts";
 import { CONSOLE, OPERATOR_READER, visibleTo } from "@/shared/navigation.ts";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { Frame } from "./frame.tsx";
@@ -49,7 +48,7 @@ function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOpe
           id="console-unread"
           failure={standing.error}
           saidOf={saidOf}
-          unanswered={STANDING_UNANSWERED}
+          unanswered={STOCK.notLoaded}
         />
         <Button
           type="button"
@@ -67,9 +66,7 @@ function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOpe
 
   return (
     <AuthPage title={CONSOLE_CLOSED}>
-      <Outcome tone="refused">
-        <RefusalLine said={ONLY_THE_OPERATOR} />
-      </Outcome>
+      <Outcome tone="refused">{STOCK.permission}</Outcome>
       <WaysOut />
     </AuthPage>
   );

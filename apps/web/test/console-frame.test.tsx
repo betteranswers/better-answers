@@ -13,9 +13,9 @@ import {
   NAMES_WAITING_KEYSTROKES,
   SELECT_A_NAME_FIRST,
 } from "@/features/console/people-keystrokes.ts";
-import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
+import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
@@ -180,7 +180,7 @@ describe("the console's shell", () => {
       "The console is better-answers support’s alone",
     );
     const refused = screen.getByRole("alert").textContent;
-    expect(refused).toBe(`${ONLY_THE_OPERATOR.why} ${ONLY_THE_OPERATOR.next}`);
+    expect(refused).toBe(STOCK.permission);
     expect(refused).not.toContain(NOT_THE_OPERATOR);
     expect(screen.queryByRole("navigation", { name: "Console" })).toBeNull();
   });
@@ -274,7 +274,7 @@ describe("the console's lists", () => {
     vi.stubGlobal("fetch", answering(THE_OPERATOR, {}, read));
     readAgainInPlace();
 
-    expect(await within(list).findByText(sentenceOf(ONLY_THE_OPERATOR))).toBeDefined();
+    expect(await within(list).findByText(STOCK.permission)).toBeDefined();
     expect(within(list).queryByRole("table")).toBeNull();
     expect(within(list).getByRole("searchbox", { name: words.search })).toBe(search);
     expect(within(list).getByDisplayValue("acme")).toBe(search);

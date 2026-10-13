@@ -16,6 +16,7 @@ import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
+import { stockWait } from "@/shared/refusal-words.ts";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
@@ -31,7 +32,6 @@ import {
   SEARCH_MAX,
 } from "./audit-log-state.ts";
 import { AUDIT_LOG_WORDS as WORDS } from "./audit-log-words.ts";
-import { auditExportCeiling } from "./refusal-words.ts";
 import { outcomeOfAuditLogFailure } from "./refusal.tsx";
 
 const system = menuGroupIn(CONTROL_CENTRE, "system");
@@ -229,18 +229,20 @@ const exportFailed = (failure: Error | ApiError): Outcome => {
   const liftsInSeconds = ceilingLiftsIn(failure);
   return liftsInSeconds === undefined
     ? outcomeOfAuditLogFailure(failure, "action")
-    : refusedWith(auditExportCeiling(liftsInSeconds));
+    : refusedWith(stockWait(liftsInSeconds));
 };
 
 function ExportAction(properties: {
   readonly asked: Asked;
   readonly nothingMatches: boolean;
-  readonly say: (outcome: Outcome) => void;
+  readonly say: (outcome: Outcome | undefined) => void;
 }) {
   const { asked, nothingMatches, say } = properties;
   const exporting = useExportAuditLog();
   const run = () => {
     if (nothingMatches || exporting.isPending) return;
+    // Cleared at the press, so a second refusal in the same sentence is announced again.
+    say(undefined);
     exporting.exportFor(asked).then(
       (exported) => {
         const name = fileName();

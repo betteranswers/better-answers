@@ -1,7 +1,6 @@
 import { useId, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { Address } from "@/shared/address.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { RowSheet } from "@/shared/row-sheet.tsx";
 import { SheetPart } from "@/shared/sheet-part.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
@@ -202,11 +201,9 @@ function HeldCredentials(properties: { readonly person: ListedPerson }) {
   return (
     <SheetPart title="Sessions and assistant access">
       <p>
-        {inspected.error === null ? (
-          "Reading the sessions and assistant access."
-        ) : (
-          <RefusalLine said={readRefused(inspected.error)} />
-        )}
+        {inspected.error === null
+          ? "Reading the sessions and assistant access."
+          : readRefused(inspected.error)}
       </p>
     </SheetPart>
   );

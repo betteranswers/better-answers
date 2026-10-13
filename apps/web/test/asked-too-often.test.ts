@@ -10,13 +10,13 @@ import {
 
 describe("the wait an ask past its ceiling names", () => {
   it.each([
-    [0, "a minute"],
-    [1, "a minute"],
-    [60, "a minute"],
-    [61, "2 minutes"],
-    [600, "10 minutes"],
-  ])("names %i seconds as %s, rounded up", (liftsInSeconds, wait) => {
-    expect(askedTooOften(liftsInSeconds).next).toContain(` ${wait}.`);
+    [0, 1],
+    [1, 1],
+    [60, 1],
+    [61, 2],
+    [600, 10],
+  ])("names %i seconds as %i whole minutes, rounded up", (liftsInSeconds, minutes) => {
+    expect(askedTooOften(liftsInSeconds).next.match(/\d+/g)).toEqual([String(minutes)]);
   });
 });
 

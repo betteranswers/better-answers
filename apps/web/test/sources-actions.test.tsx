@@ -20,7 +20,6 @@ import {
   THE_CHANGE_BEFORE_IS_STILL_GOING,
 } from "@/features/sources/words.ts";
 import { ViewStateSlot } from "@/shared/page-toolbar.tsx";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { addressOf, answered } from "./stubbed-api.ts";
 
@@ -66,9 +65,7 @@ const A_PASSPORT: GroupOfFindings = {
   ruleId: "UK_PASSPORT",
 };
 
-const { why, next } = SAID_OF_A_CONNECTED_SOURCE["not-special-category"];
-
-const NOT_SPECIAL_CATEGORY = `${why} ${next}`;
+const NOT_SPECIAL_CATEGORY = SAID_OF_A_CONNECTED_SOURCE["not-special-category"];
 
 /** The review's half of the slot, standing in for the findings table a click writes through. */
 function TicksIn(properties: { readonly connectedSourceId: string }) {
@@ -350,9 +347,7 @@ const HELD_AS_IT_WAS = { handbook: true, priceBook: false, saidWhy: true };
 /** The review that sent the keep is still drawn, so the refusal reaches it and its group. */
 const theKeepIsRefusedInItsReview = async (held: Awaited<ReturnType<typeof aKeepHeldPending>>) => {
   held.answer.resolve();
-  expect(
-    await held.row.findByText(sentenceOf(SAID_OF_A_CONNECTED_SOURCE["not-the-always-set"])),
-  ).toBeDefined();
+  expect(await held.row.findByText(SAID_OF_A_CONNECTED_SOURCE["not-the-always-set"])).toBeDefined();
   expect(held.row.getByRole("checkbox", TICKING).getAttribute("aria-checked")).toBe("true");
   await waitFor(() => {
     expect(held.review.hasAttribute("aria-disabled")).toBe(false);

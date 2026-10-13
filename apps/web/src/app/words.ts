@@ -1,5 +1,5 @@
 import { ASK, type Page } from "@/shared/navigation.ts";
-import { NO_RESPONSE_TO_A_READ, sentenceOf, type Said } from "@/shared/refusal-words.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
 export const FAILED_PAGE = {
@@ -58,7 +58,7 @@ const EITHER = new Intl.ListFormat("en-GB", { type: "disjunction" });
 export const findWhat = (kinds: readonly string[]): string => `Find ${EITHER.format(kinds)}`;
 
 /** No role is held, so no other page can be offered either. */
-export const ROLE_UNREAD = sentenceOf(NO_RESPONSE_TO_A_READ);
+export const ROLE_UNREAD = STOCK.notLoaded;
 
 /** The index finds the home of a reader whose role is not known yet. */
 export const goHome = (home: Page | undefined): string =>
@@ -87,8 +87,3 @@ export const CONNECT_ASSISTANT = {
   copied: "Address copied.",
   asYou: "Claude will act as you, in this workspace.",
 } as const;
-
-export const ADDRESS_NOT_COPIED: Said = {
-  why: "The address wasn’t copied.",
-  next: "Select it and copy it yourself.",
-};

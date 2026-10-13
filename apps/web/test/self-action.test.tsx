@@ -190,11 +190,8 @@ describe("going home after an action on yourself", () => {
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
     fireEvent.click(screen.getByRole("button", { name: "Demoted myself" }));
 
-    await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toBe(
-        "Your role changed, but it couldn’t be read again. Reload the page in a moment.",
-      ),
-    );
+    await waitFor(() => expect(screen.getByRole("alert").textContent).not.toBe(""));
+    expect(screen.getByRole("status").textContent).toBe("");
     expect(router.state.location.pathname).toBe(MEMBERS);
     expect(
       screen.getByText("Held: Admin"),

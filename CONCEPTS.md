@@ -1644,9 +1644,9 @@ caller can do about it: *unauthenticated* (sign in again), *forbidden* (someone 
 must do it), *absent* (name something that exists), *malformed* (fix the shape of what was sent),
 *inapplicable* (well-formed, but not something this action applies to), *conflict* (the state
 moved: read again and decide again), *precondition* (something else comes first). A word reaches an
-agent, the operator and the web app as itself; a person reads its sentence. Once shipped, a word is
-never removed and never changes class, so a caller that has never met a word can still act on its
-class.
+agent, the operator and the web app as itself; a person reads a sentence, which is the refusal's
+own where it has one and its class's stock sentence otherwise. Once shipped, a word is never
+removed and never changes class, so a caller that has never met a word can still act on its class.
 
 ### issue word
 

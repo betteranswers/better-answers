@@ -10,7 +10,7 @@ import {
 } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
 import { HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
-import { saidOfRefusal, sentenceOf } from "@/shared/refusal-words.ts";
+import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
 import {
@@ -41,7 +41,7 @@ placedWithoutMeasuring();
 /** What the api answers an action from a tab whose workspace the session has left. */
 const SWITCHED = aRefusalAnswer("workspace-switched", "conflict", 409);
 
-const SAID = sentenceOf(saidOfRefusal({}, "workspace-switched", "conflict"));
+const SAID = refusalSentence({}, "workspace-switched", "conflict");
 
 const MEMBERS = HOMES.Admin.path;
 
@@ -215,11 +215,7 @@ describe("a tab whose workspace the session has left", () => {
 
     changeGracesRole();
 
-    expect(
-      await screen.findByText("Another change to these members was made at the same moment.", {
-        exact: false,
-      }),
-    ).toBeDefined();
+    expect(await screen.findByText(STOCK.changed)).toBeDefined();
     expect(router.state.location.pathname).toBe(GRACES_PAGE);
     expect(await switcher()).toBeDefined();
     expect(band().getByRole("alert").textContent).toBe("");

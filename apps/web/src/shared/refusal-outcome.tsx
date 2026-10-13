@@ -7,39 +7,42 @@ import {
 } from "@/shared/api/trpc.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import {
-  NO_RESPONSE,
-  NO_RESPONSE_TO_A_READ,
-  saidOfRefusal,
+  refusalSentence,
   sentenceOf,
+  STOCK,
+  type OwnSentences,
   type Said,
-  type SaidOfWord,
 } from "@/shared/refusal-words.ts";
 
-/** What went wrong, then what the reader can do. The api's word stays in the logs. */
-export function RefusalLine(properties: { readonly said: Said }) {
-  return <>{sentenceOf(properties.said)}</>;
+/** A refusal's one sentence, or the sign-in pages' two parts joined into one. */
+const sentenceShown = (said: Said | string): string =>
+  typeof said === "string" ? said : sentenceOf(said);
+
+/** The api's word stays in the logs. */
+export function RefusalLine(properties: { readonly said: Said | string }) {
+  return <>{sentenceShown(properties.said)}</>;
 }
 
-export const refusedWith = (said: Said): Outcome => ({
+export const refusedWith = (said: Said | string): Outcome => ({
   tone: "refused",
-  words: <RefusalLine said={said} />,
+  words: sentenceShown(said),
 });
 
 const refusalOutcome = (
-  featureWords: SaidOfWord,
+  featureWords: OwnSentences,
   word: RefusalWord,
   refusalClass: RefusalClass,
-): Outcome => refusedWith(saidOfRefusal(featureWords, word, refusalClass));
+): Outcome => refusedWith(refusalSentence(featureWords, word, refusalClass));
 
-/** A read saves nothing, so its failure with no word must not say nothing was saved. */
+/** A read saves nothing, so its failure with no word says only that nothing loaded. */
 const UNANSWERED = {
-  action: NO_RESPONSE,
-  read: NO_RESPONSE_TO_A_READ,
-} satisfies Record<FailedDuring, Said>;
+  action: STOCK.tryAgain,
+  read: STOCK.notLoaded,
+} satisfies Record<FailedDuring, string>;
 
 /** A failure with no refusal word is the network's, never the reader's to fix. */
 const failureOutcome = (
-  featureWords: SaidOfWord,
+  featureWords: OwnSentences,
   failure: Error | ApiError,
   during: FailedDuring,
 ): Outcome => {
@@ -49,24 +52,24 @@ const failureOutcome = (
     : refusalOutcome(featureWords, refusal.word, refusal.class);
 };
 
-/** A feature's words, named once: its word first, then the class's, then no response. */
-export const refusalsOf = (featureWords: SaidOfWord) => ({
+/** A feature's sentences, named once: its own for the word, then the class's, then no response. */
+export const refusalsOf = (featureWords: OwnSentences) => ({
   outcomeOfFailure: (failure: Error | ApiError, during: FailedDuring): Outcome =>
     failureOutcome(featureWords, failure, during),
   refusedFor: (word: RefusalWord, refusalClass: RefusalClass): Outcome =>
     refusalOutcome(featureWords, word, refusalClass),
 });
 
-type ItemSaid = { readonly id: string; readonly said: Said };
+type ItemSaid = { readonly id: string; readonly said: string };
 
-/** An item's word crosses with no class, so a word the feature lacks is said as the whole set's. */
+/** An item's word crosses with no class, so a word the feature lacks takes the whole set's sentence. */
 export const saidOfItems = (
-  featureWords: SaidOfWord,
+  featureWords: OwnSentences,
   failure: Error | ApiError,
 ): readonly ItemSaid[] => {
   const refusal = refusalOf(failure);
   if (refusal?.items === undefined) return [];
-  const ofTheSet = saidOfRefusal(featureWords, refusal.word, refusal.class);
+  const ofTheSet = refusalSentence(featureWords, refusal.word, refusal.class);
   return Object.entries(refusal.items).map(([id, word]) => ({
     id,
     said: featureWords[word] ?? ofTheSet,
@@ -74,7 +77,7 @@ export const saidOfItems = (
 };
 
 export function RefusedItemLines(properties: {
-  readonly featureWords: SaidOfWord;
+  readonly featureWords: OwnSentences;
   readonly failure: Error | ApiError;
   readonly nameOf: (id: string) => string;
 }) {
@@ -84,7 +87,7 @@ export function RefusedItemLines(properties: {
     <ul>
       {lines.map(({ id, said }) => (
         <li key={id}>
-          {properties.nameOf(id)}: <RefusalLine said={said} />
+          {properties.nameOf(id)}: {said}
         </li>
       ))}
     </ul>
@@ -93,7 +96,7 @@ export function RefusedItemLines(properties: {
 
 /** A set refused whole; each item is named as the page named it at the press, shown or not. */
 export const setRefusalOutcome = (refused: {
-  readonly featureWords: SaidOfWord;
+  readonly featureWords: OwnSentences;
   readonly failure: Error | ApiError;
   readonly nameOf: (id: string) => string;
   readonly lead: (count: number) => string;

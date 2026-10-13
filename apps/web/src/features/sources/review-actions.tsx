@@ -9,7 +9,8 @@ import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { counted } from "@/shared/words.ts";
 
-import { outcomeOfFailure, whyAndNextOf } from "./refusal.tsx";
+import { SAID_OF_A_CONNECTED_SOURCE } from "./refusal-words.ts";
+import { outcomeOfFailure } from "./refusal.tsx";
 import {
   groupKeyText,
   keyOf,
@@ -348,7 +349,7 @@ function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
       enabledBy={properties.enabledBy}
       keystroke={SOURCES_KEYSTROKES.dismiss}
       label={action.ready === undefined ? words.label : words.named(ticked)}
-      refusedWhy={whyAndNextOf("not-special-category")}
+      refusedWhy={SAID_OF_A_CONNECTED_SOURCE["not-special-category"]}
       dialog={
         <ReasonedDialog
           action={action}

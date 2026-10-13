@@ -66,7 +66,7 @@ const MOST_TICKED = 200;
 const TOO_MANY: Outcome = { tone: "said", words: BULK_WORDS.tooMany(MOST_TICKED) };
 
 const refusedRowsOf = (failure: Error | ApiError): RefusedRows =>
-  new Map(saidOfItems(SAID_OF_TICKED_MEMBERS, failure).map(({ id, said }) => [id, said]));
+  new Set(saidOfItems(SAID_OF_TICKED_MEMBERS, failure).map(({ id }) => id));
 
 /** Names are taken at the press, so a person the list has since lost is still named. */
 const refusalOf = (failure: Error | ApiError, names: ReadonlyMap<string, string>): Outcome =>

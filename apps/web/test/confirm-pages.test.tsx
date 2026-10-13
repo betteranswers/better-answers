@@ -113,7 +113,7 @@ describe("the confirm page", () => {
 
     const field = await screen.findByRole("textbox", { name: "Authenticator code" });
     expect(alertsSaying()).toEqual([
-      "Too many codes have been tried. Try again in a minute, or use a recovery code.",
+      "Too many codes have been tried. Try again in 1 minute, or use a recovery code.",
     ]);
     expect(field.hasAttribute("readonly")).toBe(true);
 

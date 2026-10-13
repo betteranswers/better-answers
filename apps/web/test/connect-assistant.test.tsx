@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ADDRESS_NOT_COPIED, CONNECT_ASSISTANT, unbuiltLineOf } from "@/app/words.ts";
+import { CONNECT_ASSISTANT, unbuiltLineOf } from "@/app/words.ts";
 import { HOMES } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 
 import { clipboardAnswering } from "./clipboard-stand-in.ts";
 import { openApp } from "./open-app.tsx";
@@ -47,6 +47,7 @@ describe("Ask while it is unbuilt", () => {
     await vi.waitFor(() => {
       expect(steps(main).getByRole("status").textContent).toBe(CONNECT_ASSISTANT.copied);
     });
+    expect(steps(main).getByRole("alert").textContent).toBe("");
     expect(written).toEqual([`${window.location.origin}/mcp`]);
   });
 
@@ -57,7 +58,7 @@ describe("Ask while it is unbuilt", () => {
     fireEvent.click(main.getByRole("button", { name: CONNECT_ASSISTANT.copy }));
 
     await vi.waitFor(() => {
-      expect(steps(main).getByRole("alert").textContent).toBe(sentenceOf(ADDRESS_NOT_COPIED));
+      expect(steps(main).getByRole("alert").textContent).toBe(STOCK.copy);
     });
     expect(steps(main).getByRole("status").textContent).toBe("");
   });

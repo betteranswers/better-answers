@@ -1,6 +1,5 @@
 import type { Role } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
-import type { Said } from "@/shared/refusal-words.ts";
 import { counted, dayWords } from "@/shared/words.ts";
 
 import { EMPTY_LINES } from "./empty-lines.ts";
@@ -170,13 +169,7 @@ export const INVITE_WORDS = {
 } as const;
 
 export const INVITE_REFUSED = {
-  flagged: {
-    why: "Nothing was sent: an address below is flagged.",
-    next: "Fix or remove it, then send again.",
-  },
-  none: { why: "There is no address to send to.", next: "Type or paste one first." },
-  capped: (most: number): Said => ({
-    why: `One send holds at most ${String(most)} addresses.`,
-    next: "The rest wait in the field: send these first.",
-  }),
+  flagged: "Please fix or remove the flagged addresses.",
+  none: "Please enter at least one email address.",
+  capped: (most: number): string => `You can send up to ${String(most)} addresses at a time.`,
 } as const;

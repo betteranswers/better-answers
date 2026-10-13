@@ -118,8 +118,8 @@ function SignInAgain(properties: { readonly signInAt: string }) {
 /** An ended session is said by its `why` alone: the button after it is the remedy. */
 function FailureLine(properties: {
   readonly refusal: Refusal | undefined;
-  readonly saidOf: (refusal: Refusal) => Said;
-  readonly unanswered: Said;
+  readonly saidOf: (refusal: Refusal) => Said | string;
+  readonly unanswered: Said | string;
 }) {
   const { refusal } = properties;
   if (refusal === undefined) return <RefusalLine said={properties.unanswered} />;
@@ -134,8 +134,8 @@ function FailureLine(properties: {
 export function Refused(properties: {
   readonly id: string;
   readonly failure: Error | ApiError | null;
-  readonly saidOf: (refusal: Refusal) => Said;
-  readonly unanswered?: Said;
+  readonly saidOf: (refusal: Refusal) => Said | string;
+  readonly unanswered?: Said | string;
   readonly signInAt?: string;
 }) {
   const { failure } = properties;

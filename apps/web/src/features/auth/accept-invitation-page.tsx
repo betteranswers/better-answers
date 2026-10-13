@@ -12,7 +12,7 @@ import {
 } from "@/shared/api/trpc.ts";
 import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { saidOfRefusal, type Said } from "@/shared/refusal-words.ts";
+import { refusalSentence, saidOfRefusal, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -74,8 +74,8 @@ const WAYS = new Map<string, WayOn>(Object.entries(WAY_OF_WORD));
 const saidOf = (refusal: Refusal): Said =>
   saidOfRefusal(SAID_OF_ACCEPTING, refusal.word, refusal.class);
 
-const nameSaidOf = (refusal: Refusal): Said =>
-  saidOfRefusal(DISPLAY_NAME_REFUSED, refusal.word, refusal.class);
+const nameSaidOf = (refusal: Refusal): string =>
+  refusalSentence(DISPLAY_NAME_REFUSED, refusal.word, refusal.class);
 
 const wayOf = (failure: Error | ApiError | null): WayOn | undefined => {
   const word = failure === null ? undefined : refusalOf(failure)?.word;

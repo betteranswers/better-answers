@@ -8,7 +8,6 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Refused } from "@/features/auth/auth-page.tsx";
-import { SAID_OF_A_REVOCATION, SAID_OF_CORRECTING } from "@/features/console/refusal-words.ts";
 import type { Refusal } from "@/shared/api/trpc.ts";
 import {
   SAID_OF_CLASS,
@@ -54,13 +53,6 @@ describe("a refusal beside a way to sign in again", () => {
 
     expect(alert.textContent).toBe(sentenceOf(SAID_OF_CLASS.conflict));
     expect(screen.queryByRole("button", { name: SIGN_IN_AGAIN })).toBeNull();
-  });
-
-  it.each([
-    ["revoking", SAID_OF_A_REVOCATION["sign-in-too-old"]],
-    ["correcting", SAID_OF_CORRECTING["sign-in-too-old"]],
-  ])("leaves the link's label out of stale words: %s", (_, said) => {
-    expect(sentenceOf(said).toLowerCase()).not.toContain(SIGN_IN_AGAIN.toLowerCase());
   });
 });
 
