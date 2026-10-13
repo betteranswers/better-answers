@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { ListedConnectedSource } from "@/features/sources/sources-api.ts";
 import {
   AUDIENCE_WORDS,
+  CONNECT_WORDS,
   destinationOf,
   instantWords,
   lastSyncedWords,
@@ -205,5 +206,11 @@ describe("the terms a narrowing or widening changes", () => {
 
   it("lists nothing where neither term moves", () => {
     expect(termsThatChange(present, present)).toEqual([]);
+  });
+});
+
+describe("the connect dialog's audience hint", () => {
+  it("sends the reader to no page", () => {
+    expect(CONNECT_WORDS.audienceHint).not.toMatch(/People/v);
   });
 });

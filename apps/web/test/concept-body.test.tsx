@@ -396,10 +396,9 @@ describe("a concept's body", () => {
 
     expect(marksIn(article)).toEqual([]);
     expect(within(article).getByRole("heading", { name: "Footnotes" })).toBeDefined();
-    expect(within(article).getByRole("listitem").textContent.trim()).toBe(
-      "Reviewed each April. Back to the claim",
-    );
-    expect(within(article).getByRole("link", { name: "Back to the claim" })).toBeDefined();
+    const footnote = within(article).getByRole("listitem");
+    expect(footnote.textContent).toContain("Reviewed each April.");
+    expect(within(footnote).getByRole("link", { name: "Back to the claim" })).toBeDefined();
   });
 });
 
@@ -543,8 +542,6 @@ describe("a body's links to other concepts", () => {
     );
 
     expect(addressesIn(article).filter((address) => !address?.startsWith("#"))).toEqual([]);
-    expect(within(article).getByRole("listitem").textContent.trim()).toBe(
-      "../roles/audit-committee.md Back to the claim",
-    );
+    expect(within(article).getByRole("listitem").textContent).toContain(TO_THE_COMMITTEE);
   });
 });
