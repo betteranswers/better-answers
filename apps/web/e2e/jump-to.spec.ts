@@ -143,7 +143,7 @@ test("hides People from a Viewer, reading no members", async ({ page, request })
   await expect(optionOf(page, ASK.name)).toBeVisible();
   await typed(page, "people");
 
-  await expect(saidIn(page)).toHaveText(/\S/);
+  await expect(saidIn(page)).toContainText("people");
   // Search's row is no match, so it stands beside the line that says nothing matches.
   await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor("people")]);
   await expect(groupOf(page, JUMP_TO.groups.members)).toHaveCount(0);
@@ -382,7 +382,7 @@ test("offers the operator in the console no search row", async ({ page, request 
   await expect(optionOf(page, EVERY_WORKSPACE.name)).toBeVisible();
   await typed(page, "audit logs");
 
-  await expect(saidIn(page)).toHaveText(/\S/);
+  await expect(saidIn(page)).toContainText("audit logs");
   await expect(dialogOf(page).getByRole("option")).toHaveCount(0);
 });
 
@@ -393,7 +393,7 @@ test("finds nothing by an unbuilt page's name", async ({ page, request }) => {
   await expect(groupOf(page, JUMP_TO.groups.members)).toBeVisible();
   await typed(page, SIGNALS.name);
 
-  await expect(saidIn(page)).toHaveText(/\S/);
+  await expect(saidIn(page)).toContainText(SIGNALS.name);
   await expect(dialogOf(page).getByRole("option")).toHaveText([searchFor(SIGNALS.name)]);
 });
 

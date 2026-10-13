@@ -7,7 +7,13 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navi
 import { saysOfItsRead } from "../e2e/locators.ts";
 import { theConsoleIsRefused, theSwitcherListsOneWorkspace, type Gate } from "./every-role.ts";
 import { expect, test, theTestPeople } from "./fixtures.ts";
-import { groupNamesOf, sessionMemberOf } from "./reads.ts";
+import {
+  answeredOk,
+  bulkAnswerTo,
+  connectedSourcesRead,
+  groupNamesOf,
+  sessionMemberOf,
+} from "./reads.ts";
 import { theFixtureHolds, type RepairMembers } from "./test-workspace.ts";
 
 const people = menuGroupIn(CONTROL_CENTRE, "people");
@@ -66,15 +72,29 @@ const chosen = async (dialog: Locator, field: string, option: string): Promise<v
 };
 
 /**
- * A bulk action is refused while another is going, and its outcome speaks before it lands, so each
- * waits for the rows it changed.
+ * The rows change before the api answers, and a bulk action is refused while another is going, so
+ * each waits for its answer.
  */
+const committed = async (
+  page: Page,
+  procedure: string,
+  commit: Locator,
+  ticked: number,
+): Promise<void> => {
+  const [answer] = await Promise.all([bulkAnswerTo(page, procedure), commit.click()]);
+  expect(answer, `${procedure} did not change everyone ticked`).toEqual({
+    changed: ticked,
+    skipped: 0,
+  });
+  await expect(outcomeOf(membersRegion(page))).toHaveText(/\S/);
+};
+
 const rolesChanged = async (page: Page, names: readonly string[], role: Role): Promise<void> => {
   const { changeRole } = BULK_WORDS;
   const dialog = await opened(page, names, changeRole);
   await chosen(dialog, "Role", role);
-  await dialog.getByRole("button", { name: changeRole.commit(names.length, role) }).click();
-  await expect(outcomeOf(membersRegion(page))).toHaveText(/\S/);
+  const commit = dialog.getByRole("button", { name: changeRole.commit(names.length, role) });
+  await committed(page, "members.bulkChangeRole", commit, names.length);
   for (const name of names) {
     await expect(rowOf(page, name).getByRole("cell").nth(ROLE_CELL)).toHaveText(role);
   }
@@ -84,8 +104,8 @@ const addedToGroup = async (page: Page, names: readonly string[], group: string)
   const { addToGroup } = BULK_WORDS;
   const dialog = await opened(page, names, addToGroup);
   await chosen(dialog, "Group", group);
-  await dialog.getByRole("button", { name: addToGroup.commit(names.length, group) }).click();
-  await expect(outcomeOf(membersRegion(page))).toHaveText(/\S/);
+  const commit = dialog.getByRole("button", { name: addToGroup.commit(names.length, group) });
+  await committed(page, "members.bulkAddToGroup", commit, names.length);
   for (const name of names) {
     await expect(rowOf(page, name).getByRole("cell").nth(GROUPS_CELL)).toContainText(group);
   }
@@ -105,10 +125,11 @@ const groupDeleted = async (page: Page, name: string): Promise<void> => {
   await groupButton(page, name).click();
   const sheet = page.getByRole("dialog", { name });
   await sheet.getByRole("button", { name: `Delete ${name}` }).click();
-  await page
+  const confirm = page
     .getByRole("alertdialog", { name: `Delete ${name}` })
-    .getByRole("button", { name: `Delete ${name}` })
-    .click();
+    .getByRole("button", { name: `Delete ${name}` });
+  // The list drops the group before the api answers, and the run reads the api next.
+  await Promise.all([answeredOk(page, "members.deleteGroup"), confirm.click()]);
   await expect(sheet).toHaveCount(0);
   await expect(groupsRegion(page).getByRole("heading", { name: "Groups" })).toBeFocused();
   await expect(groupButton(page, name)).toHaveCount(0);
@@ -196,7 +217,9 @@ const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
     await gate();
   });
   await test.step("Connected sources", async () => {
-    await page.goto(CONNECTED_SOURCES);
+    // A failed read says so in the same region, so the page's own read is the one judged.
+    const [read] = await Promise.all([connectedSourcesRead(page), page.goto(CONNECTED_SOURCES)]);
+    expect(read, "the page read a connected source the fixture does not hold").toBe(0);
     const connectedSources = page.getByRole("region", { name: "Connected sources" });
     await saysOfItsRead(connectedSources);
     await expect(connectedSources.getByRole("listitem")).toHaveCount(0);

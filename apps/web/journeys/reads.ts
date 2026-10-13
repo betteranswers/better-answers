@@ -28,6 +28,24 @@ const readThroughTheSession = async <T>(
   data: z.ZodType<T>,
 ): Promise<T> => readFrom(await asked(page, procedure), procedure, data);
 
+/** A batch's address names its procedures in the order of its answers; a call sent alone names one. */
+const askedAt = (url: string): readonly string[] =>
+  new URL(url).pathname.replace(`${TRPC}/`, "").split(",");
+
+/** Asked for before the journey's own action that calls, or the answer can land unwaited for. */
+const answerTo = async <T>(page: Page, procedure: string, data: z.ZodType<T>): Promise<T> => {
+  const answered = await page.waitForResponse((answer) =>
+    askedAt(answer.url()).includes(procedure),
+  );
+  refusedTheRun(answered, `the page's call of ${procedure}`);
+  expect(answered.ok(), `${procedure} answered ${answered.status()}`).toBe(true);
+  const answers: unknown = await answered.json();
+  const answer = Array.isArray(answers)
+    ? answers[askedAt(answered.url()).indexOf(procedure)]
+    : answers;
+  return z.object({ result: z.object({ data }) }).parse(answer).result.data;
+};
+
 /** The api's refusal of an action: its word, alone, as the message. An edge or a failure says none. */
 const REFUSED = z.object({
   error: z.object({ message: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) }),
@@ -123,6 +141,26 @@ export const standingOf = async (page: Page): Promise<Checked<StandingRead>> => 
       connectedSources: connectedSources.value.length,
     },
   };
+};
+
+/** The api's answer to an action of the journey's own, with nothing read from it. */
+export const answeredOk = async (page: Page, procedure: string): Promise<void> => {
+  await answerTo(page, procedure, z.unknown());
+};
+
+/** How many the page's own read of the connected sources lists. */
+export const connectedSourcesRead = async (page: Page): Promise<number> =>
+  (await answerTo(page, "sources.list", CONNECTED_SOURCES)).length;
+
+const BULK_CHANGED = z.object({ changed: z.array(z.unknown()), skipped: z.number() });
+
+/** How many a bulk action the journey committed changed, and how many it passed over. */
+export const bulkAnswerTo = async (
+  page: Page,
+  procedure: string,
+): Promise<{ readonly changed: number; readonly skipped: number }> => {
+  const { changed, skipped } = await answerTo(page, procedure, BULK_CHANGED);
+  return { changed: changed.length, skipped };
 };
 
 const GROUPS = z.array(z.object({ name: z.string() }));

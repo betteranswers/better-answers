@@ -32,6 +32,12 @@ test.describe("an action's outcome region", () => {
     await expect(inTheBand, "the band's outcome region is out of the tree").toHaveCount(1);
     await standsWithoutRoom(inTheBand);
 
+    // The list's count is a status too, empty until its read lands and says no group.
+    await expect(
+      groupsRegion(page).getByRole("status").filter({ hasText: /\b0\b/ }),
+      "the groups are still unread",
+    ).toHaveCount(1);
+
     // The section's read outcome stands beside the list's action outcome, so the page holds two.
     const onThePage = emptyStatusIn(groupsRegion(page));
     await expect(onThePage, "the page's outcome regions are out of the tree").toHaveCount(2);
@@ -49,7 +55,7 @@ test.describe("an action's outcome region", () => {
       .poll(() => Promise.all(standing.map((status) => status.textContent())), {
         message: "the outcome came in a region that was not there while it was empty",
       })
-      .toContainEqual(expect.stringMatching(/\S/));
+      .toContainEqual(expect.stringContaining("Site leads"));
     await expect(
       groupsRegion(page).getByRole("button", { name: "Site leads", exact: true }),
     ).toBeVisible();

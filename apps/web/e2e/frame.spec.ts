@@ -1249,13 +1249,20 @@ test("leads each built page with its group's line, auditing each", async ({
 }) => {
   await signedIn(page, request, "Swaledale Foundry");
 
+  const lineOf = new Map<string, string>();
   for (const [group, listed] of AN_ADMINS_PAGES) {
     await page.goto(listed.path);
     await expect(page.getByRole("heading", { level: 1, name: group.name })).toBeVisible();
-    await expect(
-      page.getByRole("main").locator("h1 + p"),
-      `${listed.name}'s heading leads no line`,
-    ).toHaveText(/\S/);
+    const lead = page.getByRole("main").locator("h1 + p");
+    await expect(lead, `${listed.name}'s heading leads no line`).toHaveText(/\S/);
+    const line = await lead.innerText();
+    expect(lineOf.get(group.name) ?? line, `${listed.name} leads with a line of its own`).toBe(
+      line,
+    );
+    lineOf.set(group.name, line);
     await passesTheAccessibilityGate();
   }
+  expect(new Set(lineOf.values()).size, "two groups lead their pages with one line").toBe(
+    lineOf.size,
+  );
 });

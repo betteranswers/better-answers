@@ -539,7 +539,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
           - term: Last sign-in
           - definition: /\\d{2}:\\d{2} · \\d{1,2} [A-Z][a-z]+ \\d{4}/
           - term: Every sign-in and token ended
-          - definition
+          - definition: /^\\D+$/
         - region "Sessions":
           - heading "Sessions" [level=3]
           - paragraph: /\\b1\\b/
