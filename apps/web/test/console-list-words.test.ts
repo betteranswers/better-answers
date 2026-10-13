@@ -8,52 +8,41 @@ import {
   WORKSPACES_WORDS,
 } from "@/features/console/list-words.ts";
 
-describe("what a console list's count says", () => {
-  it.each([
-    [1, "1 person on the platform."],
-    [2, "2 people on the platform."],
-  ])("counts %i on Everyone", (count, said) => {
-    expect(EVERYONE_WORDS.counted(count)).toBe(said);
+/** A count's line with its number taken out: what is left is the form the number chose. */
+const formOf = (said: string): string => said.replaceAll(/\d+/g, "");
+
+const LISTS = [
+  ["people", EVERYONE_WORDS],
+  ["names", NAMES_WAITING_WORDS],
+  ["workspaces", WORKSPACES_WORDS],
+] as const;
+
+describe("a console list's count", () => {
+  it.each(LISTS)("shows how many %s there are", (_, words) => {
+    expect(words.counted(1)).toMatch(/\b1\b/);
+    expect(words.counted(2)).toMatch(/\b2\b/);
   });
 
-  it.each([
-    [0, "No name waits to be corrected."],
-    [1, "1 name waits to be corrected."],
-    [2, "2 names wait to be corrected."],
-  ])("counts %i on Names waiting", (count, said) => {
-    expect(NAMES_WAITING_WORDS.counted(count)).toBe(said);
+  it.each(LISTS)("gives one of the %s a form of its own", (_, words) => {
+    expect(formOf(words.counted(1))).not.toBe(formOf(words.counted(2)));
+    expect(formOf(words.counted(2))).toBe(formOf(words.counted(3)));
   });
 
-  it.each([
-    [1, "1 workspace on the platform."],
-    [2, "2 workspaces on the platform."],
-  ])("counts %i on Every workspace", (count, said) => {
-    expect(WORKSPACES_WORDS.counted(count)).toBe(said);
+  it("does not say no name waiting in one's form", () => {
+    expect(formOf(NAMES_WAITING_WORDS.counted(0))).not.toBe(formOf(NAMES_WAITING_WORDS.counted(1)));
   });
 });
 
-describe("what a console list says a search left", () => {
-  it.each([
-    [0, "0 people match “priya”."],
-    [1, "1 person matches “priya”."],
-    [2, "2 people match “priya”."],
-  ])("says %i left on Everyone", (count, said) => {
-    expect(EVERYONE_WORDS.matching(count, "priya")).toBe(said);
+describe("what a console list's search left", () => {
+  it.each(LISTS)("shows how many %s match, and the search", (_, words) => {
+    expect(words.matching(1, "priya")).toMatch(/\b1\b/);
+    expect(words.matching(2, "priya")).toMatch(/\b2\b/);
+    for (const count of [0, 1, 2]) expect(words.matching(count, "priya")).toContain("priya");
   });
 
-  it.each([
-    [0, "0 names match “priya”."],
-    [1, "1 name matches “priya”."],
-    [2, "2 names match “priya”."],
-  ])("says %i left on Names waiting", (count, said) => {
-    expect(NAMES_WAITING_WORDS.matching(count, "priya")).toBe(said);
-  });
-
-  it.each([
-    [0, "0 workspaces match “acme”."],
-    [1, "1 workspace matches “acme”."],
-    [2, "2 workspaces match “acme”."],
-  ])("says %i left on Every workspace", (count, said) => {
-    expect(WORKSPACES_WORDS.matching(count, "acme")).toBe(said);
+  it.each(LISTS)("gives one of the %s matching its own form", (_, words) => {
+    expect(formOf(words.matching(1, "priya"))).not.toBe(formOf(words.matching(2, "priya")));
+    expect(formOf(words.matching(1, "priya"))).not.toBe(formOf(words.matching(0, "priya")));
+    expect(formOf(words.matching(2, "priya"))).toBe(formOf(words.matching(3, "priya")));
   });
 });

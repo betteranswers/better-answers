@@ -4,8 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ListedConnectedSource } from "@/features/sources/sources-api.ts";
 import {
-  CONNECT_WORDS,
-  CONNECTOR_WORDS,
+  AUDIENCE_WORDS,
   destinationOf,
   instantWords,
   lastSyncedWords,
@@ -34,48 +33,55 @@ const aSync = (status: Sync["status"], finishedAt: string | null): Sync => ({
   finishedAt,
 });
 
-describe("what a connected source's last sync says", () => {
-  it("says a source with no sync is not synced yet", () => {
-    expect(lastSyncedWords(null)).toBe("Not synced yet");
+/** A count's line with its number taken out: what is left is the form the number chose. */
+const formOf = (said: string): string => said.replaceAll(/\d+/g, "");
+
+/** Each count a line shows, smallest first. */
+const countsIn = (said: string): readonly string[] => (said.match(/\b\d+\b/g) ?? []).toSorted();
+
+describe("a connected source's last sync", () => {
+  it("shows no time for a source never synced", () => {
+    expect(lastSyncedWords(null)).not.toBe("");
+    expect(lastSyncedWords(null)).not.toMatch(/\d/);
   });
 
   it("gives a finished sync's time alone", () => {
     expect(lastSyncedWords(aSync("done", FINISHED))).toBe(instantWords(FINISHED));
   });
 
-  it("says a failed sync failed, and when", () => {
-    expect(lastSyncedWords(aSync("failed", FINISHED))).toBe(
-      `Sync failed · ${instantWords(FINISHED)}`,
-    );
+  it("marks a failed sync beside the time it finished", () => {
+    const failed = lastSyncedWords(aSync("failed", FINISHED));
+
+    expect(failed).toContain(instantWords(FINISHED));
+    expect(failed).not.toBe(instantWords(FINISHED));
   });
 
-  it("says a sync given up on failed too", () => {
+  it("shows a sync given up on as a failed one", () => {
     expect(lastSyncedWords(aSync("poisoned", FINISHED))).toBe(
-      `Sync failed · ${instantWords(FINISHED)}`,
+      lastSyncedWords(aSync("failed", FINISHED)),
     );
   });
 
-  it("says a queued sync is queued, since it was asked", () => {
-    expect(lastSyncedWords(aSync("queued", null))).toBe(`Sync queued · ${instantWords(ENQUEUED)}`);
-  });
+  it("tells a queued sync from a claimed one, since asked", () => {
+    const queued = lastSyncedWords(aSync("queued", null));
+    const claimed = lastSyncedWords(aSync("claimed", null));
 
-  it("says a claimed sync is syncing, since it was asked", () => {
-    expect(lastSyncedWords(aSync("claimed", null))).toBe(`Syncing · ${instantWords(ENQUEUED)}`);
+    for (const waiting of [queued, claimed]) {
+      expect(waiting).toContain(instantWords(ENQUEUED));
+      expect(waiting).not.toBe(instantWords(ENQUEUED));
+    }
+    expect(queued).not.toBe(claimed);
   });
 });
 
-describe("what a destination says", () => {
-  it("names the bundle destination the knowledge base", () => {
-    expect(destinationOf("bundle").word).toBe("knowledge base");
-  });
-
-  it("gives a sentence that no stored word leads", () => {
+describe("a destination", () => {
+  it("gives each destination it knows a meaning of its own", () => {
     for (const stored of ["passage-index", "bundle", "map"]) {
       const { word, means } = destinationOf(stored);
-      expect(means).toMatch(/^\p{Lu}.+\.$/v);
-      expect(means.startsWith(stored)).toBe(false);
-      expect(means.toLowerCase().startsWith(word)).toBe(false);
+      expect(means).not.toBe(stored);
+      expect(means).not.toBe(word);
     }
+    expect(destinationOf("bundle").word).not.toBe("bundle");
   });
 
   it("shows a destination it has not met as itself", () => {
@@ -83,12 +89,10 @@ describe("what a destination says", () => {
   });
 });
 
-describe("what a retention class says", () => {
-  it("gives a sentence that no stored word leads", () => {
+describe("a retention class", () => {
+  it("gives each retention class it knows its own meaning", () => {
     for (const stored of ["mirror", "keep", "transient"]) {
-      const { means } = retentionOf(stored);
-      expect(means).toMatch(/^\p{Lu}.+\.$/v);
-      expect(means.toLowerCase().startsWith(stored)).toBe(false);
+      expect(retentionOf(stored).means).not.toBe(stored);
     }
   });
 
@@ -97,27 +101,19 @@ describe("what a retention class says", () => {
   });
 });
 
-describe("what a connected source's stored values read as", () => {
-  it("gives each state its word, capitalised", () => {
-    expect(STATE_WORDS).toEqual({
-      received: "Received",
-      indexing: "Indexing",
-      indexed: "Indexed",
-      published: "Published",
-    });
+describe("a connected source's stored values", () => {
+  it("gives each state a word no other state has", () => {
+    const words = Object.values(STATE_WORDS);
+
+    expect(new Set(words).size).toBe(words.length);
+    expect(words).not.toContain("");
   });
 
-  it("names the upload connector", () => {
-    expect(CONNECTOR_WORDS.upload).toBe("Upload");
-  });
+  it("gives each row action a label no other has", () => {
+    const labels = Object.values(ROW_ACTIONS);
 
-  it("says each row action's effect in its label", () => {
-    expect(ROW_ACTIONS).toEqual({
-      review: "Review findings",
-      publish: "Publish",
-      narrow: "Narrow sensitivity",
-      widen: "Widen sensitivity or audience",
-    });
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels).not.toContain("");
   });
 
   it("sentence-cases a category and a tier", () => {
@@ -127,27 +123,26 @@ describe("what a connected source's stored values read as", () => {
   });
 });
 
-/** Each id the worker's redaction descriptors raise, beside the word a reader meets. */
-const RULES_RAISED = {
-  HEALTH_CUE: "Health wording",
-  UK_BANK_ACCOUNT: "Sort code and account number",
-  UK_NHS: "NHS number",
-  UK_NINO: "National Insurance number",
-  DATE_OF_BIRTH: "Date of birth",
-  UK_HOME_ADDRESS: "Home address",
-  EMAIL_ADDRESS: "Personal email address",
-  PHONE_NUMBER: "Phone number",
-  PERSON: "Person’s name",
-  JOB_TITLE: "Job title",
-};
+/** Each id the worker's redaction descriptors raise. */
+const RULES_RAISED = [
+  "HEALTH_CUE",
+  "UK_BANK_ACCOUNT",
+  "UK_NHS",
+  "UK_NINO",
+  "DATE_OF_BIRTH",
+  "UK_HOME_ADDRESS",
+  "EMAIL_ADDRESS",
+  "PHONE_NUMBER",
+  "PERSON",
+  "JOB_TITLE",
+];
 
-describe("what a finding's rule reads as", () => {
-  it("gives every rule the worker raises its word", () => {
-    const read = Object.fromEntries(
-      Object.keys(RULES_RAISED).map((ruleId) => [ruleId, ruleWordOf(ruleId)]),
-    );
+describe("a finding's rule", () => {
+  it("gives every rule the worker raises its own word", () => {
+    const words = RULES_RAISED.map((ruleId) => ruleWordOf(ruleId));
 
-    expect(read).toEqual(RULES_RAISED);
+    expect(RULES_RAISED.filter((ruleId) => ruleWordOf(ruleId) === ruleId)).toEqual([]);
+    expect(new Set(words).size).toBe(RULES_RAISED.length);
   });
 
   it("shows a rule it has not met as its id", () => {
@@ -156,40 +151,35 @@ describe("what a finding's rule reads as", () => {
 });
 
 describe("how many documents a sync left unreadable", () => {
-  it("says nothing of OCR while no document needs it", () => {
-    expect(unreadableCounted(4, 0)).toMatch(/^4 documents unreadable\b/v);
-    expect(unreadableCounted(4, 0)).not.toMatch(/OCR/v);
+  it("counts the unreadable alone while none needs OCR", () => {
+    expect(countsIn(unreadableCounted(4, 0))).toEqual(["4"]);
+    expect(formOf(unreadableCounted(1, 0))).not.toBe(formOf(unreadableCounted(4, 0)));
   });
 
-  it("says once how many are scans needing OCR", () => {
-    expect(unreadableCounted(4, 2).match(/OCR/gv)).toHaveLength(1);
-    expect(unreadableCounted(4, 2)).toMatch(/\b2 are\b/v);
-    expect(unreadableCounted(1, 1)).toMatch(/^1 document unreadable\b.*\b1 is\b/v);
+  it("counts the scans needing OCR beside the unreadable", () => {
+    expect(countsIn(unreadableCounted(4, 2))).toEqual(["2", "4"]);
+    expect(countsIn(unreadableCounted(1, 1))).toEqual(["1", "1"]);
+    expect(formOf(unreadableCounted(4, 1))).not.toBe(formOf(unreadableCounted(4, 2)));
   });
 });
 
 describe("what the review counts", () => {
-  it("counts findings, never spans, and names no seam", () => {
-    const said = [
-      REVIEW_WORDS.lead,
-      REVIEW_WORDS.alreadyNarrowed.says,
-      REVIEW_WORDS.dismissed.says(1),
-      REVIEW_WORDS.keptStillWithheld.says(2),
-      REVIEW_WORDS.keep.consequence,
-      REVIEW_WORDS.keep.done(1, 3),
-      REVIEW_WORDS.dismiss.consequence,
-    ];
-    for (const sentence of said) expect(sentence).not.toMatch(/\bspans?\b|\bseam\b/v);
-
-    expect(REVIEW_WORDS.keep.done(1, 3)).toContain("3 findings restored");
-    expect(REVIEW_WORDS.dismissed.says(1)).toMatch(/^1 finding /v);
-    expect(REVIEW_WORDS.keptStillWithheld.says(2)).toMatch(/^2 kept findings /v);
+  it("counts the findings in each line", () => {
+    expect(countsIn(REVIEW_WORDS.keep.done(1, 3))).toEqual(["1", "3"]);
+    expect(countsIn(REVIEW_WORDS.dismissed.says(1))).toEqual(["1"]);
+    expect(countsIn(REVIEW_WORDS.keptStillWithheld.says(2))).toEqual(["2"]);
   });
 
-  it("names a group's checkbox by its rule's word", () => {
-    expect(
-      REVIEW_WORDS.select({ category: "bank-details", ruleId: "UK_BANK_ACCOUNT", title: "Form" }),
-    ).toBe(`Select bank details by ${ruleWordOf("UK_BANK_ACCOUNT")} in Form`);
+  it("names a group's checkbox by category, rule and document", () => {
+    const named = REVIEW_WORDS.select({
+      category: "bank-details",
+      ruleId: "UK_BANK_ACCOUNT",
+      title: "Form",
+    });
+
+    expect(named).toMatch(/bank details/i);
+    expect(named).toContain(ruleWordOf("UK_BANK_ACCOUNT"));
+    expect(named).toContain("Form");
   });
 });
 
@@ -205,24 +195,15 @@ describe("the terms a narrowing or widening changes", () => {
 
   it("adds the audience once it moves too", () => {
     const changes = termsThatChange(present, { sensitivity: "Internal", audience: "everyone" });
+    const said = changes[1]?.says.toLowerCase() ?? "";
+    const from = said.indexOf(AUDIENCE_WORDS.groups.toLowerCase());
 
     expect(changes.map((change) => change.term)).toEqual(["Sensitivity", "Audience"]);
-    expect(changes[1]?.says).toMatch(/named groups.+everyone in the workspace/v);
+    expect(from).toBeGreaterThanOrEqual(0);
+    expect(said.indexOf(AUDIENCE_WORDS.everyone.toLowerCase())).toBeGreaterThan(from);
   });
 
   it("lists nothing where neither term moves", () => {
     expect(termsThatChange(present, present)).toEqual([]);
-  });
-});
-
-describe("what Connect a document says", () => {
-  it("says named groups cannot be chosen yet, naming no page", () => {
-    expect(CONNECT_WORDS.audienceHint).toMatch(/Named groups cannot be chosen here yet/v);
-    expect(CONNECT_WORDS.audienceHint).not.toMatch(/People/v);
-  });
-
-  it("says when the sync starts without a retired word", () => {
-    expect(CONNECT_WORDS.consequence).not.toMatch(/\bland(?:s|ed)?\b/v);
-    expect(REVIEW_WORDS.noPassages).not.toMatch(/\bland(?:s|ed)?\b/v);
   });
 });

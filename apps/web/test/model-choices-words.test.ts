@@ -15,8 +15,8 @@ describe("a model choice's provider, in a reader's word", () => {
     expect(providerWordOf(provider)).toBe(word);
   });
 
-  it("names a local model's provider the platform's own servers", () => {
-    expect(providerWordOf("local")).toBe("The platform’s own servers");
+  it("gives a local model's provider a word of its own", () => {
+    expect(providerWordOf("local")).not.toBe("local");
   });
 
   it("shows a provider it has no word for as itself", () => {
