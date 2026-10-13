@@ -34,6 +34,7 @@ import {
   THE_BANK_DETAILS,
   THE_HANDBOOK,
   THE_PASSAGE,
+  THE_PASSAGE_QUOTED,
   THE_PLACEHOLDER,
   THE_QUERY,
   THE_RESTORED_SPAN,
@@ -282,7 +283,9 @@ describe("one uploaded document, read back through both tiers", () => {
           sensitivity: "Internal",
         },
       });
-      expect(renderOpen(opened)).toBe(`> ${THE_PASSAGE}\n\n— ${THE_TITLE} (${locator}) · Internal`);
+      expect(renderOpen(opened)).toBe(
+        `${THE_PASSAGE_QUOTED}\n\n— ${THE_TITLE} (${locator}) · Internal`,
+      );
       expect(published).toEqual([
         { sensitivity: "Internal", audience: "everyone", published_at: PUBLISHED_AT },
       ]);

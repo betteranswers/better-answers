@@ -421,6 +421,7 @@ const conceptNode = async (
   workspaceId: string,
   collection: string | null,
   iri: string = conceptIriOf(ulid()),
+  sensitivity = "Internal",
 ): Promise<string> => {
   await seed.conceptIdentity({ workspaceId, iri });
   const folder = collection === null ? "" : `${collection}/`;
@@ -428,8 +429,9 @@ const conceptNode = async (
     workspaceId,
     iri,
     path: `knowledge/${folder}${ulid().toLowerCase()}.md`,
+    sensitivity,
   });
-  await seed.mapNode({ workspaceId, uid: iri });
+  await seed.mapNode({ workspaceId, uid: iri, sensitivity });
   return iri;
 };
 
@@ -484,6 +486,31 @@ describe("a map walk narrowed to collections", () => {
     expect(whole.map((step) => step.uid).toSorted()).toEqual(
       [entry, outside, beyond, unfiled].toSorted(),
     );
+  });
+
+  it("stops a narrowed path at a withheld concept", async () => {
+    const scenario = await arrange();
+    const workspaceId = scenario.workspaceId;
+    const { entry, withheld, beyond } = await seeded(async (seed) => {
+      const made = {
+        entry: await conceptNode(seed, workspaceId, "audits"),
+        withheld: await conceptNode(seed, workspaceId, "audits", undefined, "Restricted"),
+        beyond: await conceptNode(seed, workspaceId, "audits"),
+      };
+      await seed.mapEdge({ workspaceId, fromUid: made.entry, toUid: made.withheld });
+      await seed.mapEdge({ workspaceId, fromUid: made.withheld, toUid: made.beyond });
+      return made;
+    });
+
+    const viewers = await walkedFromEntries(scenario.viewer, [entry], ["audits"]);
+    const admins = await walkedFromEntries(scenario.admin, [entry], ["audits"]);
+
+    expect(uidsByDepth(viewers)).toEqual([[entry, 0]]);
+    expect(uidsByDepth(admins)).toEqual([
+      [entry, 0],
+      [withheld, 1],
+      [beyond, 2],
+    ]);
   });
 
   it("passes through a node that is no concept", async () => {

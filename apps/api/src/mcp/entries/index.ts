@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   answerOutputWith,
+  askInput,
   FEEDBACK_REASONS,
   FEEDBACK_VERDICTS,
   find,
@@ -166,10 +167,11 @@ const askEntryAt = (origin: string) =>
     name: "ask",
     title: "Ask the company's knowledge a question",
     description:
-      "Ask a question and get the company's cited answer, verdict first. Every claim carries the concept it rests on. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised.",
+      "Ask a question and get the concepts in the company's knowledge that bear on it, verdict first. They are related knowledge, not a judged answer: write only what the returned concepts state, name each one you use, and quote an `Answer` unchanged. A verdict of `refuse` means nothing you can read bears on the question. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised.",
     scopes: ["knowledge:read"],
     input: z.object({
-      question: z.string().min(1).max(2000).describe("The question, in the person's own words."),
+      question: askInput.shape.question,
+      collections: askInput.shape.collections,
     }),
     // No record is kept on this entry's one read-only transaction, so the answer names none.
     output: answerOutputWith(trust).omit({ recordId: true }),
@@ -180,14 +182,8 @@ const askEntryAt = (origin: string) =>
       openWorldHint: false,
     },
     run: async (principal, tx, args, now) =>
-      wired(
-        await planAnswer(
-          principal,
-          (work) => work(tx),
-          { question: args.question, collections: [] },
-          now,
-        ),
-        (answer) => answeredOnTheWire(origin, answer),
+      wired(await planAnswer(principal, (work) => work(tx), args, now), (answer) =>
+        answeredOnTheWire(origin, answer),
       ),
     render: (answer) => renderAnswer(answeredInCore(answer)),
   });

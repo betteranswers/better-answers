@@ -16,7 +16,14 @@ import { footnotesOf } from "../src/guides/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { addToGroup, deleteGroup } from "../src/members/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
-import { answerWritten, asked, REFUSED, withoutRecord, type WrittenAnswer } from "./asking.ts";
+import {
+  answerWritten,
+  asked,
+  conceptSeeded,
+  REFUSED,
+  withoutRecord,
+  type WrittenAnswer,
+} from "./asking.ts";
 import {
   connectedSourceForGroups,
   conceptCiting,
@@ -576,6 +583,66 @@ describe("an `Answer` withheld from the asker", () => {
     expect(await entriesFor(scenario.admin, 2)).toEqual([withheld.iri, three.iri]);
     expect(await entriesFor(scenario.viewer, 1)).toEqual([three.iri]);
     expect(await entriesFor(scenario.viewer, 3)).toEqual([three.iri, two.iri, one.iri]);
+  });
+
+  it("spends no walked slot on a withheld concept", async () => {
+    const scenario = await arrange();
+    const minted = [conceptIriOf(ulid()), conceptIriOf(ulid())] as const;
+    const [first, second] = minted[0] < minted[1] ? minted : ([minted[1], minted[0]] as const);
+    const reached = await conceptSeeded(db(), scenario.workspaceId, {
+      collection: "audits",
+      title: "Console exports",
+      body: "Exports are made in the console.",
+      iri: second,
+    });
+    const entry = await conceptSeeded(db(), scenario.workspaceId, {
+      collection: "audits",
+      kind: "Answer",
+      title: QUESTION.question,
+      body: "Audit logs are kept for thirteen months.",
+      linksTo: [first, second],
+    });
+    const ofTwo = { caps: { ...ASK_CAPS, related: 2 } };
+
+    const before = await asked(db(), scenario.viewer, QUESTION, ofTwo);
+    // The lesser IRI: were the withheld concept walked to, it would be the first one reached.
+    const withheld = await conceptSeeded(db(), scenario.workspaceId, {
+      collection: "audits",
+      title: "Board papers",
+      body: "Papers go to the board each quarter.",
+      sensitivity: "Restricted",
+      iri: first,
+    });
+    const after = await asked(db(), scenario.viewer, QUESTION, ofTwo);
+    const admins = await asked(db(), scenario.admin, QUESTION, ofTwo);
+
+    expect(irisOf(before)).toEqual([entry, reached]);
+    expect(withoutRecord(after)).toEqual(withoutRecord(before));
+    expect(irisOf(admins)).toEqual([entry, withheld]);
+  });
+
+  it("keeps a withheld document's passage from the asker", async () => {
+    const scenario = await arrange();
+    const minutes = await documentLanded(db().pool, scenario.workspaceId, {
+      title: "Board minutes 2026",
+      text: "Audit logs are kept for seven years.",
+      sensitivity: "Restricted",
+    });
+
+    const viewers = await asked(db(), scenario.viewer, QUESTION);
+    const admins = await asked(db(), scenario.admin, QUESTION);
+
+    expect(withoutRecord(viewers)).toEqual(REFUSED);
+    expect(renderAnswer(viewers)).not.toContain("seven years");
+    expect(admins.unmappedPassages).toEqual([
+      {
+        locator: minutes.locator,
+        source: "Board minutes 2026",
+        text: "Audit logs are kept for seven years.",
+        sensitivity: "Restricted",
+      },
+    ]);
+    expect(renderAnswer(admins)).toContain("> Audit logs are kept for seven years.");
   });
 
   it("names a source the asker cannot open by its label", async () => {

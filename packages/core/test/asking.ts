@@ -103,6 +103,8 @@ export type SeededConcept = {
   readonly body: string;
   readonly contentHash?: string;
   readonly sensitivity?: string;
+  /** Minted by the caller where the order of two concepts' IRIs matters. */
+  readonly iri?: ConceptIri;
   /** Each concept this one's node has an edge to. */
   readonly linksTo?: readonly ConceptIri[];
 };
@@ -119,8 +121,13 @@ export const conceptSeeded = (
     seededConcepts += 1;
     const { kind = "Policy", title, body, sensitivity = "Internal", contentHash } = shape;
     const folder = shape.collection === null ? "" : `${shape.collection}/`;
+    const { iri } = await seed.conceptIdentity({
+      workspaceId,
+      ...(shape.iri === undefined ? {} : { iri: shape.iri }),
+    });
     const indexed = await seed.conceptIndex({
       workspaceId,
+      iri,
       path: `knowledge/${folder}seeded-${seededConcepts}.md`,
       kind,
       title,

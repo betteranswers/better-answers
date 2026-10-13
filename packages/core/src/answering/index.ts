@@ -516,6 +516,9 @@ export const renderFind = (result: FindResult<string>): string => {
     : [...lines, "", `More follow: call find again with cursor ${result.nextCursor}`].join("\n");
 };
 
+/** Every line quoted: a document's own line never reads as a heading or a concept of the answer. */
+const quoted = (text: string): readonly string[] => text.split(/\r?\n/).map((line) => `> ${line}`);
+
 export const renderOpen = (result: OpenView<string>): string => {
   if (!result.found) {
     return result.iri === undefined
@@ -525,7 +528,7 @@ export const renderOpen = (result: OpenView<string>): string => {
   if (result.passage !== undefined) {
     const { passage } = result;
     return [
-      `> ${passage.text}`,
+      ...quoted(passage.text),
       "",
       `— ${passage.source} (${passage.locator}) · ${passage.sensitivity}`,
     ].join("\n");
@@ -612,7 +615,7 @@ const returnedText = (concept: ReturnedConcept<string>): readonly string[] => [
 const unmappedText = (passage: PassageView): readonly string[] => [
   "",
   `${NOT_COMPANY_KNOWLEDGE} · ${passage.sensitivity}`,
-  `> ${passage.text}`,
+  ...quoted(passage.text),
   `— ${passage.source} (${passage.locator})`,
 ];
 

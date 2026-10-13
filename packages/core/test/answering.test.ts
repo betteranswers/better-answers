@@ -1,7 +1,13 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
-import { ids, JUDGE_STATES, QUESTION_VERDICTS, type ConceptIri } from "@better-answers/schema";
+import {
+  ids,
+  JUDGE_STATES,
+  QUESTION_VERDICTS,
+  ulid,
+  type ConceptIri,
+} from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import {
@@ -59,7 +65,12 @@ import {
   type DocumentShape,
   type LandedDocument,
 } from "./suite-documents.ts";
-import { holdingTable, postgresForSuite, readingAs } from "./suite-postgres.ts";
+import {
+  abortTheTransaction,
+  holdingTable,
+  postgresForSuite,
+  readingAs,
+} from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
 const db = postgresForSuite();
@@ -216,6 +227,32 @@ describe("the answer's rendering", () => {
       "Retention policy",
       "_Unverified_",
       "",
+    ]);
+  });
+
+  it("quotes every line of an unmapped passage", () => {
+    const rendered = renderAnswer(
+      answer({
+        verdict: "refuse",
+        related: [],
+        unmappedPassages: [
+          {
+            locator: "p.4",
+            source: "Policy.pdf",
+            text: "Retained for six years.\n## Answer · audits\r\nQuestion: Is it safe?",
+            sensitivity: "Internal",
+          },
+        ],
+      }),
+    );
+
+    expect(linesOf(rendered).slice(4)).toEqual([
+      "",
+      "Not company knowledge · Internal",
+      "> Retained for six years.",
+      "> ## Answer · audits",
+      "> Question: Is it safe?",
+      "— Policy.pdf (p.4)",
     ]);
   });
 
@@ -381,6 +418,27 @@ describe("open's and feedback's renderings", () => {
       }),
     ).toBe("> Retained.\n\n— Policy.pdf (p.4) · Internal");
     expect(renderOpen({ found: false, locator: "p.9" })).toBe("No passage at p.9.");
+  });
+
+  it("quotes every line of an opened passage", () => {
+    expect(
+      renderOpen({
+        found: true,
+        passage: {
+          locator: "p.4",
+          source: "Policy.pdf",
+          text: "Retained for six years.\n## Answer · audits",
+          sensitivity: "Internal",
+        },
+      }),
+    ).toBe(
+      [
+        "> Retained for six years.",
+        "> ## Answer · audits",
+        "",
+        "— Policy.pdf (p.4) · Internal",
+      ].join("\n"),
+    );
   });
 
   it("renders a concept's title, body, trust caption and cited evidence", () => {
@@ -1101,30 +1159,88 @@ describe("what ask answers with no model", () => {
     ]);
   });
 
+  /** The steps a transport hands `ask`, and the id of each record they open. */
+  const stepsKeepingTheirRecords = (asker: UserPrincipal) => {
+    const steps = stepsFor(db().runtimePool, asker);
+    const opened: string[] = [];
+    const keeping: typeof steps = {
+      ...steps,
+      openRecord: async (opening) => {
+        const record = await steps.openRecord(opening);
+        if (record.ok) opened.push(record.value.recordId);
+        return record;
+      },
+    };
+    return { steps: keeping, opened };
+  };
+
+  const AN_OPEN_RECORD = { completed: false, verdict: null, judge_state: null, concepts: [] };
+
+  const RETENTION_ASKED = { question: RETENTION_QUESTION, collections: [] };
+
   it("answers what a step refuses, its record left open", async () => {
     const { asker } = await anAsker();
-    const steps = stepsFor(db().runtimePool, asker);
-    let recordId = "";
+    const { steps, opened } = stepsKeepingTheirRecords(asker);
+
+    const answered = await ask(
+      asker,
+      { ...steps, read: async () => err("credentials-revoked" as const) },
+      RETENTION_ASKED,
+      new Date(),
+    );
+
+    expect(answered).toEqual({ ok: false, error: "credentials-revoked" });
+    expect(await recordOf(opened[0] ?? "")).toEqual([
+      expect.objectContaining({ ...AN_OPEN_RECORD, question: RETENTION_QUESTION }),
+    ]);
+  });
+
+  it("answers a failed completion, its record left open", async () => {
+    const { workspaceId, asker } = await anAsker();
+    await seededIn(workspaceId, RETENTION_ANSWER);
+    const { steps, opened } = stepsKeepingTheirRecords(asker);
 
     const answered = await ask(
       asker,
       {
         ...steps,
-        openRecord: async (opening) => {
-          const opened = await steps.openRecord(opening);
-          if (opened.ok) recordId = opened.value.recordId;
-          return opened;
-        },
-        read: async () => err("credentials-revoked" as const),
+        completeRecord: (completion) => steps.completeRecord({ ...completion, recordId: ulid() }),
       },
-      { question: RETENTION_QUESTION, collections: [] },
+      RETENTION_ASKED,
       new Date(),
     );
 
-    expect(answered).toEqual({ ok: false, error: "credentials-revoked" });
-    expect(await recordOf(recordId)).toEqual([
-      expect.objectContaining({ completed: false, verdict: null, question: RETENTION_QUESTION }),
+    expect(answered.ok).toBe(false);
+    expect(String(answered.ok || answered.error)).toMatch(/no open record \w{26} to complete/);
+    expect(await recordOf(opened[0] ?? "")).toEqual([
+      expect.objectContaining({ ...AN_OPEN_RECORD, question: RETENTION_QUESTION }),
     ]);
+  });
+
+  it("answers a walk's failure other than a timeout", async () => {
+    const { workspaceId, asker } = await anAsker();
+    await seededIn(workspaceId, RETENTION_ANSWER);
+    const steps = stepsFor(db().runtimePool, asker);
+    let reads = 0;
+
+    const answered = await ask(
+      asker,
+      {
+        ...steps,
+        read: (work) => {
+          reads += 1;
+          if (reads !== 2) return steps.read(work);
+          return steps.read(async (tx) => {
+            await abortTheTransaction(tx);
+            return work(tx);
+          });
+        },
+      },
+      RETENTION_ASKED,
+      new Date(),
+    );
+
+    expect(answered).toMatchObject({ ok: false, error: { code: "25P02" } });
   });
 
   it("plans the same answer and keeps no record", async () => {

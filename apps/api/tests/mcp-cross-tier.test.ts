@@ -6,6 +6,7 @@ import {
   locatorOf,
   THE_ACCOUNT_NUMBER,
   THE_PASSAGE,
+  THE_PASSAGE_QUOTED,
   THE_QUERY,
   THE_SORT_CODE,
   THE_TITLE,
@@ -97,7 +98,9 @@ describe("one uploaded document, read back over the MCP surface", () => {
           sensitivity: "Internal",
         },
       });
-      expect(rendered(opened)).toBe(`> ${THE_PASSAGE}\n\n— ${THE_TITLE} (${locator}) · Internal`);
+      expect(rendered(opened)).toBe(
+        `${THE_PASSAGE_QUOTED}\n\n— ${THE_TITLE} (${locator}) · Internal`,
+      );
       expect(JSON.stringify(opened)).not.toContain(THE_SORT_CODE);
       expect(JSON.stringify(opened)).not.toContain(THE_ACCOUNT_NUMBER);
     },
