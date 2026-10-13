@@ -332,6 +332,8 @@ const commitConcept = async (
 ): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
   const iri = input.iri ?? conceptIriOf(ulid());
   const frontmatter = fileFrontmatterOf(input, iri);
+  const body = boundarySchemas.conceptIndex.insert.shape.body.safeParse(input.body);
+  if (!body.success) return err("malformed");
   const { contentHash, sources } = hashedFileOf(frontmatter, input.body, input.path);
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
 

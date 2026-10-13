@@ -10,6 +10,7 @@ import { ACTOR_ID as ACTOR_ID_REGEX } from "./actor-id.ts";
 import { ACTION, auditEvent, FAMILIES, identityAuditEvent } from "./audit-tables.ts";
 import {
   bundleCommit,
+  CONCEPT_BODY_MAX,
   CONCEPT_FRONTMATTER_MAX,
   CONCEPT_PATH,
   CONCEPT_STATUSES,
@@ -461,6 +462,15 @@ const conceptIndexRefinements = {
   workspaceId,
   iri: conceptIri,
   ...conceptFileRefinements,
+  body: (schema: z.ZodString) =>
+    schema.refine(
+      (body) => {
+        let characters = 0;
+        for (const _ of body) characters += 1;
+        return characters <= CONCEPT_BODY_MAX;
+      },
+      { message: `a concept's body is at most ${CONCEPT_BODY_MAX} characters` },
+    ),
   kind: conceptKind,
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
   commitSha: (schema: z.ZodString) => schema.regex(GIT_SHA),

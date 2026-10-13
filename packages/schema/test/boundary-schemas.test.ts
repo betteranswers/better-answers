@@ -8,6 +8,7 @@ import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../s
 import {
   ACCESS_REQUEST_REASON_MAX,
   boundarySchemas,
+  CONCEPT_BODY_MAX,
   CONCEPT_FRONTMATTER_MAX,
   conceptFrontmatter,
   EMBEDDING_DIMENSIONS,
@@ -1338,6 +1339,25 @@ describe("the frontmatter bound's unit", () => {
     expect(conceptFrontmatter.safeParse(inside).success).toBe(true);
 
     expect(conceptFrontmatter.safeParse(astral(CONCEPT_FRONTMATTER_MAX)).success).toBe(false);
+  });
+});
+
+describe("the body bound's unit", () => {
+  const astral = (characters: number) => "\u{1D11E}".repeat(characters);
+  const bodyOf = (body: string) =>
+    boundarySchemas.conceptIndex.insert.safeParse({ ...acceptedRows.conceptIndex[0], body });
+
+  it("counts the characters `char_length` counts, not the units JavaScript measures", () => {
+    const inside = astral(CONCEPT_BODY_MAX - 100);
+    expect(inside.length).toBeGreaterThan(CONCEPT_BODY_MAX);
+    expect(bodyOf(inside).success).toBe(true);
+
+    expect(bodyOf(astral(CONCEPT_BODY_MAX + 1)).success).toBe(false);
+  });
+
+  it("refuses a body over the cap, taking one at it", () => {
+    expect(bodyOf("x".repeat(CONCEPT_BODY_MAX + 1)).success).toBe(false);
+    expect(bodyOf("x".repeat(CONCEPT_BODY_MAX)).success).toBe(true);
   });
 });
 
