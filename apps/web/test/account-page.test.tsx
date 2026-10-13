@@ -141,6 +141,7 @@ describe("the Account page's passkeys", () => {
     const row = await screen.findByRole("listitem", { name: "MacBook" });
 
     expect(row.textContent).toContain("3 March 2026");
+    expect(row.textContent).toContain(PASSKEY_WORDS.notUsed);
   });
 
   it("keeps an Admin's only factor, saying why beside Remove", async () => {
@@ -224,7 +225,8 @@ describe("making a first set on the Account page", () => {
 
     await makeCodesPressed();
 
-    expect(await screen.findByText(ACTION_LANDED.made(SESSION.user.email))).toBeDefined();
+    const landed = await screen.findByText(ACTION_LANDED.made(SESSION.user.email));
+    expect(landed.textContent).toContain(SESSION.user.email);
   });
 
   it("offers Replace once another tab made a set", async () => {

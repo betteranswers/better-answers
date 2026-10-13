@@ -367,9 +367,10 @@ describe("the confirm page for a person just promoted", () => {
 
     await openAsAda("/setup");
 
-    expect(
-      await screen.findByText(SETUP_WORDS.nowAnAdmin("Northern Tooling"), { exact: false }),
-    ).toBeDefined();
+    const why = await screen.findByText(SETUP_WORDS.nowAnAdmin("Northern Tooling"), {
+      exact: false,
+    });
+    expect(why.textContent).toContain("Northern Tooling");
   });
 });
 

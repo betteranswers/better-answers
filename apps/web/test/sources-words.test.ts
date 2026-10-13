@@ -37,8 +37,11 @@ const aSync = (status: Sync["status"], finishedAt: string | null): Sync => ({
 /** A count's line with its number taken out: what is left is the form the number chose. */
 const formOf = (said: string): string => said.replaceAll(/\d+/g, "");
 
-/** Each count a line shows, smallest first. */
-const countsIn = (said: string): readonly string[] => (said.match(/\b\d+\b/g) ?? []).toSorted();
+/** Each count a line shows, in the line's own order. */
+const countsIn = (said: string): readonly string[] => said.match(/\b\d+\b/g) ?? [];
+
+/** A closed-set word as it is held: its casing and its apostrophe are the page's to choose. */
+const spoken = (word: string): string => word.toLowerCase().replaceAll("’", "'");
 
 describe("a connected source's last sync", () => {
   it("shows no time for a source never synced", () => {
@@ -103,11 +106,14 @@ describe("a retention class", () => {
 });
 
 describe("a connected source's stored values", () => {
-  it("gives each state a word no other state has", () => {
+  it("gives each state its own word, whatever its case", () => {
     const words = Object.values(STATE_WORDS);
 
+    expect(STATE_WORDS.received).toMatch(/^received$/iv);
+    expect(STATE_WORDS.indexing).toMatch(/^indexing$/iv);
+    expect(STATE_WORDS.indexed).toMatch(/^indexed$/iv);
+    expect(STATE_WORDS.published).toMatch(/^published$/iv);
     expect(new Set(words).size).toBe(words.length);
-    expect(words).not.toContain("");
   });
 
   it("gives each row action a label no other has", () => {
@@ -124,26 +130,27 @@ describe("a connected source's stored values", () => {
   });
 });
 
-/** Each id the worker's redaction descriptors raise. */
-const RULES_RAISED = [
-  "HEALTH_CUE",
-  "UK_BANK_ACCOUNT",
-  "UK_NHS",
-  "UK_NINO",
-  "DATE_OF_BIRTH",
-  "UK_HOME_ADDRESS",
-  "EMAIL_ADDRESS",
-  "PHONE_NUMBER",
-  "PERSON",
-  "JOB_TITLE",
-];
+/** Each id the worker's redaction descriptors raise, beside its word in lower case. */
+const RULES_RAISED = {
+  HEALTH_CUE: "health wording",
+  UK_BANK_ACCOUNT: "sort code and account number",
+  UK_NHS: "nhs number",
+  UK_NINO: "national insurance number",
+  DATE_OF_BIRTH: "date of birth",
+  UK_HOME_ADDRESS: "home address",
+  EMAIL_ADDRESS: "personal email address",
+  PHONE_NUMBER: "phone number",
+  PERSON: "person's name",
+  JOB_TITLE: "job title",
+};
 
 describe("a finding's rule", () => {
   it("gives every rule the worker raises its own word", () => {
-    const words = RULES_RAISED.map((ruleId) => ruleWordOf(ruleId));
+    const ruleIds = Object.keys(RULES_RAISED);
+    const read = Object.fromEntries(ruleIds.map((ruleId) => [ruleId, spoken(ruleWordOf(ruleId))]));
 
-    expect(RULES_RAISED.filter((ruleId) => ruleWordOf(ruleId) === ruleId)).toEqual([]);
-    expect(new Set(words).size).toBe(RULES_RAISED.length);
+    expect(read).toEqual(RULES_RAISED);
+    expect(new Set(Object.values(read)).size).toBe(ruleIds.length);
   });
 
   it("shows a rule it has not met as its id", () => {
@@ -158,7 +165,7 @@ describe("how many documents a sync left unreadable", () => {
   });
 
   it("counts the scans needing OCR beside the unreadable", () => {
-    expect(countsIn(unreadableCounted(4, 2))).toEqual(["2", "4"]);
+    expect(countsIn(unreadableCounted(4, 2))).toEqual(["4", "2"]);
     expect(countsIn(unreadableCounted(1, 1))).toEqual(["1", "1"]);
     expect(formOf(unreadableCounted(4, 1))).not.toBe(formOf(unreadableCounted(4, 2)));
   });

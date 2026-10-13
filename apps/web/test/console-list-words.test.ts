@@ -28,8 +28,18 @@ describe("a console list's count", () => {
     expect(formOf(words.counted(2))).toBe(formOf(words.counted(3)));
   });
 
-  it("does not say no name waiting in one's form", () => {
-    expect(formOf(NAMES_WAITING_WORDS.counted(0))).not.toBe(formOf(NAMES_WAITING_WORDS.counted(1)));
+  it("gives no name waiting a form of its own", () => {
+    const none = formOf(NAMES_WAITING_WORDS.counted(0));
+
+    expect(none).not.toBe(formOf(NAMES_WAITING_WORDS.counted(1)));
+    expect(none).not.toBe(formOf(NAMES_WAITING_WORDS.counted(2)));
+  });
+
+  it("counts each list in its own noun", () => {
+    for (const count of [1, 2]) {
+      const lines = LISTS.map(([, words]) => words.counted(count));
+      expect(new Set(lines).size).toBe(LISTS.length);
+    }
   });
 });
 
@@ -44,5 +54,12 @@ describe("what a console list's search left", () => {
     expect(formOf(words.matching(1, "priya"))).not.toBe(formOf(words.matching(2, "priya")));
     expect(formOf(words.matching(1, "priya"))).not.toBe(formOf(words.matching(0, "priya")));
     expect(formOf(words.matching(2, "priya"))).toBe(formOf(words.matching(3, "priya")));
+  });
+
+  it("says what matches in each list's own noun", () => {
+    for (const count of [1, 2]) {
+      const lines = LISTS.map(([, words]) => words.matching(count, "priya"));
+      expect(new Set(lines).size).toBe(LISTS.length);
+    }
   });
 });

@@ -91,9 +91,17 @@ describe("a bulk action's outcome", () => {
   it.each([
     [2, 0, ["2"]],
     [1, 1, ["1", "1"]],
+    [3, 2, ["3", "2"]],
     [0, 2, ["2"]],
-  ])("counts %i cancelled and %i skipped", (changed, skipped, shown) => {
+  ])("counts %i cancelled, then %i skipped", (changed, skipped, shown) => {
     expect(countsIn(INVITATIONS_WORDS.bulk.cancelled(changed, skipped))).toEqual(shown);
+  });
+
+  it("gives one cancelled or one skipped its own form", () => {
+    const { cancelled } = INVITATIONS_WORDS.bulk;
+
+    expect(formOf(cancelled(1, 0))).not.toBe(formOf(cancelled(2, 0)));
+    expect(formOf(cancelled(2, 1))).not.toBe(formOf(cancelled(2, 2)));
   });
 });
 
@@ -105,8 +113,9 @@ describe("the dialog's words", () => {
   });
 
   it("counts the flagged apart from the ready", () => {
-    expect(countsIn(INVITE_WORDS.summary(2, 1)).toSorted()).toEqual(["1", "2"]);
+    expect(countsIn(INVITE_WORDS.summary(2, 1))).toEqual(["2", "1"]);
     expect(countsIn(INVITE_WORDS.summary(1, 0))).toEqual(["1"]);
+    expect(formOf(INVITE_WORDS.summary(1, 0))).not.toBe(formOf(INVITE_WORDS.summary(2, 0)));
   });
 
   it("counts the addresses a capped send left waiting", () => {

@@ -4,11 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
+import { WORKSPACES_WORDS } from "@/features/console/list-words.ts";
 import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
 import { ModelChoicesCard } from "@/features/model-choices/model-choices-card.tsx";
+import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
+import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { GroupsPage } from "@/features/people/groups-page.tsx";
 import { Review } from "@/features/sources/review.tsx";
 import type { ListedConnectedSource } from "@/features/sources/sources-api.ts";
+import { REVIEW_WORDS } from "@/features/sources/words.ts";
 
 import { regionsSeen } from "./regions-seen.tsx";
 
@@ -23,7 +27,7 @@ afterEach(() => {
 
 const REGION = "[aria-live=polite]";
 
-/** A region that mounted empty holds its line: which line is the page's own wording. */
+/** For a loading line the page writes inline, with no constant to hold it to. */
 const HOLDS_TEXT = /\S/v;
 
 const mounted = (selector: string, children: ReactNode) => {
@@ -60,20 +64,21 @@ describe("a page's read, said after its region mounts", () => {
 
     expect(seen[0]).toBe("");
     expect(seen.at(-1)).toMatch(HOLDS_TEXT);
+    expect(screen.queryByText(EMPTY_LINES.groups)).toBeNull();
   });
 
   it("fills a region of lines a render after it mounts", () => {
     const seen = mounted(REGION, <ModelChoicesCard />);
 
     expect(seen[0]).toBe("");
-    expect(seen.at(-1)).toMatch(HOLDS_TEXT);
+    expect(seen.at(-1)).toBe(MODEL_CHOICES_WORDS.loading);
   });
 
   it("fills a region drawing one state after mount", () => {
     const seen = mounted(REGION, <WorkspacesPage />);
 
     expect(seen[0]).toBe("");
-    expect(seen.at(-1)).toMatch(HOLDS_TEXT);
+    expect(seen.at(-1)).toBe(WORKSPACES_WORDS.loading);
   });
 
   it("fills a disclosure's region a render after opening mounts it", () => {
@@ -87,5 +92,6 @@ describe("a page's read, said after its region mounts", () => {
     expect(seen.slice(0, closed).every((text) => text === undefined)).toBe(true);
     expect(opened[0]).toBe("");
     expect(opened.at(-1)).toMatch(HOLDS_TEXT);
+    expect(opened.at(-1)).not.toContain(REVIEW_WORDS.noPassages);
   });
 });

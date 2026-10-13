@@ -235,6 +235,8 @@ const PRICE_BOOK = {
   state: "indexed",
 };
 
+const A_PUBLISH = "2026-10-07T09:05:00.000Z";
+
 const WIDENED = { sensitivity: "Internal", audience: "groups" } as const;
 
 const TO_PUBLIC = { sensitivity: "Public", audience: "groups" } as const;
@@ -283,6 +285,9 @@ type SourcesApi = {
 
   /** The actions the api refuses for the reader's role. */
   readonly forbidden?: readonly string[];
+
+  /** The connected sources the list read answers, where a test needs its own. */
+  readonly listed?: readonly unknown[];
 };
 
 /** Reads are answered at once; a widening is taken and a keep refused once `held` lets them. */
@@ -290,6 +295,7 @@ const atSources = (api: SourcesApi = {}) => {
   const asked: string[] = [];
   const answers: Readonly<Record<string, unknown>> = {
     ...ANSWERS,
+    "sources.list": api.listed ?? ANSWERS["sources.list"],
     "sources.findings": api.findings ?? [],
   };
   const refusals = new Map<string, unknown>([["sources.keepInText", KEEP_REFUSED]]);
@@ -498,6 +504,17 @@ describe("widening a connected source in its row", () => {
       within(panel).getByRole("combobox", { name: "Sensitivity" }),
     );
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("describes widening a published source by who it then reaches", async () => {
+    const { widen } = SENSITIVITY_PANEL_WORDS;
+    atSources({ listed: [{ ...HANDBOOK, state: "published", publishedAt: A_PUBLISH }] });
+    const row = await rowOf("Staff handbook");
+
+    fireEvent.click(rowAction(row, ROW_ACTIONS.widen, "Staff handbook"));
+
+    expect(describedBy(row.getByRole("group"))).toBe(widen.consequence(true));
+    expect(widen.consequence(true)).not.toBe(widen.consequence(false));
   });
 
   it("lists the one term that changes and names the result", async () => {

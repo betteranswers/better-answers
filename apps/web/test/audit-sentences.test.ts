@@ -292,6 +292,22 @@ describe("an audit event in today's words", () => {
       expect(sentence).not.toContain("01J6DDDDDDDDDDDDDDDDDDDDDD");
     }
   });
+
+  it("gives no two declared actions the same sentence", () => {
+    const actionsBySentence = Map.groupBy(DECLARED_ACTIONS, (action) =>
+      sentenceOf(
+        byHannah({
+          action,
+          subject: PRIYA,
+          detail: { userId: "01J6DDDDDDDDDDDDDDDDDDDDDD", role: "Editor" },
+          named: { userId: PRIYA },
+        }),
+      ),
+    );
+    const shared = [...actionsBySentence.values()].filter((actions) => actions.length > 1);
+
+    expect(shared, "actions that read as the same sentence").toEqual([]);
+  });
 });
 
 describe("an audit event's detail in today's words", () => {

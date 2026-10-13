@@ -93,7 +93,10 @@ describe("a page that throws", () => {
     expect(shown).not.toContain("Error");
     expect(container.querySelector("pre")).toBeNull();
 
-    expect(shown).not.toMatch(/report|logged|recorded|notified|team/i);
+    // Everything the failed page draws is in the main region; the shell's names are not its claim.
+    expect(screen.getByRole("main").textContent).not.toMatch(
+      /report|logged|recorded|notified|team/i,
+    );
   });
 
   it("offers the two ways out as controls a keyboard reaches", async () => {

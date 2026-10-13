@@ -107,7 +107,8 @@ describe("a change to the reader's own member", () => {
   it("lands a self-demoted Admin at an Editor's home, saying why", async () => {
     const router = await demotingHerself(adaAnAdmin(), () => adaAt("Editor"));
 
-    expect(await screen.findByText(homeNowSaid("Editor"))).toBeDefined();
+    const said = await screen.findByText(homeNowSaid("Editor"));
+    expect(said.textContent).toContain("Editor");
     expect(router.state.location.pathname).toBe(HOMES.Editor.path);
     expect(adminsAreaOffered(), "the rail offers the role lost").toBeNull();
   });

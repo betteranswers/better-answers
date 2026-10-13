@@ -89,7 +89,7 @@ describe("the members' bulk actions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: label }));
 
-    expect(screen.getByText(AT_MOST)).toBeDefined();
+    expect(screen.getByText(AT_MOST).textContent).toMatch(/\b200\b/v);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 

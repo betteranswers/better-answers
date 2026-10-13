@@ -158,6 +158,7 @@ describe("going home after an action on yourself", () => {
     const { history } = await demotedToEditor();
 
     expect(screen.getByRole("status").textContent).toBe(homeNowSaid("Editor"));
+    expect(screen.getByRole("status").textContent).toContain("Editor");
     expect(screen.getByText("Held: Editor")).toBeDefined();
     expect(history.length, "the move home pushed an entry of its own").toBe(2);
   });
