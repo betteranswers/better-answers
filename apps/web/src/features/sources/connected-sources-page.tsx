@@ -30,11 +30,11 @@ import {
 } from "./sources-api.ts";
 import { REVIEW_HEADING, SENSITIVITY_FIELD, SOURCES_KEYSTROKES } from "./sources-state.ts";
 import {
-  AUDIENCE_WORDS,
   NOTHING_CONNECTED,
+  PUBLISH_PENDING,
   SELECT_A_CONNECTED_SOURCE_FIRST,
+  SENSITIVITY_PANEL_WORDS,
   sensitivityAndAudienceWords,
-  STATE_WORDS,
   THE_ACTION_BEFORE_IS_STILL_GOING,
   type SensitivityAndAudience,
 } from "./words.ts";
@@ -55,17 +55,17 @@ const waitsForItsSync = (connectedSource: ListedConnectedSource): Outcome => ({
   words:
     connectedSource.state === "published"
       ? `“${connectedSource.name}” is already published.`
-      : `“${connectedSource.name}” is ${STATE_WORDS[connectedSource.state].toLowerCase()}: publishing waits for its sync to finish.`,
+      : `“${connectedSource.name}” can be published once its sync finishes.`,
 });
 
 const narrowestAlready = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
-  words: `“${connectedSource.name}” is ${connectedSource.sensitivity}, and no sensitivity is narrower.`,
+  words: `“${connectedSource.name}” is already ${connectedSource.sensitivity}.`,
 });
 
 const nothingWider = (connectedSource: ListedConnectedSource): Outcome => ({
   tone: "said",
-  words: `“${connectedSource.name}” is ${sensitivityAndAudienceWords(connectedSource)}, and no sensitivity or audience is wider.`,
+  words: `“${connectedSource.name}” is already ${sensitivityAndAudienceWords(connectedSource)}.`,
 });
 
 type Tell = (outcome: Outcome | undefined) => void;
@@ -128,8 +128,8 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
   const commit = (asked: SensitivityAndAudience) => {
     focusOn(connectedSourceHeadingId(connectedSourceId));
     setChanging(undefined);
-    // Cleared as the change is sent, so a second refusal in the same sentence is announced again.
-    tell(undefined);
+    // Said as the change is sent, which empties the alert: a second refusal alike is announced again.
+    tell({ tone: "said", words: SENSITIVITY_PANEL_WORDS[changing.change].pending });
     if (changing.change === "narrow") {
       narrowAction.mutate(
         {
@@ -140,7 +140,8 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
         },
         settledSaying(tell, (narrowed: ConnectedSourceNarrowed) => (
           <>
-            Narrowed “{name}” to {narrowed.visibility.sensitivity}. {movedWords(narrowed)}
+            “{name}” has been narrowed to {narrowed.visibility.sensitivity} successfully.{" "}
+            {movedWords(narrowed)}
           </>
         )),
       );
@@ -154,8 +155,8 @@ const useSensitivityPanel = (listed: readonly ListedConnectedSource[], tell: Tel
       },
       settledSaying(tell, (widened: ConnectedSourceWidened) => (
         <>
-          Widened “{name}” to {sensitivityAndAudienceWords(widened.visibility)}.{" "}
-          {movedWords(widened)}
+          “{name}” has been widened to {sensitivityAndAudienceWords(widened.visibility)}{" "}
+          successfully. {movedWords(widened)}
         </>
       )),
     );
@@ -282,7 +283,7 @@ export function ConnectedSourcesPage() {
 
       <section aria-labelledby={listId} className="mt-6">
         <ListHead
-          heading="Connected sources"
+          heading="Connected Sources"
           headingId={listId}
           count={
             listed.length === 0
@@ -319,13 +320,13 @@ export function ConnectedSourcesPage() {
           }}
           onConfirm={(confirmations) => {
             setPublishing(undefined);
-            setOutcome(undefined);
+            setOutcome({ tone: "said", words: PUBLISH_PENDING });
             publishAction.mutate(
               { connectedSourceId: toPublish.connectedSourceId, confirmations },
               settledSaying(
                 setOutcome,
                 () =>
-                  `Published “${toPublish.name}”: its passages reach ${AUDIENCE_WORDS[toPublish.audience].toLowerCase()} now, and the audit row is written.`,
+                  `“${toPublish.name}” has been published as ${sensitivityAndAudienceWords(toPublish)} successfully.`,
               ),
             );
           }}

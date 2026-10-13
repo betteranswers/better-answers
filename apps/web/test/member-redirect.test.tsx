@@ -102,7 +102,7 @@ describe("a person the api will not answer about", () => {
 
     const router = await openAt("/people/groups");
 
-    expect(heading()).toBe("Sign in");
+    expect(heading()).toBe("Sign In");
     expect(router.state.location.href).toBe("/sign-in?redirect=%2Fpeople%2Fgroups");
   });
 
@@ -130,7 +130,7 @@ describe("a person the api will not answer about", () => {
 
     const router = await openAt("/sign-in");
 
-    expect(heading()).toBe("Sign in");
+    expect(heading()).toBe("Sign In");
     expect(router.state.location.href).toBe("/sign-in");
   });
 

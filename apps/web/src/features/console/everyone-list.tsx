@@ -70,11 +70,11 @@ const columnsFor = (actions: PersonActions) =>
     }),
     column.display({
       id: "workspaces",
-      header: "Workspaces and roles",
+      header: "Workspaces and Roles",
       cell: ({ row }) => <WorkspacesAndRoles person={row.original} />,
     }),
     column.accessor("lastSignedInAt", {
-      header: "Last sign-in",
+      header: "Last Sign-In",
       cell: ({ getValue }) => <Instant at={getValue()} none="None on record" />,
     }),
   ]);

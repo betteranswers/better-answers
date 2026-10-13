@@ -64,9 +64,7 @@ const openGracesPage = async (api: Api) => {
 
 const changeGracesRole = () => {
   fireEvent.click(screen.getByRole("radio", { name: "Editor" }));
-  fireEvent.click(
-    screen.getByRole("button", { name: MEMBER_PAGE_WORDS.makeRole(GRACE.displayName, "Editor") }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: MEMBER_PAGE_WORDS.changeRole }));
 };
 
 /** The band names the session's workspace and says why the tab moved. */

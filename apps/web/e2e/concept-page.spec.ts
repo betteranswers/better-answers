@@ -702,7 +702,7 @@ test.describe("the concept page", () => {
     const people = page.getByRole("main");
     await people.getByRole("link", { name: "Test person", exact: true }).click();
     await people.getByRole("radio", { name: "Viewer", exact: true }).click();
-    await people.getByRole("button", { name: "Make Test person a Viewer" }).click();
+    await people.getByRole("button", { name: "Change Role" }).click();
     await landedAtHome(page, "Viewer");
 
     const open = await heldBack(page, isAnOpen);

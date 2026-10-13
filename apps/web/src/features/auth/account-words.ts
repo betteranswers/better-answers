@@ -6,9 +6,9 @@ import { dayWords, instantWords, PRODUCT_NAME } from "@/shared/words.ts";
 export const ACCOUNT_HEADING = "Account";
 
 export const ACCOUNT_WORDS = {
-  signIn: "Sign-in",
+  signIn: "Sign-In",
   goOn: `Go to ${PRODUCT_NAME}`,
-  tryAgain: "Try again",
+  tryAgain: "Try Again",
   readingAgain: "Reading",
 } as const;
 
@@ -17,35 +17,32 @@ export const THEME_WORDS = {
   device: "Match this device",
   light: "Light",
   dark: "Dark",
-  kept: "Kept on this browser.",
+  kept: "Saved on this browser.",
 } as const;
 
-const SET_UP = "Set up an authenticator";
+const SET_UP = "Set Up an Authenticator";
 
-const ADD_A_PASSKEY = "Add a passkey";
-
-/** What a passkey does, said wherever one is offered. */
-const PASSKEY_SIGNS_YOU_IN = "A passkey signs you in with your fingerprint, face or device PIN";
+const ADD_A_PASSKEY = "Add a Passkey";
 
 export const ACCOUNT_ACTIONS = {
-  readAgain: "Read your sign-in again",
+  readAgain: "Read Your Sign-In Again",
   addPasskey: ADD_A_PASSKEY,
   setUp: SET_UP,
-  copyKey: "Copy the key",
-  copyCodes: "Copy the codes",
-  download: "Download the codes",
-  print: "Print the codes",
+  copyKey: "Copy the Key",
+  copyCodes: "Copy the Codes",
+  download: "Download the Codes",
+  print: "Print the Codes",
 } as const;
 
 export const PASSKEY_WORDS = {
   heading: "Passkeys",
-  none: `No passkeys yet. ${PASSKEY_SIGNS_YOU_IN}, with no email.`,
-  noWebAuthn: "This browser can’t add a passkey. Use another browser or device.",
+  none: "No passkeys yet. Add a passkey to sign in without email.",
+  noWebAuthn: "This browser can’t add a passkey. Please use another browser or device.",
   add: ADD_A_PASSKEY,
-  nameField: "Passkey name",
-  addCommit: "Add passkey",
-  waiting: "Waiting for your device",
-  notAdded: "No passkey was added.",
+  nameField: "Passkey Name",
+  addCommit: "Add Passkey",
+  waiting: "Waiting for your device.",
+  notAdded: "No passkey was added. Please try again.",
   unnamed: "Passkey",
   notUsed: "Not used yet",
   rename: "Rename",
@@ -53,10 +50,11 @@ export const PASSKEY_WORDS = {
   saving: "Saving",
   cancel: "Cancel",
   remove: "Remove",
-  removeConsequence: "It stops signing you in at once, on every device that holds it.",
-  removeCommit: "Remove passkey",
+  removeConsequence:
+    "Are you sure you want to remove this passkey? It will stop working on every device.",
+  removeCommit: "Remove",
   offer: "Sign in with your fingerprint, face or device PIN instead of email.",
-  dismissOffer: "Dismiss the passkey offer",
+  dismissOffer: "Dismiss Passkey Offer",
 } as const;
 
 /** `Added 3 March 2026 · Last used 09:41 · 30 September 2026`, or `· Not used yet`. */
@@ -65,7 +63,7 @@ export const passkeyDates = (createdAt: string, lastUsedAt: string | null): stri
     lastUsedAt === null ? PASSKEY_WORDS.notUsed : `Last used ${instantWords(lastUsedAt)}`
   }`;
 
-export const removePasskeyTitle = (name: string): string => `Remove the passkey “${name}”`;
+export const removePasskeyTitle = (name: string): string => `Remove Passkey “${name}”`;
 
 /** In the order a user agent is read: Edge names Chrome, and Chrome names Safari. */
 const BROWSERS = [
@@ -103,57 +101,66 @@ export const AUTHENTICATOR_WORDS = {
   scan: "Scan this QR code with your authenticator.",
   qrCode: "QR code for your authenticator",
   orEnterKey: "Or enter this key:",
-  copyKey: "Copy key",
-  keyCopied: "Key copied.",
-  codeField: "Code from your authenticator",
-  codeHint: "If the code fails, check your phone sets its time automatically.",
-  finish: "Finish setup",
-  finishing: "Finishing setup",
-  startAgain: "Make a key again",
-  removeTitle: "Remove the authenticator",
-  removeConsequence: "It stops confirming your sign-in at once.",
-  removeCommit: "Remove authenticator",
+  copyKey: "Copy Key",
+  keyCopied: "Key copied successfully.",
+  codeField: "Authenticator Code",
+  codeHint:
+    "Authenticator code must be 6 digits. If it doesn’t work, please check that your phone sets its time automatically.",
+  finish: "Finish Setup",
+  finishing: "Finishing Setup",
+  startAgain: "Try Again",
+  removeTitle: "Remove Authenticator",
+  removeConsequence:
+    "Are you sure you want to remove your authenticator? It will stop working immediately.",
+  removeCommit: "Remove",
 } as const;
 
 export const RECOVERY_CODE_WORDS = {
-  heading: "Recovery codes",
-  none: "You have no recovery codes.",
-  make: "Make recovery codes",
-  replace: "Replace recovery codes",
-  making: "Making codes",
-  replaceTitle: "Replace your recovery codes",
-  replaceConsequence: "Your current codes stop working at once.",
-  replaceCommit: "Make new codes",
-  saveHeading: "Save your recovery codes",
+  heading: "Recovery Codes",
+  none: "No recovery codes yet",
+  make: "Make Recovery Codes",
+  replace: "Replace Recovery Codes",
+  making: "Making Codes",
+  makingLine: "Making codes.",
+  replaceTitle: "Replace Recovery Codes",
+  replaceConsequence:
+    "Are you sure you want to replace your recovery codes? Your current codes will stop working immediately.",
+  replaceCommit: "Replace",
+  saveHeading: "Save Your Recovery Codes",
   saveLine:
-    "If you lose your passkey and authenticator, each code signs you in once. This is the only time they’re shown.",
-  replacedLine: "These replace the codes shown before, which no longer work.",
-  list: "Recovery codes",
-  copy: "Copy codes",
-  copied: "Codes copied.",
+    "Each code signs you in once if you lose your second factor. They won’t be shown again.",
+  replacedLine: "Your previous codes no longer work.",
+  list: "Recovery Codes",
+  copy: "Copy Codes",
+  copied: "Codes copied successfully.",
   download: "Download",
   print: "Print",
   saved: "I have saved these codes",
   done: "Done",
-  finish: "Finish setup",
+  finish: "Finish Setup",
 } as const;
 
 export const codesLeft = (unused: number, madeAt: string): string =>
   `${String(unused)} of ${String(RECOVERY_CODES_IN_A_SET)} unused · made ${dayWords(madeAt)}`;
 
 /** The api sends the notice without waiting on it, so the page never says it arrived. */
-const noticeTo = (address: string): string => `A notice is on its way to ${address}.`;
+const noticeTo = (address: string): string => `A confirmation email is on its way to ${address}.`;
 
 /** Said once an action lands, with the notice every change of a second factor sends. */
 export const ACTION_LANDED = {
-  passkeyAdded: (name: string, address: string) => `Passkey “${name}” added. ${noticeTo(address)}`,
-  passkeyRenamed: (name: string) => `Passkey renamed “${name}”.`,
+  passkeyAdded: (name: string, address: string) =>
+    `Passkey “${name}” has been added successfully. ${noticeTo(address)}`,
+  passkeyRenamed: (name: string) => `Passkey has been renamed to “${name}” successfully.`,
   passkeyRemoved: (name: string, address: string) =>
-    `Passkey “${name}” removed. ${noticeTo(address)}`,
-  setUp: (address: string) => `${AUTHENTICATOR_WORDS.held} ${noticeTo(address)}`,
-  removed: (address: string) => `Authenticator removed. ${noticeTo(address)}`,
-  made: (address: string) => `Recovery codes made. ${noticeTo(address)}`,
-  replaced: (address: string) => `Recovery codes replaced. ${noticeTo(address)}`,
+    `Passkey “${name}” has been removed successfully. ${noticeTo(address)}`,
+  setUp: (address: string) =>
+    `Your authenticator has been set up successfully. ${noticeTo(address)}`,
+  removed: (address: string) =>
+    `Your authenticator has been removed successfully. ${noticeTo(address)}`,
+  made: (address: string) =>
+    `Your recovery codes have been made successfully. ${noticeTo(address)}`,
+  replaced: (address: string) =>
+    `Your recovery codes have been replaced successfully. ${noticeTo(address)}`,
 } as const;
 
 export const RECOVERY_CODES_FILE = `${PRODUCT_NAME}-recovery-codes.txt`;

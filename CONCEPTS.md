@@ -560,7 +560,7 @@ sensitivity, audience, cadence, destination and retention class; the unit the sc
 the unit that is published.
 
 Every source an Admin adds is one, listed on Control Centre › Sources › Connected sources and added
-by *Connect a document*. One collection per connected source — a website is connected per URL
+by *Connect a Document*. One collection per connected source — a website is connected per URL
 prefix. It wears one state word: **received** (its documents are in the object store),
 **indexing** (a sync is turning them into passages), **indexed** (the sync has finished and there
 is something to review) and **published**. An upload's connected source id is minted by its
@@ -672,7 +672,7 @@ One execution of a connected source by the scheduler (enumerate, index, extract,
 
 It is claimed under a lease, keyed by its run key, checkpointed per batch, one per connected source
 at a time, parked after repeated failure; its outcome rows record what changed per document.
-A page reads *Last synced*, *Not synced yet* or *Sync failed*.
+A page reads *Last Synced*, *Not synced yet* or *Sync failed*.
 
 ### job
 
@@ -1675,7 +1675,7 @@ the one action that ends what a person was issued, in two scopes.
 instant on their member row the resolver refuses against; nothing outside that workspace changes,
 and the Admin never learns whether others exist. *Everywhere*: the operator ends every session and
 token the person holds, by an instant on the person. Both end what was issued; a fresh sign-in
-mints anew. The member page's last section reads *Remove and end every sign-in*.
+mints anew. The member page's last section reads *Remove and End Every Sign-In*.
 
 ### share agent token
 
@@ -1942,7 +1942,7 @@ page, search or filter, which is why the bar counts the ticked rows out of sight
 ### bulk action
 
 An action an Admin takes over every ticked row at once, from the *selection bar*: on Members,
-*Change role*, *Add to group* and *Remove*.
+*Change Role*, *Add to Group* and *Remove*.
 
 It changes every ticked row or none: if any is refused, nothing lands, and the refusal names each
 refused person with its *refused items*, shown or not. A ticked row whose change is already true is
@@ -1971,7 +1971,7 @@ rail and the menu, in three cells.
 
 Its three cells are the *logo* over the rail; the *workspace switcher* and the *navigation control*
 over the menu; then the *breadcrumb*, *Jump to* and the **avatar menu**, which shows the person's
-initials and opens to their name, their role and *Sign out*. It holds no page's actions: those are
+initials and opens to their name, their role and *Sign Out*. It holds no page's actions: those are
 in the page's own *page head*. Hiding the menu moves nothing in it. Where the window is not wide it
 takes two rows, the breadcrumb alone on the second, and scrolls with the page.
 

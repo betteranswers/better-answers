@@ -22,7 +22,7 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const modelChoicesCard = (page: Page) => page.getByRole("region", { name: "Model choices" });
+const modelChoicesCard = (page: Page) => page.getByRole("region", { name: "Model Choices" });
 
 const ANSWERING: SeedModelChoice = {
   purpose: "answering",
@@ -278,8 +278,8 @@ test.describe("the Models and spend page's model choices card", () => {
     await skipLinkReachesThePage(page);
 
     await expect(modelChoicesCard(page)).toMatchAriaSnapshot(`
-      - region "Model choices":
-        - heading "Model choices" [level=2]
+      - region "Model Choices":
+        - heading "Model Choices" [level=2]
         - paragraph
         - paragraph
         - list:
@@ -317,7 +317,7 @@ test.describe("the Models and spend page's model choices card", () => {
           - tab "Spend"
         - tabpanel "Model Choices":
           - /children: equal
-          - region "Model choices"
+          - region "Model Choices"
     `);
 
     await passesTheAccessibilityGate();

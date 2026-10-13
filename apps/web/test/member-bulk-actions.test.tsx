@@ -50,7 +50,7 @@ const tickedMembers = (count: number, readable: boolean) =>
         </h1>
         <OutcomeLine outcome={outcome} />
         <SelectionBar
-          label="Selected members"
+          label="Selected Members"
           ticked={ticked}
           shown={[]}
           noun={["member", "members"]}
@@ -78,8 +78,8 @@ const ticking = async (count: number, readable = true) => {
 };
 
 const ACTIONS = [
-  ["Change role", "C"],
-  ["Add to group", "G"],
+  ["Change Role", "C"],
+  ["Add to Group", "G"],
   ["Remove", "D"],
 ];
 
@@ -102,13 +102,13 @@ describe("the members' bulk actions", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("opens Change role on exactly 200 ticked", async () => {
+  it("opens Change Role on exactly 200 ticked", async () => {
     await ticking(200);
 
-    fireEvent.click(screen.getByRole("button", { name: "Change role" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change Role" }));
 
     expect(
-      await screen.findByRole("dialog", { name: "Change the role of 200 members" }),
+      await screen.findByRole("dialog", { name: "Change Role for 200 Members" }),
     ).toBeDefined();
     expect(screen.queryByText(AT_MOST)).toBeNull();
   });
@@ -116,9 +116,9 @@ describe("the members' bulk actions", () => {
   it("says a failed groups read, never that none exist", async () => {
     await ticking(2);
 
-    fireEvent.click(screen.getByRole("button", { name: "Add to group" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add to Group" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "Add 2 members to a group" });
+    const dialog = await screen.findByRole("dialog", { name: "Add 2 Members to a Group" });
     await waitFor(() => {
       expect(within(dialog).getByRole("alert").textContent).not.toBe("");
     });

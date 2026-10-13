@@ -54,4 +54,4 @@ export const refusalSentence = (
 ): string => ({ ...OWN_ON_EVERY_SURFACE, ...own })[word] ?? stockOfClass(refusalClass);
 
 /** The label of each control that takes an ended or stale session to sign in. */
-export const SIGN_IN_AGAIN = "Sign in again";
+export const SIGN_IN_AGAIN = "Sign In Again";

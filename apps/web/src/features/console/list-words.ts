@@ -14,57 +14,53 @@ const WORKSPACES: Noun = ["workspace", "workspaces"];
 
 export const EVERYONE_WORDS = {
   heading: "Everyone",
-  description:
-    "Every person on the platform, the workspaces they belong to and their role in each, with the sessions and assistant access that can act as them.",
+  description: "See every person on the platform.",
   search: "Search by name or address",
-  caption:
-    "Every person on the platform, with the workspaces they belong to, their role in each and their last sign-in. A person’s name opens them.",
+  caption: "Every person on the platform.",
   loading: "The people are still loading.",
-  readingAgain: "Reading the list again.",
+  readingAgain: "Updating the list.",
   onTheFirstPage: "This is the first page of people.",
   onTheLastPage: "This is the last page of people.",
   counted: (total: number): string => `${counted(total, ...PEOPLE)} on the platform.`,
   matching: (total: number, search: string): string => matching(total, PEOPLE, search),
-  noneYet: "No one is on the platform yet.",
-  noneMatch: (search: string): string => `No one matches “${search}”.`,
+  noneYet: "No people yet",
+  noneMatch: (search: string): string => `No results found for “${search}”.`,
 } as const;
 
 const namesCounted = (count: number): string => {
-  if (count === 0) return "No name waits to be corrected.";
-  return count === 1 ? "1 name waits to be corrected." : `${count} names wait to be corrected.`;
+  if (count === 0) return "No names are waiting to be corrected.";
+  return count === 1
+    ? "1 name is waiting to be corrected."
+    : `${count} names are waiting to be corrected.`;
 };
 
 export const NAMES_WAITING_WORDS = {
-  heading: "Names waiting",
-  description:
-    "Display names an Admin flagged to better-answers support, the longest waiting first. Correcting a name replaces it in every workspace and takes it off this list.",
+  heading: "Names Waiting",
+  description: "Review display names flagged by Admins.",
   search: "Search by name or workspace",
-  caption:
-    "Every display name an Admin flagged and nobody has corrected since, the longest waiting first, with the workspaces that flagged it and when. Each row’s action corrects the name.",
+  caption: "Display names waiting to be corrected.",
   loading: "The names waiting are still loading.",
   counted: namesCounted,
   matching: (count: number, search: string): string => matching(count, NAMES, search),
-  noneWaiting: "Every flagged name is corrected.",
-  whatWaits:
-    "A name an Admin flags from their workspace’s People page waits here until you correct it.",
-  noneMatch: (search: string): string => `No name matches “${search}”.`,
+  noneWaiting: "No names waiting",
+  whatWaits: "Names flagged by Admins will appear here.",
+  noneMatch: (search: string): string => `No results found for “${search}”.`,
 } as const;
 
 export const WORKSPACES_WORDS = {
-  heading: "Every workspace",
-  description: "In name order. “More about” a workspace shows its id.",
+  heading: "Every Workspace",
+  description: "Listed in name order.",
   search: "Search by name or short name",
   columns: {
     workspace: "Workspace",
-    shortName: "Short name",
+    shortName: "Short Name",
     memberCount: "Members",
     createdAt: "Provisioned",
   },
-  caption:
-    "Every workspace on the platform, in name order, with its short name, how many members it has and the day it was provisioned. “More about” a workspace shows its id.",
+  caption: "Every workspace on the platform.",
   loading: "The workspaces are still loading.",
   counted: (count: number): string => `${counted(count, ...WORKSPACES)} on the platform.`,
   matching: (count: number, search: string): string => matching(count, WORKSPACES, search),
-  noneMatch: (search: string): string => `No workspace matches “${search}”.`,
-  moreAbout: (name: string): string => `More about ${name}`,
+  noneMatch: (search: string): string => `No results found for “${search}”.`,
+  moreAbout: (name: string): string => `More About ${name}`,
 } as const;

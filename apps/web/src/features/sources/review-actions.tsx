@@ -188,6 +188,7 @@ function ReasonedDialog(properties: {
   readonly action: BulkActionState;
   readonly title: string;
   readonly consequence: string;
+  readonly commit: string;
   readonly onReason: (reason: string) => void;
 }) {
   const { action } = properties;
@@ -209,7 +210,7 @@ function ReasonedDialog(properties: {
       consequence={properties.consequence}
       commit={
         <Button type="submit" form={formId}>
-          {properties.title}
+          {properties.commit}
         </Button>
       }
     >
@@ -232,7 +233,7 @@ function KeepInTextAction(properties: ActionProperties) {
 
   const kept = (reason: string) => {
     action.command({
-      pending: words.pending(groups.length),
+      pending: words.pending,
       done: () => words.done(groups.length, findings),
       run: (ready, settled) => {
         keep.mutate(reasonedAsk(ready, reason), settled);
@@ -245,12 +246,13 @@ function KeepInTextAction(properties: ActionProperties) {
       action={action}
       enabledBy={properties.enabledBy}
       keystroke={SOURCES_KEYSTROKES.keep}
-      label={action.ready === undefined ? words.label : words.named(groups.length)}
+      label={words.label}
       dialog={
         <ReasonedDialog
           action={action}
           title={words.named(groups.length)}
           consequence={words.consequence}
+          commit={words.label}
           onReason={kept}
         />
       }
@@ -263,13 +265,12 @@ function NarrowDocumentsAction(properties: ActionProperties) {
   const narrow = useNarrowDocuments();
   const groups = action.ready?.groups ?? [];
   const documents = [...new Map(groups.map((group) => [group.documentId, group.title]))];
-  const named = counted(documents.length, "document", "documents");
 
   const confirm = () => {
     action.command<DocumentsNarrowed>({
-      pending: `Narrowing ${named} to ${NARROWEST}.`,
+      pending: "Narrowing.",
       done: (narrowed) =>
-        `Narrowed ${counted(narrowed.documentIds.length, "document", "documents")} to ${NARROWEST}; ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.writeUps.length, "write-up", "write-ups")} moved with them.`,
+        `${counted(narrowed.documentIds.length, "document", "documents")} narrowed to ${NARROWEST} successfully. ${counted(narrowed.concepts.length, "concept", "concepts")} and ${counted(narrowed.writeUps.length, "write-up", "write-ups")} were updated with them.`,
       run: (ready, settled) => {
         narrow.mutate(askOf(ready), settled);
       },
@@ -281,19 +282,15 @@ function NarrowDocumentsAction(properties: ActionProperties) {
       action={action}
       enabledBy={properties.enabledBy}
       keystroke={SOURCES_KEYSTROKES.narrowDocuments}
-      label={action.ready === undefined ? REVIEW_WORDS.narrowDocuments.label : `Narrow ${named}`}
+      label={REVIEW_WORDS.narrowDocuments.label}
       dialog={
         <ActionDialog
           open={action.open}
           onOpenChange={action.setOpen}
           content={{ onCloseAutoFocus: action.returnFocus }}
-          title={`Narrow ${named} to ${NARROWEST}`}
-          consequence={`Each document takes the sensitivity ${NARROWEST}. The ticked groups’ unreviewed findings are reviewed as narrowed, and every concept citing the documents moves with them. A narrowing never widens, and this page cannot undo it.`}
-          commit={
-            <Button onClick={confirm}>
-              Narrow {named} to {NARROWEST}
-            </Button>
-          }
+          title={`Narrow ${counted(documents.length, "Document", "Documents")} to ${NARROWEST}`}
+          consequence="This limits who can read these documents. Concepts that cite them are updated too. This action cannot be undone."
+          commit={<Button onClick={confirm}>Narrow</Button>}
         >
           <ul className="grid gap-1">
             {documents.map(([documentId, title]) => (
@@ -328,13 +325,12 @@ function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
 
   const dismissed = (reason: string) => {
     action.command<DismissedAsNotSpecialCategory>({
-      pending: `Dismissing ${named} as not special category.`,
+      pending: "Dismissing.",
       done: (answer) => (
         <>
-          Dismissed {named} as not special category in{" "}
-          {counted(answer.documentIds.length, "document", "documents")}. The sync that reads the
-          dismissal <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />
-          .
+          {named} dismissed in {counted(answer.documentIds.length, "document", "documents")}{" "}
+          successfully. The sync{" "}
+          <SyncStatus connectedSourceId={answer.connectedSourceId} jobId={answer.jobId} />.
         </>
       ),
       run: (ready, settled) => {
@@ -348,13 +344,14 @@ function DismissAsNotSpecialCategoryAction(properties: ActionProperties) {
       action={action}
       enabledBy={properties.enabledBy}
       keystroke={SOURCES_KEYSTROKES.dismiss}
-      label={action.ready === undefined ? words.label : words.named(ticked)}
+      label={words.label}
       refusedWhy={SAID_OF_A_CONNECTED_SOURCE["not-special-category"]}
       dialog={
         <ReasonedDialog
           action={action}
           title={words.named(ticked)}
           consequence={words.consequence}
+          commit={words.label}
           onReason={dismissed}
         />
       }

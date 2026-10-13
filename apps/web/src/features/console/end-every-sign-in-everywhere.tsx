@@ -22,7 +22,7 @@ const outcomeOf = (revocation: Revocation, name: string): Outcome | undefined =>
   if (revocation.isSuccess) {
     return {
       tone: "said",
-      words: `${name}’s sessions and assistant access ended at ${instantWords(revocation.data.revokedAt)}. They can sign in again.`,
+      words: `${name}’s sessions and assistant access were ended successfully at ${instantWords(revocation.data.revokedAt)}.`,
     };
   }
   return revocation.isError ? revocationRefused(revocation.error, "action") : undefined;
@@ -45,10 +45,10 @@ export function EndEverySignInEverywhere(properties: {
   };
 
   return (
-    <SheetPart title="End every sign-in everywhere">
+    <SheetPart title="End Every Sign-In Everywhere">
       <p id={consequenceId} className="text-muted-foreground">
-        Ends every session and every assistant’s access {name} holds, in every workspace, at once.
-        They can sign in again afterwards. Recorded on the identity-set audit log under your name.
+        This will end every session and every assistant’s access {name} holds, in every workspace.
+        They can sign in again afterwards.
       </p>
       <SheetActionButton
         actionRef={actionRef}
@@ -58,7 +58,7 @@ export function EndEverySignInEverywhere(properties: {
           setConfirming(true);
         }}
       >
-        End every sign-in and token {name} holds
+        End Every Sign-In and Token
       </SheetActionButton>
       <OutcomeLine outcome={outcomeOf(revocation, name)} />
       {refusedAsStale(revocation.error) ? <SignInAgain back={backTo(person, "revoke")} /> : null}
@@ -72,11 +72,11 @@ export function EndEverySignInEverywhere(properties: {
             actionRef.current?.focus();
           },
         }}
-        title={`End every sign-in and token ${name} holds`}
-        consequence={`Every session and every assistant’s access ${name} holds ends now, in every workspace they belong to. They can sign in and connect an assistant again afterwards; this page cannot undo it.`}
+        title={`End Every Sign-In and Token for ${name}`}
+        consequence={`Are you sure you want to end every session and every assistant’s access ${name} holds, in every workspace? This action cannot be undone.`}
         commit={
           <Button variant="destructive" onClick={commit}>
-            End every sign-in everywhere
+            End Every Sign-In Everywhere
           </Button>
         }
       />

@@ -56,7 +56,7 @@ const groupButton = (page: Page, name: string): Locator =>
   groupsRegion(page).getByRole("button", { name, exact: true });
 
 const nameField = (page: Page): Locator =>
-  groupsRegion(page).getByRole("textbox", { name: "Name of a new group" });
+  groupsRegion(page).getByRole("textbox", { name: "New Group Name" });
 
 const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
 
@@ -149,9 +149,9 @@ test.describe("the People group's Groups page", () => {
       - region "Groups":
         - heading "Groups" [level=2]
         - status: /\\b2\\b/
-        - form "Create a group":
-          - textbox "Name of a new group"
-          - button "Create the group"
+        - form "Create a Group":
+          - textbox "New Group Name"
+          - button "Create Group"
         - table:
           - caption
           - rowgroup:
@@ -236,7 +236,7 @@ test.describe("a group's actions", () => {
 
     await nameField(page).fill("HR team");
     const refused = refusalAnswering(page, "members.createGroup");
-    await groupsRegion(page).getByRole("button", { name: "Create the group" }).click();
+    await groupsRegion(page).getByRole("button", { name: "Create Group" }).click();
 
     expect(await refused).toMatchObject({ word: "name-taken" });
     await saysARefusal(groupsRegion(page).getByRole("alert"));
@@ -287,16 +287,16 @@ test.describe("a group's actions", () => {
       sheet.getByRole("region", { name: "Delete" }).getByRole("paragraph"),
       "the card counts no member the deletion takes",
     ).toHaveText(/\b2\b/);
-    await sheet.getByRole("button", { name: "Delete HR team" }).click();
+    await sheet.getByRole("button", { name: "Delete Group" }).click();
 
     const confirming = page.getByRole("alertdialog", { name: "Delete HR team" });
     await expect(
       confirming,
       "the confirmation counts no member the deletion takes",
     ).toHaveAccessibleDescription(/\b2\b/);
-    await expect(confirming.getByRole("button", { name: "Keep HR team" })).toBeFocused();
+    await expect(confirming.getByRole("button", { name: "Keep Group" })).toBeFocused();
     await passesTheAccessibilityGate();
-    await confirming.getByRole("button", { name: "Delete HR team" }).focus();
+    await confirming.getByRole("button", { name: "Delete", exact: true }).focus();
     await clockTheNextKey(page, { at: LIST_COUNT, reads: "1" });
     await page.keyboard.press("Enter");
 
@@ -357,10 +357,10 @@ test.describe("a group's actions", () => {
         - region "Rename":
           - heading "Rename" [level=3]
           - textbox "Name": Bid writers
-          - button "Rename Bid writers"
+          - button "Rename Group"
         - region "Delete":
           - heading "Delete" [level=3]
-          - button "Delete Bid writers"
+          - button "Delete Group"
         - button "Close"
     `);
     await passesTheAccessibilityGate();
@@ -435,12 +435,12 @@ test.describe("a group's actions", () => {
     await expect(groupButton(page, "Site managers")).toBeFocused();
 
     await page.keyboard.press("d");
-    await expect(renamed.getByRole("button", { name: "Delete Site managers" })).toBeFocused();
+    await expect(renamed.getByRole("button", { name: "Delete Group" })).toBeFocused();
     await page.keyboard.press("Enter");
     const confirming = page.getByRole("alertdialog", { name: "Delete Site managers" });
-    await expect(confirming.getByRole("button", { name: "Keep Site managers" })).toBeFocused();
+    await expect(confirming.getByRole("button", { name: "Keep Group" })).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(confirming.getByRole("button", { name: "Delete Site managers" })).toBeFocused();
+    await expect(confirming.getByRole("button", { name: "Delete", exact: true })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(groupRows(page)).toHaveCount(2);
     await expect(groupsRegion(page).getByRole("heading", { name: "Groups" })).toBeFocused();
@@ -508,7 +508,7 @@ test.describe("a member's groups, on their row and their page", () => {
     await page.keyboard.press("g");
     const memberPage = page.getByRole("main");
     const groups = memberPage.getByRole("region", { name: "Groups", exact: true });
-    const picked = memberPage.getByRole("group", { name: "Groups Priya Shah is in" });
+    const picked = memberPage.getByRole("group", { name: "Groups for Priya Shah" });
     const bids = picked.getByRole("checkbox", { name: "Bid writers" });
     await expect(bids).toBeFocused();
     await expect(bids).not.toBeChecked();
@@ -530,7 +530,7 @@ test.describe("a member's groups, on their row and their page", () => {
       - region "Groups":
         - heading "Groups" [level=3]
         - status: /Priya Shah.*HR team/
-        - group "Groups Priya Shah is in":
+        - group "Groups for Priya Shah":
           - checkbox "Bid writers" [checked]
           - checkbox "HR team"
     `);
@@ -561,9 +561,9 @@ test.describe("a member's groups, on their row and their page", () => {
         - heading "Groups" [level=3]
         - status
         - paragraph
-        - link "Create one on the Groups page"
+        - link "Go to Groups"
     `);
-    await groups.getByRole("link", { name: "Create one on the Groups page" }).click();
+    await groups.getByRole("link", { name: "Go to Groups" }).click();
 
     await expect(page).toHaveURL(new RegExp(`${GROUPS_PAGE}$`));
     await expect(groupsRegion(page)).toMatchAriaSnapshot(`
@@ -571,8 +571,8 @@ test.describe("a member's groups, on their row and their page", () => {
         - heading "Groups" [level=2]
         - status: /\\b0\\b/
         - form "${GROUPS_KEYSTROKES.create.action}":
-          - textbox "Name of a new group"
-          - button "Create the group"
+          - textbox "New Group Name"
+          - button "Create Group"
         - table:
           - rowgroup:
             - row "Group Members"

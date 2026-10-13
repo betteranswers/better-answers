@@ -191,7 +191,7 @@ test("a just-promoted Admin sees what can confirm, gone once confirmed", async (
   });
 
   await page.goto(`/invitations/${invited.id}`);
-  await page.getByRole("button", { name: INVITATION_WORDS.join(workspace.name) }).click();
+  await page.getByRole("button", { name: INVITATION_WORDS.join }).click();
 
   await expect(confirmHeading(page)).toBeVisible();
   const whatConfirms = page.getByRole("main").getByRole("list");

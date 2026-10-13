@@ -21,7 +21,7 @@ const drawn = async (page: Page, request: APIRequestContext) => {
   await expect(page.getByRole("table")).toBeVisible();
 };
 
-const bar = (page: Page) => page.getByRole("toolbar", { name: "Selected members" });
+const bar = (page: Page) => page.getByRole("toolbar", { name: "Selected Members" });
 
 const tickOf = (page: Page, name: string) => page.getByRole("checkbox", { name: `Select ${name}` });
 
@@ -65,7 +65,7 @@ test.describe("the shared list parts, drawn together", () => {
     await tickOf(page, "Cy Twombly").click();
     await tickOf(page, "Ada Lovelace").click();
     await expect(bar(page).getByRole("status")).toHaveText(/\b2\b/);
-    await expect(page.getByRole("navigation", { name: "Pages of members" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Pages of Members" })).toBeVisible();
 
     const room = await page.evaluate(() => {
       const edge = document.documentElement.clientWidth;
@@ -143,7 +143,7 @@ test.describe("the shared list parts, drawn together", () => {
     await tabUntilFocused(page, tickOf(page, "Cy Twombly"));
     await page.keyboard.press("Space");
 
-    const action = bar(page).getByRole("button", { name: "Change role" });
+    const action = bar(page).getByRole("button", { name: "Change Role" });
     const clear = bar(page).getByRole("button", { name: "Clear Selection" });
     await backUntilFocused(page, action);
     await page.keyboard.press("ArrowRight");

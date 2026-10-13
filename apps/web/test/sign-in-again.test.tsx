@@ -32,7 +32,7 @@ const refusedOn = async (failure: Error) => {
   return screen.getByRole("alert");
 };
 
-const signInAgain = () => screen.queryByRole("button", { name: "Sign in again" });
+const signInAgain = () => screen.queryByRole("button", { name: "Sign In Again" });
 
 describe("a refusal beside a way to sign in again", () => {
   it("shows the session sentence above the sign-in button", async () => {

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 
 import { refusalOf, useTRPC, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -158,7 +159,7 @@ export function NoWorkspacePage() {
       <div className="mt-8 flex flex-wrap items-center gap-2">
         <AccountLink />
         <SignOutButton />
-        <KeystrokesAction page="this page" keystrokes={keystrokesOf(invitations)} />
+        <KeystrokesAction page={KEYSTROKE_WORDS.thisPage} keystrokes={keystrokesOf(invitations)} />
       </div>
     </AuthPage>
   );

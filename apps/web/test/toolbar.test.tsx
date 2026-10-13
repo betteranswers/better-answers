@@ -130,7 +130,7 @@ describe("the toolbar the open page fills", () => {
       within(tabs()).getByRole("tab", { name: "Spend" }).id,
     );
     expect(panel.textContent).toMatch(/\S/v);
-    expect(screen.queryByRole("region", { name: "Model choices" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Model Choices" })).toBeNull();
     // A tab divides a page, so the page's own words stand either way.
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Models");
   });
@@ -157,7 +157,7 @@ describe("the toolbar the open page fills", () => {
     expect(panel.getAttribute("aria-labelledby")).toBe(
       within(tabs()).getByRole("tab", { name: "Model Choices" }).id,
     );
-    expect(within(panel).getByRole("region", { name: "Model choices" })).toBeDefined();
+    expect(within(panel).getByRole("region", { name: "Model Choices" })).toBeDefined();
   });
 
   it("draws no toolbar or panel without tabs", async () => {

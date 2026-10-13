@@ -166,7 +166,7 @@ describe("the shell's regions", () => {
   it("gives Models the model choices card", async () => {
     await openAs("Admin", "/models/models-and-spend");
 
-    expect(screen.getByRole("heading", { level: 2, name: "Model choices" })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 2, name: "Model Choices" })).toBeDefined();
   });
 
   it("says an unknown address names no page", async () => {

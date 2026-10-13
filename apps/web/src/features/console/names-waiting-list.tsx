@@ -98,7 +98,7 @@ const columnsFor = (actions: NameActions) =>
     }),
     column.display({
       id: "flags",
-      header: "Flagged by",
+      header: "Flagged By",
       cell: ({ row }) => <Flags waiting={row.original} />,
     }),
     column.display({
@@ -118,7 +118,7 @@ function NothingWaits() {
       <p className="font-medium">{WORDS.noneWaiting}</p>
       <p className="text-muted-foreground">{WORDS.whatWaits}</p>
       <Button asChild variant="outline" className="mt-3">
-        <Link to={EVERYONE_PATH}>Find a person in Everyone</Link>
+        <Link to={EVERYONE_PATH}>Go to Everyone</Link>
       </Button>
     </div>
   );

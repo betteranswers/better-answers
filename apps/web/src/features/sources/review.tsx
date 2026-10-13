@@ -37,10 +37,10 @@ import {
 import { groupsCounted, REVIEW_WORDS, sentenceCased } from "./words.ts";
 
 const NOTHING_FOUND = {
-  received: "No sync has finished yet, so nothing has been found.",
-  indexing: "The sync has not finished, so nothing has been found yet.",
-  indexed: "The last sync found nothing to withhold in this connected source.",
-  published: "The last sync found nothing to withhold in this connected source.",
+  received: "No findings yet",
+  indexing: "No findings yet",
+  indexed: "No findings in the last sync",
+  published: "No findings in the last sync",
 } satisfies Record<ListedConnectedSource["state"], string>;
 
 function Note(properties: { readonly tag: string; readonly children: ReactNode }) {
@@ -109,12 +109,12 @@ function Preview(properties: { readonly connectedSource: ListedConnectedSource }
     <Collapsible open={open} onOpenChange={setOpen} className="mt-6">
       <CollapsibleTrigger asChild>
         <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-          Preview the passages a reader would see once published
+          Preview Passages
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <p className="mt-2 text-muted-foreground">
-          Seen by Admins here and by nobody else anywhere until the connected source is published.
+          What readers will see once it is published. Only Admins can see this until then.
         </p>
         <PreviewPassages preview={preview} open={open} />
       </CollapsibleContent>
@@ -158,9 +158,8 @@ function FindingsTable(properties: {
   return (
     <Table>
       <TableCaption>
-        {groupsCounted(selected.length)} selected. Select a group with{" "}
-        <kbd className="font-mono">{SOURCES_KEYSTROKES.select.key}</kbd>, then keep it in text,
-        narrow its document or dismiss it as not special category with the actions above.
+        {groupsCounted(selected.length)} selected. Press{" "}
+        <kbd className="font-mono">{SOURCES_KEYSTROKES.select.key}</kbd> to select a group.
       </TableCaption>
       <TableHeader>
         <TableRow>

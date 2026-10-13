@@ -60,14 +60,14 @@ const searchBox = () => screen.getByRole("searchbox", { name: "Search by name or
 /** Three pages of five. */
 const PAGES_OF_TWELVE = {
   kind: "pages",
-  label: "Pages of members",
+  label: "Pages of Members",
   pageSize: 5,
   total: 12,
 } as const;
 
 const PAGE_KEYSTROKES = {
-  previous: { key: "[", action: "Show the previous page of members" },
-  next: { key: "]", action: "Show the next page of members" },
+  previous: { key: "[", action: "Show the Previous Page of Members" },
+  next: { key: "]", action: "Show the Next Page of Members" },
 };
 
 /** jsdom's click moves no focus, where a browser's press leaves it on the button. */
@@ -281,7 +281,7 @@ describe("the list's states", () => {
 describe("the list's pages", () => {
   it("turns pages and says where the reader is", () => {
     render(<MembersList pageSize={2} />);
-    const pages = screen.getByRole("navigation", { name: "Pages of members" });
+    const pages = screen.getByRole("navigation", { name: "Pages of Members" });
 
     expect(within(pages).getByText("Showing 1–2 of 5.")).toBeTruthy();
     expect(within(pages).getByText("Page 1 of 3")).toBeTruthy();
@@ -298,7 +298,7 @@ describe("the list's pages", () => {
 
   it("says where a turn landed in one live status", () => {
     render(<MembersList pageSize={2} />);
-    const pages = screen.getByRole("navigation", { name: "Pages of members" });
+    const pages = screen.getByRole("navigation", { name: "Pages of Members" });
 
     fireEvent.click(within(pages).getByRole("button", { name: "Next Page" }));
     expect(
@@ -311,7 +311,7 @@ describe("the list's pages", () => {
   it("draws no pages when one page holds the list", () => {
     render(<MembersList pageSize={25} />);
 
-    expect(screen.queryByRole("navigation", { name: "Pages of members" })).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Pages of Members" })).toBeNull();
   });
 
   it("shows the last page when rows leave a later one", () => {
@@ -321,7 +321,7 @@ describe("the list's pages", () => {
 
     rerender(<MembersList pageSize={2} members={MEMBERS.slice(0, 2)} />);
     expect(people()).toEqual(["Cy Twombly", "Ada Lovelace"]);
-    expect(screen.queryByRole("navigation", { name: "Pages of members" })).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Pages of Members" })).toBeNull();
   });
 
   it("starts again from the first page when a filter narrows", () => {
@@ -341,7 +341,7 @@ describe("the list's pages", () => {
       <ListPages
         pages={{
           kind: "more",
-          label: "Older events",
+          label: "Older Events",
           more: true,
           loading: false,
           onMore: more,
@@ -360,7 +360,7 @@ describe("the list's pages", () => {
       <ListPages
         pages={{
           kind: "more",
-          label: "Older events",
+          label: "Older Events",
           more: true,
           loading: true,
           onMore: more,
@@ -410,7 +410,7 @@ describe("the list's pages", () => {
     const more = vi.fn<() => void>();
     const { rerender } = render(
       <ListPages
-        pages={{ kind: "more", label: "Older events", more: true, loading: false, onMore: more }}
+        pages={{ kind: "more", label: "Older Events", more: true, loading: false, onMore: more }}
       />,
     );
 
@@ -419,7 +419,7 @@ describe("the list's pages", () => {
 
     rerender(
       <ListPages
-        pages={{ kind: "more", label: "Older events", more: false, loading: false, onMore: more }}
+        pages={{ kind: "more", label: "Older Events", more: false, loading: false, onMore: more }}
       />,
     );
     expect(screen.queryByRole("button", { name: "Load More" })).toBeNull();
@@ -453,7 +453,7 @@ describe("the filter row", () => {
           {
             label: "Role",
             value: undefined,
-            anyLabel: "Any role",
+            anyLabel: "Any Role",
             choices: [{ value: "Admin", label: "Admin" }],
             onChange: () => undefined,
           },
@@ -461,7 +461,7 @@ describe("the filter row", () => {
       />,
     );
 
-    expect(screen.getByRole("combobox", { name: "Filter by Role" }).textContent).toBe("Any role");
+    expect(screen.getByRole("combobox", { name: "Filter by Role" }).textContent).toBe("Any Role");
   });
 
   it("tells a choice valued “any” from no narrowing at all", () => {

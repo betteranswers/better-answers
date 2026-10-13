@@ -6,7 +6,7 @@ import { MembersList } from "./members-list.tsx";
 
 placedWithoutMeasuring();
 
-const bar = () => screen.queryByRole("toolbar", { name: "Selected members" });
+const bar = () => screen.queryByRole("toolbar", { name: "Selected Members" });
 
 /** Each count the bar's status shows: the rows ticked, then the ticked rows a search hides. */
 const countsIn = (shown: HTMLElement | null): readonly string[] =>
@@ -30,7 +30,7 @@ describe("the selection bar", () => {
 
     expect(bar()).toBeNull();
     const standing = screen.getByRole("toolbar", { hidden: true });
-    expect(standing.getAttribute("aria-label")).toBe("Selected members");
+    expect(standing.getAttribute("aria-label")).toBe("Selected Members");
     expect(within(standing).getByRole("status", { hidden: true }).textContent).toBe("");
   });
 
@@ -71,7 +71,7 @@ describe("the selection bar", () => {
     tick("Cy Twombly");
     fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
     tick("Ed Ruscha");
-    fireEvent.click(within(bar() ?? document.body).getByRole("button", { name: "Change role" }));
+    fireEvent.click(within(bar() ?? document.body).getByRole("button", { name: "Change Role" }));
 
     expect(actions).toEqual(["change the role of cy, ed"]);
   });
@@ -90,7 +90,7 @@ describe("the selection bar", () => {
   it("moves between its buttons by arrow keys, one tab stop", async () => {
     render(<MembersList />);
     tick("Ada Lovelace");
-    const action = within(bar() ?? document.body).getByRole("button", { name: "Change role" });
+    const action = within(bar() ?? document.body).getByRole("button", { name: "Change Role" });
     const clear = within(bar() ?? document.body).getByRole("button", { name: "Clear Selection" });
 
     action.focus();
@@ -119,7 +119,7 @@ describe("the selection bar", () => {
 
     tick("Ada Lovelace");
     within(bar() ?? document.body)
-      .getByRole("button", { name: "Change role" })
+      .getByRole("button", { name: "Change Role" })
       .focus();
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "x" });
     expect(document.activeElement).toBe(search());

@@ -43,8 +43,8 @@ function Sessions(properties: { readonly sessions: readonly HeldSession[] }) {
     <SheetPart title="Sessions">
       <p>
         {sessions.length === 0
-          ? "No session is open."
-          : `${counted(sessions.length, "session", "sessions")} open. Ending every sign-in and token closes every one at once.`}
+          ? "No open sessions"
+          : `${counted(sessions.length, "session", "sessions")} open.`}
       </p>
       {sessions.length === 0 ? null : (
         <ul className="grid gap-3">
@@ -54,7 +54,7 @@ function Sessions(properties: { readonly sessions: readonly HeldSession[] }) {
                 <SummaryRow term="Began">
                   <At iso={session.createdAt} />
                 </SummaryRow>
-                <SummaryRow term="Last used">
+                <SummaryRow term="Last Used">
                   <At iso={session.lastUsedAt} />
                 </SummaryRow>
                 <SummaryRow term="Expires">
@@ -98,12 +98,12 @@ function GrantItem(properties: {
       <Collapsible className="mt-1">
         <CollapsibleTrigger asChild>
           <Button variant="link" size="sm" className="h-auto px-0 text-left whitespace-normal">
-            More about {assistant}’s grant
+            More About {assistant}’s Grant
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <Facts>
-            <SummaryRow term="Client id">
+            <SummaryRow term="Client ID">
               <code className="font-mono break-all">{grant.assistant.id}</code>
             </SummaryRow>
             {properties.more}
@@ -121,7 +121,7 @@ function OpenGrant(properties: { readonly grant: HeldGrant; readonly nowMs: numb
       grant={grant}
       state={grantStateOf(grant, properties.nowMs)}
       facts={
-        <SummaryRow term="Last used">
+        <SummaryRow term="Last Used">
           <At iso={grant.lastUsedAt} />
         </SummaryRow>
       }
@@ -145,8 +145,8 @@ function Ended(properties: { readonly grant: EndedGrant }) {
           <SummaryRow term="Ended">
             <At iso={grant.endedAt} />
           </SummaryRow>
-          <SummaryRow term="Ended by">{endedByWords(grant.endedBy)}</SummaryRow>
-          <SummaryRow term="Ended in">
+          <SummaryRow term="Ended By">{endedByWords(grant.endedBy)}</SummaryRow>
+          <SummaryRow term="Ended In">
             {grant.scope === "everywhere" ? "Every workspace" : (grant.workspace?.name ?? "None")}
           </SummaryRow>
         </>
@@ -163,9 +163,9 @@ function Grants(properties: {
   const { grants, ended } = properties;
   const [openedAtMs] = useState(Date.now);
   return (
-    <SheetPart title="Assistant access">
+    <SheetPart title="Assistant Access">
       {grants.length === 0 && ended.length === 0 ? (
-        <p>No assistant has been connected as {properties.name}.</p>
+        <p>No assistants connected as {properties.name} yet</p>
       ) : (
         <ul className="grid gap-4">
           {grants.map((grant) => (
@@ -199,10 +199,10 @@ function HeldCredentials(properties: { readonly person: ListedPerson }) {
     );
   }
   return (
-    <SheetPart title="Sessions and assistant access">
+    <SheetPart title="Sessions and Assistant Access">
       <p>
         {inspected.error === null
-          ? "Reading the sessions and assistant access."
+          ? "The sessions and assistant access are still loading."
           : readRefused(inspected.error)}
       </p>
     </SheetPart>
@@ -249,12 +249,12 @@ export function PersonSheet(properties: {
         <SheetPart title="Workspaces">
           <WorkspacesAndRoles person={person} />
         </SheetPart>
-        <SheetPart title="Sign-in">
+        <SheetPart title="Sign-In">
           <Facts>
-            <SummaryRow term="Last sign-in">
+            <SummaryRow term="Last Sign-In">
               <Instant at={person.lastSignedInAt} none="None on record" />
             </SummaryRow>
-            <SummaryRow term="Every sign-in and token ended">
+            <SummaryRow term="Every Sign-In and Token Ended">
               <Instant at={person.credentialsRevokedAt} none="Never" />
             </SummaryRow>
           </Facts>

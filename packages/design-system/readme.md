@@ -75,6 +75,19 @@ same manner where Kibo has none. A Kibo string that names a thing takes the glos
 for it, so Kibo's "Remove Team Member" is "Remove Member" here. Kibo's emoji and joke messages
 are left out. New text follows this section even where older text beside it does not.
 
+A description says what the reader does here, or the plain fact, and stops. It is a few words:
+a verb and its object. A page's lead line, a dialog's description, help text and the line under
+an empty state's title are all descriptions. The reader has the heading and the page in front
+of them, so a description does not repeat the heading or explain how the product works. It
+keeps a fact only where the reader needs it to act and nothing else on the page shows it.
+Kibo's patterns hold no page's lead line, so two of the web's own show one. Each was first
+written to explain, and reads as the second column has it:
+
+| Written to explain | Reads |
+| --- | --- |
+| "Manage the documents this workspace learns from." | "Manage documents." |
+| "Type to filter the list, then choose an item." | "Type to search." |
+
 British spelling and UK conventions throughout.
 
 Kibo's strings, by kind of text. A line that names a group, a workspace or a member had Kibo's
@@ -121,14 +134,18 @@ verb keeps its capital, as in "Sign In Again".
 | Dialog, sheet and drawer title | Title Case | "Leave Workspace", "Remove Member", "Edit Profile" |
 | Button, a confirmation's buttons included | Title Case | "Save Changes", "View Details", "Go Back", "Keep Member" |
 | Menu item | Title Case | "View Details", "Mark as Complete", "Add Tags" |
+| A keystroke's action in the Keyboard Shortcuts list | Title Case, as a menu item | "Show This List", "Review the Connected Source in Focus" |
 | Tab | Title Case | "Personal Info", "Audit Log" |
 | Table header | Title Case | "IP Address", "Display Name" |
+| A term in a summary list | Title Case, as a table header | "Last Synced", "Client ID" |
 | Form field label and legend | Title Case | "Display Name", "Email Address", "Personal Information" |
 | Tick box and switch label | Sentence case | "Remember me", "Email notifications" |
 | Radio option label | Sentence case, as a tick box label | "All new messages" |
 | Link text | Title Case where it stands alone, whether it names where it leads or says the action as a button would; sentence case where it is part of a sentence | "Terms of Service", "Back to Sign In"; in a sentence, "account page" in "You can change this later from your account page." |
 | Empty state title | Sentence case, no full stop | "No results found", "No groups yet" |
+| An empty list's one line | Sentence case, no full stop, as an empty state title | "No connected sources yet" |
 | Description, help text, tooltip | Sentence case, with a full stop | "This will be displayed publicly.", "Must be at least 8 characters long." |
+| Loading line | Sentence case, with a full stop | "The members are still loading." |
 | Alert, done message, field message | Sentence case | "Your changes have been saved successfully.", "Please enter a valid email address." |
 
 Proper nouns keep their case in every kind of text: Control Centre, Admin, Editor, Viewer,

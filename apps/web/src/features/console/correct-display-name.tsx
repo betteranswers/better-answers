@@ -4,7 +4,7 @@ import { OutcomeLine } from "@/shared/outcome.tsx";
 import { SheetPart } from "@/shared/sheet-part.tsx";
 
 import { CorrectNameDialog } from "./correct-name-dialog.tsx";
-import { correctWords } from "./correcting-words.ts";
+import { CORRECT_DISPLAY_NAME } from "./correcting-words.ts";
 import { backTo } from "./people-address.ts";
 import type { ListedPerson } from "./people-api.ts";
 import { nameOf } from "./person-words.tsx";
@@ -29,11 +29,9 @@ export function CorrectDisplayName(properties: {
   };
 
   return (
-    <SheetPart title="Display name">
+    <SheetPart title="Display Name">
       <p id={consequenceId} className="text-muted-foreground">
-        Replaces {name}’s display name in every workspace they belong to, under the rule a person’s
-        own name follows, and ends any flag waiting on it. Recorded on the identity-set audit log
-        under your name.
+        This will replace {name}’s display name in every workspace they belong to.
       </p>
       <SheetActionButton
         actionRef={actionRef}
@@ -43,7 +41,7 @@ export function CorrectDisplayName(properties: {
           setAsking(true);
         }}
       >
-        {correctWords(name)}
+        {CORRECT_DISPLAY_NAME}
       </SheetActionButton>
       <OutcomeLine outcome={correcting.outcome} />
       {correcting.staleFor === undefined ? null : <SignInAgain back={backTo(person, "correct")} />}

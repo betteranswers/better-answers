@@ -23,7 +23,7 @@ const aLinkWhoseSignIn =
   (input: string | URL | Request): Promise<Response> =>
     addressOf(input).pathname === "/sign-in-link/sign-in" ? signIn() : answered(BOUND);
 
-const signInButton = () => screen.getByRole("button", { name: "Sign in" });
+const signInButton = () => screen.getByRole("button", { name: "Sign In" });
 
 describe("a link's sign-in that got no response", () => {
   it("says to try again, its Sign in button still pressable", async () => {
@@ -33,7 +33,7 @@ describe("a link's sign-in that got no response", () => {
     vi.stubGlobal("fetch", aLinkWhoseSignIn(signIn));
     globalThis.history.replaceState(null, "", `/sign-in/link#${TOKEN}`);
     await openApp("/sign-in/link");
-    fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign In" }));
 
     await waitFor(() => {
       expect(screen.getByRole("alert").textContent).toBe(SIGN_IN_UNCONFIRMED);

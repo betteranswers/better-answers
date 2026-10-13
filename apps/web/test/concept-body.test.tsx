@@ -320,7 +320,7 @@ describe("a concept's body", () => {
       ["/"],
     );
     const down = screen.getByRole("link", { name: "1" });
-    const back = screen.getByRole("link", { name: "Back to the claim" });
+    const back = screen.getByRole("link", { name: "Back to the Claim" });
 
     fireEvent.click(down);
     expect(document.activeElement).toBe(back);
@@ -398,7 +398,7 @@ describe("a concept's body", () => {
     expect(within(article).getByRole("heading", { name: "Footnotes" })).toBeDefined();
     const footnote = within(article).getByRole("listitem");
     expect(footnote.textContent).toContain("Reviewed each April.");
-    expect(within(footnote).getByRole("link", { name: "Back to the claim" })).toBeDefined();
+    expect(within(footnote).getByRole("link", { name: "Back to the Claim" })).toBeDefined();
   });
 });
 

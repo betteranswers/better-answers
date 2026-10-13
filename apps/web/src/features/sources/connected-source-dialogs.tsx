@@ -10,7 +10,7 @@ import { counted } from "@/shared/words.ts";
 import { connectedSourceHeadingId } from "./connected-source-list.tsx";
 import { outcomeOfFailure } from "./refusal.tsx";
 import { useFindings, type ListedConnectedSource } from "./sources-api.ts";
-import { AUDIENCE_WORDS, AUDITED_CATEGORIES, spokenWord } from "./words.ts";
+import { AUDIENCE_WORDS, AUDITED_CATEGORIES, sensitivityAndAudienceWords } from "./words.ts";
 
 type DialogProperties = {
   readonly connectedSource: ListedConnectedSource;
@@ -28,10 +28,15 @@ const closedBy = (onClose: () => void) => (open: boolean) => {
   if (!open) onClose();
 };
 
+/** `said` is the tick box's label and `term` the same words as the audit summary's term. */
 const CONFIRMATIONS = [
-  { field: "lawfulBasisRecorded", said: "Lawful basis recorded" },
-  { field: "privacyInformationUpdated", said: "Privacy information updated" },
-  { field: "dpiaReferenced", said: "DPIA reference recorded" },
+  { field: "lawfulBasisRecorded", said: "Lawful basis recorded", term: "Lawful Basis Recorded" },
+  {
+    field: "privacyInformationUpdated",
+    said: "Privacy information updated",
+    term: "Privacy Information Updated",
+  },
+  { field: "dpiaReferenced", said: "DPIA reference recorded", term: "DPIA Reference Recorded" },
 ] as const;
 
 type Confirmation = (typeof CONFIRMATIONS)[number]["field"];
@@ -47,12 +52,12 @@ function TheAuditRow(properties: {
   return (
     <section aria-labelledby={headingId}>
       <h3 id={headingId} className="font-medium">
-        What the audit row will carry
+        What the Audit Log Will Record
       </h3>
       <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
         <SummaryRow term="Action">Connected source published</SummaryRow>
-        <SummaryRow term="Connected source">{properties.connectedSource.name}</SummaryRow>
-        <SummaryRow term="By">You, at the instant the platform records it</SummaryRow>
+        <SummaryRow term="Connected Source">{properties.connectedSource.name}</SummaryRow>
+        <SummaryRow term="By">You, when you publish</SummaryRow>
         {properties.children}
       </dl>
     </section>
@@ -74,7 +79,7 @@ function WhatTheRowCarries(properties: {
       <SummaryRow term="Sensitivity">{properties.connectedSource.sensitivity}</SummaryRow>
       <SummaryRow term="Audience">{AUDIENCE_WORDS[properties.connectedSource.audience]}</SummaryRow>
       {CONFIRMATIONS.map((confirmation) => (
-        <SummaryRow key={confirmation.field} term={confirmation.said}>
+        <SummaryRow key={confirmation.field} term={confirmation.term}>
           {properties.ticked.has(confirmation.field) ? "Confirmed" : "Not yet confirmed"}
         </SummaryRow>
       ))}
@@ -85,15 +90,13 @@ function WhatTheRowCarries(properties: {
             : outcomeOfFailure(findings.error, "read").words}
         </SummaryRow>
       ) : (
-        AUDITED_CATEGORIES.map((category) => (
-          <SummaryRow key={category} term={`Findings, ${spokenWord(category)}`}>
+        AUDITED_CATEGORIES.map(({ category, term }) => (
+          <SummaryRow key={category} term={term}>
             {totals.get(category) ?? 0}
           </SummaryRow>
         ))
       )}
-      <SummaryRow term="DPIA input">
-        The hash of this connected source’s DPIA input, taken at the click
-      </SummaryRow>
+      <SummaryRow term="DPIA Input">A hash of the DPIA input, taken when you publish</SummaryRow>
     </TheAuditRow>
   );
 }
@@ -121,15 +124,15 @@ export function PublishDialog(properties: DialogProperties) {
         onCloseAutoFocus: toTheConnectedSource(connectedSource.connectedSourceId),
       }}
       title={`Publish ${connectedSource.name}`}
-      consequence={`Its passages reach ${AUDIENCE_WORDS[connectedSource.audience].toLowerCase()} at the sensitivity ${connectedSource.sensitivity} the moment you publish. This page cannot unpublish it.`}
+      consequence={`It will be published as ${sensitivityAndAudienceWords(connectedSource)}. This action cannot be undone.`}
       commit={
         <Button disabled={!allConfirmed} aria-describedby={hintId} onClick={confirm}>
-          Publish {connectedSource.name}
+          Publish
         </Button>
       }
     >
       <fieldset className="grid gap-3">
-        <legend className="mb-2 font-medium">Confirm each before publishing</legend>
+        <legend className="mb-2 font-medium">Confirm Before Publishing</legend>
         {CONFIRMATIONS.map((confirmation) => (
           <div key={confirmation.field} className="flex items-center gap-2">
             <Checkbox
@@ -151,8 +154,8 @@ export function PublishDialog(properties: DialogProperties) {
 
       <p id={hintId} className="text-sm text-muted-foreground">
         {allConfirmed
-          ? "One governed write, audited under your name."
-          : "Publishing needs all three confirmations."}
+          ? "This will be recorded in the audit log."
+          : "All three confirmations are required."}
       </p>
     </ActionDialog>
   );
@@ -164,7 +167,7 @@ export const movedWords = (moved: {
 }): ReactNode => (
   <>
     {counted(moved.concepts.length, "concept", "concepts")} and{" "}
-    {counted(moved.writeUps.length, "write-up", "write-ups")} moved with it.
+    {counted(moved.writeUps.length, "write-up", "write-ups")} were updated with it.
     {moved.concepts.length === 0 ? null : (
       <span className="block">
         Concepts:{" "}

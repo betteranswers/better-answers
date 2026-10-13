@@ -55,13 +55,13 @@ function WorkspaceCell(properties: { readonly workspace: ListedWorkspace }) {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <Facts>
-            <dt className="text-muted-foreground">Workspace id</dt>
+            <dt className="text-muted-foreground">Workspace ID</dt>
             <dd>
               <code className="font-mono break-all">{workspace.id}</code>
             </dd>
           </Facts>
           <p className="mt-1 text-muted-foreground">
-            An ops command names this workspace by its id, after <code>--workspace</code>.
+            Use this ID after <code>--workspace</code> in ops commands.
           </p>
         </CollapsibleContent>
       </Collapsible>
@@ -108,8 +108,8 @@ const wordsOf = (workspace: ListedWorkspace): string => `${workspace.name}\n${wo
 function NoneProvisioned() {
   return (
     <p className="px-4 py-10">
-      No workspace is provisioned yet. The ops command <code>provision-workspace</code> makes the
-      first.
+      No workspaces yet. Use the ops command <code>provision-workspace</code> to create the first
+      one.
     </p>
   );
 }

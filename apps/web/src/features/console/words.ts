@@ -10,7 +10,7 @@ export const NO_PERSON_IN_FOCUS = selectFirst(SELECT_A_PERSON_FIRST);
 
 export const NO_NAME_IN_FOCUS = selectFirst(SELECT_A_NAME_FIRST);
 
-export const CONSOLE_CLOSED = "The console is better-answers support’s alone";
+export const CONSOLE_CLOSED = "Access Denied";
 
 /** The console's reads have no sentence of their own, so each says its class's. */
 export const saidOf = (refusal: Refusal): string =>

@@ -5,9 +5,9 @@ import type { Keystroke } from "@/shared/keystrokes.tsx";
 import type { Family } from "./audit-log-api.ts";
 
 export const AUDIT_LOG_KEYSTROKES = {
-  search: { key: "/", action: "Search the audit log" },
-  older: { key: "o", action: "Show older events" },
-  export: { key: "e", action: "Export the events shown as a file" },
+  search: { key: "/", action: "Search the Audit Log" },
+  older: { key: "o", action: "Show Older Events" },
+  export: { key: "e", action: "Export the Events Shown as a File" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 /** In the order the filter offers them. */

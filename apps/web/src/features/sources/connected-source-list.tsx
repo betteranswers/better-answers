@@ -68,7 +68,8 @@ function MoreAbout(properties: {
           className="h-auto px-0 text-left whitespace-normal"
           onFocus={properties.onFocus}
         >
-          More about {connectedSource.name}
+          More Details
+          <span className="sr-only"> {connectedSource.name}</span>
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
@@ -232,7 +233,7 @@ function ConnectedSourceItem(properties: {
         <Row term="State">
           <Pill>{STATE_WORDS[connectedSource.state]}</Pill>
         </Row>
-        <Row term="Last synced">{lastSyncedWords(connectedSource.lastSync)}</Row>
+        <Row term="Last Synced">{lastSyncedWords(connectedSource.lastSync)}</Row>
       </dl>
 
       <MoreAbout connectedSource={connectedSource} onFocus={focused} />

@@ -93,7 +93,7 @@ const rolesChanged = async (page: Page, names: readonly string[], role: Role): P
   const { changeRole } = BULK_WORDS;
   const dialog = await opened(page, names, changeRole);
   await chosen(dialog, "Role", role);
-  const commit = dialog.getByRole("button", { name: changeRole.commit(names.length, role) });
+  const commit = dialog.getByRole("button", { name: changeRole.action, exact: true });
   await committed(page, "members.bulkChangeRole", commit, names.length);
   for (const name of names) {
     await expect(rowOf(page, name).getByRole("cell").nth(ROLE_CELL)).toHaveText(role);
@@ -104,7 +104,7 @@ const addedToGroup = async (page: Page, names: readonly string[], group: string)
   const { addToGroup } = BULK_WORDS;
   const dialog = await opened(page, names, addToGroup);
   await chosen(dialog, "Group", group);
-  const commit = dialog.getByRole("button", { name: addToGroup.commit(names.length, group) });
+  const commit = dialog.getByRole("button", { name: addToGroup.action, exact: true });
   await committed(page, "members.bulkAddToGroup", commit, names.length);
   for (const name of names) {
     await expect(rowOf(page, name).getByRole("cell").nth(GROUPS_CELL)).toContainText(group);
@@ -113,7 +113,7 @@ const addedToGroup = async (page: Page, names: readonly string[], group: string)
 
 const groupMade = async (page: Page, name: string): Promise<void> => {
   await page.goto(GROUPS);
-  const naming = groupsRegion(page).getByRole("textbox", { name: "Name of a new group" });
+  const naming = groupsRegion(page).getByRole("textbox", { name: "New Group Name" });
   await naming.fill(name);
   await naming.press("Enter");
   await expect(groupButton(page, name)).toBeFocused();
@@ -124,10 +124,10 @@ const groupDeleted = async (page: Page, name: string): Promise<void> => {
   await page.goto(GROUPS);
   await groupButton(page, name).click();
   const sheet = page.getByRole("dialog", { name });
-  await sheet.getByRole("button", { name: `Delete ${name}` }).click();
+  await sheet.getByRole("button", { name: "Delete Group" }).click();
   const confirm = page
     .getByRole("alertdialog", { name: `Delete ${name}` })
-    .getByRole("button", { name: `Delete ${name}` });
+    .getByRole("button", { name: "Delete", exact: true });
   // The list drops the group before the api answers, and the run reads the api next.
   await Promise.all([answeredOk(page, "members.deleteGroup"), confirm.click()]);
   await expect(sheet).toHaveCount(0);
@@ -148,7 +148,7 @@ const repaired = async (page: Page, repair: RepairMembers): Promise<void> => {
 };
 
 const pagesOfMembers = (page: Page): Locator =>
-  page.getByRole("navigation", { name: "Pages of members" });
+  page.getByRole("navigation", { name: "Pages of Members" });
 
 /** Each turn waits for the count it says, so the next turn starts from the page it drew. */
 const lastPageReached = async (page: Page): Promise<number> => {
@@ -220,14 +220,14 @@ const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
     // A failed read says so in the same region, so the page's own read is the one judged.
     const [read] = await Promise.all([connectedSourcesRead(page), page.goto(CONNECTED_SOURCES)]);
     expect(read, "the page read a connected source the fixture does not hold").toBe(0);
-    const connectedSources = page.getByRole("region", { name: "Connected sources" });
+    const connectedSources = page.getByRole("region", { name: "Connected Sources" });
     await saysOfItsRead(connectedSources);
     await expect(connectedSources.getByRole("listitem")).toHaveCount(0);
     await gate();
   });
   await test.step("Models and spend", async () => {
     await page.goto(MODELS_AND_SPEND);
-    await expect(page.getByRole("region", { name: "Model choices" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Model Choices" })).toBeVisible();
   });
 };
 

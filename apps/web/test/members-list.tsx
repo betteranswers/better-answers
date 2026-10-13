@@ -305,7 +305,7 @@ function MembersTable(properties: { readonly held: Held }) {
       <ListPages
         pages={{
           kind: "pages",
-          label: "Pages of members",
+          label: "Pages of Members",
           pageIndex: held.pageIndex,
           pageSize: held.pageSize,
           total: held.total,
@@ -356,7 +356,7 @@ export function MembersList(properties: Asked) {
           {
             label: "Role",
             value: held.narrowed.role,
-            anyLabel: "Any role",
+            anyLabel: "Any Role",
             choices: ROLES.map((role) => ({ value: role, label: role })),
             onChange: (role) => {
               held.narrow({ role });
@@ -374,11 +374,11 @@ export function MembersList(properties: Asked) {
         }}
       />
       <SelectionBar
-        label="Selected members"
+        label="Selected Members"
         ticked={ticked}
         shown={held.table.getRowModel().rows.map((row) => row.id)}
         noun={["member", "members"]}
-        clearKeystroke={{ key: "x", action: "Clear the selection" }}
+        clearKeystroke={{ key: "x", action: "Clear the Selection" }}
         onClear={() => {
           held.setTicked(new Set());
         }}
@@ -389,7 +389,7 @@ export function MembersList(properties: Asked) {
             held.onAction(`change the role of ${[...ticked].join(", ")}`);
           }}
         >
-          Change role
+          Change Role
         </SelectionAction>
       </SelectionBar>
       <MembersRead asked={properties} held={held} />

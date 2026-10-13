@@ -12,13 +12,12 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Card, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
-import { instantWords } from "@/shared/words.ts";
 
 import { EMPTY_LINES } from "./empty-lines.ts";
 import { GroupChecklist } from "./group-checklist.tsx";
 import { useGroups } from "./groups-api.ts";
 import { GroupsReadSaid } from "./groups-read.tsx";
-import { INCLUDES_YOU, MEMBER_PAGE_WORDS as WORDS, RECORDED } from "./member-action-words.ts";
+import { MEMBER_PAGE_WORDS as WORDS } from "./member-action-words.ts";
 import { MemberRemoval } from "./member-removal.tsx";
 import { GROUPS_PATH } from "./members-address.ts";
 import {
@@ -26,13 +25,12 @@ import {
   useFlagDisplayName,
   useReaderId,
   useEndEverySignInAndToken,
-  type CredentialsRevokedHere,
   type ListedMember,
   type Role,
   type RoleChanged,
 } from "./people-api.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
-import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
+import { ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
 import { useSelfActionHome } from "./self-action.tsx";
 import { CredentialsHere, Day, nameOf } from "./words.tsx";
 
@@ -68,13 +66,12 @@ function AccessSummary(properties: { readonly member: ListedMember }) {
 }
 
 /** The hint beside the commit, which says so when the action is on the reader themself. */
-const roleHint = (name: string, held: Role, unchanged: boolean, yourself: boolean): string => {
-  if (unchanged) return WORDS.holdsRole(name, held);
+const roleHint = (name: string, held: Role, picked: Role, yourself: boolean): string => {
+  if (picked === held) return WORDS.holdsRole(name, held);
   // The role held is said here too: a refused change leaves the pick on a role they do not hold.
   const heldNow = WORDS.heldUntilChanged(name, held);
-  return yourself
-    ? `${INCLUDES_YOU} ${RECORDED} It holds from your next request. ${heldNow}`
-    : `${RECORDED} It holds from their next request. ${heldNow}`;
+  const change = yourself ? WORDS.changesYourRole(picked) : WORDS.changesTheirRole(picked);
+  return `${heldNow} ${change}`;
 };
 
 function RolePicker(properties: {
@@ -103,10 +100,7 @@ function RolePicker(properties: {
       { personId: member.personId, role: picked },
       {
         onSuccess: (changed: RoleChanged) => {
-          setOutcome({
-            tone: "said",
-            words: `${name} is ${aRole(changed.role)} now, from their next request.`,
-          });
+          setOutcome({ tone: "said", words: WORDS.roleChanged(name, changed.role) });
           // People is for Admins, so a reader who is one no longer leaves it for their new home.
           if (!yourself || changed.role === "Admin") return;
           void goHome("demoted").then((unread) => {
@@ -161,10 +155,10 @@ function RolePicker(properties: {
 
           <div className="flex flex-col items-start gap-2">
             <Button disabled={unchanged} aria-describedby={hintId} onClick={commit}>
-              {unchanged ? WORDS.changeRole : WORDS.makeRole(name, picked)}
+              {WORDS.changeRole}
             </Button>
             <p id={hintId} className="text-sm text-muted-foreground">
-              {roleHint(name, member.role, unchanged, yourself)}
+              {roleHint(name, member.role, picked, yourself)}
             </p>
           </div>
 
@@ -193,10 +187,10 @@ function CredentialsRevoker(properties: {
     revoke.mutate(
       { personId: member.personId },
       {
-        onSuccess: (revoked: CredentialsRevokedHere) => {
+        onSuccess: () => {
           setOutcome({
             tone: "said",
-            words: `${WORDS.everySignInEnded(name)} ${WORDS.refusedFrom(instantWords(revoked.revokedAt))}`,
+            words: WORDS.everySignInEnded(name),
           });
         },
         onError: (failure: Error | ApiError) => {
@@ -220,8 +214,8 @@ function CredentialsRevoker(properties: {
           {WORDS.endEverySignInAndToken}
         </Button>
         <p id={hintId} className="text-sm text-muted-foreground">
-          {WORDS.endsAtOnce(name)}{" "}
-          {member.personId === readerId ? "Your own session here ends with it." : RECORDED}
+          {WORDS.endsAtOnce(name)}
+          {member.personId === readerId ? " Your own session here will end too." : null}
         </p>
       </div>
 
@@ -233,7 +227,7 @@ function CredentialsRevoker(properties: {
 /** Shown at the press, since the answer is this for every member; a refusal replaces it. */
 const SENT_TO_THE_OPERATOR: Outcome = {
   tone: "said",
-  words: "Sent to better-answers support. The name stands until they correct it.",
+  words: "The name has been flagged to better-answers support.",
 };
 
 function DisplayNameFlag(properties: {
@@ -258,26 +252,24 @@ function DisplayNameFlag(properties: {
   };
 
   return (
-    <SheetPart title="Display name">
+    <SheetPart title="Display Name">
       {member.displayName === "" ? (
         <p className="min-w-0 text-sm text-muted-foreground">
-          <Address address={member.address} /> has given no display name yet, so there is none to
-          flag.
+          <Address address={member.address} /> has not set a display name yet.
         </p>
       ) : (
         <>
           <p className="text-sm">
-            People give their own display name, and no Admin can change one. better-answers support
-            corrects a name you flag as inappropriate.
+            People set their own display name. Flag a name that is inappropriate.
           </p>
           <div className="flex flex-col items-start gap-2">
             <Button ref={flagRef} variant="outline" aria-describedby={hintId} onClick={flag}>
               <Icon name="flag" />
-              Flag the name to support
+              Flag Name
             </Button>
             <p id={hintId} className="text-sm text-muted-foreground">
-              better-answers support is emailed, and the flag is recorded on the audit log under
-              your name. While a flag from this workspace waits, another adds nothing.
+              This will email better-answers support to correct it. A name already flagged is not
+              flagged again.
             </p>
           </div>
           <OutcomeLine outcome={outcome} className="contents" />
@@ -307,15 +299,15 @@ function GroupsPicker(properties: {
             className="gap-1"
             action={
               <Link to={GROUPS_PATH} className="text-brand underline">
-                Create one on the Groups page
+                Go to Groups
               </Link>
             }
           />
         ) : null}
         {workspaceGroups.length === 0 ? null : (
           <GroupChecklist
-            legend={`Groups ${name} is in`}
-            hint={`Each box puts ${name} in its group or takes them out at once.`}
+            legend={`Groups for ${name}`}
+            hint="Changes are saved immediately."
             choices={workspaceGroups.map((group) => ({
               id: group.id,
               label: group.name,

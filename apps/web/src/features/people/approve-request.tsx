@@ -27,8 +27,8 @@ export function ApproveRequest(properties: {
       onFocusBack={() => {
         properties.onFocusBack(sent.current);
       }}
-      title={`Approve the request from ${requesterName(request)}`}
-      consequence={`Approving emails ${request.requester.email} an invitation to join this workspace at the role below. It lasts seven days, and they become a member when they accept it.`}
+      title={`Approve Request from ${requesterName(request)}`}
+      consequence={`This will send ${request.requester.email} an invitation to join this workspace with the role below.`}
       commit={
         <Button
           onClick={() => {
@@ -36,7 +36,7 @@ export function ApproveRequest(properties: {
             properties.onApprove(role);
           }}
         >
-          Approve and send the invitation
+          Approve
         </Button>
       }
     >

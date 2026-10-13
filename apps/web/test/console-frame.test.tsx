@@ -199,7 +199,7 @@ describe("the console's shell", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "The console is better-answers support’s alone",
+        name: "Access Denied",
       }),
     ).toBeDefined();
     const refused = screen.getByRole("alert").textContent;

@@ -14,7 +14,7 @@ const drawAPictureWithNoAltText = (): void => {
 /** A refused action's button, held at its disabled look until the fade's last moment. */
 const fadeAButtonBackFromItsDisabledLook = (): void => {
   const button = document.createElement("button");
-  button.textContent = "Make Test person a Viewer";
+  button.textContent = "Change Role";
   button.style.cssText =
     "background: var(--primary); color: var(--primary-foreground); padding: 8px 16px; opacity: 0.5; transition: opacity 4s step-end";
   document.querySelector("main")?.append(button);
@@ -174,7 +174,7 @@ const scrollAControlHalfUnderABand = (): boolean => {
 
 const theSignInPage = async (page: Page): Promise<void> => {
   await page.goto("/sign-in");
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
 };
 
 test("audits the page a spec leaves, though it never asked", async ({ page }) => {

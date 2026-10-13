@@ -101,7 +101,7 @@ describe("a pending session meeting the gate", () => {
     const { router } = await openAsAda("/people/members");
 
     expect(router.state.location.href).toBe("/confirm?redirect=%2Fpeople%2Fmembers");
-    expect(heading()).toBe("Confirm it’s you");
+    expect(heading()).toBe("Confirm It’s You");
   });
 
   it("sends a reader holding no factor to setup instead", async () => {
@@ -162,7 +162,7 @@ describe("a pending refusal heard mid-session", () => {
     const { router } = await openAsAda("/people/groups");
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Confirm it’s you" }),
+      await screen.findByRole("heading", { level: 1, name: "Confirm It’s You" }),
     ).toBeDefined();
     expect(router.state.location.href).toBe("/confirm?redirect=%2Fpeople%2Fgroups");
   });
@@ -183,8 +183,8 @@ describe("a pending refusal heard mid-session", () => {
     vi.stubGlobal("fetch", ada.fetch);
     const router = await openInTheBrowser("/people/groups");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Dismiss the passkey offer" }));
-    const field = await screen.findByRole("textbox", { name: "Authenticator code" });
+    fireEvent.click(await screen.findByRole("button", { name: "Dismiss Passkey Offer" }));
+    const field = await screen.findByRole("textbox", { name: "Authenticator Code" });
     expect(router.state.location.href).toBe("/confirm?redirect=%2Fpeople%2Fgroups");
     fireEvent.change(field, { target: { value: "123456" } });
 
@@ -292,7 +292,7 @@ describe("the steps after a sign-in", () => {
     signedInByLink(held);
     const { router } = await openAsAda("/sign-in/link#abc123");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign In" }));
 
     await waitFor(() => {
       expect(router.state.location.href).toBe(step);
@@ -305,7 +305,7 @@ describe("the steps after a sign-in", () => {
     signedInByLink(NOTHING_HELD);
     await openAsAda("/sign-in/link#abc123");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign In" }));
 
     await waitFor(() => {
       expect(globalThis.localStorage.getItem(shownUnder)).toBeNull();
@@ -330,13 +330,13 @@ describe("the confirm page for a person just promoted", () => {
     await openAsAda("/confirm");
 
     const list = await screen.findByRole("list", {
-      name: "You’ve just been made an Admin. These can confirm your sign-in:",
+      name: "You’re now an Admin. You can confirm your sign-in with:",
     });
     const [passkey, ...others] = [...list.querySelectorAll("li")].map((item) => item.textContent);
     expect(passkey).toMatch(/MacBook.*3 March 2026/v);
     expect(others).toEqual([PROMOTION_WORDS.authenticator]);
     expect(screen.getByText(PROMOTION_WORDS.after)).toBeDefined();
-    const code = screen.getByRole("textbox", { name: "Authenticator code" });
+    const code = screen.getByRole("textbox", { name: "Authenticator Code" });
     expect(list.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -345,7 +345,7 @@ describe("the confirm page for a person just promoted", () => {
 
     await openAsAda("/confirm");
 
-    await screen.findByRole("textbox", { name: "Authenticator code" });
+    await screen.findByRole("textbox", { name: "Authenticator Code" });
     expect(screen.queryByText(PROMOTION_WORDS.lead)).toBeNull();
     expect(screen.queryByText(PROMOTION_WORDS.after)).toBeNull();
   });
@@ -379,7 +379,7 @@ describe("a sign-in that ended while waiting on its second factor", () => {
     adasApi(() => WAITING_TO_CONFIRM);
 
     await openAsAda("/confirm");
-    await screen.findByRole("textbox", { name: "Authenticator code" });
+    await screen.findByRole("textbox", { name: "Authenticator Code" });
 
     expect(globalThis.localStorage.getItem("better-answers.session")).toBe("pending");
   });

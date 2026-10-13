@@ -214,7 +214,7 @@ export function SensitivityPanel(properties: {
             if (refusedWhy === undefined) onCommit(asked);
           }}
         >
-          {words.commit(connectedSource.name, asked)}
+          {words.commit}
         </Button>
       </div>
     </fieldset>

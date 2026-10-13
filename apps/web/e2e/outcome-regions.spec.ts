@@ -46,10 +46,8 @@ test.describe("an action's outcome region", () => {
     }
     const standing = await onThePage.elementHandles();
 
-    await groupsRegion(page)
-      .getByRole("textbox", { name: "Name of a new group" })
-      .fill("Site leads");
-    await groupsRegion(page).getByRole("button", { name: "Create the group" }).click();
+    await groupsRegion(page).getByRole("textbox", { name: "New Group Name" }).fill("Site leads");
+    await groupsRegion(page).getByRole("button", { name: "Create Group" }).click();
 
     await expect
       .poll(() => Promise.all(standing.map((status) => status.textContent())), {

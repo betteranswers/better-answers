@@ -30,19 +30,19 @@ const menuOf = (actions: readonly ReturnType<typeof action>[]) => {
 describe("a row's menu", () => {
   it("draws a leading destructive action last, below a separator", () => {
     expect(
-      menuOf([action("Remove from workspace", true), action("Open"), action("Change role")]),
-    ).toEqual(["Open", "Change role", "—", "Remove from workspace"]);
+      menuOf([action("Remove from workspace", true), action("Open"), action("Change Role")]),
+    ).toEqual(["Open", "Change Role", "—", "Remove from workspace"]);
   });
 
   it("gathers interleaved destructive actions below one separator, in order", () => {
     const actions = [
       action("Open"),
       action("Remove", true),
-      action("Change role"),
+      action("Change Role"),
       action("Revoke", true),
     ];
 
-    expect(menuOf(actions)).toEqual(["Open", "Change role", "—", "Remove", "Revoke"]);
+    expect(menuOf(actions)).toEqual(["Open", "Change Role", "—", "Remove", "Revoke"]);
   });
 
   it("draws no separator when every action is destructive", () => {

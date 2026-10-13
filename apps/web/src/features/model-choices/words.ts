@@ -1,14 +1,14 @@
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
 export const MODEL_CHOICES_WORDS = {
-  lead: "The AI model used for each purpose in this workspace.",
-  whoSets: `${PRODUCT_NAME} support sets a workspace’s models. Ask them to set one for a purpose that has none.`,
-  noneSet: "No model is set for any purpose yet.",
+  lead: "The AI model used for each purpose.",
+  whoSets: `Contact ${PRODUCT_NAME} support to set a model.`,
+  noneSet: "No models set yet",
   unset: "Not set",
   fixed: "Fixed",
   fixedReason: "This model can’t be changed.",
   loading: "The model choices are still loading.",
-  failed: "The model choices did not load. Reload the page to try again.",
+  failed: "The model choices didn’t load. Please reload the page.",
 } as const;
 
 const PROVIDER_WORDS = new Map([

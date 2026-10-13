@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { ACTIVITY_WORDS, MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
+import {
+  ACTIVITY_WORDS,
+  BULK_WORDS,
+  MEMBER_PAGE_WORDS,
+} from "@/features/people/member-action-words.ts";
 
 const AMARA = "Amara Okafor";
 
 describe("the Role card's words", () => {
-  it("names the change with the member and the role's article", () => {
-    expect(MEMBER_PAGE_WORDS.makeRole(AMARA, "Viewer")).toContain(AMARA);
-    expect(MEMBER_PAGE_WORDS.makeRole(AMARA, "Viewer")).toMatch(/\ba Viewer\b/);
-    expect(MEMBER_PAGE_WORDS.makeRole(AMARA, "Editor")).toMatch(/\ban Editor\b/);
+  it("names the role picked, and tells the reader's own apart", () => {
+    const theirs = MEMBER_PAGE_WORDS.changesTheirRole("Viewer");
+    const yours = MEMBER_PAGE_WORDS.changesYourRole("Viewer");
+
+    for (const said of [theirs, yours]) expect(said).toMatch(/\bViewer\b/);
+    expect(yours).not.toBe(theirs);
   });
 
   it("names the role held, at rest and beside another pick", () => {
@@ -40,5 +46,27 @@ describe("an activity line's marker", () => {
 
     for (const marker of markers) expect(marker).toContain(AMARA);
     expect(new Set(markers).size).toBe(3);
+  });
+});
+
+describe("a bulk action's done line", () => {
+  const doneWith = (changed: number): readonly string[] => [
+    BULK_WORDS.changeRole.done(changed, "Viewer", 3),
+    BULK_WORDS.addToGroup.done(changed, "Site leads", 3),
+    BULK_WORDS.remove.done(changed, 3),
+  ];
+
+  it("counts no success where nobody changed, only the skipped", () => {
+    for (const said of doneWith(0)) {
+      expect(said).not.toMatch(/\b0\b/);
+      expect(said).toMatch(/\b3\b/);
+    }
+  });
+
+  it("counts the changed beside the skipped", () => {
+    for (const said of doneWith(2)) {
+      expect(said).toMatch(/\b2\b/);
+      expect(said).toMatch(/\b3\b/);
+    }
   });
 });

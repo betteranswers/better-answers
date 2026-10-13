@@ -135,9 +135,8 @@ export const tickOf = (name: string) => screen.queryByRole("checkbox", { name: `
 /** The one ticked member's role, sent to change to Viewer through the bar's dialog. */
 export const changeTheTickedToViewer = async () => {
   fireEvent.click(screen.getByRole("button", { name: BULK_WORDS.changeRole.action }));
-  fireEvent.click(
-    await screen.findByRole("button", { name: BULK_WORDS.changeRole.commit(1, "Viewer") }),
-  );
+  const dialog = await screen.findByRole("dialog", { name: BULK_WORDS.changeRole.title(1) });
+  fireEvent.click(within(dialog).getByRole("button", { name: BULK_WORDS.changeRole.action }));
 };
 
 export const openTab = (name: string) => {

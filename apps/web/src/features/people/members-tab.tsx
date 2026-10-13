@@ -175,8 +175,8 @@ const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>): Outcom
 /** Each of the row's actions opens the member's page at that action's control. */
 const ROW_ACTIONS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
   { label: "Open", at: "member" },
-  { label: "Change role", at: "role" },
-  { label: "Add to group", at: "groups" },
+  { label: "Change Role", at: "role" },
+  { label: "Add to Group", at: "groups" },
   { label: "Remove", at: "removal" },
 ];
 
@@ -204,7 +204,7 @@ function MemberFilters(properties: {
   const groupFilter = {
     label: "Group",
     value: narrowed.state.group,
-    anyLabel: "Any group",
+    anyLabel: "Any Group",
     choices: groups.map((group) => ({ value: group.id, label: group.name })),
     onChange: (group: string | undefined) => {
       narrowed.write({ group, page: 1 });
@@ -223,7 +223,7 @@ function MemberFilters(properties: {
         {
           label: "Role",
           value: narrowed.state.role,
-          anyLabel: "Any role",
+          anyLabel: "Any Role",
           choices: ROLES.map((role) => ({ value: role, label: role })),
           onChange: (role) => {
             narrowed.write({ role: ROLES.find((each) => each === role), page: 1 });
@@ -279,8 +279,8 @@ function NoOneMatches(properties: {
         kind: "emptied",
         words:
           narrowed.search === ""
-            ? "No one matches these filters."
-            : `No one matches “${narrowed.search}”.`,
+            ? "No results found. Try adjusting your filters to see more results."
+            : `No results found for “${narrowed.search}”.`,
         clearWords: CLEAR_WORDS.filters,
         onClear: narrowed.clear,
         focusAfterClear: properties.focusAfterClear,
@@ -404,7 +404,7 @@ function MemberList(properties: {
           >
             <GridTable
               table={table}
-              caption="Members of this workspace, each with their address, role, groups and the day they joined. A member’s name opens them; a tick selects them for an action on every member selected."
+              caption="Members of this workspace."
               ticking={{
                 ticked,
                 onTickedChange: setTicked,
@@ -426,7 +426,7 @@ function MemberList(properties: {
           <ListPages
             pages={{
               kind: "pages",
-              label: "Pages of members",
+              label: "Pages of Members",
               pageIndex: narrowed.pageIndex,
               pageSize: PAGE_SIZE,
               total: narrowed.data.length,

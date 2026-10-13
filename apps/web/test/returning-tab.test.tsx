@@ -178,7 +178,7 @@ describe("a tab that changes workspace itself", () => {
     const router = await openAt(MEMBERS, api);
 
     await router.navigate({ href: INVITATION });
-    fireEvent.click(await screen.findByRole("button", { name: INVITATION_WORDS.join(HOLME.name) }));
+    fireEvent.click(await screen.findByRole("button", { name: INVITATION_WORDS.join }));
 
     await landedAtHome(router);
     await waitFor(() => expect(said()).toBe(""));

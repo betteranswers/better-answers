@@ -84,7 +84,7 @@ test("a person in no workspace asks to join by keyboard", async ({
         - paragraph
         - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.reason)}
         - button ${JSON.stringify(ASK_TO_JOIN_WORDS.ask)}
-      - button "Sign out"
+      - button "Sign Out"
       - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
   await expect(shortNameField(page), "the field shows no example").toHaveAccessibleDescription(
@@ -200,8 +200,8 @@ test("sends a person whose session ended back to sign in", async ({ page, contex
   expect(await refused).toMatchObject({ class: "unauthenticated" });
   await saysARefusal(page.getByRole("alert"));
   await thePageSaysNeither(page, "once the session ended");
-  await page.getByRole("button", { name: "Sign in again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  await page.getByRole("button", { name: "Sign In Again" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
 });
 
 test("names no organisation or old word, nor in keystrokes", async ({ page, request }) => {
