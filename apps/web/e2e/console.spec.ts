@@ -35,6 +35,7 @@ import {
   quoted,
   railOf,
   saysARefusal,
+  saysOfItsRead,
   signedInAtHome,
   signIn,
   signInByEmail,
@@ -389,6 +390,7 @@ test.describe("the console's Workspaces page", () => {
     expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR, class: "forbidden" });
     await expect(listOf(page)).not.toContainText(NOT_THE_OPERATOR);
     await expect(listOf(page).getByRole("table")).toHaveCount(0);
+    await saysOfItsRead(listOf(page));
   });
 
   test("keeps Every workspace's search and focus through a refused re-read", async ({
@@ -410,6 +412,7 @@ test.describe("the console's Workspaces page", () => {
 
     expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR });
     await expect(listOf(page).getByRole("table")).toHaveCount(0);
+    await saysOfItsRead(listOf(page));
     await expect(searchOf(page)).toBeVisible();
     await expect(searchOf(page)).toBeFocused();
     await expect(searchOf(page)).toHaveValue("colne");

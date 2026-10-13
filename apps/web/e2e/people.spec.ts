@@ -1369,8 +1369,10 @@ test.describe("removing a member from their page", () => {
     // Refused only once the page has left for Members, as a change landing meanwhile is.
     await answeredChangedMeanwhile(page, REMOVAL);
 
+    const refused = refusalAnswering(page, "members.remove");
     await removedThroughTheirPage(page, "Priya Shah");
 
+    expect(await refused).toMatchObject({ word: "changed-meanwhile" });
     await expect(page).toHaveURL(new RegExp(`${MEMBERS_PAGE}$`));
     await saysARefusal(membersRegion(page).getByRole("alert"));
     await keepsItsWordOffThePage(page, "changed-meanwhile");
@@ -2176,8 +2178,10 @@ test.describe("bulk actions on the members ticked", () => {
     await tickOf(page, "Sam Okoro").check();
 
     const dialog = await changeRoleOpened(page, 2);
+    const refused = refusalAnswering(page, BULK_ROLE_CHANGE_ASKED);
     await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") }).click();
 
+    expect(await refused).toMatchObject({ word: "changed-meanwhile" });
     await saysARefusal(membersRegion(page).getByRole("alert"));
     await keepsItsWordOffThePage(page, "changed-meanwhile");
     await expect(tickOf(page, "Priya Shah")).toBeChecked();

@@ -219,7 +219,7 @@ test("a wrong setup code is refused, its digits left selected", async ({ page, r
   const refused = authAnswering(page, "/authenticator/finish");
   await codeField(page).fill(aWrongCode(authenticatorCodeAt(key, new Date())));
 
-  expect(await refused).toMatchObject({ status: 400 });
+  expect(await refused).toMatchObject({ status: 400, word: "code-wrong" });
   await saysARefusal(authenticatorPart(page).getByRole("alert"));
   await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
   await expect(codeField(page)).toBeFocused();

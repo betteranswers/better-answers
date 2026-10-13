@@ -169,7 +169,7 @@ test("a passkey removed stops signing in", async ({ page, request }) => {
   const refused = authAnswering(page, "/passkeys/sign-in");
   await signedOut(page);
 
-  expect(await refused).toMatchObject({ status: 401 });
+  expect(await refused).toMatchObject({ status: 401, word: "passkey-unknown" });
   await saysARefusal(page.getByRole("alert"));
   await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toBeVisible();
 });

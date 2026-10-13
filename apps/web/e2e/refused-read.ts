@@ -77,6 +77,7 @@ const wholeSeconds = z.coerce.number().int().optional();
 /** A path outside tRPC, Better Auth's or the api's own, asked for before the action as `refusalAnswering` is. */
 export const authAnswering = async (page: Page, path: string) => {
   const answered = await page.waitForResponse((answer) => new URL(answer.url()).pathname === path);
+  if (answered.ok()) throw new Error(`the api did not refuse ${path}`);
   const { code, error } = aRefusalOutsideTrpc.parse(await answered.json());
   return {
     status: answered.status(),

@@ -215,10 +215,32 @@ export const saysARefusal = (
   within?: { readonly timeout: number },
 ): Promise<void> => expect(alert, "the alert says nothing").toHaveText(/\S/, within);
 
-/** A wait is said in whole minutes, rounded up, and a single minute in words, which leave no number to match. */
-export const saysTheWait = (alert: Locator, waitSeconds: number): Promise<void> => {
-  const minutes = Math.ceil(waitSeconds / 60);
-  return expect(alert, `the alert does not say a wait of ${String(minutes)} minutes`).toHaveText(
+/** A list says its read in a live region no role names, apart from its head's standing words. */
+export const saysOfItsRead = (list: Locator): Promise<void> =>
+  expect(list.locator('[aria-live="polite"]'), "the list says nothing of its read").toHaveText(
+    /\S/,
+  );
+
+/** A region already saying a refusal shows the next only by saying something else. */
+export const saysAnotherRefusal = (alert: Locator, earlier: string): Promise<void> =>
+  expect
+    .poll(
+      async () => ["", earlier.trim()].includes((await alert.innerText()).trim()),
+      "the alert says nothing, or only the earlier refusal",
+    )
+    .toBe(false);
+
+/**
+ * Said in whole minutes, rounded up; a single minute is said in words, leaving no number. A wait
+ * never named fails.
+ */
+export const saysTheWait = async (
+  alert: Locator,
+  waitSeconds: number | undefined,
+): Promise<void> => {
+  const minutes = Math.ceil((waitSeconds ?? 0) / 60);
+  expect(minutes, "the ceiling's answer named no wait").toBeGreaterThan(0);
+  await expect(alert, `the alert does not say a wait of ${String(minutes)} minutes`).toHaveText(
     minutes > 1 ? new RegExp(String.raw`\b${String(minutes)}\b`) : /\S/,
   );
 };

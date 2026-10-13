@@ -185,7 +185,9 @@ More helpers in the same module drive the browser rather than the harness:
 | `clockTheNextKey` | Starts the action's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActionLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the action's 100 ms |
 | `saysARefusal` | Asserts an alert holds words. A refusal's region can stand empty from the first draw, so being in the tree shows no refusal |
-| `saysTheWait` | Asserts an alert names a ceiling's wait, given in seconds, as the page counts it: whole minutes, rounded up. A single minute is said in words, so there the alert is checked for holding words |
+| `saysAnotherRefusal` | Asserts an alert says something other than the refusal it said before, which the spec read from it and hands over. Holding words would pass on that earlier refusal |
+| `saysOfItsRead` | Asserts a list's live region holds words, where a list says its read's state in a paragraph and no alert. No role names that region, so it is found by its `aria-live`, apart from the words the list's head always shows |
+| `saysTheWait` | Asserts an alert names a ceiling's wait, given in seconds as the answer named it, as the page counts it: whole minutes, rounded up. A single minute is said in words, so there the alert is checked for holding words. A wait the answer did not name fails |
 | `keepsItsWordOffThePage` | Asserts the api's word for a refusal is nowhere on the page: the word is for the logs and the wire |
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
 | `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
@@ -220,7 +222,8 @@ word and class, and each item's word where a set was refused whole. A ceiling ca
 for one it answers the 429 status and the wait in seconds. `authAnswering` waits for the next answer
 on a path outside tRPC and answers its status, a ceiling's wait, and the refusal as that path names
 it: Better Auth's code, or the word one of the api's own routes sends. The first matching answer settles either, so a read the page asks again
-is not waited for.
+is not waited for. Either throws when that answer is no refusal, so a spec that only awaits one has
+still shown the api refused.
 
 ## Writing a spec
 
@@ -271,11 +274,16 @@ is not waited for.
 - **Tell which refusal happened from where it was decided.** Where the api answered, read its
   answer with `refusalAnswering` or `authAnswering`, above, then check the alert with
   `saysARefusal`. Ask for the answer before the action that calls and await it afterwards, because
-  an answer can land before anything waits for it. A ceiling's answer carries no word, so the spec
-  hands the wait it names to `saysTheWait`, which matches the wait's number in the alert. The
+  an answer can land before anything waits for it. Holding words shows a refusal only in an alert
+  that said nothing before it. In one that already says a refusal, read what it says first, then
+  check with `saysAnotherRefusal` that it says something else. A ceiling's answer carries no word,
+  so the spec hands the wait it names, as the answer gave it, to `saysTheWait`, which matches the
+  wait's number in the alert and fails a wait the answer never named. The
   api's word is for the logs and the wire, and `keepsItsWordOffThePage` asserts the page shows
   none of it. A refusal the page draws outside an alert, as a console list's refused read and the
   concept page's not found are, is told by the answer and by the state the page is left in. Where
+  that state is something gone from a region, the spec also checks the region says something in
+  its place, as `saysOfItsRead` does for a list. Where
   the page decided, no answer says which refusal it
   was: a request dropped, a refusal the page raises before it calls, the tries left for a code,
   which the page counts. There `saysARefusal` is the whole check, and a number the alert shows is

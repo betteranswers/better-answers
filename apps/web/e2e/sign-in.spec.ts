@@ -38,6 +38,7 @@ import {
   provision,
   quoted,
   removeMember,
+  saysAnotherRefusal,
   saysARefusal,
   saysTheWait,
   signedInAtHome,
@@ -646,11 +647,12 @@ test("a third wrong code hands focus to sending another", async ({ page, request
     await codeField(page).fill(notTheCode(code, 3 - left));
     await expect(page.getByRole("alert")).toHaveText(triesLeft(left));
   }
+  const oneLeft = await page.getByRole("alert").innerText();
   // The api refuses the third as it did the first; the page's own count makes it the last.
   const third = authAnswering(page, SIGN_IN_PATH);
   await codeField(page).fill(notTheCode(code, 3));
   expect(await third).toMatchObject({ status: 400, code: "INVALID_OTP" });
-  await saysARefusal(page.getByRole("alert"));
+  await saysAnotherRefusal(page.getByRole("alert"), oneLeft);
 
   await anotherCodeSignsIn(page, request, email);
 });
@@ -820,7 +822,10 @@ test("drops and names a workspace the person was removed from", async ({
   const refused = authAnswering(page, "/organization/set-active");
   await page.getByRole("button", { name: second.name }).click();
 
-  expect(await refused).toMatchObject({ status: 403 });
+  expect(await refused).toMatchObject({
+    status: 403,
+    code: "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION",
+  });
   await expect(page.getByRole("alert")).toContainText(second.name);
   await expect(thePicker(page)).toBeVisible();
   await expect(page.getByRole("button", { name: second.name })).toHaveCount(0);

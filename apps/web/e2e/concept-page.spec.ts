@@ -744,7 +744,7 @@ test.describe("the concept page", () => {
     const refused = refusalAnswering(page, THE_OPEN);
     await page.reload();
 
-    const { status, waitSeconds = 0 } = await refused;
+    const { status, waitSeconds } = await refused;
     expect(status, "the read met no ceiling").toBe(429);
     await saysTheWait(page.getByRole("main").getByRole("alert"), waitSeconds);
     await windowRefocused(page);

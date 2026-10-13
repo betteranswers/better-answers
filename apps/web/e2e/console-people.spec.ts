@@ -36,6 +36,7 @@ import {
   provision,
   quoted,
   saysARefusal,
+  saysOfItsRead,
   signedInAtHome,
   signIn,
   skipLinkReachesThePage,
@@ -397,6 +398,7 @@ test.describe("the console's Everyone page", () => {
     expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR, class: "forbidden" });
     await expect(everyone(page)).not.toContainText(NOT_THE_OPERATOR);
     await expect(everyone(page).getByRole("table")).toHaveCount(0);
+    await saysOfItsRead(everyone(page));
   });
 
   test("is keyboard-operable, sounds like a table and passes axe", async ({
@@ -929,6 +931,7 @@ test.describe("the console's Names waiting page", () => {
 
     expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR });
     await expect(namesWaiting(page).getByRole("table")).toHaveCount(0);
+    await saysOfItsRead(namesWaiting(page));
     await expect(waitingSearch(page)).toBeVisible();
     await expect(waitingSearch(page)).toBeFocused();
     await expect(waitingSearch(page)).toHaveValue("priya");

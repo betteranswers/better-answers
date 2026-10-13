@@ -621,7 +621,7 @@ test.describe("the Knowledge Search page", () => {
     });
     const refused = refusalAnswering(page, "knowledge.find");
     await searchBox(page).fill("forklift");
-    const { status, waitSeconds = 0 } = await refused;
+    const { status, waitSeconds } = await refused;
     expect(status, "the search met no ceiling").toBe(429);
     await saysTheWait(alerted(page), waitSeconds);
     await windowRefocused(page);

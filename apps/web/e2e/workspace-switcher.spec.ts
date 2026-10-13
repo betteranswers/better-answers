@@ -51,6 +51,9 @@ const saidInTheBand = (page: Page): Locator =>
 const refusedInTheBand = (page: Page): Locator =>
   page.getByRole("banner").getByRole("alert", { includeHidden: true });
 
+/** Better Auth's code for a switch to a workspace the person has left. */
+const NOT_A_MEMBER = "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION";
+
 const memberLink = (page: Page, name: string): Locator =>
   page.getByRole("main").getByRole("link", { name, exact: true });
 
@@ -313,7 +316,7 @@ test("says a refused switch in the band, keeping the page", async ({
   const refused = authAnswering(page, "/organization/set-active");
   await leaving.click();
 
-  expect(await refused).toMatchObject({ status: 403 });
+  expect(await refused).toMatchObject({ status: 403, code: NOT_A_MEMBER });
   await expect(refusedInTheBand(page)).toContainText(second.name);
   await expect(switcherOf(page, first.name), "focus left the switcher").toBeFocused();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
@@ -345,6 +348,7 @@ test("says a pending switch's refusal, holding others until it answers", async (
   });
   const release = await heldBack(page, "**/organization/set-active");
 
+  const refused = authAnswering(page, "/organization/set-active");
   await switched(page, first.name, second.name);
   await expect(saidInTheBand(page)).toHaveText(PICKER_WORDS.opening);
 
@@ -373,6 +377,7 @@ test("says a pending switch's refusal, holding others until it answers", async (
   await removeMember(request, { workspaceId: second.workspaceId, userId: first.admin.id });
   release();
 
+  expect(await refused).toMatchObject({ status: 403, code: NOT_A_MEMBER });
   await expect(refusedInTheBand(page), "the first switch's refusal was lost").toContainText(
     second.name,
   );

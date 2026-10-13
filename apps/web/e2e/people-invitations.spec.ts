@@ -617,10 +617,9 @@ test.describe("the People page's Invitations tab", () => {
     await addressField(page).fill(capped);
     const refused = refusalAnswering(page, "members.invite");
     await sendButton(page).click();
-    const { status, waitSeconds = 0 } = await refused;
+    const { status, waitSeconds } = await refused;
 
     expect(status, "the send met no ceiling").toBe(429);
-    expect(waitSeconds, "the ceiling's answer named no wait").toBeGreaterThan(0);
     await saysTheWait(inviteDialog(page).getByRole("alert"), waitSeconds);
     await expect(sendButton(page)).toBeFocused();
   });

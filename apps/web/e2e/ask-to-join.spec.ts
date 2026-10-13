@@ -175,9 +175,8 @@ test("tells a person past the ceiling when to ask again", async ({ page, request
 
   const refused = refusalAnswering(page, ASK_TO_JOIN);
   await askToJoin(page, A_SHORT_NAME);
-  const { waitSeconds = 0 } = await refused;
+  const { waitSeconds } = await refused;
 
-  expect(waitSeconds, "the ceiling's answer named no wait").toBeGreaterThan(0);
   await saysTheWait(page.getByRole("alert"), waitSeconds);
   await expect(askButton(page)).toBeFocused();
   await expect(requestSent(page)).toHaveCount(0);

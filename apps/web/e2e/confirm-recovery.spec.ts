@@ -29,6 +29,7 @@ import {
   quoted,
   refusedDigitsSelected,
   restored,
+  saysAnotherRefusal,
   saysTheWait,
   signIn,
   signInByEmail,
@@ -157,13 +158,15 @@ const authenticatorSetUpThere = async (page: Page): Promise<string> => {
   return key;
 };
 
-/** Wrong codes until the field must wait; answers the wait the api named, in seconds. */
-const wrongCodesUntilTheWait = async (page: Page, key: string): Promise<number> => {
+/** Wrong codes until the field must wait; answers the wait the api named, and what a wrong code said. */
+const wrongCodesUntilTheWait = async (page: Page, key: string) => {
+  let saidOfAWrongCode = "";
   for (let tried = 1; tried <= MOST_TRIES; tried += 1) {
     const answered = authAnswering(page, CONFIRM_BY_CODE);
     await codeField(page).fill(aWrongCode(codeOf(key), tried));
-    const { status, waitSeconds = 0 } = await answered;
-    if (status === TOO_MANY_REQUESTS) return waitSeconds;
+    const { status, waitSeconds } = await answered;
+    if (status === TOO_MANY_REQUESTS) return { waitSeconds, saidOfAWrongCode };
+    saidOfAWrongCode = await theRefusal(page).innerText();
   }
   throw new Error(`${String(MOST_TRIES)} wrong codes, and the field never had to wait`);
 };
@@ -199,7 +202,7 @@ test("a wrong authenticator code is refused; the right one confirms", async ({ p
   const refused = authAnswering(page, CONFIRM_BY_CODE);
   await codeField(page).fill(aWrongCode(codeOf(key)));
 
-  expect(await refused).toMatchObject({ status: 400 });
+  expect(await refused).toMatchObject({ status: 400, word: "code-wrong" });
   await expect(theRefusal(page)).toBeVisible();
   await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
   await refusedDigitsSelected(codeField(page));
@@ -215,9 +218,10 @@ test("repeated wrong codes make the field wait; passkeys still confirm", async (
   const { key } = await anAdminWithBothFactors(page, request);
   await page.goto("/confirm");
 
-  const waitSeconds = await wrongCodesUntilTheWait(page, key);
+  const { waitSeconds, saidOfAWrongCode } = await wrongCodesUntilTheWait(page, key);
 
   await saysTheWait(theRefusal(page), waitSeconds);
+  await saysAnotherRefusal(theRefusal(page), saidOfAWrongCode);
   await expect(codeField(page)).not.toBeEditable();
   await passesTheAccessibilityGate();
   await passkeyButton(page).click();
@@ -243,7 +247,7 @@ test("a recovery code's setup swaps in a new authenticator", async ({
   await page.goto("/confirm");
   const refused = authAnswering(page, CONFIRM_BY_CODE);
   await codeField(page).fill(codeOf(key));
-  expect(await refused).toMatchObject({ status: 400 });
+  expect(await refused).toMatchObject({ status: 400, word: "code-wrong" });
   await expect(theRefusal(page)).toBeVisible();
   await codeField(page).fill(codeOf(newKey));
   await landedAtHome(page, "Admin");
@@ -277,7 +281,7 @@ test("a restored Admin gives the restore code before any setup", async ({
   const refused = authAnswering(page, "/second-factor/restore");
   await codeUsed(restoreField(page), "0000-0000-0000-0000");
 
-  expect(await refused).toMatchObject({ status: 400 });
+  expect(await refused).toMatchObject({ status: 400, word: "restore-code-wrong" });
   await expect(theRefusal(page)).toBeVisible();
   await expect(authenticatorInstead(page)).toHaveCount(0);
   await passesTheAccessibilityGate();
