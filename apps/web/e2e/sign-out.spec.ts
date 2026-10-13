@@ -73,11 +73,16 @@ test("refuses revoked credentials on the next request", async ({ page, request }
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
+  // A sign-out first, so the line revoked credentials meet can be held as another.
+  await signOutFromTheShell(page, workspace.admin.name);
+  const signedOut = await signInSaysWhy(page);
+  await signIn(page, request, email);
+  await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
 
   await endEverySignInAndToken(request, workspace.admin.id);
 
   await page.getByRole("link", { name: "Groups" }).click();
   await page.reload();
 
-  await signInSaysWhy(page);
+  expect(await signInSaysWhy(page), "revoked credentials read as a sign-out").not.toBe(signedOut);
 });

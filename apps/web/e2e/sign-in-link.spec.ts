@@ -204,6 +204,11 @@ test("unknown, spent and superseded links show one dead page", async ({
   await asking.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }).click();
   // The press took focus, and the field takes it back only once the new email has gone.
   await expect(asking.getByLabel(SIGN_IN_WORDS.codeField, { exact: true })).toBeFocused();
+  // A send still out says something new too, so the button is free again before the status is read.
+  await expect(
+    asking.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }),
+    "the second email is still sending",
+  ).toHaveAttribute("aria-disabled", "false");
   await expect
     .poll(
       async () => ["", saidOfTheFirst].includes(await asking.getByRole("status").innerText()),

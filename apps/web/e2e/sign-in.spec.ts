@@ -77,14 +77,29 @@ const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
   await expect(page.getByRole("status"), "the page says nothing of the email").toHaveText(/\S/);
 };
 
-/** The status already says the first email went, so the next shows by saying something else. */
-const saysSomethingNew = (page: Page, earlier: string): Promise<void> =>
-  expect
+/**
+ * A send still out says something new too, so the status is compared only once the button that
+ * sends is free again.
+ */
+const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => {
+  await expect(
+    page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }),
+    "the new email is still sending",
+  ).toHaveAttribute("aria-disabled", "false");
+  await expect
     .poll(
       async () => ["", earlier].includes(await page.getByRole("status").innerText()),
       "the page says nothing new of the email",
     )
     .toBe(false);
+};
+
+/** A page's own words as an XPath string, whatever quotes they hold. */
+const asXPath = (words: string): string =>
+  `concat(${words
+    .split('"')
+    .map((part) => `"${part}"`)
+    .join(`, '"', `)}, "")`;
 
 const atTheCodeStep = async (page: Page, email: string): Promise<void> => {
   await page.goto("/sign-in");
@@ -488,7 +503,7 @@ test("a new code sent from the code step signs in", async ({
   // The press took focus, and the field takes it back only once the new email has gone.
   await expect(codeField(page), "the new code's field did not take focus").toBeFocused();
   await expect(codeField(page), "the refused digits outlived the new code").toHaveValue("");
-  await saysSomethingNew(page, saidOfTheFirst);
+  await saysANewEmailWent(page, saidOfTheFirst);
   const refused = page.getByRole("alert", { includeHidden: true });
   await expect(refused, "the wrong code's refusal outlived the new code").toBeEmpty();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
@@ -525,10 +540,11 @@ test("names the wait when a new code meets the ceiling", async ({
   await expect(listed.getByRole("term").filter({ hasText: /^e$/ })).toBeVisible();
   await keystrokesDismissed(page, listed);
 
-  // Landed once the button that sends a new code is unavailable, which it is while one is sending.
+  // Landed once the status stops saying the first email's line; the page is read by its heading.
+  const saidOfTheFirst = await page.getByRole("status").evaluate((status) => status.textContent);
   await clockTheNextKey(page, {
-    at: "//button[@aria-disabled='true']",
-    reads: SIGN_IN_WORDS.sendAgain,
+    at: `//main[.//*[@role='status'][string(.)!=${asXPath(saidOfTheFirst)}]]`,
+    reads: SIGN_IN_WORDS.codeTitle,
   });
   const answered = theSendsAnswer(page);
   await page.keyboard.press("n");
@@ -634,7 +650,8 @@ const anotherCodeSignsIn = async (page: Page, request: APIRequestContext, email:
   await page.keyboard.press("Enter");
   // The field takes focus only once the new email has gone, so the code read next is the new one.
   await expect(codeField(page)).toBeFocused();
-  await saysSomethingNew(page, saidOfTheFirst);
+  await expect(codeField(page), "the spent digits outlived the new code").toHaveValue("");
+  await saysANewEmailWent(page, saidOfTheFirst);
   await page.keyboard.type(await codeSentTo(request, email));
   await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
 };

@@ -284,7 +284,15 @@ test("carries Claude's request through a join to consent", async ({
   await page.getByRole("button", { name: INVITATION_WORDS.join(workspace.name) }).click();
 
   await expect(consentHeading(page)).toBeVisible();
-  await expect(page.getByText(workspace.name), "consent names another workspace").toBeVisible();
+  // The consent's own line names the workspace, apart from any heading or band that might.
+  await expect(
+    page
+      .getByRole("main")
+      .getByRole("paragraph")
+      .getByRole("strong")
+      .filter({ hasText: workspace.name }),
+    "consent names another workspace",
+  ).toBeVisible();
   await page.getByRole("button", { name: "Connect" }).click();
   const callback = landedAt(page);
   expect(`${callback.origin}${callback.pathname}`).toBe(CLAUDES_REDIRECT_URI);
