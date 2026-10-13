@@ -175,11 +175,15 @@ const anAdminAtSearch = async (
 /** What the status says now, as `toHaveText` reads it, for telling a later state from this one. */
 const saidNow = async (page: Page): Promise<string> => (await said(page).textContent()) ?? "";
 
-/** The status moves on as the typed search settles, and its list is drawn once matches land. */
+/**
+ * The last search's rows stand until the typed one reaches the address, whose search keys the
+ * list: it draws nothing while asking.
+ */
 const searched = async (page: Page, query: string): Promise<void> => {
-  const before = await saidNow(page);
   await searchBox(page).fill(query);
-  await expect(said(page), "the status says nothing new of the search").not.toHaveText(before);
+  await expect(page, "the typed search has not settled into the address").toHaveURL(
+    (url) => url.searchParams.get("knowledge.search") === query,
+  );
   await expect(said(page)).toContainText(query);
   await expect(matchesOf(page).first()).toBeVisible();
 };

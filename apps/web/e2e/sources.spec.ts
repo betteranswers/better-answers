@@ -1,4 +1,4 @@
-import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import type { APIRequestContext, Locator, Page, Response } from "@playwright/test";
 
 import { RAIL } from "@/app/words.ts";
 import {
@@ -63,9 +63,17 @@ const A_SYNC_UNDER_WAY = /^\D+\d{2}:\d{2}/;
 
 const isTheList = (url: URL): boolean => url.pathname.includes("sources.list");
 
+/** True where the list's own call, alone or in a batch, was answered with a result. */
+const answeredTheList = async (answer: Response): Promise<boolean> => {
+  const calls = new URL(answer.url()).pathname.split("/").at(-1)?.split(",") ?? [];
+  const body: unknown = await answer.json();
+  const own: unknown = Array.isArray(body) ? body[calls.indexOf("sources.list")] : body;
+  return typeof own === "object" && own !== null && "result" in own;
+};
+
 /**
- * The empty list's line draws as the loading line does, so it must say something else than it
- * said while the list's read was held.
+ * The empty list's line draws as a loading or failed read's does, so the read must be answered
+ * and the line move on.
  */
 const listsNothingConnected = async (page: Page, open: () => Promise<unknown>): Promise<void> => {
   const list = await heldBack(page, isTheList);
@@ -74,7 +82,9 @@ const listsNothingConnected = async (page: Page, open: () => Promise<unknown>): 
   const region = connectedSourcesRegion(page);
   await saysOfItsRead(region);
   const whileLoading = await saidNowIn(region.locator('[aria-live="polite"]'));
+  const answered = page.waitForResponse((answer) => isTheList(new URL(answer.url())));
   list.release();
+  expect(await answeredTheList(await answered), "the list's read was not answered").toBe(true);
   await expect(
     region.locator('[aria-live="polite"]'),
     "the list still says it is loading",
@@ -1303,6 +1313,31 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(leadOf(page, "Staff handbook", "Audience")).toHaveText(AUDIENCE_WORDS.everyone);
   });
 
+  test("describes a widening by whether its source is published", async ({ page, request }) => {
+    await anAdminAtSources(page, request, {
+      workspace: "Barkisland Looms",
+      connectedSources: [
+        indexed("Price list", { sensitivity: "Restricted", published: true }),
+        indexed("Staff rota", { sensitivity: "Restricted" }),
+      ],
+    });
+
+    await rowAction(page, "Price list", "widen").click();
+    const published = panelOf(page, "Price list", "widen");
+    await expect(published).toHaveAccessibleDescription(/\S/);
+    const describedBy = (await published.getAttribute("aria-describedby")) ?? "";
+    const ofAPublishedSource = await saidNowIn(published.locator(`[id="${describedBy}"]`));
+    await expect(published).toHaveAccessibleDescription(ofAPublishedSource);
+
+    await rowAction(page, "Staff rota", "widen").click();
+    const unpublished = panelOf(page, "Staff rota", "widen");
+    await expect(unpublished).toHaveAccessibleDescription(/\S/);
+    await expect(
+      unpublished,
+      "an unpublished source's widening is described as a published one's",
+    ).not.toHaveAccessibleDescription(ofAPublishedSource);
+  });
+
   test("cancels a widening, focus back on what opened it", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Midgley Ropes",
@@ -1452,7 +1487,7 @@ test.describe("the Sources page's keystrokes", () => {
         - paragraph
         - checkbox ${JSON.stringify(KEYSTROKE_WORDS.turnedOn)} [checked]
         - term: b
-        - definition
+        - definition: Connect a document
         - term: r
         - definition
         - term: p
@@ -1474,6 +1509,11 @@ test.describe("the Sources page's keystrokes", () => {
         - term: /⌘K|Ctrl K/
         - definition
     `);
+    // Each of the eleven keys has an action of its own, and `b` the name of the button it presses.
+    const actions = listed.getByRole("definition");
+    await expect(actions).toHaveText(Array.from({ length: 11 }, () => /\S/));
+    const said = await actions.allInnerTexts();
+    expect(new Set(said).size, "two keys are listed with one action").toBe(said.length);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
     // The rail's: the toolbar keeps the page's own actions alone.

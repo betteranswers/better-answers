@@ -230,6 +230,10 @@ test.describe("the Models and spend page's model choices card", () => {
     await expect(card.getByRole("textbox")).toHaveCount(0);
     await expect(card.getByRole("combobox")).toHaveCount(0);
     await expect(card.getByRole("checkbox")).toHaveCount(0);
+    await expect(card.getByRole("radio")).toHaveCount(0);
+    await expect(card.getByRole("switch")).toHaveCount(0);
+    await expect(card.getByRole("menuitem")).toHaveCount(0);
+    await expect(card.getByRole("spinbutton")).toHaveCount(0);
   });
 
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
