@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { RecoveryCodes } from "@/features/auth/recovery-codes.tsx";
 import { CODES_NOT_TICKED } from "@/features/auth/refusal-words.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { clipboardAnswering } from "./clipboard-stand-in.ts";
 
@@ -63,7 +62,7 @@ describe("the recovery codes block", () => {
     expect(doneButton().getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(doneButton());
 
-    expect(screen.getByRole("alert").textContent).toBe(sentenceOf(CODES_NOT_TICKED));
+    expect(screen.getByRole("alert").textContent).toBe(CODES_NOT_TICKED);
     expect(document.activeElement).toBe(savedBox());
     expect(doneCalls).toBe(0);
   });

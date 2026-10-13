@@ -10,7 +10,7 @@ import {
   type Refusal,
 } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import type { Said } from "@/shared/refusal-words.ts";
+import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 import { Input } from "@/shared/ui/input.tsx";
@@ -22,7 +22,7 @@ import {
   SHORT_NAME_EXAMPLE,
 } from "./ask-to-join-words.ts";
 import { focusOn, Refused } from "./auth-page.tsx";
-import { ASK_REFUSED, ASK_UNANSWERED, askedTooOften, REASON_REFUSED } from "./refusal-words.ts";
+import { REASON_REFUSED } from "./refusal-words.ts";
 
 export const ASK_TO_JOIN: Keystroke = { key: "j", action: ASK_TO_JOIN_WORDS.heading };
 
@@ -42,12 +42,12 @@ const SENT = "ask-to-join-sent";
 
 const SENT_TITLE = "ask-to-join-sent-title";
 
-const saidOf = (refusal: Refusal): Said =>
-  refusal.class === "malformed" ? REASON_REFUSED : ASK_REFUSED;
+const saidOf = (refusal: Refusal): string =>
+  refusal.class === "malformed" ? REASON_REFUSED : STOCK.general;
 
-const unansweredOf = (failure: Error | ApiError): Said => {
+const unansweredOf = (failure: Error | ApiError): string => {
   const liftsInSeconds = ceilingLiftsIn(failure);
-  return liftsInSeconds === undefined ? ASK_UNANSWERED : askedTooOften(liftsInSeconds);
+  return liftsInSeconds === undefined ? STOCK.tryAgain : stockWait(liftsInSeconds);
 };
 
 /** Focus is moved here once the ask lands, so the answer is what a reader meets next. */
@@ -74,7 +74,7 @@ function AskOutcome(properties: {
         id={REFUSED}
         failure={failure}
         saidOf={saidOf}
-        unanswered={failure === null ? ASK_UNANSWERED : unansweredOf(failure)}
+        unanswered={failure === null ? STOCK.tryAgain : unansweredOf(failure)}
       />
       {properties.sent ? <RequestSent /> : null}
     </>

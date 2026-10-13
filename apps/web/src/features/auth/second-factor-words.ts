@@ -1,4 +1,3 @@
-import type { Said } from "@/shared/refusal-words.ts";
 import { dayWords, PRODUCT_NAME } from "@/shared/words.ts";
 
 /** Said when a field that waited on a throttle takes codes again. */
@@ -34,10 +33,8 @@ export const passkeyThatConfirms = (name: string | null, createdAt: string): str
   ["Passkey", ...(name === null ? [] : [name]), `added ${dayWords(createdAt)}`].join(" · ");
 
 /** Said in the band on the page a refused change came from, once the person has confirmed. */
-export const UNSAVED_AFTER_CONFIRMING: Said = {
-  why: "You’ve confirmed. Your last change wasn’t saved.",
-  next: "Make it again.",
-};
+export const UNSAVED_AFTER_CONFIRMING =
+  "Confirmed. Your last change wasn't saved, so please make it again.";
 
 export const RECOVERY_WORDS = {
   heading: "Use a recovery code",

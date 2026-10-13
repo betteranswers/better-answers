@@ -6,27 +6,9 @@ import {
   type RefusalWord,
 } from "@/shared/api/trpc.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
-import {
-  refusalSentence,
-  sentenceOf,
-  STOCK,
-  type OwnSentences,
-  type Said,
-} from "@/shared/refusal-words.ts";
+import { refusalSentence, STOCK, type OwnSentences } from "@/shared/refusal-words.ts";
 
-/** A refusal's one sentence, or the sign-in pages' two parts joined into one. */
-const sentenceShown = (said: Said | string): string =>
-  typeof said === "string" ? said : sentenceOf(said);
-
-/** The api's word stays in the logs. */
-export function RefusalLine(properties: { readonly said: Said | string }) {
-  return <>{sentenceShown(properties.said)}</>;
-}
-
-export const refusedWith = (said: Said | string): Outcome => ({
-  tone: "refused",
-  words: sentenceShown(said),
-});
+export const refusedWith = (sentence: string): Outcome => ({ tone: "refused", words: sentence });
 
 const refusalOutcome = (
   featureWords: OwnSentences,

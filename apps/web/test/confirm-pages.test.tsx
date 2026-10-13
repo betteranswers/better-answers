@@ -1,7 +1,13 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  AUTHENTICATOR_CODE_WRONG,
+  SAID_OF_SECOND_FACTOR,
+  tooManyCodesTriedOr,
+} from "@/features/auth/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 
 import {
   A_CHALLENGE,
@@ -23,6 +29,9 @@ afterEach(() => {
 });
 
 const main = () => screen.getByRole("main");
+
+/** Each number the alerts name, which for a wait is its whole minutes. */
+const numbersSaid = (): readonly string[] => alertsSaying().join(" ").match(/\d+/g) ?? [];
 
 /** Every control a keyboard meets on the page, in document order. */
 const controls = (): readonly Element[] => [...main().querySelectorAll("a, button, input")];
@@ -88,10 +97,9 @@ describe("the confirm page", () => {
     fireEvent.change(field, { target: { value: "123 456" } });
 
     await waitFor(() => {
-      expect(alertsSaying()).toEqual([
-        "Too many codes have been tried. Try again in 4 minutes, or use your passkey or a recovery code.",
-      ]);
+      expect(alertsSaying()).toEqual([tooManyCodesTriedOr(240, ["passkey", "recovery-code"])]);
     });
+    expect(numbersSaid()).toEqual(["4"]);
     expect(field.hasAttribute("readonly")).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "Use your passkey" }));
@@ -112,9 +120,8 @@ describe("the confirm page", () => {
     await openAsAda("/confirm");
 
     const field = await screen.findByRole("textbox", { name: "Authenticator code" });
-    expect(alertsSaying()).toEqual([
-      "Too many codes have been tried. Try again in 1 minute, or use a recovery code.",
-    ]);
+    expect(alertsSaying()).toEqual([tooManyCodesTriedOr(1, ["recovery-code"])]);
+    expect(numbersSaid()).toEqual(["1"]);
     expect(field.hasAttribute("readonly")).toBe(true);
 
     expect(
@@ -129,9 +136,9 @@ describe("the confirm page", () => {
 
     await openAsAda("/confirm");
 
-    expect(
-      await screen.findByText("No response, so nothing is shown. Try again in a moment."),
-    ).toBeDefined();
+    await waitFor(() => {
+      expect(alertsSaying()).toEqual([STOCK.notLoaded]);
+    });
     expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
     expect(screen.getByRole("button", { name: KEYSTROKE_WORDS.button })).toBeDefined();
   });
@@ -151,9 +158,7 @@ describe("the confirm page", () => {
     await waitFor(() => {
       expect(field.getAttribute("aria-invalid")).toBe("true");
     });
-    expect(alertsSaying()).toEqual([
-      "That code is wrong. Enter the code your authenticator shows now.",
-    ]);
+    expect(alertsSaying()).toEqual([AUTHENTICATOR_CODE_WRONG]);
     expect(document.activeElement).toBe(field);
     expect([field.selectionStart, field.selectionEnd]).toEqual([0, 6]);
   });
@@ -212,9 +217,7 @@ describe("the recovery page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Use code" }));
 
     await waitFor(() => {
-      expect(alertsSaying()).toEqual([
-        "That code is wrong or already used. Check it, or try another code.",
-      ]);
+      expect(alertsSaying()).toEqual([SAID_OF_SECOND_FACTOR["recovery-code-wrong"]]);
     });
     expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(

@@ -1,8 +1,11 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STOCK } from "@/shared/refusal-words.ts";
+
 import {
   adasApi,
+  alertsSaying,
   answering,
   BOTH_HELD,
   CODES,
@@ -10,8 +13,10 @@ import {
   NOTHING_HELD,
   loadedAsAda,
   openAsAda,
+  refusing,
   sessionStanding,
   withPasskeysHere,
+  type Route,
 } from "./second-factor-api.ts";
 
 afterEach(() => {
@@ -191,6 +196,73 @@ describe("the setup page", () => {
     });
     expect(router.state.location.search).toEqual({ redirect: "/people/members" });
     expect(screen.queryByRole("button", { name: "Add a passkey" })).toBeNull();
+  });
+});
+
+const DROPPED: Route = () => Promise.reject(new TypeError("the network is down"));
+
+/** Enough of an ask to add a passkey that the browser's library hands it to the device. */
+const ASKED_TO_ADD = {
+  challenge: "Y2hhbGxlbmdl",
+  rp: { name: "better-answers" },
+  user: { id: "cA", name: "ada@example.test", displayName: "Ada" },
+  pubKeyCredParams: [],
+};
+
+/** A browser that can make a passkey, where the person closes the device's prompt. */
+const withThePromptClosed = () => {
+  const create = vi.fn<() => Promise<never>>(() =>
+    Promise.reject(new DOMException("closed", "NotAllowedError")),
+  );
+  vi.stubGlobal("PublicKeyCredential", () => undefined);
+  Object.defineProperty(navigator, "credentials", { value: { create }, configurable: true });
+  return create;
+};
+
+/** The setup page with a key made, whose finish answers as `finish` does. */
+const finishedWith = async (finish: Route) => {
+  adasApi(
+    () => NOTHING_HELD,
+    new Map([
+      ["/authenticator/start", answering(A_KEY)],
+      ["/authenticator/finish", finish],
+    ]),
+  );
+  await openAsAda("/setup");
+  await screen.findByRole("button", { name: "Finish setup" });
+  await finishTheAuthenticator();
+};
+
+describe("what the setup page says of a failed setup", () => {
+  it("cannot confirm a finish that got no response", async () => {
+    await finishedWith(DROPPED);
+
+    await waitFor(() => {
+      expect(alertsSaying()).toEqual([STOCK.unconfirmed]);
+    });
+  });
+
+  it("shows the general sentence for a status with no branch", async () => {
+    await finishedWith(refusing(403, "forbidden"));
+
+    await waitFor(() => {
+      expect(alertsSaying()).toEqual([STOCK.general]);
+    });
+  });
+
+  it("leaves the alert empty when the device cancels an add", async () => {
+    const create = withThePromptClosed();
+    adasApi(() => NOTHING_HELD, new Map([["/passkeys/add-options", answering(ASKED_TO_ADD)]]));
+    await openAsAda("/setup");
+
+    const add = await screen.findByRole("button", { name: "Add a passkey" });
+    fireEvent.click(add);
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledOnce();
+      expect(add.getAttribute("aria-disabled")).toBe("false");
+    });
+    expect(alertsSaying()).toEqual([]);
   });
 });
 

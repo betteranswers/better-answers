@@ -49,53 +49,5 @@ export const refusalSentence = (
   refusalClass: RefusalClass,
 ): string => ({ ...OWN_ON_EVERY_SURFACE, ...own })[word] ?? STOCK_OF_CLASS[refusalClass];
 
-/** The sign-in pages' two-part form, read by them alone until each holds one string. */
-export type Said = { readonly why: string; readonly next: string };
-
-export type SaidOfWord = Partial<Record<RefusalWord, Said>>;
-
 /** The label of each control that takes an ended or stale session to sign in. */
 export const SIGN_IN_AGAIN = "Sign in again";
-
-/** Only `forbidden` names who can act, because the reader can't. */
-export const SAID_OF_CLASS = {
-  unauthenticated: { why: "Your session has ended.", next: `${SIGN_IN_AGAIN}.` },
-  forbidden: {
-    why: "Your role doesn’t allow this.",
-    next: "Ask an Admin of this workspace to do it.",
-  },
-  absent: {
-    why: "What you acted on isn’t here any more.",
-    next: "Reload the page to see what is.",
-  },
-  malformed: {
-    why: "What you sent couldn’t be read, so nothing was saved.",
-    next: "Check it and try again.",
-  },
-  inapplicable: { why: "This can’t be done here.", next: "Choose something else to do." },
-  conflict: {
-    why: "This changed while you were working on it.",
-    next: "Reload the page and try again.",
-  },
-  precondition: { why: "Something else has to happen first.", next: "Try again once it has." },
-} satisfies Record<RefusalClass, Said>;
-
-/** An action the api sent no word with: the network's failure, or an answer nothing could read. */
-export const NO_RESPONSE: Said = {
-  why: "No response, so nothing was saved.",
-  next: "Try again in a moment.",
-};
-
-/** A read the api sent no word with, where nothing was being saved. */
-export const NO_RESPONSE_TO_A_READ: Said = {
-  why: "No response, so nothing is shown.",
-  next: "Try again in a moment.",
-};
-
-export const saidOfRefusal = (
-  featureWords: SaidOfWord,
-  word: RefusalWord,
-  refusalClass: RefusalClass,
-): Said => featureWords[word] ?? SAID_OF_CLASS[refusalClass];
-
-export const sentenceOf = (said: Said): string => `${said.why} ${said.next}`;

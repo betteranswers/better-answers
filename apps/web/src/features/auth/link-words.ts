@@ -1,4 +1,3 @@
-import type { Said } from "@/shared/refusal-words.ts";
 import { instantWords } from "@/shared/words.ts";
 
 /** Apart from the page's JSX, so the browser suite reads the words the link's page shows. */
@@ -36,12 +35,4 @@ export const codeShown = (code: string): string => `${code.slice(0, 3)} ${code.s
 /** One digit at a time, so a screen reader says six digits rather than two numbers. */
 export const codeSpelled = (code: string): string => code.split("").join(" ");
 
-export const LINK_UNREAD: Said = {
-  why: "No response, so the link wasn’t checked.",
-  next: "Try again in a moment.",
-};
-
-export const CODE_NOT_COPIED: Said = {
-  why: "The code wasn’t copied.",
-  next: "Type it where you started.",
-};
+export const CODE_NOT_COPIED = "Couldn't copy. Please type the code on the page where you started.";

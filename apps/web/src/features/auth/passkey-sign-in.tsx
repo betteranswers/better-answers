@@ -1,4 +1,4 @@
-import type { Said } from "@/shared/refusal-words.ts";
+import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { CodeRefused, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
@@ -7,31 +7,29 @@ import {
   PASSKEY_SIGN_IN_NOT_VERIFIED,
   PASSKEY_SIGN_IN_REFUSED,
   PASSKEY_UNKNOWN,
-  SIGN_IN_UNANSWERED,
-  tooManyPasskeySignIns,
 } from "./refusal-words.ts";
 import { SIGN_IN_WORDS } from "./sign-in-words.ts";
 
-const SAID_OF_THE_ROUTE: ReadonlyMap<string, Said> = new Map([
+const SAID_OF_THE_ROUTE: ReadonlyMap<string, string> = new Map([
   ["passkey-unknown", PASSKEY_UNKNOWN],
   ["not-verified", PASSKEY_SIGN_IN_NOT_VERIFIED],
 ]);
 
-const saidOfTheRoute = (refused: CodeRefused): Said =>
+const saidOfTheRoute = (refused: CodeRefused): string =>
   refused.status === TOO_MANY_REQUESTS
-    ? tooManyPasskeySignIns(refused.waitSeconds)
+    ? stockWait(refused.waitSeconds)
     : (SAID_OF_THE_ROUTE.get(refused.word ?? "") ?? PASSKEY_SIGN_IN_REFUSED);
 
-const saidOfTheDevice = (refused: DeviceRefused): Said | undefined => {
+const saidOfTheDevice = (refused: DeviceRefused): string | undefined => {
   if (refused.reason === "cancelled") return undefined;
   return refused.reason === "unverified" ? PASSKEY_SIGN_IN_NOT_VERIFIED : PASSKEY_SIGN_IN_REFUSED;
 };
 
 /** A dismissed prompt is no refusal; the status line says no passkey was used. */
-export const saidOfAPasskeySignIn = (failure: Error | null): Said | undefined => {
+export const saidOfAPasskeySignIn = (failure: Error | null): string | undefined => {
   if (failure === null) return undefined;
   if (failure instanceof DeviceRefused) return saidOfTheDevice(failure);
-  return failure instanceof CodeRefused ? saidOfTheRoute(failure) : SIGN_IN_UNANSWERED;
+  return failure instanceof CodeRefused ? saidOfTheRoute(failure) : STOCK.unconfirmed;
 };
 
 export const saidWhileSigningInWithAPasskey = (

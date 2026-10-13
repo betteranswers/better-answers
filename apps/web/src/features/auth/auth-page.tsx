@@ -6,8 +6,7 @@ import { GridPattern } from "@/shared/blueprint.tsx";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { Logo } from "@/shared/logo.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import { NO_RESPONSE, SAID_OF_CLASS, SIGN_IN_AGAIN, type Said } from "@/shared/refusal-words.ts";
+import { SIGN_IN_AGAIN, STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card.tsx";
 import { PRODUCT_NAME } from "@/shared/words.ts";
@@ -115,17 +114,15 @@ function SignInAgain(properties: { readonly signInAt: string }) {
   );
 }
 
-/** An ended session is said by its `why` alone: the button after it is the remedy. */
-function FailureLine(properties: {
-  readonly refusal: Refusal | undefined;
-  readonly saidOf: (refusal: Refusal) => Said | string;
-  readonly unanswered: Said | string;
-}) {
-  const { refusal } = properties;
-  if (refusal === undefined) return <RefusalLine said={properties.unanswered} />;
-  if (refusal.class === "unauthenticated") return <>{SAID_OF_CLASS.unauthenticated.why}</>;
-  return <RefusalLine said={properties.saidOf(refusal)} />;
-}
+/** An ended session says the same on every page, since the button after it is the same. */
+const failureSentence = (
+  refusal: Refusal | undefined,
+  saidOf: (refusal: Refusal) => string,
+  unanswered: string,
+): string => {
+  if (refusal === undefined) return unanswered;
+  return refusal.class === "unauthenticated" ? STOCK.session : saidOf(refusal);
+};
 
 /**
  * What went wrong and what to do. A wordless failure says `unanswered`; an ended session gets a
@@ -134,20 +131,18 @@ function FailureLine(properties: {
 export function Refused(properties: {
   readonly id: string;
   readonly failure: Error | ApiError | null;
-  readonly saidOf: (refusal: Refusal) => Said | string;
-  readonly unanswered?: Said | string;
+  readonly saidOf: (refusal: Refusal) => string;
+  readonly unanswered?: string;
   readonly signInAt?: string;
 }) {
   const { failure } = properties;
   const refusal = failure === null ? undefined : refusalOf(failure);
   const sessionEnded = refusal?.class === "unauthenticated";
-  const unanswered = properties.unanswered ?? NO_RESPONSE;
+  const unanswered = properties.unanswered ?? STOCK.tryAgain;
   return (
     <>
       <Outcome tone="refused" id={properties.id}>
-        {failure === null ? null : (
-          <FailureLine refusal={refusal} saidOf={properties.saidOf} unanswered={unanswered} />
-        )}
+        {failure === null ? null : failureSentence(refusal, properties.saidOf, unanswered)}
       </Outcome>
       {sessionEnded ? (
         <SignInAgain signInAt={properties.signInAt ?? `/sign-in${pageQuery()}`} />

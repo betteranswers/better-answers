@@ -12,7 +12,7 @@ import {
 } from "@/shared/api/trpc.ts";
 import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { refusalSentence, saidOfRefusal, type Said } from "@/shared/refusal-words.ts";
+import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -27,7 +27,7 @@ import {
 import { AuthPage, Outcome, ReadAgain, Refused } from "./auth-page.tsx";
 import { carriedFlow, invitationAt, leavingFor, pageQuery } from "./carried-flow.ts";
 import { INVITATION_ACTIONS, INVITATION_WORDS } from "./invitation-words.ts";
-import { INVITATION_UNANSWERED, JOIN_UNANSWERED, SAID_OF_ACCEPTING } from "./refusal-words.ts";
+import { SAID_OF_ACCEPTING } from "./refusal-words.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
 
 type Invitation = inferOutput<ReturnType<typeof useTRPC>["person"]["invitation"]>;
@@ -71,8 +71,8 @@ const WAY_OF_WORD = {
 
 const WAYS = new Map<string, WayOn>(Object.entries(WAY_OF_WORD));
 
-const saidOf = (refusal: Refusal): Said =>
-  saidOfRefusal(SAID_OF_ACCEPTING, refusal.word, refusal.class);
+const saidOf = (refusal: Refusal): string =>
+  refusalSentence(SAID_OF_ACCEPTING, refusal.word, refusal.class);
 
 const nameSaidOf = (refusal: Refusal): string =>
   refusalSentence(DISPLAY_NAME_REFUSED, refusal.word, refusal.class);
@@ -133,7 +133,7 @@ function InvitationUnread(properties: {
         id={READ_REFUSED}
         failure={properties.failure}
         saidOf={saidOf}
-        unanswered={INVITATION_UNANSWERED}
+        unanswered={STOCK.notLoaded}
         signInAt={properties.here}
       />
       <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -198,13 +198,7 @@ function JoinRefused(properties: {
   const { way, here } = properties;
   return (
     <>
-      <Refused
-        id={JOIN_REFUSED}
-        failure={properties.failure}
-        saidOf={saidOf}
-        unanswered={JOIN_UNANSWERED}
-        signInAt={here}
-      />
+      <Refused id={JOIN_REFUSED} failure={properties.failure} saidOf={saidOf} signInAt={here} />
       {way === undefined ? null : (
         <div className="mt-4">
           <WayOnAction way={way} here={here} />

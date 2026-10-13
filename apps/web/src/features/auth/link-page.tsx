@@ -4,8 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import type { Said } from "@/shared/refusal-words.ts";
+import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
@@ -26,12 +25,10 @@ import {
   codeShown,
   codeSpelled,
   LINK_ACTIONS,
-  LINK_UNREAD,
   LINK_WORDS,
   signingInAs,
   worksUntil,
 } from "./link-words.ts";
-import { SIGN_IN_UNANSWERED, tooManyCodesTried } from "./refusal-words.ts";
 import { useStepAfterSignIn } from "./second-factor-steps.ts";
 import { SIGN_IN_WORDS } from "./sign-in-words.ts";
 
@@ -60,8 +57,8 @@ const CHECKING: Seen = { state: "checking" };
 const linkDied = (failure: Error | null): boolean =>
   failure instanceof CodeRefused && !isTooMany(failure);
 
-const saidOfFailure = (failure: Error, unanswered: Said): Said =>
-  isTooMany(failure) ? tooManyCodesTried(failure.waitSeconds) : unanswered;
+const saidOfFailure = (failure: Error, unanswered: string): string =>
+  isTooMany(failure) ? stockWait(failure.waitSeconds) : unanswered;
 
 type Read = { readonly data: LinkDescribed | undefined; readonly error: Error | null };
 
@@ -95,7 +92,7 @@ type Slots = {
   readonly title: string;
   readonly said: string | null;
   readonly body: ReactNode;
-  readonly refused: Said | undefined;
+  readonly refused: string | undefined;
   readonly actions: ReactNode;
 };
 
@@ -192,7 +189,7 @@ const unreadSlots = (failure: Error, acting: Acting): Slots => ({
   title: SIGN_IN_TITLE,
   said: null,
   body: null,
-  refused: saidOfFailure(failure, LINK_UNREAD),
+  refused: saidOfFailure(failure, STOCK.tryAgain),
   // The fragment is gone from the address, so a reload would show the dead page.
   actions: (
     <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -221,7 +218,7 @@ const boundSlots = (bound: Bound, acting: Acting): Slots => ({
   refused:
     acting.signInFailure === null
       ? undefined
-      : saidOfFailure(acting.signInFailure, SIGN_IN_UNANSWERED),
+      : saidOfFailure(acting.signInFailure, STOCK.unconfirmed),
   actions: null,
 });
 
@@ -321,7 +318,7 @@ export function LinkPage() {
       <Outcome tone="said">{slots.said}</Outcome>
       {slots.body}
       <Outcome tone="refused" id={REFUSED}>
-        {slots.refused === undefined ? null : <RefusalLine said={slots.refused} />}
+        {slots.refused}
       </Outcome>
       {slots.actions}
     </AuthPage>
