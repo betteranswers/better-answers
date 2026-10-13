@@ -856,8 +856,7 @@ _Internal._ the one seam a *model choice* is called through; it names the model,
 it.
 
 Fetch-shaped, so a local model and a hosted one take one code path, and a test fakes the seam at
-its wire while our own code is never mocked. It holds a registry of wire shapes keyed by a model
-choice's provider: the Messages API and one decision-model shape.
+its wire while our own code is never mocked.
 
 ### DPIA input
 

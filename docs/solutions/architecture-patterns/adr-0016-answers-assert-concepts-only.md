@@ -39,7 +39,7 @@ An answer asserts only what a concept states. It is found by traversal before an
 
 An answer is served as one answer contract for the UI, MCP and the response record: an event stream, verdict first, folded by one pure function into one object. The verdict is ok, related, warn or refuse for the caller's role. It is ok when at least one `Answer` is a judged fit, and related when concepts bear on the question and none is. Nothing in v0.1 produces warn. The object says how its judge stood: *not judged*, *judged* or *judging failed*. MCP returns the object alone. On the web the object is the stream's first event and drafted sentences follow it. A refusal ends the stream with no prose.
 
-S2b builds the collections, the *related knowledge* verdict and the judge, and the tree does not hold them yet.
+A concept's collection is in the tree. S2b builds `ask`'s `collections` argument, the narrowing of the walk, the *related knowledge* verdict and the judge, and the tree does not hold them yet.
 
 When the map is unavailable, the answer runs at depth 0. Entry points, the judge and reuse still run, and the context header line says the map is unavailable.
 
