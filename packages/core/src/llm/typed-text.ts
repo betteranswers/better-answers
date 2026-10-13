@@ -57,6 +57,7 @@ const A_CUE = new RegExp(
 const A_SENTENCE_BREAK = new RegExp(String.raw`(?<=[.!?])[${SPACE}]+|\n[${SPACE}]*\n`, "gu");
 
 const A_SPACE = new RegExp(`[${SPACE}]`, "u");
+const NO_SPACE_TO_THE_END = new RegExp(`[^${SPACE}]*$`, "u");
 const LEADING_SPACE = new RegExp(`^[${SPACE}]+`, "u");
 const TRAILING_SPACE = new RegExp(`[${SPACE}]+$`, "u");
 
@@ -71,12 +72,14 @@ const passesTheCheckDigit = (written: string): boolean => {
 };
 
 /**
- * The worker reads five words back through its tokenizer. This reads all the text up to the
- * pair's first space, which holds those five.
+ * The worker reads five words back, and one word on where a colon joins the sort code to its
+ * neighbour. This reads wider than either.
  */
-const namedBefore = (text: string, pair: Hit): boolean => {
+const named = (text: string, pair: Hit): boolean => {
+  const opens = text.slice(0, pair.start).search(NO_SPACE_TO_THE_END);
   const toASpace = text.slice(pair.start).search(A_SPACE);
-  const read = toASpace === -1 ? text : text.slice(0, pair.start + toASpace);
+  const closes = toASpace === -1 ? text.length : pair.start + toASpace;
+  const read = text.slice(opens, closes).includes(":") ? text : text.slice(0, closes);
   return NAMES_AN_ACCOUNT.some((word) => read.toLowerCase().includes(word));
 };
 
@@ -105,7 +108,7 @@ const hitsIn = (text: string): readonly Hit[] => [
     .filter((match) => passesTheCheckDigit(match[0]))
     .map(hitOf),
   ...Array.from(text.matchAll(A_SORT_CODE_WITH_AN_ACCOUNT), hitOf).filter((pair) =>
-    namedBefore(text, pair),
+    named(text, pair),
   ),
   ...Array.from(text.matchAll(A_CUE), (cue) => sentenceAround(text, cue.index)),
 ];

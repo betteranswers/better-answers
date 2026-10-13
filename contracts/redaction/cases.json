@@ -205,7 +205,14 @@
         "categories": ["bank-details"],
         "input": "Can payroll pay expenses into 20-00-00, account number 12345678?",
         "expected": "Can payroll pay expenses into 20-00-00, account number 12345678?",
-        "why": "The worker reads only the words before the pair. Here the one word that names it follows the sort code, so the pair stays in the text. The seam does this today, and so both tiers do."
+        "why": "The one word that names the pair follows the sort code, and the worker looks for it before the pair, so the pair stays in the text. The seam does this today, and so both tiers do."
+      },
+      {
+        "name": "a colon joins the sort code to the word before it",
+        "categories": ["bank-details"],
+        "input": "Ref:200000 account 12345678, is that the one on file?",
+        "expected": "Ref:[withheld], is that the one on file?",
+        "why": "The worker reads Ref:200000 as one word, and then takes the next word after it as one that may name the pair. With a space in place of the colon the same text is left alone."
       },
       {
         "name": "a sort code and account number on two lines",
