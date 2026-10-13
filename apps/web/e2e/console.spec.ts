@@ -9,6 +9,7 @@ import { HOMES } from "@/shared/navigation.ts";
 import { expect, test } from "./browser.ts";
 import {
   addMember,
+  allWorkspacesPicked,
   anAddress,
   avatarOf,
   crumbOf,
@@ -249,10 +250,7 @@ test.describe("the way into the console", () => {
     await landedAtHome(page, "Viewer");
     await expect(switcherOf(page, second.name)).toBeVisible();
 
-    await switcherOf(page, second.name).click();
-    await switcherMenuOf(page, second.name)
-      .getByRole("menuitem", { name: "All Workspaces" })
-      .click();
+    await allWorkspacesPicked(page, second.name);
     await expect(page).toHaveURL("/choose-workspace");
     await expect(page.getByRole("heading", { level: 1, name: "Your Workspaces" })).toBeVisible();
   });

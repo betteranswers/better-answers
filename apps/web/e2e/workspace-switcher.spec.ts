@@ -5,6 +5,7 @@ import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigati
 import { expect, test } from "./browser.ts";
 import {
   addMember,
+  allWorkspacesPicked,
   anAddress,
   inTwoWorkspaces,
   landedAtHome,
@@ -217,8 +218,7 @@ test("takes All workspaces to the picker", async ({ page, request }) => {
     second: "Hodder Wireworks",
   });
 
-  await switcherOf(page, first.name).click();
-  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: "All Workspaces" }).click();
+  await allWorkspacesPicked(page, first.name);
 
   await expect(page).toHaveURL("/choose-workspace");
   await expect(page.getByRole("heading", { level: 1, name: "Your Workspaces" })).toBeVisible();
@@ -239,8 +239,7 @@ test("drops the left workspace's members when All workspaces picks another", asy
   // Held, so whatever the page draws before the new workspace's list lands is on show.
   const release = await heldBack(page, MEMBERS_READ);
 
-  await switcherOf(page, first.name).click();
-  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: "All Workspaces" }).click();
+  await allWorkspacesPicked(page, first.name);
   await page.getByRole("button", { name: second.name, exact: true }).click();
 
   await expect(switcherOf(page, second.name)).toBeVisible();

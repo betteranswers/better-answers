@@ -5,6 +5,7 @@ import { passkeyNameFor } from "@/features/auth/account-words.ts";
 import { expect, test } from "./browser.ts";
 import {
   addMember,
+  allWorkspacesPicked,
   aMemberSignedInAt,
   anAddress,
   emailsSentTo,
@@ -369,8 +370,7 @@ test("a Viewer's offer survives a switch to the same address", async ({ page, re
 test("a Viewer's offer ends on a trip through All workspaces", async ({ page, request }) => {
   const { first, second } = await aViewerOfTwoOffered(page, request);
 
-  await switcherOf(page, first.name).click();
-  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: "All Workspaces" }).click();
+  await allWorkspacesPicked(page, first.name);
   // A pick drops the second factor's read, so the home it opens reads it again.
   const read = secondFactorRead(page);
   await page.getByRole("button", { name: second.name }).click();

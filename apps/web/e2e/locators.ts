@@ -36,6 +36,12 @@ export const switched = async (page: Page, from: string, to: string): Promise<vo
   await switcherMenuOf(page, from).getByRole("menuitemradio").filter({ hasText: to }).click();
 };
 
+/** The switcher's way to the picker, which lists every workspace the person is in. */
+export const allWorkspacesPicked = async (page: Page, here: string): Promise<void> => {
+  await switcherOf(page, here).click();
+  await switcherMenuOf(page, here).getByRole("menuitem", { name: "All Workspaces" }).click();
+};
+
 export const railOf = (page: Page): Locator => page.getByRole("navigation", { name: "Areas" });
 
 /** The menu, named for the open area. */
