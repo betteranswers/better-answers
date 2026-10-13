@@ -1151,6 +1151,8 @@ export const importBundle = async (
 export type OpenedConcept = {
   readonly iri: ConceptIri;
   readonly path: string;
+  /** Null for a concept in no collection. */
+  readonly collection: string | null;
   readonly kind: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
@@ -1164,6 +1166,7 @@ export type OpenedConcept = {
 type ConceptRow = {
   readonly iri: string;
   readonly path: string;
+  readonly collection: string | null;
   readonly kind: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
@@ -1179,7 +1182,7 @@ type ConceptRow = {
 
 const conceptSelect = (
   ranked: { readonly columns: string; readonly joins: string } | undefined,
-): string => `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.body, c.status,
+): string => `SELECT c.iri, c.path, c.collection, c.kind, c.title, c.frontmatter, c.body, c.status,
               c.content_hash, c.commit_sha,
               v.actor AS verified_by, v.verified_at, v.content_hash AS verified_hash,
               NULLIF(verifier.name, '') AS verified_by_name${ranked === undefined ? "" : `, ${ranked.columns}`}
@@ -1202,6 +1205,7 @@ const CONCEPT_SELECT = conceptSelect(undefined);
 const openedOf = (row: ConceptRow): OpenedConcept => ({
   iri: ids.conceptIri.parse(row.iri),
   path: row.path,
+  collection: row.collection,
   kind: row.kind,
   title: row.title,
   frontmatter: row.frontmatter,
@@ -1236,6 +1240,31 @@ export const conceptByIri = async (
     ]);
     const row = rows[0];
     return row === undefined ? undefined : openedOf(row);
+  });
+};
+
+const conceptsByIrisAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.custom<readonly ConceptIri[]>(),
+  refuses: ["role-forbids"],
+});
+
+/** Those of `iris` this principal may read, by iri. A withheld one is absent, as an unwritten one is. */
+export const conceptsByIris = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  iris: readonly ConceptIri[],
+): Promise<Result<readonly OpenedConcept[], RefusalOf<typeof conceptsByIrisAction> | Error>> => {
+  const admitted = admit(conceptsByIrisAction, principal, iris);
+  if (!admitted.ok) return err(admitted.error);
+  const reader = admitted.value;
+
+  return attempt(async () => {
+    const { rows } = await tx.query<ConceptRow>(
+      `${CONCEPT_SELECT} AND c.iri = ANY($4::text[]) ORDER BY c.iri`,
+      [reader.workspaceId, ...readableParameters(reader), iris],
+    );
+    return rows.map((row) => openedOf(row));
   });
 };
 
@@ -1313,13 +1342,18 @@ export const readConcept = async (
 
 const MATCH = anyWordMatch("c.search", "$4", ["c.iri"]);
 
-const matchingConcepts = (strength: MatchStrength, after: boolean): string =>
-  `${conceptSelect(MATCH)}
+/** Collections bind sixth when named; the bound follows them, else binds sixth itself. */
+const matchingConcepts = (strength: MatchStrength, narrowed: boolean, after: boolean): string => {
+  const bound = narrowed ? 7 : 6;
+  const placed = (at: number): `$${number}` => `$${bound + at}`;
+  return `${conceptSelect(MATCH)}
       AND ${MATCH.matches}
       AND ${MATCH.strength(strength)}
-      ${after ? `AND ${MATCH.after({ matched: "$6", rank: "$7", key: ["$8"] })}` : ""}
+      ${narrowed ? "AND c.collection = ANY($6::text[])" : ""}
+      ${after ? `AND ${MATCH.after({ matched: placed(0), rank: placed(1), key: [placed(2)] })}` : ""}
     ORDER BY ${MATCH.order}
     LIMIT $5`;
+};
 
 export type ConceptBound = MatchBound<ConceptIri>;
 
@@ -1329,7 +1363,8 @@ type MatchingConceptRow = ConceptRow & { readonly matched: number; readonly rank
 
 /**
  * Readable concepts by the any-word rule, after `after` when given. A strong match holds at least
- * half the query's distinct words, a weak one fewer.
+ * half the query's distinct words, a weak one fewer. `collections`, when given, leaves only the
+ * concepts in one of them, so a concept in no collection is left out.
  */
 export const findConcepts = (
   principal: UserPrincipal,
@@ -1339,17 +1374,19 @@ export const findConcepts = (
     readonly strength: MatchStrength;
     readonly limit: number;
     readonly after?: ConceptBound | undefined;
+    readonly collections?: readonly string[] | undefined;
   },
 ): Promise<Result<readonly ConceptFound[], Error>> =>
   attempt(async () => {
-    const { after } = input;
+    const { after, collections } = input;
     const { rows } = await tx.query<MatchingConceptRow>(
-      matchingConcepts(input.strength, after !== undefined),
+      matchingConcepts(input.strength, collections !== undefined, after !== undefined),
       [
         principal.workspaceId,
         ...readableParameters(principal),
         input.query,
         input.limit,
+        ...(collections === undefined ? [] : [collections]),
         ...(after === undefined ? [] : [after.matched, after.rank, after.key]),
       ],
     );
@@ -1358,6 +1395,34 @@ export const findConcepts = (
       return { concept, bound: { matched: row.matched, rank: row.rank, key: concept.iri } };
     });
   });
+
+const readableCollectionsAction = declareAction({
+  admits: ANY_ROLE,
+  input: z.object({}),
+  refuses: ["role-forbids"],
+});
+
+/** Each collection holding a concept this principal may read, in the order Postgres sorts them. */
+export const readableCollections = async (
+  principal: UserPrincipal,
+  tx: Tx,
+): Promise<Result<readonly string[], RefusalOf<typeof readableCollectionsAction> | Error>> => {
+  const admitted = admit(readableCollectionsAction, principal, {});
+  if (!admitted.ok) return err(admitted.error);
+  const reader = admitted.value;
+
+  return attempt(async () => {
+    const { rows } = await tx.query<{ readonly collection: string }>(
+      `SELECT DISTINCT c.collection
+         FROM concept_index c
+        WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}
+          AND c.collection IS NOT NULL
+        ORDER BY c.collection`,
+      [reader.workspaceId, ...readableParameters(reader)],
+    );
+    return rows.map((row) => row.collection);
+  });
+};
 
 /** Whether a document is evidence for a concept the caller can read, `alias` naming its passage. */
 export const evidenceForAReadableConcept = (alias: string, roleParameter: number): string =>

@@ -1,3 +1,5 @@
+import { posix } from "node:path";
+
 import { z } from "zod";
 
 import { TRUST_TIERS } from "@better-answers/core/answering";
@@ -75,6 +77,8 @@ const aSource = z
 
 const aConcept = z.object({
   title: z.string().min(1),
+  /** The folder under `knowledge/` its file sits in; the file sits in none when not given. */
+  collection: z.string().min(1).optional(),
   kind: z.string().min(1).default("Answer"),
   body: z.string().min(1),
   sensitivity: z.enum(SENSITIVITIES).default("Internal"),
@@ -159,11 +163,10 @@ const shortNameOf = (title: string): string =>
     .replaceAll(/[^a-z0-9]+/g, "-")
     .replaceAll(/^-|-$/g, "");
 
-/** Every concept sits directly under `knowledge/`, so a link names the file alone. */
-const fileOf = (title: string): string => `${shortNameOf(title)}.md`;
-
-const pathOf = (concept: Pick<AskedConcept, "title">): string =>
-  `knowledge/${fileOf(concept.title)}`;
+const pathOf = ({ title, collection }: Pick<AskedConcept, "title" | "collection">): string =>
+  ["knowledge", ...(collection === undefined ? [] : [collection]), `${shortNameOf(title)}.md`].join(
+    "/",
+  );
 
 type AskedSource = AskedConcept["sources"][number];
 
@@ -294,7 +297,9 @@ const bodyOf = (
     .map((citation) => `[^${citation.id}]`)
     .filter((mark) => !concept.body.includes(mark))
     .join("");
-  const named = links.map((link) => `[${link.title}](${fileOf(link.title)})`);
+  // A link is read from the folder of the file that writes it.
+  const folder = posix.dirname(pathOf(concept));
+  const named = links.map((link) => `[${link.title}](${posix.relative(folder, link.path)})`);
   const related = named.length === 0 ? "" : `\n\nSee also ${named.join(", ")}.`;
   return `${concept.body}${marks}${related}\n`;
 };

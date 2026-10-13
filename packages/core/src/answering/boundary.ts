@@ -79,7 +79,7 @@ export const findOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
           title: z.string(),
           trust,
           trustWords: z.string(),
-          bundle: z.string(),
+          collection: z.string().nullable(),
           tags: z.array(z.string()),
         }),
         documentMatch,

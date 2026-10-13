@@ -190,7 +190,7 @@ const documentsAndTheConceptOverThem = async () => {
 
   const iri = await conceptWrittenIn(workspace, {
     mergeKey: "note:kingfisher-policy",
-    path: "knowledge/kingfisher-policy.md",
+    path: "knowledge/policies/kingfisher-policy.md",
     title: COVERING_TITLE,
     frontmatter: {
       title: COVERING_TITLE,
@@ -234,7 +234,7 @@ describe("the document layer through the MCP entries", () => {
           rider: null,
         },
         trustWords: "Unverified",
-        bundle: "knowledge",
+        collection: "policies",
         tags: [],
       },
       {
@@ -248,7 +248,7 @@ describe("the document layer through the MCP entries", () => {
 
     expect(rendered(found)).toBe(
       [
-        `Note · ${COVERING_TITLE} · Unverified · ${iri}`,
+        `Note · ${COVERING_TITLE} · policies · Unverified · ${iri}`,
         `document · ${INVOICE_TITLE} · Not company knowledge · Internal · ${standalone.locator}`,
       ].join("\n"),
     );
@@ -273,7 +273,7 @@ describe("the document layer through the MCP entries", () => {
     });
     expect(rendered(first)).toBe(
       [
-        `Note · ${COVERING_TITLE} · Unverified · ${iri}`,
+        `Note · ${COVERING_TITLE} · policies · Unverified · ${iri}`,
         "",
         `More follow: call find again with cursor ${String(cursor)}`,
       ].join("\n"),

@@ -198,6 +198,9 @@ const CONCEPT_SEARCH = [
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, body), 'C')`,
 ].join(" || ");
 
+/** The folder directly under `knowledge/`, and null for a file that sits in none. */
+const CONCEPT_COLLECTION = `substring(path from '^knowledge/([^/]+)/')`;
+
 export const conceptIndex = withRLS(
   "concept_index",
   {
@@ -221,6 +224,7 @@ export const conceptIndex = withRLS(
     updatedAt: stamp("updated_at").notNull().defaultNow(),
 
     search: searchVector("search").notNull().generatedAlwaysAs(sql.raw(CONCEPT_SEARCH)),
+    collection: text("collection").generatedAlwaysAs(sql.raw(CONCEPT_COLLECTION)),
   },
   "workspaceId",
   (table) => [
@@ -231,6 +235,7 @@ export const conceptIndex = withRLS(
 
     uniqueIndex("concept_index_workspace_id_path_uidx").on(table.workspaceId, table.path),
     index("concept_index_search_gin").using("gin", table.search),
+    index("concept_index_workspace_id_collection_idx").on(table.workspaceId, table.collection),
 
     foreignKey({
       columns: [table.workspaceId, table.commitSha],
