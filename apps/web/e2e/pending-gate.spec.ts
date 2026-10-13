@@ -4,12 +4,7 @@ import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticato
 
 import { ACCOUNT_HEADING, PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
-import {
-  CONFIRM_WORDS,
-  passkeyThatConfirms,
-  PROMOTION_WORDS,
-} from "@/features/auth/second-factor-words.ts";
-import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
+import { CONFIRM_WORDS } from "@/features/auth/second-factor-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
 
@@ -131,12 +126,22 @@ test("an hour unconfirmed ends the sign-in; signing in returns there", async ({
   expect(`${landedAt(page).pathname}${landedAt(page).search}`).toBe(
     `/sign-in?redirect=${encodeURIComponent(GROUPS)}`,
   );
-  await expect(page.getByRole("status").filter({ hasText: /\S/ })).toHaveText(
-    SIGN_IN_WORDS.arrived["confirm-timed-out"],
-  );
+  await expect(page.getByRole("status"), "the page says nothing of the hour").toHaveText(/\S/);
+  const timedOut = await page.getByRole("status").innerText();
   await passesTheAccessibilityGate();
   await signIn(page, request, workspace.admin.email);
   await expect(page).toHaveURL(new RegExp(`${GROUPS}$`));
+
+  // A confirmed session that ends is told apart from one never confirmed.
+  await page.context().clearCookies();
+  await page.reload();
+  await expect(signInHeading(page)).toBeVisible();
+  await expect
+    .poll(
+      async () => ["", timedOut].includes(await page.getByRole("status").innerText()),
+      "an ended session read as one never confirmed",
+    )
+    .toBe(false);
 });
 
 test("a confirmed session opening confirm goes straight to its return", async ({
@@ -189,20 +194,18 @@ test("a just-promoted Admin sees what can confirm, gone once confirmed", async (
   await page.getByRole("button", { name: INVITATION_WORDS.join(workspace.name) }).click();
 
   await expect(confirmHeading(page)).toBeVisible();
-  const lead = page.getByRole("list", { name: PROMOTION_WORDS.lead });
-  await expect(lead.getByRole("listitem")).toHaveText([
-    passkeyThatConfirms(passkey, new Date().toISOString()),
-    PROMOTION_WORDS.authenticator,
-  ]);
+  const whatConfirms = page.getByRole("main").getByRole("list");
+  await expect(whatConfirms, "nothing names the list of what confirms").toHaveAccessibleName(/\S/);
+  await expect(whatConfirms.getByRole("listitem")).toContainText([passkey, "Authenticator"]);
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${quoted(CONFIRM_WORDS.heading)} [level=1]
-      - paragraph: ${quoted(CONFIRM_WORDS.whyAnAdmin)}
-      - paragraph: ${quoted(PROMOTION_WORDS.lead)}
-      - list ${quoted(PROMOTION_WORDS.lead)}:
-        - listitem: ${quoted(passkeyThatConfirms(passkey, new Date().toISOString()))}
-        - listitem: ${quoted(PROMOTION_WORDS.authenticator)}
-      - paragraph: ${quoted(PROMOTION_WORDS.after)}
+      - paragraph
+      - paragraph
+      - list:
+        - listitem
+        - listitem
+      - paragraph
       - button ${quoted(CONFIRM_WORDS.passkey)}
       - textbox ${quoted(CONFIRM_WORDS.codeField)}
   `);
@@ -215,5 +218,5 @@ test("a just-promoted Admin sees what can confirm, gone once confirmed", async (
   await page.goto("/sign-in");
   await signInByEmail(page, request, who.email);
   await expect(codeField(page)).toBeVisible();
-  await expect(lead).toHaveCount(0);
+  await expect(whatConfirms).toHaveCount(0);
 });

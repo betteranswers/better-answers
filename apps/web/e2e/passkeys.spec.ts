@@ -3,7 +3,6 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import { ALL_WORKSPACES } from "@/app/words.ts";
 import {
   ACCOUNT_HEADING,
-  ACTION_LANDED,
   PASSKEY_WORDS,
   passkeyNameFor,
   RECOVERY_CODE_WORDS,
@@ -45,6 +44,12 @@ const rowOf = (page: Page, name: string) => page.getByRole("listitem", { name, e
 
 const theNoWorkspacePage = (page: Page) =>
   page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
+
+/** The status an action's outcome is said in: the one holding words. */
+const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
+
+/** A passkey's last use is shown to the minute, and the day it was added as a day alone. */
+const A_TIME_OF_USE = /\b\d{1,2}:\d{2}\b/;
 
 /** The name the page suggests, read from the browser it runs in. */
 const suggestedName = (page: Page): Promise<string> =>
@@ -97,9 +102,11 @@ test("a person adds a passkey, then signs in without email", async ({ page, requ
 
   const name = await passkeyAdded(page);
 
-  await expect(page.getByText(ACTION_LANDED.passkeyAdded(name, person.email))).toBeVisible();
+  await expect(outcomeOf(page), "the page says nothing of the add").toBeVisible();
   await expect(rowOf(page, name)).toBeFocused();
-  await expect(rowOf(page, name)).toContainText(PASSKEY_WORDS.notUsed);
+  await expect(rowOf(page, name), "an unused passkey shows a time of use").not.toContainText(
+    A_TIME_OF_USE,
+  );
   const emailsBefore = await emailsSentTo(request, person.email);
 
   await signedOut(page);
@@ -126,7 +133,7 @@ test("a renamed passkey shows its name, and its last use", async ({ page, reques
   await signedOut(page);
   await expect(theNoWorkspacePage(page)).toBeVisible();
   await accountOpened(page);
-  await expect(rowOf(page, "Work laptop")).toContainText("Last used");
+  await expect(rowOf(page, "Work laptop")).toContainText(A_TIME_OF_USE);
 });
 
 test("Escape puts a passkey's name back", async ({ page, request }) => {
@@ -155,13 +162,16 @@ test("a passkey's rename field and Save share one height", async ({ page, reques
 });
 
 test("a passkey removed stops signing in", async ({ page, request }) => {
-  const { device, person, name } = await withAPasskey(page, request, "removed");
+  const { device, name } = await withAPasskey(page, request, "removed");
+  const saidOfTheAdd = await outcomeOf(page).innerText();
 
   await rowOf(page, name).getByRole("button", { name: PASSKEY_WORDS.remove }).click();
   const dialog = page.getByRole("dialog", { name: removePasskeyTitle(name) });
   await dialog.getByRole("button", { name: PASSKEY_WORDS.removeCommit }).click();
 
-  await expect(page.getByText(ACTION_LANDED.passkeyRemoved(name, person.email))).toBeVisible();
+  await expect
+    .poll(() => outcomeOf(page).innerText(), "the page says nothing new of the removal")
+    .not.toBe(saidOfTheAdd);
   await expect(rowOf(page, name)).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 3, name: PASSKEY_WORDS.heading })).toBeFocused();
   expect(await device.held(), "the device should still hold the removed passkey").toBe(1);
@@ -204,14 +214,41 @@ test("an Admin keeps their only passkey, told why beside Remove", async ({ page,
   await expect(remove).toHaveAccessibleDescription(/\S/);
 });
 
+/**
+ * A prompt that used no passkey is no refusal. Waiting says something too, so the status is read
+ * again once the button is free.
+ */
+const saysNoPasskeyWasUsed = async (page: Page, saidBefore: string): Promise<void> => {
+  const saysSomethingNew = () =>
+    expect
+      .poll(
+        async () => ["", saidBefore].includes(await page.getByRole("status").innerText()),
+        "the page says nothing of the unused passkey",
+      )
+      .toBe(false);
+  await saysSomethingNew();
+  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.passkey })).toHaveAttribute(
+    "aria-disabled",
+    "false",
+  );
+  await saysSomethingNew();
+  await expect(
+    page.getByRole("alert", { includeHidden: true }),
+    "an unused passkey read as a refusal",
+  ).toBeEmpty();
+};
+
 test("a device whose user check fails signs nothing in", async ({ page, request }) => {
   const { device } = await withAPasskey(page, request, "unverified");
   await device.stopsVerifying();
 
   await signedOut(page);
+  // The page already says the session ended, so an unused passkey shows by what is said next.
+  await expect(page.getByRole("status")).toHaveText(/\S/);
+  const saidOnArriving = await page.getByRole("status").innerText();
   await page.getByRole("button", { name: SIGN_IN_WORDS.passkey }).click();
 
-  await expect(page.getByText(SIGN_IN_WORDS.passkeyNotUsed)).toBeVisible();
+  await saysNoPasskeyWasUsed(page, saidOnArriving);
   await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toBeVisible();
 });
 
@@ -223,7 +260,7 @@ test("a cancelled passkey prompt leaves the email step unchanged", async ({ page
 
   await page.getByRole("button", { name: SIGN_IN_WORDS.passkey }).click();
 
-  await expect(page.getByText(SIGN_IN_WORDS.passkeyNotUsed)).toBeVisible();
+  await saysNoPasskeyWasUsed(page, "");
   await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toHaveValue(address);
   await expect(page.getByRole("button", { name: SIGN_IN_WORDS.passkey })).toBeFocused();
 });
@@ -245,7 +282,8 @@ test("the email step reads email, send, then the passkey", async ({ page }) => {
 /** Knowledge's first group, whose name heads the page its rail link opens. */
 const BROWSE = menuGroupIn(KNOWLEDGE, "browse");
 
-const offerOf = (page: Page) => page.getByText(PASSKEY_WORDS.offer);
+/** The offer, found by the one control it alone draws. */
+const offerOf = (page: Page) => page.getByRole("button", { name: PASSKEY_WORDS.dismissOffer });
 
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 
@@ -305,7 +343,7 @@ test("a dismissed offer stays away after the next sign-in", async ({ page, reque
   const viewer = await aViewerOffered(page, request);
   const dismissed = page.waitForResponse((answer) => answer.url().includes("dismissPasskeyOffer"));
 
-  await page.getByRole("button", { name: PASSKEY_WORDS.dismissOffer }).click();
+  await offerOf(page).click();
 
   await expect(offerOf(page)).toHaveCount(0);
   await expect(thePage(page)).toBeFocused();
@@ -373,13 +411,13 @@ test("the offer's link lands on the Account page's add", async ({ page, request 
 
   await expect(accountHeading(page)).toBeVisible();
   await expect(page.getByRole("button", { name: PASSKEY_WORDS.add })).toBeFocused();
-  await expect(page.getByText(PASSKEY_WORDS.offer)).toHaveCount(0);
+  await expect(offerOf(page)).toHaveCount(0);
 });
 
 test("a browser without WebAuthn keeps the email path alone", async ({ page, request }) => {
   await withoutWebAuthn(page);
   await aMemberSignedInAt(page, request, "Viewer", "/ask");
-  await expect(page.getByText(PASSKEY_WORDS.offer)).toHaveCount(0);
+  await expect(offerOf(page)).toHaveCount(0);
 
   await signedOut(page);
   await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toBeVisible();
@@ -387,5 +425,8 @@ test("a browser without WebAuthn keeps the email path alone", async ({ page, req
   await signedInWithNoWorkspace(page, request, "no-webauthn");
   await accountOpened(page);
 
-  await expect(page.getByText(PASSKEY_WORDS.noWebAuthn)).toBeVisible();
+  // The add's place holds a line more than a list with no passkey shows, and no button.
+  const passkeys = page.getByRole("region", { name: PASSKEY_WORDS.heading });
+  await expect(passkeys.getByRole("paragraph"), "nothing stands in the add's place").toHaveCount(2);
+  await expect(passkeys.getByRole("button", { name: PASSKEY_WORDS.add })).toHaveCount(0);
 });

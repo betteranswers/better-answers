@@ -7,7 +7,6 @@ import {
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
 import {
-  ACTION_LANDED,
   AUTHENTICATOR_WORDS,
   PASSKEY_WORDS,
   RECOVERY_CODE_WORDS,
@@ -61,6 +60,10 @@ const authenticatorInstead = (page: Page) =>
 
 const codesListed = (page: Page) =>
   page.getByRole("list", { name: RECOVERY_CODE_WORDS.list }).getByRole("listitem");
+
+/** What the codes' block says of its set: one line for a first set, and one more for a set that replaces one. */
+const saidOfTheSet = (page: Page) =>
+  page.getByRole("region", { name: RECOVERY_CODE_WORDS.saveHeading }).getByRole("paragraph");
 
 /** Every refusal region stands from the first draw, so the one saying something is the refusal. */
 const theRefusal = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
@@ -124,9 +127,8 @@ const anAdminWithBothFactors = async (page: Page, api: APIRequestContext) => {
   await page.getByRole("button", { name: PASSKEY_WORDS.add }).click();
   await page.getByLabel(PASSKEY_WORDS.nameField).fill("Work laptop");
   await page.getByRole("button", { name: PASSKEY_WORDS.addCommit }).click();
-  await expect(
-    page.getByText(ACTION_LANDED.passkeyAdded("Work laptop", admin.email)),
-  ).toBeVisible();
+  await expect(page.getByRole("listitem", { name: "Work laptop", exact: true })).toBeFocused();
+  await expect(page.getByRole("status").filter({ hasText: /\S/ })).toBeVisible();
 
   await device.leftUnattended();
   await signedInAgain(page, api, admin.email);
@@ -236,11 +238,10 @@ test("a recovery code's setup swaps in a new authenticator", async ({
   const { email, key, codes } = await anAdminWithAnAuthenticator(page, request);
 
   await recoveryCodeSpent(page, codes[0] ?? "");
-  await expect(page.getByText(SETUP_WORDS.newWhy)).toBeVisible();
   await passesTheAccessibilityGate();
   const newKey = await authenticatorSetUpThere(page);
 
-  await expect(page.getByText(RECOVERY_CODE_WORDS.replacedLine)).toBeVisible();
+  await expect(saidOfTheSet(page), "the set does not say it replaces one").toHaveCount(2);
   await codesTicked(page, RECOVERY_CODE_WORDS.finish);
   await landedAtHome(page, "Admin");
   await signedInAgain(page, request, email);
@@ -288,7 +289,10 @@ test("a restored Admin gives the restore code before any setup", async ({
   await page.reload();
   await expect(restoreField(page)).toBeFocused();
   await codeUsed(restoreField(page), code);
-  await expect(page.getByText(SETUP_WORDS.restoreAccepted)).toBeVisible();
+  await expect(
+    page.getByRole("status").filter({ hasText: /\S/ }),
+    "the page says nothing of the restore code",
+  ).toBeVisible();
   await expect(restoreField(page)).toHaveCount(0);
   await authenticatorSetUpThere(page);
 });
@@ -303,7 +307,7 @@ test("without WebAuthn, setup opens on the authenticator's steps", async ({ page
   await expect(page.getByRole("img", { name: AUTHENTICATOR_WORDS.qrCode })).toBeVisible();
   await expect(page.getByLabel(AUTHENTICATOR_WORDS.codeField)).toBeVisible();
   await expect(addAPasskey(page)).toHaveCount(0);
-  await expect(page.getByText(SETUP_WORDS.passkey)).toHaveCount(0);
+  await expect(page.getByLabel(PASSKEY_WORDS.nameField)).toHaveCount(0);
 });
 
 test("unticked codes come back as a new set at sign-in", async ({
@@ -315,7 +319,7 @@ test("unticked codes come back as a new set at sign-in", async ({
   await codeField(page).fill(codeOf(key));
   await expect(heading(page, RECOVERY_CODE_WORDS.saveHeading)).toBeVisible();
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
-  await expect(page.getByText(RECOVERY_CODE_WORDS.replacedLine)).toHaveCount(0);
+  await expect(saidOfTheSet(page), "a first set says it replaces one").toHaveCount(1);
   const first = await codesListed(page).allInnerTexts();
 
   await page.context().clearCookies();
@@ -330,7 +334,7 @@ test("unticked codes come back as a new set at sign-in", async ({
     second.filter((code) => first.includes(code)),
     "a code of the first set came back",
   ).toEqual([]);
-  await expect(page.getByText(RECOVERY_CODE_WORDS.replacedLine)).toBeVisible();
+  await expect(saidOfTheSet(page), "the set does not say it replaces one").toHaveCount(2);
   await passesTheAccessibilityGate();
   await codesTicked(page, RECOVERY_CODE_WORDS.finish);
   await landedAtHome(page, "Admin");

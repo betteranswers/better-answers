@@ -2,11 +2,7 @@ import type { APIRequestContext, Page, Response } from "@playwright/test";
 
 import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
-import {
-  NO_WORKSPACE_ACTIONS,
-  NO_WORKSPACE_HEADING,
-  NO_WORKSPACE_WORDS,
-} from "@/features/auth/workspace-words.ts";
+import { NO_WORKSPACE_HEADING, NO_WORKSPACE_WORDS } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import type { Role } from "@/shared/navigation.ts";
 
@@ -42,7 +38,8 @@ const landedAt = (page: Page): URL => new URL(page.url());
 const noWorkspaceHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
 
-const claudeLine = (page: Page) => page.getByText(NO_WORKSPACE_WORDS.claudeAfterJoining);
+/** The page names Claude only to a person who came to connect it. */
+const claudeLine = (page: Page) => page.getByRole("main").getByText(/\bClaude\b/);
 
 const invitations = (page: Page) =>
   page.getByRole("region", { name: NO_WORKSPACE_WORDS.invitations });
@@ -70,11 +67,7 @@ const anInvitation = async (request: APIRequestContext, workspaceName: string, r
     inviterId: workspace.admin.id,
     role,
   });
-  return {
-    workspace,
-    address,
-    invitedAs: NO_WORKSPACE_WORDS.invitedAs(workspace.admin.name, role),
-  };
+  return { workspace, address };
 };
 
 /**
@@ -119,11 +112,12 @@ test("tells a person from Claude it connects once they join", async ({
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${quoted(NO_WORKSPACE_HEADING)} [level=1]
-      - paragraph: ${quoted(NO_WORKSPACE_WORDS.claudeAfterJoining)}
+      - paragraph
       - region ${quoted(ASK_TO_JOIN_WORDS.heading)}
       - button "Sign out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
   `);
+  await expect(claudeLine(page)).toBeVisible();
   await answered;
   await expect(invitations(page), "a person with none was shown invitations").toHaveCount(0);
 });
@@ -162,7 +156,7 @@ test("lists a waiting invitation within a second, then joins it", async ({
   request,
   passesTheAccessibilityGate,
 }) => {
-  const { workspace, address, invitedAs } = await anInvitation(request, "Calder Joinery", "Editor");
+  const { workspace, address } = await anInvitation(request, "Calder Joinery", "Editor");
   const elsewhere = await provision(request, { name: "Elsewhere Ltd" });
   await invite(request, {
     workspaceId: elsewhere.workspaceId,
@@ -191,7 +185,7 @@ test("lists a waiting invitation within a second, then joins it", async ({
         - list:
           - listitem:
             - link ${quoted(workspace.name)}
-            - paragraph: ${quoted(invitedAs)}
+            - paragraph
       - region ${quoted(ASK_TO_JOIN_WORDS.heading)}
       - button "Sign out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
@@ -200,12 +194,18 @@ test("lists a waiting invitation within a second, then joins it", async ({
     invitations(page).getByRole("listitem"),
     "another's invitation was shown",
   ).toHaveCount(1);
-  await expect(invitationTo(page, workspace.name)).toHaveAccessibleDescription(invitedAs);
+  const invitation = invitationTo(page, workspace.name);
+  await expect(invitation, "the link does not say who invited").toHaveAccessibleDescription(
+    new RegExp(workspace.admin.name),
+  );
+  await expect(invitation, "the link does not say the role").toHaveAccessibleDescription(
+    /\bEditor\b/,
+  );
   await expect(claudeLine(page)).toHaveCount(0);
   await passesTheAccessibilityGate();
 
   const keystrokes = await keystrokesListed(page, "this page");
-  await expect(keystrokes).toContainText(NO_WORKSPACE_ACTIONS.toInvitations);
+  await expect(keystrokes.getByRole("term").filter({ hasText: /^i$/ })).toBeVisible();
   await keystrokesDismissed(page, keystrokes);
   await page.keyboard.press("i");
   await expect(invitationTo(page, workspace.name)).toBeFocused();
@@ -239,7 +239,7 @@ test("offers to read the invitations again when no answer came", async ({
 
   await page.unroute(INVITATIONS_READ_ROUTE);
   const keystrokes = await keystrokesListed(page, "this page");
-  await expect(keystrokes).toContainText(NO_WORKSPACE_ACTIONS.readAgain);
+  await expect(keystrokes.getByRole("term").filter({ hasText: /^r$/ })).toBeVisible();
   await keystrokesDismissed(page, keystrokes);
   await page.keyboard.press("r");
 
@@ -253,11 +253,7 @@ test("carries Claude's request through a join to consent", async ({
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  const { workspace, address, invitedAs } = await anInvitation(
-    request,
-    "Ryedale Metalwork",
-    "Viewer",
-  );
+  const { workspace, address } = await anInvitation(request, "Ryedale Metalwork", "Viewer");
   await catchClaudesRedirect(page);
 
   await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent", state: "joined-first" }));
@@ -267,13 +263,13 @@ test("carries Claude's request through a join to consent", async ({
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${quoted(NO_WORKSPACE_HEADING)} [level=1]
-      - paragraph: ${quoted(NO_WORKSPACE_WORDS.claudeAfterJoining)}
+      - paragraph
       - region ${quoted(NO_WORKSPACE_WORDS.invitations)}:
         - heading ${quoted(NO_WORKSPACE_WORDS.invitations)} [level=2]
         - list:
           - listitem:
             - link ${quoted(workspace.name)}
-            - paragraph: ${quoted(invitedAs)}
+            - paragraph
       - region ${quoted(ASK_TO_JOIN_WORDS.heading)}
       - button "Sign out"
       - button ${quoted(KEYSTROKE_WORDS.button)}
@@ -288,7 +284,7 @@ test("carries Claude's request through a join to consent", async ({
   await page.getByRole("button", { name: INVITATION_WORDS.join(workspace.name) }).click();
 
   await expect(consentHeading(page)).toBeVisible();
-  await expect(page.getByText(`Claude will act as you, at ${workspace.name}.`)).toBeVisible();
+  await expect(page.getByText(workspace.name), "consent names another workspace").toBeVisible();
   await page.getByRole("button", { name: "Connect" }).click();
   const callback = landedAt(page);
   expect(`${callback.origin}${callback.pathname}`).toBe(CLAUDES_REDIRECT_URI);

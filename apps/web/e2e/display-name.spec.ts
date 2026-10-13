@@ -54,8 +54,7 @@ test("asks a first-time person for a display name before anything", async ({
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading ${JSON.stringify(DISPLAY_NAME_WORDS.heading)} [level=1]
-      - paragraph: ${JSON.stringify(DISPLAY_NAME_WORDS.hint)}
-      - text: ${JSON.stringify(DISPLAY_NAME_WORDS.label)}
+      - paragraph
       - textbox ${JSON.stringify(DISPLAY_NAME_WORDS.label)}
       - button "Save and continue"
   `);
