@@ -1,8 +1,7 @@
 import type { Page } from "@playwright/test";
 
-import { goHome } from "@/app/words.ts";
-import { BROWSE, SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
-import { HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
+import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import {
   landedAtHome,
@@ -17,10 +16,10 @@ import { publishedAddressOf, sessionMemberOf } from "./reads.ts";
 
 /** The test workspace may hold no knowledge, so Search is read with nothing asked. */
 const searchIsReached = async (page: Page, gate: Gate): Promise<void> => {
-  await railOf(page).getByRole("link", { name: KNOWLEDGE.name }).click();
+  await railOf(page).getByRole("link", { name: "Knowledge" }).click();
   await expect(page).toHaveURL(new RegExp(`${SEARCH.path}$`));
-  await expect(page.getByRole("heading", { level: 1, name: BROWSE.name })).toBeVisible();
-  const search = page.getByRole("region", { name: SEARCH.name });
+  await expect(page.getByRole("heading", { level: 1, name: "Browse" })).toBeVisible();
+  const search = page.getByRole("region", { name: "Search" });
   await expect(search.getByRole("searchbox")).toHaveValue("");
   await expect(search.getByRole("status")).toHaveText(/\S/);
   await gate();
@@ -58,7 +57,7 @@ export const aMembersJourney = async (
     await page.goto(HOMES.Admin.path);
     await notFoundOfferingHome(page, role);
     await gate();
-    await page.getByRole("link", { name: goHome(HOMES[role]) }).click();
+    await page.getByRole("link", { name: "Go to Ask" }).click();
     await landedAtHome(page, role);
   });
 
