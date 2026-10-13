@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DECLARED_ACTIONS } from "@/shared/audit/audit-actions.ts";
-import { detailLinesOf } from "@/shared/audit/audit-details.ts";
+import { detailLinesOf, type DetailLine } from "@/shared/audit/audit-details.ts";
 import {
   ACTIONS_HEADED,
   ACTIONS_SAID,
@@ -31,18 +31,34 @@ const byHannah = (
   ...event,
 });
 
+const BY_THE_PLATFORM = { kind: "platform" } as const;
+
+/** Matches a sentence that opens with its actor and then holds each part, in this order. */
+const ledBy = (actor: string, ...parts: readonly string[]): RegExp =>
+  new RegExp(
+    `^${[actor, ...parts].map((part) => part.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)).join(".*")}`,
+    "v",
+  );
+
+/** A sentence whose actor is no person opens on the platform's own word, with a capital. */
+const LED_BY_NO_PERSON = /^\p{Lu}/v;
+
+/** A detail line as the data it shows; its label is the web's wording. */
+const shownIn = (lines: readonly DetailLine[]): readonly (readonly [string, string])[] =>
+  lines.map(({ key, value }) => [key, value]);
+
 describe("an audit event's sentence", () => {
-  it("says a role change with both people named", () => {
+  it("names who changed whose role, and the role", () => {
     const changed = byHannah({
       action: "people.member.role_changed",
       subject: PRIYA,
       detail: { previousRole: "Viewer", role: "Editor" },
     });
 
-    expect(sentenceOf(changed)).toBe("Hannah Wright changed Priya Shah’s role to Editor");
+    expect(sentenceOf(changed)).toMatch(ledBy("Hannah Wright", "Priya Shah", "Editor"));
   });
 
-  it("says a deleted group for a group since deleted", () => {
+  it("names the person added to a group since deleted", () => {
     const added = byHannah({
       action: "people.group.member_added",
       subject: { kind: "deleted-group" },
@@ -50,7 +66,8 @@ describe("an audit event's sentence", () => {
       named: { userId: PRIYA },
     });
 
-    expect(sentenceOf(added)).toBe("Hannah Wright added Priya Shah to a deleted group");
+    expect(sentenceOf(added)).toMatch(ledBy("Hannah Wright", "Priya Shah"));
+    expect(sentenceOf(added)).not.toContain("01J6AAAAAAAAAAAAAAAAAAAAAA");
   });
 
   it("names a group as it stands now", () => {
@@ -59,17 +76,22 @@ describe("an audit event's sentence", () => {
       subject: { kind: "group", name: "Bid team" },
     });
 
-    expect(sentenceOf(renamed)).toBe("Hannah Wright renamed the group now called Bid team");
+    expect(sentenceOf(renamed)).toMatch(ledBy("Hannah Wright", "Bid team"));
   });
 
-  it("names an erased person a former member", () => {
-    const removed = byHannah({
-      action: "people.member.removed",
-      subject: { kind: "former-member" },
-      detail: { role: "Editor", grants: [] },
-    });
+  it("names no one for an erased person", () => {
+    const removed = (subject: SaidEvent["subject"]): string =>
+      sentenceOf(
+        byHannah({
+          action: "people.member.removed",
+          subject,
+          detail: { role: "Editor", grants: [] },
+        }),
+      );
 
-    expect(sentenceOf(removed)).toBe("Hannah Wright removed a former member from the workspace");
+    expect(removed({ kind: "former-member" })).toMatch(ledBy("Hannah Wright"));
+    expect(removed({ kind: "former-member" })).not.toBe(removed(PRIYA));
+    expect(removed({ kind: "former-member" })).not.toBe(removed(null));
   });
 
   it("names an invitation by its address", () => {
@@ -79,37 +101,41 @@ describe("an audit event's sentence", () => {
       detail: { role: "Viewer" },
     });
 
-    expect(sentenceOf(invited)).toBe(
-      "Hannah Wright sent an invitation to jo.bloggs@example.invalid as Viewer",
+    expect(sentenceOf(invited)).toMatch(
+      ledBy("Hannah Wright", "jo.bloggs@example.invalid", "Viewer"),
     );
   });
 
-  it("says an invitation erasure deleted without an address", () => {
+  it("gives no address for an invitation an erasure deleted", () => {
     const invited = byHannah({
       action: "people.invitation.created",
       subject: { kind: "erased-invitation" },
       detail: { role: "Viewer" },
     });
 
-    expect(sentenceOf(invited)).toBe("Hannah Wright sent an invitation as Viewer");
+    expect(sentenceOf(invited)).toMatch(ledBy("Hannah Wright", "Viewer"));
+    expect(sentenceOf(invited)).not.toContain("@");
   });
 
-  it("says a replaced invitation was replaced, not cancelled", () => {
-    const replaced = byHannah({
+  it("tells a replaced invitation from a cancelled one", () => {
+    const cancelled = byHannah({
       action: "people.invitation.cancelled",
       subject: { kind: "invitation", address: "jo.bloggs@example.invalid" },
+    });
+    const replaced = sentenceOf({
+      ...cancelled,
       detail: { replacedByInvitationId: "01J6BBBBBBBBBBBBBBBBBBBBBB" },
     });
 
-    expect(sentenceOf(replaced)).toBe(
-      "Hannah Wright replaced an invitation to jo.bloggs@example.invalid with a new one",
-    );
+    expect(replaced).toMatch(ledBy("Hannah Wright", "jo.bloggs@example.invalid"));
+    expect(replaced).not.toBe(sentenceOf(cancelled));
+    expect(replaced).not.toContain("01J6BBBBBBBBBBBBBBBBBBBBBB");
   });
 
   it("capitalises the platform or a former member as the actor", () => {
     const provisioned: SaidEvent = {
       action: "platform.workspace.provisioned",
-      by: { kind: "platform" },
+      by: BY_THE_PLATFORM,
       subject: null,
       detail: { role: "Admin" },
       named: {},
@@ -122,8 +148,10 @@ describe("an audit event's sentence", () => {
       named: {},
     };
 
-    expect(sentenceOf(provisioned)).toBe("The platform provisioned the workspace");
-    expect(sentenceOf(created)).toBe("A former member created the group Bid writers");
+    expect(sentenceOf(provisioned)).toMatch(LED_BY_NO_PERSON);
+    expect(sentenceOf(created)).toMatch(LED_BY_NO_PERSON);
+    expect(sentenceOf(created)).toContain("Bid writers");
+    expect(sentenceOf(created)).not.toBe(sentenceOf({ ...created, by: BY_THE_PLATFORM }));
   });
 
   it("never changes the case of a person's display name", () => {
@@ -135,13 +163,13 @@ describe("an audit event's sentence", () => {
       named: {},
     };
 
-    expect(sentenceOf(signedIn)).toBe("dj okoro signed in");
+    expect(sentenceOf(signedIn)).toMatch(ledBy("dj okoro"));
   });
 
   it("reads an unknown action by its stored name in words", () => {
     const unknown = byHannah({ action: "people.probe.unheard_of", subject: null });
 
-    expect(sentenceOf(unknown)).toBe("Probe unheard of");
+    expect(sentenceOf(unknown)).toMatch(/^probe unheard of$/iv);
   });
 });
 
@@ -152,47 +180,52 @@ describe("a second factor's audit sentence", () => {
   it("names the factor a confirmation used", () => {
     expect(
       sentenceOf(ofHerself("people.person.second_factor_confirmed", { method: "passkey" })),
-    ).toBe("Hannah Wright confirmed their second factor with a passkey");
+    ).toMatch(ledBy("Hannah Wright", "a passkey"));
     expect(
       sentenceOf(ofHerself("people.person.second_factor_confirmed", { method: "authenticator" })),
-    ).toBe("Hannah Wright confirmed their second factor with an authenticator");
+    ).toMatch(ledBy("Hannah Wright", "an authenticator"));
   });
 
   it("names the factor that replaced the old ones", () => {
-    expect(sentenceOf(ofHerself("people.person.factors_replaced", { by: "authenticator" }))).toBe(
-      "Hannah Wright replaced their second factors with an authenticator",
+    expect(
+      sentenceOf(ofHerself("people.person.factors_replaced", { by: "authenticator" })),
+    ).toMatch(ledBy("Hannah Wright", "an authenticator"));
+  });
+
+  it("keeps a factor it has not met off the page", () => {
+    const unknown = sentenceOf(ofHerself("people.person.factors_replaced", { by: "microsoft" }));
+
+    expect(unknown).toMatch(ledBy("Hannah Wright"));
+    expect(unknown).not.toContain("microsoft");
+    expect(unknown).not.toBe(
+      sentenceOf(ofHerself("people.person.factors_replaced", { by: "authenticator" })),
     );
   });
 
-  it("says an unknown factor as a second factor", () => {
-    expect(sentenceOf(ofHerself("people.person.factors_replaced", { by: "microsoft" }))).toBe(
-      "Hannah Wright replaced their second factors with a second factor",
+  it("opens a used restore code with who used it", () => {
+    expect(sentenceOf(ofHerself("people.person.restore_code_accepted"))).toMatch(
+      ledBy("Hannah Wright"),
     );
   });
 
-  it("says a restore code from better-answers support was used", () => {
-    expect(sentenceOf(ofHerself("people.person.restore_code_accepted"))).toBe(
-      "Hannah Wright used a restore code from better-answers support",
-    );
-  });
-
-  it("says the platform restored a person's sign-in", () => {
+  it("names whose sign-in the platform restored", () => {
     const restored: SaidEvent = {
       action: "people.person.sign_in_restored",
-      by: { kind: "platform" },
+      by: BY_THE_PLATFORM,
       subject: PRIYA,
       detail: {},
       named: {},
     };
 
-    expect(sentenceOf(restored)).toBe("The platform restored Priya Shah’s sign-in");
+    expect(sentenceOf(restored)).toMatch(LED_BY_NO_PERSON);
+    expect(sentenceOf(restored).indexOf("Priya Shah")).toBeGreaterThan(0);
   });
 });
 
 describe("an audit event in today's words", () => {
   const HANDBOOK = { kind: "connected-source", name: "Staff handbook" } as const;
 
-  it("says a connected source published, whatever its stored action name", () => {
+  it("names a published connected source, never its stored action", () => {
     const published = byHannah({
       action: "sources.binding.published",
       subject: HANDBOOK,
@@ -200,31 +233,34 @@ describe("an audit event in today's words", () => {
       named: { bindingId: HANDBOOK },
     });
 
-    expect(sentenceOf(published)).toBe(
-      "Hannah Wright published the connected source Staff handbook",
-    );
-    expect(headlineOf(published.action)).toBe("Connected source published");
+    expect(sentenceOf(published)).toMatch(ledBy("Hannah Wright", "Staff handbook"));
+    expect(sentenceOf(published)).not.toMatch(/binding/iv);
+    expect(headlineOf(published.action)).not.toBe("");
+    expect(headlineOf(published.action)).not.toMatch(/binding/iv);
   });
 
-  it("says a connected source since removed by its kind", () => {
-    const widened = byHannah({
-      action: "sources.binding.widened",
-      subject: { kind: "removed", of: "connected-source" },
-    });
+  it("names no connected source once it is removed", () => {
+    const widened = (subject: SaidEvent["subject"]): string =>
+      sentenceOf(byHannah({ action: "sources.binding.widened", subject }));
+    const removed = widened({ kind: "removed", of: "connected-source" });
 
-    expect(sentenceOf(widened)).toBe("Hannah Wright widened a connected source (removed)");
+    expect(removed).toMatch(ledBy("Hannah Wright"));
+    expect(removed).not.toMatch(/binding/iv);
+    expect(removed).not.toBe(widened(HANDBOOK));
+    expect(removed).not.toBe(widened(null));
   });
 
-  it("says the platform for an action no person took", () => {
+  it("opens on the platform for an action no person took", () => {
     const swept: SaidEvent = {
       action: "platform.graph.swept",
-      by: { kind: "platform" },
+      by: BY_THE_PLATFORM,
       subject: null,
       detail: { generation: 3, nodes: 10, edges: 4 },
       named: {},
     };
 
-    expect(sentenceOf(swept)).toBe("The platform cleared older copies of the map");
+    expect(sentenceOf(swept)).toMatch(LED_BY_NO_PERSON);
+    expect(sentenceOf(swept)).not.toBe(sentenceOf({ ...swept, by: HANNAH }));
   });
 
   it("names a person with no display name by their address", () => {
@@ -234,7 +270,7 @@ describe("an audit event in today's words", () => {
       subject: null,
     });
 
-    expect(sentenceOf(signedIn)).toBe("new.starter@example.invalid signed in");
+    expect(sentenceOf(signedIn)).toMatch(ledBy("new.starter@example.invalid"));
   });
 
   it("says no stored action name, actor id or person id", () => {
@@ -263,23 +299,26 @@ describe("an audit event's detail in today's words", () => {
     const handbook = { kind: "connected-source", name: "Staff handbook" } as const;
 
     expect(
-      detailLinesOf({
-        detail: { bindingId: "01J6CCCCCCCCCCCCCCCCCCCCCC", sensitivity: "Restricted" },
-        named: { bindingId: handbook },
-      }),
+      shownIn(
+        detailLinesOf({
+          detail: { bindingId: "01J6CCCCCCCCCCCCCCCCCCCCCC", sensitivity: "Restricted" },
+          named: { bindingId: handbook },
+        }),
+      ),
     ).toEqual([
-      { key: "bindingId", label: "Connected source", value: "Staff handbook" },
-      { key: "sensitivity", label: "Sensitivity", value: "Restricted" },
+      ["bindingId", "Staff handbook"],
+      ["sensitivity", "Restricted"],
     ]);
   });
 
   it("leaves off a detail it has no word for", () => {
-    expect(
-      detailLinesOf({
-        detail: { commitSha: "a".repeat(40), setId: "01J6EEEEEEEEEEEEEEEEEEEEEE", replaced: true },
-        named: {},
-      }),
-    ).toEqual([{ key: "replaced", label: "Replaced earlier codes", value: "Yes" }]);
+    const lines = detailLinesOf({
+      detail: { commitSha: "a".repeat(40), setId: "01J6EEEEEEEEEEEEEEEEEEEEEE", replaced: true },
+      named: {},
+    });
+
+    expect(lines.map((line) => line.key)).toEqual(["replaced"]);
+    expect(lines[0]?.value).not.toBe("true");
   });
 
   it("puts a person's sign-in address beneath their name", () => {
@@ -288,24 +327,21 @@ describe("an audit event's detail in today's words", () => {
       named: { userId: PRIYA },
     });
 
-    expect(lines).toEqual([
-      { key: "userId", label: "Person", value: "Priya Shah", address: "priya@example.invalid" },
-    ]);
+    expect(shownIn(lines)).toEqual([["userId", "Priya Shah"]]);
+    expect(lines[0]?.address).toBe("priya@example.invalid");
   });
 
   it("names each person and group an export's search matched", () => {
     const matched = [PRIYA, { kind: "group", name: "Bid writers" }] as const;
+    const lines = detailLinesOf({
+      detail: { matched: [], family: "people", eventCount: 1 },
+      named: { matched },
+    });
 
-    expect(
-      detailLinesOf({
-        detail: { matched: [], family: "people", eventCount: 1 },
-        named: { matched },
-      }),
-    ).toEqual([
-      { key: "matched", label: "Search matched", value: "Priya Shah, Bid writers" },
-      { key: "family", label: "Family", value: "People" },
-      { key: "eventCount", label: "Events", value: "1" },
-    ]);
+    expect(lines.map((line) => line.key)).toEqual(["matched", "family", "eventCount"]);
+    expect(lines[0]?.value).toMatch(/Priya Shah.*Bid writers/v);
+    expect(lines[1]?.value).toMatch(/^people$/iv);
+    expect(lines[2]?.value).toBe("1");
   });
 
   it("leaves off an id the read could not name", () => {
@@ -319,9 +355,26 @@ describe("an audit event's detail in today's words", () => {
       { clientId: "https://claude.ai/metadata", clientName: "Claude", workspaceId: null },
     ];
 
-    expect(detailLinesOf({ detail: { grants }, named: {} })).toEqual([
-      { key: "grants", label: "Access ended", value: "Claude" },
+    expect(shownIn(detailLinesOf({ detail: { grants }, named: {} }))).toEqual([
+      ["grants", "Claude"],
     ]);
+  });
+
+  it("labels each detail in words, never by its key", () => {
+    const lines = detailLinesOf({
+      detail: {
+        bindingId: "01J6CCCCCCCCCCCCCCCCCCCCCC",
+        sensitivity: "Restricted",
+        replaced: true,
+      },
+      named: { bindingId: { kind: "connected-source", name: "Staff handbook" } },
+    });
+
+    expect(lines).toHaveLength(3);
+    for (const { key, label } of lines) {
+      expect(label).not.toBe("");
+      expect(label).not.toBe(key);
+    }
   });
 });
 

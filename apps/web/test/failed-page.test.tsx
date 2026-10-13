@@ -78,9 +78,9 @@ describe("a page that throws", () => {
     await openModelChoicesWithABrokenRead();
 
     const [alert = document.body] = saying();
-    expect(within(alert).getByRole("heading", { level: 1 }).textContent).toBe(
-      "This page didn’t load",
-    );
+    expect(
+      within(alert).getByRole("heading", { level: 1, name: FAILED_PAGE.heading }),
+    ).toBeDefined();
     expect(alert.textContent).toContain(FAILED_PAGE.said);
   });
 
