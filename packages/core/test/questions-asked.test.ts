@@ -9,6 +9,7 @@ import { actorIdOfPerson, type Result, type UserPrincipal } from "../src/kernel/
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { makeQuestionMonths } from "../src/sweeps/index.ts";
 import { provisionedWorkspace } from "./platform.ts";
+import { askedAMicrosecondFiner } from "./question-rows.ts";
 import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
@@ -31,6 +32,8 @@ const UNVERIFIED: Trust = {
   verifiedAt: null,
   rider: "imported",
 };
+
+const A_CONCEPT = conceptIriOf(ulid());
 
 const HASH_OF = { retention: "a".repeat(64), backups: "b".repeat(64) } as const;
 
@@ -252,6 +255,17 @@ describe("completing a record", () => {
         drafted: [{ sentence: "Audit logs are kept for a year.", concepts: [retention] }],
       }),
     ]);
+  });
+
+  it("keeps a draft for a record asked at microsecond precision", async () => {
+    const asker = await anAsker();
+    const { recordId } = answered(await opening(asker));
+    await askedAMicrosecondFiner(db().pool, recordId);
+    const drafted = [{ sentence: "Audit logs are kept for a year.", concepts: [A_CONCEPT] }];
+
+    answered(await completing(asker, recordId, { ...REFUSED, verdict: "related", drafted }));
+
+    expect(await contentOf(recordId)).toEqual([expect.objectContaining({ drafted })]);
   });
 
   it("keeps an unmapped passage's locator and none of its text", async () => {

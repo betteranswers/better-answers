@@ -18,6 +18,7 @@ export type {
   ErasureDoors,
   ErasureLog,
   ErasureLogLine,
+  QuestionsLogLine,
   ErasureRun,
   RunErasureRefusal,
 } from "./routine.ts";

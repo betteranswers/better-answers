@@ -68,10 +68,11 @@ export type DraftedSentence = {
 const COMPLETED = `UPDATE question_asked
      SET completed_at = $3, verdict = $4, judge_state = $5, concepts = $6, unmapped_passages = $7
    WHERE workspace_id = $1 AND id = $2 AND completed_at IS NULL
-  RETURNING asked_at`;
+  RETURNING asked_at::text AS asked_at`;
 
+/** `asked_at` as the text Postgres gave: a `Date` keeps milliseconds and would miss the row. */
 const ITS_DRAFT = `UPDATE question_content SET drafted = $4
-   WHERE workspace_id = $1 AND record_id = $2 AND asked_at = $3`;
+   WHERE workspace_id = $1 AND record_id = $2 AND asked_at = $3::timestamptz`;
 
 /** Who verified a concept is a person and a record is kept for good, so the name is left out. */
 const asKept = ({ iri, contentHash, trust, judged }: RecordedConcept) => ({
@@ -106,7 +107,7 @@ export const completeRecord = async (
   },
 ): Promise<Result<void, Error>> =>
   attempt(async () => {
-    const completed = await tx.query<{ asked_at: Date }>(COMPLETED, [
+    const completed = await tx.query<{ asked_at: string }>(COMPLETED, [
       asker.workspaceId,
       input.recordId,
       input.completedAt,

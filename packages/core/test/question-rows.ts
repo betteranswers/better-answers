@@ -50,6 +50,49 @@ export const recordAskedBy = (pool: pg.Pool, workspaceId: string, personId: stri
     return { recordId: record.id, feedbackId: flag.id, asker, concept };
   });
 
+/** A flag with a note, given by `personId` on a record that may be another member's. */
+export const flagGivenBy = (
+  pool: pg.Pool,
+  workspaceId: string,
+  recordId: string,
+  personId: string,
+) =>
+  seedingWith(pool, (seed) =>
+    seed.questionFeedback({
+      workspaceId,
+      recordId,
+      givenBy: actorIdOfPerson(personIdOf(personId)),
+      verdict: "flag",
+      reason: "incomplete",
+      note: A_NOTE_ON_A_FLAG,
+    }),
+  );
+
+/** Who gave each flag on a record and its note, a cleared note first. */
+export const flagsOn = async (pool: pg.Pool, recordId: string) => {
+  const read = await pool.query<{ given_by: string; note: string | null }>(
+    `SELECT given_by, note FROM question_feedback
+      WHERE record_id = $1 ORDER BY note NULLS FIRST, given_by`,
+    [recordId],
+  );
+  return read.rows;
+};
+
+export const flagStanding = (givenBy: string) => ({ given_by: givenBy, note: A_NOTE_ON_A_FLAG });
+
+/** Moves a record's instant on by less than a millisecond, on the skeleton and the content. */
+export const askedAMicrosecondFiner = async (pool: pg.Pool, recordId: string): Promise<void> => {
+  for (const [table, key] of [
+    ["question_content", "record_id"],
+    ["question_asked", "id"],
+  ]) {
+    await pool.query(
+      `UPDATE ${table} SET asked_at = asked_at + interval '123 microseconds' WHERE ${key} = $1`,
+      [recordId],
+    );
+  }
+};
+
 /** What the three tables hold of one record, read past row-level security. */
 export const questionRowsOf = async (pool: pg.Pool, recordId: string) => {
   const read = async (statement: string) => (await pool.query(statement, [recordId])).rows;

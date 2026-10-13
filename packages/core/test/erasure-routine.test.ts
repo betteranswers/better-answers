@@ -27,6 +27,7 @@ import {
   suppressInTheWorkspace,
   type ErasureLog,
   type ErasureLogLine,
+  type QuestionsLogLine,
   type ErasureMap,
   type ErasureRun,
   type IdentityArm,
@@ -49,7 +50,16 @@ import {
   verificationCodeFor,
 } from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
-import { asAsked, asErased, questionRowsOf, recordAskedBy } from "./question-rows.ts";
+import {
+  asAsked,
+  asErased,
+  askedAMicrosecondFiner,
+  flagGivenBy,
+  flagsOn,
+  flagStanding,
+  questionRowsOf,
+  recordAskedBy,
+} from "./question-rows.ts";
 import { auditEventRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import {
@@ -121,9 +131,12 @@ const DOCUMENTS_WITHHELD =
 /** Every run in the file logs here, so a case reads back the lines of its own request alone. */
 const operatorLines: ErasureLogLine[] = [];
 
+const questionsLines: QuestionsLogLine[] = [];
+
 const operatorLog: ErasureLog = {
   info: (line) => {
-    operatorLines.push(line);
+    if ("arm" in line) operatorLines.push(line);
+    else questionsLines.push(line);
   },
 };
 
@@ -2143,15 +2156,7 @@ describe("the questions a person asked", () => {
   it("removes a question asked at a microsecond's precision", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const theirs = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
-    for (const [table, key] of [
-      ["question_content", "record_id"],
-      ["question_asked", "id"],
-    ]) {
-      await db().pool.query(
-        `UPDATE ${table} SET asked_at = asked_at + interval '123 microseconds' WHERE ${key} = $1`,
-        [theirs.recordId],
-      );
-    }
+    await askedAMicrosecondFiner(db().pool, theirs.recordId);
 
     await completing(scenario, subjectRequestId);
 
@@ -2195,6 +2200,61 @@ describe("the questions a person asked", () => {
     expect(await rowsOf(theirs.recordId)).toEqual(
       asErased(await pseudonymIn(scenario.workspaceId)),
     );
+  });
+
+  it("renames the person's flags alone, on anyone's record", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const { workspaceId, viewer } = scenario;
+    const theirs = await recordAskedBy(db().pool, workspaceId, person.id);
+    const anothers = await recordAskedBy(db().pool, workspaceId, viewer.userId);
+    await flagGivenBy(db().pool, workspaceId, anothers.recordId, person.id);
+    await flagGivenBy(db().pool, workspaceId, theirs.recordId, viewer.userId);
+
+    await completing(scenario, subjectRequestId);
+
+    const erased = { given_by: `human:${await pseudonymIn(workspaceId)}`, note: null };
+    expect(await flagsOn(db().pool, anothers.recordId)).toEqual([
+      erased,
+      flagStanding(anothers.asker),
+    ]);
+    expect(await flagsOn(db().pool, theirs.recordId)).toEqual([
+      erased,
+      flagStanding(anothers.asker),
+    ]);
+  });
+
+  it("erases a member named by address after a failed run", async () => {
+    const scenario = await arrange();
+    const email = addressOf("priya");
+    const person = await memberOf(db().pool, scenario.workspaceId, email);
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, null, email);
+    const theirs = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+
+    const died = await whileWritesAreRefused(db().pool, "question_asked", () =>
+      runningTheRoutine(scenario, subjectRequestId),
+    );
+    await completing(scenario, subjectRequestId, RAN_AGAIN_AT);
+
+    expect(died.ok).toBe(false);
+    expect(await rowsOf(theirs.recordId)).toEqual(
+      asErased(await pseudonymIn(scenario.workspaceId)),
+    );
+  });
+
+  it("logs its counts as it commits, kept past a rerun", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+
+    const died = await whileWritesAreRefused(db().pool, "member", () =>
+      runningTheRoutine(scenario, subjectRequestId),
+    );
+    const done = await completing(scenario, subjectRequestId, RAN_AGAIN_AT);
+
+    expect(died.ok).toBe(false);
+    const line = { actor: ERASURE_ACTOR, erasure_request_id: done.erasureRequestId };
+    expect(
+      questionsLines.filter((logged) => logged.erasure_request_id === done.erasureRequestId),
+    ).toEqual([{ ...line, records_rewritten: 1, questions_removed: 1, feedback_rewritten: 1 }]);
   });
 
   it("counts what it did on the request's row and report", async () => {

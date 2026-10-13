@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from "node:timers/promises";
+
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
@@ -81,6 +83,18 @@ const rowsOfEach = async (client: pg.PoolClient) => {
 
 const eachHolding = (workspaces: readonly string[]) =>
   THE_THREE.map((table) => ({ table, workspaces }));
+
+/** Resolves once some session of this database waits on a lock. */
+const untilASessionWaits = async (): Promise<void> => {
+  for (let turn = 0; turn < 500; turn += 1) {
+    const waiting = await db().pool.query(
+      "SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
+    );
+    if ((waiting.rowCount ?? 0) > 0) return;
+    await sleep(20);
+  }
+  throw new Error("no session ever waited on a lock");
+};
 
 const NO_PRIVILEGE = {
   SELECT: false,
@@ -411,6 +425,30 @@ describe("a month's partition of the content", () => {
       await client.query(MAKE_THE_MONTH, [inTheMonth(-1)]);
       expect(await contentPartitions(client)).toHaveLength(before.length + 1);
     });
+  });
+
+  it("is made once by two sessions asking at once", async () => {
+    const month = inTheMonth(-1);
+    const first = await db().pool.connect();
+    const second = await db().pool.connect();
+    try {
+      await first.query("BEGIN");
+      await first.query(MAKE_THE_MONTH, [month]);
+      const asked = second.query(MAKE_THE_MONTH, [month]).then(
+        () => "made",
+        (cause: unknown) => String(cause),
+      );
+      await untilASessionWaits();
+      await first.query("COMMIT");
+
+      expect(await asked).toBe("made");
+      const made = (await contentPartitions(db().pool)).map((partition) => partition.name);
+      expect(made.filter((name) => name === contentPartitionOf(month))).toHaveLength(1);
+    } finally {
+      first.release();
+      second.release();
+      await db().pool.query(`DROP TABLE IF EXISTS "${contentPartitionOf(month)}"`);
+    }
   });
 
   it("is reached through the parent, never by its own name", async () => {

@@ -92,6 +92,9 @@ BEGIN
     RAISE EXCEPTION 'create_question_content_partition: % is not a month a sweep makes', p_month
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
+  -- One maker at a time, held to the transaction's end: two calls at once would each see no
+  -- partition, and the second would fail on the name the first had just taken.
+  PERFORM pg_advisory_xact_lock(hashtext('create_question_content_partition'), 0);
   IF to_regclass(format('public.%I', partition_name)) IS NOT NULL THEN
     RETURN;
   END IF;
