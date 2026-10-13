@@ -406,10 +406,20 @@ export const writeConceptVisibility = async (
 };
 
 /**
+ * A concept outside the collections ends a narrowed path. Tested before the cap, or a hub's
+ * neighbours elsewhere take the slots.
+ */
+const insideClause = (alias: string): string =>
+  // The collections bind fifth, after the readable clause's two.
+  `(${alias}.label <> '${CONCEPT_NODE_LABEL}' OR ${alias}.uid IN (
+       SELECT filed.iri FROM concept_index filed
+        WHERE filed.workspace_id = $1 AND filed.collection = ANY($5::text[])))`;
+
+/**
  * The readable predicate goes on every node and edge of a path, not only the endpoints:
  * filtering the ends alone leaks the middle.
  */
-const walkStatement = (outward: boolean): string => {
+const walkStatement = (outward: boolean, narrowed = false): string => {
   const [source, sink] = outward ? ["from_uid", "to_uid"] : ["to_uid", "from_uid"];
   // UNION keeps a node once per depth, so the walk costs the edges crossed, never the paths.
   return `WITH RECURSIVE live AS (
@@ -421,6 +431,7 @@ const walkStatement = (outward: boolean): string => {
       JOIN live ON n.gen IS NULL OR n.gen = live.live_gen
      WHERE n.workspace_id = $1 AND n.uid = ANY($2::text[])
        AND ${readableClause("n", 3)}
+       ${narrowed ? `AND ${insideClause("n")}` : ""}
     UNION
     SELECT m.uid, m.label, m.kind, w.depth + 1
       FROM walk w
@@ -431,15 +442,18 @@ const walkStatement = (outward: boolean): string => {
      WHERE w.depth < ${MAP_WALK_DEPTH}
        AND ${readableClause("e", 3)}
        AND ${readableClause("m", 3)}
+       ${narrowed ? `AND ${insideClause("m")}` : ""}
   )
   SELECT uid, label, kind, min(depth) AS depth
     FROM walk
+   ${narrowed ? `WHERE label = '${CONCEPT_NODE_LABEL}'` : ""}
    GROUP BY uid, label, kind
    ORDER BY depth, uid
    LIMIT ${MAP_WALK_ROW_LIMIT}`;
 };
 
 const WALK_FROM = walkStatement(true);
+const WALK_FROM_INSIDE = walkStatement(true, true);
 const WALK_TO = walkStatement(false);
 
 const walk = async (
@@ -447,6 +461,7 @@ const walk = async (
   principal: UserPrincipal,
   tx: Tx,
   uids: readonly string[],
+  collections?: readonly string[],
 ): Promise<readonly WalkStep[]> => {
   // Transaction-local, so it also bounds whatever the same short read runs after the walk.
   await tx.query("SELECT set_config('statement_timeout', $1, true)", [String(MAP_WALK_TIMEOUT_MS)]);
@@ -454,20 +469,30 @@ const walk = async (
     principal.workspaceId,
     uids,
     ...readableParameters(principal),
+    ...(collections === undefined ? [] : [collections]),
   ]);
   return found.rows;
 };
 
 /**
- * One step per node within MAP_WALK_DEPTH hops out of `uids`, at its least depth. The nearest
- * MAP_WALK_ROW_LIMIT survive, the same on every run. A path stops at the first node or edge the
- * principal cannot read. Past MAP_WALK_TIMEOUT_MS the walk rejects, its transaction aborted.
+ * One step per node within MAP_WALK_DEPTH hops out of `uids`, at its least depth: the nearest
+ * MAP_WALK_ROW_LIMIT, alike on every run. A path stops at what the principal cannot read. Given
+ * `collections`, it answers their concepts alone and passes through no other concept. Past
+ * MAP_WALK_TIMEOUT_MS it rejects, its transaction aborted.
  */
 export const walkFromEntries = (
   principal: UserPrincipal,
   tx: Tx,
   uids: readonly ConceptIri[],
-): Promise<readonly WalkStep[]> => walk(WALK_FROM, principal, tx, uids);
+  collections?: readonly string[],
+): Promise<readonly WalkStep[]> =>
+  walk(collections === undefined ? WALK_FROM : WALK_FROM_INSIDE, principal, tx, uids, collections);
+
+const WALK_TIMED_OUT = "57014";
+
+/** Whether `error` is a walk stopped at its timeout, whose transaction answers nothing more. */
+export const walkTimedOut = (error: Error): boolean =>
+  "code" in error && error.code === WALK_TIMED_OUT;
 
 /** As walkFromEntries, against the edges' direction: the nodes that lead into any of `uids`. */
 export const walkToEntries = (

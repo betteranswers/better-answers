@@ -25,6 +25,9 @@ const WIDE_LINKS = [1, 7, 43, 211, 617, 1_499];
 
 const ENTRIES = 40;
 
+/** Every node of the wide map is a concept filed here, so a walk narrowed to it prunes nothing. */
+const WIDE_COLLECTION = "wide";
+
 const IN_FLIGHT = 20;
 const ROUNDS = 5;
 
@@ -100,8 +103,12 @@ const seedWideMap = async (scenario: Scenario): Promise<WideMap> => {
   const workspaceId = scenario.workspaceId;
   const seeded = await seedingWith(db().pool, async (seed) => {
     const uids: string[] = [];
+    const commitSha = (await seed.bundleCommit({ workspaceId })).sha;
     for (let at = 0; at < WIDE_NODES; at += 1) {
-      uids.push((await seed.mapNode({ workspaceId })).uid);
+      const { iri } = await seed.conceptIdentity({ workspaceId });
+      const path = `knowledge/${WIDE_COLLECTION}/node-${at}.md`;
+      await seed.conceptIndex({ workspaceId, iri, commitSha, path });
+      uids.push((await seed.mapNode({ workspaceId, uid: iri })).uid);
     }
     for (const [at, fromUid] of uids.entries()) {
       for (const step of WIDE_LINKS) {
@@ -111,7 +118,7 @@ const seedWideMap = async (scenario: Scenario): Promise<WideMap> => {
     return { uids, lone: (await seed.mapNode({ workspaceId })).uid };
   });
   // Autovacuum counts a live map's rows; uncounted, the planner joins every node to every step.
-  await db().pool.query("ANALYZE map_node, map_edge");
+  await db().pool.query("ANALYZE map_node, map_edge, concept_index");
   return {
     scenario,
     entries: seeded.uids
@@ -129,14 +136,18 @@ type TimedWalk = {
   readonly walkSteps: number;
 };
 
-const timedWalk = async (map: WideMap, reader: UserPrincipal): Promise<TimedWalk> => {
+const timedWalk = async (
+  map: WideMap,
+  reader: UserPrincipal,
+  collections: readonly string[] | undefined,
+): Promise<TimedWalk> => {
   const started = performance.now();
   const timed = answered(
     await readingAs(readers(), reader, async (principal, tx) => {
       const oneRowStarted = performance.now();
       const oneRow = await walkFrom(principal, tx, map.lone);
       const walkStarted = performance.now();
-      const walk = await walkFromEntries(principal, tx, map.entries);
+      const walk = await walkFromEntries(principal, tx, map.entries, collections);
       return {
         oneRowMs: walkStarted - oneRowStarted,
         oneRowSteps: oneRow.length,
@@ -157,11 +168,15 @@ describe("the map under concurrent read load", () => {
     wide = await seedWideMap(await arrange());
   }, 300_000);
 
-  it("answers a forty-entry walk within budget beside nineteen concurrent walks", async () => {
+  it.each([
+    ["a forty-entry walk", "", undefined],
+    ["a narrowed walk", ", narrowed to its collection", [WIDE_COLLECTION]],
+  ] as const)("answers %s within budget beside nineteen concurrent walks", async (...walked) => {
+    const [, narrowing, collections] = walked;
     const walks: TimedWalk[] = [];
     for (let round = 0; round < ROUNDS; round += 1) {
       const inFlight = Array.from({ length: IN_FLIGHT }, (_unused, at) =>
-        timedWalk(wide, at % 2 === 0 ? wide.scenario.viewer : wide.scenario.admin),
+        timedWalk(wide, at % 2 === 0 ? wide.scenario.viewer : wide.scenario.admin, collections),
       );
       walks.push(...(await Promise.all(inFlight)));
     }
@@ -172,7 +187,8 @@ describe("the map under concurrent read load", () => {
     const waitedMs = walks.map((walked) => walked.waitedMs);
     const walkMs = walks.map((walked) => walked.walkMs);
 
-    await recordFigures("The map walk from forty entries under concurrent read load", [
+    const heading = `The map walk from forty entries under concurrent read load${narrowing}`;
+    await recordFigures(heading, [
       [
         "the walk that fills the cap, in one-row walks at the median",
         `${inOneRowWalks.toFixed(1)}, against a budget of ${WALK_BUDGET_IN_ONE_ROW_WALKS}`,

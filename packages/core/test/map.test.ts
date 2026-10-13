@@ -6,6 +6,7 @@ import {
   walkFrom,
   walkFromEntries,
   walkTo,
+  walkToEntries,
   writeConceptDelta,
   type ConceptDelta,
   type WalkStep,
@@ -380,6 +381,147 @@ describe("a map walk from several entries", () => {
 
     const admin = await walkedFromEntries(scenario.admin, entries);
     expect(uidsByDepth(admin)).toEqual([...entries.map((uid) => [uid, 0]), [middle, 1], [far, 2]]);
+  });
+
+  it("reaches a node inward at its least depth", async () => {
+    const scenario = await arrange();
+    const { near, far, between, source } = await seeded(async (seed) => {
+      const node = async (): Promise<string> =>
+        (await seed.mapNode({ workspaceId: scenario.workspaceId })).uid;
+      const made = { near: await node(), far: await node(), between: await node() };
+      const leading = await node();
+      for (const [fromUid, toUid] of [
+        [leading, made.near],
+        [leading, made.between],
+        [made.between, made.far],
+      ] as const) {
+        await seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid, toUid });
+      }
+      return { ...made, source: leading };
+    });
+
+    const steps = answered(
+      await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
+        walkToEntries(principal, tx, [near, far]),
+      ),
+    );
+
+    expect(uidsByDepth(steps)).toEqual([
+      ...[near, far].toSorted().map((uid) => [uid, 0]),
+      ...[between, source].toSorted().map((uid) => [uid, 1]),
+    ]);
+  });
+});
+
+/** A concept's index row under `collection`, or under none, with its node on the map. */
+const conceptNode = async (
+  seed: TestData,
+  workspaceId: string,
+  collection: string | null,
+  iri: string = conceptIriOf(ulid()),
+): Promise<string> => {
+  await seed.conceptIdentity({ workspaceId, iri });
+  const folder = collection === null ? "" : `${collection}/`;
+  await seed.conceptIndex({
+    workspaceId,
+    iri,
+    path: `knowledge/${folder}${ulid().toLowerCase()}.md`,
+  });
+  await seed.mapNode({ workspaceId, uid: iri });
+  return iri;
+};
+
+const walkedInside = async (
+  reader: MapScenario["admin"],
+  uids: readonly string[],
+  collections: readonly string[],
+): Promise<readonly WalkStep[]> =>
+  answered(
+    await readingAs(db().runtimePool, reader, (principal, tx) =>
+      walkFromEntries(
+        principal,
+        tx,
+        uids.map((uid) => ids.conceptIri.parse(uid)),
+        collections,
+      ),
+    ),
+  );
+
+describe("a map walk narrowed to collections", () => {
+  it("keeps a collection's neighbours past a hub's thousand others", async () => {
+    const scenario = await arrange();
+    const workspaceId = scenario.workspaceId;
+    const { hub, inside } = await seeded(async (seed) => {
+      const centre = await conceptNode(seed, workspaceId, "audits");
+      const uids = Array.from({ length: 1_003 }, () => conceptIriOf(ulid())).toSorted();
+      // The two greatest uids are the hub's own collection: a cut taken first drops exactly them.
+      for (const [at, uid] of uids.entries()) {
+        await conceptNode(seed, workspaceId, at < 1_001 ? "lms" : "audits", uid);
+        await seed.mapEdge({ workspaceId, fromUid: centre, toUid: uid });
+      }
+      return { hub: centre, inside: uids.slice(1_001) };
+    });
+    await db().pool.query("ANALYZE map_node, map_edge");
+
+    const narrowed = await walkedInside(scenario.viewer, [hub], ["audits"]);
+    const whole = await walkedFromEntries(scenario.viewer, [hub]);
+
+    expect(uidsByDepth(narrowed)).toEqual([[hub, 0], ...inside.map((uid) => [uid, 1])]);
+    expect(whole).toHaveLength(1_000);
+    expect(whole.map((step) => step.uid)).not.toContain(inside[0]);
+  });
+
+  it("never leaves a named collection and comes back", async () => {
+    const scenario = await arrange();
+    const workspaceId = scenario.workspaceId;
+    const { entry, outside, beyond, unfiled } = await seeded(async (seed) => {
+      const made = {
+        entry: await conceptNode(seed, workspaceId, "audits"),
+        outside: await conceptNode(seed, workspaceId, "lms"),
+        beyond: await conceptNode(seed, workspaceId, "audits"),
+        unfiled: await conceptNode(seed, workspaceId, null),
+      };
+      for (const [fromUid, toUid] of [
+        [made.entry, made.outside],
+        [made.outside, made.beyond],
+        [made.entry, made.unfiled],
+      ] as const) {
+        await seed.mapEdge({ workspaceId, fromUid, toUid });
+      }
+      return made;
+    });
+
+    const narrowed = await walkedInside(scenario.viewer, [entry, outside], ["audits"]);
+    const whole = await walkedFromEntries(scenario.viewer, [entry]);
+
+    expect(uidsByDepth(narrowed)).toEqual([[entry, 0]]);
+    expect(whole.map((step) => step.uid).toSorted()).toEqual(
+      [entry, outside, beyond, unfiled].toSorted(),
+    );
+  });
+
+  it("passes through a node that is no concept", async () => {
+    const scenario = await arrange();
+    const workspaceId = scenario.workspaceId;
+    const { entry, section, beyond } = await seeded(async (seed) => {
+      const made = {
+        entry: await conceptNode(seed, workspaceId, "audits"),
+        section: (await seed.mapNode({ workspaceId, label: "Section", kind: null })).uid,
+        beyond: await conceptNode(seed, workspaceId, "audits"),
+      };
+      await seed.mapEdge({ workspaceId, fromUid: made.entry, toUid: made.section });
+      await seed.mapEdge({ workspaceId, fromUid: made.section, toUid: made.beyond });
+      return made;
+    });
+
+    const narrowed = await walkedInside(scenario.viewer, [entry], ["audits"]);
+    const whole = await walkedFromEntries(scenario.viewer, [entry]);
+
+    expect(uidsByDepth(narrowed)).toEqual([
+      [entry, 0],
+      [beyond, 2],
+    ]);
+    expect(uidsByDepth(whole)).toContainEqual([section, 1]);
   });
 });
 
