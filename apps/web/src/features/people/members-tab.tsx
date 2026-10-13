@@ -297,6 +297,11 @@ const namedIn =
     return member === undefined ? NO_LONGER_LISTED : nameOf(member);
   };
 
+/** The list's line and the rows it marks, held as one so a mark never outlives its reason. */
+type Shown = { readonly outcome: Outcome | undefined; readonly refused: RefusedRows };
+
+const NOTHING_SHOWN: Shown = { outcome: undefined, refused: NO_MARKS };
+
 /** Ticks and an action's outcome are the page's; what narrows the rows is the address's. */
 function MemberList(properties: {
   readonly read: ReturnType<typeof useMembers>;
@@ -309,14 +314,16 @@ function MemberList(properties: {
   // A tick outlives its row, so the next action refuses or skips that person and says so.
   const [ticked, setTicked] = useState<ReadonlySet<string>>(NONE);
   const [inFocus, setInFocus] = useState<string>();
-  const [outcome, setOutcome] = useState<Outcome>();
-  const [refused, setRefused] = useState<RefusedRows>(NO_MARKS);
+  const [shown, setShown] = useState<Shown>(NOTHING_SHOWN);
   const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
   const searchRef = useRef<HTMLInputElement>(null);
   const openMember = useOpenMember(narrowed.flush);
   const returned = useReturnedFromARemoval(heading);
+  const say = (outcome: Outcome | undefined, refused: RefusedRows = NO_MARKS) => {
+    setShown({ outcome, refused });
+  };
 
-  const columns = useMemo(() => memberColumns(refused), [refused]);
+  const columns = useMemo(() => memberColumns(shown.refused), [shown.refused]);
 
   const sorted = sortedOf(narrowed.state.sort);
   const table = useTable({
@@ -337,8 +344,7 @@ function MemberList(properties: {
     tick: setTicked,
     nameOf: namedIn(listed),
     heading,
-    say: setOutcome,
-    mark: setRefused,
+    say,
   });
 
   useInFocusKeystrokes({
@@ -348,7 +354,7 @@ function MemberList(properties: {
       setTicked(toggled(ticked, personId));
     },
     nothingInFocus: () => {
-      setOutcome(NOTHING_IN_FOCUS);
+      say(NOTHING_IN_FOCUS);
     },
   });
 
@@ -365,7 +371,7 @@ function MemberList(properties: {
         }
         action={<InviteAction />}
       />
-      <OutcomeLine outcome={outcome ?? returned} className="mt-2" />
+      <OutcomeLine outcome={shown.outcome ?? returned} className="mt-2" />
 
       <Card className="mt-4">
         <MemberFilters

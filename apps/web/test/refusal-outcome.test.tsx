@@ -56,6 +56,16 @@ describe("the sentence a refusal shows", () => {
     expect(shown(outcome.words).textContent).toBe(stock);
   });
 
+  it.each(["a-new-class", "toString"])(
+    "shows the general sentence for class %s",
+    (refusalClass) => {
+      const outcome = outcomeOfFailure(refusedWith("a-new-word", refusalClass), "action");
+
+      expect(outcome.tone).toBe("refused");
+      expect(shown(outcome.words).textContent).toBe(STOCK.general);
+    },
+  );
+
   it("gives each class a stock sentence of its own", () => {
     const sentences = STOCK_OF_EACH_CLASS.map(
       ([refusalClass]) =>

@@ -22,7 +22,7 @@ import { EMPTY_LINES } from "./empty-lines.ts";
 import { useGroups, type ListedGroup } from "./groups-api.ts";
 import { GroupsReadSaid } from "./groups-read.tsx";
 import { BULK_WORDS, NO_LONGER_LISTED } from "./member-action-words.ts";
-import { NO_MARKS, type RefusedRows } from "./member-columns.tsx";
+import type { RefusedRows } from "./member-columns.tsx";
 import { GROUPS_PATH } from "./members-address.ts";
 import {
   useBulkAddToGroup,
@@ -52,8 +52,9 @@ export type BulkList = {
   readonly tick: (ticked: ReadonlySet<string>) => void;
   readonly nameOf: (personId: string) => string;
   readonly heading: RefObject<HTMLElement | null>;
-  readonly say: (outcome: Outcome | undefined) => void;
-  readonly mark: (refused: RefusedRows) => void;
+
+  /** One write for the line and the rows it marks, so a mark never outlives its reason. */
+  readonly say: (outcome: Outcome | undefined, refused?: RefusedRows) => void;
 };
 
 const NOTHING_TICKED = selectFirst(PEOPLE_SELECT_FIRST.member);
@@ -133,7 +134,6 @@ export const useMemberBulkActions = (list: BulkList) => {
     setActing(true);
     setOpen(undefined);
     list.tick(new Set());
-    list.mark(NO_MARKS);
     list.say({ tone: "said", words: said.pending });
     said.run([...asked], {
       onSuccess: (answer) => {
@@ -147,8 +147,7 @@ export const useMemberBulkActions = (list: BulkList) => {
       onError: (failure) => {
         setActing(false);
         list.tick(new Set(asked));
-        list.mark(refusedRowsOf(failure));
-        list.say(refusalOf(failure, names));
+        list.say(refusalOf(failure, names), refusedRowsOf(failure));
       },
     });
   };

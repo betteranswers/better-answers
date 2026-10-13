@@ -3,11 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { FAILED_PAGE, RAIL } from "@/app/words.ts";
 import { INVITATIONS_WORDS } from "@/features/people/invitation-words.ts";
-import {
-  BULK_WORDS,
-  MEMBER_PAGE_WORDS,
-  MEMBERS_LOADING,
-} from "@/features/people/member-action-words.ts";
+import { MEMBER_PAGE_WORDS, MEMBERS_LOADING } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
 import { HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
 import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
@@ -19,6 +15,7 @@ import {
   aRefusalAnswer,
   aSwitchInAnotherTab,
   band,
+  changeTheTickedToViewer,
   drawnWithNoWorkspace,
   GRACE,
   HEDY,
@@ -228,10 +225,7 @@ describe("a tab whose workspace the session has left", () => {
     fireEvent.click(await screen.findByRole("checkbox", { name: `Select ${GRACE.displayName}` }));
     aSwitchInAnotherTab(api, "Admin", [ADA, GRACE, HEDY]);
 
-    fireEvent.click(screen.getByRole("button", { name: BULK_WORDS.changeRole.action }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: BULK_WORDS.changeRole.commit(1, "Viewer") }),
-    );
+    await changeTheTickedToViewer();
 
     await landedInHolme();
     await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());

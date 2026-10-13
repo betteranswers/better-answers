@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { RAIL } from "@/app/words.ts";
 import { MEMBER_PAGE_WORDS } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
+import { ROLE_UNREAD } from "@/features/people/self-action.tsx";
 import { HOMES } from "@/shared/navigation.ts";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
@@ -119,7 +120,7 @@ describe("a change to the reader's own member", () => {
     const router = await demotingHerself(adaAnAdmin(), () => LOST);
 
     const roleCard = within(screen.getByRole("region", { name: "Role" }));
-    await waitFor(() => expect(roleCard.getByRole("alert").textContent).not.toBe(""));
+    await waitFor(() => expect(roleCard.getByRole("alert").textContent).toBe(ROLE_UNREAD.words));
     expect(roleCard.getByRole("status").textContent).toBe("");
     expect(router.state.location.pathname).toBe(MEMBER_PAGE);
     expect(switcherDrawn(), "the page lost the workspace it was drawn for").not.toBeNull();

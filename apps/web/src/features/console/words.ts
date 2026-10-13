@@ -1,7 +1,7 @@
 import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
 import { selectFirst } from "@/shared/outcome.tsx";
 import { refusalsOf } from "@/shared/refusal-outcome.tsx";
-import { STOCK } from "@/shared/refusal-words.ts";
+import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 
 import { SELECT_A_NAME_FIRST, SELECT_A_PERSON_FIRST } from "./people-keystrokes.ts";
 import { SAID_OF_A_REVOCATION, SAID_OF_CORRECTING, SIGN_IN_TOO_OLD } from "./refusal-words.ts";
@@ -12,9 +12,9 @@ export const NO_NAME_IN_FOCUS = selectFirst(SELECT_A_NAME_FIRST);
 
 export const CONSOLE_CLOSED = "The console is better-answers support’s alone";
 
-/** A console read refused for anything but an ended session is not the reader's to see. */
+/** The console's reads have no sentence of their own, so each says its class's. */
 export const saidOf = (refusal: Refusal): string =>
-  refusal.class === "unauthenticated" ? STOCK.session : STOCK.permission;
+  refusalSentence({}, refusal.word, refusal.class);
 
 /** A failure with no refusal word is the network's. */
 export const readRefused = (failure: Error | ApiError): string => {

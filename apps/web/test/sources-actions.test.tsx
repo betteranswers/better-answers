@@ -256,8 +256,8 @@ const KEEP_REFUSED = {
   },
 };
 
-/** The api's refusal of a widening, in a word this feature lists no sentence for. */
-const WIDEN_REFUSED = {
+/** The api's refusal for the reader's role, in a word this feature lists no sentence for. */
+const ROLE_FORBIDS = {
   error: {
     message: "refused",
     code: -32_003,
@@ -269,13 +269,19 @@ const WIDEN_REFUSED = {
   },
 };
 
-const HELD: ReadonlySet<string> = new Set(["sources.widen", "sources.keepInText"]);
+const HELD: ReadonlySet<string> = new Set([
+  "sources.widen",
+  "sources.publish",
+  "sources.keepInText",
+]);
 
 type SourcesApi = {
   /** Read as each held call arrives, so a test may hold a later call and not an earlier one. */
   held?: Promise<void>;
   readonly findings?: readonly GroupOfFindings[];
-  readonly widenRefused?: true;
+
+  /** The actions the api refuses for the reader's role. */
+  readonly forbidden?: readonly string[];
 };
 
 /** Reads are answered at once; a widening is taken and a keep refused once `held` lets them. */
@@ -286,7 +292,7 @@ const atSources = (api: SourcesApi = {}) => {
     "sources.findings": api.findings ?? [],
   };
   const refusals = new Map<string, unknown>([["sources.keepInText", KEEP_REFUSED]]);
-  if (api.widenRefused) refusals.set("sources.widen", WIDEN_REFUSED);
+  for (const action of api.forbidden ?? []) refusals.set(action, ROLE_FORBIDS);
   vi.stubGlobal("fetch", async (input: string | URL | Request) => {
     const { pathname } = addressOf(input);
     if (!pathname.startsWith("/trpc/")) return answered({});
@@ -585,27 +591,50 @@ describe("widening a connected source in its row", () => {
       await screen.findByText(new RegExp(sensitivityAndAudienceWords(WIDENED), "v")),
     ).toBeDefined();
   });
+});
 
-  it("empties the alert when a refused widening is sent again", async () => {
-    const api: SourcesApi = { widenRefused: true };
-    atSources(api);
-    const row = await rowOf("Staff handbook");
-    widenOpened(row);
-    fireEvent.click(commitTo(row, WIDENED));
-    const alert = await screen.findByText(STOCK.permission);
-    expect(alert.getAttribute("role")).toBe("alert");
+const widenTheHandbook = async () => {
+  const row = await rowOf("Staff handbook");
+  widenOpened(row);
+  fireEvent.click(commitTo(row, WIDENED));
+};
 
-    const second = Promise.withResolvers<void>();
-    api.held = second.promise;
-    widenOpened(row);
-    fireEvent.click(commitTo(row, WIDENED));
+/** The price book's publish, opened from its row, every confirmation ticked, then sent. */
+const publishThePriceBook = async () => {
+  const row = await rowOf("Price book");
+  fireEvent.click(rowAction(row, ROW_ACTIONS.publish, "Price book"));
+  const dialog = within(await screen.findByRole("dialog"));
+  for (const confirmation of dialog.getAllByRole("checkbox")) fireEvent.click(confirmation);
+  fireEvent.click(dialog.getByRole("button", { name: "Publish Price book" }));
+};
 
-    expect(alert.textContent).toBe("");
-    second.resolve();
-    await waitFor(() => {
-      expect(alert.textContent).toBe(STOCK.permission);
-    });
-  });
+const SENT_FROM_A_ROW = [
+  { action: "widening", procedure: "sources.widen", send: widenTheHandbook },
+  { action: "publish", procedure: "sources.publish", send: publishThePriceBook },
+];
+
+/** The same sentence said twice is announced once, so the alert stands empty between them. */
+describe("a connected source's action refused twice", () => {
+  it.each(SENT_FROM_A_ROW)(
+    "empties the alert when a refused $action is sent again",
+    async ({ procedure, send }) => {
+      const api: SourcesApi = { forbidden: [procedure] };
+      atSources(api);
+      await send();
+      const alert = await screen.findByText(STOCK.permission);
+      expect(alert.getAttribute("role")).toBe("alert");
+
+      const second = Promise.withResolvers<void>();
+      api.held = second.promise;
+      await send();
+
+      expect(alert.textContent).toBe("");
+      second.resolve();
+      await waitFor(() => {
+        expect(alert.textContent).toBe(STOCK.permission);
+      });
+    },
+  );
 });
 
 describe("narrowing a connected source in its row", () => {

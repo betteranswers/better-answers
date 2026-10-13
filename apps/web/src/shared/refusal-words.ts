@@ -33,6 +33,10 @@ const STOCK_OF_CLASS = {
   precondition: STOCK.notYet,
 } satisfies Record<RefusalClass, string>;
 
+/** The api's answer is typed and never parsed, so a newer api's class can be in no table. */
+const stockOfClass = (refusalClass: RefusalClass): string =>
+  Object.hasOwn(STOCK_OF_CLASS, refusalClass) ? STOCK_OF_CLASS[refusalClass] : STOCK.general;
+
 /** The words a feature gives a sentence of its own; any other word shows its class's stock sentence. */
 export type OwnSentences = Partial<Record<RefusalWord, string>>;
 
@@ -47,7 +51,7 @@ export const refusalSentence = (
   own: OwnSentences,
   word: RefusalWord,
   refusalClass: RefusalClass,
-): string => ({ ...OWN_ON_EVERY_SURFACE, ...own })[word] ?? STOCK_OF_CLASS[refusalClass];
+): string => ({ ...OWN_ON_EVERY_SURFACE, ...own })[word] ?? stockOfClass(refusalClass);
 
 /** The label of each control that takes an ended or stale session to sign in. */
 export const SIGN_IN_AGAIN = "Sign in again";
