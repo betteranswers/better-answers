@@ -405,6 +405,16 @@ const INSIDE: Narrowing = {
 };
 
 /**
+ * Grouped behind MATERIALIZED, before a narrowing's filter: the planner counts a filtered walk
+ * as a few rows, then sorts every row to group them.
+ */
+const NEAREST = `nearest AS MATERIALIZED (
+    SELECT uid, label, kind, min(depth) AS depth
+      FROM walk
+     GROUP BY uid, label, kind
+  )`;
+
+/**
  * The readable predicate goes on every node and edge of a path, not only the endpoints:
  * filtering the ends alone leaks the middle.
  */
@@ -432,11 +442,11 @@ const walkStatement = (outward: boolean, narrowing: Narrowing = WHOLE): string =
        AND ${readableClause("e", 3)}
        AND ${readableClause("m", 3)}
        ${narrowing.hop}
-  )
-  SELECT uid, label, kind, min(depth) AS depth
-    FROM walk
+  ),
+  ${NEAREST}
+  SELECT uid, label, kind, depth
+    FROM nearest
    ${narrowing.answered}
-   GROUP BY uid, label, kind
    ORDER BY depth, uid
    LIMIT ${MAP_WALK_ROW_LIMIT}`;
 };
