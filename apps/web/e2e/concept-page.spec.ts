@@ -2,7 +2,6 @@ import type { APIRequestContext, Locator, Page, Request } from "@playwright/test
 
 import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import { CONCEPT_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
-import { CONTROL_CENTRE } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -691,7 +690,7 @@ test.describe("the concept page", () => {
 
     // No fresh document from here on: what an Admin was given stays in the page's cache.
     await railOf(page).getByRole("link", { name: "Control Centre" }).click();
-    await navOf(page, CONTROL_CENTRE).getByRole("link", { name: "Members" }).click();
+    await navOf(page, "Control Centre").getByRole("link", { name: "Members" }).click();
     const people = page.getByRole("main");
     await people.getByRole("link", { name: "Test person", exact: true }).click();
     await people.getByRole("radio", { name: "Viewer", exact: true }).click();
@@ -800,7 +799,11 @@ test.describe("the concept page", () => {
     expect(elapsedMs, "the concept rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
 
     await skipLinkReachesThePage(page);
-    await listsItsKeystrokes(page, "Search", Object.values(KEY));
+    await listsItsKeystrokes(page, "Search", [
+      "Go Back to Search",
+      "Go to the Concept’s Sources",
+      "Go to the Concept’s Links",
+    ]);
 
     await page.keyboard.press(KEY.sources.key);
     await expect(sourcesOf(page).getByRole("heading", { name: "Sources" })).toBeFocused();

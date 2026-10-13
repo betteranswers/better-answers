@@ -21,7 +21,6 @@ import {
   person,
   personMenuOpened,
   provision,
-  quoted,
   removeMember,
   saysAnotherRefusal,
   saysARefusal,
@@ -205,9 +204,9 @@ test("shows a member of two workspaces their role in each", async ({ page, reque
   await expect(page.getByRole("main").getByRole("list")).toMatchAriaSnapshot(`
     - list:
       - listitem:
-        - button ${quoted(first.name)}
+        - button ${JSON.stringify(first.name)}
       - listitem:
-        - button ${quoted(second.name)}
+        - button ${JSON.stringify(second.name)}
   `);
   await expect(rowsOf(page), "a row does not show the role held there").toContainText([
     "Admin",

@@ -4,7 +4,7 @@ import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticato
 
 import { WORKSPACES_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
-import { CONSOLE, HOMES } from "@/shared/navigation.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -21,7 +21,6 @@ import {
   person,
   personMenuOpened,
   provision,
-  quoted,
   railOf,
   saysARefusal,
   saysOfItsRead,
@@ -123,7 +122,7 @@ test.describe("the way into the console", () => {
       EVERY_WORKSPACE,
     );
     await expect(railOf(page).getByRole("link")).toHaveText(["Console"]);
-    await expect(navOf(page, CONSOLE).getByRole("link")).toHaveText([
+    await expect(navOf(page, "Console").getByRole("link")).toHaveText([
       "Everyone",
       "Names Waiting",
       "Every Workspace",
@@ -376,9 +375,9 @@ test.describe("the console's Workspaces page", () => {
 
     await markTheOperator(request, workspace.admin.email, "revoke");
     // A move between the console's own pages keeps its standing, so the list asks again alone.
-    await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
+    await navOf(page, "Console").getByRole("link", { name: "Everyone" }).click();
     const refused = refusalAnswering(page, "console.workspaces.list");
-    await navOf(page, CONSOLE).getByRole("link", { name: "Every Workspace" }).click();
+    await navOf(page, "Console").getByRole("link", { name: "Every Workspace" }).click();
 
     expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR, class: "forbidden" });
     await expect(listOf(page)).not.toContainText(NOT_THE_OPERATOR);
@@ -431,7 +430,7 @@ test.describe("the console's Workspaces page", () => {
 
     await expect(page).toHaveURL("/console/people/everyone");
     await expect(page.getByRole("region", { name: "Everyone" })).toBeVisible();
-    const pages = navOf(page, CONSOLE).getByRole("link");
+    const pages = navOf(page, "Console").getByRole("link");
     await expect(pages).toHaveText(["Everyone", "Names Waiting", "Every Workspace"]);
     await pages.filter({ hasText: "Names Waiting" }).click();
     await expect(page).toHaveURL("/console/people/names-waiting");
@@ -505,7 +504,7 @@ test.describe("the console's Workspaces page", () => {
     }
     for (const name of ["Everyone", "Names Waiting", "Every Workspace"]) {
       await page.keyboard.press("Tab");
-      await expect(navOf(page, CONSOLE).getByRole("link", { name })).toBeFocused();
+      await expect(navOf(page, "Console").getByRole("link", { name })).toBeFocused();
     }
 
     await expect(railOf(page)).toMatchAriaSnapshot(`
@@ -529,7 +528,7 @@ test.describe("the console's Workspaces page", () => {
           - heading "Every Workspace" [level=2]
           - paragraph
           - status: /\\b1\\b/
-          - searchbox "Search by name or short name": ${quoted(workspace.name)}
+          - searchbox "Search by name or short name": ${JSON.stringify(workspace.name)}
           - table:
             - caption
             - rowgroup:
@@ -541,8 +540,8 @@ test.describe("the console's Workspaces page", () => {
             - rowgroup:
               - row /${workspace.name}/:
                 - cell /${workspace.name}/:
-                  - button ${quoted(`More About ${workspace.name}`)}
-                - cell ${quoted(workspace.shortName)}
+                  - button ${JSON.stringify(`More About ${workspace.name}`)}
+                - cell ${JSON.stringify(workspace.shortName)}
                 - cell /\\b1\\b/
                 - cell /\\d{1,2} [A-Z][a-z]+ \\d{4}/
     `);

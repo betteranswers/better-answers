@@ -444,7 +444,7 @@ test("keeps the rail and nav below the band's refusal", async ({ page, request }
     })
     .toBeGreaterThan(band.height);
 
-  for (const region of [railOf(page), navOf(page, CONTROL_CENTRE)]) {
+  for (const region of [railOf(page), navOf(page, "Control Centre")]) {
     await expect
       .poll(() => clearOfTheBand(page, region), {
         message: `the band's outcome row covers the top of ${String(region)}`,

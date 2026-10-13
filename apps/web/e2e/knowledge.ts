@@ -118,14 +118,14 @@ export const readsCeilingFilled = async (page: Page, read: string): Promise<void
 export const scrolledSideways = (page: Page): Promise<number> =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
-/** `?` lists each keystroke the page declares, and Escape hands focus back to its button. */
+/** `?` lists each action the page's keystrokes take, and Escape hands focus back to its button. */
 export const listsItsKeystrokes = async (
   page: Page,
   named: string,
-  declared: readonly { readonly action: string }[],
+  actions: readonly string[],
 ): Promise<void> => {
   const listed = await keystrokesListed(page, named);
-  for (const keystroke of declared) await expect(listed).toContainText(keystroke.action);
+  for (const action of actions) await expect(listed).toContainText(action);
   await keystrokesDismissed(page, listed);
 };
 

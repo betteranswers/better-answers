@@ -1,11 +1,9 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { z } from "zod";
 
-import { BREADCRUMB, goHome, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
-import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts";
+import type { CarriedOn } from "@/features/auth/sign-in-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
-import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
-import { headingOf, HOMES, type Role, type Area } from "@/shared/navigation.ts";
+import { HOMES, type Role } from "@/shared/navigation.ts";
 
 /** Named for the person, though it shows their initials alone. */
 export const avatarOf = (page: Page, who: string): Locator =>
@@ -38,17 +36,17 @@ export const switched = async (page: Page, from: string, to: string): Promise<vo
   await switcherMenuOf(page, from).getByRole("menuitemradio").filter({ hasText: to }).click();
 };
 
-export const railOf = (page: Page): Locator => page.getByRole("navigation", { name: RAIL });
+export const railOf = (page: Page): Locator => page.getByRole("navigation", { name: "Areas" });
 
 /** The menu, named for the open area. */
-export const navOf = (page: Page, area: Area): Locator =>
-  page.getByRole("navigation", { name: area.name });
+export const navOf = (page: Page, area: string): Locator =>
+  page.getByRole("navigation", { name: area });
 
 /** The current part is `role="link"` too, so a part that leads somewhere is told by its `href`. */
 export const crumbOf = (page: Page, name: string): Locator =>
   page
     .getByRole("banner")
-    .getByRole("navigation", { name: BREADCRUMB })
+    .getByRole("navigation", { name: "Breadcrumb" })
     .getByRole("link", { name, exact: true });
 
 /** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
@@ -112,16 +110,15 @@ export const editorPickedByKeyboard = async (page: Page, select: Locator): Promi
   await expect(select).toBeFocused();
 };
 
-/** The email step's heading, read off its word table for what the sign-in carries on to. */
-export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "nothing"): Locator =>
-  page.getByRole("heading", {
-    level: 1,
-    name: SIGN_IN_WORDS.emailStep[carriedOn].title,
-    exact: true,
-  });
+const SIGN_IN_HEADINGS = {
+  nothing: "Sign In",
+  joining: "Sign In to Join a Workspace",
+  connecting: "Sign In to Connect Claude",
+} as const satisfies Readonly<Record<CarriedOn | "nothing", string>>;
 
-/** Quoted as an aria snapshot's template takes a name or a line, so a table's words drop in. */
-export const quoted = (words: string): string => JSON.stringify(words);
+/** The email step's heading, for what the sign-in carries on to. */
+export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "nothing"): Locator =>
+  page.getByRole("heading", { level: 1, name: SIGN_IN_HEADINGS[carriedOn], exact: true });
 
 /**
  * `?` opens the keystrokes of the page `named`, as the navigation list names it, from anywhere on
@@ -129,14 +126,14 @@ export const quoted = (words: string): string => JSON.stringify(words);
  */
 export const keystrokesListed = async (page: Page, named: string): Promise<Locator> => {
   await page.keyboard.press("?");
-  const listed = page.getByRole("dialog", { name: keystrokesOn(named) });
+  const listed = page.getByRole("dialog", { name: `Keyboard Shortcuts on ${named}` });
   await expect(listed).toBeVisible();
   return listed;
 };
 
 /** The one button opening the list: the rail's or the band's, or a page's outside the shell. */
 export const keystrokesButton = (within: Page | Locator): Locator =>
-  within.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true });
+  within.getByRole("button", { name: "Keyboard Shortcuts", exact: true });
 
 /** Focus lands back on the button a task after the list is gone, unless a key has moved it. */
 export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<void> => {
@@ -145,11 +142,19 @@ export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<
   await expect(keystrokesButton(page)).toBeFocused();
 };
 
-/** Read off the navigation list, so moving a role's home breaks no spec. */
+/** A role's home: its page's first heading, and the link the not-found page offers back to it. */
+const HOME_NAMES = {
+  Admin: { heading: "People", link: "Go to Members" },
+  Editor: { heading: "Ask", link: "Go to Ask" },
+  Viewer: { heading: "Ask", link: "Go to Ask" },
+} as const satisfies Readonly<Record<Role, { readonly heading: string; readonly link: string }>>;
+
+/** The address is read off the navigation list, so moving a role's home moves it here. */
 export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
-  const home = HOMES[role];
-  await expect(page).toHaveURL(new RegExp(`${home.path}$`));
-  await expect(page.getByRole("heading", { level: 1, name: headingOf(home) })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${HOMES[role].path}$`));
+  await expect(
+    page.getByRole("heading", { level: 1, name: HOME_NAMES[role].heading }),
+  ).toBeVisible();
 };
 
 /** A deployment whose page and published resource differ fails here. */
@@ -163,8 +168,8 @@ export const askShowsTheServedAddress = async (page: Page): Promise<string> => {
 
 /** A page hidden from the role says what an address that never existed says. */
 export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void> => {
-  await expect(page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading })).toBeVisible();
-  await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Page Not Found" })).toBeVisible();
+  await expect(page.getByRole("link", { name: HOME_NAMES[role].link })).toBeVisible();
 };
 
 const ACTION_BUDGET_MS = 100;

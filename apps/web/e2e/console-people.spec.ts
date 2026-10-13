@@ -26,7 +26,6 @@ import {
   navOf,
   person,
   provision,
-  quoted,
   saysARefusal,
   saysOfItsRead,
   signedInAtHome,
@@ -414,9 +413,9 @@ test.describe("the console's Everyone page", () => {
 
     await markTheOperator(request, operators.admin.email, "revoke");
     // A move between the console's own pages keeps its standing, so the list asks again alone.
-    await navOf(page, CONSOLE).getByRole("link", { name: "Every Workspace" }).click();
+    await navOf(page, "Console").getByRole("link", { name: "Every Workspace" }).click();
     const refused = refusalAnswering(page, "console.people.list");
-    await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
+    await navOf(page, "Console").getByRole("link", { name: "Everyone" }).click();
 
     expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR, class: "forbidden" });
     await expect(everyone(page)).not.toContainText(NOT_THE_OPERATOR);
@@ -884,7 +883,7 @@ test.describe("the console's Names Waiting page", () => {
           - heading "Names Waiting" [level=2]
           - paragraph
           - status: /\\b1\\b/
-          - searchbox "Search by name or workspace": ${quoted(name)}
+          - searchbox "Search by name or workspace": ${JSON.stringify(name)}
           - table:
             - caption
             - rowgroup:
@@ -900,7 +899,7 @@ test.describe("the console's Names Waiting page", () => {
                     - listitem: /^${operators.name} ${INSTANT_WORDS}$/
                     - listitem: /^Beta ${tag} ${INSTANT_WORDS}$/
                 - cell:
-                  - button ${quoted(correctionOf(name))}
+                  - button ${JSON.stringify(correctionOf(name))}
     `);
   });
 
@@ -917,7 +916,7 @@ test.describe("the console's Names Waiting page", () => {
     const theGroups = await summary.innerText();
     const ofNamesWaiting = await descriptions.innerText();
 
-    await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
+    await navOf(page, "Console").getByRole("link", { name: "Everyone" }).click();
     await expect(everyone(page).locator("h2 + p")).toHaveText(/\S/);
     await expect(descriptions, "Everyone describes more than itself").toHaveCount(1);
     await expect(descriptions, "Everyone is described as Names Waiting is").not.toHaveText(

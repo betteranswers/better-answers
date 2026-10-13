@@ -15,7 +15,6 @@ import {
   markTheOperator,
   person,
   provision,
-  quoted,
   saysARefusal,
   signIn,
   signInHeading,
@@ -179,7 +178,7 @@ test("lists a waiting invitation within a second, then joins it", async ({
         - heading "Your Invitations" [level=2]
         - list:
           - listitem:
-            - link ${quoted(workspace.name)}
+            - link ${JSON.stringify(workspace.name)}
             - paragraph
       - region "Ask to Join a Workspace"
       - button "Sign Out"
@@ -263,7 +262,7 @@ test("carries Claude's request through a join to consent", async ({
         - heading "Your Invitations" [level=2]
         - list:
           - listitem:
-            - link ${quoted(workspace.name)}
+            - link ${JSON.stringify(workspace.name)}
             - paragraph
       - region "Ask to Join a Workspace"
       - button "Sign Out"

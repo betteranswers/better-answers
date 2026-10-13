@@ -16,7 +16,6 @@ import {
   linkSentTo,
   person,
   provision,
-  quoted,
   saysTheWait,
   signInHeading,
   theActionLandedWithinItsBudget,
@@ -313,7 +312,7 @@ test("the code reads as six digits, and c copies it", async ({
     - main:
       - heading "Enter This Code Where You Started" [level=1]
       - status
-      - paragraph: ${quoted(codeSpelled(code))}
+      - paragraph: ${JSON.stringify(codeSpelled(code))}
       - paragraph: /${untilTime}/
       - button "Copy Code"
       - paragraph:

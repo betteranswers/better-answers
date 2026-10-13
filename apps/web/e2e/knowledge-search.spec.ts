@@ -6,7 +6,7 @@ import {
   QUERY_MAX,
   SEARCH_KEYSTROKES as KEY,
 } from "@/features/knowledge/knowledge-state.ts";
-import { HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -775,7 +775,10 @@ test.describe("the Knowledge Search page", () => {
     await anAdminAtSearch(page, request, "Calder Records", [handbookSeeded]);
     await skipLinkReachesThePage(page);
 
-    await listsItsKeystrokes(page, "Search", Object.values(KEY));
+    await listsItsKeystrokes(page, "Search", [
+      "Search This Workspace’s Knowledge",
+      "Show More Matches",
+    ]);
 
     await page.keyboard.press(KEY.search.key);
     await expect(searchBox(page)).toBeFocused();
@@ -822,7 +825,7 @@ test.describe("the Knowledge Search page", () => {
 
       await expect(page).toHaveURL(new RegExp(`${SEARCH.path}$`));
       await expect(page.getByRole("heading", { level: 1, name: "Browse" })).toBeVisible();
-      await expect(navOf(page, KNOWLEDGE).getByRole("link")).toHaveText(["Search"]);
+      await expect(navOf(page, "Knowledge").getByRole("link")).toHaveText(["Search"]);
       await expect(said(page)).toHaveText(/\S/);
       await expect(matchesOf(page)).toHaveCount(0);
     });

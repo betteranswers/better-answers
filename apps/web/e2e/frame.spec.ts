@@ -241,12 +241,12 @@ const paintedFill = (page: Page, name: string) =>
     .evaluate((link) => getComputedStyle(link).backgroundColor);
 
 const weightOf = (page: Page, pageName: string) =>
-  navOf(page, CONTROL_CENTRE)
+  navOf(page, "Control Centre")
     .getByRole("link", { name: pageName })
     .evaluate((link) => Number.parseInt(getComputedStyle(link).fontWeight, 10));
 
 const glyphOf = (page: Page, pageName: string) =>
-  navOf(page, CONTROL_CENTRE)
+  navOf(page, "Control Centre")
     .getByRole("link", { name: pageName })
     .evaluate((link) => link.querySelector("svg")?.innerHTML ?? "");
 
@@ -357,7 +357,7 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
   await signedIn(page, request, "Northern Tooling");
   await page.goto("/system/audit-log");
 
-  const nav = navOf(page, CONTROL_CENTRE);
+  const nav = navOf(page, "Control Centre");
   await expect(nav.getByRole("link")).toHaveText(PAGE_NAMES);
   const open = nav.getByRole("link", { name: "Audit Log" });
   await expect(open).toHaveAttribute("aria-current", "page");
@@ -410,7 +410,7 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
 
   // `goto` is the bookmark: a fresh document at a path no file sits at, not a click.
   await page.goto("/people/groups");
-  await expect(navOf(page, CONTROL_CENTRE).getByRole("link", { name: "Groups" })).toHaveAttribute(
+  await expect(navOf(page, "Control Centre").getByRole("link", { name: "Groups" })).toHaveAttribute(
     "aria-current",
     "page",
   );
@@ -424,7 +424,7 @@ test("marks Members current on a member page, adding no entry", async ({ page, r
     page.getByRole("main").getByRole("heading", { level: 2, name: workspace.admin.name }),
   ).toBeVisible();
 
-  const nav = navOf(page, CONTROL_CENTRE);
+  const nav = navOf(page, "Control Centre");
   await expect(nav.getByRole("link"), "the page took an entry of its own").toHaveText(PAGE_NAMES);
   // The page is Members' own, so its entry is the current page, as on Members itself.
   await expect(nav.getByRole("link", { name: "Members" })).toHaveAttribute("aria-current", "page");
@@ -546,10 +546,10 @@ test("keeps band, rail and nav mounted between pages, focus kept", async ({ page
   await page.goto(MEMBERS.path);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 
-  const regions = [bandOf(page), railOf(page), navOf(page, CONTROL_CENTRE)];
+  const regions = [bandOf(page), railOf(page), navOf(page, "Control Centre")];
   const before = await Promise.all(regions.map((region) => region.elementHandle()));
 
-  const groups = navOf(page, CONTROL_CENTRE).getByRole("link", { name: "Groups" });
+  const groups = navOf(page, "Control Centre").getByRole("link", { name: "Groups" });
   await groups.focus();
   await page.keyboard.press("Enter");
 
@@ -565,11 +565,11 @@ test("sizes the band's cells to the rail and nav below", async ({ page, request 
   const workspace = await signedIn(page, request, "Ryedale Castings");
   await page.setViewportSize(DESKTOP);
   await page.goto(MEMBERS.path);
-  await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
+  await expect(navOf(page, "Control Centre")).toBeVisible();
 
   const band = await boxOf(bandOf(page));
   const rail = await boxOf(railOf(page));
-  const nav = await boxOf(navOf(page, CONTROL_CENTRE));
+  const nav = await boxOf(navOf(page, "Control Centre"));
   expect(band.x).toBe(0);
   expect(band.width).toBe(DESKTOP.width);
   expect(band.y + band.height, "the band does not sit above the rail").toBeLessThanOrEqual(rail.y);
@@ -628,7 +628,7 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
 
   for (const name of PAGE_NAMES) {
     await page.keyboard.press("Tab");
-    await expect(navOf(page, CONTROL_CENTRE).getByRole("link", { name })).toBeFocused();
+    await expect(navOf(page, "Control Centre").getByRole("link", { name })).toBeFocused();
   }
 
   // An Admin holding no passkey is offered one above the first page they reach.
@@ -932,7 +932,7 @@ test("holds toggle and band still while the nav hides", async ({
   await page.setViewportSize(DESKTOP);
   await page.goto(MEMBERS.path);
 
-  const nav = navOf(page, CONTROL_CENTRE);
+  const nav = navOf(page, "Control Centre");
   await expect(nav).toBeVisible();
   const tabs = page.getByRole("tablist", { name: "Members" });
   await expect(tabs).toBeVisible();
@@ -1115,7 +1115,7 @@ test("measures a page's prose, but not a table's or dialog's", async ({ page, re
 test("remembers a closed menu on this browser only", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Ribble Toolmaking");
   await page.goto(MODELS_AND_SPEND.path);
-  await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
+  await expect(navOf(page, "Control Centre")).toBeVisible();
   await theModelChoicesHaveLanded(page);
 
   // Listening only across the action, so neither the start above nor the reload below is mistaken
@@ -1124,13 +1124,13 @@ test("remembers a closed menu on this browser only", async ({ page, request }) =
   const noting = (each: { url: () => string }) => asked.push(each.url());
   page.on("request", noting);
   await closerOf(page).click();
-  await expect(navOf(page, CONTROL_CENTRE)).toHaveCount(0);
+  await expect(navOf(page, "Control Centre")).toHaveCount(0);
   page.off("request", noting);
   expect(asked).toEqual([]);
 
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
-  await expect(navOf(page, CONTROL_CENTRE)).toHaveCount(0);
+  await expect(navOf(page, "Control Centre")).toHaveCount(0);
   await expect(openerOf(page)).toBeVisible();
 
   const kept = await keptOnThisBrowser(page);
@@ -1155,7 +1155,7 @@ test("opens the navigation over narrow content, holding and returning focus", as
   await narrowAtModelsAndSpend(page, request, "Wharfedale Castings");
 
   await expect(railOf(page)).toHaveCount(0);
-  await expect(navOf(page, CONTROL_CENTRE)).toHaveCount(0);
+  await expect(navOf(page, "Control Centre")).toHaveCount(0);
   const contentWide = await widthOf(page.getByRole("main"));
 
   const menu = sheetButtonOf(page);
@@ -1221,7 +1221,7 @@ test("closes the sheet on widening, focusing the navigation control", async ({ p
 
   await expect(sheetOf(page)).toHaveCount(0);
   await expect(railOf(page)).toBeVisible();
-  await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
+  await expect(navOf(page, "Control Centre")).toBeVisible();
   await expect(closerOf(page)).toBeFocused();
 });
 
