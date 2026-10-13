@@ -17,11 +17,19 @@ import {
   type OpenedConcept,
   type Trust,
 } from "../concepts/index.ts";
-import { attempt, err, NOT_FOUND, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import {
+  attempt,
+  err,
+  NOT_FOUND,
+  ok,
+  type KernelRefusal,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
 import { findPassages, parseLocator, passageAt } from "../sources/index.ts";
 import { walkFromEntries, walkTimedOut, type WalkStep } from "../store/map/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import type { AskInput, Evidence, PassageView } from "./boundary.ts";
+import { passageViewOf, type AskInput, type Evidence, type PassageView } from "./boundary.ts";
 import type { RecordedConcept } from "./record.ts";
 
 export type MapState =
@@ -81,10 +89,8 @@ export type ReadStep<Refused = never> = <Read, Failure>(
   work: (tx: Tx) => Promise<Result<Read, Failure>>,
 ) => Promise<Result<Read, Failure | Refused>>;
 
-type ReadFailure = Extract<
-  Awaited<ReturnType<typeof readableCollections>>,
-  { readonly ok: false }
->["error"];
+/** The reads' own steps admit for themselves, so their refusal is in what a read can answer. */
+type ReadFailure = KernelRefusal<"role-forbids"> | Error;
 
 type Asked = {
   readonly reader: UserPrincipal;
@@ -107,13 +113,12 @@ const entryPoints = async (
     limit: caps.entryPoints,
   });
   if (!strong.ok) return strong;
-  const weak = await findConcepts(reader, tx, {
-    ...search,
-    strength: "weak",
-    limit: caps.entryPoints - strong.value.length,
-  });
+  const taken = strong.value.map(({ concept }) => concept);
+  const left = caps.entryPoints - taken.length;
+  if (left === 0) return ok(taken);
+  const weak = await findConcepts(reader, tx, { ...search, strength: "weak", limit: left });
   if (!weak.ok) return weak;
-  return ok([...strong.value, ...weak.value].map(({ concept }) => concept));
+  return ok([...taken, ...weak.value.map(({ concept }) => concept)]);
 };
 
 /** Never narrowed by collection: a passage no concept rests on belongs to none. */
@@ -126,10 +131,8 @@ const unmappedPassagesFor = async (
   const passages: PassageView[] = [];
   for (const { passage } of found.value) {
     const read = await passageAt(reader, tx, passage.locator);
-    if (read.ok) {
-      const { locator, title, text, sensitivity } = read.value;
-      passages.push({ locator, source: title, text, sensitivity });
-    } else if (read.error !== NOT_FOUND) return err(read.error);
+    if (read.ok) passages.push(passageViewOf(read.value));
+    else if (read.error !== NOT_FOUND) return err(read.error);
   }
   return ok(passages);
 };
@@ -212,6 +215,16 @@ const returnedOf = (
   };
 };
 
+/** One read a locator, however many of the returned concepts cite the passage. */
+const passageReadOnce = (reader: UserPrincipal, tx: Tx) => {
+  const read = new Map<string, ReturnType<typeof passageAt>>();
+  return (locator: string): ReturnType<typeof passageAt> => {
+    const held = read.get(locator) ?? passageAt(reader, tx, locator);
+    read.set(locator, held);
+    return held;
+  };
+};
+
 /**
  * Entry points, then the walk's nearest, cut at the cap. The walk kept to what the reader may
  * read, so nothing withheld takes a slot.
@@ -224,19 +237,42 @@ const returnedBy = async (
 ): Promise<Result<readonly Returned[], ReadFailure>> => {
   const bearing = [...entries.map((entry) => entry.iri), ...reachedBeyond(entries, steps)];
   const slots = bearing.slice(0, caps.related);
-  const reached = await conceptsByIris(reader, tx, slots.slice(entries.length));
+  const beyond = slots.slice(entries.length);
+  const reached =
+    beyond.length === 0
+      ? ok<readonly OpenedConcept[]>([])
+      : await conceptsByIris(reader, tx, beyond);
   if (!reached.ok) return reached;
   const byIri = new Map([...entries, ...reached.value].map((concept) => [concept.iri, concept]));
+  const reads = {
+    passageAt: passageReadOnce(reader, tx),
+    namesPassage: (locator: string) => parseLocator(locator).ok,
+  };
   const returned: Returned[] = [];
+  // A concept the reader could read when walked and cannot now has no row, and is left out.
   for (const concept of slots.flatMap((iri) => byIri.get(iri) ?? [])) {
-    const evidence = await evidenceOf(reader, tx, concept.frontmatter, {
-      passageAt: (locator) => passageAt(reader, tx, locator),
-      namesPassage: (locator) => parseLocator(locator).ok,
-    });
+    const evidence = await evidenceOf(reader, tx, concept.frontmatter, reads);
     if (!evidence.ok) return evidence;
     returned.push(returnedOf(concept, evidence.value, now));
   }
   return ok(returned);
+};
+
+type Bearing = { readonly map: MapState; readonly returned: readonly Returned[] };
+
+/** With no entry point there is nothing to walk from, and no transaction is opened to learn it. */
+const NOTHING_BEARS: Bearing = { map: { state: "live" }, returned: [] };
+
+const bearingOn = async <Refused>(
+  asked: Asked,
+  read: ReadStep<Refused>,
+  entries: readonly OpenedConcept[],
+): Promise<Result<Bearing, ReadFailure | Refused>> => {
+  const walked = await walkedFrom(asked, read, entries);
+  if (!walked.ok) return walked;
+  const returned = await read((tx) => returnedBy(asked, tx, entries, walked.value.steps));
+  if (!returned.ok) return returned;
+  return ok({ map: walked.value.map, returned: returned.value });
 };
 
 export type AnswerPlan = {
@@ -246,8 +282,8 @@ export type AnswerPlan = {
 };
 
 /**
- * Reads what bears on the question for the reader its action admitted, in three short reads, and
- * writes nothing. No judge runs, so every `Answer` it finds is related knowledge.
+ * Reads what bears on the question for the reader its action admitted, in three short reads at
+ * most, and writes nothing. No judge runs, so every `Answer` it finds is related knowledge.
  */
 export const answerPlanned = async <Refused>(
   reader: UserPrincipal,
@@ -262,12 +298,11 @@ export const answerPlanned = async <Refused>(
   const found = await read((tx) => matched(asked, tx));
   if (!found.ok) return found;
   const { entries, unmappedPassages, readable } = found.value;
-  const walked = await walkedFrom(asked, read, entries);
-  if (!walked.ok) return walked;
-  const returned = await read((tx) => returnedBy(asked, tx, entries, walked.value.steps));
-  if (!returned.ok) return returned;
+  const bearing = entries.length === 0 ? ok(NOTHING_BEARS) : await bearingOn(asked, read, entries);
+  if (!bearing.ok) return bearing;
+  const { map, returned } = bearing.value;
 
-  const related = returned.value.map(({ shown }) => shown);
+  const related = returned.map(({ shown }) => shown);
   return ok({
     answer: {
       verdict: related.length === 0 ? "refuse" : "related",
@@ -276,10 +311,10 @@ export const answerPlanned = async <Refused>(
       related,
       conflicts: [],
       unmappedPassages,
-      map: walked.value.map,
+      map,
       collections: collections ?? readable,
       readableCollections: readable,
     },
-    concepts: returned.value.map(({ kept }) => kept),
+    concepts: returned.map(({ kept }) => kept),
   });
 };

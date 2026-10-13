@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
-  ANSWER_VERDICTS,
   FEEDBACK_REASONS,
   FEEDBACK_VERDICTS,
-  JUDGE_STATES,
   TRUST_RIDERS,
   TRUST_STATUSES,
   TRUST_TIERS,
@@ -14,6 +12,7 @@ import {
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
+import { JUDGE_STATES, QUESTION_VERDICTS } from "@better-answers/schema";
 
 import { MCP_TOKEN_RULE, MCP_UNAUTHENTICATED_IP_RULE } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
@@ -242,7 +241,7 @@ describe("era-independent", () => {
     ["find", "trust tier", TRUST_TIERS],
     ["find", "trust status", TRUST_STATUSES],
     ["find", "trust rider", TRUST_RIDERS],
-    ["ask", "verdict", ANSWER_VERDICTS],
+    ["ask", "verdict", QUESTION_VERDICTS],
     ["ask", "judge state", JUDGE_STATES],
     ["ask", "trust tier", TRUST_TIERS],
     ["open", "trust tier", TRUST_TIERS],

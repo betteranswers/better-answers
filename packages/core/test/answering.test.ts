@@ -1,11 +1,10 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
-import { ids, type ConceptIri } from "@better-answers/schema";
+import { ids, JUDGE_STATES, QUESTION_VERDICTS, type ConceptIri } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import {
-  ANSWER_VERDICTS,
   answerOutputWith,
   ask,
   ASK_CAPS,
@@ -14,7 +13,6 @@ import {
   findInput,
   findOutputWith,
   giveFeedback,
-  JUDGE_STATES,
   mapWords,
   NOT_COMPANY_KNOWLEDGE,
   open,
@@ -158,8 +156,8 @@ describe("the answer's rendering", () => {
     expect(linesOf(renderAnswer(answer({ verdict })))[0]).toBe(line);
   });
 
-  it("gives every verdict core declares a line", () => {
-    expect([...ANSWER_VERDICTS]).toEqual(["ok", "warn", "refuse", "related"]);
+  it("gives every verdict a record keeps a line", () => {
+    expect([...QUESTION_VERDICTS]).toEqual(["ok", "warn", "refuse", "related"]);
   });
 
   it.each([

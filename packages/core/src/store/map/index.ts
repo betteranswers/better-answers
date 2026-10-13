@@ -411,15 +411,27 @@ export const writeConceptVisibility = async (
  */
 const insideClause = (alias: string): string =>
   // The collections bind fifth, after the readable clause's two.
-  `(${alias}.label <> '${CONCEPT_NODE_LABEL}' OR ${alias}.uid IN (
+  `AND (${alias}.label <> '${CONCEPT_NODE_LABEL}' OR ${alias}.uid IN (
        SELECT filed.iri FROM concept_index filed
         WHERE filed.workspace_id = $1 AND filed.collection = ANY($5::text[])))`;
+
+/** What a narrowed walk adds to the statement, clause by clause. */
+type Narrowing = { readonly seed: string; readonly hop: string; readonly answered: string };
+
+const WHOLE: Narrowing = { seed: "", hop: "", answered: "" };
+
+/** A node that is no concept has no collection: a path may cross it, and it is not answered. */
+const INSIDE: Narrowing = {
+  seed: insideClause("n"),
+  hop: insideClause("m"),
+  answered: `WHERE label = '${CONCEPT_NODE_LABEL}'`,
+};
 
 /**
  * The readable predicate goes on every node and edge of a path, not only the endpoints:
  * filtering the ends alone leaks the middle.
  */
-const walkStatement = (outward: boolean, narrowed = false): string => {
+const walkStatement = (outward: boolean, narrowing: Narrowing = WHOLE): string => {
   const [source, sink] = outward ? ["from_uid", "to_uid"] : ["to_uid", "from_uid"];
   // UNION keeps a node once per depth, so the walk costs the edges crossed, never the paths.
   return `WITH RECURSIVE live AS (
@@ -431,7 +443,7 @@ const walkStatement = (outward: boolean, narrowed = false): string => {
       JOIN live ON n.gen IS NULL OR n.gen = live.live_gen
      WHERE n.workspace_id = $1 AND n.uid = ANY($2::text[])
        AND ${readableClause("n", 3)}
-       ${narrowed ? `AND ${insideClause("n")}` : ""}
+       ${narrowing.seed}
     UNION
     SELECT m.uid, m.label, m.kind, w.depth + 1
       FROM walk w
@@ -442,26 +454,32 @@ const walkStatement = (outward: boolean, narrowed = false): string => {
      WHERE w.depth < ${MAP_WALK_DEPTH}
        AND ${readableClause("e", 3)}
        AND ${readableClause("m", 3)}
-       ${narrowed ? `AND ${insideClause("m")}` : ""}
+       ${narrowing.hop}
   )
   SELECT uid, label, kind, min(depth) AS depth
     FROM walk
-   ${narrowed ? `WHERE label = '${CONCEPT_NODE_LABEL}'` : ""}
+   ${narrowing.answered}
    GROUP BY uid, label, kind
    ORDER BY depth, uid
    LIMIT ${MAP_WALK_ROW_LIMIT}`;
 };
 
-const WALK_FROM = walkStatement(true);
-const WALK_FROM_INSIDE = walkStatement(true, true);
-const WALK_TO = walkStatement(false);
+/** A walk's statement with what it binds after the readable clause's two. */
+type PreparedWalk = { readonly statement: string; readonly binds: readonly (readonly string[])[] };
+
+const WALK_FROM: PreparedWalk = { statement: walkStatement(true), binds: [] };
+const WALK_TO: PreparedWalk = { statement: walkStatement(false), binds: [] };
+const WALK_FROM_INSIDE = walkStatement(true, INSIDE);
+
+/** The narrowed statement and the collections it binds are chosen together, here alone. */
+const walkOutOf = (collections: readonly string[] | undefined): PreparedWalk =>
+  collections === undefined ? WALK_FROM : { statement: WALK_FROM_INSIDE, binds: [collections] };
 
 const walk = async (
-  statement: string,
+  { statement, binds }: PreparedWalk,
   principal: UserPrincipal,
   tx: Tx,
   uids: readonly string[],
-  collections?: readonly string[],
 ): Promise<readonly WalkStep[]> => {
   // Transaction-local, so it also bounds whatever the same short read runs after the walk.
   await tx.query("SELECT set_config('statement_timeout', $1, true)", [String(MAP_WALK_TIMEOUT_MS)]);
@@ -469,7 +487,7 @@ const walk = async (
     principal.workspaceId,
     uids,
     ...readableParameters(principal),
-    ...(collections === undefined ? [] : [collections]),
+    ...binds,
   ]);
   return found.rows;
 };
@@ -485,8 +503,7 @@ export const walkFromEntries = (
   tx: Tx,
   uids: readonly ConceptIri[],
   collections?: readonly string[],
-): Promise<readonly WalkStep[]> =>
-  walk(collections === undefined ? WALK_FROM : WALK_FROM_INSIDE, principal, tx, uids, collections);
+): Promise<readonly WalkStep[]> => walk(walkOutOf(collections), principal, tx, uids);
 
 const WALK_TIMED_OUT = "57014";
 

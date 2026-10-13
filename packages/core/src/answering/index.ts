@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-import {
-  QUESTION_VERDICTS,
-  type ConceptIri,
-  type FEEDBACK_REASONS,
-  type FEEDBACK_VERDICTS,
-  type JudgeState,
-  type MatchStrength,
+import type {
+  ConceptIri,
+  FEEDBACK_REASONS,
+  FEEDBACK_VERDICTS,
+  JudgeState,
+  MatchStrength,
+  QuestionVerdict,
 } from "@better-answers/schema";
 
 import type { ConceptRead, Frontmatter } from "../concepts/index.ts";
@@ -36,6 +36,7 @@ import {
   askInput,
   findInput,
   openInput,
+  passageViewOf,
   type AskInput,
   type Evidence,
   type FindInput,
@@ -52,7 +53,7 @@ import {
   type ReadStep,
   type ReturnedConcept,
 } from "./plan.ts";
-import type { completeRecord, openRecord } from "./record.ts";
+import type { RecordCompletion, RecordOpening } from "./record.ts";
 
 export {
   answerOutputWith,
@@ -164,10 +165,6 @@ export type OpenResult<Iri extends string = ConceptIri> = Opened<
   ConceptView<Iri> & PaneWords & Required<Pick<ConceptView<Iri>, "bodyLinks">>
 >;
 
-/** The schema's own tuple, so the words a record keeps and the words an answer says cannot drift. */
-export const ANSWER_VERDICTS = QUESTION_VERDICTS;
-type AnswerVerdict = (typeof ANSWER_VERDICTS)[number];
-
 /** What `ask` answers: the answer as planned, and the id of the record kept of the question. */
 export type AnswerResult<Iri extends string = ConceptIri> = PlannedAnswer<Iri> & {
   readonly recordId: string;
@@ -175,7 +172,7 @@ export type AnswerResult<Iri extends string = ConceptIri> = PlannedAnswer<Iri> &
 
 const NOT_ANSWERED = "Not answered from the company's knowledge.";
 
-export { FEEDBACK_REASONS, FEEDBACK_VERDICTS, JUDGE_STATES } from "@better-answers/schema";
+export { FEEDBACK_REASONS, FEEDBACK_VERDICTS } from "@better-answers/schema";
 export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
 
 type FeedbackVerdict = (typeof FEEDBACK_VERDICTS)[number];
@@ -353,8 +350,7 @@ const passageOpened = async (
   if (!passage.ok) {
     return passage.error === NOT_FOUND ? ok({ found: false, locator: asked }) : err(passage.error);
   }
-  const { locator, title, text, sensitivity } = passage.value;
-  return ok({ found: true, passage: { locator, source: title, text, sensitivity } });
+  return ok({ found: true, passage: passageViewOf(passage.value) });
 };
 
 const conceptOpened = async (
@@ -429,11 +425,11 @@ export type AskRefusal = RefusalOf<typeof askAction> | Error;
 export type AskSteps<Refused = never> = {
   /** Commits before it answers: a question refused later is still on record. */
   readonly openRecord: (
-    opening: Omit<Parameters<typeof openRecord>[2], "transport">,
+    opening: Omit<RecordOpening, "transport">,
   ) => Promise<Result<{ readonly recordId: string }, Refused | Error>>;
   readonly read: ReadStep<Refused>;
   readonly completeRecord: (
-    completion: Omit<Parameters<typeof completeRecord>[2], "completedAt" | "drafted">,
+    completion: Omit<RecordCompletion, "completedAt" | "drafted">,
   ) => Promise<Result<void, Refused | Error>>;
 };
 
@@ -590,7 +586,7 @@ const VERDICT_LINES = {
   refuse: `**${NOT_ANSWERED}**`,
   related:
     "**Related knowledge, not an answer.** Write only what these concepts state, naming each one you use, and quote an `Answer` word for word.",
-} satisfies Record<AnswerVerdict, string>;
+} satisfies Record<QuestionVerdict, string>;
 
 const JUDGE_WORDS = {
   "not-judged": "Not judged",
