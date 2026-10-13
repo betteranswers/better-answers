@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/shared/ui/select.tsx";
 
-import { whyAndNextOf } from "./refusal.tsx";
+import { SAID_OF_A_CONNECTED_SOURCE } from "./refusal-words.ts";
 import {
   EVERYONE,
   NARROWEST,
@@ -122,7 +122,7 @@ const OFFERS = {
       connectedSource.audience === EVERYONE ? [] : [connectedSource.audience, EVERYONE],
     opensOn: firstWidening,
     refusedWhy: (connectedSource, asked) =>
-      asksWider(connectedSource, asked) ? undefined : whyAndNextOf("not-wider"),
+      asksWider(connectedSource, asked) ? undefined : SAID_OF_A_CONNECTED_SOURCE["not-wider"],
   },
 } satisfies Record<SensitivityChange, Offer>;
 

@@ -3,7 +3,7 @@ import { useRef, useState, type ReactNode } from "react";
 
 import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { KeystrokesAction, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
-import { NO_RESPONSE, NO_RESPONSE_TO_A_READ } from "@/shared/refusal-words.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
@@ -37,7 +37,6 @@ import {
   saidOfAcknowledging,
   type CodesInHand,
 } from "./recovery-codes.tsx";
-import { PASSKEY_REMOVAL_UNANSWERED, REMOVAL_UNANSWERED } from "./refusal-words.ts";
 import {
   FIRST_AUTHENTICATOR,
   NEW_AUTHENTICATOR,
@@ -226,14 +225,14 @@ type AccountActions = ReturnType<typeof useAccountActions>;
 /** A read already drawn stands through a refetch that fails, so only a first read's is said. */
 const failureOnThePage = (read: SecondFactorRead, actions: AccountActions) => {
   if (read.data === undefined && read.error !== null) {
-    return { failure: read.error, unanswered: NO_RESPONSE_TO_A_READ };
+    return { failure: read.error, unanswered: STOCK.notLoaded };
   }
-  if (actions.remove.error !== null)
-    return { failure: actions.remove.error, unanswered: REMOVAL_UNANSWERED };
-  if (actions.removePasskey.error !== null)
-    return { failure: actions.removePasskey.error, unanswered: PASSKEY_REMOVAL_UNANSWERED };
+  const removal = actions.remove.error ?? actions.removePasskey.error;
+  if (removal !== null) return { failure: removal, unanswered: STOCK.tryAgain };
   const made = actions.make.error;
-  return { failure: made, unanswered: made === null ? NO_RESPONSE : codesUnanswered(made) };
+  if (made === null) return { failure: made, unanswered: STOCK.tryAgain };
+  // With no response a set may have been made, so no one is told to make another.
+  return { failure: made, unanswered: codesUnanswered(made, STOCK.unconfirmed) };
 };
 
 /** The opening actions of the passkeys and the authenticator, each offered while it is closed. */

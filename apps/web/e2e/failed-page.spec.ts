@@ -1,4 +1,4 @@
-import { FAILED_PAGE, goHome, RAIL, ROLE_UNREAD } from "@/app/words.ts";
+import { FAILED_PAGE, goHome, RAIL } from "@/app/words.ts";
 import { CONTROL_CENTRE, HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -6,6 +6,7 @@ import {
   anAddress,
   landedAtHome,
   provision,
+  saysARefusal,
   seedModelChoices,
   signIn,
   skipLinkReachesThePage,
@@ -108,7 +109,7 @@ test("shows the failed read at the index, then goes home", async ({
   await page.goto("/");
 
   await expect(page.getByRole("heading", { level: 1, name: FAILED_PAGE.heading })).toBeVisible();
-  await expect(page.getByRole("alert")).toContainText(ROLE_UNREAD);
+  await saysARefusal(page.getByRole("alert"));
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("navigation", { name: RAIL }).getByRole("link")).toHaveCount(0);
   await passesTheAccessibilityGate();

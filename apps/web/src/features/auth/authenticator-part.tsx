@@ -1,8 +1,7 @@
 import { useId, useState } from "react";
 
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import { SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
+import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { QRCode } from "@/shared/ui/kibo-ui/qr-code.tsx";
 
@@ -17,19 +16,9 @@ import {
 } from "./authenticator-code.tsx";
 import { copiedToTheClipboard } from "./clipboard.ts";
 import {
-  AUTHENTICATOR_HELD,
-  FACTORS_CHANGED_MEANWHILE,
-  KEY_NOT_COPIED,
-  KEY_UNANSWERED,
-  NO_SETUP_WAITING,
-  REPLACEMENT_SETUP_NEEDED,
+  AUTHENTICATOR_CODE_WRONG,
   RESTORE_CODE_NEEDED,
-  SETUP_CODE_WRONG,
   SETUP_NOT_GRANTED,
-  SETUP_REFUSED,
-  SETUP_UNANSWERED,
-  tooManyCodesTried,
-  tooManySetupsStarted,
 } from "./refusal-words.ts";
 import {
   useFinishAuthenticator,
@@ -44,53 +33,42 @@ export const COPY_KEY: Keystroke = { key: "k", action: ACCOUNT_ACTIONS.copyKey }
 const CONFLICT = 409;
 
 /** A setup's own words, read before its status: the replacing routes answer 409 for each. */
-const SAID_OF_A_SETUP_WORD: ReadonlyMap<string, Said> = new Map([
+const SAID_OF_A_SETUP_WORD: ReadonlyMap<string, string> = new Map([
   ["setup-not-granted", SETUP_NOT_GRANTED],
   ["restore-code-needed", RESTORE_CODE_NEEDED],
-  ["replacement-setup-needed", REPLACEMENT_SETUP_NEEDED],
-  ["changed-meanwhile", FACTORS_CHANGED_MEANWHILE],
+  ["replacement-setup-needed", STOCK.changed],
+  ["changed-meanwhile", STOCK.changed],
 ]);
 
-const saidOfStartingByStatus = (refused: CodeRefused): Said => {
+/** A 409 is another tab's doing: it finished the setup, or started one with a new key. */
+const saidOfStartingByStatus = (refused: CodeRefused): string => {
   switch (refused.status) {
     case SIGNED_OUT:
-      return SAID_OF_CLASS.unauthenticated;
+      return STOCK.session;
     case CONFLICT:
-      return AUTHENTICATOR_HELD;
+      return STOCK.changed;
     case TOO_MANY_REQUESTS:
-      return tooManySetupsStarted(refused.waitSeconds);
+      return stockWait(refused.waitSeconds);
     default:
-      return SETUP_REFUSED;
+      return STOCK.general;
   }
 };
 
-const saidOfFinishingByStatus = (refused: CodeRefused): Said => {
-  switch (refused.status) {
-    case CODE_WRONG:
-      return SETUP_CODE_WRONG;
-    case SIGNED_OUT:
-      return SAID_OF_CLASS.unauthenticated;
-    case CONFLICT:
-      return NO_SETUP_WAITING;
-    case TOO_MANY_REQUESTS:
-      return tooManyCodesTried(refused.waitSeconds);
-    default:
-      return SETUP_REFUSED;
-  }
-};
+const saidOfFinishingByStatus = (refused: CodeRefused): string =>
+  refused.status === CODE_WRONG ? AUTHENTICATOR_CODE_WRONG : saidOfStartingByStatus(refused);
 
-const saidOfStarting = (refused: CodeRefused): Said =>
+const saidOfStarting = (refused: CodeRefused): string =>
   SAID_OF_A_SETUP_WORD.get(refused.word ?? "") ?? saidOfStartingByStatus(refused);
 
-const saidOfFinishing = (refused: CodeRefused): Said =>
+const saidOfFinishing = (refused: CodeRefused): string =>
   SAID_OF_A_SETUP_WORD.get(refused.word ?? "") ?? saidOfFinishingByStatus(refused);
 
 /** A failure with no status went unanswered. */
 const saidOfFailure = (
   failure: Error,
-  saidOfRefusal: (refused: CodeRefused) => Said,
-  unanswered: Said,
-): Said => (failure instanceof CodeRefused ? saidOfRefusal(failure) : unanswered);
+  saidOf: (refused: CodeRefused) => string,
+  unanswered: string,
+): string => (failure instanceof CodeRefused ? saidOf(failure) : unanswered);
 
 /** Grouped as a phone's keyboard is typed from it; copied whole, with no space. */
 const inFours = (key: string): string => key.match(/.{1,4}/g)?.join(" ") ?? key;
@@ -131,9 +109,7 @@ function TheKey(properties: { readonly started: SetupStarted }) {
         </Button>
       </div>
       <Outcome tone="said">{copied === true ? AUTHENTICATOR_WORDS.keyCopied : null}</Outcome>
-      <Outcome tone="refused">
-        {copied === false ? <RefusalLine said={KEY_NOT_COPIED} /> : null}
-      </Outcome>
+      <Outcome tone="refused">{copied === false ? STOCK.copy : null}</Outcome>
     </>
   );
 }
@@ -152,6 +128,7 @@ function KeyAndCode(
   },
 ) {
   const fieldId = useId();
+  const hintId = useId();
   const refusedId = useId();
   const finish = useFinishAuthenticator(properties.onFinished, properties.routes);
   const finishing = finish.isPending || finish.isSuccess;
@@ -176,16 +153,18 @@ function KeyAndCode(
           digits={digits}
           readOnly={finishing}
           wrong={isAWrongCode(failure)}
-          describedBy={failure === null ? undefined : refusedId}
+          describedBy={failure === null ? hintId : `${hintId} ${refusedId}`}
         />
+        <p id={hintId} className="mt-1 text-muted-foreground">
+          {AUTHENTICATOR_WORDS.codeHint}
+        </p>
         <Button type="submit" className="mt-4" disabled={finishing}>
           {finishing ? AUTHENTICATOR_WORDS.finishing : AUTHENTICATOR_WORDS.finish}
         </Button>
       </form>
+      {/* Unconfirmed: the api may have finished the setup before its answer was lost. */}
       <Outcome tone="refused" id={refusedId}>
-        {failure === null ? null : (
-          <RefusalLine said={saidOfFailure(failure, saidOfFinishing, SETUP_UNANSWERED)} />
-        )}
+        {failure === null ? null : saidOfFailure(failure, saidOfFinishing, STOCK.unconfirmed)}
       </Outcome>
     </>
   );
@@ -206,9 +185,7 @@ export function AuthenticatorSetup(
     <div id={properties.id} className="mt-2">
       <Outcome tone="said">{starting.isPending ? AUTHENTICATOR_WORDS.making : null}</Outcome>
       <Outcome tone="refused">
-        {failure === null ? null : (
-          <RefusalLine said={saidOfFailure(failure, saidOfStarting, KEY_UNANSWERED)} />
-        )}
+        {failure === null ? null : saidOfFailure(failure, saidOfStarting, STOCK.tryAgain)}
       </Outcome>
       {failure === null ? null : (
         <Button

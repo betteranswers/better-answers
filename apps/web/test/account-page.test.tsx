@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { THEME_WORDS } from "@/features/auth/account-words.ts";
+import { SAID_OF_SECOND_FACTOR } from "@/features/auth/refusal-words.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
 
 import { openApp } from "./open-app.tsx";
@@ -143,12 +144,8 @@ describe("the Account page's passkeys", () => {
     const remove = await screen.findByRole("button", { name: "Remove" });
 
     expect(remove.getAttribute("aria-disabled")).toBe("true");
-    expect(remove.getAttribute("aria-describedby")).not.toBeNull();
-    expect(
-      screen.getByText(
-        "You must keep one passkey or authenticator. Add another before removing this one.",
-      ),
-    ).toBeDefined();
+    const reason = document.getElementById(remove.getAttribute("aria-describedby") ?? "");
+    expect(reason?.textContent).toBe(SAID_OF_SECOND_FACTOR["last-second-factor"]);
   });
 
   it("says there are none, and this browser adds none", async () => {
@@ -248,11 +245,7 @@ describe("making a first set on the Account page", () => {
     await makeCodesPressed();
 
     expect(await screen.findByRole("button", { name: "Replace recovery codes" })).toBeDefined();
-    expect(
-      screen.getByText(
-        "You already have recovery codes, made in another tab or window. Replace them if you need new ones.",
-      ),
-    ).toBeDefined();
+    expect(screen.getByText(SAID_OF_SECOND_FACTOR["recovery-codes-held"])).toBeDefined();
   });
 
   it("asks a restored sign-in for its restore code first", async () => {
@@ -266,10 +259,6 @@ describe("making a first set on the Account page", () => {
 
     await makeCodesPressed();
 
-    expect(
-      await screen.findByText(
-        "Your sign-in was restored, so its restore code comes first. Enter the code better-answers support gave you.",
-      ),
-    ).toBeDefined();
+    expect(await screen.findByText(SAID_OF_SECOND_FACTOR["restore-code-needed"])).toBeDefined();
   });
 });

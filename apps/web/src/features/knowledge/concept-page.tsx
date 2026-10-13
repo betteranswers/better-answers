@@ -7,7 +7,6 @@ import { RowLink } from "@/shared/grid-table.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListState } from "@/shared/list-pages.tsx";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
@@ -74,7 +73,7 @@ function NoSuchConcept() {
     <ListState
       state={{
         kind: "empty",
-        words: sentenceOf(SAID_OF_KNOWLEDGE["not-found"]),
+        words: SAID_OF_KNOWLEDGE["not-found"],
         action: <WayBack iri={undefined} />,
       }}
     />

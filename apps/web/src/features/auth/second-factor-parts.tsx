@@ -12,8 +12,7 @@ import {
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import { NO_RESPONSE_TO_A_READ, SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -54,7 +53,7 @@ export function SecondFactorRefused(properties: {
   readonly id: string;
   readonly read: SecondFactorRead;
   readonly failure: Error | ApiError | null;
-  readonly unanswered: Said;
+  readonly unanswered: string;
 }) {
   const { read } = properties;
   return (
@@ -149,7 +148,7 @@ export const useThrottledSend = (
   sending: SendingState,
   waitSecondsAtArrival: number,
   others: readonly OtherWay[],
-  saidOfFailure: (failure: Error | null) => Said | undefined,
+  saidOfFailure: (failure: Error | null) => string | undefined,
 ) => {
   const waiting = useWaiting(waitSecondsAtArrival, () => {
     sending.reset();
@@ -234,7 +233,7 @@ export function PendingFrame(properties: {
         id={readId}
         read={read}
         failure={read.data === undefined ? read.error : null}
-        unanswered={NO_RESPONSE_TO_A_READ}
+        unanswered={STOCK.notLoaded}
       />
       <div className="mt-10 flex flex-wrap items-center gap-2">
         {listed === undefined ? null : (
@@ -249,7 +248,7 @@ export function PendingFrame(properties: {
 /** A code field's two regions: the wait lifting, and what refused the code. */
 export function CodeOutcomes(properties: {
   readonly lifted: boolean;
-  readonly said: Said | undefined;
+  readonly said: string | undefined;
   readonly refusedId: string;
 }) {
   const { lifted, said, refusedId } = properties;
@@ -257,32 +256,32 @@ export function CodeOutcomes(properties: {
     <>
       <Outcome tone="said">{lifted ? CODE_AGAIN : null}</Outcome>
       <Outcome tone="refused" id={refusedId}>
-        {said === undefined ? null : <RefusalLine said={said} />}
+        {said}
       </Outcome>
     </>
   );
 }
 
-/** What a code typed whole says once refused; a throttle is said by its wait instead. */
-export type CodeSaids = { readonly wrong: Said; readonly unanswered: Said };
-
-const saidOfSending = (failure: Error | null, saids: CodeSaids): Said | undefined => {
+/** A throttle is said by its wait. With no response the api may have spent the code. */
+const saidOfSending = (failure: Error | null, wrong: string): string | undefined => {
   if (failure === null || isTooMany(failure)) return undefined;
-  if (!(failure instanceof CodeRefused)) return saids.unanswered;
-  return failure.status === SIGNED_OUT ? SAID_OF_CLASS.unauthenticated : saids.wrong;
+  if (!(failure instanceof CodeRefused)) return STOCK.unconfirmed;
+  return failure.status === SIGNED_OUT ? STOCK.session : wrong;
 };
 
 /** A recovery or restore code, sent as typed: the api ignores its spaces, dashes and case. */
 export function OneTimeCodeForm(properties: {
   readonly label: string;
   readonly sending: SendingACode;
-  readonly saids: CodeSaids;
+
+  /** What a code the api refused says. */
+  readonly wrong: string;
   readonly others: readonly OtherWay[];
   readonly waitSecondsAtArrival: number;
   readonly fieldRef?: FocusOnArrival | undefined;
   readonly onGranted: () => void;
 }) {
-  const { label, sending, saids, others, waitSecondsAtArrival, fieldRef, onGranted } = properties;
+  const { label, sending, wrong, others, waitSecondsAtArrival, fieldRef, onGranted } = properties;
   const fieldId = useId();
   const refusedId = useId();
   const [code, setCode] = useState("");
@@ -290,7 +289,7 @@ export function OneTimeCodeForm(properties: {
     sending,
     waitSecondsAtArrival,
     others,
-    (failure) => saidOfSending(failure, saids),
+    (failure) => saidOfSending(failure, wrong),
   );
 
   const send = (event: FormEvent) => {

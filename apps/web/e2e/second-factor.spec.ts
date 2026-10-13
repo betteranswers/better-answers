@@ -170,7 +170,7 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   await doneButton(page).focus();
   await clockTheNextKey(page, {
     at: `//section[h3[normalize-space(.)=${quoted(RECOVERY_CODE_WORDS.saveHeading)}]]//*[@role='alert']`,
-    reads: CODES_NOT_TICKED.why,
+    reads: CODES_NOT_TICKED,
   });
   await page.keyboard.press("Enter");
   await theActionLandedWithinItsBudget(page, "unticked done");

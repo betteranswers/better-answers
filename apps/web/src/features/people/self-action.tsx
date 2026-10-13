@@ -12,10 +12,7 @@ import { homeNowSaid, INCLUDES_YOU } from "./member-action-words.ts";
 import { useReaderId } from "./people-api.ts";
 import { roleOf } from "./role-meanings.ts";
 
-const ROLE_UNREAD = refusedWith({
-  why: "Your role changed, but it couldn’t be read again.",
-  next: "Reload the page in a moment.",
-});
+export const ROLE_UNREAD = refusedWith("Your role has changed. Please reload the page.");
 
 /** Carried in the home entry's history state, so it goes once the reader moves on. */
 const SENT_HOME = z.object({ homeOf: z.string().transform(roleOf) });

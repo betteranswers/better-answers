@@ -13,9 +13,9 @@ import {
   NAMES_WAITING_KEYSTROKES,
   SELECT_A_NAME_FIRST,
 } from "@/features/console/people-keystrokes.ts";
-import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
+import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
@@ -50,16 +50,36 @@ const WITHOUT_THE_MARK: Answer = {
   },
 };
 
-/** The api answers a batch as one array, one entry per procedure it names; a read not `held` is empty. */
+/** What the api answers the read of a person erased since the list was read. */
+const SINCE_ERASED: Answer = {
+  error: {
+    message: "no-such-user",
+    code: -32_004,
+    data: {
+      code: "NOT_FOUND",
+      httpStatus: 404,
+      refusal: { word: "no-such-user", class: "absent" },
+    },
+  },
+};
+
+/**
+ * The api answers a batch as one array, one entry per procedure it names; a read neither `held` nor
+ * `refused` is empty.
+ */
 const answering =
-  (standing: Answer, held: Readonly<Record<string, unknown>> = {}, refused?: string) =>
+  (
+    standing: Answer,
+    held: Readonly<Record<string, unknown>> = {},
+    refused: ReadonlyMap<string, Answer> = new Map(),
+  ) =>
   (input: string | URL | Request) => {
     const { pathname } = addressOf(input);
     if (!pathname.startsWith("/trpc/")) return answered(null);
 
     const answerTo = (name: string): Answer => {
       if (name === "session.operator") return standing;
-      return name === refused ? WITHOUT_THE_MARK : { result: { data: held[name] ?? [] } };
+      return refused.get(name) ?? { result: { data: held[name] ?? [] } };
     };
     return answered(pathname.replace("/trpc/", "").split(",").map(answerTo));
   };
@@ -180,7 +200,7 @@ describe("the console's shell", () => {
       "The console is better-answers support’s alone",
     );
     const refused = screen.getByRole("alert").textContent;
-    expect(refused).toBe(`${ONLY_THE_OPERATOR.why} ${ONLY_THE_OPERATOR.next}`);
+    expect(refused).toBe(STOCK.permission);
     expect(refused).not.toContain(NOT_THE_OPERATOR);
     expect(screen.queryByRole("navigation", { name: "Console" })).toBeNull();
   });
@@ -271,10 +291,10 @@ describe("the console's lists", () => {
     search.focus();
     searchFor(list, words.search, "acme");
 
-    vi.stubGlobal("fetch", answering(THE_OPERATOR, {}, read));
+    vi.stubGlobal("fetch", answering(THE_OPERATOR, {}, new Map([[read, WITHOUT_THE_MARK]])));
     readAgainInPlace();
 
-    expect(await within(list).findByText(sentenceOf(ONLY_THE_OPERATOR))).toBeDefined();
+    expect(await within(list).findByText(STOCK.permission)).toBeDefined();
     expect(within(list).queryByRole("table")).toBeNull();
     expect(within(list).getByRole("searchbox", { name: words.search })).toBe(search);
     expect(within(list).getByDisplayValue("acme")).toBe(search);
@@ -349,6 +369,45 @@ describe("the console's lists", () => {
     expect(screen.getByRole("main").textContent.split(EVERYONE_WORDS.description)).toHaveLength(2);
     expect(search.getAttribute("placeholder")).toBe(EVERYONE_WORDS.search);
     expect(within(list).queryByText(EVERYONE_WORDS.search)).toBeNull();
+  });
+});
+
+const PRIYA = {
+  id: "p1",
+  displayName: "Priya Shah",
+  email: "priya@example.test",
+  workspaces: [],
+  lastSignedInAt: null,
+  credentialsRevokedAt: null,
+};
+
+/** Priya's sheet, opened from Everyone, whose read of what she holds the api refuses. */
+const sheetRefusedWith = async (refusal: Answer) => {
+  vi.stubGlobal(
+    "fetch",
+    answering(
+      THE_OPERATOR,
+      { "console.people.list": { people: [PRIYA], total: 1 } },
+      new Map([["console.people.inspect", refusal]]),
+    ),
+  );
+  await openApp("/console/people/everyone");
+  fireEvent.click(await screen.findByRole("button", { name: PRIYA.displayName }));
+  return within(await screen.findByRole("dialog"));
+};
+
+describe("a person's sheet whose read is refused", () => {
+  it("says a person since erased is no longer available", async () => {
+    const sheet = await sheetRefusedWith(SINCE_ERASED);
+
+    expect(await sheet.findByText(STOCK.gone)).toBeDefined();
+    expect(sheet.queryByText(STOCK.permission)).toBeNull();
+  });
+
+  it("says a forbidden read is not the reader's to see", async () => {
+    const sheet = await sheetRefusedWith(WITHOUT_THE_MARK);
+
+    expect(await sheet.findByText(STOCK.permission)).toBeDefined();
   });
 });
 

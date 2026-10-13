@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { createQueryClient, type FailedDuring } from "@/shared/api/query-client.ts";
 import { refusalOf, type Refusal, type RefusalClass, type RefusalWord } from "@/shared/api/trpc.ts";
-import { SAID_OF_CLASS, saidOfRefusal, sentenceOf } from "@/shared/refusal-words.ts";
+import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 
 import { carrying } from "./stubbed-api.ts";
 
@@ -75,12 +75,11 @@ describe("the refusal the api sends the web", () => {
 });
 
 describe("an action refused because the workspace was switched", () => {
-  it("is said in its own words, never its class's", () => {
-    const said = saidOfRefusal({}, "workspace-switched", "conflict");
+  it("shows its own sentence on a feature listing none", () => {
+    const sentence = refusalSentence({}, "workspace-switched", "conflict");
 
-    expect(said).not.toEqual(SAID_OF_CLASS.conflict);
-    expect(sentenceOf(said)).toContain("another browser tab");
-    expect(sentenceOf(said).toLowerCase()).not.toContain("reload");
+    expect(sentence).not.toBe(STOCK.changed);
+    expect(sentence).not.toBe(refusalSentence({}, "changed-meanwhile", "conflict"));
   });
 });
 

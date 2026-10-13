@@ -13,7 +13,6 @@ import { createContext, useContext } from "react";
 import { Address } from "@/shared/address.tsx";
 import { RowLink } from "@/shared/grid-table.tsx";
 import { initialsOf } from "@/shared/initials.ts";
-import type { Said } from "@/shared/refusal-words.ts";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
@@ -52,15 +51,12 @@ type MemberActions = {
  */
 export const MemberActionsContext = createContext<MemberActions | undefined>(undefined);
 
-/** What the last bulk action's refusal said of each person it named. */
-export type RefusedRows = ReadonlyMap<string, Said>;
+/** Each person the last bulk action's refusal named; the outcome's own line says why. */
+export type RefusedRows = ReadonlySet<string>;
 
-export const NO_MARKS: RefusedRows = new Map();
+export const NO_MARKS: RefusedRows = new Set();
 
-function PersonCell(properties: {
-  readonly member: ListedMember;
-  readonly refused: Said | undefined;
-}) {
+function PersonCell(properties: { readonly member: ListedMember; readonly refused: boolean }) {
   const { member, refused } = properties;
   const actions = useContext(MemberActionsContext);
   const { personId, displayName, address } = member;
@@ -88,18 +84,17 @@ function PersonCell(properties: {
         </RowLink>
         {/* Still `anywhere`: a cell is as wide as its longest part, which would scroll the table at 320px. */}
         <Address address={address} className="text-xs text-muted-foreground" />
-        {refused === undefined ? null : (
-          <span className="mt-1 flex flex-wrap items-center gap-1 text-xs">
+        {refused ? (
+          <span className="mt-1 flex text-xs">
             <Pill>Refused</Pill>
-            {refused.why}
           </span>
-        )}
+        ) : null}
       </span>
     </span>
   );
 }
 
-/** The person's own cell says why a bulk action refused them, so the refusals ride in. */
+/** The person's own cell marks a row a bulk action refused, so the refusals ride in. */
 export const memberColumns = (refused: RefusedRows) =>
   column.columns([
     column.accessor((member) => nameOf(member), {
@@ -107,7 +102,7 @@ export const memberColumns = (refused: RefusedRows) =>
       header: "Person",
       sortFn: "text",
       cell: ({ row }) => (
-        <PersonCell member={row.original} refused={refused.get(row.original.personId)} />
+        <PersonCell member={row.original} refused={refused.has(row.original.personId)} />
       ),
     }),
     column.accessor("role", {

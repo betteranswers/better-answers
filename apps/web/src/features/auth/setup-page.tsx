@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { ActionButton } from "./account-sections.tsx";
@@ -25,12 +26,7 @@ import {
   saidOfAcknowledging,
   type CodesInHand,
 } from "./recovery-codes.tsx";
-import {
-  CODES_UNANSWERED,
-  RECOVERY_UNANSWERED,
-  RESTORE_CODE_WRONG,
-  saidOfASecondFactorRefusal,
-} from "./refusal-words.ts";
+import { RESTORE_CODE_WRONG, saidOfASecondFactorRefusal } from "./refusal-words.ts";
 import {
   FIRST_AUTHENTICATOR,
   NEW_AUTHENTICATOR,
@@ -311,7 +307,7 @@ function RestoreCode(properties: { readonly held: SecondFactor; readonly granted
         <OneTimeCodeForm
           label={SETUP_WORDS.restoreField}
           sending={accept}
-          saids={{ wrong: RESTORE_CODE_WRONG, unanswered: RECOVERY_UNANSWERED }}
+          wrong={RESTORE_CODE_WRONG}
           others={[]}
           waitSecondsAtArrival={properties.held.waits["restore-code"]}
           fieldRef={first}
@@ -423,11 +419,14 @@ export function CodesPage() {
   return (
     <AuthPage title={RECOVERY_CODE_WORDS.saveHeading}>
       <Outcome tone="said">{make.isPending ? RECOVERY_CODE_WORDS.making : null}</Outcome>
+      {/* A repeat voids only a set never shown, as a reload would, so it is safe to ask for. */}
       <Refused
         id={refusedId}
         failure={make.error}
         saidOf={saidOfASecondFactorRefusal}
-        unanswered={make.error === null ? CODES_UNANSWERED : codesUnanswered(make.error)}
+        unanswered={
+          make.error === null ? STOCK.tryAgain : codesUnanswered(make.error, STOCK.tryAgain)
+        }
       />
       {make.error === null ? null : (
         <ActionButton

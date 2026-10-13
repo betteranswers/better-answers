@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { detourTo } from "@/features/auth/second-factor-steps.ts";
+import { UNSAVED_AFTER_CONFIRMING } from "@/features/auth/second-factor-words.ts";
 import { HOMES } from "@/shared/navigation.ts";
 
 import { openApp } from "./open-app.tsx";
@@ -181,9 +182,10 @@ describe("a pending refusal heard mid-session", () => {
     expect(router.state.location.href).toBe("/confirm?redirect=%2Fpeople%2Fgroups");
     fireEvent.change(field, { target: { value: "123456" } });
 
-    expect(
-      await screen.findByText("You’ve confirmed. Your last change wasn’t saved. Make it again."),
-    ).toBeDefined();
+    await waitFor(() => {
+      const statuses = screen.getAllByRole("status").map((status) => status.textContent);
+      expect(statuses).toContain(UNSAVED_AFTER_CONFIRMING);
+    });
     expect(router.state.location.pathname).toBe("/people/groups");
   });
 });

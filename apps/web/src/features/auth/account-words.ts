@@ -106,6 +106,7 @@ export const AUTHENTICATOR_WORDS = {
   copyKey: "Copy key",
   keyCopied: "Key copied.",
   codeField: "Code from your authenticator",
+  codeHint: "If the code fails, check your phone sets its time automatically.",
   finish: "Finish setup",
   finishing: "Finishing setup",
   startAgain: "Make a key again",

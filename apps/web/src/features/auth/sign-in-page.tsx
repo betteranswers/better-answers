@@ -5,8 +5,7 @@ import { flushSync } from "react-dom";
 
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import type { Said } from "@/shared/refusal-words.ts";
+import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -28,14 +27,7 @@ import {
   saidOfAPasskeySignIn,
   saidWhileSigningInWithAPasskey,
 } from "./passkey-sign-in.tsx";
-import {
-  CODE_NOT_SENT,
-  CODE_UNANSWERED,
-  codeWrong,
-  SIGN_IN_UNANSWERED,
-  tooManyCodesAskedFor,
-  tooManyCodesTried,
-} from "./refusal-words.ts";
+import { CODE_NOT_SENT, codeWrong } from "./refusal-words.ts";
 import { useStepAfterSignIn } from "./second-factor-steps.ts";
 import { hearASignInElsewhere } from "./session-memory.ts";
 import {
@@ -60,23 +52,18 @@ const REFUSED = "sign-in-refused";
 
 const TOO_MANY_REQUESTS = 429;
 
-/** What each action's failure says: past a ceiling, refused otherwise, or never answered. */
-type SaidOfAnAction = {
-  readonly tooMany: (waitSeconds: number | undefined) => Said;
-  readonly refused: Said;
-  readonly unanswered: Said;
-};
+/** What each action's failure says when refused, and when never answered. */
+type SaidOfAnAction = { readonly refused: string; readonly unanswered: string };
 
 const SAID_OF_SENDING: SaidOfAnAction = {
-  tooMany: tooManyCodesAskedFor,
   refused: CODE_NOT_SENT,
-  unanswered: CODE_UNANSWERED,
+  unanswered: STOCK.tryAgain,
 };
 
+/** The api may have spent the code before its answer was lost, so no one is told to send it again. */
 const saidOfSigningIn = (left: number): SaidOfAnAction => ({
-  tooMany: tooManyCodesTried,
   refused: codeWrong(left),
-  unanswered: SIGN_IN_UNANSWERED,
+  unanswered: STOCK.unconfirmed,
 });
 
 /** One reading of a failed action, which the page's words, tries count and styling all follow. */
@@ -93,9 +80,9 @@ const failedAs = (failure: Error): Failed => {
   return { kind: "refused", spent: codeSpent(failure) };
 };
 
-const saidOf = (action: SaidOfAnAction, failure: Error): Said => {
+const saidOf = (action: SaidOfAnAction, failure: Error): string => {
   const failed = failedAs(failure);
-  if (failed.kind === "too-many") return action.tooMany(failed.waitSeconds);
+  if (failed.kind === "too-many") return stockWait(failed.waitSeconds);
   return failed.kind === "refused" ? action.refused : action.unanswered;
 };
 
@@ -104,7 +91,7 @@ const failureSaid = (
   sendFailure: Error | null,
   signInFailure: Error | null,
   left: number,
-): Said | undefined => {
+): string | undefined => {
   if (signInFailure !== null) return saidOf(saidOfSigningIn(left), signInFailure);
   return sendFailure === null ? undefined : saidOf(SAID_OF_SENDING, sendFailure);
 };
@@ -497,7 +484,7 @@ export function SignInPage() {
       {step.hint}
       {step.form}
       <Outcome tone="refused" id={REFUSED}>
-        {failure === undefined ? null : <RefusalLine said={failure} />}
+        {failure}
       </Outcome>
       {step.actions}
     </AuthPage>

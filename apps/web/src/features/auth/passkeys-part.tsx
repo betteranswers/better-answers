@@ -2,8 +2,7 @@ import { useId, useRef, useState, type FormEvent, type KeyboardEvent } from "rea
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import { SAID_OF_CLASS, saidOfRefusal, type Said } from "@/shared/refusal-words.ts";
+import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/shared/ui/item.tsx";
@@ -26,16 +25,13 @@ import {
   type PasskeyAdded,
 } from "./passkey-hooks.ts";
 import {
-  PASSKEY_ADD_UNANSWERED,
   PASSKEY_ASK_EXPIRED,
   PASSKEY_HELD,
-  PASSKEY_NOT_ADDED,
   PASSKEY_NOT_VERIFIED,
-  RENAME_UNANSWERED,
   RESTORE_CODE_NEEDED,
   SAID_OF_SECOND_FACTOR,
+  saidOfASecondFactorRefusal,
   SETUP_NOT_GRANTED,
-  tooManyPasskeysAdded,
 } from "./refusal-words.ts";
 import type { SecondFactor } from "./second-factor-hooks.ts";
 
@@ -54,30 +50,29 @@ const SAID_OF_THE_DEVICE = {
   cancelled: undefined,
   held: PASSKEY_HELD,
   unverified: PASSKEY_NOT_VERIFIED,
-  failed: PASSKEY_NOT_ADDED,
-} satisfies Record<DeviceRefused["reason"], Said | undefined>;
+  failed: STOCK.general,
+} satisfies Record<DeviceRefused["reason"], string | undefined>;
 
-const SAID_OF_THE_ROUTE: ReadonlyMap<string, Said> = new Map([
+const SAID_OF_THE_ROUTE: ReadonlyMap<string, string> = new Map([
   ["not-verified", PASSKEY_NOT_VERIFIED],
   ["challenge-gone", PASSKEY_ASK_EXPIRED],
-  ["passkey-refused", PASSKEY_NOT_ADDED],
   ["passkey-name-empty", SAID_OF_SECOND_FACTOR["passkey-name-empty"]],
   ["passkey-name-too-long", SAID_OF_SECOND_FACTOR["passkey-name-too-long"]],
   ["setup-not-granted", SETUP_NOT_GRANTED],
   ["restore-code-needed", RESTORE_CODE_NEEDED],
 ]);
 
-const saidOfTheRoute = (refused: CodeRefused): Said => {
-  if (refused.status === SIGNED_OUT) return SAID_OF_CLASS.unauthenticated;
-  if (refused.status === TOO_MANY_REQUESTS) return tooManyPasskeysAdded(refused.waitSeconds);
-  return SAID_OF_THE_ROUTE.get(refused.word ?? "") ?? PASSKEY_NOT_ADDED;
+const saidOfTheRoute = (refused: CodeRefused): string => {
+  if (refused.status === SIGNED_OUT) return STOCK.session;
+  if (refused.status === TOO_MANY_REQUESTS) return stockWait(refused.waitSeconds);
+  return SAID_OF_THE_ROUTE.get(refused.word ?? "") ?? STOCK.general;
 };
 
-/** A cancelled prompt is no refusal: the status line says nothing was added. */
-const saidOfAdding = (failure: Error | null): Said | undefined => {
+/** A cancelled prompt is no refusal. With no response the api may have kept the passkey. */
+const saidOfAdding = (failure: Error | null): string | undefined => {
   if (failure === null) return undefined;
   if (failure instanceof DeviceRefused) return SAID_OF_THE_DEVICE[failure.reason];
-  return failure instanceof CodeRefused ? saidOfTheRoute(failure) : PASSKEY_ADD_UNANSWERED;
+  return failure instanceof CodeRefused ? saidOfTheRoute(failure) : STOCK.unconfirmed;
 };
 
 const saidWhileAdding = (pending: boolean, failure: Error | null): string | null => {
@@ -146,18 +141,16 @@ export function AddAPasskey(properties: {
       </Button>
       <Outcome tone="said">{saidWhileAdding(pending, adding.error)}</Outcome>
       <Outcome tone="refused" id={refusedId}>
-        {said === undefined ? null : <RefusalLine said={said} />}
+        {said}
       </Outcome>
     </form>
   );
 }
 
-const saidOfRenaming = (failure: Error | ApiError | null): Said | undefined => {
+const saidOfRenaming = (failure: Error | ApiError | null): string | undefined => {
   if (failure === null) return undefined;
   const refusal = refusalOf(failure);
-  return refusal === undefined
-    ? RENAME_UNANSWERED
-    : saidOfRefusal(SAID_OF_SECOND_FACTOR, refusal.word, refusal.class);
+  return refusal === undefined ? STOCK.tryAgain : saidOfASecondFactorRefusal(refusal);
 };
 
 /** Enter saves and Escape puts the name back; either way focus returns to Rename. */
@@ -230,7 +223,7 @@ function RenameAPasskey(properties: {
       </Button>
       <div className="basis-full">
         <Outcome tone="refused" id={refusedId}>
-          {said === undefined ? null : <RefusalLine said={said} />}
+          {said}
         </Outcome>
       </div>
     </form>

@@ -41,7 +41,6 @@ const tickedMembers = (count: number, readable: boolean) =>
       nameOf: (personId) => personId,
       heading,
       say,
-      mark: NOTHING,
     });
     return (
       <>

@@ -6,7 +6,7 @@ import { refusalOf, type ApiProxy } from "@/shared/api/trpc.ts";
 import { WORKSPACE_SWITCHED } from "@/shared/member.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
-import { saidOfRefusal } from "@/shared/refusal-words.ts";
+import { refusalSentence } from "@/shared/refusal-words.ts";
 
 import { followTheSession } from "./auth-hooks.ts";
 
@@ -18,7 +18,7 @@ const landed = z.object({ switchedElsewhere: z.literal(true) });
 /** Nothing the left page carried goes on: its entry's state was said of the workspace left. */
 const HOME = { href: "/", replace: true, state: () => LANDED } as const;
 
-const SAID = refusedWith(saidOfRefusal({}, WORKSPACE_SWITCHED, "conflict"));
+const SAID = refusedWith(refusalSentence({}, WORKSPACE_SWITCHED, "conflict"));
 
 /**
  * Told by the word alone, never the address: a refusal that lands after the person left the page

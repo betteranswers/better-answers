@@ -6,12 +6,13 @@ import {
   useWorkspacesHeld,
   type SwitchedTo,
 } from "@/features/auth/auth-hooks.ts";
-import { noLongerAMemberOf, PICK_REFUSED, SWITCHER_UNREAD } from "@/features/auth/refusal-words.ts";
+import { noLongerAMemberOf } from "@/features/auth/refusal-words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { CONSOLE } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import {
   DropdownMenu,
@@ -47,14 +48,14 @@ const switchOutcome = (switching: Switching): Outcome | undefined => {
   if (switching.isPending) return { tone: "said", words: PICKER_WORDS.opening };
   const to = switching.variables;
   if (switching.error === null || to === undefined) return undefined;
-  return refusedWith(switching.error.noLongerAMember ? noLongerAMemberOf(to.name) : PICK_REFUSED);
+  return refusedWith(switching.error.noLongerAMember ? noLongerAMemberOf(to.name) : STOCK.general);
 };
 
 /** A list already held stands through a failed read of it again, so only a first read speaks. */
 const listOutcome = (list: ListRead): Outcome | undefined => {
   if (list.data !== undefined) return undefined;
   if (list.isFetching) return { tone: "said", words: PICKER_WORDS.reading };
-  return list.isError ? refusedWith(SWITCHER_UNREAD) : undefined;
+  return list.isError ? refusedWith(STOCK.notLoaded) : undefined;
 };
 
 /**

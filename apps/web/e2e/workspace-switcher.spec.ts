@@ -1,6 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { ALL_WORKSPACES, FAILED_PAGE, JUMP_TO, ROLE_UNREAD } from "@/app/words.ts";
+import { ALL_WORKSPACES, FAILED_PAGE, JUMP_TO } from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { CONSOLE, CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
 
@@ -469,7 +469,7 @@ test("drops the left workspace's name when the member read fails", async ({ page
   await expect(page.getByRole("heading", { level: 1, name: FAILED_PAGE.heading })).toBeVisible({
     timeout: 15_000,
   });
-  await expect(page.getByRole("main").getByRole("alert")).toContainText(ROLE_UNREAD);
+  await saysARefusal(page.getByRole("main").getByRole("alert"));
 
   await page.unroute(MEMBER_READ);
   await page.getByRole("button", { name: FAILED_PAGE.retry }).click();

@@ -1,4 +1,4 @@
-import type { SaidOfWord } from "@/shared/refusal-words.ts";
+import type { OwnSentences } from "@/shared/refusal-words.ts";
 
 /**
  * The api's rule holds the limit; this is the number a page tells the reader before they type.
@@ -14,24 +14,9 @@ export const DISPLAY_NAME_WORDS = {
 
 /** The rule's own refusals, said the same wherever a display name is typed. */
 export const DISPLAY_NAME_REFUSED = {
-  "display-name-empty": {
-    why: "A display name needs a character other than a space.",
-    next: "Type the name you want others to see.",
-  },
-  "display-name-not-one-line": {
-    why: "A display name is one line.",
-    next: "Remove the line break and save again.",
-  },
-  "display-name-control-character": {
-    why: "A display name cannot hold a special character, such as a tab.",
-    next: "Type it again rather than pasting it.",
-  },
-  "display-name-angle-bracket": {
-    why: "A display name cannot hold < or >.",
-    next: "Remove them and save again.",
-  },
-  "display-name-too-long": {
-    why: `A display name is at most ${DISPLAY_NAME_MAX_CHARACTERS} characters.`,
-    next: "Shorten it and save again.",
-  },
-} satisfies SaidOfWord;
+  "display-name-empty": "Please enter a display name.",
+  "display-name-not-one-line": "Display name must be on one line.",
+  "display-name-control-character": "Display name can't contain special characters such as tabs.",
+  "display-name-angle-bracket": "Display name can't contain < or >.",
+  "display-name-too-long": `Display name must be ${DISPLAY_NAME_MAX_CHARACTERS} characters or fewer.`,
+} satisfies OwnSentences;

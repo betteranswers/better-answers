@@ -3,14 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { FAILED_PAGE, RAIL } from "@/app/words.ts";
 import { INVITATIONS_WORDS } from "@/features/people/invitation-words.ts";
-import {
-  BULK_WORDS,
-  MEMBER_PAGE_WORDS,
-  MEMBERS_LOADING,
-} from "@/features/people/member-action-words.ts";
+import { MEMBER_PAGE_WORDS, MEMBERS_LOADING } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
 import { HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
-import { saidOfRefusal, sentenceOf } from "@/shared/refusal-words.ts";
+import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
 import {
@@ -19,6 +15,7 @@ import {
   aRefusalAnswer,
   aSwitchInAnotherTab,
   band,
+  changeTheTickedToViewer,
   drawnWithNoWorkspace,
   GRACE,
   HEDY,
@@ -41,7 +38,7 @@ placedWithoutMeasuring();
 /** What the api answers an action from a tab whose workspace the session has left. */
 const SWITCHED = aRefusalAnswer("workspace-switched", "conflict", 409);
 
-const SAID = sentenceOf(saidOfRefusal({}, "workspace-switched", "conflict"));
+const SAID = refusalSentence({}, "workspace-switched", "conflict");
 
 const MEMBERS = HOMES.Admin.path;
 
@@ -215,11 +212,7 @@ describe("a tab whose workspace the session has left", () => {
 
     changeGracesRole();
 
-    expect(
-      await screen.findByText("Another change to these members was made at the same moment.", {
-        exact: false,
-      }),
-    ).toBeDefined();
+    expect(await screen.findByText(STOCK.changed)).toBeDefined();
     expect(router.state.location.pathname).toBe(GRACES_PAGE);
     expect(await switcher()).toBeDefined();
     expect(band().getByRole("alert").textContent).toBe("");
@@ -232,10 +225,7 @@ describe("a tab whose workspace the session has left", () => {
     fireEvent.click(await screen.findByRole("checkbox", { name: `Select ${GRACE.displayName}` }));
     aSwitchInAnotherTab(api, "Admin", [ADA, GRACE, HEDY]);
 
-    fireEvent.click(screen.getByRole("button", { name: BULK_WORDS.changeRole.action }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: BULK_WORDS.changeRole.commit(1, "Viewer") }),
-    );
+    await changeTheTickedToViewer();
 
     await landedInHolme();
     await waitFor(() => expect(tickOf(HEDY.displayName)).not.toBeNull());

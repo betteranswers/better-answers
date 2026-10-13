@@ -1,16 +1,17 @@
 import { useId, useState } from "react";
 
-import { ADDRESS_NOT_COPIED, CONNECT_ASSISTANT } from "@/app/words.ts";
+import { CONNECT_ASSISTANT } from "@/app/words.ts";
 import { copiedToTheClipboard } from "@/features/auth/clipboard.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 /** The api serves this page only on its public origin, which is the resource's origin too. */
 const ADDRESS = `${window.location.origin}/mcp`;
 
 const copyOutcome = (copied: boolean): Outcome =>
-  copied ? { tone: "said", words: CONNECT_ASSISTANT.copied } : refusedWith(ADDRESS_NOT_COPIED);
+  copied ? { tone: "said", words: CONNECT_ASSISTANT.copied } : refusedWith(STOCK.copy);
 
 export function ConnectAssistant() {
   const addressId = useId();

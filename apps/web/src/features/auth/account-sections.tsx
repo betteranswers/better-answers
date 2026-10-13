@@ -3,7 +3,6 @@ import { useId, useRef, useState, type Ref } from "react";
 import { ActionDialog } from "@/shared/action-dialog.tsx";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { cn } from "@/shared/lib/utils.ts";
-import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
@@ -182,7 +181,7 @@ export function RemoveKeepingTheLast(properties: {
       />
       {properties.last ? (
         <p id={reasonId} className={cn("text-muted-foreground", properties.reasonClassName)}>
-          {sentenceOf(SAID_OF_SECOND_FACTOR["last-second-factor"])}
+          {SAID_OF_SECOND_FACTOR["last-second-factor"]}
         </p>
       ) : null}
       <ActionDialog
@@ -354,7 +353,7 @@ export function RecoveryCodesSection(properties: {
   readonly address: string;
   readonly making: boolean;
   readonly acknowledging: boolean;
-  readonly acknowledgeFailure: Said | undefined;
+  readonly acknowledgeFailure: string | undefined;
   readonly landsAt: LandsAt;
   readonly onMake: (replacing: boolean) => void;
   readonly onDone: (madeAt: string) => void;

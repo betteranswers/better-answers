@@ -3,7 +3,6 @@ import { useMemo, useRef, useState, type ReactNode, type RefObject } from "react
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { ListState } from "@/shared/list-pages.tsx";
 import { useReadSaid } from "@/shared/read-said.ts";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { readRefused } from "./words.ts";
@@ -16,11 +15,7 @@ export function ReadSaid(properties: { readonly read: Read; readonly loading: st
   return (
     <div aria-live="polite" className="text-muted-foreground">
       {said.isPending ? <p className="mt-2">{properties.loading}</p> : null}
-      {said.error === null ? null : (
-        <p className="mt-2">
-          <RefusalLine said={readRefused(said.error)} />
-        </p>
-      )}
+      {said.error === null ? null : <p className="mt-2">{readRefused(said.error)}</p>}
     </div>
   );
 }

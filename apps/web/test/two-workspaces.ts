@@ -3,6 +3,7 @@ import { expect } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { FAILED_PAGE, RAIL } from "@/app/words.ts";
+import { BULK_WORDS } from "@/features/people/member-action-words.ts";
 import { CONTROL_CENTRE, type Role } from "@/shared/navigation.ts";
 
 import { openApp } from "./open-app.tsx";
@@ -130,6 +131,14 @@ export const switcherDrawn = (workspace = NORTHERN) =>
   band().queryByRole("button", { name: workspace.name });
 
 export const tickOf = (name: string) => screen.queryByRole("checkbox", { name: `Select ${name}` });
+
+/** The one ticked member's role, sent to change to Viewer through the bar's dialog. */
+export const changeTheTickedToViewer = async () => {
+  fireEvent.click(screen.getByRole("button", { name: BULK_WORDS.changeRole.action }));
+  fireEvent.click(
+    await screen.findByRole("button", { name: BULK_WORDS.changeRole.commit(1, "Viewer") }),
+  );
+};
 
 export const openTab = (name: string) => {
   const tab = screen.getByRole("tab", { name });

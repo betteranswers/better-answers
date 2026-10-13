@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
+import { STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
@@ -23,7 +24,6 @@ import { carriedFlow, leavingFor, pageQuery } from "./carried-flow.ts";
 import {
   CONNECTION_UNFINISHED,
   noLongerAMember,
-  PICK_REFUSED,
   SOLE_PICK_REFUSED,
   WORKSPACES_UNREAD,
 } from "./refusal-words.ts";
@@ -237,7 +237,7 @@ const pickOutcome = (standing: Standing): Outcome | undefined => {
   if (standing.removedFrom !== undefined) {
     return { tone: "refused", words: noLongerAMember(standing.removedFrom.name) };
   }
-  if (standing.refused) return refusedWith(standing.listed ? PICK_REFUSED : SOLE_PICK_REFUSED);
+  if (standing.refused) return refusedWith(standing.listed ? STOCK.general : SOLE_PICK_REFUSED);
   return standing.listed ? undefined : { tone: "said", words: PICKER_WORDS.opening };
 };
 

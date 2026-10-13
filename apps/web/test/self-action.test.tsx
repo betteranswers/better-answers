@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
 import { useChangeRole, useReaderId } from "@/features/people/people-api.ts";
-import { HomeLine, useIncludesYou, useSelfActionHome } from "@/features/people/self-action.tsx";
+import {
+  HomeLine,
+  ROLE_UNREAD,
+  useIncludesYou,
+  useSelfActionHome,
+} from "@/features/people/self-action.tsx";
 import { createApiProxy } from "@/shared/api/trpc.ts";
 import { useMember } from "@/shared/member.ts";
 import { HOMES } from "@/shared/navigation.ts";
@@ -190,11 +195,8 @@ describe("going home after an action on yourself", () => {
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
     fireEvent.click(screen.getByRole("button", { name: "Demoted myself" }));
 
-    await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toBe(
-        "Your role changed, but it couldn’t be read again. Reload the page in a moment.",
-      ),
-    );
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe(ROLE_UNREAD.words));
+    expect(screen.getByRole("status").textContent).toBe("");
     expect(router.state.location.pathname).toBe(MEMBERS);
     expect(
       screen.getByText("Held: Admin"),

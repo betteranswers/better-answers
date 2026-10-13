@@ -1,12 +1,11 @@
 import { useDeferredValue, useEffect, useState } from "react";
 
 import type { Outcome } from "@/shared/outcome.tsx";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { UNSAVED_AFTER_CONFIRMING } from "./second-factor-words.ts";
 import { forgetTheUnsavedChange, unsavedChangeRefusedOn } from "./session-memory.ts";
 
-const SAID: Outcome = { tone: "said", words: sentenceOf(UNSAVED_AFTER_CONFIRMING) };
+const SAID: Outcome = { tone: "said", words: UNSAVED_AFTER_CONFIRMING };
 
 /**
  * Said a render after the frame mounts, so the band's standing region announces it, and only on

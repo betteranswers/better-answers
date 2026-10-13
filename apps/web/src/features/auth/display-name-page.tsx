@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 
 import { refusalOf, type Refusal } from "@/shared/api/trpc.ts";
 import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
-import { saidOfRefusal, type Said } from "@/shared/refusal-words.ts";
+import { refusalSentence } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -16,8 +16,8 @@ const HINT = "display-name-hint";
 
 const REFUSED = "display-name-refused";
 
-const saidOf = (refusal: Refusal): Said =>
-  saidOfRefusal(DISPLAY_NAME_REFUSED, refusal.word, refusal.class);
+const saidOf = (refusal: Refusal): string =>
+  refusalSentence(DISPLAY_NAME_REFUSED, refusal.word, refusal.class);
 
 export function DisplayNamePage() {
   const navigate = useNavigate();

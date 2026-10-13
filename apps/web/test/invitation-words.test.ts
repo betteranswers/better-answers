@@ -9,7 +9,9 @@ import {
   invitedOutcome,
 } from "@/features/people/invitation-words.ts";
 import type { InvitedOne } from "@/features/people/invitations-api.ts";
-import { invitationsCeiling } from "@/features/people/refusal-words.ts";
+import { outcomeOfSendingFailure } from "@/features/people/refusal.tsx";
+
+import { carrying } from "./stubbed-api.ts";
 
 const AN_EXPIRY = "2026-10-09T12:00:00.000Z";
 
@@ -102,10 +104,9 @@ describe("the dialog's words", () => {
   });
 
   it("names the wait a ceiling carried, rounded up", () => {
-    expect(invitationsCeiling(61).next).toBe("Try again in 2 minutes.");
-  });
+    const outcome = outcomeOfSendingFailure(carrying({ retryAfterSeconds: 61 }));
 
-  it("names the workspace and an address as either ceiling", () => {
-    expect(invitationsCeiling(61).why).toMatch(/^This workspace, or an address here, has had/);
+    expect(outcome.tone).toBe("refused");
+    expect(outcome.words).toMatch(/\b2\b/);
   });
 });

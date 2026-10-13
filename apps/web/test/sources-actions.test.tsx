@@ -20,7 +20,7 @@ import {
   THE_CHANGE_BEFORE_IS_STILL_GOING,
 } from "@/features/sources/words.ts";
 import { ViewStateSlot } from "@/shared/page-toolbar.tsx";
-import { sentenceOf } from "@/shared/refusal-words.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 
 import { addressOf, answered } from "./stubbed-api.ts";
 
@@ -66,9 +66,7 @@ const A_PASSPORT: GroupOfFindings = {
   ruleId: "UK_PASSPORT",
 };
 
-const { why, next } = SAID_OF_A_CONNECTED_SOURCE["not-special-category"];
-
-const NOT_SPECIAL_CATEGORY = `${why} ${next}`;
+const NOT_SPECIAL_CATEGORY = SAID_OF_A_CONNECTED_SOURCE["not-special-category"];
 
 /** The review's half of the slot, standing in for the findings table a click writes through. */
 function TicksIn(properties: { readonly connectedSourceId: string }) {
@@ -258,28 +256,50 @@ const KEEP_REFUSED = {
   },
 };
 
-const HELD: ReadonlySet<string> = new Set(["sources.widen", "sources.keepInText"]);
+/** The api's refusal for the reader's role, in a word this feature lists no sentence for. */
+const ROLE_FORBIDS = {
+  error: {
+    message: "refused",
+    code: -32_003,
+    data: {
+      code: "FORBIDDEN",
+      httpStatus: 403,
+      refusal: { word: "role-forbids", class: "forbidden" },
+    },
+  },
+};
+
+const HELD: ReadonlySet<string> = new Set([
+  "sources.widen",
+  "sources.publish",
+  "sources.keepInText",
+]);
+
+type SourcesApi = {
+  /** Read as each held call arrives, so a test may hold a later call and not an earlier one. */
+  held?: Promise<void>;
+  readonly findings?: readonly GroupOfFindings[];
+
+  /** The actions the api refuses for the reader's role. */
+  readonly forbidden?: readonly string[];
+};
 
 /** Reads are answered at once; a widening is taken and a keep refused once `held` lets them. */
-const atSources = (
-  api: { readonly held?: Promise<void>; readonly findings?: readonly GroupOfFindings[] } = {},
-) => {
+const atSources = (api: SourcesApi = {}) => {
   const asked: string[] = [];
   const answers: Readonly<Record<string, unknown>> = {
     ...ANSWERS,
     "sources.findings": api.findings ?? [],
   };
+  const refusals = new Map<string, unknown>([["sources.keepInText", KEEP_REFUSED]]);
+  for (const action of api.forbidden ?? []) refusals.set(action, ROLE_FORBIDS);
   vi.stubGlobal("fetch", async (input: string | URL | Request) => {
     const { pathname } = addressOf(input);
     if (!pathname.startsWith("/trpc/")) return answered({});
     const names = pathname.replace("/trpc/", "").split(",");
     asked.push(...names);
     if (names.some((name) => HELD.has(name))) await api.held;
-    return answered(
-      names.map((name) =>
-        name === "sources.keepInText" ? KEEP_REFUSED : { result: { data: answers[name] } },
-      ),
-    );
+    return answered(names.map((name) => refusals.get(name) ?? { result: { data: answers[name] } }));
   });
   render(
     <Providers clients={createAppClients()}>
@@ -350,9 +370,7 @@ const HELD_AS_IT_WAS = { handbook: true, priceBook: false, saidWhy: true };
 /** The review that sent the keep is still drawn, so the refusal reaches it and its group. */
 const theKeepIsRefusedInItsReview = async (held: Awaited<ReturnType<typeof aKeepHeldPending>>) => {
   held.answer.resolve();
-  expect(
-    await held.row.findByText(sentenceOf(SAID_OF_A_CONNECTED_SOURCE["not-the-always-set"])),
-  ).toBeDefined();
+  expect(await held.row.findByText(SAID_OF_A_CONNECTED_SOURCE["not-the-always-set"])).toBeDefined();
   expect(held.row.getByRole("checkbox", TICKING).getAttribute("aria-checked")).toBe("true");
   await waitFor(() => {
     expect(held.review.hasAttribute("aria-disabled")).toBe(false);
@@ -573,6 +591,50 @@ describe("widening a connected source in its row", () => {
       await screen.findByText(new RegExp(sensitivityAndAudienceWords(WIDENED), "v")),
     ).toBeDefined();
   });
+});
+
+const widenTheHandbook = async () => {
+  const row = await rowOf("Staff handbook");
+  widenOpened(row);
+  fireEvent.click(commitTo(row, WIDENED));
+};
+
+/** The price book's publish, opened from its row, every confirmation ticked, then sent. */
+const publishThePriceBook = async () => {
+  const row = await rowOf("Price book");
+  fireEvent.click(rowAction(row, ROW_ACTIONS.publish, "Price book"));
+  const dialog = within(await screen.findByRole("dialog"));
+  for (const confirmation of dialog.getAllByRole("checkbox")) fireEvent.click(confirmation);
+  fireEvent.click(dialog.getByRole("button", { name: "Publish Price book" }));
+};
+
+const SENT_FROM_A_ROW = [
+  { action: "widening", procedure: "sources.widen", send: widenTheHandbook },
+  { action: "publish", procedure: "sources.publish", send: publishThePriceBook },
+];
+
+/** The same sentence said twice is announced once, so the alert stands empty between them. */
+describe("a connected source's action refused twice", () => {
+  it.each(SENT_FROM_A_ROW)(
+    "empties the alert when a refused $action is sent again",
+    async ({ procedure, send }) => {
+      const api: SourcesApi = { forbidden: [procedure] };
+      atSources(api);
+      await send();
+      const alert = await screen.findByText(STOCK.permission);
+      expect(alert.getAttribute("role")).toBe("alert");
+
+      const second = Promise.withResolvers<void>();
+      api.held = second.promise;
+      await send();
+
+      expect(alert.textContent).toBe("");
+      second.resolve();
+      await waitFor(() => {
+        expect(alert.textContent).toBe(STOCK.permission);
+      });
+    },
+  );
 });
 
 describe("narrowing a connected source in its row", () => {

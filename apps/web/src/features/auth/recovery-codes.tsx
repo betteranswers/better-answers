@@ -2,8 +2,7 @@ import { useId, useState, type Ref } from "react";
 
 import { ceilingLiftsIn, refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import { NO_RESPONSE, type Said } from "@/shared/refusal-words.ts";
+import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -16,13 +15,7 @@ import {
 } from "./account-words.ts";
 import { focusOn, Outcome } from "./auth-page.tsx";
 import { copiedToTheClipboard } from "./clipboard.ts";
-import {
-  CODES_NOT_COPIED,
-  CODES_NOT_TICKED,
-  CODES_UNANSWERED,
-  codesMadeTooOften,
-  saidOfASecondFactorRefusal,
-} from "./refusal-words.ts";
+import { CODES_NOT_TICKED, saidOfASecondFactorRefusal } from "./refusal-words.ts";
 
 const COPY_CODES: Keystroke = { key: "c", action: ACCOUNT_ACTIONS.copyCodes };
 
@@ -86,16 +79,16 @@ function CodesActions(properties: {
   );
 }
 
-/** A ceiling carries no word, only the wait until it lifts. */
-export const codesUnanswered = (failure: Error | ApiError): Said => {
+/** A ceiling carries no word, only its wait. What no response means is the page's to say. */
+export const codesUnanswered = (failure: Error | ApiError, unanswered: string): string => {
   const liftsIn = ceilingLiftsIn(failure);
-  return liftsIn === undefined ? CODES_UNANSWERED : codesMadeTooOften(liftsIn);
+  return liftsIn === undefined ? unanswered : stockWait(liftsIn);
 };
 
-export const saidOfAcknowledging = (failure: Error | ApiError | null): Said | undefined => {
+export const saidOfAcknowledging = (failure: Error | ApiError | null): string | undefined => {
   if (failure === null) return undefined;
   const refusal = refusalOf(failure);
-  return refusal === undefined ? NO_RESPONSE : saidOfASecondFactorRefusal(refusal);
+  return refusal === undefined ? STOCK.tryAgain : saidOfASecondFactorRefusal(refusal);
 };
 
 /** On a root page the codes are the page, so their heading is its `h1`. */
@@ -129,7 +122,7 @@ function CodesHeading(properties: {
 function DoneButton(properties: {
   readonly label: string | undefined;
   readonly unavailable: boolean;
-  readonly refused: Said | undefined;
+  readonly refused: string | undefined;
   readonly refusedId: string;
   readonly onDone: () => void;
 }) {
@@ -146,7 +139,7 @@ function DoneButton(properties: {
         {label ?? RECOVERY_CODE_WORDS.done}
       </Button>
       <Outcome tone="refused" id={refusedId}>
-        {refused === undefined ? null : <RefusalLine said={refused} />}
+        {refused}
       </Outcome>
     </>
   );
@@ -160,7 +153,7 @@ export function RecoveryCodes(properties: {
   readonly inHand: CodesInHand;
   readonly address: string;
   readonly acknowledging: boolean;
-  readonly failure: Said | undefined;
+  readonly failure: string | undefined;
   readonly headingRef?: Ref<HTMLHeadingElement>;
   readonly headingLevel?: HeadingLevel;
   readonly doneLabel?: string;
@@ -177,7 +170,7 @@ export function RecoveryCodes(properties: {
   const [notTicked, setNotTicked] = useState(false);
 
   const refused = notTicked ? CODES_NOT_TICKED : failure;
-  const shown = copied === false ? CODES_NOT_COPIED : refused;
+  const shown = copied === false ? STOCK.copy : refused;
 
   const done = () => {
     setCopied(undefined);

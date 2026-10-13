@@ -8,21 +8,15 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Refused } from "@/features/auth/auth-page.tsx";
-import { SAID_OF_A_REVOCATION, SAID_OF_CORRECTING } from "@/features/console/refusal-words.ts";
-import type { Refusal } from "@/shared/api/trpc.ts";
-import {
-  SAID_OF_CLASS,
-  saidOfRefusal,
-  sentenceOf,
-  SIGN_IN_AGAIN,
-  type Said,
-} from "@/shared/refusal-words.ts";
+import { STOCK } from "@/shared/refusal-words.ts";
 
 import { carrying } from "./stubbed-api.ts";
 
 afterEach(cleanup);
 
-const saidOf = (refusal: Refusal): Said => saidOfRefusal({}, refusal.word, refusal.class);
+const THE_PAGES_OWN = "What this page alone says of a refusal.";
+
+const saidOf = (): string => THE_PAGES_OWN;
 
 /** The auth pages' refusal alone on a page, as a page renders it under its form. */
 const refusedOn = async (failure: Error) => {
@@ -38,34 +32,29 @@ const refusedOn = async (failure: Error) => {
   return screen.getByRole("alert");
 };
 
+const signInAgain = () => screen.queryByRole("button", { name: "Sign in again" });
+
 describe("a refusal beside a way to sign in again", () => {
-  it("says the session ended, leaving sign-in to the button", async () => {
+  it("shows the session sentence above the sign-in button", async () => {
     const alert = await refusedOn(
       carrying({ refusal: { word: "no-session", class: "unauthenticated" } }),
     );
 
-    expect(alert.textContent).toBe(SAID_OF_CLASS.unauthenticated.why);
-    expect(alert.textContent).not.toContain(SIGN_IN_AGAIN);
-    expect(screen.getByRole("button", { name: SIGN_IN_AGAIN })).toBeDefined();
+    expect(alert.textContent).toBe(STOCK.session);
+    expect(signInAgain()).not.toBeNull();
   });
 
-  it("still says what to do where no button follows", async () => {
+  it("shows the page's sentence, and no button, for another refusal", async () => {
     const alert = await refusedOn(carrying({ refusal: { word: "a-new-word", class: "conflict" } }));
 
-    expect(alert.textContent).toBe(sentenceOf(SAID_OF_CLASS.conflict));
-    expect(screen.queryByRole("button", { name: SIGN_IN_AGAIN })).toBeNull();
+    expect(alert.textContent).toBe(THE_PAGES_OWN);
+    expect(signInAgain()).toBeNull();
   });
 
-  it.each([
-    ["revoking", SAID_OF_A_REVOCATION["sign-in-too-old"]],
-    ["correcting", SAID_OF_CORRECTING["sign-in-too-old"]],
-  ])("leaves the link's label out of stale words: %s", (_, said) => {
-    expect(sentenceOf(said).toLowerCase()).not.toContain(SIGN_IN_AGAIN.toLowerCase());
-  });
-});
+  it("tells an action with no response to try again", async () => {
+    const alert = await refusedOn(new Error("the network went away"));
 
-describe("the ended session with nothing after it", () => {
-  it("still ends with the instruction to sign in again", () => {
-    expect(sentenceOf(SAID_OF_CLASS.unauthenticated).endsWith(`${SIGN_IN_AGAIN}.`)).toBe(true);
+    expect(alert.textContent).toBe(STOCK.tryAgain);
+    expect(signInAgain()).toBeNull();
   });
 });

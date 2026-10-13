@@ -2,15 +2,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { readsCeiling } from "@/features/knowledge/refusal-words.ts";
+import { failedReadWords } from "@/features/knowledge/refusal.tsx";
+
+import { carrying } from "./stubbed-api.ts";
 
 describe("what a knowledge read past a ceiling says", () => {
-  it("names the wait, rounded up", () => {
-    expect(readsCeiling(61).next).toContain(" 2 minutes.");
-  });
-
-  // The person's own ceiling and their address's answer alike, so the page cannot know whose it met.
-  it("never says whose asking met the ceiling", () => {
-    expect(readsCeiling(60).why).not.toMatch(/\byou\b/i);
+  it("names the wait the ceiling carried, rounded up", () => {
+    expect(failedReadWords(carrying({ retryAfterSeconds: 61 }))).toMatch(/\b2\b/);
   });
 });

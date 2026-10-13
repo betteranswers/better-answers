@@ -3,14 +3,13 @@ import { useId } from "react";
 
 import { refusalOf, useTRPC, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
 import { KeystrokesAction, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
+import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { AccountLink } from "./account-link.tsx";
 import { ASK_TO_JOIN, AskToJoin } from "./ask-to-join.tsx";
 import { AuthPage, ReadAgain, Refused } from "./auth-page.tsx";
 import { carriedFlow, invitationAt, pageQuery } from "./carried-flow.ts";
-import { INVITATIONS_UNANSWERED } from "./refusal-words.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
 import {
   NO_WORKSPACE_ACTIONS,
@@ -37,7 +36,7 @@ type InvitationsRead = ReturnType<typeof useOpenInvitations>;
 
 type OpenInvitation = NonNullable<InvitationsRead["data"]>[number];
 
-const saidOf = (refusal: Refusal): Said => SAID_OF_CLASS[refusal.class];
+const saidOf = (refusal: Refusal): string => refusalSentence({}, refusal.word, refusal.class);
 
 /** A list already read stands through a refetch that fails, so only a first read's failure is said. */
 const failureOf = (read: InvitationsRead): Error | ApiError | null =>
@@ -116,7 +115,7 @@ function Invitations(properties: { readonly read: InvitationsRead; readonly carr
         id={INVITATIONS_REFUSED}
         failure={failureOf(read)}
         saidOf={saidOf}
-        unanswered={INVITATIONS_UNANSWERED}
+        unanswered={STOCK.notLoaded}
       />
       {unanswered(read) ? (
         <ReadAgain

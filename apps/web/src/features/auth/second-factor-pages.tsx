@@ -1,8 +1,7 @@
 import { useId, useState } from "react";
 
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import { SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
+import { STOCK, stockWait } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Card } from "@/shared/ui/card.tsx";
 
@@ -18,15 +17,12 @@ import {
 import { DeviceRefused, isCancelled, passkeysHere, type DeviceRefusal } from "./passkey-hooks.ts";
 import {
   AUTHENTICATOR_CODE_WRONG,
-  CONFIRM_UNANSWERED,
   NO_PASSKEY_TO_CONFIRM,
-  PASSKEY_CONFIRM_EXPIRED,
+  PASSKEY_ASK_EXPIRED,
   PASSKEY_CONFIRM_NOT_VERIFIED,
   PASSKEY_CONFIRM_REFUSED,
   PASSKEY_NOT_YOURS,
-  RECOVERY_UNANSWERED,
   SAID_OF_SECOND_FACTOR,
-  tooManyConfirmations,
   type OtherWay,
 } from "./refusal-words.ts";
 import { useSecondFactor, type SecondFactor } from "./second-factor-hooks.ts";
@@ -100,26 +96,26 @@ const SAID_OF_THE_DEVICE = {
   held: PASSKEY_CONFIRM_REFUSED,
   unverified: PASSKEY_CONFIRM_NOT_VERIFIED,
   failed: PASSKEY_CONFIRM_REFUSED,
-} satisfies Record<DeviceRefusal, Said | undefined>;
+} satisfies Record<DeviceRefusal, string | undefined>;
 
-const SAID_OF_A_PASSKEY_WORD: ReadonlyMap<string, Said> = new Map([
+const SAID_OF_A_PASSKEY_WORD: ReadonlyMap<string, string> = new Map([
   ["passkey-not-yours", PASSKEY_NOT_YOURS],
   ["not-verified", PASSKEY_CONFIRM_NOT_VERIFIED],
-  ["challenge-gone", PASSKEY_CONFIRM_EXPIRED],
+  ["challenge-gone", PASSKEY_ASK_EXPIRED],
   ["no-passkey", NO_PASSKEY_TO_CONFIRM],
 ]);
 
-const saidOfThePasskeyRoute = (refused: CodeRefused): Said => {
-  if (refused.status === SIGNED_OUT) return SAID_OF_CLASS.unauthenticated;
-  if (refused.status === TOO_MANY_REQUESTS) return tooManyConfirmations(refused.waitSeconds);
+const saidOfThePasskeyRoute = (refused: CodeRefused): string => {
+  if (refused.status === SIGNED_OUT) return STOCK.session;
+  if (refused.status === TOO_MANY_REQUESTS) return stockWait(refused.waitSeconds);
   return SAID_OF_A_PASSKEY_WORD.get(refused.word ?? "") ?? PASSKEY_CONFIRM_REFUSED;
 };
 
 /** A dismissed prompt is no refusal: the status line says no passkey was used. */
-const saidOfConfirmingByPasskey = (failure: Error | null): Said | undefined => {
+const saidOfConfirmingByPasskey = (failure: Error | null): string | undefined => {
   if (failure === null) return undefined;
   if (failure instanceof DeviceRefused) return SAID_OF_THE_DEVICE[failure.reason];
-  return failure instanceof CodeRefused ? saidOfThePasskeyRoute(failure) : CONFIRM_UNANSWERED;
+  return failure instanceof CodeRefused ? saidOfThePasskeyRoute(failure) : STOCK.unconfirmed;
 };
 
 const saidWhilePasskeyConfirms = (pending: boolean, failure: Error | null): string | null => {
@@ -158,20 +154,18 @@ function PasskeyWay(properties: {
       </Button>
       <Outcome tone="said">{saidWhilePasskeyConfirms(confirm.isPending, confirm.error)}</Outcome>
       <Outcome tone="refused" id={refusedId}>
-        {said === undefined ? null : <RefusalLine said={said} />}
+        {said}
       </Outcome>
     </div>
   );
 }
 
 /** A throttle is said by its wait; a cancelled or wordless failure by its own words. */
-const saidOfConfirmingByCode = (failure: Error | null): Said | undefined => {
+const saidOfConfirmingByCode = (failure: Error | null): string | undefined => {
   if (failure === null || isTooMany(failure)) return undefined;
-  if (!(failure instanceof CodeRefused)) return CONFIRM_UNANSWERED;
-  if (failure.status === SIGNED_OUT) return SAID_OF_CLASS.unauthenticated;
-  return failure.word === "no-authenticator"
-    ? SAID_OF_SECOND_FACTOR["no-authenticator"]
-    : AUTHENTICATOR_CODE_WRONG;
+  if (!(failure instanceof CodeRefused)) return STOCK.unconfirmed;
+  if (failure.status === SIGNED_OUT) return STOCK.session;
+  return failure.word === "no-authenticator" ? STOCK.gone : AUTHENTICATOR_CODE_WRONG;
 };
 
 /** Read-only while throttled, with no countdown, while every other way stays open. */
@@ -341,10 +335,7 @@ export function RecoveryPage() {
           <OneTimeCodeForm
             label={RECOVERY_WORDS.field}
             sending={spend}
-            saids={{
-              wrong: SAID_OF_SECOND_FACTOR["recovery-code-wrong"],
-              unanswered: RECOVERY_UNANSWERED,
-            }}
+            wrong={SAID_OF_SECOND_FACTOR["recovery-code-wrong"]}
             others={otherWays(held, ["passkey", "authenticator"])}
             waitSecondsAtArrival={held.waits["recovery-code"]}
             fieldRef={first}

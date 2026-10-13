@@ -2,22 +2,24 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
-import type { Refusal, RefusalWord } from "@/shared/api/trpc.ts";
-import { RefusedItemLines, refusalsOf } from "@/shared/refusal-outcome.tsx";
-import { SAID_OF_CLASS, type SaidOfWord } from "@/shared/refusal-words.ts";
+import type { Refusal, RefusalClass, RefusalWord } from "@/shared/api/trpc.ts";
+import {
+  RefusedItemLines,
+  refusalsOf,
+  saidOfItems,
+  setRefusalOutcome,
+} from "@/shared/refusal-outcome.tsx";
+import { STOCK, stockWait, type OwnSentences } from "@/shared/refusal-words.ts";
 
 import { carrying } from "./stubbed-api.ts";
 
 afterEach(cleanup);
 
-const A_FEATURES_WORDS = {
-  "last-admin": {
-    why: "Nobody else here is an Admin.",
-    next: "Make someone else an Admin first.",
-  },
-} satisfies SaidOfWord;
+const A_FEATURES_OWN = {
+  "last-admin": "What this feature alone says of the last Admin.",
+} satisfies OwnSentences;
 
-/** Any word and class, as the api would send them: a word the web has never met is still said. */
+/** Any word and class, as the api would send them: a word the web has never met still shows. */
 const refusedWith = (word: string, refusalClass: string): Error =>
   carrying({ refusal: { word, class: refusalClass } });
 
@@ -25,26 +27,59 @@ const shown = (words: ReactNode): HTMLElement => render(<p>{words}</p>).containe
 
 const NETWORK_FAILURE = new Error("the network went away");
 
-const { outcomeOfFailure, refusedFor } = refusalsOf(A_FEATURES_WORDS);
+const { outcomeOfFailure, refusedFor } = refusalsOf(A_FEATURES_OWN);
 
-describe("the shared refusal template", () => {
-  it("says what went wrong, then what to do", () => {
+const STOCK_OF_EACH_CLASS = [
+  ["unauthenticated", STOCK.session],
+  ["forbidden", STOCK.permission],
+  ["absent", STOCK.gone],
+  ["malformed", STOCK.invalid],
+  ["inapplicable", STOCK.unavailable],
+  ["conflict", STOCK.changed],
+  ["precondition", STOCK.notYet],
+] as const satisfies readonly (readonly [RefusalClass, string])[];
+
+describe("the sentence a refusal shows", () => {
+  it("shows a listed word's own sentence, never its class's", () => {
     const outcome = refusedFor("last-admin", "precondition");
 
     expect(outcome.tone).toBe("refused");
-    expect(shown(outcome.words).textContent).toBe(
-      "Nobody else here is an Admin. Make someone else an Admin first.",
-    );
+    expect(shown(outcome.words).textContent).toBe(A_FEATURES_OWN["last-admin"]);
+    expect(A_FEATURES_OWN["last-admin"]).not.toBe(STOCK.notYet);
   });
 
-  it.each(Object.entries(SAID_OF_CLASS))(
-    "says an unknown word by its class: %s",
-    (refusalClass, said) => {
+  it("shows an unlisted word its class's stock sentence", () => {
+    const outcome = outcomeOfFailure(refusedWith("role-forbids", "forbidden"), "action");
+
+    expect(outcome.tone).toBe("refused");
+    expect(shown(outcome.words).textContent).toBe(STOCK.permission);
+  });
+
+  it.each(STOCK_OF_EACH_CLASS)("shows a word never met by its class: %s", (refusalClass, stock) => {
+    const outcome = outcomeOfFailure(refusedWith("a-new-word", refusalClass), "action");
+
+    expect(shown(outcome.words).textContent).toBe(stock);
+  });
+
+  it.each(["a-new-class", "toString"])(
+    "shows the general sentence for class %s",
+    (refusalClass) => {
       const outcome = outcomeOfFailure(refusedWith("a-new-word", refusalClass), "action");
 
-      expect(shown(outcome.words).textContent).toBe(`${said.why} ${said.next}`);
+      expect(outcome.tone).toBe("refused");
+      expect(shown(outcome.words).textContent).toBe(STOCK.general);
     },
   );
+
+  it("gives each class a stock sentence of its own", () => {
+    const sentences = STOCK_OF_EACH_CLASS.map(
+      ([refusalClass]) =>
+        shown(outcomeOfFailure(refusedWith("a-new-word", refusalClass), "action").words)
+          .textContent,
+    );
+
+    expect(new Set(sentences).size).toBe(STOCK_OF_EACH_CLASS.length);
+  });
 
   it.each([
     ["a known word", "last-admin"],
@@ -56,80 +91,106 @@ describe("the shared refusal template", () => {
     expect(line.querySelector("code")).toBeNull();
   });
 
-  it("says a wordless failure got no response, and nothing saved", () => {
+  it("tells an action with no response to try again", () => {
     const outcome = outcomeOfFailure(NETWORK_FAILURE, "action");
 
     expect(outcome.tone).toBe("refused");
-    expect(shown(outcome.words).textContent).toBe(
-      "No response, so nothing was saved. Try again in a moment.",
-    );
+    expect(shown(outcome.words).textContent).toBe(STOCK.tryAgain);
   });
 
-  it("says a read's wordless failure without claiming a save", () => {
+  it("says a read with no response did not load", () => {
     const outcome = outcomeOfFailure(NETWORK_FAILURE, "read");
 
-    expect(shown(outcome.words).textContent).toBe(
-      "No response, so nothing is shown. Try again in a moment.",
-    );
+    expect(shown(outcome.words).textContent).toBe(STOCK.notLoaded);
+    expect(STOCK.notLoaded).not.toBe(STOCK.tryAgain);
   });
 });
 
-const THE_PEOPLES_WORDS = {
-  ...A_FEATURES_WORDS,
-  "no-such-member": {
-    why: "They're no longer a member here.",
-    next: "Reload the page to see who is.",
-  },
-} satisfies SaidOfWord;
+describe("the wait a ceiling's sentence names", () => {
+  it.each([
+    [1, 1],
+    [60, 1],
+    [61, 2],
+    [600, 10],
+  ])("names %i seconds as %i whole minutes, rounded up", (liftsInSeconds, minutes) => {
+    const numbers = stockWait(liftsInSeconds).match(/\d+/g);
+
+    expect(numbers).toEqual([String(minutes)]);
+  });
+
+  it("names no number where the answer carried no wait", () => {
+    expect(stockWait(undefined)).not.toMatch(/\d/);
+    expect(stockWait(undefined)).not.toBe(stockWait(61));
+  });
+});
+
+const THE_PEOPLES_OWN = {
+  ...A_FEATURES_OWN,
+  "no-such-member": "What this feature alone says of a member since gone.",
+} satisfies OwnSentences;
 
 const nameOf = (id: string): string => (id === "p1" ? "Ada Lovelace" : "Grace Hopper");
 
-const itemLinesOf = (featureWords: SaidOfWord, failure: Error): readonly (string | null)[] => {
-  render(<RefusedItemLines featureWords={featureWords} failure={failure} nameOf={nameOf} />);
-  return screen.queryAllByRole("listitem").map((line) => line.textContent);
-};
+/** A set refused whole for its first item's word, naming each item it refused. */
+const refusedForItems = (items: Readonly<Record<string, string>>): Error =>
+  carrying({ refusal: { word: "last-admin", class: "precondition", items } });
 
-describe("the lines a refusal naming items draws", () => {
+describe("the reasons a refusal naming items gives", () => {
   it("reads each item's word as a plain api word", () => {
     expectTypeOf<NonNullable<Refusal["items"]>>().toEqualTypeOf<
       Readonly<Record<string, RefusalWord>>
     >();
   });
 
-  it("draws one line per item, naming the person", () => {
-    const failure = carrying({
-      refusal: {
-        word: "last-admin",
-        class: "precondition",
-        items: { p1: "last-admin", p2: "no-such-member" },
-      },
-    });
+  it("gives two item words two reasons, one per item", () => {
+    const failure = refusedForItems({ p1: "last-admin", p2: "no-such-member" });
 
-    expect(itemLinesOf(THE_PEOPLES_WORDS, failure)).toEqual([
-      "Ada Lovelace: Nobody else here is an Admin. Make someone else an Admin first.",
-      "Grace Hopper: They're no longer a member here. Reload the page to see who is.",
+    expect(saidOfItems(THE_PEOPLES_OWN, failure)).toEqual([
+      { id: "p1", said: THE_PEOPLES_OWN["last-admin"] },
+      { id: "p2", said: THE_PEOPLES_OWN["no-such-member"] },
+    ]);
+    expect(THE_PEOPLES_OWN["last-admin"]).not.toBe(THE_PEOPLES_OWN["no-such-member"]);
+  });
+
+  it("gives an unlisted item word the whole set's sentence", () => {
+    const failure = refusedForItems({ p1: "last-admin", p2: "a-new-word" });
+
+    expect(saidOfItems(A_FEATURES_OWN, failure)).toEqual([
+      { id: "p1", said: A_FEATURES_OWN["last-admin"] },
+      { id: "p2", said: A_FEATURES_OWN["last-admin"] },
     ]);
   });
 
-  it("says an unknown item word as the set's line", () => {
-    const failure = carrying({
-      refusal: {
-        word: "last-admin",
-        class: "precondition",
-        items: { p1: "last-admin", p2: "a-new-word" },
-      },
-    });
+  it("draws one line per item, naming the person", () => {
+    const failure = refusedForItems({ p1: "last-admin", p2: "no-such-member" });
+    render(<RefusedItemLines featureWords={THE_PEOPLES_OWN} failure={failure} nameOf={nameOf} />);
 
-    expect(itemLinesOf(A_FEATURES_WORDS, failure)).toEqual([
-      "Ada Lovelace: Nobody else here is an Admin. Make someone else an Admin first.",
-      "Grace Hopper: Nobody else here is an Admin. Make someone else an Admin first.",
+    expect(screen.getAllByRole("listitem").map((line) => line.textContent)).toEqual([
+      `Ada Lovelace: ${THE_PEOPLES_OWN["last-admin"]}`,
+      `Grace Hopper: ${THE_PEOPLES_OWN["no-such-member"]}`,
     ]);
   });
 
   it.each([
     ["a refusal naming no items", refusedWith("last-admin", "precondition")],
     ["a wordless failure", NETWORK_FAILURE],
-  ])("draws no line for %s", (_, failure) => {
-    expect(itemLinesOf(THE_PEOPLES_WORDS, failure)).toEqual([]);
+  ])("gives no reason for %s", (_, failure) => {
+    expect(saidOfItems(THE_PEOPLES_OWN, failure)).toEqual([]);
+  });
+});
+
+const lead = (count: number): string => `${String(count)} refused:`;
+
+describe("a set refused whole", () => {
+  it("shows the refusal's own sentence when it names no item", () => {
+    const outcome = setRefusalOutcome({
+      featureWords: A_FEATURES_OWN,
+      failure: refusedWith("last-admin", "precondition"),
+      nameOf,
+      lead,
+    });
+
+    expect(outcome.tone).toBe("refused");
+    expect(shown(outcome.words).textContent).toBe(A_FEATURES_OWN["last-admin"]);
   });
 });
