@@ -177,8 +177,8 @@ with a Retry button.
 **Dates and numbers.** UK long form — 3 March 2026; with time, 09:41 · 30 August 2026.
 Money as £1,240.00. Relative time only under a minute.
 
-**Symbols.** Only typographic Unicode symbols appear, in the interface, in empty states and
-in documentation: ·, — and ✕ on a dismiss control. An apostrophe or a quotation mark stays as
+**Symbols.** The only symbols beside the words are ·, — and ✕ on a dismiss control, in the
+interface, in empty states and in documentation. An apostrophe or a quotation mark stays as
 its source has it, straight or curly: a string taken from a Kibo pattern keeps its straight
 marks, and text already in the tree keeps the marks it has.
 
