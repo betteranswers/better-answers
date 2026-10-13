@@ -19,6 +19,7 @@ import {
   RECALL_DEPTH,
   theBuyerQuestions,
   theRecallSet,
+  type BuyerQuestions,
   type Recall,
   type RecallAnswer,
   type RecallQuestion,
@@ -29,7 +30,7 @@ import { visibilitySuite } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered } from "./suite-postgres.ts";
 
-const { arrange, reading } = visibilitySuite();
+const { arrange, reading, db } = visibilitySuite();
 
 const NOW = new Date("2026-10-09T12:00:00.000Z");
 
@@ -57,7 +58,7 @@ const conceptsFound = (person: UserPrincipal) =>
     return found.matches.flatMap((match) => (match.layer === "bundles" ? [match.iri] : []));
   });
 
-/** Entry points alone: no `Answer` of the set links to another, so the walk adds no concept. */
+/** Entry points alone only while the set's map holds no edge, which a test below holds. */
 const conceptsPlanned = (person: UserPrincipal) =>
   kept(async (question: string, collection: string | undefined) => {
     const asking = { question, collections: collection === undefined ? [] : [collection] };
@@ -85,6 +86,7 @@ const figuresOf = (
 describe("recall over the synthetic set", () => {
   let set: RecallSet;
   let landed: ReadonlyMap<string, string>;
+  let workspaceId: string;
   let found: ReturnType<typeof conceptsFound>;
   let planned: ReturnType<typeof conceptsPlanned>;
 
@@ -92,6 +94,7 @@ describe("recall over the synthetic set", () => {
     set = await theRecallSet();
     const scenario = await arrange();
     landed = await landRecallSet(scenario, set);
+    workspaceId = scenario.workspaceId;
     found = conceptsFound(scenario.viewer);
     planned = conceptsPlanned(scenario.viewer);
   }, 300_000);
@@ -104,46 +107,70 @@ describe("recall over the synthetic set", () => {
 
   it("reports each set's recall and fails no build", async () => {
     const entryCap = ASK_CAPS.entryPoints;
-    const reads = [
-      [
-        `find's first ${RECALL_DEPTH} concepts`,
-        ({ question }: RecallQuestion) => found(question),
-        RECALL_DEPTH,
-      ],
-      [
-        `ask's first ${entryCap} entry points`,
-        ({ question }: RecallQuestion) => planned(question, undefined),
-        entryCap,
-      ],
-      [
-        `ask's first ${entryCap} entry points with its collection named`,
-        ({ question, collection }: RecallQuestion) => planned(question, collection),
-        entryCap,
-      ],
-    ] as const;
+    const byFind = ({ question }: RecallQuestion) => found(question);
+    const unnamed = ({ question }: RecallQuestion) => planned(question, undefined);
+    const named = ({ question, collection }: RecallQuestion) => planned(question, collection);
+    const byAsk = `ask's first ${entryCap} entry points`;
 
     const figures: Figure[] = [];
     for (const [name, questions] of await bothSets()) {
-      const named = questions.flatMap(({ answers }) => answers).length;
-      for (const [read, ranked, depth] of reads) {
-        const recalls = await recallAt(questions, landed, ranked, depth);
-        figures.push(...figuresOf(`${name} in ${read}`, recalls));
+      const carrying = questions.filter(({ collection }) => collection !== undefined);
+      const readings = [
+        [`${name} in find's first ${RECALL_DEPTH} concepts`, questions, byFind, RECALL_DEPTH],
+        [`${name} in ${byAsk}`, questions, unnamed, entryCap],
+        [`${name} carrying a collection in ${byAsk}, none named`, carrying, unnamed, entryCap],
+        [`${name} carrying a collection in ${byAsk}, theirs named`, carrying, named, entryCap],
+      ] as const;
+      for (const [reading, asked, ranked, depth] of readings) {
+        const recalls = await recallAt(asked, landed, ranked, depth);
+        figures.push(...figuresOf(reading, recalls));
 
         const { byAnswer, everyAnswer, anyAnswer } = recalls;
         expect([byAnswer.asked, everyAnswer.asked, anyAnswer.asked]).toEqual([
-          named,
-          questions.length,
-          questions.length,
+          asked.flatMap(({ answers }) => answers).length,
+          asked.length,
+          asked.length,
         ]);
       }
     }
 
+    const wider = set.groups.filter(({ answers }) => answers.length > entryCap).length;
     await recordFigures("Recall over the synthetic set", [
       ...figures,
+      [
+        "collections holding more Answers than the entry cap, which alone it can cut",
+        `${wider} of ${set.groups.length}`,
+      ],
       ["the corpus", `${landed.size} synthetic Answers`],
       ["the route's threshold, reported and never enforced", "90 %"],
     ]);
     expect(landed.size).toBe(answersOf(set).length);
+  }, 300_000);
+
+  it("lands a set whose walk adds no concept", async () => {
+    const { rows } = await db().pool.query<{ edges: number }>(
+      "SELECT count(*)::int AS edges FROM map_edge WHERE workspace_id = $1",
+      [workspaceId],
+    );
+
+    expect(rows).toEqual([{ edges: 0 }]);
+  });
+
+  it("keeps a narrowed reading inside the collection named", async () => {
+    const groupOf = new Map(answersOf(set).map(({ key, group }) => [landed.get(key), group]));
+    const outside: string[] = [];
+    let returned = 0;
+    for (const [, questions] of await bothSets()) {
+      for (const { question, collection } of questions) {
+        if (collection === undefined) continue;
+        const ranking = await planned(question, collection);
+        returned += ranking.length;
+        if (ranking.some((iri) => groupOf.get(iri) !== collection)) outside.push(question);
+      }
+    }
+
+    expect(outside).toEqual([]);
+    expect(returned).toBeGreaterThan(0);
   }, 300_000);
 
   it("ranks ask's plan step as find ranks", async () => {
@@ -218,17 +245,44 @@ describe("the recall set's reader", () => {
   });
 });
 
+/** The set with its first question changed, or with one more source listed. */
+const altered = (
+  held: BuyerQuestions,
+  change: { readonly question?: object; readonly source?: object },
+): unknown => {
+  const [first, ...rest] = held.questions;
+  const [form] = held.sources;
+  return {
+    ...held,
+    sources:
+      change.source === undefined ? held.sources : [...held.sources, { ...form, ...change.source }],
+    questions: [{ ...first, ...change.question }, ...rest],
+  };
+};
+
 describe("the buyer-worded set's reader", () => {
-  it("refuses a question that names no Answer", async () => {
+  it.each([
+    ["a question that names no Answer", { question: { answers: [] } }],
+    [
+      "a question naming one Answer twice",
+      { question: { answers: ["what-tallyloom-is", "what-tallyloom-is"] } },
+    ],
+    ["a question citing a source the set lacks", { question: { source: "no-such-form" } }],
+    ["a source no question cites", { source: { id: "an-uncited-form" } }],
+  ])("refuses %s", async (refused, change) => {
     const held = await theBuyerQuestions(await theRecallSet());
-    const [first, ...rest] = held.questions;
-    const path = join(scratch, "a-question-naming-no-answer.json");
-    await writeFile(
-      path,
-      JSON.stringify({ ...held, questions: [{ ...first, answers: [] }, ...rest] }),
-    );
+    const path = join(scratch, `${refused.replaceAll(" ", "-")}.json`);
+    await writeFile(path, JSON.stringify(altered(held, change)));
 
     expect((await readBuyerQuestions(path)).ok).toBe(false);
+  });
+
+  it("reads the set with nothing changed", async () => {
+    const held = await theBuyerQuestions(await theRecallSet());
+    const path = join(scratch, "the-set-unchanged.json");
+    await writeFile(path, JSON.stringify(altered(held, {})));
+
+    expect((await readBuyerQuestions(path)).ok).toBe(true);
   });
 });
 

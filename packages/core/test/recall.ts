@@ -66,41 +66,58 @@ export const theRecallSet = async (): Promise<RecallSet> => {
 /** `find` takes no longer a query, and the measure asks every question of both entries. */
 const QUESTION_CHARACTERS_AT_MOST = 500;
 
-const buyerQuestions = z.strictObject({
-  note: z.string(),
-  sources: z
-    .array(
-      z.strictObject({
-        id: answerKey,
-        form: z.string().min(1),
-        publisher: z.string().min(1),
-        url: z.url(),
-        licence: z.string().min(1),
-        notice: z.string().min(1),
-        retrieved: z.iso.date(),
-      }),
-    )
-    .min(1),
-  questions: z
-    .array(
-      z.strictObject({
-        question: z.string().min(1).max(QUESTION_CHARACTERS_AT_MOST),
-        /** The `id` of the form it was taken from. */
-        source: answerKey,
-        /** Where in the form it stands. */
-        at: z.string().min(1),
-        /** The one group every `Answer` it names sits in, where there is one. */
-        collection: answerKey.optional(),
-        /** The key of each `Answer` of the recall set it must reach. */
-        answers: z.array(answerKey).min(1),
-      }),
-    )
-    .min(1),
-});
+const buyerQuestions = z
+  .strictObject({
+    note: z.string(),
+    sources: z
+      .array(
+        z.strictObject({
+          id: answerKey,
+          form: z.string().min(1),
+          publisher: z.string().min(1),
+          url: z.url(),
+          licence: z.string().min(1),
+          notice: z.string().min(1),
+          retrieved: z.iso.date(),
+        }),
+      )
+      .min(1),
+    questions: z
+      .array(
+        z.strictObject({
+          question: z.string().min(1).max(QUESTION_CHARACTERS_AT_MOST),
+          /** The `id` of the form it was taken from. */
+          source: answerKey,
+          /** Where in the form it stands. */
+          at: z.string().min(1),
+          /** The one group every `Answer` it names sits in, where there is one. */
+          collection: answerKey.optional(),
+          /** The key of each `Answer` of the recall set it must reach. */
+          answers: z
+            .array(answerKey)
+            .min(1)
+            .refine(
+              (keys) => new Set(keys).size === keys.length,
+              "a question names an Answer once, or recall by Answer counts it twice",
+            ),
+        }),
+      )
+      .min(1),
+  })
+  .refine(
+    ({ sources, questions }) =>
+      questions.every(({ source }) => sources.some(({ id }) => id === source)),
+    "a question cites a source the set does not list",
+  )
+  .refine(
+    ({ sources, questions }) =>
+      sources.every(({ id }) => questions.some(({ source }) => source === id)),
+    "a listed source is cited by no question",
+  );
 
 export type BuyerQuestions = z.infer<typeof buyerQuestions>;
 
-/** The buyer-worded set at `path`, refused as the recall set is, or for a question naming no `Answer`. */
+/** Refused as the recall set is, and where its sources and its questions' citations do not pair. */
 export const readBuyerQuestions = (path: string): Promise<Result<BuyerQuestions, Error>> =>
   readAs(path, buyerQuestions);
 
