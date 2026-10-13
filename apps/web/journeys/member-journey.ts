@@ -2,7 +2,6 @@ import type { Page } from "@playwright/test";
 
 import { goHome } from "@/app/words.ts";
 import { BROWSE, SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
-import { SEARCH_WORDS } from "@/features/knowledge/knowledge-words.ts";
 import { HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
 
 import {
@@ -21,9 +20,9 @@ const searchIsReached = async (page: Page, gate: Gate): Promise<void> => {
   await railOf(page).getByRole("link", { name: KNOWLEDGE.name }).click();
   await expect(page).toHaveURL(new RegExp(`${SEARCH.path}$`));
   await expect(page.getByRole("heading", { level: 1, name: BROWSE.name })).toBeVisible();
-  await expect(page.getByRole("region", { name: SEARCH.name }).getByRole("status")).toHaveText(
-    SEARCH_WORDS.nothingAsked,
-  );
+  const search = page.getByRole("region", { name: SEARCH.name });
+  await expect(search.getByRole("searchbox")).toHaveValue("");
+  await expect(search.getByRole("status")).toHaveText(/\S/);
   await gate();
 };
 

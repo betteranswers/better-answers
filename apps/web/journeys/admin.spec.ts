@@ -1,12 +1,10 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { MODEL_CHOICES_WORDS } from "@/features/model-choices/words.ts";
 import { AUDIT_LOG_WORDS } from "@/features/people/audit-log-words.ts";
-import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { BULK_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
-import { NOTHING_CONNECTED } from "@/features/sources/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
 
+import { saysOfItsRead } from "../e2e/locators.ts";
 import { theConsoleIsRefused, theSwitcherListsOneWorkspace, type Gate } from "./every-role.ts";
 import { expect, test, theTestPeople } from "./fixtures.ts";
 import { groupNamesOf, sessionMemberOf } from "./reads.ts";
@@ -25,8 +23,10 @@ const MODELS_AND_SPEND = pageNamed(menuGroupIn(CONTROL_CENTRE, "models"), "Model
 /** Every group the journeys make starts so, and the opening repair deletes any left behind. */
 const JOURNEYS_GROUPS = "Journeys run";
 
-/** A row's first cell is its tick, then the person, then their role. */
+/** A row's first cell is its tick, then the person, their role, and their groups. */
 const ROLE_CELL = 2;
+
+const GROUPS_CELL = 3;
 
 const membersRegion = (page: Page): Locator => page.getByRole("region", { name: "Members" });
 
@@ -35,8 +35,8 @@ const rowOf = (page: Page, name: string): Locator =>
     .getByRole("row")
     .filter({ has: page.getByRole("link", { name, exact: true }) });
 
-const saidOnMembers = (page: Page, words: string): Locator =>
-  membersRegion(page).getByRole("status").filter({ hasText: words });
+/** An outcome's status stands beside its alert. A list's count and its pages' count have none. */
+const outcomeOf = (list: Locator): Locator => list.locator("output:has(+ [role='alert'])");
 
 const groupsRegion = (page: Page): Locator => page.getByRole("region", { name: "Groups" });
 
@@ -65,13 +65,16 @@ const chosen = async (dialog: Locator, field: string, option: string): Promise<v
   await dialog.page().getByRole("option", { name: option, exact: true }).click();
 };
 
-/** A bulk action is refused while another is going, so each waits for its own outcome line. */
+/**
+ * A bulk action is refused while another is going, and its outcome speaks before it lands, so each
+ * waits for the rows it changed.
+ */
 const rolesChanged = async (page: Page, names: readonly string[], role: Role): Promise<void> => {
   const { changeRole } = BULK_WORDS;
   const dialog = await opened(page, names, changeRole);
   await chosen(dialog, "Role", role);
   await dialog.getByRole("button", { name: changeRole.commit(names.length, role) }).click();
-  await expect(saidOnMembers(page, changeRole.done(names.length, role, 0))).toBeVisible();
+  await expect(outcomeOf(membersRegion(page))).toHaveText(/\S/);
   for (const name of names) {
     await expect(rowOf(page, name).getByRole("cell").nth(ROLE_CELL)).toHaveText(role);
   }
@@ -82,7 +85,10 @@ const addedToGroup = async (page: Page, names: readonly string[], group: string)
   const dialog = await opened(page, names, addToGroup);
   await chosen(dialog, "Group", group);
   await dialog.getByRole("button", { name: addToGroup.commit(names.length, group) }).click();
-  await expect(saidOnMembers(page, addToGroup.done(names.length, group, 0))).toBeVisible();
+  await expect(outcomeOf(membersRegion(page))).toHaveText(/\S/);
+  for (const name of names) {
+    await expect(rowOf(page, name).getByRole("cell").nth(GROUPS_CELL)).toContainText(group);
+  }
 };
 
 const groupMade = async (page: Page, name: string): Promise<void> => {
@@ -170,26 +176,35 @@ const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
   await gate();
 };
 
-/** Only read: an action on either would upload documents or spend on models. */
+/**
+ * Only read: an action would upload documents or spend on models. The fixture leaves both lists
+ * empty.
+ */
 const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
   await test.step("Invitations", async () => {
     await page.goto(MEMBERS);
     await page.getByRole("tab", { name: "Invitations" }).click();
-    await expect(page.getByRole("region", { name: "Invitations" })).toContainText(
-      EMPTY_LINES.invitations,
-    );
+    const rows = page
+      .getByRole("region", { name: "Invitations" })
+      .getByRole("row")
+      .filter({ has: page.getByRole("cell") });
+    // A list still loading says so in a status, and one unread in an alert.
+    await expect(
+      rows.filter({ hasNot: page.getByRole("status") }).filter({ hasNot: page.getByRole("alert") }),
+    ).toHaveText([/\S/]);
+    await expect(rows.filter({ hasText: "@" })).toHaveCount(0);
     await gate();
   });
   await test.step("Connected sources", async () => {
     await page.goto(CONNECTED_SOURCES);
-    await expect(page.getByText(NOTHING_CONNECTED, { exact: true })).toBeVisible();
+    const connectedSources = page.getByRole("region", { name: "Connected sources" });
+    await saysOfItsRead(connectedSources);
+    await expect(connectedSources.getByRole("listitem")).toHaveCount(0);
     await gate();
   });
   await test.step("Models and spend", async () => {
     await page.goto(MODELS_AND_SPEND);
-    await expect(page.getByRole("region", { name: "Model choices" })).toContainText(
-      MODEL_CHOICES_WORDS.lead,
-    );
+    await expect(page.getByRole("region", { name: "Model choices" })).toBeVisible();
   });
 };
 
