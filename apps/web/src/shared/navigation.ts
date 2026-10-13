@@ -324,7 +324,7 @@ export const CONTROL_CENTRE = {
     {
       id: "people",
       name: "People",
-      summary: "Manage workspace.",
+      summary: "Manage members.",
       movedFrom: ["/people"],
       pages: [
         {
