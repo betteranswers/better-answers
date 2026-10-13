@@ -106,7 +106,7 @@ const TOOLBAR_TABS = ["Model Choices", "Spend"];
 
 const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Models and Spend" });
 
-const modelChoicesCardOf = (page: Page) => page.getByRole("region", { name: "Model choices" });
+const modelChoicesCardOf = (page: Page) => page.getByRole("region", { name: "Model Choices" });
 
 /** The card holds its lead until its read lands, which brings a new workspace two lines more. */
 const theModelChoicesHaveLanded = (page: Page) =>
@@ -660,7 +660,7 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
   const panel = page.getByRole("tabpanel");
   await page.keyboard.press("Tab");
   await expect(panel).toBeFocused();
-  await expect(panel.getByRole("region", { name: "Model choices" })).toBeVisible();
+  await expect(panel.getByRole("region", { name: "Model Choices" })).toBeVisible();
 
   /**
    * Nothing carries a positive tabindex, so the document's own order is the tab order. Zero

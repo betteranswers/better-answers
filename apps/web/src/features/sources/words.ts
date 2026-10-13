@@ -5,7 +5,7 @@ import type { ListedConnectedSource, Sensitivity } from "./sources-api.ts";
 export { instantWords };
 
 /** Said when a row's keystroke is pressed and no connected source has held focus. */
-export const SELECT_A_CONNECTED_SOURCE_FIRST = "Select a connected source first.";
+export const SELECT_A_CONNECTED_SOURCE_FIRST = "Please select a connected source first.";
 
 type Meaning = { readonly word: string; readonly means: string };
 
@@ -17,10 +17,10 @@ export const STATE_WORDS = {
 } satisfies Record<ListedConnectedSource["state"], string>;
 
 export const STATE_MEANS = {
-  received: "Its documents have been received; no sync has turned them into passages yet.",
-  indexing: "A sync is turning its documents into passages.",
-  indexed: "The sync has finished and there is something to review.",
-  published: "Its passages reach the readers in its audience.",
+  received: "Received and waiting to sync.",
+  indexing: "A sync is running.",
+  indexed: "Synced and ready to review.",
+  published: "Published to its audience.",
 } satisfies Record<ListedConnectedSource["state"], string>;
 
 export const CONNECTOR_WORDS = {
@@ -29,10 +29,10 @@ export const CONNECTOR_WORDS = {
 
 /** Each says its effect before the click; the row adds its source's name for a screen reader. */
 export const ROW_ACTIONS = {
-  review: "Review findings",
+  review: "Review Findings",
   publish: "Publish",
-  narrow: "Narrow sensitivity",
-  widen: "Widen sensitivity or audience",
+  narrow: "Narrow Sensitivity",
+  widen: "Widen Sensitivity or Audience",
 } as const;
 
 type Sync = NonNullable<ListedConnectedSource["lastSync"]>;
@@ -65,8 +65,14 @@ export const AUDIENCE_WORDS = {
   groups: "Named groups",
 } satisfies Record<ListedConnectedSource["audience"], string>;
 
-/** The empty list's one line: the toolbar's Connect a document is how a document is connected. */
-export const NOTHING_CONNECTED = "No document is connected yet.";
+/** An audience's word inside a sentence, typed apart so no function recases the option's label. */
+const AUDIENCE_IN_A_SENTENCE = {
+  everyone: "everyone in the workspace",
+  groups: "named groups",
+} satisfies Record<ListedConnectedSource["audience"], string>;
+
+/** The empty list's one line: the toolbar's Connect a Document is how a document is connected. */
+export const NOTHING_CONNECTED = "No connected sources yet";
 
 /** One term over every destination's sentence, however many a connected source feeds. */
 export const DESTINATIONS_TERM = "Destinations";
@@ -76,18 +82,17 @@ const DESTINATIONS = new Map<string, Meaning>([
     "passage-index",
     {
       word: "searchable",
-      means: "Its passages are found by search and opened by the readers it is published to.",
+      means: "Its passages appear in search.",
     },
   ],
   [
     "bundle",
     {
       word: "knowledge base",
-      means:
-        "Concepts drawn from it arrive as suggestions an Admin accepts, once extraction finishes.",
+      means: "Concepts from it are suggested to an Admin.",
     },
   ],
-  ["map", { word: "map", means: "The people, meetings and tasks it names join the map." }],
+  ["map", { word: "map", means: "Its people, meetings and tasks are added to the map." }],
 ]);
 
 const RETENTIONS = new Map<string, Meaning>([
@@ -95,22 +100,21 @@ const RETENTIONS = new Map<string, Meaning>([
     "mirror",
     {
       word: "mirror",
-      means:
-        "The source holds the record; a document gone at source loses its passages after a grace period.",
+      means: "Documents removed at source are removed here after a grace period.",
     },
   ],
   [
     "keep",
     {
       word: "keep",
-      means: "The platform holds the record; nothing leaves without an Admin’s action.",
+      means: "Documents are kept until an Admin removes them.",
     },
   ],
   [
     "transient",
     {
       word: "transient",
-      means: "The original is deleted once processed; the normalised redacted text is kept.",
+      means: "Originals are deleted once processed. The redacted text is kept.",
     },
   ],
 ]);
@@ -149,18 +153,18 @@ export const unreadableCounted = (unreadable: number, needingOcr: number): strin
 
 /** The publish row carries one count per category the seam can raise, a zero included. */
 export const AUDITED_CATEGORIES = [
-  "special-category",
-  "bank-details",
-  "government-identifier",
-  "date-of-birth",
-  "home-address",
-  "personal-contact",
-  "person-name",
-  "job-title",
+  { category: "special-category", term: "Findings, Special Category" },
+  { category: "bank-details", term: "Findings, Bank Details" },
+  { category: "government-identifier", term: "Findings, Government Identifier" },
+  { category: "date-of-birth", term: "Findings, Date of Birth" },
+  { category: "home-address", term: "Findings, Home Address" },
+  { category: "personal-contact", term: "Findings, Personal Contact" },
+  { category: "person-name", term: "Findings, Person Name" },
+  { category: "job-title", term: "Findings, Job Title" },
 ] as const;
 
 /** A category's or a tier's word is kebab-case on the row and spaced on the page. */
-export const spokenWord = (word: string): string => word.replaceAll("-", " ");
+const spokenWord = (word: string): string => word.replaceAll("-", " ");
 
 /** Where the word stands alone, as a table's cell does, it opens with a capital. */
 export const sentenceCased = (word: string): string => {
@@ -191,7 +195,7 @@ export type SensitivityAndAudience = {
 };
 
 export const sensitivityAndAudienceWords = (terms: SensitivityAndAudience): string =>
-  `${terms.sensitivity} for ${AUDIENCE_WORDS[terms.audience].toLowerCase()}`;
+  `${terms.sensitivity} for ${AUDIENCE_IN_A_SENTENCE[terms.audience]}`;
 
 const fromTo = (from: string, to: string): string => `From ${from} to ${to}`;
 
@@ -211,47 +215,53 @@ export const termsThatChange = (
         {
           term: "Audience",
           says: fromTo(
-            AUDIENCE_WORDS[present.audience].toLowerCase(),
-            AUDIENCE_WORDS[asked.audience].toLowerCase(),
+            AUDIENCE_IN_A_SENTENCE[present.audience],
+            AUDIENCE_IN_A_SENTENCE[asked.audience],
           ),
         },
       ]),
 ];
 
-const ITS_OWN_SENSITIVITY_STANDS = "A document with a narrower sensitivity of its own keeps it.";
+const NARROWER_DOCUMENTS_STAY = "Narrower documents stay as they are.";
 
-/** A narrowing's or a widening's inline panel: its name, its consequence and its commit. */
+const WHAT_CITES_IT_FOLLOWS = "Concepts and write-ups that cite it are updated too.";
+
+/** A narrowing's or a widening's inline panel: its name, consequence, commit and pending line. */
 export const SENSITIVITY_PANEL_WORDS = {
   narrow: {
-    named: (name: string): string => `Narrow the sensitivity of ${name}`,
-    consequence: (): string =>
-      "Every concept citing its documents, and every write-up including one of those concepts, moves with it in the same action. A narrowing never widens; widening it back is an action of its own.",
-    commit: (name: string, asked: SensitivityAndAudience): string =>
-      `Narrow ${name} to ${asked.sensitivity}`,
+    named: (name: string): string => `Narrow the Sensitivity of ${name}`,
+    consequence: (): string => `This limits who can read it. ${WHAT_CITES_IT_FOLLOWS}`,
+    commit: "Narrow",
+    pending: "Narrowing.",
   },
   widen: {
-    named: (name: string): string => `Widen the sensitivity or audience of ${name}`,
+    named: (name: string): string => `Widen the Sensitivity or Audience of ${name}`,
     consequence: (published: boolean): string =>
       `${
         published
-          ? "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every write-up including one, moves with it in the same action."
-          : "Nobody but an Admin reads it until you publish it, and the publish then releases the sensitivity you choose here."
-      } ${ITS_OWN_SENSITIVITY_STANDS}`,
-    commit: (name: string, asked: SensitivityAndAudience): string =>
-      `Widen ${name} to ${sensitivityAndAudienceWords(asked)}`,
+          ? `More people will be able to read it straight away. ${WHAT_CITES_IT_FOLLOWS}`
+          : "Only Admins can read it until you publish it."
+      } ${NARROWER_DOCUMENTS_STAY}`,
+    commit: "Widen",
+    pending: "Widening.",
   },
 } as const;
 
+/** Said from a publish's press until its answer lands. */
+export const PUBLISH_PENDING = "Publishing.";
+
 /** Said beside a commit that waits on the narrowing or widening sent before it. */
-export const THE_CHANGE_BEFORE_IS_STILL_GOING =
-  "The change before this one is still going. Try again once it answers.";
+export const THE_CHANGE_BEFORE_IS_STILL_GOING = "Please wait for the previous change to finish.";
 
 /** Said when a review is asked to open or close while a bulk action waits on its answer. */
-export const THE_ACTION_BEFORE_IS_STILL_GOING =
-  "The action before this one is still going. Try again once it answers.";
+export const THE_ACTION_BEFORE_IS_STILL_GOING = "Please wait for the previous action to finish.";
 
 export const groupsCounted = (groups: number): string =>
   counted(groups, "group of findings", "groups of findings");
+
+/** The same count as a dialog's title writes it. */
+const groupsCountedInATitle = (groups: number): string =>
+  counted(groups, "Group of Findings", "Groups of Findings");
 
 const findingsCounted = (findings: number): string => counted(findings, "finding", "findings");
 
@@ -263,46 +273,44 @@ type NamedGroup = {
 
 export const REVIEW_WORDS = {
   heading: (name: string): string => `Review of ${name}`,
-  lead: "What the last sync found, per category and rule, counted. No value is shown: the three actions take a group of findings, never what it found.",
+  lead: "Findings from the last sync. Values are never shown.",
   /** While no group is ticked, the one line that says what enables the three actions. */
   selectFirst: "Select a group of findings first.",
   select: (group: NamedGroup): string =>
     `Select ${spokenWord(group.category)} by ${ruleWordOf(group.ruleId)} in ${group.title}`,
-  noPassages: "This connected source has no passages yet.",
+  noPassages: "No passages yet",
   alreadyNarrowed: {
     tag: "Already narrowed",
     says: "A special category finding narrowed this document.",
   },
   dismissed: {
     tag: "Dismissed",
-    says: (findings: number): string =>
-      `${findingsCounted(findings)} as not special category. A dismissed finding no longer narrows its document, and stays withheld unless kept in text.`,
+    says: (findings: number): string => `${findingsCounted(findings)}.`,
   },
   keptStillWithheld: {
     tag: "Kept, still withheld",
     says: (findings: number): string =>
-      `${counted(findings, "kept finding", "kept findings")} overridden by an erasure request: an erasure outranks a keep.`,
+      `${findingsCounted(findings)} overridden by an erasure request.`,
   },
   keep: {
-    label: "Keep in text",
-    named: (groups: number): string => `Keep ${groupsCounted(groups)} in text`,
-    consequence:
-      "Every finding of each group goes back into its document’s text on the next sync, restored under your name with this reason. An erasure request still outranks a keep.",
-    pending: (groups: number): string => `Keeping ${groupsCounted(groups)} in text.`,
+    label: "Keep in Text",
+    named: (groups: number): string => `Keep ${groupsCountedInATitle(groups)} in Text`,
+    consequence: "These findings will be restored on the next sync. Your reason will be recorded.",
+    pending: "Keeping in text.",
     done: (groups: number, findings: number): string =>
-      `Kept ${groupsCounted(groups)} in text: ${findingsCounted(findings)} restored, and the sync that lets them back in is queued.`,
+      `${groupsCounted(groups)} kept successfully. ${findingsCounted(findings)} will be restored on the next sync.`,
   },
-  narrowDocuments: { label: "Narrow these documents" },
+  narrowDocuments: { label: "Narrow These Documents" },
   dismiss: {
-    label: "Dismiss as not special category",
-    named: (groups: number): string => `Dismiss ${groupsCounted(groups)} as not special category`,
+    label: "Dismiss as Not Special Category",
+    named: (groups: number): string =>
+      `Dismiss ${groupsCountedInATitle(groups)} as Not Special Category`,
     consequence:
-      "Every finding of each group is reviewed as dismissed under your name with this reason, and the sync that reads the dismissal is queued. On that sync, a document whose every special category finding is dismissed goes back to the sensitivity an Admin narrowed it to, or to its connected source’s sensitivity if none did. The findings stay withheld unless kept in text.",
+      "These findings stay withheld. A document with no other special category findings returns to its earlier sensitivity after the next sync. Your reason will be recorded.",
   },
 } as const;
 
 export const CONNECT_WORDS = {
-  consequence:
-    "The connected source starts unpublished: nobody but an Admin reads a word of it until you publish it. Its sync starts once the file is received.",
+  consequence: "Only Admins can read it until you publish it.",
   audienceHint: "Named groups cannot be chosen here yet.",
 } as const;

@@ -122,16 +122,25 @@ describe("the review's three bulk actions", () => {
     expect(screen.queryByText(NOT_SPECIAL_CATEGORY)).toBeNull();
   });
 
-  it("name the ticked groups, and the enabling line goes", () => {
+  it("take a ticked group, and the enabling line goes", () => {
     reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
 
     fireEvent.click(action("Tick bank details"));
 
     expect(screen.queryByText(REVIEW_WORDS.selectFirst)).toBeNull();
-    const keep = action(REVIEW_WORDS.keep.named(1));
+    const keep = action(REVIEW_WORDS.keep.label);
     expect(keep.disabled).toBe(false);
     expect(keep.hasAttribute("aria-describedby")).toBe(false);
-    expect(action("Narrow 1 document").disabled).toBe(false);
+    expect(action(REVIEW_WORDS.narrowDocuments.label).disabled).toBe(false);
+  });
+
+  it("count the ticked groups in the dialog's name", () => {
+    reviewing(THE_CONNECTED_SOURCE, THE_CONNECTED_SOURCE);
+    fireEvent.click(action("Tick both"));
+
+    fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.keep.key });
+
+    expect(screen.getByRole("dialog", { name: /\b2\b/v })).toBeDefined();
   });
 
   it("never take groups another connected source's review ticked", () => {
@@ -170,7 +179,7 @@ describe("the dismissal as not special category", () => {
 
     fireEvent.click(action("Tick the health cue"));
 
-    expect(action(REVIEW_WORDS.dismiss.named(1)).disabled).toBe(false);
+    expect(action(REVIEW_WORDS.dismiss.label).disabled).toBe(false);
     expect(screen.queryByText(NOT_SPECIAL_CATEGORY)).toBeNull();
   });
 
@@ -184,7 +193,7 @@ describe("the dismissal as not special category", () => {
     expect(dismissal.getAttribute("aria-describedby")).toBe(
       screen.getByText(NOT_SPECIAL_CATEGORY).id,
     );
-    expect(action(REVIEW_WORDS.keep.named(2)).disabled).toBe(false);
+    expect(action(REVIEW_WORDS.keep.label).disabled).toBe(false);
   });
 
   it("opens on s, asking a reason and naming no finding", () => {
@@ -239,8 +248,6 @@ const A_PUBLISH = "2026-10-07T09:05:00.000Z";
 
 const WIDENED = { sensitivity: "Internal", audience: "groups" } as const;
 
-const TO_PUBLIC = { sensitivity: "Public", audience: "groups" } as const;
-
 const ANSWERS: Readonly<Record<string, unknown>> = {
   "sources.list": [HANDBOOK, PRICE_BOOK],
   "sources.widen": { visibility: WIDENED, concepts: [], writeUps: [] },
@@ -273,6 +280,7 @@ const ROLE_FORBIDS = {
 };
 
 const HELD: ReadonlySet<string> = new Set([
+  "sources.narrow",
   "sources.widen",
   "sources.publish",
   "sources.keepInText",
@@ -338,8 +346,8 @@ const widenOpened = (row: ReturnType<typeof within>): HTMLElement => {
   return widen;
 };
 
-const commitTo = (row: ReturnType<typeof within>, asked: typeof WIDENED | typeof TO_PUBLIC) =>
-  row.getByRole("button", { name: SENSITIVITY_PANEL_WORDS.widen.commit("Staff handbook", asked) });
+const commitIn = (row: ReturnType<typeof within>) =>
+  row.getByRole("button", { name: SENSITIVITY_PANEL_WORDS.widen.commit });
 
 const describedBy = (control: HTMLElement): string | undefined =>
   document.getElementById(control.getAttribute("aria-describedby") ?? "")?.textContent;
@@ -526,7 +534,7 @@ describe("widening a connected source in its row", () => {
     const panel = within(row.getByRole("group"));
     expect(panel.getAllByRole("term").map((term) => term.textContent)).toEqual(["Sensitivity"]);
     expect(panel.getByRole("definition").textContent).toMatch(/Restricted.+Internal/v);
-    expect(commitTo(panel, WIDENED)).toBeDefined();
+    expect(commitIn(panel)).toBeDefined();
   });
 
   it("closes on Cancel, focus back on its opener", async () => {
@@ -577,7 +585,7 @@ describe("widening a connected source in its row", () => {
     const row = await rowOf("Staff handbook");
     widenOpened(row);
 
-    fireEvent.click(commitTo(row, WIDENED));
+    fireEvent.click(commitIn(row));
 
     expect(panelOf("widen", "Staff handbook")).toBeNull();
     expect(document.activeElement).toBe(
@@ -591,11 +599,11 @@ describe("widening a connected source in its row", () => {
     const asked = atSources({ held: answer.promise });
     const row = await rowOf("Staff handbook");
     widenOpened(row);
-    fireEvent.click(commitTo(row, WIDENED));
+    fireEvent.click(commitIn(row));
     await row.findByText(WIDENED.sensitivity);
 
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.widen.key });
-    const second = commitTo(row, TO_PUBLIC);
+    const second = commitIn(row);
     fireEvent.click(second);
 
     expect(second.getAttribute("aria-disabled")).toBe("true");
@@ -613,7 +621,7 @@ describe("widening a connected source in its row", () => {
 const widenTheHandbook = async () => {
   const row = await rowOf("Staff handbook");
   widenOpened(row);
-  fireEvent.click(commitTo(row, WIDENED));
+  fireEvent.click(commitIn(row));
 };
 
 /** The price book's publish, opened from its row, every confirmation ticked, then sent. */
@@ -622,13 +630,46 @@ const publishThePriceBook = async () => {
   fireEvent.click(rowAction(row, ROW_ACTIONS.publish, "Price book"));
   const dialog = within(await screen.findByRole("dialog"));
   for (const confirmation of dialog.getAllByRole("checkbox")) fireEvent.click(confirmation);
-  fireEvent.click(dialog.getByRole("button", { name: "Publish Price book" }));
+  fireEvent.click(dialog.getByRole("button", { name: "Publish" }));
+};
+
+const narrowThePriceBook = async () => {
+  const row = await rowOf("Price book");
+  fireEvent.click(rowAction(row, ROW_ACTIONS.narrow, "Price book"));
+  fireEvent.click(row.getByRole("button", { name: SENSITIVITY_PANEL_WORDS.narrow.commit }));
 };
 
 const SENT_FROM_A_ROW = [
   { action: "widening", procedure: "sources.widen", send: widenTheHandbook },
   { action: "publish", procedure: "sources.publish", send: publishThePriceBook },
+  { action: "narrowing", procedure: "sources.narrow", send: narrowThePriceBook },
 ];
+
+/** Every status on the page that holds words, the list's count among them. */
+const saidNow = (): readonly string[] =>
+  screen
+    .getAllByRole("status")
+    .map((status) => status.textContent)
+    .filter((words) => words !== "");
+
+describe("a connected source's action in flight", () => {
+  it.each(SENT_FROM_A_ROW)(
+    "says the $action is pending until it lands",
+    async ({ procedure, send }) => {
+      const answer = Promise.withResolvers<void>();
+      atSources({ held: answer.promise, forbidden: [procedure] });
+      await rowOf("Price book");
+      const before = saidNow();
+
+      await send();
+
+      expect(saidNow()).toHaveLength(before.length + 1);
+      answer.resolve();
+      await screen.findByText(STOCK.permission);
+      expect(saidNow()).toEqual(before);
+    },
+  );
+});
 
 /** The same sentence said twice is announced once, so the alert stands empty between them. */
 describe("a connected source's action refused twice", () => {
@@ -666,13 +707,9 @@ describe("narrowing a connected source in its row", () => {
     );
     expect(panel.getAllByRole("combobox")).toHaveLength(1);
     expect(panel.getAllByRole("term").map((term) => term.textContent)).toEqual(["Sensitivity"]);
+    expect(panel.getByRole("definition").textContent).toMatch(/Internal.+Restricted/v);
     expect(
-      panel.getByRole("button", {
-        name: SENSITIVITY_PANEL_WORDS.narrow.commit("Price book", {
-          sensitivity: "Restricted",
-          audience: "everyone",
-        }),
-      }),
+      panel.getByRole("button", { name: SENSITIVITY_PANEL_WORDS.narrow.commit }),
     ).toBeDefined();
   });
 

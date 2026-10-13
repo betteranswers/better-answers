@@ -94,7 +94,7 @@ export function ModelChoicesCard() {
       <section aria-labelledby="model-choices">
         <CardHeader>
           <CardTitle asChild>
-            <h2 id="model-choices">Model choices</h2>
+            <h2 id="model-choices">Model Choices</h2>
           </CardTitle>
           <p className="text-muted-foreground">{MODEL_CHOICES_WORDS.lead}</p>
           {modelChoices.data === undefined ? null : <WhoSets modelChoices={modelChoices.data} />}

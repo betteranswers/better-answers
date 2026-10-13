@@ -86,7 +86,7 @@ describe("a page's read, said after its region mounts", () => {
     const seen = mounted(passages, <Review connectedSource={A_CONNECTED_SOURCE} />);
     const closed = seen.length;
 
-    fireEvent.click(screen.getByRole("button", { name: /Preview the passages/v }));
+    fireEvent.click(screen.getByRole("button", { name: "Preview Passages" }));
 
     const opened = seen.slice(closed);
     expect(seen.slice(0, closed).every((text) => text === undefined)).toBe(true);

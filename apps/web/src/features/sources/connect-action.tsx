@@ -124,7 +124,7 @@ export function ConnectAction() {
           setOpen(false);
           setOutcome({
             tone: "said",
-            words: `Connected “${name}”: ${file.name} was received and its sync is queued.`,
+            words: `“${name}” has been connected successfully. ${file.name} is queued to sync.`,
           });
         },
         onError: (failure) => {
@@ -143,16 +143,16 @@ export function ConnectAction() {
       {/* Heard, not seen: the new row is what the eye reads, and the band has no width at 320px. */}
       <OutcomeLine outcome={open ? undefined : outcome} className="sr-only" />
       <Button size="sm" aria-keyshortcuts={SOURCES_KEYSTROKES.connect.key} onClick={show}>
-        Connect a document
+        Connect a Document
       </Button>
       <ActionDialog
         open={open}
         onOpenChange={setOpen}
-        title="Connect a document"
+        title="Connect a Document"
         consequence={CONNECT_WORDS.consequence}
         commit={
           <Button type="submit" form={ids.form} disabled={connect.isPending}>
-            {connect.isPending ? "Connecting the document" : "Connect the document"}
+            {connect.isPending ? "Connecting" : "Connect"}
           </Button>
         }
       >

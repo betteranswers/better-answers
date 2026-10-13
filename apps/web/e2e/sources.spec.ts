@@ -10,7 +10,6 @@ import {
   ROW_ACTIONS,
   ruleWordOf,
   SENSITIVITY_PANEL_WORDS,
-  type SensitivityAndAudience,
   sentenceCased,
   STATE_WORDS,
 } from "@/features/sources/words.ts";
@@ -50,7 +49,7 @@ const CONNECTED_SOURCES = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Con
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
 const connectedSourcesRegion = (page: Page) =>
-  page.getByRole("region", { name: "Connected sources" });
+  page.getByRole("region", { name: "Connected Sources" });
 
 /** The region's outcome line: its count and the connect action's progress are statuses before it. */
 const saidIn = (page: Page): Locator => connectedSourcesRegion(page).getByRole("status").last();
@@ -108,11 +107,11 @@ const leadOf = (page: Page, name: string, term: string): Locator =>
 
 const stateOf = (page: Page, name: string) => leadOf(page, name, "State");
 
-const lastSyncedOf = (page: Page, name: string) => leadOf(page, name, "Last synced");
+const lastSyncedOf = (page: Page, name: string) => leadOf(page, name, "Last Synced");
 
 const sensitivityOf = (page: Page, name: string) => leadOf(page, name, "Sensitivity");
 
-/** The lead's terms come first in a row, so the last of a name is More about's. */
+/** The lead's terms come first in a row, so the last of a name is More Details'. */
 const detailOf = (page: Page, name: string, term: string): Locator =>
   connectedSourceNamed(page, name)
     .getByRole("term")
@@ -135,14 +134,9 @@ const panelOf = (page: Page, name: string, change: SensitivityChange): Locator =
     name: SENSITIVITY_PANEL_WORDS[change].named(name),
   });
 
-const commitOf = (
-  page: Page,
-  name: string,
-  change: SensitivityChange,
-  asked: SensitivityAndAudience,
-): Locator =>
+const commitOf = (page: Page, name: string, change: SensitivityChange): Locator =>
   panelOf(page, name, change).getByRole("button", {
-    name: SENSITIVITY_PANEL_WORDS[change].commit(name, asked),
+    name: SENSITIVITY_PANEL_WORDS[change].commit,
     exact: true,
   });
 
@@ -230,7 +224,7 @@ test.describe("the Sources page's list of connected sources", () => {
       "a connected source never synced shows a time",
     ).toHaveText(/^\D+$/);
     await expect(
-      connectedSourcesRegion(page).getByRole("button", { name: /^More about /, expanded: false }),
+      connectedSourcesRegion(page).getByRole("button", { name: /^More Details /, expanded: false }),
     ).toHaveCount(10);
     await expect(page.locator("main")).not.toContainText(AN_ID);
   });
@@ -257,9 +251,9 @@ test.describe("the Sources page's list of connected sources", () => {
         - definition: ${quoted(AUDIENCE_WORDS.everyone)}
         - term: State
         - definition: ${quoted(STATE_WORDS.indexed)}
-        - term: Last synced
+        - term: Last Synced
         - definition: /^\\d{2}:\\d{2} · \\d{1,2} \\w+ \\d{4}/
-        - button "More about Staff handbook" [expanded=false]
+        - button "More Details Staff handbook" [expanded=false]
     `);
     const list = connectedSourcesRegion(page).getByRole("list");
     for (const stored of [...Object.keys(STATE_WORDS), ...Object.keys(CONNECTOR_WORDS)]) {
@@ -275,9 +269,9 @@ test.describe("the Sources page's list of connected sources", () => {
 
     const handbook = connectedSourceNamed(page, "Staff handbook");
     await expect(handbook.getByRole("term").filter({ hasText: DESTINATIONS_TERM })).toHaveCount(0);
-    await handbook.getByRole("button", { name: "More about Staff handbook" }).click();
+    await handbook.getByRole("button", { name: "More Details Staff handbook" }).click();
 
-    // A stored value is one word, and what More about says of it is several.
+    // A stored value is one word, and what More Details says of it is several.
     const aSentence = /\S\s+\S/;
     await expect(detailOf(page, "Staff handbook", "State")).toHaveText(aSentence);
     await expect(handbook.getByRole("term").filter({ hasText: /^Destination/ })).toHaveText([
@@ -313,7 +307,7 @@ test.describe("the Sources page's list of connected sources", () => {
     });
 
     await connectedSourceNamed(page, "Site archive")
-      .getByRole("button", { name: "More about Site archive" })
+      .getByRole("button", { name: "More Details Site archive" })
       .click();
     const archive = detailOf(page, "Site archive", "Unreadable");
     // Four unreadable, two of them scans.
@@ -335,7 +329,7 @@ test.describe("the Sources page's list of connected sources", () => {
     }
 
     await connectedSourceNamed(page, "Board minutes")
-      .getByRole("button", { name: "More about Board minutes" })
+      .getByRole("button", { name: "More Details Board minutes" })
       .click();
     const minutes = detailOf(page, "Board minutes", "Unreadable");
     await expect(
@@ -344,7 +338,7 @@ test.describe("the Sources page's list of connected sources", () => {
     ).toHaveText(/^\D*\b1\b\D*$/);
   });
 
-  test("shows an Editor Connected sources as not found, connecting nothing", async ({
+  test("shows an Editor Connected Sources as not found, connecting nothing", async ({
     page,
     request,
   }) => {
@@ -362,7 +356,7 @@ test.describe("the Sources page's list of connected sources", () => {
     });
     await page.goto("/sign-in");
     await signIn(page, request, email);
-    // Control Centre is the Admin's alone, so an Editor reaches Connected sources by address only.
+    // Control Centre is the Admin's alone, so an Editor reaches Connected Sources by address only.
     await page.goto(CONNECTED_SOURCES.path);
 
     await notFoundOfferingHome(page, "Editor");
@@ -370,7 +364,7 @@ test.describe("the Sources page's list of connected sources", () => {
     await expect(page.locator("body")).not.toContainText("Staff handbook");
 
     await page.keyboard.press("b");
-    await expect(page.getByRole("dialog", { name: "Connect a document" })).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Connect a Document" })).toHaveCount(0);
   });
 });
 
@@ -383,12 +377,12 @@ test.describe("connecting a document on the Sources page", () => {
     const { workspace } = await anAdminAtSources(page, request, { workspace: "Airedale Tooling" });
     await listsNothingConnected(page, () => page.goto("/sources/connected-sources"));
     await expect(connectedSourcesRegion(page)).toMatchAriaSnapshot(`
-      - region "Connected sources":
+      - region "Connected Sources":
         - /children: equal
-        - heading "Connected sources" [level=2]
+        - heading "Connected Sources" [level=2]
         - status
         - status
-        - button "Connect a document"
+        - button "Connect a Document"
         - status
         - paragraph
     `);
@@ -403,7 +397,7 @@ test.describe("connecting a document on the Sources page", () => {
     // key press, leaving the chooser uncaught and cancelled.
     const choosing = page.waitForEvent("filechooser");
     await page.keyboard.press("b");
-    const dialog = page.getByRole("dialog", { name: "Connect a document" });
+    const dialog = page.getByRole("dialog", { name: "Connect a Document" });
     await expect(dialog).toBeVisible();
     await expect(dialog).toHaveAccessibleDescription(/\S/);
     await expect(dialog.getByRole("combobox", { name: "Audience" })).toHaveAccessibleDescription(
@@ -438,7 +432,7 @@ test.describe("connecting a document on the Sources page", () => {
 
     await page.keyboard.press("Tab");
     await page.keyboard.press("Tab");
-    await expect(dialog.getByRole("button", { name: "Connect the document" })).toBeFocused();
+    await expect(dialog.getByRole("button", { name: "Connect", exact: true })).toBeFocused();
     await page.keyboard.press("Enter");
 
     await expect(dialog.getByRole("progressbar", { name: "Upload of handbook.md" })).toBeVisible();
@@ -479,14 +473,14 @@ test.describe("connecting a document on the Sources page", () => {
     await anAdminAtSources(page, request, { workspace: "Ryburn Signs" });
 
     await page.keyboard.press("b");
-    const dialog = page.getByRole("dialog", { name: "Connect a document" });
+    const dialog = page.getByRole("dialog", { name: "Connect a Document" });
     await dialog.getByLabel("Name").fill("Shop photographs");
     await dialog.getByLabel("File").setInputFiles({
       name: "shopfront.png",
       mimeType: "image/png",
       buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
     });
-    await dialog.getByRole("button", { name: "Connect the document" }).click();
+    await dialog.getByRole("button", { name: "Connect", exact: true }).click();
 
     await saysARefusal(dialog.getByRole("alert"));
     await keepsItsWordOffThePage(page, "media-type-refused");
@@ -508,7 +502,7 @@ test.describe("connecting a document on the Sources page", () => {
     );
 
     await page.keyboard.press("b");
-    const dialog = page.getByRole("dialog", { name: "Connect a document" });
+    const dialog = page.getByRole("dialog", { name: "Connect a Document" });
     await dialog.getByLabel("Name").fill("Shop notes");
     await dialog.getByLabel("File").setInputFiles({
       name: "notes.md",
@@ -516,7 +510,7 @@ test.describe("connecting a document on the Sources page", () => {
       buffer: Buffer.from("The shop opens at eight.\n"),
     });
     const refused = refusalAnswering(page, "sources.connect");
-    await dialog.getByRole("button", { name: "Connect the document" }).click();
+    await dialog.getByRole("button", { name: "Connect", exact: true }).click();
 
     expect(await refused).toMatchObject({ word: "media-type-refused", class: "inapplicable" });
     await saysARefusal(dialog.getByRole("alert"));
@@ -794,7 +788,7 @@ test.describe("reviewing a connected source's findings", () => {
 
     await review.getByRole("checkbox", { name: BANK_ACCOUNT_BOX }).click();
     await expect(enabling).toHaveCount(0);
-    const keep = review.getByRole("button", { name: REVIEW_WORDS.keep.named(1), exact: true });
+    const keep = review.getByRole("button", { name: REVIEW_WORDS.keep.label, exact: true });
     await expect(keep).toBeEnabled();
     await expect(keep).toHaveAccessibleDescription("");
   });
@@ -840,9 +834,9 @@ test.describe("reviewing a connected source's findings", () => {
     await page.getByRole("checkbox", { name: HOME_ADDRESS_BOX }).focus();
     await page.keyboard.press("x");
     await page.keyboard.press("d");
-    const narrowing = page.getByRole("dialog", { name: "Narrow 1 document to Restricted" });
+    const narrowing = page.getByRole("dialog", { name: "Narrow 1 Document to Restricted" });
     await expect(narrowing.getByRole("listitem")).toHaveText(["Supplier form"]);
-    await narrowing.getByRole("button", { name: "Narrow 1 document to Restricted" }).focus();
+    await narrowing.getByRole("button", { name: "Narrow", exact: true }).focus();
     await page.keyboard.press("Enter");
 
     // One document narrowed, and no concept or write-up moved with it.
@@ -866,7 +860,10 @@ test.describe("reviewing a connected source's findings", () => {
     });
     await rowAction(page, "Supplier forms", "review").click();
     const review = reviewOf(page, "Supplier forms");
-    const dismissal = review.getByRole("button", { name: /^Dismiss .*as not special category$/ });
+    const dismissal = review.getByRole("button", {
+      name: REVIEW_WORDS.dismiss.label,
+      exact: true,
+    });
     await expect(dismissal).toBeDisabled();
     const notes = notesOf(page, "Supplier forms", "Staff survey", ruleWordOf("HEALTH_CUE"));
     await expect(notes, "the survey is not noted as narrowed, and no more").toHaveText([/^\D+$/]);
@@ -883,7 +880,6 @@ test.describe("reviewing a connected source's findings", () => {
     const healthCue = review.getByRole("checkbox", { name: HEALTH_CUE_BOX });
     await expect(healthCue).toBeFocused();
     await page.keyboard.press("x");
-    await expect(dismissal).toHaveAccessibleName(REVIEW_WORDS.dismiss.named(1));
     await expect(dismissal).toBeEnabled();
 
     await page.keyboard.press("s");
@@ -1011,9 +1007,7 @@ test.describe("reviewing a connected source's findings", () => {
       ],
     });
     await rowAction(page, "Staff handbook", "review").click();
-    await page
-      .getByRole("button", { name: "Preview the passages a reader would see once published" })
-      .click();
+    await page.getByRole("button", { name: "Preview Passages" }).click();
 
     await expect(reviewOf(page, "Staff handbook").getByRole("listitem")).toHaveText([
       "The handbook says what the company decided.",
@@ -1035,13 +1029,11 @@ test.describe("reviewing a connected source's findings", () => {
     await reviewOf(page, "Supplier forms").getByRole("checkbox", { name: HEALTH_CUE_BOX }).click();
     await expect(
       reviewOf(page, "Supplier forms").getByRole("button", {
-        name: REVIEW_WORDS.dismiss.named(1),
+        name: REVIEW_WORDS.dismiss.label,
       }),
     ).toBeEnabled();
     await rowAction(page, "Supplier forms", "widen").click();
-    await expect(
-      commitOf(page, "Supplier forms", "widen", { sensitivity: "Public", audience: "everyone" }),
-    ).toBeVisible();
+    await expect(commitOf(page, "Supplier forms", "widen")).toBeVisible();
 
     const room = await page.evaluate(() => ({
       scrolls: document.documentElement.scrollWidth,
@@ -1081,17 +1073,17 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await rowAction(page, "Staff handbook", "review").focus();
     await page.keyboard.press("p");
     const dialog = page.getByRole("dialog", { name: "Publish Staff handbook" });
-    const commit = dialog.getByRole("button", { name: "Publish Staff handbook" });
+    const commit = dialog.getByRole("button", { name: "Publish", exact: true });
     await expect(commit).toBeDisabled();
     await expect(commit).toHaveAccessibleDescription(/\S/);
 
-    const carried = dialog.getByRole("region", { name: "What the audit row will carry" });
+    const carried = dialog.getByRole("region", { name: "What the Audit Log Will Record" });
     await expect(carried).toMatchAriaSnapshot(`
-      - region "What the audit row will carry":
-        - heading "What the audit row will carry" [level=3]
+      - region "What the Audit Log Will Record":
+        - heading "What the Audit Log Will Record" [level=3]
         - term: Action
         - definition
-        - term: Connected source
+        - term: Connected Source
         - definition: Staff handbook
         - term: By
         - definition
@@ -1099,29 +1091,29 @@ test.describe("publishing, narrowing and widening a connected source", () => {
         - definition: Internal
         - term: Audience
         - definition: ${quoted(AUDIENCE_WORDS.everyone)}
-        - term: Lawful basis recorded
+        - term: Lawful Basis Recorded
         - definition
-        - term: Privacy information updated
+        - term: Privacy Information Updated
         - definition
-        - term: DPIA reference recorded
+        - term: DPIA Reference Recorded
         - definition
-        - term: Findings, special category
+        - term: Findings, Special Category
         - definition: "0"
-        - term: Findings, bank details
+        - term: Findings, Bank Details
         - definition: "2"
-        - term: Findings, government identifier
+        - term: Findings, Government Identifier
         - definition: "0"
-        - term: Findings, date of birth
+        - term: Findings, Date of Birth
         - definition: "0"
-        - term: Findings, home address
+        - term: Findings, Home Address
         - definition: "1"
-        - term: Findings, personal contact
+        - term: Findings, Personal Contact
         - definition: "0"
-        - term: Findings, person name
+        - term: Findings, Person Name
         - definition: "0"
-        - term: Findings, job title
+        - term: Findings, Job Title
         - definition: "0"
-        - term: DPIA input
+        - term: DPIA Input
         - definition
     `);
 
@@ -1130,7 +1122,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       hasText: await saidNowIn(
         carried
           .getByRole("term")
-          .filter({ hasText: "Lawful basis recorded" })
+          .filter({ hasText: "Lawful Basis Recorded" })
           .locator("xpath=following-sibling::dd[1]"),
       ),
     });
@@ -1191,10 +1183,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(panel.getByRole("definition")).toHaveText([/Internal.+Restricted/]);
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
-    await commitOf(page, "Supplier payments", "narrow", {
-      sensitivity: "Restricted",
-      audience: "everyone",
-    }).focus();
+    await commitOf(page, "Supplier payments", "narrow").focus();
     await page.keyboard.press("Enter");
 
     await expect(panel).toHaveCount(0);
@@ -1246,7 +1235,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       sensitivityPicked,
       "the list of sensitivities did not hand focus back",
     ).toBeFocused();
-    const commit = panel.getByRole("button", { name: /^Widen Tender answers to / });
+    const commit = commitOf(page, "Tender answers", "widen");
     await expect(commit).toBeDisabled();
     await expect(commit).toHaveAccessibleDescription(/\S/);
     await expect(panel.getByRole("term")).toHaveCount(0);
@@ -1260,9 +1249,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     ).toBeFocused();
     await page.keyboard.press("Tab");
     await page.keyboard.press("Tab");
-    await expect(
-      commitOf(page, "Tender answers", "widen", { sensitivity: "Internal", audience: "everyone" }),
-    ).toBeFocused();
+    await expect(commit).toBeFocused();
 
     await clockTheNextKey(page, {
       at: "(//li[.//h3[.='Tender answers']]//dt[.='Sensitivity'])[1]/following-sibling::dd[1]",
@@ -1294,9 +1281,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(panel.getByRole("combobox", { name: "Sensitivity" })).toHaveText("Internal");
     await expect(panel.getByRole("term")).toHaveText(["Sensitivity"]);
     await expect(panel.getByRole("definition")).toHaveText([/Restricted.+Internal/]);
-    await expect(
-      commitOf(page, "Staff handbook", "widen", { sensitivity: "Internal", audience: "groups" }),
-    ).toBeVisible();
+    await expect(commitOf(page, "Staff handbook", "widen")).toBeVisible();
 
     await panel.getByRole("combobox", { name: "Audience" }).press("Enter");
     await page.getByRole("option", { name: AUDIENCE_WORDS.everyone }).press("Enter");
@@ -1305,8 +1290,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       /Restricted.+Internal/,
       new RegExp(`${AUDIENCE_WORDS.groups}.+${AUDIENCE_WORDS.everyone}`, "i"),
     ]);
-    const widened = { sensitivity: "Internal", audience: "everyone" } as const;
-    await commitOf(page, "Staff handbook", "widen", widened).click();
+    await commitOf(page, "Staff handbook", "widen").click();
 
     await expect(saidIn(page)).toHaveText(/Staff handbook\D+Internal/);
     await expect(sensitivityOf(page, "Staff handbook")).toHaveText("Internal");
@@ -1353,7 +1337,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(opener, "Cancel did not hand focus back to the button").toBeFocused();
 
     const moreAbout = connectedSourceNamed(page, "Staff handbook").getByRole("button", {
-      name: "More about Staff handbook",
+      name: "More Details Staff handbook",
     });
     await moreAbout.focus();
     await page.keyboard.press("w");
@@ -1371,7 +1355,6 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       workspace: "Heptonstall Slate",
       connectedSources: [indexed("Bid library"), indexed("Case studies")],
     });
-    const toPublic = { sensitivity: "Public", audience: "everyone" } as const;
 
     // The first widening reaches the api and its answer is held, so the second press meets it pending.
     const reached = Promise.withResolvers<void>();
@@ -1389,12 +1372,12 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     });
 
     await rowAction(page, "Bid library", "widen").click();
-    await commitOf(page, "Bid library", "widen", toPublic).click();
+    await commitOf(page, "Bid library", "widen").click();
     await reached.promise;
     await expect(sensitivityOf(page, "Bid library")).toHaveText("Public");
 
     await rowAction(page, "Case studies", "widen").click();
-    const second = commitOf(page, "Case studies", "widen", toPublic);
+    const second = commitOf(page, "Case studies", "widen");
     await expect(second).toHaveAttribute("aria-disabled", "true");
     await expect(second).toHaveAccessibleDescription(/\S/);
     await second.focus();
@@ -1434,10 +1417,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     ]);
     await passesTheAccessibilityGate();
 
-    await commitOf(page, "Price book", "widen", {
-      sensitivity: "Public",
-      audience: "everyone",
-    }).press("Enter");
+    await commitOf(page, "Price book", "widen").press("Enter");
 
     // The row reads widened before the api answers, and a late answer overwrites what the next
     // `w` says. The answer's counts tell it has landed.
@@ -1463,10 +1443,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
 
     await rowAction(page, "Service records", "widen").click();
     const refused = refusalAnswering(page, "sources.widen");
-    await commitOf(page, "Service records", "widen", {
-      sensitivity: "Internal",
-      audience: "everyone",
-    }).click();
+    await commitOf(page, "Service records", "widen").click();
 
     expect(await refused).toMatchObject({ word: "special-category-unreviewed" });
     await saysARefusal(connectedSourcesRegion(page).getByRole("alert"));
@@ -1487,7 +1464,7 @@ test.describe("the Sources page's keystrokes", () => {
         - paragraph
         - checkbox ${JSON.stringify(KEYSTROKE_WORDS.turnedOn)} [checked]
         - term: b
-        - definition: Connect a document
+        - definition: Connect a Document
         - term: r
         - definition
         - term: p
@@ -1524,7 +1501,7 @@ test.describe("the Sources page's keystrokes", () => {
     await expect(keystrokes).toBeFocused();
 
     await page.keyboard.press("b");
-    const connectedSource = page.getByRole("dialog", { name: "Connect a document" });
+    const connectedSource = page.getByRole("dialog", { name: "Connect a Document" });
     await expect(connectedSource).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(connectedSource).toHaveCount(0);
