@@ -81,8 +81,11 @@ export type AskCaps = {
   readonly unmappedPassages: number;
 };
 
-/** A start, to be set from measured recall. Each applies to what the reader may read. */
-export const ASK_CAPS: AskCaps = { entryPoints: 10, related: 20, unmappedPassages: 3 };
+/**
+ * Each applies to what the reader may read. `related` exceeds `entryPoints`, or the walk has no
+ * slot; a host's largest result bounds it.
+ */
+export const ASK_CAPS: AskCaps = { entryPoints: 20, related: 28, unmappedPassages: 3 };
 
 /** Runs `work` in a short read-only transaction of its own, and answers what it answered. */
 export type ReadStep<Refused = never> = <Read, Failure>(

@@ -1103,6 +1103,10 @@ describe("what ask answers with no model", () => {
     expect(irisOf(await capped(3))).toEqual([three, one, reached]);
   });
 
+  it("leaves the walk room beyond its entry points", () => {
+    expect(ASK_CAPS.related).toBeGreaterThan(ASK_CAPS.entryPoints);
+  });
+
   it("answers from its entry points when the walk times out", async () => {
     const { workspaceId, asker } = await anAsker();
     const reached = await seededIn(workspaceId, CONSOLE_EXPORTS);
