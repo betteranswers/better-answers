@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   MAP_WALK_DEPTH,
-  MAP_WALK_ROW_LIMIT,
   walkFrom,
+  walkFromEntries,
   walkTo,
   writeConceptDelta,
   type ConceptDelta,
@@ -13,7 +13,13 @@ import {
 import { citedSourcesOf, conceptIriOf, ids, ulid } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 
-import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
+import {
+  answered,
+  holdingTable,
+  postgresForSuite,
+  readingAs,
+  seedingWith,
+} from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -49,8 +55,41 @@ const walked = async (
     ),
   );
 
+const walkedFromEntries = async (
+  reader: MapScenario["admin"],
+  uids: readonly string[],
+): Promise<readonly WalkStep[]> =>
+  answered(
+    await readingAs(db().runtimePool, reader, (principal, tx) =>
+      walkFromEntries(
+        principal,
+        tx,
+        uids.map((uid) => ids.conceptIri.parse(uid)),
+      ),
+    ),
+  );
+
 const uidsByDepth = (steps: readonly WalkStep[]): readonly (readonly [string, number])[] =>
   steps.map((step) => [step.uid, step.depth]);
+
+/** A hub one hop from 1,001 spokes, more than the row limit holds. */
+const starIn = async (
+  scenario: MapScenario,
+): Promise<{ readonly hub: string; readonly spokes: readonly string[] }> => {
+  const star = await seeded(async (seed) => {
+    const hub = await seed.mapNode({ workspaceId: scenario.workspaceId });
+    const spokes = Array.from({ length: 1_001 }, () => conceptIriOf(ulid())).toSorted();
+    // Greatest uid first, so a cut taken in the order rows are met keeps the wrong spokes.
+    for (const uid of spokes.toReversed()) {
+      await seed.mapNode({ workspaceId: scenario.workspaceId, uid });
+      await seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid: hub.uid, toUid: uid });
+    }
+    return { hub: hub.uid, spokes };
+  });
+  // Autovacuum counts a live map's rows; uncounted, the planner joins every node to every step.
+  await db().pool.query("ANALYZE map_node, map_edge");
+  return star;
+};
 
 describe("a map walk", () => {
   it("reaches everything within four hops of the entry, no further", async () => {
@@ -209,28 +248,7 @@ describe("a map walk", () => {
     expect(after.map((step) => step.uid)).not.toContain(liveFar);
   });
 
-  it("caps a walk's answer at the template's row limit", async () => {
-    const scenario = await arrange();
-    const uids = await seeded(async (seed) => {
-      const nodes: string[] = [];
-      for (let at = 0; at < 8; at += 1) {
-        nodes.push((await seed.mapNode({ workspaceId: scenario.workspaceId })).uid);
-      }
-      for (const from of nodes) {
-        for (const to of nodes) {
-          if (from === to) continue;
-          await seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid: from, toUid: to });
-        }
-      }
-      return nodes;
-    });
-
-    const steps = await walked(scenario.admin, uids[0] ?? "");
-
-    expect(steps.length).toBe(MAP_WALK_ROW_LIMIT);
-  });
-
-  it("answers the path's node fields alone, nothing off an edge", async () => {
+  it("answers a node's fields alone, nothing off an edge", async () => {
     const scenario = await arrange();
     const entry = await seeded(async (seed) => {
       const a = await seed.mapNode({ workspaceId: scenario.workspaceId });
@@ -242,8 +260,126 @@ describe("a map walk", () => {
 
     expect(steps).toHaveLength(2);
     for (const step of steps) {
-      expect(Object.keys(step).toSorted()).toEqual(["depth", "kind", "label", "path", "uid"]);
+      expect(Object.keys(step).toSorted()).toEqual(["depth", "kind", "label", "uid"]);
     }
+  });
+
+  it("fails past its timeout, and the next transaction answers", async () => {
+    const scenario = await arrange();
+    const entry = await seeded((seed) => seed.mapNode({ workspaceId: scenario.workspaceId }));
+
+    await expect(
+      holdingTable(db().pool, "map_node", () => walked(scenario.viewer, entry.uid)),
+    ).rejects.toMatchObject({ code: "57014" });
+
+    expect(uidsByDepth(await walked(scenario.viewer, entry.uid))).toEqual([[entry.uid, 0]]);
+  });
+});
+
+describe("a map walk from several entries", () => {
+  it("reaches what its entries reach, each node at least depth", async () => {
+    const scenario = await arrange();
+    const { a, b, c, d, e } = await seeded(async (seed) => {
+      const node = async (): Promise<string> =>
+        (await seed.mapNode({ workspaceId: scenario.workspaceId })).uid;
+      const made = {
+        a: await node(),
+        b: await node(),
+        c: await node(),
+        d: await node(),
+        e: await node(),
+      };
+      for (const [fromUid, toUid] of [
+        [made.a, made.b],
+        [made.b, made.c],
+        [made.c, made.d],
+        [made.e, made.c],
+        [made.c, made.a],
+      ] as const) {
+        await seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid, toUid });
+      }
+      return made;
+    });
+
+    const steps = await walkedFromEntries(scenario.viewer, [a, e]);
+
+    expect(uidsByDepth(steps)).toEqual([
+      ...[a, e].toSorted().map((uid) => [uid, 0]),
+      ...[b, c].toSorted().map((uid) => [uid, 1]),
+      [d, 2],
+    ]);
+  });
+
+  it("cuts past the cap by depth then uid, every run", async () => {
+    const scenario = await arrange();
+    const { hub, spokes } = await starIn(scenario);
+    const lone = await seeded((seed) => seed.mapNode({ workspaceId: scenario.workspaceId }));
+
+    const first = await walkedFromEntries(scenario.viewer, [lone.uid, hub]);
+    const second = await walkedFromEntries(scenario.viewer, [lone.uid, hub]);
+
+    expect(uidsByDepth(first)).toEqual([
+      ...[hub, lone.uid].toSorted().map((uid) => [uid, 0]),
+      ...spokes.slice(0, 998).map((uid) => [uid, 1]),
+    ]);
+    expect(second).toEqual(first);
+  });
+
+  it("spends none of the cap on a withheld entry", async () => {
+    const scenario = await arrange();
+    const { hub, spokes } = await starIn(scenario);
+    const withheld = await seeded(async (seed) => {
+      const restricted = await seed.mapNode({
+        workspaceId: scenario.workspaceId,
+        sensitivity: "Restricted",
+      });
+      // The least uid there is: were the withheld entry walked from, this would lead depth one.
+      const behind = await seed.mapNode({
+        workspaceId: scenario.workspaceId,
+        uid: conceptIriOf("00000000000000000000000000"),
+      });
+      await seed.mapEdge({
+        workspaceId: scenario.workspaceId,
+        fromUid: restricted.uid,
+        toUid: behind.uid,
+      });
+      return restricted.uid;
+    });
+
+    const viewer = await walkedFromEntries(scenario.viewer, [withheld, hub]);
+
+    expect(uidsByDepth(viewer)).toEqual([[hub, 0], ...spokes.slice(0, 999).map((uid) => [uid, 1])]);
+    expect(viewer).toEqual(await walkedFromEntries(scenario.viewer, [hub]));
+
+    const admin = await walkedFromEntries(scenario.admin, [withheld, hub]);
+    expect(uidsByDepth(admin)).toContainEqual([withheld, 0]);
+  });
+
+  it("cuts every entry's path through a withheld node", async () => {
+    const scenario = await arrange();
+    const { entries, middle, far } = await seeded(async (seed) => {
+      const a = await seed.mapNode({ workspaceId: scenario.workspaceId });
+      const b = await seed.mapNode({ workspaceId: scenario.workspaceId });
+      const restricted = await seed.mapNode({
+        workspaceId: scenario.workspaceId,
+        sensitivity: "Restricted",
+      });
+      const c = await seed.mapNode({ workspaceId: scenario.workspaceId });
+      for (const [fromUid, toUid] of [
+        [a.uid, restricted.uid],
+        [b.uid, restricted.uid],
+        [restricted.uid, c.uid],
+      ] as const) {
+        await seed.mapEdge({ workspaceId: scenario.workspaceId, fromUid, toUid });
+      }
+      return { entries: [a.uid, b.uid].toSorted(), middle: restricted.uid, far: c.uid };
+    });
+
+    const viewer = await walkedFromEntries(scenario.viewer, entries);
+    expect(uidsByDepth(viewer)).toEqual(entries.map((uid) => [uid, 0]));
+
+    const admin = await walkedFromEntries(scenario.admin, entries);
+    expect(uidsByDepth(admin)).toEqual([...entries.map((uid) => [uid, 0]), [middle, 1], [far, 2]]);
   });
 });
 

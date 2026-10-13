@@ -198,7 +198,7 @@ describe("the preview's rendering", () => {
             title: "Expenses",
             trust: unverified,
             trustWords: "Unverified",
-            bundle: "acme",
+            collection: "acme",
             tags: [],
           },
           {
@@ -214,15 +214,50 @@ describe("the preview's rendering", () => {
               rider: null,
             },
             trustWords: "Verified by Priya Shah · 3 March 2026",
-            bundle: "acme",
+            collection: "acme",
             tags: ["travel"],
           },
         ],
       }),
     ).toBe(
       [
-        "Policy · Expenses · Unverified · https://better-answers.com/c/01A",
-        "Guide · Travel · Verified by Priya Shah · 3 March 2026 · https://better-answers.com/c/01B",
+        "Policy · Expenses · acme · Unverified · https://better-answers.com/c/01A",
+        "Guide · Travel · acme · Verified by Priya Shah · 3 March 2026 · https://better-answers.com/c/01B",
+      ].join("\n"),
+    );
+  });
+
+  it("names a concept's collection in its line, or none", () => {
+    const match = {
+      layer: "bundles",
+      kind: "Answer",
+      trust: unverified,
+      trustWords: "Unverified",
+      tags: [],
+    } as const;
+
+    expect(
+      renderFind({
+        query: "retention",
+        matches: [
+          {
+            ...match,
+            iri: "https://better-answers.com/c/01A",
+            title: "Audit log retention",
+            collection: "audits",
+          },
+          {
+            ...match,
+            iri: "https://better-answers.com/c/01B",
+            title: "Retention basics",
+            collection: null,
+          },
+        ],
+      }),
+    ).toBe(
+      [
+        "Answer · Audit log retention · audits · Unverified · https://better-answers.com/c/01A",
+        "Answer · Retention basics · No collection · Unverified · https://better-answers.com/c/01B",
       ].join("\n"),
     );
   });
@@ -784,7 +819,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
             title: CONCEPT_TITLE,
             trust: unverified,
             trustWords: "Unverified",
-            bundle: "knowledge",
+            collection: null,
             tags: [],
           },
           {
@@ -799,7 +834,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     });
     expect(found.ok && renderFind(found.value)).toBe(
       [
-        `Policy · ${CONCEPT_TITLE} · Unverified · ${iri}`,
+        `Policy · ${CONCEPT_TITLE} · No collection · Unverified · ${iri}`,
         `document · ${INVOICE_TITLE} · ${NOT_COMPANY_KNOWLEDGE} · Internal · ${invoice.locator}`,
       ].join("\n"),
     );
@@ -937,6 +972,40 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     });
   });
 
+  it("labels each concept match with its collection, or none", async () => {
+    const reader = await arrange();
+    const client = await db().pool.connect();
+    try {
+      const seed = testData(client);
+      for (const [title, path] of [
+        ["Kingfisher audits", "knowledge/audits/kingfisher.md"],
+        ["Kingfisher basics", "knowledge/kingfisher.md"],
+      ] as const) {
+        await seed.conceptIndex({
+          workspaceId: reader.workspaceId,
+          title,
+          path,
+          publishedAt: PUBLISHED_AT,
+          sensitivity: "Internal",
+        });
+      }
+    } finally {
+      client.release();
+    }
+
+    const found = await searching(reader);
+    const parsed = findOutputWith(trust).safeParse(found.ok && found.value);
+
+    expect(
+      parsed.data?.matches.map((match) =>
+        match.layer === "bundles" ? [match.title, match.collection] : [],
+      ),
+    ).toEqual([
+      ["Kingfisher audits", "audits"],
+      ["Kingfisher basics", null],
+    ]);
+  });
+
   it("keeps a two-layer search whole through find's output schema", async () => {
     const reader = await arrange();
     const { invoice, iri } = await aDocumentEachWay(reader);
@@ -955,7 +1024,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
             title: "Kingfisher policy",
             trust: unverified,
             trustWords: "Unverified",
-            bundle: "knowledge",
+            collection: null,
             tags: [],
           },
           {

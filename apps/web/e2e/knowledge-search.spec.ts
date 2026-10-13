@@ -238,6 +238,31 @@ test.describe("the Knowledge Search page", () => {
     await expect(committee).toContainText("Unverified");
   });
 
+  test("marks each match with its collection, or none", async ({ page, request }) => {
+    await anAdminAtSearch(page, request, "Nidd Records", [
+      async (api, workspace) => {
+        await seedConcepts(api, {
+          workspaceId: workspace.workspaceId,
+          userId: workspace.adminId,
+          concepts: [
+            {
+              title: "Payroll Retention",
+              collection: "finance",
+              body: "We keep payroll records for six years.",
+            },
+            { title: "Visitor Retention", body: "We keep visitor records for one year." },
+          ],
+        });
+      },
+    ]);
+
+    await searched(page, "retention");
+    await expect(matchesOf(page).filter({ hasText: "Payroll Retention" })).toContainText("finance");
+    await expect(matchesOf(page).filter({ hasText: "Visitor Retention" })).toContainText(
+      WORDS.noCollection,
+    );
+  });
+
   test("loads more, and focus lands on the first new row", async ({ page, request }) => {
     await anAdminAtSearch(page, request, "Dales Stores", [handbookSeeded]);
 

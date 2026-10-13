@@ -103,6 +103,7 @@ function ConceptLine(properties: { readonly match: ConceptMatch; readonly readin
           {match.title}
         </RowLink>
       )}
+      <Pill>{match.collection ?? WORDS.noCollection}</Pill>
       <Pill>{match.trustWords}</Pill>
     </div>
   );

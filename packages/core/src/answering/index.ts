@@ -51,6 +51,8 @@ export {
 
 export const NOT_COMPANY_KNOWLEDGE = "Not company knowledge";
 
+const NO_COLLECTION = "No collection";
+
 /** `Iri` is `string` where an iri is only read as text, as a renderer reads it. */
 type ConceptMatch<Iri extends string> = {
   readonly layer: "bundles";
@@ -59,7 +61,8 @@ type ConceptMatch<Iri extends string> = {
   readonly title: string;
   readonly trust: Trust;
   readonly trustWords: string;
-  readonly bundle: string;
+  /** Null for a concept in no collection. */
+  readonly collection: string | null;
   readonly tags: readonly string[];
 };
 
@@ -192,8 +195,6 @@ export type FeedbackReceipt = {
   readonly feedback: FeedbackInput;
 };
 
-const bundleOf = (path: string): string => path.split("/")[0] ?? path;
-
 const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
   const tags = frontmatter["tags"];
   return Array.isArray(tags) ? tags.filter((tag) => typeof tag === "string") : [];
@@ -323,7 +324,7 @@ const conceptMatchOf = (concept: OpenedConcept, now: Date): ConceptMatch<Concept
     title: concept.title,
     trust,
     trustWords: trustWords(trust),
-    bundle: bundleOf(concept.path),
+    collection: concept.collection,
     tags: tagsOf(concept.frontmatter),
   };
 };
@@ -493,7 +494,7 @@ export const giveFeedback = async (
 
 const findLine = (match: FindMatch<string>): string =>
   match.layer === "bundles"
-    ? `${match.kind} · ${match.title} · ${match.trustWords} · ${match.iri}`
+    ? `${match.kind} · ${match.title} · ${match.collection ?? NO_COLLECTION} · ${match.trustWords} · ${match.iri}`
     : `${match.kind} · ${match.title} · ${NOT_COMPANY_KNOWLEDGE} · ${match.sensitivity} · ${match.locator}`;
 
 /** A client may read only the text, so the way to the next page is written out too. */

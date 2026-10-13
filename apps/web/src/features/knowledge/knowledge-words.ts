@@ -12,6 +12,7 @@ export const SEARCH_WORDS = {
   passageLeft: "The passage you had open is no longer listed.",
   more: "More matches",
   document: "Document",
+  noCollection: "No collection",
   notCompanyKnowledge: "Not company knowledge",
 } as const;
 

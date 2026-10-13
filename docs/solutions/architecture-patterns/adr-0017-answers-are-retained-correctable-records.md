@@ -25,9 +25,12 @@ tags:
 
 Every answer the platform gives is one retained, correctable record in *Questions asked*.
 
-- Its skeleton (citations with their trust at the time, the predicate that applied, reuse and the judge's verdict, feedback, corrections) is kept for good.
-- Its content (the question, the answer, who asked) is kept twelve months by default, then thinned to the skeleton.
-- Feedback is *helpful*, or a flag with one reason: *wrong*, *out of date*, *incomplete* or *should not have shown*. The reason becomes a record in someone's queue.
+- Its skeleton is kept for good: the verdict, how the judge stood and its verdict per candidate, the predicate that applied, each returned or cited concept with its trust at the time, each unmapped passage shown by its locator, feedback and corrections.
+- Its content (the question, any prose the platform drafted, who asked) is kept twelve months by default, then thinned to the skeleton.
+- The record holds what `ask` gave. It never restates a concept's text (ADR 0014), and a page re-reads each concept as the person reading may read it now. It holds drafted prose only when the platform drafted it, so an answer an assistant wrote over MCP is kept as the concepts it was given.
+- Feedback names the record it is about and is stored on it. It is *helpful*, or a flag with one reason and the reader's note: *wrong*, *out of date*, *incomplete* or *should not have shown*. A flag on prose an assistant wrote carries the sentence disputed and the concept it rested on.
+- Storing a flag comes before routing it. S2b stores it, and S5 adds the routing that makes the reason a record in someone's queue.
+- An Admin closes a flag as fixed in the knowledge or as no fault in the knowledge, so a fault in an assistant's wording is told apart from a fault in a concept.
 - A correction is an Admin's or owner's action that records the level the answer went wrong at (concept, source or retrieval) and links the action that fixed it.
 - A retrieval correction is kept as an answer test, replayed retrieval-only when the answer path changes and weekly.
 
@@ -58,6 +61,7 @@ Control Centre is one area of eight groups: Overview, Suggestions, Sources, Mode
 - Thinning by `UPDATE`: dead tuples and held locks, where dropping a partition is free.
 - 90 days then deleted, or keeping everything until erasure: the bid cycle lost, or the largest text table in the estate within a year.
 - Thumbs only, free text only, or "missing" as a reader's reason: nothing routes.
+- Storing the assistant's final text for every answer, or a setting that makes the platform draft over MCP: an answer test replays retrieval, which the record keeps in full. What is given up is the wording a person read through an assistant, which the record holds only for a sentence someone flagged.
 - Promotion as an *edit* suggestion: a promotion has no target and no base hash until decided.
 - Admin-only promotion, every response promoted unless declined, or an Editor committing directly.
 - Refusing an uncited answer until evidence is attached: the writer stops proposing.
@@ -70,3 +74,5 @@ Control Centre is one area of eight groups: Overview, Suggestions, Sources, Mode
 The full record, with its amendments (ADR 0025 of 28/08/2026, ticket 79 applied by T-001, and the T-027 and T-028 grill): `docs/archive/adr/0017-answers-are-retained-correctable-records.md`.
 
 Edited 30/09/2026 with ADR 0047, after the archived record was frozen: Control Centre's six pages became one area of eight groups, Knowledge left it to become an area, and the refusal of pages named by verbs was lifted because Ask contradicts it.
+
+Amended 13/10/2026 on the owner's decisions of 11/10 and 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R29, with R19 to R21 and R37). The record holds what `ask` gave and no prose an assistant wrote. Feedback is stored on the record it names, a flag on an assistant's prose carries its sentence and concept, and a flag can be closed either way. A flag reaches nobody's queue until S5 builds the routing.

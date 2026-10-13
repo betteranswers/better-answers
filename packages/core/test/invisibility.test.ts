@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { walkFrom, walkTo } from "@better-answers/core/store/map";
+import { walkFrom, walkFromEntries, walkTo, walkToEntries } from "@better-answers/core/store/map";
 import { conceptIriOf, ulid, type ConceptIri } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
 import { open, renderOpen } from "../src/answering/index.ts";
-import { conceptByIri } from "../src/concepts/index.ts";
+import { conceptByIri, conceptsByIris } from "../src/concepts/index.ts";
 import { footnotesOf } from "../src/guides/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { addToGroup, deleteGroup } from "../src/members/index.ts";
@@ -196,14 +196,28 @@ describe("a source the reader may not read", () => {
   });
 });
 
+const entryLinkingToWithheld = async () => {
+  const scenario = await arrange();
+  const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
+  const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
+  const entry = await conceptCiting(scenario, scenario.editor, [internal.documentId], {
+    body: `The board's note is [here](/${withheld.path}).`,
+  });
+  return { scenario, withheld, entry };
+};
+
+/** One concept citing a Restricted document and one citing an Internal one, the same Editor's. */
+const withheldBesideVisible = async () => {
+  const scenario = await arrange();
+  const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
+  const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
+  const visible = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
+  return { scenario, withheld, visible };
+};
+
 describe("a Restricted-sourced concept, to a Viewer", () => {
   it("is invisible to either map walk, as if never mapped", async () => {
-    const scenario = await arrange();
-    const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
-    const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
-    const entry = await conceptCiting(scenario, scenario.editor, [internal.documentId], {
-      body: `The board's note is [here](/${withheld.path}).`,
-    });
+    const { scenario, withheld, entry } = await entryLinkingToWithheld();
 
     const outward = answered(
       await reading(scenario.viewer, (viewer, tx) => walkFrom(viewer, tx, entry.iri)),
@@ -229,11 +243,33 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
     expect(admin.map((step) => step.uid).toSorted()).toEqual([entry.iri, withheld.iri].toSorted());
   });
 
+  it("adds nothing to a walk it is one entry of", async () => {
+    const { scenario, withheld, entry } = await entryLinkingToWithheld();
+    const entries = [withheld.iri, entry.iri];
+
+    const outward = answered(
+      await reading(scenario.viewer, (viewer, tx) => walkFromEntries(viewer, tx, entries)),
+    );
+    const inward = answered(
+      await reading(scenario.viewer, (viewer, tx) => walkToEntries(viewer, tx, entries)),
+    );
+
+    expect(outward.map((step) => [step.uid, step.depth])).toEqual([[entry.iri, 0]]);
+    expect(inward.map((step) => [step.uid, step.depth])).toEqual([[entry.iri, 0]]);
+
+    const admin = answered(
+      await reading(scenario.admin, (reader, tx) => walkFromEntries(reader, tx, entries)),
+    );
+    expect(admin.map((step) => [step.uid, step.depth]).toSorted()).toEqual(
+      [
+        [entry.iri, 0],
+        [withheld.iri, 0],
+      ].toSorted(),
+    );
+  });
+
   it("leaves no gap in footnotes and hides its narrowed write-up", async () => {
-    const scenario = await arrange();
-    const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
-    const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
-    const visible = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
+    const { scenario, withheld, visible } = await withheldBesideVisible();
 
     const { behind, narrowed } = await seededBy(db(), async (seed) => {
       const first = await seed.writeUp({ workspaceId: scenario.workspaceId });
@@ -401,5 +437,20 @@ describe("a document narrowed under a source its siblings stand under", () => {
       await reaches(scenario.viewer, onWider.iri),
       await reaches(scenario.admin, onWider.iri),
     ]).toEqual([false, true]);
+  });
+});
+
+describe("concepts read together by iri", () => {
+  it("answers the readable ones by iri, withheld ones left out", async () => {
+    const { scenario, withheld, visible } = await withheldBesideVisible();
+    const iris = [withheld.iri, conceptIriOf(ulid()), visible.iri];
+    const readBy = async (person: UserPrincipal): Promise<readonly ConceptIri[]> => {
+      const read = await reading(person, (reader, tx) => conceptsByIris(reader, tx, iris));
+      if (!read.ok) throw read.error;
+      return read.value.map((concept) => concept.iri);
+    };
+
+    expect(await readBy(scenario.viewer)).toEqual([visible.iri]);
+    expect(await readBy(scenario.admin)).toEqual([visible.iri, withheld.iri].toSorted());
   });
 });

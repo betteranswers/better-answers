@@ -11,11 +11,13 @@ import type { FrontmatterValue, TrustStatus } from "../src/answering/index.ts";
 import {
   contentHashOf,
   conceptByIri,
+  findConcepts,
   foldKind,
   parseConceptFile,
   renderConceptFile,
   trustWords,
   writeConcept,
+  type ConceptBound,
   type Frontmatter,
   type Trust,
   type WriteConceptInput,
@@ -37,7 +39,7 @@ import {
   removeRepository,
 } from "./bundle.ts";
 import { gitStarts } from "./git-starts.ts";
-import { connectedSourceHolding } from "./sourced-concept.ts";
+import { conceptCiting, connectedSourceHolding } from "./sourced-concept.ts";
 import {
   abortTheTransaction,
   answered,
@@ -1833,6 +1835,111 @@ describe("opening a concept by IRI", () => {
     );
 
     expect(reached).toEqual({ ok: true, value: undefined });
+  });
+});
+
+const RETENTION = "Retention of audit logs";
+
+const retentionAt = (scenario: Scenario, path: string) =>
+  conceptCiting(scenario, scenario.editor, [], { path, title: RETENTION, sensitivity: "Internal" });
+
+const retentionPaths = async (reader: UserPrincipal, collections?: readonly string[]) => {
+  const found = await reading(reader, (principal, tx) =>
+    findConcepts(principal, tx, { query: "retention", strength: "strong", limit: 10, collections }),
+  );
+  return found.ok ? found.value.map(({ concept }) => concept.path).toSorted() : found;
+};
+
+describe("a concept's collection", () => {
+  it("is the folder directly under knowledge, or none", async () => {
+    const scenario = await arrange();
+    const written = [
+      await retentionAt(scenario, "knowledge/audits/retention.md"),
+      await retentionAt(scenario, "knowledge/audits/logs/retention.md"),
+      await retentionAt(scenario, "knowledge/retention.md"),
+    ];
+
+    const read = await Promise.all(
+      written.map(({ iri }) =>
+        reading(scenario.viewer, (reader, tx) => conceptByIri(reader, tx, iri)),
+      ),
+    );
+
+    expect(read.map((concept) => concept.ok && concept.value?.collection)).toEqual([
+      "audits",
+      "audits",
+      null,
+    ]);
+  });
+
+  it("narrows a match to the collections named", async () => {
+    const scenario = await arrange();
+    await retentionAt(scenario, "knowledge/audits/retention.md");
+    await retentionAt(scenario, "knowledge/lms/retention.md");
+    await retentionAt(scenario, "knowledge/website/retention.md");
+
+    expect(await retentionPaths(scenario.viewer, ["audits"])).toEqual([
+      "knowledge/audits/retention.md",
+    ]);
+    expect(await retentionPaths(scenario.viewer, ["website", "audits"])).toEqual([
+      "knowledge/audits/retention.md",
+      "knowledge/website/retention.md",
+    ]);
+  });
+
+  it("keeps the narrowing on the page after a bound", async () => {
+    const scenario = await arrange();
+    await retentionAt(scenario, "knowledge/audits/retention.md");
+    await retentionAt(scenario, "knowledge/lms/retention.md");
+    await retentionAt(scenario, "knowledge/website/retention.md");
+    const page = (after?: ConceptBound) =>
+      reading(scenario.viewer, (principal, tx) =>
+        findConcepts(principal, tx, {
+          query: "retention",
+          strength: "strong",
+          limit: 1,
+          collections: ["audits", "website"],
+          after,
+        }),
+      );
+
+    const first = await page();
+    const second = await page(first.ok ? first.value[0]?.bound : undefined);
+    const third = await page(second.ok ? second.value[0]?.bound : undefined);
+
+    expect(
+      [first, second, third]
+        .flatMap((read) => (read.ok ? read.value.map(({ concept }) => concept.path) : []))
+        .toSorted(),
+    ).toEqual(["knowledge/audits/retention.md", "knowledge/website/retention.md"]);
+    expect(third).toEqual({ ok: true, value: [] });
+  });
+
+  it("holds Audits and audits apart", async () => {
+    const scenario = await arrange();
+    await retentionAt(scenario, "knowledge/Audits/retention.md");
+    await retentionAt(scenario, "knowledge/audits/retention.md");
+
+    expect(await retentionPaths(scenario.viewer, ["Audits"])).toEqual([
+      "knowledge/Audits/retention.md",
+    ]);
+    expect(await retentionPaths(scenario.viewer, ["audits"])).toEqual([
+      "knowledge/audits/retention.md",
+    ]);
+  });
+
+  it("matches a concept in no collection unless one is named", async () => {
+    const scenario = await arrange();
+    await retentionAt(scenario, "knowledge/audits/retention.md");
+    await retentionAt(scenario, "knowledge/retention.md");
+
+    expect(await retentionPaths(scenario.viewer)).toEqual([
+      "knowledge/audits/retention.md",
+      "knowledge/retention.md",
+    ]);
+    expect(await retentionPaths(scenario.viewer, ["audits"])).toEqual([
+      "knowledge/audits/retention.md",
+    ]);
   });
 });
 

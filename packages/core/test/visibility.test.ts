@@ -13,7 +13,9 @@ import { ask, find, open } from "../src/answering/index.ts";
 import { STORED_DETAIL_KEYS } from "../src/audit/index.ts";
 import {
   cascadingVisibility,
+  findConcepts,
   overrideConceptSensitivity,
+  readableCollections,
   writeConcept,
 } from "../src/concepts/index.ts";
 import { footnotesOf } from "../src/guides/index.ts";
@@ -1878,7 +1880,7 @@ describe("find", () => {
               rider: null,
             },
             trustWords: "Unverified",
-            bundle: "knowledge",
+            collection: null,
             tags: ["finance"],
           },
         ],
@@ -1943,5 +1945,67 @@ describe("find", () => {
     ]);
     expect(pattern?.ok && pattern.value.matches).toEqual([]);
     expect(empty?.ok && empty.value.matches).toEqual([]);
+  });
+});
+
+const RETENTION = "Retention of audit logs";
+
+/** `audits` holds a concept every reader may read, and `lms` only one a Viewer may not. */
+const auditsReadableAndLmsWithheld = async (scenario: Scenario) => {
+  const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
+  await conceptCiting(scenario, scenario.editor, [internal.documentId], {
+    path: "knowledge/audits/retention.md",
+    title: RETENTION,
+  });
+  await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
+    path: "knowledge/lms/retention.md",
+    title: RETENTION,
+  });
+};
+
+const retentionIn = (person: UserPrincipal, collections: readonly string[]) =>
+  reading(person, async (reader, tx) => {
+    const found = await findConcepts(reader, tx, {
+      query: "retention",
+      strength: "strong",
+      limit: 10,
+      collections,
+    });
+    return found.ok ? ok(found.value.map(({ concept }) => concept.path)) : found;
+  });
+
+describe("the collections a reader meets", () => {
+  it("answers an unreadable collection as one that does not exist", async () => {
+    const scenario = await arrange();
+    await auditsReadableAndLmsWithheld(scenario);
+
+    const unreadable = await retentionIn(scenario.viewer, ["lms"]);
+    const absent = await retentionIn(scenario.viewer, ["payroll"]);
+    const admins = await retentionIn(scenario.admin, ["lms"]);
+
+    expect(unreadable).toEqual({ ok: true, value: [] });
+    expect(absent).toEqual(unreadable);
+    expect(admins).toEqual({ ok: true, value: ["knowledge/lms/retention.md"] });
+  });
+
+  it("offers only collections holding a concept the reader may read", async () => {
+    const scenario = await arrange();
+    await auditsReadableAndLmsWithheld(scenario);
+    await conceptCiting(scenario, scenario.editor, [], {
+      path: "knowledge/retention.md",
+      title: RETENTION,
+      sensitivity: "Internal",
+    });
+
+    const offered = await Promise.all(
+      [scenario.viewer, scenario.admin].map((person) =>
+        reading(person, (reader, tx) => readableCollections(reader, tx)),
+      ),
+    );
+
+    expect(offered).toEqual([
+      { ok: true, value: ["audits"] },
+      { ok: true, value: ["audits", "lms"] },
+    ]);
   });
 });

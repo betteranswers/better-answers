@@ -96,6 +96,54 @@ describe("the browser suite's knowledge harness", () => {
     expect(seen).not.toContain(restricted?.iri);
   });
 
+  it("lands a concept in the collection its seed names", async () => {
+    const workspace = await app().provision();
+    await conceptsSeeded({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      concepts: [
+        {
+          title: "Quarry audit trail",
+          body: "The synthetic quarry audit trail is kept a year.",
+          collection: "audits",
+        },
+        { title: "Quarry audit basics", body: "A synthetic quarry audit is yearly." },
+      ],
+    });
+
+    const hits = rpcListOf(
+      (await calledBy(workspace.admin, "find", { query: "quarry audit" }))["hits"],
+    );
+
+    expect(Object.fromEntries(hits.map((hit) => [hit["title"], hit["collection"]]))).toEqual({
+      "Quarry audit trail": "audits",
+      "Quarry audit basics": null,
+    });
+  });
+
+  it("links a concept in a collection to one outside it", async () => {
+    const workspace = await app().provision();
+    const [basics, trail] = await conceptsSeeded({
+      workspaceId: workspace.workspaceId,
+      userId: workspace.admin.id,
+      concepts: [
+        { title: "Quarry audit basics", body: "A synthetic quarry audit is yearly." },
+        {
+          title: "Quarry audit trail",
+          body: "The synthetic quarry audit trail is kept a year.",
+          collection: "audits",
+          linksTo: ["Quarry audit basics"],
+        },
+      ],
+    });
+
+    const opened = await calledBy(workspace.admin, "open", { iri: trail?.iri });
+
+    expect(rpcListOf(rpcOf(opened["concept"])["bodyLinks"])).toEqual([
+      { ordinal: 0, address: "../quarry-audit-basics.md", target: basics?.iri },
+    ]);
+  });
+
   it("lands a concept whose cited passage opens for an Admin", async () => {
     const workspace = await app().provision();
     const [concept] = await conceptsSeeded({

@@ -50,12 +50,13 @@ export type WalkStep = {
   readonly label: string;
   readonly kind: string | null;
   readonly depth: number;
-  readonly path: readonly string[];
 };
 
 export const MAP_WALK_DEPTH = 4;
 
-export const MAP_WALK_ROW_LIMIT = 1_000;
+const MAP_WALK_ROW_LIMIT = 1_000;
+
+const MAP_WALK_TIMEOUT_MS = 2_000;
 
 type OutgoingEdge = {
   readonly uid: string;
@@ -410,30 +411,32 @@ export const writeConceptVisibility = async (
  */
 const walkStatement = (outward: boolean): string => {
   const [source, sink] = outward ? ["from_uid", "to_uid"] : ["to_uid", "from_uid"];
+  // UNION keeps a node once per depth, so the walk costs the edges crossed, never the paths.
   return `WITH RECURSIVE live AS (
     SELECT live_gen FROM map_generation WHERE workspace_id = $1
   ),
   walk AS (
-    SELECT n.uid, n.label, n.kind, 0 AS depth, ARRAY[n.uid] AS path
+    SELECT n.uid, n.label, n.kind, 0 AS depth
       FROM map_node n
       JOIN live ON n.gen IS NULL OR n.gen = live.live_gen
-     WHERE n.workspace_id = $1 AND n.uid = $2
+     WHERE n.workspace_id = $1 AND n.uid = ANY($2::text[])
        AND ${readableClause("n", 3)}
-    UNION ALL
-    SELECT m.uid, m.label, m.kind, w.depth + 1, w.path || m.uid
+    UNION
+    SELECT m.uid, m.label, m.kind, w.depth + 1
       FROM walk w
       JOIN map_edge e ON e.workspace_id = $1 AND e.${source} = w.uid
       JOIN live edge_live ON e.gen IS NULL OR e.gen = edge_live.live_gen
       JOIN map_node m ON m.workspace_id = $1 AND m.uid = e.${sink}
       JOIN live node_live ON m.gen IS NULL OR m.gen = node_live.live_gen
      WHERE w.depth < ${MAP_WALK_DEPTH}
-       AND m.uid <> ALL(w.path)
        AND ${readableClause("e", 3)}
        AND ${readableClause("m", 3)}
   )
-  SELECT uid, label, kind, depth, path
-    FROM (SELECT uid, label, kind, depth, path FROM walk LIMIT ${MAP_WALK_ROW_LIMIT}) reached
-   ORDER BY depth, uid`;
+  SELECT uid, label, kind, min(depth) AS depth
+    FROM walk
+   GROUP BY uid, label, kind
+   ORDER BY depth, uid
+   LIMIT ${MAP_WALK_ROW_LIMIT}`;
 };
 
 const WALK_FROM = walkStatement(true);
@@ -443,33 +446,49 @@ const walk = async (
   statement: string,
   principal: UserPrincipal,
   tx: Tx,
-  uid: string,
+  uids: readonly string[],
 ): Promise<readonly WalkStep[]> => {
+  // Transaction-local, so it also bounds whatever the same short read runs after the walk.
+  await tx.query("SELECT set_config('statement_timeout', $1, true)", [String(MAP_WALK_TIMEOUT_MS)]);
   const found = await tx.query<WalkStep>(statement, [
     principal.workspaceId,
-    uid,
+    uids,
     ...readableParameters(principal),
   ]);
   return found.rows;
 };
 
 /**
- * One step per acyclic path out of `uid`, the start at depth 0, to MAP_WALK_DEPTH hops and at
- * most MAP_WALK_ROW_LIMIT rows. A path stops at the first node or edge the principal cannot
- * read. With no live generation the walk finds nothing.
+ * One step per node within MAP_WALK_DEPTH hops out of `uids`, at its least depth. The nearest
+ * MAP_WALK_ROW_LIMIT survive, the same on every run. A path stops at the first node or edge the
+ * principal cannot read. Past MAP_WALK_TIMEOUT_MS the walk rejects, its transaction aborted.
  */
+export const walkFromEntries = (
+  principal: UserPrincipal,
+  tx: Tx,
+  uids: readonly ConceptIri[],
+): Promise<readonly WalkStep[]> => walk(WALK_FROM, principal, tx, uids);
+
+/** As walkFromEntries, against the edges' direction: the nodes that lead into any of `uids`. */
+export const walkToEntries = (
+  principal: UserPrincipal,
+  tx: Tx,
+  uids: readonly string[],
+): Promise<readonly WalkStep[]> => walk(WALK_TO, principal, tx, uids);
+
+/** As walkFromEntries, from the one entry `uid`. With no live generation it finds nothing. */
 export const walkFrom = (
   principal: UserPrincipal,
   tx: Tx,
   uid: ConceptIri,
-): Promise<readonly WalkStep[]> => walk(WALK_FROM, principal, tx, uid);
+): Promise<readonly WalkStep[]> => walkFromEntries(principal, tx, [uid]);
 
-/** As walkFrom, against the edges' direction: the paths into `uid`. */
+/** As walkToEntries, into the one entry `uid`. */
 export const walkTo = (
   principal: UserPrincipal,
   tx: Tx,
   uid: string,
-): Promise<readonly WalkStep[]> => walk(WALK_TO, principal, tx, uid);
+): Promise<readonly WalkStep[]> => walkToEntries(principal, tx, [uid]);
 
 export type MapCounts = {
   readonly liveGen: number | null;

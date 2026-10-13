@@ -10,6 +10,7 @@ applies_when:
   - "Changing a redaction rule, a descriptor, the window rule or what a finding row holds"
   - "Touching the erasure routine, a subject request, a suppression or the replay copy"
   - "Adding a store, a column or a copy that could hold a person's identifier"
+  - "Sending a model text a person typed, such as a question or a note"
 tags:
   - adr-0020
   - redaction-seam
@@ -32,6 +33,14 @@ The **redaction seam** withholds personal data in the worker's conversion step a
 - A **finding** is its document, its rule and its two offsets into the normalised text. Its category, tier, score and version pair are the last sync's reading of it.
 - An Admin's restore, *keep in text* or special-category dismissal reaches the next sync as an argument, never a change key. An erasure outranks all three.
 - The seam answers one **withholding** per finding and never rewrites a finding.
+
+Text a person types, such as a question or a note on a flag, never passes the worker's seam. The **typed-text check** covers it in the api tier.
+
+- Before any model call, typed text is read against the always tier, and each hit is replaced by a placeholder in what the model is sent. The record keeps the text as typed.
+- Core reads the three always-tier categories with detectors of its own. Cases in `contracts/redaction` hold them to the worker's, and both tiers run every case. The worker's patterns and its detector version do not change.
+- The limit is stated: a name in typed text is not withheld. The always tier is patterns, which the api tier can read, and a name needs the detector's model, which it cannot.
+- A special-category cue withholds its whole sentence, so a one-sentence question that holds one reaches the model as a placeholder alone.
+- S2b builds the check, and the tree does not hold it yet.
 
 The erasure routine rewrites what the platform wrote; a person edits what the company wrote.
 
@@ -67,7 +76,10 @@ A **suppression** is the workspace's: one per erasure request, holding the reque
 - Typed placeholders for the always set, or an "incomplete" hint: each tells the reader what exists.
 - A targeted text replacement over concept bodies: it rewrites what the company asserts.
 - A keyed hash of each finding's value: a hash of a value is the value.
+- Calling no model when a question holds an identifier, or sending a question as typed: a person who pastes a form row with an account number gets no answer, or the number reaches a provider. What is given up is a name: one typed into a question reaches the model.
 
 ## History
 
 The full record, with its seventeen amendments (among them T-001, T-073, T-121, T-124, T-132, T-177, T-176, T-201, T-286, T-220, T-366 and the T-027/T-028 grill): `docs/archive/adr/0020-personal-data-withheld-at-the-seam.md`.
+
+Amended 13/10/2026 on the owner's decision of 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R42 and KTD12). S2b is the first block to send a model text a person typed, which the seam never reads. The typed-text check reads it against the always tier before the call. Names in typed text are not withheld, and the record keeps the text as typed.

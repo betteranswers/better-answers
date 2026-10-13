@@ -87,6 +87,11 @@ service, one sector, listed with its owners on Knowledge › Collections and own
 The knowledge base is organised collection-first, and a collection is a future bundle boundary. Not
 an email domain.
 
+A concept's collection is the folder directly under `knowledge/` that its file sits in, compared
+exactly as the folder is spelled. A concept directly under `knowledge/` is in none and reads *No
+collection*. `ask` takes the collections a question concerns as its `collections` argument, and
+labels each `Answer` it returns with its collection.
+
 ### knowledge base
 
 What a page calls a company's knowledge, held as one OKF *bundle*: what a reader is told a concept
@@ -718,11 +723,13 @@ workspace's spending limit, waits for re-acceptance.
 
 ### spending limit
 
-The workspace's cap on what extraction may spend, held as a config row and read before a sync and
-before an ad-hoc draft, and shown on Models › Models and spend.
+The workspace's cap on what its model calls may spend in a calendar month, held as a config row,
+read before a sync, before an ad-hoc draft and before a question's model call, and shown on
+Models › Models and spend.
 
 At the limit the platform refuses in one sentence naming who can raise it, and never silently
-narrows the work. Distinct from a cost estimate's price, which is one connected source's scope.
+narrows the work. `find` and `open` call no model and keep working. With no limit set, no model is
+called. Distinct from a cost estimate's price, which is one connected source's scope.
 
 ### extraction template
 
@@ -1054,17 +1061,38 @@ carrying its unmapped passages, when nothing on the map answers.
 
 ### answer
 
-What the platform returns for a question: prose asserting concepts only, a passage per claim, its
-verdict for the caller's role, and what it could not answer — found by traversal first (an
-existing `Answer` reused as it stands, shown with the question it answered) and drafted over the
-walk's concepts otherwise.
+What the platform returns for a question: its verdict for the caller's role, every `Answer` that
+fits as it stands, shown with the question it answered, or else the concepts that bear on the
+question, and what it could not answer — found by traversal first.
 
-Not the `Answer` concept (a Q&A pair), which an answer may reuse or cite.
+Prose asserts concepts only, with a passage per claim: an assistant writes it over MCP, and the
+platform drafts it on Ask. Not the `Answer` concept (a Q&A pair), which an answer may reuse or
+cite.
 
 ### answer contract
 
 _Internal._ the one shape an answer takes for the UI, MCP and the response record: an event
 stream — verdict first — folded into one object.
+
+### related knowledge
+
+The verdict of an answer that holds the concepts bearing on a question when no `Answer` is a judged
+fit; its key on the wire is `related`.
+
+A concept bears on a question when it is an entry point or the walk reaches it from one. The
+verdict's first line never says the question was answered. An `Answer` with no judge's yes is
+related knowledge and is never shown as a fit.
+
+### judge
+
+The one typed judgement that decides, for each candidate `Answer`, whether it answers the question
+as asked: yes or no, never a ranking of one candidate against another.
+
+It runs on the judging model choice. Every answer says how its judge stood, in one of three words:
+*Not judged*, where the workspace has no judging model choice or no spending limit, or no `Answer`
+was a candidate; *Judged*; and *Judging failed*, where the call failed and its candidates are
+returned as related knowledge. Their keys on the wire are `not-judged`, `judged` and
+`judging-failed`.
 
 ### match
 
@@ -2262,5 +2290,7 @@ here lands one.
   one of members.
 - The *evidence pane* and the *evidence panel* are distinct: the pane lists a concept's sources and
   the reader's access to them, and the panel is where one source opens beside its claim.
+- *Evidence* and *related knowledge* are distinct: evidence is a locator into a source that backs a
+  concept, and related knowledge is the concepts an answer returns when no `Answer` is a judged fit.
 - *Tenant* and *workspace* name one boundary: a page says *workspace*, and *tenant* is the same
   boundary said from the platform's side, never a second concept.

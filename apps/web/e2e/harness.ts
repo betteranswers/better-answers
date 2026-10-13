@@ -309,6 +309,8 @@ type SeedFrontmatterEntry = Readonly<Record<string, string | number | boolean | 
 /** A body that writes `[^source-N]` places that source's mark; the rest follow its last word. */
 type SeedConcept = {
   readonly title: string;
+  /** The folder under `knowledge/` the concept's file sits in; it sits in none when not given. */
+  readonly collection?: string;
   readonly body: string;
   readonly kind?: string;
   readonly sensitivity?: Sensitivity;
