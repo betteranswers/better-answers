@@ -6,7 +6,6 @@ import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts"
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { headingOf, HOMES, type Role, type Area } from "@/shared/navigation.ts";
-import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
 
 /** Named for the person, though it shows their initials alone. */
 export const avatarOf = (page: Page, who: string): Locator =>
@@ -216,17 +215,17 @@ export const saysARefusal = (
   within?: { readonly timeout: number },
 ): Promise<void> => expect(alert, "the alert says nothing").toHaveText(/\S/, within);
 
-/** The word stays off the page: it is for the logs and the wire. */
-export const saysItsSentenceNotItsWord = async <Word extends RefusalWord>(
-  alert: Locator,
-  refused: { readonly table: Readonly<Record<Word, Said>>; readonly word: Word },
-): Promise<void> => {
-  const { word } = refused;
-  await expect(alert).toHaveText(sentenceOf(refused.table[word]));
-  await expect(alert.page().locator("body"), `the page shows the word ${word}`).not.toContainText(
-    word,
+/** A wait is said in whole minutes, rounded up, and a single minute in words, which leave no number to match. */
+export const saysTheWait = (alert: Locator, waitSeconds: number): Promise<void> => {
+  const minutes = Math.ceil(waitSeconds / 60);
+  return expect(alert, `the alert does not say a wait of ${String(minutes)} minutes`).toHaveText(
+    minutes > 1 ? new RegExp(String.raw`\b${String(minutes)}\b`) : /\S/,
   );
 };
+
+/** The word stays off the page: it is for the logs and the wire. */
+export const keepsItsWordOffThePage = (page: Page, word: RefusalWord): Promise<void> =>
+  expect(page.locator("body"), `the page shows the word ${word}`).not.toContainText(word);
 
 /** The key in fours, as the page writes it out for typing into a phone. */
 const KEY_IN_FOURS = /^[A-Z2-7]{4}(?: [A-Z2-7]{1,4})+$/;

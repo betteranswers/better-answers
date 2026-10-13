@@ -1,10 +1,8 @@
 import type { Page } from "@playwright/test";
 
 import { ASK_TO_JOIN_WORDS, SHORT_NAME_EXAMPLE } from "@/features/auth/ask-to-join-words.ts";
-import { askedTooOften, REASON_REFUSED } from "@/features/auth/refusal-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { SAID_OF_CLASS, sentenceOf, SIGN_IN_AGAIN } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -12,12 +10,17 @@ import {
   keystrokesDismissed,
   keystrokesListed,
   provision,
+  saysARefusal,
+  saysTheWait,
   signedInWithNoWorkspace,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 /** Stated, not imported: `apps/web` takes nothing from `apps/api` at runtime. */
-const ASK_TO_JOIN_ENDPOINT = "/trpc/person.requestAccess";
+const ASK_TO_JOIN = "person.requestAccess";
+
+const ASK_TO_JOIN_ENDPOINT = `/trpc/${ASK_TO_JOIN}`;
 
 const REASON = "I run the estimating desk and need the tender library.";
 
@@ -142,9 +145,11 @@ test("refuses a blank reason, saying what to send", async ({
   await expect(refusal, "the refusal region stands with words already in it").toBeEmpty();
   const stood = await refusal.elementHandle();
 
+  const refused = refusalAnswering(page, ASK_TO_JOIN);
   await askToJoin(page, workspace.shortName, "   ");
 
-  await expect(refusal).toHaveText(sentenceOf(REASON_REFUSED));
+  expect(await refused).toMatchObject({ word: "malformed", class: "malformed" });
+  await saysARefusal(refusal);
   const sameRegion = await refusal.evaluate((now, then) => now === then, stood);
   expect(sameRegion, "the refusal came in an alert region of its own").toBe(true);
   await expect(reasonField(page)).toHaveAttribute("aria-invalid", "true");
@@ -168,12 +173,12 @@ test("tells a person past the ceiling when to ask again", async ({ page, request
   }
   expect(status, "the flood never met the ceiling").toBe(429);
 
-  const refused = page.waitForResponse((response) => response.url().includes(ASK_TO_JOIN_ENDPOINT));
+  const refused = refusalAnswering(page, ASK_TO_JOIN);
   await askToJoin(page, A_SHORT_NAME);
-  const liftsInSeconds = Number((await refused).headers()["retry-after"]);
+  const { waitSeconds = 0 } = await refused;
 
-  expect(liftsInSeconds, "the ceiling's answer named no wait").toBeGreaterThan(0);
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(askedTooOften(liftsInSeconds)));
+  expect(waitSeconds, "the ceiling's answer named no wait").toBeGreaterThan(0);
+  await saysTheWait(page.getByRole("alert"), waitSeconds);
   await expect(askButton(page)).toBeFocused();
   await expect(requestSent(page)).toHaveCount(0);
   await thePageSaysNeither(page, "at the ceiling");
@@ -183,11 +188,13 @@ test("sends a person whose session ended back to sign in", async ({ page, contex
   await signedInWithNoWorkspace(page, request, "asker");
   await context.clearCookies();
 
+  const refused = refusalAnswering(page, ASK_TO_JOIN);
   await askToJoin(page, A_SHORT_NAME);
 
-  await expect(page.getByRole("alert")).toHaveText(SAID_OF_CLASS.unauthenticated.why);
+  expect(await refused).toMatchObject({ class: "unauthenticated" });
+  await saysARefusal(page.getByRole("alert"));
   await thePageSaysNeither(page, "once the session ended");
-  await page.getByRole("button", { name: SIGN_IN_AGAIN }).click();
+  await page.getByRole("button", { name: "Sign in again" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 });
 

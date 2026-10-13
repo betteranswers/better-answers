@@ -13,35 +13,30 @@ import {
   RECOVERY_CODE_WORDS,
 } from "@/features/auth/account-words.ts";
 import {
-  AUTHENTICATOR_CODE_WRONG,
-  RESTORE_CODE_WRONG,
-  SAID_OF_SECOND_FACTOR,
-  tooManyCodesTriedOr,
-} from "@/features/auth/refusal-words.ts";
-import {
   CONFIRM_WORDS,
   RECOVERY_WORDS,
   SETUP_WORDS,
   USE_CODE,
 } from "@/features/auth/second-factor-words.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  enrolledWith,
+  keepsItsWordOffThePage,
   keyShown,
   landedAtHome,
   provision,
   quoted,
   refusedDigitsSelected,
   restored,
-  saysItsSentenceNotItsWord,
+  saysTheWait,
   signIn,
   signInByEmail,
-  enrolledWith,
 } from "./harness.ts";
+import { authAnswering } from "./refused-read.ts";
 import { aVirtualAuthenticator, withoutWebAuthn } from "./virtual-authenticator.ts";
 
-const CONFIRM_BY_CODE = "**/second-factor/confirm/authenticator";
+const CONFIRM_BY_CODE = "/second-factor/confirm/authenticator";
 
 const TOO_MANY_REQUESTS = 429;
 
@@ -165,10 +160,10 @@ const authenticatorSetUpThere = async (page: Page): Promise<string> => {
 /** Wrong codes until the field must wait; answers the wait the api named, in seconds. */
 const wrongCodesUntilTheWait = async (page: Page, key: string): Promise<number> => {
   for (let tried = 1; tried <= MOST_TRIES; tried += 1) {
-    const answered = page.waitForResponse(CONFIRM_BY_CODE);
+    const answered = authAnswering(page, CONFIRM_BY_CODE);
     await codeField(page).fill(aWrongCode(codeOf(key), tried));
-    const answer = await answered;
-    if (answer.status() === TOO_MANY_REQUESTS) return Number(answer.headers()["retry-after"]);
+    const { status, waitSeconds = 0 } = await answered;
+    if (status === TOO_MANY_REQUESTS) return waitSeconds;
   }
   throw new Error(`${String(MOST_TRIES)} wrong codes, and the field never had to wait`);
 };
@@ -201,9 +196,11 @@ test("a wrong authenticator code is refused; the right one confirms", async ({ p
   await page.goto("/confirm");
   await expect(codeField(page)).toBeFocused();
 
+  const refused = authAnswering(page, CONFIRM_BY_CODE);
   await codeField(page).fill(aWrongCode(codeOf(key)));
 
-  await expect(theRefusal(page)).toHaveText(sentenceOf(AUTHENTICATOR_CODE_WRONG));
+  expect(await refused).toMatchObject({ status: 400 });
+  await expect(theRefusal(page)).toBeVisible();
   await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
   await refusedDigitsSelected(codeField(page));
   await page.keyboard.type(codeOf(key));
@@ -220,9 +217,7 @@ test("repeated wrong codes make the field wait; passkeys still confirm", async (
 
   const waitSeconds = await wrongCodesUntilTheWait(page, key);
 
-  await expect(theRefusal(page)).toHaveText(
-    sentenceOf(tooManyCodesTriedOr(waitSeconds, ["passkey", "recovery-code"])),
-  );
+  await saysTheWait(theRefusal(page), waitSeconds);
   await expect(codeField(page)).not.toBeEditable();
   await passesTheAccessibilityGate();
   await passkeyButton(page).click();
@@ -246,8 +241,10 @@ test("a recovery code's setup swaps in a new authenticator", async ({
   await landedAtHome(page, "Admin");
   await signedInAgain(page, request, email);
   await page.goto("/confirm");
+  const refused = authAnswering(page, CONFIRM_BY_CODE);
   await codeField(page).fill(codeOf(key));
-  await expect(theRefusal(page)).toHaveText(sentenceOf(AUTHENTICATOR_CODE_WRONG));
+  expect(await refused).toMatchObject({ status: 400 });
+  await expect(theRefusal(page)).toBeVisible();
   await codeField(page).fill(codeOf(newKey));
   await landedAtHome(page, "Admin");
 });
@@ -277,9 +274,11 @@ test("a restored Admin gives the restore code before any setup", async ({
   await expect(addAPasskey(page)).toHaveCount(0);
   await expect(authenticatorInstead(page)).toHaveCount(0);
 
+  const refused = authAnswering(page, "/second-factor/restore");
   await codeUsed(restoreField(page), "0000-0000-0000-0000");
 
-  await expect(theRefusal(page)).toHaveText(sentenceOf(RESTORE_CODE_WRONG));
+  expect(await refused).toMatchObject({ status: 400 });
+  await expect(theRefusal(page)).toBeVisible();
   await expect(authenticatorInstead(page)).toHaveCount(0);
   await passesTheAccessibilityGate();
   await page.reload();
@@ -334,11 +333,11 @@ test("unticked codes come back as a new set at sign-in", async ({
 
   await signedInAgain(page, request, email);
   await page.goto("/recovery");
+  const refused = authAnswering(page, "/second-factor/recovery");
   await codeUsed(recoveryField(page), first[0] ?? "");
-  await saysItsSentenceNotItsWord(theRefusal(page), {
-    table: SAID_OF_SECOND_FACTOR,
-    word: "recovery-code-wrong",
-  });
+  expect(await refused).toMatchObject({ status: 400, word: "recovery-code-wrong" });
+  await expect(theRefusal(page)).toBeVisible();
+  await keepsItsWordOffThePage(page, "recovery-code-wrong");
   await passesTheAccessibilityGate();
   await codeUsed(recoveryField(page), second[0] ?? "");
   await expect(heading(page, SETUP_WORDS.newHeading)).toBeVisible();

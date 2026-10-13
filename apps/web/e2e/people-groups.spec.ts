@@ -3,7 +3,6 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { consequenceOfDeleting } from "@/features/people/group-words.ts";
 import { GROUPS_KEYSTROKES, PEOPLE_SELECT_FIRST } from "@/features/people/people-state.ts";
-import { SAID_OF_A_GROUP } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
@@ -11,19 +10,21 @@ import { expect, test } from "./browser.ts";
 import {
   addMember,
   aMemberSignedInAt,
-  notFoundOfferingHome,
   anAddress,
   clockTheNextKey,
+  keepsItsWordOffThePage,
   keystrokesDismissed,
   keystrokesListed,
   makeGroups,
+  notFoundOfferingHome,
   person,
   provision,
-  saysItsSentenceNotItsWord,
+  saysARefusal,
   signIn,
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -229,12 +230,12 @@ test.describe("a group's actions", () => {
     await anAdminAtGroups(page, request, "Wharfe Fabrication");
 
     await nameField(page).fill("HR team");
+    const refused = refusalAnswering(page, "members.createGroup");
     await groupsRegion(page).getByRole("button", { name: "Create the group" }).click();
 
-    await saysItsSentenceNotItsWord(groupsRegion(page).getByRole("alert"), {
-      table: SAID_OF_A_GROUP,
-      word: "name-taken",
-    });
+    expect(await refused).toMatchObject({ word: "name-taken" });
+    await saysARefusal(groupsRegion(page).getByRole("alert"));
+    await keepsItsWordOffThePage(page, "name-taken");
     await expect(nameField(page)).toHaveValue("HR team");
     await expect(groupRows(page)).toHaveCount(2);
     await passesTheAccessibilityGate();

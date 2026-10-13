@@ -2,10 +2,8 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
-import { SAID_OF_A_REQUEST } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -13,16 +11,18 @@ import {
   anAddress,
   askToJoin,
   clockTheNextKey,
+  editorPickedByKeyboard,
   keystrokesListed,
   notFoundOfferingHome,
   person,
   provision,
-  editorPickedByKeyboard,
+  saysARefusal,
   signIn,
   tabOpenedByKeyboard,
   tabUntilFocused,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -313,12 +313,12 @@ test.describe("the People page's Requests tab", () => {
     await expect(requestsRegion(elsewhere)).toContainText(EMPTY_LINES.requests);
     await elsewhere.close();
 
+    const refused = refusalAnswering(page, "members.approveRequest");
     await approving.getByRole("button", { name: "Approve and send the invitation" }).click();
 
+    expect(await refused).toMatchObject({ word: "already-decided" });
     await expect(approving).toHaveCount(0);
-    await expect(requestsRegion(page).getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_A_REQUEST["already-decided"]),
-    );
+    await saysARefusal(requestsRegion(page).getByRole("alert"));
     await expect(requestRows(page)).toHaveCount(0);
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
     await expect(page.locator("body"), "the refusal").not.toContainText(NAMES_AN_ORGANISATION);

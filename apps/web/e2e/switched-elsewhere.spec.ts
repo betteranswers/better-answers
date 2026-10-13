@@ -3,7 +3,6 @@ import type { APIRequestContext, BrowserContext, Locator, Page } from "@playwrig
 import { INVITATIONS_WORDS, STATUS_WORDS } from "@/features/people/invitation-words.ts";
 import { BULK_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { saidOfRefusal } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -11,17 +10,19 @@ import {
   anAddress,
   inTwoWorkspaces,
   invite,
+  keepsItsWordOffThePage,
   landedAtHome,
   person,
-  saysItsSentenceNotItsWord,
+  saysARefusal,
   switched,
   switcherOf,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
 
-/** What every surface says of an action that named a workspace the session has left. */
-const SAID = { "workspace-switched": saidOfRefusal({}, "workspace-switched", "conflict") } as const;
+/** What the api answers an action that named a workspace the session has left. */
+const SWITCHED = { word: "workspace-switched", class: "conflict" } as const;
 
 type Role = "Admin" | "Editor" | "Viewer";
 
@@ -101,15 +102,9 @@ const stillWaits = async (tab: Page, address: string, workspace: Workspace): Pro
   await expect(invitationTo(tab, address)).toBeVisible();
 };
 
-/** Awaited before either workspace is read, so what the action left is read after it landed. */
-const answerTo = (page: Page, procedure: string) =>
-  page.waitForResponse((answer) => answer.url().includes(procedure));
-
 const landedHomeSayingWhy = async (page: Page, now: Workspace): Promise<void> => {
-  await saysItsSentenceNotItsWord(page.getByRole("banner").getByRole("alert"), {
-    table: SAID,
-    word: "workspace-switched",
-  });
+  await saysARefusal(page.getByRole("banner").getByRole("alert"));
+  await keepsItsWordOffThePage(page, SWITCHED.word);
   await landedAtHome(page, "Admin");
   await expect(switcherOf(page, now.name), "the band names the workspace left").toBeVisible();
 };
@@ -137,10 +132,11 @@ test.describe("an action from a tab left in another workspace", () => {
     const removal = removalOf(await atSamsPage(page, request, two));
     const elsewhere = await switchedInAnotherTab(context, page, two);
 
-    const answered = answerTo(page, "members.remove");
+    const answered = refusalAnswering(page, "members.remove");
     await removal.getByRole("button", { name: "Remove Sam Okoro", exact: true }).click();
     await removal.getByRole("button", { name: "Remove Sam Okoro from this workspace" }).click();
-    await answered;
+    // Awaited before either workspace is read, so what the action left is read after it landed.
+    expect(await answered).toMatchObject(SWITCHED);
 
     await membersReadAfresh(elsewhere, two.second);
     await expect(roleOf(elsewhere, "Sam Okoro"), `removed from ${two.second.name}`).toHaveText(
@@ -176,12 +172,12 @@ test.describe("an action from a tab left in another workspace", () => {
       .getByRole("toolbar", { name: SELECTED_MEMBERS })
       .getByRole("button", { name: BULK_WORDS.changeRole.action, exact: true })
       .click();
-    const answered = answerTo(page, "members.bulkChangeRole");
+    const answered = refusalAnswering(page, "members.bulkChangeRole");
     await page
       .getByRole("dialog", { name: BULK_WORDS.changeRole.title(2) })
       .getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") })
       .click();
-    await answered;
+    expect(await answered).toMatchObject(SWITCHED);
 
     await membersReadAfresh(elsewhere, two.second);
     for (const name of ticked) {
@@ -221,12 +217,12 @@ test.describe("an action from a tab left in another workspace", () => {
     await invitationsOpened(page);
     await expect(invitationTo(page, read), "the rows are not the session's").toBeVisible();
     await expect(switcherOf(page, two.first.name), "the band no longer names it").toBeVisible();
-    const answered = answerTo(page, "members.cancelInvitation");
+    const answered = refusalAnswering(page, "members.cancelInvitation");
     await invitationsRegion(page)
       .getByRole("button", { name: `Actions for ${read}` })
       .click();
     await page.getByRole("menuitem", { name: INVITATIONS_WORDS.cancel }).click();
-    await answered;
+    expect(await answered).toMatchObject(SWITCHED);
 
     await membersReadAfresh(elsewhere, two.second);
     await invitationsOpened(elsewhere);
@@ -258,11 +254,13 @@ test.describe("an action from a tab left in another workspace", () => {
         await route.fulfill({ response });
       },
     );
+    const answered = refusalAnswering(page, "members.changeRole");
     // By pointer: the first press hands focus to the picked role, so a key's second would miss.
     await samsPage.getByRole("button", { name: "Make Sam Okoro an Admin" }).dblclick();
     await expect.poll(() => asked, { message: "neither press asked the api" }).toBe(1);
     held.resolve();
 
+    expect(await answered).toMatchObject(SWITCHED);
     await landedHomeSayingWhy(page, two.second);
     expect(asked, "the second press asked the api again").toBe(1);
     await membersReadAfresh(elsewhere, two.second);

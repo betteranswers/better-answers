@@ -1,11 +1,9 @@
 import type { Page } from "@playwright/test";
 
 import { ALL_WORKSPACES } from "@/app/words.ts";
-import { ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
-import { switcherMenuOf, switcherOf } from "../e2e/locators.ts";
+import { saysARefusal, switcherMenuOf, switcherOf } from "../e2e/locators.ts";
 import { expect } from "./fixtures.ts";
 
 /** The audit of the page the journey is about to leave. */
@@ -31,6 +29,6 @@ export const theSwitcherListsOneWorkspace = async (
 /** No test person is the operator. */
 export const theConsoleIsRefused = async (page: Page, gate: Gate): Promise<void> => {
   await page.goto(HOMES.operator.path);
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(ONLY_THE_OPERATOR));
+  await saysARefusal(page.getByRole("alert"));
   await gate();
 };

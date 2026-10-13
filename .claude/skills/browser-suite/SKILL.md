@@ -185,7 +185,8 @@ More helpers in the same module drive the browser rather than the harness:
 | `clockTheNextKey` | Starts the action's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActionLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the action's 100 ms |
 | `saysARefusal` | Asserts an alert holds words. A refusal's region can stand empty from the first draw, so being in the tree shows no refusal |
-| `saysItsSentenceNotItsWord` | Asserts an alert reads the sentence a feature's refusal table holds for a word, and that the word is nowhere on the page |
+| `saysTheWait` | Asserts an alert names a ceiling's wait, given in seconds, as the page counts it: whole minutes, rounded up. A single minute is said in words, so there the alert is checked for holding words |
+| `keepsItsWordOffThePage` | Asserts the api's word for a refusal is nowhere on the page: the word is for the logs and the wire |
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
 | `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
 | `tokenColour` | A design-system token's colour as the browser paints it, so a computed style is compared with the token rather than a copied value |
@@ -217,8 +218,8 @@ Two more in that module read what the api answered. `refusalAnswering` waits for
 one tRPC procedure, found by its place in a batch or in a call sent alone. It answers the refusal's
 word and class, and each item's word where a set was refused whole. A ceiling carries no word, so
 for one it answers the 429 status and the wait in seconds. `authAnswering` waits for the next answer
-on a path outside tRPC, Better Auth's or one of the api's own, and answers its status, the library's
-code and a ceiling's wait. The first matching answer settles either, so a read the page asks again
+on a path outside tRPC and answers its status, a ceiling's wait, and the refusal as that path names
+it: Better Auth's code, or the word one of the api's own routes sends. The first matching answer settles either, so a read the page asks again
 is not waited for.
 
 ## Writing a spec
@@ -271,9 +272,11 @@ is not waited for.
   answer with `refusalAnswering` or `authAnswering`, above, then check the alert with
   `saysARefusal`. Ask for the answer before the action that calls and await it afterwards, because
   an answer can land before anything waits for it. A ceiling's answer carries no word, so the spec
-  matches the wait's number in the alert. The answer gives the wait in seconds and the alert says
-  it in whole minutes, rounded up, so a wait of over a minute is matched as
-  `Math.ceil(waitSeconds / 60)`. Where the page decided, no answer says which refusal it
+  hands the wait it names to `saysTheWait`, which matches the wait's number in the alert. The
+  api's word is for the logs and the wire, and `keepsItsWordOffThePage` asserts the page shows
+  none of it. A refusal the page draws outside an alert, as a console list's refused read and the
+  concept page's not found are, is told by the answer and by the state the page is left in. Where
+  the page decided, no answer says which refusal it
   was: a request dropped, a refusal the page raises before it calls, the tries left for a code,
   which the page counts. There `saysARefusal` is the whole check, and a number the alert shows is
   matched by pattern. No spec imports a refusal's sentence, and the page gains no marker for a

@@ -8,10 +8,8 @@ import {
   EVIDENCE_WORDS,
   SEARCH_WORDS,
 } from "@/features/knowledge/knowledge-words.ts";
-import { readsCeiling, SAID_OF_KNOWLEDGE } from "@/features/knowledge/refusal-words.ts";
 import { MEMBERS_PAGE } from "@/features/people/members-address.ts";
 import { CONTROL_CENTRE } from "@/shared/navigation.ts";
-import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -23,6 +21,8 @@ import {
   person,
   provision,
   railOf,
+  saysARefusal,
+  saysTheWait,
   signIn,
   skipLinkReachesThePage,
   switcherMenuOf,
@@ -38,6 +38,7 @@ import {
   scrolledSideways,
   windowRefocused,
 } from "./knowledge.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -185,12 +186,19 @@ const markOf = (page: Page, place: number, label: string): Locator =>
 
 const panelOf = (page: Page, title: string): Locator => page.getByRole("dialog", { name: title });
 
-const NOT_FOUND = sentenceOf(SAID_OF_KNOWLEDGE["not-found"]);
-
-const notFound = (page: Page): Locator => page.getByRole("main").getByText(NOT_FOUND);
-
 const wayBack = (page: Page): Locator =>
   page.getByRole("main").getByRole("link", { name: WORDS.toSearch });
+
+/** Not found is the way back alone: no concept, no alert and no read under way. */
+const drawsNotFound = async (page: Page): Promise<void> => {
+  const main = page.getByRole("main");
+  await expect(wayBack(page)).toBeVisible();
+  await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(main.getByRole("alert")).toHaveCount(0);
+  await expect(main.getByRole("status").filter({ hasText: /\S/ })).toHaveCount(0);
+};
+
+const THE_OPEN = "knowledge.open";
 
 const breadcrumb = (page: Page): Locator =>
   page.getByRole("banner").getByRole("navigation", { name: BREADCRUMB });
@@ -473,9 +481,8 @@ test.describe("the concept page", () => {
       withheld,
     ]) {
       await page.goto(address);
-      await expect(notFound(page)).toBeVisible();
+      await drawsNotFound(page);
       await expect(wayBack(page)).toHaveAttribute("href", SEARCH.path);
-      await expect(page.getByRole("article")).toHaveCount(0);
       await expect(breadcrumb(page).getByRole("link").last()).toHaveText(SEARCH.name);
       expect(await page.content(), `${address} names the withheld concept`).not.toContain(SALARY);
       expect(await page.title(), `${address} titles the document`).not.toContain(SALARY);
@@ -514,9 +521,7 @@ test.describe("the concept page", () => {
     expect(await (await answered).text(), "the api did not call the id malformed").toContain(
       '"httpStatus":400',
     );
-    await expect(notFound(page)).toBeVisible();
-    await expect(page.getByRole("article")).toHaveCount(0);
-    await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+    await drawsNotFound(page);
   });
 
   test("sends a body's concept IRI link to its page", async ({ page, request }) => {
@@ -529,8 +534,10 @@ test.describe("the concept page", () => {
     const salary = concept.getByRole("link", { name: "the salary bands" });
     await expect(salary).toHaveAttribute("href", pageOf(seeded.concepts, SALARY));
 
+    const refused = refusalAnswering(page, THE_OPEN);
     await salary.click();
-    await expect(notFound(page)).toBeVisible();
+    expect(await refused).toMatchObject({ word: "not-found" });
+    await drawsNotFound(page);
     await page.goBack();
     await retention.click();
     await expect(conceptOf(page, RETENTION)).toBeVisible();
@@ -563,8 +570,7 @@ test.describe("the concept page", () => {
     await page.goto(pageOf(seeded.concepts, RETENTION));
 
     const failed = page.getByRole("main").getByRole("alert");
-    await expect(failed).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
-    await expect(notFound(page)).toHaveCount(0);
+    await saysARefusal(failed);
     await expect(breadcrumb(page)).not.toContainText(RETENTION);
 
     await page.unroute(isAnOpen);
@@ -665,11 +671,12 @@ test.describe("the concept page", () => {
       .filter({ hasText: other.name })
       .click();
     await expect(switcherOf(page, other.name)).toBeVisible();
+    const refused = refusalAnswering(page, THE_OPEN);
     await page.goBack();
 
     await expect(page).toHaveURL(new RegExp(`${pageOf(seeded.concepts, RETENTION)}$`));
-    await expect(notFound(page)).toBeVisible();
-    await expect(page.getByRole("article")).toHaveCount(0);
+    expect(await refused).toMatchObject({ word: "not-found" });
+    await drawsNotFound(page);
     await expect(breadcrumb(page)).not.toContainText(RETENTION);
     expect(await page.content(), "the page left holds the concept").not.toContain(CLAIM);
   });
@@ -706,8 +713,10 @@ test.describe("the concept page", () => {
     ).toBeVisible();
     await expect(conceptOf(page, SALARY)).toHaveCount(0);
     await expect(breadcrumb(page)).not.toContainText(SALARY);
+    const refused = refusalAnswering(page, THE_OPEN);
     open.release();
-    await expect(notFound(page)).toBeVisible();
+    expect(await refused).toMatchObject({ word: "not-found" });
+    await drawsNotFound(page);
 
     await expect(wayBack(page)).toHaveAttribute("href", asked("salary bands"));
     await wayBack(page).click();
@@ -732,12 +741,12 @@ test.describe("the concept page", () => {
     await readsCeilingFilled(page, (await found).url());
 
     const sent = opensSentBy(page);
+    const refused = refusalAnswering(page, THE_OPEN);
     await page.reload();
 
-    await expect(page.getByRole("main").getByRole("alert")).toHaveText(
-      sentenceOf(readsCeiling(60)),
-    );
-    await expect(notFound(page)).toHaveCount(0);
+    const { status, waitSeconds = 0 } = await refused;
+    expect(status, "the read met no ceiling").toBe(429);
+    await saysTheWait(page.getByRole("main").getByRole("alert"), waitSeconds);
     await windowRefocused(page);
     expect(sent, "the page asked again past the ceiling").toHaveLength(1);
   });

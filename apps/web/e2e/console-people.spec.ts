@@ -10,16 +10,9 @@ import {
   SELECT_A_NAME_FIRST,
   SELECT_A_PERSON_FIRST,
 } from "@/features/console/people-keystrokes.ts";
-import {
-  NOT_THE_OPERATOR,
-  ONLY_THE_OPERATOR,
-  SAID_OF_A_REVOCATION,
-  SAID_OF_CORRECTING,
-  SIGN_IN_TOO_OLD,
-} from "@/features/console/refusal-words.ts";
+import { NOT_THE_OPERATOR, SIGN_IN_TOO_OLD } from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { sentenceOf, SIGN_IN_AGAIN } from "@/shared/refusal-words.ts";
 import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -42,12 +35,13 @@ import {
   person,
   provision,
   quoted,
+  saysARefusal,
   signedInAtHome,
   signIn,
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
-import { refusedFromNowOn } from "./refused-read.ts";
+import { refusalAnswering, refusedFromNowOn } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -68,6 +62,11 @@ const INSTANT_WORDS = String.raw`\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}`;
 const INSTANT = new RegExp(`^${INSTANT_WORDS}$`);
 
 const REVOKE = "End every sign-in and token Priya Shah holds";
+
+const CORRECT_A_NAME = "console.people.correctDisplayName";
+
+/** What the page said, as a pattern's own text, so its full stop matches a full stop alone. */
+const asWritten = (said: string): string => said.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`);
 
 /** Everyone the run makes is on this list, so a test finds its own by a tag in their address. */
 const aTag = (): string => `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
@@ -383,7 +382,7 @@ test.describe("the console's Everyone page", () => {
     );
   });
 
-  test("shows the api's refusal once the mark clears", async ({ page, request }) => {
+  test("takes the list away once the mark clears", async ({ page, request }) => {
     const tag = aTag();
     const operators = await signedInAsTheOperator(page, request, tag);
     await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
@@ -392,9 +391,10 @@ test.describe("the console's Everyone page", () => {
     await markTheOperator(request, operators.admin.email, "revoke");
     // A move between the console's own pages keeps its standing, so the list asks again alone.
     await navOf(page, CONSOLE).getByRole("link", { name: "Every workspace" }).click();
+    const refused = refusalAnswering(page, "console.people.list");
     await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
 
-    await expect(everyone(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
+    expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR, class: "forbidden" });
     await expect(everyone(page)).not.toContainText(NOT_THE_OPERATOR);
     await expect(everyone(page).getByRole("table")).toHaveCount(0);
   });
@@ -652,16 +652,16 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     const sheet = await openPriya(page, tag);
 
     await sheet.getByRole("button", { name: REVOKE }).click();
+    const refused = refusalAnswering(page, "console.people.endEverySignInAndToken");
     await confirmationOf(page)
       .getByRole("button", { name: "End every sign-in everywhere" })
       .click();
 
-    await expect(regionOf(sheet, "End every sign-in everywhere").getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_A_REVOCATION[SIGN_IN_TOO_OLD]),
-    );
+    expect(await refused).toMatchObject({ word: SIGN_IN_TOO_OLD });
+    await saysARefusal(regionOf(sheet, "End every sign-in everywhere").getByRole("alert"));
     await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
 
-    await sheet.getByRole("link", { name: SIGN_IN_AGAIN }).click();
+    await sheet.getByRole("link", { name: "Sign in again" }).click();
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
     await signIn(page, request, operators.admin.email);
 
@@ -782,12 +782,12 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     const part = regionOf(sheetOf(page, "Priya Shah"), "Display name");
     await part.getByRole("button", { name: correctWords("Priya Shah") }).click();
     await nameFieldOf(dialogToCorrect(page, "Priya Shah")).fill("Priya Sharma");
+    const refused = refusalAnswering(page, CORRECT_A_NAME);
     await page.keyboard.press("Enter");
 
-    await expect(part.getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_CORRECTING[SIGN_IN_TOO_OLD]),
-    );
-    await part.getByRole("link", { name: SIGN_IN_AGAIN }).click();
+    expect(await refused).toMatchObject({ word: SIGN_IN_TOO_OLD });
+    await saysARefusal(part.getByRole("alert"));
+    await part.getByRole("link", { name: "Sign in again" }).click();
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
     await signIn(page, request, operators.admin.email);
 
@@ -922,11 +922,12 @@ test.describe("the console's Names waiting page", () => {
     await expect(waitingSearch(page)).toBeFocused();
 
     await refusedFromNowOn(page, "console.people.namesWaiting");
+    const refused = refusalAnswering(page, "console.people.namesWaiting");
     // The query library reads every list again as the network comes back.
     await context.setOffline(true);
     await context.setOffline(false);
 
-    await expect(namesWaiting(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
+    expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR });
     await expect(namesWaiting(page).getByRole("table")).toHaveCount(0);
     await expect(waitingSearch(page)).toBeVisible();
     await expect(waitingSearch(page)).toBeFocused();
@@ -967,19 +968,24 @@ test.describe("the console's Names waiting page", () => {
 
   test("refuses a name the rule forbids, in the rule's words", async ({ page, request }) => {
     const { name } = await priyaFlagged(page, request, aTag());
-    const refusal = sentenceOf(SAID_OF_CORRECTING["display-name-angle-bracket"]);
     await page.goto(NAMES_WAITING_PAGE);
     await correctButtonOf(page, name).click();
     const dialog = dialogToCorrect(page, name);
     await nameFieldOf(dialog).fill("Priya <priya@acme.invalid>");
+    const refused = refusalAnswering(page, CORRECT_A_NAME);
     await dialog.getByRole("button", { name: "Save the name" }).click();
 
-    await expect(namesWaiting(page).getByRole("alert")).toHaveText(refusal);
+    expect(await refused).toMatchObject({ word: "display-name-angle-bracket" });
+    const alert = namesWaiting(page).getByRole("alert");
+    await saysARefusal(alert);
+    const said = await alert.innerText();
     await expect(correctButtonOf(page, name)).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(nameFieldOf(dialog)).toHaveValue("Priya <priya@acme.invalid>");
     await expect(nameFieldOf(dialog)).toHaveAttribute("aria-invalid", "true");
-    await expect(nameFieldOf(dialog)).toHaveAccessibleDescription(new RegExp(`${refusal}$`));
+    await expect(nameFieldOf(dialog)).toHaveAccessibleDescription(
+      new RegExp(`${asWritten(said)}$`),
+    );
   });
 
   test("corrects a name after a stale sign-in's round trip", async ({ page, request }) => {
@@ -990,13 +996,13 @@ test.describe("the console's Names waiting page", () => {
     await page.goto(NAMES_WAITING_PAGE);
     await correctButtonOf(page, name).click();
     await nameFieldOf(dialogToCorrect(page, name)).fill(corrected);
+    const refused = refusalAnswering(page, CORRECT_A_NAME);
     await page.keyboard.press("Enter");
 
-    await expect(namesWaiting(page).getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_CORRECTING[SIGN_IN_TOO_OLD]),
-    );
+    expect(await refused).toMatchObject({ word: SIGN_IN_TOO_OLD });
+    await saysARefusal(namesWaiting(page).getByRole("alert"));
     await expect(waitingRowOf(page, name)).toBeVisible();
-    const signInAgain = namesWaiting(page).getByRole("link", { name: SIGN_IN_AGAIN });
+    const signInAgain = namesWaiting(page).getByRole("link", { name: "Sign in again" });
     await expect(signInAgain).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);

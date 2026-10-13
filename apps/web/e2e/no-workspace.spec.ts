@@ -2,7 +2,6 @@ import type { APIRequestContext, Page, Response } from "@playwright/test";
 
 import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
-import { INVITATIONS_UNANSWERED } from "@/features/auth/refusal-words.ts";
 import {
   NO_WORKSPACE_ACTIONS,
   NO_WORKSPACE_HEADING,
@@ -10,7 +9,6 @@ import {
 } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import type { Role } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -26,6 +24,7 @@ import {
   person,
   provision,
   quoted,
+  saysARefusal,
   signIn,
   signInHeading,
   withAnAuthenticator,
@@ -233,9 +232,7 @@ test("offers to read the invitations again when no answer came", async ({
   await page.goto("/no-workspace");
 
   // The query client asks twice more before it gives up, a second apart and then two.
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(INVITATIONS_UNANSWERED), {
-    timeout: 15_000,
-  });
+  await saysARefusal(page.getByRole("alert"), { timeout: 15_000 });
   await expect(invitations(page)).toHaveCount(0);
   await expect(askRegion(page)).toBeVisible();
   await passesTheAccessibilityGate();

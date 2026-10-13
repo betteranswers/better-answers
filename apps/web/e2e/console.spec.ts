@@ -12,10 +12,9 @@ import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { WORKSPACES_WORDS } from "@/features/console/list-words.ts";
 import { WORKSPACES_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
-import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
+import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
 import { CLEAR_WORDS, PRODUCT_NAME } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -35,6 +34,7 @@ import {
   provision,
   quoted,
   railOf,
+  saysARefusal,
   signedInAtHome,
   signIn,
   signInByEmail,
@@ -43,7 +43,7 @@ import {
   switcherOf,
   withAnAuthenticator,
 } from "./harness.ts";
-import { refusedFromNowOn } from "./refused-read.ts";
+import { refusalAnswering, refusedFromNowOn } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -173,7 +173,7 @@ test.describe("the way into the console", () => {
     await page.goto("/console");
 
     await expect(page.getByRole("heading", { level: 1, name: CLOSED })).toBeVisible();
-    await expect(page.getByRole("alert")).toHaveText(sentenceOf(ONLY_THE_OPERATOR));
+    await saysARefusal(page.getByRole("alert"));
     await expect(page.locator("body")).not.toContainText(NOT_THE_OPERATOR);
     await expect(railOf(page)).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Workspaces" })).toHaveCount(0);
@@ -375,7 +375,7 @@ test.describe("the console's Workspaces page", () => {
     expect(elapsed, "the workspaces list took longer than its second").toBeLessThan(LIST_BUDGET_MS);
   });
 
-  test("says who may read the list once the mark clears", async ({ page, request }) => {
+  test("takes the list away once the mark clears", async ({ page, request }) => {
     const workspace = await theOperator(page, request, "Calder Pressings");
     await page.goto(EVERY_WORKSPACE);
     await expect(rowOf(page, workspace.name)).toBeVisible();
@@ -383,9 +383,10 @@ test.describe("the console's Workspaces page", () => {
     await markTheOperator(request, workspace.admin.email, "revoke");
     // A move between the console's own pages keeps its standing, so the list asks again alone.
     await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
+    const refused = refusalAnswering(page, "console.workspaces.list");
     await navOf(page, CONSOLE).getByRole("link", { name: "Every workspace" }).click();
 
-    await expect(listOf(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
+    expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR, class: "forbidden" });
     await expect(listOf(page)).not.toContainText(NOT_THE_OPERATOR);
     await expect(listOf(page).getByRole("table")).toHaveCount(0);
   });
@@ -402,11 +403,12 @@ test.describe("the console's Workspaces page", () => {
     await expect(searchOf(page)).toBeFocused();
 
     await refusedFromNowOn(page, "console.workspaces.list");
+    const refused = refusalAnswering(page, "console.workspaces.list");
     // The query library reads every list again as the network comes back.
     await context.setOffline(true);
     await context.setOffline(false);
 
-    await expect(listOf(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
+    expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR });
     await expect(listOf(page).getByRole("table")).toHaveCount(0);
     await expect(searchOf(page)).toBeVisible();
     await expect(searchOf(page)).toBeFocused();

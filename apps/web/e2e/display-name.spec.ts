@@ -1,25 +1,22 @@
 import type { Page } from "@playwright/test";
 
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
-import {
-  DISPLAY_NAME_MAX_CHARACTERS,
-  DISPLAY_NAME_REFUSED,
-  DISPLAY_NAME_WORDS,
-} from "@/shared/display-name-words.ts";
-import { SAID_OF_CLASS, sentenceOf, SIGN_IN_AGAIN } from "@/shared/refusal-words.ts";
+import { DISPLAY_NAME_MAX_CHARACTERS, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
   clockTheNextKey,
+  keepsItsWordOffThePage,
   landedAtHome,
   person,
   provision,
-  saysItsSentenceNotItsWord,
+  saysARefusal,
   signIn,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const displayNameHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: DISPLAY_NAME_WORDS.heading });
@@ -30,6 +27,8 @@ const noWorkspaceHeading = (page: Page) =>
 const displayNameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.label);
 
 const saveButton = (page: Page) => page.getByRole("button", { name: "Save and continue" });
+
+const SET_DISPLAY_NAME = "person.setDisplayName";
 
 /** Every page the browser was shown, so a page that came and went cannot pass unseen. */
 const pagesShown = (page: Page): readonly string[] => {
@@ -125,12 +124,12 @@ test("says what to change in a bad name, then saves", async ({
   const stood = await refusal.elementHandle();
 
   await displayNameField(page).fill("Priya <priya@acme.invalid>");
+  const bracketed = refusalAnswering(page, SET_DISPLAY_NAME);
   await saveButton(page).click();
 
-  await saysItsSentenceNotItsWord(refusal, {
-    table: DISPLAY_NAME_REFUSED,
-    word: "display-name-angle-bracket",
-  });
+  expect(await bracketed).toMatchObject({ word: "display-name-angle-bracket" });
+  await saysARefusal(refusal);
+  await keepsItsWordOffThePage(page, "display-name-angle-bracket");
   const sameRegion = await refusal.evaluate((now, then) => now === then, stood);
   expect(sameRegion, "the refusal was said in an alert region of its own").toBe(true);
   await expect(displayNameField(page)).toHaveAttribute("aria-invalid", "true");
@@ -138,8 +137,10 @@ test("says what to change in a bad name, then saves", async ({
   await passesTheAccessibilityGate();
 
   await displayNameField(page).fill("a".repeat(DISPLAY_NAME_MAX_CHARACTERS + 1));
+  const tooLong = refusalAnswering(page, SET_DISPLAY_NAME);
   await saveButton(page).click();
-  await expect(refusal).toHaveText(sentenceOf(DISPLAY_NAME_REFUSED["display-name-too-long"]));
+  expect(await tooLong).toMatchObject({ word: "display-name-too-long" });
+  await saysARefusal(refusal);
 
   await displayNameField(page).fill("Priya Shah");
   await saveButton(page).click();
@@ -164,10 +165,12 @@ test("refuses a save after the session ended, offering sign-in again", async ({
   await context.clearCookies();
 
   await displayNameField(page).fill("Priya Shah");
+  const refused = refusalAnswering(page, SET_DISPLAY_NAME);
   await saveButton(page).click();
 
-  await expect(page.getByRole("alert")).toHaveText(SAID_OF_CLASS.unauthenticated.why);
+  expect(await refused).toMatchObject({ class: "unauthenticated" });
+  await saysARefusal(page.getByRole("alert"));
   await expect(displayNameField(page)).toHaveAttribute("aria-invalid", "false");
-  await page.getByRole("button", { name: SIGN_IN_AGAIN }).click();
+  await page.getByRole("button", { name: "Sign in again" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 });

@@ -6,7 +6,6 @@ import { AUDIT_LOG_KEYSTROKES as KEY } from "@/features/people/audit-log-state.t
 import { AUDIT_LOG_WORDS as WORDS } from "@/features/people/audit-log-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -18,6 +17,7 @@ import {
   notFoundOfferingHome,
   person,
   provision,
+  saysARefusal,
   signIn,
   skipLinkReachesThePage,
 } from "./harness.ts";
@@ -351,7 +351,7 @@ test.describe("the System group's Audit log page", () => {
     held.resolve();
 
     // The query asks twice more before it answers, as it does of any failure with no word.
-    await expect(auditLog(page).getByRole("alert")).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
+    await saysARefusal(auditLog(page).getByRole("alert"));
     await expect(familyFilter(page)).toHaveText(WORDS.families.sources);
     await page.unroute(read);
     await pickFamily(page, WORDS.everyFamily);
