@@ -133,8 +133,8 @@ test.describe("an action from a tab left in another workspace", () => {
     const elsewhere = await switchedInAnotherTab(context, page, two);
 
     const answered = refusalAnswering(page, "members.remove");
-    await removal.getByRole("button", { name: "Remove Sam Okoro", exact: true }).click();
-    await removal.getByRole("button", { name: "Remove Sam Okoro from this workspace" }).click();
+    await removal.getByRole("button", { name: "Remove Member" }).click();
+    await removal.getByRole("button", { name: "Remove", exact: true }).click();
     // Awaited before either workspace is read, so what the action left is read after it landed.
     expect(await answered).toMatchObject(SWITCHED);
 
@@ -256,7 +256,7 @@ test.describe("an action from a tab left in another workspace", () => {
     );
     const answered = refusalAnswering(page, "members.changeRole");
     // By pointer: the first press hands focus to the picked role, so a key's second would miss.
-    await samsPage.getByRole("button", { name: "Make Sam Okoro an Admin" }).dblclick();
+    await samsPage.getByRole("button", { name: "Change Role" }).dblclick();
     await expect.poll(() => asked, { message: "neither press asked the api" }).toBe(1);
     held.resolve();
 

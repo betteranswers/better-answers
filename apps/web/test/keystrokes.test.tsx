@@ -74,11 +74,11 @@ describe("the keystrokes list", () => {
 const JUMP_TO: Keystroke = { key: "Ctrl K", action: "Jump To" };
 
 const MEMBERS_KEYSTROKES: readonly Keystroke[] = [
-  { key: "/", action: "Search the members" },
-  { key: "o", action: "Open the member in focus" },
+  { key: "/", action: "Search the Members" },
+  { key: "o", action: "Open the Member in Focus" },
 ];
 
-const GROUPS_KEYSTROKES: readonly Keystroke[] = [{ key: "n", action: "Create a group" }];
+const GROUPS_KEYSTROKES: readonly Keystroke[] = [{ key: "n", action: "Create a Group" }];
 
 function Registering(properties: { readonly keystrokes: readonly Keystroke[] }) {
   usePageKeystrokes(properties.keystrokes);
@@ -114,8 +114,8 @@ describe("the shell's keystrokes list", () => {
     const listed = listedOnQuestionMark(keystrokesOn("Members"));
 
     expect(actionsIn(listed)).toStrictEqual([
-      "Search the members",
-      "Open the member in focus",
+      "Search the Members",
+      "Open the Member in Focus",
       KEYSTROKE_WORDS.showTheList,
       "Jump To",
     ]);
@@ -137,7 +137,7 @@ describe("the shell's keystrokes list", () => {
     const listed = listedOnQuestionMark(keystrokesOn("Groups"));
 
     expect(actionsIn(listed)).toStrictEqual([
-      "Create a group",
+      "Create a Group",
       KEYSTROKE_WORDS.showTheList,
       "Jump To",
     ]);

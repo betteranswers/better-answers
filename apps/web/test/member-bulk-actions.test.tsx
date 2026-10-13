@@ -50,7 +50,7 @@ const tickedMembers = (count: number, readable: boolean) =>
         </h1>
         <OutcomeLine outcome={outcome} />
         <SelectionBar
-          label="Selected members"
+          label="Selected Members"
           ticked={ticked}
           shown={[]}
           noun={["member", "members"]}

@@ -708,7 +708,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await saysARefusal(regionOf(sheet, "End Every Sign-In Everywhere").getByRole("alert"));
     await expect(sessionsOf(sheet)).toHaveCount(1);
 
-    await sheet.getByRole("link", { name: "Sign in again" }).click();
+    await sheet.getByRole("link", { name: "Sign In Again" }).click();
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
     await signIn(page, request, operators.admin.email);
 
@@ -836,7 +836,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     expect(await refused).toMatchObject({ word: SIGN_IN_TOO_OLD });
     await saysARefusal(part.getByRole("alert"));
-    await part.getByRole("link", { name: "Sign in again" }).click();
+    await part.getByRole("link", { name: "Sign In Again" }).click();
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
     await signIn(page, request, operators.admin.email);
 
@@ -1065,7 +1065,7 @@ test.describe("the console's Names Waiting page", () => {
     expect(await refused).toMatchObject({ word: SIGN_IN_TOO_OLD });
     await saysARefusal(namesWaiting(page).getByRole("alert"));
     await expect(waitingRowOf(page, name)).toBeVisible();
-    const signInAgain = namesWaiting(page).getByRole("link", { name: "Sign in again" });
+    const signInAgain = namesWaiting(page).getByRole("link", { name: "Sign In Again" });
     await expect(signInAgain).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);

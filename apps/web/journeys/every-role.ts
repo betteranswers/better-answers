@@ -27,7 +27,7 @@ export const theSwitcherListsOneWorkspace = async (
 };
 
 /** Written out: the console's word table imports tRPC code at runtime. */
-const CLOSED = "The console is better-answers support’s alone";
+const CLOSED = "Access Denied";
 
 /** No test person is the operator. A standing left unread alerts too, under another heading. */
 export const theConsoleIsRefused = async (page: Page, gate: Gate): Promise<void> => {

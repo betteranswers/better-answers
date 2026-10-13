@@ -163,7 +163,7 @@ test("opens the invite action on Members for an Admin", async ({ page, request }
 
   const invite = page.getByRole("dialog", { name: INVITE_A_PERSON.name });
   await expect(invite).toBeVisible();
-  await expect(invite.getByLabel("Email address")).toBeFocused();
+  await expect(invite.getByLabel("Email Addresses")).toBeFocused();
   await expect(dialogOf(page)).toHaveCount(0);
   // The action takes its ask off the address, so a reload or a step back does not reopen it.
   await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}$`));

@@ -9,7 +9,7 @@ describe("a single-key keystroke", () => {
   it("runs once while its key is held", () => {
     const action = vi.fn<() => void>();
     renderHook(() => {
-      useKeystroke({ key: "o", action: "Open the member in focus" }, action);
+      useKeystroke({ key: "o", action: "Open the Member in Focus" }, action);
     });
 
     fireEvent.keyDown(document.body, { key: "o" });
@@ -21,7 +21,7 @@ describe("a single-key keystroke", () => {
 
   it("keeps a held key from the browser", () => {
     renderHook(() => {
-      useKeystroke({ key: "o", action: "Open the member in focus" }, vi.fn<() => void>());
+      useKeystroke({ key: "o", action: "Open the Member in Focus" }, vi.fn<() => void>());
     });
 
     fireEvent.keyDown(document.body, { key: "o" });

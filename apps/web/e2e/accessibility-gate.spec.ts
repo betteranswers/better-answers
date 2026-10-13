@@ -14,7 +14,7 @@ const drawAPictureWithNoAltText = (): void => {
 /** A refused action's button, held at its disabled look until the fade's last moment. */
 const fadeAButtonBackFromItsDisabledLook = (): void => {
   const button = document.createElement("button");
-  button.textContent = "Make Test person a Viewer";
+  button.textContent = "Change Role";
   button.style.cssText =
     "background: var(--primary); color: var(--primary-foreground); padding: 8px 16px; opacity: 0.5; transition: opacity 4s step-end";
   document.querySelector("main")?.append(button);
