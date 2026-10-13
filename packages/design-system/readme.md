@@ -100,7 +100,7 @@ Three of Kibo's habits come with them:
 - An instruction in an alert or a field message takes "Please": "Please try again.", "Please
   enter a valid email address."
 - A done message says "successfully": "Your changes have been saved successfully."
-- Where no specific error is written, the stock General sentence stands (*Refusals*, below).
+- Where no specific error is written, a stock sentence stands (*Refusals*, below).
 
 An empty state takes an action only where the page offers no other way to take it.
 
@@ -111,7 +111,9 @@ names the platform's own actions "the platform": it names an actor and addresses
 
 **Casing.** Each kind of text takes the casing Kibo gives it. Kibo's patterns hold no page
 heading and no navigation, so a page's heading and a name in the navigation take the card
-title's casing.
+title's casing. In Title Case an article, a conjunction and a short preposition stay in lower
+case unless they come first or last, as in "Mark as Complete", and a word that is part of the
+verb keeps its capital, as in "Sign In Again".
 
 | Kind of text | Casing | Examples |
 | --- | --- | --- |
@@ -158,9 +160,9 @@ for its kind, and the table names each by its key:
 | Unavailable | class *inapplicable* | This action isn't available. |
 | Changed | class *conflict* | This has changed since you opened it. Please reload the page. |
 | Not yet | class *precondition* | This can't be done yet. |
-| General | a refusal with no class and no sentence of its own | Something went wrong. Please try again. |
+| General | a failure that is neither a refusal nor a missing response and has no sentence of its own, such as a status the page has no branch for | Something went wrong. Please try again. |
 | Try again | no response to an action that is safe to repeat | There was a problem processing your request. Please try again. |
-| Unconfirmed | no response to an action whose outcome is unknown | We couldn't confirm that. Please reload the page to check. |
+| Unconfirmed | no response to an action that is not safe to repeat, such as one that spends a code or would make a second set of recovery codes | We couldn't confirm that. Please reload the page to check. |
 | Not loaded | no response to a read | This didn't load. Please try again. |
 | Wait | too many attempts | Too many attempts. Please try again in 2 minutes. With no wait sent: Too many attempts. Please try again later. |
 | Copy | a failed copy | Couldn't copy. Please select it and copy it manually. |
