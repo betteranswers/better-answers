@@ -17,7 +17,7 @@ type Action = {
 };
 
 export const INVITE_A_PERSON = {
-  name: "Invite a person",
+  name: "Invite a Person",
   asks: "invite",
   icon: "invite",
 } as const satisfies Action;
@@ -76,14 +76,14 @@ export const ASK = {
       id: "ask",
       pages: [
         {
-          name: "New question",
+          name: "New Question",
           path: "/ask/new-question",
           icon: "new-question",
           built: false,
           seenBy: EVERY_ROLE,
         },
         {
-          name: "Your questions",
+          name: "Your Questions",
           path: "/ask/your-questions",
           icon: "history",
           built: false,
@@ -102,7 +102,7 @@ export const KNOWLEDGE = {
     {
       id: "browse",
       name: "Browse",
-      summary: "What this workspace knows, to search and read.",
+      summary: "Search and read what this workspace knows.",
       pages: [
         {
           name: "Search",
@@ -125,10 +125,10 @@ export const KNOWLEDGE = {
       id: "curation",
       name: "Curation",
       summary:
-        "Everything this workspace knows, what needs verifying, and who owns each collection.",
+        "Review everything this workspace knows, what needs verifying and who owns each collection.",
       pages: [
         {
-          name: "All knowledge",
+          name: "All Knowledge",
           path: "/knowledge/all-knowledge",
           icon: "table",
           built: false,
@@ -136,7 +136,7 @@ export const KNOWLEDGE = {
           owners: true,
         },
         {
-          name: "Due for verification",
+          name: "Due for Verification",
           path: "/knowledge/due-for-verification",
           icon: "verification",
           built: false,
@@ -160,7 +160,7 @@ export const KNOWLEDGE = {
           owners: true,
         },
         {
-          name: "Collections and owners",
+          name: "Collections and Owners",
           path: "/knowledge/collections-and-owners",
           icon: "owners",
           built: false,
@@ -189,7 +189,7 @@ const INBOX = {
       id: "inbox",
       pages: [
         {
-          name: "Waiting on you",
+          name: "Waiting on You",
           path: "/inbox/waiting-on-you",
           icon: "tray",
           built: false,
@@ -209,7 +209,7 @@ export const CONTROL_CENTRE = {
     {
       id: "overview",
       name: "Overview",
-      summary: "Where this workspace needs your attention.",
+      summary: "See where this workspace needs your attention.",
       pages: [
         { name: "Overview", path: "/overview", icon: "overview", built: false, seenBy: ADMINS },
       ],
@@ -217,10 +217,10 @@ export const CONTROL_CENTRE = {
     {
       id: "suggestions",
       name: "Suggestions",
-      summary: "Suggested changes waiting for a decision.",
+      summary: "Review suggested changes waiting for a decision.",
       pages: [
         {
-          name: "To decide",
+          name: "To Decide",
           path: "/suggestions/to-decide",
           icon: "to-decide",
           built: false,
@@ -231,11 +231,11 @@ export const CONTROL_CENTRE = {
     {
       id: "sources",
       name: "Sources",
-      summary: "The documents this workspace learns from.",
+      summary: "Manage the documents this workspace learns from.",
       movedFrom: ["/sources"],
       pages: [
         {
-          name: "Connected sources",
+          name: "Connected Sources",
           path: "/sources/connected-sources",
           icon: "database",
           built: true,
@@ -243,14 +243,14 @@ export const CONTROL_CENTRE = {
           movedFrom: ["/sources/bindings"],
         },
         {
-          name: "Publishing rules",
+          name: "Publishing Rules",
           path: "/sources/publishing-rules",
           icon: "gates",
           built: false,
           seenBy: ADMINS,
         },
         {
-          name: "Cost estimates",
+          name: "Cost Estimates",
           path: "/sources/cost-estimates",
           icon: "price",
           built: false,
@@ -264,14 +264,14 @@ export const CONTROL_CENTRE = {
           seenBy: ADMINS,
         },
         {
-          name: "Removed at source",
+          name: "Removed at Source",
           path: "/sources/removed-at-source",
           icon: "gone",
           built: false,
           seenBy: ADMINS,
         },
         {
-          name: "Share agents",
+          name: "Share Agents",
           path: "/sources/share-agents",
           icon: "token",
           built: false,
@@ -282,10 +282,10 @@ export const CONTROL_CENTRE = {
     {
       id: "models",
       name: "Models",
-      summary: "The model each purpose uses, and what it spends.",
+      summary: "Choose the model each purpose uses and see what it spends.",
       pages: [
         {
-          name: "Models and spend",
+          name: "Models and Spend",
           path: "/models/models-and-spend",
           icon: "models",
           built: true,
@@ -293,7 +293,7 @@ export const CONTROL_CENTRE = {
           movedFrom: ["/system/routes-and-spend", "/agent-operations/routes-and-spend"],
         },
         {
-          name: "Spending limit",
+          name: "Spending Limit",
           path: "/models/spending-limit",
           icon: "spending-limit",
           built: false,
@@ -304,17 +304,17 @@ export const CONTROL_CENTRE = {
     {
       id: "questions",
       name: "Questions",
-      summary: "The questions asked in this workspace, and the answers they got.",
+      summary: "See the questions asked in this workspace and the answers they got.",
       pages: [
         {
-          name: "Questions asked",
+          name: "Questions Asked",
           path: "/questions/questions-asked",
           icon: "question",
           built: false,
           seenBy: ADMINS,
         },
         {
-          name: "Answer tests",
+          name: "Answer Tests",
           path: "/questions/answer-tests",
           icon: "tests",
           built: false,
@@ -325,7 +325,7 @@ export const CONTROL_CENTRE = {
     {
       id: "people",
       name: "People",
-      summary: "Who can use this workspace, and what each person can do.",
+      summary: "Manage who can use this workspace and what each person can do.",
       movedFrom: ["/people"],
       pages: [
         {
@@ -339,7 +339,7 @@ export const CONTROL_CENTRE = {
         },
         { name: "Groups", path: "/people/groups", icon: "groups", built: true, seenBy: ADMINS },
         {
-          name: "Personal tokens",
+          name: "Personal Tokens",
           path: "/people/personal-tokens",
           icon: "token",
           built: false,
@@ -349,11 +349,12 @@ export const CONTROL_CENTRE = {
     },
     {
       id: "personal-data",
-      name: "Personal data",
-      summary: "The personal data this workspace holds, and requests to erase or suppress it.",
+      name: "Personal Data",
+      summary:
+        "See the personal data this workspace holds and manage requests to erase or suppress it.",
       pages: [
         {
-          name: "Erasure and suppression",
+          name: "Erasure and Suppression",
           path: "/personal-data/erasure-and-suppression",
           icon: "erasure",
           built: false,
@@ -364,11 +365,11 @@ export const CONTROL_CENTRE = {
     {
       id: "system",
       name: "System",
-      summary: "How this workspace is running, and a record of what was done in it.",
+      summary: "See how this workspace is running and a record of what was done in it.",
       movedFrom: ["/system"],
       pages: [
         {
-          name: "Audit log",
+          name: "Audit Log",
           path: "/system/audit-log",
           icon: "log",
           built: true,
@@ -405,7 +406,7 @@ export const CONSOLE = {
       id: "people",
       name: "People",
       summary:
-        "The people on the platform, and the display names waiting on better-answers support.",
+        "See the people on the platform and the display names waiting on better-answers support.",
       movedFrom: ["/console/people"],
       pages: [
         {
@@ -416,7 +417,7 @@ export const CONSOLE = {
           seenBy: THE_OPERATOR,
         },
         {
-          name: "Names waiting",
+          name: "Names Waiting",
           path: "/console/people/names-waiting",
           icon: "names",
           built: true,
@@ -428,11 +429,11 @@ export const CONSOLE = {
       id: "workspaces",
       name: "Workspaces",
       summary:
-        "Every workspace on the platform, with its short name, its member count and the day it was provisioned. Provisioning and renaming are ops commands, so this list is read-only.",
+        "See every workspace on the platform, with its short name, its member count and the day it was provisioned. Provisioning and renaming are ops commands, so this list is read-only.",
       movedFrom: ["/console/workspaces"],
       pages: [
         {
-          name: "Every workspace",
+          name: "Every Workspace",
           path: "/console/workspaces/every-workspace",
           icon: "workspaces",
           built: true,
@@ -489,7 +490,7 @@ export const HOMES = {
   Admin: pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members"),
   Editor: ASK.home,
   Viewer: ASK.home,
-  operator: pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every workspace"),
+  operator: pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every Workspace"),
 } as const satisfies { readonly [who in RoleOrOperator]: Page };
 
 export type Reader = {

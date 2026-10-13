@@ -25,7 +25,7 @@ const displayNameHeading = (page: Page) =>
 const noWorkspaceHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
 
-const displayNameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.label);
+const displayNameField = (page: Page) => page.getByLabel("Display name");
 
 const saveButton = (page: Page) => page.getByRole("button", { name: "Save and continue" });
 
@@ -55,7 +55,7 @@ test("asks a first-time person for a display name before anything", async ({
     - main:
       - heading ${JSON.stringify(DISPLAY_NAME_WORDS.heading)} [level=1]
       - paragraph
-      - textbox ${JSON.stringify(DISPLAY_NAME_WORDS.label)}
+      - textbox "Display name"
       - button "Save and continue"
   `);
   await passesTheAccessibilityGate();

@@ -140,15 +140,15 @@ test.describe("the way into the console", () => {
     await expect(railOf(page).getByRole("link")).toHaveText([CONSOLE.name]);
     await expect(navOf(page, CONSOLE).getByRole("link")).toHaveText([
       "Everyone",
-      "Names waiting",
-      "Every workspace",
+      "Names Waiting",
+      "Every Workspace",
     ]);
     await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
 
     const you = await personMenuOpened(page, workspace.admin.name);
     await expect(you.getByText(workspace.admin.name, { exact: true })).toBeVisible();
     await expect(you).not.toContainText("Admin");
-    await expect(you.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign out"]);
+    await expect(you.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign Out"]);
   });
 
   test("offers no console to a person without the mark", async ({ page, request }) => {
@@ -161,7 +161,7 @@ test.describe("the way into the console", () => {
     await page.keyboard.press("Escape");
 
     const you = await personMenuOpened(page, workspace.admin.name);
-    await expect(you.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign out"]);
+    await expect(you.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign Out"]);
   });
 
   test("shows a non-operator the refused state at /console", async ({
@@ -181,7 +181,7 @@ test.describe("the way into the console", () => {
     await passesTheAccessibilityGate();
 
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("link", { name: "Back to your workspaces" })).toBeFocused();
+    await expect(page.getByRole("link", { name: "Back to Your Workspaces" })).toBeFocused();
     await page.keyboard.press("Enter");
     await landedAtHome(page, "Admin");
   });
@@ -386,7 +386,7 @@ test.describe("the console's Workspaces page", () => {
     // A move between the console's own pages keeps its standing, so the list asks again alone.
     await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
     const refused = refusalAnswering(page, "console.workspaces.list");
-    await navOf(page, CONSOLE).getByRole("link", { name: "Every workspace" }).click();
+    await navOf(page, CONSOLE).getByRole("link", { name: "Every Workspace" }).click();
 
     expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR, class: "forbidden" });
     await expect(listOf(page)).not.toContainText(NOT_THE_OPERATOR);
@@ -440,8 +440,8 @@ test.describe("the console's Workspaces page", () => {
     await expect(page).toHaveURL("/console/people/everyone");
     await expect(page.getByRole("region", { name: "Everyone" })).toBeVisible();
     const pages = navOf(page, CONSOLE).getByRole("link");
-    await expect(pages).toHaveText(["Everyone", "Names waiting", "Every workspace"]);
-    await pages.filter({ hasText: "Names waiting" }).click();
+    await expect(pages).toHaveText(["Everyone", "Names Waiting", "Every Workspace"]);
+    await pages.filter({ hasText: "Names Waiting" }).click();
     await expect(page).toHaveURL("/console/people/names-waiting");
     await expect(page.getByRole("region", { name: "Names waiting" })).toBeVisible();
   });
@@ -499,7 +499,7 @@ test.describe("the console's Workspaces page", () => {
     await skipLinkReachesThePage(page);
 
     // Back to the first stop, to walk the regions in the order the document gives them.
-    await page.getByRole("link", { name: "Skip to the page" }).focus();
+    await page.getByRole("link", { name: "Skip to Main Content" }).focus();
     for (const stop of [
       page.getByRole("banner").getByRole("link", { name: PRODUCT_NAME }),
       switcherOf(page, CONSOLE.name),
@@ -514,7 +514,7 @@ test.describe("the console's Workspaces page", () => {
       await page.keyboard.press("Tab");
       await expect(stop).toBeFocused();
     }
-    for (const name of ["Everyone", "Names waiting", "Every workspace"]) {
+    for (const name of ["Everyone", "Names Waiting", "Every Workspace"]) {
       await page.keyboard.press("Tab");
       await expect(navOf(page, CONSOLE).getByRole("link", { name })).toBeFocused();
     }

@@ -113,7 +113,7 @@ function FilterSelect(properties: { readonly filter: Filter }) {
         onChange(picked === ANY ? undefined : picked.slice(CHOICE.length));
       }}
     >
-      <SelectTrigger aria-label={`Filter by ${label.toLowerCase()}`} className="min-w-32">
+      <SelectTrigger aria-label={`Filter by ${label}`} className="min-w-32">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -147,7 +147,7 @@ function ColumnMenu(properties: { readonly control: ColumnControl }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+        <DropdownMenuLabel>Show Columns</DropdownMenuLabel>
         {columns.map((column) => (
           <DropdownMenuCheckboxItem
             key={column.id}

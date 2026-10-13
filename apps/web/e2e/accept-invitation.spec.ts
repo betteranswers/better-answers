@@ -97,7 +97,7 @@ test("an invited newcomer names themselves on the invitation, then joins", async
   await expect(invitedAs(page, "Editor")).toBeVisible();
   await passesTheAccessibilityGate();
 
-  const keystrokes = await keystrokesListed(page, "this page");
+  const keystrokes = await keystrokesListed(page, "This Page");
   await expect(keystrokes.getByRole("term").filter({ hasText: /^j$/ })).toBeVisible();
   await keystrokesDismissed(page, keystrokes);
 
@@ -274,7 +274,7 @@ test("refuses a person at another address, offering the invited one", async ({
   await expect(page.getByRole("main")).not.toContainText("Brightwater Estimating");
   await passesTheAccessibilityGate();
 
-  const keystrokes = await keystrokesListed(page, "this page");
+  const keystrokes = await keystrokesListed(page, "This Page");
   await expect(keystrokes.getByRole("term").filter({ hasText: /^s$/ })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(keystrokes).toBeHidden();

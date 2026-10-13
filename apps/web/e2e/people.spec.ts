@@ -53,7 +53,7 @@ const MEMBERS = pageNamed(people, "Members");
 
 const MEMBERS_PAGE = MEMBERS.path;
 
-const AUDIT_LOG_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit log").path;
+const AUDIT_LOG_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit Log").path;
 
 const GROUPS_PAGE = pageNamed(people, "Groups").path;
 
@@ -477,7 +477,7 @@ test.describe("the People group's Members page", () => {
       "nobody by this name",
     );
     await passesTheAccessibilityGate();
-    await membersRegion(page).getByRole("button", { name: "Clear filters" }).click();
+    await membersRegion(page).getByRole("button", { name: "Clear Filters" }).click();
 
     await expect(memberRows(page)).toHaveCount(3);
     await expect(searchBox(page)).toHaveValue("");
@@ -534,7 +534,7 @@ test.describe("the People group's Members page", () => {
         - status: /\\b3\\b/
         - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
         - searchbox "Search by name or address"
-        - combobox "Filter by role": Any role
+        - combobox "Filter by Role": Any role
         - button "Columns"
         - table:
           - caption
@@ -1068,7 +1068,7 @@ test.describe("a member's Activity", () => {
 
     // A fresh document, so no page of the stream is already in the page's cache.
     await linesWithinTheBudget(page, "activity", () => page.goto(memberPageAt(adminId)), 50);
-    const loadMore = activityOf(page).getByRole("button", { name: "Load more" });
+    const loadMore = activityOf(page).getByRole("button", { name: "Load More" });
     await expect(loadMore).toHaveAttribute(
       "aria-keyshortcuts",
       MEMBER_PAGE_KEYSTROKES.olderActivity.key,
@@ -1100,7 +1100,7 @@ test.describe("a member's Activity", () => {
 
     await expect(linesOf(page)).toHaveCount(1);
     await expect(linesOf(page)).toContainText(/Ola Brennan.*Admin/);
-    await expect(activityOf(page).getByRole("button", { name: "Load more" })).toHaveCount(0);
+    await expect(activityOf(page).getByRole("button", { name: "Load More" })).toHaveCount(0);
   });
 
   test("keeps the access request they made before joining", async ({ page, request }) => {
@@ -1628,7 +1628,7 @@ test.describe("the People page's words", () => {
     await auditLog.getByRole("button", { name: /^Details of/ }).click();
     await expect(auditLog.getByRole("term").first()).toBeVisible();
     await said(`${AUDIT_LOG_PAGE}, an event opened`);
-    await auditLog.getByRole("combobox", { name: "Filter by family" }).click();
+    await auditLog.getByRole("combobox", { name: "Filter by Family" }).click();
     await expect(page.getByRole("listbox"), "the families listed").not.toContainText(organisation);
     await page.keyboard.press("Escape");
 
@@ -1652,9 +1652,9 @@ test.describe("the People page's words", () => {
     // Last, so the audit log above reads the one event the workspace's provisioning wrote.
     await page.goto(MEMBERS_PAGE);
     await expect(memberRows(page)).toHaveCount(3);
-    const inviting = page.getByRole("dialog", { name: "Invite a person" });
+    const inviting = page.getByRole("dialog", { name: "Invite a Person" });
     await page.getByRole("tab", { name: "Invitations" }).click();
-    await page.getByRole("button", { name: "Invite a person" }).click();
+    await page.getByRole("button", { name: "Invite a Person" }).click();
     await saidIn(inviting, "the invite dialog");
     await inviting.getByLabel("Email address").fill(anAddress("invited"));
     await inviting.getByRole("button", { name: "Send the invitation" }).click();
@@ -1870,11 +1870,11 @@ test.describe("bulk actions on the members ticked", () => {
       name: /^(Priya Shah|Sam Okoro|Test person)$/,
     });
 
-    await membersRegion(page).getByRole("combobox", { name: "Filter by group" }).click();
+    await membersRegion(page).getByRole("combobox", { name: "Filter by Group" }).click();
     await page.getByRole("option", { name: "Site leads", exact: true }).click();
     await expect(names).toHaveText(["Sam Okoro"]);
     await expect(countOf(page), "the count says one of three match").toHaveText(/\b1\b\D+\b3\b/);
-    await membersRegion(page).getByRole("combobox", { name: "Filter by group" }).click();
+    await membersRegion(page).getByRole("combobox", { name: "Filter by Group" }).click();
     await page.getByRole("option", { name: "Any group", exact: true }).click();
     await expect(names).toHaveCount(3);
 
@@ -2082,9 +2082,9 @@ test.describe("bulk actions on the members ticked", () => {
 
   test("page 2 of Editors comes back on Back", async ({ page, request }) => {
     await aWorkspaceOfThirtyEditors(page, request, "Ribble Cabling");
-    await membersRegion(page).getByRole("combobox", { name: "Filter by role" }).click();
+    await membersRegion(page).getByRole("combobox", { name: "Filter by Role" }).click();
     await page.getByRole("option", { name: "Editor", exact: true }).click();
-    await pagesOf(page).getByRole("button", { name: "Next page" }).click();
+    await pagesOf(page).getByRole("button", { name: "Next Page" }).click();
     const lastFiveOfThirty = /\b26\D+30\D+30\b/;
     await expect(memberRows(page)).toHaveCount(5);
     await expect(pagesOf(page).getByRole("status")).toHaveText(lastFiveOfThirty);
@@ -2095,7 +2095,7 @@ test.describe("bulk actions on the members ticked", () => {
     await expect(memberRows(page)).toHaveCount(5);
     await expect(rowOf(page, "Person 26")).toBeVisible();
     await expect(pagesOf(page).getByRole("status")).toHaveText(lastFiveOfThirty);
-    await expect(membersRegion(page).getByRole("combobox", { name: "Filter by role" })).toHaveText(
+    await expect(membersRegion(page).getByRole("combobox", { name: "Filter by Role" })).toHaveText(
       "Editor",
     );
   });

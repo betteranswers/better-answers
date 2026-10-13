@@ -71,7 +71,7 @@ const DIMENSIONS = new RegExp(String.raw`\b${String(EMBEDDING_DIMENSIONS)}\b`);
 
 const models = menuGroupIn(CONTROL_CENTRE, "models");
 
-const MODELS_AND_SPEND = pageNamed(models, "Models and spend");
+const MODELS_AND_SPEND = pageNamed(models, "Models and Spend");
 
 /** No role lands on Models and spend, so every test here opens it from the member's home. */
 const openModelChoices = async (page: Page) => {
@@ -313,9 +313,9 @@ test.describe("the Models and spend page's model choices card", () => {
         - heading ${JSON.stringify(models.name)} [level=1]
         - paragraph
         - tablist ${JSON.stringify(MODELS_AND_SPEND.name)}:
-          - tab "Model choices" [selected]
+          - tab "Model Choices" [selected]
           - tab "Spend"
-        - tabpanel "Model choices":
+        - tabpanel "Model Choices":
           - /children: equal
           - region "Model choices"
     `);

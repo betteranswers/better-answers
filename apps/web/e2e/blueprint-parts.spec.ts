@@ -104,7 +104,7 @@ test("marks the primary button on a page in light accent", async ({ page, reques
   await provision(request, { name: "Holme Valley Joinery", adminEmail: email });
   await signedInAtHome(page, request, email);
   await page.goto(MEMBERS.path);
-  const invite = page.getByRole("button", { name: "Invite a person" });
+  const invite = page.getByRole("button", { name: "Invite a Person" });
   await expect(invite).toBeVisible();
 
   const marks = await marksOf(invite);

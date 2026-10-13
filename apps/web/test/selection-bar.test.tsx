@@ -43,7 +43,7 @@ describe("the selection bar", () => {
     expect(shown).not.toBeNull();
     expect(countsIn(shown)).toEqual(["2"]);
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear Selection" }));
     expect(bar()).toBeNull();
     expect(
       screen.getByRole("checkbox", { name: "Select Ada Lovelace" }).getAttribute("aria-checked"),
@@ -69,7 +69,7 @@ describe("the selection bar", () => {
     render(<MembersList pageSize={2} onAction={(action) => actions.push(action)} />);
 
     tick("Cy Twombly");
-    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next Page" }));
     tick("Ed Ruscha");
     fireEvent.click(within(bar() ?? document.body).getByRole("button", { name: "Change role" }));
 
@@ -80,7 +80,7 @@ describe("the selection bar", () => {
     render(<MembersList />);
 
     tick("Ada Lovelace");
-    const clear = screen.getByRole("button", { name: "Clear selection" });
+    const clear = screen.getByRole("button", { name: "Clear Selection" });
     expect(clear.getAttribute("aria-keyshortcuts")).toBe("x");
 
     fireEvent.keyDown(document.body, { key: "x" });
@@ -91,7 +91,7 @@ describe("the selection bar", () => {
     render(<MembersList />);
     tick("Ada Lovelace");
     const action = within(bar() ?? document.body).getByRole("button", { name: "Change role" });
-    const clear = within(bar() ?? document.body).getByRole("button", { name: "Clear selection" });
+    const clear = within(bar() ?? document.body).getByRole("button", { name: "Clear Selection" });
 
     action.focus();
     fireEvent.keyDown(action, { key: "ArrowRight" });
@@ -111,7 +111,7 @@ describe("the selection bar", () => {
     render(<MembersList />);
     tick("Ada Lovelace");
 
-    const clear = screen.getByRole("button", { name: "Clear selection" });
+    const clear = screen.getByRole("button", { name: "Clear Selection" });
     clear.focus();
     fireEvent.click(clear);
     expect(bar()).toBeNull();

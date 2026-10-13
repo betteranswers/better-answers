@@ -50,7 +50,7 @@ const EVERYONE = pageNamed(PEOPLE, "Everyone");
 
 const EVERYONE_PAGE = EVERYONE.path;
 
-const NAMES_WAITING = pageNamed(PEOPLE, "Names waiting");
+const NAMES_WAITING = pageNamed(PEOPLE, "Names Waiting");
 
 const NAMES_WAITING_PAGE = NAMES_WAITING.path;
 
@@ -420,7 +420,7 @@ test.describe("the console's Everyone page", () => {
 
     await markTheOperator(request, operators.admin.email, "revoke");
     // A move between the console's own pages keeps its standing, so the list asks again alone.
-    await navOf(page, CONSOLE).getByRole("link", { name: "Every workspace" }).click();
+    await navOf(page, CONSOLE).getByRole("link", { name: "Every Workspace" }).click();
     const refused = refusalAnswering(page, "console.people.list");
     await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
 

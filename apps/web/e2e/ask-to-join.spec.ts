@@ -208,7 +208,7 @@ test("names no organisation or old word, nor in keystrokes", async ({ page, requ
   await signedInWithNoWorkspace(page, request, "asker");
   await thePageSaysNeither(page, "before an ask");
 
-  const keystrokes = await keystrokesListed(page, "this page");
+  const keystrokes = await keystrokesListed(page, "This Page");
   await expect(keystrokes.getByRole("term").filter({ hasText: /^j$/ })).toBeVisible();
   await thePageSaysNeither(page, "in its keystrokes");
   await keystrokesDismissed(page, keystrokes);

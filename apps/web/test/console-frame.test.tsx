@@ -173,7 +173,7 @@ describe("the console's shell", () => {
     expect(router.state.location.pathname).toBe("/console/workspaces/every-workspace");
     expect(namesIn(screen.getByRole("navigation", { name: RAIL }), "link")).toEqual(["Console"]);
     expect(namesIn(nav, "heading")).toEqual(["People", "Workspaces"]);
-    expect(namesIn(nav, "link")).toEqual(["Everyone", "Names waiting", "Every workspace"]);
+    expect(namesIn(nav, "link")).toEqual(["Everyone", "Names Waiting", "Every Workspace"]);
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
   });
 
@@ -267,7 +267,7 @@ describe("the console's lists", () => {
 
     searchFor(list, WORKSPACES_WORDS.search, "nowhere");
     expect(within(list).getByText(WORKSPACES_WORDS.noneMatch("nowhere"))).toBeDefined();
-    fireEvent.click(within(list).getByRole("button", { name: "Clear search" }));
+    fireEvent.click(within(list).getByRole("button", { name: "Clear Search" }));
     expect(rowsOf(list)).toHaveLength(2);
     expect(within(list).getByText(WORKSPACES_WORDS.counted(2))).toBeDefined();
   });

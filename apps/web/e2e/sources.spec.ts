@@ -45,7 +45,7 @@ const LIST_BUDGET_MS = 1000;
 /** Any id the platform mints: the page shows none, a finding's least of all. */
 const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
 
-const CONNECTED_SOURCES = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Connected sources");
+const CONNECTED_SOURCES = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Connected Sources");
 
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 

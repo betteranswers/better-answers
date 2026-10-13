@@ -165,7 +165,7 @@ for (const role of ["Editor", "Viewer"] as const) {
     await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toHaveCount(0);
 
     await personMenu(page, role).click();
-    await expect(page.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign out"]);
+    await expect(page.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign Out"]);
   });
 }
 

@@ -111,7 +111,7 @@ describe("what jump-to lists", () => {
       [JUMP_TO.groups.areas, ["Knowledge", "Control Centre"]],
       [
         JUMP_TO.groups.pages,
-        ["Search", "Connected sources", "Models and spend", "Members", "Groups", "Audit log"],
+        ["Search", "Connected Sources", "Models and Spend", "Members", "Groups", "Audit Log"],
       ],
       [JUMP_TO.groups.actions, [INVITE_A_PERSON.name]],
       [JUMP_TO.groups.members, ["Priya Shah", "new@example.test"]],
@@ -131,7 +131,7 @@ describe("what jump-to lists", () => {
     );
 
     expect(to["Control Centre"]).toBe("/people/members");
-    expect(to["Audit log"]).toBe("/system/audit-log");
+    expect(to["Audit Log"]).toBe("/system/audit-log");
     expect(to[INVITE_A_PERSON.name]).toBe("/people/members?action=invite");
   });
 

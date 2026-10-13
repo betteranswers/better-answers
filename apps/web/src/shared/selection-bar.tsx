@@ -73,7 +73,7 @@ export function SelectionBar(properties: {
               aria-keyshortcuts={clearKeystroke?.key}
               onClick={clear}
             >
-              Clear selection
+              Clear Selection
             </Button>
           </ToolbarPrimitive.Button>
           {clearKeystroke === undefined ? null : (

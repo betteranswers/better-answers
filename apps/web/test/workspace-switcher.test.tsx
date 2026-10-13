@@ -177,7 +177,7 @@ describe("the workspace switcher's list", () => {
 });
 
 describe("the workspace switcher's ways out", () => {
-  it.each(["All workspaces", "Console"])("holds %s while a switch is pending", async (name) => {
+  it.each(["All Workspaces", "Console"])("holds %s while a switch is pending", async (name) => {
     const router = await openTheMenu(true);
     const navigating = vi.spyOn(router, "navigate");
 
@@ -192,7 +192,7 @@ describe("the workspace switcher's ways out", () => {
   it("takes the person to all workspaces once nothing is pending", async () => {
     const router = await openTheMenu(false);
 
-    const way = screen.getByRole("menuitem", { name: "All workspaces" });
+    const way = screen.getByRole("menuitem", { name: "All Workspaces" });
     fireEvent.click(way);
 
     expect(way.getAttribute("aria-disabled")).toBeNull();

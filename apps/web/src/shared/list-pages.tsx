@@ -200,7 +200,7 @@ function PageTurns(properties: { readonly pages: Pages }) {
         summary={`Showing ${from}–${to} of ${total}.`}
         counter={`Page ${pageIndex + 1} of ${pageCount}`}
         previous={{
-          label: "Previous page",
+          label: "Previous Page",
           disabled: pageIndex === 0,
           keystroke: keystrokes?.previous.key,
           onTurn: () => {
@@ -208,7 +208,7 @@ function PageTurns(properties: { readonly pages: Pages }) {
           },
         }}
         next={{
-          label: "Next page",
+          label: "Next Page",
           disabled: pageIndex >= pageCount - 1,
           keystroke: keystrokes?.next.key,
           onTurn: () => {
@@ -250,7 +250,7 @@ function LoadMore(properties: { readonly more: More }) {
         className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
         onClick={load}
       >
-        {failed === undefined ? "Load more" : "Retry"}
+        {failed === undefined ? "Load More" : "Retry"}
       </Button>
       {keystroke === undefined ? null : <MoreOn keystroke={keystroke} onMore={load} />}
     </nav>

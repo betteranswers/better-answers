@@ -37,12 +37,12 @@ const MEMBERS = pageNamed(PEOPLE, "Members");
 
 const MODELS = menuGroupIn(CONTROL_CENTRE, "models");
 
-const MODELS_AND_SPEND = pageNamed(MODELS, "Models and spend");
+const MODELS_AND_SPEND = pageNamed(MODELS, "Models and Spend");
 
 /** Declared and never built, so no reader may find it. */
 const SIGNALS = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Signals");
 
-const EVERY_WORKSPACE = pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every workspace");
+const EVERY_WORKSPACE = pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every Workspace");
 
 const NARROW = { width: 320, height: 720 };
 

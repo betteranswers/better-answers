@@ -332,7 +332,7 @@ test("asks an unnamed member's name, then carries on through consent", async ({
   expect(landedAt(page).pathname).toBe("/display-name");
   expect(landedAt(page).searchParams.get("sig")).not.toBeNull();
   await passesTheAccessibilityGate();
-  await page.getByLabel(DISPLAY_NAME_WORDS.label).fill("Mona Reviewer");
+  await page.getByLabel("Display name").fill("Mona Reviewer");
   await page.keyboard.press("Enter");
 
   await expect(consentHeading(page)).toBeVisible();
@@ -346,7 +346,7 @@ test("asks a non-member's name, then says No workspace yet", async ({ page, requ
   await signIn(page, request, anAddress("unplaced"));
 
   await expect(displayNameHeading(page)).toBeVisible();
-  await page.getByLabel(DISPLAY_NAME_WORDS.label).fill("Sam Okoro");
+  await page.getByLabel("Display name").fill("Sam Okoro");
   await page.getByRole("button", { name: "Save and continue" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();

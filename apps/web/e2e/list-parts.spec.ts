@@ -144,7 +144,7 @@ test.describe("the shared list parts, drawn together", () => {
     await page.keyboard.press("Space");
 
     const action = bar(page).getByRole("button", { name: "Change role" });
-    const clear = bar(page).getByRole("button", { name: "Clear selection" });
+    const clear = bar(page).getByRole("button", { name: "Clear Selection" });
     await backUntilFocused(page, action);
     await page.keyboard.press("ArrowRight");
     await expect(clear).toBeFocused();
@@ -176,7 +176,7 @@ test.describe("the shared list parts, drawn together", () => {
     const search = page.getByRole("searchbox", { name: "Search by name or address" });
     await search.fill("Zed");
 
-    const clear = page.getByRole("button", { name: "Clear filters" });
+    const clear = page.getByRole("button", { name: "Clear Filters" });
     await tabUntilFocused(page, clear);
     await page.keyboard.press("Enter");
 

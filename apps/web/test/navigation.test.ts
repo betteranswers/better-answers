@@ -61,7 +61,7 @@ const aPage = (name: string, built: boolean, owners?: true): Page => ({
 describe("the one navigation list", () => {
   it("declares ADR 0047's areas, groups and pages in order", () => {
     expect(outline(AREAS)).toEqual([
-      ["Ask", [[null, ["New question", "Your questions"]]]],
+      ["Ask", [[null, ["New Question", "Your Questions"]]]],
       [
         "Knowledge",
         [
@@ -69,38 +69,38 @@ describe("the one navigation list", () => {
           [
             "Curation",
             [
-              "All knowledge",
-              "Due for verification",
+              "All Knowledge",
+              "Due for Verification",
               "Conflicts",
               "Kinds",
-              "Collections and owners",
+              "Collections and Owners",
               "Exports",
             ],
           ],
         ],
       ],
-      ["Inbox", [[null, ["Waiting on you"]]]],
+      ["Inbox", [[null, ["Waiting on You"]]]],
       [
         "Control Centre",
         [
           ["Overview", ["Overview"]],
-          ["Suggestions", ["To decide"]],
+          ["Suggestions", ["To Decide"]],
           [
             "Sources",
             [
-              "Connected sources",
-              "Publishing rules",
-              "Cost estimates",
+              "Connected Sources",
+              "Publishing Rules",
+              "Cost Estimates",
               "Backlogs",
-              "Removed at source",
-              "Share agents",
+              "Removed at Source",
+              "Share Agents",
             ],
           ],
-          ["Models", ["Models and spend", "Spending limit"]],
-          ["Questions", ["Questions asked", "Answer tests"]],
-          ["People", ["Members", "Groups", "Personal tokens"]],
-          ["Personal data", ["Erasure and suppression"]],
-          ["System", ["Audit log", "Signals", "Health", "Backups"]],
+          ["Models", ["Models and Spend", "Spending Limit"]],
+          ["Questions", ["Questions Asked", "Answer Tests"]],
+          ["People", ["Members", "Groups", "Personal Tokens"]],
+          ["Personal Data", ["Erasure and Suppression"]],
+          ["System", ["Audit Log", "Signals", "Health", "Backups"]],
         ],
       ],
     ]);
@@ -111,8 +111,8 @@ describe("the one navigation list", () => {
       [
         "Console",
         [
-          ["People", ["Everyone", "Names waiting"]],
-          ["Workspaces", ["Every workspace"]],
+          ["People", ["Everyone", "Names Waiting"]],
+          ["Workspaces", ["Every Workspace"]],
         ],
       ],
     ]);
@@ -190,10 +190,10 @@ describe("what each person is shown", () => {
       [
         "Control Centre",
         [
-          ["Sources", ["Connected sources"]],
-          ["Models", ["Models and spend"]],
+          ["Sources", ["Connected Sources"]],
+          ["Models", ["Models and Spend"]],
           ["People", ["Members", "Groups"]],
-          ["System", ["Audit log"]],
+          ["System", ["Audit Log"]],
         ],
       ],
     ]);
@@ -269,7 +269,7 @@ describe("what each person is shown", () => {
       "Models",
       "Questions",
       "People",
-      "Personal data",
+      "Personal Data",
       "System",
     ];
 

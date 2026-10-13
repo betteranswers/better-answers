@@ -29,7 +29,7 @@ const ONE_LINE_PX = 48;
 
 const system = menuGroupIn(CONTROL_CENTRE, "system");
 
-const AUDIT_LOG = pageNamed(system, "Audit log");
+const AUDIT_LOG = pageNamed(system, "Audit Log");
 
 const AUDIT_LOG_PAGE = AUDIT_LOG.path;
 
@@ -42,16 +42,16 @@ const linesOf = (page: Page): Locator => auditLog(page).getByRole("listitem");
 const searchBox = (page: Page) => auditLog(page).getByRole("searchbox", { name: WORDS.search });
 
 const familyFilter = (page: Page) =>
-  auditLog(page).getByRole("combobox", { name: `Filter by ${WORDS.family.toLowerCase()}` });
+  auditLog(page).getByRole("combobox", { name: `Filter by ${WORDS.family}` });
 
-const loadMore = (page: Page) => auditLog(page).getByRole("button", { name: "Load more" });
+const loadMore = (page: Page) => auditLog(page).getByRole("button", { name: "Load More" });
 
 const exportButton = (page: Page) => auditLog(page).getByRole("button", { name: WORDS.export });
 
 const said = (page: Page) => auditLog(page).getByRole("status").first();
 
 /** The empty list's one action, drawn only once a read has answered with no event. */
-const clearFilters = (page: Page) => auditLog(page).getByRole("button", { name: "Clear filters" });
+const clearFilters = (page: Page) => auditLog(page).getByRole("button", { name: "Clear Filters" });
 
 /** Priya's one event: her name as the actor, then the group she created. */
 const BY_PRIYA = /Priya Shah.*Bid writers/;
@@ -107,7 +107,7 @@ const anAdminAtTheAuditLog = async (
   await signIn(page, api, adminEmail);
   await page
     .getByRole("navigation", { name: CONTROL_CENTRE.name })
-    .getByRole("link", { name: "Audit log" })
+    .getByRole("link", { name: "Audit Log" })
     .click();
   await expect(page).toHaveURL(new RegExp(`${AUDIT_LOG_PAGE}$`));
   return {

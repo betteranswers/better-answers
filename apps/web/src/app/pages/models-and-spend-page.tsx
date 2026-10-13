@@ -14,7 +14,7 @@ const SPEND = "spend";
  */
 export const MODELS_AND_SPEND_TOOLBAR: PageToolbar = {
   tabs: [
-    { id: "model-choices", name: "Model choices" },
+    { id: "model-choices", name: "Model Choices" },
     { id: SPEND, name: "Spend" },
   ],
 };
@@ -28,7 +28,7 @@ export function ModelsAndSpendPage() {
 
       {open === SPEND ? (
         <Card asChild className="mt-6 p-4">
-          <p>Spend is not built yet.</p>
+          <p>Spend is coming soon.</p>
         </Card>
       ) : (
         <ModelChoicesCard />
