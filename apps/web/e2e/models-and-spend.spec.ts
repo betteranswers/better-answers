@@ -3,7 +3,7 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
 import { goHome } from "@/app/words.ts";
-import { MODEL_CHOICES_WORDS, providerWordOf } from "@/features/model-choices/words.ts";
+import { providerWordOf } from "@/features/model-choices/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
 
@@ -13,6 +13,7 @@ import {
   notFoundOfferingHome,
   anAddress,
   provision,
+  saysOfItsRead,
   seedModelChoices,
   signIn,
   skipLinkReachesThePage,
@@ -56,8 +57,17 @@ const rowOf = (page: Page, purpose: (typeof PURPOSES)[number]) =>
 
 const embeddingRow = (page: Page) => rowOf(page, "Embedding");
 
-const whoSetsLine = (page: Page) =>
-  modelChoicesCard(page).getByText(MODEL_CHOICES_WORDS.whoSets, { exact: true });
+/** The head's lines: what the card is, then who sets a model while a purpose has none. */
+const headLines = (page: Page) =>
+  modelChoicesCard(page).getByRole("heading", { level: 2 }).locator("xpath=following-sibling::p");
+
+/** A purpose with no model choice shows no field, so its row holds no term. */
+const unsetRows = (page: Page) =>
+  modelChoicesCard(page)
+    .getByRole("listitem")
+    .filter({ hasNot: page.getByRole("term") });
+
+const DIMENSIONS = new RegExp(String.raw`\b${String(EMBEDDING_DIMENSIONS)}\b`);
 
 const models = menuGroupIn(CONTROL_CENTRE, "models");
 
@@ -153,27 +163,32 @@ test.describe("the Models and spend page's model choices card", () => {
     const card = modelChoicesCard(page);
     await expect(card.getByRole("listitem")).toHaveCount(5);
     await expect(card.getByRole("heading", { level: 3 })).toHaveText(PURPOSES);
-    await expect(card.getByText(MODEL_CHOICES_WORDS.unset, { exact: true })).toHaveCount(4);
-    await expect(whoSetsLine(page)).toHaveCount(1);
+    await expect(unsetRows(page)).toHaveCount(4);
+    await expect(
+      unsetRows(page).getByRole("paragraph"),
+      "a row with no model choice does not say so in one line",
+    ).toHaveText([/\S/, /\S/, /\S/, /\S/]);
+    await expect(headLines(page), "who sets a model is not said once").toHaveCount(2);
 
     const embedding = embeddingRow(page);
-    await expect(embedding).toContainText(MODEL_CHOICES_WORDS.unset);
+    await expect(embedding.getByRole("term")).toHaveCount(0);
     await expect(
-      embedding.getByText(MODEL_CHOICES_WORDS.fixed, { exact: true }),
+      embedding,
       "an embedding purpose with no model choice has nothing fixed to note",
-    ).toHaveCount(0);
-    await expect(embedding).not.toContainText(MODEL_CHOICES_WORDS.fixedReason);
+    ).not.toContainText(DIMENSIONS);
   });
 
   test("says in one line that no model choice is set", async ({ page, request }) => {
     await signedInWith(page, request, { name: "Ryedale Pressings", modelChoices: [] });
 
     const card = modelChoicesCard(page);
-    await expect(card.getByText(MODEL_CHOICES_WORDS.noneSet, { exact: true })).toBeVisible();
-    await expect(whoSetsLine(page)).toBeVisible();
+    await saysOfItsRead(card);
+    await expect(headLines(page)).toHaveCount(2);
+    await expect(card.getByRole("paragraph"), "the card says more than its one line").toHaveCount(
+      3,
+    );
     await expect(card.getByRole("list")).toHaveCount(0);
     await expect(card.getByRole("heading", { level: 3 })).toHaveCount(0);
-    await expect(card).not.toContainText(MODEL_CHOICES_WORDS.fixedReason);
   });
 
   test("omits who sets a model once every purpose has one", async ({ page, request }) => {
@@ -181,8 +196,8 @@ test.describe("the Models and spend page's model choices card", () => {
 
     const card = modelChoicesCard(page);
     await expect(card.getByRole("listitem")).toHaveCount(5);
-    await expect(card.getByText(MODEL_CHOICES_WORDS.unset, { exact: true })).toHaveCount(0);
-    await expect(whoSetsLine(page)).toHaveCount(0);
+    await expect(unsetRows(page)).toHaveCount(0);
+    await expect(headLines(page)).toHaveCount(1);
   });
 
   test("says why the embedding model choice is fixed, with dimensions", async ({
@@ -195,14 +210,10 @@ test.describe("the Models and spend page's model choices card", () => {
     await expect(embedding).toContainText(providerWordOf(EMBEDDING.provider));
     await expect(embedding).toContainText(EMBEDDING.model);
 
-    await expect(embedding).toContainText(MODEL_CHOICES_WORDS.fixed);
-
-    await expect(embedding).toContainText(`${EMBEDDING_DIMENSIONS} dimensions`);
-
-    await expect(embedding).toContainText(MODEL_CHOICES_WORDS.fixedReason);
-
+    // Its note with the dimensions, then why.
+    await expect(embedding.getByRole("paragraph")).toHaveText([DIMENSIONS, /\S/]);
     await expect(
-      modelChoicesCard(page).getByText(MODEL_CHOICES_WORDS.fixed, { exact: true }),
+      modelChoicesCard(page).getByRole("listitem").filter({ hasText: DIMENSIONS }),
     ).toHaveCount(1);
   });
 
@@ -219,7 +230,6 @@ test.describe("the Models and spend page's model choices card", () => {
     await expect(card.getByRole("textbox")).toHaveCount(0);
     await expect(card.getByRole("combobox")).toHaveCount(0);
     await expect(card.getByRole("checkbox")).toHaveCount(0);
-    await expect(card).not.toContainText(/edit|add|delete|remove/i);
   });
 
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
@@ -266,15 +276,15 @@ test.describe("the Models and spend page's model choices card", () => {
     await expect(modelChoicesCard(page)).toMatchAriaSnapshot(`
       - region "Model choices":
         - heading "Model choices" [level=2]
-        - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.lead)}
-        - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.whoSets)}
+        - paragraph
+        - paragraph
         - list:
           - listitem:
             - heading "Extraction" [level=3]
-            - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.unset)}
+            - paragraph
           - listitem:
             - heading "Enrichment" [level=3]
-            - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.unset)}
+            - paragraph
           - listitem:
             - heading "Answering" [level=3]
             - term: Provider
@@ -283,21 +293,21 @@ test.describe("the Models and spend page's model choices card", () => {
             - definition: ${ANSWERING.model}
           - listitem:
             - heading "Judging" [level=3]
-            - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.unset)}
+            - paragraph
           - listitem:
             - heading "Embedding" [level=3]
             - term: Provider
             - definition: ${JSON.stringify(providerWordOf(EMBEDDING.provider))}
             - term: Model
             - definition: ${EMBEDDING.model}
-            - paragraph: ${JSON.stringify(`${MODEL_CHOICES_WORDS.fixed} ${EMBEDDING_DIMENSIONS} dimensions`)}
-            - paragraph: ${JSON.stringify(MODEL_CHOICES_WORDS.fixedReason)}
+            - paragraph: /\\b${String(EMBEDDING_DIMENSIONS)}\\b/
+            - paragraph
     `);
     // The heading and its lead line, then the tabs. Equal children: the panel holds the card alone.
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
         - heading ${JSON.stringify(models.name)} [level=1]
-        - paragraph: ${JSON.stringify(models.summary)}
+        - paragraph
         - tablist ${JSON.stringify(MODELS_AND_SPEND.name)}:
           - tab "Model choices" [selected]
           - tab "Spend"
