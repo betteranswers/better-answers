@@ -23,7 +23,7 @@ You are the implementor for a ticket that lands something a person looks at. The
 - **Every common action has a keystroke** and `?` lists them; every action is keyboard-operable end to end; focus is visible and lands where the action left the reader.
 - **Budgets** are asserted in the spec: the list under a second, an action under 100 ms optimistically and reconciled, a long operation shown as a job with its state and never a spinner to the end.
 - **Accessibility gate**: the axe pass and an aria snapshot in the spec, which keeps roles, names, levels, states and order and holds no line of the page's prose; semantic elements before ARIA; a name on every control; WCAG AA contrast; `prefers-reduced-motion` honoured; every interactive state present — default, hover, active, focus, disabled, loading, error, empty.
-- **A refusal from the api reaches the page as its word, and the reader sees a sentence**: the stock sentence for its kind, unless §3 of the design skill's readme gives it its own. It is one sentence, with a second only where the reader has something to do.
+- **A refusal from the api reaches the page as its word, and the reader sees a sentence**: the stock sentence for its kind, unless it earns its own by the condition in §3 of the design skill's readme. It is one sentence, with a second only where the reader has something to do or needs a fact to do it.
 - **Talks to the api over tRPC only**, through the tRPC client the web already has.
 
 ## Order of work

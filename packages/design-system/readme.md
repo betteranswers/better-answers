@@ -46,7 +46,8 @@ The areas the rail lists, each holding groups of pages (§4, *The shell*):
 - **Control Centre** — the one Admin area, in eight groups: Overview, Suggestions,
   Sources, Models, Questions, People, Personal data and System.
 
-The avatar menu in the band holds the person's name, their role and "Sign out".
+The avatar menu in the band holds the person's name, their role and the item that signs them
+out.
 
 ## 3. Content fundamentals
 
@@ -77,14 +78,13 @@ are left out. New text follows this section even where older text beside it does
 British spelling and UK conventions throughout.
 
 Kibo's strings, by kind of text. A line that names a group, a workspace or a member had Kibo's
-"project", "team" or "team member" in that place.
+"project", "team" or "team member" in that place, and "everything in it" stands for Kibo's "all
+projects and data". The web has no toast. A done message shows in a page's outcome line and
+takes Kibo's done alert form, and a refusal shows as an alert.
 
 | Kind of text | Reads |
 | --- | --- |
-| Error toast | "Something went wrong" |
 | Error alert | "There was a problem processing your request. Please try again." |
-| Warning toast | "Your session will expire soon" |
-| Done toast | "Your changes have been saved", "Verification code resent" |
 | Done alert | "Your changes have been saved successfully." |
 | Empty state | "No results found" with "Try adjusting your filters to see more results." |
 | Empty state | "No groups yet" with "Get started by creating your first group." |
@@ -99,18 +99,19 @@ Three of Kibo's habits come with them:
 
 - An instruction in an alert or a field message takes "Please": "Please try again.", "Please
   enter a valid email address."
-- A done message says "successfully": "Your changes have been saved successfully." A toast is
-  shorter: "Verification code resent".
-- Where no specific error is written, the general one stands: "Something went wrong."
+- A done message says "successfully": "Your changes have been saved successfully."
+- Where no specific error is written, the stock General sentence stands (*Refusals*, below).
 
 An empty state takes an action only where the page offers no other way to take it.
 
 **Person.** The second person for what the reader does ("you asked", "your questions"). The
-platform is "we" where a sentence says what it did or could not do: "We've sent a 6-digit code
-to your email address." The third person for everything else. The Audit log's actor column
+platform may be "we" where a sentence says what it did or could not do: "We've sent a 6-digit
+code to your email address." The third person for everything else. The Audit log's actor column
 names the platform's own actions "the platform": it names an actor and addresses no one.
 
-**Casing.** Each kind of text takes the casing Kibo gives it.
+**Casing.** Each kind of text takes the casing Kibo gives it. Kibo's patterns hold no page
+heading and no navigation, so a page's heading and a name in the navigation take the card
+title's casing.
 
 | Kind of text | Casing | Examples |
 | --- | --- | --- |
@@ -124,7 +125,7 @@ names the platform's own actions "the platform": it names an actor and addresses
 | Tick box and switch label | Sentence case | "Remember me", "Email notifications" |
 | Empty state title | Sentence case, no full stop | "No results found", "No groups yet" |
 | Description, help text, tooltip | Sentence case, with a full stop | "This will be displayed publicly.", "Must be at least 8 characters long." |
-| Alert, toast, field message | Sentence case | "Something went wrong", "Please enter a valid email address." |
+| Alert, done message, field message | Sentence case | "Your changes have been saved successfully.", "Please enter a valid email address." |
 
 Proper nouns keep their case in every kind of text: Control Centre, Admin, Editor, Viewer,
 Answer (the concept kind), Restricted, Internal, Public. A trust word is written as the closed
@@ -140,8 +141,10 @@ where the verb alone would not say enough. "Remove", "Save Changes", "Go Back". 
 thing's own name goes in the confirmation's own name, which is a dialog's title or an inline
 group's legend. What the action will do goes in the text that describes the control, in view
 before the reader clicks: "This action cannot be undone." That text keeps a fact the reader
-needs and nothing else on the page shows, and so does a done message. Where a list repeats one
-action on every row, each control's accessible name carries its row's name.
+needs and nothing else on the page shows, and so does a done message. The "Remove Member"
+confirmation above, opened on one member, is named "Remove Sam Okoro". It keeps its
+description, and its buttons are "Keep Member" and "Remove". Where a list repeats one action on
+every row, each control's accessible name carries its row's name.
 
 **Refusals.** A person reads a refusal (`CONCEPTS.md`) as a sentence. It is the stock sentence
 for its kind, and the table names each by its key:
@@ -162,9 +165,10 @@ for its kind, and the table names each by its key:
 | Wait | too many attempts | Too many attempts. Please try again in 2 minutes. With no wait sent: Too many attempts. Please try again later. |
 | Copy | a failed copy | Couldn't copy. Please select it and copy it manually. |
 
-A refusal is one sentence, with a second only where the reader has something to do. It has a
-sentence of its own only when the reader can act and the stock sentence would not tell them
-how, or when the stock sentence would leave them unaware of something the page did for them:
+A refusal is one sentence, with a second only where the reader has something to do or needs a
+fact to do it. It has a sentence of its own only when the reader can act and the stock sentence
+would not tell them how, or when the stock sentence would leave them unaware of something the
+page did for them:
 
 - "This code has expired. Please request a new one."
 - "Verification code is incorrect. 2 tries left."
