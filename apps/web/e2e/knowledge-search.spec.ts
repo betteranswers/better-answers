@@ -19,6 +19,7 @@ import {
   navOf,
   provision,
   railOf,
+  saysARefusal,
   seedConcepts,
   seedConnectedSources,
   signIn,
@@ -468,7 +469,7 @@ test.describe("the Knowledge Search page", () => {
     await handbookMatches(page).first().getByRole("button", { name: HANDBOOK }).click();
 
     const panel = passagePanel(page, HANDBOOK);
-    await expect(panel.getByRole("alert")).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
+    await saysARefusal(panel.getByRole("alert"));
     await page.unroute(isAnOpen);
     await panel.getByRole("button", { name: "Retry" }).click();
     await expect(panel).toContainText(PALLET_PASSAGES[0] ?? "");

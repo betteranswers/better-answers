@@ -210,6 +210,12 @@ export const theActionLandedWithinItsBudget = async (page: Page, action: string)
   );
 };
 
+/** A refusal's region can stand empty from the first draw, so it shows one only once it holds words. */
+export const saysARefusal = (
+  alert: Locator,
+  within?: { readonly timeout: number },
+): Promise<void> => expect(alert, "the alert says nothing").toHaveText(/\S/, within);
+
 /** The word stays off the page: it is for the logs and the wire. */
 export const saysItsSentenceNotItsWord = async <Word extends RefusalWord>(
   alert: Locator,

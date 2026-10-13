@@ -54,6 +54,7 @@ import {
   tokenColour,
   drawnMarks,
 } from "./harness.ts";
+import { authAnswering } from "./refused-read.ts";
 
 const thePicker = (page: Page) =>
   page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading });
@@ -612,8 +613,10 @@ test("sends a wrong code once, selected, naming two tries left", async ({ page, 
   const code = await codeSentTo(request, email);
   const sent = codesSentFrom(page);
 
+  const refused = authAnswering(page, SIGN_IN_PATH);
   await codeField(page).fill(notTheCode(code, 1));
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(codeWrong(2)));
+  expect(await refused).toMatchObject({ status: 400, code: "INVALID_OTP" });
+  await expect(page.getByRole("alert")).toHaveText(/\b2\b/);
   await expect(codeField(page)).toBeFocused();
   await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
   const selected = await codeField(page).evaluate((field: HTMLInputElement) => [

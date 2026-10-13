@@ -39,13 +39,14 @@ import {
   person,
   provision,
   quoted,
-  saysItsSentenceNotItsWord,
+  saysARefusal,
   seedConnectedSources,
   signIn,
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
   type SeedConnectedSource,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -416,7 +417,7 @@ test.describe("connecting a document on the Sources page", () => {
     await expect(lastSyncedOf(page, "The staff handbook")).toHaveText(/^\d{2}:\d{2} · /);
   });
 
-  test("refuses an Admin's unconvertible file, naming the kinds that convert", async ({
+  test("refuses an Admin's unconvertible file, keeping the dialog open", async ({
     page,
     request,
   }) => {
@@ -432,10 +433,40 @@ test.describe("connecting a document on the Sources page", () => {
     });
     await dialog.getByRole("button", { name: "Connect the document" }).click();
 
-    await saysItsSentenceNotItsWord(dialog.getByRole("alert"), {
-      table: SAID_OF_A_CONNECTED_SOURCE,
-      word: "media-type-refused",
+    await saysARefusal(dialog.getByRole("alert"));
+    await expect(page.locator("body"), "the page shows the api's word").not.toContainText(
+      "media-type-refused",
+    );
+    await expect(dialog).toBeVisible();
+  });
+
+  test("says in the dialog that the api refused an upload", async ({ page, request }) => {
+    await anAdminAtSources(page, request, { workspace: "Ryburn Stores" });
+    // The page lets a markdown file through, so the kind is changed on its way to the api.
+    await page.route(
+      (url) => url.pathname.endsWith("sources.connect"),
+      (route) =>
+        route.continue({
+          headers: {
+            ...route.request().headers(),
+            "x-upload-media-type": encodeURIComponent(JSON.stringify("image/png")),
+          },
+        }),
+    );
+
+    await page.keyboard.press("b");
+    const dialog = page.getByRole("dialog", { name: "Connect a document" });
+    await dialog.getByLabel("Name").fill("Shop notes");
+    await dialog.getByLabel("File").setInputFiles({
+      name: "notes.md",
+      mimeType: "text/markdown",
+      buffer: Buffer.from("The shop opens at eight.\n"),
     });
+    const refused = refusalAnswering(page, "sources.connect");
+    await dialog.getByRole("button", { name: "Connect the document" }).click();
+
+    expect(await refused).toMatchObject({ word: "media-type-refused", class: "inapplicable" });
+    await saysARefusal(dialog.getByRole("alert"));
     await expect(dialog).toBeVisible();
   });
 });

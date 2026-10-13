@@ -49,6 +49,7 @@ import {
   provision,
   quoted,
   removeMember,
+  saysARefusal,
   saysItsSentenceNotItsWord,
   signIn,
   skipLinkReachesThePage,
@@ -57,6 +58,7 @@ import {
   tabUntilFocused,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
+import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
@@ -1391,11 +1393,11 @@ test.describe("removing a member from their page", () => {
   }) => {
     await anAdminAtPeople(page, request, "Hodder Tools");
 
+    const refused = refusalAnswering(page, "members.remove");
     await removedThroughTheirPage(page, "Test person");
 
-    await expect(removalOf(page).getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_A_MEMBER["last-admin"]),
-    );
+    expect(await refused).toMatchObject({ word: "last-admin", class: "precondition" });
+    await saysARefusal(removalOf(page).getByRole("alert"));
     await expect(page).toHaveURL(AT_A_MEMBER_PAGE);
     await expect(changeRoleButton(page)).toHaveAccessibleDescription(
       MEMBER_PAGE_WORDS.holdsRole("Test person", "Admin"),

@@ -184,6 +184,7 @@ More helpers in the same module drive the browser rather than the harness:
 | `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later. A key pressed sooner keeps the focus it moved |
 | `clockTheNextKey` | Starts the action's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActionLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the action's 100 ms |
+| `saysARefusal` | Asserts an alert holds words. A refusal's region can stand empty from the first draw, so being in the tree shows no refusal |
 | `saysItsSentenceNotItsWord` | Asserts an alert reads the sentence a feature's refusal table holds for a word, and that the word is nowhere on the page |
 | `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
 | `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
@@ -211,6 +212,14 @@ console procedure inside a tRPC batch, in the api's own words for a person witho
 mark, and leaves the batch's other answers real. A spec uses it to meet a list's refused re-read
 while the console stays open, since clearing the mark itself closes the whole console.
 `apps/web/e2e/console.spec.ts` and `apps/web/e2e/console-people.spec.ts` are the worked examples.
+
+Two more in that module read what the api answered. `refusalAnswering` waits for the next answer to
+one tRPC procedure, found by its place in a batch or in a call sent alone. It answers the refusal's
+word and class, and each item's word where a set was refused whole. A ceiling carries no word, so
+for one it answers the 429 status and the wait in seconds. `authAnswering` waits for the next answer
+on a path outside tRPC, Better Auth's or one of the api's own, and answers its status, the library's
+code and a ceiling's wait. The first matching answer settles either, so a read the page asks again
+is not waited for.
 
 ## Writing a spec
 
@@ -243,17 +252,34 @@ while the console stays open, since clearing the mark itself closes the whole co
 - **Give an assertion a message wherever the failure would not name itself.** The harness's own
   `${path} answered ${status}` is the pattern, and so are the axe assertion and the gate's refusal
   in `apps/web/e2e/browser.ts`.
-- **Read the SPA's own constants, words as well as pages, rather than copying them.**
+- **Read a page's or a control's name from the SPA's own constants rather than copying it.**
   `apps/web/e2e/models-and-spend.spec.ts` imports `@/shared/navigation.ts`, so the list of areas, groups
-  and pages is written once. Read a sentence the same way: import it from a feature's word table
-  (`apps/web/src/features/sources/words.ts`), the navigation list or the role meanings
-  (`apps/web/src/shared/role-words.ts`). Then assert the state it belongs to: the
-  region, its role, the next action. Never pin prose as a literal, so rewording a page breaks no
-  spec. Read a control's accessible name from the same table where one exists. Two things stay
-  literal: the trust words, a closed set that is part of the behaviour, and text a person types.
-  A refusal's sentence comes from its feature's `refusal-words.ts`, or `@/shared/refusal-words.ts`
-  for the class fallbacks. A word table imports no React or tRPC code at runtime, so the suite
-  loads it without the rest of the SPA.
+  and pages is written once. Read a control's accessible name the same way where a table holds
+  it: a feature's word table (`apps/web/src/features/sources/words.ts`), the navigation list or the
+  role meanings (`apps/web/src/shared/role-words.ts`). A word table imports no React or tRPC code
+  at runtime, so the suite loads it without the rest of the SPA.
+- **Assert what the page does, never a sentence it shows.** A test may assert seeded data, text a
+  person types, a closed-set word, a number, and the accessible name of a control, heading, region
+  or dialog. The trust words and the api's refusal words are closed sets. A sentence the web shows
+  is asserted nowhere, whether read from a word table or written out, so rewording a page breaks no
+  spec. Assert what the sentence stood for: the region and its role, the data or the state that
+  changed, the next action. A region that stands empty until it has something to say is checked for
+  holding words, as `apps/web/e2e/outcome-regions.spec.ts` does with `filter({ hasText: /\S/ })`.
+  An aria snapshot keeps roles, names, levels, states and order, and no prose line of any kind,
+  `- text:` lines included.
+- **Tell which refusal happened from where it was decided.** Where the api answered, read its
+  answer with `refusalAnswering` or `authAnswering`, above, then check the alert with
+  `saysARefusal`. Ask for the answer before the action that calls and await it afterwards, because
+  an answer can land before anything waits for it. A ceiling's answer carries no word, so the spec
+  matches the wait's number in the alert. The answer gives the wait in seconds and the alert says
+  it in whole minutes, rounded up, so a wait of over a minute is matched as
+  `Math.ceil(waitSeconds / 60)`. Where the page decided, no answer says which refusal it
+  was: a request dropped, a refusal the page raises before it calls, the tries left for a code,
+  which the page counts. There `saysARefusal` is the whole check, and a number the alert shows is
+  matched by pattern. No spec imports a refusal's sentence, and the page gains no marker for a
+  test's sake. `apps/web/e2e/people.spec.ts` reads a batched answer, `apps/web/e2e/sources.spec.ts`
+  one sent alone and a refusal the page raises itself, `apps/web/e2e/sign-in.spec.ts` Better
+  Auth's, and `apps/web/e2e/knowledge-search.spec.ts` a dropped request.
 - **A latency budget is measured, annotated and asserted** — `test.info().annotations.push(…)`
   beside the comparison, so a run that passes still says how close it came. A list's second is
   timed from a fresh `goto`, so no cache answers it. An action's 100 ms is timed **in the page** — a
