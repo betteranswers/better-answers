@@ -59,6 +59,7 @@ const walked = async (
 const walkedFromEntries = async (
   reader: MapScenario["admin"],
   uids: readonly string[],
+  collections?: readonly string[],
 ): Promise<readonly WalkStep[]> =>
   answered(
     await readingAs(db().runtimePool, reader, (principal, tx) =>
@@ -66,6 +67,7 @@ const walkedFromEntries = async (
         principal,
         tx,
         uids.map((uid) => ids.conceptIri.parse(uid)),
+        collections,
       ),
     ),
   );
@@ -431,22 +433,6 @@ const conceptNode = async (
   return iri;
 };
 
-const walkedInside = async (
-  reader: MapScenario["admin"],
-  uids: readonly string[],
-  collections: readonly string[],
-): Promise<readonly WalkStep[]> =>
-  answered(
-    await readingAs(db().runtimePool, reader, (principal, tx) =>
-      walkFromEntries(
-        principal,
-        tx,
-        uids.map((uid) => ids.conceptIri.parse(uid)),
-        collections,
-      ),
-    ),
-  );
-
 describe("a map walk narrowed to collections", () => {
   it("keeps a collection's neighbours past a hub's thousand others", async () => {
     const scenario = await arrange();
@@ -463,7 +449,7 @@ describe("a map walk narrowed to collections", () => {
     });
     await db().pool.query("ANALYZE map_node, map_edge");
 
-    const narrowed = await walkedInside(scenario.viewer, [hub], ["audits"]);
+    const narrowed = await walkedFromEntries(scenario.viewer, [hub], ["audits"]);
     const whole = await walkedFromEntries(scenario.viewer, [hub]);
 
     expect(uidsByDepth(narrowed)).toEqual([[hub, 0], ...inside.map((uid) => [uid, 1])]);
@@ -491,7 +477,7 @@ describe("a map walk narrowed to collections", () => {
       return made;
     });
 
-    const narrowed = await walkedInside(scenario.viewer, [entry, outside], ["audits"]);
+    const narrowed = await walkedFromEntries(scenario.viewer, [entry, outside], ["audits"]);
     const whole = await walkedFromEntries(scenario.viewer, [entry]);
 
     expect(uidsByDepth(narrowed)).toEqual([[entry, 0]]);
@@ -514,7 +500,7 @@ describe("a map walk narrowed to collections", () => {
       return made;
     });
 
-    const narrowed = await walkedInside(scenario.viewer, [entry], ["audits"]);
+    const narrowed = await walkedFromEntries(scenario.viewer, [entry], ["audits"]);
     const whole = await walkedFromEntries(scenario.viewer, [entry]);
 
     expect(uidsByDepth(narrowed)).toEqual([

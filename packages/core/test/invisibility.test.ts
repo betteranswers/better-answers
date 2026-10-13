@@ -557,19 +557,25 @@ describe("an `Answer` withheld from the asker", () => {
       title: "Where do audit logs stay?",
       body: "Audit logs stay in the console for a long time.",
     });
+    const two = await answerWritten(scenario, {
+      collection: "audits",
+      slug: "long-audits",
+      title: "Do long audits happen?",
+      body: "A full audit takes a week.",
+    });
     const one = await answerWritten(scenario, {
       collection: "audits",
       slug: "log-exports",
       title: "Can a log be exported?",
       body: "A log can be exported as a spreadsheet.",
     });
-    const caps = { ...ASK_CAPS, entryPoints: 2 };
+    const entriesFor = async (asker: UserPrincipal, entryPoints: number) =>
+      irisOf(await asked(db(), asker, QUESTION, { caps: { ...ASK_CAPS, entryPoints } }));
 
-    const viewers = await asked(db(), scenario.viewer, QUESTION, { caps });
-    const admins = await asked(db(), scenario.admin, QUESTION, { caps });
-
-    expect(irisOf(viewers)).toEqual([three.iri, one.iri]);
-    expect(irisOf(admins)).toEqual([withheld.iri, three.iri]);
+    expect(await entriesFor(scenario.viewer, 2)).toEqual([three.iri, two.iri]);
+    expect(await entriesFor(scenario.admin, 2)).toEqual([withheld.iri, three.iri]);
+    expect(await entriesFor(scenario.viewer, 1)).toEqual([three.iri]);
+    expect(await entriesFor(scenario.viewer, 3)).toEqual([three.iri, two.iri, one.iri]);
   });
 
   it("names a source the asker cannot open by its label", async () => {
