@@ -21,6 +21,7 @@ import type { ObjectDoor } from "../store/objects/index.ts";
 import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { eraseFromTheIdentitySet, type IdentityArm, type IdentitySwept } from "./identity.ts";
 import { erasureMapOf, type ErasureFamily, type ErasureMap } from "./map.ts";
+import { eraseFromTheQuestions, type QuestionsSwept } from "./questions.ts";
 import { rederiveAfterErasure, type Rederived } from "./rederive.ts";
 import { writeReplayCopy } from "./replay.ts";
 import {
@@ -308,6 +309,13 @@ const withTheDocumentsStep = (
   },
 });
 
+const QUESTION_ASKED: ErasureFamily = "question-asked";
+
+const withTheQuestionsStep = (actions: ErasureActions, swept: QuestionsSwept): ErasureActions => ({
+  ...actions,
+  [QUESTION_ASKED]: { ...actions[QUESTION_ASKED], ...swept },
+});
+
 const IDENTITY_USER: ErasureFamily = "identity-user";
 
 const personTheMapFound = (map: ErasureMap): string | null =>
@@ -556,6 +564,16 @@ export const runErasure = async (
     // run nothing left to count.
     doors.log.info(identityStepLineOf(platform, erasure.id, identity.value), IDENTITY_STEP_LOGGED);
 
+    // On every arm: what a person asked here is this workspace's record of them.
+    const questions = await attempt(() =>
+      eraseFromTheQuestions(platform, doors.postgres, {
+        workspaceId,
+        personIds: [personTheMapFound(map), request.personId],
+        pseudonym,
+      }),
+    );
+    if (!questions.ok) return err(questions.error);
+
     const rederived = await attempt(() =>
       rederiveAfterErasure(platform, doors.postgres, {
         workspaceId,
@@ -565,18 +583,21 @@ export const runErasure = async (
     );
     if (!rederived.ok) return err(rederived.error);
 
-    const actions = withTheDocumentsStep(
-      withTheIdentityStep(
-        withTheVerificationsMoved(
-          withTheGitStep(foundPerFamily(map), rewritten.value),
-          rewritten.value.carried,
+    const actions = withTheQuestionsStep(
+      withTheDocumentsStep(
+        withTheIdentityStep(
+          withTheVerificationsMoved(
+            withTheGitStep(foundPerFamily(map), rewritten.value),
+            rewritten.value.carried,
+          ),
+          identity.value,
         ),
-        identity.value,
+        {
+          ...suppressed.value,
+          connectedSourcesToReprocess: rederived.value.connectedSourcesToReprocess,
+        },
       ),
-      {
-        ...suppressed.value,
-        connectedSourcesToReprocess: rederived.value.connectedSourcesToReprocess,
-      },
+      questions.value,
     );
     return completeTheRequest(platform, doors, workspaceId, opened.value, actions);
   });

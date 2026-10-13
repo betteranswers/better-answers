@@ -12,7 +12,12 @@ import {
 } from "@better-answers/core/testing/postgres";
 import { provisionWorkspace } from "@better-answers/core/workspaces";
 import { boundarySchemas, ulid } from "@better-answers/schema";
-import { testData } from "@better-answers/schema/testing";
+import {
+  contentPartitionOf,
+  contentPartitions,
+  inTheMonth,
+  testData,
+} from "@better-answers/schema/testing";
 
 import type { SweepSettings } from "../src/config.ts";
 import type { Doors } from "../src/doors.ts";
@@ -65,12 +70,31 @@ const running = (settings: SweepSettings, overrides: Partial<SweepsDependencies>
   return { pinged, logs, stop: () => sweeps.stop() };
 };
 
-const onePass = async (settings: SweepSettings): Promise<Running> => {
-  const sweeps = running(settings);
+const onePass = async (
+  settings: SweepSettings,
+  overrides: Partial<SweepsDependencies> = {},
+): Promise<Running> => {
+  const sweeps = running(settings, overrides);
   await until(async () => sweeps.pinged.length > 0);
   await sweeps.stop();
   return sweeps;
 };
+
+/** Late in the month after this one, when a pass makes the month after that. */
+const LATE_NEXT_MONTH = inTheMonth(1, 27);
+
+/** One pass with its clock stopped at `now`. */
+const onePassAt = (now: Date): Promise<Running> =>
+  onePass(
+    { uploadSweep: "list", pingUrl: PING_URL },
+    { doors: { ...doors(), clock: { now: () => now } } },
+  );
+
+const contentMonths = async (): Promise<readonly string[]> =>
+  (await contentPartitions(db().pool)).map((partition) => partition.name);
+
+const monthsOn = (...months: readonly number[]): readonly string[] =>
+  months.map((month) => contentPartitionOf(inTheMonth(month)));
 
 const passes = (logs: readonly LogLine[]): readonly LogLine[] =>
   logs.filter((line) => line["msg"] === "sweep pass");
@@ -405,6 +429,32 @@ describe("the sweeps' daily pass", () => {
       }),
     );
     expect(sweeps.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);
+  });
+
+  it("makes the next month's partition for questions' content", async () => {
+    expect(await contentMonths()).toEqual(monthsOn(0, 1));
+
+    const sweeps = await onePassAt(LATE_NEXT_MONTH);
+
+    expect(await contentMonths()).toEqual(monthsOn(0, 1, 2));
+    expect(passes(sweeps.logs)).toEqual([expect.objectContaining({ level: 30, refusals: [] })]);
+  });
+
+  it("names a month it could not make, pinging failure", async () => {
+    await db().pool.query(
+      "REVOKE EXECUTE ON FUNCTION create_question_content_partition(date) FROM app_rt",
+    );
+
+    const sweeps = await onePassAt(LATE_NEXT_MONTH);
+
+    expect(await contentMonths()).toEqual(monthsOn(0, 1));
+    expect(passes(sweeps.logs)).toEqual([
+      expect.objectContaining({
+        level: 40,
+        refusals: [{ sweep: "question-months", reason: expect.any(String) }],
+      }),
+    ]);
+    expect(sweeps.pinged.map((ping) => ping.url)).toEqual([`${PING_URL}/fail`]);
   });
 
   it("still sweeps and logs when the estate names no check", async () => {

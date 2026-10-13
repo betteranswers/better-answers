@@ -39,6 +39,7 @@ export {
   type OpenInput,
 } from "./boundary.ts";
 export { findCursor, type FindPosition } from "./cursor.ts";
+export { completeRecord, openRecord } from "./record.ts";
 
 export {
   TRUST_RIDERS,

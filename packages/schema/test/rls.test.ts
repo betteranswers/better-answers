@@ -149,6 +149,8 @@ describe("the exemption list", () => {
   });
 });
 
+// A partitioned table is read here as its declared parent; question-tables.test.ts holds
+// each month's partition of the questions' content.
 describe("every tenant table", () => {
   it("carries RLS and FORCE ROW LEVEL SECURITY in the catalogue", async () => {
     for (const qualified of tenantTableNames()) {

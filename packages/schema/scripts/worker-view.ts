@@ -14,8 +14,8 @@ export type ColumnRow = {
 };
 
 /**
- * Every live column of the `public` and `index` tables, in schema, table and column order. Any
- * table named `passage_*` is skipped, partition or not.
+ * Skips every partition, whose name changes with the tenants or the month, and any table named
+ * `passage_*`, partition or not.
  */
 export const introspect = async (client: pg.Pool | pg.PoolClient): Promise<ColumnRow[]> => {
   const result = await client.query(
@@ -25,7 +25,8 @@ export const introspect = async (client: pg.Pool | pg.PoolClient): Promise<Colum
        JOIN pg_class c ON c.oid = a.attrelid
        JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname IN ('public', 'index') AND c.relkind IN ('r', 'p')
-        AND a.attnum > 0 AND NOT a.attisdropped AND c.relname NOT LIKE 'passage\_%'
+        AND a.attnum > 0 AND NOT a.attisdropped AND NOT c.relispartition
+        AND c.relname NOT LIKE 'passage\_%'
       ORDER BY n.nspname, c.relname, a.attnum`,
   );
   return result.rows.map((row) => ({

@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0075_the-collection"
+MIGRATION_ID = "0076_the-questions-asked"
 
-MIGRATION_WHEN = 1791879526186
+MIGRATION_WHEN = 1791888930088
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -454,6 +454,40 @@ TABLES: dict[str, dict[str, str]] = {
     "public.passkey_last_use": {
         "passkey_id": "text NOT NULL",
         "at": "timestamp with time zone NOT NULL",
+    },
+    "public.question_asked": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "asked_at": "timestamp with time zone NOT NULL",
+        "asked_by": "text NOT NULL",
+        "transport": "text NOT NULL",
+        "collections": "text[] NOT NULL",
+        "predicate_role": "text NOT NULL",
+        "predicate_groups": "text[] NOT NULL",
+        "completed_at": "timestamp with time zone",
+        "verdict": "text",
+        "judge_state": "text",
+        "concepts": "jsonb NOT NULL",
+        "unmapped_passages": "text[] NOT NULL",
+    },
+    "public.question_content": {
+        "workspace_id": "text NOT NULL",
+        "record_id": "text NOT NULL",
+        "asked_at": "timestamp with time zone NOT NULL",
+        "question": "text NOT NULL",
+        "drafted": "jsonb",
+    },
+    "public.question_feedback": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "record_id": "text NOT NULL",
+        "given_at": "timestamp with time zone NOT NULL",
+        "given_by": "text NOT NULL",
+        "verdict": "text NOT NULL",
+        "reason": "text",
+        "note": "text",
+        "disputed_sentence": "text",
+        "disputed_concept": "text",
     },
     "public.rate_limit": {
         "id": "text NOT NULL",

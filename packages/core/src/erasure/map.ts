@@ -1,7 +1,12 @@
 import { boundarySchemas } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-import { actorIdOfPerson, type ActorId, type PlatformPrincipal } from "../kernel/index.ts";
+import {
+  actorIdOfPerson,
+  PERSON_PREFIX,
+  type ActorId,
+  type PlatformPrincipal,
+} from "../kernel/index.ts";
 import { historyNaming, type GitDoor } from "../store/git/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { SESSION_VERIFICATION_PREFIXES, VERIFICATION_PREFIXES } from "../workspaces/index.ts";
@@ -24,6 +29,7 @@ export const ERASURE_FAMILIES = [
   "identity-confirm-failures",
   "identity-last-active",
   "source-document",
+  "question-asked",
 ] as const;
 
 export type ErasureFamily = (typeof ERASURE_FAMILIES)[number];
@@ -37,6 +43,7 @@ export const PERSONAL_DATA_CATEGORIES = [
   "device",
   "linked-account",
   "document-text",
+  "typed-text",
 ] as const;
 
 type PersonalDataCategory = (typeof PERSONAL_DATA_CATEGORIES)[number];
@@ -103,6 +110,15 @@ const rowsOfThePersonIn =
   (table: "account" | "authenticator" | "recovery_code"): ErasureFinder =>
   (platform, subject, tx) =>
     aboutTheMember(tx, subject, `SELECT id AS location FROM ${table} WHERE user_id = $1`);
+
+/** The actor ids a record may name the person by, given each as an actor id or a person id. */
+export const askersOf = (people: readonly (string | null)[]): readonly string[] => [
+  ...new Set(
+    people
+      .filter((person) => person !== null)
+      .map((person) => (person.startsWith(PERSON_PREFIX) ? person : `${PERSON_PREFIX}${person}`)),
+  ),
+];
 
 const MEMBER_HERE = `SELECT u.id AS location
      FROM "user" u
@@ -249,6 +265,24 @@ const ERASURE_FAMILY_DESCRIPTORS = {
   "source-document": {
     categories: ["document-text"],
     find: (platform, subject, tx) => documentsNaming(platform, tx, subject),
+  },
+
+  /**
+   * By the request's person and by the member an address finds, so a former member's records
+   * are named as a present one's are.
+   */
+  "question-asked": {
+    categories: ["actor-id", "typed-text"],
+    find: async (platform, subject, tx) => {
+      const askers = askersOf([subject.actor, subject.memberId]);
+      return askers.length === 0
+        ? []
+        : located(
+            tx,
+            "SELECT id AS location FROM question_asked WHERE workspace_id = $1 AND asked_by = ANY($2)",
+            [subject.workspaceId, askers],
+          );
+    },
   },
 } satisfies Record<ErasureFamily, ErasureFamilyDescriptor>;
 

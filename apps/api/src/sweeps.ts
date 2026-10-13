@@ -3,6 +3,7 @@ import type { Logger } from "pino";
 import { attemptResult, err, ok, type Result } from "@better-answers/core/kernel";
 import type { PostgresDoor } from "@better-answers/core/store/postgres";
 import {
+  makeQuestionMonths,
   SWEEPS,
   sweepEveryWorkspace,
   sweepIdentitySet,
@@ -51,14 +52,18 @@ type Deletion = Result<number, Error>;
 
 const countOf = (deletion: Deletion): number => (deletion.ok ? deletion.value : 0);
 
-const refusalOf = (sweep: string, deletion: Deletion) =>
-  deletion.ok ? [] : [{ sweep, reason: reasonOf(deletion.error) }];
+const refusalOf = (sweep: string, swept: Result<unknown, Error>) =>
+  swept.ok ? [] : [{ sweep, reason: reasonOf(swept.error) }];
 
-/** No workspace holds an identity-set row, so a refused delete names its sweep alone. */
-const identitySetSwept = async (postgres: PostgresDoor, now: Date) => {
+/**
+ * No workspace holds an identity-set row or a month's partition of the questions' content, so a
+ * refused one names its sweep alone.
+ */
+const sweptOutsideAnyWorkspace = async (postgres: PostgresDoor, now: Date) => {
   const { sessions, verifications, ingressWindows } = await sweepIdentitySet(SWEEPS, postgres, {
     now,
   });
+  const questionMonths = await makeQuestionMonths(postgres, { now });
   return {
     deleted: {
       sessions_deleted: countOf(sessions),
@@ -69,6 +74,7 @@ const identitySetSwept = async (postgres: PostgresDoor, now: Date) => {
       ...refusalOf("sessions", sessions),
       ...refusalOf("verifications", verifications),
       ...refusalOf("ingress", ingressWindows),
+      ...refusalOf("question-months", questionMonths),
     ],
   };
 };
@@ -98,10 +104,11 @@ export const startSweeps = (dependencies: SweepsDependencies): Result<Sweeps, Sw
       logger.warn("a sweep pass was skipped: another holder has the sweeps' lock");
       return;
     }
-    // The deletions need no workspace, so a failed workspace sweep must not keep expired rows.
-    const identitySet = await identitySetSwept(postgres, clock.now());
+    // Neither the deletions nor the months need a workspace, so a failed workspace sweep must
+    // not keep expired rows or leave next month unmade.
+    const outside = await sweptOutsideAnyWorkspace(postgres, clock.now());
     if (!swept.ok) {
-      const { deleted, refusals } = identitySet;
+      const { deleted, refusals } = outside;
       logger.error(
         { reason: reasonOf(swept.error), ...deleted, refusals },
         "the sweep pass failed",
@@ -109,11 +116,11 @@ export const startSweeps = (dependencies: SweepsDependencies): Result<Sweeps, Sw
       await ping("fail");
       return;
     }
-    const refusals = [...refusalsOf(swept.value), ...identitySet.refusals];
+    const refusals = [...refusalsOf(swept.value), ...outside.refusals];
     const summary = {
       upload_sweep: uploadSweep,
       ...swept.value.totals,
-      ...identitySet.deleted,
+      ...outside.deleted,
       refusals,
     };
     const outcome: PingOutcome = refusals.length > 0 ? "fail" : "ok";

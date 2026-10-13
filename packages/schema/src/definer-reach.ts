@@ -23,6 +23,13 @@ export const SECURITY_DEFINER_REACH = [
       "Past the caller's grants. `app_rt` holds USAGE on `index` and no CREATE, so making a partition of the passage table is a thing it can do through this function and in no other way; the function revokes both runtime roles on the partition it makes, which is why a statement reaches a tenant's rows through the policied parent and never through the child.",
   },
   {
+    fn: "public.create_question_content_partition",
+    args: "p_month date",
+    reaches: ["public.question_content"],
+    reason:
+      "Past the caller's grants. `app_rt` holds no CREATE on `public`, so making a month's partition of a record's content is a thing it can do through this function and in no other way. It takes no workspace: a month's partition holds every tenant's rows, each reached through the policied parent. With no scope to guard its argument against, it refuses any month but the four around the database's own clock, so a caller cannot make partitions without end. The function forces row-level security on the partition it makes and revokes both runtime roles on it, and a second call for a month makes nothing.",
+  },
+  {
     fn: "public.submit_suggestion_set",
     args: "p_set_id text, p_kind text, p_proposer text, p_requests jsonb",
     reaches: ["public.concept_write_request", "public.suggestion"],

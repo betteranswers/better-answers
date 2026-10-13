@@ -49,6 +49,7 @@ import {
   verificationCodeFor,
 } from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
+import { asAsked, asErased, questionRowsOf, recordAskedBy } from "./question-rows.ts";
 import { auditEventRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import {
@@ -2120,6 +2121,96 @@ const completedForASubjectWithNoUserRow = async () => {
   );
   return { scenario, done: await completing(scenario, seeded.id) };
 };
+
+describe("the questions a person asked", () => {
+  const pseudonymIn = async (workspaceId: string): Promise<string> =>
+    (await erasureRowsIn(workspaceId))[0]?.pseudonym ?? "no erasure ran";
+
+  const rowsOf = (recordId: string) => questionRowsOf(db().pool, recordId);
+
+  it("rewrites the asker, removes the question and the note", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const theirs = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+    expect(await rowsOf(theirs.recordId)).toEqual(asAsked(theirs.asker));
+
+    await completing(scenario, subjectRequestId);
+
+    const pseudonym = await pseudonymIn(scenario.workspaceId);
+    expect(pseudonym).not.toEqual(person.id);
+    expect(await rowsOf(theirs.recordId)).toEqual(asErased(pseudonym));
+  });
+
+  it("leaves another member's question and note as they were", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+    const anothers = await recordAskedBy(db().pool, scenario.workspaceId, scenario.viewer.userId);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await rowsOf(anothers.recordId)).toEqual(asAsked(anothers.asker));
+  });
+
+  it("reaches this workspace's records alone, whichever arm runs", async () => {
+    const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
+    const here = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+    const there = await recordAskedBy(db().pool, elsewhere.workspaceId, person.id);
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await rowsOf(here.recordId)).toEqual(asErased(await pseudonymIn(scenario.workspaceId)));
+    expect(await rowsOf(there.recordId)).toEqual(asAsked(there.asker));
+  });
+
+  it("reaches a former member's questions by their person id", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest({
+      byIdAlone: true,
+    });
+    const theirs = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+    await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+      scenario.workspaceId,
+      person.id,
+    ]);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await rowsOf(theirs.recordId)).toEqual(
+      asErased(await pseudonymIn(scenario.workspaceId)),
+    );
+  });
+
+  it("counts what it did on the request's row and report", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+    await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+
+    const done = await completing(scenario, subjectRequestId);
+
+    const [row] = await erasureRowsIn(scenario.workspaceId);
+    expect(row?.actions["question-asked"]).toEqual({
+      found: 2,
+      rewritten: 2,
+      questionsRemoved: 2,
+      feedbackRewritten: 2,
+    });
+    expect(done.report).toContain(
+      "\n- question-asked: feedbackRewritten 2, found 2, questionsRemoved 2, rewritten 2\n",
+    );
+  });
+
+  it("rewrites again when run over rows a restore brought back", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const theirs = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+    await completing(scenario, subjectRequestId);
+    const restored = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
+
+    await completing(scenario, subjectRequestId, RAN_AGAIN_AT);
+
+    const pseudonym = await pseudonymIn(scenario.workspaceId);
+    expect(await rowsOf(restored.recordId)).toEqual(asErased(pseudonym));
+    expect(await rowsOf(theirs.recordId)).toEqual(asErased(pseudonym));
+  });
+});
 
 describe("a subject with no user row", () => {
   it("erases by suppression alone and reports what each arm did", async () => {
