@@ -280,7 +280,7 @@ test.describe("the Sources page's list of connected sources", () => {
     await expect(detailOf(page, "Staff handbook", "Retention")).toHaveText(aSentence);
   });
 
-  test("tells an Admin why documents are unreadable, OCR when needed", async ({
+  test("tells an Admin why documents are unreadable, scans counted apart", async ({
     page,
     request,
   }) => {

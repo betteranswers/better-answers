@@ -301,7 +301,7 @@ test.describe("the concept page", () => {
     await expect(concept.getByRole("definition").filter({ hasText: "Yearly" })).toBeVisible();
   });
 
-  test("leads its sources with access, ends with what next", async ({ page, request }) => {
+  test("leads and ends its sources with the read's own lines", async ({ page, request }) => {
     const seeded = await aWorkspaceOfConcepts(request, "Aire Registry");
     await signedInAsAViewer(page, request, seeded);
     const answered = page.waitForResponse((response) => isAnOpen(new URL(response.url())));

@@ -60,6 +60,10 @@ const alerted = (page: Page) => searchRegion(page).getByRole("alert");
 
 const passagePanel = (page: Page, title: string) => page.getByRole("dialog", { name: title });
 
+/** The mark of a document no concept rests on, then its sensitivity, whatever stands between. */
+const markedAt = (sensitivity: string): RegExp =>
+  new RegExp(`${WORDS.notCompanyKnowledge}\\W+${sensitivity}`);
+
 const asked = (query: string): string =>
   `${SEARCH.path}?${new URLSearchParams({ "knowledge.search": query }).toString()}`;
 
@@ -400,7 +404,7 @@ test.describe("the Knowledge Search page", () => {
     await expect(matchesOf(page).filter({ hasText: "Audit Salary Bands" })).toHaveCount(1);
     const document = matchesOf(page).filter({ hasText: PAY_REVIEW });
     await expect(document).toHaveCount(1);
-    await expect(document).toContainText(`${WORDS.notCompanyKnowledge} · Restricted`);
+    await expect(document).toContainText(markedAt("Restricted"));
   });
 
   test("asks for the most the read takes, and no more", async ({ page, request }) => {
@@ -536,9 +540,9 @@ test.describe("the Knowledge Search page", () => {
 
     const panel = passagePanel(page, renamed);
     await expect(panel.getByRole("heading", { name: renamed })).toBeFocused();
-    await expect(panel).toContainText(`${WORDS.notCompanyKnowledge} · Restricted`);
+    await expect(panel).toContainText(markedAt("Restricted"));
     await expect(panel, "the panel copied the match's sensitivity").not.toContainText("Internal");
-    await expect(first).toContainText(`${WORDS.notCompanyKnowledge} · Internal`);
+    await expect(first).toContainText(markedAt("Internal"));
 
     // The same passage refused on its next read: the title once read does not stand over the refusal.
     await page.keyboard.press("Escape");
