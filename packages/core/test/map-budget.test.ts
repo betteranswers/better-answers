@@ -1,13 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { MAP_WALK_ROW_LIMIT, walkFrom } from "@better-answers/core/store/map";
-import type { ConceptIri } from "@better-answers/schema";
+import { walkFrom, walkFromEntries } from "@better-answers/core/store/map";
+import { ids, type ConceptIri } from "@better-answers/schema";
 
 import { writeConcept, type WriteConceptInput } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
 import { inMs, percentile, recordFigures } from "./figures.ts";
-import { answered, readingAs, runtimePoolFor } from "./suite-postgres.ts";
+import { answered, readingAs, runtimePoolFor, seedingWith } from "./suite-postgres.ts";
 import { runWorkerOnce } from "./worker-process.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -18,16 +18,32 @@ const LINKS_EACH = 6;
 
 const EDGES = 159;
 
+const WIDE_NODES = 3_000;
+
+/** Each node's six links, as steps round the ring of nodes: no two short routes end together. */
+const WIDE_LINKS = [1, 7, 43, 211, 617, 1_499];
+
+const ENTRIES = 40;
+
 const IN_FLIGHT = 20;
 const ROUNDS = 5;
 
 const readers = runtimePoolFor(db, IN_FLIGHT);
 
+/** The cap counts concepts: a node is one row at its least depth, however many paths reach it. */
+const CONCEPTS_UNDER_THE_CAP = 1_000;
+
 /**
- * Priced against a one-row walk on the same connection before it: load slows both alike, a
- * dearer walk only the one filling the cap.
+ * Priced in one-row walks on the same connection, so load slows both alike. The forty-entry walk
+ * measured 20 to 24.
  */
-const WALK_BUDGET_IN_ONE_ROW_WALKS = 200;
+const WALK_BUDGET_IN_ONE_ROW_WALKS = 100;
+
+/**
+ * The walk's own statement timeout, a wall clock: on fourteen cores, twenty in flight ran 121 ms
+ * at the slowest.
+ */
+const WALK_TIMEOUT_MS = 2_000;
 
 const REBUILD_BUDGET_MS = 120_000;
 
@@ -54,25 +70,55 @@ const writeOf = (at: number, head: string | null): WriteConceptInput => ({
   sensitivity: "Internal",
 });
 
-type DenseMap = {
-  readonly scenario: Scenario;
-  readonly entry: ConceptIri;
-  readonly leaf: ConceptIri;
-};
-
-const landDenseMap = async (scenario: Scenario): Promise<DenseMap> => {
+const landDenseMap = async (scenario: Scenario): Promise<Scenario> => {
   let head: string | null = null;
-  const iris: ConceptIri[] = [];
   for (let at = 0; at < CONCEPTS; at += 1) {
     const written = await writeConcept(scenario.editor, doorsOf(scenario), writeOf(at, head));
     if (!written.ok) throw new Error(`the map did not land: ${String(written.error)}`);
     head = written.value.sha;
-    iris.push(written.value.iri);
   }
-  const [leaf] = iris;
-  const entry = iris.at(-1);
-  if (leaf === undefined || entry === undefined) throw new Error("the map landed no concept");
-  return { scenario, entry, leaf };
+  return scenario;
+};
+
+type WideMap = {
+  readonly scenario: Scenario;
+  readonly entries: readonly ConceptIri[];
+  readonly lone: ConceptIri;
+};
+
+const nodeAt = (uids: readonly string[], at: number): string => {
+  const uid = uids[at % uids.length];
+  if (uid === undefined) throw new Error("the wide map holds no node there");
+  return uid;
+};
+
+/**
+ * Every seventy-fifth node is an entry: forty entries, whose four hops reach more nodes than the
+ * row limit holds.
+ */
+const seedWideMap = async (scenario: Scenario): Promise<WideMap> => {
+  const workspaceId = scenario.workspaceId;
+  const seeded = await seedingWith(db().pool, async (seed) => {
+    const uids: string[] = [];
+    for (let at = 0; at < WIDE_NODES; at += 1) {
+      uids.push((await seed.mapNode({ workspaceId })).uid);
+    }
+    for (const [at, fromUid] of uids.entries()) {
+      for (const step of WIDE_LINKS) {
+        await seed.mapEdge({ workspaceId, fromUid, toUid: nodeAt(uids, at + step) });
+      }
+    }
+    return { uids, lone: (await seed.mapNode({ workspaceId })).uid };
+  });
+  // Autovacuum counts a live map's rows; uncounted, the planner joins every node to every step.
+  await db().pool.query("ANALYZE map_node, map_edge");
+  return {
+    scenario,
+    entries: seeded.uids
+      .filter((_uid, at) => at % (WIDE_NODES / ENTRIES) === 0)
+      .map((uid) => ids.conceptIri.parse(uid)),
+    lone: ids.conceptIri.parse(seeded.lone),
+  };
 };
 
 type TimedWalk = {
@@ -83,14 +129,14 @@ type TimedWalk = {
   readonly walkSteps: number;
 };
 
-const timedWalk = async (map: DenseMap, reader: UserPrincipal): Promise<TimedWalk> => {
+const timedWalk = async (map: WideMap, reader: UserPrincipal): Promise<TimedWalk> => {
   const started = performance.now();
   const timed = answered(
     await readingAs(readers(), reader, async (principal, tx) => {
       const oneRowStarted = performance.now();
-      const oneRow = await walkFrom(principal, tx, map.leaf);
+      const oneRow = await walkFrom(principal, tx, map.lone);
       const walkStarted = performance.now();
-      const walk = await walkFrom(principal, tx, map.entry);
+      const walk = await walkFromEntries(principal, tx, map.entries);
       return {
         oneRowMs: walkStarted - oneRowStarted,
         oneRowSteps: oneRow.length,
@@ -103,17 +149,19 @@ const timedWalk = async (map: DenseMap, reader: UserPrincipal): Promise<TimedWal
 };
 
 describe("the map under concurrent read load", () => {
-  let map: DenseMap;
+  let dense: Scenario;
+  let wide: WideMap;
 
   beforeAll(async () => {
-    map = await landDenseMap(await arrange());
+    dense = await landDenseMap(await arrange());
+    wide = await seedWideMap(await arrange());
   }, 300_000);
 
-  it("answers a row-cap walk within budget beside nineteen concurrent walks", async () => {
+  it("answers a forty-entry walk within budget beside nineteen concurrent walks", async () => {
     const walks: TimedWalk[] = [];
     for (let round = 0; round < ROUNDS; round += 1) {
       const inFlight = Array.from({ length: IN_FLIGHT }, (_unused, at) =>
-        timedWalk(map, at % 2 === 0 ? map.scenario.viewer : map.scenario.admin),
+        timedWalk(wide, at % 2 === 0 ? wide.scenario.viewer : wide.scenario.admin),
       );
       walks.push(...(await Promise.all(inFlight)));
     }
@@ -124,7 +172,7 @@ describe("the map under concurrent read load", () => {
     const waitedMs = walks.map((walked) => walked.waitedMs);
     const walkMs = walks.map((walked) => walked.walkMs);
 
-    await recordFigures("The map walk under concurrent read load", [
+    await recordFigures("The map walk from forty entries under concurrent read load", [
       [
         "the walk that fills the cap, in one-row walks at the median",
         `${inOneRowWalks.toFixed(1)}, against a budget of ${WALK_BUDGET_IN_ONE_ROW_WALKS}`,
@@ -132,31 +180,40 @@ describe("the map under concurrent read load", () => {
       ["a caller's wait at the median", inMs(percentile(waitedMs, 0.5))],
       ["a caller's wait at p95", inMs(percentile(waitedMs, 0.95))],
       ["a caller's slowest wait", inMs(percentile(waitedMs, 1))],
-      ["the slowest walk statement", inMs(percentile(walkMs, 1))],
+      ["the walk statement at the median", inMs(percentile(walkMs, 0.5))],
+      ["the walk statement at p95", inMs(percentile(walkMs, 0.95))],
+      [
+        "the slowest walk statement",
+        `${inMs(percentile(walkMs, 1))}, against a timeout of ${inMs(WALK_TIMEOUT_MS)}`,
+      ],
     ]);
 
     expect(readers().totalCount, "the connections the walks ran on").toBe(IN_FLIGHT);
+    expect(wide.entries, "the entries each walk starts from").toHaveLength(40);
     expect(walks.map((walked) => [walked.oneRowSteps, walked.walkSteps])).toEqual(
-      Array.from({ length: IN_FLIGHT * ROUNDS }, () => [1, MAP_WALK_ROW_LIMIT]),
+      Array.from({ length: IN_FLIGHT * ROUNDS }, () => [1, CONCEPTS_UNDER_THE_CAP]),
     );
     expect(
       inOneRowWalks,
       "the walk that fills the cap, in one-row walks, at the median",
     ).toBeLessThan(WALK_BUDGET_IN_ONE_ROW_WALKS);
+    expect(percentile(walkMs, 1), "the slowest walk statement, in milliseconds").toBeLessThan(
+      WALK_TIMEOUT_MS,
+    );
   });
 
   it("lands every concept and edge of the dense map", async () => {
     const rows = await db().pool.query<{ nodes: string; edges: string }>(
       `SELECT (SELECT count(*) FROM map_node WHERE workspace_id = $1) AS nodes,
               (SELECT count(*) FROM map_edge WHERE workspace_id = $1) AS edges`,
-      [map.scenario.workspaceId],
+      [dense.workspaceId],
     );
     expect(rows.rows[0]).toEqual({ nodes: String(CONCEPTS), edges: String(EDGES) });
   });
 
   it("rebuilds the map in a real worker within two minutes", async () => {
-    const workspaceId = map.scenario.workspaceId;
-    const queued = await enqueueJob(map.scenario.admin, map.scenario.postgres, {
+    const workspaceId = dense.workspaceId;
+    const queued = await enqueueJob(dense.admin, dense.postgres, {
       workspaceId,
       kind: "full-rebuild",
 
