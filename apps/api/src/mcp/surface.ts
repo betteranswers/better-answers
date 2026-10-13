@@ -25,6 +25,7 @@ import {
   consumeCall,
   folded,
   readWorkspaceConfig,
+  withHeldPrincipal,
   withMember,
   withMemberUnheld,
   withPrincipal,
@@ -77,11 +78,11 @@ const toolsListTtlOf = (authInfo: AuthInfo | undefined): number =>
   Number(authInfo?.extra?.["toolsListTtlMs"] ?? TOOLS_LIST_TTL_MS_DEFAULT);
 
 /**
- * The door an entry's transaction opens through. Only a declared `true` opens read-only: the
- * host reads an absent hint as a tool that writes.
+ * Only a declared `true` opens read-only: a host reads an absent hint as a write. Any other
+ * entry holds the member's rows to its commit.
  */
 export const doorOf = ({ readOnlyHint }: ToolAnnotations): typeof withPrincipal =>
-  readOnlyHint === true ? withPrincipalRead : withPrincipal;
+  readOnlyHint === true ? withPrincipalRead : withHeldPrincipal;
 
 type ServedEntry = Entry<z.ZodObject, z.ZodType>;
 

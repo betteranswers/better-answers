@@ -220,13 +220,17 @@ export const revocationHeldOpen = async (app: TestApp, userId: string): Promise<
   return { land: () => end("COMMIT"), abandon: () => end("ROLLBACK") };
 };
 
-export const someoneWaitsOnALock = async (app: TestApp): Promise<boolean> => {
+/** How many of this database's sessions wait on a lock another holds. */
+export const waitingOnALock = async (app: TestApp): Promise<number> => {
   const found = await app.database.superuser.query<{ waiting: number }>(
     `SELECT count(*)::int AS waiting FROM pg_stat_activity
       WHERE datname = current_database() AND wait_event_type = 'Lock'`,
   );
-  return (found.rows[0]?.waiting ?? 0) > 0;
+  return found.rows[0]?.waiting ?? 0;
 };
+
+export const someoneWaitsOnALock = async (app: TestApp): Promise<boolean> =>
+  (await waitingOnALock(app)) > 0;
 
 /** Moves every session `userId` holds to a sign-in 61 minutes ago, behind the api's back. */
 export const sessionsSignedInOverAnHourAgo = async (

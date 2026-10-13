@@ -13,7 +13,7 @@ import { findCursor } from "./cursor.ts";
 const FIND_LIMIT_AT_MOST = 20;
 
 /** Postgres refuses a NUL in text, which would fail the statement rather than refuse the input. */
-const holdsNoNul = (text: string): boolean => !text.includes("\u0000");
+export const holdsNoNul = (text: string): boolean => !text.includes("\u0000");
 
 export const findInput = z.object({
   query: z

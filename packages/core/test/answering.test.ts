@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
 import {
+  conceptIriOf,
   ids,
   JUDGE_STATES,
   QUESTION_VERDICTS,
@@ -15,6 +16,8 @@ import {
   ask,
   ASK_CAPS,
   askInput,
+  feedbackFields,
+  feedbackInput,
   find,
   findInput,
   findOutputWith,
@@ -42,6 +45,7 @@ import {
   actorIdOfPerson,
   err,
   parse,
+  type Malformed,
   type Result,
   type Role,
   type UserPrincipal,
@@ -70,6 +74,7 @@ import {
   holdingTable,
   postgresForSuite,
   readingAs,
+  seedingWith,
 } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
@@ -556,29 +561,53 @@ describe("open's and feedback's renderings", () => {
     expect(renderOpen({ found: true })).toBe("Nothing to show.");
   });
 
-  it("renders feedback and each flag reason in words, not tokens", () => {
-    const iri = "https://better-answers.com/c/01A";
-    const received = (what: string): string =>
-      `Received: ${iri} marked ${what}. It reaches the owner when the Suggestions page ships.`;
-    const flagged = (reason: FeedbackReason, detail?: string): string =>
+  it("renders stored feedback and each flag reason in words", () => {
+    const stored = (what: string): string =>
+      `Stored on record ${A_RECORD}: ${what}. No one is notified of it.`;
+    const flagged = (reason: FeedbackReason, note?: string): string =>
       renderFeedback({
-        outcome: "received",
-        feedback: { iri, verdict: "flag", reason, ...(detail === undefined ? {} : { detail }) },
+        outcome: "stored",
+        feedback: {
+          recordId: A_RECORD,
+          verdict: "flag",
+          reason,
+          ...(note === undefined ? {} : { note }),
+        },
       });
 
-    expect(renderFeedback({ outcome: "received", feedback: { iri, verdict: "helpful" } })).toBe(
-      received("helpful"),
-    );
+    expect(
+      renderFeedback({ outcome: "stored", feedback: { recordId: A_RECORD, verdict: "helpful" } }),
+    ).toBe(stored("marked helpful"));
     expect(flagged("out-of-date", "renewed in May")).toBe(
-      received('flagged as out of date — "renewed in May"'),
+      stored('flagged as out of date — "renewed in May"'),
     );
-    expect(flagged("wrong")).toBe(received("flagged as wrong"));
-    expect(flagged("incomplete")).toBe(received("flagged as incomplete"));
-    expect(flagged("should-not-have-shown")).toBe(
-      received("flagged as should not have been shown"),
+    expect(flagged("wrong")).toBe(stored("flagged as wrong"));
+    expect(flagged("incomplete")).toBe(stored("flagged as incomplete"));
+    expect(flagged("should-not-have-shown")).toBe(stored("flagged as should not have been shown"));
+  });
+
+  it("says a disputed sentence was kept, without repeating it", () => {
+    expect(
+      renderFeedback({
+        outcome: "stored",
+        feedback: {
+          recordId: A_RECORD,
+          verdict: "flag",
+          reason: "wrong",
+          note: "renewed in May",
+          disputed: { sentence: "Audit logs are kept for a year.", concept: CITED },
+        },
+      }),
+    ).toBe(
+      `Stored on record ${A_RECORD}: flagged as wrong — "renewed in May", with the sentence disputed and the concept it rested on. No one is notified of it.`,
     );
   });
 });
+
+const A_RECORD = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
+
+/** The one concept `recordOf` says a completed record returned. */
+const CITED = conceptIriOf("01J6CCCCCCCCCCCCCCCCCCCCCC");
 
 describe("what the slice's four actions answer", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
@@ -590,7 +619,7 @@ describe("what the slice's four actions answer", () => {
       Result<AnswerResult, "role-forbids" | "credentials-revoked" | Error>
     >();
     expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<
-      Result<FeedbackReceipt, "role-forbids">
+      Result<FeedbackReceipt, "role-forbids" | "not-found" | Malformed | Error>
     >();
   });
 
@@ -604,20 +633,6 @@ describe("what the slice's four actions answer", () => {
     expect(found).toEqual({ ok: true, value: { query: "expenses", matches: [] } });
   });
 
-  it("hands a reader a receipt echoing their feedback", async () => {
-    const reader = await arrange();
-    const feedback = {
-      iri: "https://better-answers.com/c/01A",
-      verdict: "flag",
-      reason: "wrong",
-      detail: "renewed in May",
-    } as const;
-
-    const receipt = await acting(reader, (principal, tx) => giveFeedback(principal, tx, feedback));
-
-    expect(receipt).toEqual({ ok: true, value: { outcome: "received", feedback } });
-  });
-
   it("refuses feedback and ask a role outside the three", async () => {
     const reader = await arrange();
     // @ts-expect-error — a role no resolver hands out is the value each face must still refuse.
@@ -628,7 +643,7 @@ describe("what the slice's four actions answer", () => {
     const noStep: AskSteps = { openRecord: aStepRan, read: aStepRan, completeRecord: aStepRan };
 
     const receipt = await acting(reader, (principal, tx) =>
-      giveFeedback(stranger(principal), tx, { iri: "urn:x", verdict: "helpful" }),
+      giveFeedback(stranger(principal), tx, { recordId: A_RECORD, verdict: "helpful" }, now),
     );
     const answered = await acting(reader, (principal) =>
       ask(stranger(principal), noStep, { question: "When is the audit?", collections: [] }, now),
@@ -681,6 +696,215 @@ describe("what the slice's four actions answer", () => {
 });
 
 const ABSENT = ids.conceptIri.parse("https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ");
+
+const A_NOTE = "The period changed in May.";
+
+const A_DISPUTED_SENTENCE = "Audit logs are kept for a year.";
+
+describe("feedback given on a record", () => {
+  const now = new Date("2026-09-08T12:00:00.000Z");
+
+  const anAsker = async (): Promise<UserPrincipal> => {
+    const reader = await arrange();
+    return principalFor(db(), reader.workspaceId, reader.userId);
+  };
+
+  /** A record `asker` asked: completed, having returned `CITED`, unless left `open`. */
+  const recordOf = async (asker: UserPrincipal, left?: "open"): Promise<string> => {
+    const record = await seedingWith(db().pool, (seed) =>
+      seed.questionAsked({
+        workspaceId: asker.workspaceId,
+        askedBy: actorIdOfPerson(asker.userId),
+        ...(left === "open"
+          ? {}
+          : {
+              completedAt: new Date(),
+              verdict: "related",
+              judgeState: "not-judged",
+              concepts: [
+                {
+                  iri: CITED,
+                  contentHash: "a".repeat(64),
+                  trust: { tier: "unverified", status: "current", verifiedAt: null, rider: null },
+                },
+              ],
+            }),
+      }),
+    );
+    return record.id;
+  };
+
+  const feedbackOn = async (recordId: string) => {
+    const read = await db().pool.query(
+      `SELECT given_at, given_by, verdict, reason, note, disputed_sentence, disputed_concept
+         FROM question_feedback WHERE record_id = $1 ORDER BY id`,
+      [recordId],
+    );
+    return read.rows;
+  };
+
+  it("stores a flag with its note, sentence and concept", async () => {
+    const asker = await anAsker();
+    const recordId = await recordOf(asker);
+    const feedback = {
+      recordId,
+      verdict: "flag",
+      reason: "wrong",
+      note: A_NOTE,
+      disputed: { sentence: A_DISPUTED_SENTENCE, concept: CITED },
+    } as const;
+
+    const receipt = await acting(asker, (principal, tx) =>
+      giveFeedback(principal, tx, feedback, now),
+    );
+
+    expect(await feedbackOn(recordId)).toEqual([
+      {
+        given_at: now,
+        given_by: `human:${asker.userId}`,
+        verdict: "flag",
+        reason: "wrong",
+        note: A_NOTE,
+        disputed_sentence: A_DISPUTED_SENTENCE,
+        disputed_concept: CITED,
+      },
+    ]);
+    expect(receipt).toEqual({ ok: true, value: { outcome: "stored", feedback } });
+  });
+
+  it("stores helpful with no reason, note or sentence", async () => {
+    const asker = await anAsker();
+    const recordId = await recordOf(asker);
+
+    await acting(asker, (principal, tx) =>
+      giveFeedback(principal, tx, { recordId, verdict: "helpful" }, now),
+    );
+
+    expect(await feedbackOn(recordId)).toEqual([
+      {
+        given_at: now,
+        given_by: `human:${asker.userId}`,
+        verdict: "helpful",
+        reason: null,
+        note: null,
+        disputed_sentence: null,
+        disputed_concept: null,
+      },
+    ]);
+  });
+
+  it.each([
+    [
+      "a colleague asked",
+      async (giver: UserPrincipal) => {
+        const colleague = await seedingWith(db().pool, (seed) =>
+          seed.member({ workspaceId: giver.workspaceId, role: "Viewer" }),
+        );
+        return recordOf(await principalFor(db(), giver.workspaceId, colleague.userId));
+      },
+    ],
+    ["nobody asked", async () => ulid()],
+    ["left with no verdict", (giver: UserPrincipal) => recordOf(giver, "open")],
+  ])("answers not-found for a record %s", async (_case, recordFor) => {
+    const giver = await anAsker();
+    const recordId = await recordFor(giver);
+
+    const refused = await acting(giver, (principal, tx) =>
+      giveFeedback(principal, tx, { recordId, verdict: "flag", reason: "wrong" }, now),
+    );
+
+    expect(await feedbackOn(recordId)).toEqual([]);
+    expect(refused).toEqual({ ok: false, error: "not-found" });
+  });
+
+  it("refuses a disputed concept the record does not cite", async () => {
+    const asker = await anAsker();
+    const recordId = await recordOf(asker);
+
+    const refused = await acting(asker, (principal, tx) =>
+      giveFeedback(
+        principal,
+        tx,
+        {
+          recordId,
+          verdict: "flag",
+          reason: "wrong",
+          disputed: { sentence: A_DISPUTED_SENTENCE, concept: ABSENT },
+        },
+        now,
+      ),
+    );
+
+    expect(await feedbackOn(recordId)).toEqual([]);
+    expect(refused).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { "disputed.concept": "not-in-set" } },
+    });
+  });
+});
+
+describe("the boundary feedback is parsed at", () => {
+  const flagging = (more: Readonly<Record<string, unknown>>) =>
+    parse(feedbackInput, { recordId: A_RECORD, verdict: "flag", reason: "wrong", ...more });
+
+  const malformedAt = (fields: Readonly<Record<string, string>>) => ({
+    ok: false,
+    error: { word: "malformed", fields },
+  });
+
+  it("holds a note and a disputed sentence to 2,000 characters", () => {
+    const long = "a".repeat(2_000);
+
+    expect(flagging({ note: long, disputed: { sentence: long, concept: CITED } })).toEqual({
+      ok: true,
+      value: {
+        recordId: A_RECORD,
+        verdict: "flag",
+        reason: "wrong",
+        note: long,
+        disputed: { sentence: long, concept: CITED },
+      },
+    });
+    expect([
+      flagging({ note: `${long}a` }),
+      flagging({ disputed: { sentence: `${long}a`, concept: CITED } }),
+    ]).toEqual([malformedAt({ note: "too-big" }), malformedAt({ "disputed.sentence": "too-big" })]);
+  });
+
+  it.each([
+    ["a note holding a NUL", { note: "renewed\u0000 in May" }, { note: "refused" }],
+    ["a note of spaces alone", { note: "   " }, { note: "too-small" }],
+    [
+      "a disputed sentence holding a NUL",
+      { disputed: { sentence: "kept\u0000 a year", concept: CITED } },
+      { "disputed.sentence": "refused" },
+    ],
+    [
+      "a disputed sentence with no concept",
+      { disputed: { sentence: A_DISPUTED_SENTENCE } },
+      { "disputed.concept": "missing" },
+    ],
+    [
+      "a malformed disputed concept",
+      { disputed: { sentence: A_DISPUTED_SENTENCE, concept: "the retention policy" } },
+      { "disputed.concept": "bad-format" },
+    ],
+    ["a reason outside the four", { reason: "rude" }, { reason: "not-in-set" }],
+    ["a malformed record id", { recordId: "the last one" }, { recordId: "bad-format" }],
+  ])("refuses a flag with %s", (_case, more, fields) => {
+    expect(flagging(more)).toEqual(malformedAt(fields));
+  });
+
+  it("describes every feedback input field", () => {
+    expect(described(feedbackFields.shape)).toEqual({
+      recordId: true,
+      verdict: true,
+      reason: true,
+      note: true,
+      disputed: true,
+    });
+  });
+});
 
 describe("the boundary find and open are parsed at", () => {
   it("refuses a query holding a NUL as malformed", () => {

@@ -69,7 +69,7 @@ Each transport:
 
 An MCP entry's transaction opens as the entry's `readOnlyHint` declares: read-only where the entry tells the host it only reads, read-write otherwise (ADR 0030). A read-write entry reads the member `FOR SHARE`, as a mutation does, so a revocation waits on its commit.
 
-An MCP entry may take the own-transaction road instead. The surface resolves the member in a short transaction, releases the connection, and hands the entry fixed steps, never a door. Read-only, for such an entry, excludes the platform's own account of the call: the record of the question and the spend rows (ADR 0030). `ask` is the first, and the road is in the tree. S2b still builds the held member, and the tree does not hold it yet.
+An MCP entry may take the own-transaction road instead. The surface resolves the member in a short transaction, releases the connection, and hands the entry fixed steps, never a door. Read-only, for such an entry, excludes the platform's own account of the call: the record of the question and the spend rows (ADR 0030). `ask` is the first. The road is in the tree, and so is the held member of a read-write entry.
 
 Every Postgres door rolls back when its work answers a refusal or throws. A principal-scoped door answers its own refusal apart from its work's, and an action that wants one union calls `folded` on it. One composition root, `openDoors` in `apps/api/src/doors.ts`, opens the four doors and the Clock (ADR 0040) and states the pool's size.
 
