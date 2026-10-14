@@ -858,6 +858,19 @@ it.
 Fetch-shaped, so a local model and a hosted one take one code path, and a test fakes the seam at
 its wire while our own code is never mocked.
 
+### model provider
+
+_Internal._ who hosts the model a *model choice* names (Anthropic, Mistral): the *model client*
+calls its API. One of a closed set, and never the *provider* of a connected source.
+
+### model key
+
+_Internal._ a workspace's key for one *model provider*, which the *model client* sends with a call.
+
+One per workspace and model provider, kept in an *envelope* and opened by the api tier alone at the
+moment of a call. The platform's own tooling sets and replaces it, never a page. A workspace with
+none has no model available from that provider.
+
 ### DPIA input
 
 What one connected source contributes to a data protection impact assessment, as a document and its
