@@ -10,7 +10,6 @@ from presidio_analyzer.predefined_recognizers import (
     GLiNERRecognizer,
     NhsRecognizer,
     PhoneRecognizer,
-    UkNinoRecognizer,
 )
 
 from .descriptors import CategoryDescriptor
@@ -20,6 +19,7 @@ from .recognisers import (
     HealthCueRecogniser,
     HomeAddressRecogniser,
     SortCodeWithAccountRecogniser,
+    a_national_insurance_number_recogniser,
 )
 
 PHONE_REGIONS = ("GB", "US")
@@ -44,7 +44,7 @@ RECOGNISERS: Mapping[str, Callable[[CategoryDescriptor], EntityRecognizer]] = (
                 context=list(it.context),
             ),
             "UK_NHS": lambda it: NhsRecognizer(context=list(it.context)),
-            "UK_NINO": lambda it: UkNinoRecognizer(context=list(it.context)),
+            "UK_NINO": a_national_insurance_number_recogniser,
             "UK_BANK_ACCOUNT": lambda it: SortCodeWithAccountRecogniser(
                 it, "UK_BANK_ACCOUNT"
             ),

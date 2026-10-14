@@ -2,9 +2,14 @@ import re
 from abc import abstractmethod
 from collections.abc import Iterator, Sequence
 
-from presidio_analyzer import AnalysisExplanation, LocalRecognizer, RecognizerResult
+from presidio_analyzer import (
+    AnalysisExplanation,
+    LocalRecognizer,
+    Pattern,
+    RecognizerResult,
+)
 from presidio_analyzer.nlp_engine import NlpArtifacts
-from presidio_analyzer.predefined_recognizers import EmailRecognizer
+from presidio_analyzer.predefined_recognizers import EmailRecognizer, UkNinoRecognizer
 
 from .consumer_domains import is_a_consumer_address
 from .descriptors import CategoryDescriptor
@@ -13,6 +18,19 @@ A_SORT_CODE_WITH_AN_ACCOUNT = re.compile(
     r"\b\d{2}[- ]?\d{2}[- ]?\d{2}\b.{0,40}?\b\d{8}\b", re.DOTALL
 )
 A_PAIR_ON_ITS_OWN = 0.2
+# What Presidio's enhancer makes of a pair named before it, so a pair scores alike
+# wherever its naming word sits.
+A_PAIR_NAMED_BETWEEN_ITS_NUMBERS = 0.55
+
+
+# Presidio's own pattern allows a space between its prefix refusal and the first letter,
+# so it takes that space and reads the refusal at it.
+A_NATIONAL_INSURANCE_NUMBER = (
+    r"\b(?!bg|gb|nk|kn|nt|tn|zz|BG|GB|NK|KN|NT|TN|ZZ)"
+    r"([a-ceghj-pr-tw-zA-CEGHJ-PR-TW-Z]{1}[a-ceghj-npr-tw-zA-CEGHJ-NPR-TW-Z]{1})"
+    r" ?([0-9]{2}) ?([0-9]{2}) ?([0-9]{2}) ?([a-dA-D]{1})\b"
+)
+A_NATIONAL_INSURANCE_NUMBER_ON_ITS_OWN = 0.5
 
 
 _MONTHS = (
@@ -95,11 +113,56 @@ class SeamRecogniser(LocalRecognizer):
 
 
 class SortCodeWithAccountRecogniser(SeamRecogniser):
+    """Presidio's enhancer reads naming words before a pair alone, so this reads
+    whole naming words, or their plurals, between its two numbers."""
+
     def spans(
         self, text: str, nlp_artifacts: NlpArtifacts | None
     ) -> Iterator[tuple[int, int, float]]:
         for match in A_SORT_CODE_WITH_AN_ACCOUNT.finditer(text):
-            yield match.start(), match.end(), A_PAIR_ON_ITS_OWN
+            named = self._named_within(match.start(), match.end(), nlp_artifacts)
+            yield (
+                match.start(),
+                match.end(),
+                A_PAIR_NAMED_BETWEEN_ITS_NUMBERS if named else A_PAIR_ON_ITS_OWN,
+            )
+
+    def _found(self, start: int, end: int, score: float) -> RecognizerResult:
+        result = super()._found(start, end, score)
+        if score >= self.descriptor.threshold:
+            # Already named: the enhancer must not raise it a second time.
+            result.recognition_metadata[
+                RecognizerResult.IS_SCORE_ENHANCED_BY_CONTEXT_KEY
+            ] = True
+        return result
+
+    def _named_within(
+        self, start: int, end: int, nlp_artifacts: NlpArtifacts | None
+    ) -> bool:
+        if nlp_artifacts is None:
+            return False
+        naming = {*self.descriptor.context, *(f"{w}s" for w in self.descriptor.context)}
+        return any(
+            start <= token.idx
+            and token.idx + len(token) <= end
+            and token.lower_ in naming
+            for token in nlp_artifacts.tokens
+        )
+
+
+def a_national_insurance_number_recogniser(
+    descriptor: CategoryDescriptor,
+) -> UkNinoRecognizer:
+    return UkNinoRecognizer(
+        patterns=[
+            Pattern(
+                "NINO (better-answers)",
+                A_NATIONAL_INSURANCE_NUMBER,
+                A_NATIONAL_INSURANCE_NUMBER_ON_ITS_OWN,
+            )
+        ],
+        context=list(descriptor.context),
+    )
 
 
 class DateInContextRecogniser(SeamRecogniser):

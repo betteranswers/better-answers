@@ -85,9 +85,9 @@ THE_FIRST_CATEGORY = DESCRIPTORS[0]
 def test_pins_the_key_beside_the_rule_version() -> None:
 
     assert detection_key() == (
-        "a1db6adae80d0dfd17b4589ac15842c84065f04d95cfce575260315764c467ac"
+        "dc180502a0092bddf484da4199800e7c3b0e755af6bc8d8b152e4f3f420c6b8b"
     )
-    assert RULE_VERSION == "6"
+    assert RULE_VERSION == "7"
 
 
 def test_each_category_field_belongs_to_the_detector_or_policy_alone() -> None:

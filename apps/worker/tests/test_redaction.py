@@ -396,6 +396,37 @@ def test_a_shouted_consumer_domain_is_still_the_same_domain() -> None:
     assert "enquiries@meridianfenland.co.uk" in found.text
 
 
+def test_a_word_between_the_numbers_names_the_pair() -> None:
+
+    remittance = (
+        "## Remittance\n\n"
+        "Expenses are paid into 20-00-00, account number 12345678, each month.\n\n"
+        "Ticket 10-20-30 is the same fault as ticket 87654321."
+    )
+
+    found = redact(
+        remittance, spans_detected(remittance), THE_SAFE_SET, NO_SUPPRESSIONS, SEED
+    )
+
+    assert "Expenses are paid into [withheld], each month." in found.text
+    assert "Ticket 10-20-30 is the same fault as ticket 87654321." in found.text
+
+
+def test_a_national_insurance_number_keeps_the_space_before_it() -> None:
+
+    starter = (
+        "Her National Insurance number AB 12 34 56 C is on file.\n\n"
+        "The supplier reference is GB123456A."
+    )
+
+    found = redact(
+        starter, spans_detected(starter), THE_SAFE_SET, NO_SUPPRESSIONS, SEED
+    )
+
+    assert "Her National Insurance number [withheld] is on file." in found.text
+    assert "The supplier reference is GB123456A." in found.text
+
+
 def test_a_health_cue_withholds_its_sentence_and_narrows_the_document(
     on_a_plain_connected_source: Redaction, page: str
 ) -> None:

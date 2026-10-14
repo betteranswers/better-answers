@@ -224,10 +224,10 @@ def test_the_version_string_joins_rule_version_and_detector_pin() -> None:
     written = VERSION_STRING
 
     assert written == (
-        "6:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
+        "7:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
         "+spacy-3.8.16+en-core-web-sm-3.8.0+gliner-multi-pii-v1"
     )
-    assert RULE_VERSION == "6"
+    assert RULE_VERSION == "7"
     assert VERSION_STRING.count(":") == 1
     assert VERSION_STRING.split(":") == [RULE_VERSION, DETECTOR_PIN]
 
@@ -243,7 +243,7 @@ def test_bumps_the_rule_version_with_its_table() -> None:
     digest = "e2244c397c2677efaa5017848d17d8d7a499394902b73585bb67f090231b4d8d"
 
     assert descriptor_digest() == digest
-    assert RULE_VERSION == "6"
+    assert RULE_VERSION == "7"
 
 
 def test_the_consumer_domain_list_carries_its_date_and_its_source() -> None:
