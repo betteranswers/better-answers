@@ -19,7 +19,7 @@ import type { Tx } from "../store/postgres/index.ts";
  * Reached through `reveal` alone, so a logger, an error or a JSON body handed this value prints no
  * part of the key.
  */
-type ModelKey = {
+export type ModelKey = {
   readonly reveal: () => string;
 };
 

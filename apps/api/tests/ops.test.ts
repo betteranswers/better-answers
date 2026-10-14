@@ -3140,6 +3140,152 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
+  describe("set-model-choice — the platform chooses a workspace's model", () => {
+    const HAIKU = "claude-haiku-5-5";
+
+    const choosing = (
+      app: TestApp,
+      workspaceId: string,
+      provider: string,
+      purpose = "judging",
+    ): Promise<Run> =>
+      ops(app, [
+        "set-model-choice",
+        "--workspace",
+        workspaceId,
+        "--purpose",
+        purpose,
+        "--provider",
+        provider,
+        "--model",
+        HAIKU,
+      ]);
+
+    const choicesHeld = async (app: TestApp, workspaceId: string) => {
+      const held = await app.database.superuser.query(
+        "SELECT purpose, provider, model FROM model_choice WHERE workspace_id = $1",
+        [workspaceId],
+      );
+      return held.rows;
+    };
+
+    const priced = (app: TestApp): Promise<Run> =>
+      ops(app, [
+        "set-model-price",
+        "--provider",
+        "anthropic",
+        "--model",
+        HAIKU,
+        "--from",
+        "2026-01-01",
+        "--gbp-per-million-in",
+        "0.08",
+        "--gbp-per-million-out",
+        "0.4",
+      ]);
+
+    it("stores a priced model of a named sub-processor", async () => {
+      const { workspaceId } = await app().provision();
+      expect((await priced(app())).exitCode).toBe(0);
+
+      const run = await choosing(app(), workspaceId, "anthropic");
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 0,
+        lines: [
+          `set-model-choice: done — workspace ${workspaceId} calls anthropic ${HAIKU} for judging`,
+        ],
+      });
+      expect(await choicesHeld(app(), workspaceId)).toEqual([
+        { purpose: "judging", provider: "anthropic", model: HAIKU },
+      ]);
+      expect(await rowsOfAction(app(), workspaceId, "platform.workspace.model_choice_set")).toEqual(
+        [
+          {
+            actor: BOOTSTRAP_ACTOR,
+            subject_id: workspaceId,
+            detail: { purpose: "judging", provider: "anthropic", model: HAIKU },
+          },
+        ],
+      );
+    });
+
+    it("refuses a provider with no sub-processor entry", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await choosing(app(), workspaceId, "openai");
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 9,
+        lines: [
+          "set-model-choice: REFUSED — no-sub-processor: openai is no sub-processor the DPIA names (anthropic · mistral · local); nothing changed",
+        ],
+      });
+      expect(await choicesHeld(app(), workspaceId)).toEqual([]);
+    });
+
+    it("refuses a model with no price in effect", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await choosing(app(), workspaceId, "mistral");
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 9,
+        lines: [
+          `set-model-choice: REFUSED — no-model-price: mistral ${HAIKU} has no price in effect today; set one with set-model-price first; nothing changed`,
+        ],
+      });
+    });
+
+    it("refuses a choice for the embedding purpose", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await choosing(app(), workspaceId, "anthropic", "embedding");
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 7,
+        lines: [
+          "set-model-choice: REFUSED — fixed-model-choice: the embedding model is fixed, since the index's vectors are its own; nothing changed",
+        ],
+      });
+    });
+
+    it("refuses malformed and no-such-workspace", async () => {
+      const nowhere = ulid();
+      const { workspaceId } = await app().provision();
+      expect((await priced(app())).exitCode).toBe(0);
+
+      const malformed = await choosing(app(), workspaceId, "anthropic", "guessing");
+      const absent = await choosing(app(), nowhere, "anthropic");
+
+      expect([malformed.exitCode, absent.exitCode]).toEqual([2, 6]);
+      expect(malformed.lines).toEqual([
+        "set-model-choice: REFUSED — malformed: give --workspace a workspace id, --purpose one of extraction · enrichment · answering · judging, and --provider and --model in lower case letters, digits, dots and hyphens",
+      ]);
+      expect(absent.lines).toEqual([
+        `set-model-choice: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
+      ]);
+    });
+
+    it("answers usage with the model missing, as help names it", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await ops(app(), ["set-model-choice", "--workspace", workspaceId]);
+      const help = await ops(app(), ["help"]);
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 2,
+        lines: [
+          "set-model-choice: --workspace <id>, --purpose <extraction|enrichment|answering|judging>, --provider <provider> and --model <model> are required",
+        ],
+      });
+      expect(await choicesHeld(app(), workspaceId)).toEqual([]);
+      expect(help.lines.join("\n")).toContain(
+        "set-model-choice --workspace <id> --purpose <extraction|enrichment|answering|judging> --provider <anthropic|mistral|local> --model <model>",
+      );
+    });
+  });
+
   describe("restore-sign-in — a person who has lost every factor, restored", () => {
     const NOTICE = "Your better-answers sign-in was restored";
     const RESTORE_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;

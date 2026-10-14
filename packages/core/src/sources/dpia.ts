@@ -14,7 +14,7 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { listModelChoices, type LlmPurpose } from "../llm/index.ts";
+import { listModelChoices, SUB_PROCESSORS, type LlmPurpose } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import {
   adminOnConnectedSource,
@@ -55,12 +55,6 @@ export const SPECIAL_CATEGORY_CONDITION = "none until a health-sector client";
 
 const SPECIAL_CATEGORY =
   REDACTION_CATEGORIES.find((entry) => entry.specialCategory)?.category ?? NOT_RECORDED;
-
-const SUB_PROCESSORS = new Map<string, { readonly processor: string; readonly country: string }>([
-  ["anthropic", { processor: "Anthropic", country: "United States" }],
-  ["mistral", { processor: "Mistral AI", country: "European Union" }],
-  ["local", { processor: "no sub-processor", country: "the platform's own estate" }],
-]);
 
 const UNNAMED_PROCESSOR = { processor: NOT_RECORDED, country: NOT_RECORDED };
 

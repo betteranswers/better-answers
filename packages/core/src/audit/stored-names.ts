@@ -68,6 +68,7 @@ export const STORED_ACT_NAMES = [
   "platform.workspace.spending_limit_set",
   "platform.model.priced",
   "knowledge.feedback.closed",
+  "platform.workspace.model_choice_set",
 ] as const;
 
 /**
@@ -141,6 +142,7 @@ export const STORED_DETAIL_KEYS = {
   searchTooBroad: "searchTooBroad",
   modelProvider: "provider",
   modelName: "model",
+  llmPurpose: "purpose",
   effectiveFrom: "effectiveFrom",
   gbpPerMillionIn: "gbpPerMillionIn",
   gbpPerMillionOut: "gbpPerMillionOut",

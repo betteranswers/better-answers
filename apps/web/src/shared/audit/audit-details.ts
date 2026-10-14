@@ -79,6 +79,7 @@ const VALUE_LABELS = new Map(
     eventCount: "Events",
     capped: "Stopped at the limit",
     searchTooBroad: "Search named too many",
+    purpose: "Used For",
     provider: "AI Provider",
     model: "AI Model",
     effectiveFrom: "Priced From",

@@ -42,6 +42,12 @@ export const WORKSPACE_REFUSALS = {
   // Asked for a first set while one stands: a page read before it was made would void it unasked.
   "recovery-codes-held": "conflict",
 
+  // Only a model the DPIA names a sub-processor for, priced before it is called, may be chosen.
+  "no-sub-processor": "precondition",
+  "no-model-price": "precondition",
+  // The index's vectors are the embedding model's: another could not read them.
+  "fixed-model-choice": "inapplicable",
+
   // An Admin, or the operator, may hold no fewer than one: removing it waits on adding another.
   "last-second-factor": "precondition",
 } as const satisfies Vocabulary;

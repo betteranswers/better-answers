@@ -28,6 +28,7 @@ const STEPS: Readonly<Record<string, string>> = {
   "guides/recomputeWriteUpsIncluding":
     "a visibility change and a landed write call it in their own transaction",
   "llm/reserveSpend": "a step of ask, which admits the asker before it reserves a call's spend",
+  "llm/resolveModel": "a step of ask, which admits the asker before it resolves the model it calls",
   "llm/settleSpend": "a step of ask, which admits the asker before it settles a call's spend",
   "members/eventsAsked": "the audit log's read and its export call it after admitting an Admin",
   "members/eventsNamed":

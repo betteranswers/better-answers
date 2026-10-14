@@ -24,14 +24,15 @@ tags:
 
 ## The decision
 
-Every model call the api tier makes goes through the model client, one fetch-shaped seam in core's `llm` layer. S2b builds it, and the tree does not hold it yet.
+Every model call the api tier makes goes through the model client, one fetch-shaped seam in core's `llm` layer.
 
 - **A registry of wire shapes**, keyed by a model choice's provider. A wire shape turns a typed call into a request and a response into an outcome.
 - **Two shapes.** The Messages API comes first, with a streamed form for the drafter. One decision-model shape comes second: one true-or-false question per candidate, answered with a probability. TypeSafe, Workers AI and a self-hosted Clef share that request shape.
 - **The fetch function is injected** through the server's dependencies, as the client-metadata fetcher is. A test passes a fake at the wire, and our own code is never mocked. No provider's SDK is added.
-- **An outcome is one of five:** answered with usage, rate limited, the provider's spend cap, refused, or failed. A provider's spend cap is told apart from a rate limit, because waiting does not lift it.
+- **An outcome is one of five:** answered with usage, rate limited, the provider's spend cap, refused, or failed. A provider's spend cap is told apart from a rate limit, because waiting does not lift it; a billing fault reads as a spend cap for the same reason.
+- **A call's attempts fit its reservation.** The client tries again only an attempt that spent nothing: a rate limit or the provider's fault. Every attempt's timeout and every wait between them end inside the reservation's life, so the sweep never settles a call still running.
 - **The client names the model a model choice names and no other.** It never substitutes a model at run time.
-- **Every call sits behind the redaction seam and the typed-text check** (ADR 0020) and writes one `llm_call` row (ADR 0025). No prompt and no completion is logged, stored or returned beyond the caller.
+- **Every call sits behind the redaction seam and the typed-text check** (ADR 0020). The client answers what each attempt spent, and the caller settles them as `llm_call` rows, one per attempt (ADR 0025). No prompt and no completion is logged, stored or returned beyond the caller.
 - **In `check` the client is faked.** A test asserts the shape of a call and of a result, never a model's judgement. A reading with a real model is a run the owner starts, over synthetic content, and its figures are recorded on the route.
 
 A decision model is measured before any workspace is set to run it. The generative judge ships first, and the decision-model backend ships unselected.
