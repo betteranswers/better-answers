@@ -113,8 +113,8 @@ class SeamRecogniser(LocalRecognizer):
 
 
 class SortCodeWithAccountRecogniser(SeamRecogniser):
-    """Presidio's enhancer reads naming words before a pair alone, so this reads the
-    words between its two numbers."""
+    """Presidio's enhancer reads naming words before a pair alone, so this reads
+    whole naming words, or their plurals, between its two numbers."""
 
     def spans(
         self, text: str, nlp_artifacts: NlpArtifacts | None
@@ -141,13 +141,12 @@ class SortCodeWithAccountRecogniser(SeamRecogniser):
     ) -> bool:
         if nlp_artifacts is None:
             return False
+        naming = {*self.descriptor.context, *(f"{w}s" for w in self.descriptor.context)}
         return any(
             start <= token.idx
             and token.idx + len(token) <= end
-            and any(word in lemma.lower() for word in self.descriptor.context)
-            for token, lemma in zip(
-                nlp_artifacts.tokens, nlp_artifacts.lemmas, strict=False
-            )
+            and token.lower_ in naming
+            for token in nlp_artifacts.tokens
         )
 
 

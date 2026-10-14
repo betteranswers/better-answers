@@ -42,6 +42,12 @@ const A_SORT_CODE_WITH_AN_ACCOUNT = new RegExp(
 
 const A_WORD_THAT_NAMES_A_PAIR = /account|sort|bank|payment|bacs/iu;
 
+/** Between the numbers the worker reads a naming word only whole, or as its plural. */
+const A_WHOLE_WORD_THAT_NAMES_A_PAIR = new RegExp(
+  `${EDGE}(?:account|sort|bank|payment|bacs)s?${EDGE}`,
+  "iu",
+);
+
 /**
  * The worker finds a cue by taking an ending off the written word, so any word that opens with
  * a cue's stem is read.
@@ -75,7 +81,7 @@ const runAround = (text: string, at: number): Hit => {
 };
 
 /**
- * The worker reads five words back, the words between the numbers, and one word on after a
+ * The worker reads five words back, whole words between the numbers, and one word on after a
  * colon-joined sort code. This reads wider.
  */
 const namedPairsIn = (text: string): readonly Hit[] => {
@@ -91,7 +97,8 @@ const namedPairsIn = (text: string): readonly Hit[] => {
       run = runAround(text, pair.start);
       joinedByAColon = text.slice(run.start, run.end).includes(":");
     }
-    if (joinedByAColon || named <= Math.max(run.end, pair.end)) pairs.push(pair);
+    const namedBetween = A_WHOLE_WORD_THAT_NAMES_A_PAIR.test(text.slice(pair.start, pair.end));
+    if (joinedByAColon || named <= run.end || namedBetween) pairs.push(pair);
   }
   return pairs;
 };

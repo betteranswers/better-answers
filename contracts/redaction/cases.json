@@ -208,6 +208,13 @@
         "why": "A word between the two numbers names the pair as a word before them does."
       },
       {
+        "name": "a word between the numbers that holds a naming word",
+        "categories": ["bank-details"],
+        "input": "Ticket 10-20-30 was sorted under ref 12345678.",
+        "expected": "Ticket 10-20-30 was sorted under ref 12345678.",
+        "why": "Between the numbers only a naming word itself, or its plural, names the pair. Sorted is not sort."
+      },
+      {
         "name": "a colon joins the sort code to the word before it",
         "categories": ["bank-details"],
         "input": "Ref:200000 account 12345678, is that the one on file?",

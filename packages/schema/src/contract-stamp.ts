@@ -1,3 +1,3 @@
 // Generated, never edited: pnpm --filter @better-answers/schema run generate:contract-stamp
 
-export const CONTRACT_DIGEST = "8584adf70b907049f0a0071d121ea1065f8d351806e0b497960cde1703547af1";
+export const CONTRACT_DIGEST = "4621cc6f94b56afbcb735dd87c89a0a5519e554e8b35083b5fbdb7574d1bc54f";
