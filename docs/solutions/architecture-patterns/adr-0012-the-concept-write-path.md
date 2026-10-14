@@ -32,7 +32,7 @@ The bundle is a bare git repository per workspace (ADR 0024). Only the api write
 - The manifest, `knowledge/manifest.yaml` inside the bundle, is such a commit too (`writeManifest`). It lands no concept row.
 - Platform-prepared changes wait as suggestions. Nothing platform-prepared reaches the bundle without acceptance.
 - A concept has two endings: deprecate, for anything that has been stable or is cited or linked, and discard, for the rest.
-- The erasure routine mailmaps git author lines to the erasure pseudonym, never to a key of the member row (ADR 0035).
+- The erasure routine rewrites git author lines, commit trailers and file text to the erasure pseudonym, never to a key of the member row, and rewrites history a second time once the member has ended (ADR 0020, ADR 0035).
 
 The reconciler replays the missed commits, oldest first, under `process:better-answers-reconciler`. It is idempotent on the trailer id, and it writes its audit event under the commit's own `Audit:` id. The head check (every thirty seconds by default, in the api) and `pnpm ops reconcile-watermark` are two triggers of one function.
 
@@ -53,7 +53,7 @@ Moving a ref back to its watermark is the operator's plumbing, written down on a
 - The row written at commit time is what makes a changed atom flag its write-ups now, not after a worker job.
 - The id is minted first for the reconciler alone. An id minted after the commit would leave the trailer empty exactly when the row was never written, the one case the reconciler exists for.
 - The lock spanning both stores gives the prefix invariant, so the replay reads from a watermark and never hunts for holes.
-- The transport's own transaction is not used: a transaction held open across a git commit waits on a subprocess.
+- The transport's own transaction is not used: a transaction held open across a git commit waits on a subprocess. The one exception is the member's row, held `FOR SHARE` across that member's commit, so an erasure's member delete waits until the commit is in git (ADR 0020).
 - A widening is an Admin's recorded action, so a recovery never guesses a wider sensitivity.
 - The commits after the watermark were never recorded, so no reader was ever served them. One ref moves and no object is rewritten. It stays a procedure because the question is whether to make the move at all, and no flag holds that judgement.
 

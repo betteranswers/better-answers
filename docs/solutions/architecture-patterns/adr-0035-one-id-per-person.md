@@ -28,7 +28,7 @@ A person has one id: the id on the identity set's `user` row.
 
 - The platform's one minter mints it: `ulid` in `packages/schema/src/ulid.ts`, re-exported by the kernel. Better Auth is handed the same function as its `generateId`, so every identity id has one shape, a time-ordered ULID. Session tokens, authorisation codes, client secrets and token `jti` values come from the library's own random paths, never from the minter.
 - It is `userId` on every Principal. It is written `human:<person id>` on every record the platform keeps: the audit log's actor, a commit trailer's `Actor:`, a suggestion's proposer and decider, an access request's requester, a `group_member` key.
-- It is never written into a concept file, which keeps `human:<email>`.
+- It is never written into a concept file, which keeps `human:<email>`; erasure still rewrites a person id it finds in one.
 - The member row's key names nothing of ours. Every People action keys by workspace and person.
 - A custom minter switches off Better Auth's opaque-invitation-id heuristic, so `requireEmailVerificationOnInvitation` is set to true explicitly.
 
@@ -45,7 +45,7 @@ A person's second factor is theirs, across every workspace (ADR 0048). Being an 
 - Making a person an Admin or the operator, from needing no factor, clears every one of their sessions' confirmations in the same action, so each confirms again as an Admin.
 - Removing a factor clears the confirmation of the person's other sessions: a confirmation never outlives the factor that may have made it.
 
-Erasure rewrites `human:<email>` across a workspace's files, history, git author lines, `bundle_commit` rows and verification rows to `human:<erasure pseudonym>`. The pseudonym is minted at erasure, one per workspace, and kept on the erasure request. It is never the person id. The user row is pseudonymised: email to a unique tombstone, name cleared, id kept. The audit log holds ids and never an email or a name, and it is never rewritten.
+Erasure rewrites `human:<email>` and `human:<person id>` across a workspace's files, history (git author lines and commit trailers), `bundle_commit` rows and verification rows to `human:<erasure pseudonym>`. The pseudonym is minted at erasure, one per workspace, and kept on the erasure request. It is never the person id. The user row is pseudonymised: email to a unique tombstone, name cleared, id kept. The audit log holds ids and never an email or a name, and it is never rewritten.
 
 The audit slice, `packages/core/src/audit/`, has two doors. `record` takes a Principal and derives the actor. `recordFor` takes the platform principal and an explicit actor. The kernel's actor id has three forms: `human:<person id>`, `process:better-answers-<purpose>`, or an agent's id. An audit action is named `family.subject.verb`, in four families: people, knowledge, sources and platform.
 
