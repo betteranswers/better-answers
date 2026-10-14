@@ -1234,8 +1234,8 @@ citations, trust then, verdicts, feedback and corrections — kept for good.
 A reader's verdict on one answer, never the platform's.
 
 It is *helpful*, or a **flag** with a reason — *wrong* · *out of date* · *incomplete* · *should not
-have shown* — that becomes a record in someone's queue (a verification request, an edit suggestion,
-or the Admin's to pass on).
+have shown* — kept on the *Questions asked* record it is about. Later a flag also becomes a record
+in someone's queue (a verification request, an edit suggestion, or the Admin's to pass on).
 
 ### correction
 
