@@ -18,6 +18,8 @@ A_SORT_CODE_WITH_AN_ACCOUNT = re.compile(
     r"\b\d{2}[- ]?\d{2}[- ]?\d{2}\b.{0,40}?\b\d{8}\b", re.DOTALL
 )
 A_PAIR_ON_ITS_OWN = 0.2
+# What Presidio's enhancer makes of a pair named before it, so a pair scores alike
+# wherever its naming word sits.
 A_PAIR_NAMED_BETWEEN_ITS_NUMBERS = 0.55
 
 
@@ -124,6 +126,15 @@ class SortCodeWithAccountRecogniser(SeamRecogniser):
                 match.end(),
                 A_PAIR_NAMED_BETWEEN_ITS_NUMBERS if named else A_PAIR_ON_ITS_OWN,
             )
+
+    def _found(self, start: int, end: int, score: float) -> RecognizerResult:
+        result = super()._found(start, end, score)
+        if score >= self.descriptor.threshold:
+            # Already named: the enhancer must not raise it a second time.
+            result.recognition_metadata[
+                RecognizerResult.IS_SCORE_ENHANCED_BY_CONTEXT_KEY
+            ] = True
+        return result
 
     def _named_within(
         self, start: int, end: int, nlp_artifacts: NlpArtifacts | None
