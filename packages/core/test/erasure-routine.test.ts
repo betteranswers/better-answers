@@ -52,6 +52,7 @@ import {
 import { actorIdOfPerson, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import { endEverySignInAndTokenHere } from "../src/members/index.ts";
 import { setDisplayName, setOperatorMark } from "../src/workspaces/index.ts";
+import { asAnotherProcess } from "./bundle-fence.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
 import {
@@ -86,6 +87,7 @@ import {
   isBlockedOnTable,
   readingAs,
   seedingWith,
+  statementsWaitingOnALock,
   until,
   whileActionsWaitAt,
   whileWritesAreRefused,
@@ -3195,6 +3197,42 @@ describe("a commit made as the person while the routine runs", () => {
     expect(freeWhileGitHangs).toBe(true);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
     expect(await writingAsThePerson(scenario, person, email)).toMatchObject({ ok: true });
+  });
+
+  it("holds the rewrite until another process's write lands", async () => {
+    const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
+    const gate = await gatingRefUpdates(scenario);
+    const elsewhere = await asAnotherProcess(scenario.git);
+    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+
+    await gate.park();
+    const writing = writeConcept(
+      scenario.editor,
+      { ...doorsOf(scenario), git: elsewhere },
+      {
+        ...A_LATE_CONCEPT,
+        frontmatter: { ...A_LATE_CONCEPT.frontmatter },
+        author: { name: "Eli Editor", email: "eli@editor.example" },
+        expects: { head: before.at(-1) ?? null },
+      },
+    );
+    await until(gate.parked);
+    const erasing = completing(scenario, subjectRequestId);
+    await until(async () =>
+      (await statementsWaitingOnALock(db().pool)).some((query) =>
+        query.includes("pg_advisory_lock(hashtext('bundle')"),
+      ),
+    );
+    await gate.unpark();
+
+    expect(await writing).toMatchObject({ ok: true });
+    expect((await erasing).completedAt).toEqual(LOCKED_AT);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(3);
+    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+    const caughtUp = await reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+    expect(caughtUp).toMatchObject({ ok: true, value: { replayed: [], stopped: undefined } });
   });
 
   it.each([

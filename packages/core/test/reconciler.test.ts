@@ -28,6 +28,7 @@ import {
 import { actorIdOf, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import { narrowConnectedSource, narrowConnectedSourceInput } from "../src/sources/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
+import { rewritingElsewhere } from "./bundle-fence.ts";
 import {
   bundleHistory,
   commitFacts,
@@ -843,6 +844,21 @@ describe("what the reconciler refuses", () => {
     expect(refused.ok).toBe(false);
     if (refused.ok) return;
     expect(refused.error).toBeInstanceOf(Error);
+  });
+
+  it("skips a bundle another process is rewriting, landing nothing", async () => {
+    const scenario = await arrange();
+    await landed(scenario, scenario.editor, guideline("Kettles"));
+    const before = await rowsOf(scenario.workspaceId);
+    const rewriting = await rewritingElsewhere(db().pool, scenario.workspaceId);
+
+    const skipped = await reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+    await rewriting.release();
+
+    expect(skipped).toEqual({ ok: false, error: "held" });
+    expect(await rowsOf(scenario.workspaceId)).toEqual(before);
   });
 
   it("refuses a malformed workspace id before opening anything", async () => {

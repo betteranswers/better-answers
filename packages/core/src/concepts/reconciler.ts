@@ -20,13 +20,7 @@ import {
   type Result,
   type WorkspaceId,
 } from "../kernel/index.ts";
-import {
-  commitsAfter,
-  readCommit,
-  withRepositoryLockAs,
-  type CommitRead,
-  type GitDoor,
-} from "../store/git/index.ts";
+import { commitsAfter, readCommit, type CommitRead, type GitDoor } from "../store/git/index.ts";
 import {
   scopeClause,
   scopeParameter,
@@ -35,6 +29,7 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
+import { tryBundleFenceAs } from "./fence.ts";
 import { hashedFileOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
 import type { Acceptance } from "./index.ts";
 import {
@@ -75,7 +70,7 @@ export type Reconciled = {
   readonly stopped: { readonly sha: string; readonly reason: ReplayRefusal | Error } | undefined;
 };
 
-export type ReconcileRefusal = "malformed" | "no-such-repository" | "history-diverged";
+export type ReconcileRefusal = "malformed" | "no-such-repository" | "history-diverged" | "held";
 
 type Replayed = "landed" | "skipped";
 
@@ -349,49 +344,67 @@ const replayCommit = async (
   return landed;
 };
 
+type ReconcilerDoors = {
+  readonly git: GitDoor;
+  readonly postgres: PostgresDoor;
+  readonly clock: Clock;
+};
+
+const replayMissed = async (
+  platform: ReconcilerPrincipal,
+  doors: ReconcilerDoors,
+  workspaceId: WorkspaceId,
+): Promise<Result<Reconciled, ReconcileRefusal | Error>> => {
+  const watermark = await attempt(() =>
+    withScope(platform, doors.postgres, workspaceId, (tx) => lastRecordedCommit(platform, tx)),
+  );
+  if (!watermark.ok) return err(watermark.error);
+  const scanned = await commitsAfter(platform, doors.git, workspaceId, watermark.value);
+  if (!scanned.ok) return err(scanned.error);
+
+  const batchId = batchIdFor(scanned.value.missed.length);
+  const replayed: string[] = [];
+  const skipped: string[] = [];
+  let stopped: Reconciled["stopped"];
+  for (const sha of scanned.value.missed) {
+    const outcome = await replayCommit(platform, doors, workspaceId, sha, batchId);
+    if (!outcome.ok) {
+      stopped = { sha, reason: outcome.error };
+      break;
+    }
+    (outcome.value === "landed" ? replayed : skipped).push(sha);
+  }
+  return ok({
+    workspaceId,
+    head: scanned.value.head,
+    watermark: watermark.value,
+    replayed,
+    skipped,
+    stopped,
+  });
+};
+
 /**
- * Replays, oldest first and under the repository lock, each bundle commit after the last one
- * the index recorded. The first commit it cannot replay ends the pass and is named in
- * `stopped`, not refused.
+ * Replays, oldest first and under the bundle fence, each bundle commit after the last one the
+ * index recorded. The first commit it cannot replay ends the pass and is named in `stopped`, not
+ * refused. A rewrite elsewhere makes it answer `held`; a later tick catches up.
  */
 export const reconcile = async (
   platform: ReconcilerPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
+  doors: ReconcilerDoors,
   input: { readonly workspaceId: string },
 ): Promise<Result<Reconciled, ReconcileRefusal | Error>> => {
   const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
   if (!workspace.success) return err("malformed");
   const workspaceId = workspace.data;
 
-  return withRepositoryLockAs(platform, doors.git, workspaceId, async () => {
-    const watermark = await attempt(() =>
-      withScope(platform, doors.postgres, workspaceId, (tx) => lastRecordedCommit(platform, tx)),
-    );
-    if (!watermark.ok) return err(watermark.error);
-    const scanned = await commitsAfter(platform, doors.git, workspaceId, watermark.value);
-    if (!scanned.ok) return err(scanned.error);
-
-    const batchId = batchIdFor(scanned.value.missed.length);
-    const replayed: string[] = [];
-    const skipped: string[] = [];
-    let stopped: Reconciled["stopped"];
-    for (const sha of scanned.value.missed) {
-      const outcome = await replayCommit(platform, doors, workspaceId, sha, batchId);
-      if (!outcome.ok) {
-        stopped = { sha, reason: outcome.error };
-        break;
-      }
-      (outcome.value === "landed" ? replayed : skipped).push(sha);
-    }
-    return ok({
-      workspaceId,
-      head: scanned.value.head,
-      watermark: watermark.value,
-      replayed,
-      skipped,
-      stopped,
-    });
-  });
+  const fenced = await attempt(() =>
+    tryBundleFenceAs(platform, doors, workspaceId, "shared", () =>
+      replayMissed(platform, doors, workspaceId),
+    ),
+  );
+  if (!fenced.ok) return err(fenced.error);
+  return fenced.value.ok ? fenced.value.value : err(fenced.value.error);
 };
 
 export type ReconcilerHit = {

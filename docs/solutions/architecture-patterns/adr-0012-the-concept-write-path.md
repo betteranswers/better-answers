@@ -27,6 +27,7 @@ tags:
 The bundle is a bare git repository per workspace (ADR 0024). Only the api writes it, through governed actions.
 
 - Each action makes one commit, under the per-repository lock. The lock is held from the hash precondition through the Postgres COMMIT.
+- The lock is two, taken in turn: a queue inside the process, then a Postgres advisory lock on the workspace (`hashtext('bundle')`, `hashtext(<workspace id>)`), so it holds across processes. Every write and the reconciler hold it shared. A history rewrite holds it alone, and the reconciler skips a workspace while one does. A process holds at most three at once, so the lock never takes its whole pool.
 - The `audit_event` id is minted first and carried in the commit's `Audit:` trailer.
 - The action's rows are written in one transaction the slice owns. So `bundle_commit` history is always a prefix of git history.
 - The manifest, `knowledge/manifest.yaml` inside the bundle, is such a commit too (`writeManifest`). It lands no concept row.

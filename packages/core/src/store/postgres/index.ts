@@ -258,6 +258,103 @@ export const withSessionTryLock = async <T>(
     return ok(await unlockingAfter(holder, key, () => work(platform)));
   });
 
+/** Shared by every write to a workspace's bundle; exclusive for a rewrite of its history. */
+export type FenceHold = "shared" | "exclusive";
+
+const FENCE_KEY = "hashtext('bundle'), hashtext($1)";
+
+const FENCE_SQL = {
+  shared: {
+    wait: `SELECT pg_advisory_lock_shared(${FENCE_KEY})`,
+    try: `SELECT pg_try_advisory_lock_shared(${FENCE_KEY}) AS taken`,
+    free: `SELECT pg_advisory_unlock_shared(${FENCE_KEY})`,
+  },
+  exclusive: {
+    wait: `SELECT pg_advisory_lock(${FENCE_KEY})`,
+    try: `SELECT pg_try_advisory_lock(${FENCE_KEY}) AS taken`,
+    free: `SELECT pg_advisory_unlock(${FENCE_KEY})`,
+  },
+} as const satisfies Record<
+  FenceHold,
+  { readonly wait: string; readonly try: string; readonly free: string }
+>;
+
+/** Each holder needs two connections: three take six of the api's ten, leaving four for other queries. */
+export const FENCE_HOLDERS_PER_POOL = 3;
+
+type Slots = { free: number; readonly waiting: (() => void)[] };
+
+const slotsByPool = new WeakMap<pg.Pool, Slots>();
+
+const slotsOf = (pool: pg.Pool): Slots => {
+  const known = slotsByPool.get(pool);
+  if (known !== undefined) return known;
+  const slots: Slots = { free: FENCE_HOLDERS_PER_POOL, waiting: [] };
+  slotsByPool.set(pool, slots);
+  return slots;
+};
+
+/** Waits for one of the pool's fence slots before taking any connection, so a waiter holds none. */
+const inAFenceSlot = async <T>(pool: pg.Pool, work: () => Promise<T>): Promise<T> => {
+  const slots = slotsOf(pool);
+  if (slots.free > 0) slots.free -= 1;
+  else await new Promise<void>((resolve) => slots.waiting.push(resolve));
+  try {
+    return await work();
+  } finally {
+    const next = slots.waiting.shift();
+    if (next === undefined) slots.free += 1;
+    else next();
+  }
+};
+
+const fencedOn = async <T>(
+  holder: pg.PoolClient,
+  workspaceId: string,
+  hold: FenceHold,
+  work: () => Promise<T>,
+): Promise<T> => {
+  try {
+    return await work();
+  } finally {
+    await holder.query(FENCE_SQL[hold].free, [workspaceId]);
+  }
+};
+
+/**
+ * Holds the workspace's bundle fence across processes while `work` runs, outside any
+ * transaction. Taken before a transaction opens, so a waiter holds no row.
+ */
+export const withWorkspaceFence = async <T>(
+  principal: Principal,
+  door: PostgresDoor,
+  workspaceId: string,
+  hold: FenceHold,
+  work: () => Promise<T>,
+): Promise<T> =>
+  inAFenceSlot(door.pool, () =>
+    onOwnConnection(door, async (holder) => {
+      await holder.query(FENCE_SQL[hold].wait, [workspaceId]);
+      return fencedOn(holder, workspaceId, hold, work);
+    }),
+  );
+
+/** As withWorkspaceFence, but `held` at once while another holder's kind of hold excludes this one. */
+export const tryWorkspaceFence = async <T>(
+  principal: Principal,
+  door: PostgresDoor,
+  workspaceId: string,
+  hold: FenceHold,
+  work: () => Promise<T>,
+): Promise<Result<T, LockHeld>> =>
+  inAFenceSlot(door.pool, () =>
+    onOwnConnection(door, async (holder): Promise<Result<T, LockHeld>> => {
+      const tried = await holder.query<{ taken: boolean }>(FENCE_SQL[hold].try, [workspaceId]);
+      if (tried.rows[0]?.taken !== true) return err("held");
+      return ok(await fencedOn(holder, workspaceId, hold, work));
+    }),
+  );
+
 /**
  * Runs `work` in one transaction with no workspace scope. It rolls back when `work` throws or
  * answers a refused Result.

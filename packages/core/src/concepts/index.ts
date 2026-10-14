@@ -51,14 +51,9 @@ import {
   type UserId,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import {
-  ANY_HEAD,
-  withRepositoryLock,
-  type CommitAuthor,
-  type Committed,
-  type GitDoor,
-} from "../store/git/index.ts";
+import { ANY_HEAD, type CommitAuthor, type Committed, type GitDoor } from "../store/git/index.ts";
 import { withMember, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { withBundleWrite } from "./fence.ts";
 import {
   hashedFileOf,
   renderConceptFile,
@@ -134,6 +129,7 @@ export {
   type Frontmatter,
   type FrontmatterValue,
 } from "./file.ts";
+export { withBundleFenceAs } from "./fence.ts";
 export { carryVerificationsOntoRewrite, foldKind, moveBundleCommits } from "./landing.ts";
 export {
   ERASURE_REHEARSAL_PATH,
@@ -353,7 +349,7 @@ const commitConcept = async (
 
   const auditEventId = ulid();
 
-  return withRepositoryLock(principal, doors.git, () =>
+  return withBundleWrite(principal, doors, () =>
     writeUnderLock(principal, doors, {
       input,
       iri,
