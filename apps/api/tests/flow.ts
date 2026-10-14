@@ -173,7 +173,7 @@ export const connectIn = (workspaceId: string): Record<string, string> => ({
 });
 
 /** The fields Connect sends from a drawn consent page, read off the page itself. */
-export const connectOn = (page: string): Record<string, string> => {
+const connectOn = (page: string): Record<string, string> => {
   const workspace = DRAWN_FOR.exec(page)?.[1];
   expect(workspace, "the consent page names no workspace").toBeDefined();
   return connectIn(workspace ?? "");
