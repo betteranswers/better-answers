@@ -5,6 +5,8 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  ACTION_SAMPLES,
+  actionClocked,
   A_ROLE,
   addMember,
   aMemberSignedInAt,
@@ -22,6 +24,7 @@ import {
   signIn,
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
+  theActionsLandedWithinTheirBudget,
 } from "./harness.ts";
 import { refusalAnswering } from "./refused-read.ts";
 
@@ -72,6 +75,18 @@ const SHEET_COUNT = "//div[@role='dialog']//h2/following-sibling::p[1]";
 
 const LIST_COUNT = "//section[h2[normalize-space(.)='Groups']]/div/output";
 
+/** Deletes an empty group through its sheet, answering how long its confirming key took to land. */
+const deletedAtAKey = async (page: Page, name: string, left: number): Promise<number> => {
+  await groupButton(page, name).click();
+  await sheetOf(page, name).getByRole("button", { name: "Delete Group" }).click();
+  const confirming = page.getByRole("alertdialog", { name: `Delete ${name}` });
+  await confirming.getByRole("button", { name: "Delete", exact: true }).focus();
+  await clockTheNextKey(page, { at: LIST_COUNT, reads: String(left) });
+  await page.keyboard.press("Enter");
+  await expect(groupRows(page)).toHaveCount(left);
+  return actionClocked(page);
+};
+
 /** A group's label on a member's page, found only while the box beside it is ticked. */
 const tickedGroup = (name: string): string =>
   `//fieldset//div[button[@role='checkbox'][@aria-checked='true']]//label[normalize-space(.)='${name}']`;
@@ -91,7 +106,12 @@ const startsUnderItsHeader = async (card: Locator): Promise<void> => {
 };
 
 /** Another workspace's group is made alongside, so a list that leaked would show it. */
-const anAdminAtGroups = async (page: Page, api: APIRequestContext, workspaceName: string) => {
+const anAdminAtGroups = async (
+  page: Page,
+  api: APIRequestContext,
+  workspaceName: string,
+  emptyGroups: readonly string[] = [],
+) => {
   const adminEmail = anAddress("admin");
   const [workspace, priya, sam] = await Promise.all([
     provision(api, { name: workspaceName, adminEmail }),
@@ -103,7 +123,7 @@ const anAdminAtGroups = async (page: Page, api: APIRequestContext, workspaceName
   await addMember(api, { workspaceId, userId: sam.id, role: "Viewer" });
   const userId = workspace.admin.id;
   await makeGroups(api, { workspaceId, userId, names: ["HR team"], memberIds: [priya.id, sam.id] });
-  await makeGroups(api, { workspaceId, userId, names: ["Bid writers"] });
+  await makeGroups(api, { workspaceId, userId, names: ["Bid writers", ...emptyGroups] });
 
   const elsewhere = await provision(api, { name: `Not ${workspaceName}` });
   await makeGroups(api, {
@@ -116,7 +136,7 @@ const anAdminAtGroups = async (page: Page, api: APIRequestContext, workspaceName
   await page.goto(GROUPS_PAGE);
   await signIn(page, api, adminEmail);
   await expect(page).toHaveURL(new RegExp(`${GROUPS_PAGE}$`));
-  await expect(groupRows(page)).toHaveCount(2);
+  await expect(groupRows(page)).toHaveCount(2 + emptyGroups.length);
 };
 
 test.describe("the People group's Groups page", () => {
@@ -276,7 +296,15 @@ test.describe("a group's actions", () => {
     request,
     passesTheAccessibilityGate,
   }) => {
-    await anAdminAtGroups(page, request, "Ure Mill Tools");
+    const shifts = Array.from(
+      { length: ACTION_SAMPLES - 1 },
+      (_unused, at) => `Shift ${String(at + 1)}`,
+    );
+    await anAdminAtGroups(page, request, "Ure Mill Tools", shifts);
+    const samples: number[] = [];
+    for (const [at, name] of shifts.entries()) {
+      samples.push(await deletedAtAKey(page, name, 1 + shifts.length - at));
+    }
 
     await groupButton(page, "HR team").click();
     const sheet = sheetOf(page, "HR team");
@@ -298,7 +326,8 @@ test.describe("a group's actions", () => {
     await page.keyboard.press("Enter");
 
     await expect(sheet).toHaveCount(0);
-    await theActionLandedWithinItsBudget(page, "delete a group");
+    samples.push(await actionClocked(page));
+    theActionsLandedWithinTheirBudget("delete a group", samples);
     await expect(groupRows(page)).toHaveCount(1);
     await expect(groupsRegion(page).getByRole("status").filter({ hasText: /\S/ })).toHaveText([
       /\b1\b/,

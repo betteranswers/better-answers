@@ -238,13 +238,38 @@ export const clockTheNextKey = (
     Reflect.set(window, "actionClocked", clocked);
   }, landed);
 
+/** How many times a spec presses an action it holds at the median: one press on a busy runner is noise. */
+export const ACTION_SAMPLES = 5;
+
 /** Reads the clock `clockTheNextKey` started, so that call comes before the key it times. */
-export const theActionLandedWithinItsBudget = async (page: Page, action: string): Promise<void> => {
-  const elapsed = await page.evaluate(() => Reflect.get(window, "actionClocked"));
-  test.info().annotations.push({ type: `${action} action`, description: `${elapsed} ms` });
-  expect(elapsed, `the ${action} did not read as landed within its budget`).toBeLessThan(
+export const actionClocked = async (page: Page): Promise<number> =>
+  z.number().parse(await page.evaluate(() => Reflect.get(window, "actionClocked")));
+
+const medianOf = (samples: readonly number[]): number => {
+  const sorted = samples.toSorted((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  const upper = sorted[middle] ?? Number.NaN;
+  return sorted.length % 2 === 1 ? upper : ((sorted[middle - 1] ?? Number.NaN) + upper) / 2;
+};
+
+/** Each press is annotated, so a run that passes still says how close each one came. */
+export const theActionsLandedWithinTheirBudget = (
+  action: string,
+  samples: readonly number[],
+): void => {
+  expect(samples.length, `the ${action} was never clocked`).toBeGreaterThan(0);
+  const median = medianOf(samples);
+  test.info().annotations.push({
+    type: `${action} action`,
+    description: `${samples.map((elapsed) => `${String(elapsed)} ms`).join(", ")}; median ${String(median)} ms`,
+  });
+  expect(median, `the ${action} did not read as landed within its budget`).toBeLessThan(
     ACTION_BUDGET_MS,
   );
+};
+
+export const theActionLandedWithinItsBudget = async (page: Page, action: string): Promise<void> => {
+  theActionsLandedWithinTheirBudget(action, [await actionClocked(page)]);
 };
 
 /** A refusal's region can stand empty from the first draw, so it shows one only once it holds words. */
