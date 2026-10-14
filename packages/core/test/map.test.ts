@@ -14,6 +14,7 @@ import {
 import { citedSourcesOf, conceptIriOf, ids, ulid } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 
+import { planned } from "./planned.ts";
 import {
   answered,
   holdingTable,
@@ -535,6 +536,24 @@ describe("a map walk narrowed to collections", () => {
       [beyond, 2],
     ]);
     expect(uidsByDepth(whole)).toContainEqual([section, 1]);
+  });
+
+  it("groups a narrowed walk before it filters by label", async () => {
+    const scenario = await arrange();
+    const entry = await seeded((seed) => conceptNode(seed, scenario.workspaceId, "audits"));
+
+    const narrowed = await planned(db(), scenario.viewer, (principal, tx) =>
+      walkFromEntries(principal, tx, [ids.conceptIri.parse(entry)], ["audits"]),
+    );
+    /** The filter on each scan of the CTE `name`: a filter beneath the grouping costs a sort. */
+    const filtersOn = (name: string): readonly string[] =>
+      narrowed.nodes
+        .filter((node) => node["Node Type"] === "CTE Scan" && node["CTE Name"] === name)
+        .map((scan) => scan.Filter ?? "no filter");
+
+    expect(uidsByDepth(narrowed.answer)).toEqual([[entry, 0]]);
+    expect(filtersOn("walk"), "what the grouping reads").toEqual(["no filter"]);
+    expect(filtersOn("nearest"), "what reads the groups").toEqual(["(label = 'Concept'::text)"]);
   });
 });
 
