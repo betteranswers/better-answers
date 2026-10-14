@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
-import { err, ok, type Result } from "@better-answers/core/kernel";
+import { ENVELOPE_KEY_BYTES, err, ok, type Result } from "@better-answers/core/kernel";
 import type { ObjectStoreSettings } from "@better-answers/core/store/objects";
 import type { UploadSweepMode } from "@better-answers/core/sweeps";
 import { UPLOAD_SWEEP_MODES } from "@better-answers/schema";
@@ -103,6 +103,13 @@ const runningImageSchema = z.object({
     .regex(/^sha256:[0-9a-f]{64}$/, "must be a digest: sha256: followed by 64 hex characters")
     .optional(),
 });
+
+const envelopeKeySchema = z.object({
+  KEK: z.string().regex(new RegExp(`^[0-9a-fA-F]{${String(ENVELOPE_KEY_BYTES * 2)}}$`)),
+});
+
+/** One sentence for a key that is absent and one that is malformed, and neither repeats it. */
+const NO_ENVELOPE_KEY = `KEK must be set to the envelope key: ${String(ENVELOPE_KEY_BYTES * 2)} hexadecimal characters, its ${String(ENVELOPE_KEY_BYTES)} bytes`;
 
 export type Bootstrap = {
   readonly databaseUrl: string;
@@ -206,6 +213,15 @@ export function readRunningImage(
   const parsed = runningImageSchema.safeParse(environment);
   if (!parsed.success) return err(invalid(parsed.error, "the image the api runs"));
   return ok({ digest: parsed.data.API_IMAGE_DIGEST });
+}
+
+/** The key every sealed credential row opens under; held by this tier alone. */
+export function readEnvelopeKey(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Result<Uint8Array> {
+  const parsed = envelopeKeySchema.safeParse(environment);
+  if (!parsed.success) return err(new Error(NO_ENVELOPE_KEY));
+  return ok(new Uint8Array(Buffer.from(parsed.data.KEK, "hex")));
 }
 
 export function requireBootstrap(processName: string): Bootstrap {

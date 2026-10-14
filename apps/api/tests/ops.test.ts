@@ -19,7 +19,8 @@ import {
   type ErasureRehearsed,
   type SubjectIdentifiers,
 } from "@better-answers/core/erasure";
-import { ok, type UserPrincipal } from "@better-answers/core/kernel";
+import { err, ok, type UserPrincipal } from "@better-answers/core/kernel";
+import { openCredentials } from "@better-answers/core/llm";
 import { connectUpload, connectUploadFields } from "@better-answers/core/sources";
 import { fileAtHead, head, initRepository } from "@better-answers/core/store/git";
 import { getObject, listObjects } from "@better-answers/core/store/objects";
@@ -27,6 +28,7 @@ import {
   folded,
   openPostgres,
   withPrincipal,
+  withScope,
   type Answered,
   type Foldable,
   type Tx,
@@ -40,6 +42,7 @@ import {
   until,
   whileWritesAreRefused,
 } from "@better-answers/core/testing/postgres";
+import { BOOTSTRAP } from "@better-answers/core/workspaces";
 import {
   bundleCommit,
   conceptIndex,
@@ -51,6 +54,7 @@ import {
   mapGeneration,
   mapNode,
   job,
+  modelKey,
   sourceDocument,
   suppression,
   ulid,
@@ -209,6 +213,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "reindex-connected-sources": [connectedSource, job],
   "erasure-rehearsal": [erasureRequest, suppression],
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
+  "set-model-key": [modelKey],
 };
 
 const idOnTheDoneLine = (run: Run): string => {
@@ -2761,6 +2766,192 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.lines.join("\n")).toContain(
         "rename-workspace --workspace <id> [--name <name>] [--short-name <short name>]",
+      );
+    });
+  });
+
+  describe("set-model-key — the platform sets a workspace's model key", () => {
+    /** Invented, as each key here is: they seal and call nothing outside this suite. */
+    const credentials = openCredentials(Uint8Array.from({ length: 32 }, (_byte, index) => index));
+    const A_KEY = "sk-test-u9-invented-ops-0001";
+    const A_NEWER_KEY = "sk-test-u9-invented-ops-0002";
+
+    const ACTION = "platform.workspace.model_key_set";
+    const ANTHROPIC = ["--provider", "anthropic"];
+
+    const setting = (
+      app: TestApp,
+      workspaceId: string,
+      typed: string,
+      flags: readonly string[] = ANTHROPIC,
+      io: Pick<OpsIo, "credentials"> = { credentials: ok(credentials) },
+    ): Promise<Run> =>
+      opsWith(app, ["set-model-key", "--workspace", workspaceId, ...flags], {
+        io: { stdin: async () => typed, ...io },
+      });
+
+    const keyHeld = async (
+      app: TestApp,
+      workspaceId: string,
+      provider: "anthropic" | "mistral",
+    ) => {
+      const read = await withScope(BOOTSTRAP, openPostgres(app.database.pool), workspaceId, (tx) =>
+        credentials.readModelKey(tx, { workspaceId: ids.workspaceId.parse(workspaceId), provider }),
+      );
+      return read.ok ? read.value?.reveal() : read.error;
+    };
+
+    const rowsHeld = async (app: TestApp, workspaceId: string) => {
+      const held = await app.database.superuser.query<{ provider: string; sealed: Buffer }>(
+        "SELECT provider, sealed FROM model_key WHERE workspace_id = $1 ORDER BY provider",
+        [workspaceId],
+      );
+      return held.rows;
+    };
+
+    const setEvent = (workspaceId: string, provider: string) => ({
+      actor: BOOTSTRAP_ACTOR,
+      subject_id: workspaceId,
+      detail: { provider },
+    });
+
+    const MALFORMED =
+      "set-model-key: REFUSED — malformed: give --workspace a workspace id, --provider one of anthropic · mistral, and on standard input one key with no space or line break in it";
+
+    it("seals the key typed on standard input, recording the provider", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await setting(app(), workspaceId, `${A_KEY}\n`);
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 0,
+        lines: [`set-model-key: done — workspace ${workspaceId} holds a new key for anthropic`],
+      });
+      expect(await keyHeld(app(), workspaceId, "anthropic")).toBe(A_KEY);
+      expect(await rowsOfAction(app(), workspaceId, ACTION)).toEqual([
+        setEvent(workspaceId, "anthropic"),
+      ]);
+    });
+
+    it("replaces the key on a second run, keeping one", async () => {
+      const { workspaceId } = await app().provision();
+
+      await setting(app(), workspaceId, A_KEY, ["--provider", "mistral"]);
+      const again = await setting(app(), workspaceId, `${A_NEWER_KEY}\r\n`, [
+        "--provider",
+        "mistral",
+      ]);
+
+      expect(again.exitCode).toBe(0);
+      expect(await rowsHeld(app(), workspaceId)).toHaveLength(1);
+      expect(await keyHeld(app(), workspaceId, "mistral")).toBe(A_NEWER_KEY);
+      expect(await rowsOfAction(app(), workspaceId, ACTION)).toEqual([
+        setEvent(workspaceId, "mistral"),
+        setEvent(workspaceId, "mistral"),
+      ]);
+    });
+
+    it("says the key in no line, log or row", async () => {
+      const { workspaceId } = await app().provision();
+
+      const set = await setting(app(), workspaceId, A_KEY);
+      const refusedByTheStore = await whileWritesAreRefused(
+        app().database.superuser,
+        "model_key",
+        () => setting(app(), workspaceId, A_NEWER_KEY),
+      );
+      const malformed = await setting(app(), workspaceId, `${A_NEWER_KEY} ${A_NEWER_KEY}`);
+      const unsealed = await setting(app(), workspaceId, A_NEWER_KEY, ANTHROPIC, {
+        credentials: undefined,
+      });
+
+      expect(await keyHeld(app(), workspaceId, "anthropic"), "the key was stored").toBe(A_KEY);
+      expect([set, refusedByTheStore, malformed, unsealed].map((run) => run.exitCode)).toEqual([
+        0, 1, 2, 1,
+      ]);
+      const everythingSaid = [
+        JSON.stringify([set, refusedByTheStore, malformed, unsealed]),
+        JSON.stringify(await rowsOfAction(app(), workspaceId, ACTION)),
+        ...(await rowsHeld(app(), workspaceId)).map((row) => row.sealed.toString("latin1")),
+      ].join("\n");
+      expect(everythingSaid).not.toContain(A_KEY);
+      expect(everythingSaid).not.toContain(A_NEWER_KEY);
+    });
+
+    it("refuses without an envelope key, sealing nothing", async () => {
+      const { workspaceId } = await app().provision();
+
+      const absent = await setting(app(), workspaceId, A_KEY, ANTHROPIC, {
+        credentials: undefined,
+      });
+      const refused = await setting(app(), workspaceId, A_KEY, ANTHROPIC, {
+        credentials: err("KEK must be set to the envelope key"),
+      });
+
+      expect(
+        [absent, refused].map((run) => ({ exitCode: run.exitCode, lines: run.lines })),
+      ).toEqual([
+        {
+          exitCode: 1,
+          lines: [
+            "set-model-key: REFUSED — no envelope key is configured (KEK on the api service), so a model key cannot be sealed; nothing changed",
+          ],
+        },
+        {
+          exitCode: 1,
+          lines: ["set-model-key: REFUSED — KEK must be set to the envelope key; nothing changed"],
+        },
+      ]);
+      expect(await rowsHeld(app(), workspaceId)).toEqual([]);
+    });
+
+    it.each([
+      ["an empty standard input", "", ["--provider", "anthropic"]],
+      ["a key holding a space", "sk-test u9", ["--provider", "anthropic"]],
+      ["a key over two lines", "sk-test\nu9", ["--provider", "anthropic"]],
+      ["an unknown model provider", A_KEY, ["--provider", "openai"]],
+    ])("refuses malformed for %s, changing nothing", async (_shape, typed, flags) => {
+      const { workspaceId } = await app().provision();
+
+      const run = await setting(app(), workspaceId, typed, flags);
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 2,
+        lines: [MALFORMED],
+      });
+      expect(await rowsHeld(app(), workspaceId)).toEqual([]);
+      expect(await rowsOfAction(app(), workspaceId, ACTION)).toEqual([]);
+    });
+
+    it("refuses no-such-workspace for an unknown id, writing nothing", async () => {
+      const nowhere = ulid();
+
+      const run = await setting(app(), nowhere, A_KEY);
+
+      expect(run.exitCode).toBe(6);
+      expect(run.lines).toEqual([
+        `set-model-key: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
+      ]);
+      expect(await auditLogOf(app(), nowhere)).toEqual([]);
+    });
+
+    it("answers usage with no --provider, reading nothing", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await setting(app(), workspaceId, A_KEY, []);
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([
+        "set-model-key: --workspace <id> and --provider <anthropic|mistral> are required, with the key on standard input",
+      ]);
+      expect(await rowsHeld(app(), workspaceId)).toEqual([]);
+    });
+
+    it("names the command in the usage", async () => {
+      const run = await ops(app(), ["help"]);
+
+      expect(run.lines.join("\n")).toContain(
+        "set-model-key --workspace <id> --provider <anthropic|mistral>",
       );
     });
   });

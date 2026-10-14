@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   readBootstrap,
+  readEnvelopeKey,
   readHeadCheck,
   readIdentityBootstrap,
   readObjectStore,
@@ -278,6 +279,49 @@ describe("the head check's settings", () => {
     const reason = read.ok ? "" : read.error.message;
     expect(reason).toContain("HEALTHCHECKS_PING_URL_SCHEDULER");
     expect(reason).not.toContain("7c1d9e4a");
+  });
+});
+
+describe("the envelope key", () => {
+  /** Invented: the bytes 0 to 31, sealing nothing outside this file. */
+  const KEY_HEX = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+
+  it("gives the 32 bytes KEK writes in hexadecimal", () => {
+    expect(readEnvelopeKey({ KEK: KEY_HEX })).toEqual({
+      ok: true,
+      value: Uint8Array.from({ length: 32 }, (_byte, index) => index),
+    });
+  });
+
+  it("reads capitals as the same bytes", () => {
+    expect(readEnvelopeKey({ KEK: KEY_HEX.toUpperCase() })).toEqual(
+      readEnvelopeKey({ KEK: KEY_HEX }),
+    );
+  });
+
+  it.each([
+    ["no value", undefined],
+    ["an empty value", ""],
+    ["a key cut short", KEY_HEX.slice(2)],
+    ["a key a byte too long", `${KEY_HEX}20`],
+    ["the same bytes in base64", Buffer.from(KEY_HEX, "hex").toString("base64")],
+    ["a key with a space after it", `${KEY_HEX} `],
+  ])("refuses %s for KEK", (_case, value) => {
+    const read = readEnvelopeKey({ KEK: value });
+
+    expect(read.ok).toBe(false);
+    expect(read.ok ? "" : read.error.message).toContain("KEK");
+  });
+
+  it("names the refused setting, never the value it was given", () => {
+    const almost = `${KEY_HEX.slice(0, -1)}g`;
+    const read = readEnvelopeKey({ KEK: almost });
+
+    expect(read.ok).toBe(false);
+    const reason = read.ok ? "" : read.error.message;
+    expect(reason).toContain("KEK");
+    expect(reason).not.toContain(almost);
+    expect(reason).not.toContain(almost.slice(0, 8));
   });
 });
 
