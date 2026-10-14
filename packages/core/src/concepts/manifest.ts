@@ -17,14 +17,9 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import {
-  ANY_HEAD,
-  fileAtHead,
-  withRepositoryLock,
-  type CommitAuthor,
-  type GitDoor,
-} from "../store/git/index.ts";
+import { ANY_HEAD, fileAtHead, type CommitAuthor, type GitDoor } from "../store/git/index.ts";
 import { withMember, type PostgresDoor } from "../store/postgres/index.ts";
+import { withBundleWrite } from "./fence.ts";
 import { scalarPairOf, type FrontmatterSource } from "./file.ts";
 import { commitAsMember, landBundleCommit } from "./landing.ts";
 import type { PassedOnCommitRefusal } from "./vocabulary.ts";
@@ -108,7 +103,7 @@ export const writeManifest = async (
 
   const auditEventId = ulid();
 
-  return withRepositoryLock(principal, doors.git, async () => {
+  return withBundleWrite(principal, doors, async () => {
     const atHead = await manifestAtHead(principal, doors.git, manifest.data);
     if (!atHead.ok) return err(atHead.error);
     if (atHead.value === "standing") return ok({ written: false });

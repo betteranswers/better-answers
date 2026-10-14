@@ -149,6 +149,7 @@ const CATALOGUED = {
   "unreadable-commit": "inapplicable by concepts",
   "no-such-repository": "precondition by concepts",
   "history-diverged": "precondition by concepts",
+  held: "conflict by concepts",
   "stale-precondition": "conflict by concepts",
   "malformed-path": "malformed by concepts",
   "malformed-message": "malformed by concepts",

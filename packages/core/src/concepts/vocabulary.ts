@@ -28,6 +28,9 @@ export const CONCEPT_REFUSALS = {
   "no-such-repository": "precondition",
   "history-diverged": "precondition",
 
+  // Another process is rewriting the bundle's history; the next reconciler pass catches up.
+  held: "conflict",
+
   // The git door's commit words, which a governed write passes on as its own.
   "stale-precondition": "conflict",
   "malformed-path": "malformed",

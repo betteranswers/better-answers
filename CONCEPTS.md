@@ -253,7 +253,7 @@ _Internal._ one change to a bundle, by whatever path; what the map is derived fr
 _Internal._ the last commit a workspace's rows know about: its newest *bundle commit*, or none for a
 bundle whose rows know no commit yet.
 
-The governed write holds the per-repository lock through its Postgres COMMIT, so recorded history is
+The governed write holds the bundle lock (a queue in the process, then a Postgres advisory lock on the workspace) through its Postgres COMMIT, so recorded history is
 a prefix of git history: everything after the watermark is missed and nothing before it is. A
 watermark the ref's history does not contain is *history diverged*, which no replay can put right.
 

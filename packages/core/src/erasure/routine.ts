@@ -1,7 +1,11 @@
 import { boundarySchemas } from "@better-answers/schema";
 
 import { action, declareActions, record, type DetailOf } from "../audit/index.ts";
-import { carryVerificationsOntoRewrite, moveBundleCommits } from "../concepts/index.ts";
+import {
+  carryVerificationsOntoRewrite,
+  moveBundleCommits,
+  withBundleFenceAs,
+} from "../concepts/index.ts";
 import {
   attempt,
   err,
@@ -14,7 +18,6 @@ import {
 import {
   ERASED_DOMAIN,
   rewriteHistory,
-  withRepositoryLockAs,
   type GitDoor,
   type Pseudonymisation,
 } from "../store/git/index.ts";
@@ -306,10 +309,7 @@ const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): Erasure
   },
 });
 
-/**
- * The lock spans the rewrite and the rows naming its commits: a reconciler tick between them
- * meets a head its watermark cannot reach.
- */
+/** Held alone across processes: a write or reconciler tick between rewrite and rows names a pruned commit. */
 const rewritingTheBundle = (
   platform: ErasurePrincipal,
   doors: ErasureDoors,
@@ -317,7 +317,7 @@ const rewritingTheBundle = (
   who: Pseudonymisation & { readonly paths: readonly string[] },
 ): Promise<Result<GitStep, Error>> =>
   attempt(() =>
-    withRepositoryLockAs(platform, doors.git, workspaceId, async () => {
+    withBundleFenceAs(platform, doors, workspaceId, "exclusive", async () => {
       const { moved, paths } = await rewriteHistory(platform, doors.git, workspaceId, who);
       const rows = await withScope(platform, doors.postgres, workspaceId, async (tx) => ({
         moved: await moveBundleCommits(platform, tx, moved),

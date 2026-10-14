@@ -371,6 +371,18 @@ export const withRepositoryLockAs = <T>(
   work: () => Promise<T>,
 ): Promise<T> => lockedRepository(repositoryPath(door, workspaceId), work);
 
+/** As withRepositoryLockAs, but `held` at once while work in this process has the repository. */
+export const tryRepositoryLockAs = async <T>(
+  platform: PlatformPrincipal,
+  door: GitDoor,
+  workspaceId: string,
+  work: () => Promise<T>,
+): Promise<Result<T, "held">> => {
+  const key = repositoryPath(door, workspaceId);
+  if (locks.has(key)) return err("held");
+  return ok(await lockedRepository(key, work));
+};
+
 const lockedRepository = async <T>(key: string, work: () => Promise<T>): Promise<T> => {
   const ahead = locks.get(key) ?? Promise.resolve();
   const mine = ahead.then(work, work);

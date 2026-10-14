@@ -28,6 +28,7 @@ import {
 import { actorIdOf, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import { narrowConnectedSource, narrowConnectedSourceInput } from "../src/sources/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
+import { rewritingElsewhere } from "./bundle-fence.ts";
 import {
   bundleHistory,
   commitFacts,
@@ -845,6 +846,21 @@ describe("what the reconciler refuses", () => {
     expect(refused.error).toBeInstanceOf(Error);
   });
 
+  it("skips a bundle another process is rewriting, landing nothing", async () => {
+    const scenario = await arrange();
+    await landed(scenario, scenario.editor, guideline("Kettles"));
+    const before = await rowsOf(scenario.workspaceId);
+    const rewriting = await rewritingElsewhere(db().pool, scenario.workspaceId);
+
+    const skipped = await reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+    await rewriting.release();
+
+    expect(skipped).toEqual({ ok: false, error: "held" });
+    expect(await rowsOf(scenario.workspaceId)).toEqual(before);
+  });
+
   it("refuses a malformed workspace id before opening anything", async () => {
     const scenario = await arrange();
 
@@ -998,7 +1014,7 @@ describe("a commit the rows cannot take", () => {
 });
 
 describe("the fence", () => {
-  it("waits behind a live action on the same bundle", async () => {
+  it("skips a bundle a live action holds, never waiting", async () => {
     const scenario = await arrange();
     const order: string[] = [];
     const action = withRepositoryLock(scenario.editor, scenario.git, async () => {
@@ -1008,11 +1024,15 @@ describe("the fence", () => {
     });
     const run = reconcile(RECONCILER, doorsOf(scenario), {
       workspaceId: scenario.workspaceId,
-    }).then(() => order.push("reconciler out"));
+    }).then((answered) => {
+      order.push("reconciler out");
+      return answered;
+    });
 
-    await Promise.all([action, run]);
+    const [, answered] = await Promise.all([action, run]);
 
-    expect(order).toEqual(["action in", "action out", "reconciler out"]);
+    expect(answered).toEqual({ ok: false, error: "held" });
+    expect(order).toEqual(["action in", "reconciler out", "action out"]);
   });
 });
 
