@@ -3104,6 +3104,24 @@ const thePersonIn = async (scenario: Scenario, person: { readonly id: string }, 
 
 const NOWHERE = { address: false, personId: false, authors: [] };
 
+/** NOWAIT, so a row a commit still holds answers at once rather than queueing behind it. */
+const theMemberRowIsFree = async (scenario: Scenario, person: { readonly id: string }) => {
+  const probe = await db().pool.connect();
+  try {
+    await probe.query("BEGIN");
+    await probe.query(
+      "SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE NOWAIT",
+      [scenario.workspaceId, person.id],
+    );
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await probe.query("ROLLBACK");
+    probe.release();
+  }
+};
+
 describe("a commit made as the person while the routine runs", () => {
   it("rewrites a concept the person writes after the git step", async () => {
     const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
@@ -3151,6 +3169,32 @@ describe("a commit made as the person while the routine runs", () => {
     expect(swept.ok && swept.value.replayed).toHaveLength(1);
     const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
     expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased, erased, erased]);
+  });
+
+  it("stops a hung commit and frees the member row", async () => {
+    const { scenario, email, person } = await bundleNamingThePerson();
+    const gate = await gatingRefUpdates(scenario);
+    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+    const writer = await principalFor(db(), scenario.workspaceId, person.id);
+    const impatient = { ...doorsOf(scenario), git: { ...scenario.git, commitBudgetMs: 500 } };
+
+    await gate.park();
+    const written = await writeConcept(writer, impatient, {
+      ...A_LATE_CONCEPT,
+      frontmatter: { ...A_LATE_CONCEPT.frontmatter },
+      author: { name: "Priya Anand", email },
+      expects: { head: before.at(-1) ?? null },
+    });
+    const freeWhileGitHangs = await theMemberRowIsFree(scenario, person);
+    await gate.unpark();
+
+    expect(written).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining("ran past its 500 ms budget") },
+    });
+    expect(freeWhileGitHangs).toBe(true);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+    expect(await writingAsThePerson(scenario, person, email)).toMatchObject({ ok: true });
   });
 
   it.each([

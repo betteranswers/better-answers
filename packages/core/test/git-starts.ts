@@ -26,6 +26,49 @@ const withShimFirst = async (shim: string, log: string, work: () => Promise<unkn
   }
 };
 
+/** Reads no input and takes a second to exit on SIGTERM, as git does clearing its locks. */
+const HANGING = `#!/bin/sh
+for word in "$@"; do
+  if [ "$word" = "$GIT_HANGS_AT" ]; then
+    echo $$ > "$GIT_HUNG_PID"
+    trap 'kill $!; sleep 1; exit 143' TERM
+    sleep 30 &
+    wait
+    exit 1
+  fi
+done
+PATH="$GIT_STARTS_PATH" exec git "$@"
+`;
+
+const HANGING_ENVIRONMENT = ["GIT_HANGS_AT", "GIT_HUNG_PID", "GIT_STARTS_PATH"] as const;
+
+/**
+ * Runs `work` while every git naming `subcommand` hangs, and answers the hung child's pid. PATH
+ * is process-wide, as for gitStarts.
+ */
+export const whileGitHangsAt = async (
+  subcommand: string,
+  work: () => Promise<void>,
+): Promise<number> => {
+  const shim = await mkdtemp(path.join(tmpdir(), "better-answers-git-hangs-"));
+  const searched = process.env["PATH"] ?? "";
+  const pidFile = path.join(shim, "pid");
+  try {
+    await writeFile(path.join(shim, "git"), HANGING);
+    await chmod(path.join(shim, "git"), 0o755);
+    process.env["GIT_HANGS_AT"] = subcommand;
+    process.env["GIT_HUNG_PID"] = pidFile;
+    process.env["GIT_STARTS_PATH"] = searched;
+    process.env["PATH"] = `${shim}${path.delimiter}${searched}`;
+    await work();
+    return Number((await readFile(pidFile, "utf8")).trim());
+  } finally {
+    process.env["PATH"] = searched;
+    for (const name of HANGING_ENVIRONMENT) delete process.env[name];
+    await rm(shim, { recursive: true, force: true });
+  }
+};
+
 /** PATH is process-wide, so `work` must be the only thing starting `git` while it runs. */
 export const gitStarts = async (work: () => Promise<unknown>): Promise<readonly string[]> => {
   const shim = await mkdtemp(path.join(tmpdir(), "better-answers-git-starts-"));
