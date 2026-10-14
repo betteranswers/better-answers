@@ -15,7 +15,8 @@ const { db, arrange } = suiteWithBundles();
 
 const NOW = new Date("2026-10-09T12:00:00.000Z");
 
-const IN_FLIGHT = 20;
+/** The most connections one api process opens to Postgres: its pool holds ten. */
+const IN_FLIGHT = 10;
 const ROUNDS = 5;
 
 const readers = runtimePoolFor(db, IN_FLIGHT);
@@ -202,7 +203,7 @@ describe("find and open under concurrent read load", () => {
     corpus = await landCorpus();
   }, 300_000);
 
-  it("answers find within budget beside nineteen concurrent finds", async () => {
+  it("answers find within budget beside nine concurrent finds", async () => {
     const reads = await underLoad(corpus.scenario, (reader) =>
       timed(reader, corpus.plain, async (principal, tx): Promise<FindResult> =>
         answered(await find(principal, tx, { query: BROAD_QUESTION, limit: PAGE }, NOW)),
@@ -224,7 +225,7 @@ describe("find and open under concurrent read load", () => {
     );
   });
 
-  it("answers open within budget beside nineteen concurrent opens", async () => {
+  it("answers open within budget beside nine concurrent opens", async () => {
     const reads = await underLoad(corpus.scenario, (reader) => opened(reader, corpus.plain));
 
     const inOneRowReads = await reported(
