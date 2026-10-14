@@ -17,6 +17,7 @@ const CONSENTING = {
   hostedAt: "claude.ai",
   sendsCodeTo: "claude.ai",
   workspace: "Acme",
+  workspaceId: "acme-workspace",
   scopes: ["knowledge:read", "feedback:write", "offline_access"],
 };
 

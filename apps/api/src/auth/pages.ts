@@ -33,6 +33,9 @@ export const CONSENT_WORDS = {
   cancel: "Cancel",
 } as const;
 
+/** The Connect form's field naming the workspace the page was drawn for. */
+export const CONSENT_WORKSPACE_FIELD = "workspace";
+
 type RefusalWords = { readonly title: string; readonly why: string };
 
 /** A refusal whose last line says what to do. */
@@ -57,6 +60,11 @@ export const REFUSAL_PAGES = {
   notCompleted: {
     title: "Nothing was connected",
     why: "The connection could not be finished.",
+    next: START_AGAIN,
+  },
+  workspaceMoved: {
+    title: "Nothing was connected",
+    why: "You switched workspace after this page opened.",
     next: START_AGAIN,
   },
   signInFirst: {
@@ -93,6 +101,8 @@ export const consentPage = (
 
     readonly sendsCodeTo: string;
     readonly workspace: string;
+    /** Sent back with Connect, so a grant after a switch elsewhere is told apart. */
+    readonly workspaceId: string;
     readonly scopes: readonly string[];
   },
 ): string => {
@@ -109,7 +119,7 @@ export const consentPage = (
 <p>${CONSENT_WORDS.recorded(assistant)}</p>
 <div data-slot="actions">
 <form method="post" action="/consent${escaped(query)}">
-  <input type="hidden" name="accept" value="true"><button type="submit" data-variant="default" data-marks>${CONSENT_WORDS.connect}</button>
+  <input type="hidden" name="accept" value="true"><input type="hidden" name="${CONSENT_WORKSPACE_FIELD}" value="${escaped(params.workspaceId)}"><button type="submit" data-variant="default" data-marks>${CONSENT_WORDS.connect}</button>
 </form>
 <form method="post" action="/consent${escaped(query)}">
   <input type="hidden" name="accept" value="false"><button type="submit" data-variant="outline">${CONSENT_WORDS.cancel}</button>

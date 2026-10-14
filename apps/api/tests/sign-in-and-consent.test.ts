@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
 
-import { authorizeUrl, connectAsHost, driveToPage, pkce, signIn } from "./flow.ts";
+import { authorizeUrl, connectAsHost, connectIn, driveToPage, pkce, signIn } from "./flow.ts";
 import { CLAUDE_CLIENT_ID, PUBLIC_URL, type TestApp } from "./harness.ts";
 import { codeSentPastItsExpiry } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
@@ -196,7 +196,7 @@ describe("a consent, recorded on the consented workspace's audit log", () => {
   });
 
   it("records nothing when sent to sign in again first", async () => {
-    const { admin } = await app().provision();
+    const { admin, workspaceId } = await app().provision();
     const client = app().client();
     await signIn(app(), client, admin.email);
     const asked = authorizeUrl({
@@ -209,9 +209,10 @@ describe("a consent, recorded on the consented workspace's audit log", () => {
     expect(toSignIn.pathname).toBe("/sign-in");
     const before = app().logs.length;
 
-    const answered = await client.form(`${PUBLIC_URL}/consent${toSignIn.search}`, {
-      accept: "true",
-    });
+    const answered = await client.form(
+      `${PUBLIC_URL}/consent${toSignIn.search}`,
+      connectIn(workspaceId),
+    );
 
     expect((await consentRowsBy(admin.id)).rows).toEqual([]);
     expect(new URL(answered.headers.get("location") ?? "", PUBLIC_URL).pathname).toBe("/sign-in");

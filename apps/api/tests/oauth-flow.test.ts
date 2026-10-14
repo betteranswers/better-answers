@@ -15,6 +15,7 @@ import { authOver } from "./auth-instance.ts";
 import {
   authorizeUrl,
   connectAsHost,
+  connectIn,
   continueAfterPostLogin,
   driveToPage,
   exchangeCode,
@@ -403,7 +404,7 @@ describe("the pages, as a person walks them", () => {
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
     await endTheirStanding(acme);
-    return client.form(`/consent${consent.search}`, { accept: "true" });
+    return client.form(`/consent${consent.search}`, connectIn(acme.workspaceId));
   };
 
   it("takes a one-workspace person straight to consent, with no picker", async () => {
@@ -460,7 +461,7 @@ describe("the pages, as a person walks them", () => {
     const consent = await driveToPage(app, client, acme.admin);
     await app.database.superuser.query("DELETE FROM session WHERE user_id = $1", [acme.admin.id]);
 
-    const refused = await client.form(`/consent${consent.search}`, { accept: "true" });
+    const refused = await client.form(`/consent${consent.search}`, connectIn(acme.workspaceId));
 
     expect(refused.status).toBe(401);
     const page = await refused.text();
@@ -471,7 +472,7 @@ describe("the pages, as a person walks them", () => {
     });
     const back = await backThroughSignIn(client, acme.admin.email, link.href);
     expect(`${back.origin}${back.pathname}`).toBe(`${PUBLIC_URL}/consent`);
-    const connected = await client.form(`/consent${back.search}`, { accept: "true" });
+    const connected = await client.form(`/consent${back.search}`, connectIn(acme.workspaceId));
     const callback = new URL(connected.headers.get("location") ?? "", PUBLIC_URL);
     expect(`${callback.origin}${callback.pathname}`).toBe(CLAUDE_REDIRECT_URI);
     expect(callback.searchParams.get("code")).not.toBeNull();
@@ -503,7 +504,7 @@ describe("the pages, as a person walks them", () => {
     const forged = new URLSearchParams(consent.search);
     forged.set("sig", "forged");
 
-    const failed = await client.form(`/consent?${forged.toString()}`, { accept: "true" });
+    const failed = await client.form(`/consent?${forged.toString()}`, connectIn(acme.workspaceId));
 
     expect(failed.status).toBe(400);
     expect(failed.headers.get("location")).toBeNull();
@@ -517,6 +518,54 @@ describe("the pages, as a person walks them", () => {
 
     expect(decided.status).toBe(401);
     expect(decided.headers.get("location")).toBeNull();
+  });
+
+  /** Consent drawn in Acme, then the session moved to Zenith, as a switch in another tab does. */
+  const drawnThenMoved = async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const zenith = await app.provision({ name: "Zenith" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+    expect(consent.pathname).toBe("/consent");
+    await app.addMember(zenith.workspaceId, acme.admin.id, "Admin");
+    expect((await setActiveWorkspace(client, zenith.workspaceId)).status).toBe(200);
+    return { acme, client, consent };
+  };
+
+  const consentsGiven = async (): Promise<unknown> =>
+    (await app.database.superuser.query("SELECT count(*)::int AS n FROM oauth_consent")).rows[0];
+
+  it("refuses a grant once the session moved, minting no code", async () => {
+    const { acme, client, consent } = await drawnThenMoved();
+    const before = await consentsGiven();
+
+    const refused = await client.form(`/consent${consent.search}`, connectIn(acme.workspaceId));
+
+    expect(refused.status).toBe(409);
+    expect(refused.headers.get("location")).toBeNull();
+    expectRefusalPage(await refused.text(), REFUSAL_PAGES.workspaceMoved);
+    expect(await consentsGiven()).toEqual(before);
+  });
+
+  it("refuses a grant whose form names no workspace", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+
+    const refused = await client.form(`/consent${consent.search}`, { accept: "true" });
+
+    expect(refused.status).toBe(409);
+    expect(refused.headers.get("location")).toBeNull();
+    expectRefusalPage(await refused.text(), REFUSAL_PAGES.workspaceMoved);
+  });
+
+  it("takes a cancel after the session moved as a cancel", async () => {
+    const { client, consent } = await drawnThenMoved();
+
+    const cancelled = await client.form(`/consent${consent.search}`, { accept: "false" });
+
+    expect(cancelled.status).toBe(302);
+    expect(cancelled.headers.get("location")).toContain("error=access_denied");
   });
 
   it("refuses to be framed by another site", async () => {
@@ -588,9 +637,10 @@ describe("the pages refuse a cross-site form", () => {
     );
     expect(after.rows[0]).toEqual(before.rows[0]);
 
-    const navigated = await client.form(`${consent.pathname}${consent.search}`, {
-      accept: "true",
-    });
+    const navigated = await client.form(
+      `${consent.pathname}${consent.search}`,
+      connectIn(acme.workspaceId),
+    );
     expect(navigated.status).toBe(302);
     expect(
       new URL(navigated.headers.get("location") ?? "").searchParams.get("code"),

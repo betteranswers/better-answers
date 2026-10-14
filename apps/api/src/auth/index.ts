@@ -5,4 +5,4 @@ export { serveFaces } from "./page-style.ts";
 export { createAuthRoutes } from "./routes.ts";
 export { createTokenVerifier } from "./verify.ts";
 export * from "./constants.ts";
-export { CONSENT_WORDS, REFUSAL_PAGES } from "./pages.ts";
+export { CONSENT_WORDS, CONSENT_WORKSPACE_FIELD, REFUSAL_PAGES } from "./pages.ts";

@@ -10,6 +10,7 @@ import {
   CLAUDES_REDIRECT_URI,
   claudesAuthorizeUrl,
   drawnMarks,
+  inTwoWorkspaces,
   landedAtHome,
   person,
   provision,
@@ -17,6 +18,8 @@ import {
   railOf,
   signIn,
   signInHeading,
+  switched,
+  switcherOf,
   tokenPainted,
 } from "./harness.ts";
 
@@ -288,6 +291,36 @@ test("refuses consent after credentials are revoked, sending no code", async ({
   await expect(page.getByRole("heading", { level: 1, name: "Sign in again" })).toBeVisible();
   expect(landedAt(page).origin).toBe(origin);
   expect(landedAt(page).searchParams.get("code")).toBeNull();
+});
+
+test("refuses Connect once another tab switched workspace", async ({
+  page,
+  context,
+  request,
+  baseURL,
+  passesTheAccessibilityGate,
+}) => {
+  const origin = baseURL ?? "";
+  const { first, second } = await inTwoWorkspaces(page, request, {
+    first: "Ouse Consent",
+    second: "Foss Consent",
+  });
+  await catchClaudesRedirect(page);
+  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
+  await expect(page.getByRole("main").getByText(first.name)).toBeVisible();
+  const elsewhere = await context.newPage();
+  await elsewhere.goto("/");
+  await switched(elsewhere, first.name, second.name);
+  await expect(switcherOf(elsewhere, second.name)).toBeVisible();
+
+  await page.getByRole("button", { name: "Connect" }).click();
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Nothing was connected" }),
+  ).toBeVisible();
+  expect(landedAt(page).origin).toBe(origin);
+  expect(landedAt(page).searchParams.get("code")).toBeNull();
+  await passesTheAccessibilityGate();
 });
 
 test("takes a named member from connector sign-in straight to consent", async ({
