@@ -156,18 +156,32 @@ describe("a tab whose workspace the session has left", () => {
     aSwitchInAnotherTab(api, "Admin");
     api.set("members.changeRole", () => SWITCHED);
     const member = heldBack(api, "session.member", adaAt("Admin", HOLME));
+    // The second action's settle reads the member again, which cancels the follow's own read.
+    const overtaken = Promise.withResolvers<void>();
+    const answer = api.get("session.member");
+    let memberReads = 0;
+    api.set("session.member", () => {
+      memberReads += 1;
+      if (memberReads === 2) overtaken.resolve();
+      return answer?.();
+    });
+    let blanked = false;
+    const watching = new MutationObserver(() => {
+      if (switcherDrawn(NORTHERN) === null && switcherDrawn(HOLME) === null) blanked = true;
+    });
+    watching.observe(document.body, { subtree: true, childList: true, characterData: true });
 
     fireEvent.click(screen.getByRole("button", { name: "End Every Sign-In and Token Here" }));
     await second.asked;
     changeGracesRole();
     await member.asked;
     second.resolve();
-    // Over the stub server, so the second refusal is heard only after a turn of the event loop.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(switcherDrawn(NORTHERN), "the band blanked while the member was read").not.toBeNull();
+    await overtaken.promise;
     member.resolve();
     await landedInHolme();
+    watching.disconnect();
+
+    expect(blanked, "the band blanked while the member was read").toBe(false);
   });
 
   it("draws no name of the workspace left when unread", async () => {
