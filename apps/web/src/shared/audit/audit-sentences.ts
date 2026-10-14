@@ -170,8 +170,7 @@ const SENTENCES = {
   "platform.reconciler.replayed": ({ by }) => `${by} re-applied a change to the knowledge base`,
   "platform.workspace.marked": ({ by }) =>
     `${by} kept the workspace’s invitations to its testing domain`,
-  "platform.workspace.model_key_set": ({ by }) =>
-    `${by} set the workspace’s key for a model provider`,
+  "platform.workspace.model_key_set": ({ by }) => `${by} set an AI provider’s API key`,
   "platform.workspace.provisioned": ({ by }) => `${by} provisioned the workspace`,
   "platform.workspace.renamed": ({ by }) => `${by} renamed the workspace`,
   "sources.binding.bound": ({ by, subject }) => `${by} added ${connectedSourceNamed(subject)}`,

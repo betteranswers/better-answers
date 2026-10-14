@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -20,7 +21,7 @@ import {
   type SubjectIdentifiers,
 } from "@better-answers/core/erasure";
 import { err, ok, type UserPrincipal } from "@better-answers/core/kernel";
-import { openCredentials } from "@better-answers/core/llm";
+import { openCredentials, openModelKeySetting } from "@better-answers/core/llm";
 import { connectUpload, connectUploadFields } from "@better-answers/core/sources";
 import { fileAtHead, head, initRepository } from "@better-answers/core/store/git";
 import { getObject, listObjects } from "@better-answers/core/store/objects";
@@ -137,6 +138,7 @@ const ioFor = (
     writeReport: async (file, body) => {
       await writeFile(file, body, "utf8");
     },
+    modelKeySetting: err("this suite's commands are given no envelope key"),
   };
 };
 
@@ -2772,7 +2774,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("set-model-key — the platform sets a workspace's model key", () => {
     /** Invented, as each key here is: they seal and call nothing outside this suite. */
-    const credentials = openCredentials(Uint8Array.from({ length: 32 }, (_byte, index) => index));
+    const ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => index);
+    const KEK = Buffer.from(ENVELOPE_KEY).toString("hex");
+    const credentials = openCredentials(ENVELOPE_KEY);
+    const modelKeySetting = openModelKeySetting(ENVELOPE_KEY);
     const A_KEY = "sk-test-u9-invented-ops-0001";
     const A_NEWER_KEY = "sk-test-u9-invented-ops-0002";
 
@@ -2784,7 +2789,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       workspaceId: string,
       typed: string,
       flags: readonly string[] = ANTHROPIC,
-      io: Pick<OpsIo, "credentials"> = { credentials: ok(credentials) },
+      io: Pick<OpsIo, "modelKeySetting"> = { modelKeySetting: ok(modelKeySetting) },
     ): Promise<Run> =>
       opsWith(app, ["set-model-key", "--workspace", workspaceId, ...flags], {
         io: { stdin: async () => typed, ...io },
@@ -2796,7 +2801,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       provider: "anthropic" | "mistral",
     ) => {
       const read = await withScope(BOOTSTRAP, openPostgres(app.database.pool), workspaceId, (tx) =>
-        credentials.readModelKey(tx, { workspaceId: ids.workspaceId.parse(workspaceId), provider }),
+        credentials.readModelKey(tx, provider),
       );
       return read.ok ? read.value?.reveal() : read.error;
     };
@@ -2862,7 +2867,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
       const malformed = await setting(app(), workspaceId, `${A_NEWER_KEY} ${A_NEWER_KEY}`);
       const unsealed = await setting(app(), workspaceId, A_NEWER_KEY, ANTHROPIC, {
-        credentials: undefined,
+        modelKeySetting: err("KEK must be set to the envelope key"),
       });
 
       expect(await keyHeld(app(), workspaceId, "anthropic"), "the key was stored").toBe(A_KEY);
@@ -2874,34 +2879,76 @@ describe("pnpm ops — the restore scripts' commands", () => {
         JSON.stringify(await rowsOfAction(app(), workspaceId, ACTION)),
         ...(await rowsHeld(app(), workspaceId)).map((row) => row.sealed.toString("latin1")),
       ].join("\n");
-      expect(everythingSaid).not.toContain(A_KEY);
-      expect(everythingSaid).not.toContain(A_NEWER_KEY);
+      const secrets = [A_KEY, A_NEWER_KEY, KEK, Buffer.from(ENVELOPE_KEY).toString("base64")];
+      expect(secrets.filter((secret) => everythingSaid.includes(secret))).toEqual([]);
     });
 
     it("refuses without an envelope key, sealing nothing", async () => {
       const { workspaceId } = await app().provision();
 
-      const absent = await setting(app(), workspaceId, A_KEY, ANTHROPIC, {
-        credentials: undefined,
-      });
       const refused = await setting(app(), workspaceId, A_KEY, ANTHROPIC, {
-        credentials: err("KEK must be set to the envelope key"),
+        modelKeySetting: err("KEK must be set to the envelope key"),
       });
 
+      expect({ exitCode: refused.exitCode, lines: refused.lines }).toEqual({
+        exitCode: 1,
+        lines: ["set-model-key: REFUSED — KEK must be set to the envelope key; nothing changed"],
+      });
+      expect(await rowsHeld(app(), workspaceId)).toEqual([]);
+    });
+
+    /** The real entrypoint in a process of its own, so its whole output is read and no part is injected. */
+    const throughTheEntrypoint = (workspaceId: string, typed: string, kek: string | undefined) => {
+      const inherited = Object.entries(process.env).filter(([name]) => name !== "KEK");
+      const finished = spawnSync(
+        process.execPath,
+        ["src/ops.ts", "set-model-key", "--workspace", workspaceId, "--provider", "anthropic"],
+        {
+          cwd: path.resolve(import.meta.dirname, ".."),
+          encoding: "utf8",
+          input: typed,
+          env: {
+            ...Object.fromEntries(inherited),
+            DATABASE_URL: app().database.connectionUri,
+            ...(kek === undefined ? {} : { KEK: kek }),
+          },
+        },
+      );
+      return { status: finished.status, printed: `${finished.stdout}${finished.stderr}` };
+    };
+
+    it("seals through the entrypoint, printing neither key", { timeout: 60_000 }, async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = throughTheEntrypoint(workspaceId, A_KEY, KEK);
+
+      expect(run).toEqual({
+        status: 0,
+        printed: expect.stringContaining(
+          `set-model-key: done — workspace ${workspaceId} holds a new key for anthropic`,
+        ),
+      });
+      expect(await keyHeld(app(), workspaceId, "anthropic")).toBe(A_KEY);
+      expect([A_KEY, KEK].filter((secret) => run.printed.includes(secret))).toEqual([]);
+    });
+
+    it.each([
+      ["no `KEK`", undefined],
+      ["a malformed `KEK`", "not-an-envelope-key-u9"],
+    ])("refuses at the entrypoint with %s", { timeout: 60_000 }, async (_shape, kek) => {
+      const { workspaceId } = await app().provision();
+
+      const run = throughTheEntrypoint(workspaceId, A_KEY, kek);
+
+      expect(run).toEqual({
+        status: 1,
+        printed: expect.stringContaining(
+          "set-model-key: REFUSED — KEK must be set to the envelope key: 64 hexadecimal characters, its 32 bytes; nothing changed",
+        ),
+      });
       expect(
-        [absent, refused].map((run) => ({ exitCode: run.exitCode, lines: run.lines })),
-      ).toEqual([
-        {
-          exitCode: 1,
-          lines: [
-            "set-model-key: REFUSED — no envelope key is configured (KEK on the api service), so a model key cannot be sealed; nothing changed",
-          ],
-        },
-        {
-          exitCode: 1,
-          lines: ["set-model-key: REFUSED — KEK must be set to the envelope key; nothing changed"],
-        },
-      ]);
+        [A_KEY, "not-an-envelope-key-u9"].filter((said) => run.printed.includes(said)),
+      ).toEqual([]);
       expect(await rowsHeld(app(), workspaceId)).toEqual([]);
     });
 

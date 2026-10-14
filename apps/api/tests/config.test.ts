@@ -285,18 +285,17 @@ describe("the head check's settings", () => {
 describe("the envelope key", () => {
   /** Invented: the bytes 0 to 31, sealing nothing outside this file. */
   const KEY_HEX = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+  const ITS_BYTES = Uint8Array.from({ length: 32 }, (_byte, index) => index);
 
   it("gives the 32 bytes KEK writes in hexadecimal", () => {
-    expect(readEnvelopeKey({ KEK: KEY_HEX })).toEqual({
-      ok: true,
-      value: Uint8Array.from({ length: 32 }, (_byte, index) => index),
-    });
+    expect(readEnvelopeKey({ KEK: KEY_HEX })).toEqual({ ok: true, value: ITS_BYTES });
   });
 
   it("reads capitals as the same bytes", () => {
-    expect(readEnvelopeKey({ KEK: KEY_HEX.toUpperCase() })).toEqual(
-      readEnvelopeKey({ KEK: KEY_HEX }),
-    );
+    expect(readEnvelopeKey({ KEK: KEY_HEX.toUpperCase() })).toEqual({
+      ok: true,
+      value: ITS_BYTES,
+    });
   });
 
   it.each([

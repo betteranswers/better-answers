@@ -34,7 +34,7 @@ import {
   type RefusalClass,
   type Result,
 } from "@better-answers/core/kernel";
-import type { Credentials } from "@better-answers/core/llm";
+import type { ModelKeySetting } from "@better-answers/core/llm";
 import {
   ensureTestWorkspace,
   INVENTED_MEMBERS,
@@ -138,8 +138,8 @@ export type OpsIo = {
   /** Absent where no email transport is configured, so an action that must notify refuses. */
   readonly mail?: Mail | undefined;
 
-  /** Absent where no envelope key is configured, and a refusal where one is that cannot seal. */
-  readonly credentials?: Result<Credentials, string> | undefined;
+  /** A refusal where no envelope key is configured, in the config module's own sentence. */
+  readonly modelKeySetting: Result<ModelKeySetting, string>;
 };
 
 /** Takes a dump stamp (`20260601T120000Z`) or any instant `Date` reads; `undefined` is neither. */
@@ -1339,9 +1339,6 @@ const renameWorkspaceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Pr
 
 const MODEL_KEY_USAGE = `set-model-key: --workspace <id> and --provider <${MODEL_PROVIDERS.join("|")}> are required, with the key on standard input`;
 
-const NO_ENVELOPE_KEY =
-  "no envelope key is configured (KEK on the api service), so a model key cannot be sealed";
-
 const modelKeyReason = (refusal: SetModelKeyRefusal | Error, workspaceId: string): string => {
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
@@ -1367,13 +1364,12 @@ const setModelKeyCommand = async (
     io.say(MODEL_KEY_USAGE);
     return USAGE;
   }
-  const credentials = doorTold(io.credentials, NO_ENVELOPE_KEY);
-  if (!credentials.ok) {
-    io.say(`set-model-key: REFUSED — ${credentials.error}; nothing changed`);
+  if (!io.modelKeySetting.ok) {
+    io.say(`set-model-key: REFUSED — ${io.modelKeySetting.error}; nothing changed`);
     return REFUSED;
   }
   const typed = await io.stdin();
-  const set = await setModelKey(BOOTSTRAP, doors.postgres, credentials.value, {
+  const set = await setModelKey(BOOTSTRAP, doors.postgres, io.modelKeySetting.value, {
     workspaceId,
     provider,
     key: typed.replace(/\r?\n$/, ""),

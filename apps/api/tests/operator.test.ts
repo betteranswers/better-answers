@@ -2,7 +2,7 @@ import type { inferProcedureBuilderResolverOptions } from "@trpc/server";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
-import type { OperatorPrincipal, Principal } from "@better-answers/core/kernel";
+import { err, type OperatorPrincipal, type Principal } from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
 import { ulid } from "@better-answers/schema";
 
@@ -85,6 +85,7 @@ const ops = async (argv: readonly string[]): Promise<Run> => {
       lines.push(line);
     },
     logger: capturingLogger().logger,
+    modelKeySetting: err("this suite's commands are given no envelope key"),
   });
   return { exitCode, lines };
 };

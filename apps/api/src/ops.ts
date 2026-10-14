@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 
 import { err, ok } from "@better-answers/core/kernel";
-import { openCredentials } from "@better-answers/core/llm";
+import { openModelKeySetting } from "@better-answers/core/llm";
 
 import {
   readEnvelopeKey,
@@ -61,9 +61,9 @@ const exitCode = await runOps(process.argv.slice(2), doors, {
 
   readTree: readTreeUnder,
   mail,
-  credentials: envelopeKey.ok
-    ? ok(openCredentials(envelopeKey.value))
-    : err(`${envelopeKey.error.message}, on the api service`),
+  modelKeySetting: envelopeKey.ok
+    ? ok(openModelKeySetting(envelopeKey.value))
+    : err(envelopeKey.error.message),
 }).finally(() => closeDoors(doors));
 
 process.exit(exitCode);

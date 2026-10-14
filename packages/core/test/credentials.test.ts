@@ -1,11 +1,12 @@
 import { inspect } from "node:util";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { boundarySchemas, type ModelProvider } from "@better-answers/schema";
 
-import { openCredentials, type Credentials } from "../src/llm/index.ts";
-import { openPostgres, withScope } from "../src/store/postgres/index.ts";
+import { attempt } from "../src/kernel/index.ts";
+import { openCredentials, openModelKeySetting, type Credentials } from "../src/llm/index.ts";
+import { openPostgres, withIdentityRead, withScope } from "../src/store/postgres/index.ts";
 import { setModelKey } from "../src/workspaces/index.ts";
 import { bootstrap } from "./platform.ts";
 import { postgresForSuite, seedingWith, whileWritesAreRefused } from "./suite-postgres.ts";
@@ -15,39 +16,33 @@ const db = postgresForSuite();
 /** Invented, as every key here is: they seal nothing outside this file. */
 const ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => index);
 const ANOTHER_ENVELOPE_KEY = Uint8Array.from({ length: 32 }, (_byte, index) => 255 - index);
+const A_SHORT_ENVELOPE_KEY = Uint8Array.of(0xde, 0xad, 0xbe, 0xef, 0x99);
 
 const A_KEY = "sk-test-u9-invented-key-0001";
 const A_NEWER_KEY = "sk-test-u9-invented-key-0002";
 
+const LONGEST_KEY = 1024;
+
 const credentials = openCredentials(ENVELOPE_KEY);
+const modelKeySetting = openModelKeySetting(ENVELOPE_KEY);
 
 const door = () => openPostgres(db().runtimePool);
 
 const aWorkspace = (): Promise<string> =>
   seedingWith(db().pool, async (seed) => (await seed.workspace()).id);
 
-const setting = (
-  workspaceId: string,
-  key: string,
-  provider = "anthropic",
-  under: Credentials = credentials,
-) => setModelKey(bootstrap, door(), under, { workspaceId, provider, key });
+const setting = (workspaceId: string, key: string, provider = "anthropic") =>
+  setModelKey(bootstrap, door(), modelKeySetting, { workspaceId, provider, key });
 
-/** The key of `of`, asked for inside the scope of the workspace `scope`. */
+/** The key the workspace `scope` holds, read in a transaction of its own. */
 const keyReadIn = (
   scope: string,
-  of: { readonly workspaceId: string; readonly provider: ModelProvider },
+  provider: ModelProvider = "anthropic",
   under: Credentials = credentials,
-) =>
-  withScope(bootstrap, door(), scope, (tx) =>
-    under.readModelKey(tx, {
-      workspaceId: boundarySchemas.workspace.select.shape.id.parse(of.workspaceId),
-      provider: of.provider,
-    }),
-  );
+) => withScope(bootstrap, door(), scope, (tx) => under.readModelKey(tx, provider));
 
 const revealedIn = async (workspaceId: string, provider: ModelProvider = "anthropic") => {
-  const read = await keyReadIn(workspaceId, { workspaceId, provider });
+  const read = await keyReadIn(workspaceId, provider);
   return read.ok ? read.value?.reveal() : read.error;
 };
 
@@ -89,13 +84,49 @@ const shown = (value: unknown): string =>
     value instanceof Error ? `${value.message}\n${value.stack ?? ""}` : "",
   ].join("\n");
 
+/** Each way a key's bytes are written out: in hexadecimal, in base64, and as a list of numbers. */
+const writtenOut = (bytes: Uint8Array): readonly string[] => {
+  const held = Buffer.from(bytes);
+  const hex = held.toString("hex");
+  return [
+    hex,
+    hex.toUpperCase(),
+    held.toString("base64"),
+    [...bytes].join(","),
+    [...bytes].join(", "),
+    JSON.stringify(bytes),
+  ];
+};
+
+const CONSOLE_METHODS = ["log", "info", "warn", "error", "debug"] as const;
+
+/** All the process printed while `work` ran, through the console or either stream. */
+const printedDuring = async (work: () => Promise<unknown>): Promise<string> => {
+  const printed: string[] = [];
+  const keep = (...parts: unknown[]): boolean => {
+    printed.push(parts.map((part) => (typeof part === "string" ? part : shown(part))).join(" "));
+    return true;
+  };
+  const watched = [
+    vi.spyOn(process.stdout, "write").mockImplementation(keep),
+    vi.spyOn(process.stderr, "write").mockImplementation(keep),
+    ...CONSOLE_METHODS.map((method) => vi.spyOn(console, method).mockImplementation(keep)),
+  ];
+  try {
+    await work();
+  } finally {
+    for (const spy of watched) spy.mockRestore();
+  }
+  return printed.join("\n");
+};
+
 const NOT_ONE_HEADER_VALUE = [
   ["an empty key", ""],
   ["a key of spaces", "   "],
   ["a key with a space in it", "sk-test u9"],
   ["a key over two lines", "sk-test-u9\nsk-test-u9"],
   ["a key with a letter outside ASCII", "sk-test-ü9"],
-  ["a key longer than any provider issues", "k".repeat(1025)],
+  ["a key longer than any provider issues", "k".repeat(LONGEST_KEY + 1)],
 ] as const;
 
 describe("a workspace's model key", () => {
@@ -103,12 +134,24 @@ describe("a workspace's model key", () => {
     const [holder, other] = [await aWorkspace(), await aWorkspace()];
     await setting(holder, A_KEY);
 
-    const inItsOwn = await keyReadIn(holder, { workspaceId: holder, provider: "anthropic" });
-    const fromAnother = await keyReadIn(other, { workspaceId: holder, provider: "anthropic" });
+    const inItsOwn = await keyReadIn(holder);
+    const inAnother = await keyReadIn(other);
 
     expect(inItsOwn.ok && inItsOwn.value?.reveal()).toBe(A_KEY);
-    expect(fromAnother).toEqual({ ok: true, value: undefined });
-    expect(await revealedIn(other)).toBe(undefined);
+    expect(inAnother).toEqual({ ok: true, value: undefined });
+  });
+
+  it("refuses a read outside any workspace's transaction", async () => {
+    const workspaceId = await aWorkspace();
+    await setting(workspaceId, A_KEY);
+
+    const read = await attempt(() =>
+      withIdentityRead(bootstrap, door(), (tx) => credentials.readModelKey(tx, "anthropic")),
+    );
+
+    expect(read.ok ? "answered" : read.error.message).toBe(
+      "credentials: a model key is read inside its workspace's transaction",
+    );
   });
 
   it("writes one audit event naming the provider, never the key", async () => {
@@ -131,15 +174,26 @@ describe("a workspace's model key", () => {
     expect(JSON.stringify(events)).not.toContain(A_KEY);
   });
 
+  it("keeps no key whose audit event was not written", async () => {
+    const workspaceId = boundarySchemas.workspace.select.shape.id.parse(await aWorkspace());
+
+    const stored = await attempt(() =>
+      withScope(bootstrap, door(), workspaceId, (tx) =>
+        modelKeySetting.storeModelKey(tx, { workspaceId, provider: "anthropic" }, A_KEY, () =>
+          Promise.reject(new Error("the audit log refused the event")),
+        ),
+      ),
+    );
+
+    expect(stored.ok ? "stored" : stored.error.message).toBe("the audit log refused the event");
+    expect(await rowsOf(workspaceId)).toEqual([]);
+  });
+
   it("opens no row sealed under another envelope key", async () => {
     const workspaceId = await aWorkspace();
     await setting(workspaceId, A_KEY);
 
-    const read = await keyReadIn(
-      workspaceId,
-      { workspaceId, provider: "anthropic" },
-      openCredentials(ANOTHER_ENVELOPE_KEY),
-    );
+    const read = await keyReadIn(workspaceId, "anthropic", openCredentials(ANOTHER_ENVELOPE_KEY));
 
     expect(read).toEqual({ ok: false, error: "envelope-not-authentic" });
   });
@@ -148,11 +202,11 @@ describe("a workspace's model key", () => {
     const workspaceId = await aWorkspace();
 
     const set = await setting(workspaceId, A_KEY);
-    const read = await keyReadIn(workspaceId, { workspaceId, provider: "anthropic" });
+    const read = await keyReadIn(workspaceId);
     const rows = await rowsOf(workspaceId);
     const underAnother = await keyReadIn(
       workspaceId,
-      { workspaceId, provider: "anthropic" },
+      "anthropic",
       openCredentials(ANOTHER_ENVELOPE_KEY),
     );
     const refused = await whileWritesAreRefused(db().pool, "model_key", () =>
@@ -178,6 +232,40 @@ describe("a workspace's model key", () => {
     expect(everythingElse).not.toContain(A_NEWER_KEY);
   });
 
+  it("prints neither key while setting and reading one", async () => {
+    const workspaceId = await aWorkspace();
+    let revealed: string | undefined;
+
+    const printed = await printedDuring(async () => {
+      await setting(workspaceId, A_KEY);
+      revealed = await revealedIn(workspaceId);
+    });
+    const control = await printedDuring(async () => {
+      process.stdout.write(`${A_KEY} ${String(ENVELOPE_KEY)}\n`);
+    });
+
+    expect(revealed, "a key was set and read while the process was watched").toBe(A_KEY);
+    const secrets = [A_KEY, ...writtenOut(ENVELOPE_KEY)];
+    expect(secrets.filter((secret) => printed.includes(secret))).toEqual([]);
+    expect(
+      secrets.filter((secret) => control.includes(secret)).length,
+      "the watch sees a printed key",
+    ).toBeGreaterThan(1);
+  });
+
+  it.each([
+    ["opening to read", () => openCredentials(A_SHORT_ENVELOPE_KEY)],
+    ["opening to set", () => openModelKeySetting(A_SHORT_ENVELOPE_KEY)],
+  ])("%s names no byte of a short key", async (_side, open) => {
+    const opened = await attempt(async () => open());
+
+    expect(opened.ok ? "opened" : opened.error.message).toBe(
+      "credentials: an envelope key is 32 bytes, not 5",
+    );
+    const thrown = shown(opened.ok ? undefined : opened.error);
+    expect(writtenOut(A_SHORT_ENVELOPE_KEY).filter((form) => thrown.includes(form))).toEqual([]);
+  });
+
   it("leaves one current key when a key is set twice", async () => {
     const workspaceId = await aWorkspace();
 
@@ -195,10 +283,7 @@ describe("a workspace's model key", () => {
   it("reads a workspace with no key as none", async () => {
     const workspaceId = await aWorkspace();
 
-    expect(await keyReadIn(workspaceId, { workspaceId, provider: "anthropic" })).toEqual({
-      ok: true,
-      value: undefined,
-    });
+    expect(await keyReadIn(workspaceId)).toEqual({ ok: true, value: undefined });
   });
 
   it("holds each model provider's key apart", async () => {
@@ -227,6 +312,16 @@ describe("a workspace's model key", () => {
     await frameCopied(workspaceId, { workspaceId, provider: "mistral" });
 
     expect(await revealedIn(workspaceId, "mistral")).toBe("envelope-not-authentic");
+  });
+
+  it("stores a key of exactly the longest length", async () => {
+    const workspaceId = await aWorkspace();
+    const longest = "k".repeat(LONGEST_KEY);
+
+    const set = await setting(workspaceId, longest);
+
+    expect(set.ok).toBe(true);
+    expect(await revealedIn(workspaceId)).toBe(longest);
   });
 
   it.each(NOT_ONE_HEADER_VALUE)("refuses %s, storing nothing", async (_case, key) => {

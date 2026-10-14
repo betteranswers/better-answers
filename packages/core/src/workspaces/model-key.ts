@@ -13,7 +13,7 @@ import {
   type PlatformPrincipal,
   type Result,
 } from "../kernel/index.ts";
-import type { Credentials } from "../llm/index.ts";
+import type { ModelKeySetting } from "../llm/index.ts";
 import { type PostgresDoor, withScope } from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
@@ -49,7 +49,7 @@ export type SetModelKeyRefusal = KernelRefusal<"malformed"> | WorkspaceRefusal<"
 export const setModelKey = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  credentials: Credentials,
+  setting: ModelKeySetting,
   input: SetModelKeyInput,
 ): Promise<Result<ModelKeySet, SetModelKeyRefusal | Error>> => {
   const asked = named.safeParse({ workspaceId: input.workspaceId, provider: input.provider });
@@ -65,15 +65,15 @@ export const setModelKey = async (
         const held = await tx.query("SELECT 1 FROM workspace WHERE id = $1", [of.workspaceId]);
         if (held.rows.length === 0) return err("no-such-workspace");
 
-        const stored = await credentials.storeModelKey(tx, of, input.key);
-        if (!stored.ok) return stored;
-        await record(platform, tx, {
-          id: ulid(),
-          action: MODEL_KEY_ACTIONS.set,
-          subjectId: of.workspaceId,
-          detail: { [STORED_DETAIL_KEYS.modelProvider]: of.provider },
-        });
-        return ok(of);
+        const stored = await setting.storeModelKey(tx, of, input.key, () =>
+          record(platform, tx, {
+            id: ulid(),
+            action: MODEL_KEY_ACTIONS.set,
+            subjectId: of.workspaceId,
+            detail: { [STORED_DETAIL_KEYS.modelProvider]: of.provider },
+          }),
+        );
+        return stored.ok ? ok(of) : stored;
       },
     ),
   );
