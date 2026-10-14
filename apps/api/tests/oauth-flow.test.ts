@@ -596,11 +596,13 @@ describe("the pages, as a person walks them", () => {
 
   it("takes a cancel after the session moved as a cancel", async () => {
     const { client, consent } = await drawnThenMoved();
+    const before = await consentsGiven();
 
     const cancelled = await client.form(`/consent${consent.search}`, { accept: "false" });
 
     expect(cancelled.status).toBe(302);
     expect(cancelled.headers.get("location")).toContain("error=access_denied");
+    expect(await consentsGiven()).toEqual(before);
   });
 
   it("refuses to be framed by another site", async () => {

@@ -71,4 +71,6 @@ PR #731 (BA-149) put the drawn workspace on the consent page and refused a grant
 - **Test scenarios:**
   - Refuses a grant when the switch lands after the page's check: the session moves to Zenith, then the library's consent is called for the Acme page; no consent row is written and no code minted.
   - Grants the drawn workspace when the session still holds it: the existing connect tests.
-- **Known gap:** no test drives the route's own answer to a moved grant (the refusal page after the library's 409), because nothing in the suite can land a switch between `grantRefused` and the library's read. The library-level test above proves the binding; the route maps the mark to the page `grantRefused` already answers.
+  - Answers a switch landing mid-grant with the moved page: the switch lands after the route's checks, as the route hands the grant to the library (`apps/api/tests/consent-grant.test.ts`, which patches Node's `AsyncLocalStorage.prototype.run`, not our code).
+  - Refuses a session pending its second factor mid-grant: the library's second-factor gate holds the in-process call, because the route passes a `request`.
+  - Takes a cancel after the session moved as a cancel, recording nothing.
