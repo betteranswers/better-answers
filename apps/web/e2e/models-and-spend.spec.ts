@@ -46,6 +46,10 @@ const EVERY_PURPOSE: readonly SeedModelChoice[] = [
 
 const UNNAMED_PROVIDER = "acme-inference";
 
+/** Found where a purpose is set to them, so their absence elsewhere names words the page shows. */
+const OPENAI = "OpenAI";
+const GOOGLE = "Google";
+
 const PURPOSES = ["Extraction", "Enrichment", "Answering", "Judging", "Embedding"] as const;
 
 const rowOf = (page: Page, purpose: (typeof PURPOSES)[number]) =>
@@ -120,10 +124,10 @@ test.describe("the Models and spend page's model choices card", () => {
 
     const everything = page.locator("body");
     await expect(everything).not.toContainText("openai");
-    await expect(everything).not.toContainText("OpenAI");
+    await expect(everything).not.toContainText(OPENAI);
     await expect(everything).not.toContainText("gpt-5-not-mine");
     await expect(everything).not.toContainText("google");
-    await expect(everything).not.toContainText("Google");
+    await expect(everything).not.toContainText(GOOGLE);
     await expect(everything).not.toContainText("gemini-not-mine");
     await expect(everything).not.toContainText(theirs.name);
   });
@@ -140,6 +144,19 @@ test.describe("the Models and spend page's model choices card", () => {
     // Exact, because a model's id can hold its provider's: mistral-embed.
     await expect(page.getByText(ANSWERING.provider, { exact: true })).toHaveCount(0);
     await expect(page.getByText(EMBEDDING.provider, { exact: true })).toHaveCount(0);
+  });
+
+  test("names OpenAI and Google where a purpose uses them", async ({ page, request }) => {
+    await signedInWith(page, request, {
+      name: "Wharfedale Gauges",
+      modelChoices: [
+        { purpose: "judging", provider: "openai", model: "gpt-5" },
+        { purpose: "extraction", provider: "google", model: "gemini-3" },
+      ],
+    });
+
+    await expect(rowOf(page, "Judging").getByText(OPENAI, { exact: true })).toBeVisible();
+    await expect(rowOf(page, "Extraction").getByText(GOOGLE, { exact: true })).toBeVisible();
   });
 
   test("shows a provider it cannot name as its stored id", async ({ page, request }) => {

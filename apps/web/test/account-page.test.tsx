@@ -18,6 +18,7 @@ import {
   NOTHING_HELD,
   openAsAda,
   sessionStanding,
+  withPasskeysHere,
 } from "./second-factor-api.ts";
 import { addressOf, answered } from "./stubbed-api.ts";
 
@@ -159,6 +160,14 @@ describe("the Account page's passkeys", () => {
     expect(await screen.findByText(PASSKEY_WORDS.none)).toBeDefined();
     expect(screen.getByText(PASSKEY_WORDS.noWebAuthn)).toBeDefined();
     expect(screen.queryByRole("button", { name: "Add a Passkey" })).toBeNull();
+  });
+
+  it("offers to add one where this browser can", async () => {
+    withPasskeysHere();
+    await accountOpened(NO_SET);
+
+    expect(await screen.findByRole("button", { name: "Add a Passkey" })).toBeDefined();
+    expect(screen.queryByText(PASSKEY_WORDS.noWebAuthn)).toBeNull();
   });
 });
 

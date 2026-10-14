@@ -42,6 +42,10 @@ const EVERY_WORKSPACE = HOMES.operator.path;
 /** Found where an Admin lands, so its absence from the console names a menu the shell does draw. */
 const controlCentreMenu = (page: Page) => navOf(page, "Control Centre");
 
+/** Found where a person who is not the operator lands, so its absence names a page that is drawn. */
+const noWorkspaceYet = (page: Page) =>
+  page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
+
 const CLOSED = "Access Denied";
 
 const UK_DAY =
@@ -223,7 +227,17 @@ test.describe("the way into the console", () => {
     await page.goto("/");
     await expect(page).toHaveURL(EVERY_WORKSPACE);
     await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "No Workspace Yet" })).toHaveCount(0);
+    await expect(noWorkspaceYet(page)).toHaveCount(0);
+  });
+
+  test("shows a non-operator with no workspace No Workspace Yet", async ({ page, request }) => {
+    const email = anAddress("person");
+    await person(request, email);
+    await page.goto("/sign-in");
+    await signIn(page, request, email);
+
+    await page.goto("/");
+    await expect(noWorkspaceYet(page)).toBeVisible();
   });
 
   test("lists the operator's workspaces from the console's switcher", async ({
