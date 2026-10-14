@@ -1,4 +1,5 @@
--- Custom migration (hand-written SQL; ADR 0031). A failure was terminal; now a job that
+-- Custom migration (hand-written SQL; ADR 0032).
+-- The claim protocol (ADR 0031). A failure was terminal; now a job that
 -- has an attempt left goes back to the queue for another run, its claim state returned,
 -- and only a failure at the bound ends the job and records its outcome. The claim
 -- protocol's other three functions are unchanged, and the poisoned arm of claim_job keeps
