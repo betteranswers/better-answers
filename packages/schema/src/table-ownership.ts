@@ -50,6 +50,7 @@ export const TABLE_OWNERS = {
   "public.group": "members",
   "public.group_member": "members",
   "public.model_choice": "llm",
+  "public.model_key": "llm",
   "public.audit_event": "audit",
   "public.identity_audit_event": "audit",
   "public.access_request": "members",

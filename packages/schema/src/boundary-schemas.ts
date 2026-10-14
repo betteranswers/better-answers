@@ -77,6 +77,7 @@ import {
 import { passage, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
 import { workspaceLastActive } from "./last-active-tables.ts";
+import { MODEL_PROVIDERS, modelKey } from "./llm-tables.ts";
 import {
   MAP_EDGE_LABELS,
   MAP_NODE_LABELS,
@@ -166,6 +167,22 @@ const modelChoiceRefinements = {
 const modelChoiceSelect = createSelectSchema(modelChoice, modelChoiceRefinements);
 const modelChoiceInsert = createInsertSchema(modelChoice, modelChoiceRefinements);
 const modelChoiceUpdate = createUpdateSchema(modelChoice, modelChoiceRefinements);
+
+/** The driver hands a `bytea` back as bytes, and a frame is written as bytes. */
+const sealedFrame = z.instanceof(Uint8Array);
+
+const modelKeyRefinements = {
+  workspaceId,
+  provider: (schema: z.ZodString) => schema.pipe(z.enum(MODEL_PROVIDERS)),
+  sealed: sealedFrame,
+};
+
+const modelKeySelect = createSelectSchema(modelKey, modelKeyRefinements);
+const modelKeyInsert = createInsertSchema(modelKey, modelKeyRefinements);
+const modelKeyUpdate = createUpdateSchema(modelKey, {
+  ...modelKeyRefinements,
+  sealed: sealedFrame.optional(),
+});
 
 const workspaceConfigRefinements = {
   workspaceId,
@@ -929,6 +946,12 @@ export const boundarySchemas = {
     select: modelChoiceSelect,
     insert: modelChoiceInsert,
     update: modelChoiceUpdate,
+  },
+  modelKey: {
+    table: modelKey,
+    select: modelKeySelect,
+    insert: modelKeyInsert,
+    update: modelKeyUpdate,
   },
   workspaceConfig: {
     table: workspaceConfig,

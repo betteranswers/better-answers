@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0078_the-retried-job-failure"
+MIGRATION_ID = "0079_the-model-key"
 
-MIGRATION_WHEN = 1791930411781
+MIGRATION_WHEN = 1791986656585
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -323,6 +323,11 @@ TABLES: dict[str, dict[str, str]] = {
         "model": "text NOT NULL",
         "dimensions": "integer",
         "retention_tail": "text",
+    },
+    "public.model_key": {
+        "workspace_id": "text NOT NULL",
+        "provider": "text NOT NULL",
+        "sealed": "bytea NOT NULL",
     },
     "public.oauth_access_token": {
         "id": "text NOT NULL",
