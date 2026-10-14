@@ -6,69 +6,229 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { find } from "../src/answering/index.ts";
+import { ASK_CAPS, askInput, find, planAnswer } from "../src/answering/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
-import { recordFigures } from "./figures.ts";
+import { recordFigures, type Figure } from "./figures.ts";
 import {
   answersOf,
   landRecallSet,
+  paraphrasesOf,
+  readBuyerQuestions,
   readRecallSet,
   recallAt,
   RECALL_DEPTH,
+  theBuyerQuestions,
   theRecallSet,
+  type BuyerQuestions,
+  type Recall,
+  type RecallAnswer,
+  type RecallQuestion,
+  type Recalls,
+  type RecallSet,
 } from "./recall.ts";
 import { visibilitySuite } from "./sourced-concept.ts";
+import { inputOf } from "./suite-input.ts";
 import { answered } from "./suite-postgres.ts";
 
-const { arrange, reading } = visibilitySuite();
+const { arrange, reading, db } = visibilitySuite();
 
 const NOW = new Date("2026-10-09T12:00:00.000Z");
 
-/** `find`'s concept matches for `question`, best first, as `person` reads them. */
-const conceptsFound =
-  (person: UserPrincipal) =>
-  async (question: string): Promise<readonly string[]> => {
+type Ranking = Promise<readonly string[]>;
+
+/** Ranks each asking once: a question with no collection asks the same of two readings. */
+const kept = <Asking extends readonly unknown[]>(rank: (...asking: Asking) => Ranking) => {
+  const held = new Map<string, Ranking>();
+  return (...asking: Asking): Ranking => {
+    const key = JSON.stringify(asking);
+    const ranking = held.get(key) ?? rank(...asking);
+    held.set(key, ranking);
+    return ranking;
+  };
+};
+
+/** `find`'s concept matches for a question, best first, as `person` reads them. */
+const conceptsFound = (person: UserPrincipal) =>
+  kept(async (question: string) => {
     const found = answered(
       await reading(person, (reader, tx) =>
         find(reader, tx, { query: question, limit: RECALL_DEPTH }, NOW),
       ),
     );
     return found.matches.flatMap((match) => (match.layer === "bundles" ? [match.iri] : []));
-  };
+  });
 
-describe("recall at ten over the synthetic set", () => {
-  it("reports find's recall beside the corpus size", async () => {
-    const set = await theRecallSet();
+/** Entry points alone only while the set's map holds no edge, which a test below holds. */
+const conceptsPlanned = (person: UserPrincipal) =>
+  kept(async (question: string, collection: string | undefined) => {
+    const asking = { question, collections: collection === undefined ? [] : [collection] };
+    const planned = answered(
+      await reading(person, (reader, tx) =>
+        planAnswer(reader, (work) => work(tx), inputOf(askInput, asking), NOW, ASK_CAPS),
+      ),
+    );
+    return planned.related.map(({ iri }) => iri);
+  });
+
+const worded = ({ recall, recalled, asked }: Recall, counted: string): string =>
+  `${(recall * 100).toFixed(1)} %, for ${recalled} of ${asked} ${counted}`;
+
+/** By `Answer` named leads: it is the figure a cap is sized from. */
+const figuresOf = (
+  read: string,
+  { byAnswer, everyAnswer, anyAnswer }: Recalls,
+): readonly Figure[] => [
+  [`${read}, by Answer named`, worded(byAnswer, "Answers named")],
+  [`${read}, questions reaching every Answer named`, worded(everyAnswer, "questions")],
+  [`${read}, questions reaching at least one`, worded(anyAnswer, "questions")],
+];
+
+describe("recall over the synthetic set", () => {
+  let set: RecallSet;
+  let landed: ReadonlyMap<string, string>;
+  let workspaceId: string;
+  let found: ReturnType<typeof conceptsFound>;
+  let planned: ReturnType<typeof conceptsPlanned>;
+
+  beforeAll(async () => {
+    set = await theRecallSet();
     const scenario = await arrange();
-    const landed = await landRecallSet(scenario, set);
+    landed = await landRecallSet(scenario, set);
+    workspaceId = scenario.workspaceId;
+    found = conceptsFound(scenario.viewer);
+    planned = conceptsPlanned(scenario.viewer);
+  }, 300_000);
 
-    const recall = await recallAt(set, landed, conceptsFound(scenario.viewer));
+  const bothSets = async () =>
+    [
+      ["paraphrases", paraphrasesOf(set)],
+      ["buyer-worded questions", (await theBuyerQuestions(set)).questions],
+    ] as const;
 
-    await recordFigures("Recall at ten over the synthetic set", [
+  it("reports each set's recall and fails no build", async () => {
+    const entryCap = ASK_CAPS.entryPoints;
+    const byFind = ({ question }: RecallQuestion) => found(question);
+    const unnamed = ({ question }: RecallQuestion) => planned(question, undefined);
+    const named = ({ question, collection }: RecallQuestion) => planned(question, collection);
+    const byAsk = `ask's first ${entryCap} entry points`;
+
+    const figures: Figure[] = [];
+    for (const [name, questions] of await bothSets()) {
+      const carrying = questions.filter(({ collection }) => collection !== undefined);
+      const readings = [
+        [`${name} in find's first ${RECALL_DEPTH} concepts`, questions, byFind, RECALL_DEPTH],
+        [`${name} in ${byAsk}`, questions, unnamed, entryCap],
+        [`${name} carrying a collection in ${byAsk}, none named`, carrying, unnamed, entryCap],
+        [`${name} carrying a collection in ${byAsk}, theirs named`, carrying, named, entryCap],
+      ] as const;
+      for (const [reading, asked, ranked, depth] of readings) {
+        const recalls = await recallAt(asked, landed, ranked, depth);
+        figures.push(...figuresOf(reading, recalls));
+
+        const { byAnswer, everyAnswer, anyAnswer } = recalls;
+        expect([byAnswer.asked, everyAnswer.asked, anyAnswer.asked]).toEqual([
+          asked.flatMap(({ answers }) => answers).length,
+          asked.length,
+          asked.length,
+        ]);
+      }
+    }
+
+    const wider = set.groups.filter(({ answers }) => answers.length > entryCap).length;
+    await recordFigures("Recall over the synthetic set", [
+      ...figures,
       [
-        "the master Answer in find's first ten concepts",
-        `${(recall.recall * 100).toFixed(1)} %, for ${recall.recalled} of ${recall.asked} paraphrases`,
+        "collections holding more Answers than the entry cap, which alone it can cut",
+        `${wider} of ${set.groups.length}`,
       ],
       ["the corpus", `${landed.size} synthetic Answers`],
       ["the route's threshold, reported and never enforced", "90 %"],
     ]);
-    const answers = answersOf(set);
-    expect(landed.size).toBe(answers.length);
-    expect(recall.asked).toBe(answers.flatMap(({ paraphrases }) => paraphrases).length);
-    expect(recall.recall).toBeGreaterThanOrEqual(0);
-    expect(recall.recall).toBeLessThanOrEqual(1);
+    expect(landed.size).toBe(answersOf(set).length);
+  }, 300_000);
+
+  it("lands a set whose walk adds no concept", async () => {
+    const { rows } = await db().pool.query<{ edges: number }>(
+      "SELECT count(*)::int AS edges FROM map_edge WHERE workspace_id = $1",
+      [workspaceId],
+    );
+
+    expect(rows).toEqual([{ edges: 0 }]);
+  });
+
+  it("keeps a narrowed reading inside the collection named", async () => {
+    const groupOf = new Map(answersOf(set).map(({ key, group }) => [landed.get(key), group]));
+    const outside: string[] = [];
+    let returned = 0;
+    for (const [, questions] of await bothSets()) {
+      for (const { question, collection } of questions) {
+        if (collection === undefined) continue;
+        const ranking = await planned(question, collection);
+        returned += ranking.length;
+        if (ranking.some((iri) => groupOf.get(iri) !== collection)) outside.push(question);
+      }
+    }
+
+    expect(outside).toEqual([]);
+    expect(returned).toBeGreaterThan(0);
+  }, 300_000);
+
+  it("ranks ask's plan step as find ranks", async () => {
+    const depth = Math.min(RECALL_DEPTH, ASK_CAPS.entryPoints);
+    const apart: string[] = [];
+    let matching = 0;
+    for (const [, questions] of await bothSets()) {
+      for (const { question } of questions) {
+        const byFind = (await found(question)).slice(0, depth);
+        const byAsk = (await planned(question, undefined)).slice(0, depth);
+        if (byFind.join() !== byAsk.join()) apart.push(question);
+        if (byFind.length > 0) matching += 1;
+      }
+    }
+
+    expect(apart).toEqual([]);
+    expect(matching).toBeGreaterThan(0);
   }, 300_000);
 });
 
-describe("the recall set's reader", () => {
-  let scratch: string;
+describe("recall", () => {
+  it("counts every Answer, any Answer and each Answer named", async () => {
+    const landed = new Map([
+      ["first", "iri:first"],
+      ["second", "iri:second"],
+      ["third", "iri:third"],
+    ]);
+    const ranked = () => Promise.resolve(["iri:first", "iri:second", "iri:third"]);
 
-  beforeAll(async () => {
-    scratch = await mkdtemp(join(tmpdir(), "recall-set-"));
+    const recalls = await recallAt(
+      [
+        { question: "both inside the depth", answers: ["first", "second"] },
+        { question: "one beyond the depth", answers: ["first", "third"] },
+        { question: "its one beyond the depth", answers: ["third"] },
+        { question: "its one inside the depth", answers: ["second"] },
+      ],
+      landed,
+      ranked,
+      2,
+    );
+
+    expect(recalls).toEqual({
+      everyAnswer: { asked: 4, recalled: 2, recall: 0.5 },
+      anyAnswer: { asked: 4, recalled: 3, recall: 0.75 },
+      byAnswer: { asked: 6, recalled: 4, recall: 4 / 6 },
+    });
   });
+});
 
-  afterAll(() => rm(scratch, { recursive: true }));
+let scratch: string;
 
+beforeAll(async () => {
+  scratch = await mkdtemp(join(tmpdir(), "recall-set-"));
+});
+
+afterAll(() => rm(scratch, { recursive: true }));
+
+describe("the recall set's reader", () => {
   it.each([
     ["a file that is not there", undefined],
     ["text that is not JSON", "{ groups: "],
@@ -82,6 +242,47 @@ describe("the recall set's reader", () => {
     if (text !== undefined) await writeFile(path, text);
 
     expect((await readRecallSet(path)).ok).toBe(false);
+  });
+});
+
+/** The set with its first question changed, or with one more source listed. */
+const altered = (
+  held: BuyerQuestions,
+  change: { readonly question?: object; readonly source?: object },
+): unknown => {
+  const [first, ...rest] = held.questions;
+  const [form] = held.sources;
+  return {
+    ...held,
+    sources:
+      change.source === undefined ? held.sources : [...held.sources, { ...form, ...change.source }],
+    questions: [{ ...first, ...change.question }, ...rest],
+  };
+};
+
+describe("the buyer-worded set's reader", () => {
+  it.each([
+    ["a question that names no Answer", { question: { answers: [] } }],
+    [
+      "a question naming one Answer twice",
+      { question: { answers: ["what-tallyloom-is", "what-tallyloom-is"] } },
+    ],
+    ["a question citing a source the set lacks", { question: { source: "no-such-form" } }],
+    ["a source no question cites", { source: { id: "an-uncited-form" } }],
+  ])("refuses %s", async (refused, change) => {
+    const held = await theBuyerQuestions(await theRecallSet());
+    const path = join(scratch, `${refused.replaceAll(" ", "-")}.json`);
+    await writeFile(path, JSON.stringify(altered(held, change)));
+
+    expect((await readBuyerQuestions(path)).ok).toBe(false);
+  });
+
+  it("reads the set with nothing changed", async () => {
+    const held = await theBuyerQuestions(await theRecallSet());
+    const path = join(scratch, "the-set-unchanged.json");
+    await writeFile(path, JSON.stringify(altered(held, {})));
+
+    expect((await readBuyerQuestions(path)).ok).toBe(true);
   });
 });
 
@@ -159,5 +360,28 @@ describe("the recall set's provenance", () => {
 
     expect(bundle.runs.size).toBeGreaterThan(0);
     expect(borrowed).toEqual([]);
+  });
+});
+
+/** Every wording the set holds an `Answer` under: its title, each line of its body, each paraphrase. */
+const wordingsOf = ({ title, body, paraphrases }: RecallAnswer): readonly string[] =>
+  [title, ...body.split("\n"), ...paraphrases].map(phraseOf);
+
+describe("the buyer-worded set", () => {
+  it("words no question as its Answer's title or line", async () => {
+    const set = await theRecallSet();
+    const byKey = new Map(answersOf(set).map((answer) => [answer.key, answer]));
+    const { questions } = await theBuyerQuestions(set);
+
+    const repeating = questions.flatMap(({ question, answers }) =>
+      answers.flatMap((key) => {
+        const answer = byKey.get(key);
+        return answer !== undefined && wordingsOf(answer).includes(phraseOf(question))
+          ? [`${question} (${key})`]
+          : [];
+      }),
+    );
+
+    expect(repeating).toEqual([]);
   });
 });
