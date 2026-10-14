@@ -474,26 +474,26 @@ The command writes nothing when it refuses. `malformed` is a workspace id that i
 
 ## Set a model's price and a workspace's spending limit
 
-A workspace's question calls a model only when three things stand: a model choice for the purpose, a price for that model on the day of the call, and a spending limit for the workspace. With any of them missing, `ask` calls no model and answers with its evidence. Two commands on the `api` service set the price and the limit, and no page can. Money is in US dollars, which is what a provider prices a call in. Until the release that brings the judge, `ask` calls no model whatever is set, so both can be set ahead of it.
+A workspace's question calls a model only when three things stand: a model choice for the purpose, a price for that model on the day of the call, and a spending limit for the workspace. With any of them missing, `ask` calls no model and answers with its evidence. Two commands on the `api` service set the price and the limit, and no page can. Money is in pounds sterling: prices, the ledger's `cost_gbp` and the limit are all in pounds, and no exchange rate is read when a call is made. Until the release that brings the judge, `ask` calls no model whatever is set, so both can be set ahead of it.
 
-1. **Price the model, once per estate and again whenever the provider changes its price.** Read the price from the provider's own price page on the day, and set it from that day:
+1. **Price the model, once per estate and again whenever the provider's price or the exchange rate moves.** Read the provider's list price in US dollars from its own price page on the day, convert it to pounds at that day's rate, and set it from that day:
 
    ```sh
    docker exec "$api" pnpm ops set-model-price --provider anthropic --model claude-sonnet-5-5 \
-     --from <yyyy-mm-dd> --usd-per-million-in <the provider's input price> --usd-per-million-out <its output price>
+     --from <yyyy-mm-dd> --gbp-per-million-in <the input price in pounds> --gbp-per-million-out <the output price in pounds>
    ```
 
-   A price is a fact about the provider, so it holds for every workspace that calls the model. A call is priced by the latest price on or before its day, by UTC, so a price set for a later day changes nothing until that day. A second run for the same day replaces that day's price. The done line names the provider, the model and the day, and the api's log carries a `model price set` line with the same three: a price belongs to no workspace, so no workspace's audit log holds it.
+   A price is a fact about the provider, so it holds for every workspace that calls the model. A call is priced by the latest price on or before its day, by UTC, so a price set for a later day changes nothing until that day. When the dollar price or the rate moves, set a new price from the day it moves rather than editing an old one, so past calls keep the price they were made at. A second run for the same day replaces that day's price. The done line names the provider, the model and the day. Each run records `platform.model.priced` in the identity-set audit log under the platform's own actor id, with the provider, the model, the day and both rates: a price belongs to no workspace, so no workspace's audit log holds it.
 2. **Set the workspace's limit,** the most its model calls may spend in a calendar month, by UTC:
 
    ```sh
-   docker exec "$api" pnpm ops set-spending-limit --workspace <id> --usd <US dollars>
+   docker exec "$api" pnpm ops set-spending-limit --workspace <id> --gbp <pounds>
    ```
 
    A second run replaces the limit, and each run records `platform.workspace.spending_limit_set` in the workspace's audit log under the platform's own actor id; the amount is the setting itself, read as below. Spend counts from the first of each month, and last month's calls never count against this one. At the limit `ask` refuses with `spending-limit-met`, a precondition, and its sentence tells the person their Admin can ask better-answers to raise it. `find` and `open` call no model and keep working.
 
-Each command writes nothing when it refuses. `malformed` is a sum that is not a decimal of dollars, a day the calendar does not have, a model provider outside the two, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
+Each command writes nothing when it refuses. `malformed` is a sum that is not a decimal of pounds, a model name that is not lower case letters, digits, dots and hyphens, a day the calendar does not have, a model provider outside the two, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
 
 **How a call is counted.** Before a model call, `ask` reserves the most the call may cost, at that day's price, in the same transaction that would refuse it, so two questions cannot both pass the last of the limit. When the call ends the reservation becomes one `llm_call` row per attempt at what was spent, and the rest is released. A reservation lives ten minutes. If the `api` stops mid-call, the daily sweep settles a reservation past its ten minutes as one failed `llm_call` row at the whole reserved cost, since the provider may have billed the call: the pass's log line counts them as `reservations_settled`, and names a workspace whose settling was refused under `refusals` with the sweep `spend`. Until then an open reservation still counts against the limit.
 
-**Reading the spend.** Through the browsing login: this month's spend for a workspace is `SELECT sum(cost_usd) FROM llm_call WHERE workspace_id = '<id>' AND called_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, and the limit is `SELECT value FROM workspace_config WHERE workspace_id = '<id>' AND key = 'llm.spending_limit_usd'`. A row names the question it served by `answer_id`, and never holds the prompt or the completion. After the release that adds these tables, run the browsing role's file again (§ Browse production, step 3).
+**Reading the spend.** Through the browsing login: this month's spend for a workspace is `SELECT sum(cost_gbp) FROM llm_call WHERE workspace_id = '<id>' AND called_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, and the limit is `SELECT value FROM workspace_config WHERE workspace_id = '<id>' AND key = 'llm.spending_limit_gbp'`. A row names the question it served by `answer_id`, and never holds the prompt or the completion. After the release that adds these tables, run the browsing role's file again (§ Browse production, step 3).

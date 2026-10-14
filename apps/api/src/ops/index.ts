@@ -34,7 +34,7 @@ import {
   type RefusalClass,
   type Result,
 } from "@better-answers/core/kernel";
-import { setModelPrice, type ModelKeySetting } from "@better-answers/core/llm";
+import type { ModelKeySetting } from "@better-answers/core/llm";
 import {
   ensureTestWorkspace,
   INVENTED_MEMBERS,
@@ -68,6 +68,7 @@ import {
   renameWorkspace,
   restoreSignIn,
   setModelKey,
+  setModelPrice,
   setOperatorMark,
   setSpendingLimit,
   type AddMemberRefusal,
@@ -238,8 +239,8 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             the workspace's name, its short name, or both; at least one is named, and the other kept
   set-model-key --workspace <id> --provider <${MODEL_PROVIDERS.join("|")}>
                                                             stdin: the workspace's key for that model provider, sealed and never printed; a second run replaces it
-  set-spending-limit --workspace <id> --usd <US dollars>    the most the workspace's model calls may spend each calendar month; a second run replaces it, and with none set no model is called
-  set-model-price --provider <${MODEL_PROVIDERS.join("|")}> --model <model> --from <yyyy-mm-dd> --usd-per-million-in <US dollars> --usd-per-million-out <US dollars>
+  set-spending-limit --workspace <id> --gbp <pounds>        the most the workspace's model calls may spend each calendar month; a second run replaces it, and with none set no model is called
+  set-model-price --provider <${MODEL_PROVIDERS.join("|")}> --model <model> --from <yyyy-mm-dd> --gbp-per-million-in <pounds> --gbp-per-million-out <pounds>
                                                             what a model costs from that day on, per million tokens sent and returned; a model with no price is never called
   operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
   restore-sign-in --email <email>                           a person who lost every factor and code, once you have checked who they are another way: their factors and sessions ended, a notice sent, a one-time restore code printed
@@ -1400,7 +1401,7 @@ const spendingLimitReason = (
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
     case "malformed":
-      return "malformed: give --workspace a workspace id and --usd a sum in US dollars, such as 50 or 12.50";
+      return "malformed: give --workspace a workspace id and --gbp a sum in pounds, such as 50 or 12.50";
     case "no-such-workspace":
       return noSuchWorkspace(workspaceId);
   }
@@ -1412,18 +1413,18 @@ const setSpendingLimitCommand = async (
   flags: Flags,
   io: OpsIo,
 ): Promise<number> => {
-  const usd = flagValue(flags, "usd");
-  if (usd === undefined) {
-    io.say("set-spending-limit: --workspace <id> and --usd <US dollars a month> are required");
+  const gbp = flagValue(flags, "gbp");
+  if (gbp === undefined) {
+    io.say("set-spending-limit: --workspace <id> and --gbp <pounds a month> are required");
     return USAGE;
   }
-  const set = await setSpendingLimit(BOOTSTRAP, doors.postgres, { workspaceId, usd });
+  const set = await setSpendingLimit(BOOTSTRAP, doors.postgres, { workspaceId, gbp });
   if (!set.ok) {
     io.say(`set-spending-limit: REFUSED — ${spendingLimitReason(set.error, workspaceId)}`);
     return exitOf(set.error);
   }
   io.say(
-    `set-spending-limit: done — workspace ${workspaceId} may spend $${set.value.usd} on model calls each calendar month`,
+    `set-spending-limit: done — workspace ${workspaceId} may spend £${set.value.gbp} on model calls each calendar month`,
   );
   return DONE;
 };
@@ -1432,24 +1433,24 @@ const MODEL_PRICE_FLAGS = [
   "provider",
   "model",
   "from",
-  "usd-per-million-in",
-  "usd-per-million-out",
+  "gbp-per-million-in",
+  "gbp-per-million-out",
 ] as const;
 
-const MODEL_PRICE_NAMED = `--provider <${MODEL_PROVIDERS.join("|")}>, --model <model>, --from <yyyy-mm-dd>, --usd-per-million-in <US dollars> and --usd-per-million-out <US dollars>`;
+const MODEL_PRICE_NAMED = `--provider <${MODEL_PROVIDERS.join("|")}>, --model <model>, --from <yyyy-mm-dd>, --gbp-per-million-in <pounds> and --gbp-per-million-out <pounds>`;
 
 const MODEL_PRICE_USAGE = `set-model-price: ${MODEL_PRICE_NAMED} are required`;
 
 const priceNamed = (flags: Flags) => {
   const named = MODEL_PRICE_FLAGS.map((name) => flagValue(flags, name));
-  const [provider, model, effectiveFrom, usdPerMillionIn, usdPerMillionOut] = named;
+  const [provider, model, effectiveFrom, gbpPerMillionIn, gbpPerMillionOut] = named;
   return provider === undefined ||
     model === undefined ||
     effectiveFrom === undefined ||
-    usdPerMillionIn === undefined ||
-    usdPerMillionOut === undefined
+    gbpPerMillionIn === undefined ||
+    gbpPerMillionOut === undefined
     ? undefined
-    : { provider, model, effectiveFrom, usdPerMillionIn, usdPerMillionOut };
+    : { provider, model, effectiveFrom, gbpPerMillionIn, gbpPerMillionOut };
 };
 
 /** A price names no workspace, so the command is sliceless and looks for its own table. */
@@ -1468,20 +1469,11 @@ const setModelPriceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Prom
   if (!set.ok) {
     const reason =
       set.error === "malformed"
-        ? `malformed: ${MODEL_PRICE_NAMED}, the day one the calendar has and each sum a decimal such as 3 or 0.25`
+        ? `malformed: ${MODEL_PRICE_NAMED}, the model lower case letters, digits, dots and hyphens, the day one the calendar has and each sum in pounds a decimal such as 3 or 0.25`
         : set.error.message;
     io.say(`set-model-price: REFUSED — ${reason}`);
     return exitOf(set.error);
   }
-  // A price names no workspace, so no workspace's audit log can hold it: its record is this line.
-  io.logger.info(
-    {
-      provider: set.value.provider,
-      model: set.value.model,
-      effective_from: set.value.effectiveFrom,
-    },
-    "model price set",
-  );
   io.say(
     `set-model-price: done — ${set.value.provider} ${set.value.model} is priced from ${set.value.effectiveFrom}`,
   );

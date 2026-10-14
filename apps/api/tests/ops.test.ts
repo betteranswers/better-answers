@@ -3009,14 +3009,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
   describe("set-spending-limit — the platform caps a workspace's monthly spend", () => {
     const limitHeld = async (app: TestApp, workspaceId: string) => {
       const held = await app.database.superuser.query<{ value: string }>(
-        "SELECT value FROM workspace_config WHERE workspace_id = $1 AND key = 'llm.spending_limit_usd'",
+        "SELECT value FROM workspace_config WHERE workspace_id = $1 AND key = 'llm.spending_limit_gbp'",
         [workspaceId],
       );
       return held.rows.map((row) => row.value);
     };
 
-    const limiting = (app: TestApp, workspaceId: string, usd: string): Promise<Run> =>
-      ops(app, ["set-spending-limit", "--workspace", workspaceId, "--usd", usd]);
+    const limiting = (app: TestApp, workspaceId: string, gbp: string): Promise<Run> =>
+      ops(app, ["set-spending-limit", "--workspace", workspaceId, "--gbp", gbp]);
 
     it("sets the limit, and a second run replaces it", async () => {
       const { workspaceId } = await app().provision();
@@ -3027,7 +3027,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect({ exitCode: first.exitCode, lines: first.lines }).toEqual({
         exitCode: 0,
         lines: [
-          `set-spending-limit: done — workspace ${workspaceId} may spend $50 on model calls each calendar month`,
+          `set-spending-limit: done — workspace ${workspaceId} may spend £50 on model calls each calendar month`,
         ],
       });
       expect(again.exitCode).toBe(0);
@@ -3038,7 +3038,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ).toEqual([set, set]);
     });
 
-    it("refuses malformed for a sum that is not dollars", async () => {
+    it("refuses malformed for a sum that is not pounds", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await limiting(app(), workspaceId, "fifty");
@@ -3046,7 +3046,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
         exitCode: 2,
         lines: [
-          "set-spending-limit: REFUSED — malformed: give --workspace a workspace id and --usd a sum in US dollars, such as 50 or 12.50",
+          "set-spending-limit: REFUSED — malformed: give --workspace a workspace id and --gbp a sum in pounds, such as 50 or 12.50",
         ],
       });
       expect(await limitHeld(app(), workspaceId)).toEqual([]);
@@ -3067,7 +3067,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   describe("set-model-price — the platform prices a model by day", () => {
     const SONNET = "claude-sonnet-5-5";
 
-    const pricing = (app: TestApp, from: string, usdIn = "3", usdOut = "15"): Promise<Run> =>
+    const pricing = (app: TestApp, from: string, gbpIn = "3", gbpOut = "15"): Promise<Run> =>
       ops(app, [
         "set-model-price",
         "--provider",
@@ -3076,15 +3076,15 @@ describe("pnpm ops — the restore scripts' commands", () => {
         SONNET,
         "--from",
         from,
-        "--usd-per-million-in",
-        usdIn,
-        "--usd-per-million-out",
-        usdOut,
+        "--gbp-per-million-in",
+        gbpIn,
+        "--gbp-per-million-out",
+        gbpOut,
       ]);
 
     const pricesHeld = async (app: TestApp) => {
       const held = await app.database.superuser.query(
-        `SELECT effective_from::text AS "from", usd_per_million_in, usd_per_million_out
+        `SELECT effective_from::text AS "from", gbp_per_million_in, gbp_per_million_out
            FROM model_price WHERE provider = 'anthropic' AND model = $1 ORDER BY effective_from`,
         [SONNET],
       );
@@ -3101,7 +3101,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
       expect(again.exitCode).toBe(0);
       expect(await pricesHeld(app())).toEqual([
-        { from: "2026-10-14", usd_per_million_in: "2.5", usd_per_million_out: "12" },
+        { from: "2026-10-14", gbp_per_million_in: "2.5", gbp_per_million_out: "12" },
       ]);
     });
 
@@ -3133,9 +3133,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("names both spend commands in the usage", async () => {
       const run = await ops(app(), ["help"]);
 
-      expect(run.lines.join("\n")).toContain(
-        "set-spending-limit --workspace <id> --usd <US dollars>",
-      );
+      expect(run.lines.join("\n")).toContain("set-spending-limit --workspace <id> --gbp <pounds>");
       expect(run.lines.join("\n")).toContain(
         "set-model-price --provider <anthropic|mistral> --model <model> --from <yyyy-mm-dd>",
       );

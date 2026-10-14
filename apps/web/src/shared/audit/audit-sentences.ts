@@ -171,6 +171,7 @@ const SENTENCES = {
   "platform.workspace.marked": ({ by }) =>
     `${by} kept the workspace’s invitations to its testing domain`,
   "platform.workspace.model_key_set": ({ by }) => `${by} set an AI provider’s API key`,
+  "platform.model.priced": ({ by }) => `${by} set an AI model’s price`,
   "platform.workspace.spending_limit_set": ({ by }) =>
     `${by} set the workspace’s monthly AI spending limit`,
   "platform.workspace.provisioned": ({ by }) => `${by} provisioned the workspace`,

@@ -22,13 +22,13 @@ const SPENDING_LIMIT_ACTIONS = declareActions("platform", {
   set: action("platform.workspace.spending_limit_set", {}),
 });
 
-/** Whole dollars and cents beyond them, as a decimal string: money is never a float. */
+/** Whole pounds and pence beyond them, as a decimal string: money is never a float. */
 const named = z.object({
   workspaceId: boundarySchemas.workspace.select.shape.id,
-  usd: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/),
+  gbp: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/),
 });
 
-type SpendingLimit = { readonly workspaceId: string; readonly usd: string };
+type SpendingLimit = { readonly workspaceId: string; readonly gbp: string };
 
 export type SetSpendingLimitRefusal =
   | KernelRefusal<"malformed">
@@ -45,7 +45,7 @@ export const setSpendingLimit = async (
 ): Promise<Result<SpendingLimit, SetSpendingLimitRefusal | Error>> => {
   const asked = named.safeParse(input);
   if (!asked.success) return err(MALFORMED);
-  const { workspaceId, usd } = asked.data;
+  const { workspaceId, gbp } = asked.data;
 
   const set = await attempt(() =>
     withScope(
@@ -55,14 +55,14 @@ export const setSpendingLimit = async (
       async (tx): Promise<Result<SpendingLimit, SetSpendingLimitRefusal>> => {
         const held = await tx.query("SELECT 1 FROM workspace WHERE id = $1", [workspaceId]);
         if (held.rows.length === 0) return err("no-such-workspace");
-        await writeWorkspaceConfig(tx, { workspaceId, key: SPENDING_LIMIT_KEY, value: usd });
+        await writeWorkspaceConfig(tx, { workspaceId, key: SPENDING_LIMIT_KEY, value: gbp });
         await record(platform, tx, {
           id: ulid(),
           action: SPENDING_LIMIT_ACTIONS.set,
           subjectId: workspaceId,
           detail: {},
         });
-        return ok({ workspaceId, usd });
+        return ok({ workspaceId, gbp });
       },
     ),
   );

@@ -2,7 +2,7 @@
 
 MIGRATION_ID = "0082_the-spend-ledger"
 
-MIGRATION_WHEN = 1792011666736
+MIGRATION_WHEN = 1792017015489
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -280,7 +280,7 @@ TABLES: dict[str, dict[str, str]] = {
         "tokens_in": "integer NOT NULL",
         "tokens_out": "integer NOT NULL",
         "seconds": "double precision NOT NULL",
-        "cost_usd": "numeric NOT NULL",
+        "cost_gbp": "numeric NOT NULL",
         "outcome": "text NOT NULL",
         "run_id": "text",
         "answer_id": "text",
@@ -348,8 +348,8 @@ TABLES: dict[str, dict[str, str]] = {
         "provider": "text NOT NULL",
         "model": "text NOT NULL",
         "effective_from": "date NOT NULL",
-        "usd_per_million_in": "numeric NOT NULL",
-        "usd_per_million_out": "numeric NOT NULL",
+        "gbp_per_million_in": "numeric NOT NULL",
+        "gbp_per_million_out": "numeric NOT NULL",
     },
     "public.oauth_access_token": {
         "id": "text NOT NULL",
@@ -580,9 +580,9 @@ TABLES: dict[str, dict[str, str]] = {
         "model": "text NOT NULL",
         "tokens_in": "integer NOT NULL",
         "tokens_out": "integer NOT NULL",
-        "usd_per_million_in": "numeric NOT NULL",
-        "usd_per_million_out": "numeric NOT NULL",
-        "reserved_usd": "numeric NOT NULL",
+        "gbp_per_million_in": "numeric NOT NULL",
+        "gbp_per_million_out": "numeric NOT NULL",
+        "reserved_gbp": "numeric NOT NULL",
         "run_id": "text",
         "answer_id": "text",
     },

@@ -1,5 +1,5 @@
 {
-  "id": "1e79e76b-54e1-4c13-aa9f-5b63575d816f",
+  "id": "966a377a-75ac-4852-a571-b0594ec152f7",
   "prevId": "2ce0c939-c9ec-4ca1-81ba-4837e93c19ec",
   "version": "7",
   "dialect": "postgresql",
@@ -6417,8 +6417,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "cost_usd": {
-          "name": "cost_usd",
+        "cost_gbp": {
+          "name": "cost_gbp",
           "type": "numeric",
           "primaryKey": false,
           "notNull": true
@@ -6528,7 +6528,7 @@
         },
         "llm_call_spend_check": {
           "name": "llm_call_spend_check",
-          "value": "tokens_in >= 0 AND tokens_out >= 0 AND seconds >= 0 AND cost_usd >= 0"
+          "value": "tokens_in >= 0 AND tokens_out >= 0 AND seconds >= 0 AND cost_gbp >= 0"
         }
       },
       "isRLSEnabled": true
@@ -6624,14 +6624,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "usd_per_million_in": {
-          "name": "usd_per_million_in",
+        "gbp_per_million_in": {
+          "name": "gbp_per_million_in",
           "type": "numeric",
           "primaryKey": false,
           "notNull": true
         },
-        "usd_per_million_out": {
-          "name": "usd_per_million_out",
+        "gbp_per_million_out": {
+          "name": "gbp_per_million_out",
           "type": "numeric",
           "primaryKey": false,
           "notNull": true
@@ -6658,7 +6658,7 @@
         },
         "model_price_rates_check": {
           "name": "model_price_rates_check",
-          "value": "usd_per_million_in >= 0 AND usd_per_million_out >= 0"
+          "value": "gbp_per_million_in >= 0 AND gbp_per_million_out >= 0"
         }
       },
       "isRLSEnabled": false
@@ -6722,20 +6722,20 @@
           "primaryKey": false,
           "notNull": true
         },
-        "usd_per_million_in": {
-          "name": "usd_per_million_in",
+        "gbp_per_million_in": {
+          "name": "gbp_per_million_in",
           "type": "numeric",
           "primaryKey": false,
           "notNull": true
         },
-        "usd_per_million_out": {
-          "name": "usd_per_million_out",
+        "gbp_per_million_out": {
+          "name": "gbp_per_million_out",
           "type": "numeric",
           "primaryKey": false,
           "notNull": true
         },
-        "reserved_usd": {
-          "name": "reserved_usd",
+        "reserved_gbp": {
+          "name": "reserved_gbp",
           "type": "numeric",
           "primaryKey": false,
           "notNull": true
@@ -6835,7 +6835,7 @@
         },
         "spend_reservation_size_check": {
           "name": "spend_reservation_size_check",
-          "value": "tokens_in >= 0 AND tokens_out >= 0 AND usd_per_million_in >= 0\n          AND usd_per_million_out >= 0 AND reserved_usd >= 0 AND expires_at > taken_at"
+          "value": "tokens_in >= 0 AND tokens_out >= 0 AND gbp_per_million_in >= 0\n          AND gbp_per_million_out >= 0 AND reserved_gbp >= 0 AND expires_at > taken_at"
         }
       },
       "isRLSEnabled": true

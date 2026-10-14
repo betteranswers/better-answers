@@ -7,12 +7,11 @@ import {
   reserveSpend,
   settleExpiredSpend,
   settleSpend,
-  setModelPrice,
   type CallSize,
   type CallSpent,
 } from "../src/llm/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
-import { setSpendingLimit } from "../src/workspaces/index.ts";
+import { setModelPrice, setSpendingLimit } from "../src/workspaces/index.ts";
 import { provisionedWorkspace } from "./platform.ts";
 import { answered, postgresForSuite, racedAt, readingAs, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
@@ -42,8 +41,8 @@ type Asker = { readonly asker: UserPrincipal; readonly recordId: string };
 
 const priced = async (
   from: string,
-  usdPerMillionIn: string,
-  usdPerMillionOut: string,
+  gbpPerMillionIn: string,
+  gbpPerMillionOut: string,
   model: string = SONNET,
 ) =>
   answered(
@@ -51,8 +50,8 @@ const priced = async (
       provider: "anthropic",
       model,
       effectiveFrom: from,
-      usdPerMillionIn,
-      usdPerMillionOut,
+      gbpPerMillionIn,
+      gbpPerMillionOut,
     }),
   );
 
@@ -74,7 +73,7 @@ const anAsker = async (limit?: string, model: string = SONNET): Promise<Asker> =
     answered(
       await setSpendingLimit(PLATFORM, openPostgres(db().pool), {
         workspaceId: workspace.workspaceId,
-        usd: limit,
+        gbp: limit,
       }),
     );
   }
@@ -110,7 +109,7 @@ const reservationIdOf = (reserved: { readonly reserved: boolean }): string => {
 
 const reservationsOf = async ({ asker }: Asker) => {
   const read = await db().pool.query(
-    "SELECT reserved_usd, expires_at FROM spend_reservation WHERE workspace_id = $1",
+    "SELECT reserved_gbp, expires_at FROM spend_reservation WHERE workspace_id = $1",
     [asker.workspaceId],
   );
   return read.rows;
@@ -118,16 +117,16 @@ const reservationsOf = async ({ asker }: Asker) => {
 
 const callsOf = async ({ asker }: Asker) => {
   const read = await db().pool.query(
-    `SELECT purpose, model, tokens_in, tokens_out, seconds, cost_usd, outcome, run_id, answer_id
+    `SELECT purpose, model, tokens_in, tokens_out, seconds, cost_gbp, outcome, run_id, answer_id
        FROM llm_call WHERE workspace_id = $1 ORDER BY tokens_in`,
     [asker.workspaceId],
   );
   return read.rows;
 };
 
-const spentAt = ({ asker, recordId }: Asker, calledAt: Date, costUsd: string) =>
+const spentAt = ({ asker, recordId }: Asker, calledAt: Date, costGbp: string) =>
   seedingWith(db().pool, (seed) =>
-    seed.llmCall({ workspaceId: asker.workspaceId, calledAt, costUsd, answerId: recordId }),
+    seed.llmCall({ workspaceId: asker.workspaceId, calledAt, costGbp, answerId: recordId }),
   );
 
 /** Priced at $3 and $15 a million, under a $10 limit, one reservation settled as `calls`. */
@@ -151,7 +150,7 @@ describe("spend", () => {
         tokens_in: 1_000,
         tokens_out: 0,
         seconds: 30,
-        cost_usd: "0.003",
+        cost_gbp: "0.003",
         outcome: "failed",
         run_id: null,
         answer_id: asking.recordId,
@@ -162,7 +161,7 @@ describe("spend", () => {
         tokens_in: 1_580,
         tokens_out: 96,
         seconds: 1.118,
-        cost_usd: "0.00618",
+        cost_gbp: "0.00618",
         outcome: "succeeded",
         run_id: null,
         answer_id: asking.recordId,
@@ -225,7 +224,7 @@ describe("spend", () => {
         tokens_in: 40_000,
         tokens_out: 0,
         seconds: 600,
-        cost_usd: "0.15",
+        cost_gbp: "0.15",
         outcome: "failed",
         run_id: null,
         answer_id: asking.recordId,
@@ -247,7 +246,7 @@ describe("spend", () => {
     const late = await settling(asking, reservationId, [A_CALL]);
 
     expect(late.ok ? "settled" : String(late.error)).toContain(reservationId);
-    expect(await callsOf(asking)).toMatchObject([{ outcome: "failed", cost_usd: "0.15" }]);
+    expect(await callsOf(asking)).toMatchObject([{ outcome: "failed", cost_gbp: "0.15" }]);
   });
 
   it("releases the whole reservation when no attempt was made", async () => {
@@ -323,7 +322,7 @@ describe("spend", () => {
 
     await priced(NOW.toISOString().slice(0, 10), "3", "15", pricedLater);
     answered(await reserving(asking));
-    expect(await reservationsOf(asking)).toMatchObject([{ reserved_usd: "0.15" }]);
+    expect(await reservationsOf(asking)).toMatchObject([{ reserved_gbp: "0.15" }]);
   });
 
   it("releases what a settle spent less than it reserved", async () => {
@@ -347,7 +346,7 @@ describe("spend", () => {
     expect(Object.keys(read.rows[0] ?? {}).toSorted()).toEqual([
       "answer_id",
       "called_at",
-      "cost_usd",
+      "cost_gbp",
       "id",
       "model",
       "model_choice_id",

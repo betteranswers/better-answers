@@ -78,8 +78,11 @@ import { passage, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
 import { workspaceLastActive } from "./last-active-tables.ts";
 import {
+  CALENDAR_DAY,
+  GBP,
   LLM_CALL_OUTCOMES,
   llmCall,
+  MODEL_NAME,
   MODEL_PROVIDERS,
   modelKey,
   modelPrice,
@@ -192,8 +195,7 @@ const modelKeyUpdate = createUpdateSchema(modelKey, {
 });
 
 /** Money and rates are `numeric`, which the driver hands back as a string and never a float. */
-const DECIMAL = /^\d+(\.\d+)?$/;
-const decimal = (schema: z.ZodString) => schema.regex(DECIMAL);
+const decimal = (schema: z.ZodString) => schema.regex(GBP);
 
 const tokenCount = (schema: z.ZodNumber) => schema.int().nonnegative();
 
@@ -211,7 +213,7 @@ const llmCallRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID),
   ...servedBy,
   seconds: (schema: z.ZodNumber) => schema.nonnegative(),
-  costUsd: decimal,
+  costGbp: decimal,
   outcome: (schema: z.ZodString) => schema.pipe(z.enum(LLM_CALL_OUTCOMES)),
 };
 
@@ -223,9 +225,9 @@ const spendReservationRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
   ...servedBy,
-  usdPerMillionIn: decimal,
-  usdPerMillionOut: decimal,
-  reservedUsd: decimal,
+  gbpPerMillionIn: decimal,
+  gbpPerMillionOut: decimal,
+  reservedGbp: decimal,
 };
 
 const spendReservationSelect = createSelectSchema(spendReservation, spendReservationRefinements);
@@ -234,10 +236,10 @@ const spendReservationUpdate = createUpdateSchema(spendReservation, spendReserva
 
 const modelPriceRefinements = {
   provider: (schema: z.ZodString) => schema.pipe(z.enum(MODEL_PROVIDERS)),
-  model: (schema: z.ZodString) => schema.trim().min(1),
-  effectiveFrom: (schema: z.ZodString) => schema.regex(/^\d{4}-\d{2}-\d{2}$/),
-  usdPerMillionIn: decimal,
-  usdPerMillionOut: decimal,
+  model: (schema: z.ZodString) => schema.regex(MODEL_NAME),
+  effectiveFrom: (schema: z.ZodString) => schema.regex(CALENDAR_DAY),
+  gbpPerMillionIn: decimal,
+  gbpPerMillionOut: decimal,
 };
 
 const modelPriceSelect = createSelectSchema(modelPrice, modelPriceRefinements);

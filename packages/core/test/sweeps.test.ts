@@ -312,9 +312,9 @@ describe("a sweep pass and the spend held", () => {
       { ok: true, value: 1 },
     ]);
     const settled = await db().pool.query(
-      "SELECT outcome, cost_usd FROM llm_call WHERE workspace_id = $1",
+      "SELECT outcome, cost_gbp FROM llm_call WHERE workspace_id = $1",
       [workspace.workspaceId],
     );
-    expect(settled.rows).toEqual([{ outcome: "failed", cost_usd: "0.15" }]);
+    expect(settled.rows).toEqual([{ outcome: "failed", cost_gbp: "0.15" }]);
   });
 });

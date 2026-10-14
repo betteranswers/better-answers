@@ -97,8 +97,8 @@ const acceptedRows = {
       provider: "anthropic",
       model: "claude-sonnet-5-5",
       effectiveFrom: "2026-10-01",
-      usdPerMillionIn: "3",
-      usdPerMillionOut: "15.00",
+      gbpPerMillionIn: "3",
+      gbpPerMillionOut: "15.00",
     },
   ],
   llmCall: [
@@ -112,7 +112,7 @@ const acceptedRows = {
       tokensIn: 1580,
       tokensOut: 96,
       seconds: 1.118,
-      costUsd: "0.006180",
+      costGbp: "0.006180",
       outcome: "succeeded",
       answerId: QUESTION_RECORD_ID,
     },
@@ -126,7 +126,7 @@ const acceptedRows = {
       tokensIn: 7310,
       tokensOut: 0,
       seconds: 30.004,
-      costUsd: "0.02193",
+      costGbp: "0.02193",
       outcome: "failed",
       runId: "a run of the worker's",
     },
@@ -142,9 +142,9 @@ const acceptedRows = {
       model: "claude-sonnet-5-5",
       tokensIn: 40_000,
       tokensOut: 2_000,
-      usdPerMillionIn: "3",
-      usdPerMillionOut: "15",
-      reservedUsd: "0.15",
+      gbpPerMillionIn: "3",
+      gbpPerMillionOut: "15",
+      reservedGbp: "0.15",
       answerId: QUESTION_RECORD_ID,
     },
   ],
@@ -1044,11 +1044,11 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     ],
 
     llmCall: [
-      { ...acceptedRows.llmCall[0], costUsd: "0.1e-3" },
+      { ...acceptedRows.llmCall[0], costGbp: "0.1e-3" },
       { ...acceptedRows.llmCall[0], outcome: "cancelled" },
       { ...acceptedRows.llmCall[0], tokensIn: -1 },
     ],
-    spendReservation: [{ ...acceptedRows.spendReservation[0], reservedUsd: "-0.15" }],
+    spendReservation: [{ ...acceptedRows.spendReservation[0], reservedGbp: "-0.15" }],
     modelPrice: [
       { ...acceptedRows.modelPrice[0], provider: "openai" },
       { ...acceptedRows.modelPrice[0], effectiveFrom: "1 October 2026" },
@@ -1624,7 +1624,7 @@ describe("5 — the inferred type is pinned", () => {
       tokensIn: number;
       tokensOut: number;
       seconds: number;
-      costUsd: string;
+      costGbp: string;
       outcome: "succeeded" | "failed";
       runId: string | null;
       answerId: string | null;
@@ -1639,9 +1639,9 @@ describe("5 — the inferred type is pinned", () => {
       model: string;
       tokensIn: number;
       tokensOut: number;
-      usdPerMillionIn: string;
-      usdPerMillionOut: string;
-      reservedUsd: string;
+      gbpPerMillionIn: string;
+      gbpPerMillionOut: string;
+      reservedGbp: string;
       runId: string | null;
       answerId: string | null;
     };
@@ -1649,8 +1649,8 @@ describe("5 — the inferred type is pinned", () => {
       provider: "anthropic" | "mistral";
       model: string;
       effectiveFrom: string;
-      usdPerMillionIn: string;
-      usdPerMillionOut: string;
+      gbpPerMillionIn: string;
+      gbpPerMillionOut: string;
     };
     workspaceConfig: { workspaceId: WorkspaceId; key: string; value: string; updatedAt: Date };
     passage: {

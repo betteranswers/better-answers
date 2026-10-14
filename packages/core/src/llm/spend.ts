@@ -20,8 +20,8 @@ import {
 } from "../store/postgres/index.ts";
 import type { LlmPurpose } from "./index.ts";
 
-/** Its value is a decimal string of US dollars, the currency a provider prices a call in. */
-export const SPENDING_LIMIT_KEY = "llm.spending_limit_usd";
+/** Its value is a decimal string of pounds sterling, the currency every price is set in. */
+export const SPENDING_LIMIT_KEY = "llm.spending_limit_gbp";
 
 /**
  * Past the longest a call's timeout and its provider's retries can run, so a live call is never
@@ -52,21 +52,21 @@ type PricedChoice = {
   readonly id: string;
   readonly provider: string;
   readonly model: string;
-  readonly usdPerMillionIn: string | null;
-  readonly usdPerMillionOut: string | null;
+  readonly gbpPerMillionIn: string | null;
+  readonly gbpPerMillionOut: string | null;
 };
 
 type Priced = PricedChoice & {
-  readonly usdPerMillionIn: string;
-  readonly usdPerMillionOut: string;
+  readonly gbpPerMillionIn: string;
+  readonly gbpPerMillionOut: string;
 };
 
 /** A price takes effect on a UTC day; the latest on or before the call's day prices it. */
 const PRICED_CHOICE = `SELECT c.id, c.provider, c.model,
-       p.usd_per_million_in AS "usdPerMillionIn", p.usd_per_million_out AS "usdPerMillionOut"
+       p.gbp_per_million_in AS "gbpPerMillionIn", p.gbp_per_million_out AS "gbpPerMillionOut"
   FROM model_choice c
   LEFT JOIN LATERAL (
-    SELECT usd_per_million_in, usd_per_million_out FROM model_price
+    SELECT gbp_per_million_in, gbp_per_million_out FROM model_price
      WHERE provider = c.provider AND model = c.model
        AND effective_from <= ($3::timestamptz AT TIME ZONE 'UTC')::date
      ORDER BY effective_from DESC LIMIT 1
@@ -78,20 +78,20 @@ const PRICED_CHOICE = `SELECT c.id, c.provider, c.model,
  * each lives minutes.
  */
 const RESERVED_UNDER_THE_LIMIT = `WITH spent AS (
-    SELECT (SELECT COALESCE(sum(cost_usd), 0) FROM llm_call
+    SELECT (SELECT COALESCE(sum(cost_gbp), 0) FROM llm_call
              WHERE workspace_id = $1 AND called_at >= $2 AND called_at < $3)
-         + (SELECT COALESCE(sum(reserved_usd), 0) FROM spend_reservation
-             WHERE workspace_id = $1) AS usd
+         + (SELECT COALESCE(sum(reserved_gbp), 0) FROM spend_reservation
+             WHERE workspace_id = $1) AS gbp
   ), sized AS (
-    SELECT trim_scale(($4::integer * $6::numeric + $5::integer * $7::numeric) / 1000000) AS usd
+    SELECT trim_scale(($4::integer * $6::numeric + $5::integer * $7::numeric) / 1000000) AS gbp
   )
   INSERT INTO spend_reservation
     (workspace_id, id, taken_at, expires_at, purpose, model_choice_id, model, tokens_in,
-     tokens_out, usd_per_million_in, usd_per_million_out, reserved_usd, answer_id)
+     tokens_out, gbp_per_million_in, gbp_per_million_out, reserved_gbp, answer_id)
   SELECT $1, $8, $9, $10, $11, $12, $13, $4::integer, $5::integer, $6::numeric, $7::numeric,
-         sized.usd, $14
+         sized.gbp, $14
     FROM spent, sized
-   WHERE spent.usd + sized.usd <= $15::numeric
+   WHERE spent.gbp + sized.gbp <= $15::numeric
   RETURNING id`;
 
 /** The calendar month `now` falls in, by UTC. */
@@ -123,8 +123,8 @@ const reservedUnderTheLimit = async (
     to,
     String(input.most.tokensIn),
     String(input.most.tokensOut),
-    choice.usdPerMillionIn,
-    choice.usdPerMillionOut,
+    choice.gbpPerMillionIn,
+    choice.gbpPerMillionOut,
     reservationId,
     input.now,
     new Date(input.now.getTime() + RESERVATION_LIFETIME_MS),
@@ -161,8 +161,8 @@ export const reserveSpend = async (
     ]);
     const choice = found.rows[0];
     if (choice === undefined) return ok({ reserved: false, because: "no-model-choice" });
-    const { usdPerMillionIn, usdPerMillionOut } = choice;
-    if (usdPerMillionIn === null || usdPerMillionOut === null) {
+    const { gbpPerMillionIn, gbpPerMillionOut } = choice;
+    if (gbpPerMillionIn === null || gbpPerMillionOut === null) {
       return ok({ reserved: false, because: "no-price" });
     }
     const limit = await holdWorkspaceConfig(asker, tx, SPENDING_LIMIT_KEY);
@@ -171,7 +171,7 @@ export const reserveSpend = async (
       asker,
       tx,
       input,
-      { ...choice, usdPerMillionIn, usdPerMillionOut },
+      { ...choice, gbpPerMillionIn, gbpPerMillionOut },
       limit,
     );
   });
@@ -190,11 +190,11 @@ const SETTLED = `WITH taken AS (
   ), written AS (
     INSERT INTO llm_call
       (workspace_id, id, called_at, purpose, model_choice_id, model, tokens_in, tokens_out,
-       seconds, cost_usd, outcome, run_id, answer_id)
+       seconds, cost_gbp, outcome, run_id, answer_id)
     SELECT taken.workspace_id, call.id, $3, taken.purpose, taken.model_choice_id, taken.model,
            call.tokens_in, call.tokens_out, call.seconds,
-           trim_scale((call.tokens_in * taken.usd_per_million_in
-                       + call.tokens_out * taken.usd_per_million_out) / 1000000),
+           trim_scale((call.tokens_in * taken.gbp_per_million_in
+                       + call.tokens_out * taken.gbp_per_million_out) / 1000000),
            call.outcome, taken.run_id, taken.answer_id
       FROM taken
      CROSS JOIN unnest($4::text[], $5::integer[], $6::integer[], $7::float8[], $8::text[])
@@ -240,9 +240,9 @@ const EXPIRED_SETTLED = `WITH expired AS (
   )
   INSERT INTO llm_call
     (workspace_id, id, called_at, purpose, model_choice_id, model, tokens_in, tokens_out,
-     seconds, cost_usd, outcome, run_id, answer_id)
+     seconds, cost_gbp, outcome, run_id, answer_id)
   SELECT workspace_id, id, taken_at, purpose, model_choice_id, model, tokens_in, 0,
-         extract(epoch FROM expires_at - taken_at), reserved_usd, $3, run_id, answer_id
+         extract(epoch FROM expires_at - taken_at), reserved_gbp, $3, run_id, answer_id
     FROM expired`;
 
 /**
