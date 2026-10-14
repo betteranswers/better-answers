@@ -29,7 +29,12 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { actorOf, namesOfPeople, peopleAmong, type AuditEventActor } from "../workspaces/index.ts";
+import {
+  actorOf,
+  namesOfActors,
+  type AuditEventActor,
+  type PeopleNames,
+} from "../workspaces/index.ts";
 
 const RECORD_ACTIONS = declareActions("knowledge", {
   flagClosed: action("knowledge.feedback.closed", { recordId: "id", closedAs: "flagClosing" }),
@@ -37,14 +42,14 @@ const RECORD_ACTIONS = declareActions("knowledge", {
 
 const QUESTIONS_ASKED_PAGE = 50;
 
-const QUESTIONS_ASKED_PAGE_MOST = 100;
+const QUESTIONS_ASKED_PAGE_MAX = 100;
 
 const recordId = boundarySchemas.questionAsked.select.shape.id;
 
 export const questionsAskedInput = z.object({
   /** The last record of the page before; absent for the first page. */
   cursor: recordId.optional(),
-  limit: z.number().int().min(1).max(QUESTIONS_ASKED_PAGE_MOST).default(QUESTIONS_ASKED_PAGE),
+  limit: z.number().int().min(1).max(QUESTIONS_ASKED_PAGE_MAX).default(QUESTIONS_ASKED_PAGE),
 });
 
 export type QuestionsAskedInput = z.output<typeof questionsAskedInput>;
@@ -76,7 +81,7 @@ type DraftedSentence = { readonly sentence: string; readonly concepts: readonly 
 export type FeedbackAsRead = {
   readonly id: string;
   readonly givenAt: string;
-  readonly verdict: "helpful" | "flag";
+  readonly verdict: z.output<typeof boundarySchemas.questionFeedback.select>["verdict"];
   readonly reason: z.output<typeof boundarySchemas.questionFeedback.select>["reason"];
   readonly note: string | null;
   /** Given only where the reader may read the concept the sentence rested on. */
@@ -114,24 +119,26 @@ export type QuestionsAskedPage = {
 
 export type QuestionsAskedRefusal = RefusalOf<typeof readQuestionsAskedAction> | Error;
 
-/** A record holds a flag while any flag on it is open. */
-const OPEN_FLAG_ON = (record: string) => `EXISTS (
-    SELECT 1 FROM question_feedback f
-     WHERE f.workspace_id = ${record}.workspace_id AND f.record_id = ${record}.id
-       AND f.verdict = '${FEEDBACK_FLAG_VERDICT}' AND f.closed_at IS NULL)`;
-
-/** Flagged first, then newest; the cursor's place is read in SQL, never through a `Date`. */
-const A_PAGE_OF_RECORDS = `SELECT q.id, q.asked_at AS "askedAt", q.asked_by AS "askedBy", q.transport,
-         q.collections, q.verdict, q.judge_state AS "judgeState", q.concepts, c.question, c.drafted,
-         ${OPEN_FLAG_ON("q")} AS flagged
-    FROM question_asked q
+/**
+ * Flagged first, then newest, a record flagged while any flag on it is open. The cursor's place is
+ * read in SQL, never through a `Date`.
+ */
+const A_PAGE_OF_RECORDS = `WITH open_flags AS (
+    SELECT DISTINCT record_id FROM question_feedback
+     WHERE workspace_id = $1 AND verdict = '${FEEDBACK_FLAG_VERDICT}' AND closed_at IS NULL
+  ), placed AS (
+    SELECT q.*, o.record_id IS NOT NULL AS flagged
+      FROM question_asked q LEFT JOIN open_flags o ON o.record_id = q.id
+     WHERE q.workspace_id = $1
+  )
+  SELECT r.id, r.asked_at AS "askedAt", r.asked_by AS "askedBy", r.transport, r.collections,
+         r.verdict, r.judge_state AS "judgeState", r.concepts, c.question, c.drafted, r.flagged
+    FROM placed r
     LEFT JOIN question_content c
-           ON c.workspace_id = q.workspace_id AND c.record_id = q.id AND c.asked_at = q.asked_at
-   WHERE q.workspace_id = $1
-     AND ($2::text IS NULL OR (${OPEN_FLAG_ON("q")}, q.asked_at, q.id) < (
-          SELECT ${OPEN_FLAG_ON("p")}, p.asked_at, p.id
-            FROM question_asked p WHERE p.workspace_id = $1 AND p.id = $2))
-   ORDER BY flagged DESC, q.asked_at DESC, q.id DESC
+           ON c.workspace_id = r.workspace_id AND c.record_id = r.id AND c.asked_at = r.asked_at
+   WHERE $2::text IS NULL
+      OR (r.flagged, r.asked_at, r.id) < (SELECT flagged, asked_at, id FROM placed WHERE id = $2)
+   ORDER BY r.flagged DESC, r.asked_at DESC, r.id DESC
    LIMIT $3 + 1`;
 
 const THEIR_FEEDBACK = `SELECT id, record_id AS "recordId", given_at AS "givenAt", verdict, reason,
@@ -229,8 +236,10 @@ const refusalGroup = (row: PageRow, concepts: readonly ConceptAsRead[]) =>
 type Read = {
   readonly readable: Readable;
   readonly feedback: ReadonlyMap<string, readonly FeedbackRow[]>;
-  readonly askers: Awaited<ReturnType<typeof namesOfPeople>>;
+  readonly askers: PeopleNames;
 };
+
+const NOTHING_READ: Read = { readable: new Map(), feedback: new Map(), askers: new Map() };
 
 const recordAsRead = (row: PageRow, read: Read): RecordAsRead => {
   const concepts = (row.concepts ?? []).flatMap((kept) => conceptAsRead(kept, read.readable));
@@ -261,6 +270,7 @@ const readOf = async (
   tx: Tx,
   rows: readonly PageRow[],
 ): Promise<Result<Read, QuestionsAskedRefusal>> => {
+  if (rows.length === 0) return ok(NOTHING_READ);
   const ids = rows.map((row) => row.id);
   const feedback = await attempt(async () =>
     (await tx.query(THEIR_FEEDBACK, [admin.workspaceId, ids])).rows.map((row) =>
@@ -272,7 +282,10 @@ const readOf = async (
   const concepts = iris.length === 0 ? ok([]) : await conceptsByIris(admin, tx, iris);
   if (!concepts.ok) return err(concepts.error);
   const askers = await attempt(() =>
-    namesOfPeople(tx, peopleAmong(rows.map((row) => row.askedBy))),
+    namesOfActors(
+      tx,
+      rows.map((row) => row.askedBy),
+    ),
   );
   if (!askers.ok) return err(askers.error);
   return ok({
