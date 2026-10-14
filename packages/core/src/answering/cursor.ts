@@ -43,7 +43,8 @@ const FIND_POSITION = z.discriminatedUnion("run", [
   }),
 ]);
 
-const CURSOR_LENGTH_AT_MOST = 512;
+/** Room for the corpus counts of a 500-character question. */
+const CURSOR_LENGTH_AT_MOST = 1024;
 
 const positionOf = (text: string): FindPosition | undefined => {
   try {

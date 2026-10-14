@@ -323,6 +323,22 @@ describe("find's pages", () => {
     expect(unpaged).toHaveLength(3);
   });
 
+  it("pages a 500-character query of common words to page two", async () => {
+    const { workspaceId, viewer } = await arrange();
+    const query = Array.from({ length: 120 }, (_, at) => `w${String(at)}`).join(" ");
+    for (let at = 0; at < 25; at += 1) {
+      await conceptLanded(workspaceId, { title: `Concept ${String(at)}`, body: query });
+    }
+
+    const first = await searching(viewer, query, 10);
+    const second = await searching(viewer, query, 10, findCursor.parse(first.nextCursor));
+
+    expect(query.length).toBeLessThanOrEqual(500);
+    expect(first.nextCursor?.length).toBeGreaterThan(512);
+    expect(titlesOf(second)).toHaveLength(10);
+    expect(titlesOf(second).filter((title) => titlesOf(first).includes(title))).toEqual([]);
+  });
+
   it("weighs a Viewer's concepts as before a Restricted one lands", async () => {
     const { workspaceId, viewer } = await arrange();
     await conceptsLanded(workspaceId, [
@@ -529,7 +545,7 @@ describe("the cursor find hands out", () => {
     ],
     ["a character outside base64url before it", `!${PAST_THE_END}`],
     ["a character outside base64url after it", `${PAST_THE_END}!`],
-    ["one character too long", `${PAST_THE_END}${"A".repeat(513 - PAST_THE_END.length)}`],
+    ["one character too long", `${PAST_THE_END}${"A".repeat(1025 - PAST_THE_END.length)}`],
   ])("refuses %s", (_case, cursor) => {
     expect(findCursor.safeParse(cursor).success).toBe(false);
   });

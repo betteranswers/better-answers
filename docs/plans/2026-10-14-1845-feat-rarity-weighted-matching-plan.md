@@ -110,7 +110,7 @@ The gain is modest, as the owner expected: the buyer-worded set at ten rises 5.2
 ### Risks
 
 - **Cost.** `find`'s budget test (`packages/core/test/find-budget.test.ts`) read 4.6 one-row reads at the median before, and between 8.6 and 17.7 over three readings after, against a budget of 60; the recall figures above are unchanged by freezing the counts. EXPLAIN ANALYZE of the counts for a 104-word query over the 240 synthetic `Answer`s: one `Bitmap Heap Scan on concept_index d (actual rows=240.00 loops=1)`, 1.6 ms; in the match, the rarities are an InitPlan that runs `loops=1`. The passage run reads every readable passage once a request, so its cost grows with the passage table (BA-169).
-- **Cursor length.** The cap is 512 characters. The three longest buyer-worded rows (431 to 477 characters, 26 to 31 words) gave cursors of 312 to 323 over the synthetic `Answer`s; the same counts scaled to 10^5 passages give at most 404. A 500-character query of 64 distinct words held widely would exceed the cap (602 characters at 240 rows, 776 at 10^5), and its next page would be refused as a cursor `find` did not hand out. Raising the cap, or a denser encoding, is the owner's to choose.
+- **Cursor length.** The cap was 512 characters. The three longest buyer-worded rows (431 to 477 characters, 26 to 31 words) gave cursors of 312 to 323 over the synthetic `Answer`s; the same counts scaled to 10^5 passages give at most 404. A 500-character query of 64 distinct words held widely gave 602 characters at 240 rows and 776 at 10^5, so its next page was refused as a cursor `find` did not hand out. The owner raised the cap to 1,024 on 14/10/2026, and a test pages a 500-character query of 120 common words to its second page. A query of about 120 words each held by 1,000 rows or more can still pass 1,024.
 - **A lexeme with no positions** (past position 16,383, or a stripped vector) counts toward strength but adds nothing to the weight. The body cap of 100,000 characters keeps a concept short of that; a passage is a chunk.
 
 ## Implementation Units
@@ -152,6 +152,7 @@ The gain is modest, as the owner expected: the buyer-worded set at ten rises 5.2
 - **Test scenarios:**
   - A page's cursor names the run, the row's weight (`ln 2.4` for the case built), its density and its key.
   - A cursor carrying `matched`, no counts, a negative weight, a weight that is no number, a fractional size, or a word held by more rows than were counted is refused.
+  - A 500-character query of 120 words held by every concept pages to its second page, its cursor longer than the old cap of 512.
   - A tie group paged one row at a time, with a readable concept holding no query word landing between pages, gives the unpaged list.
   - A Viewer's concepts, and a Viewer's passages, page and order as before a Restricted row holding a query word lands.
   - The largest and smallest bounds read without error.
