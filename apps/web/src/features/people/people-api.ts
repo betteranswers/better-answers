@@ -88,6 +88,7 @@ const toldAtOnce = (change: () => void): void => {
   try {
     change();
   } finally {
+    // The default goes back: notifyManager has no getter, and nothing else in the web sets a scheduler.
     notifyManager.setScheduler(defaultScheduler);
   }
 };
