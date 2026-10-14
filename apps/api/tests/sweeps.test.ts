@@ -491,3 +491,58 @@ describe("the sweeps' daily pass", () => {
     expect(logs).toEqual([]);
   });
 });
+
+/** Taken now, so a day on it is past its expiry. */
+const aReservationTaken = async (workspaceId: string): Promise<void> => {
+  const recordId = ulid();
+  await db().pool.query(
+    `INSERT INTO question_asked (workspace_id, id, asked_at, asked_by, transport, predicate_role)
+     VALUES ($1, $2, now(), 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', 'mcp', 'Viewer')`,
+    [workspaceId, recordId],
+  );
+  await db().pool.query(
+    `INSERT INTO spend_reservation
+       (workspace_id, id, taken_at, expires_at, purpose, model_choice_id, model, tokens_in,
+        tokens_out, usd_per_million_in, usd_per_million_out, reserved_usd, answer_id)
+     VALUES ($1, $2, now(), now() + interval '10 minutes', 'judging', 'judge',
+             'claude-sonnet-5-5', 40000, 2000, '3', '15', '0.15', $3)`,
+    [workspaceId, ulid(), recordId],
+  );
+};
+
+describe("the sweeps' daily pass and the spend held", () => {
+  it("counts the reservations it settled in its log line", async () => {
+    const { workspaceId } = await provisioned();
+    await aReservationTaken(workspaceId);
+
+    const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
+
+    expect(passes(sweeps.logs)).toEqual([
+      expect.objectContaining({ level: 30, reservations_settled: 1, refusals: [] }),
+    ]);
+  });
+
+  it("names a refused settling in the log, pinging failure", async () => {
+    const { workspaceId } = await provisioned();
+    await aReservationTaken(workspaceId);
+
+    const sweeps = await whileWritesAreRefused(db().pool, "llm_call", () =>
+      onePass({ uploadSweep: "list", pingUrl: PING_URL }),
+    );
+
+    expect(passes(sweeps.logs)).toEqual([
+      expect.objectContaining({
+        level: 40,
+        reservations_settled: 0,
+        refusals: [
+          {
+            workspace_id: workspaceId,
+            sweep: "spend",
+            reason: expect.stringContaining("the store refused a write to llm_call"),
+          },
+        ],
+      }),
+    ]);
+    expect(sweeps.pinged.map((ping) => ping.url)).toEqual([`${PING_URL}/fail`]);
+  });
+});

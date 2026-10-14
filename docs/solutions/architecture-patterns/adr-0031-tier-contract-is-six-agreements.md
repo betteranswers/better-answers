@@ -35,7 +35,7 @@ The agreements live in top-level `contracts/`, listed in `contracts/manifest.jso
 - `queue` (SQL functions): claim, lease, heartbeat, reaper, attempt count and poison threshold; the kinds a claimant runs, a job's subject and the run key.
 - `suggestions` (SQL function): submitting a suggestion set; what acceptance promises is fixtured.
 - `model-choice` (SQL function): one model choice per workspace per purpose, resolved by the database.
-- `cost-ledger` (generated): the `llm_call` row, its golden rows held to the purpose vocabulary both tiers speak.
+- `cost-ledger` (generated): the `llm_call` row, its golden rows held to the migrated table's columns and outcomes and to the purpose vocabulary both tiers speak.
 - `credential-envelope`: the envelope's sealed vectors and the words an opener refuses with.
 - `id-shape`: the one shape every minted id has.
 - `concept-file`: the canonical text and content hash of a concept file.

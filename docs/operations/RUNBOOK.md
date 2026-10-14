@@ -373,7 +373,7 @@ Two sweeps clear what no row names. **The upload sweep** removes an original a f
 **Reading the last pass.** Each of three places is enough on its own:
 
 - the `sweeps` check: a completed pass pings it with an outcome word and counts, such as `ok workspaces=3 refused=0 upload_sweep=list found=2 removed=0 generations=1`. A pass that passed over a workspace pings the check's failure with the same body under `fail`. The body never names a workspace, a key or an error.
-- the api's log: one `sweep pass` line per pass, at info even when it removed nothing and at warn when it passed over a workspace. It carries `upload_sweep`, `workspaces`, `refused`, `found`, `removed`, `generations`, `sessions_deleted`, `verifications_deleted`, `ingress_windows_deleted` and `refusals`, which names each workspace passed over, which sweep and why. It never names a key, a person or an address.
+- the api's log: one `sweep pass` line per pass, at info even when it removed nothing and at warn when it passed over a workspace. It carries `upload_sweep`, `workspaces`, `refused`, `found`, `removed`, `generations`, `sessions_deleted`, `verifications_deleted`, `ingress_windows_deleted`, `reservations_settled` (§ Set a model's price and a workspace's spending limit) and `refusals`, which names each workspace passed over, which sweep and why. It never names a key, a person or an address.
 - the `sweep_pass` table: one row per completed pass, a pass that removed nothing included and a skipped one never, read through `browse_ro` (§ Browse production, whose step 3 is run again after the release that adds the table): `SELECT * FROM sweep_pass ORDER BY at DESC LIMIT 1`. It carries `at`, `upload_sweep`, `workspaces`, `refused` (how many were passed over), `found`, `removed` and `generations`, and names no workspace. The api writes it once and can neither change nor delete it.
 
 **List-only until an operator switches removal on.** On production the upload sweep starts as `list`: it counts what it would remove and removes nothing, so a pass reads `upload_sweep=list … removed=0` and `found` is the number of originals past the grace that no document row names, over every workspace. The map sweep deletes from its first pass. A sweep that lists the bucket and removes what no row names deletes live bytes for good if its join is ever wrong, so its counts are read against their causes before it removes anything:
@@ -471,3 +471,29 @@ The command writes nothing when it refuses. `malformed` is a workspace id that i
 **After a compromise of `KEK`.** Whoever read `KEK` and the database can open every model key sealed under it. Sealing the same keys again under a new `KEK` protects nothing. Treat each one as leaked: revoke it at its model provider, issue a new one there, set the new `KEK`, redeploy, and set each new key with the command.
 
 **After a restore.** A dump taken before a model key was replaced brings the earlier key back, and it opens cleanly under the same `KEK`, so nothing refuses until the model provider does. After any restore, set again every model key replaced since the dump was taken (`BACKUPS.md` § Recovery order).
+
+## Set a model's price and a workspace's spending limit
+
+A workspace's question calls a model only when three things stand: a model choice for the purpose, a price for that model on the day of the call, and a spending limit for the workspace. With any of them missing, `ask` calls no model and answers with its evidence. Two commands on the `api` service set the price and the limit, and no page can. Money is in US dollars, which is what a provider prices a call in. Until the release that brings the judge, `ask` calls no model whatever is set, so both can be set ahead of it.
+
+1. **Price the model, once per estate and again whenever the provider changes its price.** Read the price from the provider's own price page on the day, and set it from that day:
+
+   ```sh
+   docker exec "$api" pnpm ops set-model-price --provider anthropic --model claude-sonnet-5-5 \
+     --from <yyyy-mm-dd> --usd-per-million-in <the provider's input price> --usd-per-million-out <its output price>
+   ```
+
+   A price is a fact about the provider, so it holds for every workspace that calls the model. A call is priced by the latest price on or before its day, by UTC, so a price set for a later day changes nothing until that day. A second run for the same day replaces that day's price. The done line names the provider, the model and the day.
+2. **Set the workspace's limit,** the most its model calls may spend in a calendar month, by UTC:
+
+   ```sh
+   docker exec "$api" pnpm ops set-spending-limit --workspace <id> --usd <US dollars>
+   ```
+
+   A second run replaces the limit. Spend counts from the first of each month, and last month's calls never count against this one. At the limit `ask` refuses with `spending-limit-met`, a precondition, and its sentence tells the person their Admin can ask better-answers to raise it. `find` and `open` call no model and keep working.
+
+Each command writes nothing when it refuses. `malformed` is a sum that is not a decimal of dollars, a day the calendar does not have, a model provider outside the two, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
+
+**How a call is counted.** Before a model call, `ask` reserves the most the call may cost, at that day's price, in the same transaction that would refuse it, so two questions cannot both pass the last of the limit. When the call ends the reservation becomes one `llm_call` row per attempt at what was spent, and the rest is released. A reservation lives ten minutes. If the `api` stops mid-call, the daily sweep settles a reservation past its ten minutes as one failed `llm_call` row at the whole reserved cost, since the provider may have billed the call: the pass's log line counts them as `reservations_settled`, and names a workspace whose settling was refused under `refusals` with the sweep `spend`. Until then an open reservation still counts against the limit.
+
+**Reading the spend.** Through the browsing login: this month's spend for a workspace is `SELECT sum(cost_usd) FROM llm_call WHERE workspace_id = '<id>' AND called_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`, and the limit is `SELECT value FROM workspace_config WHERE workspace_id = '<id>' AND key = 'llm.spending_limit_usd'`. A row names the question it served by `answer_id`, and never holds the prompt or the completion. After the release that adds these tables, run the browsing role's file again (§ Browse production, step 3).

@@ -34,7 +34,7 @@ import {
   type RefusalClass,
   type Result,
 } from "@better-answers/core/kernel";
-import type { ModelKeySetting } from "@better-answers/core/llm";
+import { setModelPrice, type ModelKeySetting } from "@better-answers/core/llm";
 import {
   ensureTestWorkspace,
   INVENTED_MEMBERS,
@@ -69,11 +69,13 @@ import {
   restoreSignIn,
   setModelKey,
   setOperatorMark,
+  setSpendingLimit,
   type AddMemberRefusal,
   type AddPersonRefusal,
   type ProvisionRefusal,
   type RenameRefusal,
   type SetModelKeyRefusal,
+  type SetSpendingLimitRefusal,
   type SignInRestored,
 } from "@better-answers/core/workspaces";
 import {
@@ -86,12 +88,15 @@ import {
   mapGeneration,
   mapNode,
   job,
+  llmCall,
   MODEL_PROVIDERS,
   modelKey,
+  modelPrice,
   REBUILD_REASONS,
   ROLES,
   SENSITIVITIES,
   sourceDocument,
+  spendReservation,
   suppression,
   ulid,
 } from "@better-answers/schema";
@@ -189,6 +194,7 @@ const NEEDS = {
   "erasure-rehearsal": [erasureRequest, suppression],
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
   "set-model-key": [modelKey],
+  "set-spending-limit": [llmCall, spendReservation],
 };
 
 type SliceCommand = keyof typeof NEEDS;
@@ -232,6 +238,9 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             the workspace's name, its short name, or both; at least one is named, and the other kept
   set-model-key --workspace <id> --provider <${MODEL_PROVIDERS.join("|")}>
                                                             stdin: the workspace's key for that model provider, sealed and never printed; a second run replaces it
+  set-spending-limit --workspace <id> --usd <US dollars>    the most the workspace's model calls may spend each calendar month; a second run replaces it, and with none set no model is called
+  set-model-price --provider <${MODEL_PROVIDERS.join("|")}> --model <model> --from <yyyy-mm-dd> --usd-per-million-in <US dollars> --usd-per-million-out <US dollars>
+                                                            what a model costs from that day on, per million tokens sent and returned; a model with no price is never called
   operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
   restore-sign-in --email <email>                           a person who lost every factor and code, once you have checked who they are another way: their factors and sessions ended, a notice sent, a one-time restore code printed
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <sensitivity>] [--dry-run]
@@ -1384,6 +1393,90 @@ const setModelKeyCommand = async (
   return DONE;
 };
 
+const spendingLimitReason = (
+  refusal: SetSpendingLimitRefusal | Error,
+  workspaceId: string,
+): string => {
+  if (refusal instanceof Error) return refusal.message;
+  switch (refusal) {
+    case "malformed":
+      return "malformed: give --workspace a workspace id and --usd a sum in US dollars, such as 50 or 12.50";
+    case "no-such-workspace":
+      return noSuchWorkspace(workspaceId);
+  }
+};
+
+const setSpendingLimitCommand = async (
+  doors: Doors,
+  workspaceId: string,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
+  const usd = flagValue(flags, "usd");
+  if (usd === undefined) {
+    io.say("set-spending-limit: --workspace <id> and --usd <US dollars a month> are required");
+    return USAGE;
+  }
+  const set = await setSpendingLimit(BOOTSTRAP, doors.postgres, { workspaceId, usd });
+  if (!set.ok) {
+    io.say(`set-spending-limit: REFUSED — ${spendingLimitReason(set.error, workspaceId)}`);
+    return exitOf(set.error);
+  }
+  io.say(
+    `set-spending-limit: done — workspace ${workspaceId} may spend $${set.value.usd} on model calls each calendar month`,
+  );
+  return DONE;
+};
+
+const MODEL_PRICE_FLAGS = [
+  "provider",
+  "model",
+  "from",
+  "usd-per-million-in",
+  "usd-per-million-out",
+] as const;
+
+const MODEL_PRICE_USAGE = `set-model-price: --provider <${MODEL_PROVIDERS.join("|")}>, --model <model>, --from <yyyy-mm-dd>, --usd-per-million-in <US dollars> and --usd-per-million-out <US dollars> are required`;
+
+const priceNamed = (flags: Flags) => {
+  const named = MODEL_PRICE_FLAGS.map((name) => flagValue(flags, name));
+  const [provider, model, effectiveFrom, usdPerMillionIn, usdPerMillionOut] = named;
+  return provider === undefined ||
+    model === undefined ||
+    effectiveFrom === undefined ||
+    usdPerMillionIn === undefined ||
+    usdPerMillionOut === undefined
+    ? undefined
+    : { provider, model, effectiveFrom, usdPerMillionIn, usdPerMillionOut };
+};
+
+/** A price names no workspace, so the command is sliceless and looks for its own table. */
+const setModelPriceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
+  const price = priceNamed(flags);
+  if (price === undefined) {
+    io.say(MODEL_PRICE_USAGE);
+    return USAGE;
+  }
+  const table = getTableName(modelPrice);
+  if ((await tablesPresent(doors.postgres, [table])).length === 0) {
+    io.say(`set-model-price: not built — ${table} absent from this schema`);
+    return NOT_BUILT;
+  }
+  const set = await setModelPrice(BOOTSTRAP, doors.postgres, price);
+  if (!set.ok) {
+    const reason =
+      set.error === "malformed"
+        ? `malformed: ${MODEL_PRICE_USAGE.slice("set-model-price: ".length)}, the day one the calendar has and each sum a decimal such as 3 or 0.25`
+        : set.error.message;
+    io.say(`set-model-price: REFUSED — ${reason}`);
+    return exitOf(set.error);
+  }
+  io.say(
+    `set-model-price: done — ${set.value.provider} ${set.value.model} is priced from ${set.value.effectiveFrom}`,
+  );
+  return DONE;
+};
+
 const OPERATOR_USAGE = "operator: --email <email> and one of --grant or --revoke are required";
 
 const MARK_SAID = {
@@ -1471,6 +1564,7 @@ const SLICE_RUNNERS = {
   "erasure-rehearsal": erasureRehearsal,
   "import-bundle": importBundleCommand,
   "set-model-key": setModelKeyCommand,
+  "set-spending-limit": setSpendingLimitCommand,
 } satisfies Readonly<
   Record<
     SliceCommand,
@@ -1490,6 +1584,7 @@ const SLICELESS_COMMANDS = new Map<
   ["add-member", addMemberCommand],
   ["test-workspace", testWorkspaceCommand],
   ["rename-workspace", renameWorkspaceCommand],
+  ["set-model-price", setModelPriceCommand],
   ["operator", operatorCommand],
   ["restore-sign-in", restoreSignInCommand],
 ]);

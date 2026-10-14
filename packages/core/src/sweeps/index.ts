@@ -17,6 +17,7 @@ import {
   type Result,
   type WorkspaceId,
 } from "../kernel/index.ts";
+import { settleExpiredSpend } from "../llm/index.ts";
 import {
   sweepOrphanedUploads,
   UPLOAD_SWEEP,
@@ -62,6 +63,8 @@ type WorkspaceSwept = {
   readonly workspaceId: WorkspaceId;
   readonly uploads: Result<SweptUploads, SweepUploadsRefusal>;
   readonly map: Result<readonly SweptGeneration[], MapMaintenanceRefusal | Error>;
+  /** How many reservations past their expiry were settled as failed calls. */
+  readonly spend: Result<number, Error>;
 };
 
 type SweepTotals = {
@@ -86,8 +89,8 @@ const totalsOf = (swept: readonly WorkspaceSwept[]): SweepTotals => {
   let found = 0;
   let removed = 0;
   let generations = 0;
-  for (const { uploads, map } of swept) {
-    if (!uploads.ok || !map.ok) refused += 1;
+  for (const { uploads, map, spend } of swept) {
+    if (!uploads.ok || !map.ok || !spend.ok) refused += 1;
     if (uploads.ok) {
       found += uploads.value.found;
       removed += uploads.value.removed;
@@ -128,6 +131,7 @@ const recordThePass = async (
 };
 
 const sweepOne = async (
+  platform: SweepsPrincipal,
   doors: SweepDoors,
   workspaceId: WorkspaceId,
   uploadSweep: UploadSweepMode,
@@ -139,6 +143,10 @@ const sweepOne = async (
     { workspaceId, now: doors.clock.now(), dryRun: uploadSweep === "list" },
   ),
   map: await sweepMap(MAP_MAINTENANCE, doors.postgres, { workspaceId }),
+  spend: await settleExpiredSpend(platform, doors.postgres, {
+    workspaceId,
+    now: doors.clock.now(),
+  }),
 });
 
 /**
@@ -160,7 +168,7 @@ export const sweepEveryWorkspace = async (
       if (!listed.ok) return err(listed.error);
       const swept: WorkspaceSwept[] = [];
       for (const workspaceId of listed.value) {
-        swept.push(await sweepOne(doors, workspaceId, input.uploadSweep));
+        swept.push(await sweepOne(platform, doors, workspaceId, input.uploadSweep));
       }
       const totals = totalsOf(swept);
       const recorded = await recordThePass(doors.postgres, input.uploadSweep, totals);

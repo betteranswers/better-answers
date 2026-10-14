@@ -73,6 +73,7 @@ const CATALOGUED = {
   "envelope-version-unknown": "inapplicable by kernel",
   "envelope-malformed": "malformed by kernel",
   "envelope-not-authentic": "malformed by kernel",
+  "spending-limit-met": "precondition by kernel",
 
   "no-such-binding": "absent by sources",
   "no-such-document": "absent by sources",
