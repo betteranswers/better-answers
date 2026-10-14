@@ -33,7 +33,7 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 - A concept match (`layer: "bundles"`) sits beside a document match (`layer: "sources"`), which the rendering marks *Not company knowledge*.
 - A document that a concept visible to the caller cites is left out.
 - The caller's limit is spent on the union: concepts holding at least half the query's words first, then document matches, then the remaining concepts (owner, 09/10/2026).
-- The two arms share no score. Each is ranked on its own, first by how many of the query's words a row holds, then by its full-text rank.
+- The two arms share no score. Each is ranked on its own, first by the rarity weight of the query's words a row holds, then by its full-text rank (owner, 14/10/2026).
 - A page that more matches follow carries `nextCursor`, which the next call passes back as `cursor`.
 
 `open` takes one IRI or one wire locator.

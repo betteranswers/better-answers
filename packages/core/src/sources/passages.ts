@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { anyWordMatch, SENSITIVITIES, type MatchBound } from "@better-answers/schema";
+import {
+  anyWordMatch,
+  SENSITIVITIES,
+  type CorpusCounts,
+  type MatchBound,
+} from "@better-answers/schema";
 
 import {
   narrower,
@@ -9,7 +14,7 @@ import {
   sensitivityAndAudienceClause,
   type Sensitivity,
 } from "../access/index.ts";
-import { evidenceForAReadableConcept } from "../concepts/index.ts";
+import { corpusCountsOf, evidenceForAReadableConcept } from "../concepts/index.ts";
 import {
   admit,
   ADMIN_ALONE,
@@ -140,7 +145,24 @@ const wireLocatorOf = (row: {
   readonly char_end: number;
 }): string => locatorOf(row.source_document_id, row.char_start, row.char_end);
 
-const MATCH = anyWordMatch("c.search", "$2", ["c.source_document_id", "c.char_start"]);
+const MATCH = anyWordMatch("c.search", "$2", ["c.source_document_id", "c.char_start"], {
+  size: "$8",
+  frequencies: "$9",
+});
+
+/** The passages `principal` may read, counted for `query`'s words. */
+export const passageCountsOf = (
+  principal: UserPrincipal,
+  tx: Tx,
+  query: string,
+): Promise<Result<CorpusCounts, Error>> =>
+  corpusCountsOf(
+    tx,
+    `SELECT d.search FROM "index".readable_passage d
+      WHERE d.workspace_id = $1 AND ${readableClause("d", 2)}`,
+    [principal.workspaceId, ...readableParameters(principal)],
+    query,
+  );
 
 const matchingRows = (
   after: string,
@@ -162,7 +184,7 @@ const matchingRows = (
 const MATCHING_ROWS = matchingRows("");
 
 const MATCHING_ROWS_AFTER = matchingRows(
-  `AND ${MATCH.after({ matched: "$8", rank: "$9", key: ["$10", "$11"] })}`,
+  `AND ${MATCH.after({ weight: "$10", rank: "$11", key: ["$12", "$13"] })}`,
 );
 
 type MatchRow = {
@@ -171,7 +193,7 @@ type MatchRow = {
   readonly char_end: number;
   readonly sensitivity: string | null;
   readonly title: string;
-  readonly matched: number;
+  readonly weight: number;
   readonly rank: number;
 };
 
@@ -185,20 +207,35 @@ export type PassageFound = { readonly passage: PassageMatch; readonly bound: Pas
 const boundParameters = (after: PassageBound | undefined): readonly unknown[] =>
   after === undefined
     ? []
-    : [after.matched, after.rank, after.key.sourceDocumentId, after.key.charStart];
+    : [after.weight, after.rank, after.key.sourceDocumentId, after.key.charStart];
+
+type PassageSearch = {
+  readonly query: string;
+  readonly limit: number;
+  readonly after?: PassageBound | undefined;
+};
 
 /**
  * By the any-word rule, after `after` when given. Leaves out a passage whose document is evidence for
- * a concept the caller can read.
+ * a concept the caller can read. `counts`, when given, weigh the words in place of a fresh count.
  */
-export const findPassages = (
+export const findPassages = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: {
-    readonly query: string;
-    readonly limit: number;
-    readonly after?: PassageBound | undefined;
-  },
+  input: PassageSearch & { readonly counts?: CorpusCounts | undefined },
+): Promise<Result<readonly PassageFound[], Error>> => {
+  const counts =
+    input.counts === undefined
+      ? await passageCountsOf(principal, tx, input.query)
+      : ok(input.counts);
+  return counts.ok ? passagesWeighed(principal, tx, input, counts.value) : counts;
+};
+
+const passagesWeighed = (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: PassageSearch,
+  counts: CorpusCounts,
 ): Promise<Result<readonly PassageFound[], Error>> => {
   const parameters = readableParameters(principal);
   return attempt(async () => {
@@ -210,6 +247,8 @@ export const findPassages = (
         ...parameters,
         ...parameters,
         input.limit,
+        counts.size,
+        counts.frequencies,
         ...boundParameters(input.after),
       ],
     );
@@ -222,7 +261,7 @@ export const findPassages = (
         sensitivity: PASSAGE_SENSITIVITY.parse(row.sensitivity),
       },
       bound: {
-        matched: row.matched,
+        weight: row.weight,
         rank: row.rank,
         key: { sourceDocumentId: row.source_document_id, charStart: row.char_start },
       },

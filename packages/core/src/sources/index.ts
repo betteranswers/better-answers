@@ -91,6 +91,7 @@ export type { DpiaReadInput, DpiaInputRead, DpiaInputRefusal } from "./dpia.ts";
 export { passageIdOf, parseLocator, spanText, type LocatorRefusal } from "./passage-address.ts";
 export {
   findPassages,
+  passageCountsOf,
   passageAt,
   previewPassages,
   previewPassagesInput,

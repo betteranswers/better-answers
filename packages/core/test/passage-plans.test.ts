@@ -136,7 +136,7 @@ describe("find's plan, as the api and under the passage's policy", () => {
       const read = await findPassages(reader, tx, {
         query: QUERY,
         limit: 10,
-        after: { matched: 3, rank: 3, key: { sourceDocumentId: arranged.handbook, charStart: 0 } },
+        after: { weight: 3, rank: 3, key: { sourceDocumentId: arranged.handbook, charStart: 0 } },
       });
       return read.ok ? ok(read.value.map(({ passage }) => passage)) : read;
     });

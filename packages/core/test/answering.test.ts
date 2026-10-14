@@ -983,14 +983,18 @@ describe("the boundary find and open are parsed at", () => {
 
   it("reads a cursor back into the position it names", () => {
     const cursor =
-      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6MSwicmFuayI6MC41LCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZaWlpaWlpaWlpaWlpaWlpaWlpaWlpaIn19";
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjoxLCJyYW5rIjowLjUsImtleSI6Imh0dHBzOi8vYmV0dGVyLWFuc3dlcnMuY29tL2MvMDFKNlpaWlpaWlpaWlpaWlpaWlpaWlpaWloifSwiY291bnRzIjp7InNpemUiOjEsImZyZXF1ZW5jaWVzIjpbMV19fQ";
 
     expect(parse(findInput, { query: "audit", cursor })).toEqual({
       ok: true,
       value: {
         query: "audit",
         limit: 5,
-        cursor: { run: "weak", bound: { matched: 1, rank: 0.5, key: ABSENT } },
+        cursor: {
+          run: "weak",
+          bound: { weight: 1, rank: 0.5, key: ABSENT },
+          counts: { size: 1, frequencies: [1] },
+        },
       },
     });
   });
