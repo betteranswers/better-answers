@@ -86,6 +86,6 @@ The full record, with its seventeen amendments (among them T-001, T-073, T-121, 
 
 Amended 13/10/2026 on the owner's decision of 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R42 and KTD12). S2b is the first block to send a model text a person typed, which the seam never reads. The typed-text check reads it against the always tier before the call. Names in typed text are not withheld, and the record keeps the text as typed.
 
-Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-153. A word between a sort code and its account number now names the pair, in a document and in typed text. A National Insurance number no longer takes the space before it, and a refused prefix after a space is no longer read as one. The rule version moved from 6 to 7.
-
 Amended 13/10/2026 by the same plan's U4 (R39 and KTD8). The erasure routine gained a step and a family, `question-asked`, so an erasure rewrites who asked and who gave feedback, deletes the question and clears each note.
+
+Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-153. A word between a sort code and its account number now names the pair, in a document and in typed text. A National Insurance number no longer takes the space before it, and a refused prefix after a space is no longer read as one. The rule version moved from 6 to 7. A National Insurance finding that took the space before it now starts one character later, so a restore made on it before the change no longer matches, and the number is withheld again at the next sync until an Admin restores it afresh.
