@@ -252,12 +252,12 @@ test("drops the left workspace's members when All workspaces picks another", asy
   await expect(jumpTo.getByRole("status"), "jump-to says nothing of its read").toHaveText(/\S/);
   await expect(jumpTo.getByRole("status")).not.toContainText("Only In Esk");
   // Search's row names what was typed, so a member is looked for under Members alone.
-  await expect(
-    jumpTo.getByRole("group", { name: "Members" }),
-    "jump-to offered the left workspace's members",
-  ).toHaveCount(0);
+  const members = jumpTo.getByRole("group", { name: "Members" });
+  await expect(members, "jump-to offered the left workspace's members").toHaveCount(0);
 
   release();
+  await jumpTo.getByRole("combobox", { name: "Jump To" }).fill("Only In Derwent");
+  await expect(members).toContainText("Only In Derwent");
   await page.keyboard.press("Escape");
   await expect(memberLink(page, "Only In Derwent")).toBeVisible();
 });
