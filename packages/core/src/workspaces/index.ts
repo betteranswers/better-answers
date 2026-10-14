@@ -68,6 +68,9 @@ export type { SetDisplayNameRefusal } from "./display-name.ts";
 export { listWorkspaces } from "./listing.ts";
 export { setModelKey } from "./model-key.ts";
 export type { SetModelKeyRefusal } from "./model-key.ts";
+export { setModelPrice } from "./model-price.ts";
+export { setSpendingLimit } from "./spending-limit.ts";
+export type { SetSpendingLimitRefusal } from "./spending-limit.ts";
 export {
   operatorAddresses,
   restoreSignIn,

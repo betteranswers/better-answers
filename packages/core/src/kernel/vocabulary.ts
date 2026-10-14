@@ -34,6 +34,10 @@ export const KERNEL_REFUSALS = {
   "envelope-version-unknown": "inapplicable",
   "envelope-malformed": "malformed",
   "envelope-not-authentic": "malformed",
+
+  // The llm layer may import no slice. The remedy is a raised limit or a new month, never a wait,
+  // so it is no `CeilingMet`.
+  "spending-limit-met": "precondition",
 } as const satisfies Vocabulary;
 
 type KernelRefusalWord = Extract<keyof typeof KERNEL_REFUSALS, string>;

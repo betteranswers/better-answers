@@ -77,7 +77,17 @@ import {
 import { passage, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
 import { workspaceLastActive } from "./last-active-tables.ts";
-import { MODEL_PROVIDERS, modelKey } from "./llm-tables.ts";
+import {
+  CALENDAR_DAY,
+  GBP,
+  LLM_CALL_OUTCOMES,
+  llmCall,
+  MODEL_NAME,
+  MODEL_PROVIDERS,
+  modelKey,
+  modelPrice,
+  spendReservation,
+} from "./llm-tables.ts";
 import {
   MAP_EDGE_LABELS,
   MAP_NODE_LABELS,
@@ -183,6 +193,58 @@ const modelKeyUpdate = createUpdateSchema(modelKey, {
   ...modelKeyRefinements,
   sealed: sealedFrame.optional(),
 });
+
+/** Money and rates are `numeric`, which the driver hands back as a string and never a float. */
+const decimal = (schema: z.ZodString) => schema.regex(GBP);
+
+const tokenCount = (schema: z.ZodNumber) => schema.int().nonnegative();
+
+const servedBy = {
+  modelChoiceId: (schema: z.ZodString) => schema.trim().min(1),
+  model: (schema: z.ZodString) => schema.trim().min(1),
+  tokensIn: tokenCount,
+  tokensOut: tokenCount,
+  runId: (schema: z.ZodString) => schema.trim().min(1),
+  answerId: (schema: z.ZodString) => schema.regex(ULID),
+};
+
+const llmCallRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  ...servedBy,
+  seconds: (schema: z.ZodNumber) => schema.nonnegative(),
+  costGbp: decimal,
+  outcome: (schema: z.ZodString) => schema.pipe(z.enum(LLM_CALL_OUTCOMES)),
+};
+
+const llmCallSelect = createSelectSchema(llmCall, llmCallRefinements);
+const llmCallInsert = createInsertSchema(llmCall, llmCallRefinements);
+const llmCallUpdate = createUpdateSchema(llmCall, llmCallRefinements);
+
+const spendReservationRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  ...servedBy,
+  gbpPerMillionIn: decimal,
+  gbpPerMillionOut: decimal,
+  reservedGbp: decimal,
+};
+
+const spendReservationSelect = createSelectSchema(spendReservation, spendReservationRefinements);
+const spendReservationInsert = createInsertSchema(spendReservation, spendReservationRefinements);
+const spendReservationUpdate = createUpdateSchema(spendReservation, spendReservationRefinements);
+
+const modelPriceRefinements = {
+  provider: (schema: z.ZodString) => schema.pipe(z.enum(MODEL_PROVIDERS)),
+  model: (schema: z.ZodString) => schema.regex(MODEL_NAME),
+  effectiveFrom: (schema: z.ZodString) => schema.regex(CALENDAR_DAY),
+  gbpPerMillionIn: decimal,
+  gbpPerMillionOut: decimal,
+};
+
+const modelPriceSelect = createSelectSchema(modelPrice, modelPriceRefinements);
+const modelPriceInsert = createInsertSchema(modelPrice, modelPriceRefinements);
+const modelPriceUpdate = createUpdateSchema(modelPrice, modelPriceRefinements);
 
 const workspaceConfigRefinements = {
   workspaceId,
@@ -952,6 +1014,24 @@ export const boundarySchemas = {
     select: modelKeySelect,
     insert: modelKeyInsert,
     update: modelKeyUpdate,
+  },
+  llmCall: {
+    table: llmCall,
+    select: llmCallSelect,
+    insert: llmCallInsert,
+    update: llmCallUpdate,
+  },
+  spendReservation: {
+    table: spendReservation,
+    select: spendReservationSelect,
+    insert: spendReservationInsert,
+    update: spendReservationUpdate,
+  },
+  modelPrice: {
+    table: modelPrice,
+    select: modelPriceSelect,
+    insert: modelPriceInsert,
+    update: modelPriceUpdate,
   },
   workspaceConfig: {
     table: workspaceConfig,

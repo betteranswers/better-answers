@@ -4,10 +4,13 @@ import {
   ACTION,
   AUDIENCES,
   boundarySchemas,
+  CALENDAR_DAY,
   CONTENT_HASH,
   FAMILIES,
+  GBP,
   GIT_SHA,
   IRI,
+  MODEL_NAME,
   MODEL_PROVIDERS,
   type ModelProvider,
   ROLES,
@@ -93,6 +96,9 @@ export const DETAIL_KINDS = {
   // One of the closed set and nothing freer: a detail that took any text could take a key.
   modelProvider: (value: DetailValue) =>
     typeof value === "string" && MODEL_PROVIDERS.some((provider) => provider === value),
+  modelName: (value: DetailValue) => typeof value === "string" && MODEL_NAME.test(value),
+  day: (value: DetailValue) => typeof value === "string" && CALENDAR_DAY.test(value),
+  gbp: (value: DetailValue) => typeof value === "string" && GBP.test(value),
 } as const;
 
 export type DetailKind = keyof typeof DETAIL_KINDS;

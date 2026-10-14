@@ -55,8 +55,10 @@ import {
   mapGeneration,
   mapNode,
   job,
+  llmCall,
   modelKey,
   sourceDocument,
+  spendReservation,
   suppression,
   ulid,
   type ConceptIri,
@@ -215,6 +217,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "reindex-connected-sources": [connectedSource, job],
   "erasure-rehearsal": [erasureRequest, suppression],
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
+  "set-spending-limit": [llmCall, spendReservation],
   "set-model-key": [modelKey],
 };
 
@@ -2999,6 +3002,140 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.lines.join("\n")).toContain(
         "set-model-key --workspace <id> --provider <anthropic|mistral>",
+      );
+    });
+  });
+
+  describe("set-spending-limit — the platform caps a workspace's monthly spend", () => {
+    const limitHeld = async (app: TestApp, workspaceId: string) => {
+      const held = await app.database.superuser.query<{ value: string }>(
+        "SELECT value FROM workspace_config WHERE workspace_id = $1 AND key = 'llm.spending_limit_gbp'",
+        [workspaceId],
+      );
+      return held.rows.map((row) => row.value);
+    };
+
+    const limiting = (app: TestApp, workspaceId: string, gbp: string): Promise<Run> =>
+      ops(app, ["set-spending-limit", "--workspace", workspaceId, "--gbp", gbp]);
+
+    it("sets the limit, and a second run replaces it", async () => {
+      const { workspaceId } = await app().provision();
+
+      const first = await limiting(app(), workspaceId, "50");
+      const again = await limiting(app(), workspaceId, "12.50");
+
+      expect({ exitCode: first.exitCode, lines: first.lines }).toEqual({
+        exitCode: 0,
+        lines: [
+          `set-spending-limit: done — workspace ${workspaceId} may spend £50 on model calls each calendar month`,
+        ],
+      });
+      expect(again.exitCode).toBe(0);
+      expect(await limitHeld(app(), workspaceId)).toEqual(["12.50"]);
+      const set = { actor: BOOTSTRAP_ACTOR, subject_id: workspaceId, detail: {} };
+      expect(
+        await rowsOfAction(app(), workspaceId, "platform.workspace.spending_limit_set"),
+      ).toEqual([set, set]);
+    });
+
+    it("refuses malformed for a sum that is not pounds", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await limiting(app(), workspaceId, "fifty");
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 2,
+        lines: [
+          "set-spending-limit: REFUSED — malformed: give --workspace a workspace id and --gbp a sum in pounds, such as 50 or 12.50",
+        ],
+      });
+      expect(await limitHeld(app(), workspaceId)).toEqual([]);
+    });
+
+    it("refuses no-such-workspace for an unknown id", async () => {
+      const nowhere = ulid();
+
+      const run = await limiting(app(), nowhere, "50");
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 6,
+        lines: [`set-spending-limit: REFUSED — no-such-workspace: ${nowhere} is not a workspace`],
+      });
+    });
+  });
+
+  describe("set-model-price — the platform prices a model by day", () => {
+    const SONNET = "claude-sonnet-5-5";
+
+    const pricing = (app: TestApp, from: string, gbpIn = "3", gbpOut = "15"): Promise<Run> =>
+      ops(app, [
+        "set-model-price",
+        "--provider",
+        "anthropic",
+        "--model",
+        SONNET,
+        "--from",
+        from,
+        "--gbp-per-million-in",
+        gbpIn,
+        "--gbp-per-million-out",
+        gbpOut,
+      ]);
+
+    const pricesHeld = async (app: TestApp) => {
+      const held = await app.database.superuser.query(
+        `SELECT effective_from::text AS "from", gbp_per_million_in, gbp_per_million_out
+           FROM model_price WHERE provider = 'anthropic' AND model = $1 ORDER BY effective_from`,
+        [SONNET],
+      );
+      return held.rows;
+    };
+
+    it("sets the price, and a same-day run replaces it", async () => {
+      const first = await pricing(app(), "2026-10-14");
+      const again = await pricing(app(), "2026-10-14", "2.5", "12");
+
+      expect({ exitCode: first.exitCode, lines: first.lines }).toEqual({
+        exitCode: 0,
+        lines: [`set-model-price: done — anthropic ${SONNET} is priced from 2026-10-14`],
+      });
+      expect(again.exitCode).toBe(0);
+      expect(await pricesHeld(app())).toEqual([
+        { from: "2026-10-14", gbp_per_million_in: "2.5", gbp_per_million_out: "12" },
+      ]);
+    });
+
+    it("refuses malformed for a day the calendar lacks", async () => {
+      const before = await pricesHeld(app());
+
+      const run = await pricing(app(), "2026-02-30");
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([expect.stringMatching(/^set-model-price: REFUSED — malformed: /)]);
+      expect(await pricesHeld(app())).toEqual(before);
+    });
+
+    it("answers usage with a rate missing, writing nothing", async () => {
+      const before = await pricesHeld(app());
+
+      const run = await ops(app(), [
+        "set-model-price",
+        "--provider",
+        "anthropic",
+        "--model",
+        SONNET,
+      ]);
+
+      expect(run.exitCode).toBe(2);
+      expect(await pricesHeld(app())).toEqual(before);
+    });
+
+    it("names both spend commands in the usage", async () => {
+      const run = await ops(app(), ["help"]);
+
+      expect(run.lines.join("\n")).toContain("set-spending-limit --workspace <id> --gbp <pounds>");
+      expect(run.lines.join("\n")).toContain(
+        "set-model-price --provider <anthropic|mistral> --model <model> --from <yyyy-mm-dd>",
       );
     });
   });

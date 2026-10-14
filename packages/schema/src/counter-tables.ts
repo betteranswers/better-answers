@@ -46,4 +46,5 @@ export const GLOBAL_TABLE_NAMES_BEYOND_IDENTITY = [
   "public.contract_stamp",
   "public.sweep_pass",
   "public.identity_audit_event",
+  "public.model_price",
 ] as const;

@@ -41,12 +41,18 @@ export type Sweeps = {
 };
 
 const refusalsOf = (pass: SweepPass) =>
-  pass.swept.flatMap(({ workspaceId, uploads, map }) => [
+  pass.swept.flatMap(({ workspaceId, uploads, map, spend }) => [
     ...(uploads.ok
       ? []
       : [{ workspace_id: workspaceId, sweep: "uploads", reason: reasonOf(uploads.error) }]),
     ...(map.ok ? [] : [{ workspace_id: workspaceId, sweep: "map", reason: reasonOf(map.error) }]),
+    ...(spend.ok
+      ? []
+      : [{ workspace_id: workspaceId, sweep: "spend", reason: reasonOf(spend.error) }]),
   ]);
+
+const reservationsSettledIn = (pass: SweepPass): number =>
+  pass.swept.reduce((settled, { spend }) => settled + (spend.ok ? spend.value : 0), 0);
 
 type Deletion = Result<number, Error>;
 
@@ -121,6 +127,7 @@ export const startSweeps = (dependencies: SweepsDependencies): Result<Sweeps, Sw
       upload_sweep: uploadSweep,
       ...swept.value.totals,
       ...outside.deleted,
+      reservations_settled: reservationsSettledIn(swept.value),
       refusals,
     };
     const outcome: PingOutcome = refusals.length > 0 ? "fail" : "ok";

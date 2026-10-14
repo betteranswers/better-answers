@@ -491,3 +491,50 @@ describe("the sweeps' daily pass", () => {
     expect(logs).toEqual([]);
   });
 });
+
+/** Taken now, so on the suite's clock, a day on, it is past its expiry. */
+const aReservationTaken = async (workspaceId: string): Promise<void> => {
+  const client = await db().pool.connect();
+  try {
+    await testData(client).spendReservation({ workspaceId });
+  } finally {
+    client.release();
+  }
+};
+
+describe("the sweeps' daily pass and the spend held", () => {
+  it("counts the reservations it settled in its log line", async () => {
+    const { workspaceId } = await provisioned();
+    await aReservationTaken(workspaceId);
+
+    const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
+
+    expect(passes(sweeps.logs)).toEqual([
+      expect.objectContaining({ level: 30, reservations_settled: 1, refusals: [] }),
+    ]);
+  });
+
+  it("names a refused settling in the log, pinging failure", async () => {
+    const { workspaceId } = await provisioned();
+    await aReservationTaken(workspaceId);
+
+    const sweeps = await whileWritesAreRefused(db().pool, "llm_call", () =>
+      onePass({ uploadSweep: "list", pingUrl: PING_URL }),
+    );
+
+    expect(passes(sweeps.logs)).toEqual([
+      expect.objectContaining({
+        level: 40,
+        reservations_settled: 0,
+        refusals: [
+          {
+            workspace_id: workspaceId,
+            sweep: "spend",
+            reason: expect.stringContaining("the store refused a write to llm_call"),
+          },
+        ],
+      }),
+    ]);
+    expect(sweeps.pinged.map((ping) => ping.url)).toEqual([`${PING_URL}/fail`]);
+  });
+});

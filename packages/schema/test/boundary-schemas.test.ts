@@ -92,6 +92,62 @@ const acceptedRows = {
     },
   ],
   modelKey: [{ workspaceId: WS_ID, provider: "anthropic", sealed: A_SEALED_FRAME }],
+  modelPrice: [
+    {
+      provider: "anthropic",
+      model: "claude-sonnet-5-5",
+      effectiveFrom: "2026-10-01",
+      gbpPerMillionIn: "3",
+      gbpPerMillionOut: "15.00",
+    },
+  ],
+  llmCall: [
+    {
+      workspaceId: WS_ID,
+      id: "01J6TTTTTTTTTTTTTTTTTTTTT1",
+      calledAt: NOW,
+      purpose: "judging",
+      modelChoiceId: "model-choice-judge",
+      model: "claude-sonnet-5-5",
+      tokensIn: 1580,
+      tokensOut: 96,
+      seconds: 1.118,
+      costGbp: "0.006180",
+      outcome: "succeeded",
+      answerId: QUESTION_RECORD_ID,
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6TTTTTTTTTTTTTTTTTTTTT2",
+      calledAt: NOW,
+      purpose: "extraction",
+      modelChoiceId: "model-choice-extract",
+      model: "claude-sonnet-5-5",
+      tokensIn: 7310,
+      tokensOut: 0,
+      seconds: 30.004,
+      costGbp: "0.02193",
+      outcome: "failed",
+      runId: "a run of the worker's",
+    },
+  ],
+  spendReservation: [
+    {
+      workspaceId: WS_ID,
+      id: "01J6TTTTTTTTTTTTTTTTTTTTT3",
+      takenAt: NOW,
+      expiresAt: new Date(NOW.getTime() + 600_000),
+      purpose: "judging",
+      modelChoiceId: "model-choice-judge",
+      model: "claude-sonnet-5-5",
+      tokensIn: 40_000,
+      tokensOut: 2_000,
+      gbpPerMillionIn: "3",
+      gbpPerMillionOut: "15",
+      reservedGbp: "0.15",
+      answerId: QUESTION_RECORD_ID,
+    },
+  ],
   workspaceConfig: [{ workspaceId: WS_ID, key: "mcp.tools_list_ttl_ms", value: "300000" }],
 
   member: [
@@ -947,6 +1003,9 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "questionAsked",
         "questionContent",
         "questionFeedback",
+        "modelPrice",
+        "llmCall",
+        "spendReservation",
         "passage",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
@@ -982,6 +1041,17 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     modelKey: [
       { ...acceptedRows.modelKey[0], provider: "openai" },
       { ...acceptedRows.modelKey[0], sealed: "a frame written as text" },
+    ],
+
+    llmCall: [
+      { ...acceptedRows.llmCall[0], costGbp: "0.1e-3" },
+      { ...acceptedRows.llmCall[0], outcome: "cancelled" },
+      { ...acceptedRows.llmCall[0], tokensIn: -1 },
+    ],
+    spendReservation: [{ ...acceptedRows.spendReservation[0], reservedGbp: "-0.15" }],
+    modelPrice: [
+      { ...acceptedRows.modelPrice[0], provider: "openai" },
+      { ...acceptedRows.modelPrice[0], effectiveFrom: "1 October 2026" },
     ],
 
     user: [{ ...acceptedRows.user[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
@@ -1543,6 +1613,44 @@ describe("5 — the inferred type is pinned", () => {
       workspaceId: WorkspaceId;
       provider: "anthropic" | "mistral";
       sealed: Uint8Array<ArrayBuffer>;
+    };
+    llmCall: {
+      workspaceId: WorkspaceId;
+      id: string;
+      calledAt: Date;
+      purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
+      modelChoiceId: string;
+      model: string;
+      tokensIn: number;
+      tokensOut: number;
+      seconds: number;
+      costGbp: string;
+      outcome: "succeeded" | "failed";
+      runId: string | null;
+      answerId: string | null;
+    };
+    spendReservation: {
+      workspaceId: WorkspaceId;
+      id: string;
+      takenAt: Date;
+      expiresAt: Date;
+      purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
+      modelChoiceId: string;
+      model: string;
+      tokensIn: number;
+      tokensOut: number;
+      gbpPerMillionIn: string;
+      gbpPerMillionOut: string;
+      reservedGbp: string;
+      runId: string | null;
+      answerId: string | null;
+    };
+    modelPrice: {
+      provider: "anthropic" | "mistral";
+      model: string;
+      effectiveFrom: string;
+      gbpPerMillionIn: string;
+      gbpPerMillionOut: string;
     };
     workspaceConfig: { workspaceId: WorkspaceId; key: string; value: string; updatedAt: Date };
     passage: {

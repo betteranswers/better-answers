@@ -803,6 +803,34 @@ export const readWorkspaceConfig = async (
 };
 
 /**
+ * As readWorkspaceConfig, the row held until the transaction ends, so a second caller holding the
+ * same key reads it only after the first commits.
+ */
+export const holdWorkspaceConfig = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  key: string,
+): Promise<string | undefined> => {
+  const found = await tx.query<{ value: string }>(
+    "SELECT value FROM workspace_config WHERE workspace_id = $1 AND key = $2 FOR UPDATE",
+    [principal.workspaceId, key],
+  );
+  return found.rows[0]?.value;
+};
+
+/** Sets one setting by key in the workspace `tx` is scoped to, replacing any value it held. */
+export const writeWorkspaceConfig = async (
+  tx: Tx,
+  setting: { readonly workspaceId: WorkspaceId; readonly key: string; readonly value: string },
+): Promise<void> => {
+  await tx.query(
+    `INSERT INTO workspace_config (workspace_id, key, value) VALUES ($1, $2, $3)
+     ON CONFLICT (workspace_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+    [setting.workspaceId, setting.key, setting.value],
+  );
+};
+
+/**
  * Those of `names` that `information_schema.tables` lists in `public`, in no set order: a view
  * counts, and a table the role holds no privilege on does not.
  */

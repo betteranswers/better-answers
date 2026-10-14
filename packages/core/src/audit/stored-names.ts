@@ -65,6 +65,8 @@ export const STORED_ACT_NAMES = [
   "platform.audit_log.exported",
   "platform.job.followed",
   "platform.workspace.model_key_set",
+  "platform.workspace.spending_limit_set",
+  "platform.model.priced",
 ] as const;
 
 /**
@@ -137,4 +139,8 @@ export const STORED_DETAIL_KEYS = {
   capped: "capped",
   searchTooBroad: "searchTooBroad",
   modelProvider: "provider",
+  modelName: "model",
+  effectiveFrom: "effectiveFrom",
+  gbpPerMillionIn: "gbpPerMillionIn",
+  gbpPerMillionOut: "gbpPerMillionOut",
 } as const;

@@ -199,6 +199,7 @@ describe("a sweep pass over every workspace", () => {
             workspaceId: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
             uploads: { ok: true, value: { found: 0, removed: 0 } },
             map: { ok: true, value: [] },
+            spend: { ok: true, value: 0 },
           },
         ],
       },
@@ -295,5 +296,25 @@ describe("the session lock a sweep by hand holds", () => {
 
     await expect(run).rejects.toThrow("the work failed");
     expect({ during, after: await sessionLocksHeld() }).toEqual({ during: 1, after: 0 });
+  });
+});
+
+describe("a sweep pass and the spend held", () => {
+  it("settles a reservation a day past its expiry", async () => {
+    const workspace = await provisionedWorkspace(db(), "Reserved");
+    await seedingWith(db().pool, (seed) =>
+      seed.spendReservation({ workspaceId: workspace.workspaceId }),
+    );
+
+    const pass = await sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "list" });
+
+    expect(pass.ok && pass.value.swept.map((swept) => swept.spend)).toEqual([
+      { ok: true, value: 1 },
+    ]);
+    const settled = await db().pool.query(
+      "SELECT outcome, cost_gbp FROM llm_call WHERE workspace_id = $1",
+      [workspace.workspaceId],
+    );
+    expect(settled.rows).toEqual([{ outcome: "failed", cost_gbp: "0.15" }]);
   });
 });

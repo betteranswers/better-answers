@@ -575,6 +575,13 @@
       "when": 1792003139814,
       "tag": "0081_the-erased-flags-sentence",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1792017015489,
+      "tag": "0082_the-spend-ledger",
+      "breakpoints": true
     }
   ]
 }

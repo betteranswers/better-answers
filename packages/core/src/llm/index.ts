@@ -18,6 +18,16 @@ import type { Tx } from "../store/postgres/index.ts";
 export { openCredentials, openModelKeySetting } from "./credentials.ts";
 export type { Credentials, ModelKeySetting } from "./credentials.ts";
 export { checkTypedText } from "./typed-text.ts";
+export {
+  RESERVATION_LIFETIME_MS,
+  reserveSpend,
+  settleExpiredSpend,
+  settleSpend,
+  SPENDING_LIMIT_KEY,
+} from "./spend.ts";
+export type { CallSize, CallSpent } from "./spend.ts";
+export { storeModelPrice } from "./price.ts";
+export type { ModelPrice } from "./price.ts";
 
 export const LLM_PURPOSES = llmPurpose.enumValues;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];

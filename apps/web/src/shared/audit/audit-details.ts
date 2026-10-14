@@ -80,6 +80,10 @@ const VALUE_LABELS = new Map(
     capped: "Stopped at the limit",
     searchTooBroad: "Search named too many",
     provider: "AI Provider",
+    model: "AI Model",
+    effectiveFrom: "Priced From",
+    gbpPerMillionIn: "£ per Million Tokens In",
+    gbpPerMillionOut: "£ per Million Tokens Out",
     grants: "Access ended",
   }),
 );
