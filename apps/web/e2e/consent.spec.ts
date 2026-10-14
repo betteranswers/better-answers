@@ -14,6 +14,7 @@ import {
   person,
   provision,
   endEverySignInAndToken,
+  railOf,
   signIn,
   signInHeading,
   tokenPainted,
@@ -80,6 +81,7 @@ test("carries sign-in through consent to Claude's code on one origin", async ({
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await landedAtHome(page, "Admin");
+  await expect(railOf(page)).toBeVisible();
 
   await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
 
@@ -87,7 +89,7 @@ test("carries sign-in through consent to Claude's code on one origin", async ({
   expect(landedAt(page).origin).toBe(origin);
   expect(landedAt(page).pathname).toBe("/consent");
 
-  await expect(page.getByRole("navigation", { name: "Areas" })).toHaveCount(0);
+  await expect(railOf(page)).toHaveCount(0);
 
   await expect(page.getByText(`Claude will act as you, at ${workspace.name}.`)).toBeVisible();
   await expect(page.getByText("Read what you can see of the company’s knowledge")).toBeVisible();

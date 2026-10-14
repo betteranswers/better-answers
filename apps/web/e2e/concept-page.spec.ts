@@ -799,7 +799,7 @@ test.describe("the concept page", () => {
     expect(elapsedMs, "the concept rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
 
     await skipLinkReachesThePage(page);
-    await listsItsKeystrokes(page, "Search", [
+    await listsItsKeystrokes(page, "Search", KEY, [
       "Go Back to Search",
       "Go to the Concept’s Sources",
       "Go to the Concept’s Links",

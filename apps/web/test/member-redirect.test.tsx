@@ -76,6 +76,8 @@ const losingTheShellsRead = (role: Role) => {
 /** What a page's `beforeLoad` finds once the role is in hand and lets the reader see it. */
 const TAKEN = { hidden: false, unread: false };
 
+const INVITE = "Invite a Person";
+
 const memberAsks = () => asked.filter((name) => name === "session.member").length;
 
 const openAt = async (path: string, clients?: AppClients) => (await openApp(path, clients)).router;
@@ -156,7 +158,7 @@ describe("a person the api will not answer about", () => {
     expect(heading()).toBe("Page Not Found");
     expect(screen.getByRole("link", { name: "Go to Ask" })).toBeDefined();
     expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Invite a Person" })).toBeNull();
+    expect(screen.queryByRole("button", { name: INVITE })).toBeNull();
   });
 
   it("holds the verdict taken when the role arrives", async () => {
@@ -165,6 +167,7 @@ describe("a person the api will not answer about", () => {
     const rail = () => within(screen.getByRole("navigation", { name: "Areas" }));
     await rail().findByRole("link", { name: "Control Centre" });
     await vi.waitFor(() => expect(router.state.matches.at(-1)?.context).toMatchObject(TAKEN));
+    expect(await screen.findByRole("button", { name: INVITE })).toBeDefined();
 
     // An Admin who demotes themself reads their role again, as a Viewer.
     vi.stubGlobal("fetch", answeringAs("Viewer"));

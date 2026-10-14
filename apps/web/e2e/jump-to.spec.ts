@@ -31,6 +31,9 @@ const MODELS_AND_SPEND = pageNamed(MODELS, "Models and Spend");
 /** Declared and never built, so no reader may find it. */
 const SIGNALS = "Signals";
 
+/** Throws once no declared page has that name, so the test never types a word that names none. */
+const SIGNALS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), SIGNALS);
+
 const EVERY_WORKSPACE = pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every Workspace");
 
 const NARROW = { width: 320, height: 720 };
@@ -372,6 +375,7 @@ test("offers the operator in the console no search row", async ({ page, request 
 test("finds nothing by an unbuilt page's name", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Nidderdale Forge");
 
+  expect(SIGNALS_PAGE.built, `${SIGNALS} is built, so a reader may find it`).toBe(false);
   await opened(page, "Meta+k");
   await expect(groupOf(page, "Members")).toBeVisible();
   await typed(page, SIGNALS);

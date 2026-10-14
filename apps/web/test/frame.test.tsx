@@ -42,6 +42,8 @@ const rail = () => screen.getByRole("navigation", { name: "Areas" });
 
 const menu = () => screen.getByRole("navigation", { name: "Control Centre" });
 
+const JUMP_TO = "Jump To";
+
 const namesIn = (region: HTMLElement, role: "link" | "heading" = "link") =>
   within(region)
     .queryAllByRole(role, role === "heading" ? { level: 3 } : {})
@@ -112,6 +114,7 @@ describe("the shell's regions", () => {
     for (const name of ["Control Centre", "Models", "Models and Spend"]) {
       expect(within(bar).getByText(name, { exact: true })).toBeDefined();
     }
+    expect(within(bar).getByRole("button", { name: JUMP_TO })).toBeDefined();
   });
 
   it("names an area's home once in the band", async () => {
@@ -194,7 +197,7 @@ describe("jump to, while no role is held", () => {
     await openWithNoRoleAt("/people/members");
 
     const band = within(screen.getByRole("banner"));
-    expect(band.queryByRole("button", { name: "Jump To" })).toBeNull();
+    expect(band.queryByRole("button", { name: JUMP_TO })).toBeNull();
   });
 
   it("leaves its chord to the browser", async () => {
@@ -215,7 +218,7 @@ describe("jump to, while no role is held", () => {
     );
 
     expect(actions).toContain("Show This List");
-    expect(actions).not.toContain("Jump To");
+    expect(actions).not.toContain(JUMP_TO);
   });
 });
 

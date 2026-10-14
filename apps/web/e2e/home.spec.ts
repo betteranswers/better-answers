@@ -12,6 +12,7 @@ import {
   keystrokesDismissed,
   keystrokesListed,
   landedAtHome,
+  navOf,
   notFoundOfferingHome,
   person,
   provision,
@@ -38,6 +39,9 @@ const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
   await signIn(page, api, email);
 };
 
+/** Found on an Admin's home, so its absence from another role's names a menu the shell does draw. */
+const controlCentreMenu = (page: Page) => navOf(page, "Control Centre");
+
 const unknownPage = (page: Page) => page.getByRole("heading", { level: 1, name: "Page Not Found" });
 
 /** In the shell, past the skip link, the not-found's one link is the way home. */
@@ -61,6 +65,7 @@ for (const role of ROLES) {
     await signedInAs(page, request, role);
 
     await landedAtHome(page, role);
+    await expect(controlCentreMenu(page)).toHaveCount(role === "Admin" ? 1 : 0);
   });
 
   test(`offers ${A_ROLE[role]} their own home at an unknown address`, async ({
@@ -104,7 +109,7 @@ for (const role of ["Editor", "Viewer"] as const) {
           - listitem:
             - link "Knowledge"
     `);
-    await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
+    await expect(controlCentreMenu(page)).toHaveCount(0);
     const address = await askShowsTheServedAddress(page);
     await expect(page.getByRole("main")).toMatchAriaSnapshot(`
       - main "Page":
@@ -160,7 +165,7 @@ for (const role of ["Editor", "Viewer"] as const) {
       neverExisted,
     );
     await expect(page.getByRole("tablist")).toHaveCount(0);
-    await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
+    await expect(controlCentreMenu(page)).toHaveCount(0);
 
     await personMenu(page, role).click();
     await expect(page.getByRole("menuitem")).toHaveText(["Account", "Sign Out"]);

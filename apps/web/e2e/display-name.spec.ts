@@ -14,6 +14,7 @@ import {
   saysSomethingNew,
   saysARefusal,
   signIn,
+  signInHeading,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
 import { refusalAnswering } from "./refused-read.ts";
@@ -150,7 +151,7 @@ test("says what to change in a bad name, then saves", async ({
 test("sends a signed-out visitor from the display-name page to sign-in", async ({ page }) => {
   await page.goto("/display-name");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
+  await expect(signInHeading(page)).toBeVisible();
   await expect(page).toHaveURL(/\/sign-in$/);
 });
 
@@ -172,5 +173,5 @@ test("refuses a save after the session ended, offering sign-in again", async ({
   await saysARefusal(page.getByRole("alert"));
   await expect(displayNameField(page)).toHaveAttribute("aria-invalid", "false");
   await page.getByRole("button", { name: "Sign In Again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
+  await expect(signInHeading(page)).toBeVisible();
 });

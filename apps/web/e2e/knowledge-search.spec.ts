@@ -775,7 +775,7 @@ test.describe("the Knowledge Search page", () => {
     await anAdminAtSearch(page, request, "Calder Records", [handbookSeeded]);
     await skipLinkReachesThePage(page);
 
-    await listsItsKeystrokes(page, "Search", [
+    await listsItsKeystrokes(page, "Search", KEY, [
       "Search This Workspace’s Knowledge",
       "Show More Matches",
     ]);

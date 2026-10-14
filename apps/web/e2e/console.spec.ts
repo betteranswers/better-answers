@@ -39,6 +39,9 @@ const LIST_BUDGET_MS = 1000;
 
 const EVERY_WORKSPACE = HOMES.operator.path;
 
+/** Found where an Admin lands, so its absence from the console names a menu the shell does draw. */
+const controlCentreMenu = (page: Page) => navOf(page, "Control Centre");
+
 const CLOSED = "Access Denied";
 
 const UK_DAY =
@@ -128,7 +131,7 @@ test.describe("the way into the console", () => {
       "Names Waiting",
       "Every Workspace",
     ]);
-    await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
+    await expect(controlCentreMenu(page)).toHaveCount(0);
 
     const you = await personMenuOpened(page, workspace.admin.name);
     await expect(you.getByText(workspace.admin.name, { exact: true })).toBeVisible();
@@ -169,6 +172,7 @@ test.describe("the way into the console", () => {
     await expect(page.getByRole("link", { name: "Back to Your Workspaces" })).toBeFocused();
     await page.keyboard.press("Enter");
     await landedAtHome(page, "Admin");
+    await expect(controlCentreMenu(page)).toBeVisible();
   });
 
   test("sends a signed-out operator to sign in, then back", async ({ page, request }) => {

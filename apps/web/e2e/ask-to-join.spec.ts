@@ -11,6 +11,7 @@ import {
   saysARefusal,
   saysTheWait,
   signedInWithNoWorkspace,
+  signInHeading,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
 import { refusalAnswering } from "./refused-read.ts";
@@ -187,7 +188,7 @@ test("sends a person whose session ended back to sign in", async ({ page, contex
   await saysARefusal(page.getByRole("alert"));
   await thePageSaysNeither(page, "once the session ended");
   await page.getByRole("button", { name: "Sign In Again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
+  await expect(signInHeading(page)).toBeVisible();
 });
 
 test("names no organisation or old word, nor in keystrokes", async ({ page, request }) => {
