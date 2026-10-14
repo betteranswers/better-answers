@@ -6,7 +6,14 @@ import { z } from "zod";
 import type { AUDIENCES, REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
-import { landedAtHome, switcherOf } from "./locators.ts";
+import {
+  authenticatorCodeField,
+  emailField,
+  landedAtHome,
+  sendCodeButton,
+  switcherOf,
+  verificationCodeField,
+} from "./locators.ts";
 
 export * from "./locators.ts";
 
@@ -430,10 +437,10 @@ export const signInByEmail = async (
   api: APIRequestContext,
   email: string,
 ): Promise<void> => {
-  await page.getByLabel("Email Address").fill(email);
-  await page.getByRole("button", { name: "Send Code" }).click();
+  await emailField(page).fill(email);
+  await sendCodeButton(page).click();
 
-  const code = page.getByLabel("Verification Code", { exact: true });
+  const code = verificationCodeField(page);
   await expect(code).toBeVisible();
   await code.fill(await codeSentTo(api, email));
 
@@ -462,9 +469,7 @@ const confirmedWithTheHarness = async (
   await factorsRead(page);
   const key = await withAnAuthenticator(api, email);
   await page.goto(`/confirm${new URL(page.url()).search}`);
-  await page
-    .getByRole("textbox", { name: "Authenticator Code" })
-    .fill(authenticatorCodeAt(key, new Date()));
+  await authenticatorCodeField(page).fill(authenticatorCodeAt(key, new Date()));
   await expect(page).not.toHaveURL(/\/confirm(?:\?|$)/);
 };
 

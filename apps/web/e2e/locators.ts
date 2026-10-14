@@ -129,6 +129,19 @@ const SIGN_IN_HEADINGS = {
 export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "nothing"): Locator =>
   page.getByRole("heading", { level: 1, name: SIGN_IN_HEADINGS[carriedOn], exact: true });
 
+/* Shared with the journeys, so a sign-in rename the suite catches is fixed before a release walks them. */
+
+export const emailField = (page: Page): Locator => page.getByLabel("Email Address");
+
+export const sendCodeButton = (page: Page): Locator =>
+  page.getByRole("button", { name: "Send Code" });
+
+export const verificationCodeField = (page: Page): Locator =>
+  page.getByLabel("Verification Code", { exact: true });
+
+export const authenticatorCodeField = (page: Page): Locator =>
+  page.getByLabel("Authenticator Code", { exact: true });
+
 /**
  * `?` opens the keystrokes of the page `named`, as the navigation list names it, from anywhere on
  * it outside a field.

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
+import { authenticatorCodeField } from "../e2e/locators.ts";
 import { couldNotRun, failed } from "./outcome.ts";
 import { refusedTheRun } from "./sign-in.ts";
 
@@ -56,7 +57,7 @@ export const keyFromTheHarness =
 
 /** A page that sets a factor up, not one that confirms it, means the test Admin holds none. */
 const theConfirmPage = async (page: Page): Promise<void> => {
-  const field = page.getByLabel("Authenticator Code", { exact: true });
+  const field = authenticatorCodeField(page);
   const setup = page.getByRole("heading", { level: 1, name: "Set Up a Second Factor" });
   await expect(field.or(setup)).toBeVisible();
   if (await setup.isVisible()) {
@@ -77,7 +78,7 @@ const judged = (status: number): void => {
 export const confirmedWith = (page: Page, key: string): Promise<void> =>
   test.step("Confirm the second factor", async () => {
     await theConfirmPage(page);
-    const field = page.getByLabel("Authenticator Code", { exact: true });
+    const field = authenticatorCodeField(page);
     const answered = page.waitForResponse(
       (response) =>
         response.request().method() === "POST" && new URL(response.url()).pathname === CONFIRM_PATH,
