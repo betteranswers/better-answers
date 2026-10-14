@@ -33,8 +33,8 @@ export function PageHead(properties: {
 }
 
 /**
- * An open tab already names its list, so there the heading is a screen reader's, drawn only
- * while the keyboard holds focus on it.
+ * An open tab names its list, so the heading is a screen reader's. Its focus rings the count line:
+ * drawn, it would move rows.
  */
 export function ListHead(properties: {
   readonly heading: string;
@@ -55,14 +55,19 @@ export function ListHead(properties: {
         id={headingId}
         ref={headingRef}
         tabIndex={headingRef === undefined ? undefined : -1}
-        className={cn(namedByATab && "sr-only focus-visible:not-sr-only")}
+        className={cn(namedByATab && "peer sr-only")}
       >
         {heading}
       </h2>
       {description === undefined ? null : (
         <p className="mt-1 text-muted-foreground">{description}</p>
       )}
-      <div className="mt-1 flex min-h-8 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div
+        className={cn(
+          "mt-1 flex min-h-8 flex-wrap items-center justify-between gap-x-4 gap-y-2",
+          namedByATab && "peer-focus-visible:shadow-[var(--focus-ring)]",
+        )}
+      >
         <output className="block text-muted-foreground">{count}</output>
         {action}
       </div>
