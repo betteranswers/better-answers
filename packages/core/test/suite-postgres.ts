@@ -199,7 +199,7 @@ const HOLD_OF: Readonly<Record<Released, string>> = {
 export const whileActionsWaitAt = async <T>(
   pool: pg.Pool,
   table: string,
-  event: "INSERT" | "UPDATE",
+  event: "INSERT" | "UPDATE" | "DELETE",
   work: (release: () => Promise<void>) => Promise<T>,
   released: Released = "in turn",
 ): Promise<T> => {
@@ -212,9 +212,14 @@ export const whileActionsWaitAt = async <T>(
     await holder.query(`SELECT pg_advisory_unlock(${key}, ${key})`);
   };
   await holder.query(`SELECT pg_advisory_lock(${key}, ${key})`);
+  // A delete has no NEW, and a row trigger that answers null skips its row.
   await pool.query(
     `CREATE OR REPLACE FUNCTION test_actions_wait_at() RETURNS trigger LANGUAGE plpgsql AS $$
-     BEGIN PERFORM ${HOLD_OF[released]}(${key}, ${key}); RETURN NEW; END $$`,
+     BEGIN
+       PERFORM ${HOLD_OF[released]}(${key}, ${key});
+       IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+       RETURN NEW;
+     END $$`,
   );
   await pool.query(
     `CREATE TRIGGER test_actions_wait_at BEFORE ${event} ON "${table}"

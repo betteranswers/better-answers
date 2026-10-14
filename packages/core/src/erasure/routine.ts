@@ -58,7 +58,10 @@ export type ErasureLogLine = {
   readonly last_active_deleted: number;
 };
 
-/** What the questions step did, which a rerun finds already done and counts as nothing. */
+/**
+ * What one sweep of the questions did, the questions step's or the identity step's; a rerun
+ * finds it done and counts nothing.
+ */
 export type QuestionsLogLine = {
   readonly actor: typeof ERASURE_ACTOR;
   readonly erasure_request_id: string;
@@ -76,6 +79,9 @@ export type ErasureLog = {
 };
 
 const QUESTIONS_STEP_LOGGED = "erasure: what the questions step rewrote and removed";
+
+const QUESTIONS_SINCE_LOGGED =
+  "erasure: what was asked or flagged after the questions step, rewritten and removed as the member ended";
 
 const IDENTITY_STEP_LOGGED =
   "erasure: the identity step's arm, and what it pseudonymised and deleted";
@@ -339,6 +345,17 @@ const questionsStepLineOf = (
   feedback_rewritten: swept.feedbackRewritten,
 });
 
+/** A sweep that found nothing has no count to keep. */
+const logTheSweep = (log: ErasureLog, line: QuestionsLogLine, message: string): void => {
+  if (line.records_rewritten + line.feedback_rewritten > 0) log.info(line, message);
+};
+
+const inBothSweeps = (step: QuestionsSwept, since: QuestionsSwept): QuestionsSwept => ({
+  rewritten: step.rewritten + since.rewritten,
+  questionsRemoved: step.questionsRemoved + since.questionsRemoved,
+  feedbackRewritten: step.feedbackRewritten + since.feedbackRewritten,
+});
+
 const IDENTITY_USER: ErasureFamily = "identity-user";
 
 const personTheMapFound = (map: ErasureMap): string | null =>
@@ -586,14 +603,12 @@ export const runErasure = async (
       }),
     );
     if (!questions.ok) return err(questions.error);
-    // Logged as the step commits, for the identity step's reason below; a step that found
-    // nothing has no count to keep.
-    if (questions.value.rewritten + questions.value.feedbackRewritten > 0) {
-      doors.log.info(
-        questionsStepLineOf(platform, erasure.id, questions.value),
-        QUESTIONS_STEP_LOGGED,
-      );
-    }
+    // Logged as the step commits, for the identity step's reason below.
+    logTheSweep(
+      doors.log,
+      questionsStepLineOf(platform, erasure.id, questions.value),
+      QUESTIONS_STEP_LOGGED,
+    );
 
     const identity = await attempt(() =>
       eraseFromTheIdentitySet(platform, doors.postgres, {
@@ -607,6 +622,11 @@ export const runErasure = async (
     // Logged as the step commits, not at completion: a run that dies after it leaves the next
     // run nothing left to count.
     doors.log.info(identityStepLineOf(platform, erasure.id, identity.value), IDENTITY_STEP_LOGGED);
+    logTheSweep(
+      doors.log,
+      questionsStepLineOf(platform, erasure.id, identity.value.questionsSince),
+      QUESTIONS_SINCE_LOGGED,
+    );
 
     const rederived = await attempt(() =>
       rederiveAfterErasure(platform, doors.postgres, {
@@ -631,7 +651,7 @@ export const runErasure = async (
           connectedSourcesToReprocess: rederived.value.connectedSourcesToReprocess,
         },
       ),
-      questions.value,
+      inBothSweeps(questions.value, identity.value.questionsSince),
     );
     return completeTheRequest(platform, doors, workspaceId, opened.value, actions);
   });
