@@ -100,7 +100,8 @@ export const questionRowsOf = async (pool: pg.Pool, recordId: string) => {
     skeleton: await read("SELECT asked_by, verdict FROM question_asked WHERE id = $1"),
     content: await read("SELECT question FROM question_content WHERE record_id = $1"),
     feedback: await read(
-      `SELECT given_by, reason, note, disputed_sentence
+      `SELECT given_by, reason, note, disputed_sentence,
+              disputed_concept IS NOT NULL AS rests_on_a_concept
          FROM question_feedback WHERE record_id = $1`,
     ),
   };
@@ -116,11 +117,12 @@ export const asAsked = (asker: string) => ({
       reason: "wrong",
       note: A_NOTE_ON_A_FLAG,
       disputed_sentence: A_DISPUTED_SENTENCE,
+      rests_on_a_concept: true,
     },
   ],
 });
 
-/** The same rows once an erasure has reached them: the skeleton and the flag stay, renamed. */
+/** The rows once erased: renamed, the flag keeping its reason and concept but no free text. */
 export const asErased = (pseudonym: string) => ({
   skeleton: [{ asked_by: `human:${pseudonym}`, verdict: "related" }],
   content: [],
@@ -129,7 +131,8 @@ export const asErased = (pseudonym: string) => ({
       given_by: `human:${pseudonym}`,
       reason: "wrong",
       note: null,
-      disputed_sentence: A_DISPUTED_SENTENCE,
+      disputed_sentence: null,
+      rests_on_a_concept: true,
     },
   ],
 });

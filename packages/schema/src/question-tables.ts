@@ -155,13 +155,14 @@ export const questionFeedback = withRLS(
       "question_feedback_reason_check",
       sql.raw(`reason IS NULL OR reason IN (${listed(FEEDBACK_REASONS)})`),
     ),
+    // A concept may outlive its sentence: an erasure clears the sentence and keeps what it rested on.
     check(
       "question_feedback_flag_check",
       sql.raw(
         `(verdict = '${FEEDBACK_FLAG_VERDICT}') = (reason IS NOT NULL)
          AND (note IS NULL OR verdict = '${FEEDBACK_FLAG_VERDICT}')
-         AND (disputed_sentence IS NULL OR verdict = '${FEEDBACK_FLAG_VERDICT}')
-         AND (disputed_sentence IS NULL) = (disputed_concept IS NULL)`,
+         AND (disputed_concept IS NULL OR verdict = '${FEEDBACK_FLAG_VERDICT}')
+         AND (disputed_sentence IS NULL OR disputed_concept IS NOT NULL)`,
       ),
     ),
   ],
