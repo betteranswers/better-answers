@@ -342,8 +342,18 @@ describe("what feedback refuses", () => {
         "admitted",
       );
       expect(await given(client, id, ["flag", "wrong", null, sentence, null])).toBe(shape);
-      expect(await given(client, id, ["flag", "wrong", null, null, A_CONCEPT])).toBe(shape);
       expect(await given(client, id, ["helpful", null, null, sentence, A_CONCEPT])).toBe(shape);
+    });
+  });
+
+  it("keeps a flag's concept once an erasure cleared its sentence", async () => {
+    await withRollback(db().pool, async (client) => {
+      const { id } = await testData(client).questionAsked({ workspaceId: WS_A });
+
+      expect(await given(client, id, ["flag", "wrong", null, null, A_CONCEPT])).toBe("admitted");
+      expect(await given(client, id, ["helpful", null, null, null, A_CONCEPT])).toBe(
+        "question_feedback_flag_check",
+      );
     });
   });
 });

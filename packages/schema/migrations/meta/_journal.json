@@ -568,6 +568,13 @@
       "when": 1791998863438,
       "tag": "0080_the-concept-description",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1792003139814,
+      "tag": "0081_the-erased-flags-sentence",
+      "breakpoints": true
     }
   ]
 }

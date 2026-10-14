@@ -309,7 +309,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "write",
     reason:
-      "Feedback names who gave it and may carry their note, so the erasure rewrites the id as it does on the record and clears the note; the reason and the disputed sentence stay.",
+      "Feedback names who gave it and may carry their note, so the erasure rewrites the id as it does on the record and clears the note and the disputed sentence; the reason and the disputed concept stay.",
   },
   {
     table: "index.passage",

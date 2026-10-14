@@ -2161,7 +2161,7 @@ describe("the questions a person asked", () => {
 
   const rowsOf = (recordId: string) => questionRowsOf(db().pool, recordId);
 
-  it("rewrites the asker, removes the question and the note", async () => {
+  it("rewrites the asker, removes the question, note and disputed sentence", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const theirs = await recordAskedBy(db().pool, scenario.workspaceId, person.id);
     expect(await rowsOf(theirs.recordId)).toEqual(asAsked(theirs.asker));
@@ -2338,7 +2338,13 @@ describe("the questions a person asked", () => {
     skeleton: [{ asked_by: asker, verdict: "refuse" }],
     content: [{ question: A_LATE_QUESTION }],
     feedback: [
-      { given_by: asker, reason: "incomplete", note: A_LATE_NOTE, disputed_sentence: null },
+      {
+        given_by: asker,
+        reason: "incomplete",
+        note: A_LATE_NOTE,
+        disputed_sentence: null,
+        rests_on_a_concept: false,
+      },
     ],
   });
 
@@ -2346,7 +2352,13 @@ describe("the questions a person asked", () => {
     skeleton: [{ asked_by: `human:${pseudonym}`, verdict: "refuse" }],
     content: [],
     feedback: [
-      { given_by: `human:${pseudonym}`, reason: "incomplete", note: null, disputed_sentence: null },
+      {
+        given_by: `human:${pseudonym}`,
+        reason: "incomplete",
+        note: null,
+        disputed_sentence: null,
+        rests_on_a_concept: false,
+      },
     ],
   });
 
