@@ -56,7 +56,9 @@ import {
   mapNode,
   job,
   llmCall,
+  modelChoice,
   modelKey,
+  modelPrice,
   sourceDocument,
   spendReservation,
   suppression,
@@ -219,6 +221,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
   "set-spending-limit": [llmCall, spendReservation],
   "set-model-key": [modelKey],
+  "set-model-choice": [modelChoice, modelPrice],
 };
 
 const idOnTheDoneLine = (run: Run): string => {
