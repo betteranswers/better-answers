@@ -21,6 +21,8 @@ const A_NOTE = "The period changed in May.";
 
 const A_DISPUTED_SENTENCE = "Audit logs are kept for a year.";
 
+const A_CONCEPT_NEVER_RETURNED = "https://better-answers.com/c/01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
 /** What the tool says of a record the caller may not give feedback on, whatever the reason. */
 const NO_SUCH_RECORD = {
   content: [{ type: "text", text: "Refused: not-found (absent)." }],
@@ -34,7 +36,7 @@ const connected = async () => {
   const workspace = await app().provision();
   const client = app().client();
   const tokens = await connectAsHost(app(), client, workspace.admin, { scope: FULL_SCOPE });
-  const { concepts } = await seedConcepts(
+  await seedConcepts(
     app(),
     conceptsSeeding.parse({
       workspaceId: workspace.workspaceId,
@@ -42,7 +44,7 @@ const connected = async () => {
       concepts: [{ title: RETENTION_QUESTION, body: "Audit logs are kept for thirteen months." }],
     }),
   );
-  return { workspace, client, token: tokens.accessToken, concept: concepts[0]?.iri };
+  return { workspace, client, token: tokens.accessToken };
 };
 
 /** A Viewer of `workspaceId` with a token of their own that may give feedback. */
@@ -59,10 +61,10 @@ const answered = z.object({
   related: z.array(z.object({ iri: z.string() })),
 });
 
-/** Asks the retention question and hands back the id of the record kept of it. */
-const asked = async ({ client, token }: Connected): Promise<string> => {
+/** Asks the retention question: the record's id and the concepts, as the wire gave them. */
+const asked = async ({ client, token }: Connected) => {
   const said = await calledTool(client, token, "ask", { question: RETENTION_QUESTION });
-  return answered.parse(structured(said)).recordId;
+  return answered.parse(structured(said));
 };
 
 const given = ({ client, token }: Connected, feedback: Rpc): Promise<Rpc> =>
@@ -99,8 +101,9 @@ const helpfulFrom = (userId: string) => ({
 describe("feedback an assistant sends on a record", () => {
   it("AE8: stores a flag with its sentence, queueing nothing", async () => {
     const host = await connected();
-    const { workspace, concept } = host;
-    const recordId = await asked(host);
+    const { workspace } = host;
+    const { recordId, related } = await asked(host);
+    const concept = related[0]?.iri;
     const before = await queuedIn(workspace.workspaceId);
     const feedback = {
       recordId,
@@ -132,7 +135,7 @@ describe("feedback an assistant sends on a record", () => {
   it("stores helpful with no reason", async () => {
     const host = await connected();
     const { workspace } = host;
-    const recordId = await asked(host);
+    const { recordId } = await asked(host);
 
     const said = await given(host, { recordId, verdict: "helpful" });
 
@@ -144,7 +147,7 @@ describe("feedback an assistant sends on a record", () => {
 
   it("stores a second flag beside the first", async () => {
     const host = await connected();
-    const recordId = await asked(host);
+    const { recordId } = await asked(host);
 
     await given(host, { recordId, verdict: "flag", reason: "incomplete", note: A_NOTE });
     await given(host, { recordId, verdict: "flag", reason: "out-of-date" });
@@ -158,7 +161,7 @@ describe("feedback an assistant sends on a record", () => {
   it("refuses another member's record and a missing one alike", async () => {
     const host = await connected();
     const { workspace } = host;
-    const recordId = await asked(host);
+    const { recordId } = await asked(host);
     const colleague = await aColleagueIn(workspace.workspaceId);
 
     const anothers = await given(colleague, { recordId, verdict: "flag", reason: "wrong" });
@@ -167,6 +170,43 @@ describe("feedback an assistant sends on a record", () => {
     expect(await feedbackKeptOn(recordId)).toEqual([]);
     expect(anothers).toEqual(NO_SUCH_RECORD);
     expect(missing).toEqual(NO_SUCH_RECORD);
+  });
+
+  it("says nothing of a colleague's record, whatever concept is disputed", async () => {
+    const host = await connected();
+    const { recordId } = await asked(host);
+    const colleague = await aColleagueIn(host.workspace.workspaceId);
+
+    const refused = await given(colleague, {
+      recordId,
+      verdict: "flag",
+      reason: "wrong",
+      disputed: { sentence: A_DISPUTED_SENTENCE, concept: A_CONCEPT_NEVER_RETURNED },
+    });
+
+    expect(await feedbackKeptOn(recordId)).toEqual([]);
+    expect(refused).toEqual(NO_SUCH_RECORD);
+  });
+
+  it("refuses an Admin feedback on a Viewer's record", async () => {
+    const host = await connected();
+    const colleague = await aColleagueIn(host.workspace.workspaceId);
+    const { recordId } = await asked(colleague);
+
+    const refused = await given(host, { recordId, verdict: "flag", reason: "wrong" });
+
+    expect(await feedbackKeptOn(recordId)).toEqual([]);
+    expect(refused).toEqual(NO_SUCH_RECORD);
+  });
+
+  it("refuses a note sent with helpful, storing nothing", async () => {
+    const host = await connected();
+    const { recordId } = await asked(host);
+
+    const refused = await given(host, { recordId, verdict: "helpful", note: A_NOTE });
+
+    expect(await feedbackKeptOn(recordId)).toEqual([]);
+    expect(rendered(refused)).toBe("Refused: malformed (malformed). Fields: note wrong-type.");
   });
 
   it("refuses a record with no verdict as one never asked", async () => {
@@ -187,7 +227,7 @@ describe("feedback an assistant sends on a record", () => {
 
   it("refuses a flag with a reason outside the four", async () => {
     const host = await connected();
-    const recordId = await asked(host);
+    const { recordId } = await asked(host);
 
     const refused = await given(host, { recordId, verdict: "flag", reason: "rude" });
 
@@ -198,14 +238,12 @@ describe("feedback an assistant sends on a record", () => {
 
   it("refuses a disputed concept the record never returned", async () => {
     const host = await connected();
-    const recordId = await asked(host);
-    const neverReturned = `https://better-answers.com/c/${ulid()}`;
-
+    const { recordId } = await asked(host);
     const refused = await given(host, {
       recordId,
       verdict: "flag",
       reason: "wrong",
-      disputed: { sentence: A_DISPUTED_SENTENCE, concept: neverReturned },
+      disputed: { sentence: A_DISPUTED_SENTENCE, concept: A_CONCEPT_NEVER_RETURNED },
     });
 
     expect(await feedbackKeptOn(recordId)).toEqual([]);
@@ -217,7 +255,7 @@ describe("feedback an assistant sends on a record", () => {
   it("holds a revocation of the member until its commit", async () => {
     const host = await connected();
     const { workspace } = host;
-    const recordId = await asked(host);
+    const { recordId } = await asked(host);
     const store = app().database.superuser;
     const landed: string[] = [];
 

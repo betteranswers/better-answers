@@ -793,16 +793,16 @@ describe("feedback given on a record", () => {
     ]);
   });
 
+  /** A completed record another Viewer of the giver's workspace asked. */
+  const aColleaguesRecord = async (giver: UserPrincipal): Promise<string> => {
+    const colleague = await seedingWith(db().pool, (seed) =>
+      seed.member({ workspaceId: giver.workspaceId, role: "Viewer" }),
+    );
+    return recordOf(await principalFor(db(), giver.workspaceId, colleague.userId));
+  };
+
   it.each([
-    [
-      "a colleague asked",
-      async (giver: UserPrincipal) => {
-        const colleague = await seedingWith(db().pool, (seed) =>
-          seed.member({ workspaceId: giver.workspaceId, role: "Viewer" }),
-        );
-        return recordOf(await principalFor(db(), giver.workspaceId, colleague.userId));
-      },
-    ],
+    ["a colleague asked", aColleaguesRecord],
     ["nobody asked", async () => ulid()],
     ["left with no verdict", (giver: UserPrincipal) => recordOf(giver, "open")],
   ])("answers not-found for a record %s", async (_case, recordFor) => {
@@ -817,11 +817,9 @@ describe("feedback given on a record", () => {
     expect(refused).toEqual({ ok: false, error: "not-found" });
   });
 
-  it("refuses a disputed concept the record does not cite", async () => {
-    const asker = await anAsker();
-    const recordId = await recordOf(asker);
-
-    const refused = await acting(asker, (principal, tx) =>
+  /** A flag on a sentence resting on `ABSENT`, a concept no record here returned. */
+  const disputingAnUncitedConcept = (giver: UserPrincipal, recordId: string) =>
+    acting(giver, (principal, tx) =>
       giveFeedback(
         principal,
         tx,
@@ -835,11 +833,27 @@ describe("feedback given on a record", () => {
       ),
     );
 
+  it("refuses a disputed concept the record does not cite", async () => {
+    const asker = await anAsker();
+    const recordId = await recordOf(asker);
+
+    const refused = await disputingAnUncitedConcept(asker, recordId);
+
     expect(await feedbackOn(recordId)).toEqual([]);
     expect(refused).toEqual({
       ok: false,
       error: { word: "malformed", fields: { "disputed.concept": "not-in-set" } },
     });
+  });
+
+  it("answers not-found before comparing a colleague's disputed concept", async () => {
+    const giver = await anAsker();
+    const recordId = await aColleaguesRecord(giver);
+
+    const refused = await disputingAnUncitedConcept(giver, recordId);
+
+    expect(await feedbackOn(recordId)).toEqual([]);
+    expect(refused).toEqual({ ok: false, error: "not-found" });
   });
 });
 
@@ -893,6 +907,20 @@ describe("the boundary feedback is parsed at", () => {
     ["a malformed record id", { recordId: "the last one" }, { recordId: "bad-format" }],
   ])("refuses a flag with %s", (_case, more, fields) => {
     expect(flagging(more)).toEqual(malformedAt(fields));
+  });
+
+  it.each([
+    ["a reason", { reason: "wrong" }, { reason: "wrong-type" }],
+    ["a note", { note: A_NOTE }, { note: "wrong-type" }],
+    [
+      "a disputed sentence",
+      { disputed: { sentence: A_DISPUTED_SENTENCE, concept: CITED } },
+      { disputed: "wrong-type" },
+    ],
+  ])("refuses helpful sent with %s", (_case, more, fields) => {
+    expect(parse(feedbackInput, { recordId: A_RECORD, verdict: "helpful", ...more })).toEqual(
+      malformedAt(fields),
+    );
   });
 
   it("describes every feedback input field", () => {

@@ -62,8 +62,17 @@ export const feedbackFields = z.object({
     ),
 });
 
+/** Sent with `helpful`, a flag's field is refused by name: stripped, it would be lost unsaid. */
+const flagOnly = z.never().optional();
+
 export const feedbackInput = z.discriminatedUnion("verdict", [
-  z.object({ recordId, verdict: z.literal("helpful") }),
+  z.object({
+    recordId,
+    verdict: z.literal("helpful"),
+    reason: flagOnly,
+    note: flagOnly,
+    disputed: flagOnly,
+  }),
   z.object({
     recordId,
     verdict: z.literal("flag"),
@@ -89,12 +98,13 @@ const giveFeedbackAction = declareAction({
 });
 
 /**
- * Row-level security shows a colleague's record too, so `asked_by` is what withholds it. `cites`
- * is true where no concept is named.
+ * `asked_by` withholds a colleague's record, which row-level security shows. The share lock makes
+ * an erasure's rewrite wait, so it finds this feedback too.
  */
 const THE_GIVERS_RECORD = `SELECT ($4::jsonb IS NULL OR concepts @> $4::jsonb) AS cites
    FROM question_asked
-  WHERE workspace_id = $1 AND id = $2 AND asked_by = $3 AND completed_at IS NOT NULL`;
+  WHERE workspace_id = $1 AND id = $2 AND asked_by = $3 AND completed_at IS NOT NULL
+    FOR SHARE`;
 
 const ITS_FEEDBACK = `INSERT INTO question_feedback
     (workspace_id, id, record_id, given_at, given_by, verdict, reason, note,

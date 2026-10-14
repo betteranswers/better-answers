@@ -8,10 +8,10 @@ import {
   listPlatformObjects,
   openObjects,
 } from "@better-answers/core/store/objects";
-import { withScope } from "@better-answers/core/store/postgres";
+import { openPostgres, withHeldPrincipal, withScope } from "@better-answers/core/store/postgres";
 import { boundarySchemas, IDENTITY_SET, ulid, type ConceptIri } from "@better-answers/schema";
 
-import { open, trustWords } from "../src/answering/index.ts";
+import { giveFeedback, open, trustWords } from "../src/answering/index.ts";
 import {
   contentHashOf,
   RECONCILER,
@@ -2221,6 +2221,31 @@ describe("the questions a person asked", () => {
       erased,
       flagStanding(anothers.asker),
     ]);
+  });
+
+  it("renames a flag its giver stored while erasure ran", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const { workspaceId } = scenario;
+    const theirs = await recordAskedBy(db().pool, workspaceId, person.id);
+    const flag = { recordId: theirs.recordId, verdict: "flag", reason: "incomplete" } as const;
+    const ended: string[] = [];
+
+    await whileActionsWaitAt(db().pool, "question_feedback", "INSERT", async (release) => {
+      const giving = withHeldPrincipal(
+        openPostgres(db().runtimePool),
+        { workspaceId, userId: person.id, issuedAt: LOCKED_AT },
+        (giver, tx) => giveFeedback(giver, tx, { ...flag, note: "Still wrong." }, LOCKED_AT),
+      );
+      await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
+      const erasing = completing(scenario, subjectRequestId).then(() => ended.push("erasure"));
+      await until(async () => ended.length > 0 || (await countWaitingOnLocks(db().pool)) === 2);
+      await release();
+      await giving;
+      await erasing;
+    });
+
+    const erased = { given_by: `human:${await pseudonymIn(workspaceId)}`, note: null };
+    expect(await flagsOn(db().pool, theirs.recordId)).toEqual([erased, erased]);
   });
 
   it("erases a member named by address after a failed run", async () => {

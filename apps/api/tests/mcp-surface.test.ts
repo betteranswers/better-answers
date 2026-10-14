@@ -306,6 +306,7 @@ describe("era-independent", () => {
 
     expect(entry?.description).toContain("on the record of that question");
     expect(entry?.description).toContain("`recordId`");
+    expect(entry?.description).toContain("a call repeated after a timeout stores it twice");
     expect(entry?.description).not.toContain("one write");
     expect(Object.keys(entry?.inputSchema.properties ?? {})).toEqual([
       "recordId",
