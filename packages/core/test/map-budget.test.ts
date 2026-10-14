@@ -28,7 +28,8 @@ const ENTRIES = 40;
 /** Every node of the wide map is a concept filed here, so a walk narrowed to it prunes nothing. */
 const WIDE_COLLECTION = "wide";
 
-const IN_FLIGHT = 20;
+/** The most connections one api process opens to Postgres: its pool holds ten. */
+const IN_FLIGHT = 10;
 const ROUNDS = 5;
 
 const readers = runtimePoolFor(db, IN_FLIGHT);
@@ -43,7 +44,7 @@ const CONCEPTS_UNDER_THE_CAP = 1_000;
 const WALK_BUDGET_IN_ONE_ROW_WALKS = 100;
 
 /**
- * The walk's own statement timeout, a wall clock: on fourteen cores, twenty in flight ran 121 ms
+ * The walk's own statement timeout, a wall clock: on fourteen cores, ten in flight ran 128 ms
  * at the slowest.
  */
 const WALK_TIMEOUT_MS = 2_000;
@@ -171,7 +172,7 @@ describe("the map under concurrent read load", () => {
   it.each([
     ["a forty-entry walk", "", undefined],
     ["a narrowed walk", ", narrowed to its collection", [WIDE_COLLECTION]],
-  ] as const)("answers %s within budget beside nineteen concurrent walks", async (...walked) => {
+  ] as const)("answers %s within budget beside nine concurrent walks", async (...walked) => {
     const [, narrowing, collections] = walked;
     const walks: TimedWalk[] = [];
     for (let round = 0; round < ROUNDS; round += 1) {
