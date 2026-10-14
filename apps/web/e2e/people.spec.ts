@@ -1247,7 +1247,7 @@ test.describe("ending every sign-in and token a member holds here", () => {
   });
 });
 
-/** Viewers joined, then removed by keyboard with each confirming key timed: back on the list, a first click goes nowhere. */
+/** Viewers joined, then each opened and removed, its confirming key timed. */
 const removedAtAKey = async (
   page: Page,
   api: APIRequestContext,
@@ -1265,11 +1265,9 @@ const removedAtAKey = async (
   const samples: number[] = [];
   for (const [at, name] of names.entries()) {
     const left = 1 + names.length - at;
-    await memberLink(page, name).focus();
-    await page.keyboard.press("Enter");
+    await memberLink(page, name).click();
     await expect(personHeading(page, name)).toBeVisible();
-    await removalOf(page).getByRole("button", { name: "Remove Member" }).focus();
-    await page.keyboard.press("Enter");
+    await removalOf(page).getByRole("button", { name: "Remove Member" }).click();
     await removalOf(page).getByRole("button", { name: "Remove", exact: true }).focus();
     await clockTheNextKey(page, { at: THE_COUNT, reads: String(left) });
     await page.keyboard.press("Enter");
@@ -1790,13 +1788,6 @@ const MORE_TICKED = [
   ["Person 10", "Person 11", "Person 30"],
 ] as const;
 
-/** By keyboard: after a bulk dialog closes, the first click on a tick ticks nothing. */
-const tickedByKeyboard = async (page: Page, name: string): Promise<void> => {
-  await tickOf(page, name).focus();
-  await page.keyboard.press("Space");
-  await expect(tickOf(page, name)).toBeChecked();
-};
-
 /** Commits the open dialog's Viewer, timed until the second page's ticked member reads it. */
 const rolesChangedAtAKey = async (
   page: Page,
@@ -2097,10 +2088,10 @@ test.describe("bulk actions on the members ticked", () => {
     );
     for (const [first, second, onPageTwo] of MORE_TICKED) {
       await page.keyboard.press(PEOPLE_KEYSTROKES.previousPage.key);
-      await tickedByKeyboard(page, first);
-      await tickedByKeyboard(page, second);
+      await tickOf(page, first).check();
+      await tickOf(page, second).check();
       await page.keyboard.press(PEOPLE_KEYSTROKES.nextPage.key);
-      await tickedByKeyboard(page, onPageTwo);
+      await tickOf(page, onPageTwo).check();
       // The bar refuses another set while the last is still out.
       await expect(selectionAction(page, "Change Role")).not.toHaveAttribute(
         "aria-disabled",
@@ -2116,6 +2107,23 @@ test.describe("bulk actions on the members ticked", () => {
     await expect(cellOf(page, "Person 03", "Role")).toHaveText("Editor");
     await page.reload();
     await expect(cellOf(page, "Person 01", "Role")).toHaveText("Viewer");
+  });
+
+  test("ticks at the first click after a bulk role change", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Ribble Joinery");
+    await tickOf(page, "Priya Shah").check();
+    const dialog = await changeRoleOpened(page, "Change Role for 1 Member");
+    await dialog.getByRole("button", { name: "Change Role", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await expect(outcomeOf(page), "the outcome counts one changed").toHaveText(/^\D*1\D*$/);
+    await expect(listHeading(page)).toBeFocused();
+    await expect(
+      countOf(membersRegion(page)).locator(".."),
+      "focus on the tab's hidden heading draws no ring",
+    ).not.toHaveCSS("box-shadow", "none");
+
+    await tickOf(page, "Sam Okoro").click();
+    await expect(tickOf(page, "Sam Okoro"), "the first click ticked nothing").toBeChecked();
   });
 
   test("page 2 of Editors comes back on Back", async ({ page, request }) => {
