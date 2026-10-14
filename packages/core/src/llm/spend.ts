@@ -20,7 +20,7 @@ import {
 } from "../store/postgres/index.ts";
 import type { LlmPurpose } from "./index.ts";
 
-/** A decimal string of US dollars, which a provider prices a call in. */
+/** Its value is a decimal string of US dollars, the currency a provider prices a call in. */
 export const SPENDING_LIMIT_KEY = "llm.spending_limit_usd";
 
 /**
@@ -204,7 +204,8 @@ const SETTLED = `WITH taken AS (
 
 /**
  * Replaces the reservation with one `llm_call` row per attempt, in the caller's transaction; what
- * was reserved and not spent is released. A reservation the sweep already settled is an error.
+ * was reserved and not spent is released, all of it when no attempt was made. A reservation the
+ * sweep already settled is an error, and writes nothing.
  */
 export const settleSpend = async (
   asker: UserPrincipal,
@@ -230,14 +231,17 @@ export const settleSpend = async (
     return err(new Error(`llm: no open reservation ${input.reservationId} to settle`));
   });
 
-/** The reservation's whole size is counted as spent, since a provider may have billed a call cut off. */
+/**
+ * Billed whole: a provider may have billed a call cut off. It returned no tokens; the most it could
+ * send and run stand in.
+ */
 const EXPIRED_SETTLED = `WITH expired AS (
     DELETE FROM spend_reservation WHERE workspace_id = $1 AND expires_at < $2 RETURNING *
   )
   INSERT INTO llm_call
     (workspace_id, id, called_at, purpose, model_choice_id, model, tokens_in, tokens_out,
      seconds, cost_usd, outcome, run_id, answer_id)
-  SELECT workspace_id, id, taken_at, purpose, model_choice_id, model, tokens_in, tokens_out,
+  SELECT workspace_id, id, taken_at, purpose, model_choice_id, model, tokens_in, 0,
          extract(epoch FROM expires_at - taken_at), reserved_usd, $3, run_id, answer_id
     FROM expired`;
 

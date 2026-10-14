@@ -217,8 +217,8 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "reindex-connected-sources": [connectedSource, job],
   "erasure-rehearsal": [erasureRequest, suppression],
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
-  "set-model-key": [modelKey],
   "set-spending-limit": [llmCall, spendReservation],
+  "set-model-key": [modelKey],
 };
 
 const idOnTheDoneLine = (run: Run): string => {
@@ -3032,6 +3032,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
       expect(again.exitCode).toBe(0);
       expect(await limitHeld(app(), workspaceId)).toEqual(["12.50"]);
+      const set = { actor: BOOTSTRAP_ACTOR, subject_id: workspaceId, detail: {} };
+      expect(
+        await rowsOfAction(app(), workspaceId, "platform.workspace.spending_limit_set"),
+      ).toEqual([set, set]);
     });
 
     it("refuses malformed for a sum that is not dollars", async () => {

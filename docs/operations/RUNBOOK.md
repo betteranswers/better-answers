@@ -483,14 +483,14 @@ A workspace's question calls a model only when three things stand: a model choic
      --from <yyyy-mm-dd> --usd-per-million-in <the provider's input price> --usd-per-million-out <its output price>
    ```
 
-   A price is a fact about the provider, so it holds for every workspace that calls the model. A call is priced by the latest price on or before its day, by UTC, so a price set for a later day changes nothing until that day. A second run for the same day replaces that day's price. The done line names the provider, the model and the day.
+   A price is a fact about the provider, so it holds for every workspace that calls the model. A call is priced by the latest price on or before its day, by UTC, so a price set for a later day changes nothing until that day. A second run for the same day replaces that day's price. The done line names the provider, the model and the day, and the api's log carries a `model price set` line with the same three: a price belongs to no workspace, so no workspace's audit log holds it.
 2. **Set the workspace's limit,** the most its model calls may spend in a calendar month, by UTC:
 
    ```sh
    docker exec "$api" pnpm ops set-spending-limit --workspace <id> --usd <US dollars>
    ```
 
-   A second run replaces the limit. Spend counts from the first of each month, and last month's calls never count against this one. At the limit `ask` refuses with `spending-limit-met`, a precondition, and its sentence tells the person their Admin can ask better-answers to raise it. `find` and `open` call no model and keep working.
+   A second run replaces the limit, and each run records `platform.workspace.spending_limit_set` in the workspace's audit log under the platform's own actor id; the amount is the setting itself, read as below. Spend counts from the first of each month, and last month's calls never count against this one. At the limit `ask` refuses with `spending-limit-met`, a precondition, and its sentence tells the person their Admin can ask better-answers to raise it. `find` and `open` call no model and keep working.
 
 Each command writes nothing when it refuses. `malformed` is a sum that is not a decimal of dollars, a day the calendar does not have, a model provider outside the two, or a workspace id that is not one. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached.
 

@@ -60,6 +60,7 @@ export const ACTION_HEADLINES = {
   "platform.reconciler.replayed": "Change re-applied",
   "platform.workspace.marked": "Invitations kept to the testing domain",
   "platform.workspace.model_key_set": "AI provider key set",
+  "platform.workspace.spending_limit_set": "AI spending limit set",
   "platform.workspace.provisioned": "Workspace provisioned",
   "platform.workspace.renamed": "Workspace renamed",
   "sources.binding.bound": "Connected source added",

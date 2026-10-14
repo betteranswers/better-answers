@@ -2,11 +2,13 @@ import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
+import { action, declareActions, record } from "../audit/index.ts";
 import {
   attempt,
   err,
   MALFORMED,
   ok,
+  ulid,
   type KernelRefusal,
   type PlatformPrincipal,
   type Result,
@@ -14,6 +16,11 @@ import {
 import { SPENDING_LIMIT_KEY } from "../llm/index.ts";
 import { type PostgresDoor, withScope, writeWorkspaceConfig } from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
+
+/** The amount stays in the setting it sets: no detail key holds a sum of money. */
+const SPENDING_LIMIT_ACTIONS = declareActions("platform", {
+  set: action("platform.workspace.spending_limit_set", {}),
+});
 
 /** Whole dollars and cents beyond them, as a decimal string: money is never a float. */
 const named = z.object({
@@ -27,7 +34,10 @@ export type SetSpendingLimitRefusal =
   | KernelRefusal<"malformed">
   | WorkspaceRefusal<"no-such-workspace">;
 
-/** Sets the most the workspace's model calls may spend in a calendar month, replacing any limit. */
+/**
+ * Sets the most the workspace's model calls may spend in a calendar month, replacing any limit, and
+ * records that it was set.
+ */
 export const setSpendingLimit = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -46,6 +56,12 @@ export const setSpendingLimit = async (
         const held = await tx.query("SELECT 1 FROM workspace WHERE id = $1", [workspaceId]);
         if (held.rows.length === 0) return err("no-such-workspace");
         await writeWorkspaceConfig(tx, { workspaceId, key: SPENDING_LIMIT_KEY, value: usd });
+        await record(platform, tx, {
+          id: ulid(),
+          action: SPENDING_LIMIT_ACTIONS.set,
+          subjectId: workspaceId,
+          detail: {},
+        });
         return ok({ workspaceId, usd });
       },
     ),

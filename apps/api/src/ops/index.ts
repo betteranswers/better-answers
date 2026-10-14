@@ -1473,6 +1473,15 @@ const setModelPriceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Prom
     io.say(`set-model-price: REFUSED — ${reason}`);
     return exitOf(set.error);
   }
+  // A price names no workspace, so no workspace's audit log can hold it: its record is this line.
+  io.logger.info(
+    {
+      provider: set.value.provider,
+      model: set.value.model,
+      effective_from: set.value.effectiveFrom,
+    },
+    "model price set",
+  );
   io.say(
     `set-model-price: done — ${set.value.provider} ${set.value.model} is priced from ${set.value.effectiveFrom}`,
   );

@@ -65,6 +65,7 @@ export const STORED_ACT_NAMES = [
   "platform.audit_log.exported",
   "platform.job.followed",
   "platform.workspace.model_key_set",
+  "platform.workspace.spending_limit_set",
 ] as const;
 
 /**

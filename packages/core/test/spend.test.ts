@@ -223,7 +223,7 @@ describe("spend", () => {
         purpose: "judging",
         model: SONNET,
         tokens_in: 40_000,
-        tokens_out: 2_000,
+        tokens_out: 0,
         seconds: 600,
         cost_usd: "0.15",
         outcome: "failed",
@@ -231,6 +231,54 @@ describe("spend", () => {
         answer_id: asking.recordId,
       },
     ]);
+  });
+
+  it("refuses to settle a reservation the sweep already settled", async () => {
+    await priced("2026-10-01", "3", "15");
+    const asking = await anAsker("10");
+    const reservationId = reservationIdOf(answered(await reserving(asking, NOW)));
+    answered(
+      await settleExpiredSpend(PLATFORM, openPostgres(db().pool), {
+        workspaceId: asking.asker.workspaceId,
+        now: new Date(NOW.getTime() + RESERVATION_LIFETIME_MS + 1),
+      }),
+    );
+
+    const late = await settling(asking, reservationId, [A_CALL]);
+
+    expect(late.ok).toBe(false);
+    expect(await callsOf(asking)).toMatchObject([{ outcome: "failed", cost_usd: "0.15" }]);
+  });
+
+  it("releases the whole reservation when no attempt was made", async () => {
+    const asking = await settledOnce([]);
+
+    expect(await reservationsOf(asking)).toEqual([]);
+    expect(await callsOf(asking)).toEqual([]);
+  });
+
+  it("passes a reservation that meets the limit exactly", async () => {
+    await priced("2026-10-01", "3", "15");
+    const asking = await anAsker("0.15");
+
+    expect(answered(await reserving(asking))).toMatchObject({ reserved: true });
+    expect(await reserving(asking)).toEqual({ ok: false, error: "spending-limit-met" });
+  });
+
+  it("calls no model for a purpose with no model choice", async () => {
+    await priced("2026-10-01", "3", "15");
+    const { asker, recordId } = await anAsker("10");
+
+    const reserved = await readingAs(db().runtimePool, asker, (principal, tx) =>
+      reserveSpend(principal, tx, {
+        answerId: recordId,
+        purpose: "answering",
+        most: MOST,
+        now: NOW,
+      }),
+    );
+
+    expect(answered(reserved)).toEqual({ reserved: false, because: "no-model-choice" });
   });
 
   it("keeps a reservation inside its expiry from the sweep", async () => {
