@@ -235,8 +235,10 @@ still shown the api refused.
   the name the page gives them, written as a literal where the spec uses it. A name built from
   seeded data is a template over that data, such as `` `Remove ${member.name}` ``. Playwright
   matches a name as a substring in any case, so a name that sits inside another control's name on
-  the same page takes `exact: true`. Test ids appear nowhere in this suite; adding one adds a
-  handle the reader does not have.
+  the same page takes `exact: true`. A check that a name is absent holds only while that name
+  still names the control, so the same spec also finds the control by that name, held once, where
+  the page shows it. Test ids appear nowhere in this suite; adding one adds a handle the reader
+  does not have.
 - **Import none of the web's text.** A spec and a journey import from the SPA only what is not
   text: a page's address, a wire word, a limit, a count, a key's letter, a type, a function that
   formats seeded data. A changed label then fails the tests that name that control, at run time,
