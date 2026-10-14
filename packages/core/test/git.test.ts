@@ -29,7 +29,7 @@ import {
   objectRemovedFrom,
   staged,
 } from "./bundle.ts";
-import { gitStarts } from "./git-starts.ts";
+import { gitStarts, whileGitHangsAt } from "./git-starts.ts";
 
 const bundles = bundlesForSuite();
 
@@ -241,6 +241,61 @@ describe("a git failure after the precondition passed", () => {
     expect(failed.ok).toBe(false);
     expect(failed.ok ? undefined : failed.error).toBeInstanceOf(Error);
     expect(await head(bundle.principal, bundle.door)).toBeNull();
+  });
+});
+
+const BUDGET_MS = 300;
+
+const overBudget = {
+  ok: false,
+  error: expect.objectContaining({
+    message: expect.stringContaining(`ran past its ${BUDGET_MS} ms budget`),
+  }),
+};
+
+const impatient = (bundle: Bundle): GitDoor => ({ ...bundle.door, commitBudgetMs: BUDGET_MS });
+
+const stillRunning = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+describe("a commit past its budget", () => {
+  it("answers the budget, not a missing repository, while rev-parse hangs", async () => {
+    const bundle = await arrange();
+    let answered: unknown;
+
+    await whileGitHangsAt("rev-parse", async () => {
+      answered = await commit(bundle.principal, impatient(bundle), requestFor());
+    });
+
+    expect(answered).toMatchObject(overBudget);
+  });
+
+  it("answers the budget while git ignores a large input", async () => {
+    const bundle = await arrange();
+    const large = requestFor({ content: "x".repeat(4 * 1024 * 1024) });
+    let answered: unknown;
+
+    await whileGitHangsAt("hash-object", async () => {
+      answered = await commit(bundle.principal, impatient(bundle), large);
+    });
+
+    expect(answered).toMatchObject(overBudget);
+  });
+
+  it("answers only once the stopped git has exited", async () => {
+    const bundle = await arrange();
+
+    const hung = await whileGitHangsAt("rev-parse", async () => {
+      await commit(bundle.principal, impatient(bundle), requestFor());
+    });
+
+    expect(stillRunning(hung)).toBe(false);
   });
 });
 

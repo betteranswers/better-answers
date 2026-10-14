@@ -1,4 +1,8 @@
-import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
+import {
+  execFile,
+  type ChildProcess,
+  type ExecFileOptionsWithStringEncoding,
+} from "node:child_process";
 import { statSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -104,6 +108,29 @@ const childEnvironment = (added: Readonly<Record<string, string>> = {}): NodeJS.
   LC_ALL: "C",
 });
 
+/** A child stopped mid-write closes its stdin; its exit, not the broken pipe, says what happened. */
+const feeding = (child: ChildProcess, input: string | undefined): void => {
+  if (input === undefined) return;
+  child.stdin?.on("error", (cause: NodeJS.ErrnoException) => {
+    if (cause.code !== "EPIPE" && cause.code !== "ERR_STREAM_DESTROYED") child.kill();
+  });
+  child.stdin?.end(input);
+};
+
+/** execFile settles on abort before the child exits; five seconds lets git clear its lock files first. */
+const EXIT_GRACE_MS = 5_000;
+
+const exitedWithin = async (child: ChildProcess, graceMs: number): Promise<void> => {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+  const outright = setTimeout(() => child.kill("SIGKILL"), graceMs);
+  try {
+    await exited;
+  } finally {
+    clearTimeout(outright);
+  }
+};
+
 const git = async (
   gitDir: string,
   arguments_: readonly string[],
@@ -123,12 +150,15 @@ const git = async (
     maxBuffer: 64 * 1024 * 1024,
   };
   if (options.signal !== undefined) childOptions.signal = options.signal;
-  const child = run("git", ["--git-dir", gitDir, ...arguments_], childOptions);
-  if (options.input !== undefined) {
-    child.child.stdin?.end(options.input);
+  const running = run("git", ["--git-dir", gitDir, ...arguments_], childOptions);
+  feeding(running.child, options.input);
+  try {
+    const { stdout } = await running;
+    return options.raw === true ? stdout : stdout.trim();
+  } catch (cause) {
+    if (options.signal?.aborted === true) await exitedWithin(running.child, EXIT_GRACE_MS);
+    throw cause;
   }
-  const { stdout } = await child;
-  return options.raw === true ? stdout : stdout.trim();
 };
 
 const exitStatusOf = (cause: unknown): number | null => {
