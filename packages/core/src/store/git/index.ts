@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
 import { statSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -21,6 +21,9 @@ const run = promisify(execFile);
 
 export type GitDoor = {
   readonly root: string;
+
+  /** How long one commit, every git child in it, may run; a test shortens it. */
+  readonly commitBudgetMs?: number;
 };
 
 export type GitRootRefusal = "root-not-absolute" | "no-such-root";
@@ -109,12 +112,18 @@ const git = async (
     readonly env?: Readonly<Record<string, string>>;
 
     readonly raw?: boolean;
+
+    /** Stops the child with SIGTERM, on which git removes the lock files it holds. */
+    readonly signal?: AbortSignal | undefined;
   } = {},
 ): Promise<string> => {
-  const child = run("git", ["--git-dir", gitDir, ...arguments_], {
+  const childOptions: ExecFileOptionsWithStringEncoding = {
+    encoding: "utf8",
     env: childEnvironment(options.env),
     maxBuffer: 64 * 1024 * 1024,
-  });
+  };
+  if (options.signal !== undefined) childOptions.signal = options.signal;
+  const child = run("git", ["--git-dir", gitDir, ...arguments_], childOptions);
   if (options.input !== undefined) {
     child.child.stdin?.end(options.input);
   }
@@ -146,17 +155,17 @@ const stdoutOf = (cause: unknown): string => {
  */
 const standingHead = async (
   gitDir: string,
+  signal?: AbortSignal,
 ): Promise<Result<string | null, "no-such-repository">> => {
   try {
-    const read = await git(gitDir, [
-      "rev-parse",
-      "--git-dir",
-      "--verify",
-      "--quiet",
-      `${BUNDLE_REF}^{commit}`,
-    ]);
+    const read = await git(
+      gitDir,
+      ["rev-parse", "--git-dir", "--verify", "--quiet", `${BUNDLE_REF}^{commit}`],
+      { signal },
+    );
     return ok(read.split("\n")[1] ?? null);
   } catch (cause) {
+    if (signal?.aborted === true) throw cause;
     return stdoutOf(cause) === "" ? err("no-such-repository") : ok(null);
   }
 };
@@ -207,16 +216,21 @@ const danglingCommit = async (
   parent: string | null,
   request: CommitRequest,
   message: string,
+  signal: AbortSignal,
 ): Promise<string> => {
   const env = { GIT_INDEX_FILE: indexFile };
 
-  if (parent !== null) await git(gitDir, ["read-tree", parent], { env });
+  if (parent !== null) await git(gitDir, ["read-tree", parent], { env, signal });
 
-  const blob = await git(gitDir, ["hash-object", "-w", "--stdin"], { input: request.content });
+  const blob = await git(gitDir, ["hash-object", "-w", "--stdin"], {
+    input: request.content,
+    signal,
+  });
   await git(gitDir, ["update-index", "--add", "--cacheinfo", `100644,${blob},${request.path}`], {
     env,
+    signal,
   });
-  const tree = await git(gitDir, ["write-tree"], { env });
+  const tree = await git(gitDir, ["write-tree"], { env, signal });
 
   const at = request.at.toISOString();
   return git(
@@ -233,6 +247,7 @@ const danglingCommit = async (
         GIT_COMMITTER_EMAIL: PLATFORM_BOT.email,
         GIT_COMMITTER_DATE: at,
       },
+      signal,
     },
   );
 };
@@ -250,10 +265,49 @@ const commitFailure = (cause: unknown): "stale-precondition" | Error => {
   return cause instanceof Error ? cause : new Error(message);
 };
 
+/** A one-file commit takes milliseconds; a minute allows a slow disk yet frees the member row held across it. */
+const COMMIT_BUDGET_MS = 60_000;
+
+type Budget = { readonly ms: number; readonly signal: AbortSignal };
+
+const budgetOf = (door: GitDoor): Budget => {
+  const ms = door.commitBudgetMs ?? COMMIT_BUDGET_MS;
+  return { ms, signal: AbortSignal.timeout(ms) };
+};
+
+const overBudget = (budget: Budget): Error =>
+  new Error(`git: the commit ran past its ${budget.ms} ms budget, so its git child was stopped`);
+
+const commitWithin = async (
+  gitDir: string,
+  request: CommitRequest,
+  message: string,
+  budget: Budget,
+): Promise<Result<Committed, CommitRefusal | Error>> => {
+  const { signal } = budget;
+  const index = await mkdtemp(path.join(tmpdir(), "better-answers-index-"));
+  try {
+    const standing = await standingHead(gitDir, signal);
+    if (!standing.ok) return err(standing.error);
+
+    const parent = standing.value;
+    if (!meetsExpectedHead(request.expectedHead, parent)) return err("stale-precondition");
+
+    const indexFile = path.join(index, "index");
+    const sha = await danglingCommit(gitDir, indexFile, parent, request, message, signal);
+    await git(gitDir, ["update-ref", BUNDLE_REF, sha, parent ?? ""], { signal });
+    return ok({ sha, parent });
+  } catch (cause) {
+    return err(signal.aborted ? overBudget(budget) : commitFailure(cause));
+  } finally {
+    await rm(index, { recursive: true, force: true });
+  }
+};
+
 /**
  * Writes one file as one commit on `main`, compare-and-swap against the head it reads, which must
  * be `expectedHead` (null for the first commit) unless that is `ANY_HEAD`. The committer is always
- * the platform bot; the author is the request's.
+ * the platform bot; the author is the request's. A git child past the budget is stopped.
  */
 export const commit = async (
   principal: UserPrincipal,
@@ -263,24 +317,8 @@ export const commit = async (
   if (!isPortablePath(request.path)) return err("malformed-path");
   const trailers = trailerLines(request.trailers);
   if (!isSubjectLine(request.message) || trailers === undefined) return err("malformed-message");
-  const gitDir = bundleOf(door, principal);
-  const standing = await standingHead(gitDir);
-  if (!standing.ok) return err(standing.error);
-
-  const parent = standing.value;
-  if (!meetsExpectedHead(request.expectedHead, parent)) return err("stale-precondition");
-
-  const index = await mkdtemp(path.join(tmpdir(), "better-answers-index-"));
-  try {
-    const message = messageWith(request.message, trailers);
-    const sha = await danglingCommit(gitDir, path.join(index, "index"), parent, request, message);
-    await git(gitDir, ["update-ref", BUNDLE_REF, sha, parent ?? ""]);
-    return ok({ sha, parent });
-  } catch (cause) {
-    return err(commitFailure(cause));
-  } finally {
-    await rm(index, { recursive: true, force: true });
-  }
+  const message = messageWith(request.message, trailers);
+  return commitWithin(bundleOf(door, principal), request, message, budgetOf(door));
 };
 
 const locks = new Map<string, Promise<unknown>>();
