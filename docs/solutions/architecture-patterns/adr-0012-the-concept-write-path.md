@@ -53,7 +53,7 @@ Moving a ref back to its watermark is the operator's plumbing, written down on a
 - The row written at commit time is what makes a changed atom flag its write-ups now, not after a worker job.
 - The id is minted first for the reconciler alone. An id minted after the commit would leave the trailer empty exactly when the row was never written, the one case the reconciler exists for.
 - The lock spanning both stores gives the prefix invariant, so the replay reads from a watermark and never hunts for holes.
-- The transport's own transaction is not used: a transaction held open across a git commit waits on a subprocess. The one exception is the member's row, held `FOR SHARE` across that member's commit, so an erasure's member delete waits until the commit is in git (ADR 0020).
+- The transport's own transaction is not used: a transaction held open across a git commit waits on a subprocess. The one exception is the member's row, held `FOR SHARE` across that member's commit, so an erasure's member delete waits until the commit is in git, or until the commit's one-minute budget runs out and it fails (ADR 0020).
 - A widening is an Admin's recorded action, so a recovery never guesses a wider sensitivity.
 - The commits after the watermark were never recorded, so no reader was ever served them. One ref moves and no object is rewritten. It stays a procedure because the question is whether to make the move at all, and no flag holds that judgement.
 
