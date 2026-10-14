@@ -104,6 +104,46 @@ describe("the periodic head check", () => {
     vi.useRealTimers();
   });
 
+  /** A rewrite in another process, as the reconciler sees one: the bundle's lock held alone. */
+  const rewritingElsewhere = async (workspaceId: string) => {
+    const holder = await app().database.superuser.connect();
+    await holder.query("SELECT pg_advisory_lock(hashtext('bundle'), hashtext($1))", [workspaceId]);
+    return async (): Promise<void> => {
+      await holder.query("SELECT pg_advisory_unlock(hashtext('bundle'), hashtext($1))", [
+        workspaceId,
+      ]);
+      holder.release();
+    };
+  };
+
+  /** One tick's lines, run while a rewrite elsewhere holds a workspace that has its repository. */
+  const aTickBesideARewrite = async (): Promise<{
+    readonly lines: readonly LogLine[];
+    readonly heldId: string;
+  }> => {
+    const held = await app().provision();
+    await initRepository(openTestGit(app()), held.workspaceId);
+    const release = await rewritingElsewhere(held.workspaceId);
+    const head = watched({ pingUrl: undefined });
+    vi.advanceTimersByTime(RECONCILER_INTERVAL_MS);
+    await head.stop();
+    await release();
+    return { lines: ticks(head.logs), heldId: held.workspaceId };
+  };
+
+  // First in the file: workspaces later cases leave without a repository would turn this to warn.
+  it("logs a bundle held by a rewrite elsewhere at info", async () => {
+    const { lines, heldId } = await aTickBesideARewrite();
+
+    expect(lines).toEqual([
+      expect.objectContaining({
+        level: 30,
+        held: [{ workspace_id: heldId }],
+        refused: [],
+      }),
+    ]);
+  });
+
   it("asks every workspace each interval, logs each tick, and stops", async () => {
     const held = await app().provision();
     const bare = await app().provision();
@@ -125,6 +165,20 @@ describe("the periodic head check", () => {
 
     vi.advanceTimersByTime(RECONCILER_INTERVAL_MS * 3);
     expect(ticks(head.logs)).toHaveLength(1);
+  });
+
+  it("still warns of a refusal beside a held bundle", async () => {
+    const bare = await app().provision();
+
+    const { lines, heldId } = await aTickBesideARewrite();
+
+    expect(lines[0]).toMatchObject({
+      level: 40,
+      held: [{ workspace_id: heldId }],
+      refused: expect.arrayContaining([
+        { workspace_id: bare.workspaceId, reason: "no-such-repository" },
+      ]),
+    });
   });
 
   it("follows a sync even where the reconciler refuses the workspace", async () => {

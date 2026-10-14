@@ -44,7 +44,12 @@ const summaryOf = (outcomes: readonly WorkspaceReconciled[]) => {
   let alreadyLanded = 0;
   const stopped: { workspace_id: string; commit_sha: string; reason: string }[] = [];
   const refused: { workspace_id: string; reason: string }[] = [];
+  const held: { workspace_id: string }[] = [];
   for (const { workspaceId, outcome } of outcomes) {
+    if (!outcome.ok && outcome.error === "held") {
+      held.push({ workspace_id: workspaceId });
+      continue;
+    }
     if (!outcome.ok) {
       refused.push({ workspace_id: workspaceId, reason: reasonOf(outcome.error) });
       continue;
@@ -59,7 +64,14 @@ const summaryOf = (outcomes: readonly WorkspaceReconciled[]) => {
       });
     }
   }
-  return { workspaces: outcomes.length, replayed, already_landed: alreadyLanded, stopped, refused };
+  return {
+    workspaces: outcomes.length,
+    replayed,
+    already_landed: alreadyLanded,
+    stopped,
+    refused,
+    held,
+  };
 };
 
 const followedSummaryOf = (passes: readonly Result<WorkspaceSyncsFollowed, Error>[]) => {
@@ -105,7 +117,8 @@ export const startReconciler = (
 
     if (summary.stopped.length > 0 || summary.refused.length > 0) {
       logger.warn(summary, "reconciler tick");
-    } else if (summary.replayed > 0) {
+    } else if (summary.replayed > 0 || summary.held.length > 0) {
+      // A bundle held by a rewrite or a write under way is caught up next tick, so it is no warning.
       logger.info(summary, "reconciler tick");
     } else {
       logger.debug(summary, "reconciler tick");
