@@ -1,5 +1,5 @@
 {
-  "description": "queue (ADR 0031, ADR 0005): the worker's control plane is rows, and the claim protocol is four SQL functions both tiers call — claim_job, heartbeat_job, finish_job, fail_job — all SECURITY INVOKER, so the caller's own role and the transaction's workspace scope are what fence every row they touch. Each suite seeds `workspaces` and `jobs` as the container's superuser (an `enqueued_ago_seconds` and a `lease_expires_in_seconds` are written as instants relative to now, which is how the fixture advances time without waiting), runs every entry of `refused_enqueues` as an insert that must fail with the named sqlstate against a savepoint, then runs each entry of `claims` as its `role` in its `workspace_id` scope ('' = no scope), passing its `kinds` array as the claim's third argument, and asserts the ids `claim_job` returned, in that order — an empty list meaning zero rows. A claim carrying `lapse_first` has those jobs' leases pushed thirty seconds into the past, as the superuser, immediately before it runs: that is how a lease lapses mid-sequence without a suite waiting for one. Every entry of `calls` is then run in the same way and must answer exactly `expect`, and `expect_final` is read back per job as the superuser, `attempts` and `status` together, so a poisoning or a lost lease is visible as the row it left behind. A lease that has lapsed revokes its claimant: the heartbeat, the finish and the failure all answer false to the worker that let it lapse, whether or not anybody has claimed the job since, because from that instant the job is the queue's to hand out again. A claimant reaches only the kinds it passes — in both arms, so a job it cannot run is neither claimed nor poisoned by it — and a subject has at most one job claimed under a live lease and at most one queued behind it.",
+  "description": "queue (ADR 0031, ADR 0005): the worker's control plane is rows, and the claim protocol is four SQL functions both tiers call — claim_job, heartbeat_job, finish_job, fail_job — all SECURITY INVOKER, so the caller's own role and the transaction's workspace scope are what fence every row they touch. Each suite seeds `workspaces` and `jobs` as the container's superuser (an `enqueued_ago_seconds` and a `lease_expires_in_seconds` are written as instants relative to now, which is how the fixture advances time without waiting), runs every entry of `refused_enqueues` as an insert that must fail with the named sqlstate against a savepoint, then runs each entry of `claims` as its `role` in its `workspace_id` scope ('' = no scope), passing its `kinds` array as the claim's third argument, and asserts the ids `claim_job` returned, in that order — an empty list meaning zero rows. A claim carrying `lapse_first` has those jobs' leases pushed thirty seconds into the past, as the superuser, immediately before it runs: that is how a lease lapses mid-sequence without a suite waiting for one. Every entry of `calls` is then run in the same way and must answer exactly `expect`, and `expect_final` is read back per job as the superuser, `attempts` and `status` together, so a poisoning or a lost lease is visible as the row it left behind. A lease that has lapsed revokes its claimant: the heartbeat, the finish and the failure all answer false to the worker that let it lapse, whether or not anybody has claimed the job since, because from that instant the job is the queue's to hand out again. A failure is no longer an end in itself: a job with an attempt left goes back to the queue, its claim returned, and only a failure at the bound ends the job and writes its outcome. A claimant reaches only the kinds it passes — in both arms, so a job it cannot run is neither claimed nor poisoned by it — and a subject has at most one job claimed under a live lease and at most one queued behind it.",
   "lease_seconds": 60,
   "workspaces": [
     { "id": "01J6AAAAAAAAAAAAAAAAAAAAAA", "name": "Workspace A" },
@@ -61,6 +61,20 @@
       "enqueued_ago_seconds": 500,
       "claimed_by": "worker-gone",
       "lease_expires_in_seconds": -30
+    },
+    {
+      "why": "a job claimed for its last attempt: a failure now ends it, recording its outcome, rather than queuing a run the bound forbids",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J9AAAAAAAAAAAAAAAAAAAA",
+      "kind": "full-rebuild",
+      "reason": "erasure",
+      "subject_id": null,
+      "status": "claimed",
+      "attempts": 3,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 100,
+      "claimed_by": "worker-bound",
+      "lease_expires_in_seconds": 120
     },
     {
       "why": "an index job in workspace A, whose kind no claim here passes: every claim in this workspace steps over it and it is still queued at the end, which is what lets a kind land in the schema before the tier that runs it has a handler for it",
@@ -343,13 +357,23 @@
       "expect": true
     },
     {
-      "why": "and a heartbeat after the end is refused, because the lease ended with the job",
+      "why": "and a heartbeat after the failure is refused, because the claim went back to the queue with the job",
       "function": "heartbeat_job",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "job_id": "01J6J1AAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
       "expect": false
+    },
+    {
+      "why": "a failure at the bound ends the job and records its outcome, because queuing a run the bound forbids is what the bound exists to refuse",
+      "function": "fail_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "job_id": "01J6J9AAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-bound",
+      "outcome": { "error": "UnreadableError" },
+      "expect": true
     },
     {
       "why": "a heartbeat after the lease lapsed is refused, even though nobody has claimed the job since — the lapse itself revoked the claimant, and pushing the lease out again would race whichever claim was about to win it",
@@ -383,12 +407,20 @@
   ],
   "expect_final": [
     {
-      "why": "failed by its claimant after one claim",
+      "why": "failed by its claimant after one claim and queued again, its claim returned, its outcome unwritten: a transient failure costs a retry, not an upload or a bind",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "id": "01J6J1AAAAAAAAAAAAAAAAAAAA",
-      "status": "failed",
+      "status": "queued",
       "attempts": 1,
-      "claimed_by": "worker-1"
+      "claimed_by": null
+    },
+    {
+      "why": "failed at the bound: the job ends, and the outcome names what went wrong",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J9AAAAAAAAAAAAAAAAAAAA",
+      "status": "failed",
+      "attempts": 3,
+      "claimed_by": "worker-bound"
     },
     {
       "why": "the lapsed lease was claimed again — never lost — and finished by its new claimant on its second attempt",

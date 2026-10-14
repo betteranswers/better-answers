@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/map";
-import { conceptIriOf, ulid } from "@better-answers/schema";
+import { conceptIriOf, CONCEPT_BODY_MAX, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { mapWords, open } from "../src/answering/index.ts";
@@ -1064,6 +1064,26 @@ describe("what a governed write refuses", () => {
       expect(await head(scenario.editor, scenario.git)).toBeNull();
     },
   );
+
+  it("refuses a body over the cap, taking one at it", async () => {
+    const scenario = await arrange();
+
+    const refused = await write(
+      scenario,
+      scenario.editor,
+      writeFor({ body: "x".repeat(CONCEPT_BODY_MAX + 1) }),
+    );
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    expect(await head(scenario.editor, scenario.git)).toBeNull();
+
+    const written = await write(
+      scenario,
+      scenario.editor,
+      writeFor({ body: "x".repeat(CONCEPT_BODY_MAX) }),
+    );
+    expect(written.ok).toBe(true);
+    expect(await head(scenario.editor, scenario.git)).not.toBeNull();
+  });
 
   it("hands back the store's own failure from its pre-commit read", async () => {
     const scenario = await arrange();

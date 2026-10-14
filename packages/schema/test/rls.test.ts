@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { declaredTableNames } from "../scripts/worker-view.ts";
 import {
   boundarySchemas,
+  CONCEPT_BODY_MAX,
   CONCEPT_FRONTMATTER_MAX,
   CONTRACT_DIGEST,
   EXEMPT_TABLE_NAMES,
@@ -30,6 +31,7 @@ import {
   A_CONCEPT_SENSITIVITY_OVERRIDE,
   A_CONCEPT_IDENTITY,
   A_CONCEPT_INDEX_ROW,
+  A_CONCEPT_INDEX_ROW_WITH_A_BODY,
   A_CONCEPT_VERIFICATION,
   A_CONCEPT_VERIFICATION_OF_ORIGIN,
   A_CONCEPT_WRITE_REQUEST,
@@ -1035,6 +1037,19 @@ describe("the concept write path under app_rt", () => {
           A_CONCEPT_INDEX_ROW,
           indexed("knowledge/four.md", "draft", "Internal", new Date()),
           "concept_index_published_check",
+        ],
+
+        [
+          A_CONCEPT_INDEX_ROW_WITH_A_BODY,
+          [
+            WS_A,
+            identity.iri,
+            "knowledge/too-long.md",
+            "x".repeat(CONCEPT_BODY_MAX + 1),
+            A_CONTENT_HASH,
+            commit.sha,
+          ],
+          "concept_index_body_length_check",
         ],
 
         [

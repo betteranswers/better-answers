@@ -1,0 +1,1 @@
+ALTER TABLE "concept_index" ADD CONSTRAINT "concept_index_body_length_check" CHECK (char_length(body) <= 100000);

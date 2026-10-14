@@ -128,6 +128,9 @@ export const CONTENT_HASH = /^[0-9a-f]{64}$/;
  */
 export const CONCEPT_FRONTMATTER_MAX = 64_000;
 
+/** The body's cap: refused at the write's boundary and held by a CHECK. */
+export const CONCEPT_BODY_MAX = 100_000;
+
 export const conceptIdentity = withRLS(
   "concept_identity",
   {
@@ -243,6 +246,7 @@ export const conceptIndex = withRLS(
       name: "concept_index_bundle_commit_fk",
     }),
     check("concept_index_status_check", sql.raw(`status IN (${listed(CONCEPT_STATUSES)})`)),
+    check("concept_index_body_length_check", sql.raw(`char_length(body) <= ${CONCEPT_BODY_MAX}`)),
     check("concept_index_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
 
     check(

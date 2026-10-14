@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { autolinkClosesAt, nextOf, nextStopsOf } from "./scan.ts";
 import { ULID_CHARACTERS } from "./ulid.ts";
 
 export const CONCEPT_IRI_PREFIX = "https://better-answers.com/c/";
@@ -26,16 +27,153 @@ export type CitedSource = {
   readonly id: string | null;
 };
 
-/** Lines break at `\n` alone and whitespace is these six, so both tiers' regex engines read alike. */
-const LINK_DEFINITION = /(?<=^|\n) {0,3}\[([^\]]+)\]:[ \t\n\r\f\v]*([^ \t\n\r\f\v]+)/g;
+/** Lines break at `\n` alone and whitespace is these six, so both tiers read alike. */
+const SIX = " \t\n\r\f\v";
 
-const LINK =
-  /\[[^\]]*\]\([^)]*\)|\[(?!\^)[^\]]*\]\[[^\]]*\]|\[[^\]]*\]|<[a-z][a-z0-9+.-]*:[^> \t\n\r\f\v]*>/gi;
+const isSix = (ch: string): boolean => SIX.includes(ch);
 
-const FOOTNOTE = /^\[\^([^\]]*)\]$/;
+/** The first line start at or after `from`: the string's start, or the position after a `\n`. */
+const lineStartFrom = (text: string, from: number): number => {
+  if (from <= 0) return 0;
+  if (text[from - 1] === "\n") return from;
+  const found = text.indexOf("\n", from);
+  return found === -1 ? text.length : found + 1;
+};
 
-const FENCED_BLOCK =
-  /(?<=^|\n) {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:(?<=\n) {0,3}\1\2*[ \t]*(?=\n|(?![\s\S]))|(?![\s\S]))/g;
+/** What a scanner found: where it starts, and what it holds. */
+type Found = { readonly at: number; readonly text: string };
+
+/** The next `>` or one of the six at or after each position, `-1` where there is none. */
+const autolinkEndsOf = (text: string): Int32Array =>
+  nextStopsOf(text, (ch) => ch === ">" || isSix(ch));
+
+/** Each `[`-form and autolink in order and extent: inline first, then reference, then
+ * bare, then autolink. */
+/** Where the inline form after `bracket` ends, or `undefined` when it is none. */
+const inlineFormAt = (prose: string, bracket: number, ending: Int32Array): number | undefined => {
+  if (prose[bracket + 1] !== "(") return undefined;
+  const closed = ending[bracket + 2] ?? -1;
+  return closed === -1 ? undefined : closed + 1;
+};
+
+/** Where the reference form after `bracket` ends, or `undefined` when it is none. */
+const referenceFormAt = (
+  prose: string,
+  at: number,
+  bracket: number,
+  close: Int32Array,
+): number | undefined => {
+  if (prose[bracket + 1] !== "[" || prose[at + 1] === "^") return undefined;
+  const reference = close[bracket + 2] ?? -1;
+  return reference === -1 ? undefined : reference + 1;
+};
+
+/** Where the `[`-form starting at `at` ends, in the expression's order: inline, then
+ * reference, then bare. */
+const bracketFormAt = (
+  prose: string,
+  at: number,
+  close: Int32Array,
+  ending: Int32Array,
+): number | undefined => {
+  const bracket = close[at + 1] ?? -1;
+  if (bracket === -1) return undefined;
+  return (
+    inlineFormAt(prose, bracket, ending) ??
+    referenceFormAt(prose, at, bracket, close) ??
+    bracket + 1
+  );
+};
+
+const linkMatchesOf = (prose: string): readonly Found[] => {
+  const close = nextOf(prose, "]");
+  const ending = nextOf(prose, ")");
+  const ends = autolinkEndsOf(prose);
+  const found: Found[] = [];
+  for (let at = 0; at < prose.length;) {
+    const ch = prose[at] ?? "";
+    if (ch === "[") {
+      const end = bracketFormAt(prose, at, close, ending);
+      if (end !== undefined) {
+        found.push({ at, text: prose.slice(at, end) });
+        at = end;
+        continue;
+      }
+    } else if (ch === "<") {
+      const end = autolinkClosesAt(prose, at, ends);
+      if (end !== undefined) {
+        found.push({ at, text: prose.slice(at, end + 1) });
+        at = end + 1;
+        continue;
+      }
+    }
+    at += 1;
+  }
+  return found;
+};
+
+/** Where the run of `mark` starting at `at` ends. */
+const markRunOf = (body: string, at: number, mark: string): number => {
+  let marker = at;
+  while (body[marker] === mark) marker += 1;
+  return marker;
+};
+
+/** The spaces before a fence or a definition, at most three. */
+const leadingSpacesOf = (body: string, at: number): number => {
+  let spaces = 0;
+  while (spaces < 4 && body[at + spaces] === " ") spaces += 1;
+  return spaces;
+};
+
+type OpenedFence = { readonly mark: string; readonly marks: number; readonly lineEnd: number };
+
+/** The fence opening at the line start `at`, or `undefined` when the line opens none. */
+const openedFenceAt = (body: string, at: number): OpenedFence | undefined => {
+  const spaces = leadingSpacesOf(body, at);
+  const opened = at + spaces;
+  const mark = body[opened] ?? "";
+  if (spaces > 3 || (mark !== "`" && mark !== "~")) return undefined;
+  const run = markRunOf(body, opened, mark);
+  if (run - opened < 3) return undefined;
+  const lineEnd = body.indexOf("\n", run);
+  return lineEnd === -1 ? undefined : { mark, marks: run - opened, lineEnd };
+};
+
+/** Where the line at `at` ends, when only spaces or tabs follow its marks to a line feed
+ * or the string's end; `-1` otherwise. */
+const closingAt = (body: string, at: number, mark: string, marks: number): number => {
+  const spaces = leadingSpacesOf(body, at);
+  if (spaces > 3) return -1;
+  const run = markRunOf(body, at + spaces, mark);
+  if (run - (at + spaces) < marks) return -1;
+  let tail = run;
+  while (body[tail] === " " || body[tail] === "\t") tail += 1;
+  return body[tail] === "\n" || tail === body.length ? tail : -1;
+};
+
+/** Where the fence opened at `lineEnd`'s line closes, or `-1` when no line closes it. */
+const closingLineEnd = (body: string, from: number, mark: string, marks: number): number => {
+  for (let at = from; at < body.length; at = lineStartFrom(body, at + 1)) {
+    const end = closingAt(body, at, mark, marks);
+    if (end !== -1) return end;
+  }
+  return -1;
+};
+
+/** Each fenced block's extent: a line of three or more marks, closed by as long a line
+ * or the string's end. */
+const fencedBlocksOf = (body: string): readonly { start: number; end: number }[] => {
+  const blocks: { start: number; end: number }[] = [];
+  for (let at = 0; at < body.length; at = lineStartFrom(body, at + 1)) {
+    const opened = openedFenceAt(body, at);
+    if (opened === undefined) continue;
+    const end = closingLineEnd(body, opened.lineEnd + 1, opened.mark, opened.marks);
+    blocks.push({ start: at, end: end === -1 ? body.length : end });
+    at = end === -1 ? body.length : end;
+  }
+  return blocks;
+};
 
 const blanked = (text: string): string => text.replaceAll(/[^\n]/g, " ");
 
@@ -87,7 +225,16 @@ const blankedSpans = (body: string): string => {
 };
 
 /** The body with fenced blocks and code spans blanked to spaces, so an offset into one is into both. */
-export const proseOf = (body: string): string => blankedSpans(body.replace(FENCED_BLOCK, blanked));
+export const proseOf = (body: string): string => {
+  const pieces: string[] = [];
+  let cursor = 0;
+  for (const block of fencedBlocksOf(body)) {
+    pieces.push(body.slice(cursor, block.start), blanked(body.slice(block.start, block.end)));
+    cursor = block.end;
+  }
+  pieces.push(body.slice(cursor));
+  return blankedSpans(pieces.join(""));
+};
 
 const normalisedLabel = (label: string): string =>
   label
@@ -99,13 +246,49 @@ const normalisedLabel = (label: string): string =>
 const labelKey = (label: string): string =>
   label.startsWith("^") ? `^${normalisedLabel(label.slice(1))}` : normalisedLabel(label);
 
+/** The first run of more than the six after the six that follow `from`, and where it
+ * ends. */
+const targetAfter = (
+  prose: string,
+  from: number,
+): { readonly start: number; readonly end: number } | undefined => {
+  let start = from;
+  while (start < prose.length && isSix(prose[start] ?? "")) start += 1;
+  if (start === prose.length) return undefined;
+  let end = start;
+  while (end < prose.length && !isSix(prose[end] ?? "")) end += 1;
+  return { start, end };
+};
+
+type Definition = { readonly key: string; readonly target: string; readonly end: number };
+
+/** The definition at the line start `at`: a label without `]`, a colon at once, a
+ * target after the six. */
+const definitionAt = (prose: string, at: number, close: Int32Array): Definition | undefined => {
+  const spaces = leadingSpacesOf(prose, at);
+  const opened = at + spaces;
+  if (spaces > 3 || prose[opened] !== "[") return undefined;
+  const bracket = close[opened + 1] ?? -1;
+  if (bracket === -1 || bracket === opened + 1 || prose[bracket + 1] !== ":") return undefined;
+  const target = targetAfter(prose, bracket + 2);
+  if (target === undefined) return undefined;
+  return {
+    key: labelKey(prose.slice(opened + 1, bracket)),
+    target: prose.slice(target.start, target.end),
+    end: target.end,
+  };
+};
+
 const definitionsOf = (prose: string): ReadonlyMap<string, string> => {
   const definitions = new Map<string, string>();
-  for (const match of prose.matchAll(LINK_DEFINITION)) {
-    const label = labelKey(match[1] ?? "");
-    if (!definitions.has(label)) {
-      definitions.set(label, (match[2] ?? "").replace(/^</, "").replace(/>$/, ""));
+  const close = nextOf(prose, "]");
+  for (let at = 0; at < prose.length; at = lineStartFrom(prose, at + 1)) {
+    const found = definitionAt(prose, at, close);
+    if (found === undefined) continue;
+    if (!definitions.has(found.key)) {
+      definitions.set(found.key, found.target.replace(/^</, "").replace(/>$/, ""));
     }
+    at = found.end - 1;
   }
   return definitions;
 };
@@ -119,20 +302,23 @@ const sourcesById = (sources: readonly CitedSource[]): ReadonlyMap<string, numbe
   return byId;
 };
 
+const INLINE_TARGET = /\]\([ \t\n\r\f\v]*<?([^) \t\n\r\f\v>]+)/;
+const REFERENCE = /^\[([^\]]*)\]\[([^\]]*)\]$/;
+
 const linkTargetOf = (
-  match: RegExpExecArray,
+  found: Found,
   prose: string,
   definitions: ReadonlyMap<string, string>,
 ): string | undefined => {
-  const text = match[0];
+  const text = found.text;
   if (text.startsWith("<")) return text.slice(1, -1);
-  if (text.includes("](")) return /\]\([ \t\n\r\f\v]*<?([^) \t\n\r\f\v>]+)/.exec(text)?.[1];
-  const reference = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(text);
+  if (text.includes("](")) return INLINE_TARGET.exec(text)?.[1];
+  const reference = REFERENCE.exec(text);
   if (reference !== null) {
     return definitions.get(labelKey((reference[2] === "" ? reference[1] : reference[2]) ?? ""));
   }
 
-  if (prose[match.index + text.length] === ":") return undefined;
+  if (prose[found.at + text.length] === ":") return undefined;
   return definitions.get(labelKey(text.slice(1, -1)));
 };
 
@@ -146,14 +332,12 @@ type BodyRefs = {
   readonly sourcesById: ReadonlyMap<string, number>;
 };
 
-const footnoteReading = (
-  match: RegExpExecArray,
-  prose: string,
-  refs: BodyRefs,
-): Reading | undefined => {
-  const footnote = FOOTNOTE.exec(match[0]);
+const FOOTNOTE = /^\[\^([^\]]*)\]$/;
+
+const footnoteReading = (found: Found, prose: string, refs: BodyRefs): Reading | undefined => {
+  const footnote = FOOTNOTE.exec(found.text);
   if (footnote === null) return undefined;
-  if (prose[match.index + match[0].length] === ":") return { as: "text" };
+  if (prose[found.at + found.text.length] === ":") return { as: "text" };
   const key = normalisedLabel(footnote[1] ?? "");
   const source = refs.sourcesById.get(key);
   if (source !== undefined) return { as: "mark", source };
@@ -161,12 +345,12 @@ const footnoteReading = (
   return target === undefined ? { as: "text" } : { as: "link", target };
 };
 
-const readingOf = (match: RegExpExecArray, prose: string, refs: BodyRefs): Reading => {
-  if (prose[match.index - 1] === "!") return { as: "link", target: undefined };
+const readingOf = (found: Found, prose: string, refs: BodyRefs): Reading => {
+  if (prose[found.at - 1] === "!") return { as: "link", target: undefined };
   return (
-    footnoteReading(match, prose, refs) ?? {
+    footnoteReading(found, prose, refs) ?? {
       as: "link",
-      target: linkTargetOf(match, prose, refs.definitions),
+      target: linkTargetOf(found, prose, refs.definitions),
     }
   );
 };
@@ -199,13 +383,12 @@ export const linksAndMarksOf = (body: string, sources: readonly CitedSource[]): 
   const links: BodyLink[] = [];
   const marks: CitationMark[] = [];
   let ordinal = 0;
-  for (const match of prose.matchAll(LINK)) {
-    const reading = readingOf(match, prose, refs);
+  for (const found of linkMatchesOf(prose)) {
+    const reading = readingOf(found, prose, refs);
     if (reading.as === "mark")
-      marks.push({ at: match.index, mark: match[0], source: reading.source });
+      marks.push({ at: found.at, mark: found.text, source: reading.source });
     if (reading.as !== "link") continue;
-    if (reading.target !== undefined)
-      links.push({ ordinal, at: match.index, target: reading.target });
+    if (reading.target !== undefined) links.push({ ordinal, at: found.at, target: reading.target });
     ordinal += 1;
   }
   return { links, marks };

@@ -42,6 +42,12 @@ export const A_CONCEPT_VERIFICATION_OF_ORIGIN = `INSERT INTO concept_verificatio
          (id, workspace_id, iri, actor, origin, content_hash)
        VALUES ($1, $2, $3, 'process:better-answers-test', $4, $5)`;
 
+export const A_CONCEPT_INDEX_ROW_WITH_A_BODY = `INSERT INTO concept_index
+         (workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha,
+          audience, status, sensitivity, published_at)
+       VALUES ($1, $2, $3, 'Policy', 'Expenses', '{}'::jsonb, $4, $5, $6,
+               'everyone', 'stable', 'Internal', now())`;
+
 export const A_CONCEPT_INDEX_ROW = `INSERT INTO concept_index
          (workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha,
           audience, status, sensitivity, published_at)
