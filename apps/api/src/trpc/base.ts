@@ -199,9 +199,23 @@ const claimsOf = async (ctx: TrpcContext, path: string): Promise<Claims> => {
   return claims;
 };
 
+/** The read that tells a tab where the session is, so a tab left behind can always learn it. */
+const MEMBER_READ = "session.member";
+
+/** An action must name the session's workspace; a read from a tab holding no member yet names none. */
+const leftBehind = (
+  held: string | null,
+  claims: Claims,
+  path: string,
+  type: TRPCProcedureType,
+): boolean => {
+  if (type === "mutation") return held !== claims.workspaceId;
+  return path !== MEMBER_READ && held !== null && held !== claims.workspaceId;
+};
+
 /**
- * One browser holds one session, so a tab left behind by a switch would act in the session's new
- * workspace. A read changes nothing.
+ * One browser holds one session, so a tab left behind by a switch would act in, or draw rows from,
+ * the session's new workspace.
  */
 const claimsInTheTabsWorkspace = async (
   ctx: TrpcContext,
@@ -210,7 +224,7 @@ const claimsInTheTabsWorkspace = async (
 ): Promise<Claims> => {
   const claims = await claimsOf(ctx, path);
 
-  if (type === "mutation" && ctx.headers.get(TAB_WORKSPACE_HEADER) !== claims.workspaceId) {
+  if (leftBehind(ctx.headers.get(TAB_WORKSPACE_HEADER), claims, path, type)) {
     throw refused(ctx.log, path, "workspace-switched");
   }
   return claims;

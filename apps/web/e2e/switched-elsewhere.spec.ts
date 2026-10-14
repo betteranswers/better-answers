@@ -188,7 +188,7 @@ test.describe("an action from a tab left in another workspace", () => {
     }
   });
 
-  test("refuses cancelling an invitation read since the switch", async ({
+  test("refuses reading the other workspace's invitations into the tab", async ({
     page,
     context,
     request,
@@ -212,20 +212,14 @@ test.describe("an action from a tab left in another workspace", () => {
     await membersReadAfresh(page, two.first);
     const elsewhere = await switchedInAnotherTab(context, page, two);
 
-    await invitationsOpened(page);
-    await expect(invitationTo(page, read), "the rows are not the session's").toBeVisible();
-    await expect(switcherOf(page, two.first.name), "the band no longer names it").toBeVisible();
-    const answered = refusalAnswering(page, "members.cancelInvitation");
-    await invitationsRegion(page)
-      .getByRole("button", { name: `Actions for ${read}` })
-      .click();
-    await page.getByRole("menuitem", { name: "Cancel" }).click();
+    const answered = refusalAnswering(page, "members.invitations");
+    await page.getByRole("tab", { name: "Invitations" }).click();
     expect(await answered).toMatchObject(SWITCHED);
 
+    await landedHomeSayingWhy(page, two.second);
     await membersReadAfresh(elsewhere, two.second);
     await invitationsOpened(elsewhere);
     await stillWaits(elsewhere, read, two.second);
-    await landedHomeSayingWhy(page, two.second);
     await backIn(elsewhere, two);
     await invitationsOpened(elsewhere);
     await stillWaits(elsewhere, kept, two.first);

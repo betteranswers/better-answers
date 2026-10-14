@@ -32,7 +32,7 @@ import {
 import { knowledgeReadProcedure } from "../src/trpc/knowledge.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { appRouter } from "../src/trpc/router.ts";
-import { capturingLogger, doorsFor } from "./harness.ts";
+import { capturingLogger, doorsFor, type TestClient } from "./harness.ts";
 import { signedInClient } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 import { postedFromATab, sessionMovedTo } from "./web-client.ts";
@@ -370,9 +370,15 @@ const MUTATIONS = Object.entries(appRouter._def.procedures).filter(
   ([, procedure]) => middlewaresOf(procedure).type === "mutation",
 );
 
-const ROADS_NAMING_NO_WORKSPACE = [personProcedure, operatorMutationProcedure].map(
-  (road) => middlewaresOf(road).middlewares[0],
+const QUERIES = Object.entries(appRouter._def.procedures).filter(
+  ([, procedure]) => middlewaresOf(procedure).type === "query",
 );
+
+const ROADS_NAMING_NO_WORKSPACE = [
+  personProcedure,
+  operatorMutationProcedure,
+  operatorQueryProcedure,
+].map((road) => middlewaresOf(road).middlewares[0]);
 
 const namesNoWorkspace = (procedure: object): boolean =>
   ROADS_NAMING_NO_WORKSPACE.includes(middlewaresOf(procedure).middlewares[0]);
@@ -390,8 +396,60 @@ const switchedAway = async () => {
   await app().addMember(here.workspaceId, left.admin.id, "Admin");
   const client = await signedInClient(app(), left.admin.email);
   await sessionMovedTo(client, here.workspaceId);
-  return { client, left };
+  return { client, left, here };
 };
+
+/** A query asked over GET with no input, by a tab holding `held` when one is given. */
+const queriedFromATab = (client: TestClient, path: string, held?: string): Promise<Response> =>
+  client.fetch(`${TRPC_ENDPOINT}/${path}`, {
+    headers: held === undefined ? {} : { [TAB_WORKSPACE_HEADER]: held },
+  });
+
+const wordOf = async (answered: Response): Promise<string | undefined> =>
+  answeredWord.parse(await answered.json()).error?.data.refusal?.word;
+
+/** The read that tells a tab where the session is, so the tab can always learn it. */
+const MEMBER_READ = "session.member";
+
+const memberRead = z.object({
+  result: z.object({ data: z.object({ workspace: z.object({ id: z.string() }) }) }),
+});
+
+describe("every query the router serves on a workspace road", () => {
+  it("is refused, its tab naming another workspace", async () => {
+    const { client, left } = await switchedAway();
+    const paths = QUERIES.filter(
+      ([path, procedure]) => !namesNoWorkspace(procedure) && path !== MEMBER_READ,
+    ).map(([path]) => path);
+
+    // Asked with no input, so only a road that judges ahead of the parse answers the word.
+    const words: (readonly [string, string | undefined])[] = [];
+    for (const path of paths) {
+      words.push([path, await wordOf(await queriedFromATab(client, path, left.workspaceId))]);
+    }
+
+    expect(paths).toEqual(expect.arrayContaining(["members.list", "knowledge.find"]));
+    expect(words).toEqual(paths.map((path) => [path, "workspace-switched"]));
+  });
+
+  it("answers the member read whatever workspace the tab names", async () => {
+    const { client, left, here } = await switchedAway();
+
+    const answered = await queriedFromATab(client, MEMBER_READ, left.workspaceId);
+
+    expect(answered.status).toBe(200);
+    expect(memberRead.parse(await answered.json()).result.data.workspace.id).toBe(here.workspaceId);
+  });
+
+  it("answers from the session's workspace when the tab names none", async () => {
+    const { client, here } = await switchedAway();
+
+    const unnamed = await queriedFromATab(client, "members.list");
+    const named = await queriedFromATab(client, "members.list", here.workspaceId);
+
+    expect([unnamed.status, named.status]).toEqual([200, 200]);
+  });
+});
 
 describe("every mutation the router serves", () => {
   it("is refused on a workspace road, its tab naming another", async () => {
