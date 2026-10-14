@@ -41,12 +41,15 @@ import {
 } from "./boundary.ts";
 import { cursorOf, type FindPosition, type FindRun } from "./cursor.ts";
 import {
+  ANSWER_KIND,
   answerPlanned,
   ASK_CAPS,
   type AskCaps,
   type MapState,
   type PlannedAnswer,
+  type PreviewedConcept,
   type ReadStep,
+  type RelatedConcept,
   type ReturnedConcept,
 } from "./plan.ts";
 import type { RecordCompletion, RecordOpening } from "./record.ts";
@@ -68,7 +71,9 @@ export {
   type AskCaps,
   type MapState,
   type PlannedAnswer,
+  type PreviewedConcept,
   type ReadStep,
+  type RelatedConcept,
   type ReturnedConcept,
 } from "./plan.ts";
 export { completeRecord, openRecord } from "./record.ts";
@@ -549,8 +554,6 @@ export const mapWords = (map: MapState): string => {
   }
 };
 
-const ANSWER_KIND = "Answer";
-
 /** The related line tells an assistant what to do, and never says the question was answered. */
 const VERDICT_LINES = {
   ok: "**Answered from the company's knowledge.**",
@@ -581,6 +584,21 @@ const returnedText = (concept: ReturnedConcept<string>): readonly string[] => [
   `${concept.iri} — ${concept.url}`,
 ];
 
+const PREVIEWS_HEADING =
+  "Also bearing on the question, one line each: read one with `open` and its iri before writing from it.";
+
+const previewLine = (concept: PreviewedConcept<string>): string =>
+  `- ${concept.kind} · ${concept.title} · ${concept.collection ?? NO_COLLECTION} · ${concept.trustWords} · ${concept.iri} — ${concept.url}`;
+
+/** An `Answer` in full, then every other concept by its line, each in the order it bears. */
+const relatedText = (related: readonly RelatedConcept<string>[]): readonly string[] => [
+  ...related.flatMap((concept) => ("body" in concept ? returnedText(concept) : [])),
+  ...listed(
+    PREVIEWS_HEADING,
+    related.flatMap((concept) => ("body" in concept ? [] : [previewLine(concept)])),
+  ),
+];
+
 const unmappedText = (passage: PassageView): readonly string[] => [
   "",
   `${NOT_COMPANY_KNOWLEDGE} · ${passage.sensitivity}`,
@@ -594,6 +612,6 @@ export const renderAnswer = (answer: PlannedAnswer<string>): string =>
     `_${JUDGE_WORDS[answer.judgeState]} · ${mapWords(answer.map)}_`,
     `Collections considered: ${namedOrNone(answer.collections)}`,
     `Collections you may name: ${namedOrNone(answer.readableCollections)}`,
-    ...answer.related.flatMap(returnedText),
+    ...relatedText(answer.related),
     ...answer.unmappedPassages.flatMap(unmappedText),
   ].join("\n");

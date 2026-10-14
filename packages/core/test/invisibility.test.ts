@@ -10,6 +10,7 @@ import {
   renderAnswer,
   renderOpen,
   type AnswerResult,
+  type RelatedConcept,
 } from "../src/answering/index.ts";
 import { conceptByIri, conceptsByIris } from "../src/concepts/index.ts";
 import { footnotesOf } from "../src/guides/index.ts";
@@ -645,6 +646,9 @@ describe("an `Answer` withheld from the asker", () => {
     expect(renderAnswer(admins)).toContain("> Audit logs are kept for seven years.");
   });
 
+  /** Only an `Answer` comes back with its evidence. */
+  const evidenceOf = (concept: RelatedConcept) => ("evidence" in concept ? concept.evidence : []);
+
   it("names a source the asker cannot open by its label", async () => {
     const scenario = await arrange();
     const minutes = await documentLanded(db().pool, scenario.workspaceId, {
@@ -654,11 +658,12 @@ describe("an `Answer` withheld from the asker", () => {
     });
     await conceptCiting(scenario, scenario.editor, [], {
       title: RETENTION.title,
+      kind: "Answer",
       sensitivity: "Internal",
       body: "Audit logs are kept for thirteen months.[^BM-1]",
       frontmatter: {
         title: RETENTION.title,
-        type: "Note",
+        type: "Answer",
         sources: [
           {
             id: "BM-1",
@@ -674,13 +679,13 @@ describe("an `Answer` withheld from the asker", () => {
     const admins = await asked(db(), scenario.admin, QUESTION);
     const seen = `${JSON.stringify(viewers)}\n${renderAnswer(viewers)}`;
 
-    expect(viewers.related.map((concept) => concept.evidence)).toEqual([
+    expect(viewers.related.map(evidenceOf)).toEqual([
       [{ id: "BM-1", source: "The board's minutes" }],
     ]);
     expect(seen).not.toContain(minutes.locator);
     expect(seen).not.toContain(minutes.documentId);
     expect(seen).not.toContain("Board minutes 2026");
-    expect(admins.related.map((concept) => concept.evidence)).toEqual([
+    expect(admins.related.map(evidenceOf)).toEqual([
       [{ id: "BM-1", source: "The board's minutes", locator: minutes.locator }],
     ]);
   });

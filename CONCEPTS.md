@@ -1094,7 +1094,8 @@ fit; its key on the wire is `related`.
 
 A concept bears on a question when it is an entry point or the walk reaches it from one. The
 verdict's first line never says the question was answered. An `Answer` with no judge's yes is
-related knowledge and is never shown as a fit.
+related knowledge and is never shown as a fit. An `Answer` comes back as it stands; any other
+concept comes back as a preview, its line as `find` gives it, for `open` to read in full.
 
 ### judge
 

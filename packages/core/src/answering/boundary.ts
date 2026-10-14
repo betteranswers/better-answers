@@ -172,17 +172,33 @@ export type Evidence<Iri extends string> = {
   readonly iri?: Iri;
 };
 
-const returnedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
+const previewedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
   z.object({
-    iri: z.string(),
+    iri: z.string().describe("What `open` takes as `iri` to read the concept in full."),
     url: z.string().describe("The concept's page, for the person to open."),
     kind: z.string(),
     title: z.string().describe("For an `Answer`, the question it answered."),
     collection: z.string().nullable().describe("Null for a concept in no collection."),
-    body: z.string().describe("The concept's own words, to quote unchanged."),
     trust,
     trustWords: z.string(),
+  });
+
+const returnedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
+  previewedConceptWith(trust).extend({
+    body: z.string().describe("The `Answer`'s own words, to quote unchanged."),
     evidence: z.array(evidenceItem),
+  });
+
+/** One object with two optional keys, not a union: the kind that decides is free text. */
+const relatedConceptWith = <Trust extends z.ZodType>(trust: Trust) =>
+  previewedConceptWith(trust).extend({
+    body: z
+      .string()
+      .exactOptional()
+      .describe(
+        "An `Answer`'s own words, to quote unchanged. Any other concept comes without them: read it with `open` before writing from it.",
+      ),
+    evidence: z.array(evidenceItem).exactOptional().describe("An `Answer`'s sources."),
   });
 
 export const answerOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
@@ -195,8 +211,10 @@ export const answerOutputWith = <Trust extends z.ZodType>(trust: Trust) =>
       .array(returnedConceptWith(trust))
       .describe("Every `Answer` a judge found to fit the question, as it stands."),
     related: z
-      .array(returnedConceptWith(trust))
-      .describe("The concepts that bear on the question, an unjudged `Answer` among them."),
+      .array(relatedConceptWith(trust))
+      .describe(
+        "The concepts that bear on the question, best first: an unjudged `Answer` as it stands, any other by its line.",
+      ),
     conflicts: z.array(
       z.object({
         subject: z.string(),

@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { walkFrom, walkFromEntries } from "@better-answers/core/store/map";
+import { walkConceptsFromEntries, walkFrom } from "@better-answers/core/store/map";
 import { ids, type ConceptIri } from "@better-answers/schema";
 
 import { writeConcept, type WriteConceptInput } from "../src/concepts/index.ts";
@@ -148,7 +148,7 @@ const timedWalk = async (
       const oneRowStarted = performance.now();
       const oneRow = await walkFrom(principal, tx, map.lone);
       const walkStarted = performance.now();
-      const walk = await walkFromEntries(principal, tx, map.entries, collections);
+      const walk = await walkConceptsFromEntries(principal, tx, map.entries, collections);
       return {
         oneRowMs: walkStarted - oneRowStarted,
         oneRowSteps: oneRow.length,

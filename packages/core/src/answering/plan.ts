@@ -1,5 +1,4 @@
 import {
-  CONCEPT_NODE_LABEL,
   ids,
   type ConceptIri,
   type JudgeState,
@@ -27,7 +26,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { findPassages, parseLocator, passageAt } from "../sources/index.ts";
-import { walkFromEntries, walkTimedOut, type WalkStep } from "../store/map/index.ts";
+import { walkConceptsFromEntries, walkTimedOut, type WalkStep } from "../store/map/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { passageViewOf, type AskInput, type Evidence, type PassageView } from "./boundary.ts";
 import type { RecordedConcept } from "./record.ts";
@@ -37,8 +36,14 @@ export type MapState =
   | { readonly state: "as_of"; readonly at: string }
   | { readonly state: "unavailable_since"; readonly since: string };
 
-/** A concept an answer returns as it stands. `Iri` is `string` where an iri is only read as text. */
-export type ReturnedConcept<Iri extends string = ConceptIri> = {
+/** The kind whose body an answer returns word for word. */
+export const ANSWER_KIND = "Answer";
+
+/**
+ * A concept named by a line, as `find` names it; `open` reads it in full. `Iri` is `string` where
+ * an iri is only text.
+ */
+export type PreviewedConcept<Iri extends string = ConceptIri> = {
   readonly iri: Iri;
   /** The concept's page on the web. */
   readonly url: string;
@@ -47,11 +52,20 @@ export type ReturnedConcept<Iri extends string = ConceptIri> = {
   readonly title: string;
   /** Null for a concept in no collection. */
   readonly collection: string | null;
-  readonly body: string;
   readonly trust: Trust;
   readonly trustWords: string;
+};
+
+/** An `Answer` an answer returns as it stands. */
+export type ReturnedConcept<Iri extends string = ConceptIri> = PreviewedConcept<Iri> & {
+  readonly body: string;
   readonly evidence: readonly Evidence<Iri>[];
 };
+
+/** A concept that bears on a question: an `Answer` as it stands, any other by its line. */
+export type RelatedConcept<Iri extends string = ConceptIri> =
+  | ReturnedConcept<Iri>
+  | PreviewedConcept<Iri>;
 
 /** An answer before its record is kept: everything `ask` answers but the record's id. */
 export type PlannedAnswer<Iri extends string = ConceptIri> = {
@@ -60,7 +74,7 @@ export type PlannedAnswer<Iri extends string = ConceptIri> = {
   /** Every `Answer` a judge found to fit the question. */
   readonly answers: readonly ReturnedConcept<Iri>[];
   /** The concepts that bear on the question, an `Answer` no judge passed among them. */
-  readonly related: readonly ReturnedConcept<Iri>[];
+  readonly related: readonly RelatedConcept<Iri>[];
   readonly conflicts: readonly {
     readonly subject: string;
     readonly values: readonly { readonly value: string; readonly evidence: string }[];
@@ -172,14 +186,16 @@ const walkedFrom = async <Refused>(
   entries: readonly OpenedConcept[],
 ): Promise<Result<Walked, Refused | Error>> => {
   const seeds = entries.map((entry) => entry.iri);
-  const walked = await read((tx) => attempt(() => walkFromEntries(reader, tx, seeds, collections)));
+  const walked = await read((tx) =>
+    attempt(() => walkConceptsFromEntries(reader, tx, seeds, collections)),
+  );
   if (walked.ok) return ok({ steps: walked.value, map: { state: "live" } });
   return walked.error instanceof Error && walkTimedOut(walked.error)
     ? ok({ steps: [], map: { state: "unavailable_since", since: now.toISOString() } })
     : walked;
 };
 
-/** The concepts the walk reached beyond its seeds, nearest first. */
+/** The concepts the walk reached beyond its seeds, nearest first; the walk answers concepts alone. */
 const reachedBeyond = (
   entries: readonly OpenedConcept[],
   steps: readonly WalkStep[],
@@ -187,35 +203,42 @@ const reachedBeyond = (
   const seeds = new Set<string>(entries.map((entry) => entry.iri));
   return steps.flatMap((step) => {
     const iri = ids.conceptIri.safeParse(step.uid);
-    return step.label === CONCEPT_NODE_LABEL && !seeds.has(step.uid) && iri.success
-      ? [iri.data]
-      : [];
+    return !seeds.has(step.uid) && iri.success ? [iri.data] : [];
   });
 };
 
-type Returned = { readonly shown: ReturnedConcept; readonly kept: RecordedConcept };
+type Returned = { readonly shown: RelatedConcept; readonly kept: RecordedConcept };
 
-const returnedOf = (
-  concept: OpenedConcept,
-  evidence: ReturnedConcept["evidence"],
-  now: Date,
-): Returned => {
-  const { iri, kind, title, collection, body, contentHash } = concept;
-  const trust = trustOf(concept, now);
+const previewOf = (concept: OpenedConcept, trust: Trust): PreviewedConcept => {
+  const { iri, kind, title, collection } = concept;
   return {
-    shown: {
-      iri,
-      url: conceptPageOf(iri),
-      kind,
-      title,
-      collection,
-      body,
-      trust,
-      trustWords: trustWords(trust),
-      evidence,
-    },
-    kept: { iri, contentHash, trust },
+    iri,
+    url: conceptPageOf(iri),
+    kind,
+    title,
+    collection,
+    trust,
+    trustWords: trustWords(trust),
   };
+};
+
+type ReturnReads = Parameters<typeof evidenceOf>[3];
+
+/** An `Answer` comes back as it stands; any other concept by its line, its evidence unread. */
+const returnedOf = async (
+  reader: UserPrincipal,
+  tx: Tx,
+  concept: OpenedConcept,
+  reads: ReturnReads,
+  now: Date,
+): Promise<Result<Returned, ReadFailure>> => {
+  const trust = trustOf(concept, now);
+  const kept = { iri: concept.iri, contentHash: concept.contentHash, trust };
+  const preview = previewOf(concept, trust);
+  if (concept.kind !== ANSWER_KIND) return ok({ shown: preview, kept });
+  const evidence = await evidenceOf(reader, tx, concept.frontmatter, reads);
+  if (!evidence.ok) return evidence;
+  return ok({ shown: { ...preview, body: concept.body, evidence: evidence.value }, kept });
 };
 
 /** One read a locator, however many of the returned concepts cite the passage. */
@@ -254,9 +277,9 @@ const returnedBy = async (
   const returned: Returned[] = [];
   // A concept the reader could read when walked and cannot now has no row, and is left out.
   for (const concept of slots.flatMap((iri) => byIri.get(iri) ?? [])) {
-    const evidence = await evidenceOf(reader, tx, concept.frontmatter, reads);
-    if (!evidence.ok) return evidence;
-    returned.push(returnedOf(concept, evidence.value, now));
+    const one = await returnedOf(reader, tx, concept, reads, now);
+    if (!one.ok) return one;
+    returned.push(one.value);
   }
   return ok(returned);
 };
