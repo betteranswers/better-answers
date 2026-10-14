@@ -198,6 +198,10 @@ export const SOME_QUESTION_FEEDBACK = `INSERT INTO question_feedback
           disputed_sentence, disputed_concept)
        VALUES ($1, $2, $3, now(), $4, $5, $6, $7, $8, $9)`;
 
+export const A_CLOSED_QUESTION_FEEDBACK = `INSERT INTO question_feedback
+         (workspace_id, id, record_id, given_at, given_by, verdict, reason, closed_as, closed_at)
+       VALUES ($1, $2, $3, now(), $4, $5, $6, $7, $8)`;
+
 export const A_MODEL_KEY =
   "INSERT INTO model_key (workspace_id, provider, sealed) VALUES ($1, $2, $3)";
 

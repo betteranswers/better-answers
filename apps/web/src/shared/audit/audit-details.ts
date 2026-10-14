@@ -85,6 +85,7 @@ const VALUE_LABELS = new Map(
     gbpPerMillionIn: "£ per Million Tokens In",
     gbpPerMillionOut: "£ per Million Tokens Out",
     grants: "Access ended",
+    closedAs: "Closed as",
   }),
 );
 
@@ -97,6 +98,7 @@ export const LABELLED_DETAIL_KEYS: readonly string[] = [
 export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, readonly string[]>>> = {
   "knowledge.check.imported": ["verificationId"],
   "knowledge.concept.committed": ["commitSha", "contentHash"],
+  "knowledge.feedback.closed": ["recordId"],
   "knowledge.manifest.written": ["bundleId", "commitSha"],
   "knowledge.suggestion.accepted": ["commitSha", "contentHash", "setId"],
   "knowledge.suggestion.declined": ["setId"],
@@ -132,6 +134,8 @@ const VALUE_WORDS: ReadonlyMap<unknown, string> = new Map([
   ["platform", "Platform"],
   ["anthropic", "Anthropic"],
   ["mistral", "Mistral AI"],
+  ["fixed-in-the-knowledge", "Fixed in the knowledge"],
+  ["no-fault-in-the-knowledge", "No fault in the knowledge"],
 ]);
 
 type Said = { readonly value: string; readonly address?: string };

@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0082_the-spend-ledger"
+MIGRATION_ID = "0083_the-closed-flag"
 
-MIGRATION_WHEN = 1792017015489
+MIGRATION_WHEN = 1792020457249
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -515,6 +515,8 @@ TABLES: dict[str, dict[str, str]] = {
         "note": "text",
         "disputed_sentence": "text",
         "disputed_concept": "text",
+        "closed_as": "text",
+        "closed_at": "timestamp with time zone",
     },
     "public.rate_limit": {
         "id": "text NOT NULL",

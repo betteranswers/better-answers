@@ -7,6 +7,8 @@ import {
   CALENDAR_DAY,
   CONTENT_HASH,
   FAMILIES,
+  FLAG_CLOSINGS,
+  type FlagClosing,
   GBP,
   GIT_SHA,
   IRI,
@@ -99,6 +101,8 @@ export const DETAIL_KINDS = {
   modelName: (value: DetailValue) => typeof value === "string" && MODEL_NAME.test(value),
   day: (value: DetailValue) => typeof value === "string" && CALENDAR_DAY.test(value),
   gbp: (value: DetailValue) => typeof value === "string" && GBP.test(value),
+  flagClosing: (value: DetailValue) =>
+    typeof value === "string" && FLAG_CLOSINGS.some((closing) => closing === value),
 } as const;
 
 export type DetailKind = keyof typeof DETAIL_KINDS;
@@ -127,7 +131,9 @@ type DetailValueOf<K extends DetailKind> = K extends "role"
                 ? readonly Matched[]
                 : K extends "modelProvider"
                   ? ModelProvider
-                  : string;
+                  : K extends "flagClosing"
+                    ? FlagClosing
+                    : string;
 
 export type DetailOf<Shape extends DetailShape> = {
   readonly [

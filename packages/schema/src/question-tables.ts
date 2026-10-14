@@ -31,6 +31,10 @@ export const FEEDBACK_REASONS = [
   "should-not-have-shown",
 ] as const;
 
+/** How an Admin closes a flag: the knowledge was at fault and is fixed, or it was not at fault. */
+export const FLAG_CLOSINGS = ["fixed-in-the-knowledge", "no-fault-in-the-knowledge"] as const;
+export type FlagClosing = (typeof FLAG_CLOSINGS)[number];
+
 /**
  * A record's skeleton, kept for good. `concepts` names each by IRI with no foreign key, so a
  * record outlives a concept it returned.
@@ -137,6 +141,10 @@ export const questionFeedback = withRLS(
     disputedSentence: text("disputed_sentence"),
     /** The IRI the disputed sentence rested on, with no foreign key. */
     disputedConcept: text("disputed_concept"),
+
+    /** Who closed it is the audit event's actor alone: the row is kept for good. */
+    closedAs: text("closed_as"),
+    closedAt: stamp("closed_at"),
   },
   "workspaceId",
   (table) => [
@@ -163,6 +171,14 @@ export const questionFeedback = withRLS(
          AND (note IS NULL OR verdict = '${FEEDBACK_FLAG_VERDICT}')
          AND (disputed_concept IS NULL OR verdict = '${FEEDBACK_FLAG_VERDICT}')
          AND (disputed_sentence IS NULL OR disputed_concept IS NOT NULL)`,
+      ),
+    ),
+    check(
+      "question_feedback_closed_check",
+      sql.raw(
+        `(closed_as IS NULL) = (closed_at IS NULL)
+         AND (closed_as IS NULL OR closed_as IN (${listed(FLAG_CLOSINGS)}))
+         AND (closed_as IS NULL OR verdict = '${FEEDBACK_FLAG_VERDICT}')`,
       ),
     ),
   ],

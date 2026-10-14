@@ -1251,6 +1251,18 @@ It is *helpful*, or a **flag** with a reason — *wrong* · *out of date* · *in
 have shown* — kept on the *Questions asked* record it is about. Later a flag also becomes a record
 in someone's queue (a verification request, an edit suggestion, or the Admin's to pass on).
 
+An Admin **closes** a flag once, as *fixed in the knowledge* or *no fault in the knowledge*; a closed
+flag no longer puts its record first on *Questions asked*.
+
+### fixed in the knowledge (of a flag)
+
+How an Admin closes a flag whose fault lay in the company's knowledge, once that knowledge is put
+right.
+
+### no fault in the knowledge (of a flag)
+
+How an Admin closes a flag whose fault lay elsewhere, such as an assistant's wording, or nowhere.
+
 ### correction
 
 An Admin's or owner's action on one answer in *Questions asked* that records the level it went wrong

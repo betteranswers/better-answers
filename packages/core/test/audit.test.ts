@@ -238,6 +238,8 @@ const PROBE = declareActions("platform", {
   ended: action("platform.probe.ended", { grants: "grants" }),
 
   hashed: action("platform.probe.hashed", { contentHash: "contentHash" }),
+
+  closed: action("platform.probe.closed", { closedAs: "flagClosing" }),
 });
 
 const rowsOfSubjects = async (subjectIds: readonly string[]) => {
@@ -463,6 +465,27 @@ describe("the first door — record, the actor from the Principal", () => {
         detail: { contentHash: "sha256:not-a-digest" },
       }),
     ).rejects.toThrow(/contentHash is not a contentHash$/);
+  });
+
+  it("lands a flag's closing in one of two words", async () => {
+    const { door, workspaceId } = await provisioned();
+    const closing = (closedAs: string) =>
+      writingIn(
+        door,
+        workspaceId,
+      )({
+        id: ulid(),
+        action: PROBE.closed,
+        subjectId: ulid(),
+        detail: { closedAs },
+      });
+
+    const { id } = await closing("no-fault-in-the-knowledge");
+
+    expect(await rowById(id)).toEqual(
+      expect.objectContaining({ detail: { closedAs: "no-fault-in-the-knowledge" } }),
+    );
+    await expect(closing("fixed")).rejects.toThrow(/closedAs is not a flagClosing$/);
   });
 
   it("rejects a detail naming a field the action does not", async () => {

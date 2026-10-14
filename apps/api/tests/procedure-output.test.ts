@@ -100,6 +100,8 @@ describe("what a procedure may answer the wire", () => {
       "person.secondFactor",
       "person.setDisplayName",
       "person.workspaces",
+      "questions.asked",
+      "questions.closeFlag",
       "runs.ofSubject",
       "session.member",
       "session.operator",
@@ -165,6 +167,8 @@ describe("what a procedure may answer the wire", () => {
       | "members.declineRequest"
       | "knowledge.find"
       | "knowledge.open"
+      | "questions.asked"
+      | "questions.closeFlag"
       | "modelChoices.list"
       | "sources.list"
       | "sources.connect"

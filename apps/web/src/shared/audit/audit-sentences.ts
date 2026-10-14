@@ -90,6 +90,7 @@ const SENTENCES = {
   "knowledge.concept.class_overridden": ({ by, subject }) =>
     `${by} overrode the sensitivity of ${conceptNamed(subject)}`,
   "knowledge.concept.committed": ({ by, subject }) => `${by} saved ${conceptNamed(subject)}`,
+  "knowledge.feedback.closed": ({ by }) => `${by} closed a flag on an answer`,
   "knowledge.manifest.written": ({ by }) => `${by} updated the knowledge base’s description`,
   "knowledge.suggestion.accepted": ({ by, named }) =>
     `${by} accepted a suggestion, saved as ${conceptNamed(namedIn(named, "iri"))}`,
