@@ -470,7 +470,10 @@ not judge the release. `could-not-run` outranks `fail`. A journey raises those t
 `couldNotRun` and `failed` in `apps/web/journeys/outcome.ts`. The run's summary names the role,
 the page and the step from the steps' titles and those reasons alone, never an error's message,
 which can hold an address, so write a reason that names none. The reporter prints no error
-either; by hand, add `--reporter=list` to read one.
+either. By hand, `--reporter=list` prints each one, but the flag replaces the config's reporters,
+so that run writes no outcome: take the outcome from a run without the flag. Naming the outcome
+reporter in the flag beside `list` fails at the run's end, because only the config hands it its
+outcome file.
 
 `check:web` never runs a journey, since the suite's `testDir` is `e2e`, and nor does a pull
 request or the merge queue. Its typecheck covers them, but a journey writes each name itself, as a

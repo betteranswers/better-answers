@@ -105,7 +105,6 @@ export const STATUS_WORDS = {
   cancelled: "Cancelled",
 } as const satisfies Readonly<Record<InvitationStatus, string>>;
 
-/** Apart from `words.tsx` and its JSX, so the browser suite reads the lines the tab shows. */
 export const INVITATIONS_WORDS = {
   status: "Status",
   search: "Search by address",

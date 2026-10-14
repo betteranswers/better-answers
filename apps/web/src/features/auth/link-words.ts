@@ -1,6 +1,5 @@
 import { instantWords } from "@/shared/words.ts";
 
-/** Apart from the page's JSX, so the browser suite reads the words the link's page shows. */
 export const LINK_WORDS = {
   checking: "Checking the link.",
   elsewhereTitle: "Enter This Code Where You Started",
