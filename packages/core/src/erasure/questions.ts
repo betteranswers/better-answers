@@ -1,5 +1,5 @@
 import { PERSON_PREFIX, type PlatformPrincipal } from "../kernel/index.ts";
-import { withScope, type PostgresDoor } from "../store/postgres/index.ts";
+import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 
 export type QuestionsSwept = {
   /** The records whose asker was rewritten; each keeps its skeleton. */
@@ -30,11 +30,48 @@ const REMOVE_THE_QUESTIONS = `DELETE FROM question_content
 const REWRITE_THE_FEEDBACK = `UPDATE question_feedback SET given_by = $3, note = NULL
    WHERE workspace_id = $1 AND given_by = ANY($2)`;
 
+export const NO_QUESTIONS_SWEPT: QuestionsSwept = {
+  rewritten: 0,
+  questionsRemoved: 0,
+  feedbackRewritten: 0,
+};
+
 /**
  * Rewrites who asked and who gave feedback to the erasure pseudonym, deletes the questions and
- * clears the notes, in this workspace alone and in one transaction. The skeletons stay. Does
- * nothing where no person is named.
+ * clears the notes, in this workspace alone and in the caller's transaction. The skeletons stay.
  */
+export const sweepTheQuestions = async (
+  tx: Tx,
+  subject: {
+    readonly workspaceId: string;
+    readonly askers: readonly string[];
+    readonly pseudonym: string;
+  },
+): Promise<QuestionsSwept> => {
+  const { workspaceId, askers } = subject;
+  const erased = `${PERSON_PREFIX}${subject.pseudonym}`;
+  const records = await tx.query<{ id: string; asked_at: string }>(REWRITE_THE_ASKER, [
+    workspaceId,
+    askers,
+    erased,
+  ]);
+  const questions =
+    records.rows.length === 0
+      ? { rowCount: 0 }
+      : await tx.query(REMOVE_THE_QUESTIONS, [
+          workspaceId,
+          records.rows.map((row) => row.id),
+          records.rows.map((row) => row.asked_at),
+        ]);
+  const feedback = await tx.query(REWRITE_THE_FEEDBACK, [workspaceId, askers, erased]);
+  return {
+    rewritten: records.rowCount ?? 0,
+    questionsRemoved: questions.rowCount ?? 0,
+    feedbackRewritten: feedback.rowCount ?? 0,
+  };
+};
+
+/** As sweepTheQuestions, in one transaction of its own. Does nothing where no person is named. */
 export const eraseFromTheQuestions = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -45,28 +82,13 @@ export const eraseFromTheQuestions = async (
   },
 ): Promise<QuestionsSwept> => {
   const askers = askersOf(subject.personIds);
-  if (askers.length === 0) return { rewritten: 0, questionsRemoved: 0, feedbackRewritten: 0 };
+  if (askers.length === 0) return NO_QUESTIONS_SWEPT;
 
-  const erased = `${PERSON_PREFIX}${subject.pseudonym}`;
-  return withScope(platform, door, subject.workspaceId, async (tx) => {
-    const records = await tx.query<{ id: string; asked_at: string }>(REWRITE_THE_ASKER, [
-      subject.workspaceId,
+  return withScope(platform, door, subject.workspaceId, (tx) =>
+    sweepTheQuestions(tx, {
+      workspaceId: subject.workspaceId,
       askers,
-      erased,
-    ]);
-    const questions =
-      records.rows.length === 0
-        ? { rowCount: 0 }
-        : await tx.query(REMOVE_THE_QUESTIONS, [
-            subject.workspaceId,
-            records.rows.map((row) => row.id),
-            records.rows.map((row) => row.asked_at),
-          ]);
-    const feedback = await tx.query(REWRITE_THE_FEEDBACK, [subject.workspaceId, askers, erased]);
-    return {
-      rewritten: records.rowCount ?? 0,
-      questionsRemoved: questions.rowCount ?? 0,
-      feedbackRewritten: feedback.rowCount ?? 0,
-    };
-  });
+      pseudonym: subject.pseudonym,
+    }),
+  );
 };

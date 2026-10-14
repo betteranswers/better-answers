@@ -12,7 +12,7 @@ import {
 import { groupMemberInput, removeFromGroup } from "@better-answers/core/members";
 import { documentLanded, groupSeeded } from "@better-answers/core/testing/documents";
 import { inputOf } from "@better-answers/core/testing/input";
-import { holdingTable } from "@better-answers/core/testing/postgres";
+import { holdingTable, until, whileActionsWaitAt } from "@better-answers/core/testing/postgres";
 import {
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
@@ -24,7 +24,7 @@ import { connectAsHost } from "./flow.ts";
 import { conceptsSeeding, seedConcepts } from "./harness-knowledge.ts";
 import { actingIn, type TestClient } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
-import { changedWhileItWaitsOn, seededIn, whileTheApiLacks } from "./provoke.ts";
+import { changedWhileItWaitsOn, seededIn, waitingOnALock, whileTheApiLacks } from "./provoke.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
 
 const { clock, stopTheClock } = aStoppableClock();
@@ -789,6 +789,36 @@ describe("ask, on the own-transaction road", () => {
 
     expect(await recordsKeptIn(workspace.workspaceId)).toEqual([]);
     expect(refused).toEqual([true, "Refused: not-a-member (unauthenticated).", undefined]);
+  });
+
+  // An erasure sweeps the asker's records once it has deleted their member row, and trusts
+  // that delete to have waited for each of these writes.
+  it.each([
+    ["opens its record", "INSERT", false],
+    ["completes its record", "UPDATE", true],
+  ] as const)("holds the member's removal while it %s", async (_case, write, completed) => {
+    const { workspace, viewer, client, token } = await connectAViewer();
+    const store = app().database.superuser;
+    const landed: string[] = [];
+
+    const waited = await whileActionsWaitAt(store, "question_asked", write, async (release) => {
+      const asking = callTool(client, token, "ask", { question: RETENTION_QUESTION });
+      await until(async () => (await waitingOnALock(app())) === 1);
+      const removing = app()
+        .removeMember(workspace.workspaceId, viewer.id)
+        .then(() => landed.push("the removal"));
+      await until(async () => landed.length > 0 || (await waitingOnALock(app())) === 2);
+      const heldBack = landed.length === 0;
+      await release();
+      await asking;
+      await removing;
+      return heldBack;
+    });
+
+    expect(waited).toBe(true);
+    expect((await recordsKeptIn(workspace.workspaceId)).map((kept) => kept.completed)).toEqual([
+      completed,
+    ]);
   });
 
   it("fits the bound at the caps with 2,000-character bodies", async () => {

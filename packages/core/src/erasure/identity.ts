@@ -6,6 +6,12 @@ import {
   verificationIdentifiersOf,
   workspacesHeldBy,
 } from "../workspaces/index.ts";
+import {
+  askersOf,
+  NO_QUESTIONS_SWEPT,
+  sweepTheQuestions,
+  type QuestionsSwept,
+} from "./questions.ts";
 
 export type IdentityArm = "no-person" | "last-workspace" | "held-elsewhere";
 
@@ -31,6 +37,12 @@ export type IdentitySwept = {
    * not read: it is the operator's, and never the report's.
    */
   readonly invitationsEverywhere: number;
+
+  /**
+   * What the person asked or flagged after the questions step. Swept in the transaction ending
+   * the member: a failed run's rerun still finds them.
+   */
+  readonly questionsSince: QuestionsSwept;
 };
 
 const SWEPT_NOTHING = {
@@ -46,6 +58,7 @@ const SWEPT_NOTHING = {
   lastActive: 0,
   invitationsHere: 0,
   invitationsEverywhere: 0,
+  questionsSince: NO_QUESTIONS_SWEPT,
 } as const;
 
 export type ErasureSubject = {
@@ -124,9 +137,10 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
 };
 
 /**
- * Does nothing without a person. Otherwise ends the member and their last activity here, and only
- * when it was the person's last deletes their sessions, accounts, verifications, invitations and
- * second factor, pseudonymises them and clears their marks. Throws when the workspaces they hold cannot be read.
+ * Does nothing without a person. Otherwise ends the member and their last activity here, sweeps
+ * their questions again, and only when it was the person's last deletes their sessions, accounts,
+ * verifications, invitations and second factor, pseudonymises them and clears their marks. Throws
+ * when the workspaces they hold cannot be read.
  */
 export const eraseFromTheIdentitySet = async (
   platform: PlatformPrincipal,
@@ -142,8 +156,8 @@ export const eraseFromTheIdentitySet = async (
   const elsewhere = held.value.filter((workspaceId) => workspaceId !== subject.workspaceId);
   const arm: IdentityArm = elsewhere.length === 0 ? "last-workspace" : "held-elsewhere";
 
-  // One transaction for the step: of its tables only the last-activity one is under row-level
-  // security, so the workspace's scope narrows nothing else.
+  // One transaction for the step: only its last-activity and questions tables are under
+  // row-level security, so the workspace's scope narrows nothing else.
   return withScope(platform, door, subject.workspaceId, async (tx) => {
     const lastActive = rowsOf(
       await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [personId]),
@@ -153,8 +167,17 @@ export const eraseFromTheIdentitySet = async (
       personId,
     ]);
     const membersEnded = rowsOf(ended);
-    if (arm === "held-elsewhere") return { arm, ...SWEPT_NOTHING, membersEnded, lastActive };
+    // The delete waited for each write holding the member's row. READ COMMITTED: this
+    // statement's snapshot is fresh, so it sees what they committed.
+    const questionsSince = await sweepTheQuestions(tx, {
+      workspaceId: subject.workspaceId,
+      askers: askersOf([personId]),
+      pseudonym: subject.pseudonym,
+    });
+    if (arm === "held-elsewhere") {
+      return { arm, ...SWEPT_NOTHING, membersEnded, lastActive, questionsSince };
+    }
     const swept = await sweepTheSet(tx, subject, `${subject.pseudonym}@${ERASED_DOMAIN}`);
-    return { arm, membersEnded, lastActive, ...swept };
+    return { arm, membersEnded, lastActive, questionsSince, ...swept };
   });
 };
