@@ -11,6 +11,7 @@ import { placedWithoutMeasuring } from "./measuring.ts";
 import {
   ADA,
   adaAnAdmin,
+  adaAt,
   aRefusalAnswer,
   aSwitchInAnotherTab,
   band,
@@ -26,6 +27,7 @@ import {
   openTab,
   read,
   switcher,
+  switcherDrawn,
   tickOf,
   type Api,
 } from "./two-workspaces.ts";
@@ -113,6 +115,59 @@ describe("a tab whose workspace the session has left", () => {
 
     await landedInHolme();
     expect(router.state.location.pathname).toBe(HOMES.Viewer.path);
+  });
+
+  it("reads the member once when reads are refused together", async () => {
+    const api = adaAnAdmin();
+    const router = await openGracesPage(api);
+    aSwitchInAnotherTab(api, "Admin");
+    for (const [procedure, after] of [
+      ["members.list", read([ADA, HEDY])],
+      ["members.groups", read([])],
+    ] as const) {
+      let refused = false;
+      api.set(procedure, () => {
+        if (refused) return after;
+        refused = true;
+        return SWITCHED;
+      });
+    }
+    const member = heldBack(api, "session.member", adaAt("Admin", HOLME));
+    const answer = api.get("session.member");
+    let memberReads = 0;
+    api.set("session.member", () => {
+      memberReads += 1;
+      return answer?.();
+    });
+
+    await router.navigate({ to: MEMBERS });
+    await member.asked;
+    member.resolve();
+
+    await landedInHolme();
+    expect(router.state.location.pathname).toBe(MEMBERS);
+    expect(memberReads, "each refusal read the member again").toBe(1);
+  });
+
+  it("keeps the band drawn when a refusal lands mid-follow", async () => {
+    const api = adaAnAdmin();
+    const second = heldBack(api, "members.endEverySignInAndToken", SWITCHED);
+    await openGracesPage(api);
+    aSwitchInAnotherTab(api, "Admin");
+    api.set("members.changeRole", () => SWITCHED);
+    const member = heldBack(api, "session.member", adaAt("Admin", HOLME));
+
+    fireEvent.click(screen.getByRole("button", { name: "End Every Sign-In and Token Here" }));
+    await second.asked;
+    changeGracesRole();
+    await member.asked;
+    second.resolve();
+    // Over the stub server, so the second refusal is heard only after a turn of the event loop.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(switcherDrawn(NORTHERN), "the band blanked while the member was read").not.toBeNull();
+    member.resolve();
+    await landedInHolme();
   });
 
   it("draws no name of the workspace left when unread", async () => {

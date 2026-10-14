@@ -107,6 +107,24 @@ const landedHomeSayingWhy = async (page: Page, now: Workspace): Promise<void> =>
   await expect(switcherOf(page, now.name), "the band names the workspace left").toBeVisible();
 };
 
+/** Counted in the page from now on: each move of the tab home, which a URL matcher sees only last. */
+const homesCounted = async (page: Page) => {
+  await page.evaluate(() => {
+    const homes = { count: 0 };
+    for (const way of ["pushState", "replaceState"] as const) {
+      const moved = history[way].bind(history);
+      history[way] = (state, unused, url) => {
+        if (url !== undefined && url !== null && new URL(url, location.href).pathname === "/") {
+          homes.count += 1;
+        }
+        moved(state, unused, url);
+      };
+    }
+    Reflect.set(window, "homesCounted", homes);
+  });
+  return () => page.evaluate((): number => Reflect.get(window, "homesCounted").count);
+};
+
 /** Sam's page under `first`, read before the other tab switches. */
 const atSamsPage = async (page: Page, api: APIRequestContext, two: Two): Promise<Locator> => {
   const sam = await aMemberOfBoth(api, two, "Sam Okoro", { first: "Editor", second: "Viewer" });
@@ -223,6 +241,42 @@ test.describe("an action from a tab left in another workspace", () => {
     await backIn(elsewhere, two);
     await invitationsOpened(elsewhere);
     await stillWaits(elsewhere, kept, two.first);
+  });
+
+  test("sends a stale tab home once when several reads refuse", async ({
+    page,
+    context,
+    request,
+  }) => {
+    const two = await inTwoWorkspaces(page, request, {
+      first: "Ouse Cooperage",
+      second: "Foss Cooperage",
+    });
+    await page.goto("/knowledge/search");
+    await expect(switcherOf(page, two.first.name)).toBeVisible();
+    await switchedInAnotherTab(context, page, two);
+
+    const refused = new Set<string>();
+    page.on("response", async (answer) => {
+      if (!answer.url().includes("/trpc/")) return;
+      const asked = new URL(answer.url()).pathname.replace("/trpc/", "").split(",");
+      const answers: unknown = await answer.json().catch(() => undefined);
+      if (!Array.isArray(answers)) return;
+      answers.forEach((each: unknown, at) => {
+        if (JSON.stringify(each).includes(`"${SWITCHED.word}"`)) refused.add(asked[at] ?? "");
+      });
+    });
+    const homes = await homesCounted(page);
+
+    // In the app, not a fresh document: the band keeps its member, and the page asks its reads together.
+    await page
+      .getByRole("navigation", { name: "Areas" })
+      .getByRole("link", { name: "Control Centre" })
+      .click();
+
+    await landedHomeSayingWhy(page, two.second);
+    expect(refused.size, `only ${[...refused].join(", ")} refused`).toBeGreaterThan(1);
+    expect(await homes(), "the tab was sent home more than once").toBe(1);
   });
 
   test("asks once when a role change is pressed twice", async ({ page, context, request }) => {
