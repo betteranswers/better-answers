@@ -7,7 +7,6 @@ import {
   tooManyCodesTriedOr,
 } from "@/features/auth/refusal-words.ts";
 import { CODE_AGAIN, RECOVERY_WORDS } from "@/features/auth/second-factor-words.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { STOCK } from "@/shared/refusal-words.ts";
 
 import {
@@ -139,7 +138,7 @@ describe("the confirm page", () => {
       expect(alertsSaying()).toEqual([STOCK.notLoaded]);
     });
     expect(screen.getByRole("button", { name: "Try Again" })).toBeDefined();
-    expect(screen.getByRole("button", { name: KEYSTROKE_WORDS.button })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Keyboard Shortcuts" })).toBeDefined();
   });
 
   it("keeps a wrong code's digits selected and marks it invalid", async () => {

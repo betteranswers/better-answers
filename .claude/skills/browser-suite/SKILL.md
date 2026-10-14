@@ -157,13 +157,13 @@ More helpers in the same module drive the browser rather than the harness:
 | Helper | What it does |
 | --- | --- |
 | `anAddress` | An email address nobody else in the run will use, so a code read back is this test's |
-| `signInHeading` | The sign-in page's heading, read off its word table for what the sign-in carries on to: nothing, joining a workspace or connecting Claude |
-| `quoted` | A table's sentence quoted as an inline aria snapshot takes it, so the snapshot reads the words rather than copying them |
+| `A_ROLE` | The article a role takes in a test's title, such as *an Editor*, for a test written once for each role |
+| `signInHeading` | The sign-in page's heading, for what the sign-in carries on to: nothing, joining a workspace or connecting Claude |
 | `signInByEmail` | Signs a person in **through the product's own page** — fill the address, send, read the six-digit code back from the captured transport, and fill it. Six digits submit on their own, so it clicks nothing, and it waits for the code field to be gone, because leaving the page sooner cancels the sign-in. An Admin or the operator is left on the confirm or setup page, which is where a spec about those pages starts |
 | `signIn` | `signInByEmail`, then, once the first page draws, past the confirm or setup page an Admin or the operator meets: it gives the person the harness's authenticator through `withAnAuthenticator`, opens the confirm page afresh with the page's own query, and types the code — the gate passed through the real page, never around it. Anyone else is left where the sign-in sends them. Most specs sign in with this |
 | `confirmedWhenAsked` | Waits for the confirm or setup page an action sent the person to, such as joining as an Admin, then passes it as `signIn` does |
 | `aMemberSignedInAt` | A new workspace's Editor or Viewer, signed in having asked for a path first, so sign-in carries them back to it — where a refused page is proved |
-| `landedAtHome` | Asserts the page is on a role's home, its address and its heading read off the navigation list. The heading is the page's group's name, or its area's where it has none |
+| `landedAtHome` | Asserts the page is on a role's home: its address, read off the navigation list, and its heading. The heading is the page's group's name, or its area's where it has none |
 | `notFoundOfferingHome` | Asserts the not-found page and its link to a role's home. A page hidden from the role shows it, as an address that never existed does |
 | `signedInAtHome` | Opens the sign-in page, runs `signIn`, and waits for a role's home, an Admin's unless another is named, as a member of one workspace arrives |
 | `signedInWithNoWorkspace` | A new person in no workspace, signed in through `signIn` and waiting on the no-workspace page, answered as the harness's `person` |
@@ -172,20 +172,23 @@ More helpers in the same module drive the browser rather than the harness:
 | `signOutFromTheShell` | Opens the avatar menu through `personMenuOpened`, then signs out, because sign-out is one disclosure in |
 | `switcherOf` | The workspace switcher in the band, named for where the person is: the workspace they are reading, or the console |
 | `switcherMenuOf` | The switcher's open menu, named as its button is |
-| `railOf` | The icon rail, the `navigation` named `RAIL` |
-| `navOf` | The menu, the `navigation` named for the area it is given, such as `CONTROL_CENTRE` |
+| `allWorkspacesPicked` | Opens the switcher and picks *All Workspaces*, its way to the picker |
+| `railOf` | The icon rail, the `navigation` named *Areas* |
+| `navOf` | The menu, the `navigation` named for the open area, whose name it is given, such as `"Control Centre"` |
 | `crumbOf` | A part of the band's breadcrumb by its name. The current part is a link too, so a part that leads somewhere is told by its `href` |
 | `skipLinkReachesThePage` | Tab, the skip link has focus, Enter, `main` has focus — where a shell spec's keyboard traversal starts |
 | `tabUntilFocused` | Presses Tab until a locator has focus, and fails by name when it never does |
 | `tabOpenedByKeyboard` | A fresh document at a page, the skip link, Tab to its open tab, then the arrow keys along to a named tab, each arrow landing before the next |
 | `editorPickedByKeyboard` | From a role select in focus reading Viewer: open it, one step up to Editor, pick it, and focus is back on the select |
 | `keystrokesListed` | Presses `?` and answers the list of keystrokes once it is open, named for the open page as the navigation list names it |
-| `keystrokesButton` | The one *Keyboard shortcuts* button, in the page or in a region it is given: at the rail's foot where the layout is wide, in the band where it is narrow, and a page's own outside the shell |
+| `keyListed` | A keystroke's key among the terms of the open list of keystrokes, which sets each action beside its key |
+| `keystrokesButton` | The one *Keyboard Shortcuts* button, in the page or in a region it is given: at the rail's foot where the layout is wide, in the band where it is narrow, and a page's own outside the shell |
 | `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later. A key pressed sooner keeps the focus it moved |
 | `clockTheNextKey` | Starts the action's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActionLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the action's 100 ms |
 | `saysARefusal` | Asserts an alert holds words. A refusal's region can stand empty from the first draw, so being in the tree shows no refusal |
-| `saysAnotherRefusal` | Asserts an alert says something other than the refusal it said before, which the spec read from it and hands over. Holding words would pass on that earlier refusal |
+| `saysSomethingNew` | Asserts a status or an alert says something other than what it said before, which the spec read from it and hands over. Holding words would pass on what it already said |
+| `countOf` | A list's count: the first status its region holds, which its head says |
 | `saysOfItsRead` | Asserts a list's live region holds words, where a list says its read's state in a paragraph and no alert. No role names that region, so it is found by its `aria-live`, apart from the words the list's head always shows |
 | `saysTheWait` | Asserts an alert names a ceiling's wait, given in seconds as the answer named it, as the page counts it: whole minutes, rounded up, matched by their number. A wait the answer did not name fails |
 | `keepsItsWordOffThePage` | Asserts the api's word for a refusal is nowhere on the page: the word is for the logs and the wire |
@@ -227,22 +230,33 @@ still shown the api refused.
 
 ## Writing a spec
 
-- **Locate by role and accessible name.** `getByRole`, `getByLabel`, `getByText`. Test ids appear
-  nowhere in this suite; adding one adds a handle the reader does not have.
-- **Find the shell by its landmarks**, named from `apps/web/src/app/words.ts` and
-  `apps/web/src/shared/navigation.ts`:
+- **Locate by role and accessible name, and write the name in the spec.** `getByRole`,
+  `getByLabel`, `getByText`. A control, a heading, a region, a dialog and a field are each found by
+  the name the page gives them, written as a literal where the spec uses it. A name built from
+  seeded data is a template over that data, such as `` `Remove ${member.name}` ``. Playwright
+  matches a name as a substring in any case, so a name that sits inside another control's name on
+  the same page takes `exact: true`. A check that a name is absent holds only while that name
+  still names the control, so the same spec also finds the control by that name, held once, where
+  the page shows it. Test ids appear nowhere in this suite; adding one adds a handle the reader
+  does not have.
+- **Import none of the web's text.** A spec and a journey import from the SPA only what is not
+  text: a page's address, a wire word, a limit, a count, a key's letter, a type, a function that
+  formats seeded data. A changed label then fails the tests that name that control, at run time,
+  and nothing else. `apps/web/e2e/models-and-spend.spec.ts` reads its page's address off
+  `apps/web/src/shared/navigation.ts` and writes each name itself.
+- **Find the shell by its landmarks:**
   - The top band is the `banner`.
-  - The icon rail is the `navigation` named `RAIL`, one link per area, which `railOf` finds.
-    Its foot holds *Keyboard shortcuts*, which `keystrokesButton` finds.
-  - The menu is the `navigation` named for the open area, such as
-    `CONTROL_CENTRE.name`, with each group a heading over its pages' links. `navOf` finds it.
-  - The breadcrumb is the `navigation` named `BREADCRUMB`, inside the banner. `crumbOf` finds a
+  - The icon rail is the `navigation` named *Areas*, one link per area, which `railOf` finds.
+    Its foot holds *Keyboard Shortcuts*, which `keystrokesButton` finds.
+  - The menu is the `navigation` named for the open area, such as *Control Centre*, with each
+    group a heading over its pages' links. `navOf` finds it.
+  - The breadcrumb is the `navigation` named *Breadcrumb*, inside the banner. `crumbOf` finds a
     part of it.
-  - Jump-to is the banner's button named `JUMP_TO.name`. It opens a `dialog` of the same name
+  - Jump-to is the banner's button named *Jump To*. It opens a `dialog` of the same name
     holding a `combobox`.
   - The workspace switcher is `switcherOf` and its menu `switcherMenuOf`. The avatar is
     `avatarOf`, and its menu is `personMenuOpened`.
-  - At a narrow width the navigation control opens a `dialog` named `NAVIGATION_SHEET`, holding
+  - At a narrow width the navigation control opens a `dialog` named *Menu*, holding
     the rail and the menu.
 
   `apps/web/e2e/frame.spec.ts` holds the shell. `apps/web/e2e/jump-to.spec.ts` and
@@ -256,27 +270,23 @@ still shown the api refused.
 - **Give an assertion a message wherever the failure would not name itself.** The harness's own
   `${path} answered ${status}` is the pattern, and so are the axe assertion and the gate's refusal
   in `apps/web/e2e/browser.ts`.
-- **Read a page's or a control's name from the SPA's own constants rather than copying it.**
-  `apps/web/e2e/models-and-spend.spec.ts` imports `@/shared/navigation.ts`, so the list of areas, groups
-  and pages is written once. Read a control's accessible name the same way where a table holds
-  it: a feature's word table (`apps/web/src/features/sources/words.ts`), the navigation list or the
-  role meanings (`apps/web/src/shared/role-words.ts`). A word table imports no React or tRPC code
-  at runtime, so the suite loads it without the rest of the SPA.
 - **Assert what the page does, never a sentence it shows.** A test may assert seeded data, text a
   person types, a closed-set word, a number, and the accessible name of a control, heading, region
   or dialog. The trust words and the api's refusal words are closed sets. A sentence the web shows
-  is asserted nowhere, whether read from a word table or written out, so rewording a page breaks no
-  spec. Assert what the sentence stood for: the region and its role, the data or the state that
-  changed, the next action. A region that stands empty until it has something to say is checked for
-  holding words, as `apps/web/e2e/outcome-regions.spec.ts` does with `filter({ hasText: /\S/ })`.
-  An aria snapshot keeps roles, names, levels, states and order, and no prose line of any kind,
-  `- text:` lines included.
+  is asserted nowhere, so rewording a page breaks no spec. Assert what the sentence stood for: the
+  region and its role, the data or the state that changed, the next action. A region that stands
+  empty until it has something to say is checked for holding words, with `toHaveText(/\S/)` or
+  `filter({ hasText: /\S/ })`. `apps/web/e2e/outcome-regions.spec.ts` finds such a region while it
+  is still empty, with `filter({ hasNotText: /\S/ })`, and checks the outcome lands in that same
+  region. An aria snapshot keeps roles, names, levels, states and order, and no prose line of any
+  kind, `- text:` lines included. A name in one is a literal, and a name from seeded data goes in
+  through `JSON.stringify`, which quotes it as the snapshot takes it.
 - **Tell which refusal happened from where it was decided.** Where the api answered, read its
   answer with `refusalAnswering` or `authAnswering`, above, then check the alert with
   `saysARefusal`. Ask for the answer before the action that calls and await it afterwards, because
   an answer can land before anything waits for it. Holding words shows a refusal only in an alert
   that said nothing before it. In one that already says a refusal, read what it says first, then
-  check with `saysAnotherRefusal` that it says something else. A ceiling's answer carries no word,
+  check with `saysSomethingNew` that it says something else. A ceiling's answer carries no word,
   so the spec hands the wait it names, as the answer gave it, to `saysTheWait`, which matches the
   wait's number in the alert and fails a wait the answer never named. The
   api's word is for the logs and the wire, and `keepsItsWordOffThePage` asserts the page shows
@@ -462,12 +472,16 @@ not judge the release. `could-not-run` outranks `fail`. A journey raises those t
 `couldNotRun` and `failed` in `apps/web/journeys/outcome.ts`. The run's summary names the role,
 the page and the step from the steps' titles and those reasons alone, never an error's message,
 which can hold an address, so write a reason that names none. The reporter prints no error
-either; by hand, add `--reporter=list` to read one.
+either. By hand, `--reporter=list` prints each one, but the flag replaces the config's reporters,
+so that run writes no outcome: take the outcome from a run without the flag. Naming the outcome
+reporter in the flag beside `list` fails at the run's end, because only the config hands it its
+outcome file.
 
 `check:web` never runs a journey, since the suite's `testDir` is `e2e`, and nor does a pull
-request or the merge queue. Its typecheck does cover them, so renaming a word they read from a
-word table fails `check` before it lands. A change to a page a journey walks changes that
-journey in the same pull request and runs it by hand as above (`docs/agents/workflow.md`).
+request or the merge queue. Its typecheck covers them, but a journey writes each name itself, as a
+spec does, so a label changed under one fails nothing until the journey runs. A change to a page a
+journey walks, a label it names included, changes that journey in the same pull request and runs it
+by hand as above (`docs/agents/workflow.md`).
 
 ## Carried from Onyx
 

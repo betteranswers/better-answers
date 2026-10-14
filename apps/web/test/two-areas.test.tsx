@@ -10,7 +10,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Frame } from "@/app/frame.tsx";
 import { createAppClients, Providers } from "@/app/providers.tsx";
-import { RAIL } from "@/app/words.ts";
 import type { IconName } from "@/shared/icon.tsx";
 import type { Page, VisibleTree } from "@/shared/navigation.ts";
 
@@ -79,7 +78,8 @@ const openAt = async (path: string) => {
   );
 };
 
-const railLinks = () => within(screen.getByRole("navigation", { name: RAIL })).getAllByRole("link");
+const railLinks = () =>
+  within(screen.getByRole("navigation", { name: "Areas" })).getAllByRole("link");
 
 const tooltipsShowing = () => screen.queryAllByRole("tooltip").map((each) => each.textContent);
 

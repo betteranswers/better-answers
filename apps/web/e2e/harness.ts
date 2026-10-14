@@ -6,10 +6,6 @@ import { z } from "zod";
 import type { AUDIENCES, REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
-import { CONFIRM_WORDS, SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
-import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
-import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
-
 import { landedAtHome, switcherOf } from "./locators.ts";
 
 export * from "./locators.ts";
@@ -434,10 +430,10 @@ export const signInByEmail = async (
   api: APIRequestContext,
   email: string,
 ): Promise<void> => {
-  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
-  await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
+  await page.getByLabel("Email Address").fill(email);
+  await page.getByRole("button", { name: "Send Code" }).click();
 
-  const code = page.getByLabel(SIGN_IN_WORDS.codeField, { exact: true });
+  const code = page.getByLabel("Verification Code", { exact: true });
   await expect(code).toBeVisible();
   await code.fill(await codeSentTo(api, email));
 
@@ -453,8 +449,8 @@ export const signInByEmail = async (
 const factorsRead = (page: Page) =>
   expect(
     page
-      .getByRole("link", { name: CONFIRM_WORDS.recoveryCode })
-      .or(page.getByRole("button", { name: SETUP_WORDS.authenticatorInstead })),
+      .getByRole("link", { name: "Use a Recovery Code" })
+      .or(page.getByRole("button", { name: "Set Up an Authenticator Instead" })),
   ).toBeVisible();
 
 /** The real confirm page, opened afresh since it drew the factors held before the harness wrote one. */
@@ -467,7 +463,7 @@ const confirmedWithTheHarness = async (
   const key = await withAnAuthenticator(api, email);
   await page.goto(`/confirm${new URL(page.url()).search}`);
   await page
-    .getByRole("textbox", { name: CONFIRM_WORDS.codeField })
+    .getByRole("textbox", { name: "Authenticator Code" })
     .fill(authenticatorCodeAt(key, new Date()));
   await expect(page).not.toHaveURL(/\/confirm(?:\?|$)/);
 };
@@ -554,6 +550,6 @@ export const signedInWithNoWorkspace = async (page: Page, api: APIRequestContext
   const signedIn = await person(api, email);
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   return signedIn;
 };

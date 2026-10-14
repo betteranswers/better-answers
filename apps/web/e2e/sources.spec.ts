@@ -1,19 +1,6 @@
 import type { APIRequestContext, Locator, Page, Response } from "@playwright/test";
 
-import { RAIL } from "@/app/words.ts";
-import {
-  AUDIENCE_WORDS,
-  CONNECTOR_WORDS,
-  DESTINATIONS_TERM,
-  NEEDS_OCR,
-  REVIEW_WORDS,
-  ROW_ACTIONS,
-  ruleWordOf,
-  SENSITIVITY_PANEL_WORDS,
-  sentenceCased,
-  STATE_WORDS,
-} from "@/features/sources/words.ts";
-import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
+import { NEEDS_OCR } from "@/features/sources/words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -27,7 +14,6 @@ import {
   notFoundOfferingHome,
   person,
   provision,
-  quoted,
   saysARefusal,
   saysOfItsRead,
   type SeedConnectedSource,
@@ -46,7 +32,13 @@ const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
 
 const CONNECTED_SOURCES = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Connected Sources");
 
-const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
+const nav = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
+
+const EVERYONE = "Everyone in the workspace";
+
+const NAMED_GROUPS = "Named groups";
+
+const DESTINATIONS_TERM = "Destinations";
 
 const connectedSourcesRegion = (page: Page) =>
   page.getByRole("region", { name: "Connected Sources" });
@@ -119,6 +111,13 @@ const detailOf = (page: Page, name: string, term: string): Locator =>
     .last()
     .locator("xpath=following-sibling::dd[1]");
 
+const ROW_ACTIONS = {
+  review: "Review Findings",
+  publish: "Publish",
+  narrow: "Narrow Sensitivity",
+  widen: "Widen Sensitivity or Audience",
+} as const;
+
 /** A row's action, named for its effect and then, for a screen reader, its connected source. */
 const rowAction = (page: Page, name: string, action: keyof typeof ROW_ACTIONS): Locator =>
   connectedSourceNamed(page, name).getByRole("button", {
@@ -126,17 +125,26 @@ const rowAction = (page: Page, name: string, action: keyof typeof ROW_ACTIONS): 
     exact: true,
   });
 
-type SensitivityChange = keyof typeof SENSITIVITY_PANEL_WORDS;
+/** A sensitivity panel's name, which holds its connected source's, and its commit. */
+const SENSITIVITY_PANELS = {
+  narrow: { named: (name: string) => `Narrow the Sensitivity of ${name}`, commit: "Narrow" },
+  widen: {
+    named: (name: string) => `Widen the Sensitivity or Audience of ${name}`,
+    commit: "Widen",
+  },
+} as const;
+
+type SensitivityChange = keyof typeof SENSITIVITY_PANELS;
 
 /** Found inside its connected source's row, so a panel drawn anywhere else is not found. */
 const panelOf = (page: Page, name: string, change: SensitivityChange): Locator =>
   connectedSourceNamed(page, name).getByRole("group", {
-    name: SENSITIVITY_PANEL_WORDS[change].named(name),
+    name: SENSITIVITY_PANELS[change].named(name),
   });
 
 const commitOf = (page: Page, name: string, change: SensitivityChange): Locator =>
   panelOf(page, name, change).getByRole("button", {
-    name: SENSITIVITY_PANEL_WORDS[change].commit,
+    name: SENSITIVITY_PANELS[change].commit,
     exact: true,
   });
 
@@ -157,7 +165,7 @@ const anAdminAtSources = async (
         });
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await nav(page).getByRole("link", { name: CONNECTED_SOURCES.name }).click();
+  await nav(page).getByRole("link", { name: "Connected Sources" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
   return { workspace, seeded };
 };
@@ -215,10 +223,10 @@ test.describe("the Sources page's list of connected sources", () => {
     await expect(connectedSourcesRegion(page).getByRole("heading", { level: 3 })).toHaveText(
       ten.map((connectedSource) => connectedSource.name),
     );
-    await expect(stateOf(page, "Case studies")).toHaveText(STATE_WORDS.published);
-    await expect(stateOf(page, "Contracts")).toHaveText(STATE_WORDS.received);
-    await expect(stateOf(page, "Framework returns")).toHaveText(STATE_WORDS.indexing);
-    await expect(stateOf(page, "Staff handbook")).toHaveText(STATE_WORDS.indexed);
+    await expect(stateOf(page, "Case studies")).toHaveText("Published");
+    await expect(stateOf(page, "Contracts")).toHaveText("Received");
+    await expect(stateOf(page, "Framework returns")).toHaveText("Indexing");
+    await expect(stateOf(page, "Staff handbook")).toHaveText("Indexed");
     await expect(
       lastSyncedOf(page, "Safety records"),
       "a connected source never synced shows a time",
@@ -239,24 +247,24 @@ test.describe("the Sources page's list of connected sources", () => {
     await expect(handbook).toMatchAriaSnapshot(`
       - listitem:
         - heading "Staff handbook" [level=3]
-        - button ${quoted(`${ROW_ACTIONS.review} Staff handbook`)} [expanded=false]
-        - button ${quoted(`${ROW_ACTIONS.publish} Staff handbook`)}
-        - button ${quoted(`${ROW_ACTIONS.narrow} Staff handbook`)}
-        - button ${quoted(`${ROW_ACTIONS.widen} Staff handbook`)}
+        - button "Review Findings Staff handbook" [expanded=false]
+        - button "Publish Staff handbook"
+        - button "Narrow Sensitivity Staff handbook"
+        - button "Widen Sensitivity or Audience Staff handbook"
         - term: Connector
-        - definition: ${quoted(CONNECTOR_WORDS.upload)}
+        - definition: Upload
         - term: Sensitivity
         - definition: Internal
         - term: Audience
-        - definition: ${quoted(AUDIENCE_WORDS.everyone)}
+        - definition: ${EVERYONE}
         - term: State
-        - definition: ${quoted(STATE_WORDS.indexed)}
+        - definition: Indexed
         - term: Last Synced
         - definition: /^\\d{2}:\\d{2} · \\d{1,2} \\w+ \\d{4}/
         - button "More Details Staff handbook" [expanded=false]
     `);
     const list = connectedSourcesRegion(page).getByRole("list");
-    for (const stored of [...Object.keys(STATE_WORDS), ...Object.keys(CONNECTOR_WORDS)]) {
+    for (const stored of ["received", "indexing", "indexed", "published", "upload"]) {
       await expect(list, `the list shows the stored value ${stored}`).not.toContainText(stored);
     }
   });
@@ -448,21 +456,21 @@ test.describe("connecting a document on the Sources page", () => {
     await expect(
       connectedSourcesRegion(page).getByRole("status").filter({ hasText: "The staff handbook" }),
     ).toContainText("handbook.md");
-    await expect(stateOf(page, "The staff handbook")).toHaveText(STATE_WORDS.received);
+    await expect(stateOf(page, "The staff handbook")).toHaveText("Received");
     const lastSynced = lastSyncedOf(page, "The staff handbook");
     await expect(lastSynced).toHaveText(A_SYNC_UNDER_WAY);
     const whileQueued = await saidNowIn(lastSynced);
     await expect(sensitivityOf(page, "The staff handbook")).toHaveText("Restricted");
 
     await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "claimed" });
-    await expect(stateOf(page, "The staff handbook")).toHaveText(STATE_WORDS.indexing);
+    await expect(stateOf(page, "The staff handbook")).toHaveText("Indexing");
     await expect(lastSynced, "a sync that started is said as it was while queued").not.toHaveText(
       whileQueued,
     );
     await expect(lastSynced).toHaveText(A_SYNC_UNDER_WAY);
 
     await moveTheSync(request, { workspaceId: workspace.workspaceId, to: "done" });
-    await expect(stateOf(page, "The staff handbook")).toHaveText(STATE_WORDS.indexed);
+    await expect(stateOf(page, "The staff handbook")).toHaveText("Indexed");
     await expect(lastSyncedOf(page, "The staff handbook")).toHaveText(/^\d{2}:\d{2} · /);
   });
 
@@ -535,29 +543,24 @@ const SUPPLIER_FORMS: SeedConnectedSource = indexed("Supplier forms", {
   ],
 });
 
-const BANK_ACCOUNT_BOX = REVIEW_WORDS.select({
-  category: "bank-details",
-  ruleId: "UK_BANK_ACCOUNT",
-  title: "Supplier form",
-});
+/** The words the review shows for the three rules seeded here. */
+const BANK_ACCOUNT_RULE = "Sort code and account number";
 
-const HOME_ADDRESS_BOX = REVIEW_WORDS.select({
-  category: "home-address",
-  ruleId: "UK_HOME_ADDRESS",
-  title: "Supplier form",
-});
+const HOME_ADDRESS_RULE = "Home address";
+
+const HEALTH_CUE_RULE = "Health wording";
+
+const BANK_ACCOUNT_BOX = `Select bank details by ${BANK_ACCOUNT_RULE} in Supplier form`;
+
+const HOME_ADDRESS_BOX = `Select home address by ${HOME_ADDRESS_RULE} in Supplier form`;
 
 const healthCueBoxIn = (title: string): string =>
-  REVIEW_WORDS.select({ category: "special-category", ruleId: "HEALTH_CUE", title });
+  `Select special category by ${HEALTH_CUE_RULE} in ${title}`;
 
 const HEALTH_CUE_BOX = healthCueBoxIn("Staff survey");
 
 /** A note that a document is narrowed counts nothing; one of findings dismissed or kept does. */
 const aNoteOf = (findings: number): RegExp => new RegExp(String.raw`\b${String(findings)}\b`);
-
-/** A category over its tier, as one cell of the review's table reads them. */
-const categoryCell = (category: string, tier: string): string =>
-  quoted(`${sentenceCased(category)} ${sentenceCased(tier)}`);
 
 /**
  * Two documents as a sync leaves them after a dismissal: one lifted to its connected source's sensitivity, one
@@ -595,16 +598,16 @@ const SERVICE_RECORDS: SeedConnectedSource = indexed("Service records", {
 
 /** A connected source's review wherever the page draws it, for saying none is drawn. */
 const reviewNamed = (page: Page, name: string) =>
-  page.getByRole("region", { name: REVIEW_WORDS.heading(name) });
+  page.getByRole("region", { name: `Review of ${name}` });
 
 /** Found inside its connected source's row, so a review drawn anywhere else is not found. */
 const reviewOf = (page: Page, name: string) =>
-  connectedSourceNamed(page, name).getByRole("region", { name: REVIEW_WORDS.heading(name) });
+  connectedSourceNamed(page, name).getByRole("region", { name: `Review of ${name}` });
 
 const WIDENING = (url: URL): boolean => url.pathname.includes("sources.widen");
 
 const reviewHeading = (page: Page, name: string) =>
-  page.getByRole("heading", { level: 4, name: REVIEW_WORDS.heading(name) });
+  page.getByRole("heading", { level: 4, name: `Review of ${name}` });
 
 const findingRow = (page: Page, name: string, document: string, rule: string) =>
   reviewOf(page, name).getByRole("row").filter({ hasText: document }).filter({ hasText: rule });
@@ -642,25 +645,25 @@ test.describe("reviewing a connected source's findings", () => {
         - rowgroup:
           - row:
             - cell:
-              - checkbox ${quoted(BANK_ACCOUNT_BOX)} [checked=false]
-            - cell ${categoryCell("bank-details", "always")}
-            - cell ${quoted(ruleWordOf("UK_BANK_ACCOUNT"))}
+              - checkbox "${BANK_ACCOUNT_BOX}" [checked=false]
+            - cell "Bank details Always"
+            - cell "${BANK_ACCOUNT_RULE}"
             - cell "Supplier form"
             - cell "2"
             - cell "Internal"
           - row:
             - cell:
-              - checkbox ${quoted(HOME_ADDRESS_BOX)} [checked=false]
-            - cell ${categoryCell("home-address", "default-on")}
-            - cell ${quoted(ruleWordOf("UK_HOME_ADDRESS"))}
+              - checkbox "${HOME_ADDRESS_BOX}" [checked=false]
+            - cell "Home address Default on"
+            - cell "${HOME_ADDRESS_RULE}"
             - cell "Supplier form"
             - cell "1"
             - cell "Internal"
           - row:
             - cell:
-              - checkbox ${quoted(HEALTH_CUE_BOX)} [checked=false]
-            - cell ${categoryCell("special-category", "always")}
-            - cell ${quoted(ruleWordOf("HEALTH_CUE"))}
+              - checkbox "${HEALTH_CUE_BOX}" [checked=false]
+            - cell "Special category Always"
+            - cell "${HEALTH_CUE_RULE}"
             - cell "Staff survey"
             - cell "1"
             - cell /^Restricted/:
@@ -701,11 +704,7 @@ test.describe("reviewing a connected source's findings", () => {
     const row = findingRow(page, "Visa files", "Passport scan", "UK_PASSPORT");
     await expect(row.getByRole("cell", { name: "UK_PASSPORT", exact: true })).toBeVisible();
     await expect(row.getByRole("checkbox")).toHaveAccessibleName(
-      REVIEW_WORDS.select({
-        category: "government-identifier",
-        ruleId: "UK_PASSPORT",
-        title: "Passport scan",
-      }),
+      "Select government identifier by UK_PASSPORT in Passport scan",
     );
   });
 
@@ -771,14 +770,14 @@ test.describe("reviewing a connected source's findings", () => {
     // One line on the page describes all three while nothing is ticked.
     const describedBy =
       (await review
-        .getByRole("button", { name: REVIEW_WORDS.keep.label, exact: true })
+        .getByRole("button", { name: "Keep in Text", exact: true })
         .getAttribute("aria-describedby")) ?? "";
     const enabling = review.locator(`[id="${describedBy}"]`);
     await expect(enabling).toBeVisible();
     for (const label of [
-      REVIEW_WORDS.keep.label,
-      REVIEW_WORDS.narrowDocuments.label,
-      REVIEW_WORDS.dismiss.label,
+      "Keep in Text",
+      "Narrow These Documents",
+      "Dismiss as Not Special Category",
     ]) {
       const action = review.getByRole("button", { name: label, exact: true });
       await expect(action).toBeDisabled();
@@ -788,7 +787,7 @@ test.describe("reviewing a connected source's findings", () => {
 
     await review.getByRole("checkbox", { name: BANK_ACCOUNT_BOX }).click();
     await expect(enabling).toHaveCount(0);
-    const keep = review.getByRole("button", { name: REVIEW_WORDS.keep.label, exact: true });
+    const keep = review.getByRole("button", { name: "Keep in Text", exact: true });
     await expect(keep).toBeEnabled();
     await expect(keep).toHaveAccessibleDescription("");
   });
@@ -801,11 +800,11 @@ test.describe("reviewing a connected source's findings", () => {
     await rowAction(page, "Supplier forms", "review").click();
 
     await expect(
-      reviewOf(page, "Supplier forms").getByRole("button", { name: REVIEW_WORDS.keep.label }),
+      reviewOf(page, "Supplier forms").getByRole("button", { name: "Keep in Text" }),
     ).toBeDisabled();
     await expect(
       reviewOf(page, "Supplier forms").getByRole("button", {
-        name: REVIEW_WORDS.narrowDocuments.label,
+        name: "Narrow These Documents",
       }),
     ).toBeDisabled();
     await expect(reviewHeading(page, "Supplier forms")).toBeFocused();
@@ -817,8 +816,8 @@ test.describe("reviewing a connected source's findings", () => {
     await expect(page.getByRole("checkbox", { name: BANK_ACCOUNT_BOX })).toBeChecked();
 
     await page.keyboard.press("k");
-    const keeping = page.getByRole("dialog", { name: REVIEW_WORDS.keep.named(1) });
-    await expect(keeping.getByRole("listitem")).toContainText(ruleWordOf("UK_BANK_ACCOUNT"));
+    const keeping = page.getByRole("dialog", { name: "Keep 1 Group of Findings in Text" });
+    await expect(keeping.getByRole("listitem")).toContainText(BANK_ACCOUNT_RULE);
     await expect(keeping.getByRole("listitem")).toHaveText(/Supplier form\D+2\b/);
     await expect(keeping.getByLabel("Reason")).toBeFocused();
     await page.keyboard.type("The company's own bank details, printed on every invoice");
@@ -828,7 +827,7 @@ test.describe("reviewing a connected source's findings", () => {
     const kept = /\b1\b\D+\b2\b/;
     await expect(outcomesOf(page, "Supplier forms")).toHaveText([kept]);
     await expect(
-      reviewOf(page, "Supplier forms").getByRole("button", { name: REVIEW_WORDS.keep.label }),
+      reviewOf(page, "Supplier forms").getByRole("button", { name: "Keep in Text" }),
     ).toBeDisabled();
 
     await page.getByRole("checkbox", { name: HOME_ADDRESS_BOX }).focus();
@@ -845,10 +844,10 @@ test.describe("reviewing a connected source's findings", () => {
       /\b1\b\D+Restricted\D+\b0\b\D+\b0\b/,
     ]);
     await expect(
-      findingRow(page, "Supplier forms", "Supplier form", ruleWordOf("UK_HOME_ADDRESS")),
+      findingRow(page, "Supplier forms", "Supplier form", HOME_ADDRESS_RULE),
     ).toContainText("Restricted");
     await expect(
-      findingRow(page, "Supplier forms", "Supplier form", ruleWordOf("UK_BANK_ACCOUNT")),
+      findingRow(page, "Supplier forms", "Supplier form", BANK_ACCOUNT_RULE),
     ).toContainText("Restricted");
     await expect(page.locator("body")).not.toContainText(AN_ID);
   });
@@ -861,11 +860,11 @@ test.describe("reviewing a connected source's findings", () => {
     await rowAction(page, "Supplier forms", "review").click();
     const review = reviewOf(page, "Supplier forms");
     const dismissal = review.getByRole("button", {
-      name: REVIEW_WORDS.dismiss.label,
+      name: "Dismiss as Not Special Category",
       exact: true,
     });
     await expect(dismissal).toBeDisabled();
-    const notes = notesOf(page, "Supplier forms", "Staff survey", ruleWordOf("HEALTH_CUE"));
+    const notes = notesOf(page, "Supplier forms", "Staff survey", HEALTH_CUE_RULE);
     await expect(notes, "the survey is not noted as narrowed, and no more").toHaveText([/^\D+$/]);
 
     await page.keyboard.press("Tab");
@@ -883,13 +882,15 @@ test.describe("reviewing a connected source's findings", () => {
     await expect(dismissal).toBeEnabled();
 
     await page.keyboard.press("s");
-    const dismissing = page.getByRole("dialog", { name: REVIEW_WORDS.dismiss.named(1) });
-    await expect(dismissing.getByRole("listitem")).toContainText(ruleWordOf("HEALTH_CUE"));
+    const dismissing = page.getByRole("dialog", {
+      name: "Dismiss 1 Group of Findings as Not Special Category",
+    });
+    await expect(dismissing.getByRole("listitem")).toContainText(HEALTH_CUE_RULE);
     await expect(dismissing.getByRole("listitem")).toHaveText(/Staff survey\D+1\b/);
     await expect(dismissing.getByLabel("Reason")).toBeFocused();
     await page.keyboard.type("A survey of the pumps our engineers diagnose, not of people");
     await clockTheNextKey(page, {
-      at: `//tr[td[.='${ruleWordOf("HEALTH_CUE")}']][td[.='Staff survey']]//p[contains(., '1')]`,
+      at: `//tr[td[.='${HEALTH_CUE_RULE}']][td[.='Staff survey']]//p[contains(., '1')]`,
       reads: "1",
     });
     await page.keyboard.press("Enter");
@@ -922,7 +923,7 @@ test.describe("reviewing a connected source's findings", () => {
     await page.reload();
     await rowAction(page, "Supplier forms", "review").click();
     await expect(
-      notesOf(page, "Supplier forms", "Staff survey", ruleWordOf("HEALTH_CUE")),
+      notesOf(page, "Supplier forms", "Staff survey", HEALTH_CUE_RULE),
       "the dismissal did not outlive the page that made it",
     ).toHaveText([aNoteOf(1)]);
   });
@@ -939,9 +940,9 @@ test.describe("reviewing a connected source's findings", () => {
       - rowgroup:
         - row:
           - cell:
-            - checkbox ${quoted(healthCueBoxIn("Absence log"))} [checked=false]
-          - cell ${categoryCell("special-category", "always")}
-          - cell ${quoted(ruleWordOf("HEALTH_CUE"))}
+            - checkbox "${healthCueBoxIn("Absence log")}" [checked=false]
+          - cell "Special category Always"
+          - cell "${HEALTH_CUE_RULE}"
           - cell "Absence log"
           - cell "2"
           - cell /^Restricted/:
@@ -949,9 +950,9 @@ test.describe("reviewing a connected source's findings", () => {
             - paragraph: /\\b1\\b/
         - row:
           - cell:
-            - checkbox ${quoted(healthCueBoxIn("Pump service notes"))} [checked=false]
-          - cell ${categoryCell("special-category", "always")}
-          - cell ${quoted(ruleWordOf("HEALTH_CUE"))}
+            - checkbox "${healthCueBoxIn("Pump service notes")}" [checked=false]
+          - cell "Special category Always"
+          - cell "${HEALTH_CUE_RULE}"
           - cell "Pump service notes"
           - cell "1"
           - cell /^Internal/:
@@ -984,7 +985,7 @@ test.describe("reviewing a connected source's findings", () => {
     await rowAction(page, "Payroll exports", "review").click();
 
     await expect(
-      notesOf(page, "Payroll exports", "March payroll", ruleWordOf("UK_BANK_ACCOUNT")),
+      notesOf(page, "Payroll exports", "March payroll", BANK_ACCOUNT_RULE),
       "the group is not noted as two kept findings still withheld, and no more",
     ).toHaveText([aNoteOf(2)]);
   });
@@ -1029,7 +1030,7 @@ test.describe("reviewing a connected source's findings", () => {
     await reviewOf(page, "Supplier forms").getByRole("checkbox", { name: HEALTH_CUE_BOX }).click();
     await expect(
       reviewOf(page, "Supplier forms").getByRole("button", {
-        name: REVIEW_WORDS.dismiss.label,
+        name: "Dismiss as Not Special Category",
       }),
     ).toBeEnabled();
     await rowAction(page, "Supplier forms", "widen").click();
@@ -1090,7 +1091,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
         - term: Sensitivity
         - definition: Internal
         - term: Audience
-        - definition: ${quoted(AUDIENCE_WORDS.everyone)}
+        - definition: ${EVERYONE}
         - term: Lawful Basis Recorded
         - definition
         - term: Privacy Information Updated
@@ -1144,13 +1145,13 @@ test.describe("publishing, narrowing and widening a connected source", () => {
 
     await clockTheNextKey(page, {
       at: "//li[.//h3[.='Staff handbook']]//dt[.='State']/following-sibling::dd[1]",
-      reads: STATE_WORDS.published,
+      reads: "Published",
     });
     await page.keyboard.press("Enter");
     await theActionLandedWithinItsBudget(page, "publish");
 
     await expect(saidIn(page)).toContainText("Staff handbook");
-    await expect(stateOf(page, "Staff handbook")).toHaveText(STATE_WORDS.published);
+    await expect(stateOf(page, "Staff handbook")).toHaveText("Published");
     await expect(rowAction(page, "Staff handbook", "publish")).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 3, name: "Staff handbook" })).toBeFocused();
   });
@@ -1284,17 +1285,17 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     await expect(commitOf(page, "Staff handbook", "widen")).toBeVisible();
 
     await panel.getByRole("combobox", { name: "Audience" }).press("Enter");
-    await page.getByRole("option", { name: AUDIENCE_WORDS.everyone }).press("Enter");
+    await page.getByRole("option", { name: EVERYONE }).press("Enter");
     await expect(panel.getByRole("term")).toHaveText(["Sensitivity", "Audience"]);
     await expect(panel.getByRole("definition")).toHaveText([
       /Restricted.+Internal/,
-      new RegExp(`${AUDIENCE_WORDS.groups}.+${AUDIENCE_WORDS.everyone}`, "i"),
+      new RegExp(`${NAMED_GROUPS}.+${EVERYONE}`, "i"),
     ]);
     await commitOf(page, "Staff handbook", "widen").click();
 
     await expect(saidIn(page)).toHaveText(/Staff handbook\D+Internal/);
     await expect(sensitivityOf(page, "Staff handbook")).toHaveText("Internal");
-    await expect(leadOf(page, "Staff handbook", "Audience")).toHaveText(AUDIENCE_WORDS.everyone);
+    await expect(leadOf(page, "Staff handbook", "Audience")).toHaveText(EVERYONE);
   });
 
   test("describes a widening by whether its source is published", async ({ page, request }) => {
@@ -1404,14 +1405,12 @@ test.describe("publishing, narrowing and widening a connected source", () => {
       ],
     });
     const audienceOf = leadOf(page, "Price book", "Audience");
-    await expect(audienceOf).toHaveText(new RegExp(`^${AUDIENCE_WORDS.groups}\\D+1\\b`));
+    await expect(audienceOf).toHaveText(new RegExp(`^${NAMED_GROUPS}\\D+1\\b`));
 
     await rowAction(page, "Price book", "widen").focus();
     await page.keyboard.press("w");
     const panel = panelOf(page, "Price book", "widen");
-    await expect(panel.getByRole("combobox", { name: "Audience" })).toHaveText(
-      AUDIENCE_WORDS.everyone,
-    );
+    await expect(panel.getByRole("combobox", { name: "Audience" })).toHaveText(EVERYONE);
     await expect(panel.getByRole("term"), "a term that stays is listed as a change").toHaveText([
       "Audience",
     ]);
@@ -1423,7 +1422,7 @@ test.describe("publishing, narrowing and widening a connected source", () => {
     // `w` says. The answer's counts tell it has landed.
     await expect(saidIn(page)).toHaveText(/Price book\D+Public\D+\b0\b\D+\b0\b/);
     const whenWidened = await saidNowIn(saidIn(page));
-    await expect(audienceOf).toHaveText(AUDIENCE_WORDS.everyone);
+    await expect(audienceOf).toHaveText(EVERYONE);
     await expect(rowAction(page, "Price book", "widen")).toHaveCount(0);
     await rowAction(page, "Price book", "review").focus();
     await page.keyboard.press("w");
@@ -1456,13 +1455,14 @@ test.describe("the Sources page's keystrokes", () => {
     await anAdminAtSources(page, request, { workspace: "Luddenden Weaving" });
 
     await page.keyboard.press("?");
-    const heading = keystrokesOn(CONNECTED_SOURCES.name);
+    const turnedOn = "Use single-key shortcuts on this browser";
+    const heading = "Keyboard Shortcuts on Connected Sources";
     const listed = page.getByRole("dialog", { name: heading });
     await expect(listed).toMatchAriaSnapshot(`
-      - dialog ${JSON.stringify(heading)}:
-        - heading ${JSON.stringify(heading)} [level=2]
+      - dialog "${heading}":
+        - heading "${heading}" [level=2]
         - paragraph
-        - checkbox ${JSON.stringify(KEYSTROKE_WORDS.turnedOn)} [checked]
+        - checkbox "${turnedOn}" [checked]
         - term: b
         - definition: Connect a Document
         - term: r
@@ -1495,8 +1495,8 @@ test.describe("the Sources page's keystrokes", () => {
     await expect(listed).toHaveCount(0);
     // The rail's: the toolbar keeps the page's own actions alone.
     const keystrokes = page
-      .getByRole("navigation", { name: RAIL })
-      .getByRole("button", { name: KEYSTROKE_WORDS.button });
+      .getByRole("navigation", { name: "Areas" })
+      .getByRole("button", { name: "Keyboard Shortcuts" });
     await expect(keystrokes).toHaveAttribute("aria-keyshortcuts", "?");
     await expect(keystrokes).toBeFocused();
 
@@ -1507,7 +1507,7 @@ test.describe("the Sources page's keystrokes", () => {
     await expect(connectedSource).toHaveCount(0);
 
     await keystrokes.click();
-    await listed.getByRole("checkbox", { name: KEYSTROKE_WORDS.turnedOn }).press("Space");
+    await listed.getByRole("checkbox", { name: turnedOn }).press("Space");
     // A key sent into the closing list is ignored as the list's own, however the setting reads.
     await keystrokesDismissed(page, listed);
     await page.keyboard.press("b");
@@ -1543,6 +1543,6 @@ test("tells a spec why the harness refused its seed", async ({ page, request }) 
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await listsNothingConnected(page, () =>
-    nav(page).getByRole("link", { name: CONNECTED_SOURCES.name }).click(),
+    nav(page).getByRole("link", { name: "Connected Sources" }).click(),
   );
 });

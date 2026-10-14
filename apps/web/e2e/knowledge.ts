@@ -7,7 +7,7 @@ import {
 } from "@playwright/test";
 import { z } from "zod";
 
-import { keystrokesDismissed, keystrokesListed, seedConcepts } from "./harness.ts";
+import { keyListed, keystrokesDismissed, keystrokesListed, seedConcepts } from "./harness.ts";
 
 /** Matched by name anywhere in the path, because the tRPC client batches its reads. */
 export const isAFind = (url: URL): boolean => url.pathname.includes("knowledge.find");
@@ -118,14 +118,18 @@ export const readsCeilingFilled = async (page: Page, read: string): Promise<void
 export const scrolledSideways = (page: Page): Promise<number> =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
-/** `?` lists each keystroke the page declares, and Escape hands focus back to its button. */
+/** `?` lists every key the page declares and each action named, and Escape hands focus back. */
 export const listsItsKeystrokes = async (
   page: Page,
   named: string,
-  declared: readonly { readonly action: string }[],
+  declared: Readonly<Record<string, { readonly key: string }>>,
+  actions: readonly string[],
 ): Promise<void> => {
   const listed = await keystrokesListed(page, named);
-  for (const keystroke of declared) await expect(listed).toContainText(keystroke.action);
+  for (const { key } of Object.values(declared)) {
+    await expect(keyListed(listed, key), `the list holds no ${key}`).toBeVisible();
+  }
+  for (const action of actions) await expect(listed).toContainText(action);
   await keystrokesDismissed(page, listed);
 };
 

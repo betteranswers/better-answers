@@ -329,12 +329,10 @@ describe("the confirm page for a person just promoted", () => {
 
     await openAsAda("/confirm");
 
-    const list = await screen.findByRole("list", {
-      name: "You’re now an Admin. You can confirm your sign-in with:",
-    });
+    const list = await screen.findByRole("list", { name: PROMOTION_WORDS.lead });
     const [passkey, ...others] = [...list.querySelectorAll("li")].map((item) => item.textContent);
     expect(passkey).toMatch(/MacBook.*3 March 2026/v);
-    expect(others).toEqual([PROMOTION_WORDS.authenticator]);
+    expect(others).toEqual(["Authenticator"]);
     expect(screen.getByText(PROMOTION_WORDS.after)).toBeDefined();
     const code = screen.getByRole("textbox", { name: "Authenticator Code" });
     expect(list.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

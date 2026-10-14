@@ -1,7 +1,5 @@
 import type { APIRequestContext, BrowserContext, Locator, Page } from "@playwright/test";
 
-import { INVITATIONS_WORDS, STATUS_WORDS } from "@/features/people/invitation-words.ts";
-import { BULK_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -96,9 +94,9 @@ const invitationsOpened = async (tab: Page): Promise<void> => {
 
 const stillWaits = async (tab: Page, address: string, workspace: Workspace): Promise<void> => {
   await expect(
-    invitationsRegion(tab).getByRole("radio", { name: new RegExp(`^${STATUS_WORDS.waiting}\\b`) }),
+    invitationsRegion(tab).getByRole("radio", { name: /^Waiting\b/ }),
     `${workspace.name} no longer holds its one waiting invitation`,
-  ).toHaveAccessibleName(`${STATUS_WORDS.waiting} 1`);
+  ).toHaveAccessibleName("Waiting 1");
   await expect(invitationTo(tab, address)).toBeVisible();
 };
 
@@ -169,13 +167,13 @@ test.describe("an action from a tab left in another workspace", () => {
 
     for (const name of ticked) await tickOf(page, name).check();
     await page
-      .getByRole("toolbar", { name: SELECTED_MEMBERS })
-      .getByRole("button", { name: BULK_WORDS.changeRole.action, exact: true })
+      .getByRole("toolbar", { name: "Selected Members" })
+      .getByRole("button", { name: "Change Role", exact: true })
       .click();
     const answered = refusalAnswering(page, "members.bulkChangeRole");
     await page
-      .getByRole("dialog", { name: BULK_WORDS.changeRole.title(2) })
-      .getByRole("button", { name: BULK_WORDS.changeRole.action, exact: true })
+      .getByRole("dialog", { name: "Change Role for 2 Members" })
+      .getByRole("button", { name: "Change Role", exact: true })
       .click();
     expect(await answered).toMatchObject(SWITCHED);
 
@@ -221,7 +219,7 @@ test.describe("an action from a tab left in another workspace", () => {
     await invitationsRegion(page)
       .getByRole("button", { name: `Actions for ${read}` })
       .click();
-    await page.getByRole("menuitem", { name: INVITATIONS_WORDS.cancel }).click();
+    await page.getByRole("menuitem", { name: "Cancel" }).click();
     expect(await answered).toMatchObject(SWITCHED);
 
     await membersReadAfresh(elsewhere, two.second);

@@ -1,8 +1,5 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { RAIL } from "@/app/words.ts";
-import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
-import { DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
 import { THEME_KEPT_UNDER } from "@/shared/theme-switch.ts";
 
 import { expect, test } from "./browser.ts";
@@ -17,6 +14,7 @@ import {
   person,
   provision,
   endEverySignInAndToken,
+  railOf,
   signIn,
   signInHeading,
   tokenPainted,
@@ -28,7 +26,7 @@ const consentHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Connect Claude" });
 
 const displayNameHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: DISPLAY_NAME_WORDS.heading });
+  page.getByRole("heading", { level: 1, name: "Your Name" });
 
 const themeOf = (page: Page) => page.evaluate(() => document.documentElement.dataset["theme"]);
 
@@ -83,6 +81,7 @@ test("carries sign-in through consent to Claude's code on one origin", async ({
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await landedAtHome(page, "Admin");
+  await expect(railOf(page)).toBeVisible();
 
   await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
 
@@ -90,7 +89,7 @@ test("carries sign-in through consent to Claude's code on one origin", async ({
   expect(landedAt(page).origin).toBe(origin);
   expect(landedAt(page).pathname).toBe("/consent");
 
-  await expect(page.getByRole("navigation", { name: RAIL })).toHaveCount(0);
+  await expect(railOf(page)).toHaveCount(0);
 
   await expect(page.getByText(`Claude will act as you, at ${workspace.name}.`)).toBeVisible();
   await expect(page.getByText("Read what you can see of the company’s knowledge")).toBeVisible();
@@ -349,6 +348,6 @@ test("asks a non-member's name, then says No workspace yet", async ({ page, requ
   await page.getByLabel("Display Name").fill("Sam Okoro");
   await page.getByRole("button", { name: "Save and Continue" }).click();
 
-  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   expect(landedAt(page).searchParams.get("sig")).not.toBeNull();
 });

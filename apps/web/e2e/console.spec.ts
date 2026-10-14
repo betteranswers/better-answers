@@ -2,24 +2,14 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
-import { ALL_WORKSPACES, goHome, JUMP_TO, RAIL, TOGGLE, UNKNOWN_PAGE } from "@/app/words.ts";
-import {
-  ACCOUNT_HEADING,
-  AUTHENTICATOR_WORDS,
-  RECOVERY_CODE_WORDS,
-} from "@/features/auth/account-words.ts";
-import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
-import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { WORKSPACES_WORDS } from "@/features/console/list-words.ts";
 import { WORKSPACES_KEYSTROKES } from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { CONSOLE, HOMES, menuGroupIn } from "@/shared/navigation.ts";
-import { CLEAR_WORDS, PRODUCT_NAME } from "@/shared/words.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
+  allWorkspacesPicked,
   anAddress,
   avatarOf,
   crumbOf,
@@ -32,7 +22,6 @@ import {
   person,
   personMenuOpened,
   provision,
-  quoted,
   railOf,
   saysARefusal,
   saysOfItsRead,
@@ -50,9 +39,8 @@ const LIST_BUDGET_MS = 1000;
 
 const EVERY_WORKSPACE = HOMES.operator.path;
 
-const WORKSPACES = menuGroupIn(CONSOLE, "workspaces");
-
-const COLUMNS = WORKSPACES_WORDS.columns;
+/** Found where an Admin lands, so its absence from the console names a menu the shell does draw. */
+const controlCentreMenu = (page: Page) => navOf(page, "Control Centre");
 
 const CLOSED = "Access Denied";
 
@@ -63,7 +51,7 @@ const UK_DAY =
 const theConsoleOffered = async (page: Page, workspaceName: string) => {
   await switcherOf(page, workspaceName).click();
   const theConsole = switcherMenuOf(page, workspaceName).getByRole("menuitem", {
-    name: CONSOLE.name,
+    name: "Console",
   });
   await expect(theConsole).toBeVisible();
   return theConsole;
@@ -72,10 +60,10 @@ const theConsoleOffered = async (page: Page, workspaceName: string) => {
 /** An item of the switcher reads its workspace's name, then the person's role there. */
 const listedAs = (name: string, role: "Admin" | "Viewer"): string => `${name} ${role}`;
 
-const listOf = (page: Page) => page.getByRole("region", { name: WORKSPACES_WORDS.heading });
+const listOf = (page: Page) => page.getByRole("region", { name: "Every Workspace" });
 
 const searchOf = (page: Page) =>
-  listOf(page).getByRole("searchbox", { name: WORKSPACES_WORDS.search });
+  listOf(page).getByRole("searchbox", { name: "Search by name or short name" });
 
 /** The list's one count, which the head says and nothing else in the region repeats. */
 const countOf = (page: Page) => listOf(page).getByRole("status");
@@ -89,7 +77,7 @@ const workspaceRows = (page: Page): Locator =>
 /** A workspace's row, found by the disclosure it alone carries. */
 const rowOf = (page: Page, name: string): Locator =>
   workspaceRows(page).filter({
-    has: page.getByRole("button", { name: WORKSPACES_WORDS.moreAbout(name), exact: true }),
+    has: page.getByRole("button", { name: `More About ${name}`, exact: true }),
   });
 
 /**
@@ -131,24 +119,24 @@ test.describe("the way into the console", () => {
 
     await expect(page).toHaveURL(EVERY_WORKSPACE);
     const bar = page.getByRole("banner");
-    await expect(switcherOf(page, CONSOLE.name)).toBeVisible();
+    await expect(switcherOf(page, "Console")).toBeVisible();
     await expect(bar.getByText(workspace.name)).toHaveCount(0);
-    await expect(bar.getByRole("link", { name: PRODUCT_NAME })).toHaveAttribute(
+    await expect(bar.getByRole("link", { name: "better-answers" })).toHaveAttribute(
       "href",
       EVERY_WORKSPACE,
     );
-    await expect(railOf(page).getByRole("link")).toHaveText([CONSOLE.name]);
-    await expect(navOf(page, CONSOLE).getByRole("link")).toHaveText([
+    await expect(railOf(page).getByRole("link")).toHaveText(["Console"]);
+    await expect(navOf(page, "Console").getByRole("link")).toHaveText([
       "Everyone",
       "Names Waiting",
       "Every Workspace",
     ]);
-    await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
+    await expect(controlCentreMenu(page)).toHaveCount(0);
 
     const you = await personMenuOpened(page, workspace.admin.name);
     await expect(you.getByText(workspace.admin.name, { exact: true })).toBeVisible();
     await expect(you).not.toContainText("Admin");
-    await expect(you.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign Out"]);
+    await expect(you.getByRole("menuitem")).toHaveText(["Account", "Sign Out"]);
   });
 
   test("offers no console to a person without the mark", async ({ page, request }) => {
@@ -157,11 +145,11 @@ test.describe("the way into the console", () => {
     await switcherOf(page, workspace.name).click();
     const menu = switcherMenuOf(page, workspace.name);
     await expect(menu.getByRole("menuitemradio")).toHaveText([listedAs(workspace.name, "Admin")]);
-    await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES]);
+    await expect(menu.getByRole("menuitem")).toHaveText(["All Workspaces"]);
     await page.keyboard.press("Escape");
 
     const you = await personMenuOpened(page, workspace.admin.name);
-    await expect(you.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign Out"]);
+    await expect(you.getByRole("menuitem")).toHaveText(["Account", "Sign Out"]);
   });
 
   test("shows a non-operator the refused state at /console", async ({
@@ -184,6 +172,7 @@ test.describe("the way into the console", () => {
     await expect(page.getByRole("link", { name: "Back to Your Workspaces" })).toBeFocused();
     await page.keyboard.press("Enter");
     await landedAtHome(page, "Admin");
+    await expect(controlCentreMenu(page)).toBeVisible();
   });
 
   test("sends a signed-out operator to sign in, then back", async ({ page, request }) => {
@@ -206,15 +195,15 @@ test.describe("the way into the console", () => {
     await page.goto("/sign-in");
     await signInByEmail(page, request, email);
 
-    await page.getByRole("button", { name: SETUP_WORDS.authenticatorInstead }).click();
+    await page.getByRole("button", { name: "Set Up an Authenticator Instead" }).click();
     const key = await keyShown(page);
-    await page.getByLabel(AUTHENTICATOR_WORDS.codeField).fill(authenticatorCodeAt(key, new Date()));
-    await page.getByRole("checkbox", { name: RECOVERY_CODE_WORDS.saved }).check();
-    await page.getByRole("button", { name: RECOVERY_CODE_WORDS.finish }).click();
+    await page.getByLabel("Authenticator Code").fill(authenticatorCodeAt(key, new Date()));
+    await page.getByRole("checkbox", { name: "I have saved these codes" }).check();
+    await page.getByRole("button", { name: "Finish Setup" }).click();
 
     await expect(page).toHaveURL(EVERY_WORKSPACE);
     await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
-    await expect(switcherOf(page, CONSOLE.name)).toBeVisible();
+    await expect(switcherOf(page, "Console")).toBeVisible();
   });
 
   test("sends no-workspace operators to the console at sign-in and /", async ({
@@ -234,7 +223,7 @@ test.describe("the way into the console", () => {
     await page.goto("/");
     await expect(page).toHaveURL(EVERY_WORKSPACE);
     await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: NO_WORKSPACE_HEADING })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "No Workspace Yet" })).toHaveCount(0);
   });
 
   test("lists the operator's workspaces from the console's switcher", async ({
@@ -251,24 +240,23 @@ test.describe("the way into the console", () => {
     });
     await page.goto("/console");
 
-    await switcherOf(page, CONSOLE.name).click();
-    const menu = switcherMenuOf(page, CONSOLE.name);
+    await switcherOf(page, "Console").click();
+    const menu = switcherMenuOf(page, "Console");
     // No workspace is open in the console, so the list reads in name order, each role its own.
     await expect(menu.getByRole("menuitemradio")).toHaveText([
       listedAs(second.name, "Viewer"),
       listedAs(workspace.name, "Admin"),
     ]);
-    await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES]);
+    await expect(menu.getByRole("menuitem")).toHaveText(["All Workspaces"]);
     await passesTheAccessibilityGate();
 
     await menu.getByRole("menuitemradio", { name: second.name }).click();
     await landedAtHome(page, "Viewer");
     await expect(switcherOf(page, second.name)).toBeVisible();
 
-    await switcherOf(page, second.name).click();
-    await switcherMenuOf(page, second.name).getByRole("menuitem", { name: ALL_WORKSPACES }).click();
+    await allWorkspacesPicked(page, second.name);
     await expect(page).toHaveURL("/choose-workspace");
-    await expect(page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Your Workspaces" })).toBeVisible();
   });
 });
 
@@ -285,7 +273,12 @@ test.describe("the console's Workspaces page", () => {
 
     await page.goto(EVERY_WORKSPACE);
 
-    await expect(listOf(page).getByRole("columnheader")).toHaveText(Object.values(COLUMNS));
+    await expect(listOf(page).getByRole("columnheader")).toHaveText([
+      "Workspace",
+      "Short Name",
+      "Members",
+      "Provisioned",
+    ]);
     const theirs = rowOf(page, acme.name);
     await expect(theirs.getByRole("cell").nth(1)).toHaveText(acme.shortName);
     await expect(theirs.getByRole("cell").nth(2)).toHaveText(/\b2\b/);
@@ -296,7 +289,7 @@ test.describe("the console's Workspaces page", () => {
       listOf(page).getByText(acme.workspaceId, { exact: true }),
       "a workspace's id shows before its disclosure opens",
     ).toHaveCount(0);
-    await theirs.getByRole("button", { name: WORKSPACES_WORDS.moreAbout(acme.name) }).click();
+    await theirs.getByRole("button", { name: `More About ${acme.name}` }).click();
     await expect(theirs.getByText(acme.workspaceId, { exact: true })).toBeVisible();
   });
 
@@ -310,11 +303,11 @@ test.describe("the console's Workspaces page", () => {
     await page.goto(EVERY_WORKSPACE);
     await expect(rowOf(page, other.name)).toBeVisible();
 
-    const listed = await keystrokesListed(page, HOMES.operator.name);
+    const listed = await keystrokesListed(page, "Every Workspace");
     await expect(listed.getByRole("definition")).toHaveText([
-      WORKSPACES_KEYSTROKES.search.action,
-      KEYSTROKE_WORDS.showTheList,
-      JUMP_TO.name,
+      "Search Every Workspace by Name or Short Name",
+      "Show This List",
+      "Jump To",
     ]);
     await keystrokesDismissed(page, listed);
 
@@ -336,7 +329,7 @@ test.describe("the console's Workspaces page", () => {
     await expect(rowOf(page, workspace.name)).toHaveCount(0);
     await expect(rowOf(page, other.name)).toHaveCount(0);
     await passesTheAccessibilityGate();
-    await listOf(page).getByRole("button", { name: CLEAR_WORDS.search }).click();
+    await listOf(page).getByRole("button", { name: "Clear Search" }).click();
 
     await expect(searchOf(page)).toHaveValue("");
     await expect(searchOf(page)).toBeFocused();
@@ -360,7 +353,7 @@ test.describe("the console's Workspaces page", () => {
     await expect(list.getByRole("link")).toHaveCount(0);
     const buttons = await list.getByRole("button").allTextContents();
     expect(
-      buttons.filter((name) => !name.startsWith(WORKSPACES_WORDS.moreAbout(""))),
+      buttons.filter((name) => !name.startsWith("More About ")),
       "a button other than a row's disclosure and the column menu",
     ).toEqual(["Columns"]);
   });
@@ -384,9 +377,9 @@ test.describe("the console's Workspaces page", () => {
 
     await markTheOperator(request, workspace.admin.email, "revoke");
     // A move between the console's own pages keeps its standing, so the list asks again alone.
-    await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
+    await navOf(page, "Console").getByRole("link", { name: "Everyone" }).click();
     const refused = refusalAnswering(page, "console.workspaces.list");
-    await navOf(page, CONSOLE).getByRole("link", { name: "Every Workspace" }).click();
+    await navOf(page, "Console").getByRole("link", { name: "Every Workspace" }).click();
 
     expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR, class: "forbidden" });
     await expect(listOf(page)).not.toContainText(NOT_THE_OPERATOR);
@@ -439,7 +432,7 @@ test.describe("the console's Workspaces page", () => {
 
     await expect(page).toHaveURL("/console/people/everyone");
     await expect(page.getByRole("region", { name: "Everyone" })).toBeVisible();
-    const pages = navOf(page, CONSOLE).getByRole("link");
+    const pages = navOf(page, "Console").getByRole("link");
     await expect(pages).toHaveText(["Everyone", "Names Waiting", "Every Workspace"]);
     await pages.filter({ hasText: "Names Waiting" }).click();
     await expect(page).toHaveURL("/console/people/names-waiting");
@@ -451,9 +444,9 @@ test.describe("the console's Workspaces page", () => {
 
     await page.goto("/console/not-a-page");
 
-    await expect(page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Page Not Found" })).toBeVisible();
     await expect(railOf(page)).toBeVisible();
-    await expect(page.getByRole("link", { name: goHome(HOMES.operator) })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: "Go to Every Workspace" })).toHaveAttribute(
       "href",
       HOMES.operator.path,
     );
@@ -467,10 +460,7 @@ test.describe("the console's Workspaces page", () => {
     await expect(rowOf(page, workspace.name)).toBeVisible();
 
     // Four columns outrun a narrow window, so it opens on two and its menu shows the rest again.
-    await expect(listOf(page).getByRole("columnheader")).toHaveText([
-      COLUMNS.workspace,
-      COLUMNS.shortName,
-    ]);
+    await expect(listOf(page).getByRole("columnheader")).toHaveText(["Workspace", "Short Name"]);
     const room = await page.evaluate(() => {
       const table = document.querySelector("[data-slot=table-container]");
       return {
@@ -481,7 +471,7 @@ test.describe("the console's Workspaces page", () => {
     expect(room, "the page or its table scrolls sideways").toEqual({ page: 0, table: 0 });
 
     await listOf(page).getByRole("button", { name: "Columns" }).click();
-    await page.getByRole("menuitemcheckbox", { name: COLUMNS.memberCount }).click();
+    await page.getByRole("menuitemcheckbox", { name: "Members" }).click();
     await page.keyboard.press("Escape");
     await expect(rowOf(page, workspace.name).getByRole("cell").nth(2)).toHaveText(/\b1\b/);
   });
@@ -501,30 +491,30 @@ test.describe("the console's Workspaces page", () => {
     // Back to the first stop, to walk the regions in the order the document gives them.
     await page.getByRole("link", { name: "Skip to the Page" }).focus();
     for (const stop of [
-      page.getByRole("banner").getByRole("link", { name: PRODUCT_NAME }),
-      switcherOf(page, CONSOLE.name),
-      page.getByRole("button", { name: TOGGLE.hide }),
-      crumbOf(page, CONSOLE.name),
+      page.getByRole("banner").getByRole("link", { name: "better-answers" }),
+      switcherOf(page, "Console"),
+      page.getByRole("button", { name: "Hide Menu" }),
+      crumbOf(page, "Console"),
       crumbOf(page, "Workspaces"),
-      page.getByRole("banner").getByRole("button", { name: JUMP_TO.name }),
+      page.getByRole("banner").getByRole("button", { name: "Jump To" }),
       avatarOf(page, workspace.admin.name),
-      railOf(page).getByRole("link", { name: CONSOLE.name }),
-      railOf(page).getByRole("button", { name: KEYSTROKE_WORDS.button }),
+      railOf(page).getByRole("link", { name: "Console" }),
+      railOf(page).getByRole("button", { name: "Keyboard Shortcuts" }),
     ]) {
       await page.keyboard.press("Tab");
       await expect(stop).toBeFocused();
     }
     for (const name of ["Everyone", "Names Waiting", "Every Workspace"]) {
       await page.keyboard.press("Tab");
-      await expect(navOf(page, CONSOLE).getByRole("link", { name })).toBeFocused();
+      await expect(navOf(page, "Console").getByRole("link", { name })).toBeFocused();
     }
 
     await expect(railOf(page)).toMatchAriaSnapshot(`
-      - navigation "${RAIL}":
+      - navigation "Areas":
         - list:
           - listitem:
-            - link "${CONSOLE.name}"
-        - button "${KEYSTROKE_WORDS.button}"
+            - link "Console"
+        - button "Keyboard Shortcuts"
     `);
 
     // The count is the whole platform's, so the page is read narrowed to this test's own row.
@@ -534,33 +524,33 @@ test.describe("the console's Workspaces page", () => {
     await expect(workspaceRows(page)).toHaveCount(1);
     await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
       - main "Page":
-        - heading ${quoted(WORKSPACES.name)} [level=1]
+        - heading "Workspaces" [level=1]
         - paragraph
-        - region ${quoted(WORKSPACES_WORDS.heading)}:
-          - heading ${quoted(WORKSPACES_WORDS.heading)} [level=2]
+        - region "Every Workspace":
+          - heading "Every Workspace" [level=2]
           - paragraph
           - status: /\\b1\\b/
-          - searchbox ${quoted(WORKSPACES_WORDS.search)}: ${quoted(workspace.name)}
+          - searchbox "Search by name or short name": ${JSON.stringify(workspace.name)}
           - table:
             - caption
             - rowgroup:
-              - row ${quoted(Object.values(COLUMNS).join(" "))}:
-                - columnheader ${quoted(COLUMNS.workspace)}
-                - columnheader ${quoted(COLUMNS.shortName)}
-                - columnheader ${quoted(COLUMNS.memberCount)}
-                - columnheader ${quoted(COLUMNS.createdAt)}
+              - row "Workspace Short Name Members Provisioned":
+                - columnheader "Workspace"
+                - columnheader "Short Name"
+                - columnheader "Members"
+                - columnheader "Provisioned"
             - rowgroup:
               - row /${workspace.name}/:
                 - cell /${workspace.name}/:
-                  - button ${quoted(WORKSPACES_WORDS.moreAbout(workspace.name))}
-                - cell ${quoted(workspace.shortName)}
+                  - button ${JSON.stringify(`More About ${workspace.name}`)}
+                - cell ${JSON.stringify(workspace.shortName)}
                 - cell /\\b1\\b/
                 - cell /\\d{1,2} [A-Z][a-z]+ \\d{4}/
     `);
 
     await passesTheAccessibilityGate();
 
-    const more = ours.getByRole("button", { name: WORKSPACES_WORDS.moreAbout(workspace.name) });
+    const more = ours.getByRole("button", { name: `More About ${workspace.name}` });
     await more.focus();
     await page.keyboard.press("Enter");
     await expect(more).toHaveAttribute("aria-expanded", "true");

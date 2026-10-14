@@ -1,12 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import {
-  ASK_TO_JOIN_WORDS,
-  REASON_MAX_CHARACTERS,
-  SHORT_NAME_EXAMPLE,
-} from "@/features/auth/ask-to-join-words.ts";
-import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { REASON_MAX_CHARACTERS } from "@/features/auth/ask-to-join-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -17,6 +11,7 @@ import {
   saysARefusal,
   saysTheWait,
   signedInWithNoWorkspace,
+  signInHeading,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
 import { refusalAnswering } from "./refused-read.ts";
@@ -39,18 +34,16 @@ const UNSAID = [
   { word: `a ${OLD_WORD}`, pattern: new RegExp(String.raw`\b${OLD_WORD}\b`, "i") },
 ] as const;
 
-const askRegion = (page: Page) => page.getByRole("region", { name: ASK_TO_JOIN_WORDS.heading });
+const askRegion = (page: Page) => page.getByRole("region", { name: "Ask to Join a Workspace" });
 
-const shortNameField = (page: Page) => page.getByLabel(ASK_TO_JOIN_WORDS.shortName);
+const shortNameField = (page: Page) => page.getByLabel("Workspace Short Name");
 
-const reasonField = (page: Page) => page.getByLabel(ASK_TO_JOIN_WORDS.reason);
+const reasonField = (page: Page) => page.getByLabel("Reason");
 
 const askButton = (page: Page) =>
-  askRegion(page).getByRole("button", {
-    name: new RegExp(`^(${ASK_TO_JOIN_WORDS.ask}|${ASK_TO_JOIN_WORDS.asking})$`),
-  });
+  askRegion(page).getByRole("button", { name: /^(Ask to Join|Asking)$/ });
 
-const requestSent = (page: Page) => page.getByRole("alert", { name: ASK_TO_JOIN_WORDS.sent });
+const requestSent = (page: Page) => page.getByRole("alert", { name: "Request sent" });
 
 const askToJoin = async (page: Page, shortName: string, reason = REASON): Promise<void> => {
   await shortNameField(page).fill(shortName);
@@ -76,19 +69,19 @@ test("a person in no workspace asks to join by keyboard", async ({
 
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${JSON.stringify(NO_WORKSPACE_HEADING)} [level=1]
-      - region ${JSON.stringify(ASK_TO_JOIN_WORDS.heading)}:
-        - heading ${JSON.stringify(ASK_TO_JOIN_WORDS.heading)} [level=2]
+      - heading "No Workspace Yet" [level=1]
+      - region "Ask to Join a Workspace":
+        - heading "Ask to Join a Workspace" [level=2]
         - paragraph
-        - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.shortName)}
+        - textbox "Workspace Short Name"
         - paragraph
-        - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.reason)}
-        - button ${JSON.stringify(ASK_TO_JOIN_WORDS.ask)}
+        - textbox "Reason"
+        - button "Ask to Join"
       - button "Sign Out"
-      - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
+      - button "Keyboard Shortcuts"
   `);
   await expect(shortNameField(page), "the field shows no example").toHaveAccessibleDescription(
-    new RegExp(SHORT_NAME_EXAMPLE),
+    /acme-joinery/,
   );
   await expect(reasonField(page), "the field names no limit").toHaveAccessibleDescription(
     new RegExp(REASON_MAX_CHARACTERS.toLocaleString("en-GB")),
@@ -101,16 +94,13 @@ test("a person in no workspace asks to join by keyboard", async ({
   await page.keyboard.press("Tab");
   await expect(reasonField(page)).toBeFocused();
   await page.keyboard.type(REASON);
-  await clockTheNextKey(page, {
-    at: "//main//button[@type='submit']",
-    reads: ASK_TO_JOIN_WORDS.asking,
-  });
+  await clockTheNextKey(page, { at: "//main//button[@type='submit']", reads: "Asking" });
   await page.keyboard.press("Enter");
   await theActionLandedWithinItsBudget(page, "ask to join");
 
   await expect(requestSent(page)).toBeFocused();
   await expect(requestSent(page)).toMatchAriaSnapshot(`
-    - alert ${JSON.stringify(ASK_TO_JOIN_WORDS.sent)}:
+    - alert "Request sent":
       - paragraph
       - paragraph
   `);
@@ -131,10 +121,7 @@ test("answers known, unknown and repeated short names alike", async ({ page, req
   }
 
   const [known, unknown, alreadyAsked] = said;
-  expect(
-    known?.replace(ASK_TO_JOIN_WORDS.sent, ""),
-    "the answer says nothing past its name",
-  ).toMatch(/\S/);
+  expect(known?.replace("Request sent", ""), "the answer says nothing past its name").toMatch(/\S/);
   expect(unknown, "an unknown short name was answered differently").toBe(known);
   expect(alreadyAsked, "a second ask was answered differently").toBe(known);
 });
@@ -201,7 +188,7 @@ test("sends a person whose session ended back to sign in", async ({ page, contex
   await saysARefusal(page.getByRole("alert"));
   await thePageSaysNeither(page, "once the session ended");
   await page.getByRole("button", { name: "Sign In Again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
+  await expect(signInHeading(page)).toBeVisible();
 });
 
 test("names no organisation or old word, nor in keystrokes", async ({ page, request }) => {

@@ -9,13 +9,9 @@ import { ReviewActions } from "@/features/sources/review-actions.tsx";
 import type { GroupOfFindings } from "@/features/sources/sources-api.ts";
 import { SOURCES_KEYSTROKES, useTickedGroups } from "@/features/sources/sources-state.ts";
 import {
-  CONNECTOR_WORDS,
   REVIEW_WORDS,
-  ROW_ACTIONS,
-  ruleWordOf,
   SENSITIVITY_PANEL_WORDS,
   sensitivityAndAudienceWords,
-  STATE_WORDS,
   THE_ACTION_BEFORE_IS_STILL_GOING,
   THE_CHANGE_BEFORE_IS_STILL_GOING,
 } from "@/features/sources/words.ts";
@@ -104,11 +100,13 @@ const reviewing = (connectedSourceId: string, tickedIn: string) =>
 
 const action = (name: string) => screen.getByRole<HTMLButtonElement>("button", { name });
 
-const UNTICKED = [
-  REVIEW_WORDS.keep.label,
-  REVIEW_WORDS.narrowDocuments.label,
-  REVIEW_WORDS.dismiss.label,
-];
+const KEEP = "Keep in Text";
+
+const NARROW_DOCUMENTS = "Narrow These Documents";
+
+const DISMISS = "Dismiss as Not Special Category";
+
+const UNTICKED = [KEEP, NARROW_DOCUMENTS, DISMISS];
 
 describe("the review's three bulk actions", () => {
   it("stand disabled, each described by the line that enables them", () => {
@@ -128,10 +126,10 @@ describe("the review's three bulk actions", () => {
     fireEvent.click(action("Tick bank details"));
 
     expect(screen.queryByText(REVIEW_WORDS.selectFirst)).toBeNull();
-    const keep = action(REVIEW_WORDS.keep.label);
+    const keep = action(KEEP);
     expect(keep.disabled).toBe(false);
     expect(keep.hasAttribute("aria-describedby")).toBe(false);
-    expect(action(REVIEW_WORDS.narrowDocuments.label).disabled).toBe(false);
+    expect(action(NARROW_DOCUMENTS).disabled).toBe(false);
   });
 
   it("count the ticked groups in the dialog's name", () => {
@@ -159,7 +157,7 @@ describe("the review's three bulk actions", () => {
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.keep.key });
 
     const listed = within(screen.getByRole("dialog")).getByRole("listitem");
-    expect(listed.textContent).toContain(ruleWordOf(BANK_DETAILS.ruleId));
+    expect(listed.textContent).toContain("Sort code and account number");
     expect(listed.textContent).not.toContain(BANK_DETAILS.ruleId);
   });
 
@@ -179,7 +177,7 @@ describe("the dismissal as not special category", () => {
 
     fireEvent.click(action("Tick the health cue"));
 
-    expect(action(REVIEW_WORDS.dismiss.label).disabled).toBe(false);
+    expect(action(DISMISS).disabled).toBe(false);
     expect(screen.queryByText(NOT_SPECIAL_CATEGORY)).toBeNull();
   });
 
@@ -188,12 +186,12 @@ describe("the dismissal as not special category", () => {
 
     fireEvent.click(action("Tick both"));
 
-    const dismissal = action(REVIEW_WORDS.dismiss.label);
+    const dismissal = action(DISMISS);
     expect(dismissal.disabled).toBe(true);
     expect(dismissal.getAttribute("aria-describedby")).toBe(
       screen.getByText(NOT_SPECIAL_CATEGORY).id,
     );
-    expect(action(REVIEW_WORDS.keep.label).disabled).toBe(false);
+    expect(action(KEEP).disabled).toBe(false);
   });
 
   it("opens on s, asking a reason and naming no finding", () => {
@@ -202,8 +200,10 @@ describe("the dismissal as not special category", () => {
 
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.dismiss.key });
 
-    const dialog = screen.getByRole("dialog", { name: REVIEW_WORDS.dismiss.named(1) });
-    expect(dialog.textContent).toContain(ruleWordOf(HEALTH_CUE.ruleId));
+    const dialog = screen.getByRole("dialog", {
+      name: "Dismiss 1 Group of Findings as Not Special Category",
+    });
+    expect(dialog.textContent).toContain("Health wording");
     expect(dialog.textContent).toContain("Pump service notes");
     expect(screen.getByLabelText("Reason")).toBeDefined();
     expect(dialog.textContent).not.toMatch(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
@@ -328,15 +328,27 @@ const atSources = (api: SourcesApi = {}) => {
 
 const rowOf = async (name: string) => within(await screen.findByRole("listitem", { name }));
 
+/** Each row action's label, which the row follows with its source's name. */
+const ROW_ACTIONS = {
+  review: "Review Findings",
+  publish: "Publish",
+  narrow: "Narrow Sensitivity",
+  widen: "Widen Sensitivity or Audience",
+};
+
 /** jsdom's accessible name drops the space a browser keeps before the hidden source's name. */
 const rowAction = (row: ReturnType<typeof within>, label: string, name: string) =>
   row.getByRole("button", { name: new RegExp(`^${label} ?${name}$`, "v") });
 
-const panelOf = (change: "narrow" | "widen", name: string) =>
-  screen.queryByRole("group", { name: SENSITIVITY_PANEL_WORDS[change].named(name) });
+const PANEL_NAMED = {
+  narrow: (name: string) => `Narrow the Sensitivity of ${name}`,
+  widen: (name: string) => `Widen the Sensitivity or Audience of ${name}`,
+};
 
-const reviewOf = (name: string) =>
-  screen.queryByRole("region", { name: REVIEW_WORDS.heading(name) });
+const panelOf = (change: "narrow" | "widen", name: string) =>
+  screen.queryByRole("group", { name: PANEL_NAMED[change](name) });
+
+const reviewOf = (name: string) => screen.queryByRole("region", { name: `Review of ${name}` });
 
 /** The handbook's widening opened from its row's button, which then holds focus as the opener. */
 const widenOpened = (row: ReturnType<typeof within>): HTMLElement => {
@@ -346,13 +358,14 @@ const widenOpened = (row: ReturnType<typeof within>): HTMLElement => {
   return widen;
 };
 
-const commitIn = (row: ReturnType<typeof within>) =>
-  row.getByRole("button", { name: SENSITIVITY_PANEL_WORDS.widen.commit });
+const commitIn = (row: ReturnType<typeof within>) => row.getByRole("button", { name: "Widen" });
 
 const describedBy = (control: HTMLElement): string | undefined =>
   document.getElementById(control.getAttribute("aria-describedby") ?? "")?.textContent;
 
-const TICKING = { name: REVIEW_WORDS.select(BANK_DETAILS) };
+const TICKING = {
+  name: `Select bank details by Sort code and account number in ${BANK_DETAILS.title}`,
+};
 
 /** A keep sent from the handbook's review, its answer held and the hold already drawn. */
 const aKeepHeldPending = async () => {
@@ -397,8 +410,8 @@ describe("a connected source's row", () => {
     atSources();
     const row = await rowOf("Staff handbook");
 
-    expect(row.getByText(CONNECTOR_WORDS.upload)).toBeDefined();
-    expect(row.getByText(STATE_WORDS.received)).toBeDefined();
+    expect(row.getByText("Upload")).toBeDefined();
+    expect(row.getByText("Received")).toBeDefined();
     expect(row.getByText("Restricted")).toBeDefined();
     expect(row.queryByText("upload")).toBeNull();
     expect(row.queryByText("received")).toBeNull();
@@ -423,10 +436,10 @@ describe("a connected source's row", () => {
 
     const heading = row.getByRole("heading", {
       level: 4,
-      name: REVIEW_WORDS.heading("Staff handbook"),
+      name: "Review of Staff handbook",
     });
     expect(document.activeElement).toBe(heading);
-    expect(row.getByRole("region", { name: REVIEW_WORDS.heading("Staff handbook") })).toBeDefined();
+    expect(row.getByRole("region", { name: "Review of Staff handbook" })).toBeDefined();
     expect(review.getAttribute("aria-expanded")).toBe("true");
   });
 
@@ -487,9 +500,7 @@ describe("a connected source's row", () => {
     fireEvent.click(rowAction(priceBook, ROW_ACTIONS.review, "Price book"));
 
     expect(reviewOf("Staff handbook")).toBeNull();
-    expect(
-      priceBook.getByRole("region", { name: REVIEW_WORDS.heading("Price book") }),
-    ).toBeDefined();
+    expect(priceBook.getByRole("region", { name: "Review of Price book" })).toBeDefined();
   });
 });
 
@@ -505,7 +516,7 @@ describe("widening a connected source in its row", () => {
     fireEvent.keyDown(document.body, { key: SOURCES_KEYSTROKES.widen.key });
 
     const panel = row.getByRole("group", {
-      name: SENSITIVITY_PANEL_WORDS.widen.named("Staff handbook"),
+      name: PANEL_NAMED.widen("Staff handbook"),
     });
     expect(describedBy(panel)).toBe(SENSITIVITY_PANEL_WORDS.widen.consequence(false));
     expect(document.activeElement).toBe(
@@ -636,7 +647,7 @@ const publishThePriceBook = async () => {
 const narrowThePriceBook = async () => {
   const row = await rowOf("Price book");
   fireEvent.click(rowAction(row, ROW_ACTIONS.narrow, "Price book"));
-  fireEvent.click(row.getByRole("button", { name: SENSITIVITY_PANEL_WORDS.narrow.commit }));
+  fireEvent.click(row.getByRole("button", { name: "Narrow" }));
 };
 
 const SENT_FROM_A_ROW = [
@@ -702,15 +713,11 @@ describe("narrowing a connected source in its row", () => {
 
     fireEvent.click(rowAction(row, ROW_ACTIONS.narrow, "Price book"));
 
-    const panel = within(
-      row.getByRole("group", { name: SENSITIVITY_PANEL_WORDS.narrow.named("Price book") }),
-    );
+    const panel = within(row.getByRole("group", { name: PANEL_NAMED.narrow("Price book") }));
     expect(panel.getAllByRole("combobox")).toHaveLength(1);
     expect(panel.getAllByRole("term").map((term) => term.textContent)).toEqual(["Sensitivity"]);
     expect(panel.getByRole("definition").textContent).toMatch(/Internal.+Restricted/v);
-    expect(
-      panel.getByRole("button", { name: SENSITIVITY_PANEL_WORDS.narrow.commit }),
-    ).toBeDefined();
+    expect(panel.getByRole("button", { name: "Narrow" })).toBeDefined();
   });
 
   it("takes the place of a panel open in another row", async () => {

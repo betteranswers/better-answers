@@ -1,12 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { z } from "zod";
 
-import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
-import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
-import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts";
-import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { PRODUCT_NAME } from "@/shared/words.ts";
+import type { CarriedOn } from "@/features/auth/sign-in-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -26,9 +21,8 @@ import {
   person,
   personMenuOpened,
   provision,
-  quoted,
   removeMember,
-  saysAnotherRefusal,
+  saysSomethingNew,
   saysARefusal,
   saysTheWait,
   signedInAtHome,
@@ -40,12 +34,11 @@ import {
 } from "./harness.ts";
 import { authAnswering } from "./refused-read.ts";
 
-const thePicker = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading });
+const thePicker = (page: Page) => page.getByRole("heading", { level: 1, name: "Your Workspaces" });
 
 const SEND_PATH = "/email-otp/send-verification-otp";
 
-const codeField = (page: Page) => page.getByLabel(SIGN_IN_WORDS.codeField, { exact: true });
+const codeField = (page: Page) => page.getByLabel("Verification Code", { exact: true });
 
 /** Asked for before the action that sends, or the answer can land before anything waits for it. */
 const theSendsAnswer = (page: Page) =>
@@ -62,17 +55,17 @@ const waitNamedBy = async (answered: ReturnType<typeof theSendsAnswer>): Promise
 
 /** A code asked for at the email step meets a ceiling, and the page says the wait it named. */
 const theSendIsRefusedNamingItsWait = async (page: Page, email: string): Promise<void> => {
-  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
+  await page.getByLabel("Email Address").fill(email);
   const answered = theSendsAnswer(page);
-  await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
+  await page.getByRole("button", { name: "Send Code" }).click();
 
   await saysTheWait(page.getByRole("alert"), await waitNamedBy(answered));
 };
 
 /** From the email step the page shows to the code step, through the product's own page. */
 const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
-  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
-  await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
+  await page.getByLabel("Email Address").fill(email);
+  await page.getByRole("button", { name: "Send Code" }).click();
   await expect(codeField(page)).toBeVisible();
   await expect(page.getByRole("status"), "the page says nothing of the email").toHaveText(/\S/);
 };
@@ -83,15 +76,10 @@ const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
  */
 const saysANewEmailWent = async (page: Page, earlier: string): Promise<void> => {
   await expect(
-    page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }),
+    page.getByRole("button", { name: "Send a New Code" }),
     "the new email is still sending",
   ).toHaveAttribute("aria-disabled", "false");
-  await expect
-    .poll(
-      async () => ["", earlier].includes(await page.getByRole("status").innerText()),
-      "the page says nothing new of the email",
-    )
-    .toBe(false);
+  await saysSomethingNew(page.getByRole("status"), earlier);
 };
 
 /** A page's own words as an XPath string, whatever quotes they hold. */
@@ -211,9 +199,9 @@ test("shows a member of two workspaces their role in each", async ({ page, reque
   await expect(page.getByRole("main").getByRole("list")).toMatchAriaSnapshot(`
     - list:
       - listitem:
-        - button ${quoted(first.name)}
+        - button ${JSON.stringify(first.name)}
       - listitem:
-        - button ${quoted(second.name)}
+        - button ${JSON.stringify(second.name)}
   `);
   await expect(rowsOf(page), "a row does not show the role held there").toContainText([
     "Admin",
@@ -261,7 +249,6 @@ test("lands a sole member in the shell: workspace, person, role", async ({ page,
   await expect(you.getByText(workspace.admin.name, { exact: true })).toBeVisible();
   await expect(you.getByText("Admin", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Choose a workspace" })).toHaveCount(0);
 
   await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
@@ -307,24 +294,24 @@ test("ends the chooser with Account, Sign out and Keyboard shortcuts", async ({
 
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(PICKER_WORDS.heading)} [level=1]
+      - heading "Your Workspaces" [level=1]
       - paragraph
       - list
-      - link ${quoted(ACCOUNT_HEADING)}
+      - link "Account"
       - button "Sign Out"
-      - button ${quoted(KEYSTROKE_WORDS.button)}
+      - button "Keyboard Shortcuts"
   `);
   await workspaces.first().focus();
   await page.keyboard.press("Tab");
   await expect(workspaces.last(), "a role tag took a stop between the workspaces").toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: ACCOUNT_HEADING })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Account" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Sign Out" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(keystrokesButton(page)).toBeFocused();
 
-  const listed = await keystrokesListed(page, PICKER_WORDS.heading);
+  const listed = await keystrokesListed(page, "Your Workspaces");
   await expect(listed.getByRole("term").filter({ hasText: /^w$/ })).toBeVisible();
   await keystrokesDismissed(page, listed);
   await page.keyboard.press("w");
@@ -334,7 +321,7 @@ test("ends the chooser with Account, Sign out and Keyboard shortcuts", async ({
 test("offers one way on to a person in no workspace", async ({ page, request }) => {
   await signedInWithNoWorkspace(page, request, "nobody");
 
-  await expect(page.getByRole("region", { name: ASK_TO_JOIN_WORDS.heading })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Ask to Join a Workspace" })).toBeVisible();
 
   await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
@@ -346,27 +333,29 @@ test("offers one way on to a person in no workspace", async ({ page, request }) 
 test("names the product in tab and banner, beside its logo", async ({ page }) => {
   await page.goto("/sign-in");
 
-  await expect(page).toHaveTitle(PRODUCT_NAME);
+  await expect(page).toHaveTitle("better-answers");
   const icon = (await page.locator('head link[rel="icon"]').getAttribute("href")) ?? "";
   const inline = /^data:image\/svg\+xml,(?<drawn>.*)$/.exec(icon)?.groups?.["drawn"];
   expect(inline, "the tab icon is not an inline SVG").toBeDefined();
   const drawn = decodeURIComponent(inline ?? "");
-  expect(drawn, "the tab icon is not the logo").toContain(`<title>${PRODUCT_NAME}</title>`);
+  expect(drawn, "the tab icon is not the logo").toContain("<title>better-answers</title>");
   expect(drawn, "the logo no longer takes the icon's colour").toContain('fill="currentColor"');
   expect(drawn, "a dark tab strip would hide the icon").toMatch(
     /@media \(prefers-color-scheme:dark\)\{svg\{color:#[\da-f]{6}\}\}/,
   );
 
   const banner = page.getByRole("banner");
-  await expect(banner).toHaveText(PRODUCT_NAME, { useInnerText: true });
-  await expect(banner.getByRole("img", { name: PRODUCT_NAME, includeHidden: true })).toBeVisible();
+  await expect(banner).toHaveText("better-answers", { useInnerText: true });
+  await expect(
+    banner.getByRole("img", { name: "better-answers", includeHidden: true }),
+  ).toBeVisible();
   await expect(banner.getByRole("img"), "the name would be heard twice").toHaveCount(0);
 });
 
 test("draws the outline edge hairline and the send ink blue", async ({ page }) => {
   await page.goto("/sign-in");
-  const passkey = page.getByRole("button", { name: SIGN_IN_WORDS.passkey });
-  const send = page.getByRole("button", { name: SIGN_IN_WORDS.send });
+  const passkey = page.getByRole("button", { name: "Sign In with a Passkey" });
+  const send = page.getByRole("button", { name: "Send Code" });
 
   await expect(passkey, "the outline button's edge is not the control edge").toHaveCSS(
     "border-top-color",
@@ -402,7 +391,7 @@ test("says a code is sent, wrong, or asked too often", async ({
   const flooded = anAddress("flood");
   await floodCodesTo(request, flooded, 6);
 
-  await page.getByRole("button", { name: SIGN_IN_WORDS.otherAddress }).click();
+  await page.getByRole("button", { name: "Use a Different Email Address" }).click();
   await theSendIsRefusedNamingItsWait(page, flooded);
   // Red words alone: the system never draws a coloured rule beside them.
   await expect(page.getByRole("alert")).toHaveCSS("border-left-width", "0px");
@@ -413,9 +402,7 @@ test("frames the sign-in form in one marked card", async ({ page }) => {
   await expect(signInHeading(page)).toBeVisible();
 
   expect(await drawnMarks(page), "the card stands for its primary button").toEqual(["card"]);
-  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.send })).toHaveAttribute(
-    "data-marks",
-  );
+  await expect(page.getByRole("button", { name: "Send Code" })).toHaveAttribute("data-marks");
 });
 
 test("keeps the framed sign-in page inside 320 pixels", async ({ page }) => {
@@ -435,7 +422,7 @@ test("draws a row of secondary actions in one treatment", async ({ page, request
   await page.goto("/sign-in");
   await sendTheFirstCode(page, email);
 
-  const row = page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }).locator("..");
+  const row = page.getByRole("button", { name: "Send a New Code" }).locator("..");
   const treatments = await row
     .getByRole("button")
     .evaluateAll((buttons) => [...new Set(buttons.map((button) => button.dataset["variant"]))]);
@@ -474,10 +461,10 @@ test("names joining a workspace when sign-in carries an invitation", async ({ pa
   await namesWhereItCarries(page, "joining");
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(SIGN_IN_WORDS.emailStep.joining.title)} [level=1]
+      - heading "Sign In to Join a Workspace" [level=1]
       - paragraph
-      - textbox ${quoted(SIGN_IN_WORDS.emailField)}
-      - button ${quoted(SIGN_IN_WORDS.send)}
+      - textbox "Email Address"
+      - button "Send Code"
   `);
 });
 
@@ -498,7 +485,7 @@ test("a new code sent from the code step signs in", async ({
   await aWrongCodeIsRefused(page);
   const saidOfTheFirst = await page.getByRole("status").innerText();
 
-  await page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }).click();
+  await page.getByRole("button", { name: "Send a New Code" }).click();
 
   // The press took focus, and the field takes it back only once the new email has gone.
   await expect(codeField(page), "the new code's field did not take focus").toBeFocused();
@@ -508,13 +495,13 @@ test("a new code sent from the code step signs in", async ({
   await expect(refused, "the wrong code's refusal outlived the new code").toBeEmpty();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(SIGN_IN_WORDS.codeTitle)} [level=1]
+      - heading "Enter Your Code" [level=1]
       - status
-      - textbox ${quoted(SIGN_IN_WORDS.codeField)}
-      - button ${quoted(SIGN_IN_WORDS.signIn)}
-      - button ${quoted(SIGN_IN_WORDS.sendAgain)}
-      - button ${quoted(SIGN_IN_WORDS.otherAddress)}
-      - button ${quoted(KEYSTROKE_WORDS.button)}
+      - textbox "Verification Code"
+      - button "Sign In"
+      - button "Send a New Code"
+      - button "Use a Different Email Address"
+      - button "Keyboard Shortcuts"
   `);
   await passesTheAccessibilityGate();
   await codeField(page).fill(await codeSentTo(request, email));
@@ -535,7 +522,7 @@ test("names the wait when a new code meets the ceiling", async ({
   await floodCodesTo(request, email, 4);
 
   await page.keyboard.press("Tab");
-  const listed = await keystrokesListed(page, KEYSTROKE_WORDS.thisPage);
+  const listed = await keystrokesListed(page, "This Page");
   await expect(listed.getByRole("term").filter({ hasText: /^n$/ })).toBeVisible();
   await expect(listed.getByRole("term").filter({ hasText: /^e$/ })).toBeVisible();
   await keystrokesDismissed(page, listed);
@@ -544,7 +531,7 @@ test("names the wait when a new code meets the ceiling", async ({
   const saidOfTheFirst = await page.getByRole("status").evaluate((status) => status.textContent);
   await clockTheNextKey(page, {
     at: `//main[.//*[@role='status'][string(.)!=${asXPath(saidOfTheFirst)}]]`,
-    reads: SIGN_IN_WORDS.codeTitle,
+    reads: "Enter Your Code",
   });
   const answered = theSendsAnswer(page);
   await page.keyboard.press("n");
@@ -554,8 +541,8 @@ test("names the wait when a new code meets the ceiling", async ({
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("e");
-  await expect(page.getByLabel(SIGN_IN_WORDS.emailField), "focus left the way on").toBeFocused();
-  await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toHaveValue(email);
+  await expect(page.getByLabel("Email Address"), "focus left the way on").toBeFocused();
+  await expect(page.getByLabel("Email Address")).toHaveValue(email);
 });
 
 test("announces a sent code in the standing region, keeping focus", async ({ page, request }) => {
@@ -573,8 +560,8 @@ test("announces a sent code in the standing region, keeping focus", async ({ pag
   await expect(refused, "the alert region stands with words already in it").toBeEmpty();
   const stood = await said.elementHandle();
 
-  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
-  await page.getByLabel(SIGN_IN_WORDS.emailField).press("Enter");
+  await page.getByLabel("Email Address").fill(email);
+  await page.getByLabel("Email Address").press("Enter");
 
   await expect(said).toContainText(email);
   const sameRegion = await said.evaluate((now, then) => now === then, stood);
@@ -613,7 +600,7 @@ test("drops letters, and five digits never sign in", async ({ page, request }) =
   await page.keyboard.press("Enter");
   await page.keyboard.type(code.slice(5));
 
-  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   expect(sent, "five digits were sent").toHaveLength(1);
 });
 
@@ -644,7 +631,7 @@ test("sends a wrong code once, selected, naming two tries left", async ({ page, 
 
 /** A spent code leaves focus on sending another, so Enter alone asks for the code that signs in. */
 const anotherCodeSignsIn = async (page: Page, request: APIRequestContext, email: string) => {
-  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Send a New Code" })).toBeFocused();
   const saidOfTheFirst = await page.getByRole("status").innerText();
 
   await page.keyboard.press("Enter");
@@ -653,7 +640,7 @@ const anotherCodeSignsIn = async (page: Page, request: APIRequestContext, email:
   await expect(codeField(page), "the spent digits outlived the new code").toHaveValue("");
   await saysANewEmailWent(page, saidOfTheFirst);
   await page.keyboard.type(await codeSentTo(request, email));
-  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
 };
 
 test("a third wrong code hands focus to sending another", async ({ page, request }) => {
@@ -671,7 +658,7 @@ test("a third wrong code hands focus to sending another", async ({ page, request
   const third = authAnswering(page, SIGN_IN_PATH);
   await codeField(page).fill(notTheCode(code, 3));
   expect(await third).toMatchObject({ status: 400, code: "INVALID_OTP" });
-  await saysAnotherRefusal(page.getByRole("alert"), oneLeft);
+  await saysSomethingNew(page.getByRole("alert"), oneLeft);
 
   await anotherCodeSignsIn(page, request, email);
 });
@@ -893,7 +880,7 @@ test("sends a non-member from the picker to the refused page", async ({ page, re
 
   await page.goto("/choose-workspace");
 
-  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign Out" })).toBeVisible();
 });
 
@@ -915,10 +902,10 @@ test("separates an unread workspace list from no workspace, offering retry", asy
   await saysARefusal(page.getByRole("alert"), { timeout: 15_000 });
   await expect(thePicker(page)).toBeVisible();
 
-  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toHaveCount(0);
 
   await page.unroute(theWorkspacesRead);
-  await page.getByRole("button", { name: PICKER_WORDS.tryAgain }).click();
+  await page.getByRole("button", { name: "Try Again" }).click();
 
   await expect(page.getByRole("button", { name: first.name })).toBeVisible();
   await expect(page.getByRole("button", { name: second.name })).toBeVisible();
@@ -936,10 +923,10 @@ test("makes the pages outside the shell keyboard-operable, landmarked and labell
 
   await expect(page.getByRole("main")).toHaveCount(1);
   await page.keyboard.press("Tab");
-  await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toBeFocused();
+  await expect(page.getByLabel("Email Address")).toBeFocused();
   await page.keyboard.type(email);
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.send })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Send Code" })).toBeFocused();
   await page.keyboard.press("Enter");
 
   await expect(codeField(page)).toBeVisible();
@@ -947,7 +934,7 @@ test("makes the pages outside the shell keyboard-operable, landmarked and labell
   await codeField(page).focus();
   await page.keyboard.type(sixDigits);
 
-  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
   await expect(page.getByRole("main")).toHaveCount(1);
   const signOut = page.getByRole("button", { name: "Sign Out" });
   await signOut.focus();

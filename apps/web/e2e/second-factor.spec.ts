@@ -3,17 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
-import {
-  ACCOUNT_HEADING,
-  ACCOUNT_WORDS,
-  AUTHENTICATOR_WORDS,
-  PASSKEY_WORDS,
-  RECOVERY_CODE_WORDS,
-} from "@/features/auth/account-words.ts";
-import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
-import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { CONSOLE, HOMES } from "@/shared/navigation.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -29,7 +19,6 @@ import {
   person,
   personMenuOpened,
   provision,
-  quoted,
   railOf,
   refusedDigitsSelected,
   saysARefusal,
@@ -43,28 +32,28 @@ import { authAnswering, refusalAnswering } from "./refused-read.ts";
 /** A recovery code as the api mints it: four groups of four, none of them easy to misread. */
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
 
-const accountHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: ACCOUNT_HEADING });
+const accountHeading = (page: Page) => page.getByRole("heading", { level: 1, name: "Account" });
 
 const regionOf = (page: Page, name: string) => page.getByRole("region", { name, exact: true });
 
-const authenticatorPart = (page: Page) => regionOf(page, AUTHENTICATOR_WORDS.heading);
+const authenticatorPart = (page: Page) => regionOf(page, "Authenticator");
 
-const codesBlock = (page: Page) => regionOf(page, RECOVERY_CODE_WORDS.saveHeading);
+const codesBlock = (page: Page) => regionOf(page, "Save Your Recovery Codes");
 
 const codesListed = (page: Page) =>
-  page.getByRole("list", { name: RECOVERY_CODE_WORDS.list }).getByRole("listitem");
+  page.getByRole("list", { name: "Recovery Codes" }).getByRole("listitem");
 
-const codeField = (page: Page) => page.getByLabel(AUTHENTICATOR_WORDS.codeField);
+const codeField = (page: Page) => page.getByLabel("Authenticator Code");
 
-const setUpButton = (page: Page) => page.getByRole("button", { name: AUTHENTICATOR_WORDS.setUp });
+const setUpButton = (page: Page) =>
+  page.getByRole("button", { name: "Set Up an Authenticator", exact: true });
 
-const doneButton = (page: Page) => page.getByRole("button", { name: RECOVERY_CODE_WORDS.done });
+const doneButton = (page: Page) => page.getByRole("button", { name: "Done" });
 
-const savedBox = (page: Page) => page.getByRole("checkbox", { name: RECOVERY_CODE_WORDS.saved });
+const savedBox = (page: Page) => page.getByRole("checkbox", { name: "I have saved these codes" });
 
 const removeButton = (page: Page) =>
-  authenticatorPart(page).getByRole("button", { name: AUTHENTICATOR_WORDS.remove });
+  authenticatorPart(page).getByRole("button", { name: "Remove", exact: true });
 
 /** The status an action's outcome is said in: the one holding words. */
 const outcomeOf = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
@@ -77,7 +66,7 @@ const aWrongCode = (right: string): string => (right === "000000" ? "111111" : "
 
 const accountFromTheBand = async (page: Page, who: string): Promise<void> => {
   const menu = await personMenuOpened(page, who);
-  await menu.getByRole("menuitem", { name: ACCOUNT_HEADING }).click();
+  await menu.getByRole("menuitem", { name: "Account" }).click();
   await expect(accountHeading(page)).toBeVisible();
   await expect(page).toHaveURL(/\/account$/);
 };
@@ -88,14 +77,14 @@ const accountWithNoWorkspace = async (page: Page, api: Parameters<typeof person>
   await person(api, email);
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
-  await page.getByRole("link", { name: ACCOUNT_HEADING }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
+  await page.getByRole("link", { name: "Account" }).click();
   await expect(accountHeading(page)).toBeVisible();
 };
 
 const setupOpened = async (page: Page): Promise<string> => {
   await setUpButton(page).click();
-  await expect(page.getByRole("img", { name: AUTHENTICATOR_WORDS.qrCode })).toBeVisible();
+  await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();
   return keyShown(page);
 };
 
@@ -112,7 +101,7 @@ const doneClosesTheCodes = async (page: Page): Promise<void> => {
   await doneButton(page).click();
   await expect(codesBlock(page)).toHaveCount(0);
   await expect(
-    page.getByRole("heading", { level: 3, name: RECOVERY_CODE_WORDS.heading }),
+    page.getByRole("heading", { level: 3, name: "Recovery Codes", exact: true }),
   ).toBeFocused();
 };
 
@@ -149,19 +138,19 @@ test("an Editor sets up an authenticator from the avatar menu", async ({ page, r
   await expect(outcomeOf(page), "the page says nothing of the setup").toBeVisible();
   await expect(removeButton(page), "the page does not list the authenticator").toBeVisible();
   await expect(
-    codesBlock(page).getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading }),
+    codesBlock(page).getByRole("heading", { name: "Save Your Recovery Codes" }),
   ).toBeFocused();
   await expect(codesBlock(page)).toMatchAriaSnapshot(`
-    - region ${quoted(RECOVERY_CODE_WORDS.saveHeading)}:
-      - heading ${quoted(RECOVERY_CODE_WORDS.saveHeading)} [level=3]
+    - region "Save Your Recovery Codes":
+      - heading "Save Your Recovery Codes" [level=3]
       - paragraph
-      - list ${quoted(RECOVERY_CODE_WORDS.list)}:
+      - list "Recovery Codes":
 ${tenCodesInTheList}
-      - button ${quoted(RECOVERY_CODE_WORDS.copy)}
-      - link ${quoted(RECOVERY_CODE_WORDS.download)}
-      - button ${quoted(RECOVERY_CODE_WORDS.print)}
-      - checkbox ${quoted(RECOVERY_CODE_WORDS.saved)}
-      - button ${quoted(RECOVERY_CODE_WORDS.done)}
+      - button "Copy Codes"
+      - link "Download"
+      - button "Print"
+      - checkbox "I have saved these codes"
+      - button "Done"
   `);
 });
 
@@ -172,8 +161,8 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   await doneButton(page).focus();
   // Landed once the block's alert holds words: the block is found so, and read for its heading.
   await clockTheNextKey(page, {
-    at: `//section[h3[normalize-space(.)=${quoted(RECOVERY_CODE_WORDS.saveHeading)}]][.//*[@role='alert'][normalize-space(.)]]`,
-    reads: RECOVERY_CODE_WORDS.saveHeading,
+    at: `//section[h3[normalize-space(.)="Save Your Recovery Codes"]][.//*[@role='alert'][normalize-space(.)]]`,
+    reads: "Save Your Recovery Codes",
   });
   await page.keyboard.press("Enter");
   await theActionLandedWithinItsBudget(page, "unticked done");
@@ -189,7 +178,7 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   const everyCodeLeft = new RegExp(
     String.raw`^\D*${String(RECOVERY_CODES_IN_A_SET)}\D+${String(RECOVERY_CODES_IN_A_SET)}\b`,
   );
-  const codesLeft = regionOf(page, RECOVERY_CODE_WORDS.heading).getByRole("paragraph");
+  const codesLeft = regionOf(page, "Recovery Codes").getByRole("paragraph");
   await expect(codesLeft).toHaveText(everyCodeLeft);
 
   await page.reload();
@@ -219,7 +208,7 @@ test("a wrong setup code is refused, its digits left selected", async ({ page, r
   // The key is bound once the read says there is no authenticator, which the button shows.
   await expect(setUpButton(page)).toBeVisible();
   await page.keyboard.press("s");
-  await expect(page.getByRole("img", { name: AUTHENTICATOR_WORDS.qrCode })).toBeVisible();
+  await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();
   const key = await keyShown(page);
 
   const refused = authAnswering(page, "/authenticator/finish");
@@ -239,7 +228,7 @@ test("the keystroke list drops Set up once the setup opens", async ({ page, requ
   await accountWithNoWorkspace(page, request);
   await setupOpened(page);
 
-  const listed = await keystrokesListed(page, ACCOUNT_HEADING);
+  const listed = await keystrokesListed(page, "Account");
   await expect(keyListed(listed, "k"), "the list holds no key that copies the key").toBeVisible();
   await expect(keyListed(listed, "s"), "the list still holds the key that sets up").toHaveCount(0);
   await keystrokesDismissed(page, listed);
@@ -266,7 +255,7 @@ test("a setup's codes land though Set up is pressed mid-finish", async ({ page, 
 
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
   await expect(
-    codesBlock(page).getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading }),
+    codesBlock(page).getByRole("heading", { name: "Save Your Recovery Codes" }),
   ).toBeFocused();
 });
 
@@ -277,11 +266,11 @@ test("a member removes their authenticator through its dialog", async ({ page, r
   const saidOfTheSetup = await outcomeOf(page).innerText();
 
   await removeButton(page).click();
-  const dialog = page.getByRole("dialog", { name: AUTHENTICATOR_WORDS.removeTitle });
+  const dialog = page.getByRole("dialog", { name: "Remove Authenticator" });
   await expect(dialog, "the dialog does not say what removing does").toHaveAccessibleDescription(
     /\S/,
   );
-  await dialog.getByRole("button", { name: AUTHENTICATOR_WORDS.removeCommit }).click();
+  await dialog.getByRole("button", { name: "Remove", exact: true }).click();
 
   await expect
     .poll(() => outcomeOf(page).innerText(), "the page says nothing new of the removal")
@@ -297,12 +286,12 @@ test("replacing the recovery codes shows a new set", async ({ page, request }) =
   await codesSaved(page);
   const saidOfTheSetup = await outcomeOf(page).innerText();
 
-  await page.getByRole("button", { name: RECOVERY_CODE_WORDS.replace }).click();
-  const dialog = page.getByRole("dialog", { name: RECOVERY_CODE_WORDS.replaceTitle });
+  await page.getByRole("button", { name: "Replace Recovery Codes" }).click();
+  const dialog = page.getByRole("dialog", { name: "Replace Recovery Codes" });
   await expect(dialog, "the dialog does not say what replacing does").toHaveAccessibleDescription(
     /\S/,
   );
-  await dialog.getByRole("button", { name: RECOVERY_CODE_WORDS.replaceCommit }).click();
+  await dialog.getByRole("button", { name: "Replace", exact: true }).click();
 
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
   await expect(
@@ -324,10 +313,10 @@ test("a set replaced in another tab is refused at Done", async ({ page, context,
   await setUpWithItsCode(page);
   const other = await context.newPage();
   await other.goto("/account");
-  await other.getByRole("button", { name: RECOVERY_CODE_WORDS.replace }).click();
+  await other.getByRole("button", { name: "Replace Recovery Codes" }).click();
   await other
-    .getByRole("dialog", { name: RECOVERY_CODE_WORDS.replaceTitle })
-    .getByRole("button", { name: RECOVERY_CODE_WORDS.replaceCommit })
+    .getByRole("dialog", { name: "Replace Recovery Codes" })
+    .getByRole("button", { name: "Replace", exact: true })
     .click();
   await expect(codesListed(other)).toHaveCount(RECOVERY_CODES_IN_A_SET);
   await other.close();
@@ -346,9 +335,9 @@ test("a member's Account page sits inside the shell", async ({ page, request }) 
   await anEditorOnAccount(page, request);
 
   await expect(railOf(page)).toBeVisible();
-  await expect(crumbOf(page, ACCOUNT_HEADING)).toBeVisible();
-  await expect(page.getByRole("link", { name: ACCOUNT_WORDS.goOn })).toHaveCount(0);
-  await keystrokesDismissed(page, await keystrokesListed(page, ACCOUNT_HEADING));
+  await expect(crumbOf(page, "Account")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Go to better-answers" })).toHaveCount(0);
+  await keystrokesDismissed(page, await keystrokesListed(page, "Account"));
 });
 
 test("the operator reaches Account from the console's avatar menu", async ({ page, request }) => {
@@ -357,7 +346,7 @@ test("the operator reaches Account from the console's avatar menu", async ({ pag
   await markTheOperator(request, email);
   await signedInAtHome(page, request, email);
   await page.goto(HOMES.operator.path);
-  await expect(page.getByRole("navigation", { name: CONSOLE.name })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
 
   await accountFromTheBand(page, workspace.admin.name);
   await expect(removeButton(page), "the page does not list the authenticator").toBeVisible();
@@ -373,27 +362,27 @@ test("a signed-out visitor signs in and lands back on Account", async ({ page, r
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(ACCOUNT_HEADING)} [level=1]
-      - region ${quoted(ACCOUNT_WORDS.signIn)}:
-        - heading ${quoted(ACCOUNT_WORDS.signIn)} [level=2]
-        - region ${quoted(AUTHENTICATOR_WORDS.heading)}:
-          - heading ${quoted(AUTHENTICATOR_WORDS.heading)} [level=3]
+      - heading "Account" [level=1]
+      - region "Sign-In":
+        - heading "Sign-In" [level=2]
+        - region "Authenticator":
+          - heading "Authenticator" [level=3]
           - paragraph
-          - button ${quoted(AUTHENTICATOR_WORDS.setUp)} [expanded=false]
-      - link ${quoted(ACCOUNT_WORDS.goOn)}
+          - button "Set Up an Authenticator" [expanded=false]
+      - link "Go to better-answers"
       - button "Sign Out"
-      - button ${quoted(KEYSTROKE_WORDS.button)}
+      - button "Keyboard Shortcuts"
   `);
 
-  const listed = await keystrokesListed(page, ACCOUNT_HEADING);
+  const listed = await keystrokesListed(page, "Account");
   await expect(keyListed(listed, "s"), "the list holds no key that sets up").toBeVisible();
   await keystrokesDismissed(page, listed);
 });
 
-const passkeyName = (page: Page) => page.getByLabel(PASSKEY_WORDS.nameField);
+const passkeyName = (page: Page) => page.getByLabel("Passkey Name");
 
 const authenticatorInstead = (page: Page) =>
-  page.getByRole("button", { name: SETUP_WORDS.authenticatorInstead });
+  page.getByRole("button", { name: "Set Up an Authenticator Instead" });
 
 /** Each accent-filled button a person can see, in the order the page reads. */
 const primaries = (page: Page) =>
@@ -413,12 +402,12 @@ test("setup shows one primary, whichever way is open", async ({
   passesTheAccessibilityGate,
 }) => {
   await anAdminOnSetup(page, request);
-  await expect(primaries(page)).toHaveText([SETUP_WORDS.addPasskey]);
+  await expect(primaries(page)).toHaveText(["Add a Passkey"]);
 
   await authenticatorInstead(page).click();
 
   await expect(codeField(page)).toBeVisible();
-  await expect(primaries(page)).toHaveText([AUTHENTICATOR_WORDS.finish]);
+  await expect(primaries(page)).toHaveText(["Finish Setup"]);
   await expect(passkeyName(page)).toBeHidden();
   await expect(authenticatorInstead(page)).toBeFocused();
   await passesTheAccessibilityGate();
@@ -426,7 +415,7 @@ test("setup shows one primary, whichever way is open", async ({
   await authenticatorInstead(page).click();
 
   await expect(passkeyName(page)).toBeVisible();
-  await expect(primaries(page)).toHaveText([SETUP_WORDS.addPasskey]);
+  await expect(primaries(page)).toHaveText(["Add a Passkey"]);
   await expect(authenticatorInstead(page)).toBeFocused();
 });
 
@@ -437,8 +426,8 @@ test("s opens and closes the authenticator on setup", async ({ page, request }) 
   await page.keyboard.press("s");
 
   await expect(authenticatorInstead(page)).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("img", { name: AUTHENTICATOR_WORDS.qrCode })).toBeVisible();
-  const listed = await keystrokesListed(page, SETUP_WORDS.heading);
+  await expect(page.getByRole("img", { name: "QR code for your authenticator" })).toBeVisible();
+  const listed = await keystrokesListed(page, "Set Up a Second Factor");
   await expect(keyListed(listed, "s"), "the list holds no key that sets up").toBeVisible();
   await expect(keyListed(listed, "k"), "the list holds no key that copies the key").toBeVisible();
   await keystrokesDismissed(page, listed);
@@ -454,7 +443,7 @@ test("the passkey field and its button share one height", async ({ page, request
 
   const [field, button] = await Promise.all([
     passkeyName(page).boundingBox(),
-    page.getByRole("button", { name: SETUP_WORDS.addPasskey }).boundingBox(),
+    page.getByRole("button", { name: "Add a Passkey" }).boundingBox(),
   ]);
 
   expect(field, "the passkey field has no box to measure").not.toBeNull();
@@ -471,7 +460,7 @@ test("the authenticator's code field and its button share one height", async ({
 
   const [field, button] = await Promise.all([
     codeField(page).boundingBox(),
-    page.getByRole("button", { name: AUTHENTICATOR_WORDS.finish }).boundingBox(),
+    page.getByRole("button", { name: "Finish Setup" }).boundingBox(),
   ]);
 
   expect(field, "the code field has no box to measure").not.toBeNull();

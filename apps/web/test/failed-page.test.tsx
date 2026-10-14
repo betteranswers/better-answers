@@ -5,9 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FailedPage } from "@/app/failed-page.tsx";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
-import { FAILED_PAGE, goHome, UNKNOWN_PAGE } from "@/app/words.ts";
+import { FAILED_PAGE } from "@/app/words.ts";
 import { HOMES } from "@/shared/navigation.ts";
-import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
 
@@ -62,7 +61,7 @@ describe("a page that throws", () => {
     await openModelChoicesWithABrokenRead();
 
     const band = screen.getByRole("banner");
-    expect(within(band).getByRole("link", { name: PRODUCT_NAME })).toBeDefined();
+    expect(within(band).getByRole("link", { name: "better-answers" })).toBeDefined();
     expect(within(band).getByText(A_MEMBER.workspace.name)).toBeDefined();
     expect(within(band).getByRole("button", { name: "Hide Menu" })).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
@@ -79,7 +78,7 @@ describe("a page that throws", () => {
 
     const [alert = document.body] = saying();
     expect(
-      within(alert).getByRole("heading", { level: 1, name: FAILED_PAGE.heading }),
+      within(alert).getByRole("heading", { level: 1, name: "This Page Didn’t Load" }),
     ).toBeDefined();
     expect(alert.textContent).toContain(FAILED_PAGE.said);
   });
@@ -102,7 +101,7 @@ describe("a page that throws", () => {
   it("offers the two ways out as controls a keyboard reaches", async () => {
     await openModelChoicesWithABrokenRead();
 
-    const again = screen.getByRole("button", { name: FAILED_PAGE.retry });
+    const again = screen.getByRole("button", { name: "Try Again" });
 
     expect(again.tagName).toBe("BUTTON");
     expect(again.getAttribute("tabindex")).toBeNull();
@@ -110,7 +109,7 @@ describe("a page that throws", () => {
     again.focus();
     expect(document.activeElement).toBe(again);
 
-    const away = await screen.findByRole("link", { name: goHome(HOMES.Admin) });
+    const away = await screen.findByRole("link", { name: "Go to Members" });
     expect(away.getAttribute("href")).toBe(HOMES.Admin.path);
   });
 
@@ -118,7 +117,7 @@ describe("a page that throws", () => {
     vi.stubGlobal("fetch", answerTrpc);
     await openApp(HOMES.Admin.path);
 
-    expect(await screen.findByRole("button", { name: FAILED_PAGE.retry })).toBeDefined();
+    expect(await screen.findByRole("button", { name: "Try Again" })).toBeDefined();
     expect(within(screen.getByRole("main")).queryAllByRole("link")).toEqual([]);
   });
 
@@ -144,12 +143,12 @@ describe("a page that throws", () => {
       </Providers>,
     );
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(FAILED_PAGE.heading);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("This Page Didn’t Load");
 
     broken = false;
     expect(screen.queryByText("The page drew.")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: FAILED_PAGE.retry }));
+    fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
 
     expect(screen.getByText("The page drew.")).toBeDefined();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -160,8 +159,6 @@ describe("a page that throws", () => {
 
     await openApp("/not-a-page");
 
-    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe(
-      UNKNOWN_PAGE.heading,
-    );
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("Page Not Found");
   });
 });

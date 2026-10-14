@@ -1,15 +1,7 @@
 import type { APIRequestContext, Locator, Page, Request } from "@playwright/test";
 
-import { BREADCRUMB } from "@/app/words.ts";
 import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import { CONCEPT_KEYSTROKES as KEY } from "@/features/knowledge/knowledge-state.ts";
-import {
-  CONCEPT_WORDS as WORDS,
-  EVIDENCE_WORDS,
-  SEARCH_WORDS,
-} from "@/features/knowledge/knowledge-words.ts";
-import { MEMBERS_PAGE } from "@/features/people/members-address.ts";
-import { CONTROL_CENTRE } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -177,17 +169,17 @@ const signedInAsAViewer = async (page: Page, api: APIRequestContext, seeded: Wor
 const conceptOf = (page: Page, title: string): Locator =>
   page.getByRole("article", { name: title });
 
-const sourcesOf = (page: Page): Locator => page.getByRole("region", { name: WORDS.sources });
+const sourcesOf = (page: Page): Locator => page.getByRole("region", { name: "Sources" });
 
 const sourceLines = (page: Page): Locator => sourcesOf(page).getByRole("listitem");
 
 const markOf = (page: Page, place: number, label: string): Locator =>
-  page.getByRole("button", { name: WORDS.sourceNamed(place, label), exact: true });
+  page.getByRole("button", { name: `Source ${String(place)}: ${label}`, exact: true });
 
 const panelOf = (page: Page, title: string): Locator => page.getByRole("dialog", { name: title });
 
 const wayBack = (page: Page): Locator =>
-  page.getByRole("main").getByRole("link", { name: WORDS.toSearch });
+  page.getByRole("main").getByRole("link", { name: "Back to Search" });
 
 /** Not found is the way back alone: no concept, no alert and no read under way. */
 const drawsNotFound = async (page: Page): Promise<void> => {
@@ -201,15 +193,13 @@ const drawsNotFound = async (page: Page): Promise<void> => {
 const THE_OPEN = "knowledge.open";
 
 const breadcrumb = (page: Page): Locator =>
-  page.getByRole("banner").getByRole("navigation", { name: BREADCRUMB });
+  page.getByRole("banner").getByRole("navigation", { name: "Breadcrumb" });
 
 const asked = (query: string): string =>
   `${SEARCH.path}?${new URLSearchParams({ "knowledge.search": query }).toString()}`;
 
 const matchOf = (page: Page, title: string): Locator =>
-  page
-    .getByRole("list", { name: SEARCH_WORDS.matches })
-    .getByRole("link", { name: title, exact: true });
+  page.getByRole("list", { name: "Matches" }).getByRole("link", { name: title, exact: true });
 
 /** Every `knowledge.open` the page sends from here on. */
 const opensSentBy = (page: Page): Request[] => {
@@ -265,18 +255,18 @@ test.describe("the concept page", () => {
     await expect(concept).toMatchAriaSnapshot(`
       - article "${RETENTION}":
         - paragraph:
-          - link "${WORDS.toSearch}"
+          - link "Back to Search"
         - heading "${RETENTION}" [level=2]
         - paragraph: How long audit logs are kept, and who decides.
-        - list "${WORDS.tags}":
+        - list "Tags":
           - listitem: audit
           - listitem: retention
         - paragraph:
           - superscript:
-            - 'button "${WORDS.sourceNamed(1, POLICY)}"'
+            - 'button "Source 1: ${POLICY}"'
         - heading "Who decides" [level=3]
-        - region "${WORDS.sources}":
-          - heading "${WORDS.sources}" [level=3]
+        - region "Sources":
+          - heading "Sources" [level=3]
           - list:
             - listitem:
               - button "${POLICY}"
@@ -285,19 +275,19 @@ test.describe("the concept page", () => {
             - listitem:
               - button "${COMMITTEE}"
             - listitem
-        - region "${WORDS.verification}":
-          - heading "${WORDS.verification}" [level=3]
+        - region "Verification":
+          - heading "Verification" [level=3]
           - list:
             - listitem: /3 March 2026/
-        - region "${WORDS.links}":
-          - heading "${WORDS.links}" [level=3]
+        - region "Links":
+          - heading "Links" [level=3]
           - list:
             - listitem:
               - link "${COMMITTEE}"
-        - button "${WORDS.details}"
+        - button "Details from the File"
     `);
 
-    await concept.getByRole("button", { name: WORDS.details }).click();
+    await concept.getByRole("button", { name: "Details from the File" }).click();
     await expect(concept.getByRole("definition").filter({ hasText: "Yearly" })).toBeVisible();
   });
 
@@ -331,7 +321,7 @@ test.describe("the concept page", () => {
     await expect(panel).toContainText(POLICY_PASSAGE);
     await expect(panel.getByRole("heading", { name: POLICY })).toBeFocused();
     await expect(panel, "a passage a concept rests on is company knowledge").not.toContainText(
-      SEARCH_WORDS.notCompanyKnowledge,
+      "Not company knowledge",
     );
     await expect(panel.getByText("Internal", { exact: true })).toBeVisible();
     await expect(mark).toHaveAttribute("aria-expanded", "true");
@@ -380,7 +370,7 @@ test.describe("the concept page", () => {
       MINUTES_DOCUMENT,
     );
     await expect(minutes.getByText("Restricted", { exact: true })).toBeVisible();
-    await expect(minutes).not.toContainText(SEARCH_WORDS.notCompanyKnowledge);
+    await expect(minutes).not.toContainText("Not company knowledge");
   });
 
   test("opens a cited concept in the panel, one level only", async ({
@@ -398,19 +388,19 @@ test.describe("the concept page", () => {
     await expect(panel.getByRole("heading", { name: COMMITTEE })).toBeFocused();
     await expect(panel).toContainText("The committee meets each quarter.[1]");
     await expect(panel).toContainText("Unverified");
-    await expect(panel.getByRole("button", { name: WORDS.sourceNamed(1, CHARTER) })).toHaveCount(0);
+    await expect(panel.getByRole("button", { name: `Source 1: ${CHARTER}` })).toHaveCount(0);
     await passesTheAccessibilityGate();
 
-    await panel.getByRole("link", { name: WORDS.ownPage }).focus();
+    await panel.getByRole("link", { name: "Open This Concept’s Page" }).focus();
     await page.keyboard.press("Tab");
-    await expect(panel.getByRole("button", { name: EVIDENCE_WORDS.close })).toBeFocused();
+    await expect(panel.getByRole("button", { name: "Close" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(
       markOf(page, 3, COMMITTEE),
       "Tab off the concept's panel did not reach the page",
     ).toBeFocused();
 
-    await panel.getByRole("link", { name: WORDS.ownPage }).click();
+    await panel.getByRole("link", { name: "Open This Concept’s Page" }).click();
     await expect(page).toHaveURL(new RegExp(`${pageOf(seeded.concepts, COMMITTEE)}$`));
     await expect(conceptOf(page, COMMITTEE)).toBeVisible();
     await expect(panelOf(page, COMMITTEE)).toHaveCount(0);
@@ -485,7 +475,7 @@ test.describe("the concept page", () => {
       await page.goto(address);
       await drawsNotFound(page);
       await expect(wayBack(page)).toHaveAttribute("href", SEARCH.path);
-      await expect(breadcrumb(page).getByRole("link").last()).toHaveText(SEARCH.name);
+      await expect(breadcrumb(page).getByRole("link").last()).toHaveText("Search");
       expect(await page.content(), `${address} names the withheld concept`).not.toContain(SALARY);
       expect(await page.title(), `${address} titles the document`).not.toContain(SALARY);
       drawn.push(await page.getByRole("main").innerHTML());
@@ -502,7 +492,9 @@ test.describe("the concept page", () => {
     );
 
     await wayBack(page).click();
-    await expect(page.getByRole("searchbox", { name: SEARCH_WORDS.search })).toBeVisible();
+    await expect(
+      page.getByRole("searchbox", { name: "Search by a word or a question" }),
+    ).toBeVisible();
     const kept = await page.evaluate(() => JSON.stringify(history.state));
     expect(kept, "the way back kept the withheld address in history").not.toContain(
       withheld.slice(SEARCH.path.length + 1),
@@ -594,7 +586,7 @@ test.describe("the concept page", () => {
     const loading = page.getByRole("main").getByRole("status").filter({ hasText: /\S/ });
     await expect(loading).toBeVisible();
     await expect(page.getByRole("article")).toHaveCount(0);
-    await expect(breadcrumb(page).getByRole("link").last()).toHaveText(SEARCH.name);
+    await expect(breadcrumb(page).getByRole("link").last()).toHaveText("Search");
     const before = (await edges(loading)).top;
 
     held.resolve();
@@ -642,7 +634,7 @@ test.describe("the concept page", () => {
     await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
     await page.unroute(isAFind);
 
-    const box = page.getByRole("searchbox", { name: SEARCH_WORDS.search });
+    const box = page.getByRole("searchbox", { name: "Search by a word or a question" });
     await box.fill("audit logs");
 
     await expect(matchOf(page, RETENTION)).toBeVisible();
@@ -697,8 +689,8 @@ test.describe("the concept page", () => {
     await expect(conceptOf(page, SALARY)).toBeVisible();
 
     // No fresh document from here on: what an Admin was given stays in the page's cache.
-    await railOf(page).getByRole("link", { name: CONTROL_CENTRE.name }).click();
-    await navOf(page, CONTROL_CENTRE).getByRole("link", { name: MEMBERS_PAGE.name }).click();
+    await railOf(page).getByRole("link", { name: "Control Centre" }).click();
+    await navOf(page, "Control Centre").getByRole("link", { name: "Members" }).click();
     const people = page.getByRole("main");
     await people.getByRole("link", { name: "Test person", exact: true }).click();
     await people.getByRole("radio", { name: "Viewer", exact: true }).click();
@@ -723,10 +715,10 @@ test.describe("the concept page", () => {
     await expect(wayBack(page)).toHaveAttribute("href", asked("salary bands"));
     await wayBack(page).click();
     await find.reached;
-    const said = page.getByRole("region", { name: SEARCH.name }).getByRole("status");
+    const said = page.getByRole("region", { name: "Search" }).getByRole("status");
     await expect(said).toContainText("salary bands");
     await expect(
-      page.getByRole("list", { name: SEARCH_WORDS.matches }),
+      page.getByRole("list", { name: "Matches" }),
       "the matches were drawn before they were read again",
     ).toHaveCount(0);
     find.release();
@@ -784,7 +776,7 @@ test.describe("the concept page", () => {
       await listed.click();
       const listedInline = sourceLines(page).nth(2).getByRole("region", { name: COMMITTEE });
       await expect(listedInline).toContainText("The committee meets each quarter.");
-      await listedInline.getByRole("button", { name: EVIDENCE_WORDS.close }).click();
+      await listedInline.getByRole("button", { name: "Close" }).click();
       await expect(listedInline).toHaveCount(0);
       await expect(listed).toBeFocused();
     });
@@ -807,17 +799,21 @@ test.describe("the concept page", () => {
     expect(elapsedMs, "the concept rendered past its budget").toBeLessThan(LIST_BUDGET_MS);
 
     await skipLinkReachesThePage(page);
-    await listsItsKeystrokes(page, SEARCH.name, Object.values(KEY));
+    await listsItsKeystrokes(page, "Search", KEY, [
+      "Go Back to Search",
+      "Go to the Concept’s Sources",
+      "Go to the Concept’s Links",
+    ]);
 
     await page.keyboard.press(KEY.sources.key);
-    await expect(sourcesOf(page).getByRole("heading", { name: WORDS.sources })).toBeFocused();
+    await expect(sourcesOf(page).getByRole("heading", { name: "Sources" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(sourceLines(page).nth(0).getByRole("button", { name: POLICY })).toBeFocused();
     await page.keyboard.press("Enter");
     const panel = panelOf(page, POLICY);
     await expect(panel.getByRole("heading", { name: POLICY })).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(panel.getByRole("button", { name: EVIDENCE_WORDS.close })).toBeFocused();
+    await expect(panel.getByRole("button", { name: "Close" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(
       sourceLines(page).nth(0).getByRole("button", { name: POLICY }),
@@ -829,9 +825,11 @@ test.describe("the concept page", () => {
     await expect(panel).toHaveCount(0);
 
     await page.keyboard.press(KEY.links.key);
-    await expect(page.getByRole("heading", { name: WORDS.links })).toBeFocused();
+    await expect(page.getByRole("heading", { name: "Links" })).toBeFocused();
     await page.keyboard.press(KEY.back.key);
     await expect(page).toHaveURL(new RegExp(`${SEARCH.path}$`));
-    await expect(page.getByRole("searchbox", { name: SEARCH_WORDS.search })).toBeVisible();
+    await expect(
+      page.getByRole("searchbox", { name: "Search by a word or a question" }),
+    ).toBeVisible();
   });
 });

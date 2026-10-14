@@ -1,7 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
-import { DISPLAY_NAME_MAX_CHARACTERS, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
+import { DISPLAY_NAME_MAX_CHARACTERS } from "@/shared/display-name-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -12,18 +11,19 @@ import {
   landedAtHome,
   person,
   provision,
-  saysAnotherRefusal,
+  saysSomethingNew,
   saysARefusal,
   signIn,
+  signInHeading,
   theActionLandedWithinItsBudget,
 } from "./harness.ts";
 import { refusalAnswering } from "./refused-read.ts";
 
 const displayNameHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: DISPLAY_NAME_WORDS.heading });
+  page.getByRole("heading", { level: 1, name: "Your Name" });
 
 const noWorkspaceHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
+  page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
 
 const displayNameField = (page: Page) => page.getByLabel("Display Name");
 
@@ -53,7 +53,7 @@ test("asks a first-time person for a display name before anything", async ({
   await expect(displayNameField(page)).toBeFocused();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${JSON.stringify(DISPLAY_NAME_WORDS.heading)} [level=1]
+      - heading "Your Name" [level=1]
       - paragraph
       - textbox "Display Name"
       - button "Save and Continue"
@@ -141,7 +141,7 @@ test("says what to change in a bad name, then saves", async ({
   const tooLong = refusalAnswering(page, SET_DISPLAY_NAME);
   await saveButton(page).click();
   expect(await tooLong).toMatchObject({ word: "display-name-too-long" });
-  await saysAnotherRefusal(refusal, said);
+  await saysSomethingNew(refusal, said);
 
   await displayNameField(page).fill("Priya Shah");
   await saveButton(page).click();
@@ -151,7 +151,7 @@ test("says what to change in a bad name, then saves", async ({
 test("sends a signed-out visitor from the display-name page to sign-in", async ({ page }) => {
   await page.goto("/display-name");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
+  await expect(signInHeading(page)).toBeVisible();
   await expect(page).toHaveURL(/\/sign-in$/);
 });
 
@@ -173,5 +173,5 @@ test("refuses a save after the session ended, offering sign-in again", async ({
   await saysARefusal(page.getByRole("alert"));
   await expect(displayNameField(page)).toHaveAttribute("aria-invalid", "false");
   await page.getByRole("button", { name: "Sign In Again" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Sign In" })).toBeVisible();
+  await expect(signInHeading(page)).toBeVisible();
 });

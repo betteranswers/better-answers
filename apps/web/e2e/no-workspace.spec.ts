@@ -1,9 +1,5 @@
 import type { APIRequestContext, Page, Response } from "@playwright/test";
 
-import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
-import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
-import { NO_WORKSPACE_HEADING, NO_WORKSPACE_WORDS } from "@/features/auth/workspace-words.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import type { Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -19,7 +15,6 @@ import {
   markTheOperator,
   person,
   provision,
-  quoted,
   saysARefusal,
   signIn,
   signInHeading,
@@ -36,18 +31,17 @@ const INVITATIONS_READ_ROUTE = `**${INVITATIONS_READ}*`;
 const landedAt = (page: Page): URL => new URL(page.url());
 
 const noWorkspaceHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
+  page.getByRole("heading", { level: 1, name: "No Workspace Yet" });
 
 /** The page names Claude only to a person who came to connect it. */
 const claudeLine = (page: Page) => page.getByRole("main").getByText(/\bClaude\b/);
 
-const invitations = (page: Page) =>
-  page.getByRole("region", { name: NO_WORKSPACE_WORDS.invitations });
+const invitations = (page: Page) => page.getByRole("region", { name: "Your Invitations" });
 
 const invitationTo = (page: Page, workspace: string) =>
   invitations(page).getByRole("link", { name: workspace, exact: true });
 
-const askRegion = (page: Page) => page.getByRole("region", { name: ASK_TO_JOIN_WORDS.heading });
+const askRegion = (page: Page) => page.getByRole("region", { name: "Ask to Join a Workspace" });
 
 const consentHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Connect Claude" });
@@ -111,11 +105,11 @@ test("tells a person from Claude it connects once they join", async ({
   await landedConnecting(page, request, baseURL ?? "", email);
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(NO_WORKSPACE_HEADING)} [level=1]
+      - heading "No Workspace Yet" [level=1]
       - paragraph
-      - region ${quoted(ASK_TO_JOIN_WORDS.heading)}
+      - region "Ask to Join a Workspace"
       - button "Sign Out"
-      - button ${quoted(KEYSTROKE_WORDS.button)}
+      - button "Keyboard Shortcuts"
   `);
   await expect(claudeLine(page)).toBeVisible();
   await answered;
@@ -179,16 +173,16 @@ test("lists a waiting invitation within a second, then joins it", async ({
 
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(NO_WORKSPACE_HEADING)} [level=1]
-      - region ${quoted(NO_WORKSPACE_WORDS.invitations)}:
-        - heading ${quoted(NO_WORKSPACE_WORDS.invitations)} [level=2]
+      - heading "No Workspace Yet" [level=1]
+      - region "Your Invitations":
+        - heading "Your Invitations" [level=2]
         - list:
           - listitem:
-            - link ${quoted(workspace.name)}
+            - link ${JSON.stringify(workspace.name)}
             - paragraph
-      - region ${quoted(ASK_TO_JOIN_WORDS.heading)}
+      - region "Ask to Join a Workspace"
       - button "Sign Out"
-      - button ${quoted(KEYSTROKE_WORDS.button)}
+      - button "Keyboard Shortcuts"
   `);
   await expect(
     invitations(page).getByRole("listitem"),
@@ -212,7 +206,7 @@ test("lists a waiting invitation within a second, then joins it", async ({
   await page.keyboard.press("Enter");
 
   await expect(
-    page.getByRole("heading", { level: 1, name: INVITATION_WORDS.heading(workspace.name) }),
+    page.getByRole("heading", { level: 1, name: `Your Invitation to ${workspace.name}` }),
   ).toBeVisible();
   await page.keyboard.press("j");
   await landedAtHome(page, "Editor");
@@ -262,26 +256,26 @@ test("carries Claude's request through a join to consent", async ({
   await expect(noWorkspaceHeading(page)).toBeVisible();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(NO_WORKSPACE_HEADING)} [level=1]
+      - heading "No Workspace Yet" [level=1]
       - paragraph
-      - region ${quoted(NO_WORKSPACE_WORDS.invitations)}:
-        - heading ${quoted(NO_WORKSPACE_WORDS.invitations)} [level=2]
+      - region "Your Invitations":
+        - heading "Your Invitations" [level=2]
         - list:
           - listitem:
-            - link ${quoted(workspace.name)}
+            - link ${JSON.stringify(workspace.name)}
             - paragraph
-      - region ${quoted(ASK_TO_JOIN_WORDS.heading)}
+      - region "Ask to Join a Workspace"
       - button "Sign Out"
-      - button ${quoted(KEYSTROKE_WORDS.button)}
+      - button "Keyboard Shortcuts"
   `);
   await passesTheAccessibilityGate();
 
   await invitationTo(page, workspace.name).click();
   await expect(
-    page.getByRole("heading", { level: 1, name: INVITATION_WORDS.heading(workspace.name) }),
+    page.getByRole("heading", { level: 1, name: `Your Invitation to ${workspace.name}` }),
   ).toBeVisible();
   expect(landedAt(page).searchParams.get("sig"), "the link dropped Claude's query").not.toBeNull();
-  await page.getByRole("button", { name: INVITATION_WORDS.join }).click();
+  await page.getByRole("button", { name: "Join Workspace" }).click();
 
   await expect(consentHeading(page)).toBeVisible();
   // The consent's own line names the workspace, apart from any heading or band that might.
@@ -313,7 +307,7 @@ test("lands a join at home once Claude's request has lapsed", async ({
   await page.goto(`/no-workspace${lapsed(landedAt(page).search)}`);
   await expect(claudeLine(page)).toBeVisible();
   await invitationTo(page, workspace.name).click();
-  await page.getByRole("button", { name: INVITATION_WORDS.join }).click();
+  await page.getByRole("button", { name: "Join Workspace" }).click();
 
   await landedAtHome(page, "Viewer");
   await expect(consentHeading(page)).toHaveCount(0);

@@ -1,17 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { BREADCRUMB, JUMP_TO, NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
-import { ACCOUNT_HEADING, PASSKEY_WORDS } from "@/features/auth/account-words.ts";
-import { keystrokesOn } from "@/shared/keystroke-words.ts";
-import {
-  ASK,
-  CONTROL_CENTRE,
-  menuGroupIn,
-  headingOf,
-  HOMES,
-  pageNamed,
-} from "@/shared/navigation.ts";
-import { PRODUCT_NAME } from "@/shared/words.ts";
+import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -48,21 +37,24 @@ const MEMBERS = pageNamed(PEOPLE, "Members");
 
 const SYSTEM = menuGroupIn(CONTROL_CENTRE, "system");
 
-/** What an Admin is shown today, spelled out rather than read through the filter that draws it. */
+/**
+ * What an Admin is shown today, spelled out rather than read through the filter that draws it:
+ * each page's group, its name and its address.
+ */
 const AN_ADMINS_PAGES = [
-  [SOURCES, pageNamed(SOURCES, "Connected Sources")],
-  [MODELS, MODELS_AND_SPEND],
-  [PEOPLE, MEMBERS],
-  [PEOPLE, pageNamed(PEOPLE, "Groups")],
-  [SYSTEM, pageNamed(SYSTEM, "Audit Log")],
+  ["Sources", "Connected Sources", pageNamed(SOURCES, "Connected Sources").path],
+  ["Models", "Models and Spend", MODELS_AND_SPEND.path],
+  ["People", "Members", MEMBERS.path],
+  ["People", "Groups", pageNamed(PEOPLE, "Groups").path],
+  ["System", "Audit Log", pageNamed(SYSTEM, "Audit Log").path],
 ] as const;
 
 const AREA_NAMES = ["Knowledge", "Control Centre"];
 
-const PAGE_NAMES = AN_ADMINS_PAGES.map(([, page]) => page.name);
+const PAGE_NAMES = AN_ADMINS_PAGES.map(([, name]) => name);
 
 /** The first heading Models and spend draws: its group's name. */
-const ITS_HEADING = headingOf(MODELS_AND_SPEND);
+const ITS_HEADING = "Models";
 
 const SWAP_BUDGET_MS = 1000;
 
@@ -84,23 +76,22 @@ const LONG_PERSON = "Bartholomew Featherstonehaugh-Whittingham";
 
 const bandOf = (page: Page) => page.getByRole("banner");
 
-const logoOf = (page: Page) => bandOf(page).getByRole("link", { name: PRODUCT_NAME });
+const logoOf = (page: Page) => bandOf(page).getByRole("link", { name: "better-answers" });
 
-const closerOf = (page: Page) => page.getByRole("button", { name: TOGGLE.hide });
+const closerOf = (page: Page) => page.getByRole("button", { name: "Hide Menu" });
 
-const openerOf = (page: Page) => page.getByRole("button", { name: TOGGLE.show });
+const openerOf = (page: Page) => page.getByRole("button", { name: "Show Menu" });
 
-/** Exact, as "Menu" would otherwise match the toggle's "Hide the menu" too. */
-const sheetButtonOf = (page: Page) =>
-  page.getByRole("button", { name: NAVIGATION_SHEET, exact: true });
+/** Exact, as "Menu" would otherwise match the toggle's "Hide Menu" too. */
+const sheetButtonOf = (page: Page) => page.getByRole("button", { name: "Menu", exact: true });
 
-const sheetOf = (page: Page) => page.getByRole("dialog", { name: NAVIGATION_SHEET, exact: true });
+const sheetOf = (page: Page) => page.getByRole("dialog", { name: "Menu", exact: true });
 
-const jumpToOf = (page: Page) => bandOf(page).getByRole("button", { name: JUMP_TO.name });
+const jumpToOf = (page: Page) => bandOf(page).getByRole("button", { name: "Jump To" });
 
 const partOf = (page: Page, name: string) => bandOf(page).getByText(name, { exact: true });
 
-const crumbsOf = (page: Page) => bandOf(page).getByRole("navigation", { name: BREADCRUMB });
+const crumbsOf = (page: Page) => bandOf(page).getByRole("navigation", { name: "Breadcrumb" });
 
 const TOOLBAR_TABS = ["Model Choices", "Spend"];
 
@@ -250,12 +241,12 @@ const paintedFill = (page: Page, name: string) =>
     .evaluate((link) => getComputedStyle(link).backgroundColor);
 
 const weightOf = (page: Page, pageName: string) =>
-  navOf(page, CONTROL_CENTRE)
+  navOf(page, "Control Centre")
     .getByRole("link", { name: pageName })
     .evaluate((link) => Number.parseInt(getComputedStyle(link).fontWeight, 10));
 
 const glyphOf = (page: Page, pageName: string) =>
-  navOf(page, CONTROL_CENTRE)
+  navOf(page, "Control Centre")
     .getByRole("link", { name: pageName })
     .evaluate((link) => link.querySelector("svg")?.innerHTML ?? "");
 
@@ -327,9 +318,9 @@ test("names the icon rail's areas to eye, pointer and keyboard", async ({ page, 
   await expect(rail.getByRole("link")).toHaveText(AREA_NAMES);
 
   // The keyboard first, before any pointer has opened one, then the pointer.
-  const entry = rail.getByRole("link", { name: CONTROL_CENTRE.name });
+  const entry = rail.getByRole("link", { name: "Control Centre" });
   await tabUntilFocused(page, entry);
-  const tooltip = page.getByRole("tooltip").filter({ hasText: CONTROL_CENTRE.name }).first();
+  const tooltip = page.getByRole("tooltip").filter({ hasText: "Control Centre" }).first();
   await expect(tooltip).toBeVisible();
 
   await page.keyboard.press("Escape");
@@ -343,7 +334,7 @@ test("marks the open area in the rail, on any page", async ({ page, request }) =
   await page.goto("/people/groups");
 
   const rail = railOf(page);
-  await expect(rail.getByRole("link", { name: CONTROL_CENTRE.name })).toHaveAttribute(
+  await expect(rail.getByRole("link", { name: "Control Centre" })).toHaveAttribute(
     "aria-current",
     "page",
   );
@@ -353,7 +344,7 @@ test("marks the open area in the rail, on any page", async ({ page, request }) =
   expect(marked).toBe(1);
 
   // A fill where the others have none reads in greyscale, so the mark is not colour alone.
-  const fill = await paintedFill(page, CONTROL_CENTRE.name);
+  const fill = await paintedFill(page, "Control Centre");
   expect(fill).not.toBe("rgba(0, 0, 0, 0)");
 
   // A place, not an action, and lighter than the primary button: the menu's open-page grey.
@@ -366,7 +357,7 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
   await signedIn(page, request, "Northern Tooling");
   await page.goto("/system/audit-log");
 
-  const nav = navOf(page, CONTROL_CENTRE);
+  const nav = navOf(page, "Control Centre");
   await expect(nav.getByRole("link")).toHaveText(PAGE_NAMES);
   const open = nav.getByRole("link", { name: "Audit Log" });
   await expect(open).toHaveAttribute("aria-current", "page");
@@ -419,7 +410,7 @@ test("lists the open area's groups and pages, marking one", async ({ page, reque
 
   // `goto` is the bookmark: a fresh document at a path no file sits at, not a click.
   await page.goto("/people/groups");
-  await expect(navOf(page, CONTROL_CENTRE).getByRole("link", { name: "Groups" })).toHaveAttribute(
+  await expect(navOf(page, "Control Centre").getByRole("link", { name: "Groups" })).toHaveAttribute(
     "aria-current",
     "page",
   );
@@ -433,34 +424,28 @@ test("marks Members current on a member page, adding no entry", async ({ page, r
     page.getByRole("main").getByRole("heading", { level: 2, name: workspace.admin.name }),
   ).toBeVisible();
 
-  const nav = navOf(page, CONTROL_CENTRE);
+  const nav = navOf(page, "Control Centre");
   await expect(nav.getByRole("link"), "the page took an entry of its own").toHaveText(PAGE_NAMES);
   // The page is Members' own, so its entry is the current page, as on Members itself.
-  await expect(nav.getByRole("link", { name: MEMBERS.name })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(nav.getByRole("link", { name: "Members" })).toHaveAttribute("aria-current", "page");
   const marked = await nav
     .getByRole("link")
     .evaluateAll((links) => links.filter((link) => link.hasAttribute("aria-current")).length);
   expect(marked).toBe(1);
-  expect(await weightOf(page, MEMBERS.name)).toBeGreaterThan(await weightOf(page, "Groups"));
-  await expect(railOf(page).getByRole("link", { name: CONTROL_CENTRE.name })).toHaveAttribute(
+  expect(await weightOf(page, "Members")).toBeGreaterThan(await weightOf(page, "Groups"));
+  await expect(railOf(page).getByRole("link", { name: "Control Centre" })).toHaveAttribute(
     "aria-current",
     "page",
   );
-  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 });
 
 test("lists a Viewer's home as the nav's one entry", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
-  const nav = page.getByRole("navigation", { name: ASK.name });
+  const nav = page.getByRole("navigation", { name: "Ask" });
   await expect(nav.getByRole("link")).toHaveText(["Ask"]);
-  await expect(nav.getByRole("link", { name: HOMES.Viewer.name })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(nav.getByRole("link", { name: "Ask" })).toHaveAttribute("aria-current", "page");
 
   await closerOf(page).click();
   await expect(nav).toHaveCount(0);
@@ -473,7 +458,7 @@ test("names workspace and place, the logo leading home", async ({ page, request 
   await page.goto(MODELS_AND_SPEND.path);
 
   await expect(switcherOf(page, workspace.name)).toBeVisible();
-  for (const name of [CONTROL_CENTRE.name, MODELS.name, MODELS_AND_SPEND.name]) {
+  for (const name of ["Control Centre", "Models", "Models and Spend"]) {
     await expect(partOf(page, name)).toBeVisible();
   }
   await expect(bandOf(page).getByRole("button", { name: "Sign Out" })).toHaveCount(0);
@@ -500,7 +485,7 @@ test("shows initials, with name and role one menu in", async ({ page, request })
   const menu = await personMenuOpened(page, LONG_PERSON);
   await expect(menu.getByText(LONG_PERSON, { exact: true })).toBeVisible();
   await expect(menu.getByText("Admin", { exact: true })).toBeVisible();
-  await expect(menu.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign Out"]);
+  await expect(menu.getByRole("menuitem")).toHaveText(["Account", "Sign Out"]);
 });
 
 test("names area, group, page and open tab, following the tab", async ({ page, request }) => {
@@ -509,11 +494,11 @@ test("names area, group, page and open tab, following the tab", async ({ page, r
   await page.getByRole("tab", { name: "Invitations" }).click();
 
   const parts = crumbsOf(page).getByRole("listitem");
-  await expect(parts).toHaveText([CONTROL_CENTRE.name, PEOPLE.name, MEMBERS.name, "Invitations"]);
+  await expect(parts).toHaveText(["Control Centre", "People", "Members", "Invitations"]);
 
   const started = Date.now();
   await page.getByRole("tab", { name: "Requests" }).click();
-  await expect(parts).toHaveText([CONTROL_CENTRE.name, PEOPLE.name, MEMBERS.name, "Requests"]);
+  await expect(parts).toHaveText(["Control Centre", "People", "Members", "Requests"]);
   const elapsed = Date.now() - started;
   test
     .info()
@@ -527,7 +512,7 @@ test("links each part but the last, the current page", async ({ page, request })
   await page.getByRole("tab", { name: "Invitations" }).click();
 
   // Control Centre opens on the Admin's home until Overview is built.
-  for (const name of [CONTROL_CENTRE.name, PEOPLE.name, MEMBERS.name]) {
+  for (const name of ["Control Centre", "People", "Members"]) {
     await expect(crumbOf(page, name)).toHaveAttribute("href", MEMBERS.path);
     await expect(crumbOf(page, name)).not.toHaveAttribute("aria-current");
   }
@@ -537,34 +522,34 @@ test("links each part but the last, the current page", async ({ page, request })
 
   await page.goto("/people/groups");
   await expect(crumbsOf(page).getByRole("listitem")).toHaveText([
-    CONTROL_CENTRE.name,
-    PEOPLE.name,
+    "Control Centre",
+    "People",
     "Groups",
   ]);
-  await expect(crumbOf(page, PEOPLE.name)).toHaveAttribute("href", MEMBERS.path);
+  await expect(crumbOf(page, "People")).toHaveAttribute("href", MEMBERS.path);
   await expect(crumbOf(page, "Groups")).toHaveAttribute("aria-current", "page");
 
-  await crumbOf(page, CONTROL_CENTRE.name).click();
+  await crumbOf(page, "Control Centre").click();
   await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}$`));
 });
 
 test("names Ask once, with no group, on a Viewer's home", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
-  await expect(crumbsOf(page).getByRole("listitem")).toHaveText([ASK.name]);
-  await expect(crumbOf(page, ASK.name)).toHaveAttribute("aria-current", "page");
-  await expect(crumbOf(page, ASK.name)).not.toHaveAttribute("href");
+  await expect(crumbsOf(page).getByRole("listitem")).toHaveText(["Ask"]);
+  await expect(crumbOf(page, "Ask")).toHaveAttribute("aria-current", "page");
+  await expect(crumbOf(page, "Ask")).not.toHaveAttribute("href");
 });
 
 test("keeps band, rail and nav mounted between pages, focus kept", async ({ page, request }) => {
   await signedIn(page, request, "Hebden Wireworks");
   await page.goto(MEMBERS.path);
-  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 
-  const regions = [bandOf(page), railOf(page), navOf(page, CONTROL_CENTRE)];
+  const regions = [bandOf(page), railOf(page), navOf(page, "Control Centre")];
   const before = await Promise.all(regions.map((region) => region.elementHandle()));
 
-  const groups = navOf(page, CONTROL_CENTRE).getByRole("link", { name: "Groups" });
+  const groups = navOf(page, "Control Centre").getByRole("link", { name: "Groups" });
   await groups.focus();
   await page.keyboard.press("Enter");
 
@@ -580,11 +565,11 @@ test("sizes the band's cells to the rail and nav below", async ({ page, request 
   const workspace = await signedIn(page, request, "Ryedale Castings");
   await page.setViewportSize(DESKTOP);
   await page.goto(MEMBERS.path);
-  await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
+  await expect(navOf(page, "Control Centre")).toBeVisible();
 
   const band = await boxOf(bandOf(page));
   const rail = await boxOf(railOf(page));
-  const nav = await boxOf(navOf(page, CONTROL_CENTRE));
+  const nav = await boxOf(navOf(page, "Control Centre"));
   expect(band.x).toBe(0);
   expect(band.width).toBe(DESKTOP.width);
   expect(band.y + band.height, "the band does not sit above the rail").toBeLessThanOrEqual(rail.y);
@@ -599,13 +584,13 @@ test("sizes the band's cells to the rail and nav below", async ({ page, request 
   const name = await boxOf(partOf(page, workspace.name));
   expect(name.x).toBeGreaterThanOrEqual(nav.x);
   expect(toggle.x + toggle.width).toBeLessThanOrEqual(nav.x + nav.width);
-  expect(await leftOf(partOf(page, CONTROL_CENTRE.name))).toBeGreaterThanOrEqual(nav.x + nav.width);
+  expect(await leftOf(partOf(page, "Control Centre"))).toBeGreaterThanOrEqual(nav.x + nav.width);
 });
 
 test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, request }) => {
   const workspace = await signedInAtModelsAndSpend(page, request, "Dales Engineering");
   const rail = railOf(page);
-  await expect(rail.getByRole("link", { name: CONTROL_CENTRE.name })).toHaveAttribute(
+  await expect(rail.getByRole("link", { name: "Control Centre" })).toHaveAttribute(
     "aria-current",
     "page",
   );
@@ -616,9 +601,9 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
     logoOf(page),
     switcherOf(page, workspace.name),
     closerOf(page),
-    crumbOf(page, CONTROL_CENTRE.name),
-    crumbOf(page, MODELS.name),
-    crumbOf(page, MODELS_AND_SPEND.name),
+    crumbOf(page, "Control Centre"),
+    crumbOf(page, "Models"),
+    crumbOf(page, "Models and Spend"),
     jumpToOf(page),
     avatarOf(page, workspace.admin.name),
   ];
@@ -643,15 +628,15 @@ test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, requ
 
   for (const name of PAGE_NAMES) {
     await page.keyboard.press("Tab");
-    await expect(navOf(page, CONTROL_CENTRE).getByRole("link", { name })).toBeFocused();
+    await expect(navOf(page, "Control Centre").getByRole("link", { name })).toBeFocused();
   }
 
   // An Admin holding no passkey is offered one above the first page they reach.
-  const offer = page.getByRole("region", { name: PASSKEY_WORDS.heading });
+  const offer = page.getByRole("region", { name: "Passkeys" });
   await page.keyboard.press("Tab");
-  await expect(offer.getByRole("link", { name: PASSKEY_WORDS.add })).toBeFocused();
+  await expect(offer.getByRole("link", { name: "Add a Passkey" })).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(offer.getByRole("button", { name: PASSKEY_WORDS.dismissOffer })).toBeFocused();
+  await expect(offer.getByRole("button", { name: "Dismiss Passkey Offer" })).toBeFocused();
 
   await page.keyboard.press("Tab");
   await expect(tabsOf(page).getByRole("tab", { name: "Model Choices" })).toBeFocused();
@@ -692,8 +677,8 @@ test("moves focus from the skip link into the content", async ({ page, request }
 
 test("leaves no target half under the band after skipping", async ({ page, request }) => {
   await signedInAtModelsAndSpend(page, request, "Swaledale Forge");
-  const offer = page.getByRole("region", { name: PASSKEY_WORDS.heading });
-  await expect(offer.getByRole("link", { name: PASSKEY_WORDS.add })).toBeVisible();
+  const offer = page.getByRole("region", { name: "Passkeys" });
+  await expect(offer.getByRole("link", { name: "Add a Passkey" })).toBeVisible();
   await expect(tabsOf(page).getByRole("tab")).toHaveText(TOOLBAR_TABS);
   await skipLinkReachesThePage(page);
 
@@ -738,12 +723,12 @@ test("names all four parts at 320 pixels, clipping none", async ({ page, request
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await page.goto(MEMBERS.path);
-  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
   await page.getByRole("tab", { name: "Invitations" }).click();
 
   // Its own row under the controls, so a long workspace name takes nothing from it.
   const row = await boxOf(sheetButtonOf(page));
-  const parts = [CONTROL_CENTRE.name, PEOPLE.name, MEMBERS.name, "Invitations"];
+  const parts = ["Control Centre", "People", "Members", "Invitations"];
   await expect(crumbsOf(page).getByRole("listitem")).toHaveText(parts);
   for (const name of parts) {
     const part = crumbOf(page, name);
@@ -769,7 +754,7 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
   const workspace = await signedIn(page, request, "Swaledale Ironworks");
   await page.setViewportSize(NARROW_AND_SHORT);
   await page.goto(MEMBERS.path);
-  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 
   const firstRow = [
     sheetButtonOf(page),
@@ -793,9 +778,9 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
   await expect(page.getByRole("link", { name: "Skip to the Page" })).toBeFocused();
   for (const stop of [
     ...firstRow,
-    crumbOf(page, CONTROL_CENTRE.name),
-    crumbOf(page, PEOPLE.name),
-    page.getByRole("tab", { name: MEMBERS.name }),
+    crumbOf(page, "Control Centre"),
+    crumbOf(page, "People"),
+    page.getByRole("tab", { name: "Members" }),
     page.getByRole("main").getByRole("link", { name: workspace.admin.name, exact: true }),
   ]) {
     await tabClearOfTheBand(page, stop);
@@ -817,22 +802,22 @@ test("opens the keystrokes from the narrow band, focus returned", async ({
   await signedIn(page, request, "Wensleydale Forge");
   await page.setViewportSize(NARROW);
   await page.goto(MEMBERS.path);
-  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 
   // The rail lives in the sheet here, a dialog the keystrokes ignore, so the band holds the one.
   const trigger = keystrokesButton(bandOf(page));
   await expect(keystrokesButton(page)).toHaveCount(1);
   await expect(trigger).toHaveAttribute("aria-keyshortcuts", "?");
 
-  const listed = await keystrokesListed(page, MEMBERS.name);
-  await expect(listed).toContainText(JUMP_TO.name);
+  const listed = await keystrokesListed(page, "Members");
+  await expect(listed).toContainText("Jump To");
   await scrollsNothingSideways(page, "with the keystrokes open");
   await passesTheAccessibilityGate();
   await keystrokesDismissed(page, listed);
   await expect(trigger).toBeFocused();
 
   await trigger.click();
-  await expect(page.getByRole("dialog", { name: keystrokesOn(MEMBERS.name) })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Keyboard Shortcuts on Members" })).toBeVisible();
 });
 
 test("keeps a focused control clear of the fixed band", async ({ page, request }) => {
@@ -923,9 +908,7 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
 
 test("draws no toolbar over a page without tabs", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
-  await expect(
-    page.getByRole("heading", { level: 1, name: headingOf(HOMES.Viewer) }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Ask" })).toBeVisible();
 
   await expect(page.getByRole("tablist")).toHaveCount(0);
 
@@ -936,7 +919,7 @@ test("draws no toolbar over a page without tabs", async ({ page, request }) => {
   const met = await page.evaluate((offer) => {
     const above = document.querySelector("main")?.previousElementSibling;
     return above === null || above?.getAttribute("aria-label") === offer;
-  }, PASSKEY_WORDS.heading);
+  }, "Passkeys");
   expect(met, "something other than the passkey offer stands above the page").toBe(true);
 });
 
@@ -949,9 +932,9 @@ test("holds toggle and band still while the nav hides", async ({
   await page.setViewportSize(DESKTOP);
   await page.goto(MEMBERS.path);
 
-  const nav = navOf(page, CONTROL_CENTRE);
+  const nav = navOf(page, "Control Centre");
   await expect(nav).toBeVisible();
-  const tabs = page.getByRole("tablist", { name: MEMBERS.name });
+  const tabs = page.getByRole("tablist", { name: "Members" });
   await expect(tabs).toBeVisible();
   const table = page.getByRole("main").getByRole("table");
   await expect(table).toBeVisible();
@@ -1096,7 +1079,7 @@ test("measures a page's prose, but not a table's or dialog's", async ({ page, re
   await signedIn(page, request, "Ribblesdale Mouldings");
   await page.setViewportSize(DESKTOP);
   await page.goto(MEMBERS.path);
-  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 
   const prose = await page.evaluate(() => {
     const content = document.querySelector("[data-page-content]");
@@ -1132,7 +1115,7 @@ test("measures a page's prose, but not a table's or dialog's", async ({ page, re
 test("remembers a closed menu on this browser only", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Ribble Toolmaking");
   await page.goto(MODELS_AND_SPEND.path);
-  await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
+  await expect(navOf(page, "Control Centre")).toBeVisible();
   await theModelChoicesHaveLanded(page);
 
   // Listening only across the action, so neither the start above nor the reload below is mistaken
@@ -1141,13 +1124,13 @@ test("remembers a closed menu on this browser only", async ({ page, request }) =
   const noting = (each: { url: () => string }) => asked.push(each.url());
   page.on("request", noting);
   await closerOf(page).click();
-  await expect(navOf(page, CONTROL_CENTRE)).toHaveCount(0);
+  await expect(navOf(page, "Control Centre")).toHaveCount(0);
   page.off("request", noting);
   expect(asked).toEqual([]);
 
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
-  await expect(navOf(page, CONTROL_CENTRE)).toHaveCount(0);
+  await expect(navOf(page, "Control Centre")).toHaveCount(0);
   await expect(openerOf(page)).toBeVisible();
 
   const kept = await keptOnThisBrowser(page);
@@ -1172,14 +1155,14 @@ test("opens the navigation over narrow content, holding and returning focus", as
   await narrowAtModelsAndSpend(page, request, "Wharfedale Castings");
 
   await expect(railOf(page)).toHaveCount(0);
-  await expect(navOf(page, CONTROL_CENTRE)).toHaveCount(0);
+  await expect(navOf(page, "Control Centre")).toHaveCount(0);
   const contentWide = await widthOf(page.getByRole("main"));
 
   const menu = sheetButtonOf(page);
   await menu.click();
   const panel = sheetOf(page);
-  await expect(panel.getByRole("navigation", { name: RAIL })).toBeVisible();
-  await expect(panel.getByRole("navigation", { name: CONTROL_CENTRE.name })).toBeVisible();
+  await expect(panel.getByRole("navigation", { name: "Areas" })).toBeVisible();
+  await expect(panel.getByRole("navigation", { name: "Control Centre" })).toBeVisible();
   await expect(panel.getByRole("link")).toHaveText([...AREA_NAMES, ...PAGE_NAMES]);
 
   // Over the content, not beside it: the content keeps every pixel it had.
@@ -1219,7 +1202,7 @@ test("closes the sheet on a chosen page, focus returned", async ({ page, request
   await scrollsNothingSideways(page, "once the sheet has closed");
 
   await menu.click();
-  await sheetOf(page).getByRole("link", { name: CONTROL_CENTRE.name }).click();
+  await sheetOf(page).getByRole("link", { name: "Control Centre" }).click();
 
   await expect(sheetOf(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
@@ -1238,7 +1221,7 @@ test("closes the sheet on widening, focusing the navigation control", async ({ p
 
   await expect(sheetOf(page)).toHaveCount(0);
   await expect(railOf(page)).toBeVisible();
-  await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
+  await expect(navOf(page, "Control Centre")).toBeVisible();
   await expect(closerOf(page)).toBeFocused();
 });
 
@@ -1250,16 +1233,14 @@ test("leads each built page with its group's line, auditing each", async ({
   await signedIn(page, request, "Swaledale Foundry");
 
   const lineOf = new Map<string, string>();
-  for (const [group, listed] of AN_ADMINS_PAGES) {
-    await page.goto(listed.path);
-    await expect(page.getByRole("heading", { level: 1, name: group.name })).toBeVisible();
+  for (const [heading, name, path] of AN_ADMINS_PAGES) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
     const lead = page.getByRole("main").locator("h1 + p");
-    await expect(lead, `${listed.name}'s heading leads no line`).toHaveText(/\S/);
+    await expect(lead, `${name}'s heading leads no line`).toHaveText(/\S/);
     const line = await lead.innerText();
-    expect(lineOf.get(group.name) ?? line, `${listed.name} leads with a line of its own`).toBe(
-      line,
-    );
-    lineOf.set(group.name, line);
+    expect(lineOf.get(heading) ?? line, `${name} leads with a line of its own`).toBe(line);
+    lineOf.set(heading, line);
     await passesTheAccessibilityGate();
   }
   expect(new Set(lineOf.values()).size, "two groups lead their pages with one line").toBe(

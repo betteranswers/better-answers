@@ -2,7 +2,6 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { switchedInAnotherTab } from "@/app/words.ts";
-import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { MEMBERS_LOADING } from "@/features/people/member-action-words.ts";
 import { memberPageOf } from "@/features/people/members-address.ts";
 import { CONTROL_CENTRE, HOMES, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
@@ -119,8 +118,8 @@ describe("a tab shown again after a switch in another tab", () => {
     await waitFor(() => expect(said()).toBe(SAID));
 
     fireEvent.click(
-      within(screen.getByRole("navigation", { name: CONTROL_CENTRE.name })).getByRole("link", {
-        name: GROUPS.name,
+      within(screen.getByRole("navigation", { name: "Control Centre" })).getByRole("link", {
+        name: "Groups",
       }),
     );
 
@@ -178,7 +177,7 @@ describe("a tab that changes workspace itself", () => {
     const router = await openAt(MEMBERS, api);
 
     await router.navigate({ href: INVITATION });
-    fireEvent.click(await screen.findByRole("button", { name: INVITATION_WORDS.join }));
+    fireEvent.click(await screen.findByRole("button", { name: "Join Workspace" }));
 
     await landedAtHome(router);
     await waitFor(() => expect(said()).toBe(""));

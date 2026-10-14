@@ -1,8 +1,6 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { RAIL, TOGGLE } from "@/app/words.ts";
-
 import { openApp } from "./open-app.tsx";
 import { answeringAs } from "./stubbed-api.ts";
 
@@ -18,9 +16,9 @@ const openAt = async (path: string) => {
   return (await openApp(path)).rendered;
 };
 
-const closer = () => screen.getByRole("button", { name: TOGGLE.hide });
+const closer = () => screen.getByRole("button", { name: "Hide Menu" });
 
-const opener = () => screen.getByRole("button", { name: TOGGLE.show });
+const opener = () => screen.getByRole("button", { name: "Show Menu" });
 
 const menu = () => screen.queryByRole("navigation", { name: "Control Centre" });
 
@@ -69,7 +67,7 @@ describe("whether the menu is showing", () => {
 
     expect(menu()).toBeNull();
     expect(opener()).toBeDefined();
-    expect(screen.getByRole("navigation", { name: RAIL })).toBeDefined();
+    expect(screen.getByRole("navigation", { name: "Areas" })).toBeDefined();
   });
 
   it("remembers the nav reopened for the next visit", async () => {

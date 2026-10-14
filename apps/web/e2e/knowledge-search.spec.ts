@@ -1,13 +1,12 @@
 import type { APIRequestContext, Locator, Page, Request, Route } from "@playwright/test";
 
-import { BROWSE, SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
+import { SEARCH_PAGE as SEARCH } from "@/features/knowledge/concept-address.ts";
 import {
   MATCHES_A_PAGE,
   QUERY_MAX,
   SEARCH_KEYSTROKES as KEY,
 } from "@/features/knowledge/knowledge-state.ts";
-import { EVIDENCE_WORDS, SEARCH_WORDS as WORDS } from "@/features/knowledge/knowledge-words.ts";
-import { HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -44,12 +43,13 @@ const LIST_BUDGET_MS = 1000;
 /** The read gives at most 20 matches a page. */
 const A_PAGE = 20;
 
-const searchRegion = (page: Page) => page.getByRole("region", { name: SEARCH.name });
+const searchRegion = (page: Page) => page.getByRole("region", { name: "Search" });
 
-const searchBox = (page: Page) => searchRegion(page).getByRole("searchbox", { name: WORDS.search });
+const searchBox = (page: Page) =>
+  searchRegion(page).getByRole("searchbox", { name: "Search by a word or a question" });
 
 const matchesOf = (page: Page): Locator =>
-  searchRegion(page).getByRole("list", { name: WORDS.matches }).getByRole("listitem");
+  searchRegion(page).getByRole("list", { name: "Matches" }).getByRole("listitem");
 
 const loadMore = (page: Page) => searchRegion(page).getByRole("button", { name: "Load More" });
 
@@ -62,7 +62,7 @@ const passagePanel = (page: Page, title: string) => page.getByRole("dialog", { n
 
 /** The mark of a document no concept rests on, then its sensitivity, whatever stands between. */
 const markedAt = (sensitivity: string): RegExp =>
-  new RegExp(`${WORDS.notCompanyKnowledge}\\W+${sensitivity}`);
+  new RegExp(`Not company knowledge\\W+${sensitivity}`);
 
 const asked = (query: string): string =>
   `${SEARCH.path}?${new URLSearchParams({ "knowledge.search": query }).toString()}`;
@@ -300,7 +300,7 @@ test.describe("the Knowledge Search page", () => {
     await searched(page, "retention");
     await expect(matchesOf(page).filter({ hasText: "Payroll Retention" })).toContainText("finance");
     await expect(matchesOf(page).filter({ hasText: "Visitor Retention" })).toContainText(
-      WORDS.noCollection,
+      "No collection",
     );
   });
 
@@ -440,8 +440,8 @@ test.describe("the Knowledge Search page", () => {
     await searched(page, "pallet");
 
     const first = handbookMatches(page).first();
-    await expect(first).toContainText(WORDS.document);
-    await expect(first).toContainText(WORDS.notCompanyKnowledge);
+    await expect(first).toContainText("Document");
+    await expect(first).toContainText("Not company knowledge");
     await expect(first).toContainText("Internal");
     const opener = first.getByRole("button", { name: HANDBOOK });
     await expect(opener).toHaveAttribute("aria-expanded", "false");
@@ -488,7 +488,7 @@ test.describe("the Knowledge Search page", () => {
     await passesTheAccessibilityGate();
 
     await page.keyboard.press("Tab");
-    await expect(panel.getByRole("button", { name: EVIDENCE_WORDS.close })).toBeFocused();
+    await expect(panel.getByRole("button", { name: "Close" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(opener, "Tab off the panel did not reach the page").toBeFocused();
     await expect(panel).toBeVisible();
@@ -586,7 +586,7 @@ test.describe("the Knowledge Search page", () => {
       );
       const saidItLeft = await saidNow(page);
       await expect(
-        searchRegion(page).getByRole("heading", { name: SEARCH.name }),
+        searchRegion(page).getByRole("heading", { name: "Search" }),
         "focus fell to the page with the passage",
       ).toBeFocused();
 
@@ -638,7 +638,7 @@ test.describe("the Knowledge Search page", () => {
       await expect(opener).toHaveAttribute("aria-expanded", "false");
 
       await opener.click();
-      await inline.getByRole("button", { name: EVIDENCE_WORDS.close }).click();
+      await inline.getByRole("button", { name: "Close" }).click();
       await expect(inline).toHaveCount(0);
       await expect(opener).toBeFocused();
     });
@@ -775,7 +775,10 @@ test.describe("the Knowledge Search page", () => {
     await anAdminAtSearch(page, request, "Calder Records", [handbookSeeded]);
     await skipLinkReachesThePage(page);
 
-    await listsItsKeystrokes(page, SEARCH.name, Object.values(KEY));
+    await listsItsKeystrokes(page, "Search", KEY, [
+      "Search This Workspace’s Knowledge",
+      "Show More Matches",
+    ]);
 
     await page.keyboard.press(KEY.search.key);
     await expect(searchBox(page)).toBeFocused();
@@ -798,11 +801,11 @@ test.describe("the Knowledge Search page", () => {
     await expect(matchesOf(page).nth(A_PAGE)).toBeFocused();
 
     await expect(searchRegion(page)).toMatchAriaSnapshot(`
-      - region "${SEARCH.name}":
-        - heading "${SEARCH.name}" [level=2]
-        - searchbox "${WORDS.search}": pallet
+      - region "Search":
+        - heading "Search" [level=2]
+        - searchbox "Search by a word or a question": pallet
         - status
-        - list "${WORDS.matches}":
+        - list "Matches":
           - listitem:
             - button "${HANDBOOK}"
     `);
@@ -818,11 +821,11 @@ test.describe("the Knowledge Search page", () => {
       await aMemberSignedInAt(page, request, role, HOMES[role].path);
       await landedAtHome(page, role);
 
-      await railOf(page).getByRole("link", { name: KNOWLEDGE.name }).click();
+      await railOf(page).getByRole("link", { name: "Knowledge" }).click();
 
       await expect(page).toHaveURL(new RegExp(`${SEARCH.path}$`));
-      await expect(page.getByRole("heading", { level: 1, name: BROWSE.name })).toBeVisible();
-      await expect(navOf(page, KNOWLEDGE).getByRole("link")).toHaveText([SEARCH.name]);
+      await expect(page.getByRole("heading", { level: 1, name: "Browse" })).toBeVisible();
+      await expect(navOf(page, "Knowledge").getByRole("link")).toHaveText(["Search"]);
       await expect(said(page)).toHaveText(/\S/);
       await expect(matchesOf(page)).toHaveCount(0);
     });

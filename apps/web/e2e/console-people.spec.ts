@@ -1,16 +1,11 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { JUMP_TO } from "@/app/words.ts";
-import { correctWords } from "@/features/console/correcting-words.ts";
-import { EVERYONE_WORDS, NAMES_WAITING_WORDS } from "@/features/console/list-words.ts";
 import {
   NAMES_WAITING_KEYSTROKES,
   PEOPLE_KEYSTROKES,
 } from "@/features/console/people-keystrokes.ts";
 import { NOT_THE_OPERATOR, SIGN_IN_TOO_OLD } from "@/features/console/refusal-words.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
-import { CLEAR_WORDS } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -24,6 +19,7 @@ import {
   claudeExchanges,
   claudesAuthorizeUrl,
   clockTheNextKey,
+  countOf,
   flagTheName,
   keystrokesDismissed,
   keystrokesListed,
@@ -31,7 +27,6 @@ import {
   navOf,
   person,
   provision,
-  quoted,
   saysARefusal,
   saysOfItsRead,
   signedInAtHome,
@@ -46,13 +41,9 @@ const LIST_BUDGET_MS = 1000;
 const PEOPLE = menuGroupIn(CONSOLE, "people");
 
 /** Where the console's People group opens. */
-const EVERYONE = pageNamed(PEOPLE, "Everyone");
+const EVERYONE_PAGE = pageNamed(PEOPLE, "Everyone").path;
 
-const EVERYONE_PAGE = EVERYONE.path;
-
-const NAMES_WAITING = pageNamed(PEOPLE, "Names Waiting");
-
-const NAMES_WAITING_PAGE = NAMES_WAITING.path;
+const NAMES_WAITING_PAGE = pageNamed(PEOPLE, "Names Waiting").path;
 
 /** Written once, so an aria snapshot can set it after a workspace's name. */
 const INSTANT_WORDS = String.raw`\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}`;
@@ -80,23 +71,13 @@ const aTag = (): string => `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
 /** A page's own regions, under the head its group gives it. */
 const thePage = (page: Page) => page.getByRole("main", { name: "Page" });
 
-/** What `?` lists on a page: its own keystrokes, then the two every page has. */
-const listedFor = (own: Readonly<Record<string, { readonly action: string }>>): string[] => [
-  ...Object.values(own).map((keystroke) => keystroke.action),
-  KEYSTROKE_WORDS.showTheList,
-  JUMP_TO.name,
-];
-
-const everyone = (page: Page) => page.getByRole("region", { name: EVERYONE_WORDS.heading });
-
-/** A list's count is its head's, so it is the first status its region holds. */
-const countOf = (list: Locator): Locator => list.getByRole("status").first();
+const everyone = (page: Page) => page.getByRole("region", { name: "Everyone" });
 
 /** An outcome's status stands beside its alert. A list's count and its pages' count have none. */
 const outcomeOf = (list: Locator): Locator => list.locator("output:has(+ [role='alert'])");
 
 const searchBox = (page: Page) =>
-  everyone(page).getByRole("searchbox", { name: EVERYONE_WORDS.search });
+  everyone(page).getByRole("searchbox", { name: "Search by name or address" });
 
 /** The header row is a row too, so the people are the rows with a cell. */
 const personRows = (page: Page): Locator =>
@@ -187,8 +168,11 @@ const openPriya = async (page: Page, tag: string): Promise<Locator> => {
   return sheet;
 };
 
+/** The dialog's title, and the name of the action each waiting row repeats. */
+const correctionOf = (name: string): string => `Correct ${name}’s Display Name`;
+
 const dialogToCorrect = (page: Page, name: string): Locator =>
-  page.getByRole("dialog", { name: correctWords(name) });
+  page.getByRole("dialog", { name: correctionOf(name) });
 
 const nameFieldOf = (dialog: Locator): Locator =>
   dialog.getByRole("textbox", { name: "Display Name" });
@@ -223,13 +207,12 @@ const correctingCancelled = async (
   return dialog;
 };
 
-const namesWaiting = (page: Page) =>
-  page.getByRole("region", { name: NAMES_WAITING_WORDS.heading });
+const namesWaiting = (page: Page) => page.getByRole("region", { name: "Names Waiting" });
 
 const waitingCount = (page: Page): Locator => countOf(namesWaiting(page));
 
 const waitingSearch = (page: Page): Locator =>
-  namesWaiting(page).getByRole("searchbox", { name: NAMES_WAITING_WORDS.search });
+  namesWaiting(page).getByRole("searchbox", { name: "Search by name or workspace" });
 
 /** The header row is a row too, so the names are the rows with a cell. */
 const waitingRows = (page: Page): Locator =>
@@ -244,7 +227,7 @@ const waitingRowOf = (page: Page, name: string): Locator =>
     .filter({ has: page.getByRole("cell", { name, exact: true }) });
 
 const correctButtonOf = (page: Page, name: string): Locator =>
-  waitingRowOf(page, name).getByRole("button", { name: correctWords(name) });
+  waitingRowOf(page, name).getByRole("button", { name: correctionOf(name) });
 
 /** Priya, named `displayName`, is an Editor in the operator's workspace. */
 const priyaWithTheOperator = async (
@@ -347,10 +330,10 @@ test.describe("the console's Everyone page", () => {
     await expect(countOf(everyone(page))).toHaveText(/\b0\b/);
     // The one row left is the list's own, saying none match and offering to clear.
     await expect(personRows(page)).toHaveCount(1);
-    await expect(personRows(page).getByRole("button")).toHaveText([CLEAR_WORDS.search]);
+    await expect(personRows(page).getByRole("button")).toHaveText(["Clear Search"]);
     const narrowed = await countOf(everyone(page)).innerText();
     await passesTheAccessibilityGate();
-    await everyone(page).getByRole("button", { name: CLEAR_WORDS.search }).click();
+    await everyone(page).getByRole("button", { name: "Clear Search" }).click();
 
     await expect(searchBox(page)).toHaveValue("");
     await expect(searchBox(page)).toBeFocused();
@@ -428,9 +411,9 @@ test.describe("the console's Everyone page", () => {
 
     await markTheOperator(request, operators.admin.email, "revoke");
     // A move between the console's own pages keeps its standing, so the list asks again alone.
-    await navOf(page, CONSOLE).getByRole("link", { name: "Every Workspace" }).click();
+    await navOf(page, "Console").getByRole("link", { name: "Every Workspace" }).click();
     const refused = refusalAnswering(page, "console.people.list");
-    await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
+    await navOf(page, "Console").getByRole("link", { name: "Everyone" }).click();
 
     expect(await refused).toMatchObject({ word: NOT_THE_OPERATOR, class: "forbidden" });
     await expect(everyone(page)).not.toContainText(NOT_THE_OPERATOR);
@@ -452,13 +435,13 @@ test.describe("the console's Everyone page", () => {
     // The search sits in the list's own row, between its count and its table.
     await expect(thePage(page)).toMatchAriaSnapshot(`
       - main "Page":
-        - heading ${quoted(PEOPLE.name)} [level=1]
+        - heading "People" [level=1]
         - paragraph
-        - region ${quoted(EVERYONE_WORDS.heading)}:
-          - heading ${quoted(EVERYONE_WORDS.heading)} [level=2]
+        - region "Everyone":
+          - heading "Everyone" [level=2]
           - paragraph
           - status: /\\b2\\b/
-          - searchbox ${quoted(EVERYONE_WORDS.search)}: ${tag}
+          - searchbox "Search by name or address": ${tag}
           - table:
             - caption
             - rowgroup:
@@ -481,7 +464,7 @@ test.describe("the console's Everyone page", () => {
                 - cell /\\d{2}:\\d{2} · \\d{1,2} [A-Z][a-z]+ \\d{4}/
     `);
     await expect(
-      everyone(page).getByText(EVERYONE_WORDS.search, { exact: true }),
+      everyone(page).getByText("Search by name or address", { exact: true }),
       "the search is a labelled field of its own again",
     ).toHaveCount(0);
     await passesTheAccessibilityGate();
@@ -491,11 +474,20 @@ test.describe("the console's Everyone page", () => {
     await expect(outcomeOf(everyone(page))).toHaveText(/\S/);
     await expect(page.getByRole("dialog"), "a person opened with none in focus").toHaveCount(0);
 
-    const listed = (await keystrokesListed(page, EVERYONE.name)).getByRole("definition");
-    await expect(listed).toHaveText(listedFor(PEOPLE_KEYSTROKES));
+    const listed = (await keystrokesListed(page, "Everyone")).getByRole("definition");
+    await expect(listed).toHaveText([
+      "Search Everyone by Name or Address",
+      "Open the Person in Focus",
+      "End Every Sign-In and Token of the Person in Focus",
+      "Correct the Display Name of the Person in Focus",
+      "Show the Previous Page of People",
+      "Show the Next Page of People",
+      "Show This List",
+      "Jump To",
+    ]);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
-    await expect(page.getByRole("button", { name: KEYSTROKE_WORDS.button })).toBeFocused();
+    await expect(page.getByRole("button", { name: "Keyboard Shortcuts" })).toBeFocused();
 
     await page.keyboard.press(PEOPLE_KEYSTROKES.search.key);
     await expect(searchBox(page)).toBeFocused();
@@ -815,7 +807,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     // Behind the sheet, so read with what it hides: the list, read again, holds the operator alone.
     await expect(
       page
-        .getByRole("region", { name: EVERYONE_WORDS.heading, includeHidden: true })
+        .getByRole("region", { name: "Everyone", includeHidden: true })
         .getByRole("status", { includeHidden: true })
         .first(),
     ).toHaveText(/\b1\b/);
@@ -883,13 +875,13 @@ test.describe("the console's Names Waiting page", () => {
     await expect(waitingRows(page)).toHaveCount(1);
     await expect(thePage(page)).toMatchAriaSnapshot(`
       - main "Page":
-        - heading ${quoted(PEOPLE.name)} [level=1]
+        - heading "People" [level=1]
         - paragraph
-        - region ${quoted(NAMES_WAITING_WORDS.heading)}:
-          - heading ${quoted(NAMES_WAITING_WORDS.heading)} [level=2]
+        - region "Names Waiting":
+          - heading "Names Waiting" [level=2]
           - paragraph
           - status: /\\b1\\b/
-          - searchbox ${quoted(NAMES_WAITING_WORDS.search)}: ${quoted(name)}
+          - searchbox "Search by name or workspace": ${JSON.stringify(name)}
           - table:
             - caption
             - rowgroup:
@@ -905,7 +897,7 @@ test.describe("the console's Names Waiting page", () => {
                     - listitem: /^${operators.name} ${INSTANT_WORDS}$/
                     - listitem: /^Beta ${tag} ${INSTANT_WORDS}$/
                 - cell:
-                  - button ${quoted(correctWords(name))}
+                  - button ${JSON.stringify(correctionOf(name))}
     `);
   });
 
@@ -922,7 +914,7 @@ test.describe("the console's Names Waiting page", () => {
     const theGroups = await summary.innerText();
     const ofNamesWaiting = await descriptions.innerText();
 
-    await navOf(page, CONSOLE).getByRole("link", { name: EVERYONE.name }).click();
+    await navOf(page, "Console").getByRole("link", { name: "Everyone" }).click();
     await expect(everyone(page).locator("h2 + p")).toHaveText(/\S/);
     await expect(descriptions, "Everyone describes more than itself").toHaveCount(1);
     await expect(descriptions, "Everyone is described as Names Waiting is").not.toHaveText(
@@ -961,7 +953,7 @@ test.describe("the console's Names Waiting page", () => {
     await expect(waitingCount(page)).toHaveText(/\b0\b/);
     // The one row left is the list's own, saying none match and offering to clear.
     await expect(waitingRows(page)).toHaveCount(1);
-    await expect(waitingRows(page).getByRole("button")).toHaveText([CLEAR_WORDS.search]);
+    await expect(waitingRows(page).getByRole("button")).toHaveText(["Clear Search"]);
     const narrowed = await waitingCount(page).innerText();
     await passesTheAccessibilityGate();
 
@@ -1096,8 +1088,13 @@ test.describe("the console's Names Waiting page", () => {
     await page.keyboard.press("c");
     await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
     await expect(page.getByRole("dialog"), "a name opened with none in focus").toHaveCount(0);
-    const listed = await keystrokesListed(page, NAMES_WAITING.name);
-    await expect(listed.getByRole("definition")).toHaveText(listedFor(NAMES_WAITING_KEYSTROKES));
+    const listed = await keystrokesListed(page, "Names Waiting");
+    await expect(listed.getByRole("definition")).toHaveText([
+      "Search the Names Waiting by Name or Workspace",
+      "Correct the Display Name in Focus",
+      "Show This List",
+      "Jump To",
+    ]);
     await keystrokesDismissed(page, listed);
 
     const correct = correctButtonOf(page, name);

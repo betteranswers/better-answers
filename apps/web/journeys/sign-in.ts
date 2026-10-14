@@ -1,7 +1,5 @@
 import { expect, test, type APIResponse, type Page, type Response } from "@playwright/test";
 
-import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
-
 import type { InboxAnswer, Noted } from "./inbox.ts";
 import { couldNotRun, failed, type Outcome } from "./outcome.ts";
 
@@ -99,15 +97,15 @@ const sendTheCode = async (page: Page, address: string): Promise<void> => {
   const opened = await page.goto("/");
   if (opened !== null) refusedByTheEdge(opened, "the sign-in page");
   const sent = answerTo(page, SEND_PATH);
-  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(address);
-  await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
+  await page.getByLabel("Email Address").fill(address);
+  await page.getByRole("button", { name: "Send Code" }).click();
   const response = await sent;
   refusedByTheEdge(response, "the Send");
   expect(response.ok(), `the Send answered ${response.status()}`).toBe(true);
 };
 
 const enterTheCode = async (page: Page, awaiting: Awaiting, code: string): Promise<void> => {
-  const field = page.getByLabel(SIGN_IN_WORDS.codeField, { exact: true });
+  const field = page.getByLabel("Verification Code", { exact: true });
   const answered = answerTo(page, SIGN_IN_PATH);
   await field.fill(code);
   const response = await answered;

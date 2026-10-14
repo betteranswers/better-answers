@@ -1,5 +1,4 @@
-import { FAILED_PAGE, goHome, RAIL } from "@/app/words.ts";
-import { CONTROL_CENTRE, HOMES, KNOWLEDGE } from "@/shared/navigation.ts";
+import { HOMES } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -15,6 +14,8 @@ import {
 const NOT_A_LIST = { why: "the api answered a shape the model choices card cannot render" };
 
 const MODEL_CHOICES_LIST = "modelChoices.list";
+
+const FAILED_HEADING = "This Page Didn’t Load";
 
 test("offers a way out, shell intact, when a page throws", async ({
   page,
@@ -51,21 +52,23 @@ test("offers a way out, shell intact, when a page throws", async ({
   await signIn(page, request, email);
   await page.goto("/models/models-and-spend");
 
-  const failed = page.getByRole("heading", { level: 1, name: FAILED_PAGE.heading });
+  const failed = page.getByRole("heading", { level: 1, name: FAILED_HEADING });
   await expect(page.getByRole("alert").filter({ has: failed })).toBeVisible();
   await expect(page.getByRole("alert").getByRole("paragraph")).toHaveText(/\S/);
-  const home = HOMES.Admin;
-  await expect(page.getByRole("link", { name: goHome(home) })).toHaveAttribute("href", home.path);
+  await expect(page.getByRole("link", { name: "Go to Members" })).toHaveAttribute(
+    "href",
+    HOMES.Admin.path,
+  );
   const everything = page.locator("body");
   await expect(everything).not.toContainText("TypeError");
   await expect(everything).not.toContainText("is not a function");
 
   await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
-  await expect(page.getByRole("navigation", { name: RAIL }).getByRole("link")).toHaveText([
-    KNOWLEDGE.name,
-    CONTROL_CENTRE.name,
+  await expect(page.getByRole("navigation", { name: "Areas" }).getByRole("link")).toHaveText([
+    "Knowledge",
+    "Control Centre",
   ]);
-  const navigation = page.getByRole("navigation", { name: CONTROL_CENTRE.name });
+  const navigation = page.getByRole("navigation", { name: "Control Centre" });
   await expect(navigation.getByRole("link", { name: "Audit Log" })).toBeVisible();
 
   await skipLinkReachesThePage(page);
@@ -75,7 +78,7 @@ test("offers a way out, shell intact, when a page throws", async ({
   await page.keyboard.press("Tab");
   await expect(page.getByRole("tabpanel")).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: FAILED_PAGE.retry })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Try Again" })).toBeFocused();
 
   await passesTheAccessibilityGate();
 
@@ -111,13 +114,13 @@ test("shows the failed read at the index, then goes home", async ({
   await page.route(theMemberRead, (route) => route.abort());
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { level: 1, name: FAILED_PAGE.heading })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: FAILED_HEADING })).toBeVisible();
   await saysARefusal(page.getByRole("alert"));
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("navigation", { name: RAIL }).getByRole("link")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Areas" }).getByRole("link")).toHaveCount(0);
   await passesTheAccessibilityGate();
 
   await page.unroute(theMemberRead);
-  await page.getByRole("button", { name: FAILED_PAGE.retry }).click();
+  await page.getByRole("button", { name: "Try Again" }).click();
   await landedAtHome(page, "Admin");
 });

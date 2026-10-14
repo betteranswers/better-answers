@@ -1,16 +1,18 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
-import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  A_ROLE,
   addMember,
   anAddress,
   askToJoin,
   clockTheNextKey,
+  countOf,
   editorPickedByKeyboard,
+  keyListed,
   keystrokesListed,
   notFoundOfferingHome,
   person,
@@ -25,9 +27,7 @@ import { refusalAnswering } from "./refused-read.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
-
-const MEMBERS_PAGE = MEMBERS.path;
+const MEMBERS_PAGE = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members").path;
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
@@ -39,8 +39,6 @@ const requestsRegion = (page: Page) => page.getByRole("region", { name: "Request
 
 /** The region's outcome line: its count is a status too, and stands before it. */
 const saidIn = (page: Page): Locator => requestsRegion(page).getByRole("status").last();
-
-const countIn = (page: Page): Locator => requestsRegion(page).getByRole("status").first();
 
 /** An empty list is one paragraph, which says so, where a list of requests draws a table. */
 const emptyLine = (page: Page): Locator => requestsRegion(page).getByRole("paragraph");
@@ -136,7 +134,7 @@ test.describe("the People page's Requests tab", () => {
     await expect(cells.nth(1)).toHaveText(REASON);
     await expect(cells.nth(2)).toHaveText("Waiting");
     await expect(cells.nth(3)).toHaveText(LONG_UK_DATE);
-    await expect(countIn(page)).toHaveText(/\b1\b/);
+    await expect(countOf(requestsRegion(page))).toHaveText(/\b1\b/);
 
     await rowOf(page, "Priya Shah")
       .getByRole("button", { name: "Approve Request from Priya Shah" })
@@ -196,16 +194,14 @@ test.describe("the People page's Requests tab", () => {
         - /children: equal
         - heading "Requests" [level=2]
         - status
-        - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
+        - button "Invite a Person"
         - status
         - paragraph: /\\S/
     `);
     await expect(invitingButtons(page), "the head's action is the one way to invite").toHaveCount(
       1,
     );
-    await expect(
-      page.getByRole("button", { name: PEOPLE_KEYSTROKES.invite.action, exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Invite a Person", exact: true })).toBeVisible();
   });
 
   test("an Admin decides requests by keyboard alone", async ({
@@ -239,12 +235,11 @@ test.describe("the People page's Requests tab", () => {
     expect((await landed.boundingBox())?.width, "focus landed out of sight").toBeGreaterThan(1);
     await expect(saidIn(page)).toContainText("Dropped Ray");
 
-    const keystrokes = await keystrokesListed(page, MEMBERS.name);
-    const listed = (key: string) => keystrokes.getByRole("term").getByText(key, { exact: true });
-    await expect(listed(PEOPLE_KEYSTROKES.approve.key)).toBeVisible();
-    await expect(listed(PEOPLE_KEYSTROKES.decline.key)).toBeVisible();
+    const keystrokes = await keystrokesListed(page, "Members");
+    await expect(keyListed(keystrokes, PEOPLE_KEYSTROKES.approve.key)).toBeVisible();
+    await expect(keyListed(keystrokes, PEOPLE_KEYSTROKES.decline.key)).toBeVisible();
     await expect(
-      listed(PEOPLE_KEYSTROKES.changeRole.key),
+      keyListed(keystrokes, PEOPLE_KEYSTROKES.changeRole.key),
       "the Members tab's keystrokes on Requests",
     ).toHaveCount(0);
     await page.keyboard.press("Escape");
@@ -281,7 +276,7 @@ test.describe("the People page's Requests tab", () => {
       - region "Requests":
         - heading "Requests" [level=2]
         - status: /\\b1\\b/
-        - button ${JSON.stringify(PEOPLE_KEYSTROKES.invite.action)}
+        - button "Invite a Person"
         - status: /approved-\\d+/
         - paragraph
         - table:
@@ -352,7 +347,7 @@ test.describe("the People page's Requests tab", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${aRole(role)} no requests, Members being hidden`, async ({ page, request }) => {
+    test(`shows ${A_ROLE[role]} no requests, Members being hidden`, async ({ page, request }) => {
       const email = anAddress(role.toLowerCase());
       const [member, workspace] = await Promise.all([
         person(request, email, { displayName: `A ${role}` }),

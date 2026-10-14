@@ -1,8 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { AUDIT_LOG_WORDS } from "@/features/people/audit-log-words.ts";
-import { BULK_WORDS, SELECTED_MEMBERS } from "@/features/people/member-action-words.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
+import { counted } from "@/shared/words.ts";
 
 import { saysOfItsRead } from "../e2e/locators.ts";
 import { theConsoleIsRefused, theSwitcherListsOneWorkspace, type Gate } from "./every-role.ts";
@@ -51,6 +50,19 @@ const groupButton = (page: Page, name: string): Locator =>
 
 type BulkAction = { readonly action: string; readonly title: (count: number) => string };
 
+/** A bulk dialog's title counts the members ticked. */
+const membersTitled = (count: number): string => counted(count, "Member", "Members");
+
+const CHANGE_ROLE: BulkAction = {
+  action: "Change Role",
+  title: (count) => `Change Role for ${membersTitled(count)}`,
+};
+
+const ADD_TO_GROUP: BulkAction = {
+  action: "Add to Group",
+  title: (count) => `Add ${membersTitled(count)} to a Group`,
+};
+
 /** Ticked on the first page, where the invented members' names sort the repair members. */
 const opened = async (page: Page, names: readonly string[], bulk: BulkAction): Promise<Locator> => {
   await page.goto(MEMBERS);
@@ -60,7 +72,7 @@ const opened = async (page: Page, names: readonly string[], bulk: BulkAction): P
       .check();
   }
   await page
-    .getByRole("toolbar", { name: SELECTED_MEMBERS })
+    .getByRole("toolbar", { name: "Selected Members" })
     .getByRole("button", { name: bulk.action, exact: true })
     .click();
   return page.getByRole("dialog", { name: bulk.title(names.length) });
@@ -90,10 +102,9 @@ const committed = async (
 };
 
 const rolesChanged = async (page: Page, names: readonly string[], role: Role): Promise<void> => {
-  const { changeRole } = BULK_WORDS;
-  const dialog = await opened(page, names, changeRole);
+  const dialog = await opened(page, names, CHANGE_ROLE);
   await chosen(dialog, "Role", role);
-  const commit = dialog.getByRole("button", { name: changeRole.action, exact: true });
+  const commit = dialog.getByRole("button", { name: CHANGE_ROLE.action, exact: true });
   await committed(page, "members.bulkChangeRole", commit, names.length);
   for (const name of names) {
     await expect(rowOf(page, name).getByRole("cell").nth(ROLE_CELL)).toHaveText(role);
@@ -101,10 +112,9 @@ const rolesChanged = async (page: Page, names: readonly string[], role: Role): P
 };
 
 const addedToGroup = async (page: Page, names: readonly string[], group: string): Promise<void> => {
-  const { addToGroup } = BULK_WORDS;
-  const dialog = await opened(page, names, addToGroup);
+  const dialog = await opened(page, names, ADD_TO_GROUP);
   await chosen(dialog, "Group", group);
-  const commit = dialog.getByRole("button", { name: addToGroup.action, exact: true });
+  const commit = dialog.getByRole("button", { name: ADD_TO_GROUP.action, exact: true });
   await committed(page, "members.bulkAddToGroup", commit, names.length);
   for (const name of names) {
     await expect(rowOf(page, name).getByRole("cell").nth(GROUPS_CELL)).toContainText(group);
@@ -185,7 +195,7 @@ const membersWalked = async (page: Page, gate: Gate): Promise<void> => {
 /** The newest page of events, then Load more, which must bring older ones below it. */
 const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
   await page.goto(AUDIT_LOG);
-  const auditLog = page.getByRole("region", { name: AUDIT_LOG_WORDS.heading });
+  const auditLog = page.getByRole("region", { name: "Audit Log" });
   const events = auditLog.getByRole("listitem");
   const loadMore = auditLog.getByRole("button", { name: "Load More" });
   await expect(loadMore, "the Audit log offered no Load more").toBeVisible();

@@ -3,10 +3,7 @@ import { randomInt } from "node:crypto";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { z } from "zod";
 
-import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
-import { codeShown, codeSpelled, LINK_WORDS } from "@/features/auth/link-words.ts";
-import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { codeShown, codeSpelled } from "@/features/auth/link-words.ts";
 
 import { expect, test as base } from "./browser.ts";
 import {
@@ -19,7 +16,7 @@ import {
   linkSentTo,
   person,
   provision,
-  quoted,
+  saysSomethingNew,
   saysTheWait,
   signInHeading,
   theActionLandedWithinItsBudget,
@@ -74,23 +71,22 @@ const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, w
   await addMember(api, { workspaceId: workspace.workspaceId, userId: editor.id, role: "Editor" });
   const page = await asking.newPage();
   await page.goto("/sign-in");
-  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
+  await page.getByLabel("Email Address").fill(email);
   await page.keyboard.press("Enter");
-  await expect(page.getByLabel(SIGN_IN_WORDS.codeField, { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Verification Code", { exact: true })).toBeVisible();
   return { email, asking: page, token: await linkSentTo(api, email) };
 };
 
 /** As a person reading the code off the other device types it. */
 const typedWhereItStarted = async (asking: Page, code: string): Promise<void> => {
-  await asking.getByLabel(SIGN_IN_WORDS.codeField, { exact: true }).fill(code);
+  await asking.getByLabel("Verification Code", { exact: true }).fill(code);
   await landedAtHome(asking, "Editor");
 };
 
 const headingOf = (page: Page, name: string) =>
   page.getByRole("heading", { level: 1, name, exact: true });
 
-const signInButton = (page: Page) =>
-  page.getByRole("button", { name: SIGN_IN_WORDS.signIn, exact: true });
+const signInButton = (page: Page) => page.getByRole("button", { name: "Sign In", exact: true });
 
 /** One refusal from a ceiling, naming its wait; the next ask reaches the api. */
 const refusedOnceAt = (page: Page, path: string, waitSeconds: number) =>
@@ -107,11 +103,11 @@ const refusedOnceAt = (page: Page, path: string, waitSeconds: number) =>
 
 const DEAD_PAGE = `
   - main:
-    - heading ${quoted(LINK_WORDS.deadTitle)} [level=1]
+    - heading "This Sign-In Link No Longer Works" [level=1]
     - status
-    - link ${quoted(LINK_WORDS.backToSignIn)}:
+    - link "Back to Sign-In":
       - /url: /sign-in
-    - button ${quoted(KEYSTROKE_WORDS.button)}
+    - button "Keyboard Shortcuts"
 `;
 
 /** Answers what a screen reader hears, so two dead pages can be told identical. */
@@ -134,7 +130,7 @@ test("a scanner's read spends nothing; the asking browser signs in", async ({
 
   const scanner = await anotherBrowser.newPage();
   await scanner.goto(linkTo(token));
-  await expect(headingOf(scanner, LINK_WORDS.elsewhereTitle)).toBeVisible();
+  await expect(headingOf(scanner, "Enter This Code Where You Started")).toBeVisible();
 
   await page.goto(linkTo(token));
   await expect(signInButton(page)).toBeFocused();
@@ -168,14 +164,14 @@ test("another device shows the code and stays signed out", async ({
 
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto(linkTo(token));
-  await expect(headingOf(page, LINK_WORDS.elsewhereTitle)).toBeVisible();
+  await expect(headingOf(page, "Enter This Code Where You Started")).toBeVisible();
   await expect(page.getByText(codeShown(code))).toBeVisible();
   await expect(signInButton(page)).toHaveCount(0);
 
   // The copy's own status follows the page's, and stands empty until the code is copied.
   const saidOfTheCopy = page.getByRole("status").last();
   await expect(saidOfTheCopy, "the copy's status holds words before a copy").toBeEmpty();
-  await page.getByRole("button", { name: LINK_WORDS.copy }).click();
+  await page.getByRole("button", { name: "Copy Code" }).click();
   await expect(saidOfTheCopy, "the page says nothing of the copy").toHaveText(/\S/);
   await page.bringToFront();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
@@ -201,20 +197,15 @@ test("unknown, spent and superseded links show one dead page", async ({
   const asked = await aLinkAskedForIn(anotherBrowser, request, "Dunmore");
   const { asking, token: superseded } = asked;
   const saidOfTheFirst = await asking.getByRole("status").innerText();
-  await asking.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }).click();
+  await asking.getByRole("button", { name: "Send a New Code" }).click();
   // The press took focus, and the field takes it back only once the new email has gone.
-  await expect(asking.getByLabel(SIGN_IN_WORDS.codeField, { exact: true })).toBeFocused();
+  await expect(asking.getByLabel("Verification Code", { exact: true })).toBeFocused();
   // A send still out says something new too, so the button is free again before the status is read.
   await expect(
-    asking.getByRole("button", { name: SIGN_IN_WORDS.sendAgain }),
+    asking.getByRole("button", { name: "Send a New Code" }),
     "the second email is still sending",
   ).toHaveAttribute("aria-disabled", "false");
-  await expect
-    .poll(
-      async () => ["", saidOfTheFirst].includes(await asking.getByRole("status").innerText()),
-      "the page says nothing new of the second email",
-    )
-    .toBe(false);
+  await saysSomethingNew(asking.getByRole("status"), saidOfTheFirst);
   const spent = await linkSentTo(request, asked.email);
   expect(spent, "asking again sent the same link").not.toBe(superseded);
 
@@ -252,7 +243,7 @@ test("a link spent after its read shows the dead page", async ({ page, context, 
   await page.keyboard.press("Enter");
 
   await theDeadPage(page);
-  await expect(page.getByRole("link", { name: LINK_WORDS.backToSignIn })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Back to Sign-In" })).toBeFocused();
 });
 
 test("a refused read offers to check the link again", async ({
@@ -315,14 +306,14 @@ test("the code reads as six digits, and c copies it", async ({
   );
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(LINK_WORDS.elsewhereTitle)} [level=1]
+      - heading "Enter This Code Where You Started" [level=1]
       - status
-      - paragraph: ${quoted(codeSpelled(code))}
+      - paragraph: ${JSON.stringify(codeSpelled(code))}
       - paragraph: /${untilTime}/
-      - button ${quoted(LINK_WORDS.copy)}
+      - button "Copy Code"
       - paragraph:
         - strong
-      - button ${quoted(KEYSTROKE_WORDS.button)}
+      - button "Keyboard Shortcuts"
   `);
   await expect(page.getByRole("status").first(), "the page says nothing of the code").toHaveText(
     /\S/,
@@ -331,7 +322,7 @@ test("the code reads as six digits, and c copies it", async ({
   // Landed once the copy's own status, the page's last, holds words; the page is read by its heading.
   await clockTheNextKey(page, {
     at: "//main[(.//*[@role='status'])[last()][normalize-space(.)]]",
-    reads: LINK_WORDS.elsewhereTitle,
+    reads: "Enter This Code Where You Started",
   });
   await page.keyboard.press("c");
   await theActionLandedWithinItsBudget(page, "copy");
@@ -356,15 +347,15 @@ test("an invitee signing in by link lands on the invitation", async ({
   const asking = await context.newPage();
   await asking.goto(`/invitations/${invited.id}`);
   await expect(signInHeading(asking, "joining")).toBeVisible();
-  await asking.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
+  await asking.getByLabel("Email Address").fill(email);
   await asking.keyboard.press("Enter");
-  await expect(asking.getByLabel(SIGN_IN_WORDS.codeField, { exact: true })).toBeVisible();
+  await expect(asking.getByLabel("Verification Code", { exact: true })).toBeVisible();
 
   await page.goto(linkTo(await linkSentTo(request, email)));
-  await expect(headingOf(page, SIGN_IN_WORDS.emailStep.joining.title)).toBeVisible();
+  await expect(headingOf(page, "Sign In to Join a Workspace")).toBeVisible();
   await page.keyboard.press("Enter");
 
   await expect(
-    page.getByRole("heading", { level: 1, name: INVITATION_WORDS.heading("The Linnet workspace") }),
+    page.getByRole("heading", { level: 1, name: "Your Invitation to The Linnet workspace" }),
   ).toBeVisible();
 });

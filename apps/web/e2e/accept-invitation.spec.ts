@@ -1,8 +1,5 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { INVITATION_ACTIONS, INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
-import { DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import type { Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -18,7 +15,6 @@ import {
   person,
   personMenuOpened,
   provision,
-  quoted,
   saysARefusal,
   signIn,
   signInHeading,
@@ -37,11 +33,11 @@ const THE_INVITATION = "person.invitation";
 const THE_JOIN = "person.acceptInvitation";
 
 const invitationHeading = (page: Page, workspace: string) =>
-  page.getByRole("heading", { level: 1, name: INVITATION_WORDS.heading(workspace) });
+  page.getByRole("heading", { level: 1, name: `Your Invitation to ${workspace}` });
 
-const joinButton = (page: Page) => page.getByRole("button", { name: INVITATION_WORDS.join });
+const joinButton = (page: Page) => page.getByRole("button", { name: "Join Workspace" });
 
-const nameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.label);
+const nameField = (page: Page) => page.getByLabel("Display Name");
 
 /** The line saying who invited, and as the first role it names after them. */
 const invitedAs = (page: Page, role: Role) =>
@@ -85,13 +81,13 @@ test("an invited newcomer names themselves on the invitation, then joins", async
   await expect(page).toHaveURL(new RegExp(`${link}$`));
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(INVITATION_WORDS.heading("Calder Joinery"))} [level=1]
+      - heading "Your Invitation to Calder Joinery" [level=1]
       - paragraph
       - paragraph
-      - textbox ${quoted(DISPLAY_NAME_WORDS.label)}
-      - button ${quoted(INVITATION_WORDS.join)}
+      - textbox "Display Name"
+      - button "Join Workspace"
       - button "Sign Out"
-      - button ${quoted(KEYSTROKE_WORDS.button)}
+      - button "Keyboard Shortcuts"
   `);
   await expect(invitedAs(page, "Editor")).toBeVisible();
   await passesTheAccessibilityGate();
@@ -103,10 +99,7 @@ test("an invited newcomer names themselves on the invitation, then joins", async
   await nameField(page).fill("Priya Shah");
   await page.keyboard.press("Tab");
   await expect(joinButton(page)).toBeFocused();
-  await clockTheNextKey(page, {
-    at: "//main//button[@type='submit']",
-    reads: INVITATION_WORDS.joining,
-  });
+  await clockTheNextKey(page, { at: "//main//button[@type='submit']", reads: "Joining" });
   await page.keyboard.press("j");
   await theActionLandedWithinItsBudget(page, "name and accept");
 
@@ -202,7 +195,7 @@ test("keeps a given name when the join is then refused", async ({
   await keepsItsWordOffThePage(page, "already-a-member");
   await passesTheAccessibilityGate();
 
-  await page.getByRole("button", { name: INVITATION_ACTIONS.yourWorkspaces }).click();
+  await page.getByRole("button", { name: "Go to Your Workspaces" }).click();
   await landedAtHome(page, "Viewer");
   await expect(page.getByRole("banner").getByRole("button", { name: /Ines Moreau/ })).toBeVisible();
 });
@@ -262,11 +255,11 @@ test("refuses a person at another address, offering the invited one", async ({
   await saysARefusal(page.getByRole("alert"));
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading ${quoted(INVITATION_WORDS.untitled)} [level=1]
+      - heading "Your Invitation" [level=1]
       - alert
-      - button ${quoted(INVITATION_ACTIONS.anotherAddress)}
+      - button "Sign In with Another Address"
       - button "Sign Out"
-      - button ${quoted(KEYSTROKE_WORDS.button)}
+      - button "Keyboard Shortcuts"
   `);
   await expect(page.getByRole("main")).not.toContainText("Brightwater Estimating");
   await passesTheAccessibilityGate();
