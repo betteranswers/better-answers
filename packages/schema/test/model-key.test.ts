@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
 import { postgresForSuite, privilegesHeld, refusalOf } from "./probes.ts";
+import { A_MODEL_KEY } from "./rls-probes.ts";
 
 const db = postgresForSuite();
 
@@ -11,8 +12,6 @@ const WS_A = "01J6AAAAAAAAAAAAAAAAAAAAAA";
 const WS_B = "01J6BBBBBBBBBBBBBBBBBBBBBB";
 
 const A_FRAME = new Uint8Array(40).fill(9);
-
-const A_KEY = "INSERT INTO model_key (workspace_id, provider, sealed) VALUES ($1, $2, $3)";
 
 const aKeyInEach = async (client: pg.PoolClient): Promise<void> => {
   const seed = testData(client);
@@ -60,7 +59,7 @@ describe("a workspace's model key", () => {
       await aKeyInEach(client);
       await asTheApiIn(client, WS_A);
 
-      await expect(client.query(A_KEY, [WS_B, "mistral", A_FRAME])).rejects.toThrow(
+      await expect(client.query(A_MODEL_KEY, [WS_B, "mistral", A_FRAME])).rejects.toThrow(
         /row-level security/,
       );
     });
@@ -87,8 +86,12 @@ describe("a workspace's model key", () => {
       await aKeyInEach(client);
 
       expect({
-        again: await refusalOf(client, () => client.query(A_KEY, [WS_A, "anthropic", A_FRAME])),
-        another: await refusalOf(client, () => client.query(A_KEY, [WS_A, "mistral", A_FRAME])),
+        again: await refusalOf(client, () =>
+          client.query(A_MODEL_KEY, [WS_A, "anthropic", A_FRAME]),
+        ),
+        another: await refusalOf(client, () =>
+          client.query(A_MODEL_KEY, [WS_A, "mistral", A_FRAME]),
+        ),
       }).toEqual({ again: "model_key_workspace_id_provider_pk", another: "admitted" });
     });
   });
@@ -97,9 +100,9 @@ describe("a workspace's model key", () => {
     await withRollback(db().pool, async (client) => {
       await aKeyInEach(client);
 
-      expect(await refusalOf(client, () => client.query(A_KEY, [WS_A, "openai", A_FRAME]))).toBe(
-        "model_key_provider_check",
-      );
+      expect(
+        await refusalOf(client, () => client.query(A_MODEL_KEY, [WS_A, "openai", A_FRAME])),
+      ).toBe("model_key_provider_check");
     });
   });
 
@@ -108,7 +111,7 @@ describe("a workspace's model key", () => {
       const nowhere = "01J6CCCCCCCCCCCCCCCCCCCCCC";
 
       expect(
-        await refusalOf(client, () => client.query(A_KEY, [nowhere, "anthropic", A_FRAME])),
+        await refusalOf(client, () => client.query(A_MODEL_KEY, [nowhere, "anthropic", A_FRAME])),
       ).toBe("model_key_workspace_id_workspace_id_fk");
     });
   });

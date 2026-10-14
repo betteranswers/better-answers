@@ -35,7 +35,7 @@ type SetModelKeyInput = {
   readonly key: string;
 };
 
-export type ModelKeySet = {
+type ModelKeySet = {
   readonly workspaceId: string;
   readonly provider: ModelProvider;
 };

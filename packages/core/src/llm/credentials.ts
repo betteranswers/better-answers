@@ -17,11 +17,11 @@ import type { Tx } from "../store/postgres/index.ts";
  * Reached through `reveal` alone, so a logger, an error or a JSON body handed this value prints no
  * part of the key.
  */
-export type ModelKey = {
+type ModelKey = {
   readonly reveal: () => string;
 };
 
-export type ModelKeyOf = {
+type ModelKeyOf = {
   readonly workspaceId: WorkspaceId;
   readonly provider: ModelProvider;
 };

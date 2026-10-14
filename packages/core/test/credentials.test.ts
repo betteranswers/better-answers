@@ -59,6 +59,18 @@ const rowsOf = async (workspaceId: string) => {
   return stored.rows;
 };
 
+/** The first frame `from` holds, written as the key of `onto`: what a writer past the provider could do. */
+const frameCopied = async (
+  from: string,
+  onto: { readonly workspaceId: string; readonly provider: ModelProvider },
+): Promise<void> => {
+  const [held] = await rowsOf(from);
+  if (held === undefined) throw new Error(`${from} holds no model key to copy`);
+  await seedingWith(db().pool, (seed) =>
+    seed.modelKey({ ...onto, sealed: new Uint8Array(held.sealed) }),
+  );
+};
+
 const eventsOf = async (workspaceId: string) => {
   const audited = await db().pool.query(
     `SELECT action, family, actor, subject_kind, subject_id, detail, batch_id
@@ -203,11 +215,7 @@ describe("a workspace's model key", () => {
     const [holder, other] = [await aWorkspace(), await aWorkspace()];
     await setting(holder, A_KEY);
 
-    await db().pool.query(
-      `INSERT INTO model_key (workspace_id, provider, sealed)
-       SELECT $2, provider, sealed FROM model_key WHERE workspace_id = $1`,
-      [holder, other],
-    );
+    await frameCopied(holder, { workspaceId: other, provider: "anthropic" });
 
     expect(await revealedIn(other)).toBe("envelope-not-authentic");
   });
@@ -216,11 +224,7 @@ describe("a workspace's model key", () => {
     const workspaceId = await aWorkspace();
     await setting(workspaceId, A_KEY, "anthropic");
 
-    await db().pool.query(
-      `INSERT INTO model_key (workspace_id, provider, sealed)
-       SELECT workspace_id, 'mistral', sealed FROM model_key WHERE workspace_id = $1`,
-      [workspaceId],
-    );
+    await frameCopied(workspaceId, { workspaceId, provider: "mistral" });
 
     expect(await revealedIn(workspaceId, "mistral")).toBe("envelope-not-authentic");
   });
