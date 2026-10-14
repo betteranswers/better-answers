@@ -17,7 +17,7 @@ import {
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
-import { JUDGE_STATES, QUESTION_VERDICTS, ULID } from "@better-answers/schema";
+import { CONCEPT_BODY_MAX, JUDGE_STATES, QUESTION_VERDICTS, ULID } from "@better-answers/schema";
 
 import { MCP_TOKEN_RULE, MCP_UNAUTHENTICATED_IP_RULE } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
@@ -195,16 +195,20 @@ const REFUSED_AT_THE_CEILING = {
   sentence: expect.stringContaining("an Admin can raise the ceiling in System"),
 };
 
-/** The figure a size check is made against; no host's limit on one result is known. */
-const RESULT_CHARACTERS_CHECKED_UNDER = 150_000;
+/**
+ * Past this Claude Code hands its model a file, not the result. Both copies count: no host says
+ * which it counts.
+ */
+const RESULT_CHARACTERS_CHECKED_UNDER = 50_000;
 
-/** The one body length `ask`'s size is checked at, about 300 words; nothing bounds a longer body. */
-const SIZED_BODY_CHARACTERS = 2_000;
+/** A passage is split near 1,200 bytes and may run past it. */
+const PASSAGE_CHARACTERS = 2_000;
 
-const aSizedBodyOf = (sentence: string): string =>
-  sentence
-    .repeat(Math.ceil(SIZED_BODY_CHARACTERS / sentence.length))
-    .slice(0, SIZED_BODY_CHARACTERS);
+/** The seed ends a body with a newline, and a link line where the concept links. */
+const NEAR_THE_BODY_CAP = CONCEPT_BODY_MAX - 1_000;
+
+const aSizedBodyOf = (sentence: string, characters: number): string =>
+  sentence.repeat(Math.ceil(characters / sentence.length)).slice(0, characters);
 
 const RETENTION_QUESTION = "How long are audit logs kept?";
 
@@ -214,6 +218,10 @@ const answered = z.object({
   unmappedPassages: z.array(z.object({ locator: z.string() })),
   map: z.object({ state: z.string() }),
   recordId: z.string(),
+});
+
+const bodies = z.object({
+  related: z.array(z.object({ body: z.string().optional() })),
 });
 
 const askedOf = async (client: TestClient, token: string, args: Params) => {
@@ -821,17 +829,18 @@ describe("ask, on the own-transaction road", () => {
     ]);
   });
 
-  it("fits the bound at the caps with 2,000-character bodies", async () => {
+  it("fits the bound at the caps, bodies near their cap", async () => {
     const { workspace, client, token } = await connect();
     const beyondTheEntryPoints = Math.max(0, ASK_CAPS.related - ASK_CAPS.entryPoints);
     const reached = Array.from({ length: beyondTheEntryPoints }, (_, nth) => ({
       title: `Console exports ${String(nth)}`,
       kind: "Note",
-      body: aSizedBodyOf("A spreadsheet can be exported from the console. "),
+      body: aSizedBodyOf("A spreadsheet can be exported from the console. ", NEAR_THE_BODY_CAP),
     }));
     const entries = Array.from({ length: ASK_CAPS.entryPoints }, (_, nth) => ({
       title: `Audit log retention ${String(nth)}`,
-      body: aSizedBodyOf("Audit logs are kept for thirteen months. "),
+      kind: "Policy",
+      body: aSizedBodyOf("Audit logs are kept for thirteen months. ", NEAR_THE_BODY_CAP),
       linksTo: reached
         .filter((_, place) => place % ASK_CAPS.entryPoints === nth)
         .map((concept) => concept.title),
@@ -847,7 +856,7 @@ describe("ask, on the own-transaction road", () => {
     for (let nth = 0; nth < ASK_CAPS.unmappedPassages; nth += 1) {
       await documentLanded(app().database.superuser, workspace.workspaceId, {
         title: `Hosting contract ${String(nth)}`,
-        text: aSizedBodyOf("Audit logs are kept by the host for ninety days. "),
+        text: aSizedBodyOf("Audit logs are kept by the host for ninety days. ", PASSAGE_CHARACTERS),
       });
     }
     await theMapCounted();
@@ -859,7 +868,31 @@ describe("ask, on the own-transaction road", () => {
       ASK_CAPS.unmappedPassages,
       "live",
     ]);
+    expect(
+      bodies.parse(called.structuredContent).related.filter((concept) => "body" in concept),
+    ).toEqual([]);
     expect(JSON.stringify(called).length).toBeLessThan(RESULT_CHARACTERS_CHECKED_UNDER);
+  });
+
+  it("returns an `Answer` at the body cap word for word", async () => {
+    const { workspace, client, token } = await connect();
+    // The seed ends it with a newline, which brings it to the cap.
+    const body = aSizedBodyOf("Audit logs are kept for thirteen months. ", CONCEPT_BODY_MAX - 1);
+    await seedConcepts(
+      app(),
+      conceptsSeeding.parse({
+        workspaceId: workspace.workspaceId,
+        userId: workspace.admin.id,
+        concepts: [{ title: "How long are audit logs kept?", body }],
+      }),
+    );
+
+    const { called } = await askedOf(client, token, { question: RETENTION_QUESTION });
+
+    expect(bodies.parse(called.structuredContent).related.map((concept) => concept.body)).toEqual([
+      `${body}\n`,
+    ]);
+    expect(firstText(called)).toContain(body.trimEnd());
   });
 });
 

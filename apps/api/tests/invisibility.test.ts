@@ -165,7 +165,6 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
             kind: "Note",
             title: TITLE,
             collection: null,
-            body: "The board's remuneration is reviewed each March.",
             trust: { tier: "unverified", status: "current", checkedBy: null, checkedAt: null },
           },
         ],

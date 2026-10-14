@@ -381,9 +381,7 @@ describe("ask's entry step", () => {
 
     const related = await relatedTo(viewer, "When is the audit?");
 
-    expect(related.map((concept) => [concept.iri, concept.body])).toEqual([
-      [records, "Our audits run every spring."],
-    ]);
+    expect(related.map((concept) => concept.iri)).toEqual([records]);
   });
 
   it("links a concept to its page by its ulid", async () => {

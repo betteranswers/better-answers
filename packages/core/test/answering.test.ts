@@ -38,6 +38,7 @@ import {
   type FindResult,
   type OpenResult,
   type PlannedAnswer,
+  type PreviewedConcept,
   type ReturnedConcept,
   type Trust,
 } from "../src/answering/index.ts";
@@ -224,14 +225,24 @@ describe("the answer's rendering", () => {
     ]);
   });
 
-  it("titles any other concept plainly, under no collection", () => {
-    const policy = returned({ kind: "Policy", title: "Retention policy", collection: null });
+  it("lists any other concept after the `Answer`s, to open", () => {
+    const policy: PreviewedConcept<string> = {
+      iri: "https://better-answers.com/c/01B",
+      url: "https://app.example/knowledge/search/01B",
+      kind: "Policy",
+      title: "Retention policy",
+      collection: null,
+      trust: unverified,
+      trustWords: "Unverified",
+    };
 
-    expect(linesOf(renderAnswer(answer({ related: [policy] }))).slice(5, 9)).toEqual([
-      "## Policy · No collection",
-      "Retention policy",
-      "_Unverified_",
+    const rendered = linesOf(renderAnswer(answer({ related: [policy, returned()] })));
+
+    expect(rendered[5]).toBe("## Answer · audits");
+    expect(rendered.slice(-3)).toEqual([
       "",
+      "Also bearing on the question, one line each: read one with `open` and its iri before writing from it.",
+      "- Policy · Retention policy · No collection · Unverified · https://better-answers.com/c/01B — https://app.example/knowledge/search/01B",
     ]);
   });
 
@@ -1218,9 +1229,21 @@ describe("what ask answers with no model", () => {
       [],
       [],
     ]);
-    expect(answer.related.map((concept) => [concept.iri, concept.kind])).toEqual([
-      [policy, "Policy"],
-      [note, "Note"],
+    expect(answer.related).toEqual([
+      {
+        iri: policy,
+        url: pageOf(policy),
+        kind: "Policy",
+        title: "Audit log retention",
+        collection: "audits",
+        trust: unverified,
+        trustWords: "Unverified",
+      },
+      expect.objectContaining({ iri: note, kind: "Note" }),
+    ]);
+    expect(answer.related.map((concept) => "body" in concept || "evidence" in concept)).toEqual([
+      false,
+      false,
     ]);
     const [first] = linesOf(renderAnswer(answer));
     expect(first).toBe(RELATED_LINE);
@@ -1298,6 +1321,34 @@ describe("what ask answers with no model", () => {
     ]);
     expect(irisOf(whole).toSorted()).toEqual([audits, lms, linked].toSorted());
     expect(whole.unmappedPassages).toEqual(narrowed.unmappedPassages);
+  });
+
+  it("returns the same concepts naming every collection or none", async () => {
+    const { workspaceId, asker } = await anAsker();
+    const uids = Array.from({ length: 1_002 }, () => conceptIriOf(ulid())).toSorted();
+    const sections = uids.slice(0, 1_001);
+    // The greatest uid is the concept: a cap that counts the sections drops exactly it.
+    const reached = await seededIn(workspaceId, {
+      ...CONSOLE_EXPORTS,
+      collection: "audits",
+      iri: ids.conceptIri.parse(uids.at(-1)),
+    });
+    const entry = await seededIn(workspaceId, { ...RETENTION_ANSWER, linksTo: [reached] });
+    await seedingWith(db().pool, async (seed) => {
+      for (const uid of sections) {
+        await seed.mapNode({ workspaceId, uid, label: "Section", kind: null });
+        await seed.mapEdge({ workspaceId, fromUid: entry, toUid: uid });
+      }
+    });
+
+    const unnamed = await asked(db(), asker, { question: RETENTION_QUESTION });
+    const named = await asked(db(), asker, {
+      question: RETENTION_QUESTION,
+      collections: ["audits"],
+    });
+
+    expect(irisOf(unnamed)).toEqual([entry, reached]);
+    expect(irisOf(named)).toEqual(irisOf(unnamed));
   });
 
   it("names the collections it considered, a misspelt one echoed", async () => {

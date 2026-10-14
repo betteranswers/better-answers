@@ -397,11 +397,17 @@ type Narrowing = { readonly seed: string; readonly hop: string; readonly answere
 
 const WHOLE: Narrowing = { seed: "", hop: "", answered: "" };
 
-/** A node that is no concept has no collection: a path may cross it, and it is not answered. */
+/** Filtered before the cap, so the cap counts concepts alone. */
+const CONCEPTS_ANSWERED = `WHERE label = '${CONCEPT_NODE_LABEL}'`;
+
+/** A path may cross a node that is no concept, and it is not answered. */
+const CONCEPTS: Narrowing = { seed: "", hop: "", answered: CONCEPTS_ANSWERED };
+
+/** As CONCEPTS, inside the collections: a node that is no concept has none, so a path may cross it. */
 const INSIDE: Narrowing = {
   seed: insideClause("n"),
   hop: insideClause("m"),
-  answered: `WHERE label = '${CONCEPT_NODE_LABEL}'`,
+  answered: CONCEPTS_ANSWERED,
 };
 
 /**
@@ -456,11 +462,14 @@ type PreparedWalk = { readonly statement: string; readonly binds: readonly (read
 
 const WALK_FROM: PreparedWalk = { statement: walkStatement(true), binds: [] };
 const WALK_TO: PreparedWalk = { statement: walkStatement(false), binds: [] };
+const WALK_CONCEPTS_FROM: PreparedWalk = { statement: walkStatement(true, CONCEPTS), binds: [] };
 const WALK_FROM_INSIDE = walkStatement(true, INSIDE);
 
 /** The narrowed statement and the collections it binds are chosen together, here alone. */
-const walkOutOf = (collections: readonly string[] | undefined): PreparedWalk =>
-  collections === undefined ? WALK_FROM : { statement: WALK_FROM_INSIDE, binds: [collections] };
+const conceptWalkOutOf = (collections: readonly string[] | undefined): PreparedWalk =>
+  collections === undefined
+    ? WALK_CONCEPTS_FROM
+    : { statement: WALK_FROM_INSIDE, binds: [collections] };
 
 const walk = async (
   { statement, binds }: PreparedWalk,
@@ -481,16 +490,25 @@ const walk = async (
 
 /**
  * One step per node within MAP_WALK_DEPTH hops out of `uids`, at its least depth: the nearest
- * MAP_WALK_ROW_LIMIT, alike on every run. A path stops at what the principal cannot read. Given
- * `collections`, it answers their concepts alone and passes through no other concept. Past
+ * MAP_WALK_ROW_LIMIT, alike on every run. A path stops at what the principal cannot read. Past
  * MAP_WALK_TIMEOUT_MS it rejects, its transaction aborted.
  */
 export const walkFromEntries = (
   principal: UserPrincipal,
   tx: Tx,
   uids: readonly ConceptIri[],
+): Promise<readonly WalkStep[]> => walk(WALK_FROM, principal, tx, uids);
+
+/**
+ * As walkFromEntries, answering concepts alone, so its row limit counts concepts. Given
+ * `collections`, it answers their concepts alone and passes through no other concept.
+ */
+export const walkConceptsFromEntries = (
+  principal: UserPrincipal,
+  tx: Tx,
+  uids: readonly ConceptIri[],
   collections?: readonly string[],
-): Promise<readonly WalkStep[]> => walk(walkOutOf(collections), principal, tx, uids);
+): Promise<readonly WalkStep[]> => walk(conceptWalkOutOf(collections), principal, tx, uids);
 
 const WALK_TIMED_OUT = "57014";
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   MAP_WALK_DEPTH,
+  walkConceptsFromEntries,
   walkFrom,
   walkFromEntries,
   walkTo,
@@ -63,14 +64,12 @@ const walkedFromEntries = async (
   collections?: readonly string[],
 ): Promise<readonly WalkStep[]> =>
   answered(
-    await readingAs(db().runtimePool, reader, (principal, tx) =>
-      walkFromEntries(
-        principal,
-        tx,
-        uids.map((uid) => ids.conceptIri.parse(uid)),
-        collections,
-      ),
-    ),
+    await readingAs(db().runtimePool, reader, (principal, tx) => {
+      const iris = uids.map((uid) => ids.conceptIri.parse(uid));
+      return collections === undefined
+        ? walkFromEntries(principal, tx, iris)
+        : walkConceptsFromEntries(principal, tx, iris, collections);
+    }),
   );
 
 const uidsByDepth = (steps: readonly WalkStep[]): readonly (readonly [string, number])[] =>
@@ -436,21 +435,32 @@ const conceptNode = async (
   return iri;
 };
 
+/** A hub one hop from 1,003 spokes in uid order: the first 1,001 fill the row limit. */
+const hubOf = async (
+  workspaceId: string,
+  spoke: (seed: TestData, uid: string, first: boolean) => Promise<void>,
+): Promise<{ readonly hub: string; readonly last: readonly string[] }> => {
+  const made = await seeded(async (seed) => {
+    const hub = await conceptNode(seed, workspaceId, "audits");
+    const uids = Array.from({ length: 1_003 }, () => conceptIriOf(ulid())).toSorted();
+    for (const [at, uid] of uids.entries()) {
+      await spoke(seed, uid, at < 1_001);
+      await seed.mapEdge({ workspaceId, fromUid: hub, toUid: uid });
+    }
+    return { hub, last: uids.slice(1_001) };
+  });
+  await db().pool.query("ANALYZE map_node, map_edge");
+  return made;
+};
+
 describe("a map walk narrowed to collections", () => {
   it("keeps a collection's neighbours past a hub's thousand others", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
-    const { hub, inside } = await seeded(async (seed) => {
-      const centre = await conceptNode(seed, workspaceId, "audits");
-      const uids = Array.from({ length: 1_003 }, () => conceptIriOf(ulid())).toSorted();
-      // The two greatest uids are the hub's own collection: a cut taken first drops exactly them.
-      for (const [at, uid] of uids.entries()) {
-        await conceptNode(seed, workspaceId, at < 1_001 ? "lms" : "audits", uid);
-        await seed.mapEdge({ workspaceId, fromUid: centre, toUid: uid });
-      }
-      return { hub: centre, inside: uids.slice(1_001) };
+    // The two greatest uids are the hub's own collection: a cut taken first drops exactly them.
+    const { hub, last: inside } = await hubOf(workspaceId, async (seed, uid, first) => {
+      await conceptNode(seed, workspaceId, first ? "lms" : "audits", uid);
     });
-    await db().pool.query("ANALYZE map_node, map_edge");
 
     const narrowed = await walkedFromEntries(scenario.viewer, [hub], ["audits"]);
     const whole = await walkedFromEntries(scenario.viewer, [hub]);
@@ -538,12 +548,35 @@ describe("a map walk narrowed to collections", () => {
     expect(uidsByDepth(whole)).toContainEqual([section, 1]);
   });
 
-  it("groups a narrowed walk before it filters by label", async () => {
+  it("caps concepts alone when no collection is named", async () => {
+    const scenario = await arrange();
+    const workspaceId = scenario.workspaceId;
+    // The two greatest uids are concepts: a cap that counts sections drops exactly them.
+    const { hub, last: concepts } = await hubOf(workspaceId, async (seed, uid, first) => {
+      if (first) await seed.mapNode({ workspaceId, uid, label: "Section", kind: null });
+      else await conceptNode(seed, workspaceId, "audits", uid);
+    });
+
+    const walked = answered(
+      await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
+        walkConceptsFromEntries(principal, tx, [ids.conceptIri.parse(hub)]),
+      ),
+    );
+    const whole = await walkedFromEntries(scenario.viewer, [hub]);
+
+    expect(uidsByDepth(walked)).toEqual([[hub, 0], ...concepts.map((uid) => [uid, 1])]);
+    expect(whole.map((step) => step.uid)).not.toContain(concepts[0]);
+  });
+
+  it.each([
+    ["a narrowed walk", ["audits"]],
+    ["an un-narrowed concept walk", undefined],
+  ] as const)("groups %s before it filters by label", async (_walk, collections) => {
     const scenario = await arrange();
     const entry = await seeded((seed) => conceptNode(seed, scenario.workspaceId, "audits"));
 
     const narrowed = await planned(db(), scenario.viewer, (principal, tx) =>
-      walkFromEntries(principal, tx, [ids.conceptIri.parse(entry)], ["audits"]),
+      walkConceptsFromEntries(principal, tx, [ids.conceptIri.parse(entry)], collections),
     );
     /** The filter on each scan of the CTE `name`: a filter beneath the grouping costs a sort. */
     const filtersOn = (name: string): readonly string[] =>

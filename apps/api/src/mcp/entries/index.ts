@@ -25,6 +25,7 @@ import {
   type FindResult,
   type OpenResult,
   type OpenView,
+  type RelatedConcept,
   type ReturnedConcept,
   type Trust,
 } from "@better-answers/core/answering";
@@ -135,11 +136,9 @@ const findEntry = defineEntry({
   render: (found) => renderFind(foundInCore(found)),
 });
 
-type WireReturned = WireMatch<ReturnedConcept<string>>;
-
 type WireAnswered = Omit<AnswerResult<string>, "answers" | "related"> & {
-  readonly answers: readonly WireReturned[];
-  readonly related: readonly WireReturned[];
+  readonly answers: readonly WireMatch<ReturnedConcept<string>>[];
+  readonly related: readonly WireMatch<RelatedConcept<string>>[];
 };
 
 /** Core names a concept's page by its path; an outside client can only open it under our origin. */
@@ -147,7 +146,7 @@ const answeredOnTheWire = (
   origin: string,
   { answers, related, ...answer }: AnswerResult,
 ): WireAnswered => {
-  const wire = (concept: ReturnedConcept): WireReturned => ({
+  const wire = <Concept extends RelatedConcept>(concept: Concept) => ({
     ...concept,
     url: `${origin}${concept.url}`,
     trust: wireTrust(concept.trust),
@@ -156,7 +155,7 @@ const answeredOnTheWire = (
 };
 
 const answeredInCore = ({ answers, related, ...answer }: WireAnswered): AnswerResult<string> => {
-  const core = (concept: WireReturned): ReturnedConcept<string> => ({
+  const core = <Concept extends WireMatch<RelatedConcept<string>>>(concept: Concept) => ({
     ...concept,
     trust: coreTrust(concept.trust),
   });
@@ -173,7 +172,7 @@ const askEntryAt = (origin: string) =>
     name: "ask",
     title: "Ask the company's knowledge a question",
     description:
-      "Ask a question and get the concepts in the company's knowledge that bear on it, verdict first. They are related knowledge, not a judged answer: write only what the returned concepts state, name each one you use, and quote an `Answer` unchanged. Each concept is labelled with its collection, and `Answer`s under different collections are never merged: give each under its own. An empty `conflicts` list means no conflict was looked for, not that none exists. A verdict of `refuse` means nothing you can read bears on the question. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised. Each question is kept as a record, and the answer carries its `recordId`. The person who asked and the workspace's Admins may read it. The question's words are kept for twelve months; the verdict and which concepts were returned are kept for good, and who asked until that person is erased.",
+      "Ask a question and get the concepts in the company's knowledge that bear on it, verdict first. They are related knowledge, not a judged answer: write only what the returned concepts state, name each one you use, and quote an `Answer` unchanged. An `Answer` comes back in full; any other concept comes back as one line, so read it with `open` and its `iri` before you write from it. Each concept is labelled with its collection, and `Answer`s under different collections are never merged: give each under its own. An empty `conflicts` list means no conflict was looked for, not that none exists. A verdict of `refuse` means nothing you can read bears on the question. A passage marked 'Not company knowledge' is to be quoted with its source named, never summarised. Each question is kept as a record, and the answer carries its `recordId`. The person who asked and the workspace's Admins may read it. The question's words are kept for twelve months; the verdict and which concepts were returned are kept for good, and who asked until that person is erased.",
     scopes: ["knowledge:read"],
     input: z.object({
       question: askInput.shape.question,
