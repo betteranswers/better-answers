@@ -556,14 +556,20 @@ export const fileAtHead = async (
 
 export type Pseudonymisation = {
   readonly addresses: readonly string[];
+
+  /** Person ids, rewritten where history names them as `human:<id>`, trailers included. */
+  readonly people: readonly string[];
   readonly pseudonym: string;
 };
 
 export type HistoryRewritten = {
   readonly moved: readonly (readonly [string, string])[];
+
+  /** Each path whose file, at some commit, named an address or a person id. */
+  readonly paths: readonly string[];
 };
 
-const NOTHING_MOVED: HistoryRewritten = { moved: [] };
+const NOTHING_MOVED: HistoryRewritten = { moved: [], paths: [] };
 
 export const ERASED_DOMAIN = "erased.better-answers.invalid";
 
@@ -572,13 +578,25 @@ const PYTHON_SPECIAL = /[()[\]{}?*+\-|^$\\.&~# \t\n\r\v\f]/g;
 const escapedForPython = (literal: string): string =>
   literal.replace(PYTHON_SPECIAL, (character) => `\\${character}`);
 
-const replacementsFor = (addresses: readonly string[], pseudonym: string): string =>
-  addresses
-    .map(
+/** A person id is a ULID, so its actor id is matched literally and no longer one extends it. */
+const replacementsFor = (
+  addresses: readonly string[],
+  people: readonly string[],
+  pseudonym: string,
+): string =>
+  [
+    ...addresses.map(
       (address) =>
         `regex:(?i)${escapedForPython(`${PERSON_PREFIX}${address}`)}==>${PERSON_PREFIX}${pseudonym}\n`,
-    )
-    .join("");
+    ),
+    ...people.map((person) => `${PERSON_PREFIX}${person}==>${PERSON_PREFIX}${pseudonym}\n`),
+  ].join("");
+
+/** A trailer is in the message, which no file search reads. */
+const messagesNaming = async (gitDir: string, needles: readonly string[]): Promise<boolean> => {
+  const logged = await git(gitDir, ["log", "--all", "--format=%B%x00"]);
+  return logged.split("\0").some((message) => carries(message, needles));
+};
 
 const identitiesOf = (line: string): readonly (readonly [string, string])[] => {
   const [author = "", authorAddress = "", committer = "", committerAddress = ""] = line.split("\0");
@@ -646,10 +664,13 @@ const commitMapOf = async (
   return moved;
 };
 
+const trimmed = (values: readonly string[]): readonly string[] =>
+  values.map((value) => value.trim()).filter((value) => value !== "");
+
 /**
- * Only when a file or an author names an address, rewrites every ref: each actor id naming one,
- * in files and messages, and each author or committer carrying one, takes the pseudonym, and old
- * objects are pruned. `moved` holds the commits whose sha changed; a dropped one throws.
+ * Only when history names an address or a person id, rewrites every ref: each actor id naming
+ * one, in files and messages, and each author or committer carrying an address, takes the
+ * pseudonym, and old objects are pruned. A dropped commit throws.
  */
 export const rewriteHistory = async (
   platform: PlatformPrincipal,
@@ -657,21 +678,25 @@ export const rewriteHistory = async (
   workspaceId: string,
   who: Pseudonymisation,
 ): Promise<HistoryRewritten> => {
-  const addresses = who.addresses.map((address) => address.trim()).filter((one) => one !== "");
+  const addresses = trimmed(who.addresses);
+  const people = trimmed(who.people);
   const pseudonym = who.pseudonym.trim();
-  if (addresses.length === 0 || pseudonym === "") return NOTHING_MOVED;
+  if (addresses.length + people.length === 0 || pseudonym === "") return NOTHING_MOVED;
 
-  const naming = await historyNaming(platform, door, workspaceId, addresses);
-  if (naming.blobs.length === 0 && naming.authors.length === 0) return NOTHING_MOVED;
-
+  const needles = [...addresses, ...people.map((person) => `${PERSON_PREFIX}${person}`)];
+  const naming = await historyNaming(platform, door, workspaceId, needles);
   const gitDir = repositoryPath(door, workspaceId);
+  const named =
+    naming.blobs.length > 0 || naming.authors.length > 0 || (await messagesNaming(gitDir, needles));
+  if (!named) return NOTHING_MOVED;
+
   const started = new Set(await allCommits(gitDir));
   const signed = await identitiesNaming(gitDir, addresses);
   const written = await mkdtemp(path.join(tmpdir(), "better-answers-rewrite-"));
   try {
     const text = path.join(written, "replacements");
     const mailmap = path.join(written, "mailmap");
-    await writeFile(text, replacementsFor(addresses, pseudonym), "utf8");
+    await writeFile(text, replacementsFor(addresses, people, pseudonym), "utf8");
     await writeFile(mailmap, mailmapFor(signed, pseudonym), "utf8");
     await filterRepo(gitDir, [
       "--force",
@@ -693,7 +718,7 @@ export const rewriteHistory = async (
     // refers to.
     await git(gitDir, ["reflog", "expire", "--expire=now", "--all"]);
     await git(gitDir, ["gc", "--prune=now", "--quiet"]);
-    return { moved };
+    return { moved, paths: [...new Set(naming.blobs.map((blob) => blob.path))] };
   } finally {
     await rm(written, { recursive: true, force: true });
   }

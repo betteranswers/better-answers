@@ -19,7 +19,6 @@ import {
 } from "../kernel/index.ts";
 import {
   ANY_HEAD,
-  commit as commitToBundle,
   fileAtHead,
   withRepositoryLock,
   type CommitAuthor,
@@ -27,7 +26,7 @@ import {
 } from "../store/git/index.ts";
 import { withMember, type PostgresDoor } from "../store/postgres/index.ts";
 import { scalarPairOf, type FrontmatterSource } from "./file.ts";
-import { landBundleCommit } from "./landing.ts";
+import { commitAsMember, landBundleCommit } from "./landing.ts";
 import type { PassedOnCommitRefusal } from "./vocabulary.ts";
 
 const MANIFEST_ACTIONS = declareActions("knowledge", {
@@ -115,7 +114,7 @@ export const writeManifest = async (
     if (atHead.value === "standing") return ok({ written: false });
     if (atHead.value === "taken") return err("path-taken");
 
-    const committed = await commitToBundle(principal, doors.git, {
+    const committed = await commitAsMember(principal, doors, {
       path: BUNDLE_MANIFEST_PATH,
       content: renderBundleManifest(manifest.data),
       message: input.message,

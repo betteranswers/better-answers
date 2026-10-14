@@ -1,11 +1,8 @@
-import { normalizeError, type PlatformPrincipal } from "../kernel/index.ts";
+import type { PlatformPrincipal } from "../kernel/index.ts";
 import { ERASED_DOMAIN } from "../store/git/index.ts";
 import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
-import {
-  SESSION_VERIFICATION_PREFIXES,
-  verificationIdentifiersOf,
-  workspacesHeldBy,
-} from "../workspaces/index.ts";
+import { SESSION_VERIFICATION_PREFIXES, verificationIdentifiersOf } from "../workspaces/index.ts";
+import { NO_ACTORS_SWEPT, sweepTheActors, type ActorsSwept } from "./actors.ts";
 import {
   askersOf,
   NO_QUESTIONS_SWEPT,
@@ -43,6 +40,9 @@ export type IdentitySwept = {
    * the member: a failed run's rerun still finds them.
    */
   readonly questionsSince: QuestionsSwept;
+
+  /** The commit and verification rows the person's writes landed after the actors step. */
+  readonly actorsSince: ActorsSwept;
 };
 
 const SWEPT_NOTHING = {
@@ -59,6 +59,7 @@ const SWEPT_NOTHING = {
   invitationsHere: 0,
   invitationsEverywhere: 0,
   questionsSince: NO_QUESTIONS_SWEPT,
+  actorsSince: NO_ACTORS_SWEPT,
 } as const;
 
 export type ErasureSubject = {
@@ -137,10 +138,17 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
 };
 
 /**
- * Does nothing without a person. Otherwise ends the member and their last activity here, sweeps
- * their questions again, and only when it was the person's last deletes their sessions, accounts,
- * verifications, invitations and second factor, pseudonymises them and clears their marks. Throws
- * when the workspaces they hold cannot be read.
+ * Held to the erasure's commit, so a removal elsewhere waits and the arm read here is still true
+ * when the step commits.
+ */
+const HELD_ELSEWHERE = `SELECT workspace_id FROM member
+   WHERE user_id = $1 AND workspace_id <> $2
+     FOR KEY SHARE`;
+
+/**
+ * Does nothing without a person. Otherwise ends the member here, sweeps their questions and actor
+ * ids again, and, when no other workspace holds them once the member has ended, deletes their
+ * sign-in identity and pseudonymises them.
  */
 export const eraseFromTheIdentitySet = async (
   platform: PlatformPrincipal,
@@ -150,13 +158,7 @@ export const eraseFromTheIdentitySet = async (
   const { personId } = subject;
   if (personId === null) return { arm: "no-person", ...SWEPT_NOTHING };
 
-  const held = await workspacesHeldBy(platform, door, personId);
-
-  if (!held.ok) throw normalizeError(held.error);
-  const elsewhere = held.value.filter((workspaceId) => workspaceId !== subject.workspaceId);
-  const arm: IdentityArm = elsewhere.length === 0 ? "last-workspace" : "held-elsewhere";
-
-  // One transaction for the step: only its last-activity and questions tables are under
+  // One transaction for the step: only its last-activity, questions and actor tables are under
   // row-level security, so the workspace's scope narrows nothing else.
   return withScope(platform, door, subject.workspaceId, async (tx) => {
     const lastActive = rowsOf(
@@ -167,17 +169,16 @@ export const eraseFromTheIdentitySet = async (
       personId,
     ]);
     const membersEnded = rowsOf(ended);
-    // The delete waited for each write holding the member's row. READ COMMITTED: this
+    // The delete waited for each write holding the member's row. READ COMMITTED: each
     // statement's snapshot is fresh, so it sees what they committed.
-    const questionsSince = await sweepTheQuestions(tx, {
-      workspaceId: subject.workspaceId,
-      askers: askersOf([personId]),
-      pseudonym: subject.pseudonym,
-    });
-    if (arm === "held-elsewhere") {
-      return { arm, ...SWEPT_NOTHING, membersEnded, lastActive, questionsSince };
-    }
+    const named = { workspaceId: subject.workspaceId, pseudonym: subject.pseudonym };
+    const questionsSince = await sweepTheQuestions(tx, { ...named, askers: askersOf([personId]) });
+    const actorsSince = await sweepTheActors(tx, { ...named, actors: askersOf([personId]) });
+    const done = { membersEnded, lastActive, questionsSince, actorsSince };
+
+    const elsewhere = await tx.query(HELD_ELSEWHERE, [personId, subject.workspaceId]);
+    if (elsewhere.rows.length > 0) return { arm: "held-elsewhere", ...SWEPT_NOTHING, ...done };
     const swept = await sweepTheSet(tx, subject, `${subject.pseudonym}@${ERASED_DOMAIN}`);
-    return { arm, membersEnded, lastActive, questionsSince, ...swept };
+    return { arm: "last-workspace", ...done, ...swept };
   });
 };

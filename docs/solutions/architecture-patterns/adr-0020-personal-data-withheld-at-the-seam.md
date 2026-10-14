@@ -45,9 +45,10 @@ Text a person types, such as a question or a note on a flag, never passes the wo
 
 The erasure routine rewrites what the platform wrote; a person edits what the company wrote.
 
-- Every actor id the platform wrote (files, history, `bundle_commit` rows, verification rows, git author lines by mailmap) becomes `human:<erasure pseudonym>`, one pseudonym per workspace. The audit log is never rewritten: it names a person by person id.
+- Every actor id the platform wrote (files, history and its commit trailers, `bundle_commit` rows, verification rows, git author lines by mailmap) becomes `human:<erasure pseudonym>`, one pseudonym per workspace. The audit log is never rewritten: it names a person by person id.
+- A member's commit to the bundle holds their member row until it is in git, so ending the member waits for a commit under way and refuses a later one. The routine rewrites history a second time once the member has ended.
 - When this is the person's last workspace, it pseudonymises the user row (email to a tombstone, name cleared, id kept) and deletes their sessions, verification rows, invitations and linked accounts. It ends the person as a member here on every arm.
-- It reaches *Questions asked* on every arm, in the erasing workspace alone. Who asked and who gave feedback become `human:<erasure pseudonym>`, the question is deleted and each note is cleared. The record's skeleton stays (ADR 0017).
+- It reaches *Questions asked* on every arm, in the erasing workspace alone. Who asked and who gave feedback become `human:<erasure pseudonym>`, the question is deleted and each note and each disputed sentence is cleared. The record's skeleton stays (ADR 0017).
 - Erasure alone may leave a workspace with no Admin. The operator repairs it with `pnpm ops add-member`.
 - It clears the operator's mark where the person carries one.
 - It writes its replay copy to the object store, under `erasures/<workspace id>/`, before the completion commits.
@@ -86,6 +87,8 @@ The full record, with its seventeen amendments (among them T-001, T-073, T-121, 
 
 Amended 13/10/2026 on the owner's decision of 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R42 and KTD12). S2b is the first block to send a model text a person typed, which the seam never reads. The typed-text check reads it against the always tier before the call. Names in typed text are not withheld, and the record keeps the text as typed.
 
-Amended 13/10/2026 by the same plan's U4 (R39 and KTD8). The erasure routine gained a step and a family, `question-asked`, so an erasure rewrites who asked and who gave feedback, deletes the question and clears each note.
+Amended 13/10/2026 by the same plan's U4 (R39 and KTD8). The erasure routine gained a step and a family, `question-asked`, so an erasure rewrites who asked and who gave feedback, deletes the question and clears each note and each disputed sentence.
 
 Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-153. A naming word between a sort code and its account number, whole or as its plural, now names the pair, in a document and in typed text. A National Insurance number no longer takes the space before it, and a refused prefix after a space is no longer read as one. The rule version moved from 6 to 7. A National Insurance finding that took the space before it now starts one character later, so a restore made on it before the change no longer matches, and the number is withheld again at the next sync until an Admin restores it afresh.
+
+Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-166 and BA-160 (`docs/plans/2026-10-14-1811-fix-erasure-late-commit-and-actors-plan.md`). The routine now rewrites `bundle_commit.actor` and `concept_verification.actor`, which it had found but never rewritten, and the person id in commit trailers. A commit made as the person while the routine runs is rewritten: the commit holds the member row, and history is rewritten again once the member has ended. The identity step reads which arm applies inside its own transaction.

@@ -1346,7 +1346,7 @@ describe("authority that moved while the action was in flight", () => {
     },
   );
 
-  it("refuses the rows for a revocation the action cannot see", async () => {
+  it("refuses before committing for a revocation the read cannot see", async () => {
     const scenario = await arrange();
 
     const revoker = await db().pool.connect();
@@ -1370,8 +1370,8 @@ describe("authority that moved while the action was in flight", () => {
 
     expect(landed).toEqual({ ok: false, error: "credentials-revoked" });
 
-    const history = await bundleHistory(scenario.git, scenario.workspaceId);
-    expect(history).toHaveLength(1);
+    // The commit holds the member row too, so it reads the revocation the first read missed.
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
     expect(await recordedCommits(scenario.workspaceId)).toEqual([]);
     expect(await rowsFor(scenario.workspaceId)).toMatchObject({
       concepts: "0",
