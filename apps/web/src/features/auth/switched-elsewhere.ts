@@ -20,17 +20,33 @@ const HOME = { href: "/", replace: true, state: () => LANDED } as const;
 
 const SAID = refusedWith(refusalSentence({}, WORKSPACE_SWITCHED, "conflict"));
 
+type Reading = { readonly queryClient: QueryClient; readonly api: ApiProxy };
+
+/**
+ * Joined by a refusal landing meanwhile: a second follow's fresh read cancels the first's, so a page
+ * refused over and over never lands.
+ */
+const following = new WeakMap<QueryClient, Promise<typeof HOME>>();
+
+const followedOnce = (reading: Reading): Promise<typeof HOME> => {
+  const underWay = following.get(reading.queryClient);
+  if (underWay !== undefined) return underWay;
+  const followed = followTheSession(reading.queryClient, reading.api)
+    .then(() => HOME)
+    .finally(() => following.delete(reading.queryClient));
+  following.set(reading.queryClient, followed);
+  return followed;
+};
+
 /**
  * Told by the word alone, never the address: a refusal that lands after the person left the page
  * still means the tab is stale.
  */
 export const homeAfterASwitchElsewhere = (
   failure: Error,
-  reading: { readonly queryClient: QueryClient; readonly api: ApiProxy },
+  reading: Reading,
 ): Promise<typeof HOME> | undefined =>
-  refusalOf(failure)?.word === WORKSPACE_SWITCHED
-    ? followTheSession(reading.queryClient, reading.api).then(() => HOME)
-    : undefined;
+  refusalOf(failure)?.word === WORKSPACE_SWITCHED ? followedOnce(reading) : undefined;
 
 /** Said in the band, which outlives the page the frame draws afresh for the new workspace. */
 export const useSwitchedElsewhereSaid = (): Outcome | undefined => {

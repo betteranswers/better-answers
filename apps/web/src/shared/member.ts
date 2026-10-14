@@ -97,6 +97,11 @@ export const memberChanged = async (
   const filters = { queryKey: memberOptions(api).queryKey, exact: true };
   if (change.readAgain) {
     await queryClient.refetchQueries(filters);
+    // An action's settle may cancel ours with a read of its own; wait out the latest. A paused
+    // read leaves the loop.
+    while (queryClient.getQueryState(filters.queryKey)?.fetchStatus === "fetching") {
+      await queryClient.refetchQueries(filters, { cancelRefetch: false });
+    }
     const read = queryClient.getQueryState(filters.queryKey);
     // `refetchQueries` resolves on a failed or paused read too, so only a settled answer counts.
     if (read?.status === "success" && read.fetchStatus === "idle") return read.data;

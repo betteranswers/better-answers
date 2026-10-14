@@ -107,6 +107,10 @@ const landedHomeSayingWhy = async (page: Page, now: Workspace): Promise<void> =>
   await expect(switcherOf(page, now.name), "the band names the workspace left").toBeVisible();
 };
 
+/** A batch's address names its procedures; a call sent alone names one. */
+const askedIn = (url: string): readonly string[] =>
+  new URL(url).pathname.replace("/trpc/", "").split(",");
+
 /** Sam's page under `first`, read before the other tab switches. */
 const atSamsPage = async (page: Page, api: APIRequestContext, two: Two): Promise<Locator> => {
   const sam = await aMemberOfBoth(api, two, "Sam Okoro", { first: "Editor", second: "Viewer" });
@@ -223,6 +227,48 @@ test.describe("an action from a tab left in another workspace", () => {
     await backIn(elsewhere, two);
     await invitationsOpened(elsewhere);
     await stillWaits(elsewhere, kept, two.first);
+  });
+
+  test("sends a stale tab home once when several reads refuse", async ({
+    page,
+    context,
+    request,
+  }) => {
+    const two = await inTwoWorkspaces(page, request, {
+      first: "Ouse Cooperage",
+      second: "Foss Cooperage",
+    });
+    await page.goto("/knowledge/search");
+    await expect(switcherOf(page, two.first.name)).toBeVisible();
+    await switchedInAnotherTab(context, page, two);
+
+    const refused = new Set<string>();
+    page.on("response", async (answer) => {
+      if (!answer.url().includes("/trpc/")) return;
+      const asked = askedIn(answer.url());
+      const answers: unknown = await answer.json().catch(() => undefined);
+      if (!Array.isArray(answers)) return;
+      answers.forEach((each: unknown, at) => {
+        if (JSON.stringify(each).includes(`"${SWITCHED.word}"`)) refused.add(asked[at] ?? "");
+      });
+    });
+    // Each follow of the session reads the member again; history cannot tell two moves home apart.
+    let memberReads = 0;
+    page.on("request", (asking) => {
+      if (asking.url().includes("/trpc/") && askedIn(asking.url()).includes("session.member")) {
+        memberReads += 1;
+      }
+    });
+
+    // In the app, not a fresh document: the band keeps its member, and the page asks its reads together.
+    await page
+      .getByRole("navigation", { name: "Areas" })
+      .getByRole("link", { name: "Control Centre" })
+      .click();
+
+    await landedHomeSayingWhy(page, two.second);
+    expect(refused.size, `only ${[...refused].join(", ")} refused`).toBeGreaterThan(1);
+    expect(memberReads, "the session was followed more than once").toBe(1);
   });
 
   test("asks once when a role change is pressed twice", async ({ page, context, request }) => {
