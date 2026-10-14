@@ -16,9 +16,11 @@ import {
   rewriteHistory,
   withRepositoryLockAs,
   type GitDoor,
+  type Pseudonymisation,
 } from "../store/git/index.ts";
 import type { ObjectDoor } from "../store/objects/index.ts";
 import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { eraseFromTheActors, inEverySweep, type ActorsSwept } from "./actors.ts";
 import { eraseFromTheIdentitySet, type IdentityArm, type IdentitySwept } from "./identity.ts";
 import { erasureMapOf, type ErasureFamily, type ErasureMap } from "./map.ts";
 import { eraseFromTheQuestions, type QuestionsSwept } from "./questions.ts";
@@ -31,7 +33,7 @@ import {
   type ErasureRecord,
 } from "./report.ts";
 import { monthsOn, type SubjectRequest } from "./requests.ts";
-import { suppressInTheWorkspace, type Suppressed } from "./suppressions.ts";
+import { addressesSuppressedFor, suppressInTheWorkspace, type Suppressed } from "./suppressions.ts";
 
 const ERASURE_ACTOR = "process:better-answers-erasure";
 
@@ -261,10 +263,22 @@ const foundPerFamily = (map: ErasureMap): ErasureActions => {
 
 const BUNDLE_COMMIT: ErasureFamily = "bundle-commit";
 
-const withTheGitStep = (
-  actions: ErasureActions,
-  step: { readonly rewritten: number; readonly moved: number },
-): ErasureActions => ({
+type GitStep = {
+  readonly rewritten: number;
+  readonly moved: number;
+  readonly carried: { readonly concepts: number; readonly verifications: number };
+};
+
+const inBothPasses = (first: GitStep, second: GitStep): GitStep => ({
+  rewritten: first.rewritten + second.rewritten,
+  moved: first.moved + second.moved,
+  carried: {
+    concepts: first.carried.concepts + second.carried.concepts,
+    verifications: first.carried.verifications + second.carried.verifications,
+  },
+});
+
+const withTheGitStep = (actions: ErasureActions, step: GitStep): ErasureActions => ({
   ...actions,
   [CONCEPT_FILE]: { ...actions[CONCEPT_FILE], rewritten: step.rewritten },
   [BUNDLE_COMMIT]: { ...actions[BUNDLE_COMMIT], moved: step.moved },
@@ -274,12 +288,73 @@ const CONCEPT_VERIFICATION: ErasureFamily = "concept-verification";
 
 const withTheVerificationsMoved = (
   actions: ErasureActions,
-  carried: { readonly concepts: number; readonly verifications: number },
+  carried: GitStep["carried"],
 ): ErasureActions => ({
   ...actions,
   [CONCEPT_FILE]: { ...actions[CONCEPT_FILE], reindexed: carried.concepts },
   [CONCEPT_VERIFICATION]: { ...actions[CONCEPT_VERIFICATION], rehashed: carried.verifications },
 });
+
+const withTheActorsStep = (actions: ErasureActions, swept: ActorsSwept): ErasureActions => ({
+  ...actions,
+  [BUNDLE_COMMIT]: { ...actions[BUNDLE_COMMIT], actorsRewritten: swept.commits },
+  [CONCEPT_VERIFICATION]: {
+    ...actions[CONCEPT_VERIFICATION],
+    actorsRewritten: swept.verifications,
+  },
+});
+
+/**
+ * The lock spans the rewrite and the rows naming its commits: a reconciler tick between them
+ * meets a head its watermark cannot reach.
+ */
+const rewritingTheBundle = (
+  platform: ErasurePrincipal,
+  doors: ErasureDoors,
+  workspaceId: string,
+  who: Pseudonymisation & { readonly paths: readonly string[] },
+): Promise<Result<GitStep, Error>> =>
+  attempt(() =>
+    withRepositoryLockAs(platform, doors.git, workspaceId, async () => {
+      const { moved, paths } = await rewriteHistory(platform, doors.git, workspaceId, who);
+      const rows = await withScope(platform, doors.postgres, workspaceId, async (tx) => ({
+        moved: await moveBundleCommits(platform, tx, moved),
+        carried: await carryVerificationsOntoRewrite(platform, tx, doors.git, {
+          workspaceId,
+          paths: [...new Set([...who.paths, ...paths])],
+        }),
+      }));
+      return { rewritten: moved.length, moved: rows.moved, carried: rows.carried };
+    }),
+  );
+
+/**
+ * The suppression still holds the sign-in address once the user row is tombstoned. Actor rows go
+ * again for a commit the reconciler replayed.
+ */
+const afterTheMembersEnd = async (
+  platform: ErasurePrincipal,
+  doors: ErasureDoors,
+  subject: Pseudonymisation & {
+    readonly workspaceId: string;
+    readonly erasureRequestId: string;
+    readonly personIds: readonly (string | null)[];
+    readonly paths: readonly string[];
+  },
+): Promise<Result<{ readonly git: GitStep; readonly actors: ActorsSwept }, Error>> => {
+  const { workspaceId } = subject;
+  const suppressed = await attempt(() =>
+    withScope(platform, doors.postgres, workspaceId, (tx) => addressesSuppressedFor(tx, subject)),
+  );
+  if (!suppressed.ok) return err(suppressed.error);
+  const git = await rewritingTheBundle(platform, doors, workspaceId, {
+    ...subject,
+    addresses: [...new Set([...subject.addresses, ...suppressed.value])],
+  });
+  if (!git.ok) return err(git.error);
+  const actors = await attempt(() => eraseFromTheActors(platform, doors.postgres, subject));
+  return actors.ok ? ok({ git: git.value, actors: actors.value }) : err(actors.error);
+};
 
 /**
  * The arm, pseudonymisation and deletes go to the operator's log line: on this workspace's row
@@ -419,7 +494,12 @@ type ErasureOpened = {
   readonly map: ErasureMap;
   readonly concepts: readonly string[];
   readonly addresses: SubjectAddresses;
+
+  /** The person this request already pseudonymised, found by the tombstone it gave them. */
+  readonly tombstoned: readonly string[];
 };
+
+const TOMBSTONED = `SELECT id FROM "user" WHERE email = $1`;
 
 const openTheRequest = async (
   platform: ErasurePrincipal,
@@ -448,14 +528,26 @@ const openTheRequest = async (
           personIds: [personTheMapFound(map), request.personId],
           requested: request.identifiers?.emails ?? [],
         }),
+        tombstoned: (
+          await tx.query<{ id: string }>(TOMBSTONED, [`${pseudonym}@${ERASED_DOMAIN}`])
+        ).rows.map((row) => row.id),
       };
     }),
   );
   if (!searched.ok) return err(searched.error);
-  const { map, concepts, addresses } = searched.value;
+  const { map, concepts, addresses, tombstoned } = searched.value;
 
   if (namedInTheBundle(map) && addresses.inTheBundle.length === 0) return err("no-address");
-  return ok({ request, erasure, pseudonym, standingCompletion, map, concepts, addresses });
+  return ok({
+    request,
+    erasure,
+    pseudonym,
+    standingCompletion,
+    map,
+    concepts,
+    addresses,
+    tombstoned,
+  });
 };
 
 const completeTheRequest = async (
@@ -552,27 +644,18 @@ export const runErasure = async (
 
     const opened = await openTheRequest(platform, doors, workspaceId, requestId.data, lockedAt);
     if (!opened.ok) return err(opened.error);
-    const { request, erasure, pseudonym, standingCompletion, map, addresses } = opened.value;
+    const { request, erasure, pseudonym, standingCompletion, map, addresses, tombstoned } =
+      opened.value;
+    // A rerun after the identity step finds no member, but the tombstone still names the person.
+    const personIds = [personTheMapFound(map), request.personId, ...tombstoned];
+    const people = [...new Set(personIds.filter((person) => person !== null))];
 
-    const rewritten = await attempt(() =>
-      // The lock spans the rewrite and the rows naming its commits: a reconciler tick between
-      // them meets a head its watermark cannot reach.
-      withRepositoryLockAs(platform, doors.git, workspaceId, async () => {
-        const { moved } = await rewriteHistory(platform, doors.git, workspaceId, {
-          addresses: addresses.inTheBundle,
-          pseudonym,
-        });
-
-        const rows = await withScope(platform, doors.postgres, workspaceId, async (tx) => ({
-          moved: await moveBundleCommits(platform, tx, moved),
-          carried: await carryVerificationsOntoRewrite(platform, tx, doors.git, {
-            workspaceId,
-            paths: pathsNaming(map),
-          }),
-        }));
-        return { rewritten: moved.length, moved: rows.moved, carried: rows.carried };
-      }),
-    );
+    const rewritten = await rewritingTheBundle(platform, doors, workspaceId, {
+      addresses: addresses.inTheBundle,
+      people,
+      pseudonym,
+      paths: pathsNaming(map),
+    });
     if (!rewritten.ok) return err(rewritten.error);
 
     /**
@@ -593,22 +676,20 @@ export const runErasure = async (
 
     /**
      * Before the identity step, which ends the member: a rerun after it would find no person
-     * behind an address, and leave their questions.
+     * behind an address, and leave their questions and ids.
      */
-    const questions = await attempt(() =>
-      eraseFromTheQuestions(platform, doors.postgres, {
-        workspaceId,
-        personIds: [personTheMapFound(map), request.personId],
-        pseudonym,
-      }),
-    );
-    if (!questions.ok) return err(questions.error);
-    // Logged as the step commits, for the identity step's reason below.
-    logTheSweep(
-      doors.log,
-      questionsStepLineOf(platform, erasure.id, questions.value),
-      QUESTIONS_STEP_LOGGED,
-    );
+    const named = { workspaceId, personIds, pseudonym };
+    const swept = await attempt(async () => {
+      const questions = await eraseFromTheQuestions(platform, doors.postgres, named);
+      // Logged as the step commits, for the identity step's reason below.
+      logTheSweep(
+        doors.log,
+        questionsStepLineOf(platform, erasure.id, questions),
+        QUESTIONS_STEP_LOGGED,
+      );
+      return { questions, actors: await eraseFromTheActors(platform, doors.postgres, named) };
+    });
+    if (!swept.ok) return err(swept.error);
 
     const identity = await attempt(() =>
       eraseFromTheIdentitySet(platform, doors.postgres, {
@@ -628,6 +709,15 @@ export const runErasure = async (
       QUESTIONS_SINCE_LOGGED,
     );
 
+    const after = await afterTheMembersEnd(platform, doors, {
+      ...named,
+      erasureRequestId: erasure.id,
+      addresses: addresses.inTheBundle,
+      people,
+      paths: pathsNaming(map),
+    });
+    if (!after.ok) return err(after.error);
+
     const rederived = await attempt(() =>
       rederiveAfterErasure(platform, doors.postgres, {
         workspaceId,
@@ -637,12 +727,13 @@ export const runErasure = async (
     );
     if (!rederived.ok) return err(rederived.error);
 
+    const git = inBothPasses(rewritten.value, after.value.git);
     const actions = withTheQuestionsStep(
       withTheDocumentsStep(
         withTheIdentityStep(
-          withTheVerificationsMoved(
-            withTheGitStep(foundPerFamily(map), rewritten.value),
-            rewritten.value.carried,
+          withTheActorsStep(
+            withTheVerificationsMoved(withTheGitStep(foundPerFamily(map), git), git.carried),
+            inEverySweep(swept.value.actors, identity.value.actorsSince, after.value.actors),
           ),
           identity.value,
         ),
@@ -651,7 +742,7 @@ export const runErasure = async (
           connectedSourcesToReprocess: rederived.value.connectedSourcesToReprocess,
         },
       ),
-      inBothSweeps(questions.value, identity.value.questionsSince),
+      inBothSweeps(swept.value.questions, identity.value.questionsSince),
     );
     return completeTheRequest(platform, doors, workspaceId, opened.value, actions);
   });

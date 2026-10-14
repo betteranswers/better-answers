@@ -21,14 +21,53 @@ import {
   type Visibility,
 } from "../access/index.ts";
 import { recomputeWriteUpsIncluding } from "../guides/index.ts";
-import type { ActorId, PlatformPrincipal, Principal } from "../kernel/index.ts";
-import { fileAt, type Committed, type GitDoor } from "../store/git/index.ts";
+import {
+  attempt,
+  err,
+  type ActorId,
+  type PlatformPrincipal,
+  type Principal,
+  type PrincipalRefusal,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
+import {
+  commit,
+  fileAt,
+  type CommitRefusal,
+  type CommitRequest,
+  type Committed,
+  type GitDoor,
+} from "../store/git/index.ts";
 import { writeConceptDelta } from "../store/map/index.ts";
-import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
+import {
+  scopeClause,
+  scopeParameter,
+  withMember,
+  type PostgresDoor,
+  type Tx,
+} from "../store/postgres/index.ts";
 import { contentHashOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
 import type { Acceptance } from "./index.ts";
 import { markDeciding } from "./suggestions.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
+
+/**
+ * Commits as the member with their member row held until the commit is in git, so ending the
+ * member waits for a commit under way and refuses one that starts after it. The repository lock
+ * cannot: it fences one process, and the erasure routine runs in another.
+ */
+export const commitAsMember = async (
+  principal: UserPrincipal,
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
+  request: CommitRequest,
+): Promise<Result<Committed, CommitRefusal | PrincipalRefusal | Error>> => {
+  const held = await attempt(() =>
+    withMember(principal, doors.postgres, (fresh) => commit(fresh, doors.git, request)),
+  );
+  if (!held.ok) return err(held.error);
+  return held.value.ok ? held.value.value : err(held.value.error);
+};
 
 /** Title-cases each word and drops a plural: `policies` and `Policy` both fold to `Policy`. */
 export const foldKind = (kind: string): string =>

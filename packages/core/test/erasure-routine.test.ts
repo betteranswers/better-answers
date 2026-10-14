@@ -1,3 +1,7 @@
+import { randomBytes } from "node:crypto";
+import { access, mkdir, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -28,6 +32,7 @@ import {
   RECONCILER,
   reconcile,
   renderConceptFile,
+  writeConcept,
   type Frontmatter,
 } from "../src/concepts/index.ts";
 import {
@@ -412,6 +417,17 @@ const bundleCommitRowsIn = async (workspaceId: string) => {
     [workspaceId],
   );
   return read.rows;
+};
+
+const actorsIn = async (
+  table: "bundle_commit" | "concept_verification",
+  workspaceId: string,
+): Promise<readonly string[]> => {
+  const read = await db().pool.query<{ actor: string }>(
+    `SELECT actor FROM ${table} WHERE workspace_id = $1 ORDER BY actor`,
+    [workspaceId],
+  );
+  return read.rows.map((row) => row.actor);
 };
 
 const readingTheBundle = async (workspaceId: string, git: GitDoor) => ({
@@ -1136,7 +1152,7 @@ describe("the git step", () => {
       `human:${row?.pseudonym} <${row?.pseudonym}@erased.better-answers.invalid>`,
     ]);
 
-    expect(done.report).toContain("bundle-commit: found 2, moved 2");
+    expect(done.report).toContain("bundle-commit: actorsRewritten 2, found 2, moved 2");
   });
 
   it("refuses a request naming only an address already erased to", async () => {
@@ -1176,6 +1192,16 @@ describe("the bundle_commit rows the rewrite moves", () => {
     expect(commitOfTheConcept).toEqual(after.history[0]);
   });
 
+  it("names the pseudonym on each commit row, the person nowhere", async () => {
+    const { scenario, person, pseudonym, after } = await theBundleRewritten();
+
+    expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([
+      `human:${pseudonym}`,
+      `human:${pseudonym}`,
+    ]);
+    expect(after.objects).not.toContain(person.id);
+  });
+
   it("leaves the reconciler nothing to replay, head and watermark agreeing", async () => {
     const { scenario } = await theBundleRewritten();
 
@@ -1195,7 +1221,8 @@ describe("the bundle_commit rows the rewrite moves", () => {
 
     expect(actions).toMatchObject({
       "concept-file": { rewritten: 2 },
-      "bundle-commit": { moved: 2 },
+      "bundle-commit": { moved: 2, actorsRewritten: 2 },
+      "concept-verification": { actorsRewritten: 2 },
     });
 
     expect(actions["concept-file"]).toHaveProperty("found");
@@ -1223,7 +1250,7 @@ describe("the verifications the rewrite moved", () => {
   it("carries each onto the new hash under origin erasure-rewrite", async () => {
     const {
       email,
-      person,
+      pseudonym,
       iri,
       verificationsBefore,
       verificationsAfter,
@@ -1247,7 +1274,7 @@ describe("the verifications the rewrite moved", () => {
       hash: indexAfter?.content_hash,
 
       origin: "erasure-rewrite",
-      actor: before.actor,
+      actor: `human:${pseudonym}`,
       at: before.at,
     });
 
@@ -1255,7 +1282,7 @@ describe("the verifications the rewrite moved", () => {
     expect(trustAfter[0]).toEqual({
       tier: "human-reviewed",
       status: "current",
-      verifiedBy: actorIdOfPerson(person.id),
+      verifiedBy: `human:${pseudonym}`,
       verifiedAt: "2026-04-05T09:00:00.000Z",
       rider: null,
     });
@@ -1264,18 +1291,25 @@ describe("the verifications the rewrite moved", () => {
     );
   });
 
-  it("leaves a verification alone when only unhashed keys were rewritten", async () => {
-    const { person, steadyIri, verificationsBefore, verificationsAfter, trustBefore, trustAfter } =
-      await theBundleRewritten();
+  it("keeps a verification's hash when only unhashed keys were rewritten", async () => {
+    const {
+      pseudonym,
+      steadyIri,
+      verificationsBefore,
+      verificationsAfter,
+      trustBefore,
+      trustAfter,
+    } = await theBundleRewritten();
 
-    expect(verificationsAfter.find((verification) => verification.iri === steadyIri)).toEqual(
-      verificationsBefore.find((verification) => verification.iri === steadyIri),
-    );
+    expect(verificationsAfter.find((verification) => verification.iri === steadyIri)).toEqual({
+      ...verificationsBefore.find((verification) => verification.iri === steadyIri),
+      actor: `human:${pseudonym}`,
+    });
     expect(trustBefore[1]).toMatchObject({ verifiedBy: "Priya Anand" });
     expect(trustAfter[1]).toEqual({
       tier: "human-reviewed",
       status: "current",
-      verifiedBy: actorIdOfPerson(person.id),
+      verifiedBy: `human:${pseudonym}`,
       verifiedAt: "2026-04-05T09:00:00.000Z",
       rider: null,
     });
@@ -2155,10 +2189,35 @@ const completedForASubjectWithNoUserRow = async () => {
   return { scenario, done: await completing(scenario, seeded.id) };
 };
 
-describe("the questions a person asked", () => {
-  const pseudonymIn = async (workspaceId: string): Promise<string> =>
-    (await erasureRowsIn(workspaceId))[0]?.pseudonym ?? "no erasure ran";
+type Member = { readonly workspaceId: string; readonly userId: string };
 
+/**
+ * Holds the routine at its identity step's first delete, the git, questions and actors steps
+ * committed and the member not yet ended, while `meanwhile` runs.
+ */
+const heldAheadOfTheMembersEnd = async <T>(
+  scenario: Scenario,
+  subjectRequestId: string,
+  member: Member,
+  meanwhile: (resume: () => Promise<unknown>) => Promise<T>,
+) => {
+  await lastActiveIn(db().pool, member.workspaceId, member.userId);
+  return whileActionsWaitAt(db().pool, "workspace_last_active", "DELETE", async (release) => {
+    const erasing = runningTheRoutine(scenario, subjectRequestId);
+    await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
+    const met = await meanwhile(async () => {
+      await release();
+      return erasing;
+    });
+    await release();
+    return { done: await erasing, met };
+  });
+};
+
+const pseudonymIn = async (workspaceId: string): Promise<string> =>
+  (await erasureRowsIn(workspaceId))[0]?.pseudonym ?? "no erasure ran";
+
+describe("the questions a person asked", () => {
   const rowsOf = (recordId: string) => questionRowsOf(db().pool, recordId);
 
   it("rewrites the asker, removes the question and the note", async () => {
@@ -2268,8 +2327,6 @@ describe("the questions a person asked", () => {
     expect(await flagsOn(db().pool, theirs.recordId)).toEqual([erased, erased]);
   });
 
-  type Member = { readonly workspaceId: string; readonly userId: string };
-
   /** As an entry that writes runs: the member's rows are held until `work` commits. */
   const asTheMember = async <T>(
     member: Member,
@@ -2349,29 +2406,6 @@ describe("the questions a person asked", () => {
       { given_by: `human:${pseudonym}`, reason: "incomplete", note: null, disputed_sentence: null },
     ],
   });
-
-  /**
-   * Holds the routine at its identity step's first delete, the questions step committed and the
-   * member not yet ended, while `meanwhile` runs.
-   */
-  const heldAheadOfTheMembersEnd = async <T>(
-    scenario: Scenario,
-    subjectRequestId: string,
-    member: Member,
-    meanwhile: (resume: () => Promise<unknown>) => Promise<T>,
-  ) => {
-    await lastActiveIn(db().pool, member.workspaceId, member.userId);
-    return whileActionsWaitAt(db().pool, "workspace_last_active", "DELETE", async (release) => {
-      const erasing = runningTheRoutine(scenario, subjectRequestId);
-      await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
-      const met = await meanwhile(async () => {
-        await release();
-        return erasing;
-      });
-      await release();
-      return { done: await erasing, met };
-    });
-  };
 
   it("erases a question asked and flagged after its questions step", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
@@ -2666,7 +2700,7 @@ describe("a subject with no user row", () => {
     const { scenario, done } = await completedForASubjectWithNoUserRow();
 
     expect(done.report).toContain("concept-file: found 0, reindexed 0, rewritten 0");
-    expect(done.report).toContain("bundle-commit: found 0, moved 0");
+    expect(done.report).toContain("bundle-commit: actorsRewritten 0, found 0, moved 0");
     expect(done.report).toContain("- identity-user: found 0, membershipsEnded 0\n");
     expect(done.report).toContain(
       "source-document: bindingsReindexed 0, found 0, identifiersWithheld 2",
@@ -2861,5 +2895,283 @@ describe("a request the routine will not run", () => {
     const run = await runningTheRoutine(scenario, theirs.id);
 
     expect(run).toEqual({ ok: false, error: "no-such-request" });
+  });
+});
+
+/** A concept landed in a workspace and verified by `verifier` on 5 April 2026. */
+const conceptVerifiedBy = async (workspaceId: string, verifier: string): Promise<ConceptIri> =>
+  seedingWith(db().pool, async (seed) => {
+    const sha = randomBytes(20).toString("hex");
+    const actor = `human:${verifier}`;
+    await seed.bundleCommit({ workspaceId, sha, parentSha: null, actor });
+    const conceptPath = `knowledge/mileage-${sha.slice(0, 8)}.md`;
+    const frontmatter = { title: "Mileage", type: "Policy" };
+    const body = "Mileage is claimed at the published rate.";
+    const indexed = await seed.conceptIndex({
+      workspaceId,
+      path: conceptPath,
+      commitSha: sha,
+      frontmatter,
+      body,
+      contentHash: contentHashOf(frontmatter, body, conceptPath),
+    });
+    await seed.conceptVerification({
+      workspaceId,
+      iri: indexed.iri,
+      actor,
+      contentHash: indexed.contentHash,
+      verifiedAt: new Date("2026-04-05T09:00:00.000Z"),
+    });
+    return indexed.iri;
+  });
+
+describe("the arm the identity step takes", () => {
+  it("takes the last workspace for a person removed elsewhere meanwhile", async () => {
+    const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
+    const member = { workspaceId: scenario.workspaceId, userId: person.id };
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
+
+    const { done } = await heldAheadOfTheMembersEnd(scenario, subjectRequestId, member, () =>
+      db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+        elsewhere.workspaceId,
+        person.id,
+      ]),
+    );
+
+    if (!done.ok) throw new Error(`the routine refused: ${String(done.error)}`);
+    expect(operatorLinesAbout(done.value.erasureRequestId).map((line) => line.arm)).toEqual([
+      "last-workspace",
+    ]);
+    expect((await userRowOf(person.id))?.email).toMatch(/@erased\.better-answers\.invalid$/);
+  });
+});
+
+describe("the person's actor id on the platform's records", () => {
+  it("rewrites both families for a request by address alone", async () => {
+    const { scenario, email } = await bundleNamingThePerson();
+    const byAddress = await erasureRequestAbout(scenario.workspaceId, null, email);
+
+    const done = await completing(scenario, byAddress);
+
+    const pseudonym = (await erasureRowsIn(scenario.workspaceId)).find(
+      (row) => row.subject_request_id === byAddress,
+    )?.pseudonym;
+    const erased = `human:${pseudonym}`;
+    expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased, erased]);
+    expect(await actorsIn("concept_verification", scenario.workspaceId)).toEqual([erased, erased]);
+    expect(done.report).toContain("bundle-commit: actorsRewritten 2, found 2, moved 2");
+    expect(done.report).toContain("concept-verification: actorsRewritten 2, found 2, rehashed 1");
+  });
+
+  it("leaves another member's commit and verification as they were", async () => {
+    const { scenario, subjectRequestId } = await bundleNamingThePerson();
+    await conceptVerifiedBy(scenario.workspaceId, scenario.editor.userId);
+
+    await completing(scenario, subjectRequestId);
+
+    const theirs = actorIdOfPerson(scenario.editor.userId);
+    expect(await actorsIn("bundle_commit", scenario.workspaceId)).toContain(theirs);
+    expect(await actorsIn("concept_verification", scenario.workspaceId)).toContain(theirs);
+  });
+
+  it("names no verifier held elsewhere, saying a former member verified", async () => {
+    const { scenario, email, person } = await memberHereAndElsewhere();
+    const iri = await conceptVerifiedBy(scenario.workspaceId, person.id);
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
+    expect(await trustOf(scenario, iri)).toMatchObject({ verifiedBy: "Priya Anand" });
+
+    await completing(scenario, subjectRequestId);
+
+    const trust = await trustOf(scenario, iri);
+    expect(trust).toMatchObject({ verifiedBy: `human:${await pseudonymIn(scenario.workspaceId)}` });
+    expect(trust && trustWords(trust)).toBe("Verified by a former member · 5 April 2026");
+  });
+
+  it("rewrites rows the person lands before the member ends", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const member = { workspaceId: scenario.workspaceId, userId: person.id };
+
+    const { done } = await heldAheadOfTheMembersEnd(scenario, subjectRequestId, member, () =>
+      conceptVerifiedBy(scenario.workspaceId, person.id),
+    );
+
+    const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
+    expect(done.ok).toBe(true);
+    expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased]);
+    expect(await actorsIn("concept_verification", scenario.workspaceId)).toEqual([erased]);
+  });
+});
+
+const A_LATE_CONCEPT = {
+  mergeKey: "guideline:late-claims",
+  path: "knowledge/guidelines/late-claims.md",
+  kind: "Guideline",
+  title: "Late claims",
+  frontmatter: { title: "Late claims", type: "Guideline" },
+  body: "# Late claims\n\nA claim after thirty days needs a manager's note.",
+  message: "Record the late claims guideline",
+  status: "stable",
+  sensitivity: "Internal",
+} as const;
+
+const writingAsThePerson = async (
+  scenario: Scenario,
+  person: { readonly id: string },
+  email: string,
+) => {
+  const writer = await principalFor(db(), scenario.workspaceId, person.id);
+  const history = await bundleHistory(scenario.git, scenario.workspaceId);
+  return writeConcept(writer, doorsOf(scenario), {
+    ...A_LATE_CONCEPT,
+    frontmatter: { ...A_LATE_CONCEPT.frontmatter },
+    author: { name: "Priya Anand", email },
+    expects: { head: history.at(-1) ?? null },
+  });
+};
+
+/** Git's one seam inside a commit: a hook that parks a ref update, or refuses it, on a file. */
+const gatingRefUpdates = async (scenario: Scenario) => {
+  const repository = path.join(scenario.git.root, `${scenario.workspaceId}.git`);
+  const gate = path.join(repository, "gate");
+  const at = (name: string): string => path.join(gate, name);
+  const hooks = path.join(repository, "hooks");
+  await mkdir(gate, { recursive: true });
+  await mkdir(hooks, { recursive: true });
+  await writeFile(
+    path.join(hooks, "reference-transaction"),
+    [
+      "#!/bin/sh",
+      "cat >/dev/null",
+      '[ "$1" = prepared ] || exit 0',
+      `[ -e "${at("refuse")}" ] && exit 1`,
+      `[ -e "${at("park")}" ] || exit 0`,
+      `touch "${at("parked")}"`,
+      "turns=0",
+      `while [ -e "${at("park")}" ] && [ "$turns" -lt 1200 ]; do`,
+      "  sleep 0.05",
+      "  turns=$((turns + 1))",
+      "done",
+      "exit 0",
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  const exists = (name: string): Promise<boolean> =>
+    access(at(name)).then(
+      () => true,
+      () => false,
+    );
+  return {
+    park: () => writeFile(at("park"), ""),
+    parked: () => exists("parked"),
+    unpark: () => rm(at("park")),
+    refuse: () => writeFile(at("refuse"), ""),
+    allow: () => rm(at("refuse")),
+  };
+};
+
+const thePersonIn = async (scenario: Scenario, person: { readonly id: string }, email: string) => {
+  const objects = await everyObjectOf(scenario.git, scenario.workspaceId);
+  return {
+    address: objects.includes(email),
+    personId: objects.includes(person.id),
+    authors: (await authorLinesOf(scenario.git, scenario.workspaceId)).filter((line) =>
+      line.includes(email),
+    ),
+  };
+};
+
+const NOWHERE = { address: false, personId: false, authors: [] };
+
+describe("a commit made as the person while the routine runs", () => {
+  it("rewrites a concept the person writes after the git step", async () => {
+    const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
+    const member = { workspaceId: scenario.workspaceId, userId: person.id };
+
+    const { done, met } = await heldAheadOfTheMembersEnd(scenario, subjectRequestId, member, () =>
+      writingAsThePerson(scenario, person, email),
+    );
+
+    expect(met.ok).toBe(true);
+    expect(done.ok).toBe(true);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(3);
+    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+  });
+
+  it("ends the member after a commit underway, then rewrites it", async () => {
+    const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
+    const member = { workspaceId: scenario.workspaceId, userId: person.id };
+    const gate = await gatingRefUpdates(scenario);
+
+    const { done, met } = await heldAheadOfTheMembersEnd(
+      scenario,
+      subjectRequestId,
+      member,
+      async (resume) => {
+        await gate.park();
+        const writing = writingAsThePerson(scenario, person, email);
+        await until(gate.parked);
+        const ending = resume();
+        await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
+        await gate.unpark();
+        await ending;
+        return writing;
+      },
+    );
+
+    expect(done.ok).toBe(true);
+    expect(met).toEqual({ ok: false, error: "not-a-member" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(3);
+    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+
+    const swept = await reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+    expect(swept.ok && swept.value.replayed).toHaveLength(1);
+    const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
+    expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased, erased, erased]);
+  });
+
+  it("reaches a late commit by address after a failed run", async () => {
+    const scenario = await arrange();
+    const email = addressOf("priya");
+    const person = await memberOf(db().pool, scenario.workspaceId, email);
+    const member = { workspaceId: scenario.workspaceId, userId: person.id };
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, null, email);
+    const gate = await gatingRefUpdates(scenario);
+
+    const { done: died } = await heldAheadOfTheMembersEnd(
+      scenario,
+      subjectRequestId,
+      member,
+      async () => {
+        const written = await writingAsThePerson(scenario, person, email);
+        await gate.refuse();
+        return written;
+      },
+    );
+    await gate.allow();
+    const done = await completing(scenario, subjectRequestId, RAN_AGAIN_AT);
+
+    expect(died.ok).toBe(false);
+    expect(done.completedAt).toEqual(RAN_AGAIN_AT);
+    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+  });
+
+  it("refuses a write the person starts after the erasure", async () => {
+    const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
+    const writer = await principalFor(db(), scenario.workspaceId, person.id);
+    await completing(scenario, subjectRequestId);
+    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+
+    const refused = await writeConcept(writer, doorsOf(scenario), {
+      ...A_LATE_CONCEPT,
+      frontmatter: { ...A_LATE_CONCEPT.frontmatter },
+      author: { name: "Priya Anand", email },
+      expects: { head: before.at(-1) ?? null },
+    });
+
+    expect(refused).toEqual({ ok: false, error: "not-a-member" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
   });
 });

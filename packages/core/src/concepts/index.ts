@@ -50,7 +50,6 @@ import {
 } from "../kernel/index.ts";
 import {
   ANY_HEAD,
-  commit as commitToBundle,
   withRepositoryLock,
   type CommitAuthor,
   type Committed,
@@ -65,6 +64,7 @@ import {
   type HashedSource,
 } from "./file.ts";
 import {
+  commitAsMember,
   foldKind,
   heldByIri,
   heldVisibilityOf,
@@ -415,7 +415,7 @@ const writeUnderLock = async (
   if (!parsed.success) return err("malformed");
   const row = parsed.data;
 
-  const committed = await commitWrite(principal, doors.git, write, row.path, now);
+  const committed = await commitWrite(principal, doors, write, row.path, now);
   if (!committed.ok) return err(committed.error);
 
   const landed = await landWrite(principal, doors.postgres, write, row, committed.value);
@@ -502,13 +502,13 @@ const writeRefusalOf = (write: ParsedWrite, existing: Existing): WriteConceptRef
 
 const commitWrite = async (
   principal: UserPrincipal,
-  git: GitDoor,
+  doors: WriteDoors,
   write: ParsedWrite,
   path: string,
   at: Date,
 ) => {
   const { input } = write;
-  return commitToBundle(principal, git, {
+  return commitAsMember(principal, doors, {
     path,
     content: renderConceptFile(write.frontmatter, input.body),
     message: input.message,

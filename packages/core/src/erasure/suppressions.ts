@@ -24,6 +24,23 @@ const withTheSignInAddresses = (
 };
 
 /**
+ * The addresses the request's suppression holds, lower-cased. It is written before the identity
+ * step and never replaced, so it still holds the sign-in address once the user row is tombstoned.
+ */
+export const addressesSuppressedFor = async (
+  tx: Tx,
+  input: { readonly workspaceId: string; readonly erasureRequestId: string },
+): Promise<readonly string[]> => {
+  const held = await tx.query<{ email: string }>(
+    `SELECT lower(email) AS email
+       FROM suppression, jsonb_array_elements_text(identifiers -> 'emails') AS email
+      WHERE workspace_id = $1 AND erasure_request_id = $2`,
+    [input.workspaceId, input.erasureRequestId],
+  );
+  return held.rows.map((row) => row.email);
+};
+
+/**
  * Writes nothing for an empty set, and keeps the first set a request wrote. Answers the count of
  * the set that stands.
  */

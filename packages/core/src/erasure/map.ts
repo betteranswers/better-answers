@@ -87,12 +87,18 @@ const located = async (
   return found.rows.map((row) => row.location);
 };
 
-const aboutTheActor = async (
+/**
+ * By the request's person and by the member an address finds, so a former member's rows are
+ * named as a present one's are.
+ */
+const aboutTheActors = async (
   tx: Tx,
   subject: SubjectHere,
   statement: string,
-): Promise<readonly string[]> =>
-  subject.actor === null ? [] : located(tx, statement, [subject.workspaceId, subject.actor]);
+): Promise<readonly string[]> => {
+  const actors = askersOf([subject.actor, subject.memberId]);
+  return actors.length === 0 ? [] : located(tx, statement, [subject.workspaceId, actors]);
+};
 
 const aboutTheMember = async (
   tx: Tx,
@@ -134,20 +140,20 @@ const ERASURE_FAMILY_DESCRIPTORS = {
   "bundle-commit": {
     categories: ["actor-id"],
     find: (platform, subject, tx) =>
-      aboutTheActor(
+      aboutTheActors(
         tx,
         subject,
-        "SELECT sha AS location FROM bundle_commit WHERE workspace_id = $1 AND actor = $2",
+        "SELECT sha AS location FROM bundle_commit WHERE workspace_id = $1 AND actor = ANY($2)",
       ),
   },
 
   "concept-verification": {
     categories: ["actor-id"],
     find: (platform, subject, tx) =>
-      aboutTheActor(
+      aboutTheActors(
         tx,
         subject,
-        "SELECT id AS location FROM concept_verification WHERE workspace_id = $1 AND actor = $2",
+        "SELECT id AS location FROM concept_verification WHERE workspace_id = $1 AND actor = ANY($2)",
       ),
   },
 
@@ -254,22 +260,14 @@ const ERASURE_FAMILY_DESCRIPTORS = {
     find: (platform, subject, tx) => documentsNaming(platform, tx, subject),
   },
 
-  /**
-   * By the request's person and by the member an address finds, so a former member's records
-   * are named as a present one's are.
-   */
   "question-asked": {
     categories: ["actor-id", "typed-text"],
-    find: async (platform, subject, tx) => {
-      const askers = askersOf([subject.actor, subject.memberId]);
-      return askers.length === 0
-        ? []
-        : located(
-            tx,
-            "SELECT id AS location FROM question_asked WHERE workspace_id = $1 AND asked_by = ANY($2)",
-            [subject.workspaceId, askers],
-          );
-    },
+    find: (platform, subject, tx) =>
+      aboutTheActors(
+        tx,
+        subject,
+        "SELECT id AS location FROM question_asked WHERE workspace_id = $1 AND asked_by = ANY($2)",
+      ),
   },
 } satisfies Record<ErasureFamily, ErasureFamilyDescriptor>;
 
