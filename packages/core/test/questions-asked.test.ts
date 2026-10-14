@@ -442,6 +442,21 @@ const aMemberOf = async (admin: UserPrincipal, role: "Editor" | "Viewer") => {
   return principalFor(db(), admin.workspaceId, member.userId);
 };
 
+/** The first two pages of one record each, the second read from the first's cut. */
+const pagesOfOne = async (admin: UserPrincipal) => {
+  const first = answered(await asked(admin, { limit: 1 }));
+  const next = answered(await asked(admin, { limit: 1, cursor: first.nextCursor ?? undefined }));
+  return [first, next];
+};
+
+/** An Admin with one record asked and one open flag on it. */
+const anOpenFlag = async () => {
+  const admin = await anAsker();
+  const record = await aRecord(admin);
+  const flag = await aFlagOn(admin, record.id);
+  return { admin, record, flag };
+};
+
 const closingOf = async (feedbackId: string) => {
   const read = await db().pool.query(
     "SELECT closed_as, closed_at IS NOT NULL AS stamped FROM question_feedback WHERE id = $1",
@@ -485,14 +500,44 @@ describe("reading the questions asked", () => {
     const older = await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) });
     const newer = await aRecord(admin);
 
-    const first = answered(await asked(admin, { limit: 1 }));
-    const last = answered(await asked(admin, { limit: 1, cursor: first.nextCursor ?? "" }));
+    const pages = await pagesOfOne(admin);
 
-    expect(
-      [first, last].map((page) => [page.records.map(({ id }) => id), page.nextCursor]),
-    ).toEqual([
-      [[newer.id], newer.id],
+    expect(pages.map((page) => [page.records.map(({ id }) => id), page.nextCursor])).toEqual([
+      [[newer.id], { id: newer.id, flagged: false }],
       [[older.id], null],
+    ]);
+  });
+
+  it("pages from the last flagged record into the unflagged", async () => {
+    const admin = await anAsker();
+    const unflagged = await aRecord(admin);
+    const flagged = await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) });
+    await aFlagOn(admin, flagged.id);
+
+    const pages = await pagesOfOne(admin);
+
+    expect(pages.map((page) => page.records.map(({ id }) => id))).toEqual([
+      [flagged.id],
+      [unflagged.id],
+    ]);
+  });
+
+  it("keeps its place when the cut record's flag closes", async () => {
+    const admin = await anAsker();
+    const [earlier, later] = [
+      await aRecord(admin, { askedAt: new Date(Date.now() - 60_000) }),
+      await aRecord(admin),
+    ];
+    await aFlagOn(admin, earlier.id);
+    const laterFlag = await aFlagOn(admin, later.id);
+    const first = answered(await asked(admin, { limit: 1 }));
+    answered(await closing(admin, laterFlag.id, "no-fault-in-the-knowledge"));
+
+    const next = answered(await asked(admin, { limit: 1, cursor: first.nextCursor ?? undefined }));
+
+    expect([first, next].map((page) => page.records.map(({ id }) => id))).toEqual([
+      [later.id],
+      [earlier.id],
     ]);
   });
 
@@ -605,9 +650,7 @@ describe("reading the questions asked", () => {
 
 describe("closing a flag", () => {
   it("stores no fault, audits it once, and unflags the record", async () => {
-    const admin = await anAsker();
-    const record = await aRecord(admin);
-    const flag = await aFlagOn(admin, record.id);
+    const { admin, record, flag } = await anOpenFlag();
 
     const closed = await closing(admin, flag.id, "no-fault-in-the-knowledge");
 
@@ -631,9 +674,7 @@ describe("closing a flag", () => {
   });
 
   it("stores fixed in the knowledge as its outcome", async () => {
-    const admin = await anAsker();
-    const record = await aRecord(admin);
-    const flag = await aFlagOn(admin, record.id);
+    const { admin, flag } = await anOpenFlag();
 
     answered(await closing(admin, flag.id, "fixed-in-the-knowledge"));
 
@@ -643,9 +684,7 @@ describe("closing a flag", () => {
   });
 
   it("refuses a flag already closed, changing nothing", async () => {
-    const admin = await anAsker();
-    const record = await aRecord(admin);
-    const flag = await aFlagOn(admin, record.id);
+    const { admin, flag } = await anOpenFlag();
     answered(await closing(admin, flag.id, "fixed-in-the-knowledge"));
 
     const again = await closing(admin, flag.id, "no-fault-in-the-knowledge");
@@ -676,9 +715,7 @@ describe("closing a flag", () => {
   });
 
   it.each(["Editor", "Viewer"] as const)("refuses an %s the closing", async (role) => {
-    const admin = await anAsker();
-    const record = await aRecord(admin);
-    const flag = await aFlagOn(admin, record.id);
+    const { admin, flag } = await anOpenFlag();
 
     const refused = await closing(await aMemberOf(admin, role), flag.id, "fixed-in-the-knowledge");
 

@@ -2,7 +2,7 @@
 
 MIGRATION_ID = "0083_the-closed-flag"
 
-MIGRATION_WHEN = 1792020457249
+MIGRATION_WHEN = 1792022028759
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {

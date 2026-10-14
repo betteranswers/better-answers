@@ -46,9 +46,14 @@ const QUESTIONS_ASKED_PAGE_MAX = 100;
 
 const recordId = boundarySchemas.questionAsked.select.shape.id;
 
+/** Where a page was cut: its last record, and whether it was flagged when served. */
+const questionsAskedCursor = z.object({ id: recordId, flagged: z.boolean() });
+
+type QuestionsAskedCursor = z.output<typeof questionsAskedCursor>;
+
 export const questionsAskedInput = z.object({
-  /** The last record of the page before; absent for the first page. */
-  cursor: recordId.optional(),
+  /** Absent for the first page. */
+  cursor: questionsAskedCursor.optional(),
   limit: z.number().int().min(1).max(QUESTIONS_ASKED_PAGE_MAX).default(QUESTIONS_ASKED_PAGE),
 });
 
@@ -65,7 +70,7 @@ const skeleton = boundarySchemas.questionAsked.select;
 type KeptConcept = NonNullable<z.output<typeof skeleton>["concepts"]>[number];
 
 /** A concept a record cites, as the reader may read it now, with the trust it had then. */
-export type ConceptAsRead = {
+type ConceptAsRead = {
   readonly iri: ConceptIri;
   readonly kind: string;
   readonly title: string;
@@ -78,7 +83,7 @@ export type ConceptAsRead = {
 
 type DraftedSentence = { readonly sentence: string; readonly concepts: readonly ConceptIri[] };
 
-export type FeedbackAsRead = {
+type FeedbackAsRead = {
   readonly id: string;
   readonly givenAt: string;
   readonly verdict: z.output<typeof boundarySchemas.questionFeedback.select>["verdict"];
@@ -90,7 +95,7 @@ export type FeedbackAsRead = {
   readonly closedAt: string | null;
 };
 
-export type RecordAsRead = {
+type RecordAsRead = {
   readonly id: string;
   readonly askedAt: string;
   readonly askedBy: AuditEventActor;
@@ -113,31 +118,39 @@ export type RecordAsRead = {
 
 export type QuestionsAskedPage = {
   readonly records: readonly RecordAsRead[];
-  /** The last record's id when another page follows; null on the last page. */
-  readonly nextCursor: string | null;
+  /** Null on the last page. */
+  readonly nextCursor: QuestionsAskedCursor | null;
 };
 
 export type QuestionsAskedRefusal = RefusalOf<typeof readQuestionsAskedAction> | Error;
 
-/**
- * Flagged first, then newest, a record flagged while any flag on it is open. The cursor's place is
- * read in SQL, never through a `Date`.
- */
+/** Each arm reads one page by its index; the cut keeps its served flag, so a closing mid-read loses nothing. */
 const A_PAGE_OF_RECORDS = `WITH open_flags AS (
     SELECT DISTINCT record_id FROM question_feedback
      WHERE workspace_id = $1 AND verdict = '${FEEDBACK_FLAG_VERDICT}' AND closed_at IS NULL
-  ), placed AS (
-    SELECT q.*, o.record_id IS NOT NULL AS flagged
-      FROM question_asked q LEFT JOIN open_flags o ON o.record_id = q.id
-     WHERE q.workspace_id = $1
+  ), cut AS (
+    SELECT asked_at, id FROM question_asked WHERE workspace_id = $1 AND id = $2
+  ), page AS (
+    (SELECT q.*, true AS flagged
+       FROM question_asked q JOIN open_flags o ON o.record_id = q.id
+      WHERE q.workspace_id = $1
+        AND ($2::text IS NULL OR ($4::boolean AND (q.asked_at, q.id) < (SELECT asked_at, id FROM cut)))
+      ORDER BY q.asked_at DESC NULLS LAST, q.id DESC NULLS LAST
+      LIMIT $3 + 1)
+    UNION ALL
+    (SELECT q.*, false AS flagged
+       FROM question_asked q
+      WHERE q.workspace_id = $1
+        AND NOT EXISTS (SELECT 1 FROM open_flags o WHERE o.record_id = q.id)
+        AND ($2::text IS NULL OR $4::boolean OR (q.asked_at, q.id) < (SELECT asked_at, id FROM cut))
+      ORDER BY q.asked_at DESC NULLS LAST, q.id DESC NULLS LAST
+      LIMIT $3 + 1)
   )
   SELECT r.id, r.asked_at AS "askedAt", r.asked_by AS "askedBy", r.transport, r.collections,
          r.verdict, r.judge_state AS "judgeState", r.concepts, c.question, c.drafted, r.flagged
-    FROM placed r
+    FROM page r
     LEFT JOIN question_content c
            ON c.workspace_id = r.workspace_id AND c.record_id = r.id AND c.asked_at = r.asked_at
-   WHERE $2::text IS NULL
-      OR (r.flagged, r.asked_at, r.id) < (SELECT flagged, asked_at, id FROM placed WHERE id = $2)
    ORDER BY r.flagged DESC, r.asked_at DESC, r.id DESC
    LIMIT $3 + 1`;
 
@@ -239,6 +252,9 @@ type Read = {
   readonly askers: PeopleNames;
 };
 
+const cutAt = (last: PageRow | undefined): QuestionsAskedCursor | null =>
+  last === undefined ? null : { id: last.id, flagged: last.flagged };
+
 const NOTHING_READ: Read = { readable: new Map(), feedback: new Map(), askers: new Map() };
 
 const recordAsRead = (row: PageRow, read: Read): RecordAsRead => {
@@ -295,6 +311,13 @@ const readOf = async (
   });
 };
 
+const pageParameters = (admin: AdminUserPrincipal, { cursor, limit }: QuestionsAskedInput) => [
+  admin.workspaceId,
+  cursor?.id ?? null,
+  limit,
+  cursor?.flagged ?? null,
+];
+
 /**
  * Every record for an Admin, a page at a time, open flags first, then newest. Each concept is read
  * under the Admin's predicate now: one they cannot read is absent with no sign, as is a drafted or
@@ -309,9 +332,10 @@ export const readQuestionsAsked = async (
   if (!admitted.ok) return err(admitted.error);
   const admin = admitted.value;
 
-  const asked = [admin.workspaceId, input.cursor ?? null, input.limit];
   const page = await attempt(async () =>
-    (await tx.query(A_PAGE_OF_RECORDS, asked)).rows.map((row) => pageRow.parse(row)),
+    (await tx.query(A_PAGE_OF_RECORDS, pageParameters(admin, input))).rows.map((row) =>
+      pageRow.parse(row),
+    ),
   );
   if (!page.ok) return err(page.error);
   const rows = page.value.slice(0, input.limit);
@@ -319,7 +343,7 @@ export const readQuestionsAsked = async (
   if (!read.ok) return err(read.error);
   return ok({
     records: rows.map((row) => recordAsRead(row, read.value)),
-    nextCursor: page.value.length > input.limit ? (rows.at(-1)?.id ?? null) : null,
+    nextCursor: page.value.length > input.limit ? cutAt(rows.at(-1)) : null,
   });
 };
 

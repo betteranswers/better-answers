@@ -1,5 +1,5 @@
 {
-  "id": "09b1fdd7-a434-471a-bf85-198961b868af",
+  "id": "2ad08b8c-5eb4-449b-897c-dcc6f72e62b8",
   "prevId": "966a377a-75ac-4852-a571-b0594ec152f7",
   "version": "7",
   "dialect": "postgresql",
@@ -6049,6 +6049,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "question_asked_workspace_id_asked_at_id_idx": {
+          "name": "question_asked_workspace_id_asked_at_id_idx",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "asked_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -6306,6 +6333,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "question_feedback_open_flag_idx": {
+          "name": "question_feedback_open_flag_idx",
+          "columns": [
+            {
+              "expression": "workspace_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "record_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "verdict = 'flag' AND closed_at IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

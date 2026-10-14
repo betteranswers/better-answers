@@ -66,6 +66,12 @@ export const questionAsked = withRLS(
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
     index("question_asked_workspace_id_asked_by_idx").on(table.workspaceId, table.askedBy),
+    /** Questions asked pages newest first, so a page reads its rows and not the workspace's. */
+    index("question_asked_workspace_id_asked_at_id_idx").on(
+      table.workspaceId,
+      table.askedAt.desc(),
+      table.id.desc(),
+    ),
 
     check("question_asked_asked_by_check", sql.raw(`asked_by ~ '^${ACTOR_ID_PATTERN}$'`)),
     check(
@@ -156,6 +162,9 @@ export const questionFeedback = withRLS(
     }),
     index("question_feedback_workspace_id_record_id_idx").on(table.workspaceId, table.recordId),
     index("question_feedback_workspace_id_given_by_idx").on(table.workspaceId, table.givenBy),
+    index("question_feedback_open_flag_idx")
+      .on(table.workspaceId, table.recordId)
+      .where(sql.raw(`verdict = '${FEEDBACK_FLAG_VERDICT}' AND closed_at IS NULL`)),
 
     check("question_feedback_given_by_check", sql.raw(`given_by ~ '^${ACTOR_ID_PATTERN}$'`)),
     check("question_feedback_verdict_check", sql.raw(`verdict IN (${listed(FEEDBACK_VERDICTS)})`)),

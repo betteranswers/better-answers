@@ -90,13 +90,7 @@ export {
   closeFlagInput,
   questionsAskedInput,
   readQuestionsAsked,
-  type CloseFlagInput,
-  type ConceptAsRead,
-  type FeedbackAsRead,
-  type FlagClosed,
   type QuestionsAskedInput,
-  type QuestionsAskedPage,
-  type RecordAsRead,
 } from "./records.ts";
 
 export {
