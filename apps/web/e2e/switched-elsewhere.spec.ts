@@ -107,23 +107,9 @@ const landedHomeSayingWhy = async (page: Page, now: Workspace): Promise<void> =>
   await expect(switcherOf(page, now.name), "the band names the workspace left").toBeVisible();
 };
 
-/** Counted in the page from now on: each move of the tab home, which a URL matcher sees only last. */
-const homesCounted = async (page: Page) => {
-  await page.evaluate(() => {
-    const homes = { count: 0 };
-    for (const way of ["pushState", "replaceState"] as const) {
-      const moved = history[way].bind(history);
-      history[way] = (state, unused, url) => {
-        if (url !== undefined && url !== null && new URL(url, location.href).pathname === "/") {
-          homes.count += 1;
-        }
-        moved(state, unused, url);
-      };
-    }
-    Reflect.set(window, "homesCounted", homes);
-  });
-  return () => page.evaluate((): number => Reflect.get(window, "homesCounted").count);
-};
+/** A batch's address names its procedures; a call sent alone names one. */
+const askedIn = (url: string): readonly string[] =>
+  new URL(url).pathname.replace("/trpc/", "").split(",");
 
 /** Sam's page under `first`, read before the other tab switches. */
 const atSamsPage = async (page: Page, api: APIRequestContext, two: Two): Promise<Locator> => {
@@ -259,14 +245,20 @@ test.describe("an action from a tab left in another workspace", () => {
     const refused = new Set<string>();
     page.on("response", async (answer) => {
       if (!answer.url().includes("/trpc/")) return;
-      const asked = new URL(answer.url()).pathname.replace("/trpc/", "").split(",");
+      const asked = askedIn(answer.url());
       const answers: unknown = await answer.json().catch(() => undefined);
       if (!Array.isArray(answers)) return;
       answers.forEach((each: unknown, at) => {
         if (JSON.stringify(each).includes(`"${SWITCHED.word}"`)) refused.add(asked[at] ?? "");
       });
     });
-    const homes = await homesCounted(page);
+    // Each follow of the session reads the member again; history cannot tell two moves home apart.
+    let memberReads = 0;
+    page.on("request", (asking) => {
+      if (asking.url().includes("/trpc/") && askedIn(asking.url()).includes("session.member")) {
+        memberReads += 1;
+      }
+    });
 
     // In the app, not a fresh document: the band keeps its member, and the page asks its reads together.
     await page
@@ -276,7 +268,7 @@ test.describe("an action from a tab left in another workspace", () => {
 
     await landedHomeSayingWhy(page, two.second);
     expect(refused.size, `only ${[...refused].join(", ")} refused`).toBeGreaterThan(1);
-    expect(await homes(), "the tab was sent home more than once").toBe(1);
+    expect(memberReads, "the session was followed more than once").toBe(1);
   });
 
   test("asks once when a role change is pressed twice", async ({ page, context, request }) => {

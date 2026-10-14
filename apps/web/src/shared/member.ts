@@ -97,8 +97,9 @@ export const memberChanged = async (
   const filters = { queryKey: memberOptions(api).queryKey, exact: true };
   if (change.readAgain) {
     await queryClient.refetchQueries(filters);
-    // A read begun meanwhile, by another follow or an action's settle, cancelled ours: wait on it.
-    if (queryClient.getQueryState(filters.queryKey)?.fetchStatus === "fetching") {
+    // An action's settle may cancel ours with a read of its own; wait out the latest. A paused
+    // read leaves the loop.
+    while (queryClient.getQueryState(filters.queryKey)?.fetchStatus === "fetching") {
       await queryClient.refetchQueries(filters, { cancelRefetch: false });
     }
     const read = queryClient.getQueryState(filters.queryKey);

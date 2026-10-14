@@ -74,6 +74,38 @@ const landedInHolme = async () => {
   await waitFor(() => expect(band().getByRole("alert").textContent).toBe(SAID));
 };
 
+/** Watched from now on, since a check at one moment can miss a blank: the band naming no workspace. */
+const bandBlanksWatched = () => {
+  let blanked = false;
+  const watching = new MutationObserver(() => {
+    if (switcherDrawn(NORTHERN) === null && switcherDrawn(HOLME) === null) blanked = true;
+  });
+  watching.observe(document.body, { subtree: true, childList: true, characterData: true });
+  return () => {
+    watching.disconnect();
+    return blanked;
+  };
+};
+
+/** Held until `resolve`. A refused action's settle reads the member again, cancelling the read under way. */
+const memberHeldAndCounted = (api: Api) => {
+  const member = heldBack(api, "session.member", adaAt("Admin", HOLME));
+  const answer = api.get("session.member");
+  let reads = 0;
+  api.set("session.member", () => {
+    reads += 1;
+    return answer?.();
+  });
+  const askedAgainOnceSettled = async (refusal: { readonly resolve: () => void }) => {
+    const before = reads;
+    refusal.resolve();
+    await waitFor(() =>
+      expect(reads, "the refused action's settle read no member").toBeGreaterThan(before),
+    );
+  };
+  return { ...member, askedAgainOnceSettled };
+};
+
 /** Refused once another browser tab took the session to Holme Valley Tools, Ada a Viewer there. */
 const refusedAfterASwitch = async () => {
   const api = adaAnAdmin();
@@ -155,33 +187,44 @@ describe("a tab whose workspace the session has left", () => {
     await openGracesPage(api);
     aSwitchInAnotherTab(api, "Admin");
     api.set("members.changeRole", () => SWITCHED);
-    const member = heldBack(api, "session.member", adaAt("Admin", HOLME));
-    // The second action's settle reads the member again, which cancels the follow's own read.
-    const overtaken = Promise.withResolvers<void>();
-    const answer = api.get("session.member");
-    let memberReads = 0;
-    api.set("session.member", () => {
-      memberReads += 1;
-      if (memberReads === 2) overtaken.resolve();
-      return answer?.();
-    });
-    let blanked = false;
-    const watching = new MutationObserver(() => {
-      if (switcherDrawn(NORTHERN) === null && switcherDrawn(HOLME) === null) blanked = true;
-    });
-    watching.observe(document.body, { subtree: true, childList: true, characterData: true });
+    const member = memberHeldAndCounted(api);
+    const blanked = bandBlanksWatched();
 
     fireEvent.click(screen.getByRole("button", { name: "End Every Sign-In and Token Here" }));
     await second.asked;
     changeGracesRole();
     await member.asked;
-    second.resolve();
-    await overtaken.promise;
+    await member.askedAgainOnceSettled(second);
     member.resolve();
     await landedInHolme();
-    watching.disconnect();
 
-    expect(blanked, "the band blanked while the member was read").toBe(false);
+    expect(blanked(), "the band blanked while the member was read").toBe(false);
+  });
+
+  it("keeps the band drawn when three refusals overlap the follow", async () => {
+    const api = adaAnAdmin();
+    const ended = heldBack(api, "members.endEverySignInAndToken", SWITCHED);
+    const changed = heldBack(api, "members.changeRole", SWITCHED);
+    const removed = heldBack(api, "members.remove", SWITCHED);
+    await openGracesPage(api);
+    aSwitchInAnotherTab(api, "Admin");
+    const member = memberHeldAndCounted(api);
+    const blanked = bandBlanksWatched();
+
+    // Sent apart: actions in one request are answered together.
+    fireEvent.click(screen.getByRole("button", { name: "End Every Sign-In and Token Here" }));
+    await ended.asked;
+    changeGracesRole();
+    await changed.asked;
+    const removal = screen.getByRole("region", { name: /^Removal$/ });
+    fireEvent.click(within(removal).getByRole("button", { name: "Remove Member" }));
+    fireEvent.click(within(removal).getByRole("button", { name: /^Remove$/ }));
+    await removed.asked;
+    for (const refusal of [changed, ended, removed]) await member.askedAgainOnceSettled(refusal);
+    member.resolve();
+    await landedInHolme();
+
+    expect(blanked(), "the band blanked while the member was read").toBe(false);
   });
 
   it("draws no name of the workspace left when unread", async () => {
