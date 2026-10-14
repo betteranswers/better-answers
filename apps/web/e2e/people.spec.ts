@@ -5,6 +5,8 @@ import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  ACTION_SAMPLES,
+  actionClocked,
   A_ROLE,
   addMember,
   aMemberSignedInAt,
@@ -35,6 +37,7 @@ import {
   switcherOf,
   tabUntilFocused,
   theActionLandedWithinItsBudget,
+  theActionsLandedWithinTheirBudget,
 } from "./harness.ts";
 import { refusalAnswering } from "./refused-read.ts";
 
@@ -1244,13 +1247,45 @@ test.describe("ending every sign-in and token a member holds here", () => {
   });
 });
 
+/** Viewers joined, then removed by keyboard with each confirming key timed: back on the list, a first click goes nowhere. */
+const removedAtAKey = async (
+  page: Page,
+  api: APIRequestContext,
+  workspaceId: string,
+): Promise<number[]> => {
+  const names = Array.from(
+    { length: ACTION_SAMPLES - 1 },
+    (_unused, at) => `Extra ${String(at + 1)}`,
+  );
+  for (const displayName of names) {
+    const made = await person(api, anAddress("extra"), { displayName });
+    await addMember(api, { workspaceId, userId: made.id, role: "Viewer" });
+  }
+  await page.reload();
+  const samples: number[] = [];
+  for (const [at, name] of names.entries()) {
+    const left = 1 + names.length - at;
+    await memberLink(page, name).focus();
+    await page.keyboard.press("Enter");
+    await expect(personHeading(page, name)).toBeVisible();
+    await removalOf(page).getByRole("button", { name: "Remove Member" }).focus();
+    await page.keyboard.press("Enter");
+    await removalOf(page).getByRole("button", { name: "Remove", exact: true }).focus();
+    await clockTheNextKey(page, { at: THE_COUNT, reads: String(left) });
+    await page.keyboard.press("Enter");
+    await expect(memberRows(page)).toHaveCount(left);
+    samples.push(await actionClocked(page));
+  }
+  return samples;
+};
+
 test.describe("removing a member from their page", () => {
   test("removes a member behind a confirmation, within its budget", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
-    await anAdminAtPeople(page, request, "Rye Foundry");
+    const { workspaceId } = await anAdminAtPeople(page, request, "Rye Foundry");
     // Sorted, so the return is seen to keep what the list's address held.
     const person = membersRegion(page).getByRole("columnheader", { name: "Person" });
     await person.getByRole("button").click();
@@ -1291,7 +1326,7 @@ test.describe("removing a member from their page", () => {
     await expect(person).toHaveAttribute("aria-sort", "descending");
     await expect(listHeading(page)).toBeFocused();
     await expect(outcomeOf(page)).toContainText("Priya Shah");
-    await theActionLandedWithinItsBudget(page, "removal");
+    const priyas = await actionClocked(page);
 
     await page.goBack();
     await expect(page).toHaveURL(priyasPage);
@@ -1300,6 +1335,9 @@ test.describe("removing a member from their page", () => {
     await page.goto(MEMBERS_PAGE);
     await expect(memberRows(page)).toHaveCount(2);
     await expect(rowOf(page, "Priya Shah")).toHaveCount(0);
+
+    const more = await removedAtAKey(page, request, workspaceId);
+    theActionsLandedWithinTheirBudget("removal", [priyas, ...more]);
   });
 
   test("says on Members why a removal was refused, row restored", async ({
@@ -1744,6 +1782,36 @@ const aWorkspaceOfThirtyEditors = async (
 /** A bulk dialog's lines: one more stands in it when the selection includes the reader. */
 const linesIn = (dialog: Locator): Locator => dialog.getByRole("paragraph");
 
+/** Two on the first page and one on the second, apart from each other set and from Person 03. */
+const MORE_TICKED = [
+  ["Person 04", "Person 05", "Person 26"],
+  ["Person 06", "Person 07", "Person 28"],
+  ["Person 08", "Person 09", "Person 29"],
+  ["Person 10", "Person 11", "Person 30"],
+] as const;
+
+/** By keyboard: after a bulk dialog closes, the first click on a tick ticks nothing. */
+const tickedByKeyboard = async (page: Page, name: string): Promise<void> => {
+  await tickOf(page, name).focus();
+  await page.keyboard.press("Space");
+  await expect(tickOf(page, name)).toBeChecked();
+};
+
+/** Commits the open dialog's Viewer, timed until the second page's ticked member reads it. */
+const rolesChangedAtAKey = async (
+  page: Page,
+  dialog: Locator,
+  onPageTwo: string,
+): Promise<number> => {
+  await dialog.getByRole("button", { name: "Change Role", exact: true }).focus();
+  await clockTheNextKey(page, {
+    at: `//tr[.//a[normalize-space(.)='${onPageTwo}']]/td[3]`,
+    reads: "Viewer",
+  });
+  await page.keyboard.press("Enter");
+  return actionClocked(page);
+};
+
 /** Opens the bar's Change Role and answers the dialog `titled`, the role select in focus. */
 const changeRoleOpened = async (page: Page, titled: string): Promise<Locator> => {
   await selectionAction(page, "Change Role").click();
@@ -2022,18 +2090,26 @@ test.describe("bulk actions on the members ticked", () => {
     await expect(linesIn(dialog), "a line warns three others as it would the reader").toHaveCount(
       2,
     );
-    const commit = dialog.getByRole("button", { name: "Change Role", exact: true });
-    await commit.focus();
-    await clockTheNextKey(page, {
-      at: "//tr[.//a[normalize-space(.)='Person 27']]/td[3]",
-      reads: "Viewer",
-    });
-    await page.keyboard.press("Enter");
+    const samples = [await rolesChangedAtAKey(page, dialog, "Person 27")];
 
     await expect(outcomeOf(page), "the outcome counts three changed, and none skipped").toHaveText(
       /^\D*3\D*$/,
     );
-    await theActionLandedWithinItsBudget(page, "bulk role change");
+    for (const [first, second, onPageTwo] of MORE_TICKED) {
+      await page.keyboard.press(PEOPLE_KEYSTROKES.previousPage.key);
+      await tickedByKeyboard(page, first);
+      await tickedByKeyboard(page, second);
+      await page.keyboard.press(PEOPLE_KEYSTROKES.nextPage.key);
+      await tickedByKeyboard(page, onPageTwo);
+      // The bar refuses another set while the last is still out.
+      await expect(selectionAction(page, "Change Role")).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      const again = await changeRoleOpened(page, "Change Role for 3 Members");
+      samples.push(await rolesChangedAtAKey(page, again, onPageTwo));
+    }
+    theActionsLandedWithinTheirBudget("bulk role change", samples);
     await page.keyboard.press(PEOPLE_KEYSTROKES.previousPage.key);
     await expect(cellOf(page, "Person 01", "Role")).toHaveText("Viewer");
     await expect(cellOf(page, "Person 02", "Role")).toHaveText("Viewer");
