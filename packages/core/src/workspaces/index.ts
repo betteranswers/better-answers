@@ -66,6 +66,8 @@ export {
 } from "./display-name.ts";
 export type { SetDisplayNameRefusal } from "./display-name.ts";
 export { listWorkspaces } from "./listing.ts";
+export { setModelKey } from "./model-key.ts";
+export type { ModelKeySet, SetModelKeyRefusal } from "./model-key.ts";
 export {
   operatorAddresses,
   restoreSignIn,

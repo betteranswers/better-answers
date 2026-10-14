@@ -15,6 +15,8 @@ import {
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
+export { openCredentials } from "./credentials.ts";
+export type { Credentials, ModelKey, ModelKeyOf } from "./credentials.ts";
 export { checkTypedText } from "./typed-text.ts";
 
 export const LLM_PURPOSES = llmPurpose.enumValues;

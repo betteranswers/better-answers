@@ -14,6 +14,7 @@ export {
   openEnvelope,
   sealEnvelope,
 } from "./envelope.ts";
+export type { OpenEnvelopeRefusal } from "./envelope.ts";
 export { classesIn, REFUSAL_CLASSES, refusalsIn } from "./refusal.ts";
 export type { Catalogue, RefusalClass, Vocabulary, WordIn } from "./refusal.ts";
 export { KERNEL_REFUSALS, MALFORMED, NOT_FOUND } from "./vocabulary.ts";
