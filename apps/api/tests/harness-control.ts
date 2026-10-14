@@ -180,10 +180,11 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json(await app.invite(asked));
   });
 
+  // The api's own instant, as the product takes it: one ahead of it refuses a sign-in made before it.
   control.post(`${HARNESS_PREFIX}/revocations`, async (context) => {
     const asked = await readBody(context.req.raw, revocation);
 
-    await app.endEverySignInAndToken(asked.userId, new Date(Date.now() + 1_000));
+    await app.endEverySignInAndToken(asked.userId, new Date());
     return context.json({ revoked: true });
   });
 
