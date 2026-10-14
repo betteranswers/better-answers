@@ -347,10 +347,11 @@ const afterTheMembersEnd = async (
     withScope(platform, doors.postgres, workspaceId, (tx) => addressesSuppressedFor(tx, subject)),
   );
   if (!suppressed.ok) return err(suppressed.error);
-  const git = await rewritingTheBundle(platform, doors, workspaceId, {
-    ...subject,
-    addresses: [...new Set([...subject.addresses, ...suppressed.value])],
-  });
+  // An address typed into the request may be another erasure's tombstone, which stays as it is.
+  const addresses = [...new Set([...subject.addresses, ...suppressed.value])].filter(
+    (address) => !address.endsWith(`@${ERASED_DOMAIN}`),
+  );
+  const git = await rewritingTheBundle(platform, doors, workspaceId, { ...subject, addresses });
   if (!git.ok) return err(git.error);
   const actors = await attempt(() => eraseFromTheActors(platform, doors.postgres, subject));
   return actors.ok ? ok({ git: git.value, actors: actors.value }) : err(actors.error);

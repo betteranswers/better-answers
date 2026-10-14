@@ -3132,12 +3132,19 @@ describe("a commit made as the person while the routine runs", () => {
     expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased, erased, erased]);
   });
 
-  it("reaches a late commit by address after a failed run", async () => {
+  it.each([
+    { named: "address", byId: false },
+    { named: "id", byId: true },
+  ])("reaches a late commit by $named after a failed run", async ({ byId }) => {
     const scenario = await arrange();
     const email = addressOf("priya");
     const person = await memberOf(db().pool, scenario.workspaceId, email);
     const member = { workspaceId: scenario.workspaceId, userId: person.id };
-    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, null, email);
+    const subjectRequestId = await erasureRequestAbout(
+      scenario.workspaceId,
+      byId ? person.id : null,
+      byId ? null : email,
+    );
     const gate = await gatingRefUpdates(scenario);
 
     const { done: died } = await heldAheadOfTheMembersEnd(
@@ -3156,6 +3163,34 @@ describe("a commit made as the person while the routine runs", () => {
     expect(died.ok).toBe(false);
     expect(done.completedAt).toEqual(RAN_AGAIN_AT);
     expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+  });
+
+  it("rewrites rows landed before a failed run, held elsewhere", async () => {
+    const { scenario, email, person } = await bundleNamingThePerson();
+    const elsewhere = await arrange();
+    await seedingWith(db().pool, (seed) =>
+      seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
+    );
+    const member = { workspaceId: scenario.workspaceId, userId: person.id };
+    const byAddress = await erasureRequestAbout(scenario.workspaceId, null, email);
+    const gate = await gatingRefUpdates(scenario);
+
+    const { done: died } = await heldAheadOfTheMembersEnd(scenario, byAddress, member, async () => {
+      await conceptVerifiedBy(scenario.workspaceId, person.id);
+      await writingAsThePerson(scenario, person, email);
+      await gate.refuse();
+    });
+    await gate.allow();
+    await completing(scenario, byAddress, RAN_AGAIN_AT);
+
+    const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
+    expect(died.ok).toBe(false);
+    expect(new Set(await actorsIn("bundle_commit", scenario.workspaceId))).toEqual(
+      new Set([erased]),
+    );
+    expect(new Set(await actorsIn("concept_verification", scenario.workspaceId))).toEqual(
+      new Set([erased]),
+    );
   });
 
   it("refuses a write the person starts after the erasure", async () => {
