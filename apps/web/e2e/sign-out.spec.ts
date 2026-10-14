@@ -86,3 +86,20 @@ test("refuses revoked credentials on the next request", async ({ page, request }
 
   expect(await signInSaysWhy(page), "revoked credentials read as a sign-out").not.toBe(signedOut);
 });
+
+test("admits a sign-in made straight after the revocation", async ({ page, request }) => {
+  const email = anAddress("again");
+  const workspace = await provision(request, { name: "Again", adminEmail: email });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
+
+  await endEverySignInAndToken(request, workspace.admin.id);
+  await page.reload();
+  await signIn(page, request, email);
+
+  await page.getByRole("link", { name: "Groups" }).click();
+  await page.reload();
+  await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
+  await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
+});

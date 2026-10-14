@@ -49,7 +49,13 @@ import {
   mintNonce,
   unseal,
 } from "./link-token.ts";
-import { consentPage, refusedPage, REFUSAL_PAGES, signInPage } from "./pages.ts";
+import {
+  CONSENT_WORKSPACE_FIELD,
+  consentPage,
+  refusedPage,
+  REFUSAL_PAGES,
+  signInPage,
+} from "./pages.ts";
 import { mountThePasskeys } from "./passkeys.ts";
 import { sameOriginOnly } from "./same-origin.ts";
 import { askingWithALink, dropALink, readALink, signingInByLink } from "./sign-in-link.ts";
@@ -459,6 +465,21 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   const holds = async (claims: Claims | undefined): Promise<boolean> =>
     claims !== undefined && (await withPrincipalRead(door, claims, async () => true)).ok;
 
+  const grantRefused = async (
+    context: Context,
+    form: FormData,
+    claims: Claims | undefined,
+  ): Promise<Response | undefined> => {
+    if (!(await holds(claims))) {
+      return context.html(signInPage(REFUSAL_PAGES.sessionEnded, carry(context.req.url)), 401);
+    }
+    // A token's workspace is fixed at consent, so it must be the one the page named when drawn.
+    if (form.get(CONSENT_WORKSPACE_FIELD) !== claims?.workspaceId) {
+      return context.html(refusedPage(REFUSAL_PAGES.workspaceMoved), 409);
+    }
+    return undefined;
+  };
+
   /** Confirming first carries the signed query, so the flow resumes once the session is confirmed. */
   const confirmFirst = (context: Context): Response =>
     context.redirect(`/confirm${carry(context.req.url)}`, 302);
@@ -544,6 +565,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
         hostedAt: hostnameOf(asked.clientId),
         sendsCodeTo: hostnameOf(asked.redirectUri),
         workspace,
+        workspaceId: claims.workspaceId,
         scopes: asked.scopes,
       }),
     );
@@ -556,9 +578,8 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
 
     const claims = await claimsFrom(flowHeaders(context.req.raw, publicUrl));
     if (claims === PENDING) return confirmFirst(context);
-    if (accept && !(await holds(claims))) {
-      return context.html(signInPage(REFUSAL_PAGES.sessionEnded, carry(context.req.url)), 401);
-    }
+    const refusal = accept ? await grantRefused(context, form, claims) : undefined;
+    if (refusal !== undefined) return refusal;
     const decided = await attempt(() =>
       callFlow(auth, publicUrl, "/oauth2/consent", flowHeaders(context.req.raw, publicUrl), {
         accept,

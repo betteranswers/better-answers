@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
+import { CONSENT_WORKSPACE_FIELD } from "../src/auth/index.ts";
 import { confirmedByTheHarness } from "./factor-harness.ts";
 import {
   CLAUDE_CLIENT_ID,
@@ -163,6 +164,21 @@ export const driveToPage = async (
   return sentTo(resumed);
 };
 
+const DRAWN_FOR = new RegExp(`name="${CONSENT_WORKSPACE_FIELD}" value="([^"]*)"`);
+
+/** The fields Connect sends from a consent page drawn for `workspaceId`. */
+export const connectIn = (workspaceId: string): Record<string, string> => ({
+  accept: "true",
+  [CONSENT_WORKSPACE_FIELD]: workspaceId,
+});
+
+/** The fields Connect sends from a drawn consent page, read off the page itself. */
+const connectOn = (page: string): Record<string, string> => {
+  const workspace = DRAWN_FOR.exec(page)?.[1];
+  expect(workspace, "the consent page names no workspace").toBeDefined();
+  return connectIn(workspace ?? "");
+};
+
 /**
  * Connects as Claude does: authorize, sign in, `pick` the active workspace if given, consent and
  * exchange. Fails the test at a step that strays.
@@ -196,7 +212,7 @@ export const connectAsHost = async (
 
   const consent = await client.fetch(next.href);
   expect(consent.status).toBe(200);
-  step = await client.form(`${PUBLIC_URL}/consent${next.search}`, { accept: "true" });
+  step = await client.form(`${PUBLIC_URL}/consent${next.search}`, connectOn(await consent.text()));
   expect(step.status).toBe(302);
   const callback = new URL(location(step));
   expect(callback.origin + callback.pathname).toBe(CLAUDE_REDIRECT_URI);
