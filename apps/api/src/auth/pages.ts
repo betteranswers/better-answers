@@ -64,7 +64,7 @@ export const REFUSAL_PAGES = {
   },
   workspaceMoved: {
     title: "Nothing was connected",
-    why: "You switched workspace after this page opened.",
+    why: "This page no longer matches the workspace you’re signed in to.",
     next: START_AGAIN,
   },
   signInFirst: {

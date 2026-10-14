@@ -15,7 +15,7 @@ execution: code
 - **Means:** The consent page carries the workspace it drew, and the api refuses a workspace read from a tab that names another workspace (KTD1, KTD2). The browser harness revokes at the api's own instant (KTD4).
 - **Authority:** This plan, then BA-149 and BA-162 in Linear, then `CODING_STANDARDS.md` with `apps/api/CODING_STANDARDS.md` and `apps/web/CODING_STANDARDS.md`.
 - **Stop conditions:** Stop and report if a migration or a `contracts/` change turns out to be needed. Stop if refusing reads breaks a flow the web has no way to recover from (a refused read that does not land the tab on the session's workspace).
-- **Owner decisions:** The new consent refusal's words (R3) are a proposal. The owner rules on user-visible strings.
+- **Owner decisions:** The consent refusal's words (R3) are the owner's ruling of 14/10/2026.
 - **Finishes and ships:** The B2 worker, in one pull request. The orchestrator arms the merge.
 
 ---
@@ -41,7 +41,7 @@ BA-162 asked whether a sign-in straight after "end every sign-in and token" hold
 
 - R1. A grant sent from a consent page drawn for one workspace, after the session moved to another, is refused and connects nothing.
 - R2. A grant from a page whose workspace is still the session's connects as today. A cancel is never refused for a moved workspace.
-- R3. The refusal page says, in words, that the workspace changed since the page opened and that nothing was connected. Proposed wording (owner's to rule): title "Nothing was connected", why "You switched workspace after this page opened.", next "Start the connection again from where you began it."
+- R3. The refusal page says, in words, that the page no longer matches the signed-in workspace and that nothing was connected. Wording (owner's ruling, 14/10/2026): title "Nothing was connected", why "This page no longer matches the workspace you’re signed in to.", next "Start the connection again from where you began it."
 
 **Reads from a stale tab**
 
@@ -170,5 +170,5 @@ No journey walks the consent page or a stale tab, so the journeys need no run.
 ## Definition of Done
 
 - Every R holds, each by a test named for its behaviour.
-- The R3 words are flagged to the owner as a proposal in the report.
+- The refusal page shows the R3 words the owner ruled.
 - No probe or experiment file is left in the diff.
