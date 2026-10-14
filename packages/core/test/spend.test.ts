@@ -246,7 +246,7 @@ describe("spend", () => {
 
     const late = await settling(asking, reservationId, [A_CALL]);
 
-    expect(late.ok).toBe(false);
+    expect(late.ok ? "settled" : String(late.error)).toContain(reservationId);
     expect(await callsOf(asking)).toMatchObject([{ outcome: "failed", cost_usd: "0.15" }]);
   });
 
@@ -303,7 +303,8 @@ describe("spend", () => {
     const firstOfNovember = new Date("2026-11-01T00:00:00.000Z");
     await spentAt(asking, new Date("2026-10-31T23:59:59.999Z"), "0.10");
 
-    expect(answered(await reserving(asking, firstOfNovember))).toMatchObject({ reserved: true });
+    const passed = reservationIdOf(answered(await reserving(asking, firstOfNovember)));
+    answered(await settling(asking, passed, []));
 
     await spentAt(asking, firstOfNovember, "0.10");
     expect(await reserving(asking, firstOfNovember)).toEqual({
