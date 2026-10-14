@@ -141,8 +141,8 @@
         "name": "a National Insurance number in a question",
         "categories": ["government-identifier"],
         "input": "Does the pension scheme need my National Insurance number AB 12 34 56 C before I join?",
-        "expected": "Does the pension scheme need my National Insurance number[withheld] before I join?",
-        "why": "The number goes and the question stays. The space before the number goes with it, because the worker's pattern reads that space as the number's first character."
+        "expected": "Does the pension scheme need my National Insurance number [withheld] before I join?",
+        "why": "The number goes and everything round it stays, the space before it too."
       },
       {
         "name": "a National Insurance number that opens the text",
@@ -155,22 +155,22 @@
         "name": "a National Insurance number in lower case",
         "categories": ["government-identifier"],
         "input": "Is ab123456c the number payroll holds for me?",
-        "expected": "Is[withheld] the number payroll holds for me?",
+        "expected": "Is [withheld] the number payroll holds for me?",
         "why": "The pattern reads its letters in either case."
       },
       {
-        "name": "a refused prefix is taken after a space",
+        "name": "a refused prefix after a space",
         "categories": ["government-identifier"],
         "input": "Is GB123456A a National Insurance number?",
-        "expected": "Is[withheld] a National Insurance number?",
-        "why": "GB is a prefix the pattern refuses, but it reads the refusal before the space, so a number that follows a space is taken whatever its prefix. The seam does this today, and so both tiers do."
+        "expected": "Is GB123456A a National Insurance number?",
+        "why": "GB is a prefix no National Insurance number takes, and a space before it changes nothing."
       },
       {
         "name": "a refused prefix that opens the text",
         "categories": ["government-identifier"],
         "input": "Gb123456A is the reference on the form, is that right?",
         "expected": "Gb123456A is the reference on the form, is that right?",
-        "why": "With no space before it the refusal holds, in either case of its letters."
+        "why": "The refusal holds where the text opens too, in either case of its letters."
       },
       {
         "name": "an NHS number",
@@ -198,21 +198,21 @@
         "categories": ["bank-details"],
         "input": "Is ticket 10-20-30 the same fault as ticket 12345678?",
         "expected": "Is ticket 10-20-30 the same fault as ticket 12345678?",
-        "why": "Six digits and eight are a sort code and an account number only when a word before them says so: account, sort, bank, payment or BACS."
+        "why": "Six digits and eight are a sort code and an account number only when a word before them or between them says so: account, sort, bank, payment or BACS."
       },
       {
         "name": "the word that names the pair sits between its numbers",
         "categories": ["bank-details"],
         "input": "Can payroll pay expenses into 20-00-00, account number 12345678?",
-        "expected": "Can payroll pay expenses into 20-00-00, account number 12345678?",
-        "why": "The one word that names the pair follows the sort code, and the worker looks for it before the pair, so the pair stays in the text. The seam does this today, and so both tiers do."
+        "expected": "Can payroll pay expenses into [withheld]?",
+        "why": "A word between the two numbers names the pair as a word before them does."
       },
       {
         "name": "a colon joins the sort code to the word before it",
         "categories": ["bank-details"],
         "input": "Ref:200000 account 12345678, is that the one on file?",
         "expected": "Ref:[withheld], is that the one on file?",
-        "why": "The worker reads Ref:200000 as one word, and then takes the next word after it as one that may name the pair. With a space in place of the colon the same text is left alone."
+        "why": "The word between the numbers names the pair, and the colon that joins Ref to the sort code changes nothing."
       },
       {
         "name": "two pairs, one of them named",
@@ -240,7 +240,7 @@
         "categories": ["bank-details"],
         "input": "Do expenses go to 200000.account 12345678?",
         "expected": "Do expenses go to [withheld]?",
-        "why": "With no space after the sort code, the worker reads it and the word as one, and a word read with the pair names it."
+        "why": "A word between the numbers names the pair even when nothing parts it from the sort code."
       },
       {
         "name": "a one-sentence question that holds a cue",

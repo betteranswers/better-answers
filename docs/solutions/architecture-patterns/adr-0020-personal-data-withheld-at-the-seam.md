@@ -37,8 +37,8 @@ The **redaction seam** withholds personal data in the worker's conversion step a
 Text a person types, such as a question or a note on a flag, never passes the worker's seam. The **typed-text check** covers it in the api tier.
 
 - Before any model call, typed text is read against the always tier, and each hit is replaced by a placeholder in what the model is sent. The record keeps the text as typed.
-- Core reads the three always-tier categories with detectors of its own. Cases in `contracts/redaction` hold them to the worker's, and both tiers run every case. The worker's patterns and its detector version do not change.
-- The worker reads a cue, and the word that names a sort code and account number, through its tokenizer. Core has none. The worker finds a cue by taking an ending off the written word, so core reads as a cue any word that opens with a cue's stem, a misspelt one included. Core reads all the text before the pair where the worker reads five words. Core's reading is made the wider of the two, so that a difference between them withholds more and not less.
+- Core reads the three always-tier categories with detectors of its own. Cases in `contracts/redaction` hold them to the worker's, and both tiers run every case. A change to the worker's always-tier patterns moves its rule version, and core changes in the same pull request.
+- The worker reads a cue, and the word that names a sort code and account number, through its tokenizer. Core has none. The worker finds a cue by taking an ending off the written word, so core reads as a cue any word that opens with a cue's stem, a misspelt one included. The worker reads five words before the pair and the words between its two numbers. Core reads all the text up to the pair's end. Core's reading is made the wider of the two, so that a difference between them withholds more and not less.
 - The limit is stated: a name in typed text is not withheld. The always tier is patterns, which the api tier can read, and a name needs the detector's model, which it cannot.
 - A special-category cue withholds its whole sentence, so a one-sentence question that holds one reaches the model as a placeholder alone.
 - The check is `checkTypedText` in core's `llm` layer. S2b builds its callers with the model client, and the tree does not hold them yet.
@@ -85,5 +85,7 @@ A **suppression** is the workspace's: one per erasure request, holding the reque
 The full record, with its seventeen amendments (among them T-001, T-073, T-121, T-124, T-132, T-177, T-176, T-201, T-286, T-220, T-366 and the T-027/T-028 grill): `docs/archive/adr/0020-personal-data-withheld-at-the-seam.md`.
 
 Amended 13/10/2026 on the owner's decision of 12/10/2026, by the S2b ask plan (`docs/plans/2026-10-11-2309-feat-s2b-ask-plan.md`, R42 and KTD12). S2b is the first block to send a model text a person typed, which the seam never reads. The typed-text check reads it against the always tier before the call. Names in typed text are not withheld, and the record keeps the text as typed.
+
+Amended 14/10/2026 on the owner's ruling of 14/10/2026, by BA-153. A word between a sort code and its account number now names the pair, in a document and in typed text. A National Insurance number no longer takes the space before it, and a refused prefix after a space is no longer read as one. The rule version moved from 6 to 7.
 
 Amended 13/10/2026 by the same plan's U4 (R39 and KTD8). The erasure routine gained a step and a family, `question-asked`, so an erasure rewrites who asked and who gave feedback, deletes the question and clears each note.

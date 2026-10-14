@@ -24,12 +24,9 @@ const edgeOf = (word: string): string =>
 const EDGE = edgeOf(WORD);
 const EDGE_TO_PRESIDIO = edgeOf(WORD_TO_PRESIDIO);
 
-/**
- * Presidio's pattern as written. It reads its refused prefixes before the optional space, so a
- * number after a space takes that space and any prefix.
- */
+/** The worker's pattern: its prefix refusal reads the number's first letter, never a space. */
 const A_NATIONAL_INSURANCE_NUMBER = new RegExp(
-  String.raw`${EDGE_TO_PRESIDIO}(?!bg|gb|nk|kn|nt|tn|zz|BG|GB|NK|KN|NT|TN|ZZ) ?([a-ceghj-pr-tw-zA-CEGHJ-PR-TW-Z]{1}[a-ceghj-npr-tw-zA-CEGHJ-NPR-TW-Z]{1}) ?([0-9]{2}) ?([0-9]{2}) ?([0-9]{2}) ?([a-dA-D]{1})${EDGE_TO_PRESIDIO}`,
+  String.raw`${EDGE_TO_PRESIDIO}(?!bg|gb|nk|kn|nt|tn|zz|BG|GB|NK|KN|NT|TN|ZZ)([a-ceghj-pr-tw-zA-CEGHJ-PR-TW-Z]{1}[a-ceghj-npr-tw-zA-CEGHJ-NPR-TW-Z]{1}) ?([0-9]{2}) ?([0-9]{2}) ?([0-9]{2}) ?([a-dA-D]{1})${EDGE_TO_PRESIDIO}`,
   "giu",
 );
 
@@ -78,8 +75,8 @@ const runAround = (text: string, at: number): Hit => {
 };
 
 /**
- * The worker reads five words back, and one word on where a colon joins the sort code to its
- * neighbour. This reads wider than either.
+ * The worker reads five words back, the words between the numbers, and one word on after a
+ * colon-joined sort code. This reads wider.
  */
 const namedPairsIn = (text: string): readonly Hit[] => {
   const naming = A_WORD_THAT_NAMES_A_PAIR.exec(text);
@@ -94,7 +91,7 @@ const namedPairsIn = (text: string): readonly Hit[] => {
       run = runAround(text, pair.start);
       joinedByAColon = text.slice(run.start, run.end).includes(":");
     }
-    if (joinedByAColon || named <= run.end) pairs.push(pair);
+    if (joinedByAColon || named <= Math.max(run.end, pair.end)) pairs.push(pair);
   }
   return pairs;
 };

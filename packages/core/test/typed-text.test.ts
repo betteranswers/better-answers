@@ -32,9 +32,8 @@ describe("the typed-text check", () => {
     const question =
       "Does the pension scheme need my National Insurance number AB 12 34 56 C before I join?";
 
-    // The space before the number goes with it, as it does in the worker.
     expect(checkTypedText(question)).toBe(
-      "Does the pension scheme need my National Insurance number[withheld] before I join?",
+      "Does the pension scheme need my National Insurance number [withheld] before I join?",
     );
   });
 
@@ -42,6 +41,18 @@ describe("the typed-text check", () => {
     const question = "Can payroll pay expenses into sort code 20-00-00, account number 12345678?";
 
     expect(checkTypedText(question)).toBe("Can payroll pay expenses into sort code [withheld]?");
+  });
+
+  it("writes the placeholder over a pair named between its numbers", () => {
+    const question = "Can payroll pay expenses into 20-00-00, account number 12345678?";
+
+    expect(checkTypedText(question)).toBe("Can payroll pay expenses into [withheld]?");
+  });
+
+  it("leaves a refused prefix after a space in the text", () => {
+    const question = "Is GB123456A a National Insurance number?";
+
+    expect(checkTypedText(question)).toBe(question);
   });
 
   it("writes the placeholder over a special-category cue's sentence", () => {

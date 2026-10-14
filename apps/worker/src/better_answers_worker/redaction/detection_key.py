@@ -20,6 +20,9 @@ from .pins import DETECTOR_PIN
 from .recognisers import (
     A_DATE,
     A_DATE_ON_ITS_OWN,
+    A_NATIONAL_INSURANCE_NUMBER,
+    A_NATIONAL_INSURANCE_NUMBER_ON_ITS_OWN,
+    A_PAIR_NAMED_BETWEEN_ITS_NUMBERS,
     A_PAIR_ON_ITS_OWN,
     A_POSTCODE,
     A_PROMOTED_POSTCODE,
@@ -47,6 +50,12 @@ def as_read(value: re.Pattern[str] | int | float | str) -> str:
 DETECTOR_LITERALS: tuple[tuple[str, str], ...] = (
     ("A_DATE", as_read(A_DATE)),
     ("A_DATE_ON_ITS_OWN", as_read(A_DATE_ON_ITS_OWN)),
+    ("A_NATIONAL_INSURANCE_NUMBER", as_read(A_NATIONAL_INSURANCE_NUMBER)),
+    (
+        "A_NATIONAL_INSURANCE_NUMBER_ON_ITS_OWN",
+        as_read(A_NATIONAL_INSURANCE_NUMBER_ON_ITS_OWN),
+    ),
+    ("A_PAIR_NAMED_BETWEEN_ITS_NUMBERS", as_read(A_PAIR_NAMED_BETWEEN_ITS_NUMBERS)),
     ("A_PAIR_ON_ITS_OWN", as_read(A_PAIR_ON_ITS_OWN)),
     ("A_POSTCODE", as_read(A_POSTCODE)),
     ("A_PROMOTED_POSTCODE", as_read(A_PROMOTED_POSTCODE)),
