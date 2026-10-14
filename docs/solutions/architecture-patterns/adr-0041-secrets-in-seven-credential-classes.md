@@ -56,8 +56,9 @@ How a model key is kept:
 - **Sealed directly under the envelope key**, the bootstrap secret `KEK`. ADR 0005's record of the envelope's format expected a data key per workspace between the two. That data key is not built, and whether to build it stays open.
 - **The sealed text names its workspace and model provider.** A frame copied onto another workspace's row, or another provider's, does not open as that row's key.
 - **No key reads as none.** A workspace with no model key for a provider has no model available from it. A frame that does not open is refused in the envelope's own word and is never read as none, so a key lost to a changed envelope key is seen.
+- **The read and the store are held apart.** The side that calls a model is handed the read alone, and it reads the key of its own transaction's workspace, naming no other. A key is stored only together with the audit event that records it.
 - **One ops command sets and replaces it**, taking the key on standard input. No page sets it, and nothing reads a model provider's key from the environment.
-- **Rotation is replacement.** A new key is issued at the model provider, set with the command, and the old one revoked at the model provider. Expiry and revocation are the model provider's own. No command re-seals, so a new envelope key means every model key is set again.
+- **Rotation is replacement.** A new key is issued at the model provider, set with the command, and the old one revoked at the model provider. Expiry and revocation are the model provider's own. No command re-seals, so a new envelope key means every model key is set again. After a compromise of the envelope key, every model key sealed under it is treated as leaked and reissued at its model provider, not only sealed again.
 
 ## Why
 

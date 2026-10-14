@@ -52,7 +52,9 @@ A model key is a workspace's API key for one model provider. It is a row sealed 
 - **Setting a key** is `pnpm ops set-model-key`, with the key on standard input (`RUNBOOK.md` § Set a workspace's model key). The key is never a command-line argument, so it reaches no shell history and no process list. Each run writes one audit event naming the model provider.
 - **Rotation is replacement,** and needs no downtime: issue a new key at the model provider, set it with the command, then revoke the old key at the model provider. A call made between the two steps uses whichever key the row holds.
 - **On a leak of a model key,** revoke it at the model provider first, since that is what stops its use, then set a new one.
-- **On a new envelope key,** every row sealed under the old one stops opening, and a model call refuses until its key is set again. Set `KEK`, redeploy, and run the command once for each workspace and provider. No command re-seals a row.
+- **On a new envelope key,** every row sealed under the old one stays in place and stops opening, and a model call refuses until its key is set again. Nothing reports such a row before a call does. List the workspace and provider pairs that hold a row first, through the browsing login, which reads `workspace_id` and `provider` and never the sealed key. Then set `KEK`, redeploy, and run the command once for each pair. No command re-seals a row.
+- **On a compromise of the envelope key,** every model key sealed under it is treated as leaked, because whoever holds `KEK` and the database can open each one. Sealing the same key again under a new `KEK` protects nothing. Each is revoked and reissued at its model provider, then set under the new `KEK`.
+- **After a restore,** a model key replaced since the dump was taken is back as it was, and it opens cleanly. Set each one again (`RUNBOOK.md` § Set a workspace's model key).
 
 ## The backup identity
 
