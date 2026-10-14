@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
-import { check, integer, pgEnum, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
+import { check, integer, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { stamp } from "./column-helpers.ts";
+import { llmPurpose } from "./llm-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -24,14 +25,6 @@ export * from "./question-tables.ts";
 export * from "./llm-tables.ts";
 export * from "./job-tables.ts";
 export * from "./platform-tables.ts";
-
-export const llmPurpose = pgEnum("llm_purpose", [
-  "extraction",
-  "enrichment",
-  "answering",
-  "judging",
-  "embedding",
-]);
 
 export const modelChoice = withRLS(
   "model_choice",

@@ -51,6 +51,9 @@ export const TABLE_OWNERS = {
   "public.group_member": "members",
   "public.model_choice": "llm",
   "public.model_key": "llm",
+  "public.llm_call": "llm",
+  "public.spend_reservation": "llm",
+  "public.model_price": "llm",
   "public.audit_event": "audit",
   "public.identity_audit_event": "audit",
   "public.access_request": "members",
@@ -384,9 +387,9 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.workspace_config",
     by: POSTGRES_DOOR,
-    access: "read",
+    access: "read and write",
     reason:
-      "A transport reads one setting of the caller's workspace by key in the transaction the door already scoped, as the MCP surface reads how long a client may keep its tool list.",
+      "A transport reads one setting of the caller's workspace by key in the transaction the door already scoped, as the MCP surface reads how long a client may keep its tool list; a reservation of spend reads the spending limit held to its commit, so two cannot both pass it; and the platform sets a setting by key, as the ops command sets the spending limit.",
   },
   {
     table: "public.member",

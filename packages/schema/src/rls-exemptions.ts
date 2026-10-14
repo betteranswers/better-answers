@@ -43,6 +43,8 @@ export const RLS_EXEMPTIONS = {
     "One row per sweep pass, and a pass covers every workspace at once: a fact about the deploy's schedule that names no tenant and holds counts alone.",
   "public.identity_audit_event":
     "The identity-set audit log: an action on a person's own identity belongs to no workspace, so no scope could hold its row; it names people by person id and actions by their word, never a name or an address.",
+  "public.model_price":
+    "What a provider charges for a model is a fact about the provider, the same for every workspace that calls it: it names no tenant and holds rates alone.",
 } satisfies Record<string, string>;
 
 export const EXEMPT_TABLE_NAMES: readonly string[] = [

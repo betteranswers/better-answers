@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { llmPurpose } from "@better-answers/schema";
+import { LLM_CALL_OUTCOMES, llmPurpose } from "@better-answers/schema";
 
 import { LLM_PURPOSES } from "../src/llm/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
+import { postgresForSuite } from "./suite-postgres.ts";
+
+const db = postgresForSuite();
 
 const fixtureSchema = z.object({
   description: z.string(),
@@ -46,6 +49,18 @@ describe("cost-ledger, golden rows for the cost ledger of model calls", () => {
     expect(fixture.rows.map((row) => Object.keys(row).toSorted())).toEqual(
       fixture.rows.map(() => recordedColumns),
     );
+  });
+
+  it("records exactly the columns the migrated table has", async () => {
+    const columns = await db().pool.query<{ column_name: string }>(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'llm_call'",
+    );
+
+    expect(columns.rows.map((row) => row.column_name).toSorted()).toEqual(recordedColumns);
+  });
+
+  it("records exactly the outcomes the table admits", () => {
+    expect([...LLM_CALL_OUTCOMES].toSorted()).toEqual(recordedOutcomes);
   });
 
   it("records no column a prompt or completion could sit under", () => {

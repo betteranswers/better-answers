@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0081_the-erased-flags-sentence"
+MIGRATION_ID = "0082_the-spend-ledger"
 
-MIGRATION_WHEN = 1792003139814
+MIGRATION_WHEN = 1792011666736
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {
@@ -270,6 +270,21 @@ TABLES: dict[str, dict[str, str]] = {
         "alg": "text",
         "crv": "text",
     },
+    "public.llm_call": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "called_at": "timestamp with time zone NOT NULL",
+        "purpose": "llm_purpose NOT NULL",
+        "model_choice_id": "text NOT NULL",
+        "model": "text NOT NULL",
+        "tokens_in": "integer NOT NULL",
+        "tokens_out": "integer NOT NULL",
+        "seconds": "double precision NOT NULL",
+        "cost_usd": "numeric NOT NULL",
+        "outcome": "text NOT NULL",
+        "run_id": "text",
+        "answer_id": "text",
+    },
     "public.map_edge": {
         "workspace_id": "text NOT NULL",
         "gen": "integer",
@@ -328,6 +343,13 @@ TABLES: dict[str, dict[str, str]] = {
         "workspace_id": "text NOT NULL",
         "provider": "text NOT NULL",
         "sealed": "bytea NOT NULL",
+    },
+    "public.model_price": {
+        "provider": "text NOT NULL",
+        "model": "text NOT NULL",
+        "effective_from": "date NOT NULL",
+        "usd_per_million_in": "numeric NOT NULL",
+        "usd_per_million_out": "numeric NOT NULL",
     },
     "public.oauth_access_token": {
         "id": "text NOT NULL",
@@ -547,6 +569,22 @@ TABLES: dict[str, dict[str, str]] = {
         "sensitivity": "text",
         "unreadable_reason": "text",
         "narrowed_to": "text",
+    },
+    "public.spend_reservation": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "taken_at": "timestamp with time zone NOT NULL",
+        "expires_at": "timestamp with time zone NOT NULL",
+        "purpose": "llm_purpose NOT NULL",
+        "model_choice_id": "text NOT NULL",
+        "model": "text NOT NULL",
+        "tokens_in": "integer NOT NULL",
+        "tokens_out": "integer NOT NULL",
+        "usd_per_million_in": "numeric NOT NULL",
+        "usd_per_million_out": "numeric NOT NULL",
+        "reserved_usd": "numeric NOT NULL",
+        "run_id": "text",
+        "answer_id": "text",
     },
     "public.subject_request": {
         "workspace_id": "text NOT NULL",

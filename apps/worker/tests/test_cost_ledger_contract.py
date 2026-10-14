@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -35,6 +36,28 @@ def test_every_row_carries_exactly_the_recorded_columns() -> None:
 
     for row in read_cost_ledger()["rows"]:
         assert sorted(row) == columns, row
+
+
+def test_records_exactly_the_columns_and_outcomes_the_table_has() -> None:
+    from pg_harness import migrated_postgres
+
+    fixture = read_cost_ledger()
+
+    with migrated_postgres() as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_schema = 'public' AND table_name = 'llm_call'"
+        )
+        assert sorted(name for (name,) in cursor.fetchall()) == recorded_columns()
+
+        cursor.execute(
+            "SELECT pg_get_constraintdef(oid) FROM pg_constraint"
+            " WHERE conname = 'llm_call_outcome_check'"
+        )
+        found = cursor.fetchone()
+        assert found is not None
+        admitted = sorted(re.findall(r"'([^']+)'::text", str(found[0])))
+        assert admitted == sorted(entry["outcome"] for entry in fixture["outcomes"])
 
 
 def test_records_no_column_a_prompt_or_completion_sits_under() -> None:
