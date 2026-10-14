@@ -3171,15 +3171,26 @@ describe("a commit made as the person while the routine runs", () => {
     expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
   });
 
-  it("rewrites rows landed before a failed run, held elsewhere", async () => {
+  /** A bundle naming a person held elsewhere too, and a request naming them by address alone. */
+  const heldElsewhereNamedByAddress = async () => {
     const { scenario, email, person } = await bundleNamingThePerson();
     const elsewhere = await arrange();
     await seedingWith(db().pool, (seed) =>
       seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
     );
-    const member = { workspaceId: scenario.workspaceId, userId: person.id };
-    const byAddress = await erasureRequestAbout(scenario.workspaceId, null, email);
-    const gate = await gatingRefUpdates(scenario);
+    return {
+      scenario,
+      email,
+      person,
+      member: { workspaceId: scenario.workspaceId, userId: person.id },
+      byAddress: await erasureRequestAbout(scenario.workspaceId, null, email),
+      gate: await gatingRefUpdates(scenario),
+    };
+  };
+
+  it("rewrites rows landed before a failed run, held elsewhere", async () => {
+    const { scenario, email, person, member, byAddress, gate } =
+      await heldElsewhereNamedByAddress();
 
     const { done: died } = await heldAheadOfTheMembersEnd(scenario, byAddress, member, async () => {
       await conceptVerifiedBy(scenario.workspaceId, person.id);
@@ -3197,6 +3208,75 @@ describe("a commit made as the person while the routine runs", () => {
     expect(new Set(await actorsIn("concept_verification", scenario.workspaceId))).toEqual(
       new Set([erased]),
     );
+  });
+
+  it("rewrites a replayed trailer held elsewhere after a failed run", async () => {
+    const { scenario, email, person, member, byAddress, gate } =
+      await heldElsewhereNamedByAddress();
+
+    const { done: died, met: lost } = await heldAheadOfTheMembersEnd(
+      scenario,
+      byAddress,
+      member,
+      async () => {
+        const written = await whileWritesAreRefused(db().pool, "bundle_commit", () =>
+          writingAsThePerson(scenario, person, email),
+        );
+        await gate.refuse();
+        return written;
+      },
+    );
+    await gate.allow();
+    await completing(scenario, byAddress, RAN_AGAIN_AT);
+    const swept = await reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+
+    expect(died.ok).toBe(false);
+    expect(lost.ok).toBe(false);
+    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+    expect(swept.ok && swept.value.replayed).toHaveLength(1);
+    const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
+    expect(new Set(await actorsIn("bundle_commit", scenario.workspaceId))).toEqual(
+      new Set([erased]),
+    );
+  });
+
+  it("rewrites a former member's trailers for a request by address", async () => {
+    const { scenario, email, person } = await bundleNamingThePerson();
+    await db().pool.query("DELETE FROM member WHERE user_id = $1 AND workspace_id = $2", [
+      person.id,
+      scenario.workspaceId,
+    ]);
+    const byAddress = await erasureRequestAbout(scenario.workspaceId, null, email);
+
+    await completing(scenario, byAddress);
+
+    const erased = `human:${await pseudonymIn(scenario.workspaceId)}`;
+    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
+    expect(await actorsIn("bundle_commit", scenario.workspaceId)).toEqual([erased, erased]);
+  });
+
+  it("rewrites a history naming the person in a trailer alone", async () => {
+    const { scenario, email, person, subjectRequestId } = await workspaceWithAnErasureRequest({
+      byIdAlone: true,
+    });
+    const principal = await principalFor(db(), scenario.workspaceId, person.id);
+    const made = await commit(principal, scenario.git, {
+      path: "knowledge/parking.md",
+      content: renderConceptFile({ title: "Parking", type: "Policy" }, "Park at the station."),
+      message: "Record the parking policy",
+      author: { name: "Acme Bot", email: "bot@acme.invalid" },
+      trailers: { actor: actorIdOfPerson(principal.userId), audit: ulid() },
+      expectedHead: null,
+      at: new Date("2026-04-02T11:00:00.000Z"),
+    });
+    expect(made.ok).toBe(true);
+    expect((await thePersonIn(scenario, person, email)).personId).toBe(true);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await thePersonIn(scenario, person, email)).toEqual(NOWHERE);
   });
 
   it("refuses a write the person starts after the erasure", async () => {

@@ -37,6 +37,8 @@ import { addressesSuppressedFor, suppressInTheWorkspace, type Suppressed } from 
 
 const ERASURE_ACTOR = "process:better-answers-erasure";
 
+const isTombstone = (address: string): boolean => address.endsWith(`@${ERASED_DOMAIN}`);
+
 export type ErasurePrincipal = PlatformPrincipal & {
   readonly actorId: typeof ERASURE_ACTOR;
 };
@@ -349,7 +351,7 @@ const afterTheMembersEnd = async (
   if (!suppressed.ok) return err(suppressed.error);
   // An address typed into the request may be another erasure's tombstone, which stays as it is.
   const addresses = [...new Set([...subject.addresses, ...suppressed.value])].filter(
-    (address) => !address.endsWith(`@${ERASED_DOMAIN}`),
+    (address) => !isTombstone(address),
   );
   const git = await rewritingTheBundle(platform, doors, workspaceId, { ...subject, addresses });
   if (!git.ok) return err(git.error);
@@ -457,14 +459,13 @@ const addressesOfTheSubject = async (
   const people = [...new Set(subject.personIds.filter((id) => id !== null))];
   const found =
     people.length === 0 ? { rows: [] } : await tx.query<{ email: string }>(ADDRESSES_OF, [people]);
-  const erased = (address: string): boolean => address.endsWith(`@${ERASED_DOMAIN}`);
   const ofTheSubject = [...new Set(lowered(found.rows.map((row) => row.email)))].filter(
-    (address) => !erased(address),
+    (address) => !isTombstone(address),
   );
   return {
     ofTheSubject,
     inTheBundle: [...new Set([...ofTheSubject, ...lowered(subject.requested)])].filter(
-      (address) => !erased(address),
+      (address) => !isTombstone(address),
     ),
   };
 };
@@ -496,11 +497,32 @@ type ErasureOpened = {
   readonly concepts: readonly string[];
   readonly addresses: SubjectAddresses;
 
-  /** The person this request already pseudonymised, found by the tombstone it gave them. */
-  readonly tombstoned: readonly string[];
+  /** People a rerun cannot reach through a member row. */
+  readonly namedPeople: readonly string[];
 };
 
-const TOMBSTONED = `SELECT id FROM "user" WHERE email = $1`;
+/** By this request's tombstone, or by an address it holds, a person held elsewhere among them. */
+const NAMED_PEOPLE = `SELECT id FROM "user" WHERE email = $1 OR lower(email) = ANY($2::text[])`;
+
+const peopleNamedBy = async (
+  tx: Tx,
+  request: {
+    readonly workspaceId: string;
+    readonly erasureRequestId: string;
+    readonly pseudonym: string;
+    readonly addresses: readonly string[];
+  },
+): Promise<readonly string[]> => {
+  const suppressed = await addressesSuppressedFor(tx, request);
+  const addresses = [...new Set([...request.addresses, ...suppressed])].filter(
+    (address) => !isTombstone(address),
+  );
+  const found = await tx.query<{ id: string }>(NAMED_PEOPLE, [
+    `${request.pseudonym}@${ERASED_DOMAIN}`,
+    addresses,
+  ]);
+  return found.rows.map((row) => row.id);
+};
 
 const openTheRequest = async (
   platform: ErasurePrincipal,
@@ -521,22 +543,25 @@ const openTheRequest = async (
   const searched = await attempt(() =>
     withScope(platform, doors.postgres, workspaceId, async (tx) => {
       const map = await erasureMapOf(platform, tx, doors.git, request);
+      const addresses = await addressesOfTheSubject(tx, {
+        personIds: [personTheMapFound(map), request.personId],
+        requested: request.identifiers?.emails ?? [],
+      });
       return {
         map,
         concepts: await conceptsNaming(tx, workspaceId, map),
-
-        addresses: await addressesOfTheSubject(tx, {
-          personIds: [personTheMapFound(map), request.personId],
-          requested: request.identifiers?.emails ?? [],
+        addresses,
+        namedPeople: await peopleNamedBy(tx, {
+          workspaceId,
+          erasureRequestId: erasure.id,
+          pseudonym,
+          addresses: addresses.inTheBundle,
         }),
-        tombstoned: (
-          await tx.query<{ id: string }>(TOMBSTONED, [`${pseudonym}@${ERASED_DOMAIN}`])
-        ).rows.map((row) => row.id),
       };
     }),
   );
   if (!searched.ok) return err(searched.error);
-  const { map, concepts, addresses, tombstoned } = searched.value;
+  const { map, concepts, addresses, namedPeople } = searched.value;
 
   if (namedInTheBundle(map) && addresses.inTheBundle.length === 0) return err("no-address");
   return ok({
@@ -547,7 +572,7 @@ const openTheRequest = async (
     map,
     concepts,
     addresses,
-    tombstoned,
+    namedPeople,
   });
 };
 
@@ -645,10 +670,9 @@ export const runErasure = async (
 
     const opened = await openTheRequest(platform, doors, workspaceId, requestId.data, lockedAt);
     if (!opened.ok) return err(opened.error);
-    const { request, erasure, pseudonym, standingCompletion, map, addresses, tombstoned } =
+    const { request, erasure, pseudonym, standingCompletion, map, addresses, namedPeople } =
       opened.value;
-    // A rerun after the identity step finds no member, but the tombstone still names the person.
-    const personIds = [personTheMapFound(map), request.personId, ...tombstoned];
+    const personIds = [personTheMapFound(map), request.personId, ...namedPeople];
     const people = [...new Set(personIds.filter((person) => person !== null))];
 
     const rewritten = await rewritingTheBundle(platform, doors, workspaceId, {

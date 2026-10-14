@@ -175,7 +175,7 @@ sequenceDiagram
 - **Files:** `packages/core/src/erasure/routine.ts`, `packages/core/test/erasure-routine.test.ts`.
 - **Approach:**
   1. Factor the git step so it runs twice: rewrite, move `bundle_commit` rows, carry verifications over the map's paths and the paths the rewrite found.
-  2. Pass 2 runs after the identity step, with the open addresses and the suppression row's emails. The person ids include any user row this request's tombstone names, so a rerun after the identity step still rewrites the trailers.
+  2. Pass 2 runs after the identity step, with the open addresses and the suppression row's emails. The person ids include any user row this request's tombstone names, and any its addresses or its suppression's addresses name, so a rerun after the identity step still rewrites the trailers of a person held elsewhere or a former member.
   3. The actor sweep runs after pass 2.
   4. Each family's counts are the two passes' sums.
 - **Execution note:** Write the `writeConcept` test first and see it fail on `main`'s routine.
