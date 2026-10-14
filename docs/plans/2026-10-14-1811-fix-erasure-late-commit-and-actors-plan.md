@@ -17,8 +17,8 @@ execution: code
 - **Authority:** Linear BA-166 with its comments of 14/10/2026, BA-160's ruling comment of 14/10/2026, BA-167's description; ADR 0019, ADR 0020, ADR 0035; `CODING_STANDARDS.md`.
 - **Stop conditions:** Stop and report before adding a migration (Track A holds 0080). Stop and report if a change would touch `contracts/`.
 - **Execution profile:** One pull request, no migration, no `contracts/` change. Five units.
-- **Who finishes:** This session builds and opens the pull request; the orchestrator arms it once the owner has read the proposals below.
-- **Open blockers:** BA-167 needs a migration (R8), so it is not in this pull request.
+- **Who finishes:** This session builds and opens the pull request; the orchestrator arms it.
+- **Open blockers:** None. BA-167 is a separate migration change (R8).
 
 ---
 
@@ -51,12 +51,15 @@ ADR 0020 says every actor id the platform wrote becomes the pseudonym, `bundle_c
 
 **Disputed sentence (BA-167, ruled 14/10/2026)**
 
-- R8. Not built here. `question_feedback_flag_check` requires `(disputed_sentence IS NULL) = (disputed_concept IS NULL)`, so clearing the sentence while keeping the concept, as ruled, needs a migration. See Open Questions.
+- R8. Not built here. `question_feedback_flag_check` requires `(disputed_sentence IS NULL) = (disputed_concept IS NULL)`, so clearing the sentence while keeping the reason and the concept needs a migration that relaxes the check. It ships as its own pull request once Track A's migration 0080 has merged.
 
 ### Key Decisions
 
 - **The rewrite of the two columns is owed (owner, BA-160, 14/10/2026).** Governs R6, R7.
-- **Only the audit log keeps the person id (owner, BA-160, 14/10/2026).** ADR 0019's "no routine rewrites" narrows to the audit log. Governs R6.
+- **Only the audit log keeps the person id (owner, BA-160, 14/10/2026).** ADR 0019's "no routine rewrites" narrows to the audit log, in the wording U6 drafted. Governs R6.
+- **The person id is rewritten in git history, commit trailers and frontmatter included (owner, 14/10/2026).** ADR 0020 already counts history among the records erasure rewrites, and the report's "every actor identifier … across the repository's history" is now true of trailers. Governs R2, R4; KTD3.
+- **The verifier words stay "a former member" (owner, 14/10/2026).** A `human:<pseudonym>` actor has no user row, so `verifierWords` in `packages/core/src/concepts/trust.ts` already says it. Governs R6.
+- **BA-167 is a migration that relaxes the check, in its own pull request after 0080 (owner, 14/10/2026).** The sentence is cleared and the reason and concept kept. Governs R8.
 
 ### Scope Boundaries
 
@@ -65,16 +68,7 @@ ADR 0020 says every actor id the platform wrote becomes the pseudonym, `bundle_c
 
 ### Deferred to Follow-Up Work
 
-- BA-167, as a migration change once 0080 has merged (Open Questions).
-
-### Open Questions
-
-- **BA-167 needs the owner (blocking BA-167 only).** Clearing the sentence and keeping the concept breaks `question_feedback_flag_check`. Options: a migration that lets a flag keep its concept with no sentence, queued behind Track A's 0080; or set the sentence to an empty string, which passes the CHECK with no migration but puts an empty quotation on any page that shows a disputed sentence.
-
-### Assumptions
-
-- The person id in history text and trailers is an actor id the platform wrote, so ADR 0020 already covers its rewrite, and the report's sentence "Every actor identifier for this person has been rewritten across the repository's history" is meant to be true of trailers. **Proposal, awaiting owner** (KTD3).
-- The verifier line needs no new words. A `human:<pseudonym>` actor has no user row, so the existing "a former member" applies (`verifierWords` in `packages/core/src/concepts/trust.ts`). **Proposal, awaiting owner.**
+- BA-167, as a migration change once 0080 has merged (R8).
 
 ### Sources / Research
 
@@ -95,7 +89,7 @@ ADR 0020 says every actor id the platform wrote becomes the pseudonym, `bundle_c
 
 - KTD1. **The fence is the member row, not the repository lock.** The lock is per process and the routine runs in another. `withMember` already holds the row `FOR SHARE`, which a `DELETE` waits on, so wrapping the git commit in it gives the identity step's delete the wait it lacks. One more short transaction per write is the cost.
 - KTD2. **A second history rewrite after the identity step, not one moved later.** Moving the only rewrite after the identity step would lose the sign-in address on a rerun by id alone, because the user row is tombstoned by then. Pass 2 reads the suppression row too, which the run writes before the identity step and never replaces.
-- KTD3. **Rewrite `human:<person id>` in history text and messages.** **Proposal, awaiting owner.** The reconciler replays a commit with the actor its trailer names, so a late commit whose rows were refused would land `human:<person id>` after the run. The replacement is the same mechanism as the address's, added to the same file, so trailers, frontmatter `verified` entries and any body naming the id move together. `rewriteHistory` also answers the paths it found, so pass 2 re-indexes a late path the map never named.
+- KTD3. **Rewrite `human:<person id>` in history text and messages (owner, 14/10/2026).** The reconciler replays a commit with the actor its trailer names, so a late commit whose rows were refused would land `human:<person id>` after the run. The replacement is the same mechanism as the address's, added to the same file, so trailers, frontmatter `verified` entries and any body naming the id move together. `rewriteHistory` also answers the paths it found, so pass 2 re-indexes a late path the map never named.
 - KTD4. **The actor sweep runs where the questions sweep runs, and once more after pass 2.** Before the identity step with both person ids, so a former member is reached; inside the identity transaction after the member delete, so a failed run's rerun still finds them; after pass 2, for a row the reconciler replayed in between.
 - KTD5. **The arm is read after the member delete, holding what it read.** `SELECT … FROM member WHERE user_id = $1 … FOR KEY SHARE` in the identity transaction. A concurrent removal elsewhere waits for the erasure to commit. The pre-read goes.
 
@@ -211,7 +205,7 @@ sequenceDiagram
 - **Requirements:** R6; KTD3.
 - **Dependencies:** U3, U4.
 - **Files:** `docs/solutions/architecture-patterns/adr-0019-trust-derived-from-the-file.md`, `docs/solutions/architecture-patterns/adr-0020-personal-data-withheld-at-the-seam.md`.
-- **Approach:** ADR 0019's sentence narrows to the audit log (**wording a proposal, awaiting owner**). ADR 0020 gains the late commit, the person id in trailers, and an amendment line.
+- **Approach:** ADR 0019's sentence narrows to the audit log, in the wording the owner accepted on 14/10/2026. ADR 0020 gains the late commit, the person id in trailers, and an amendment line.
 - **Test expectation:** none, docs only.
 - **Verification:** `check:docs` passes.
 
@@ -229,5 +223,5 @@ sequenceDiagram
 ## Definition of Done
 
 - R1 to R7 hold, each with a test named by its behaviour.
-- The proposals (KTD3, ADR 0019's wording, the verifier words) and BA-167's options are listed for the owner in the pull request.
+- The pull request records the owner's rulings on KTD3, ADR 0019's wording, the verifier words and BA-167.
 - No migration and no `contracts/` change in the diff; no abandoned code left in it.
