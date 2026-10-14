@@ -1014,7 +1014,7 @@ describe("a commit the rows cannot take", () => {
 });
 
 describe("the fence", () => {
-  it("waits behind a live action on the same bundle", async () => {
+  it("skips a bundle a live action holds, never waiting", async () => {
     const scenario = await arrange();
     const order: string[] = [];
     const action = withRepositoryLock(scenario.editor, scenario.git, async () => {
@@ -1024,11 +1024,15 @@ describe("the fence", () => {
     });
     const run = reconcile(RECONCILER, doorsOf(scenario), {
       workspaceId: scenario.workspaceId,
-    }).then(() => order.push("reconciler out"));
+    }).then((answered) => {
+      order.push("reconciler out");
+      return answered;
+    });
 
-    await Promise.all([action, run]);
+    const [, answered] = await Promise.all([action, run]);
 
-    expect(order).toEqual(["action in", "action out", "reconciler out"]);
+    expect(answered).toEqual({ ok: false, error: "held" });
+    expect(order).toEqual(["action in", "reconciler out", "action out"]);
   });
 });
 

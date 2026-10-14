@@ -5,7 +5,12 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { withRepositoryLock, withRepositoryLockAs, type GitDoor } from "../store/git/index.ts";
+import {
+  tryRepositoryLockAs,
+  withRepositoryLock,
+  withRepositoryLockAs,
+  type GitDoor,
+} from "../store/git/index.ts";
 import {
   tryWorkspaceFence,
   withWorkspaceFence,
@@ -45,14 +50,20 @@ export const withBundleFenceAs = <T>(
     withWorkspaceFence(platform, doors.postgres, workspaceId, hold, work),
   );
 
-/** As withBundleFenceAs, but `held` at once while a rewrite elsewhere holds the bundle. */
-export const tryBundleFenceAs = <T>(
+/**
+ * As withBundleFenceAs, but `held` at once while work in this process has the repository or a
+ * rewrite elsewhere holds the bundle. The in-process try still comes first: taking the fence
+ * before the queue would make a cycle across processes that Postgres cannot see.
+ */
+export const tryBundleFenceAs = async <T>(
   platform: PlatformPrincipal,
   doors: BundleDoors,
   workspaceId: string,
   hold: FenceHold,
   work: () => Promise<T>,
-): Promise<Result<T, LockHeld>> =>
-  withRepositoryLockAs(platform, doors.git, workspaceId, () =>
+): Promise<Result<T, LockHeld>> => {
+  const tried = await tryRepositoryLockAs(platform, doors.git, workspaceId, () =>
     tryWorkspaceFence(platform, doors.postgres, workspaceId, hold, work),
   );
+  return tried.ok ? tried.value : tried;
+};
