@@ -29,6 +29,7 @@ const WITHHELD = {
   "public.oauth_client": ["client_secret"],
   "public.oauth_access_token": ["token"],
   "public.oauth_refresh_token": ["token", "rotation_replay_response"],
+  "public.model_key": ["sealed"],
 } as const satisfies Record<string, readonly string[]>;
 
 const withheldTables: readonly string[] = Object.keys(WITHHELD);

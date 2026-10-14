@@ -28,7 +28,9 @@ BEGIN
               ('public.jwks', ARRAY['private_key']),
               ('public.oauth_client', ARRAY['client_secret']),
               ('public.oauth_access_token', ARRAY['token']),
-              ('public.oauth_refresh_token', ARRAY['token', 'rotation_replay_response'])
+              ('public.oauth_refresh_token', ARRAY['token', 'rotation_replay_response']),
+              -- Sealed, so no key by itself; withheld because this login has no use for the frame.
+              ('public.model_key', ARRAY['sealed'])
            ) AS w(relation, withheld)
       JOIN pg_catalog.pg_attribute a ON a.attrelid = w.relation::regclass
      WHERE a.attnum > 0 AND NOT a.attisdropped AND a.attname <> ALL (w.withheld)
