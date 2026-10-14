@@ -11,6 +11,7 @@ import {
   type AuditExport,
 } from "../src/members/index.ts";
 import type { PostgresDoor, Tx } from "../src/store/postgres/index.ts";
+import { auditEventsIn } from "./audit-rows.ts";
 import { provisionedWorkspace, seedPerson, type ProvisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
@@ -299,15 +300,11 @@ describe("the audit log's export", () => {
 
   it("stops at 10,000 rows, saying so on a line", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportCapped");
-    await seedingWith(db().pool, async (seed) => {
-      for (let index = 0; index < 10_001; index += 1) {
-        await seed.auditEvent({
-          workspaceId: workspace.workspaceId,
-          action: "people.group.created",
-          actor: `human:${workspace.adminUserId}`,
-          detail: {},
-        });
-      }
+    await auditEventsIn(db().pool, {
+      workspaceId: workspace.workspaceId,
+      action: "people.group.created",
+      actor: `human:${workspace.adminUserId}`,
+      count: 10_001,
     });
 
     const file = exported(await exportAs(workspace, workspace.adminUserId, { family: "people" }));
