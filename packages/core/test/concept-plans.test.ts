@@ -65,7 +65,7 @@ describe("the concept arm's plan, as the api under its policy", () => {
         query: "holiday policy grants",
         strength: "weak",
         limit: 10,
-        after: { matched: 3, rank: 3, key: conceptIriOf(ulid()) },
+        after: { weight: 3, rank: 3, key: conceptIriOf(ulid()) },
       });
       return read.ok ? ok(read.value.map(({ concept }) => concept.title)) : read;
     });

@@ -1,22 +1,34 @@
 import { z } from "zod";
 
-import { boundarySchemas, ids, MATCH_STRENGTHS } from "@better-answers/schema";
+import { boundarySchemas, ids, MATCH_STRENGTHS, type CorpusCounts } from "@better-answers/schema";
 
 import type { ConceptBound } from "../concepts/index.ts";
 import type { PassageBound } from "../sources/index.ts";
 
+/** `counts` are the run's corpus as its first page counted it, so later pages weigh words alike. */
 export type FindPosition =
-  | { readonly run: "strong" | "weak"; readonly bound: ConceptBound }
-  | { readonly run: "passages"; readonly bound: PassageBound };
+  | { readonly run: "strong" | "weak"; readonly bound: ConceptBound; readonly counts: CorpusCounts }
+  | { readonly run: "passages"; readonly bound: PassageBound; readonly counts: CorpusCounts };
 
 export type FindRun = FindPosition["run"];
 
-const ranked = { matched: z.int().nonnegative(), rank: z.number().nonnegative() };
+const ranked = { weight: z.number().nonnegative(), rank: z.number().nonnegative() };
+
+const counts = z
+  .strictObject({
+    size: z.int().nonnegative(),
+    frequencies: z.array(z.int().nonnegative()),
+  })
+  .refine(
+    ({ size, frequencies }) => frequencies.every((held) => held <= size),
+    "a word is held by more rows than were counted",
+  );
 
 const FIND_POSITION = z.discriminatedUnion("run", [
   z.strictObject({
     run: z.enum(MATCH_STRENGTHS),
     bound: z.strictObject({ ...ranked, key: ids.conceptIri }),
+    counts,
   }),
   z.strictObject({
     run: z.literal("passages"),
@@ -27,10 +39,12 @@ const FIND_POSITION = z.discriminatedUnion("run", [
         charStart: z.int32().nonnegative(),
       }),
     }),
+    counts,
   }),
 ]);
 
-const CURSOR_LENGTH_AT_MOST = 512;
+/** Room for the corpus counts of a 500-character question. */
+const CURSOR_LENGTH_AT_MOST = 1024;
 
 const positionOf = (text: string): FindPosition | undefined => {
   try {

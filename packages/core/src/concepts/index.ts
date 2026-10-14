@@ -5,11 +5,14 @@ import {
   boundarySchemas,
   CONCEPT_STABLE_STATUS,
   conceptIriOf,
+  corpusCounts,
   ids,
+  QUERY_WORDS,
   SUGGESTION_EDIT_KIND,
   SUGGESTION_SET_MAX,
   type BundleManifest,
   type ConceptIri,
+  type CorpusCounts,
   type MatchBound,
   type MatchStrength,
   type SENSITIVITIES,
@@ -1356,42 +1359,93 @@ export const evidenceOf = async (
   return sources.ok ? ok(sources.value.map((source) => source.item)) : err(sources.error);
 };
 
-const MATCH = anyWordMatch("c.search", "$4", ["c.iri"]);
+/**
+ * The corpus counts `anyWordMatch` weighs by, over `documents` with `parameters` bound before the
+ * query's words. A text with no words counts nothing: it matches nothing.
+ */
+export const corpusCountsOf = (
+  tx: Tx,
+  documents: string,
+  parameters: readonly unknown[],
+  query: string,
+): Promise<Result<CorpusCounts, Error>> =>
+  attempt(async () => {
+    const words = await tx.query<{ readonly word: string }>(QUERY_WORDS, [query]);
+    if (words.rows.length === 0) return { size: 0, frequencies: [] };
+    const counted = await tx.query<CorpusCounts>(
+      corpusCounts(documents, words.rows.length, parameters.length + 1),
+      [...parameters, ...words.rows.map(({ word }) => word)],
+    );
+    const [counts] = counted.rows;
+    if (counts === undefined) throw new Error("a count answered no row");
+    return counts;
+  });
 
-/** Collections bind sixth when named; the bound follows them, else binds sixth itself. */
+/** The concepts `principal` may read, counted for `query`'s words. */
+export const conceptCountsOf = (
+  principal: UserPrincipal,
+  tx: Tx,
+  query: string,
+): Promise<Result<CorpusCounts, Error>> =>
+  corpusCountsOf(
+    tx,
+    `SELECT d.search FROM concept_index d WHERE d.workspace_id = $1 AND ${readableClause("d", 2)}`,
+    [principal.workspaceId, ...readableParameters(principal)],
+    query,
+  );
+
+const MATCH = anyWordMatch("c.search", "$4", ["c.iri"], { size: "$5", frequencies: "$6" });
+
+/** Collections bind eighth when named; the bound follows them, else binds eighth itself. */
 const matchingConcepts = (strength: MatchStrength, narrowed: boolean, after: boolean): string => {
-  const bound = narrowed ? 7 : 6;
+  const bound = narrowed ? 9 : 8;
   const placed = (at: number): `$${number}` => `$${bound + at}`;
   return `${conceptSelect(MATCH)}
       AND ${MATCH.matches}
       AND ${MATCH.strength(strength)}
-      ${narrowed ? "AND c.collection = ANY($6::text[])" : ""}
-      ${after ? `AND ${MATCH.after({ matched: placed(0), rank: placed(1), key: [placed(2)] })}` : ""}
+      ${narrowed ? "AND c.collection = ANY($8::text[])" : ""}
+      ${after ? `AND ${MATCH.after({ weight: placed(0), rank: placed(1), key: [placed(2)] })}` : ""}
     ORDER BY ${MATCH.order}
-    LIMIT $5`;
+    LIMIT $7`;
 };
 
 export type ConceptBound = MatchBound<ConceptIri>;
 
 export type ConceptFound = { readonly concept: OpenedConcept; readonly bound: ConceptBound };
 
-type MatchingConceptRow = ConceptRow & { readonly matched: number; readonly rank: number };
+type MatchingConceptRow = ConceptRow & { readonly weight: number; readonly rank: number };
 
 /**
  * Readable concepts by the any-word rule, after `after` when given. A strong match holds at least
  * half the query's distinct words, a weak one fewer. `collections`, when given, leaves only the
- * concepts in one of them, so a concept in no collection is left out.
+ * concepts in one of them, so a concept in no collection is left out. `counts` freeze a cursor's
+ * ranking.
  */
-export const findConcepts = (
+export const findConcepts = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: {
-    readonly query: string;
-    readonly strength: MatchStrength;
-    readonly limit: number;
-    readonly after?: ConceptBound | undefined;
-    readonly collections?: readonly string[] | undefined;
-  },
+  input: ConceptSearch & { readonly counts?: CorpusCounts | undefined },
+): Promise<Result<readonly ConceptFound[], Error>> => {
+  const counts =
+    input.counts === undefined
+      ? await conceptCountsOf(principal, tx, input.query)
+      : ok(input.counts);
+  return counts.ok ? conceptsWeighed(principal, tx, input, counts.value) : counts;
+};
+
+type ConceptSearch = {
+  readonly query: string;
+  readonly strength: MatchStrength;
+  readonly limit: number;
+  readonly after?: ConceptBound | undefined;
+  readonly collections?: readonly string[] | undefined;
+};
+
+const conceptsWeighed = (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: ConceptSearch,
+  counts: CorpusCounts,
 ): Promise<Result<readonly ConceptFound[], Error>> =>
   attempt(async () => {
     const { after, collections } = input;
@@ -1401,14 +1455,16 @@ export const findConcepts = (
         principal.workspaceId,
         ...readableParameters(principal),
         input.query,
+        counts.size,
+        counts.frequencies,
         input.limit,
         ...(collections === undefined ? [] : [collections]),
-        ...(after === undefined ? [] : [after.matched, after.rank, after.key]),
+        ...(after === undefined ? [] : [after.weight, after.rank, after.key]),
       ],
     );
     return rows.map((row) => {
       const concept = openedOf(row);
-      return { concept, bound: { matched: row.matched, rank: row.rank, key: concept.iri } };
+      return { concept, bound: { weight: row.weight, rank: row.rank, key: concept.iri } };
     });
   });
 

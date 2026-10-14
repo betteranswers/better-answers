@@ -8,8 +8,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   anyWordMatch,
+  corpusCounts,
   MARK_THE_MATCH_LEAKPROOF,
   passage,
+  QUERY_WORDS,
+  type CorpusCounts,
   type MatchStrength,
 } from "../src/index.ts";
 import { testData } from "./factory.ts";
@@ -108,6 +111,24 @@ const passageSearchExpression = (): { readonly sql: string; readonly params: unk
   return new PgDialect().sqlToQuery(generated);
 };
 
+describe("the concept search column's index, after the description joined it", () => {
+  it("is valid, ready and over the column", async () => {
+    const read = await db().pool.query<{ valid: boolean; ready: boolean; definition: string }>(
+      `SELECT i.indisvalid AS valid, i.indisready AS ready, pg_get_indexdef(i.indexrelid) AS definition
+         FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+        WHERE c.relname = 'concept_index_search_gin'`,
+    );
+
+    expect(read.rows).toEqual([
+      {
+        valid: true,
+        ready: true,
+        definition: expect.stringContaining("USING gin (search)"),
+      },
+    ]);
+  });
+});
+
 describe("the full-text rule's SQL", () => {
   it("stores a passage's vector exactly as its migration wrote it", () => {
     expect(passageSearchExpression()).toEqual({
@@ -117,16 +138,38 @@ describe("the full-text rule's SQL", () => {
   });
 });
 
-const BY_TITLE = anyWordMatch("c.search", "$2", ["c.title"]);
+const BY_TITLE = anyWordMatch("c.search", "$2", ["c.title"], { size: "$3", frequencies: "$4" });
+
+const WORKSPACE_CONCEPTS = "SELECT d.search FROM concept_index d WHERE d.workspace_id = $1";
 
 type Narrowed = {
   readonly strength?: MatchStrength;
-  readonly after?: readonly [matched: number, rank: number, title: string];
+  readonly after?: readonly [weight: number, rank: number, title: string];
+  readonly counts?: CorpusCounts;
 };
 
-type Matched = { readonly title: string; readonly matched: number; readonly rank: number };
+type Matched = { readonly title: string; readonly weight: number; readonly rank: number };
 
-/** Concept rows titled and bodied as given, read back by the rule over `text`, keyed by title. */
+/** The workspace's concepts counted for `text`'s words, in one pass. */
+const countedFor = async (
+  client: pg.PoolClient,
+  workspaceId: string,
+  text: string,
+): Promise<CorpusCounts> => {
+  const words = await client.query<{ word: string }>(QUERY_WORDS, [text]);
+  const counted = await client.query<CorpusCounts>(
+    corpusCounts(WORKSPACE_CONCEPTS, words.rows.length, 2),
+    [workspaceId, ...words.rows.map(({ word }) => word)],
+  );
+  const [counts] = counted.rows;
+  if (counts === undefined) throw new Error("the count answered no row");
+  return counts;
+};
+
+/**
+ * Concept rows titled and bodied as given, read back by the rule over `text`, keyed by title, with
+ * the counts given or the workspace's own.
+ */
 const matchedOver = (
   concepts: readonly (readonly [title: string, body: string])[],
   text: string,
@@ -137,6 +180,7 @@ const matchedOver = (
     const { id: workspaceId } = await seed.workspace();
     for (const [title, body] of concepts) await seed.conceptIndex({ workspaceId, title, body });
     const { strength, after } = narrowed;
+    const counts = narrowed.counts ?? (await countedFor(client, workspaceId, text));
     const read = await client.query<Matched>(
       `SELECT c.title, ${BY_TITLE.columns}
          FROM concept_index c
@@ -144,9 +188,9 @@ const matchedOver = (
         WHERE c.workspace_id = $1
           AND ${BY_TITLE.matches}
           ${strength === undefined ? "" : `AND ${BY_TITLE.strength(strength)}`}
-          ${after === undefined ? "" : `AND ${BY_TITLE.after({ matched: "$3", rank: "$4", key: ["$5"] })}`}
+          ${after === undefined ? "" : `AND ${BY_TITLE.after({ weight: "$5", rank: "$6", key: ["$7"] })}`}
         ORDER BY ${BY_TITLE.order}`,
-      [workspaceId, text, ...(after ?? [])],
+      [workspaceId, text, counts.size, counts.frequencies, ...(after ?? [])],
     );
     return read.rows;
   });
@@ -167,7 +211,71 @@ describe("the any-word rule over concept rows", () => {
     expect(matched.map(({ title }) => title)).toEqual(["Audit Logs Retention", "Retention"]);
   });
 
-  it("ranks distinct words held, then density, then key", async () => {
+  it("weighs a rare word above a common one", async () => {
+    const matched = await matchedOver(
+      [
+        ["Audit Logs", UNRELATED],
+        ["Audit Plan", UNRELATED],
+        ["Audit Policy", UNRELATED],
+        ["Retention", UNRELATED],
+      ],
+      "audit retention",
+    );
+
+    expect(matched.map(({ title }) => title)).toEqual([
+      "Retention",
+      "Audit Logs",
+      "Audit Plan",
+      "Audit Policy",
+    ]);
+  });
+
+  it("counts the corpus and each word in one pass", async () => {
+    const counts = await withRollback(db().pool, async (client) => {
+      const seed = testData(client);
+      const { id: workspaceId } = await seed.workspace();
+      for (const title of ["Audit Logs", "Audit Plan", "Retention", "Holiday policy"]) {
+        await seed.conceptIndex({ workspaceId, title, body: UNRELATED });
+      }
+      return countedFor(client, workspaceId, "retention audit");
+    });
+
+    expect(counts).toEqual({ size: 4, frequencies: [2, 1] });
+  });
+
+  it("weighs by the counts it is given, not the rows", async () => {
+    const concepts = [
+      ["Audit Logs", UNRELATED],
+      ["Retention", UNRELATED],
+    ] as const;
+
+    const titles = async (frequencies: readonly number[]) =>
+      (await matchedOver(concepts, "audit retention", { counts: { size: 9, frequencies } })).map(
+        ({ title }) => title,
+      );
+
+    expect({
+      auditRare: await titles([1, 8]),
+      retentionRare: await titles([8, 1]),
+    }).toEqual({
+      auditRare: ["Audit Logs", "Retention"],
+      retentionRare: ["Retention", "Audit Logs"],
+    });
+  });
+
+  it("weighs a title word above a body word", async () => {
+    const matched = await matchedOver(
+      [
+        ["Records", "Our audit runs in spring."],
+        ["Audit", UNRELATED],
+      ],
+      "audit",
+    );
+
+    expect(matched.map(({ title }) => title)).toEqual(["Audit", "Records"]);
+  });
+
+  it("weighs by rarity and saturated count, then density, then key", async () => {
     const matched = await matchedOver(
       [
         ["Logs", "audit audit audit audit audit audit"],
@@ -178,11 +286,18 @@ describe("the any-word rule over concept rows", () => {
       "audit log retention",
     );
 
+    // Of four rows, audit and log are each held by three and retention by one.
+    const common = Math.log(1 + 1.5 / 3.5);
+    const rare = Math.log(1 + 3.5 / 1.5);
     expect(matched).toEqual([
-      { title: "Audit Logs Retention", matched: 3, rank: 3 },
-      { title: "Logs", matched: 2, rank: 2.200000047683716 },
-      { title: "Audit", matched: 1, rank: 1 },
-      { title: "Log", matched: 1, rank: 1 },
+      { title: "Audit Logs Retention", weight: expect.closeTo(2 * common + rare, 12), rank: 3 },
+      {
+        title: "Logs",
+        weight: expect.closeTo(common + (common * 1.2 * 2.2) / (1.2 + 1.2), 12),
+        rank: 2.200000047683716,
+      },
+      { title: "Audit", weight: expect.closeTo(common, 12), rank: 1 },
+      { title: "Log", weight: expect.closeTo(common, 12), rank: 1 },
     ]);
   });
 
@@ -209,41 +324,52 @@ describe("the any-word rule over concept rows", () => {
     });
   });
 
-  it("continues after a bound by words held, rank, then key", async () => {
+  it("continues after a bound by weight, rank, then key", async () => {
     const concepts = [
       ["Audit Logs", UNRELATED],
       ["Audit", "audit"],
       ["Log", "log"],
       ["Retention", UNRELATED],
     ] as const;
+    const ranked = await matchedOver(concepts, "audit log retention");
+    const boundAt = (title: string): NonNullable<Narrowed["after"]> => {
+      const row = ranked.find((each) => each.title === title);
+      if (row === undefined) throw new Error(`${title} did not match`);
+      return [row.weight, row.rank, row.title];
+    };
 
     const after = async (bound: NonNullable<Narrowed["after"]>) =>
       (await matchedOver(concepts, "audit log retention", { after: bound })).map(
         ({ title }) => title,
       );
 
+    const [audit, log] = [boundAt("Audit"), boundAt("Log")];
     expect({
-      pastTheTwoWordRow: await after([2, 2, "Audit Logs"]),
-      pastTheDenserRow: await after([1, 1.2000000476837158, "Log"]),
-      pastTheKey: await after([1, 1.2000000476837158, "Audit"]),
-      pastTheLast: await after([1, 1, "Retention"]),
+      inOrder: ranked.map(({ title }) => title),
+      pastTheHeaviest: await after(boundAt("Audit Logs")),
+      pastTheDenserRow: await after(boundAt("Retention")),
+      pastTheKey: await after(audit),
+      pastTheLast: await after(log),
+      tiedButForTheKey: audit[0] === log[0] && audit[1] === log[1],
     }).toEqual({
-      pastTheTwoWordRow: ["Audit", "Log", "Retention"],
-      pastTheDenserRow: ["Retention"],
-      pastTheKey: ["Log", "Retention"],
+      inOrder: ["Audit Logs", "Retention", "Audit", "Log"],
+      pastTheHeaviest: ["Retention", "Audit", "Log"],
+      pastTheDenserRow: ["Audit", "Log"],
+      pastTheKey: ["Log"],
       pastTheLast: [],
+      tiedButForTheKey: true,
     });
   });
 
   it.each([
-    ["the largest bounds", Number.MAX_SAFE_INTEGER, Number.MAX_VALUE],
-    ["the smallest rank", 0, Number.MIN_VALUE],
-  ])("compares a bound of %s without error", async (_case, matched, rank) => {
+    ["the largest bounds", Number.MAX_VALUE, Number.MAX_VALUE],
+    ["the smallest bounds", 0, Number.MIN_VALUE],
+  ])("compares a bound of %s without error", async (_case, weight, rank) => {
     const after = await matchedOver([["Audit", UNRELATED]], "audit", {
-      after: [matched, rank, "Audit"],
+      after: [weight, rank, "Audit"],
     });
 
-    expect(after.map(({ title }) => title)).toEqual(matched === 0 ? [] : ["Audit"]);
+    expect(after.map(({ title }) => title)).toEqual(weight === 0 ? [] : ["Audit"]);
   });
 
   it("reads `!`, `:*`, `&`, quotes and parentheses as no syntax", async () => {
@@ -268,7 +394,9 @@ describe("the any-word rule over concept rows", () => {
       "example.com/o'brien",
     );
 
-    expect(matched).toEqual([{ title: "See example.com/o'brien", matched: 3, rank: 3 }]);
+    expect(matched).toEqual([
+      { title: "See example.com/o'brien", weight: expect.any(Number), rank: 3 },
+    ]);
   });
 
   it("matches nothing on stop words alone, and raises nothing", async () => {

@@ -178,7 +178,7 @@ const threeRunsLanded = async (workspaceId: string): Promise<void> => {
 };
 
 const PAST_THE_END =
-  "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6MCwicmFuayI6MCwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy8wMUo2TU1NTU1NTU1NTU1NTU1NTU1NTU1NTSJ9fQ";
+  "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn0sImNvdW50cyI6eyJzaXplIjowLCJmcmVxdWVuY2llcyI6W119fQ";
 
 const pagesOf = async (
   person: UserPrincipal,
@@ -220,9 +220,11 @@ describe("find's pages", () => {
 
     const page = await searching(viewer, QUESTION, 1);
 
+    // Of two concepts, audit is held by one and log by both: ln(1 + 1.5 / 1.5) + ln(1 + 0.5 / 2.5).
     expect(findCursor.parse(page.nextCursor)).toEqual({
       run: "strong",
-      bound: { matched: 2, rank: 2, key: retention },
+      bound: { weight: expect.closeTo(Math.log(2.4), 12), rank: 2, key: retention },
+      counts: { size: 2, frequencies: [1, 0, 2, 0] },
     });
   });
 
@@ -266,15 +268,16 @@ describe("find's pages", () => {
   });
 
   it.each([
-    ["the largest bounds", Number.MAX_SAFE_INTEGER, Number.MAX_VALUE],
-    ["the smallest rank", 0, Number.MIN_VALUE],
-  ])("reads a cursor of %s without error", async (_case, matched, rank) => {
+    ["the largest bounds", Number.MAX_VALUE, Number.MAX_VALUE],
+    ["the smallest bounds", Number.MIN_VALUE, Number.MIN_VALUE],
+  ])("reads a cursor of %s without error", async (_case, weight, rank) => {
     const { workspaceId, viewer } = await arrange();
     await conceptsLanded(workspaceId, [{ title: AUDIT_LOGS_RETENTION }]);
 
     const page = await searching(viewer, QUESTION, 10, {
       run: "strong",
-      bound: { matched, rank, key: conceptIriOf(ulid()) },
+      bound: { weight, rank, key: conceptIriOf(ulid()) },
+      counts: { size: 1, frequencies: [0, 0, 1, 0] },
     });
 
     expect(page.query).toBe(QUESTION);
@@ -290,7 +293,8 @@ describe("find's pages", () => {
     await conceptsLanded(workspaceId, [{ title: "Audit Logs" }, { title: "Audit" }]);
     const after = (key: ConceptIri): FindPosition => ({
       run: "strong",
-      bound: { matched: 4, rank: 2.4, key },
+      bound: { weight: Number.MAX_VALUE, rank: 2.4, key },
+      counts: { size: 3, frequencies: [3, 0, 2, 0] },
     });
 
     const [past, absent] = await Promise.all([
@@ -300,6 +304,96 @@ describe("find's pages", () => {
 
     expect(titlesOf(past)).toEqual(["Audit Logs", "Audit"]);
     expect(past).toEqual(absent);
+  });
+
+  it("pages a tie as counted, across a write between pages", async () => {
+    const { workspaceId, viewer } = await arrange();
+    await conceptsLanded(workspaceId, [
+      { title: "Audit Plan" },
+      { title: "Audit Policy" },
+      { title: "Audit Logs" },
+    ]);
+    const unpaged = titlesOf(await searching(viewer, "audit"));
+    const first = await searching(viewer, "audit", 1);
+
+    await conceptLanded(workspaceId, { title: "Holiday policy" });
+    const rest = await searching(viewer, "audit", 10, findCursor.parse(first.nextCursor));
+
+    expect([...titlesOf(first), ...titlesOf(rest)]).toEqual(unpaged);
+    expect(unpaged).toHaveLength(3);
+  });
+
+  it("pages a 500-character query of common words to page two", async () => {
+    const { workspaceId, viewer } = await arrange();
+    const query = Array.from({ length: 120 }, (_, at) => `w${String(at)}`).join(" ");
+    for (let at = 0; at < 25; at += 1) {
+      await conceptLanded(workspaceId, { title: `Concept ${String(at)}`, body: query });
+    }
+
+    const first = await searching(viewer, query, 10);
+    const second = await searching(viewer, query, 10, findCursor.parse(first.nextCursor));
+
+    expect(query.length).toBeLessThanOrEqual(500);
+    expect(first.nextCursor?.length).toBeGreaterThan(512);
+    expect(titlesOf(second)).toHaveLength(10);
+    expect(titlesOf(second).filter((title) => titlesOf(first).includes(title))).toEqual([]);
+  });
+
+  it("weighs a Viewer's concepts as before a Restricted one lands", async () => {
+    const { workspaceId, viewer } = await arrange();
+    await conceptsLanded(workspaceId, [
+      { title: "Audit Logs" },
+      { title: "Audit Plan" },
+      { title: "Retention" },
+    ]);
+    const read = async () => {
+      const page = await searching(viewer, "audit retention", 1);
+      return {
+        titles: titlesOf(await searching(viewer, "audit retention")),
+        next: page.nextCursor,
+      };
+    };
+    const before = await read();
+
+    await conceptLanded(workspaceId, { title: "Retention", sensitivity: "Restricted" });
+
+    expect(await read()).toEqual(before);
+    expect(before.titles[0]).toBe("Retention");
+  });
+
+  it("weighs a Viewer's passages as before a Restricted one lands", async () => {
+    const { workspaceId, viewer } = await arrange();
+    const internal = await connectedSourceHolding(db(), workspaceId);
+    for (const [ordinal, content] of ["Audit logs.", "Retention schedule."].entries()) {
+      await passageUnder(db(), workspaceId, internal, {
+        content,
+        ordinal,
+        charStart: ordinal * 100,
+        charEnd: ordinal * 100 + content.length,
+      });
+    }
+    const read = async () => {
+      const page = await searching(viewer, "audit retention", 1);
+      const all = await searching(viewer, "audit retention");
+      return { found: titlesOrLocatorsOf(all), next: page.nextCursor };
+    };
+    const before = await read();
+
+    const restricted = await connectedSourceHolding(db(), workspaceId, {
+      sensitivity: "Restricted",
+    });
+    await passageUnder(db(), workspaceId, restricted, {
+      content: "Retention.",
+      ordinal: 0,
+      charStart: 0,
+      charEnd: 10,
+    });
+
+    expect(await read()).toEqual(before);
+    expect(before.found).toEqual([
+      `${internal.documentId}/chars:0-11`,
+      `${internal.documentId}/chars:100-119`,
+    ]);
   });
 
   it("matches a Restricted concept for an Admin alone, uncounted", async () => {
@@ -339,7 +433,7 @@ const afterAFailedStatement = async <T, Refused>(
 };
 
 const PASSAGES_CURSOR =
-  "eyJydW4iOiJwYXNzYWdlcyIsImJvdW5kIjp7Im1hdGNoZWQiOjEsInJhbmsiOjAuMSwia2V5Ijp7InNvdXJjZURvY3VtZW50SWQiOiIwMUo2RERERERERERERERERERERERERERERCIsImNoYXJTdGFydCI6MH19fQ";
+  "eyJydW4iOiJwYXNzYWdlcyIsImJvdW5kIjp7IndlaWdodCI6MSwicmFuayI6MC4xLCJrZXkiOnsic291cmNlRG9jdW1lbnRJZCI6IjAxSjZEREREREREREREREREREREREREREREIiwiY2hhclN0YXJ0IjowfX0sImNvdW50cyI6eyJzaXplIjoyLCJmcmVxdWVuY2llcyI6WzEsMl19fQ";
 
 describe("a failed read", () => {
   it.each([
@@ -407,35 +501,51 @@ describe("the cursor find hands out", () => {
     ["base64url of no JSON", "ew"],
     [
       "a run find has no name for",
-      "eyJydW4iOiJtaWRkbGUiLCJib3VuZCI6eyJtYXRjaGVkIjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn19",
+      "eyJydW4iOiJtaWRkbGUiLCJib3VuZCI6eyJ3ZWlnaHQiOjAsInJhbmsiOjAsImtleSI6Imh0dHBzOi8vYmV0dGVyLWFuc3dlcnMuY29tL2MvMDFKNk1NTU1NTU1NTU1NTU1NTU1NTU1NTU0ifSwiY291bnRzIjp7InNpemUiOjAsImZyZXF1ZW5jaWVzIjpbXX19",
     ],
     [
-      "a negative word count",
-      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6LTEsInJhbmsiOjAsImtleSI6Imh0dHBzOi8vYmV0dGVyLWFuc3dlcnMuY29tL2MvMDFKNk1NTU1NTU1NTU1NTU1NTU1NTU1NTU0ifX0",
+      "a negative weight",
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjotMSwicmFuayI6MCwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy8wMUo2TU1NTU1NTU1NTU1NTU1NTU1NTU1NTSJ9LCJjb3VudHMiOnsic2l6ZSI6MCwiZnJlcXVlbmNpZXMiOltdfX0",
     ],
     [
-      "a fractional word count",
-      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6MS41LCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn19",
+      "a weight that is no number",
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjoiMSIsInJhbmsiOjAsImtleSI6Imh0dHBzOi8vYmV0dGVyLWFuc3dlcnMuY29tL2MvMDFKNk1NTU1NTU1NTU1NTU1NTU1NTU1NTU0ifSwiY291bnRzIjp7InNpemUiOjAsImZyZXF1ZW5jaWVzIjpbXX19",
+    ],
+    [
+      "a cursor from before find weighed words",
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6MCwicmFuayI6MCwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy8wMUo2TU1NTU1NTU1NTU1NTU1NTU1NTU1NTSJ9fQ",
     ],
     [
       "a negative rank",
-      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6MCwicmFuayI6LTAuMSwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy8wMUo2TU1NTU1NTU1NTU1NTU1NTU1NTU1NTSJ9fQ",
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjotMC4xLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn0sImNvdW50cyI6eyJzaXplIjowLCJmcmVxdWVuY2llcyI6W119fQ",
     ],
     [
       "a key that is no IRI",
-      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6MCwicmFuayI6MCwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy9ub3BlIn19",
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jL25vcGUifSwiY291bnRzIjp7InNpemUiOjAsImZyZXF1ZW5jaWVzIjpbXX19",
     ],
     [
       "a key of another run",
-      "eyJydW4iOiJwYXNzYWdlcyIsImJvdW5kIjp7Im1hdGNoZWQiOjAsInJhbmsiOjAsImtleSI6Imh0dHBzOi8vYmV0dGVyLWFuc3dlcnMuY29tL2MvMDFKNk1NTU1NTU1NTU1NTU1NTU1NTU1NTU0ifX0",
+      "eyJydW4iOiJwYXNzYWdlcyIsImJvdW5kIjp7IndlaWdodCI6MCwicmFuayI6MCwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy8wMUo2TU1NTU1NTU1NTU1NTU1NTU1NTU1NTSJ9LCJjb3VudHMiOnsic2l6ZSI6MCwiZnJlcXVlbmNpZXMiOltdfX0",
     ],
     [
       "a key it does not know",
-      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsibWF0Y2hlZCI6MCwicmFuayI6MCwia2V5IjoiaHR0cHM6Ly9iZXR0ZXItYW5zd2Vycy5jb20vYy8wMUo2TU1NTU1NTU1NTU1NTU1NTU1NTU1NTSJ9LCJleHRyYSI6MX0",
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn0sImNvdW50cyI6eyJzaXplIjowLCJmcmVxdWVuY2llcyI6W119LCJleHRyYSI6MX0",
+    ],
+    [
+      "a cursor that counted no corpus",
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn19",
+    ],
+    [
+      "a word held by more rows than were counted",
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn0sImNvdW50cyI6eyJzaXplIjoxLCJmcmVxdWVuY2llcyI6WzJdfX0",
+    ],
+    [
+      "a fractional corpus size",
+      "eyJydW4iOiJ3ZWFrIiwiYm91bmQiOnsid2VpZ2h0IjowLCJyYW5rIjowLCJrZXkiOiJodHRwczovL2JldHRlci1hbnN3ZXJzLmNvbS9jLzAxSjZNTU1NTU1NTU1NTU1NTU1NTU1NTU1NIn0sImNvdW50cyI6eyJzaXplIjoxLjUsImZyZXF1ZW5jaWVzIjpbXX19",
     ],
     ["a character outside base64url before it", `!${PAST_THE_END}`],
     ["a character outside base64url after it", `${PAST_THE_END}!`],
-    ["one character too long", `${PAST_THE_END}${"A".repeat(513 - PAST_THE_END.length)}`],
+    ["one character too long", `${PAST_THE_END}${"A".repeat(1025 - PAST_THE_END.length)}`],
   ])("refuses %s", (_case, cursor) => {
     expect(findCursor.safeParse(cursor).success).toBe(false);
   });
@@ -444,10 +554,11 @@ describe("the cursor find hands out", () => {
     expect(findCursor.parse(PASSAGES_CURSOR)).toEqual({
       run: "passages",
       bound: {
-        matched: 1,
+        weight: 1,
         rank: 0.1,
         key: { sourceDocumentId: "01J6DDDDDDDDDDDDDDDDDDDDDD", charStart: 0 },
       },
+      counts: { size: 2, frequencies: [1, 2] },
     });
   });
 });

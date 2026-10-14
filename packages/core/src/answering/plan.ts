@@ -6,6 +6,7 @@ import {
 } from "@better-answers/schema";
 
 import {
+  conceptCountsOf,
   conceptPageOf,
   conceptsByIris,
   evidenceOf,
@@ -123,7 +124,9 @@ const entryPoints = async (
   { reader, question, collections, caps }: Asked,
   tx: Tx,
 ): Promise<Result<readonly OpenedConcept[], Error>> => {
-  const search = { query: question, collections };
+  const counts = await conceptCountsOf(reader, tx, question);
+  if (!counts.ok) return counts;
+  const search = { query: question, collections, counts: counts.value };
   const strong = await findConcepts(reader, tx, {
     ...search,
     strength: "strong",

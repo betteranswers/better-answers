@@ -1,5 +1,6 @@
 import type {
   ConceptIri,
+  CorpusCounts,
   JudgeState,
   MatchStrength,
   QuestionVerdict,
@@ -7,6 +8,7 @@ import type {
 
 import type { ConceptRead, Frontmatter } from "../concepts/index.ts";
 import {
+  conceptCountsOf,
   findConcepts,
   readConcept,
   trustOf,
@@ -26,7 +28,13 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { findPassages, parseLocator, passageAt, type PassageMatch } from "../sources/index.ts";
+import {
+  findPassages,
+  parseLocator,
+  passageAt,
+  passageCountsOf,
+  type PassageMatch,
+} from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import {
   askInput,
@@ -201,34 +209,63 @@ type Search = {
   readonly query: string;
 };
 
+type Counted = () => Promise<Result<CorpusCounts, Error>>;
+
+/** Counts once a request, or takes the counts of a cursor that stopped in one of `runs`. */
+const countedOnce = (
+  runs: readonly FindRun[],
+  after: FindPosition | undefined,
+  count: Counted,
+): Counted => {
+  let held: Promise<Result<CorpusCounts, Error>> | undefined;
+  return () => {
+    held ??=
+      after !== undefined && runs.includes(after.run) ? Promise.resolve(ok(after.counts)) : count();
+    return held;
+  };
+};
+
 const conceptRun =
-  ({ principal, tx, query }: Search, run: MatchStrength): RunReader<OpenedConcept> =>
+  (
+    { principal, tx, query }: Search,
+    run: MatchStrength,
+    counted: Counted,
+  ): RunReader<OpenedConcept> =>
   async (limit, after) => {
+    const counts = await counted();
+    if (!counts.ok) return err(counts.error);
     const found = await findConcepts(principal, tx, {
       query,
       strength: run,
       limit,
       after: after?.run === run ? after.bound : undefined,
+      counts: counts.value,
     });
     if (!found.ok) return err(found.error);
     return ok(
-      found.value.map(({ concept, bound }) => ({ match: concept, position: { run, bound } })),
+      found.value.map(({ concept, bound }) => ({
+        match: concept,
+        position: { run, bound, counts: counts.value },
+      })),
     );
   };
 
 const passageRun =
-  ({ principal, tx, query }: Search): RunReader<PassageMatch> =>
+  ({ principal, tx, query }: Search, counted: Counted): RunReader<PassageMatch> =>
   async (limit, after) => {
+    const counts = await counted();
+    if (!counts.ok) return err(counts.error);
     const found = await findPassages(principal, tx, {
       query,
       limit,
       after: after?.run === "passages" ? after.bound : undefined,
+      counts: counts.value,
     });
     if (!found.ok) return err(found.error);
     return ok(
       found.value.map(({ passage, bound }) => ({
         match: passage,
-        position: { run: "passages" as const, bound },
+        position: { run: "passages" as const, bound, counts: counts.value },
       })),
     );
   };
@@ -288,11 +325,17 @@ export const find = async (
 
   const search = { principal: admitted.value, tx, query: input.query };
   const toConcept = (concept: OpenedConcept) => conceptMatchOf(concept, now);
+  const concepts = countedOnce(["strong", "weak"], input.cursor, () =>
+    conceptCountsOf(search.principal, tx, search.query),
+  );
+  const passages = countedOnce(["passages"], input.cursor, () =>
+    passageCountsOf(search.principal, tx, search.query),
+  );
   const page = await pageOf<FindMatch>(
     [
-      ["strong", mappedRun(conceptRun(search, "strong"), toConcept)],
-      ["passages", mappedRun(passageRun(search), documentMatchOf)],
-      ["weak", mappedRun(conceptRun(search, "weak"), toConcept)],
+      ["strong", mappedRun(conceptRun(search, "strong", concepts), toConcept)],
+      ["passages", mappedRun(passageRun(search, passages), documentMatchOf)],
+      ["weak", mappedRun(conceptRun(search, "weak", concepts), toConcept)],
     ],
     input.limit,
     input.cursor,

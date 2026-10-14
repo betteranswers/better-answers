@@ -53,6 +53,29 @@ describe("the search column writeConcept lands", () => {
     ]);
   });
 
+  it("weighs the description B", async () => {
+    const scenario = await arrange();
+
+    const written = await conceptCiting(scenario, scenario.admin, [], {
+      ...RETENTION,
+      frontmatter: { ...RETENTION.frontmatter, description: "Invoices are kept for audits." },
+      body: "Archives stay seven years.",
+    });
+
+    expect(await weighed(scenario, written.iri)).toEqual([
+      { lexeme: "archiv", weights: ["C"] },
+      { lexeme: "audit", weights: ["B"] },
+      { lexeme: "complianc", weights: ["B"] },
+      { lexeme: "invoic", weights: ["B"] },
+      { lexeme: "kept", weights: ["B"] },
+      { lexeme: "retent", weights: ["A"] },
+      { lexeme: "schedul", weights: ["A"] },
+      { lexeme: "seven", weights: ["C"] },
+      { lexeme: "stay", weights: ["C"] },
+      { lexeme: "year", weights: ["C"] },
+    ]);
+  });
+
   it("moves the vector with a rewritten body", async () => {
     const scenario = await arrange();
     const first = await conceptCiting(scenario, scenario.admin, [], {

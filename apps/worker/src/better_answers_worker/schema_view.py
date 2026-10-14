@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0079_the-model-key"
+MIGRATION_ID = "0080_the-concept-description"
 
-MIGRATION_WHEN = 1791986656585
+MIGRATION_WHEN = 1791998863438
 
 TABLES: dict[str, dict[str, str]] = {
     "index.passage": {

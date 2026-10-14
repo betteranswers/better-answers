@@ -197,6 +197,7 @@ export const bundleCommit = withRLS(
 const CONCEPT_SEARCH = [
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, title), 'A')`,
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, jsonb_path_query_array(frontmatter, '$.tags[*]')), 'B')`,
+  `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, jsonb_path_query_array(frontmatter, '$.description')), 'B')`,
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, coalesce(substring(body from '(?n)^Also known as: (.*)$'), '')), 'B')`,
   `setweight(to_tsvector(${FULL_TEXT_LANGUAGE}, body), 'C')`,
 ].join(" || ");
