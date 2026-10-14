@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { grantingFor } from "../src/auth/consent-grant.ts";
 import {
   CONSENT_WORDS,
   OAUTH_SCOPES,
@@ -547,6 +548,40 @@ describe("the pages, as a person walks them", () => {
     expect(await consentsGiven()).toEqual(before);
   });
 
+  it("refuses a grant when a switch lands after the check", async () => {
+    const { acme, client, consent } = await drawnThenMoved();
+    const before = await consentsGiven();
+
+    // The route's check saw Acme; the library's own read of the session now finds Zenith.
+    const grant = await grantingFor(acme.workspaceId, () =>
+      authOver(app).api.oauth2Consent({
+        headers: new Headers({ cookie: client.cookies() }),
+        body: { accept: true, oauth_query: consent.search.replace(/^\?/, "") },
+        asResponse: true,
+      }),
+    );
+
+    expect(grant.moved).toBe(true);
+    expect(grant.answered.status).toBe(409);
+    expect(await grant.answered.text()).not.toContain("code=");
+    expect(await consentsGiven()).toEqual(before);
+  });
+
+  it("refuses a consent posted straight to the library", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+    const before = await consentsGiven();
+
+    const posted = await client.json("/oauth2/consent", {
+      accept: true,
+      oauth_query: consent.search.replace(/^\?/, ""),
+    });
+
+    expect(posted.status).toBe(404);
+    expect(await consentsGiven()).toEqual(before);
+  });
+
   it("refuses a grant whose form names no workspace", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
@@ -561,11 +596,13 @@ describe("the pages, as a person walks them", () => {
 
   it("takes a cancel after the session moved as a cancel", async () => {
     const { client, consent } = await drawnThenMoved();
+    const before = await consentsGiven();
 
     const cancelled = await client.form(`/consent${consent.search}`, { accept: "false" });
 
     expect(cancelled.status).toBe(302);
     expect(cancelled.headers.get("location")).toContain("error=access_denied");
+    expect(await consentsGiven()).toEqual(before);
   });
 
   it("refuses to be framed by another site", async () => {

@@ -64,6 +64,7 @@ import {
   SECOND_FACTOR_PENDING,
   SESSIONLESS_LIBRARY_PATHS,
 } from "../second-factor-gate.ts";
+import { grantLeftItsWorkspace } from "./consent-grant.ts";
 import {
   ACCESS_TOKEN_LIFETIME_SECONDS,
   CIMD_ALLOWED_CLIENT_HOSTS,
@@ -526,12 +527,13 @@ export const createAuth = (deps: AuthDependencies) => {
 
     trustedOrigins: [deps.publicUrl],
     /**
-     * /token serves callers with no OAuth flow, which the library asks off under a provider;
-     * /update-user writes a display name past its rule.
+     * /token serves callers with no OAuth flow; /update-user writes a name past its rule;
+     * /oauth2/consent grants past the consent route, which calls it in process.
      */
     disabledPaths: [
       "/token",
       "/update-user",
+      "/oauth2/consent",
       ...CLOSED_ORGANISATION_PATHS,
       ...CLOSED_FACTOR_PATHS,
       ...CLOSED_SESSION_PATHS,
@@ -728,6 +730,13 @@ export const createAuth = (deps: AuthDependencies) => {
 
             consentReferenceId: async ({ session, user: person }) => {
               const active = consentedWorkspaceOf(session, await workspacesOf(person.id));
+              // The session read here can follow a switch that landed after the page's own check.
+              if (grantLeftItsWorkspace(active)) {
+                throw new APIError("CONFLICT", {
+                  error: "workspace_moved",
+                  error_description: "the session left the workspace the consent page named",
+                });
+              }
               if (active === undefined) {
                 throw new APIError("BAD_REQUEST", {
                   error: "set_workspace",

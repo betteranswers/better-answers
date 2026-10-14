@@ -17,6 +17,7 @@ import { judged, pendingOr, SECOND_FACTOR_PENDING } from "../second-factor-gate.
 import type { Auth } from "./auth.ts";
 import { mountTheAuthenticator } from "./authenticator.ts";
 import { mountTheConfirm } from "./confirm.ts";
+import { grantingFor } from "./consent-grant.ts";
 import {
   DISCOVERY_CACHE_CONTROL,
   DISCOVERY_PATHS,
@@ -167,8 +168,10 @@ const limitCodesByEmail = (door: PostgresDoor, clock: Clock): MiddlewareHandler 
 
 type FlowBody =
   | { readonly postLogin: true; readonly oauth_query: string }
-  | { readonly accept: boolean; readonly oauth_query: string }
   | { readonly email: string; readonly otp: string; readonly oauth_query?: string };
+
+/** Closed to HTTP; the consent route alone reaches it, as a server function. */
+const LIBRARY_CONSENT_PATH = "/oauth2/consent";
 
 const callFlow = (
   auth: Auth,
@@ -480,6 +483,22 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     return undefined;
   };
 
+  /** Bound to the workspace grantRefused checked a Connect against; a Cancel grants nothing. */
+  const grantInTheLibrary = (context: Context, accept: boolean, claims: Claims | undefined) => {
+    const headers = flowHeaders(context.req.raw, publicUrl);
+    return grantingFor(claims?.workspaceId ?? "", () =>
+      attempt(() =>
+        auth.api.oauth2Consent({
+          headers,
+          // The provider's authorize step reads the request itself, so a server call names one.
+          request: new Request(`${publicUrl}${LIBRARY_CONSENT_PATH}`, { method: "POST", headers }),
+          body: { accept, oauth_query: oauthQuery(context.req.url) },
+          asResponse: true,
+        }),
+      ),
+    );
+  };
+
   /** Confirming first carries the signed query, so the flow resumes once the session is confirmed. */
   const confirmFirst = (context: Context): Response =>
     context.redirect(`/confirm${carry(context.req.url)}`, 302);
@@ -580,12 +599,9 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     if (claims === PENDING) return confirmFirst(context);
     const refusal = accept ? await grantRefused(context, form, claims) : undefined;
     if (refusal !== undefined) return refusal;
-    const decided = await attempt(() =>
-      callFlow(auth, publicUrl, "/oauth2/consent", flowHeaders(context.req.raw, publicUrl), {
-        accept,
-        oauth_query: oauthQuery(context.req.url),
-      }),
-    );
+    const grant = await grantInTheLibrary(context, accept, claims);
+    if (grant.moved) return context.html(refusedPage(REFUSAL_PAGES.workspaceMoved), 409);
+    const decided = grant.answered;
     if (decided.ok) {
       forwardCookies(decided.value, context.res.headers);
       const next = await nextLocation(decided.value);
