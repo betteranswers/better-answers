@@ -77,6 +77,8 @@ import {
   addressOf,
   answered,
   countWaitingOnLocks,
+  holdingTable,
+  isBlockedOnTable,
   readingAs,
   seedingWith,
   until,
@@ -145,10 +147,16 @@ const operatorLines: ErasureLogLine[] = [];
 
 const questionsLines: QuestionsLogLine[] = [];
 
+/** The message each questions line was logged with: two sweeps log the same shape. */
+const saidWith = new Map<QuestionsLogLine, string>();
+
 const operatorLog: ErasureLog = {
-  info: (line) => {
+  info: (line, message) => {
     if ("arm" in line) operatorLines.push(line);
-    else questionsLines.push(line);
+    else {
+      questionsLines.push(line);
+      saidWith.set(line, message);
+    }
   },
 };
 
@@ -2277,20 +2285,24 @@ describe("the questions a person asked", () => {
       ),
     );
 
-  const openingARecord = (member: Member): Promise<{ readonly recordId: string }> =>
-    asTheMember(member, (asker, tx) =>
-      openRecord(asker, tx, {
-        question: "Who signs off the Leeds lease?",
-        collections: [],
-        transport: "mcp",
-        askedAt: new Date(),
-      }),
-    );
+  const A_LATE_QUESTION = "Who signs off the Leeds lease?";
 
-  /** One `ask` refused and then flagged by its asker, each step in a transaction of its own. */
-  const askingThenFlagging = async (member: Member): Promise<string> => {
-    const { recordId } = await openingARecord(member);
-    await asTheMember(member, (asker, tx) =>
+  const A_LATE_NOTE = "It left out the Leeds office.";
+
+  const opening = (asker: UserPrincipal, tx: Tx) =>
+    openRecord(asker, tx, {
+      question: A_LATE_QUESTION,
+      collections: [],
+      transport: "mcp",
+      askedAt: new Date(),
+    });
+
+  const openingARecord = (member: Member): Promise<{ readonly recordId: string }> =>
+    asTheMember(member, opening);
+
+  /** Refused, with prose the platform drafted, so the content row holds more than the question. */
+  const completingTheRecord = (member: Member, recordId: string): Promise<void> =>
+    asTheMember(member, (asker, tx) =>
       completeRecord(asker, tx, {
         recordId,
         completedAt: new Date(),
@@ -2298,18 +2310,37 @@ describe("the questions a person asked", () => {
         judgeState: "not-judged",
         concepts: [],
         unmappedPassages: [],
+        drafted: [{ sentence: "The landlord signs off the Leeds lease.", concepts: [] }],
       }),
     );
+
+  const flaggingTheRecord = async (member: Member, recordId: string): Promise<void> => {
     await asTheMember(member, (giver, tx) =>
       giveFeedback(
         giver,
         tx,
-        { recordId, verdict: "flag", reason: "incomplete", note: "It left out the Leeds office." },
+        { recordId, verdict: "flag", reason: "incomplete", note: A_LATE_NOTE },
         new Date(),
       ),
     );
+  };
+
+  /** One `ask` refused and then flagged by its asker, each step in a transaction of its own. */
+  const askingThenFlagging = async (member: Member): Promise<string> => {
+    const { recordId } = await openingARecord(member);
+    await completingTheRecord(member, recordId);
+    await flaggingTheRecord(member, recordId);
     return recordId;
   };
+
+  /** What `askingThenFlagging` leaves, named by `asker`. */
+  const asAskedMidRun = (asker: string) => ({
+    skeleton: [{ asked_by: asker, verdict: "refuse" }],
+    content: [{ question: A_LATE_QUESTION }],
+    feedback: [
+      { given_by: asker, reason: "incomplete", note: A_LATE_NOTE, disputed_sentence: null },
+    ],
+  });
 
   const asErasedMidRun = (pseudonym: string) => ({
     skeleton: [{ asked_by: `human:${pseudonym}`, verdict: "refuse" }],
@@ -2409,10 +2440,132 @@ describe("the questions a person asked", () => {
       questions_removed: 1,
       feedback_rewritten: 1,
     };
-    expect(questionsLines.filter((logged) => logged.erasure_request_id === row?.id)).toEqual([
-      sweep,
-      sweep,
+    const logged = questionsLines.filter((line) => line.erasure_request_id === row?.id);
+    expect(logged).toEqual([sweep, sweep]);
+    expect(logged.map((line) => saidWith.get(line))).toEqual([
+      "erasure: what the questions step rewrote and removed",
+      "erasure: what was asked or flagged after the questions step, rewritten and removed as the member ended",
     ]);
+  });
+
+  it("erases late questions here alone for a member held elsewhere", async () => {
+    const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
+    const here = { workspaceId: scenario.workspaceId, userId: person.id };
+    const there = { workspaceId: elsewhere.workspaceId, userId: person.id };
+    const subjectRequestId = await erasureRequestAbout(here.workspaceId, person.id, email);
+
+    const { done, met } = await heldAheadOfTheMembersEnd(
+      scenario,
+      subjectRequestId,
+      here,
+      async () => ({
+        here: await askingThenFlagging(here),
+        there: await askingThenFlagging(there),
+      }),
+    );
+
+    expect(done.ok).toBe(true);
+    expect(await rowsOf(met.here)).toEqual(asErasedMidRun(await pseudonymIn(here.workspaceId)));
+    expect(await rowsOf(met.there)).toEqual(asAskedMidRun(`human:${person.id}`));
+  });
+
+  /**
+   * Parks `write` on `table` with the member's row held, until the routine `resume` lets go waits
+   * on that row to end the member.
+   */
+  const stillOpenAtTheMembersEnd = async (
+    table: string,
+    resume: () => Promise<unknown>,
+    write: () => Promise<unknown>,
+  ): Promise<void> => {
+    // Wrapped, or the lock would be held until the write it blocks had ended.
+    const parked = await holdingTable(db().pool, table, async () => {
+      const writing = write();
+      await until(() => isBlockedOnTable(db().pool, table));
+      const ending = resume();
+      await until(async () => (await countWaitingOnLocks(db().pool)) === 2);
+      return { writing, ending };
+    });
+    await parked.writing;
+    await parked.ending;
+  };
+
+  it.each([
+    {
+      late: "completion",
+      table: "question_asked",
+      first: [],
+      write: completingTheRecord,
+      flags: 0,
+    },
+    {
+      late: "flag",
+      table: "question_feedback",
+      first: [completingTheRecord],
+      write: flaggingTheRecord,
+      flags: 1,
+    },
+  ])(
+    "erases a late question whose $late was still to commit",
+    async ({ table, first, write, flags }) => {
+      const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+      const member = { workspaceId: scenario.workspaceId, userId: person.id };
+
+      const { done, met: recordId } = await heldAheadOfTheMembersEnd(
+        scenario,
+        subjectRequestId,
+        member,
+        async (resume) => {
+          const opened = await openingARecord(member);
+          for (const step of first) await step(member, opened.recordId);
+          await stillOpenAtTheMembersEnd(table, resume, () => write(member, opened.recordId));
+          return opened.recordId;
+        },
+      );
+
+      const erased = asErasedMidRun(await pseudonymIn(member.workspaceId));
+      expect(done.ok).toBe(true);
+      expect(await rowsOf(recordId)).toEqual({
+        ...erased,
+        feedback: erased.feedback.slice(0, flags),
+      });
+    },
+  );
+
+  it("refuses a question that starts once the member is ended", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const member = { workspaceId: scenario.workspaceId, userId: person.id };
+
+    const answers: unknown[] = [];
+
+    const { done, asked } = await whileActionsWaitAt(
+      db().pool,
+      "user",
+      "UPDATE",
+      async (release) => {
+        const erasing = runningTheRoutine(scenario, subjectRequestId);
+        await until(async () => (await countWaitingOnLocks(db().pool)) === 1);
+        const asking = withHeldPrincipal(
+          openPostgres(db().runtimePool),
+          { ...member, issuedAt: LOCKED_AT },
+          opening,
+        ).then((answer) => {
+          answers.push(answer);
+          return answer;
+        });
+        await until(async () => answers.length > 0 || (await countWaitingOnLocks(db().pool)) === 2);
+        await release();
+        return { done: await erasing, asked: await asking };
+      },
+    );
+
+    const theirs = await db().pool.query(
+      "SELECT id FROM question_asked WHERE workspace_id = $1 AND asked_by = $2",
+      [member.workspaceId, `human:${person.id}`],
+    );
+    expect(done.ok).toBe(true);
+    expect(asked).toEqual({ ok: false, error: "not-a-member" });
+    expect(theirs.rows).toEqual([]);
   });
 
   it("erases a question whose opening commits after its questions step", async () => {

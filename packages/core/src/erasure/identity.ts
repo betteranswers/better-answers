@@ -38,7 +38,10 @@ export type IdentitySwept = {
    */
   readonly invitationsEverywhere: number;
 
-  /** What the person asked or flagged here after the routine's questions step had passed. */
+  /**
+   * What the person asked or flagged after the questions step. Swept in the transaction ending
+   * the member: a failed run's rerun still finds them.
+   */
   readonly questionsSince: QuestionsSwept;
 };
 
@@ -164,8 +167,8 @@ export const eraseFromTheIdentitySet = async (
       personId,
     ]);
     const membersEnded = rowsOf(ended);
-    // After the delete, which waited for every write holding the member's row, and committed
-    // with it: a failed run's rerun still finds the person.
+    // The delete waited for each write holding the member's row. READ COMMITTED: this
+    // statement's snapshot is fresh, so it sees what they committed.
     const questionsSince = await sweepTheQuestions(tx, {
       workspaceId: subject.workspaceId,
       askers: askersOf([personId]),
