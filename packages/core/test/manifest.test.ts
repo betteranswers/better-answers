@@ -221,14 +221,16 @@ describe("the manifest, the bundle's first commit", () => {
 
   it("refuses a member removed since they signed in, committing nothing", async () => {
     const scenario = await arrange();
-    await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
-      scenario.workspaceId,
-      scenario.editor.userId,
+    const { workspaceId, editor } = scenario;
+    await db().pool.query("DELETE FROM member WHERE user_id = $1 AND workspace_id = $2", [
+      editor.userId,
+      workspaceId,
     ]);
 
-    const refused = await write(scenario, scenario.editor, manifestFor());
-
-    expect(refused).toEqual({ ok: false, error: "not-a-member" });
+    expect(await write(scenario, editor, manifestFor())).toEqual({
+      ok: false,
+      error: "not-a-member",
+    });
     await nothingWritten(scenario);
   });
 });

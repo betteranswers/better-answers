@@ -2191,6 +2191,18 @@ const completedForASubjectWithNoUserRow = async () => {
 
 type Member = { readonly workspaceId: string; readonly userId: string };
 
+const aMemberHere = async () => {
+  const scenario = await arrange();
+  const email = addressOf("priya");
+  const person = await memberOf(db().pool, scenario.workspaceId, email);
+  return {
+    scenario,
+    email,
+    person,
+    member: { workspaceId: scenario.workspaceId, userId: person.id },
+  };
+};
+
 /**
  * Holds the routine at its identity step's first delete, the git, questions and actors steps
  * committed and the member not yet ended, while `meanwhile` runs.
@@ -2429,10 +2441,7 @@ describe("the questions a person asked", () => {
   });
 
   it("erases by address after a run died ending the member", async () => {
-    const scenario = await arrange();
-    const email = addressOf("priya");
-    const person = await memberOf(db().pool, scenario.workspaceId, email);
-    const member = { workspaceId: scenario.workspaceId, userId: person.id };
+    const { scenario, email, member } = await aMemberHere();
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, null, email);
 
     const { done: died, met: recordId } = await heldAheadOfTheMembersEnd(
@@ -3136,10 +3145,7 @@ describe("a commit made as the person while the routine runs", () => {
     { named: "address", byId: false },
     { named: "id", byId: true },
   ])("reaches a late commit by $named after a failed run", async ({ byId }) => {
-    const scenario = await arrange();
-    const email = addressOf("priya");
-    const person = await memberOf(db().pool, scenario.workspaceId, email);
-    const member = { workspaceId: scenario.workspaceId, userId: person.id };
+    const { scenario, email, person, member } = await aMemberHere();
     const subjectRequestId = await erasureRequestAbout(
       scenario.workspaceId,
       byId ? person.id : null,
