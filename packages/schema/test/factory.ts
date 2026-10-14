@@ -173,6 +173,19 @@ export type TestData = {
   questionFeedback(
     overrides?: Partial<InsertInput<"questionFeedback">>,
   ): Promise<Row<"questionFeedback">>;
+
+  /** Serves a question it seeds, asked now, when given no run and no answer. */
+  llmCall(overrides?: Partial<InsertInput<"llmCall">>): Promise<Row<"llmCall">>;
+
+  /**
+   * Taken now for ten minutes, at $0.15 the most, serving a question it seeds when given no run
+   * and no answer.
+   */
+  spendReservation(
+    overrides?: Partial<InsertInput<"spendReservation">>,
+  ): Promise<Row<"spendReservation">>;
+
+  modelPrice(overrides?: Partial<InsertInput<"modelPrice">>): Promise<Row<"modelPrice">>;
 };
 
 const hexOfLength = (length: number): string =>
@@ -993,7 +1006,68 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const served = async (
+    workspaceId: string,
+    overrides: { readonly runId?: string | null; readonly answerId?: string | null },
+  ) =>
+    overrides.answerId === undefined && overrides.runId === undefined
+      ? { runId: null, answerId: (await questionAsked({ workspaceId })).id }
+      : { runId: overrides.runId ?? null, answerId: overrides.answerId ?? null };
+
+  const llmCall: TestData["llmCall"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "llmCall", {
+      id: ulid(),
+      calledAt: new Date(),
+      purpose: "judging",
+      modelChoiceId: "model-choice-judge",
+      model: "claude-sonnet-5-5",
+      tokensIn: 1580,
+      tokensOut: 96,
+      seconds: 1.118,
+      costUsd: "0.00618",
+      outcome: "succeeded",
+      ...overrides,
+      ...(await served(workspaceId, overrides)),
+      workspaceId,
+    });
+  };
+
+  const spendReservation: TestData["spendReservation"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const takenAt = overrides.takenAt ?? new Date();
+    return insertRow(client, "spendReservation", {
+      id: ulid(),
+      expiresAt: new Date(takenAt.getTime() + 10 * 60_000),
+      purpose: "judging",
+      modelChoiceId: "model-choice-judge",
+      model: "claude-sonnet-5-5",
+      tokensIn: 40_000,
+      tokensOut: 2_000,
+      usdPerMillionIn: "3",
+      usdPerMillionOut: "15",
+      reservedUsd: "0.15",
+      ...overrides,
+      ...(await served(workspaceId, overrides)),
+      takenAt,
+      workspaceId,
+    });
+  };
+
+  const modelPrice: TestData["modelPrice"] = async (overrides = {}) =>
+    insertRow(client, "modelPrice", {
+      provider: "anthropic",
+      model: "claude-sonnet-5-5",
+      effectiveFrom: "2026-10-01",
+      usdPerMillionIn: "3",
+      usdPerMillionOut: "15",
+      ...overrides,
+    });
+
   return {
+    llmCall,
+    spendReservation,
+    modelPrice,
     workspace,
     user,
     account,

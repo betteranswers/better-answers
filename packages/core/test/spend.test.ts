@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { openRecord } from "../src/answering/index.ts";
 import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import {
+  RESERVATION_LIFETIME_MS,
   reserveSpend,
   settleExpiredSpend,
   settleSpend,
@@ -13,7 +14,7 @@ import {
 import { openPostgres } from "../src/store/postgres/index.ts";
 import { setSpendingLimit } from "../src/workspaces/index.ts";
 import { provisionedWorkspace } from "./platform.ts";
-import { answered, postgresForSuite, racedAt, readingAs } from "./suite-postgres.ts";
+import { answered, postgresForSuite, racedAt, readingAs, seedingWith } from "./suite-postgres.ts";
 import { principalFor } from "./workspace-with-bundle.ts";
 
 const db = postgresForSuite();
@@ -59,10 +60,15 @@ const priced = async (
 const anAsker = async (limit?: string, model: string = SONNET): Promise<Asker> => {
   const workspace = await provisionedWorkspace(db(), "Acme");
   const asker = await principalFor(db(), workspace.workspaceId, workspace.adminUserId);
-  await db().pool.query(
-    `INSERT INTO model_choice (id, workspace_id, purpose, provider, model)
-     VALUES ($1, $2, 'judging', 'anthropic', $3)`,
-    [`judge-${workspace.workspaceId}`, workspace.workspaceId, model],
+  await seedingWith(db().pool, (seed) =>
+    seed.modelChoice({
+      id: `judge-${workspace.workspaceId}`,
+      workspaceId: workspace.workspaceId,
+      purpose: "judging",
+      provider: "anthropic",
+      model,
+      dimensions: null,
+    }),
   );
   if (limit !== undefined) {
     answered(
@@ -119,23 +125,23 @@ const callsOf = async ({ asker }: Asker) => {
   return read.rows;
 };
 
-const spentAt = async ({ asker, recordId }: Asker, calledAt: Date, costUsd: string) => {
-  await db().pool.query(
-    `INSERT INTO llm_call
-       (workspace_id, id, called_at, purpose, model_choice_id, model, tokens_in, tokens_out,
-        seconds, cost_usd, outcome, answer_id)
-     VALUES ($1, gen_random_uuid()::text, $2, 'judging', 'judge', $3, 1, 1, 1, $4, 'succeeded', $5)`,
-    [asker.workspaceId, calledAt, SONNET, costUsd, recordId],
+const spentAt = ({ asker, recordId }: Asker, calledAt: Date, costUsd: string) =>
+  seedingWith(db().pool, (seed) =>
+    seed.llmCall({ workspaceId: asker.workspaceId, calledAt, costUsd, answerId: recordId }),
   );
+
+/** Priced at $3 and $15 a million, under a $10 limit, one reservation settled as `calls`. */
+const settledOnce = async (calls: readonly CallSpent[]): Promise<Asker> => {
+  await priced("2026-10-01", "3", "15");
+  const asking = await anAsker("10");
+  const reservationId = reservationIdOf(answered(await reserving(asking)));
+  answered(await settling(asking, reservationId, calls));
+  return asking;
 };
 
 describe("spend", () => {
   it("settles a reservation as one priced row per call", async () => {
-    await priced("2026-10-01", "3", "15");
-    const asking = await anAsker("10");
-
-    const reservationId = reservationIdOf(answered(await reserving(asking)));
-    answered(await settling(asking, reservationId, [A_FAILED_ATTEMPT, A_CALL]));
+    const asking = await settledOnce([A_FAILED_ATTEMPT, A_CALL]);
 
     expect(await reservationsOf(asking)).toEqual([]);
     expect(await callsOf(asking)).toEqual([
@@ -203,7 +209,7 @@ describe("spend", () => {
     await priced("2026-10-01", "3", "15");
     const asking = await anAsker("10");
     answered(await reserving(asking, NOW));
-    const pastItsExpiry = new Date(NOW.getTime() + 10 * 60_000 + 1);
+    const pastItsExpiry = new Date(NOW.getTime() + RESERVATION_LIFETIME_MS + 1);
 
     const swept = await settleExpiredSpend(PLATFORM, openPostgres(db().pool), {
       workspaceId: asking.asker.workspaceId,
@@ -231,7 +237,7 @@ describe("spend", () => {
     await priced("2026-10-01", "3", "15");
     const asking = await anAsker("10");
     answered(await reserving(asking, NOW));
-    const atItsExpiry = new Date(NOW.getTime() + 10 * 60_000);
+    const atItsExpiry = new Date(NOW.getTime() + RESERVATION_LIFETIME_MS);
 
     const swept = await settleExpiredSpend(PLATFORM, openPostgres(db().pool), {
       workspaceId: asking.asker.workspaceId,
@@ -283,10 +289,7 @@ describe("spend", () => {
   });
 
   it("holds no prompt and no completion in a call's row", async () => {
-    await priced("2026-10-01", "3", "15");
-    const asking = await anAsker("10");
-    const reservationId = reservationIdOf(answered(await reserving(asking)));
-    answered(await settling(asking, reservationId, [A_CALL]));
+    const asking = await settledOnce([A_CALL]);
 
     const read = await db().pool.query("SELECT * FROM llm_call WHERE workspace_id = $1", [
       asking.asker.workspaceId,

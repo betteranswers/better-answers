@@ -200,3 +200,22 @@ export const SOME_QUESTION_FEEDBACK = `INSERT INTO question_feedback
 
 export const A_MODEL_KEY =
   "INSERT INTO model_key (workspace_id, provider, sealed) VALUES ($1, $2, $3)";
+
+/** `$3` the outcome, `$4` the run and `$5` the answer served. */
+export const A_CALL_SERVING = `INSERT INTO llm_call
+    (workspace_id, id, called_at, purpose, model_choice_id, model, tokens_in, tokens_out, seconds,
+     cost_usd, outcome, run_id, answer_id)
+  VALUES ($1, $2, now(), 'judging', 'model-choice-judge', 'claude-sonnet-5-5', 1580, 96, 1.118,
+          '0.006180', $3, $4, $5)`;
+
+/** `$3` the answer served. */
+export const A_RESERVATION_SERVING = `INSERT INTO spend_reservation
+    (workspace_id, id, taken_at, expires_at, purpose, model_choice_id, model, tokens_in,
+     tokens_out, usd_per_million_in, usd_per_million_out, reserved_usd, answer_id)
+  VALUES ($1, $2, now(), now() + interval '10 minutes', 'judging', 'model-choice-judge',
+          'claude-sonnet-5-5', 40000, 2000, '3', '15', '0.15', $3)`;
+
+/** `$1` the provider. */
+export const A_PRICE_FROM_OCTOBER = `INSERT INTO model_price
+    (provider, model, effective_from, usd_per_million_in, usd_per_million_out)
+  VALUES ($1, 'claude-sonnet-5-5', '2026-10-01', '3', '15')`;

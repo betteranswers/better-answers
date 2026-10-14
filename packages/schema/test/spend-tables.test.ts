@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
 import { postgresForSuite, privilegesHeld, refusalOf } from "./probes.ts";
+import { A_CALL_SERVING, A_PRICE_FROM_OCTOBER, A_RESERVATION_SERVING } from "./rls-probes.ts";
 
 const db = postgresForSuite();
 
@@ -12,42 +13,13 @@ const WS_B = "01J6BBBBBBBBBBBBBBBBBBBBBB";
 
 const RECORD = "01J6QQQQQQQQQQQQQQQQQQQQQQ";
 
-const A_QUESTION = `INSERT INTO question_asked
-    (workspace_id, id, asked_at, asked_by, transport, predicate_role)
-  VALUES ($1, $2, now(), 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', 'mcp', 'Viewer')`;
-
-const A_CALL = `INSERT INTO llm_call
-    (workspace_id, id, called_at, purpose, model_choice_id, model, tokens_in, tokens_out, seconds,
-     cost_usd, outcome, run_id, answer_id)
-  VALUES ($1, $2, now(), 'judging', 'model-choice-judge', 'claude-sonnet-5-5', 1580, 96, 1.118,
-          '0.006180', $3, $4, $5)`;
-
-const A_RESERVATION = `INSERT INTO spend_reservation
-    (workspace_id, id, taken_at, expires_at, purpose, model_choice_id, model, tokens_in,
-     tokens_out, usd_per_million_in, usd_per_million_out, reserved_usd, answer_id)
-  VALUES ($1, $2, now(), now() + interval '10 minutes', 'judging', 'model-choice-judge',
-          'claude-sonnet-5-5', 40000, 2000, '3', '15', '0.15', $3)`;
-
-const A_PRICE = `INSERT INTO model_price
-    (provider, model, effective_from, usd_per_million_in, usd_per_million_out)
-  VALUES ($1, 'claude-sonnet-5-5', '2026-10-01', '3', '15')`;
-
 const spendInEach = async (client: pg.PoolClient): Promise<void> => {
   const seed = testData(client);
-  for (const [workspaceId, at] of [
-    [WS_A, "1"],
-    [WS_B, "2"],
-  ] as const) {
+  for (const workspaceId of [WS_A, WS_B]) {
     await seed.workspace({ id: workspaceId, name: workspaceId });
-    await client.query(A_QUESTION, [workspaceId, RECORD]);
-    await client.query(A_CALL, [
-      workspaceId,
-      `01J6TTTTTTTTTTTTTTTTTTTTT${at}`,
-      "succeeded",
-      null,
-      RECORD,
-    ]);
-    await client.query(A_RESERVATION, [workspaceId, `01J6RRRRRRRRRRRRRRRRRRRRR${at}`, RECORD]);
+    await seed.questionAsked({ workspaceId, id: RECORD });
+    await seed.llmCall({ workspaceId, answerId: RECORD });
+    await seed.spendReservation({ workspaceId, answerId: RECORD });
   }
 };
 
@@ -107,7 +79,7 @@ describe("spend", () => {
 
   it("lets the api read prices with no workspace in scope", async () => {
     await withRollback(db().pool, async (client) => {
-      await client.query(A_PRICE, ["anthropic"]);
+      await client.query(A_PRICE_FROM_OCTOBER, ["anthropic"]);
 
       await asTheApiIn(client, "");
 
@@ -121,7 +93,13 @@ describe("spend", () => {
       await spendInEach(client);
       const call = (runId: string | null, answerId: string | null) =>
         refusalOf(client, () =>
-          client.query(A_CALL, [WS_A, "01J6TTTTTTTTTTTTTTTTTTTTT9", "succeeded", runId, answerId]),
+          client.query(A_CALL_SERVING, [
+            WS_A,
+            "01J6TTTTTTTTTTTTTTTTTTTTT9",
+            "succeeded",
+            runId,
+            answerId,
+          ]),
         );
 
       expect({
@@ -142,7 +120,13 @@ describe("spend", () => {
 
       expect(
         await refusalOf(client, () =>
-          client.query(A_CALL, [WS_A, "01J6TTTTTTTTTTTTTTTTTTTTT9", "cancelled", null, RECORD]),
+          client.query(A_CALL_SERVING, [
+            WS_A,
+            "01J6TTTTTTTTTTTTTTTTTTTTT9",
+            "cancelled",
+            null,
+            RECORD,
+          ]),
         ),
       ).toBe("llm_call_outcome_check");
     });
@@ -155,10 +139,16 @@ describe("spend", () => {
 
       expect({
         call: await refusalOf(client, () =>
-          client.query(A_CALL, [WS_A, "01J6TTTTTTTTTTTTTTTTTTTTT9", "succeeded", null, unrecorded]),
+          client.query(A_CALL_SERVING, [
+            WS_A,
+            "01J6TTTTTTTTTTTTTTTTTTTTT9",
+            "succeeded",
+            null,
+            unrecorded,
+          ]),
         ),
         reservation: await refusalOf(client, () =>
-          client.query(A_RESERVATION, [WS_A, "01J6RRRRRRRRRRRRRRRRRRRRR9", unrecorded]),
+          client.query(A_RESERVATION_SERVING, [WS_A, "01J6RRRRRRRRRRRRRRRRRRRRR9", unrecorded]),
         ),
       }).toEqual({ call: "llm_call_answer_fk", reservation: "spend_reservation_answer_fk" });
     });
@@ -166,11 +156,11 @@ describe("spend", () => {
 
   it("holds one price for a model from each day", async () => {
     await withRollback(db().pool, async (client) => {
-      await client.query(A_PRICE, ["anthropic"]);
+      await client.query(A_PRICE_FROM_OCTOBER, ["anthropic"]);
 
       expect({
-        again: await refusalOf(client, () => client.query(A_PRICE, ["anthropic"])),
-        elsewhere: await refusalOf(client, () => client.query(A_PRICE, ["openai"])),
+        again: await refusalOf(client, () => client.query(A_PRICE_FROM_OCTOBER, ["anthropic"])),
+        elsewhere: await refusalOf(client, () => client.query(A_PRICE_FROM_OCTOBER, ["openai"])),
       }).toEqual({
         again: "model_price_provider_model_effective_from_pk",
         elsewhere: "model_price_provider_check",

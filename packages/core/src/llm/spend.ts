@@ -48,14 +48,17 @@ export type NoModelToCall = {
 
 export type ReserveSpendRefusal = KernelRefusal<"spending-limit-met"> | Error;
 
-const SPENDING_LIMIT_MET = "spending-limit-met" satisfies KernelRefusal<"spending-limit-met">;
-
 type PricedChoice = {
   readonly id: string;
   readonly provider: string;
   readonly model: string;
   readonly usdPerMillionIn: string | null;
   readonly usdPerMillionOut: string | null;
+};
+
+type Priced = PricedChoice & {
+  readonly usdPerMillionIn: string;
+  readonly usdPerMillionOut: string;
 };
 
 /** A price takes effect on a UTC day; the latest on or before the call's day prices it. */
@@ -109,7 +112,7 @@ const reservedUnderTheLimit = async (
   asker: UserPrincipal,
   tx: Tx,
   input: ReserveSpendInput,
-  choice: PricedChoice & { readonly usdPerMillionIn: string; readonly usdPerMillionOut: string },
+  choice: Priced,
   limit: string,
 ): Promise<Result<SpendReserved, ReserveSpendRefusal>> => {
   const { from, to } = monthOf(input.now);
@@ -131,7 +134,7 @@ const reservedUnderTheLimit = async (
     input.answerId,
     limit,
   ]);
-  if (taken.rowCount !== 1) return err(SPENDING_LIMIT_MET);
+  if (taken.rowCount !== 1) return err("spending-limit-met");
   return ok({
     reserved: true,
     reservationId,

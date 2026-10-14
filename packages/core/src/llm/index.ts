@@ -25,15 +25,8 @@ export {
   settleSpend,
   SPENDING_LIMIT_KEY,
 } from "./spend.ts";
-export type {
-  CallSize,
-  CallSpent,
-  NoModelToCall,
-  ReserveSpendRefusal,
-  SpendReserved,
-} from "./spend.ts";
+export type { CallSize, CallSpent } from "./spend.ts";
 export { setModelPrice } from "./price.ts";
-export type { ModelPriceSet, SetModelPriceRefusal } from "./price.ts";
 
 export const LLM_PURPOSES = llmPurpose.enumValues;
 export type LlmPurpose = (typeof LLM_PURPOSES)[number];

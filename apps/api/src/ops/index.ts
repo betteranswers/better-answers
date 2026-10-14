@@ -1436,7 +1436,9 @@ const MODEL_PRICE_FLAGS = [
   "usd-per-million-out",
 ] as const;
 
-const MODEL_PRICE_USAGE = `set-model-price: --provider <${MODEL_PROVIDERS.join("|")}>, --model <model>, --from <yyyy-mm-dd>, --usd-per-million-in <US dollars> and --usd-per-million-out <US dollars> are required`;
+const MODEL_PRICE_NAMED = `--provider <${MODEL_PROVIDERS.join("|")}>, --model <model>, --from <yyyy-mm-dd>, --usd-per-million-in <US dollars> and --usd-per-million-out <US dollars>`;
+
+const MODEL_PRICE_USAGE = `set-model-price: ${MODEL_PRICE_NAMED} are required`;
 
 const priceNamed = (flags: Flags) => {
   const named = MODEL_PRICE_FLAGS.map((name) => flagValue(flags, name));
@@ -1466,7 +1468,7 @@ const setModelPriceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Prom
   if (!set.ok) {
     const reason =
       set.error === "malformed"
-        ? `malformed: ${MODEL_PRICE_USAGE.slice("set-model-price: ".length)}, the day one the calendar has and each sum a decimal such as 3 or 0.25`
+        ? `malformed: ${MODEL_PRICE_NAMED}, the day one the calendar has and each sum a decimal such as 3 or 0.25`
         : set.error.message;
     io.say(`set-model-price: REFUSED — ${reason}`);
     return exitOf(set.error);

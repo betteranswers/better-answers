@@ -21,7 +21,7 @@ const named = z.object({
   usd: z.string().regex(/^\d{1,9}(\.\d{1,6})?$/),
 });
 
-type SpendingLimitSet = { readonly workspaceId: string; readonly usd: string };
+type SpendingLimit = { readonly workspaceId: string; readonly usd: string };
 
 export type SetSpendingLimitRefusal =
   | KernelRefusal<"malformed">
@@ -31,8 +31,8 @@ export type SetSpendingLimitRefusal =
 export const setSpendingLimit = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  input: { readonly workspaceId: string; readonly usd: string },
-): Promise<Result<SpendingLimitSet, SetSpendingLimitRefusal | Error>> => {
+  input: SpendingLimit,
+): Promise<Result<SpendingLimit, SetSpendingLimitRefusal | Error>> => {
   const asked = named.safeParse(input);
   if (!asked.success) return err(MALFORMED);
   const { workspaceId, usd } = asked.data;
@@ -42,7 +42,7 @@ export const setSpendingLimit = async (
       platform,
       door,
       workspaceId,
-      async (tx): Promise<Result<SpendingLimitSet, SetSpendingLimitRefusal>> => {
+      async (tx): Promise<Result<SpendingLimit, SetSpendingLimitRefusal>> => {
         const held = await tx.query("SELECT 1 FROM workspace WHERE id = $1", [workspaceId]);
         if (held.rows.length === 0) return err("no-such-workspace");
         await writeWorkspaceConfig(tx, { workspaceId, key: SPENDING_LIMIT_KEY, value: usd });

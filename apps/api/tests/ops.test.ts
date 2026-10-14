@@ -55,8 +55,10 @@ import {
   mapGeneration,
   mapNode,
   job,
+  llmCall,
   modelKey,
   sourceDocument,
+  spendReservation,
   suppression,
   ulid,
   type ConceptIri,
@@ -216,6 +218,7 @@ const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
   "erasure-rehearsal": [erasureRequest, suppression],
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
   "set-model-key": [modelKey],
+  "set-spending-limit": [llmCall, spendReservation],
 };
 
 const idOnTheDoneLine = (run: Run): string => {

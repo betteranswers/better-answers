@@ -58,6 +58,15 @@ export type LlmCallOutcome = (typeof LLM_CALL_OUTCOMES)[number];
 
 export const LLM_CALL_FAILED = "failed" satisfies LlmCallOutcome;
 
+/** What was called, for what, and its tokens: a fresh set of builders each time a table takes them. */
+const theCall = () => ({
+  purpose: llmPurpose("purpose").notNull(),
+  modelChoiceId: text("model_choice_id").notNull(),
+  model: text("model").notNull(),
+  tokensIn: integer("tokens_in").notNull(),
+  tokensOut: integer("tokens_out").notNull(),
+});
+
 /**
  * Never the prompt or the completion. A model choice is edited in place, so `model_choice_id` keeps
  * no foreign key and `model` says what ran.
@@ -70,11 +79,7 @@ export const llmCall = withRLS(
       .references(() => workspace.id),
     id: text("id").notNull(),
     calledAt: stamp("called_at").notNull(),
-    purpose: llmPurpose("purpose").notNull(),
-    modelChoiceId: text("model_choice_id").notNull(),
-    model: text("model").notNull(),
-    tokensIn: integer("tokens_in").notNull(),
-    tokensOut: integer("tokens_out").notNull(),
+    ...theCall(),
     seconds: doublePrecision("seconds").notNull(),
     costUsd: numeric("cost_usd").notNull(),
     outcome: text("outcome").notNull(),
@@ -113,12 +118,8 @@ export const spendReservation = withRLS(
     id: text("id").notNull(),
     takenAt: stamp("taken_at").notNull(),
     expiresAt: stamp("expires_at").notNull(),
-    purpose: llmPurpose("purpose").notNull(),
-    modelChoiceId: text("model_choice_id").notNull(),
-    model: text("model").notNull(),
-    /** The most the call may send and return, over every attempt. */
-    tokensIn: integer("tokens_in").notNull(),
-    tokensOut: integer("tokens_out").notNull(),
+    // Its tokens are the most the call may send and return, over every attempt.
+    ...theCall(),
     usdPerMillionIn: numeric("usd_per_million_in").notNull(),
     usdPerMillionOut: numeric("usd_per_million_out").notNull(),
     reservedUsd: numeric("reserved_usd").notNull(),

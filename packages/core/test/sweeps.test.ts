@@ -302,19 +302,8 @@ describe("the session lock a sweep by hand holds", () => {
 describe("a sweep pass and the spend held", () => {
   it("settles a reservation a day past its expiry", async () => {
     const workspace = await provisionedWorkspace(db(), "Reserved");
-    const recordId = ulid();
-    await db().pool.query(
-      `INSERT INTO question_asked (workspace_id, id, asked_at, asked_by, transport, predicate_role)
-       VALUES ($1, $2, now(), 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', 'mcp', 'Viewer')`,
-      [workspace.workspaceId, recordId],
-    );
-    await db().pool.query(
-      `INSERT INTO spend_reservation
-         (workspace_id, id, taken_at, expires_at, purpose, model_choice_id, model, tokens_in,
-          tokens_out, usd_per_million_in, usd_per_million_out, reserved_usd, answer_id)
-       VALUES ($1, $2, now(), now() + interval '10 minutes', 'judging', 'judge',
-               'claude-sonnet-5-5', 40000, 2000, '3', '15', '0.15', $3)`,
-      [workspace.workspaceId, ulid(), recordId],
+    await seedingWith(db().pool, (seed) =>
+      seed.spendReservation({ workspaceId: workspace.workspaceId }),
     );
 
     const pass = await sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "list" });
