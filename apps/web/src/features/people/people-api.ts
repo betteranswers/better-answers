@@ -1,4 +1,6 @@
 import {
+  defaultScheduler,
+  notifyManager,
   useInfiniteQuery,
   useMutation,
   useMutationState,
@@ -76,6 +78,21 @@ const ASKED_OF = z.union([
 ]);
 
 /**
+ * The cache tells its readers a task later by default, a frame after the press's render. Told at
+ * once, the change lands in it.
+ */
+const toldAtOnce = (change: () => void): void => {
+  notifyManager.setScheduler((notify) => {
+    notify();
+  });
+  try {
+    change();
+  } finally {
+    notifyManager.setScheduler(defaultScheduler);
+  }
+};
+
+/**
  * The list takes the action before the api answers, so it lands within 100 ms. The action may touch the
  * reader's own member row.
  */
@@ -89,12 +106,15 @@ const useReconciledList = <Asked>(
   const listKey = api.members.list.queryKey();
   // Callers spread these into `useMutation`: the React lint takes a callback passed through `mutationOptions` as called during render.
   return {
-    onMutate: async (asked: Asked): Promise<Undo> => {
-      await queryClient.cancelQueries({ queryKey: listKey });
+    // Not awaited: a cancel reverts a read in flight at once and drops its answer, so the change below stands.
+    onMutate: (asked: Asked): Undo => {
+      void queryClient.cancelQueries({ queryKey: listKey });
       const taken = takenFrom(queryClient, listKey);
-      queryClient.setQueryData(listKey, (listed) =>
-        listed === undefined ? listed : reshape(listed, asked),
-      );
+      toldAtOnce(() => {
+        queryClient.setQueryData(listKey, (listed) =>
+          listed === undefined ? listed : reshape(listed, asked),
+        );
+      });
       return taken;
     },
     onError: (_refusal: ApiError, _asked: Asked, taken: Undo | undefined) => {
