@@ -325,7 +325,10 @@ describe("a refusal crossing the MCP surface", () => {
   it("reaches an agent as its word, class and malformed field", async () => {
     const { client, token } = await asAnAgent();
 
-    const said = await toolText(client, token, "give_feedback", { iri: "x", verdict: "flag" });
+    const said = await toolText(client, token, "give_feedback", {
+      recordId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      verdict: "flag",
+    });
 
     expect(said.isError).toBe(true);
     expect(said.text).toBe("Refused: malformed (malformed). Fields: reason not-in-set.");

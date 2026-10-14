@@ -1,9 +1,5 @@
-import { z } from "zod";
-
 import type {
   ConceptIri,
-  FEEDBACK_REASONS,
-  FEEDBACK_VERDICTS,
   JudgeState,
   MatchStrength,
   QuestionVerdict,
@@ -173,23 +169,14 @@ export type AnswerResult<Iri extends string = ConceptIri> = PlannedAnswer<Iri> &
 const NOT_ANSWERED = "Not answered from the company's knowledge.";
 
 export { FEEDBACK_REASONS, FEEDBACK_VERDICTS } from "@better-answers/schema";
-export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
-
-type FeedbackVerdict = (typeof FEEDBACK_VERDICTS)[number];
-
-export type FeedbackInput =
-  | { readonly iri: string; readonly verdict: Extract<FeedbackVerdict, "helpful"> }
-  | {
-      readonly iri: string;
-      readonly verdict: Extract<FeedbackVerdict, "flag">;
-      readonly reason: FeedbackReason;
-      readonly detail?: string | undefined;
-    };
-
-export type FeedbackReceipt = {
-  readonly outcome: "received";
-  readonly feedback: FeedbackInput;
-};
+export {
+  feedbackFields,
+  feedbackInput,
+  giveFeedback,
+  renderFeedback,
+  type FeedbackReason,
+  type FeedbackReceipt,
+} from "./feedback.ts";
 
 const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
   const tags = frontmatter["tags"];
@@ -484,24 +471,6 @@ export const ask = async <Refused = never>(
   return ok({ ...answer, recordId });
 };
 
-const giveFeedbackAction = declareAction({
-  admits: ANY_ROLE,
-  input: z.custom<FeedbackInput>(),
-  refuses: ["role-forbids"],
-});
-
-/** Keeps nothing: the receipt echoes the input. */
-export const giveFeedback = async (
-  principal: UserPrincipal,
-  _tx: Tx,
-  input: FeedbackInput,
-): Promise<Result<FeedbackReceipt, RefusalOf<typeof giveFeedbackAction>>> => {
-  const admitted = admit(giveFeedbackAction, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-
-  return ok({ outcome: "received", feedback: input });
-};
-
 const findLine = (match: FindMatch<string>): string =>
   match.layer === "bundles"
     ? `${match.kind} · ${match.title} · ${match.collection ?? NO_COLLECTION} · ${match.trustWords} · ${match.iri}`
@@ -628,19 +597,3 @@ export const renderAnswer = (answer: PlannedAnswer<string>): string =>
     ...answer.related.flatMap(returnedText),
     ...answer.unmappedPassages.flatMap(unmappedText),
   ].join("\n");
-
-const REASON_WORDS = {
-  wrong: "wrong",
-  "out-of-date": "out of date",
-  incomplete: "incomplete",
-  "should-not-have-shown": "should not have been shown",
-} satisfies Record<FeedbackReason, string>;
-
-export const renderFeedback = (receipt: FeedbackReceipt): string => {
-  const { feedback } = receipt;
-  const what =
-    feedback.verdict === "helpful"
-      ? `helpful`
-      : `flagged as ${REASON_WORDS[feedback.reason]}${feedback.detail === undefined ? "" : ` — "${feedback.detail}"`}`;
-  return `Received: ${feedback.iri} marked ${what}. It reaches the owner when the Suggestions page ships.`;
-};

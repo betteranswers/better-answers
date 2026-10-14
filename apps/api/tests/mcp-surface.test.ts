@@ -291,12 +291,30 @@ describe("era-independent", () => {
 
     const refused = await rpc(
       await callTool(client, token, "give_feedback", {
-        iri: "x",
+        recordId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
         verdict: "flag",
         reason: "wrong",
       }),
     );
     expect(refused.error ?? toolCalled.parse(refused.result).isError).toBeTruthy();
+  });
+
+  it("lists give_feedback as naming the record it stores on", async () => {
+    const { client, token } = await connect();
+
+    const entry = (await listTools(client, token)).find((tool) => tool.name === "give_feedback");
+
+    expect(entry?.description).toContain("on the record of that question");
+    expect(entry?.description).toContain("`recordId`");
+    expect(entry?.description).toContain("a call repeated after a timeout stores it twice");
+    expect(entry?.description).not.toContain("one write");
+    expect(Object.keys(entry?.inputSchema.properties ?? {})).toEqual([
+      "recordId",
+      "verdict",
+      "reason",
+      "note",
+      "disputed",
+    ]);
   });
 
   it("annotates every entry: reads read-only, the one write not", async () => {
@@ -503,13 +521,13 @@ describe("era-independent", () => {
 
     const fed = await result(
       await callTool(client, token, "give_feedback", {
-        iri: "https://better-answers.com/c/01X",
+        recordId: asked.structuredContent?.["recordId"],
         verdict: "flag",
         reason: "wrong",
       }),
       toolCalled,
     );
-    expect(fed.structuredContent?.["outcome"]).toBe("received");
+    expect(fed.structuredContent?.["outcome"]).toBe("stored");
   });
 
   it("refuses a revoked person's token, its reason logged, not sent", async () => {

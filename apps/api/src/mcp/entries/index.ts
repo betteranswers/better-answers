@@ -4,8 +4,8 @@ import {
   answerOutputWith,
   ask,
   askInput,
-  FEEDBACK_REASONS,
-  FEEDBACK_VERDICTS,
+  feedbackFields,
+  feedbackInput,
   find,
   findInput,
   findOutputWith,
@@ -212,40 +212,23 @@ const openEntry = defineEntry({
   render: (opened) => renderOpen(openedInCore(opened)),
 });
 
-const feedbackIri = z.string().min(1).describe("The concept or answer the feedback is about.");
-
-const feedbackDetail = z
-  .string()
-  .max(2000)
-  .optional()
-  .describe("What was wrong, in the person's words.");
-
-const feedbackInput = z.discriminatedUnion("verdict", [
-  z.object({ iri: feedbackIri, verdict: z.literal("helpful") }),
-  z.object({
-    iri: feedbackIri,
-    verdict: z.literal("flag"),
-    reason: z.enum(FEEDBACK_REASONS),
-    detail: feedbackDetail,
-  }),
-]);
-
 const giveFeedbackEntry = defineEntry({
   road: "resolvers-transaction",
   name: "give_feedback",
   title: "Give feedback on an answer",
   description:
-    "Record a reader's verdict on an answer or a concept: helpful, or a flag — wrong, out of date, incomplete, or should not have been shown — with what was wrong in their words. Called from a view's button or on the person's explicit ask; it is the server's one write.",
+    "Store a person's verdict on an answer `ask` gave, on the record of that question: helpful, or a flag — wrong, out of date, incomplete, or should not have been shown — with a note in their words. Name the record by the `recordId` the answer carried; only the person who asked can give feedback on it. For a flag on a sentence you wrote from the answer, send that sentence and the concept it rested on as `disputed`. Call it on the person's explicit ask. Each call stores another verdict beside the last, so a call repeated after a timeout stores it twice. The feedback is kept with the record, and no one is notified of it. The note and who gave it are kept until that person is erased, and the rest for good.",
   scopes: ["knowledge:read", "feedback:write"],
   // A flag with no reason is the action's own refusal, not a rule the flat wire shape could carry.
   input: z.object({
-    iri: feedbackIri,
-    verdict: z.enum(FEEDBACK_VERDICTS).describe("Helpful, or a flag with a reason."),
-    reason: z.enum(FEEDBACK_REASONS).optional().describe("Required with a flag."),
-    detail: feedbackDetail,
+    recordId: feedbackFields.shape.recordId,
+    verdict: feedbackFields.shape.verdict,
+    reason: feedbackFields.shape.reason,
+    note: feedbackFields.shape.note,
+    disputed: feedbackFields.shape.disputed,
   }),
   output: z.object({
-    outcome: z.literal("received"),
+    outcome: z.literal("stored"),
     feedback: feedbackInput,
   }),
   annotations: {
@@ -254,10 +237,10 @@ const giveFeedbackEntry = defineEntry({
     idempotentHint: false,
     openWorldHint: false,
   },
-  run: async (principal, tx, args) => {
+  run: async (principal, tx, args, now) => {
     const parsed = parse(feedbackInput, args);
     if (!parsed.ok) return parsed;
-    return giveFeedback(principal, tx, parsed.value);
+    return giveFeedback(principal, tx, parsed.value, now);
   },
   render: renderFeedback,
 });

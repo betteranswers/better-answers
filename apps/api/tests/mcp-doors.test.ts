@@ -9,7 +9,7 @@ import {
   type PrincipalRefusal,
   type UserPrincipal,
 } from "@better-answers/core/kernel";
-import { withPrincipal, withPrincipalRead, type Tx } from "@better-answers/core/store/postgres";
+import { withHeldPrincipal, withPrincipalRead, type Tx } from "@better-answers/core/store/postgres";
 import type { JudgeState, QuestionVerdict } from "@better-answers/schema";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 
@@ -220,8 +220,8 @@ describe("the steps the own-transaction road hands an entry", () => {
 describe("the door an entry's transaction opens through", () => {
   it.each([
     ["read-only where the hint is declared true", { readOnlyHint: true }, withPrincipalRead],
-    ["read-write where the hint is declared false", { readOnlyHint: false }, withPrincipal],
-    ["read-write where no hint is declared", {}, withPrincipal],
+    ["held to its commit where the hint is false", { readOnlyHint: false }, withHeldPrincipal],
+    ["held to its commit where no hint is declared", {}, withHeldPrincipal],
   ])("is %s", (_case, annotations, door) => {
     expect(doorOf(annotations)).toBe(door);
   });
