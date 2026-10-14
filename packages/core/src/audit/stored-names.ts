@@ -64,6 +64,7 @@ export const STORED_ACT_NAMES = [
   "people.person.sign_in_restored",
   "platform.audit_log.exported",
   "platform.job.followed",
+  "platform.workspace.model_key_set",
 ] as const;
 
 /**
@@ -135,4 +136,5 @@ export const STORED_DETAIL_KEYS = {
   eventCount: "eventCount",
   capped: "capped",
   searchTooBroad: "searchTooBroad",
+  modelProvider: "provider",
 } as const;

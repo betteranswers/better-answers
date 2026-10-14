@@ -1,4 +1,4 @@
-# Runbook — thirteen pages and nine procedures
+# Runbook — thirteen pages and ten procedures
 
 **Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
@@ -22,7 +22,7 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 ## 2. Host compromise
 
 - **Fires:** anything unusual — a firewall rule you did not make, an unknown process, a provider notice; a spike in `401`s on the machine route (ticket 42).
-- **Do:** **isolate** (deny all inbound at the provider's firewall; revoke the tunnel token so nothing reaches the api). **Rotate every host-side credential** — that is every row in the estate's secrets inventory whose *Lives in* column names a box, and no others: the bucket write-and-list pair, the registry pull token, the object store's root pair, the mirror deploy key, the auth secret and the mail credential. The **escrowed credentials were never on VPC 1**; do not rotate the envelope key unless the database itself is suspected, because rotating it re-wraps every workspace data key. Then rebuild VPC 1 from a fresh image and **restore from a copy older than the compromise** (`restore-production.sh --dump <the copy>`) — the dumps are under object-lock governance, so an attacker could not have altered them — and the script **replays erasures** after the dump, before the api turns healthy. Go to page 3 if personal data may have been read.
+- **Do:** **isolate** (deny all inbound at the provider's firewall; revoke the tunnel token so nothing reaches the api). **Rotate every host-side credential** — that is every row in the estate's secrets inventory whose *Lives in* column names a box, and no others: the bucket write-and-list pair, the registry pull token, the object store's root pair, the mirror deploy key, the auth secret and the mail credential. The **escrowed credentials were never on VPC 1**; do not rotate the envelope key unless the database itself is suspected, because a new one means every model key is reissued at its model provider and set again (§ Set a workspace's model key). Once a workspace holds a model key, `KEK` is in the `api` service's env on VPC 1 beside the rows it seals, so a compromise of VPC 1 that may have read either is a compromise of `KEK`. Then rebuild VPC 1 from a fresh image and **restore from a copy older than the compromise** (`restore-production.sh --dump <the copy>`) — the dumps are under object-lock governance, so an attacker could not have altered them — and the script **replays erasures** after the dump, before the api turns healthy. Go to page 3 if personal data may have been read.
 - **If the compromised box is VPC 2:** the backup `age` identity is **resident there in a root-only file** (`SECRETS.md` § The backup identity), so assume **every dump and bundle in the buckets was readable in plaintext** — that is every customer's personal data — and page 3 applies without further evidence. Rotate the identity by that section's procedure, the bucket READ credential, the mirror key's accepted public half, and every orchestrator token; rebuild VPC 2 (page 5) before the drill runs again.
 - **Attach:** the provider notice or the log line that fired; the rotation list with each row ticked and timed; the dump name restored from.
 - **Escalate:** the technical contact immediately; the second escrow holder if a rotation needs the vault and the owner is unreachable.
@@ -445,3 +445,29 @@ An Admin who has lost every second factor and every recovery code asks the opera
 3. Read them the restore code it prints, by the channel you checked them on and never by email. It works once, for 24 hours, and a second restore voids it. At their next email sign-in, setup asks for it before any factor can be added.
 
 The command changes nothing for an address no person holds (`REFUSED — no-such-user`), or when the `api` service has no `SMTP_URL`, because the notice is part of the action. If the notice does not go, the restore still stands, and the output says to tell them yourself.
+
+## Set a workspace's model key
+
+A workspace calls a model provider with a key of its own, its model key. One command on the `api` service sets it and replaces it, and no page can. Nothing reads a model provider's key from the environment (`SECRETS.md` § A workspace's model key).
+
+1. **Once per estate: the envelope key.** The `api` service's `KEK` is 64 hexadecimal characters, the 32 bytes every model key is sealed under. `openssl rand -hex 32` makes one. It goes into the escrow vault before it is set, because a row sealed under a lost key is lost with it. Nothing read `KEK` before this command, so check the value the estate holds before the first run. A value of any other shape is replaced and the `api` service redeployed, which loses nothing while no model key is set. While `KEK` is absent or of another shape the command refuses, saying `KEK must be set to the envelope key`.
+2. **Run `pnpm ops set-model-key --workspace <id> --provider <anthropic|mistral>` on the `api` service, with the key on standard input.** The key is never an argument, so it reaches no shell history and no process list. From a shell on the box, with `$api` the service's container:
+
+   ```sh
+   read -rs MODEL_KEY && printf '%s' "$MODEL_KEY" | docker exec -i "$api" pnpm ops set-model-key --workspace <id> --provider anthropic; unset MODEL_KEY
+   ```
+
+   `read -rs` takes the pasted key without showing it, and `printf` is the shell's own, so no process carries the key as an argument. The done line names the workspace and the model provider, and never the key. Each run records `platform.workspace.model_key_set` in the workspace's audit log under the platform's own actor id, naming the model provider.
+
+3. **To rotate,** issue a new key at the model provider, run the command again, then revoke the old key at the model provider. A second run replaces the key, and a workspace holds one for each model provider. On a leak, revoke first.
+4. **After this release, run the browsing role's file again** (§ Browse production, step 3), as after any release that adds a table. It withholds the sealed key from `browse_ro` and leaves each row's `workspace_id` and `provider` readable. Run it after the release and not before: before the migration it finds no `model_key`, fails whole and grants nothing.
+
+The command writes nothing when it refuses. `malformed` is a workspace id that is not one, a model provider outside the two, or a standard input that is empty or holds a space or a line break. `no-such-workspace` is an id no workspace holds. `not built`, exit 3, is a database the migration has not reached. A workspace with no key for a model provider has no model available from that provider.
+
+**Which workspaces hold a key.** No command lists them. Through the browsing login, `SELECT workspace_id, provider FROM model_key ORDER BY 1, 2` names every pair that holds a row. A workspace's audit log names each time a key was set, as `platform.workspace.model_key_set` with its model provider.
+
+**After `KEK` changes.** A row sealed under the old envelope key stays in place and no longer opens. Nothing reports it until a model call for that workspace refuses. So list the pairs as above before the change, and run the command once for each afterwards.
+
+**After a compromise of `KEK`.** Whoever read `KEK` and the database can open every model key sealed under it. Sealing the same keys again under a new `KEK` protects nothing. Treat each one as leaked: revoke it at its model provider, issue a new one there, set the new `KEK`, redeploy, and set each new key with the command.
+
+**After a restore.** A dump taken before a model key was replaced brings the earlier key back, and it opens cleanly under the same `KEK`, so nothing refuses until the model provider does. After any restore, set again every model key replaced since the dump was taken (`BACKUPS.md` § Recovery order).

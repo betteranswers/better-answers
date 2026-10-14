@@ -79,6 +79,7 @@ const VALUE_LABELS = new Map(
     eventCount: "Events",
     capped: "Stopped at the limit",
     searchTooBroad: "Search named too many",
+    provider: "AI Provider",
     grants: "Access ended",
   }),
 );
@@ -113,7 +114,7 @@ export const KEPT_OFF_DETAIL_KEYS: Readonly<Partial<Record<DeclaredAction, reado
   "sources.finding.restored": ["findingId"],
 };
 
-/** Stored values a reader would not say: a sign-in method, an audience, a family. */
+/** Stored values a reader would not say: a sign-in method, an audience, a family, an AI provider. */
 const VALUE_WORDS: ReadonlyMap<unknown, string> = new Map([
   ["email_code", "Emailed code"],
   ["email_link", "Sign-in link"],
@@ -125,6 +126,8 @@ const VALUE_WORDS: ReadonlyMap<unknown, string> = new Map([
   ["knowledge", "Knowledge"],
   ["sources", "Sources"],
   ["platform", "Platform"],
+  ["anthropic", "Anthropic"],
+  ["mistral", "Mistral AI"],
 ]);
 
 type Said = { readonly value: string; readonly address?: string };

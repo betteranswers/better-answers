@@ -34,6 +34,7 @@ import {
   type RefusalClass,
   type Result,
 } from "@better-answers/core/kernel";
+import type { ModelKeySetting } from "@better-answers/core/llm";
 import {
   ensureTestWorkspace,
   INVENTED_MEMBERS,
@@ -66,11 +67,13 @@ import {
   provisionWorkspace,
   renameWorkspace,
   restoreSignIn,
+  setModelKey,
   setOperatorMark,
   type AddMemberRefusal,
   type AddPersonRefusal,
   type ProvisionRefusal,
   type RenameRefusal,
+  type SetModelKeyRefusal,
   type SignInRestored,
 } from "@better-answers/core/workspaces";
 import {
@@ -83,6 +86,8 @@ import {
   mapGeneration,
   mapNode,
   job,
+  MODEL_PROVIDERS,
+  modelKey,
   REBUILD_REASONS,
   ROLES,
   SENSITIVITIES,
@@ -132,6 +137,9 @@ export type OpsIo = {
 
   /** Absent where no email transport is configured, so an action that must notify refuses. */
   readonly mail?: Mail | undefined;
+
+  /** A refusal where no envelope key is configured, in the config module's own sentence. */
+  readonly modelKeySetting: Result<ModelKeySetting, string>;
 };
 
 /** Takes a dump stamp (`20260601T120000Z`) or any instant `Date` reads; `undefined` is neither. */
@@ -180,6 +188,7 @@ const NEEDS = {
   "reindex-connected-sources": [connectedSource, job],
   "erasure-rehearsal": [erasureRequest, suppression],
   "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
+  "set-model-key": [modelKey],
 };
 
 type SliceCommand = keyof typeof NEEDS;
@@ -221,6 +230,8 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             the journeys' test workspace, marked to invite its testing domain alone, its three test people and ${String(INVENTED_MEMBERS)} invented Viewers, made or set back; its id first on the done line
   rename-workspace --workspace <id> [--name <name>] [--short-name <short name>]
                                                             the workspace's name, its short name, or both; at least one is named, and the other kept
+  set-model-key --workspace <id> --provider <${MODEL_PROVIDERS.join("|")}>
+                                                            stdin: the workspace's key for that model provider, sealed and never printed; a second run replaces it
   operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
   restore-sign-in --email <email>                           a person who lost every factor and code, once you have checked who they are another way: their factors and sessions ended, a notice sent, a one-time restore code printed
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <sensitivity>] [--dry-run]
@@ -1326,6 +1337,53 @@ const renameWorkspaceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Pr
   return DONE;
 };
 
+const MODEL_KEY_USAGE = `set-model-key: --workspace <id> and --provider <${MODEL_PROVIDERS.join("|")}> are required, with the key on standard input`;
+
+const modelKeyReason = (refusal: SetModelKeyRefusal | Error, workspaceId: string): string => {
+  if (refusal instanceof Error) return refusal.message;
+  switch (refusal) {
+    case "malformed":
+      return `malformed: give --workspace a workspace id, --provider one of ${MODEL_PROVIDERS.join(" · ")}, and on standard input one key with no space or line break in it`;
+    case "no-such-workspace":
+      return noSuchWorkspace(workspaceId);
+  }
+};
+
+/**
+ * The key comes on standard input, which no shell history and no process list keeps, and no line
+ * this says repeats it.
+ */
+const setModelKeyCommand = async (
+  doors: Doors,
+  workspaceId: string,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
+  const provider = flagValue(flags, "provider");
+  if (provider === undefined) {
+    io.say(MODEL_KEY_USAGE);
+    return USAGE;
+  }
+  if (!io.modelKeySetting.ok) {
+    io.say(`set-model-key: REFUSED — ${io.modelKeySetting.error}; nothing changed`);
+    return REFUSED;
+  }
+  const typed = await io.stdin();
+  const set = await setModelKey(BOOTSTRAP, doors.postgres, io.modelKeySetting.value, {
+    workspaceId,
+    provider,
+    key: typed.replace(/\r?\n$/, ""),
+  });
+  if (!set.ok) {
+    io.say(`set-model-key: REFUSED — ${modelKeyReason(set.error, workspaceId)}`);
+    return exitOf(set.error);
+  }
+  io.say(
+    `set-model-key: done — workspace ${workspaceId} holds a new key for ${set.value.provider}`,
+  );
+  return DONE;
+};
+
 const OPERATOR_USAGE = "operator: --email <email> and one of --grant or --revoke are required";
 
 const MARK_SAID = {
@@ -1412,6 +1470,7 @@ const SLICE_RUNNERS = {
     reindexConnectedSources(doors, workspaceId, io),
   "erasure-rehearsal": erasureRehearsal,
   "import-bundle": importBundleCommand,
+  "set-model-key": setModelKeyCommand,
 } satisfies Readonly<
   Record<
     SliceCommand,

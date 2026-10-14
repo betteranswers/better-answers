@@ -46,6 +46,7 @@ The three dates are computed **from the timestamp of the last dump before the re
 3. Resync the map from git and records (the estate rebuild).
 4. Reconcile pipeline state: every LMDB is wiped; connected sources reprocess from the object store.
 5. Object-store orphans: blobs with no catalogue row are listed, then swept after the grace.
+6. Model keys, by hand, since no script holds one: a dump taken before a workspace's model key was replaced brings the earlier key back, and it opens cleanly. Set again every model key replaced since the dump (`RUNBOOK.md` § Set a workspace's model key).
 
 **Why the replay waits for the stores** (11/09/2026, ADR 0022 amended): the routine it re-runs rewrites each workspace's bare repository and reads the replay copy every erasure left in the object store, so a replay that ran beside `migrate` — where both scripts ran it until this date — either found no copy to read or rewrote a repository the git step was about to overwrite from a bundle that still named the subject. It runs on the `api` service rather than `migrate`, because that is the one service in `deploy/platform.compose.yaml` carrying `GIT_STORE_DIR` with `/data/git` mounted and the object store's endpoint, bucket, region and credentials.
 

@@ -56,6 +56,9 @@ export type TestData = {
 
   modelChoice(overrides?: Partial<InsertInput<"modelChoice">>): Promise<Row<"modelChoice">>;
 
+  /** Its frame is bytes of a frame's length that seal nothing. */
+  modelKey(overrides?: Partial<InsertInput<"modelKey">>): Promise<Row<"modelKey">>;
+
   passage(overrides?: Partial<InsertInput<"passage">>): Promise<Row<"passage">>;
 
   oauthClient(overrides?: Partial<InsertInput<"oauthClient">>): Promise<Row<"oauthClient">>;
@@ -334,6 +337,16 @@ export const testData = (client: pg.PoolClient): TestData => {
       retentionTail: null,
       ...overrides,
       purpose,
+      workspaceId,
+    });
+  };
+
+  const modelKey: TestData["modelKey"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "modelKey", {
+      provider: "anthropic",
+      sealed: new Uint8Array(40).fill(7),
+      ...overrides,
       workspaceId,
     });
   };
@@ -990,6 +1003,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     groupMember,
     workspaceConfig,
     modelChoice,
+    modelKey,
     passage,
     oauthClient,
     oauthRefreshToken,

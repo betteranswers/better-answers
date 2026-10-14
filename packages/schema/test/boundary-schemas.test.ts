@@ -59,6 +59,9 @@ const MEMBER_ERASURE_ID = "01J6YYYYYYYYYYYYYYYYYYYYY3";
 const QUESTION_RECORD_ID = "01J6QQQQQQQQQQQQQQQQQQQQQQ";
 const DRAFTED_RECORD_ID = "01J6QQQQQQQQQQQQQQQQQQQQQ2";
 
+/** Bytes of a frame's length that seal nothing: no key was ever behind them. */
+const A_SEALED_FRAME = new Uint8Array(40).fill(7);
+
 /** Inside the month the migration made a content partition for, which is the month it ran in. */
 const ASKED_THIS_MONTH = new Date();
 
@@ -88,6 +91,7 @@ const acceptedRows = {
       dimensions: EMBEDDING_DIMENSIONS,
     },
   ],
+  modelKey: [{ workspaceId: WS_ID, provider: "anthropic", sealed: A_SEALED_FRAME }],
   workspaceConfig: [{ workspaceId: WS_ID, key: "mcp.tools_list_ttl_ms", value: "300000" }],
 
   member: [
@@ -877,6 +881,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "workspace",
         "user",
         "modelChoice",
+        "modelKey",
         "workspaceConfig",
         "member",
 
@@ -972,6 +977,11 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     modelChoice: [
       { ...acceptedRows.modelChoice[0], dimensions: 0 },
       { ...acceptedRows.modelChoice[0], retentionTail: "   " },
+    ],
+
+    modelKey: [
+      { ...acceptedRows.modelKey[0], provider: "openai" },
+      { ...acceptedRows.modelKey[0], sealed: "a frame written as text" },
     ],
 
     user: [{ ...acceptedRows.user[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
@@ -1437,6 +1447,22 @@ describe("the customType exception, per shape", () => {
     expect(Object.keys(inserted)).not.toContain("search");
     expect(Object.keys(updated)).not.toContain("search");
   });
+
+  it("modelKey.select and insert require a sealed frame of bytes", () => {
+    const row = acceptedRows.modelKey[0];
+    for (const form of [boundarySchemas.modelKey.select, boundarySchemas.modelKey.insert]) {
+      expect(form.safeParse(row).success).toBe(true);
+      expect(form.safeParse({ ...row, sealed: Buffer.from(row.sealed) }).success).toBe(true);
+      expect(form.safeParse({ ...row, sealed: undefined }).success).toBe(false);
+      expect(form.safeParse({ ...row, sealed: null }).success).toBe(false);
+    }
+  });
+
+  it("modelKey.update skips an absent frame and checks a present one", () => {
+    const update = boundarySchemas.modelKey.update;
+    expect(update.safeParse({ provider: "mistral" }).success).toBe(true);
+    expect(update.safeParse({ sealed: "a frame written as text" }).success).toBe(false);
+  });
 });
 
 describe("5 — the inferred type is pinned", () => {
@@ -1512,6 +1538,11 @@ describe("5 — the inferred type is pinned", () => {
       model: string;
       dimensions: number | null;
       retentionTail: string | null;
+    };
+    modelKey: {
+      workspaceId: WorkspaceId;
+      provider: "anthropic" | "mistral";
+      sealed: Uint8Array<ArrayBuffer>;
     };
     workspaceConfig: { workspaceId: WorkspaceId; key: string; value: string; updatedAt: Date };
     passage: {

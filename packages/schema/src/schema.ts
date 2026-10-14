@@ -21,6 +21,7 @@ export * from "./finding-tables.ts";
 export * from "./erasure-tables.ts";
 export * from "./write-up-tables.ts";
 export * from "./question-tables.ts";
+export * from "./llm-tables.ts";
 export * from "./job-tables.ts";
 export * from "./platform-tables.ts";
 

@@ -233,7 +233,7 @@ Reviewer: no scan can tell what a logged value holds, on either tier.
 A secret belongs to one of the seven credential classes `docs/operations/SECRETS.md` names.
 
 - The bootstrap class is what the deploy unit must give the process before it can reach anything. A config module reads it.
-- The other six are rows under the envelope. A credentials provider reaches them; the first slice that needs one builds it.
+- The other six are rows under the envelope. A credentials provider reaches them. The LLM-provider class has one, in core's llm layer; any other class gets its own with the first slice that needs it.
 
 Never mix classes in one scope, and never log a secret.
 

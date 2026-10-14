@@ -1,6 +1,14 @@
 import { writeFile } from "node:fs/promises";
 
-import { readIdentityBootstrap, readObjectStore, requireBootstrap } from "./config.ts";
+import { err, ok } from "@better-answers/core/kernel";
+import { openModelKeySetting } from "@better-answers/core/llm";
+
+import {
+  readEnvelopeKey,
+  readIdentityBootstrap,
+  readObjectStore,
+  requireBootstrap,
+} from "./config.ts";
 import { closeDoors, openDoors } from "./doors.ts";
 import { logger } from "./logger.ts";
 import { fetchHonouringHost } from "./ops/http-fetch.ts";
@@ -12,6 +20,7 @@ import { emailSender, pacedTransport } from "./smtp.ts";
 const bootstrap = requireBootstrap("pnpm ops");
 const identity = readIdentityBootstrap();
 const objectStore = readObjectStore();
+const envelopeKey = readEnvelopeKey();
 
 const mail =
   identity.ok && identity.value.smtpUrl !== undefined
@@ -52,6 +61,9 @@ const exitCode = await runOps(process.argv.slice(2), doors, {
 
   readTree: readTreeUnder,
   mail,
+  modelKeySetting: envelopeKey.ok
+    ? ok(openModelKeySetting(envelopeKey.value))
+    : err(envelopeKey.error.message),
 }).finally(() => closeDoors(doors));
 
 process.exit(exitCode);
