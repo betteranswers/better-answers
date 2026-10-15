@@ -1,4 +1,4 @@
-import { addressOf, type Ask, askedIn } from "@/shared/address-ask.ts";
+import { type Ask, askedIn } from "@/shared/address-ask.ts";
 import type { PagePath } from "@/shared/navigation.ts";
 
 /** Typed by the navigation list, so a page moved there fails here at compile time. */
@@ -13,19 +13,8 @@ const PERSON = "person";
 /** Read through `askedIn`, so a return address under the older key still lands. */
 const ACTION: Ask = "action";
 
-/** The sheet's two actions that ask for a sign-in from the last hour. */
+/** The sheet's two actions, opened straight from the address. */
 export type FreshAction = "revoke" | "correct";
-
-/** Where signing in again comes back to: the person, found by their address, open at the action. */
-export const backTo = (
-  person: { readonly id: string; readonly email: string },
-  action: FreshAction,
-): string =>
-  addressOf(EVERYONE_PATH, { [SEARCH]: person.email, [PERSON]: person.id, [ACTION]: action });
-
-/** Where signing in again comes back to from Names waiting: the list, focus on the person's action. */
-export const backToTheName = (personId: string): string =>
-  addressOf(NAMES_WAITING_PATH, { [PERSON]: personId });
 
 export type Arrival = {
   readonly search: string;

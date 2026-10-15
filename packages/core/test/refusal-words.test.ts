@@ -62,7 +62,7 @@ const CATALOGUED = {
   "role-forbids": "forbidden by kernel",
   "not-found": "absent by kernel",
   "not-the-operator": "forbidden by kernel",
-  "sign-in-too-old": "unauthenticated by kernel",
+  "confirmation-too-old": "precondition by kernel",
   "second-factor-pending": "precondition by kernel",
   "changed-meanwhile": "conflict by kernel",
   "not-a-member": "unauthenticated by kernel",

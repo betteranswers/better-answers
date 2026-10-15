@@ -12,6 +12,7 @@ import {
   type InvitationMinted,
 } from "../src/members/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
+import { confirmedSessionFor } from "./identity-rows.ts";
 import type { ProvisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
 import { addressOf, readingAs, seedingWith } from "./suite-postgres.ts";
@@ -43,11 +44,21 @@ export const ceilingOf = (answer: Result<unknown, unknown>): number | undefined 
 
 /** `db` answers the suite's database once its hooks have run, so it is read at each call. */
 export const invitationsSuite = (db: () => MigratedPostgres) => {
-  const as = <T>(
+  const as = async <T>(
     workspace: ProvisionedWorkspace,
     userId: string,
     work: (principal: UserPrincipal, tx: Tx) => Promise<Result<T, unknown>>,
-  ) => readingAs(db().runtimePool, { workspaceId: workspace.workspaceId, userId }, work);
+    confirmedAt: Date = new Date(),
+  ) =>
+    readingAs(
+      db().runtimePool,
+      {
+        workspaceId: workspace.workspaceId,
+        userId,
+        sessionId: await confirmedSessionFor(db().pool, userId, confirmedAt),
+      },
+      work,
+    );
 
   const sending = (
     workspace: ProvisionedWorkspace,
@@ -55,11 +66,15 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
     role: string,
     now: Date = INVITED_AT,
   ) =>
-    as(workspace, workspace.adminUserId, (principal, tx) =>
-      inviteMembers(principal, tx, {
-        ...inputOf(inviteMembersInput, { addresses, role }),
-        now,
-      }),
+    as(
+      workspace,
+      workspace.adminUserId,
+      (principal, tx) =>
+        inviteMembers(principal, tx, {
+          ...inputOf(inviteMembersInput, { addresses, role }),
+          now,
+        }),
+      now,
     );
 
   /** One address, answering its one invitation as the action answered it. */

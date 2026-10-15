@@ -41,6 +41,7 @@ const memberOf = (workspaceId: string): UserPrincipal => ({
   role: "Editor",
   groups: [],
   credentialIssuedAtMs: Date.now(),
+  secondFactorConfirmedAtMs: Date.now(),
 });
 
 type Bundle = {

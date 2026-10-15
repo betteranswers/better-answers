@@ -252,12 +252,16 @@ export const sessionFor = async (
     readonly lastUsedAt: Date;
     readonly expiresAt: Date;
     readonly pendingSince?: Date;
+
+    /** When the session last confirmed a second factor, where it holds one. */
+    readonly confirmedAt?: Date;
   },
 ): Promise<string> => {
   const sessionId = ulid();
   await pool.query(
-    `INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id, pending_since)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    `INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id, pending_since,
+                          second_factor_confirmed_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       sessionId,
       at.expiresAt,
@@ -266,10 +270,24 @@ export const sessionFor = async (
       at.lastUsedAt,
       userId,
       at.pendingSince ?? null,
+      at.confirmedAt ?? null,
     ],
   );
   return sessionId;
 };
+
+/** A session the person confirmed at `confirmedAt`, so an act judged then goes ahead. */
+export const confirmedSessionFor = (
+  pool: pg.Pool,
+  userId: string,
+  confirmedAt: Date = new Date(),
+): Promise<string> =>
+  sessionFor(pool, userId, {
+    createdAt: confirmedAt,
+    lastUsedAt: confirmedAt,
+    expiresAt: new Date(confirmedAt.getTime() + 30 * 24 * 60 * 60_000),
+    confirmedAt,
+  });
 
 type CredentialPair = {
   readonly earlier: string;

@@ -40,6 +40,9 @@ export type TestData = {
 
   user(overrides?: Partial<InsertInput<"user">>): Promise<Row<"user">>;
 
+  /** As the library writes one; `secondFactorConfirmedAt` where the session confirmed a factor. */
+  session(overrides?: Partial<InsertInput<"session">>): Promise<Row<"session">>;
+
   account(overrides?: Partial<InsertInput<"account">>): Promise<Row<"account">>;
 
   member(overrides?: Partial<InsertInput<"member">>): Promise<Row<"member">>;
@@ -262,6 +265,22 @@ export const testData = (client: pg.PoolClient): TestData => {
       name: "Test person",
       email: `${id.toLowerCase()}@example.invalid`,
       ...overrides,
+    });
+  };
+
+  const session: TestData["session"] = async (overrides = {}) => {
+    const userId = overrides.userId ?? (await user()).id;
+    const id = overrides.id ?? ulid();
+    const at = overrides.createdAt ?? new Date();
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+    return insertRow(client, "session", {
+      token: `token-${id}`,
+      createdAt: at,
+      updatedAt: at,
+      expiresAt: new Date(at.getTime() + thirtyDays),
+      ...overrides,
+      userId,
+      id,
     });
   };
 
@@ -1072,6 +1091,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     modelPrice,
     workspace,
     user,
+    session,
     account,
     member,
     invitation,

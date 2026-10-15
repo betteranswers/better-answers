@@ -1,6 +1,9 @@
-import type { Refusal } from "@/shared/api/trpc.ts";
+import type { Refusal, RefusalWord } from "@/shared/api/trpc.ts";
 import { refusalSentence, type OwnSentences } from "@/shared/refusal-words.ts";
 import { minutesUntil, PRODUCT_NAME } from "@/shared/words.ts";
+
+/** The one refusal a stale confirmation answers with, wherever an act was refused. */
+export const STALE_CONFIRMATION = "confirmation-too-old" satisfies RefusalWord;
 
 const INVITATION_LINK_INVALID =
   "This invitation link isn't valid. Please ask the person who invited you to send a new one.";

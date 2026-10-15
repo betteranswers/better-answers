@@ -522,12 +522,12 @@ describe("ending every sign-in and token everywhere, as the operator", () => {
     expect(await identityRowsAbout(nobody)).toEqual([]);
   });
 
-  it("refuses a sign-in over an hour old, ending nothing", async () => {
+  it("refuses a confirmation over an hour old, ending nothing", async () => {
     const personId = await seedUser();
 
     const { answered } = await revoking({ personId, at: AT }, new Date("2026-09-02T10:59:59.999Z"));
 
-    expect(answered).toEqual({ ok: true, value: { ok: false, error: "sign-in-too-old" } });
+    expect(answered).toEqual({ ok: true, value: { ok: false, error: "confirmation-too-old" } });
     expect(await revokedAtOf(personId)).toEqual([{ credentials_revoked_at: null }]);
     expect(await identityRowsAbout(personId)).toEqual([]);
   });
@@ -1005,6 +1005,7 @@ describe("what the slice answers when the store cannot be reached", () => {
     kind: "operator",
     userId: boundarySchemas.user.select.shape.id.parse(ulid()),
     credentialIssuedAtMs: signedIn.getTime(),
+    secondFactorConfirmedAtMs: signedIn.getTime(),
   });
 
   it("hands back the store's Error from the operator's actions", async () => {

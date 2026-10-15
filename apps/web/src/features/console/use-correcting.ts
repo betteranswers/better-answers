@@ -5,7 +5,7 @@ import type { Outcome } from "@/shared/outcome.tsx";
 
 import { correctedWords } from "./correcting-words.ts";
 import { useCorrectDisplayName } from "./people-api.ts";
-import { correctingRefused, refusedAsStale } from "./words.ts";
+import { correctingRefused } from "./words.ts";
 
 type CorrectName = ReturnType<typeof useCorrectDisplayName>;
 
@@ -34,15 +34,12 @@ export const useCorrecting = () => {
   const correctName = useCorrectDisplayName();
   const [was, setWas] = useState("");
   const refusedFor = correctName.isError ? correctName.variables.personId : undefined;
-  const stale = refusedAsStale(correctName.error);
 
   return {
     pending: correctName.isPending,
     outcome: outcomeOf(correctName, was),
-    /** Refused over a sign-in too old, which signing in again mends. */
-    staleFor: stale ? refusedFor : undefined,
-    /** Refused for any other reason, so the person's action takes focus back. */
-    otherwiseRefusedFor: stale ? undefined : refusedFor,
+    /** Refused, so the person's action takes focus back. */
+    otherwiseRefusedFor: refusedFor,
     refusedAt: (personId: string) => refusedOf(correctName, personId),
     save: (asked: {
       readonly personId: string;

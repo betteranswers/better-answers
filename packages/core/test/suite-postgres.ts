@@ -107,13 +107,24 @@ export const seedingWith = async <T>(
 /** Runs `work` as the member `reader`, in one transaction under row-level security; it may write. */
 export const readingAs = async <T>(
   pool: pg.Pool,
-  reader: { readonly workspaceId: string; readonly userId: string },
+  reader: {
+    readonly workspaceId: string;
+    readonly userId: string;
+
+    /** A session of the reader's, for an act that asks how fresh its confirmation is. */
+    readonly sessionId?: string;
+  },
   work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
 ): Promise<Folded<T>> =>
   folded<T>(
     await withPrincipal(
       openPostgres(pool),
-      { workspaceId: reader.workspaceId, userId: reader.userId, issuedAt: new Date() },
+      {
+        workspaceId: reader.workspaceId,
+        userId: reader.userId,
+        issuedAt: new Date(),
+        ...(reader.sessionId === undefined ? {} : { sessionId: reader.sessionId }),
+      },
       work,
     ),
   );

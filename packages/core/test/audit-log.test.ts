@@ -19,6 +19,7 @@ import {
 } from "../src/members/index.ts";
 import type { Foldable, Folded, Tx } from "../src/store/postgres/index.ts";
 import { recordSignIn } from "../src/workspaces/index.ts";
+import { confirmedSessionFor } from "./identity-rows.ts";
 import {
   bootstrap,
   erasedFromTheSet,
@@ -49,12 +50,20 @@ const memberAt = async (
   return userId;
 };
 
-const acting = <T>(
+const acting = async <T>(
   workspace: ProvisionedWorkspace,
   userId: string,
   work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
 ): Promise<Folded<T>> =>
-  readingAs(db().runtimePool, { workspaceId: workspace.workspaceId, userId }, work);
+  readingAs(
+    db().runtimePool,
+    {
+      workspaceId: workspace.workspaceId,
+      userId,
+      sessionId: await confirmedSessionFor(db().pool, userId),
+    },
+    work,
+  );
 
 /** One transaction each, so each group's event holds an instant of its own. */
 const groupsMadeBy = async (
@@ -103,7 +112,10 @@ const done = <T>(answered: Result<T, unknown>): T => {
 const roleChangedOf = async (workspace: ProvisionedWorkspace, personId: string) =>
   done(
     await acting(workspace, workspace.adminUserId, (principal, tx) =>
-      changeRole(principal, tx, inputOf(changeRoleInput, { personId, role: "Editor" })),
+      changeRole(principal, tx, {
+        ...inputOf(changeRoleInput, { personId, role: "Editor" }),
+        at: new Date(),
+      }),
     ),
   );
 

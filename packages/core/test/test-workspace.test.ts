@@ -7,7 +7,13 @@ import {
 } from "@better-answers/schema";
 import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/test-workspace";
 
-import type { PlatformPrincipal, Result, UserPrincipal, WorkspaceId } from "../src/kernel/index.ts";
+import type {
+  PlatformPrincipal,
+  Result,
+  UserId,
+  UserPrincipal,
+  WorkspaceId,
+} from "../src/kernel/index.ts";
 import {
   changeRole,
   ensureTestWorkspace,
@@ -159,6 +165,14 @@ const asTheAdmin = async <T>(
   return heldAs(workspace, adminUserId, work);
 };
 
+/** The Admin moves `personId` to Editor, from a session confirmed now. */
+const theRoleOf = async (fixture: Fixture, workspaceId: WorkspaceId, personId: UserId) =>
+  answeredValue(
+    await asTheAdmin(fixture, workspaceId, (principal, tx) =>
+      changeRole(principal, tx, { personId, role: "Editor", at: new Date() }),
+    ),
+  );
+
 describe("ensuring the test workspace", () => {
   it("makes the workspace, its mark, three people and 51 Viewers", async () => {
     const fixture = aFixture();
@@ -255,11 +269,7 @@ describe("ensuring the test workspace", () => {
     const fixture = aFixture();
     const { workspaceId } = answeredValue(await ensured(fixture));
     const invented = await personIdAt(inventedAt(fixture, "07"));
-    answeredValue(
-      await asTheAdmin(fixture, workspaceId, (principal, tx) =>
-        changeRole(principal, tx, { personId: invented, role: "Editor" }),
-      ),
-    );
+    await theRoleOf(fixture, workspaceId, invented);
     const before = await eventsIn(workspaceId);
 
     const repaired = answeredValue(await ensured(fixture));
@@ -285,7 +295,7 @@ describe("ensuring the test workspace", () => {
     const editor = await personIdAt(fixture.editor);
     answeredValue(
       await asTheAdmin(fixture, workspaceId, (principal, tx) =>
-        changeRole(principal, tx, { personId: editor, role: "Viewer" }),
+        changeRole(principal, tx, { personId: editor, role: "Viewer", at: new Date() }),
       ),
     );
 
@@ -321,11 +331,7 @@ describe("ensuring the test workspace", () => {
     const fixture = aFixture();
     const { workspaceId } = answeredValue(await ensured(fixture));
     const invented = await personIdAt(inventedAt(fixture, "09"));
-    answeredValue(
-      await asTheAdmin(fixture, workspaceId, (principal, tx) =>
-        changeRole(principal, tx, { personId: invented, role: "Editor" }),
-      ),
-    );
+    await theRoleOf(fixture, workspaceId, invented);
     const before = await eventsIn(workspaceId);
     const holder = await db().pool.connect();
     await holder.query("BEGIN");

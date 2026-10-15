@@ -215,7 +215,7 @@ type OperatorStanding =
  */
 export const standingAsOperator = async (
   door: PostgresDoor,
-  claims: Pick<Claims, "userId" | "issuedAt">,
+  claims: Pick<Claims, "userId" | "issuedAt" | "sessionId">,
 ): Promise<Result<OperatorStanding, Error>> => {
   const resolved = await attempt(() =>
     withOperatorRead(door, claims, async (operator, tx) => {

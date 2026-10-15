@@ -1,16 +1,17 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { STALE_CONFIRMATION } from "@/features/auth/refusal-words.ts";
 import {
   NAMES_WAITING_KEYSTROKES,
   PEOPLE_KEYSTROKES,
 } from "@/features/console/people-keystrokes.ts";
-import { NOT_THE_OPERATOR, SIGN_IN_TOO_OLD } from "@/features/console/refusal-words.ts";
+import { NOT_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
-  ageTheSignIn,
+  ageTheConfirmation,
   anAddress,
   aPkcePair,
   catchClaudesRedirect,
@@ -30,6 +31,7 @@ import {
   saysARefusal,
   saysOfItsRead,
   signedInAtHome,
+  reconfirmedOn,
   signIn,
   skipLinkReachesThePage,
   theActionLandedWithinItsBudget,
@@ -173,6 +175,18 @@ const correctionOf = (name: string): string => `Correct ${name}’s Display Name
 
 const dialogToCorrect = (page: Page, name: string): Locator =>
   page.getByRole("dialog", { name: correctionOf(name) });
+
+/** Saves the correction typed, answers its refusal, and re-confirms so the saved name goes ahead. */
+const correctionReconfirmed = async (
+  page: Page,
+  request: APIRequestContext,
+  email: string,
+): Promise<void> => {
+  const refused = refusalAnswering(page, CORRECT_A_NAME);
+  await page.keyboard.press("Enter");
+  expect(await refused).toMatchObject({ word: STALE_CONFIRMATION });
+  await reconfirmedOn(page, request, email);
+};
 
 const nameFieldOf = (dialog: Locator): Locator =>
   dialog.getByRole("textbox", { name: "Display Name" });
@@ -684,10 +698,10 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(grant).toMatchAriaSnapshot(endedEverywhere);
   });
 
-  test("sends a stale sign-in to sign in and back", async ({ page, request, baseURL }) => {
+  test("re-confirms a stale confirmation, retrying the act", async ({ page, request, baseURL }) => {
     const tag = aTag();
     const { operators } = await priyaConnected(page, request, baseURL, tag);
-    await ageTheSignIn(request, operators.admin.id);
+    await ageTheConfirmation(request, operators.admin.id);
     const sheet = await openPriya(page, tag);
 
     await sheet.getByRole("button", { name: REVOKE }).click();
@@ -696,30 +710,16 @@ test.describe("a person, opened from Everyone as a sheet", () => {
       .getByRole("button", { name: "End Every Sign-In Everywhere" })
       .click();
 
-    expect(await refused).toMatchObject({ word: SIGN_IN_TOO_OLD });
-    await saysARefusal(regionOf(sheet, "End Every Sign-In Everywhere").getByRole("alert"));
-    await expect(sessionsOf(sheet)).toHaveCount(1);
+    expect(await refused).toMatchObject({ word: STALE_CONFIRMATION });
 
-    await sheet.getByRole("link", { name: "Sign In Again" }).click();
-    await expect(page).toHaveURL(/\/sign-in\?redirect=/);
-    await signIn(page, request, operators.admin.email);
+    // The refused act waits in the dialog; its confirmation runs it again with the person kept.
+    await reconfirmedOn(page, request, operators.admin.email);
+    const ended = regionOf(sheet, "End Every Sign-In Everywhere");
+    await expect(ended.getByRole("status")).toHaveText(ENDED_AT);
+    await expect(sessionsOf(sheet)).toHaveCount(0);
 
-    await expect(page).toHaveURL(new RegExp(`${EVERYONE_PAGE}\\?`));
-    const again = sheetOf(page, "Priya Shah");
-    const revoke = again.getByRole("button", { name: REVOKE });
-    await expect(revoke).toBeFocused();
-    await revoke.press("Enter");
-    await confirmationOf(page)
-      .getByRole("button", { name: "End Every Sign-In Everywhere" })
-      .click();
-    await expect(regionOf(again, "End Every Sign-In Everywhere").getByRole("status")).toHaveText(
-      ENDED_AT,
-    );
-    await expect(sessionsOf(again)).toHaveCount(0);
-
-    // The way back has served once the person is closed, so a reload does not reopen them.
+    // The sheet closes on the person the search still names, and focus goes back to them.
     await page.keyboard.press("Escape");
-    await expect(page).toHaveURL(EVERYONE_PAGE);
     await expect(personButton(page, "Priya Shah")).toBeFocused();
   });
 
@@ -816,32 +816,17 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(searchBox(page)).toBeFocused();
   });
 
-  test("corrects after a stale sign-in's round trip, from the sheet", async ({ page, request }) => {
+  test("corrects a name after re-confirming, from the sheet", async ({ page, request }) => {
     const { operators } = await priyaListed(page, request, aTag());
-    await ageTheSignIn(request, operators.admin.id);
+    await ageTheConfirmation(request, operators.admin.id);
     await personButton(page, "Priya Shah").click();
     const part = regionOf(sheetOf(page, "Priya Shah"), "Display Name");
     await part.getByRole("button", { name: "Correct Display Name" }).click();
     await nameFieldOf(dialogToCorrect(page, "Priya Shah")).fill("Priya Sharma");
-    const refused = refusalAnswering(page, CORRECT_A_NAME);
-    await page.keyboard.press("Enter");
+    await correctionReconfirmed(page, request, operators.admin.email);
 
-    expect(await refused).toMatchObject({ word: SIGN_IN_TOO_OLD });
-    await saysARefusal(part.getByRole("alert"));
-    await part.getByRole("link", { name: "Sign In Again" }).click();
-    await expect(page).toHaveURL(/\/sign-in\?redirect=/);
-    await signIn(page, request, operators.admin.email);
-
-    const again = regionOf(sheetOf(page, "Priya Shah"), "Display Name").getByRole("button", {
-      name: "Correct Display Name",
-    });
-    await expect(again).toBeFocused();
-    await again.press("Enter");
-    await nameFieldOf(dialogToCorrect(page, "Priya Shah")).fill("Priya Sharma");
-    await page.keyboard.press("Enter");
     const corrected = regionOf(sheetOf(page, "Priya Sharma"), "Display Name");
     await expect(corrected.getByRole("status")).toHaveText(/\S/);
-    // The action is dimmed while the correction is pending, and the gate audits the page next.
     await expect(corrected.getByRole("button", { name: "Correct Display Name" })).toHaveAttribute(
       "aria-disabled",
       "false",
@@ -1047,32 +1032,15 @@ test.describe("the console's Names Waiting page", () => {
     );
   });
 
-  test("corrects a name after a stale sign-in's round trip", async ({ page, request }) => {
+  test("corrects a waiting name after re-confirming", async ({ page, request }) => {
     const tag = aTag();
     const { operators, name } = await priyaFlagged(page, request, tag);
     const corrected = `Priya Sharma ${tag}`;
-    await ageTheSignIn(request, operators.admin.id);
+    await ageTheConfirmation(request, operators.admin.id);
     await page.goto(NAMES_WAITING_PAGE);
     await correctButtonOf(page, name).click();
     await nameFieldOf(dialogToCorrect(page, name)).fill(corrected);
-    const refused = refusalAnswering(page, CORRECT_A_NAME);
-    await page.keyboard.press("Enter");
-
-    expect(await refused).toMatchObject({ word: SIGN_IN_TOO_OLD });
-    await saysARefusal(namesWaiting(page).getByRole("alert"));
-    await expect(waitingRowOf(page, name)).toBeVisible();
-    const signInAgain = namesWaiting(page).getByRole("link", { name: "Sign In Again" });
-    await expect(signInAgain).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/\/sign-in\?redirect=/);
-    await signIn(page, request, operators.admin.email);
-
-    await expect(page).toHaveURL(new RegExp(`${NAMES_WAITING_PAGE}\\?`));
-    const again = correctButtonOf(page, name);
-    await expect(again).toBeFocused();
-    await again.press("Enter");
-    await nameFieldOf(dialogToCorrect(page, name)).fill(corrected);
-    await page.keyboard.press("Enter");
+    await correctionReconfirmed(page, request, operators.admin.email);
     await expect(waitingRowOf(page, name)).toHaveCount(0);
     await expect(outcomeOf(namesWaiting(page))).toHaveText(/\S/);
     // The way back has served once the name is corrected, so a reload lands nowhere in particular.

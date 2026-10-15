@@ -27,6 +27,7 @@ import { DisplayNamePage } from "@/features/auth/display-name-page.tsx";
 import { LinkPage } from "@/features/auth/link-page.tsx";
 import { NoWorkspacePage } from "@/features/auth/no-workspace-page.tsx";
 import { detourAfter } from "@/features/auth/pending-refusal.ts";
+import { reconfirmAfter, ReconfirmDialog } from "@/features/auth/reconfirm-dialog.tsx";
 import { ConfirmPage, RecoveryPage } from "@/features/auth/second-factor-pages.tsx";
 import {
   CODES_STEP,
@@ -143,8 +144,18 @@ const confirmedFirst = async (
   if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
 };
 
+/** The dialog every refused act's page shares, drawn beside whatever page is open. */
+function RootFrame() {
+  return (
+    <>
+      <ReconfirmDialog />
+      <Outlet />
+    </>
+  );
+}
+
 const rootRoute = createRootRouteWithContext<ShellContext>()({
-  component: Outlet,
+  component: RootFrame,
   notFoundComponent: () => <UnknownAddress />,
 });
 
@@ -545,7 +556,9 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
       void router.navigate(leavingFor(href));
     },
   });
-  clients.failures.answeredBy((failure, during) => {
+  clients.failures.answeredBy((failure, during, refusedAct) => {
+    // A stale confirmation is met where the act was refused, never by a page away.
+    if (refusedAct !== undefined && reconfirmAfter(failure, refusedAct)) return;
     const home = homeAfterASwitchElsewhere(failure, context);
     if (home === undefined) detour(failure, during);
     else void home.then((to) => router.navigate(to));

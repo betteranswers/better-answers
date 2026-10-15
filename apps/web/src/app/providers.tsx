@@ -22,8 +22,8 @@ type FailureListener = {
 const aFailureListener = (): FailureListener => {
   let answer: FailureHeard = () => undefined;
   return {
-    heard: (failure, during) => {
-      answer(failure, during);
+    heard: (failure, during, refusedAct) => {
+      answer(failure, during, refusedAct);
     },
     answeredBy: (given) => {
       answer = given;

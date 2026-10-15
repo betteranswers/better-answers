@@ -8,6 +8,7 @@ import {
   declareAction,
   err,
   ok,
+  requireFreshConfirmation,
   type PrincipalRefusal,
   type RefusalOf,
   type Result,
@@ -45,12 +46,13 @@ const EXPORT_CAP = 10_000;
 
 export const exportAuditLogInput = readAuditLogInput.pick({ family: true, search: true });
 
-export type ExportAuditLogInput = z.output<typeof exportAuditLogInput>;
+/** When the action happens: a confirmation older than an hour makes the export wait on a re-confirm. */
+export type ExportAuditLogInput = z.output<typeof exportAuditLogInput> & { readonly at: Date };
 
 const exportAuditLogAction = declareAction({
   admits: ADMIN_ALONE,
   input: exportAuditLogInput,
-  refuses: ["role-forbids"],
+  refuses: ["role-forbids", "confirmation-too-old"],
 });
 
 export type ExportAuditLogRefusal =
@@ -209,16 +211,17 @@ export const exportAuditLog = async (
 ): Promise<Result<AuditExport, ExportAuditLogRefusal>> => {
   const admitted = admit(exportAuditLogAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
-
+  const fresh = requireFreshConfirmation(admitted.value, input.at);
+  if (!fresh.ok) return err(fresh.error);
   const read = await attempt(() =>
-    withMemberUnheld(admitted.value, door, (member, tx) => readForExport(member, tx, input)),
+    withMemberUnheld(fresh.value, door, (member, tx) => readForExport(member, tx, input)),
   );
   if (!read.ok) return err(read.error);
   if (!read.value.ok) return err(read.value.error);
   const exported = read.value.value;
 
   const recorded = await attempt(() =>
-    withMember(admitted.value, door, (member, tx) => recordExport(member, tx, input, exported)),
+    withMember(fresh.value, door, (member, tx) => recordExport(member, tx, input, exported)),
   );
   if (!recorded.ok) return err(recorded.error);
   if (!recorded.value.ok) return err(recorded.value.error);

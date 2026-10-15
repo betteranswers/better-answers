@@ -5,6 +5,7 @@ import { z } from "zod";
 import { attempt } from "@better-answers/core/kernel";
 import {
   applyPasskeyNameRule,
+  factorChangeStale,
   hasNoDisplayName,
   recordPasskeyAdded,
   replaceFactorsByPasskey,
@@ -127,8 +128,14 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
   ): Promise<SecondFactorHeld | Response> => {
     const held = await heldBy(deps, person);
     if (held === undefined) return unanswered(context, "the second factor was not read");
-    return waitsOnTheRestoreCode(held)
-      ? context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409)
+    if (waitsOnTheRestoreCode(held)) {
+      return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
+    }
+    // A grant a spent code made needs no re-confirm: the code was the stronger proof.
+    if (mayReplace(held)) return held;
+    // An add to a person already holding a factor re-confirms first, so nothing reaches the device.
+    return factorChangeStale(held, clock.now())
+      ? context.json(PERSON_ROUTE_REFUSALS.confirmationTooOld, 412)
       : held;
   };
 

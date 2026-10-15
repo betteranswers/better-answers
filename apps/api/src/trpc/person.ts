@@ -1,5 +1,8 @@
 import { setTimeout as elapsed } from "node:timers/promises";
 
+import type { Logger } from "pino";
+
+import { type Clock, err, ok, type Result } from "@better-answers/core/kernel";
 import {
   acceptInvitation,
   invitationInput,
@@ -12,6 +15,7 @@ import {
   acknowledgeRecoveryCodes,
   acknowledgeRecoveryCodesInput,
   dismissPasskeyOffer,
+  factorChangeStale,
   readSecondFactor,
   readWorkspacesHeld,
   removeAuthenticator,
@@ -30,10 +34,41 @@ import {
   ASK_TO_JOIN_PERSON_RULE,
   RECOVERY_CODES_PERSON_RULE,
 } from "../auth/constants.ts";
+import type { Doors } from "../doors.ts";
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { sendPromotionNotice } from "../promotion-notice-email.ts";
+import type { RefusalAnswer } from "../refusal.ts";
 import { crossing, given, parsedBy, personCeiling, personProcedure, router } from "./base.ts";
+
+type ThePerson = {
+  readonly personId: string;
+  readonly sessionId: string;
+  readonly doors: Doors;
+  readonly clock: Clock;
+  readonly log: Logger;
+};
+
+/** A factor change re-confirms where the person already holds a factor; a first one needs none. */
+const reconfirmingTheirFactors = async (
+  ctx: ThePerson,
+): Promise<Result<undefined, "confirmation-too-old" | RefusalAnswer | Error>> => {
+  const held = await readSecondFactor(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+    personId: ctx.personId,
+    sessionId: ctx.sessionId,
+    now: ctx.clock.now(),
+  });
+  if (!held.ok) return held;
+  // A restored person's factor change waits on their restore code alone, never a re-confirm.
+  if (held.value.restoreRequired || !factorChangeStale(held.value, ctx.clock.now())) {
+    return ok(undefined);
+  }
+  return err("confirmation-too-old");
+};
+
+const crossingTheirFactors = async (ctx: ThePerson): Promise<void> => {
+  await crossing(ctx, reconfirmingTheirFactors.name, reconfirmingTheirFactors(ctx));
+};
 
 const answeredNoSoonerThan = async <Answer>(
   floorMs: number,
@@ -144,6 +179,7 @@ export const personRouter = router({
   removePasskey: personProcedure
     .input(parsedBy(removePasskeyInput))
     .mutation(async ({ ctx, input }) => {
+      await crossingTheirFactors(ctx);
       const removed = await crossing(
         ctx,
         removePasskey.name,
@@ -169,6 +205,7 @@ export const personRouter = router({
     ),
   ),
   removeAuthenticator: personProcedure.mutation(async ({ ctx }) => {
+    await crossingTheirFactors(ctx);
     const removed = await crossing(
       ctx,
       removeAuthenticator.name,
@@ -183,6 +220,7 @@ export const personRouter = router({
   replaceRecoveryCodes: personCeiling(RECOVERY_CODES_PERSON_RULE)
     .input(parsedBy(replaceRecoveryCodesInput))
     .mutation(async ({ ctx, input }) => {
+      await crossingTheirFactors(ctx);
       const issued = await crossing(
         ctx,
         replaceRecoveryCodes.name,

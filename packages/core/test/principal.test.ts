@@ -45,6 +45,7 @@ import {
   type PostgresDoor,
   type Tx,
 } from "../src/store/postgres/index.ts";
+import { sessionFor } from "./identity-rows.ts";
 import { bootstrap, principalOf } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
@@ -495,8 +496,49 @@ describe("the Principal resolver", () => {
       groups: [],
 
       credentialIssuedAtMs: claims.issuedAt.getTime(),
+      secondFactorConfirmedAtMs: null,
     });
     expect(resolved.value.scope).toBe(seeded.workspaceId);
+  });
+
+  it("carries the session's confirmation, or none", async () => {
+    const seeded = await seedMember({ role: "Editor" });
+    const other = await seedMember({ role: "Editor" });
+    const door = openPostgres(db().runtimePool);
+    const own = await sessionFor(db().pool, seeded.userId, {
+      createdAt: new Date(),
+      lastUsedAt: new Date(),
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    const someoneElses = await sessionFor(db().pool, other.userId, {
+      createdAt: new Date(),
+      lastUsedAt: new Date(),
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    const confirmedAt = new Date("2026-10-02T12:00:00.000Z");
+    for (const sessionId of [own, someoneElses]) {
+      await db().pool.query("UPDATE session SET second_factor_confirmed_at = $2 WHERE id = $1", [
+        sessionId,
+        confirmedAt,
+      ]);
+    }
+
+    const stampOf = (claims: Claims) =>
+      withPrincipal(
+        door,
+        claims,
+        async ({ secondFactorConfirmedAtMs }) => secondFactorConfirmedAtMs,
+      );
+
+    expect(await stampOf(claimsFor(seeded, { sessionId: own }))).toEqual({
+      ok: true,
+      value: confirmedAt.getTime(),
+    });
+    expect(await stampOf(claimsFor(seeded))).toEqual({ ok: true, value: null });
+    expect(await stampOf(claimsFor(seeded, { sessionId: someoneElses }))).toEqual({
+      ok: true,
+      value: null,
+    });
   });
 
   it("refuses a non-member of the workspace the credential names", async () => {
@@ -594,6 +636,7 @@ describe("the Principal resolver", () => {
         role: "Editor",
         groups: seeded.groupIds.there,
         credentialIssuedAtMs: issuedAt.getTime(),
+        secondFactorConfirmedAtMs: null,
       },
     });
     expect(seeded.groupIds.there).not.toEqual(seeded.groupIds.here);
@@ -924,10 +967,33 @@ describe("the operator resolver", () => {
             kind: "operator",
             userId: person.id,
             credentialIssuedAtMs: Date.parse("2026-09-25T09:00:00.000Z"),
+            secondFactorConfirmedAtMs: null,
           },
           scope: null,
         },
       });
+    });
+
+    it("carries the named session's confirmation to the operator", async () => {
+      const person = await aPerson({ operator: true });
+      const sessionId = await sessionFor(db().pool, person.id, {
+        createdAt: new Date(),
+        lastUsedAt: new Date(),
+        expiresAt: new Date(Date.now() + 86_400_000),
+      });
+      const confirmedAt = new Date("2026-10-02T12:00:00.000Z");
+      await db().pool.query("UPDATE session SET second_factor_confirmed_at = $2 WHERE id = $1", [
+        sessionId,
+        confirmedAt,
+      ]);
+
+      const resolved = await withOperator(
+        openPostgres(db().runtimePool),
+        { userId: person.id, issuedAt: new Date(), sessionId },
+        async (operator) => operator.secondFactorConfirmedAtMs,
+      );
+
+      expect(resolved).toEqual({ ok: true, value: confirmedAt.getTime() });
     });
 
     it("refuses a person without the mark", async () => {

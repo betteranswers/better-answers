@@ -83,8 +83,8 @@ describe("the rule that a declared action admits before it awaits", () => {
     expect(lint.flagged(holding(nested))).toEqual([FILE]);
   });
 
-  describe("the shorthand `requireFreshSignIn`", () => {
-    const shorthand = "requireFreshSignIn";
+  describe("the shorthand `requireFreshConfirmation`", () => {
+    const shorthand = "requireFreshConfirmation";
     const step = (body: string): Tree => ({ "step.ts": body });
 
     it("refuses a step that awaits before it, naming the call", () => {
@@ -115,7 +115,7 @@ describe("the rule that a declared action admits before it awaits", () => {
 
   it("refuses a late `admit`, though a shorthand came first", () => {
     const mixed = `export const reprocess = async (principal, tx, input) => {
-  const fresh = requireFreshSignIn(principal, new Date());
+  const fresh = requireFreshConfirmation(principal, new Date());
   if (!fresh.ok) return fresh;
   await tx.query("SELECT 1");
   return admit(reprocessAction, principal, input);
@@ -128,7 +128,7 @@ describe("the rule that a declared action admits before it awaits", () => {
 
   it("pairs a declaration with `admit` alone, never a shorthand's argument", () => {
     const both = `export const reprocess = async (principal, tx, input) => {
-  const fresh = requireFreshSignIn(reprocessAction);
+  const fresh = requireFreshConfirmation(reprocessAction);
   if (!fresh.ok) return fresh;
   return tx.query("SELECT 1");
 };

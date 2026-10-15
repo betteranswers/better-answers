@@ -9,14 +9,15 @@ import {
   aWrongCode,
   anAdminSignedIn as anAdminSignedInTo,
   codeNow,
-  sessionsSignedInOverAnHourAgo,
+  sessionsAgedUnderTheApi,
+  sessionPointedAt,
   setUpOn,
   signedInByEmailOnly,
   startOn,
   whileCommitsAreRefused,
 } from "./provoke.ts";
 import { appForSuite, aStoppableClock } from "./suite-app.ts";
-import { webClientOf, webSignedIn } from "./web-client.ts";
+import { webClientOf, webSignedIn, webTabOf } from "./web-client.ts";
 
 /** While set, the relay holds every message to the address until the test ends. */
 let mailHeld: { readonly to: string; readonly until: Promise<void> } | undefined;
@@ -92,19 +93,20 @@ const agesOf = async (personId: string) =>
     )
   ).rows;
 
-const revokedAtOf = async (personId: string) =>
-  (
-    await app().database.superuser.query<{ revokedAt: Date | null }>(
-      'SELECT credentials_revoked_at AS "revokedAt" FROM "user" WHERE id = $1',
-      [personId],
-    )
-  ).rows;
-
 const noticesTo = (email: string) =>
   app().emails.filter((message) => message.to === email && !/^\d{6}$/m.test(message.text));
 
 const subjectsTo = (email: string): readonly string[] =>
   noticesTo(email).map((notice) => notice.subject);
+
+type ApiOf = Awaited<ReturnType<typeof webTabOf>>["api"];
+
+/** The member read of a session issued before a revocation, refused in its own word. */
+const expectTheMembersReadRevoked = async (api: ApiOf) => {
+  expect(await refusalOf(api.session.member.query())).toMatchObject({
+    data: { httpStatus: 401, refusal: { word: "credentials-revoked", class: "unauthenticated" } },
+  });
+};
 
 describe("setting up an authenticator", () => {
   it("leaves nothing enabled after a wrong code", async () => {
@@ -185,28 +187,26 @@ describe("setting up an authenticator", () => {
     const { answered } = await setUpOn(client);
 
     expect(answered.status).toBe(200);
-    expect(await refusalOf(api.session.member.query())).toMatchObject({
-      data: { httpStatus: 401, refusal: { word: "credentials-revoked", class: "unauthenticated" } },
-    });
+    await expectTheMembersReadRevoked(api);
   });
 
-  it("refuses the operator's hour-old sign-in after the session swap", async () => {
+  it("refuses the swapped-in session a revocation predates", async () => {
     const workspace = await app().provision();
-    await app().markOperator(workspace.admin.email, "grant");
     const client = await signedInByEmailOnly(app(), workspace.admin.email);
-    const { api } = webClientOf(client);
-    const person = await app().person();
-    await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
+    await sessionsAgedUnderTheApi(app(), workspace.admin.id);
 
     const { answered } = await setUpOn(client);
+    await sessionPointedAt(app(), workspace.admin.id, workspace.workspaceId);
+    const { api } = await webTabOf(client);
 
+    // The swapped-in session keeps the age of the one before it, so a revocation landing after
+    // the swap reads it as issued before itself.
     expect(answered.status).toBe(200);
-    expect(
-      await refusalOf(api.console.people.endEverySignInAndToken.mutate({ personId: person.id })),
-    ).toMatchObject({
-      data: { httpStatus: 401, refusal: { word: "sign-in-too-old", class: "unauthenticated" } },
+    const ended = await api.members.endEverySignInAndToken.mutate({
+      personId: workspace.admin.id,
     });
-    expect(await revokedAtOf(person.id)).toEqual([{ revokedAt: null }]);
+    expect(ended.personId).toBe(workspace.admin.id);
+    await expectTheMembersReadRevoked(api);
   });
 
   it("sends one notice holding neither the key nor a code", async () => {

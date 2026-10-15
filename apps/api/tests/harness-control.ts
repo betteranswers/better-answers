@@ -35,9 +35,9 @@ import {
 import type { TestApp } from "./harness.ts";
 import {
   codeSentPastItsExpiry,
+  confirmationsAgedOverAnHourAgo,
   pendingSessionsPastTheirHour,
   restoredByTheOperator,
-  sessionsSignedInOverAnHourAgo,
 } from "./provoke.ts";
 
 const HARNESS_PREFIX = "/__harness";
@@ -189,10 +189,10 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json({ revoked: true });
   });
 
-  // An hour is too long for a spec to wait, so the sign-in is moved back behind the api's back.
-  control.post(`${HARNESS_PREFIX}/sign-ins/aged`, async (context) => {
+  // An hour is too long for a spec to wait, so the confirmation is moved back behind the api's back.
+  control.post(`${HARNESS_PREFIX}/confirmations/aged`, async (context) => {
     const asked = await readBody(context.req.raw, aging);
-    await sessionsSignedInOverAnHourAgo(app, asked.userId);
+    await confirmationsAgedOverAnHourAgo(app, asked.userId);
     return context.json({ aged: true });
   });
 

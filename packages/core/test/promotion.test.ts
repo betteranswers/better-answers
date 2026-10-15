@@ -13,6 +13,7 @@ import { removeAuthenticator, removePasskey, setOperatorMark } from "../src/work
 import { authenticatorFor, passkeyFor } from "./identity-rows.ts";
 import { heldAs, membersSuite } from "./members-suite.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
+import type { ProvisionedWorkspace } from "./platform.ts";
 import { AT, secondFactorSuite } from "./second-factor-suite.ts";
 import { inputOf } from "./suite-input.ts";
 import { seedingWith } from "./suite-postgres.ts";
@@ -38,6 +39,16 @@ const isPromoted = async (personId: string) =>
     )
   ).rows[0]?.promoted;
 
+/** The Admin moves `personId` to the role named, from a session confirmed now. */
+const movedByTheAdmin = (
+  workspace: ProvisionedWorkspace,
+  personId: string,
+  role: "Admin" | "Viewer",
+) =>
+  heldAs(workspace, workspace.adminUserId, (principal, tx) =>
+    changeRole(principal, tx, { ...inputOf(changeRoleInput, { personId, role }), at: new Date() }),
+  );
+
 describe("becoming one who must hold a second factor", () => {
   it("clears every session's stamp and hour on becoming Admin", async () => {
     const workspace = await provisionedWorkspace(db(), "Promoted");
@@ -45,9 +56,7 @@ describe("becoming one who must hold a second factor", () => {
     const stamped = await confirmedSession(editor, AT);
     const plain = await aSession(editor);
 
-    const moved = await heldAs(workspace, workspace.adminUserId, (principal, tx) =>
-      changeRole(principal, tx, inputOf(changeRoleInput, { personId: editor, role: "Admin" })),
-    );
+    const moved = await movedByTheAdmin(workspace, editor, "Admin");
 
     expect(moved).toMatchObject({ ok: true, value: { role: "Admin", promoted: true } });
     expect([await confirmedAt(stamped), await confirmedAt(plain)]).toEqual([
@@ -66,9 +75,7 @@ describe("becoming one who must hold a second factor", () => {
     );
     const stamped = await confirmedSession(editor);
 
-    const moved = await heldAs(here, here.adminUserId, (principal, tx) =>
-      changeRole(principal, tx, inputOf(changeRoleInput, { personId: editor, role: "Admin" })),
-    );
+    const moved = await movedByTheAdmin(here, editor, "Admin");
 
     expect(moved).toMatchObject({ ok: true, value: { promoted: false } });
     expect(await confirmedAt(stamped)).toEqual({ confirmed: AT, pending: null });
@@ -81,11 +88,10 @@ describe("becoming one who must hold a second factor", () => {
     const stamped = await confirmedSession(viewer);
 
     const moved = await heldAs(workspace, workspace.adminUserId, (principal, tx) =>
-      bulkChangeRole(
-        principal,
-        tx,
-        inputOf(bulkChangeRoleInput, { personIds: [viewer], role: "Admin" }),
-      ),
+      bulkChangeRole(principal, tx, {
+        ...inputOf(bulkChangeRoleInput, { personIds: [viewer], role: "Admin" }),
+        at: new Date(),
+      }),
     );
 
     expect(moved).toMatchObject({ ok: true, value: { promoted: [viewer] } });

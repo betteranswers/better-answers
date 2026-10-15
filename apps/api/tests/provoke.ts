@@ -233,12 +233,20 @@ export const someoneWaitsOnALock = async (app: TestApp): Promise<boolean> =>
   (await waitingOnALock(app)) > 0;
 
 /** Moves every session `userId` holds to a sign-in 61 minutes ago, behind the api's back. */
-export const sessionsSignedInOverAnHourAgo = async (
+export const sessionsAgedUnderTheApi = async (app: TestApp, userId: string): Promise<void> => {
+  await app.database.superuser.query(
+    "UPDATE session SET created_at = now() - interval '61 minutes' WHERE user_id = $1",
+    [userId],
+  );
+};
+
+/** Moves every session `userId` holds to a confirmation 61 minutes ago, behind the api's back. */
+export const confirmationsAgedOverAnHourAgo = async (
   app: TestApp,
   userId: string,
 ): Promise<void> => {
   await app.database.superuser.query(
-    "UPDATE session SET created_at = now() - interval '61 minutes' WHERE user_id = $1",
+    "UPDATE session SET second_factor_confirmed_at = now() - interval '61 minutes' WHERE user_id = $1",
     [userId],
   );
 };

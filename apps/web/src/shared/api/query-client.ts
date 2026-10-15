@@ -38,8 +38,11 @@ export const WHILE_A_CEILING_HOLDS = {
 /** A read saves nothing, so only a refused action leaves something unsaved. */
 export type FailedDuring = "read" | "action";
 
+/** The refused act a mutation leaves behind, so a re-confirm can run it again with its input. */
+export type RefusedAct = { readonly retry: () => void };
+
 /** Typed as the cache types it, though the auth library's failures arrive as plain objects. */
-export type FailureHeard = (failure: Error, during: FailedDuring) => void;
+export type FailureHeard = (failure: Error, during: FailedDuring, refusedAct?: RefusedAct) => void;
 
 export const createQueryClient = (heard: FailureHeard = () => undefined) =>
   new QueryClient({
@@ -49,8 +52,11 @@ export const createQueryClient = (heard: FailureHeard = () => undefined) =>
       },
     }),
     mutationCache: new MutationCache({
-      onError: (failure) => {
-        heard(failure, "action");
+      onError: (failure, variables, _context, mutation) => {
+        // As the observer's own `mutate` does: the act's answer reaches it, not this call.
+        heard(failure, "action", {
+          retry: () => void mutation.execute(variables).catch(() => undefined),
+        });
       },
     }),
     defaultOptions: {

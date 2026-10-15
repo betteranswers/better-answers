@@ -10,7 +10,6 @@ import {
   EVERY_PURPOSE,
   KERNEL_REFUSALS,
   OPERATOR_ALONE,
-  requireFreshSignIn,
   type AdmissionRefusal,
   type AdmittedOf,
   type InputOf,
@@ -41,6 +40,7 @@ const person = (role: Role): UserPrincipal => ({
   role,
   groups: [],
   credentialIssuedAtMs: Date.now(),
+  secondFactorConfirmedAtMs: Date.now(),
 });
 
 const processActor = (purpose: string): PlatformPrincipal => ({
@@ -52,6 +52,7 @@ const theOperator = (): OperatorPrincipal => ({
   kind: "operator",
   userId: boundarySchemas.user.select.shape.id.parse("01JQ0000000000000000000ZED"),
   credentialIssuedAtMs: Date.now(),
+  secondFactorConfirmedAtMs: Date.now(),
 });
 
 const nothing = z.object({});
@@ -179,32 +180,6 @@ describe("what an action admits of the operator", () => {
       Result<OperatorPrincipal, "not-the-operator">
     >();
     expect(KERNEL_REFUSALS["not-the-operator"]).toBe("forbidden");
-  });
-});
-
-describe("how fresh a sign-in the operator's writes ask for", () => {
-  const signedInAt = (): OperatorPrincipal => ({
-    ...theOperator(),
-    credentialIssuedAtMs: Date.parse("2026-09-25T09:00:00.000Z"),
-  });
-
-  it("admits a sign-in an hour old, refusing one older", () => {
-    const operator = signedInAt();
-
-    expect([
-      requireFreshSignIn(operator, new Date("2026-09-25T09:00:00.000Z")),
-      requireFreshSignIn(operator, new Date("2026-09-25T10:00:00.000Z")),
-      requireFreshSignIn(operator, new Date("2026-09-25T10:00:00.001Z")),
-    ]).toEqual([
-      { ok: true, value: operator },
-      { ok: true, value: operator },
-      { ok: false, error: "sign-in-too-old" },
-    ]);
-  });
-
-  it("refuses in a word whose remedy is signing in again", () => {
-    expect(KERNEL_REFUSALS["sign-in-too-old"]).toBe("unauthenticated");
-    expectTypeOf<"sign-in-too-old">().toExtend<AdmissionRefusal>();
   });
 });
 

@@ -9,6 +9,7 @@ import {
   addMember,
   ageThePendingHour,
   anAddress,
+  authenticatorCodeField,
   catchClaudesRedirect,
   claudesAuthorizeUrl,
   invite,
@@ -157,6 +158,11 @@ const someoneHoldingBoth = async (page: Page, api: APIRequestContext) => {
   await page.goto("/sign-in");
   await signIn(page, api, email);
   await expect(page.getByRole("heading", { level: 1, name: "No Workspace Yet" })).toBeVisible();
+  // Adding a passkey beside a held factor asks for a fresh confirmation first, so confirm here.
+  const codeNow = authenticatorCodeAt(key, new Date());
+  await page.goto("/confirm");
+  await authenticatorCodeField(page).fill(codeNow);
+  await expect(page).not.toHaveURL(/\/confirm(?:\?|$)/);
   await page.goto("/account");
   await expect(page.getByRole("heading", { level: 1, name: "Account" })).toBeVisible();
   await page.getByRole("button", { name: "Add a Passkey" }).click();

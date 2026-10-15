@@ -237,7 +237,10 @@ describe("the last Admin, removed", () => {
     const answers = await Promise.all([
       removedBy(workspace, first, second),
       heldAs(workspace, second, (principal, tx) =>
-        changeRole(principal, tx, inputOf(changeRoleInput, { personId: first, role: "Editor" })),
+        changeRole(principal, tx, {
+          ...inputOf(changeRoleInput, { personId: first, role: "Editor" }),
+          at: new Date(),
+        }),
       ),
     ]);
 

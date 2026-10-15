@@ -1,7 +1,15 @@
 import type { z } from "zod";
 
 import { action, declareActions, record } from "../audit/index.ts";
-import { admit, ADMIN_ALONE, declareAction, err, ok, ulid } from "../kernel/index.ts";
+import {
+  admit,
+  ADMIN_ALONE,
+  declareAction,
+  err,
+  ok,
+  requireFreshConfirmation,
+  ulid,
+} from "../kernel/index.ts";
 import type {
   AdminUserPrincipal,
   AdmittedOf,
@@ -30,11 +38,23 @@ export type RemoveMemberInput = z.output<typeof removeMemberInput> & {
 const removeMemberAction = declareAction({
   admits: ADMIN_ALONE,
   input: removeMemberInput,
-  refuses: ["role-forbids", "no-such-member", "last-admin", "changed-meanwhile"],
+  refuses: [
+    "role-forbids",
+    "no-such-member",
+    "last-admin",
+    "confirmation-too-old",
+    "changed-meanwhile",
+  ],
 });
 
 export type RemoveMemberRefusal =
-  | MemberRefusal<"role-forbids" | "no-such-member" | "last-admin" | "changed-meanwhile">
+  | MemberRefusal<
+      | "role-forbids"
+      | "no-such-member"
+      | "last-admin"
+      | "confirmation-too-old"
+      | "changed-meanwhile"
+    >
   | Error;
 
 export type MemberRemoved = {
@@ -102,5 +122,7 @@ export const removeMember = async (
 ): Promise<Result<MemberRemoved, RemoveMemberRefusal>> => {
   const admitted = admit(removeMemberAction, principal, input);
   if (!admitted.ok) return err(admitted.error);
-  return removedUnderTheLock(admitted.value, tx, input);
+  const recent = requireFreshConfirmation(admitted.value, input.at);
+  if (!recent.ok) return err(recent.error);
+  return removedUnderTheLock(recent.value, tx, input);
 };

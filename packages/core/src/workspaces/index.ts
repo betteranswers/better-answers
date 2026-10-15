@@ -17,7 +17,7 @@ import {
   err,
   ok,
   refusalFor,
-  requireFreshSignIn,
+  requireFreshConfirmation,
   type RefusalOf,
   type Result,
   ulid,
@@ -115,6 +115,7 @@ export {
   takePasskeyChallenge,
 } from "./passkey-confirm.ts";
 export {
+  factorChangeStale,
   readCredentialsHeld,
   readSecondFactor,
   recordAuthenticatorSetUp,
@@ -455,7 +456,9 @@ type CredentialsRevoked = {
   readonly revokedAt: string;
 };
 
-export type EndEverySignInAndTokenRefusal = WorkspaceRefusal<"no-such-user" | "sign-in-too-old">;
+export type EndEverySignInAndTokenRefusal = WorkspaceRefusal<
+  "no-such-user" | "confirmation-too-old"
+>;
 
 type CredentialsEnded = { readonly held: Date; readonly grants: readonly EndedGrant[] };
 
@@ -486,7 +489,7 @@ export const endEverySignInAndToken = async (
   tx: Tx,
   input: EndEverySignInAndTokenInput,
 ): Promise<Result<CredentialsRevoked, EndEverySignInAndTokenRefusal | Error>> => {
-  const fresh = requireFreshSignIn(operator, input.at);
+  const fresh = requireFreshConfirmation(operator, input.at);
   if (!fresh.ok) return err(fresh.error);
   const { personId } = input;
 

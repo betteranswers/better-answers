@@ -981,8 +981,9 @@ describe("the audit log an erasure never rewrites", () => {
       });
       return client.clientId;
     });
+    const admin = await principalFor(db(), scenario.workspaceId, scenario.admin.userId, true);
     const revoked = await withScope(bootstrap, scenario.postgres, scenario.workspaceId, (tx) =>
-      endEverySignInAndTokenHere(scenario.admin, tx, { personId: person.id, at: new Date() }),
+      endEverySignInAndTokenHere(admin, tx, { personId: person.id, at: new Date() }),
     );
     expect(revoked.ok).toBe(true);
     const before = await rowTextIn("audit_event", scenario.workspaceId);

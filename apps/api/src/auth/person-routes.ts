@@ -47,6 +47,8 @@ export const PERSON_ROUTE_REFUSALS = {
   /** Restored by the operator: only a session that gave the restore code may set up a factor. */
   restoreCodeNeeded: { error: "restore-code-needed" },
   secondFactorPending: { error: "second-factor-pending" },
+  /** A factor change whose confirmation is over an hour old, refused where a factor is held. */
+  confirmationTooOld: { error: "confirmation-too-old" },
 } as const;
 
 /** Past a route's ceiling, or while the person's tries of a code wait. */

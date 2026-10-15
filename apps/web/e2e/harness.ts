@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { z } from "zod";
 
 import type {
@@ -123,19 +123,35 @@ export const invite = (
   );
 };
 
-const signInAged = z.object({ aged: z.boolean() });
+const confirmationAged = z.object({ aged: z.boolean() });
 
-/** How a spec meets `sign-in-too-old` without waiting the hour out. */
-export const ageTheSignIn = (api: APIRequestContext, userId: string) =>
-  ask(api, "/sign-ins/aged", { userId }, signInAged);
+/** How a spec meets `confirmation-too-old` without waiting the hour out. */
+export const ageTheConfirmation = (api: APIRequestContext, userId: string) =>
+  ask(api, "/confirmations/aged", { userId }, confirmationAged);
 
 /** How a spec meets a pending session's end without waiting out its hour. */
 export const ageThePendingHour = (api: APIRequestContext, userId: string) =>
-  ask(api, "/pending-sessions/aged", { userId }, signInAged);
+  ask(api, "/pending-sessions/aged", { userId }, confirmationAged);
 
 /** How a spec meets an expired code without waiting out its lifetime. */
 export const ageTheCode = (api: APIRequestContext, email: string) =>
-  ask(api, "/codes/aged", { email }, signInAged);
+  ask(api, "/codes/aged", { email }, confirmationAged);
+
+/** The re-confirm a stale confirmation opens, wherever the refused act was asked for. */
+export const reconfirmOf = (page: Page): Locator =>
+  page.getByRole("dialog", { name: "Confirm It’s You" });
+
+/** Confirms the re-confirm with the code the harness-written authenticator shows now. */
+export const reconfirmedOn = async (
+  page: Page,
+  api: APIRequestContext,
+  email: string,
+): Promise<void> => {
+  await expect(reconfirmOf(page)).toBeVisible();
+  const key = await withAnAuthenticator(api, email);
+  await authenticatorCodeField(page).fill(authenticatorCodeAt(key, new Date()));
+  await expect(reconfirmOf(page)).toHaveCount(0);
+};
 
 const enrolled = z.object({ key: z.string(), recoveryCodes: z.array(z.string()) });
 

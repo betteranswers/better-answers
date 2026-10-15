@@ -56,7 +56,10 @@ type Action = (
 const changingRoles =
   (personIds: readonly string[], role: string): Action =>
   (principal, tx) =>
-    bulkChangeRole(principal, tx, inputOf(bulkChangeRoleInput, { personIds, role }));
+    bulkChangeRole(principal, tx, {
+      ...inputOf(bulkChangeRoleInput, { personIds, role }),
+      at: new Date(),
+    });
 
 const removing =
   (personIds: readonly string[]): Action =>
@@ -69,7 +72,10 @@ const removing =
 const adding =
   (groupId: string, personIds: readonly string[]): Action =>
   (principal, tx) =>
-    bulkAddToGroup(principal, tx, inputOf(bulkAddToGroupInput, { groupId, personIds }));
+    bulkAddToGroup(principal, tx, {
+      ...inputOf(bulkAddToGroupInput, { groupId, personIds }),
+      at: new Date(),
+    });
 
 const asAdmin = (workspace: ProvisionedWorkspace, action: Action) =>
   heldAs(workspace, workspace.adminUserId, action);

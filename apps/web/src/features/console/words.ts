@@ -4,7 +4,7 @@ import { refusalsOf } from "@/shared/refusal-outcome.tsx";
 import { refusalSentence, STOCK } from "@/shared/refusal-words.ts";
 
 import { SELECT_A_NAME_FIRST, SELECT_A_PERSON_FIRST } from "./people-keystrokes.ts";
-import { SAID_OF_A_REVOCATION, SAID_OF_CORRECTING, SIGN_IN_TOO_OLD } from "./refusal-words.ts";
+import { SAID_OF_CORRECTING } from "./refusal-words.ts";
 
 export const NO_PERSON_IN_FOCUS = selectFirst(SELECT_A_PERSON_FIRST);
 
@@ -22,10 +22,7 @@ export const readRefused = (failure: Error | ApiError): string => {
   return refusal === undefined ? STOCK.notLoaded : saidOf(refusal);
 };
 
-/** Refused for a sign-in over an hour old, which signing in again mends. */
-export const refusedAsStale = (failure: Error | ApiError | null): boolean =>
-  failure !== null && refusalOf(failure)?.word === SIGN_IN_TOO_OLD;
-
-export const { outcomeOfFailure: revocationRefused } = refusalsOf(SAID_OF_A_REVOCATION);
+/** The revocation has no sentence of its own, so each refusal shows its class's. */
+export const { outcomeOfFailure: revocationRefused } = refusalsOf({});
 
 export const { outcomeOfFailure: correctingRefused } = refusalsOf(SAID_OF_CORRECTING);

@@ -17,6 +17,7 @@ import {
   emailAddressOf,
   err,
   ok,
+  requireFreshConfirmation,
   type AdminUserPrincipal,
   type CeilingMet,
   type RefusalOf,
@@ -69,6 +70,7 @@ const inviteMembersAction = declareAction({
     "malformed",
     "already-a-member",
     "off-testing-domain",
+    "confirmation-too-old",
     "changed-meanwhile",
   ],
 });
@@ -99,7 +101,7 @@ const cancelInvitationAction = declareAction({
 type AlreadyAMember = Extract<keyof typeof WORKSPACE_REFUSALS, "already-a-member">;
 
 export type InviteMembersRefusal =
-  | MemberRefusal<"role-forbids" | "no-such-role" | "changed-meanwhile">
+  | MemberRefusal<"role-forbids" | "no-such-role" | "confirmation-too-old" | "changed-meanwhile">
   | RefusedItems<MemberRefusal<"malformed" | "off-testing-domain"> | AlreadyAMember>
   | Error;
 
@@ -398,6 +400,11 @@ export const inviteMembers = async (
   if (!admitted.ok) return err(admitted.error);
   const role = ROLE.safeParse(input.role);
   if (!role.success) return err("no-such-role");
+  // Only a hand reached for the Admin role asks for a recent confirmation.
+  if (role.data === "Admin") {
+    const fresh = requireFreshConfirmation(admitted.value, input.now);
+    if (!fresh.ok) return err(fresh.error);
+  }
 
   const { addresses, malformed } = addressesOf(input.addresses);
   const refused = refusedItemsOf(

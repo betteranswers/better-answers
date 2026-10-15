@@ -122,6 +122,7 @@ const provisioned = async () => {
       role: "Admin",
       groups: [],
       credentialIssuedAtMs: Date.now(),
+      secondFactorConfirmedAtMs: Date.now(),
     };
     return { workspaceId, admin: principal };
   } finally {
