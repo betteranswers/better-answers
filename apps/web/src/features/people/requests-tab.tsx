@@ -4,12 +4,12 @@ import { useId, useMemo, useRef, useState, type RefObject } from "react";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
-import { ListRead, ListState } from "@/shared/list-pages.tsx";
+import { ListRead, ListState, NothingListed } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Card } from "@/shared/ui/card.tsx";
-import { CLEAR_WORDS, counted } from "@/shared/words.ts";
+import { counted, nothingMatches } from "@/shared/words.ts";
 
 import { ApproveRequest } from "./approve-request.tsx";
 import { EMPTY_LINES } from "./empty-lines.ts";
@@ -62,8 +62,6 @@ const useNarrowedRequests = () => {
   return { ...list, read, listed, data };
 };
 
-type Narrowed = ReturnType<typeof useNarrowedRequests>;
-
 /** A keystroke acts on the row in focus, and says which row to pick when none is. */
 const useInFocusKeystrokes = (properties: {
   readonly inFocus: WaitingRequest | undefined;
@@ -79,27 +77,6 @@ const useInFocusKeystrokes = (properties: {
   useKeystroke(KEY.approve, onTheRowInFocus(properties.approve));
   useKeystroke(KEY.decline, onTheRowInFocus(properties.decline));
 };
-
-function NoneShown(properties: {
-  readonly narrowed: Narrowed;
-  readonly focusAfterClear: RefObject<HTMLElement | null>;
-}) {
-  const { narrowed } = properties;
-  if (narrowed.search === "") {
-    return <ListState state={{ kind: "empty", words: EMPTY_LINES.requests, action: undefined }} />;
-  }
-  return (
-    <ListState
-      state={{
-        kind: "emptied",
-        words: `No results found for “${narrowed.search}”.`,
-        clearWords: CLEAR_WORDS.search,
-        onClear: narrowed.clear,
-        focusAfterClear: properties.focusAfterClear,
-      }}
-    />
-  );
-}
 
 function RequestsList(properties: {
   readonly headingId: string;
@@ -222,7 +199,18 @@ function RequestsList(properties: {
               onRowFocus={(request) => {
                 setInFocusId(request?.id);
               }}
-              empty={<NoneShown narrowed={narrowed} focusAfterClear={searchRef} />}
+              empty={
+                <NothingListed
+                  search={search}
+                  noneMatch={nothingMatches}
+                  onClear={narrowed.clear}
+                  searchRef={searchRef}
+                >
+                  <ListState
+                    state={{ kind: "empty", words: EMPTY_LINES.requests, action: undefined }}
+                  />
+                </NothingListed>
+              }
             />
           </RequestsActionsContext>
         </ListRead>

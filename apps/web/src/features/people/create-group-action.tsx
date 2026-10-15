@@ -35,7 +35,10 @@ export function CreateGroupAction(properties: {
   const created = useRef<string | undefined>(undefined);
   const ids = { field: useId() };
 
+  // The trigger and the keystroke open by one path, so nothing from the last open outlives its close.
   const show = () => {
+    created.current = undefined;
+    setRefused(undefined);
     setOpen(true);
   };
   useKeystroke(CREATE_KEYSTROKE, show);
@@ -65,10 +68,8 @@ export function CreateGroupAction(properties: {
     <Dialog
       open={open}
       onOpenChange={(opened) => {
-        setOpen(opened);
-        if (!opened) return;
-        created.current = undefined;
-        setRefused(undefined);
+        if (opened) show();
+        else setOpen(false);
       }}
     >
       <DialogTrigger asChild>
@@ -83,9 +84,14 @@ export function CreateGroupAction(properties: {
           fieldRef.current?.focus();
         }}
         onCloseAutoFocus={(event) => {
-          if (created.current === undefined) return;
+          const row =
+            created.current === undefined
+              ? null
+              : document.getElementById(groupButtonId(created.current));
+          // A row the search hides has no button, so Radix's own return to the trigger stands.
+          if (row === null) return;
           event.preventDefault();
-          document.getElementById(groupButtonId(created.current))?.focus();
+          row.focus();
         }}
       >
         <DialogHeader>

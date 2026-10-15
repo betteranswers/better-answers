@@ -58,28 +58,41 @@ const rowOf = (page: Page, name: string): Locator => requestRows(page).filter({ 
 const approveDialog = (page: Page, name: string) =>
   page.getByRole("dialog", { name: `Approve Request from ${name}` });
 
-/** The api refuses a decline only once another page decided it, and the read that follows hides the restore: the one call is answered here. */
-const decliningRefused = (page: Page) =>
-  page.route(
-    (url) => url.pathname.includes("members.declineRequest"),
-    async (route) => {
-      await route.fulfill({
-        json: [
-          {
-            error: {
-              message: "already-decided",
-              code: -32_009,
-              data: {
-                code: "CONFLICT",
-                httpStatus: 409,
-                refusal: { word: "already-decided", class: "conflict" },
-              },
-            },
-          },
-        ],
-      });
+/** A batch's address names its procedures, so a call is matched by its name alone. */
+const asks =
+  (procedure: string) =>
+  (url: URL): boolean =>
+    url.pathname.replace("/trpc/", "").split(",").includes(procedure);
+
+/** A refusal that leaves the request waiting on the api, unlike one that says it was decided. */
+const DECLINE_FORBIDDEN = {
+  error: {
+    message: "role-forbids",
+    code: -32_003,
+    data: {
+      code: "FORBIDDEN",
+      httpStatus: 403,
+      refusal: { word: "role-forbids", class: "forbidden" },
     },
-  );
+  },
+};
+
+/** Held until the returned call, so the row's leaving is seen before the api's answer lands. */
+const refusingTheDeclineOnRelease = async (page: Page): Promise<() => void> => {
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(asks("members.declineRequest"), async (route) => {
+    await released;
+    await route.fulfill({ json: [DECLINE_FORBIDDEN] });
+  });
+  return release;
+};
+
+/** Never answered, so only the undo can bring a row back: the read after a refusal would too. */
+const holdingTheRequestsRead = (page: Page) =>
+  page.route(asks("members.requests"), () => undefined);
 
 /** A role select is described by its role's meaning, so a pick shows in a description that changed. */
 const describedAfresh = async (select: Locator, pick: () => Promise<void>): Promise<void> => {
@@ -265,12 +278,16 @@ test.describe("the People page's Requests tab", () => {
   test("brings a request back when the api refuses its decline", async ({ page, request }) => {
     await anAdminAtRequests(page, request, "Nidd Weir", [{ displayName: "Priya Shah" }]);
     await openRequests(page);
-    await decliningRefused(page);
+    await expect(rowOf(page, "Priya Shah")).toHaveCount(1);
+    await holdingTheRequestsRead(page);
+    const refuse = await refusingTheDeclineOnRelease(page);
 
     await rowOf(page, "Priya Shah")
       .getByRole("button", { name: "Decline Request from Priya Shah" })
       .click();
+    await expect(rowOf(page, "Priya Shah"), "the row waited for the api").toHaveCount(0);
 
+    refuse();
     await saysARefusal(requestsRegion(page).getByRole("alert"));
     await expect(rowOf(page, "Priya Shah"), "the refused decline left the row gone").toHaveCount(1);
   });

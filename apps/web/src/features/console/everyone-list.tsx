@@ -7,6 +7,7 @@ import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { useLastRead } from "@/shared/last-read.ts";
+import { NothingListed } from "@/shared/list-pages.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
 import { RowSheetButton } from "@/shared/row-sheet.tsx";
@@ -14,7 +15,7 @@ import { Card } from "@/shared/ui/card.tsx";
 
 import { Pages, turnsOf, type PageTurns } from "./everyone-pages.tsx";
 import { useAsking } from "./everyone-search.tsx";
-import { NothingListed, ReadSaid } from "./list-parts.tsx";
+import { ReadSaid } from "./list-parts.tsx";
 import { EVERYONE_WORDS as WORDS } from "./list-words.ts";
 import { arrival, EVERYONE_PATH, type Arrival } from "./people-address.ts";
 import { usePeople, type ListedPerson } from "./people-api.ts";

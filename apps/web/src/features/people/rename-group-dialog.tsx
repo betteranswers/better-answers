@@ -21,22 +21,22 @@ export function RenameGroupDialog(properties: {
   const renameGroup = useRenameGroup();
   const formId = useId();
   const ids = { field: useId() };
-  // A refusal keeps the dialog open, so its line is the dialog's, where the reader is.
-  const [refused, setRefused] = useState<Outcome>();
+  // Every outcome but the one that closes it is the dialog's line, where the reader is.
+  const [line, setLine] = useState<Outcome>();
 
   // Never disabled: the button a reader pressed keeps focus while the answer comes back.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setRefused(undefined);
+    setLine(undefined);
     submitRename({
       group,
       form: event.currentTarget,
       renameGroup,
-      say: (outcome) => {
-        setRefused(outcome.tone === "refused" ? outcome : undefined);
+      say: setLine,
+      sent: (outcome) => {
         properties.onRenamed(outcome);
+        properties.onClose();
       },
-      sent: properties.onClose,
     });
   };
 
@@ -52,7 +52,7 @@ export function RenameGroupDialog(properties: {
         </Button>
       }
     >
-      <OutcomeLine outcome={refused} className="text-sm" />
+      <OutcomeLine outcome={line} className="text-sm" />
       <form id={formId} onSubmit={submit} className="grid gap-2">
         <Label htmlFor={ids.field}>Name</Label>
         <Input id={ids.field} name="name" defaultValue={group.name} required autoComplete="off" />

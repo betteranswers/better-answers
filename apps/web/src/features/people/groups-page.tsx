@@ -1,10 +1,10 @@
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
-import { useId, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useId, useMemo, useRef, useState } from "react";
 
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
-import { ListRead, ListState } from "@/shared/list-pages.tsx";
+import { ListRead, ListState, NothingListed } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
@@ -13,7 +13,7 @@ import { RowSheetButton } from "@/shared/row-sheet.tsx";
 import { useSearchedList } from "@/shared/searched-list.ts";
 import { Card } from "@/shared/ui/card.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { CLEAR_WORDS, counted } from "@/shared/words.ts";
+import { counted, nothingMatches } from "@/shared/words.ts";
 
 import { CreateGroupAction } from "./create-group-action.tsx";
 import { DeleteGroupDialog } from "./delete-group-dialog.tsx";
@@ -69,21 +69,24 @@ const column = createColumnHelper<typeof features, GroupRow>();
 type GroupActions = {
   readonly open: (groupId: string) => void;
   readonly focusedOn: (groupId: string) => void;
-  /** The group just created: its button takes focus as it arrives. */
+  /** The group just created: its button takes focus as its row arrives, once. */
   readonly landOn: string | undefined;
+  readonly landed: (button: HTMLButtonElement | null) => void;
 };
 
-const focusOnArrival = (button: HTMLButtonElement | null) => {
-  button?.focus();
-};
+/** Read by each cell, so a change of what the page does leaves the columns, and their cells, standing. */
+const GroupActionsContext = createContext<GroupActions | undefined>(undefined);
 
-function GroupCell(properties: { readonly row: GroupRow; readonly actions: GroupActions }) {
-  const { row, actions } = properties;
-  if (row.group === undefined) return <span className="font-medium">{row.name}</span>;
+function GroupCell(properties: { readonly row: GroupRow }) {
+  const { row } = properties;
+  const actions = useContext(GroupActionsContext);
+  if (row.group === undefined || actions === undefined) {
+    return <span className="font-medium">{row.name}</span>;
+  }
   const groupId = row.group.id;
   return (
     <RowSheetButton
-      ref={groupId === actions.landOn ? focusOnArrival : undefined}
+      ref={groupId === actions.landOn ? actions.landed : undefined}
       id={groupButtonId(groupId)}
       onFocus={() => {
         actions.focusedOn(groupId);
@@ -97,18 +100,16 @@ function GroupCell(properties: { readonly row: GroupRow; readonly actions: Group
   );
 }
 
-/** The group's own cell opens it, so its actions ride into the columns. */
-const columnsFor = (actions: GroupActions) =>
-  column.columns([
-    column.accessor("name", {
-      header: "Group",
-      cell: ({ row }) => <GroupCell row={row.original} actions={actions} />,
-    }),
-    column.accessor("memberCount", {
-      header: "Members",
-      cell: ({ getValue }) => <Pill>{counted(getValue(), "member", "members")}</Pill>,
-    }),
-  ]);
+const COLUMNS = column.columns([
+  column.accessor("name", {
+    header: "Group",
+    cell: ({ row }) => <GroupCell row={row.original} />,
+  }),
+  column.accessor("memberCount", {
+    header: "Members",
+    cell: ({ getValue }) => <Pill>{counted(getValue(), "member", "members")}</Pill>,
+  }),
+]);
 
 const matching = (search: string) => {
   const sought = search.toLowerCase();
@@ -128,6 +129,12 @@ const saidOfCount = (shown: number, total: number, search: string): string =>
 
 type Opened = { readonly groupId: string; readonly at: GroupOpenedAt };
 
+/** Read once the groups are listed: sooner, it rides the request a switch's follow waits on. */
+function MembersRead() {
+  useMembers();
+  return null;
+}
+
 function GroupsList(properties: { readonly headingId: string }) {
   const read = useGroups();
   const pending = usePendingGroupNames();
@@ -142,34 +149,40 @@ function GroupsList(properties: { readonly headingId: string }) {
   const deleteGroup = useDeleteGroup();
   // Set before the deleted row leaves the cache, so nothing hands focus to it meanwhile.
   const closingOnADeletion = useRef(false);
-  // Read with the list, so a sheet opened on its members has boxes to land focus on.
-  useMembers();
 
   const rows = useMemo(() => rowsOf(read.data ?? [], pending), [read.data, pending]);
   const narrowed = useNarrowedGroups(rows);
   const { search, data } = narrowed;
 
-  const columns = useMemo(
-    () =>
-      columnsFor({
-        open: (groupId) => {
-          setOpened({ groupId, at: "group" });
-        },
-        focusedOn: setInFocus,
-        landOn,
-      }),
-    [landOn],
-  );
+  const actions: GroupActions = {
+    open: (groupId) => {
+      setOpened({ groupId, at: "group" });
+    },
+    focusedOn: setInFocus,
+    landOn,
+    // Cleared as the button takes focus, so the row's later remounts under a search take none.
+    landed: (button) => {
+      if (button === null) return;
+      button.focus();
+      setLandOn(undefined);
+    },
+  };
 
   const table = useTable({
     features,
-    columns,
+    columns: COLUMNS,
     data,
     getRowId: (row) => row.key,
   });
 
   const groupOf = (groupId: string | undefined) =>
     (read.data ?? []).find((group) => group.id === groupId);
+
+  /** A row the search hides, or that another Admin deleted meanwhile, has nothing to land on. */
+  const landOnOrHeading = (elementId: string | undefined) => {
+    const target = elementId === undefined ? null : document.getElementById(elementId);
+    (target ?? heading.current)?.focus();
+  };
 
   /** A letter pressed outside the list still needs a group, so the one last in focus stands. */
   const openInFocus = (at: GroupOpenedAt) => {
@@ -265,31 +278,29 @@ function GroupsList(properties: { readonly headingId: string }) {
           failed={(failure) => outcomeOfGroupFailure(failure, "read").words}
           focusAfterRetry={searchRef}
         >
-          <GridTable
-            table={table}
-            caption="Groups in this workspace."
-            rowMenu={rowMenuOf}
-            onRowFocus={(row) => {
-              setInFocus(row?.group?.id);
-            }}
-            empty={
-              search === "" ? (
-                <ListState
-                  state={{ kind: "empty", words: EMPTY_LINES.groups, action: undefined }}
-                />
-              ) : (
-                <ListState
-                  state={{
-                    kind: "emptied",
-                    words: `No results found for “${search}”.`,
-                    clearWords: CLEAR_WORDS.search,
-                    onClear: narrowed.clear,
-                    focusAfterClear: searchRef,
-                  }}
-                />
-              )
-            }
-          />
+          <MembersRead />
+          <GroupActionsContext value={actions}>
+            <GridTable
+              table={table}
+              caption="Groups in this workspace."
+              rowMenu={rowMenuOf}
+              onRowFocus={(row) => {
+                setInFocus(row?.group?.id);
+              }}
+              empty={
+                <NothingListed
+                  search={search}
+                  noneMatch={nothingMatches}
+                  onClear={narrowed.clear}
+                  searchRef={searchRef}
+                >
+                  <ListState
+                    state={{ kind: "empty", words: EMPTY_LINES.groups, action: undefined }}
+                  />
+                </NothingListed>
+              }
+            />
+          </GroupActionsContext>
         </ListRead>
       </Card>
 
@@ -302,12 +313,9 @@ function GroupsList(properties: { readonly headingId: string }) {
             setOpened(undefined);
           }}
           returnFocus={() => {
-            const row = closingOnADeletion.current
-              ? null
-              : document.getElementById(groupButtonId(openedGroup.id));
+            const row = closingOnADeletion.current ? undefined : groupButtonId(openedGroup.id);
             closingOnADeletion.current = false;
-            // A group another Admin deleted meanwhile has no row either.
-            (row ?? heading.current)?.focus();
+            landOnOrHeading(row);
           }}
           onDelete={remove}
         />
@@ -321,7 +329,7 @@ function GroupsList(properties: { readonly headingId: string }) {
             setRenaming(undefined);
           }}
           onFocusBack={() => {
-            document.getElementById(groupMenuId(renaming.id))?.focus();
+            landOnOrHeading(groupMenuId(renaming.id));
           }}
         />
       )}
@@ -334,12 +342,9 @@ function GroupsList(properties: { readonly headingId: string }) {
             setDeleting(undefined);
           }}
           onFocusBack={() => {
-            if (closingOnADeletion.current) {
-              closingOnADeletion.current = false;
-              heading.current?.focus();
-              return;
-            }
-            document.getElementById(groupMenuId(deleting.id))?.focus();
+            const trigger = closingOnADeletion.current ? undefined : groupMenuId(deleting.id);
+            closingOnADeletion.current = false;
+            landOnOrHeading(trigger);
           }}
         />
       )}

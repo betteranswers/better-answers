@@ -7,6 +7,7 @@ import { useTRPC } from "@/shared/api/trpc.ts";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { usePageKeystrokes } from "@/shared/keystrokes.tsx";
+import { NothingListed } from "@/shared/list-pages.tsx";
 import { CONSOLE, menuGroupIn } from "@/shared/navigation.ts";
 import { ListHead, PageHead } from "@/shared/page-head.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -16,7 +17,7 @@ import { useHiddenColumns } from "@/shared/wide-layout.ts";
 import { counted, dayWords } from "@/shared/words.ts";
 
 import { Facts } from "./facts.tsx";
-import { countOf, NothingListed, ReadSaid, useNarrowedRows } from "./list-parts.tsx";
+import { countOf, ReadSaid, useNarrowedRows } from "./list-parts.tsx";
 import { WORKSPACES_WORDS as WORDS } from "./list-words.ts";
 import { WORKSPACES_KEYSTROKES } from "./people-keystrokes.ts";
 

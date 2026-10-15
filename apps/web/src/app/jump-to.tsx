@@ -26,9 +26,9 @@ import {
   CommandList,
 } from "@/shared/ui/command.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui/dialog.tsx";
-import { nameOrAddress } from "@/shared/words.ts";
+import { nameOrAddress, nothingMatches } from "@/shared/words.ts";
 
-import { findWhat, JUMP_TO, nothingMatches, searchFor } from "./words.ts";
+import { findWhat, JUMP_TO, searchFor } from "./words.ts";
 
 /** The search row's value, constant so the row keeps the selection while more is typed. */
 const SEARCH_ROW = "search";

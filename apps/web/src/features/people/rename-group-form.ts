@@ -15,8 +15,10 @@ export const submitRename = (properties: {
   readonly group: ListedGroup;
   readonly form: HTMLFormElement;
   readonly renameGroup: ReturnType<typeof useRenameGroup>;
+  /** Hears each outcome that leaves the form where it is. */
   readonly say: (outcome: Outcome) => void;
-  readonly sent?: (() => void) | undefined;
+  /** Hears a rename that went, in `say`'s place, where the form closes on it. */
+  readonly sent?: ((outcome: Outcome) => void) | undefined;
 }): void => {
   const { group } = properties;
   const name = nameOfGroupForm(properties.form);
@@ -28,8 +30,7 @@ export const submitRename = (properties: {
   }
   void properties.renameGroup.mutateAsync({ groupId: group.id, name }).then(
     () => {
-      properties.say({ tone: "said", words: GROUP_WORDS.renamed(was, name) });
-      properties.sent?.();
+      (properties.sent ?? properties.say)({ tone: "said", words: GROUP_WORDS.renamed(was, name) });
     },
     (failure: Error) => {
       properties.say(outcomeOfGroupFailure(failure, "action"));

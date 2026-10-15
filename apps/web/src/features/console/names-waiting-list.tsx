@@ -5,6 +5,7 @@ import { useId, useMemo, useRef, useState } from "react";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { NothingListed } from "@/shared/list-pages.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { ListHead } from "@/shared/page-head.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -12,7 +13,7 @@ import { Card } from "@/shared/ui/card.tsx";
 
 import { CorrectNameDialog } from "./correct-name-dialog.tsx";
 import { correctWords } from "./correcting-words.ts";
-import { countOf, NothingListed, ReadSaid, useNarrowedRows } from "./list-parts.tsx";
+import { countOf, ReadSaid, useNarrowedRows } from "./list-parts.tsx";
 import { NAMES_WAITING_WORDS as WORDS } from "./list-words.ts";
 import { arrival, EVERYONE_PATH, NAMES_WAITING_PATH } from "./people-address.ts";
 import { useNamesWaiting, type NameWaiting } from "./people-api.ts";
